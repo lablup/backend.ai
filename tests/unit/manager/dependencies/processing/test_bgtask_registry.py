@@ -2,8 +2,6 @@ from __future__ import annotations
 
 from unittest.mock import MagicMock, patch
 
-import pytest
-
 from ai.backend.manager.dependencies.processing.bgtask_registry import (
     BgtaskRegistryDependency,
     BgtaskRegistryInput,
@@ -13,7 +11,6 @@ from ai.backend.manager.dependencies.processing.bgtask_registry import (
 class TestBgtaskRegistryDependency:
     """Test BgtaskRegistryDependency lifecycle."""
 
-    @pytest.mark.asyncio
     @patch("ai.backend.manager.dependencies.processing.bgtask_registry.CommitSessionHandler")
     @patch("ai.backend.manager.dependencies.processing.bgtask_registry.RescanGPUAllocMapsHandler")
     @patch("ai.backend.manager.dependencies.processing.bgtask_registry.PurgeImagesHandler")

@@ -231,7 +231,6 @@ class TestResourceUsageHistoryRepository:
 
     # ==================== Kernel Usage Record Tests ====================
 
-    @pytest.mark.asyncio
     async def test_create_kernel_usage_record(
         self,
         resource_usage_history_repository: ResourceUsageHistoryRepository,
@@ -267,7 +266,6 @@ class TestResourceUsageHistoryRepository:
         assert result.project_id == test_project_id
         assert result.resource_usage["cpu"] == Decimal("300")
 
-    @pytest.mark.asyncio
     async def test_bulk_create_kernel_usage_records(
         self,
         resource_usage_history_repository: ResourceUsageHistoryRepository,
@@ -310,7 +308,6 @@ class TestResourceUsageHistoryRepository:
             assert result.resource_group == test_scaling_group
             assert result.domain_name == test_domain_name
 
-    @pytest.mark.asyncio
     async def test_search_kernel_usage_records(
         self,
         resource_usage_history_repository: ResourceUsageHistoryRepository,
@@ -361,7 +358,6 @@ class TestResourceUsageHistoryRepository:
 
     # ==================== Domain Usage Bucket Tests ====================
 
-    @pytest.mark.asyncio
     async def test_create_domain_usage_bucket(
         self,
         resource_usage_history_repository: ResourceUsageHistoryRepository,
@@ -396,7 +392,6 @@ class TestResourceUsageHistoryRepository:
         assert result.period_start == today
         assert result.resource_usage["cpu"] == Decimal("86400")
 
-    @pytest.mark.asyncio
     async def test_upsert_domain_usage_bucket_insert(
         self,
         resource_usage_history_repository: ResourceUsageHistoryRepository,
@@ -423,7 +418,6 @@ class TestResourceUsageHistoryRepository:
         assert result.domain_name == test_domain_name
         assert result.resource_usage["cpu"] == Decimal("3600")
 
-    @pytest.mark.asyncio
     async def test_upsert_domain_usage_bucket_update(
         self,
         resource_usage_history_repository: ResourceUsageHistoryRepository,
@@ -463,7 +457,6 @@ class TestResourceUsageHistoryRepository:
 
         assert result.resource_usage["cpu"] == Decimal("7200")
 
-    @pytest.mark.asyncio
     async def test_search_domain_usage_buckets(
         self,
         resource_usage_history_repository: ResourceUsageHistoryRepository,
@@ -507,7 +500,6 @@ class TestResourceUsageHistoryRepository:
 
     # ==================== User Usage Bucket Tests ====================
 
-    @pytest.mark.asyncio
     async def test_create_user_usage_bucket(
         self,
         resource_usage_history_repository: ResourceUsageHistoryRepository,
@@ -539,7 +531,6 @@ class TestResourceUsageHistoryRepository:
         assert result.project_id == test_project_id
         assert result.resource_usage["cpu"] == Decimal("3600")
 
-    @pytest.mark.asyncio
     async def test_upsert_user_usage_bucket(
         self,
         resource_usage_history_repository: ResourceUsageHistoryRepository,
@@ -572,7 +563,6 @@ class TestResourceUsageHistoryRepository:
 
     # ==================== Project Usage Bucket Tests ====================
 
-    @pytest.mark.asyncio
     async def test_create_project_usage_bucket(
         self,
         resource_usage_history_repository: ResourceUsageHistoryRepository,
@@ -603,7 +593,6 @@ class TestResourceUsageHistoryRepository:
 
     # ==================== Aggregation Tests ====================
 
-    @pytest.mark.asyncio
     async def test_get_aggregated_usage_by_user(
         self,
         resource_usage_history_repository: ResourceUsageHistoryRepository,
@@ -659,7 +648,6 @@ class TestResourceUsageHistoryRepository:
         assert key in results
         assert results[key]["cpu"] == Decimal("10800")  # 3600 * 3
 
-    @pytest.mark.asyncio
     async def test_get_aggregated_usage_by_user_empty(
         self,
         resource_usage_history_repository: ResourceUsageHistoryRepository,
@@ -678,7 +666,6 @@ class TestResourceUsageHistoryRepository:
 
         assert len(results) == 0
 
-    @pytest.mark.asyncio
     async def test_get_aggregated_usage_by_project(
         self,
         resource_usage_history_repository: ResourceUsageHistoryRepository,
@@ -731,7 +718,6 @@ class TestResourceUsageHistoryRepository:
         assert test_project_id in results
         assert results[test_project_id]["cpu"] == Decimal("14400")  # 7200 * 2
 
-    @pytest.mark.asyncio
     async def test_get_aggregated_usage_by_domain(
         self,
         resource_usage_history_repository: ResourceUsageHistoryRepository,

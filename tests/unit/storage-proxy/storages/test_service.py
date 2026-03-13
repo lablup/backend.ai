@@ -69,7 +69,6 @@ _TEST_KEY = "test-key"
 _PRESIGNED_TEST_KEY = "presigned-test-key"
 
 
-@pytest.mark.asyncio
 async def test_stream_upload_success(
     s3_client: object, storages_service: ObjectStorageService
 ) -> None:
@@ -85,7 +84,6 @@ async def test_stream_upload_success(
     )
 
 
-@pytest.mark.asyncio
 async def test_stream_upload_invalid_storage(storages_service: ObjectStorageService) -> None:
     """Test stream upload with invalid storage name"""
 
@@ -98,7 +96,6 @@ async def test_stream_upload_invalid_storage(storages_service: ObjectStorageServ
         )
 
 
-@pytest.mark.asyncio
 async def test_stream_upload_invalid_bucket(storages_service: ObjectStorageService) -> None:
     """Test stream upload with invalid bucket name"""
 
@@ -113,7 +110,6 @@ async def test_stream_upload_invalid_bucket(storages_service: ObjectStorageServi
         )
 
 
-@pytest.mark.asyncio
 async def test_stream_download_success(
     s3_client: object, storages_service: ObjectStorageService
 ) -> None:
@@ -140,7 +136,6 @@ async def test_stream_download_success(
     assert b"test chunk 2" in combined_data
 
 
-@pytest.mark.asyncio
 async def test_stream_download_nonexistent_file(
     s3_client: object, storages_service: ObjectStorageService
 ) -> None:
@@ -153,7 +148,6 @@ async def test_stream_download_nonexistent_file(
             pass
 
 
-@pytest.mark.asyncio
 async def test_get_object_info_success(
     s3_client: object, storages_service: ObjectStorageService
 ) -> None:
@@ -176,7 +170,6 @@ async def test_get_object_info_success(
     assert result.last_modified is not None
 
 
-@pytest.mark.asyncio
 async def test_get_object_info_nonexistent_file(
     s3_client: object, storages_service: ObjectStorageService
 ) -> None:
@@ -187,21 +180,18 @@ async def test_get_object_info_nonexistent_file(
         )
 
 
-@pytest.mark.asyncio
 async def test_get_object_info_invalid_storage(storages_service: ObjectStorageService) -> None:
     """Test object info retrieval with invalid storage"""
     with pytest.raises(StorageNotFoundError):
         await storages_service.get_object_info("invalid_storage", _BUCKET_FIXTURE_NAME, _TEST_KEY)
 
 
-@pytest.mark.asyncio
 async def test_get_object_info_invalid_bucket(storages_service: ObjectStorageService) -> None:
     """Test object info retrieval with invalid bucket"""
     with pytest.raises(ObjectStorageBucketNotFoundError):
         await storages_service.get_object_info("test_storage", "invalid-bucket", _TEST_KEY)
 
 
-@pytest.mark.asyncio
 async def test_delete_object_success(
     s3_client: object, storages_service: ObjectStorageService
 ) -> None:
@@ -218,7 +208,6 @@ async def test_delete_object_success(
     await storages_service.delete_object("test_storage", _BUCKET_FIXTURE_NAME, _TEST_KEY)
 
 
-@pytest.mark.asyncio
 async def test_delete_object_nonexistent_file(
     s3_client: object, storages_service: ObjectStorageService
 ) -> None:
@@ -226,14 +215,12 @@ async def test_delete_object_nonexistent_file(
     await storages_service.delete_object("test_storage", _BUCKET_FIXTURE_NAME, "nonexistent-key")
 
 
-@pytest.mark.asyncio
 async def test_delete_object_invalid_storage(storages_service: ObjectStorageService) -> None:
     """Test object deletion with invalid storage"""
     with pytest.raises(StorageNotFoundError):
         await storages_service.delete_object("invalid_storage", _BUCKET_FIXTURE_NAME, _TEST_KEY)
 
 
-@pytest.mark.asyncio
 async def test_delete_object_invalid_bucket(storages_service: ObjectStorageService) -> None:
     """Test object deletion with invalid bucket"""
     with pytest.raises(ObjectStorageBucketNotFoundError):

@@ -29,7 +29,6 @@ class TestScopedQuery:
         info.context = ctx
         return info
 
-    @pytest.mark.asyncio
     async def test_project_param_preserved(self, mock_graphene_info: MagicMock) -> None:
         """Regression: project was silently overridden by group_id in scoped_query."""
         project_id = uuid.uuid4()

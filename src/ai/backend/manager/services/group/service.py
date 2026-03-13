@@ -40,6 +40,7 @@ from ai.backend.manager.services.group.actions.purge_group import (
 from ai.backend.manager.services.group.actions.search_projects import (
     GetProjectAction,
     GetProjectActionResult,
+    ScopedSearchProjectsActionResult,
     SearchProjectsAction,
     SearchProjectsActionResult,
     SearchProjectsByDomainAction,
@@ -77,7 +78,7 @@ class GroupService:
 
     async def create_group(self, action: CreateGroupAction) -> CreateGroupActionResult:
         group_data = await self._group_repository.create(action.creator)
-        return CreateGroupActionResult(data=group_data)
+        return CreateGroupActionResult(data=group_data, _domain_name=action._domain_name)
 
     async def modify_group(self, action: ModifyGroupAction) -> ModifyGroupActionResult:
         # Convert user_uuids from list[str] to list[UUID] if provided
@@ -179,7 +180,7 @@ class GroupService:
 
     async def search_projects_by_domain(
         self, action: SearchProjectsByDomainAction
-    ) -> SearchProjectsActionResult:
+    ) -> ScopedSearchProjectsActionResult:
         """Search projects within a domain.
 
         Scope validation (domain existence) is done in repository layer.
@@ -188,21 +189,23 @@ class GroupService:
             action: SearchProjectsByDomainAction with scope and querier.
 
         Returns:
-            SearchProjectsActionResult with domain-scoped items.
+            ScopedSearchProjectsActionResult with domain-scoped items.
         """
         result = await self._group_repository.search_projects_by_domain(
             action.scope, action.querier
         )
-        return SearchProjectsActionResult(
+        return ScopedSearchProjectsActionResult(
             items=result.items,
             total_count=result.total_count,
             has_next_page=result.has_next_page,
             has_previous_page=result.has_previous_page,
+            _scope_type=action.scope_type(),
+            _scope_id=action.scope_id(),
         )
 
     async def search_projects_by_user(
         self, action: SearchProjectsByUserAction
-    ) -> SearchProjectsActionResult:
+    ) -> ScopedSearchProjectsActionResult:
         """Search projects a user is member of.
 
         Filters by association_groups_users table.
@@ -211,14 +214,16 @@ class GroupService:
             action: SearchProjectsByUserAction with scope and querier.
 
         Returns:
-            SearchProjectsActionResult with user's projects.
+            ScopedSearchProjectsActionResult with user's projects.
         """
         result = await self._group_repository.search_projects_by_user(action.scope, action.querier)
-        return SearchProjectsActionResult(
+        return ScopedSearchProjectsActionResult(
             items=result.items,
             total_count=result.total_count,
             has_next_page=result.has_next_page,
             has_previous_page=result.has_previous_page,
+            _scope_type=action.scope_type(),
+            _scope_id=action.scope_id(),
         )
 
     async def get_project(self, action: GetProjectAction) -> GetProjectActionResult:

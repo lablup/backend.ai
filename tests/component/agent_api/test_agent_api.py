@@ -8,6 +8,8 @@ implemented on the server side.
 
 from __future__ import annotations
 
+import secrets
+
 import pytest
 
 from ai.backend.client.v2.exceptions import PermissionDeniedError
@@ -29,7 +31,6 @@ from ai.backend.common.dto.manager.query import StringFilter
 class TestSearchAgents:
     """Tests for ``AgentClient.search_agents``."""
 
-    @pytest.mark.asyncio
     async def test_admin_searches_agents(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -44,7 +45,6 @@ class TestSearchAgents:
         assert agent_fixture in agent_ids
         assert result.pagination.total >= 1
 
-    @pytest.mark.asyncio
     async def test_admin_searches_agents_with_status_filter_alive(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -62,7 +62,6 @@ class TestSearchAgents:
         agent_ids = [item.id for item in result.items]
         assert agent_fixture in agent_ids
 
-    @pytest.mark.asyncio
     async def test_admin_searches_agents_with_status_filter_terminated(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -80,7 +79,6 @@ class TestSearchAgents:
         agent_ids = [item.id for item in result.items]
         assert agent_fixture not in agent_ids
 
-    @pytest.mark.asyncio
     async def test_admin_searches_agents_with_resource_group_filter(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -101,7 +99,6 @@ class TestSearchAgents:
         for item in result.items:
             assert item.resource_group == scaling_group_fixture
 
-    @pytest.mark.asyncio
     async def test_admin_searches_agents_with_ordering(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -122,7 +119,6 @@ class TestSearchAgents:
         ids = [item.id for item in result.items]
         assert ids == sorted(ids)
 
-    @pytest.mark.asyncio
     async def test_admin_searches_agents_with_pagination(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -138,7 +134,51 @@ class TestSearchAgents:
         assert result.pagination.offset == 0
         assert result.pagination.limit == 1
 
-    @pytest.mark.asyncio
+    async def test_compound_filters_status_and_resource_group(
+        self,
+        admin_registry: BackendAIClientRegistry,
+        agent_fixture: str,
+        scaling_group_fixture: str,
+    ) -> None:
+        """Compound filters (status + resource_group) return intersection of conditions."""
+        # Search with both status=ALIVE and resource_group filters
+        result = await admin_registry.agent.search_agents(
+            SearchAgentsRequest(
+                filter=AgentFilter(
+                    status=AgentStatusEnumFilter(equals=AgentStatusEnum.ALIVE),
+                    resource_group=StringFilter(equals=scaling_group_fixture),
+                ),
+            ),
+        )
+
+        # All results should match both filters
+        for item in result.items:
+            assert item.status == AgentStatusEnum.ALIVE
+            assert item.resource_group == scaling_group_fixture
+
+        # Our fixture agent should be in the results
+        agent_ids = [item.id for item in result.items]
+        assert agent_fixture in agent_ids
+
+    async def test_empty_result_nonexistent_resource_group(
+        self,
+        admin_registry: BackendAIClientRegistry,
+    ) -> None:
+        """Empty result returns total=0 and empty items."""
+        # Search for a non-existent resource group
+        nonexistent_rg = f"nonexistent-rg-{secrets.token_hex(8)}"
+
+        result = await admin_registry.agent.search_agents(
+            SearchAgentsRequest(
+                filter=AgentFilter(
+                    resource_group=StringFilter(equals=nonexistent_rg),
+                ),
+            ),
+        )
+
+        assert result.pagination.total == 0
+        assert len(result.items) == 0
+
     async def test_regular_user_cannot_search_agents(
         self,
         user_registry: BackendAIClientRegistry,

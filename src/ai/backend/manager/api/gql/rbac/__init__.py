@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from .resolver import (
     admin_assign_role,
+    admin_bulk_assign_role,
+    admin_bulk_revoke_role,
     admin_create_permission,
     admin_create_role,
     admin_delete_permission,
@@ -13,10 +15,17 @@ from .resolver import (
     admin_role,
     admin_role_assignments,
     admin_roles,
+    admin_update_permission,
     admin_update_role,
+    my_roles,
+    rbac_scope_entity_combinations,
 )
 from .types import (
     AssignRoleInput,
+    BulkAssignRoleInputGQL,
+    BulkAssignRolePayloadGQL,
+    BulkRevokeRoleInputGQL,
+    BulkRevokeRolePayloadGQL,
     CreatePermissionInput,
     CreateRoleInput,
     EntityConnection,
@@ -39,6 +48,8 @@ from .types import (
     RoleOrderBy,
     RoleSourceGQL,
     RoleStatusGQL,
+    ScopeEntityCombinationGQL,
+    UpdatePermissionInput,
     UpdateRoleInput,
 )
 
@@ -53,6 +64,7 @@ __all__ = (
     "PermissionGQL",
     "RoleAssignmentGQL",
     "EntityRefGQL",
+    "ScopeEntityCombinationGQL",
     # Filters
     "RoleFilter",
     "PermissionFilter",
@@ -66,8 +78,14 @@ __all__ = (
     "CreateRoleInput",
     "UpdateRoleInput",
     "CreatePermissionInput",
+    "UpdatePermissionInput",
     "AssignRoleInput",
     "RevokeRoleInput",
+    "BulkAssignRoleInputGQL",
+    "BulkRevokeRoleInputGQL",
+    # Payloads
+    "BulkAssignRolePayloadGQL",
+    "BulkRevokeRolePayloadGQL",
     # Connections
     "RoleConnection",
     "PermissionConnection",
@@ -79,13 +97,18 @@ __all__ = (
     "admin_permissions",
     "admin_role_assignments",
     "admin_entities",
+    "my_roles",
+    "rbac_scope_entity_combinations",
     # Mutation resolvers
     "admin_create_role",
     "admin_update_role",
     "admin_delete_role",
     "admin_purge_role",
     "admin_create_permission",
+    "admin_update_permission",
     "admin_delete_permission",
     "admin_assign_role",
     "admin_revoke_role",
+    "admin_bulk_assign_role",
+    "admin_bulk_revoke_role",
 )

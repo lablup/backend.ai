@@ -5,7 +5,6 @@ from collections.abc import Sequence
 
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.deployment.types import (
-    DeploymentInfo,
     DeploymentLifecycleStatus,
     DeploymentStatusTransitions,
 )
@@ -16,6 +15,7 @@ from ai.backend.manager.sokovan.deployment.executor import DeploymentExecutor
 from ai.backend.manager.sokovan.deployment.types import (
     DeploymentExecutionResult,
     DeploymentLifecycleType,
+    DeploymentWithHistory,
 )
 
 from .base import DeploymentHandler
@@ -48,23 +48,27 @@ class ReconcileDeploymentHandler(DeploymentHandler):
         return None
 
     @classmethod
-    def target_statuses(cls) -> list[EndpointLifecycle]:
+    def target_statuses(cls) -> list[DeploymentLifecycleStatus]:
         """Get the target deployment statuses for this handler."""
-        return [EndpointLifecycle.READY]
+        return [DeploymentLifecycleStatus(lifecycle=EndpointLifecycle.READY)]
 
     @classmethod
     def status_transitions(cls) -> DeploymentStatusTransitions:
         """Define state transitions for reconcile deployment handler (BEP-1030).
 
         - success: None (stays READY)
-        - failure: Deployment → SCALING (replica-route mismatch needs re-scaling)
+        - need_retry, expired, give_up: Deployment → SCALING (replica-route mismatch needs re-scaling)
         """
         return DeploymentStatusTransitions(
             success=None,
-            failure=DeploymentLifecycleStatus(lifecycle=EndpointLifecycle.SCALING),
+            need_retry=DeploymentLifecycleStatus(lifecycle=EndpointLifecycle.SCALING),
+            expired=DeploymentLifecycleStatus(lifecycle=EndpointLifecycle.SCALING),
+            give_up=DeploymentLifecycleStatus(lifecycle=EndpointLifecycle.SCALING),
         )
 
-    async def execute(self, deployments: Sequence[DeploymentInfo]) -> DeploymentExecutionResult:
+    async def execute(
+        self, deployments: Sequence[DeploymentWithHistory]
+    ) -> DeploymentExecutionResult:
         """Check ready deployments."""
         log.debug("Checking ready deployments for replica-route mismatches")
 

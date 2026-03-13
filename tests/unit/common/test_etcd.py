@@ -2,14 +2,12 @@ from __future__ import annotations
 
 import asyncio
 
-import pytest
 from etcd_client import CondVar, WatchEventType
 
 from ai.backend.common.etcd import AsyncEtcd, ConfigScopes
 from ai.backend.common.types import QueueSentinel
 
 
-@pytest.mark.asyncio
 async def test_basic_crud(etcd: AsyncEtcd) -> None:
     await etcd.put("wow", "abc")
 
@@ -34,7 +32,6 @@ async def test_basic_crud(etcd: AsyncEtcd) -> None:
     assert len(vp) == 0
 
 
-@pytest.mark.asyncio
 async def test_quote_for_put_prefix(etcd: AsyncEtcd) -> None:
     await etcd.put_prefix(
         "data",
@@ -63,7 +60,6 @@ async def test_quote_for_put_prefix(etcd: AsyncEtcd) -> None:
     assert v == "oops"
 
 
-@pytest.mark.asyncio
 async def test_unquote_for_get_prefix(etcd: AsyncEtcd) -> None:
     await etcd.put("obj/aa%3Abb/option1", "value1")
     await etcd.put("obj/aa%3Abb/option2", "value2")
@@ -91,7 +87,6 @@ async def test_unquote_for_get_prefix(etcd: AsyncEtcd) -> None:
     assert dict(v) == {"": "wow"}
 
 
-@pytest.mark.asyncio
 async def test_scope_empty_prefix(gateway_etcd: AsyncEtcd) -> None:
     # This test case is to ensure compatibility with the legacy managers.
     # gateway_etcd is created with a scope prefix map that contains
@@ -121,7 +116,6 @@ async def test_scope_empty_prefix(gateway_etcd: AsyncEtcd) -> None:
     assert len(vp) == 0
 
 
-@pytest.mark.asyncio
 async def test_scope(etcd: AsyncEtcd) -> None:
     await etcd.put("wow", "abc", scope=ConfigScopes.GLOBAL)
     await etcd.put("wow", "def", scope=ConfigScopes.SGROUP)
@@ -146,7 +140,6 @@ async def test_scope(etcd: AsyncEtcd) -> None:
     assert v == "000"
 
 
-@pytest.mark.asyncio
 async def test_scope_dict(etcd: AsyncEtcd) -> None:
     await etcd.put_dict({"point/x": "1", "point/y": "2"}, scope=ConfigScopes.GLOBAL)
     await etcd.put_dict({"point/y": "3"}, scope=ConfigScopes.SGROUP)
@@ -171,7 +164,6 @@ async def test_scope_dict(etcd: AsyncEtcd) -> None:
     assert len(vp) == 0
 
 
-@pytest.mark.asyncio
 async def test_multi(etcd: AsyncEtcd) -> None:
     v = await etcd.get("foo")
     assert v is None
@@ -191,7 +183,6 @@ async def test_multi(etcd: AsyncEtcd) -> None:
     assert v is None
 
 
-@pytest.mark.asyncio
 async def test_watch(etcd: AsyncEtcd) -> None:
     records = []
     records_prefix = []
@@ -252,7 +243,6 @@ async def test_watch(etcd: AsyncEtcd) -> None:
     assert records_prefix[3].value == ""
 
 
-@pytest.mark.asyncio
 async def test_watch_once(etcd: AsyncEtcd) -> None:
     records = []
     records_prefix = []

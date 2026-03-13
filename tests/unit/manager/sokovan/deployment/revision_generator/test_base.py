@@ -203,7 +203,6 @@ class TestLoadServiceDefinition:
         ],
         ids=lambda tc: tc.id,
     )
-    @pytest.mark.asyncio
     async def test_load_service_definition(
         self,
         test_case: _LoadServiceDefinitionTestCase,
@@ -231,7 +230,6 @@ class TestLoadServiceDefinition:
         assert result.resource_slots == test_case.expected.resource_slots
         assert result.environ == test_case.expected.environ
 
-    @pytest.mark.asyncio
     async def test_no_service_definition(
         self,
         base_generator: BaseRevisionGenerator,
@@ -746,7 +744,6 @@ class TestCompleteOverridePipeline:
         ],
         ids=lambda tc: tc.id,
     )
-    @pytest.mark.asyncio
     async def test_complete_pipeline(
         self,
         test_case: _CompletePipelineTestCase,
@@ -817,7 +814,6 @@ class TestDefinitionFileRequirement:
     def custom_generator(self, mock_deployment_repository: MagicMock) -> CustomRevisionGenerator:
         return CustomRevisionGenerator(mock_deployment_repository)
 
-    @pytest.mark.asyncio
     @pytest.mark.parametrize(
         "runtime_variant",
         [
@@ -888,7 +884,6 @@ class TestDefinitionFileRequirement:
         # Then: Should have called fetch_service_definition (not fetch_model_definition)
         mock_deployment_repository.fetch_service_definition.assert_called_once_with(vfolder_id)
 
-    @pytest.mark.asyncio
     async def test_non_custom_variants_work_without_service_definition(
         self,
         base_generator: BaseRevisionGenerator,
@@ -937,7 +932,6 @@ class TestDefinitionFileRequirement:
         # Then: Should succeed using only API request values
         assert result is not None
 
-    @pytest.mark.asyncio
     async def test_custom_variant_requires_model_definition_success(
         self,
         custom_generator: CustomRevisionGenerator,
@@ -995,7 +989,6 @@ class TestDefinitionFileRequirement:
             model_definition_path=None,
         )
 
-    @pytest.mark.asyncio
     async def test_custom_variant_requires_model_definition_failure_not_found(
         self,
         custom_generator: CustomRevisionGenerator,
@@ -1049,7 +1042,6 @@ class TestDefinitionFileRequirement:
             model_definition_path=None,
         )
 
-    @pytest.mark.asyncio
     async def test_custom_variant_requires_valid_model_definition_schema(
         self,
         custom_generator: CustomRevisionGenerator,

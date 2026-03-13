@@ -334,7 +334,7 @@ class AccountManagerConfig(BaseSchema):
     group: Annotated[
         int,
         GroupID(default_gid=_file_perm.st_gid),
-        Field(default=_file_perm.st_uid, description="Process group."),
+        Field(default=_file_perm.st_gid, description="Process group."),
     ]
     ssl_enabled: Annotated[
         bool, Field(description="Use TLS to communicate. Default is false.", default=False)

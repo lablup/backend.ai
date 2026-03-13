@@ -2,10 +2,17 @@
 
 from __future__ import annotations
 
+import json
 from collections.abc import Mapping
 from dataclasses import dataclass, field
 from typing import Any, override
 
+import sqlalchemy as sa
+from sqlalchemy import cast, func
+from sqlalchemy.dialects.postgresql import JSONB
+from sqlalchemy.dialects.postgresql import array as pg_array
+
+from ai.backend.manager.data.scaling_group.types import PreemptionConfig as DataPreemptionConfig
 from ai.backend.manager.models.scaling_group import ScalingGroupOpts, ScalingGroupRow
 from ai.backend.manager.models.scaling_group.types import FairShareScalingGroupSpec
 from ai.backend.manager.repositories.base.updater import UpdaterSpec
@@ -119,6 +126,9 @@ class ScalingGroupSchedulerConfigUpdaterSpec(UpdaterSpec[ScalingGroupRow]):
     scheduler_opts: OptionalState[ScalingGroupOpts] = field(
         default_factory=OptionalState[ScalingGroupOpts].nop
     )
+    preemption_config: OptionalState[DataPreemptionConfig] = field(
+        default_factory=OptionalState[DataPreemptionConfig].nop
+    )
 
     @property
     @override
@@ -131,6 +141,17 @@ class ScalingGroupSchedulerConfigUpdaterSpec(UpdaterSpec[ScalingGroupRow]):
         self.scheduler.update_dict(to_update, "scheduler")
         if (scheduler_opts := self.scheduler_opts.optional_value()) is not None:
             to_update["scheduler_opts"] = scheduler_opts
+        if (preemption := self.preemption_config.optional_value()) is not None:
+            preemption_dict = {
+                "preemptible_priority": preemption.preemptible_priority,
+                "order": preemption.order.value,
+                "mode": preemption.mode.value,
+            }
+            to_update["scheduler_opts"] = func.jsonb_set(
+                sa.literal_column("scheduler_opts"),
+                pg_array(["preemption"]),
+                cast(json.dumps(preemption_dict), JSONB),
+            )
         return to_update
 
 

@@ -318,7 +318,6 @@ class TestUserRepository:
             group_id=sample_group_id,
         )
 
-    @pytest.mark.asyncio
     async def test_get_by_email_validated_success(
         self,
         user_repository: UserRepository,
@@ -332,7 +331,6 @@ class TestUserRepository:
         assert result.email == sample_user_email
         assert result.role == UserRole.USER
 
-    @pytest.mark.asyncio
     async def test_get_by_email_validated_not_found(
         self,
         user_repository: UserRepository,
@@ -341,7 +339,6 @@ class TestUserRepository:
         with pytest.raises(UserNotFound):
             await user_repository.get_by_email_validated("nonexistent@example.com")
 
-    @pytest.mark.asyncio
     async def test_create_user_validated_success(
         self,
         user_repository: UserRepository,
@@ -384,7 +381,6 @@ class TestUserRepository:
         assert result.keypair is not None
         assert result.keypair.access_key is not None
 
-    @pytest.mark.asyncio
     async def test_create_user_validated_domain_not_exists(
         self,
         user_repository: UserRepository,
@@ -415,7 +411,6 @@ class TestUserRepository:
         with pytest.raises(UserCreationBadRequest, match=r"Domain.*does not exist"):
             await user_repository.create_user_validated(creator, group_ids=[])
 
-    @pytest.mark.asyncio
     async def test_create_user_validated_duplicate_email(
         self,
         user_repository: UserRepository,
@@ -448,7 +443,6 @@ class TestUserRepository:
         with pytest.raises(UserConflict, match=r"User with email.*or username.*already exists"):
             await user_repository.create_user_validated(creator, group_ids=[])
 
-    @pytest.mark.asyncio
     async def test_create_user_validated_duplicate_username(
         self,
         user_repository: UserRepository,
@@ -650,7 +644,6 @@ class TestUserRepository:
             )
             assert group_assoc is not None
 
-    @pytest.mark.asyncio
     async def test_update_user_validated_success(
         self,
         user_repository: UserRepository,
@@ -673,7 +666,6 @@ class TestUserRepository:
         assert result.full_name == "Updated Name"
         assert result.description == "Updated Description"
 
-    @pytest.mark.asyncio
     async def test_create_user_validated_creates_group_association(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
@@ -696,7 +688,6 @@ class TestUserRepository:
             assert len(group_list) == 1
             assert str(group_list[0].group_id) == sample_group_id
 
-    @pytest.mark.asyncio
     async def test_update_user_role_preserves_group_associations(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
@@ -740,7 +731,6 @@ class TestUserRepository:
             )
             assert str(final_group_list[0].group_id) == sample_user_with_group.group_id
 
-    @pytest.mark.asyncio
     async def test_update_user_validated_not_found(
         self,
         user_repository: UserRepository,
@@ -757,7 +747,6 @@ class TestUserRepository:
                 updater=updater,
             )
 
-    @pytest.mark.asyncio
     async def test_soft_delete_user_validated_success(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
@@ -775,7 +764,6 @@ class TestUserRepository:
             assert result is not None
             assert result.status == UserStatus.DELETED
 
-    @pytest.mark.asyncio
     async def test_soft_delete_user_validated_nonexistent_user(
         self,
         user_repository: UserRepository,
@@ -785,7 +773,6 @@ class TestUserRepository:
         await user_repository.soft_delete_user_validated(email="nonexistent@example.com")
         # No exception should be raised
 
-    @pytest.mark.asyncio
     async def test_bulk_create_users_validated_success(
         self,
         user_repository: UserRepository,
@@ -828,7 +815,6 @@ class TestUserRepository:
             assert user_data.role == UserRole.USER
             assert user_data.status == UserStatus.ACTIVE
 
-    @pytest.mark.asyncio
     async def test_bulk_create_users_validated_partial_failure(
         self,
         user_repository: UserRepository,
@@ -875,7 +861,6 @@ class TestUserRepository:
         # Verify the failure has the correct index
         assert result.failures[0].index == 1
 
-    @pytest.mark.asyncio
     async def test_bulk_update_users_validated_success(
         self,
         user_repository: UserRepository,
@@ -932,7 +917,6 @@ class TestUserRepository:
             assert user_data.domain_name == sample_domain
             assert user_data.role == UserRole.USER
 
-    @pytest.mark.asyncio
     async def test_bulk_update_users_validated_partial_failure(
         self,
         user_repository: UserRepository,
@@ -997,7 +981,6 @@ class TestUserRepository:
         # Verify the failure has the correct index
         assert result.failures[0].index == 1
 
-    @pytest.mark.asyncio
     async def test_repository_has_expected_methods(
         self,
         user_repository: UserRepository,

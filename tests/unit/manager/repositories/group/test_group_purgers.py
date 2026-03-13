@@ -361,7 +361,6 @@ class TestGroupPurgersIntegration:
                 await session.refresh(routing)
         return sessions, routings
 
-    @pytest.mark.asyncio
     async def test_purge_group_sessions(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
@@ -386,7 +385,6 @@ class TestGroupPurgersIntegration:
             )
             assert count == 0
 
-    @pytest.mark.asyncio
     async def test_purge_group_kernels(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
@@ -411,7 +409,6 @@ class TestGroupPurgersIntegration:
             )
             assert count == 0
 
-    @pytest.mark.asyncio
     async def test_purge_group_endpoints(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
@@ -436,7 +433,6 @@ class TestGroupPurgersIntegration:
             )
             assert count == 0
 
-    @pytest.mark.asyncio
     async def test_purge_group_endpoint_sessions(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
@@ -476,7 +472,6 @@ class TestGroupPurgersIntegration:
             )
             assert count == 0
 
-    @pytest.mark.asyncio
     async def test_purge_group(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,

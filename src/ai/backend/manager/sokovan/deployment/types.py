@@ -5,7 +5,13 @@ from enum import StrEnum
 from typing import TYPE_CHECKING
 from uuid import UUID
 
-from ai.backend.manager.data.deployment.types import DeploymentInfo, RouteStatus
+from ai.backend.manager.data.deployment.types import (
+    DeploymentInfo,
+    RouteStatus,
+)
+from ai.backend.manager.data.deployment.types import (
+    DeploymentWithHistory as DeploymentWithHistory,
+)
 
 if TYPE_CHECKING:
     from ai.backend.manager.data.deployment.types import DeploymentInfoWithRoutes, RouteInfo
@@ -16,12 +22,13 @@ class DeploymentLifecycleType(StrEnum):
     CHECK_REPLICA = "check_replica"
     SCALING = "scaling"
     RECONCILE = "reconcile"
+    DEPLOYING = "deploying"
     DESTROYING = "destroying"
 
 
 @dataclass
 class DeploymentExecutionError:
-    deployment_info: DeploymentInfo
+    deployment_info: DeploymentWithHistory
     reason: str
     error_detail: str
     error_code: str | None = None
@@ -31,9 +38,9 @@ class DeploymentExecutionError:
 class DeploymentExecutionResult:
     """Result of a deployment execution operation."""
 
-    successes: list[DeploymentInfo] = field(default_factory=list)
+    successes: list[DeploymentWithHistory] = field(default_factory=list)
     errors: list[DeploymentExecutionError] = field(default_factory=list)
-    skipped: list[DeploymentInfo] = field(default_factory=list)
+    skipped: list[DeploymentWithHistory] = field(default_factory=list)
 
 
 @dataclass

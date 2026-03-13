@@ -281,7 +281,6 @@ class TestUpdateWithHistory:
 
         yield session_id
 
-    @pytest.mark.asyncio
     async def test_update_with_history_success(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
@@ -346,7 +345,6 @@ class TestUpdateWithHistory:
             assert history_record.to_status == str(to_status)
             assert history_record.message == "Preparation completed successfully"
 
-    @pytest.mark.asyncio
     async def test_update_with_history_failure(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
@@ -409,7 +407,6 @@ class TestUpdateWithHistory:
             assert history_record.result == str(SchedulingResult.FAILURE)
             assert history_record.error_code == "AGENT_LOST"
 
-    @pytest.mark.asyncio
     async def test_update_with_history_multiple_sessions(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
@@ -504,7 +501,6 @@ class TestUpdateWithHistory:
             history_records = history_result.scalars().all()
             assert len(history_records) == 3
 
-    @pytest.mark.asyncio
     async def test_update_with_history_no_matching_sessions(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
@@ -545,7 +541,6 @@ class TestUpdateWithHistory:
         # (This matches the current behavior where history is always created)
         assert updated_count == 0
 
-    @pytest.mark.asyncio
     async def test_update_with_history_empty_bulk_creator(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
@@ -592,7 +587,6 @@ class TestUpdateWithHistory:
             history_record = await db_sess.scalar(history_stmt)
             assert history_record is None
 
-    @pytest.mark.asyncio
     async def test_update_with_history_merge_same_phase_error_to_status(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
@@ -708,7 +702,6 @@ class TestUpdateWithHistory:
             assert len(records) == 1
             assert records[0].attempts == 3
 
-    @pytest.mark.asyncio
     async def test_update_with_history_no_merge_different_phase(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
@@ -774,7 +767,6 @@ class TestUpdateWithHistory:
             assert phases == {"schedule", "prepare"}
             assert all(r.attempts == 1 for r in records)
 
-    @pytest.mark.asyncio
     async def test_update_with_history_no_merge_different_error_code(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
@@ -839,7 +831,6 @@ class TestUpdateWithHistory:
             error_codes = {r.error_code for r in records}
             assert error_codes == {"ERROR_A", "ERROR_B"}
 
-    @pytest.mark.asyncio
     async def test_update_with_history_no_merge_different_to_status(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
@@ -904,7 +895,6 @@ class TestUpdateWithHistory:
             to_statuses = {r.to_status for r in records}
             assert to_statuses == {str(SessionStatus.PREPARING), str(SessionStatus.SCHEDULED)}
 
-    @pytest.mark.asyncio
     async def test_update_with_history_merge_multiple_sessions_batch(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,

@@ -34,7 +34,6 @@ class TestEtcdHealthChecker:
         ) as etcd:
             yield etcd
 
-    @pytest.mark.asyncio
     async def test_success(self, etcd_client: AsyncEtcd) -> None:
         """Test successful health check with real etcd connection."""
         checker = EtcdHealthChecker(
@@ -48,7 +47,6 @@ class TestEtcdHealthChecker:
         assert status.is_healthy
         assert status.error_message is None
 
-    @pytest.mark.asyncio
     async def test_timeout_property(self, etcd_client: AsyncEtcd) -> None:
         """Test that timeout property returns the correct value."""
         timeout_value = 3.5
@@ -59,7 +57,6 @@ class TestEtcdHealthChecker:
 
         assert checker.timeout == timeout_value
 
-    @pytest.mark.asyncio
     async def test_connection_error(self) -> None:
         """Test health check failure with unreachable etcd server."""
         # Create client pointing to non-existent server
@@ -83,7 +80,6 @@ class TestEtcdHealthChecker:
             assert not status.is_healthy
             assert status.error_message is not None
 
-    @pytest.mark.asyncio
     async def test_multiple_checks(self, etcd_client: AsyncEtcd) -> None:
         """Test that multiple health checks work correctly."""
         checker = EtcdHealthChecker(

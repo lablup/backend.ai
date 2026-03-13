@@ -38,11 +38,10 @@ class MonitoringDependency(NonMonitorableDependencyProvider[MonitoringInput, Res
     pass
 
 
-class ErrorMonitorDependency(MonitoringDependency[ManagerErrorPluginContext | None]):
+class ErrorMonitorDependency(MonitoringDependency[ManagerErrorPluginContext]):
     """Provides ManagerErrorPluginContext lifecycle management.
 
-    Tolerates initialization failures — yields None if init fails.
-    Injects error_log_repository directly, bypassing root_ctx lookup.
+    Injects error_log_repository directly.
     """
 
     @property
@@ -52,17 +51,12 @@ class ErrorMonitorDependency(MonitoringDependency[ManagerErrorPluginContext | No
     @asynccontextmanager
     async def provide(
         self, setup_input: MonitoringInput
-    ) -> AsyncIterator[ManagerErrorPluginContext | None]:
+    ) -> AsyncIterator[ManagerErrorPluginContext]:
         ctx = ManagerErrorPluginContext(setup_input.etcd, setup_input.local_config)
-        try:
-            await ctx.init(
-                context={"error_log_repository": setup_input.error_log_repository},
-                allowlist=setup_input.allowed_plugins,
-            )
-        except Exception:
-            log.error("Failed to initialize error monitor plugin")
-            yield None
-            return
+        await ctx.init(
+            context={"error_log_repository": setup_input.error_log_repository},
+            allowlist=setup_input.allowed_plugins,
+        )
         log.info(
             "ManagerErrorPluginContext initialized with plugins: {}",
             list(ctx.plugins.keys()),
@@ -73,10 +67,9 @@ class ErrorMonitorDependency(MonitoringDependency[ManagerErrorPluginContext | No
             await ctx.cleanup()
 
 
-class StatsMonitorDependency(MonitoringDependency[ManagerStatsPluginContext | None]):
+class StatsMonitorDependency(MonitoringDependency[ManagerStatsPluginContext]):
     """Provides ManagerStatsPluginContext lifecycle management.
 
-    Tolerates initialization failures — yields None if init fails.
     Does not use error_log_repository.
     """
 
@@ -87,16 +80,11 @@ class StatsMonitorDependency(MonitoringDependency[ManagerStatsPluginContext | No
     @asynccontextmanager
     async def provide(
         self, setup_input: MonitoringInput
-    ) -> AsyncIterator[ManagerStatsPluginContext | None]:
+    ) -> AsyncIterator[ManagerStatsPluginContext]:
         ctx = ManagerStatsPluginContext(setup_input.etcd, setup_input.local_config)
-        try:
-            await ctx.init(
-                allowlist=setup_input.allowed_plugins,
-            )
-        except Exception:
-            log.error("Failed to initialize stats monitor plugin")
-            yield None
-            return
+        await ctx.init(
+            allowlist=setup_input.allowed_plugins,
+        )
         log.info(
             "ManagerStatsPluginContext initialized with plugins: {}",
             list(ctx.plugins.keys()),

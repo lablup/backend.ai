@@ -76,6 +76,7 @@ async def admin_create_user_v2(
     Raises:
         NotImplementedError: This mutation is not yet implemented.
     """
+    check_admin_only()
     raise NotImplementedError("admin_create_user_v2 is not yet implemented")
 
 
@@ -183,6 +184,7 @@ async def admin_update_user_v2(
     Raises:
         NotImplementedError: This mutation is not yet implemented.
     """
+    check_admin_only()
     raise NotImplementedError("admin_update_user_v2 is not yet implemented")
 
 
@@ -314,6 +316,7 @@ async def admin_delete_user_v2(
     Raises:
         NotImplementedError: This mutation is not yet implemented.
     """
+    check_admin_only()
     raise NotImplementedError("admin_delete_user_v2 is not yet implemented")
 
 
@@ -340,6 +343,7 @@ async def admin_delete_users_v2(
     Raises:
         NotImplementedError: This mutation is not yet implemented.
     """
+    check_admin_only()
     raise NotImplementedError("admin_delete_users_v2 is not yet implemented")
 
 
@@ -369,6 +373,7 @@ async def admin_purge_user_v2(
     Raises:
         NotImplementedError: This mutation is not yet implemented.
     """
+    check_admin_only()
     raise NotImplementedError("admin_purge_user_v2 is not yet implemented")
 
 

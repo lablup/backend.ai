@@ -13,6 +13,11 @@ from ai.backend.manager.models.base import (
 
 
 class EntityFieldRow(Base):  # type: ignore[misc]
+    """Deprecated: No longer actively used. The field-scoped entity concept
+    (RBACFieldCreator/RBACFieldPurger) was removed by BEP-1048.
+    Kept only for the existing database table; will be dropped in a future migration.
+    """
+
     __tablename__ = "entity_fields"
     __table_args__ = (
         sa.UniqueConstraint(

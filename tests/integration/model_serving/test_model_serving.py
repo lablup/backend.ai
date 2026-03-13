@@ -35,7 +35,6 @@ class TestModelServingLifecycle:
     model VFolder. Skipped in environments without full infrastructure.
     """
 
-    @pytest.mark.asyncio
     async def test_list_and_search_empty(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -49,7 +48,6 @@ class TestModelServingLifecycle:
         assert isinstance(search_result, SearchServicesResponseModel)
         assert search_result.pagination.total >= 0
 
-    @pytest.mark.asyncio
     async def test_get_info_nonexistent_returns_error(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -57,7 +55,6 @@ class TestModelServingLifecycle:
         with pytest.raises(BackendAPIError):
             await admin_registry.model_serving.get_info(uuid.uuid4())
 
-    @pytest.mark.asyncio
     async def test_delete_nonexistent_returns_error(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -74,7 +71,6 @@ class TestModelServingTokens:
     error handling for nonexistent services.
     """
 
-    @pytest.mark.asyncio
     async def test_generate_token_nonexistent_returns_error(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -94,7 +90,6 @@ class TestModelServingErrors:
     verifies error handling for nonexistent services.
     """
 
-    @pytest.mark.asyncio
     async def test_list_errors_nonexistent_returns_error(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -102,7 +97,6 @@ class TestModelServingErrors:
         with pytest.raises(BackendAPIError):
             await admin_registry.model_serving.list_errors(uuid.uuid4())
 
-    @pytest.mark.asyncio
     async def test_clear_error_nonexistent_returns_error(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -119,7 +113,6 @@ class TestModelServingRoutes:
     This test verifies error handling for nonexistent services.
     """
 
-    @pytest.mark.asyncio
     async def test_update_route_nonexistent_returns_error(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -131,7 +124,6 @@ class TestModelServingRoutes:
                 UpdateRouteRequestModel(traffic_ratio=1.0),
             )
 
-    @pytest.mark.asyncio
     async def test_delete_route_nonexistent_returns_error(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -145,7 +137,6 @@ class TestModelServingRoutes:
 
 @pytest.mark.integration
 class TestModelServingRuntimes:
-    @pytest.mark.asyncio
     async def test_list_supported_runtimes(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -154,7 +145,6 @@ class TestModelServingRuntimes:
         assert isinstance(result, RuntimeInfoModel)
         assert len(result.runtimes) > 0
 
-    @pytest.mark.asyncio
     async def test_scale_nonexistent_returns_error(
         self,
         admin_registry: BackendAIClientRegistry,

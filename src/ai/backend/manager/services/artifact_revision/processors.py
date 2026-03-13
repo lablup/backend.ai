@@ -3,6 +3,7 @@ from typing import override
 from ai.backend.manager.actions.monitors.monitor import ActionMonitor
 from ai.backend.manager.actions.processor import ActionProcessor
 from ai.backend.manager.actions.types import AbstractProcessorPackage, ActionSpec
+from ai.backend.manager.actions.validators import ActionValidators
 from ai.backend.manager.services.artifact_revision.actions.approve import (
     ApproveArtifactRevisionAction,
     ApproveArtifactRevisionActionResult,
@@ -91,7 +92,10 @@ class ArtifactRevisionProcessors(AbstractProcessorPackage):
     ]
 
     def __init__(
-        self, service: ArtifactRevisionService, action_monitors: list[ActionMonitor]
+        self,
+        service: ArtifactRevisionService,
+        action_monitors: list[ActionMonitor],
+        validators: ActionValidators,
     ) -> None:
         self.get = ActionProcessor(service.get, action_monitors)
         self.get_readme = ActionProcessor(service.get_readme, action_monitors)

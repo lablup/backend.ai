@@ -11,6 +11,10 @@ from .logging import BraceStyleAdapter
 
 log = BraceStyleAdapter(logging.getLogger())
 
+AGENT_HOST_KEY_PATH = Path("/home/config/ssh/dropbear_rsa_host_key")
+# Legacy path where host key is generated inside container
+LEGACY_HOST_KEY_PATH = Path("/tmp/dropbear/dropbear_rsa_host_key")
+
 
 async def init_sshd_service(child_env: MutableMapping[str, str]) -> None:
     if Path("/tmp/dropbear").is_dir():
@@ -67,24 +71,28 @@ async def init_sshd_service(child_env: MutableMapping[str, str]) -> None:
                 auth_path.chmod(0o600)
         except OSError:
             log.warning("could not set the permission for /home/work/.ssh")
-    proc = await asyncio.create_subprocess_exec(
-        *[
-            "/opt/kernel/dropbearmulti",
-            "dropbearkey",
-            "-t",
-            "rsa",
-            "-s",
-            "2048",
-            "-f",
-            "/tmp/dropbear/dropbear_rsa_host_key",
-        ],
-        stdout=asyncio.subprocess.PIPE,
-        stderr=asyncio.subprocess.PIPE,
-        env=child_env,
-    )
-    stdout, stderr = await proc.communicate()
-    if proc.returncode != 0:
-        raise RuntimeError(f"sshd init error: {stderr.decode('utf8')}")
+    # Check if agent-generated host key exists (mounted read-only from agent)
+    # Generate host key only if agent-generated key is not present
+    agent_host_key_exists = AGENT_HOST_KEY_PATH.is_file()
+    if not agent_host_key_exists:
+        proc = await asyncio.create_subprocess_exec(
+            *[
+                "/opt/kernel/dropbearmulti",
+                "dropbearkey",
+                "-t",
+                "rsa",
+                "-s",
+                "2048",
+                "-f",
+                "/tmp/dropbear/dropbear_rsa_host_key",
+            ],
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+            env=child_env,
+        )
+        stdout, stderr = await proc.communicate()
+        if proc.returncode != 0:
+            raise RuntimeError(f"sshd init error: {stderr.decode('utf8')}")
 
     cluster_privkey_src_path = Path("/home/config/ssh/id_cluster")
     cluster_ssh_port_mapping_path = Path("/home/config/ssh/port-mapping.json")
@@ -141,11 +149,16 @@ async def init_sshd_service(child_env: MutableMapping[str, str]) -> None:
 
 
 async def prepare_sshd_service(service_info: Mapping[str, Any]) -> tuple[list[str], dict[str, str]]:
+    if AGENT_HOST_KEY_PATH.is_file():
+        host_key_path = str(AGENT_HOST_KEY_PATH)
+    else:
+        host_key_path = str(LEGACY_HOST_KEY_PATH)
+
     cmdargs = [
         "/opt/kernel/dropbearmulti",
         "dropbear",
         "-r",
-        "/tmp/dropbear/dropbear_rsa_host_key",
+        host_key_path,
         "-E",  # show logs in stderr
         "-F",  # run in foreground
         "-g",  # Disable password logins for root

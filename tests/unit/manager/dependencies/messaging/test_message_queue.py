@@ -57,7 +57,6 @@ def _make_mock_config(*, use_experimental: bool = False) -> MockConfig:
 class TestMessageQueueDependency:
     """Test MessageQueueDependency lifecycle."""
 
-    @pytest.mark.asyncio
     @patch("ai.backend.manager.dependencies.messaging.message_queue.RedisQueue")
     async def test_provide_redis_queue(self, mock_redis_queue_class: MagicMock) -> None:
         """Dependency should create RedisQueue when experimental flag is off."""
@@ -84,7 +83,6 @@ class TestMessageQueueDependency:
         # Queue should be closed after context exit
         mock_queue.close.assert_called_once()
 
-    @pytest.mark.asyncio
     @patch("ai.backend.manager.dependencies.messaging.message_queue.HiRedisQueue")
     async def test_provide_hiredis_queue(self, mock_hiredis_class: MagicMock) -> None:
         """Dependency should create HiRedisQueue when experimental flag is on."""
@@ -103,7 +101,6 @@ class TestMessageQueueDependency:
         # Queue should be closed after context exit
         mock_queue.close.assert_called_once()
 
-    @pytest.mark.asyncio
     @patch("ai.backend.manager.dependencies.messaging.message_queue.RedisQueue")
     async def test_cleanup_on_exception(self, mock_redis_queue_class: MagicMock) -> None:
         """Dependency should close queue even on exception."""

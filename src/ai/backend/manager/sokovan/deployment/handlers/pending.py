@@ -5,7 +5,6 @@ from collections.abc import Sequence
 
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.deployment.types import (
-    DeploymentInfo,
     DeploymentLifecycleStatus,
     DeploymentStatusTransitions,
 )
@@ -16,6 +15,7 @@ from ai.backend.manager.sokovan.deployment.executor import DeploymentExecutor
 from ai.backend.manager.sokovan.deployment.types import (
     DeploymentExecutionResult,
     DeploymentLifecycleType,
+    DeploymentWithHistory,
 )
 
 from .base import DeploymentHandler
@@ -45,23 +45,27 @@ class CheckPendingDeploymentHandler(DeploymentHandler):
         return LockID.LOCKID_DEPLOYMENT_CHECK_PENDING
 
     @classmethod
-    def target_statuses(cls) -> list[EndpointLifecycle]:
+    def target_statuses(cls) -> list[DeploymentLifecycleStatus]:
         """Get the target deployment statuses for this handler."""
-        return [EndpointLifecycle.PENDING, EndpointLifecycle.CREATED]
+        return [
+            DeploymentLifecycleStatus(lifecycle=EndpointLifecycle.PENDING),
+            DeploymentLifecycleStatus(lifecycle=EndpointLifecycle.CREATED),
+        ]
 
     @classmethod
     def status_transitions(cls) -> DeploymentStatusTransitions:
         """Define state transitions for check pending deployment handler (BEP-1030).
 
         - success: Deployment → SCALING
-        - failure: None (stays in current state)
+        - failure: None (stays in current state for all failure categories)
         """
         return DeploymentStatusTransitions(
             success=DeploymentLifecycleStatus(lifecycle=EndpointLifecycle.SCALING),
-            failure=None,
         )
 
-    async def execute(self, deployments: Sequence[DeploymentInfo]) -> DeploymentExecutionResult:
+    async def execute(
+        self, deployments: Sequence[DeploymentWithHistory]
+    ) -> DeploymentExecutionResult:
         """Check for pending deployments and process them."""
         log.debug("Checking for pending deployments")
 

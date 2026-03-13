@@ -108,7 +108,6 @@ class TestModelDefinitionGeneratorRegistry:
         for variant in RuntimeVariant:
             assert registry.get(variant) is not None
 
-    @pytest.mark.asyncio
     @pytest.mark.parametrize("variant", NON_CUSTOM_VARIANTS)
     async def test_generates_definition_without_override(
         self, mock_repo: MagicMock, variant: RuntimeVariant
@@ -128,7 +127,6 @@ class TestModelDefinitionGeneratorRegistry:
         assert model.service is not None
         assert model.service.port == expected.port
 
-    @pytest.mark.asyncio
     @pytest.mark.parametrize("enable_override", [True, False])
     async def test_custom_variant_always_fetches(
         self, mock_repo: MagicMock, enable_override: bool
@@ -155,7 +153,6 @@ class TestModelDefinitionGeneratorRegistry:
         mock_repo.fetch_model_definition.assert_called_once()
         assert result.models[0].name == "custom-model"
 
-    @pytest.mark.asyncio
     @pytest.mark.parametrize(
         ("path", "should_fetch"),
         [(None, False), ("", False), ("model.yaml", True)],
@@ -183,7 +180,6 @@ class TestModelDefinitionGeneratorRegistry:
             mock_repo.fetch_model_definition.assert_not_called()
             assert model.service.port == expected.port
 
-    @pytest.mark.asyncio
     @pytest.mark.parametrize("variant", VARIANTS_WITH_HEALTH_CHECK)
     async def test_override_merges_with_generated(
         self, mock_repo: MagicMock, variant: RuntimeVariant
@@ -206,7 +202,6 @@ class TestModelDefinitionGeneratorRegistry:
         assert model.service.health_check.interval == 30.0
         assert model.service.health_check.initial_delay == 600.0
 
-    @pytest.mark.asyncio
     @pytest.mark.parametrize(
         "exception",
         [DefinitionFileNotFound, RuntimeError("error"), ValueError("error")],

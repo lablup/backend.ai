@@ -24,7 +24,6 @@ def mock_peer() -> MagicMock:
 
 
 class TestAgentClientPassesAgentId:
-    @pytest.mark.asyncio
     async def test_gather_hwinfo_passes_agent_id(self, mock_peer: MagicMock) -> None:
         client = AgentClient(mock_peer, AgentId("test-agent"))
 
@@ -34,7 +33,6 @@ class TestAgentClientPassesAgentId:
 
         mock_peer.call.gather_hwinfo.assert_called_once_with(agent_id=AgentId("test-agent"))
 
-    @pytest.mark.asyncio
     async def test_scan_gpu_alloc_map_passes_agent_id(self, mock_peer: MagicMock) -> None:
         client = AgentClient(mock_peer, AgentId("gpu-agent"))
 
@@ -44,7 +42,6 @@ class TestAgentClientPassesAgentId:
 
         mock_peer.call.scan_gpu_alloc_map.assert_called_once_with(agent_id=AgentId("gpu-agent"))
 
-    @pytest.mark.asyncio
     async def test_create_kernels_passes_agent_id(self, mock_peer: MagicMock) -> None:
         client = AgentClient(mock_peer, AgentId("agent-2"))
 
@@ -59,7 +56,6 @@ class TestAgentClientPassesAgentId:
         args, kwargs = mock_peer.call.create_kernels.call_args
         assert kwargs["agent_id"] == AgentId("agent-2")
 
-    @pytest.mark.asyncio
     async def test_destroy_kernel_passes_agent_id(self, mock_peer: MagicMock) -> None:
         client = AgentClient(mock_peer, AgentId("agent-1"))
 
@@ -70,7 +66,6 @@ class TestAgentClientPassesAgentId:
         args, kwargs = mock_peer.call.destroy_kernel.call_args
         assert kwargs["agent_id"] == AgentId("agent-1")
 
-    @pytest.mark.asyncio
     async def test_execute_passes_agent_id(self, mock_peer: MagicMock) -> None:
         client = AgentClient(mock_peer, AgentId("exec-agent"))
 
@@ -83,7 +78,6 @@ class TestAgentClientPassesAgentId:
         args, kwargs = mock_peer.call.execute.call_args
         assert kwargs["agent_id"] == AgentId("exec-agent")
 
-    @pytest.mark.asyncio
     async def test_check_and_pull_passes_agent_id(self, mock_peer: MagicMock) -> None:
         client = AgentClient(mock_peer, AgentId("image-agent"))
 
@@ -96,7 +90,6 @@ class TestAgentClientPassesAgentId:
             image_configs, agent_id=AgentId("image-agent")
         )
 
-    @pytest.mark.asyncio
     async def test_create_local_network_passes_agent_id(self, mock_peer: MagicMock) -> None:
         client = AgentClient(mock_peer, AgentId("network-agent"))
 
@@ -108,7 +101,6 @@ class TestAgentClientPassesAgentId:
             "test-network", agent_id=AgentId("network-agent")
         )
 
-    @pytest.mark.asyncio
     async def test_assign_port_passes_agent_id(self, mock_peer: MagicMock) -> None:
         client = AgentClient(mock_peer, AgentId("port-agent"))
 
@@ -119,7 +111,6 @@ class TestAgentClientPassesAgentId:
         assert result == 30000
         mock_peer.call.assign_port.assert_called_once_with(agent_id=AgentId("port-agent"))
 
-    @pytest.mark.asyncio
     async def test_upload_file_passes_agent_id(self, mock_peer: MagicMock) -> None:
         client = AgentClient(mock_peer, AgentId("file-agent"))
 
@@ -132,7 +123,6 @@ class TestAgentClientPassesAgentId:
             str(kernel_id), "test.py", b"data", agent_id=AgentId("file-agent")
         )
 
-    @pytest.mark.asyncio
     async def test_start_service_passes_agent_id(self, mock_peer: MagicMock) -> None:
         client = AgentClient(mock_peer, AgentId("service-agent"))
 
@@ -145,7 +135,6 @@ class TestAgentClientPassesAgentId:
             str(kernel_id), "jupyter", {}, agent_id=AgentId("service-agent")
         )
 
-    @pytest.mark.asyncio
     async def test_different_agents_use_different_ids(self, mock_peer: MagicMock) -> None:
         client1 = AgentClient(mock_peer, AgentId("agent-1"))
         client2 = AgentClient(mock_peer, AgentId("agent-2"))

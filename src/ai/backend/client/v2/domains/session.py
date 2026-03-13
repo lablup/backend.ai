@@ -115,10 +115,11 @@ class SessionClient(BaseDomainClient):
         session_name: str,
         request: RestartSessionRequest | None = None,
     ) -> None:
+        params = request.model_dump(mode="json", exclude_none=True) if request else None
         await self._client.typed_request_no_content(
             "PATCH",
             f"{_BASE_PATH}/{session_name}",
-            request=request,
+            params=params,
         )
 
     async def destroy(
@@ -126,11 +127,15 @@ class SessionClient(BaseDomainClient):
         session_name: str,
         request: DestroySessionRequest | None = None,
     ) -> DestroySessionResponse:
+        params: dict[str, str] | None = None
+        if request is not None:
+            raw = request.model_dump(mode="json", exclude_none=True)
+            params = {k: str(v) for k, v in raw.items()}
         return await self._client.typed_request(
             "DELETE",
             f"{_BASE_PATH}/{session_name}",
-            request=request,
             response_model=DestroySessionResponse,
+            params=params,
         )
 
     async def rename(
@@ -138,10 +143,11 @@ class SessionClient(BaseDomainClient):
         session_name: str,
         request: RenameSessionRequest,
     ) -> None:
+        params = request.model_dump(mode="json", exclude_none=True)
         await self._client.typed_request_no_content(
             "POST",
             f"{_BASE_PATH}/{session_name}/rename",
-            request=request,
+            params={k: str(v) for k, v in params.items()},
         )
 
     async def interrupt(
@@ -234,8 +240,8 @@ class SessionClient(BaseDomainClient):
         return await self._client.typed_request(
             "POST",
             f"{_BASE_PATH}/{session_name}/commit",
-            request=request,
             response_model=CommitSessionResponse,
+            params=request.model_dump(mode="json", exclude_none=True),
         )
 
     async def get_commit_status(
@@ -258,8 +264,8 @@ class SessionClient(BaseDomainClient):
         return await self._client.typed_request(
             "POST",
             f"{_BASE_PATH}/{session_name}/imagify",
-            request=request,
             response_model=ConvertSessionToImageResponse,
+            params=request.model_dump(mode="json", exclude_none=True),
         )
 
     # -----------------------------------------------------------------------
@@ -271,11 +277,12 @@ class SessionClient(BaseDomainClient):
         session_name: str,
         request: ListFilesRequest | None = None,
     ) -> ListFilesResponse:
+        params = request.model_dump(mode="json", exclude_none=True) if request else None
         return await self._client.typed_request(
             "GET",
             f"{_BASE_PATH}/{session_name}/files",
-            request=request,
             response_model=ListFilesResponse,
+            params=params,
         )
 
     async def get_container_logs(

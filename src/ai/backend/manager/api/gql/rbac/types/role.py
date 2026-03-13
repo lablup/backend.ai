@@ -20,6 +20,7 @@ from ai.backend.manager.api.gql.base import OrderDirection, StringFilter
 from ai.backend.manager.api.gql.types import GQLFilter, GQLOrderBy, StrawberryGQLContext
 from ai.backend.manager.data.permission.role import (
     AssignedUserData,
+    BulkUserRoleRevocationInput,
     RoleData,
     RoleDetailData,
     UserRoleAssignmentData,
@@ -28,12 +29,17 @@ from ai.backend.manager.data.permission.role import (
     UserRoleRevocationInput,
 )
 from ai.backend.manager.models.rbac_models.role import RoleRow
+from ai.backend.manager.models.rbac_models.user_role import UserRoleRow
 from ai.backend.manager.repositories.base import QueryCondition, QueryOrder
-from ai.backend.manager.repositories.base.creator import Creator
+from ai.backend.manager.repositories.base.creator import BulkCreator, Creator
 from ai.backend.manager.repositories.base.updater import Updater
-from ai.backend.manager.repositories.permission_controller.creators import RoleCreatorSpec
+from ai.backend.manager.repositories.permission_controller.creators import (
+    RoleCreatorSpec,
+    UserRoleCreatorSpec,
+)
 from ai.backend.manager.repositories.permission_controller.options import (
     AssignedUserConditions,
+    AssignedUserOrders,
     RoleConditions,
     RoleOrders,
 )
@@ -41,6 +47,11 @@ from ai.backend.manager.repositories.permission_controller.updaters import RoleU
 from ai.backend.manager.types import OptionalState, TriState
 
 if TYPE_CHECKING:
+    from ai.backend.manager.api.gql.rbac.types.permission import (
+        PermissionConnection,
+        PermissionFilter,
+        PermissionOrderBy,
+    )
     from ai.backend.manager.api.gql.user.types.node import UserV2GQL
 
 # ==================== Enums ====================
@@ -118,6 +129,99 @@ class RoleGQL(Node):
             created_at=data.created_at,
             updated_at=data.updated_at,
             deleted_at=data.deleted_at,
+        )
+
+    @strawberry.field(description="Added in 26.3.0. Permissions associated with this role.")  # type: ignore[misc]
+    async def permissions(
+        self,
+        info: Info[StrawberryGQLContext],
+        filter: Annotated[
+            PermissionFilter,
+            strawberry.lazy("ai.backend.manager.api.gql.rbac.types.permission"),
+        ]
+        | None = None,
+        order_by: list[
+            Annotated[
+                PermissionOrderBy,
+                strawberry.lazy("ai.backend.manager.api.gql.rbac.types.permission"),
+            ]
+        ]
+        | None = None,
+        before: str | None = None,
+        after: str | None = None,
+        first: int | None = None,
+        last: int | None = None,
+        limit: int | None = None,
+        offset: int | None = None,
+    ) -> Annotated[
+        PermissionConnection,
+        strawberry.lazy("ai.backend.manager.api.gql.rbac.types.permission"),
+    ]:
+        from ai.backend.manager.api.gql.rbac.fetcher.permission import fetch_permissions
+        from ai.backend.manager.api.gql.rbac.types.permission import PermissionFilter
+
+        # Add role_id filter to scope permissions to this role
+        role_filter = PermissionFilter(role_id=uuid.UUID(self.id))
+        if filter is not None:
+            # Merge with user-provided filter
+            combined_filter = PermissionFilter(
+                role_id=role_filter.role_id,
+                scope_type=filter.scope_type,
+                entity_type=filter.entity_type,
+            )
+        else:
+            combined_filter = role_filter
+
+        return await fetch_permissions(
+            info,
+            filter=combined_filter,
+            order_by=order_by,
+            before=before,
+            after=after,
+            first=first,
+            last=last,
+            limit=limit,
+            offset=offset,
+        )
+
+    @strawberry.field(description="Added in 26.3.0. Users assigned to this role.")  # type: ignore[misc]
+    async def users(
+        self,
+        info: Info[StrawberryGQLContext],
+        filter: RoleAssignmentFilter | None = None,
+        order_by: list[RoleAssignmentOrderBy] | None = None,
+        before: str | None = None,
+        after: str | None = None,
+        first: int | None = None,
+        last: int | None = None,
+        limit: int | None = None,
+        offset: int | None = None,
+    ) -> RoleAssignmentConnection:
+        from ai.backend.manager.api.gql.rbac.fetcher.role import fetch_role_assignments
+
+        # Add role_id filter to scope assignments to this role
+        role_filter = RoleAssignmentFilter(role_id=uuid.UUID(self.id))
+        if filter is not None:
+            # Merge with user-provided filter
+            combined_filter = RoleAssignmentFilter(
+                role_id=role_filter.role_id,
+                role=filter.role,
+                username=filter.username,
+                email=filter.email,
+            )
+        else:
+            combined_filter = role_filter
+
+        return await fetch_role_assignments(
+            info,
+            filter=combined_filter,
+            order_by=order_by,
+            before=before,
+            after=after,
+            first=first,
+            last=last,
+            limit=limit,
+            offset=offset,
         )
 
 
@@ -241,9 +345,46 @@ class RoleFilter(GQLFilter):
 # TODO: Add user_id filter (requires AssignedUserConditions.by_user_id)
 
 
+@strawberry.input(
+    name="RoleAssignmentRoleNestedFilter",
+    description=(
+        "Added in 26.3.0. Nested filter for roles within a role assignment. "
+        "Filters assignments that have a role matching all specified conditions."
+    ),
+)
+class RoleAssignmentRoleNestedFilterGQL:
+    name: StringFilter | None = None
+    source: list[RoleSourceGQL] | None = None
+    status: list[RoleStatusGQL] | None = None
+
+    def build_conditions(self) -> list[QueryCondition]:
+        raw_conditions: list[QueryCondition] = []
+        if self.name:
+            condition = self.name.build_query_condition(
+                contains_factory=RoleConditions.by_name_contains,
+                equals_factory=RoleConditions.by_name_equals,
+                starts_with_factory=RoleConditions.by_name_starts_with,
+                ends_with_factory=RoleConditions.by_name_ends_with,
+            )
+            if condition:
+                raw_conditions.append(condition)
+        if self.source is not None and len(self.source) > 0:
+            raw_conditions.append(RoleConditions.by_sources([s.to_internal() for s in self.source]))
+        if self.status is not None and len(self.status) > 0:
+            raw_conditions.append(
+                RoleConditions.by_statuses([s.to_internal() for s in self.status])
+            )
+        if not raw_conditions:
+            return []
+        return [AssignedUserConditions.exists_role_combined(raw_conditions)]
+
+
 @strawberry.input(description="Added in 26.3.0. Filter for role assignments")
 class RoleAssignmentFilter(GQLFilter):
     role_id: uuid.UUID | None = None
+    role: RoleAssignmentRoleNestedFilterGQL | None = None
+    username: StringFilter | None = None
+    email: StringFilter | None = None
 
     @override
     def build_conditions(self) -> list[QueryCondition]:
@@ -251,6 +392,29 @@ class RoleAssignmentFilter(GQLFilter):
 
         if self.role_id is not None:
             conditions.append(AssignedUserConditions.by_role_id(self.role_id))
+
+        if self.role:
+            conditions.extend(self.role.build_conditions())
+
+        if self.username is not None:
+            condition = self.username.build_query_condition(
+                contains_factory=AssignedUserConditions.by_username_contains,
+                equals_factory=AssignedUserConditions.by_username_equals,
+                starts_with_factory=AssignedUserConditions.by_username_starts_with,
+                ends_with_factory=AssignedUserConditions.by_username_ends_with,
+            )
+            if condition:
+                conditions.append(condition)
+
+        if self.email is not None:
+            condition = self.email.build_query_condition(
+                contains_factory=AssignedUserConditions.by_email_contains,
+                equals_factory=AssignedUserConditions.by_email_equals,
+                starts_with_factory=AssignedUserConditions.by_email_starts_with,
+                ends_with_factory=AssignedUserConditions.by_email_ends_with,
+            )
+            if condition:
+                conditions.append(condition)
 
         return conditions
 
@@ -273,6 +437,30 @@ class RoleOrderBy(GQLOrderBy):
                 return RoleOrders.created_at(ascending)
             case RoleOrderField.UPDATED_AT:
                 return RoleOrders.updated_at(ascending)
+
+
+@strawberry.enum(description="Added in 26.3.0. Role assignment ordering field")
+class RoleAssignmentOrderField(StrEnum):
+    USERNAME = "username"
+    EMAIL = "email"
+    GRANTED_AT = "granted_at"
+
+
+@strawberry.input(description="Added in 26.3.0. Order by specification for role assignments")
+class RoleAssignmentOrderBy(GQLOrderBy):
+    field: RoleAssignmentOrderField
+    direction: OrderDirection = OrderDirection.DESC
+
+    @override
+    def to_query_order(self) -> QueryOrder:
+        ascending = self.direction == OrderDirection.ASC
+        match self.field:
+            case RoleAssignmentOrderField.USERNAME:
+                return AssignedUserOrders.username(ascending)
+            case RoleAssignmentOrderField.EMAIL:
+                return AssignedUserOrders.email(ascending)
+            case RoleAssignmentOrderField.GRANTED_AT:
+                return AssignedUserOrders.granted_at(ascending)
 
 
 # ==================== Input Types ====================
@@ -300,6 +488,7 @@ class UpdateRoleInput:
     id: uuid.UUID
     name: str | None = None
     description: str | None = None
+    status: RoleStatusGQL | None = None
 
     def to_updater(self) -> Updater[RoleRow]:
         spec = RoleUpdaterSpec(
@@ -308,6 +497,11 @@ class UpdateRoleInput:
                 TriState.update(self.description)
                 if self.description is not None
                 else TriState.nop()
+            ),
+            status=(
+                OptionalState.update(self.status.to_internal())
+                if self.status is not None
+                else OptionalState.nop()
             ),
         )
         return Updater(spec=spec, pk_value=self.id)
@@ -337,6 +531,34 @@ class RevokeRoleInput:
         )
 
 
+@strawberry.input(
+    name="BulkAssignRoleInput",
+    description="Added in 26.3.0. Input for bulk assigning a role to multiple users",
+)
+class BulkAssignRoleInputGQL:
+    role_id: uuid.UUID
+    user_ids: list[uuid.UUID]
+
+    def to_bulk_creator(self) -> BulkCreator[UserRoleRow]:
+        specs = [UserRoleCreatorSpec(user_id=uid, role_id=self.role_id) for uid in self.user_ids]
+        return BulkCreator(specs=specs)
+
+
+@strawberry.input(
+    name="BulkRevokeRoleInput",
+    description="Added in 26.3.0. Input for bulk revoking a role from multiple users",
+)
+class BulkRevokeRoleInputGQL:
+    role_id: uuid.UUID
+    user_ids: list[uuid.UUID]
+
+    def to_input(self) -> BulkUserRoleRevocationInput:
+        return BulkUserRoleRevocationInput(
+            role_id=self.role_id,
+            user_ids=self.user_ids,
+        )
+
+
 @strawberry.input(description="Added in 26.3.0. Input for soft-deleting a role")
 class DeleteRoleInput:
     id: uuid.UUID
@@ -358,6 +580,50 @@ class DeleteRolePayload:
 @strawberry.type(description="Added in 26.3.0. Payload for purge role mutation")
 class PurgeRolePayload:
     id: ID
+
+
+@strawberry.type(
+    name="BulkAssignRoleError",
+    description="Added in 26.3.0. Error information for a failed user in bulk role assignment.",
+)
+class BulkAssignRoleErrorGQL:
+    user_id: uuid.UUID = strawberry.field(description="UUID of the user that failed.")
+    message: str = strawberry.field(description="Error message describing the failure.")
+
+
+@strawberry.type(
+    name="BulkAssignRolePayload",
+    description="Added in 26.3.0. Payload for bulk role assignment mutation.",
+)
+class BulkAssignRolePayloadGQL:
+    assigned: list[RoleAssignmentGQL] = strawberry.field(
+        description="List of successfully created role assignments."
+    )
+    failed: list[BulkAssignRoleErrorGQL] = strawberry.field(
+        description="List of errors for users that failed to be assigned."
+    )
+
+
+@strawberry.type(
+    name="BulkRevokeRoleError",
+    description="Added in 26.3.0. Error information for a failed user in bulk role revocation.",
+)
+class BulkRevokeRoleErrorGQL:
+    user_id: uuid.UUID = strawberry.field(description="UUID of the user that failed.")
+    message: str = strawberry.field(description="Error message describing the failure.")
+
+
+@strawberry.type(
+    name="BulkRevokeRolePayload",
+    description="Added in 26.3.0. Payload for bulk role revocation mutation.",
+)
+class BulkRevokeRolePayloadGQL:
+    revoked: list[RoleAssignmentGQL] = strawberry.field(
+        description="List of successfully revoked role assignments."
+    )
+    failed: list[BulkRevokeRoleErrorGQL] = strawberry.field(
+        description="List of errors for users that failed to be revoked."
+    )
 
 
 # ==================== Connection Types ====================

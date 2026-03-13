@@ -1,21 +1,25 @@
-"""
-Scaling Group DTOs for Manager API.
-"""
+"""Common DTOs for scaling group API."""
+
+from __future__ import annotations
 
 from .request import (
-    ListScalingGroupsQueryParams,
+    ListScalingGroupsRequest,
+    WsproxyVersionPathParam,
+    WsproxyVersionQueryParam,
 )
 from .response import (
-    GetWsproxyVersionResponse,
     ListScalingGroupsResponse,
-    ScalingGroupDTO,
+    WsproxyVersionResponse,
 )
 
+# Backward-compatible alias: client SDK uses GetWsproxyVersionResponse
+GetWsproxyVersionResponse = WsproxyVersionResponse
+
 __all__ = (
-    # Request
-    "ListScalingGroupsQueryParams",
-    # Response
-    "ScalingGroupDTO",
+    "ListScalingGroupsRequest",
+    "WsproxyVersionPathParam",
+    "WsproxyVersionQueryParam",
     "ListScalingGroupsResponse",
+    "WsproxyVersionResponse",
     "GetWsproxyVersionResponse",
 )

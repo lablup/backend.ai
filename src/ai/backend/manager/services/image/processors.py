@@ -3,6 +3,7 @@ from typing import override
 from ai.backend.manager.actions.monitors.monitor import ActionMonitor
 from ai.backend.manager.actions.processor import ActionProcessor
 from ai.backend.manager.actions.types import AbstractProcessorPackage, ActionSpec
+from ai.backend.manager.actions.validators import ActionValidators
 from ai.backend.manager.services.image.actions.alias_image import (
     AliasImageAction,
     AliasImageActionResult,
@@ -40,6 +41,10 @@ from ai.backend.manager.services.image.actions.get_images import (
     GetImageByIdentifierActionResult,
     GetImagesByCanonicalsAction,
     GetImagesByCanonicalsActionResult,
+)
+from ai.backend.manager.services.image.actions.load_image_last_used import (
+    LoadImageLastUsedAction,
+    LoadImageLastUsedActionResult,
 )
 from ai.backend.manager.services.image.actions.modify_image import (
     ModifyImageAction,
@@ -125,8 +130,14 @@ class ImageProcessors(AbstractProcessorPackage):
     get_all_images: ActionProcessor[GetAllImagesAction, GetAllImagesActionResult]
     search_images: ActionProcessor[SearchImagesAction, SearchImagesActionResult]
     search_aliases: ActionProcessor[SearchAliasesAction, SearchAliasesActionResult]
+    load_image_last_used: ActionProcessor[LoadImageLastUsedAction, LoadImageLastUsedActionResult]
 
-    def __init__(self, service: ImageService, action_monitors: list[ActionMonitor]) -> None:
+    def __init__(
+        self,
+        service: ImageService,
+        action_monitors: list[ActionMonitor],
+        validators: ActionValidators,
+    ) -> None:
         self.get_image_installed_agents = ActionProcessor(
             service.get_image_installed_agents, action_monitors
         )
@@ -164,6 +175,7 @@ class ImageProcessors(AbstractProcessorPackage):
         )
         self.search_images = ActionProcessor(service.search_images, action_monitors)
         self.search_aliases = ActionProcessor(service.search_aliases, action_monitors)
+        self.load_image_last_used = ActionProcessor(service.load_image_last_used, action_monitors)
 
     @override
     def supported_actions(self) -> list[ActionSpec]:
@@ -183,4 +195,5 @@ class ImageProcessors(AbstractProcessorPackage):
             ClearImageCustomResourceLimitAction.spec(),
             ClearImageCustomResourceLimitByIdAction.spec(),
             SetImageResourceLimitByIdAction.spec(),
+            LoadImageLastUsedAction.spec(),
         ]

@@ -449,7 +449,6 @@ class TestBatchQuerierScopeValidation:
 
         yield data
 
-    @pytest.mark.asyncio
     async def test_skips_validation_when_scope_is_none(
         self,
         database_connection: ExtendedAsyncSAEngine,
@@ -469,7 +468,6 @@ class TestBatchQuerierScopeValidation:
             assert len(result.rows) == 4
             assert result.total_count == 4
 
-    @pytest.mark.asyncio
     async def test_skips_validation_when_existence_checks_empty(
         self,
         database_connection: ExtendedAsyncSAEngine,
@@ -490,7 +488,6 @@ class TestBatchQuerierScopeValidation:
             assert len(result.rows) == 4
             assert result.total_count == 4
 
-    @pytest.mark.asyncio
     async def test_passes_validation_when_single_check_succeeds(
         self,
         database_connection: ExtendedAsyncSAEngine,
@@ -519,7 +516,6 @@ class TestBatchQuerierScopeValidation:
             assert len(result.rows) == 4
             assert result.total_count == 4
 
-    @pytest.mark.asyncio
     async def test_raises_error_when_single_check_fails(
         self,
         database_connection: ExtendedAsyncSAEngine,
@@ -546,7 +542,6 @@ class TestBatchQuerierScopeValidation:
             with pytest.raises(TestScopeValidationError):
                 await execute_batch_querier(db_sess, query, querier, scope=scope)
 
-    @pytest.mark.asyncio
     async def test_passes_validation_when_all_checks_succeed(
         self,
         database_connection: ExtendedAsyncSAEngine,
@@ -580,7 +575,6 @@ class TestBatchQuerierScopeValidation:
             assert len(result.rows) == 4
             assert result.total_count == 4
 
-    @pytest.mark.asyncio
     async def test_raises_first_error_when_first_check_fails(
         self,
         database_connection: ExtendedAsyncSAEngine,
@@ -614,7 +608,6 @@ class TestBatchQuerierScopeValidation:
 
             assert "first error" in str(exc_info.value)
 
-    @pytest.mark.asyncio
     async def test_raises_second_error_when_second_check_fails(
         self,
         database_connection: ExtendedAsyncSAEngine,
@@ -648,7 +641,6 @@ class TestBatchQuerierScopeValidation:
 
             assert "second error" in str(exc_info.value)
 
-    @pytest.mark.asyncio
     async def test_raises_first_error_when_multiple_checks_fail(
         self,
         database_connection: ExtendedAsyncSAEngine,
@@ -682,7 +674,6 @@ class TestBatchQuerierScopeValidation:
 
             assert "first error - priority" in str(exc_info.value)
 
-    @pytest.mark.asyncio
     async def test_scope_condition_filters_results(
         self,
         database_connection: ExtendedAsyncSAEngine,

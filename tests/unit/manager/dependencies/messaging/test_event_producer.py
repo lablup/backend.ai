@@ -29,7 +29,6 @@ class MockConfig:
 class TestEventProducerDependency:
     """Test EventProducerDependency lifecycle."""
 
-    @pytest.mark.asyncio
     @patch(
         "ai.backend.manager.dependencies.messaging.event_producer.asyncio.sleep",
         new_callable=AsyncMock,
@@ -66,7 +65,6 @@ class TestEventProducerDependency:
         mock_producer.close.assert_called_once()
         mock_sleep.assert_called_once_with(0.2)
 
-    @pytest.mark.asyncio
     @patch(
         "ai.backend.manager.dependencies.messaging.event_producer.asyncio.sleep",
         new_callable=AsyncMock,

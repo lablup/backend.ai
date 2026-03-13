@@ -42,7 +42,6 @@ class TestRedisProvider:
         config.core_redis = None
         return config
 
-    @pytest.mark.asyncio
     async def test_provide_valkey_clients(
         self,
         coordinator_config: ServerConfig,
@@ -62,7 +61,6 @@ class TestRedisProvider:
             server_time = await clients.valkey_live.get_server_time()
             assert server_time > 0
 
-    @pytest.mark.asyncio
     async def test_cleanup_on_exception(
         self,
         coordinator_config: ServerConfig,

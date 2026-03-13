@@ -124,7 +124,6 @@ class TestSchedulingHistoryRepository:
 
     # ========== Session History Tests ==========
 
-    @pytest.mark.asyncio
     async def test_search_session_history_pagination(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
@@ -159,7 +158,6 @@ class TestSchedulingHistoryRepository:
         assert result.has_next_page is True
         assert result.has_previous_page is False
 
-    @pytest.mark.asyncio
     async def test_search_session_history_by_session_id(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
@@ -205,7 +203,6 @@ class TestSchedulingHistoryRepository:
         assert result.total_count == 3
         assert all(item.session_id == session_id_1 for item in result.items)
 
-    @pytest.mark.asyncio
     async def test_search_session_history_by_result(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
@@ -254,7 +251,6 @@ class TestSchedulingHistoryRepository:
         assert result.total_count == 2
         assert all(item.result == SchedulingResult.FAILURE for item in result.items)
 
-    @pytest.mark.asyncio
     async def test_search_session_history_with_status_transition(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
@@ -292,7 +288,6 @@ class TestSchedulingHistoryRepository:
 
     # ========== Kernel History Tests ==========
 
-    @pytest.mark.asyncio
     async def test_search_kernel_history_pagination(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
@@ -329,7 +324,6 @@ class TestSchedulingHistoryRepository:
         assert result.has_next_page is True
         assert result.has_previous_page is False
 
-    @pytest.mark.asyncio
     async def test_search_kernel_history_with_status_transition(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
@@ -369,7 +363,6 @@ class TestSchedulingHistoryRepository:
 
     # ========== Deployment History Tests ==========
 
-    @pytest.mark.asyncio
     async def test_search_deployment_history_pagination(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
@@ -404,7 +397,6 @@ class TestSchedulingHistoryRepository:
         assert result.has_next_page is True
         assert result.has_previous_page is False
 
-    @pytest.mark.asyncio
     async def test_search_deployment_history_by_result(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
@@ -455,7 +447,6 @@ class TestSchedulingHistoryRepository:
 
     # ========== Route History Tests ==========
 
-    @pytest.mark.asyncio
     async def test_search_route_history_pagination(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
@@ -492,7 +483,6 @@ class TestSchedulingHistoryRepository:
         assert result.has_next_page is True
         assert result.has_previous_page is False
 
-    @pytest.mark.asyncio
     async def test_search_route_history_with_status_transition(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
@@ -530,7 +520,6 @@ class TestSchedulingHistoryRepository:
         assert item.from_status == RouteStatus.PROVISIONING
         assert item.to_status == RouteStatus.HEALTHY
 
-    @pytest.mark.asyncio
     async def test_search_route_history_by_deployment_id(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,

@@ -54,6 +54,7 @@ from ai.backend.manager.models.kernel import (
     kernels,
 )
 from ai.backend.manager.models.keypair import KeyPairRow, generate_keypair_data, keypairs
+from ai.backend.manager.models.rbac_models.user_role import UserRoleRow
 from ai.backend.manager.models.resource_policy import UserResourcePolicyRow
 from ai.backend.manager.models.session import (
     AGENT_RESOURCE_OCCUPYING_SESSION_STATUSES,
@@ -96,7 +97,11 @@ from ai.backend.manager.repositories.user.purgers import (
     create_user_purger,
     create_user_vfolder_permission_purger,
 )
-from ai.backend.manager.repositories.user.types import DomainUserSearchScope, ProjectUserSearchScope
+from ai.backend.manager.repositories.user.types import (
+    DomainUserSearchScope,
+    ProjectUserSearchScope,
+    RoleUserSearchScope,
+)
 from ai.backend.manager.repositories.user.updaters import UserUpdaterSpec
 from ai.backend.manager.services.user.actions.create_user import UserCreateSpec
 from ai.backend.manager.services.user.actions.modify_user import UserUpdateSpec
@@ -1152,6 +1157,34 @@ class UserDBSource:
                 .join(
                     AssocGroupUserRow,
                     UserRow.uuid == AssocGroupUserRow.user_id,
+                )
+            )
+            result = await execute_batch_querier(db_session, query, querier, scope=scope)
+
+            items = [row.UserRow.to_data() for row in result.rows]
+            return UserSearchResult(
+                items=items,
+                total_count=result.total_count,
+                has_next_page=result.has_next_page,
+                has_previous_page=result.has_previous_page,
+            )
+
+    async def search_users_by_role(
+        self,
+        scope: RoleUserSearchScope,
+        querier: BatchQuerier,
+    ) -> UserSearchResult:
+        """Search users assigned to a role.
+
+        Joins with user_roles to find users assigned to the role.
+        """
+        async with self._db.begin_readonly_session() as db_session:
+            query = (
+                sa.select(UserRow)
+                .select_from(UserRow)
+                .join(
+                    UserRoleRow,
+                    UserRow.uuid == UserRoleRow.user_id,
                 )
             )
             result = await execute_batch_querier(db_session, query, querier, scope=scope)

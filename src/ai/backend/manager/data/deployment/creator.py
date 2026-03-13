@@ -113,11 +113,18 @@ class DeploymentCreationDraft:
 
 @dataclass
 class DeploymentPolicyConfig:
-    """Configuration for deployment policy.
+    """Policy configuration without a target deployment."""
 
-    Passed from GQL layer to service layer for policy creation/update.
-    """
+    strategy: DeploymentStrategy
+    strategy_spec: RollingUpdateSpec | BlueGreenSpec
+    rollback_on_failure: bool = False
 
+
+@dataclass
+class DeploymentPolicyCreator:
+    """Creator for deployment policy bound to an existing deployment."""
+
+    deployment_id: UUID
     strategy: DeploymentStrategy
     strategy_spec: RollingUpdateSpec | BlueGreenSpec
     rollback_on_failure: bool = False

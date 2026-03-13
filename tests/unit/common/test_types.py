@@ -11,12 +11,12 @@ from ai.backend.common.types import (
     ResourceSlot,
     SlotName,
     SlotTypes,
+    _stringify_number,
     aobject,
     check_typed_dict,
 )
 
 
-@pytest.mark.asyncio
 async def test_aobject() -> None:
     init_count = 0
     ainit_count = 0
@@ -382,3 +382,21 @@ def test_resource_slot_calc_with_infinity() -> None:
     r5 = r1 + r4
     assert r5["a"] == Decimal("Infinity")
     assert r5["b"] == 5
+
+
+def test_stringify_number_decimal_places() -> None:
+    # Regression test: fGPU values should not show 6 decimal places (BA-4840)
+    assert _stringify_number(Decimal("1.000000")) == "1"
+    assert _stringify_number(Decimal("1.500000")) == "1.5"
+    assert _stringify_number(Decimal("1.250000")) == "1.25"
+    assert _stringify_number(Decimal("0.250000")) == "0.25"
+    assert _stringify_number(Decimal("0.000000")) == "0"
+    assert _stringify_number(Decimal("10.000000")) == "10"
+    # Values with more than 2 decimal places are rounded to 2
+    assert _stringify_number(Decimal("1.234567")) == "1.23"
+    # Infinity handling unchanged
+    assert _stringify_number(float("inf")) == "Infinity"
+    assert _stringify_number(float("-inf")) == "-Infinity"
+    # Integer and BinarySize handling unchanged
+    assert _stringify_number(42) == "42"
+    assert _stringify_number(BinarySize(1024)) == "1024"

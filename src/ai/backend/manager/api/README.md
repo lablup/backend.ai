@@ -181,7 +181,7 @@ Database
 **REST Adapters** convert API request DTOs to repository `Querier` objects:
 
 ```python
-from ai.backend.manager.api.adapter import BaseFilterAdapter
+from ai.backend.manager.api.rest.adapter import BaseFilterAdapter
 from ai.backend.manager.repositories.base import Querier
 
 class NotificationChannelAdapter(BaseFilterAdapter):

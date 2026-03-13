@@ -3,6 +3,7 @@ from typing import override
 from ai.backend.manager.actions.monitors.monitor import ActionMonitor
 from ai.backend.manager.actions.processor import ActionProcessor
 from ai.backend.manager.actions.types import AbstractProcessorPackage, ActionSpec
+from ai.backend.manager.actions.validators import ActionValidators
 from ai.backend.manager.services.model_serving.actions.create_auto_scaling_rule import (
     CreateEndpointAutoScalingRuleAction,
     CreateEndpointAutoScalingRuleActionResult,
@@ -36,7 +37,12 @@ class ModelServingAutoScalingProcessors(AbstractProcessorPackage):
         ModifyEndpointAutoScalingRuleAction, ModifyEndpointAutoScalingRuleActionResult
     ]
 
-    def __init__(self, service: AutoScalingService, action_monitors: list[ActionMonitor]) -> None:
+    def __init__(
+        self,
+        service: AutoScalingService,
+        action_monitors: list[ActionMonitor],
+        validators: ActionValidators,
+    ) -> None:
         self.scale_service_replicas = ActionProcessor(
             service.scale_service_replicas, action_monitors
         )

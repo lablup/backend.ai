@@ -19,7 +19,6 @@ class TestValkeyDependency:
             password=None,
         )
 
-    @pytest.mark.asyncio
     async def test_valkey_dependency_creates_all_clients(self, redis_config: RedisConfig) -> None:
         """Test that valkey dependency creates all 4 clients."""
         dependency = AgentValkeyDependency()

@@ -9,12 +9,12 @@ import strawberry
 from ai.backend.manager.api.gql.data_loader.data_loaders import DataLoaders
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.repositories.base import QueryCondition, QueryOrder
-from ai.backend.manager.services.processors import Processors
 
 if TYPE_CHECKING:
     from ai.backend.common.events.fetcher import EventFetcher
     from ai.backend.common.events.hub.hub import EventHub
     from ai.backend.manager.api.gql.adapter import BaseGQLAdapter
+    from ai.backend.manager.services.processors import Processors  # pants: no-infer-dep
 
 
 class GQLFilter(ABC):

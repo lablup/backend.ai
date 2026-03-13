@@ -1,6 +1,7 @@
 from abc import ABC, abstractmethod
 from collections.abc import Mapping
 from datetime import datetime
+from typing import override
 
 from yarl import URL
 
@@ -21,6 +22,27 @@ class AuthStrategy(ABC):
         raise NotImplementedError
 
 
+class NoAuth(AuthStrategy):
+    """Auth strategy that provides no credentials.
+
+    Used by the webserver, which has no real keypair and only proxies requests.
+    Any accidental call to an authenticated endpoint will get a 401 from the
+    manager rather than crash internally.
+    """
+
+    @override
+    def sign(
+        self,
+        method: str,
+        version: str,
+        endpoint: URL,
+        date: datetime,
+        rel_url: str,
+        content_type: str,
+    ) -> Mapping[str, str]:
+        return {}
+
+
 class HMACAuth(AuthStrategy):
     def __init__(
         self,
@@ -32,6 +54,7 @@ class HMACAuth(AuthStrategy):
         self.secret_key: str = secret_key
         self.hash_type: str = hash_type
 
+    @override
     def sign(
         self,
         method: str,

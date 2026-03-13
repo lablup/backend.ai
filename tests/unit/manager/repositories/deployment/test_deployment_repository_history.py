@@ -417,7 +417,6 @@ class TestUpdateEndpointLifecycleBulkWithHistory:
             valkey_schedule=valkey_schedule,
         )
 
-    @pytest.mark.asyncio
     async def test_updates_status_and_creates_history_atomically(
         self,
         deployment_repository: DeploymentRepository,
@@ -468,7 +467,6 @@ class TestUpdateEndpointLifecycleBulkWithHistory:
             assert histories[0].phase == "check_pending"
             assert histories[0].result == str(SchedulingResult.SUCCESS)
 
-    @pytest.mark.asyncio
     async def test_returns_zero_when_no_batch_updaters(
         self,
         deployment_repository: DeploymentRepository,
@@ -861,7 +859,6 @@ class TestUpdateRouteStatusBulkWithHistory:
             valkey_schedule=valkey_schedule,
         )
 
-    @pytest.mark.asyncio
     async def test_updates_status_and_creates_history_atomically(
         self,
         deployment_repository: DeploymentRepository,
@@ -913,7 +910,6 @@ class TestUpdateRouteStatusBulkWithHistory:
             assert histories[0].phase == "provisioning"
             assert histories[0].result == str(SchedulingResult.SUCCESS)
 
-    @pytest.mark.asyncio
     async def test_returns_zero_when_no_batch_updaters(
         self,
         deployment_repository: DeploymentRepository,
@@ -1159,7 +1155,6 @@ class TestDeploymentHistoryMergeLogic:
             valkey_schedule=valkey_schedule,
         )
 
-    @pytest.mark.asyncio
     async def test_merge_same_phase_error_to_status(
         self,
         deployment_repository: DeploymentRepository,
@@ -1204,7 +1199,6 @@ class TestDeploymentHistoryMergeLogic:
             assert histories[0].id == history_id
             assert histories[0].attempts == 2
 
-    @pytest.mark.asyncio
     async def test_no_merge_different_phase(
         self,
         deployment_repository: DeploymentRepository,
@@ -1503,7 +1497,6 @@ class TestRouteHistoryMergeLogic:
             valkey_schedule=valkey_schedule,
         )
 
-    @pytest.mark.asyncio
     async def test_merge_same_phase_error_to_status(
         self,
         deployment_repository: DeploymentRepository,
@@ -1546,7 +1539,6 @@ class TestRouteHistoryMergeLogic:
             assert histories[0].id == history_id
             assert histories[0].attempts == 2
 
-    @pytest.mark.asyncio
     async def test_no_merge_different_to_status(
         self,
         deployment_repository: DeploymentRepository,

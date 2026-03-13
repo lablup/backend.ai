@@ -19,6 +19,14 @@ from ai.backend.common.dto.manager.artifact.response import (
     RejectRevisionResponse,
     UpdateArtifactResponse,
 )
+from ai.backend.common.dto.manager.artifact_registry import (
+    ArtifactFilterInput,
+    OffsetPaginationInput,
+    PaginationInput,
+    SearchArtifactsRequest,
+    SearchArtifactsResponse,
+)
+from ai.backend.common.dto.manager.query import StringFilter
 
 from .conftest import ArtifactFixtureData
 
@@ -29,7 +37,6 @@ STORAGE_XFAIL_REASON = (
 
 
 class TestUpdateArtifact:
-    @pytest.mark.asyncio
     async def test_admin_updates_artifact(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -44,7 +51,6 @@ class TestUpdateArtifact:
         assert result.artifact.readonly is True
         assert result.artifact.description == "Updated description"
 
-    @pytest.mark.asyncio
     async def test_update_nonexistent_artifact(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -59,7 +65,6 @@ class TestUpdateArtifact:
 
 class TestApproveRevision:
     @pytest.mark.xfail(strict=True, reason=STORAGE_XFAIL_REASON)
-    @pytest.mark.asyncio
     async def test_admin_approves_revision(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -72,7 +77,6 @@ class TestApproveRevision:
 
 
 class TestRejectRevision:
-    @pytest.mark.asyncio
     async def test_admin_rejects_revision(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -86,7 +90,6 @@ class TestRejectRevision:
 
 class TestImportArtifacts:
     @pytest.mark.xfail(strict=True, reason=STORAGE_XFAIL_REASON)
-    @pytest.mark.asyncio
     async def test_admin_imports_artifacts(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -101,7 +104,6 @@ class TestImportArtifacts:
 
 
 class TestCancelImportTask:
-    @pytest.mark.asyncio
     async def test_admin_cancels_import_task(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -117,7 +119,6 @@ class TestCancelImportTask:
 
 class TestCleanupRevisions:
     @pytest.mark.xfail(strict=True, reason=STORAGE_XFAIL_REASON)
-    @pytest.mark.asyncio
     async def test_admin_cleans_up_revisions(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -132,7 +133,6 @@ class TestCleanupRevisions:
 
 
 class TestGetRevisionReadme:
-    @pytest.mark.asyncio
     async def test_admin_gets_revision_readme(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -145,7 +145,6 @@ class TestGetRevisionReadme:
 
 
 class TestGetRevisionVerificationResult:
-    @pytest.mark.asyncio
     async def test_admin_gets_verification_result(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -158,7 +157,6 @@ class TestGetRevisionVerificationResult:
 
 
 class TestGetRevisionDownloadProgress:
-    @pytest.mark.asyncio
     async def test_admin_gets_download_progress(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -168,3 +166,43 @@ class TestGetRevisionDownloadProgress:
             target_artifact.artifact_revision_id,
         )
         assert isinstance(result, GetRevisionDownloadProgressResponse)
+
+
+class TestSearchArtifacts:
+    async def test_search_artifacts_finds_existing_artifact(
+        self,
+        admin_registry: BackendAIClientRegistry,
+        target_artifact: ArtifactFixtureData,
+    ) -> None:
+        """Search artifacts → seeded artifact appears in results."""
+        result = await admin_registry.artifact_registry.search_artifacts(
+            SearchArtifactsRequest(
+                pagination=PaginationInput(
+                    offset=OffsetPaginationInput(offset=0, limit=20),
+                ),
+            ),
+        )
+        assert isinstance(result, SearchArtifactsResponse)
+        assert len(result.artifacts) >= 1
+        artifact_ids = [a.id for a in result.artifacts]
+        assert target_artifact.artifact_id in artifact_ids
+
+    async def test_search_artifacts_empty_result(
+        self,
+        admin_registry: BackendAIClientRegistry,
+    ) -> None:
+        """Search artifacts with non-matching filter → empty list."""
+        result = await admin_registry.artifact_registry.search_artifacts(
+            SearchArtifactsRequest(
+                pagination=PaginationInput(
+                    offset=OffsetPaginationInput(offset=0, limit=20),
+                ),
+                filters=ArtifactFilterInput(
+                    name_filter=StringFilter(
+                        equals="nonexistent-artifact-name-that-will-never-match"
+                    ),
+                ),
+            ),
+        )
+        assert isinstance(result, SearchArtifactsResponse)
+        assert result.artifacts == []

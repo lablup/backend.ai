@@ -12,7 +12,7 @@ from uuid import UUID
 from pydantic import AliasChoices, ConfigDict, Field
 
 from ai.backend.common.api_handlers import BaseFieldModel
-from ai.backend.common.types import BinarySize, MountPermission, MountTypes
+from ai.backend.common.types import BinarySizeField, MountPermission, MountTypes
 
 __all__ = (
     # Shared field models
@@ -36,7 +36,7 @@ __all__ = (
 class ResourceOpts(BaseFieldModel):
     """Pydantic equivalent of ``resource_opts_iv``."""
 
-    shmem: BinarySize | None = None
+    shmem: BinarySizeField | None = None
     allow_fractional_resource_fragmentation: bool | None = None
     model_config = ConfigDict(extra="allow")
 
@@ -79,7 +79,7 @@ class CreationConfigV2(BaseFieldModel):
         ge=1,
         validation_alias=AliasChoices("cluster_size", "clusterSize"),
     )
-    instance_memory: BinarySize | None = Field(
+    instance_memory: BinarySizeField | None = Field(
         default=None,
         validation_alias=AliasChoices("instance_memory", "instanceMemory"),
     )

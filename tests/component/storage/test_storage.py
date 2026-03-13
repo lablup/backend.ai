@@ -21,7 +21,6 @@ from ai.backend.common.dto.manager.storage.response import (
 
 
 class TestListObjectStorages:
-    @pytest.mark.asyncio
     async def test_admin_lists_object_storages(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -30,7 +29,6 @@ class TestListObjectStorages:
         assert isinstance(result, ObjectStorageListResponse)
         assert isinstance(result.storages, list)
 
-    @pytest.mark.asyncio
     async def test_user_lists_object_storages(
         self,
         user_registry: BackendAIClientRegistry,
@@ -41,7 +39,6 @@ class TestListObjectStorages:
 
 
 class TestGetPresignedUploadURL:
-    @pytest.mark.asyncio
     async def test_presigned_upload_url_with_invalid_revision(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -56,7 +53,6 @@ class TestGetPresignedUploadURL:
 
 
 class TestGetPresignedDownloadURL:
-    @pytest.mark.asyncio
     async def test_presigned_download_url_with_invalid_revision(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -71,7 +67,6 @@ class TestGetPresignedDownloadURL:
 
 
 class TestGetAllBuckets:
-    @pytest.mark.asyncio
     async def test_admin_gets_all_buckets(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -82,7 +77,6 @@ class TestGetAllBuckets:
 
 
 class TestGetBuckets:
-    @pytest.mark.asyncio
     async def test_get_buckets_with_nonexistent_storage(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -96,7 +90,6 @@ class TestGetBuckets:
 
 
 class TestListVFSStorages:
-    @pytest.mark.asyncio
     async def test_admin_lists_vfs_storages(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -105,7 +98,6 @@ class TestListVFSStorages:
         assert isinstance(result, ListVFSStorageResponse)
         assert isinstance(result.storages, list)
 
-    @pytest.mark.asyncio
     async def test_user_lists_vfs_storages(
         self,
         user_registry: BackendAIClientRegistry,
@@ -116,7 +108,6 @@ class TestListVFSStorages:
 
 
 class TestGetVFSStorage:
-    @pytest.mark.asyncio
     async def test_get_vfs_storage_not_found(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -126,7 +117,6 @@ class TestGetVFSStorage:
 
 
 class TestListVFSFiles:
-    @pytest.mark.asyncio
     @pytest.mark.xfail(
         strict=True,
         reason=(

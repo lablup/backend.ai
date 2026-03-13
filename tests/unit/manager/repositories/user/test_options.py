@@ -458,7 +458,6 @@ class TestUserNestedSearchIntegration:
 
     # ---- Domain nested filter tests ----
 
-    @pytest.mark.asyncio
     async def test_search_users_with_domain_is_active_filter(
         self,
         user_db_source: UserDBSource,
@@ -475,7 +474,6 @@ class TestUserNestedSearchIntegration:
         assert result.total_count == 1
         assert result.items[0].uuid == search_fixture.user_in_active_domain
 
-    @pytest.mark.asyncio
     async def test_search_users_with_domain_description_contains_filter(
         self,
         user_db_source: UserDBSource,
@@ -495,7 +493,6 @@ class TestUserNestedSearchIntegration:
 
     # ---- Project nested filter tests ----
 
-    @pytest.mark.asyncio
     async def test_search_users_with_project_name_contains_filter(
         self,
         user_db_source: UserDBSource,
@@ -513,7 +510,6 @@ class TestUserNestedSearchIntegration:
         assert result.total_count == 1
         assert result.items[0].uuid == search_fixture.user_in_active_domain
 
-    @pytest.mark.asyncio
     async def test_search_users_with_project_name_negated_filter(
         self,
         user_db_source: UserDBSource,
@@ -533,7 +529,6 @@ class TestUserNestedSearchIntegration:
 
     # ---- Domain nested order tests ----
 
-    @pytest.mark.asyncio
     async def test_search_users_ordered_by_domain_name(
         self,
         user_db_source: UserDBSource,
@@ -554,7 +549,6 @@ class TestUserNestedSearchIntegration:
 
     # ---- Project nested order tests ----
 
-    @pytest.mark.asyncio
     async def test_search_users_ordered_by_project_name(
         self,
         user_db_source: UserDBSource,
@@ -575,7 +569,6 @@ class TestUserNestedSearchIntegration:
 
     # ---- Combined filter + order tests ----
 
-    @pytest.mark.asyncio
     async def test_search_users_combined_domain_filter_and_project_order(
         self,
         user_db_source: UserDBSource,

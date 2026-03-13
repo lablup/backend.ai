@@ -12,7 +12,6 @@ from ai.backend.common.dto.manager.export import (
 
 @pytest.mark.integration
 class TestExportLifecycle:
-    @pytest.mark.asyncio
     async def test_list_reports_then_get_each(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -36,7 +35,6 @@ class TestExportLifecycle:
 
 @pytest.mark.integration
 class TestExportCSVDownload:
-    @pytest.mark.asyncio
     async def test_download_users_csv(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -46,7 +44,6 @@ class TestExportCSVDownload:
         assert isinstance(result, bytes)
         assert len(result) > 0
 
-    @pytest.mark.asyncio
     async def test_download_projects_csv(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -56,7 +53,6 @@ class TestExportCSVDownload:
         assert isinstance(result, bytes)
         assert len(result) > 0
 
-    @pytest.mark.asyncio
     async def test_download_keypairs_csv(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -69,7 +65,6 @@ class TestExportCSVDownload:
 
 @pytest.mark.integration
 class TestExportAccessControl:
-    @pytest.mark.asyncio
     async def test_regular_user_forbidden_on_all_endpoints(
         self,
         user_registry: BackendAIClientRegistry,

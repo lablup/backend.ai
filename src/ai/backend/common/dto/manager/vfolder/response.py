@@ -9,7 +9,7 @@ from typing import Any
 
 from pydantic import BaseModel, Field
 
-from ai.backend.common.api_handlers import BaseResponseModel
+from ai.backend.common.api_handlers import BaseResponseModel, BaseRootResponseModel
 from ai.backend.common.bgtask.types import TaskID
 from ai.backend.common.dto.manager.field import (
     VFolderItemField,
@@ -17,7 +17,7 @@ from ai.backend.common.dto.manager.field import (
     VFolderOwnershipTypeField,
     VFolderPermissionField,
 )
-from ai.backend.common.types import VFolderUsageMode
+from ai.backend.common.types import ResultSet, VFolderUsageMode
 
 __all__ = (
     # DTOs (data transfer objects)
@@ -51,6 +51,7 @@ __all__ = (
     # Response wrappers - Admin
     "GetFstabContentsResponse",
     "GetQuotaResponse",
+    "GetVolumePerfMetricResponse",
     "GetUsageResponse",
     "GetUsedBytesResponse",
     "ListAllHostsResponse",
@@ -178,16 +179,12 @@ class MountResultDTO(BaseModel):
 # ============================================================
 
 
-class VFolderCreateResponse(BaseResponseModel):
-    """Response for vfolder creation."""
-
-    item: VFolderItemField
+class VFolderCreateResponse(BaseRootResponseModel[VFolderItemField]):
+    """Response for vfolder creation (flat object for backward compatibility)."""
 
 
-class VFolderListResponse(BaseResponseModel):
-    """Response for listing vfolders."""
-
-    items: list[VFolderItemField] = Field(default_factory=list)
+class VFolderListResponse(BaseRootResponseModel[list[VFolderItemField]]):
+    """Response for listing vfolders (plain array for backward compatibility)."""
 
 
 class VFolderGetInfoResponse(BaseResponseModel):
@@ -216,7 +213,7 @@ class VFolderCloneResponse(BaseResponseModel):
 class MkdirResponse(BaseResponseModel):
     """Response for mkdir operation."""
 
-    results: list[Any] = Field(description="Results of directory creation")
+    results: ResultSet = Field(description="Results of directory creation")
 
 
 class CreateDownloadSessionResponse(BaseResponseModel):
@@ -314,10 +311,14 @@ class ListAllHostsResponse(BaseResponseModel):
     allowed: list[str] = Field(description="Allowed folder hosts")
 
 
-class ListAllowedTypesResponse(BaseResponseModel):
-    """Response for listing allowed vfolder types."""
+class ListAllowedTypesResponse(BaseRootResponseModel[list[str]]):
+    """Response for listing allowed vfolder types (plain array for backward compatibility)."""
 
-    allowed_types: list[str] = Field(description="Allowed vfolder types")
+
+class GetVolumePerfMetricResponse(BaseResponseModel):
+    """Response for getting volume performance metrics."""
+
+    data: dict[str, Any] = Field(description="Performance metric data from storage proxy")
 
 
 class GetQuotaResponse(BaseResponseModel):

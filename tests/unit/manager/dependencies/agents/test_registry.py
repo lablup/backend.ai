@@ -2,8 +2,6 @@ from __future__ import annotations
 
 from unittest.mock import AsyncMock, MagicMock, patch
 
-import pytest
-
 from ai.backend.manager.dependencies.agents.registry import (
     AgentRegistryDependency,
     AgentRegistryInput,
@@ -13,7 +11,6 @@ from ai.backend.manager.dependencies.agents.registry import (
 class TestAgentRegistryDependency:
     """Test AgentRegistryDependency lifecycle."""
 
-    @pytest.mark.asyncio
     @patch("ai.backend.manager.dependencies.agents.registry.AgentRegistry")
     async def test_provide_agent_registry(
         self,

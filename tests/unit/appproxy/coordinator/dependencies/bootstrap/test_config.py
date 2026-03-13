@@ -178,7 +178,6 @@ class TestProxyCoordinatorConfig:
 class TestConfigProvider:
     """Test ConfigProvider lifecycle."""
 
-    @pytest.mark.asyncio
     @patch("ai.backend.appproxy.coordinator.dependencies.bootstrap.config.load")
     async def test_provide_config(self, mock_load: MagicMock) -> None:
         """Dependency should load config from file."""
@@ -192,7 +191,6 @@ class TestConfigProvider:
             assert config is mock_config
             mock_load.assert_called_once_with(Path("/test/config.toml"))
 
-    @pytest.mark.asyncio
     @patch("ai.backend.appproxy.coordinator.dependencies.bootstrap.config.load")
     async def test_provide_config_with_none_path(self, mock_load: MagicMock) -> None:
         """Dependency should handle None config path."""

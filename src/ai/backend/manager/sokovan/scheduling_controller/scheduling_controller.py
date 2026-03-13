@@ -45,6 +45,7 @@ from .resolvers.scaling_group_resolver import ScalingGroupResolver
 from .validators import (
     ClusterValidationRule,
     ContainerLimitRule,
+    InferenceModelFolderRule,
     MountNameValidationRule,
     PublicPrivateFilterRule,
     ScalingGroupFilter,
@@ -119,6 +120,7 @@ class SchedulingController:
             ServicePortRule(),
             ClusterValidationRule(),
             MountNameValidationRule(),
+            InferenceModelFolderRule(),
         ]
         self._validator = SessionValidator(validator_rules)
 

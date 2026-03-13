@@ -17,6 +17,8 @@ from ai.backend.common.dto.manager.rbac.request import (
     PurgeRoleRequest,
     RevokeRoleRequest,
     RoleFilter,
+    RoleOrder,
+    SearchEntitiesRequest,
     SearchRolesRequest,
     SearchScopesRequest,
     SearchUsersAssignedToRoleRequest,
@@ -30,18 +32,23 @@ from ai.backend.common.dto.manager.rbac.response import (
     GetRoleResponse,
     GetScopeTypesResponse,
     RevokeRoleResponse,
+    SearchEntitiesResponse,
     SearchRolesResponse,
     SearchScopesResponse,
     SearchUsersAssignedToRoleResponse,
     UpdateRoleResponse,
 )
-from ai.backend.common.dto.manager.rbac.types import RoleSource, RoleStatus
+from ai.backend.common.dto.manager.rbac.types import (
+    OrderDirection,
+    RoleOrderField,
+    RoleSource,
+    RoleStatus,
+)
 
 RoleFactory = Callable[..., Coroutine[Any, Any, CreateRoleResponse]]
 
 
 class TestRoleCreate:
-    @pytest.mark.asyncio
     async def test_admin_creates_role(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -58,7 +65,6 @@ class TestRoleCreate:
         assert result.role.source == RoleSource.CUSTOM
         assert result.role.status == RoleStatus.ACTIVE
 
-    @pytest.mark.asyncio
     async def test_admin_creates_role_with_description(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -71,7 +77,6 @@ class TestRoleCreate:
         )
         assert result.role.description == "A role with a description"
 
-    @pytest.mark.asyncio
     async def test_regular_user_cannot_create_role(
         self,
         user_registry: BackendAIClientRegistry,
@@ -87,7 +92,6 @@ class TestRoleCreate:
 
 
 class TestRoleGet:
-    @pytest.mark.asyncio
     async def test_admin_gets_role_by_id(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -99,7 +103,6 @@ class TestRoleGet:
         assert get_result.role.name == target_role.role.name
         assert get_result.role.description == target_role.role.description
 
-    @pytest.mark.asyncio
     async def test_get_nonexistent_role_returns_not_found(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -109,7 +112,6 @@ class TestRoleGet:
 
 
 class TestRoleSearch:
-    @pytest.mark.asyncio
     async def test_admin_searches_roles(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -121,7 +123,6 @@ class TestRoleSearch:
         assert result.pagination.total >= 1
         assert len(result.roles) >= 1
 
-    @pytest.mark.asyncio
     async def test_search_with_name_filter(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -138,7 +139,6 @@ class TestRoleSearch:
         assert result.pagination.total >= 1
         assert any(r.name == marker for r in result.roles)
 
-    @pytest.mark.asyncio
     async def test_search_with_pagination(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -149,7 +149,187 @@ class TestRoleSearch:
         assert result.pagination.limit == 1
         assert len(result.roles) <= 1
 
-    @pytest.mark.asyncio
+    async def test_search_with_status_filter_active(
+        self,
+        admin_registry: BackendAIClientRegistry,
+        role_factory: RoleFactory,
+    ) -> None:
+        """Search with status filter ACTIVE returns only active roles."""
+        unique = secrets.token_hex(4)
+        active_role = await role_factory(
+            name=f"active-{unique}",
+            status=RoleStatus.ACTIVE,
+        )
+
+        result = await admin_registry.rbac.search_roles(
+            SearchRolesRequest(
+                filter=RoleFilter(
+                    name=StringFilter(contains=f"active-{unique}"),
+                    statuses=[RoleStatus.ACTIVE],
+                ),
+            )
+        )
+
+        assert result.pagination.total >= 1
+        assert all(r.status == RoleStatus.ACTIVE for r in result.roles)
+        assert any(r.id == active_role.role.id for r in result.roles)
+
+    async def test_search_with_status_filter_inactive(
+        self,
+        admin_registry: BackendAIClientRegistry,
+        role_factory: RoleFactory,
+    ) -> None:
+        """Search with status filter INACTIVE returns only inactive roles."""
+        unique = secrets.token_hex(4)
+        inactive_role = await role_factory(
+            name=f"inactive-{unique}",
+            status=RoleStatus.INACTIVE,
+        )
+
+        result = await admin_registry.rbac.search_roles(
+            SearchRolesRequest(
+                filter=RoleFilter(
+                    name=StringFilter(contains=f"inactive-{unique}"),
+                    statuses=[RoleStatus.INACTIVE],
+                ),
+            )
+        )
+
+        assert result.pagination.total >= 1
+        assert all(r.status == RoleStatus.INACTIVE for r in result.roles)
+        assert any(r.id == inactive_role.role.id for r in result.roles)
+
+    async def test_search_with_pagination_offset(
+        self,
+        admin_registry: BackendAIClientRegistry,
+        role_factory: RoleFactory,
+    ) -> None:
+        """Search with pagination offset skips correct number of items."""
+        unique = secrets.token_hex(4)
+        # Create 3 roles
+        for i in range(3):
+            await role_factory(name=f"offset-{unique}-{i}")
+
+        # Get first page
+        page1 = await admin_registry.rbac.search_roles(
+            SearchRolesRequest(
+                filter=RoleFilter(name=StringFilter(contains=f"offset-{unique}")),
+                limit=2,
+                offset=0,
+            )
+        )
+
+        # Get second page
+        page2 = await admin_registry.rbac.search_roles(
+            SearchRolesRequest(
+                filter=RoleFilter(name=StringFilter(contains=f"offset-{unique}")),
+                limit=2,
+                offset=2,
+            )
+        )
+
+        assert page1.pagination.total == 3
+        assert len(page1.roles) == 2
+        assert page2.pagination.total == 3
+        assert len(page2.roles) == 1
+        # Ensure different roles on different pages
+        page1_ids = {r.id for r in page1.roles}
+        page2_ids = {r.id for r in page2.roles}
+        assert page1_ids.isdisjoint(page2_ids)
+
+    async def test_search_with_sorting_asc(
+        self,
+        admin_registry: BackendAIClientRegistry,
+        role_factory: RoleFactory,
+    ) -> None:
+        """Search with sorting ascending returns correctly ordered results."""
+        unique = secrets.token_hex(4)
+        # Create roles with specific names for sorting
+        await role_factory(name=f"sort-{unique}-z-last")
+        await role_factory(name=f"sort-{unique}-a-first")
+        await role_factory(name=f"sort-{unique}-m-middle")
+
+        result = await admin_registry.rbac.search_roles(
+            SearchRolesRequest(
+                filter=RoleFilter(name=StringFilter(contains=f"sort-{unique}")),
+                order=[RoleOrder(field=RoleOrderField.NAME, direction=OrderDirection.ASC)],
+            )
+        )
+
+        assert len(result.roles) == 3
+        names = [r.name for r in result.roles]
+        assert names == sorted(names)
+        assert names[0].endswith("a-first")
+        assert names[2].endswith("z-last")
+
+    async def test_search_with_sorting_desc(
+        self,
+        admin_registry: BackendAIClientRegistry,
+        role_factory: RoleFactory,
+    ) -> None:
+        """Search with sorting descending returns correctly ordered results."""
+        unique = secrets.token_hex(4)
+        # Create roles with specific names for sorting
+        await role_factory(name=f"desc-{unique}-a-first")
+        await role_factory(name=f"desc-{unique}-z-last")
+        await role_factory(name=f"desc-{unique}-m-middle")
+
+        result = await admin_registry.rbac.search_roles(
+            SearchRolesRequest(
+                filter=RoleFilter(name=StringFilter(contains=f"desc-{unique}")),
+                order=[RoleOrder(field=RoleOrderField.NAME, direction=OrderDirection.DESC)],
+            )
+        )
+
+        assert len(result.roles) == 3
+        names = [r.name for r in result.roles]
+        assert names == sorted(names, reverse=True)
+        assert names[0].endswith("z-last")
+        assert names[2].endswith("a-first")
+
+    async def test_search_empty_result(
+        self,
+        admin_registry: BackendAIClientRegistry,
+    ) -> None:
+        """Search with non-matching filter returns empty result."""
+        unique = secrets.token_hex(4)
+        nonexistent_marker = f"this-role-definitely-does-not-exist-{unique}"
+
+        result = await admin_registry.rbac.search_roles(
+            SearchRolesRequest(
+                filter=RoleFilter(name=StringFilter(contains=nonexistent_marker)),
+            )
+        )
+
+        assert isinstance(result, SearchRolesResponse)
+        assert result.pagination.total == 0
+        assert len(result.roles) == 0
+
+    async def test_search_with_source_filter(
+        self,
+        admin_registry: BackendAIClientRegistry,
+        role_factory: RoleFactory,
+    ) -> None:
+        """Search with source filter returns only roles from specified source."""
+        unique = secrets.token_hex(4)
+        custom_role = await role_factory(
+            name=f"custom-{unique}",
+            source=RoleSource.CUSTOM,
+        )
+
+        result = await admin_registry.rbac.search_roles(
+            SearchRolesRequest(
+                filter=RoleFilter(
+                    name=StringFilter(contains=f"custom-{unique}"),
+                    sources=[RoleSource.CUSTOM],
+                ),
+            )
+        )
+
+        assert result.pagination.total >= 1
+        assert all(r.source == RoleSource.CUSTOM for r in result.roles)
+        assert any(r.id == custom_role.role.id for r in result.roles)
+
     async def test_regular_user_cannot_search_roles(
         self,
         user_registry: BackendAIClientRegistry,
@@ -159,7 +339,6 @@ class TestRoleSearch:
 
 
 class TestRoleUpdate:
-    @pytest.mark.asyncio
     async def test_admin_updates_role_name(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -174,7 +353,6 @@ class TestRoleUpdate:
         assert update_result.role.name == f"updated-role-{unique}"
         assert update_result.role.id == target_role.role.id
 
-    @pytest.mark.asyncio
     async def test_admin_updates_role_description(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -188,7 +366,6 @@ class TestRoleUpdate:
         assert isinstance(update_result, UpdateRoleResponse)
         assert update_result.role.description == f"Updated description {unique}"
 
-    @pytest.mark.asyncio
     async def test_regular_user_cannot_update_role(
         self,
         user_registry: BackendAIClientRegistry,
@@ -202,7 +379,6 @@ class TestRoleUpdate:
 
 
 class TestRoleDelete:
-    @pytest.mark.asyncio
     async def test_admin_soft_deletes_role(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -214,7 +390,6 @@ class TestRoleDelete:
         assert isinstance(delete_result, DeleteRoleResponse)
         assert delete_result.deleted is True
 
-    @pytest.mark.asyncio
     async def test_regular_user_cannot_delete_role(
         self,
         user_registry: BackendAIClientRegistry,
@@ -225,7 +400,6 @@ class TestRoleDelete:
 
 
 class TestRolePurge:
-    @pytest.mark.asyncio
     async def test_admin_purges_role(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -238,7 +412,6 @@ class TestRolePurge:
         with pytest.raises(NotFoundError):
             await admin_registry.rbac.get_role(r.role.id)
 
-    @pytest.mark.asyncio
     async def test_regular_user_cannot_purge_role(
         self,
         user_registry: BackendAIClientRegistry,
@@ -249,7 +422,6 @@ class TestRolePurge:
 
 
 class TestRoleAssignment:
-    @pytest.mark.asyncio
     async def test_admin_assigns_role_to_user(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -274,7 +446,6 @@ class TestRoleAssignment:
             )
         )
 
-    @pytest.mark.asyncio
     async def test_admin_revokes_role_from_user(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -299,7 +470,6 @@ class TestRoleAssignment:
         assert revoke_result.user_id == admin_user_fixture.user_uuid
         assert revoke_result.role_id == target_role.role.id
 
-    @pytest.mark.asyncio
     async def test_admin_searches_assigned_users(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -330,7 +500,6 @@ class TestRoleAssignment:
             )
         )
 
-    @pytest.mark.asyncio
     async def test_regular_user_cannot_assign_role(
         self,
         user_registry: BackendAIClientRegistry,
@@ -345,7 +514,6 @@ class TestRoleAssignment:
                 )
             )
 
-    @pytest.mark.asyncio
     async def test_regular_user_cannot_revoke_role(
         self,
         user_registry: BackendAIClientRegistry,
@@ -362,7 +530,6 @@ class TestRoleAssignment:
 
 
 class TestScopeManagement:
-    @pytest.mark.asyncio
     async def test_admin_gets_scope_types(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -371,7 +538,6 @@ class TestScopeManagement:
         assert isinstance(result, GetScopeTypesResponse)
         assert len(result.items) > 0
 
-    @pytest.mark.asyncio
     async def test_admin_searches_scopes(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -381,7 +547,20 @@ class TestScopeManagement:
         assert result.pagination.total >= 1
         assert len(result.items) >= 1
 
-    @pytest.mark.asyncio
+    async def test_search_scopes_with_pagination(
+        self,
+        admin_registry: BackendAIClientRegistry,
+    ) -> None:
+        """Search scopes with pagination returns correct page."""
+        result = await admin_registry.rbac.search_scopes(
+            "domain",
+            SearchScopesRequest(limit=1, offset=0),
+        )
+
+        assert isinstance(result, SearchScopesResponse)
+        assert result.pagination.limit == 1
+        assert len(result.items) <= 1
+
     async def test_regular_user_cannot_get_scope_types(
         self,
         user_registry: BackendAIClientRegistry,
@@ -389,9 +568,16 @@ class TestScopeManagement:
         with pytest.raises(PermissionDeniedError):
             await user_registry.rbac.get_scope_types()
 
+    async def test_regular_user_cannot_search_scopes(
+        self,
+        user_registry: BackendAIClientRegistry,
+    ) -> None:
+        """Regular user cannot search scopes (admin-only operation)."""
+        with pytest.raises(PermissionDeniedError):
+            await user_registry.rbac.search_scopes("domain", SearchScopesRequest())
+
 
 class TestEntityManagement:
-    @pytest.mark.asyncio
     async def test_admin_gets_entity_types(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -400,10 +586,60 @@ class TestEntityManagement:
         assert isinstance(result, GetEntityTypesResponse)
         assert len(result.items) > 0
 
-    @pytest.mark.asyncio
+    async def test_search_entities_in_domain(
+        self,
+        admin_registry: BackendAIClientRegistry,
+        domain_fixture: str,
+    ) -> None:
+        """Search entities within a domain scope."""
+        # Search for users in the test domain
+        result = await admin_registry.rbac.search_entities(
+            scope_type="domain",
+            scope_id=domain_fixture,
+            entity_type="user",
+            request=SearchEntitiesRequest(),
+        )
+
+        assert isinstance(result, SearchEntitiesResponse)
+        # Test domain may be empty, just verify search works
+        assert result.pagination.total >= len(result.items)
+        assert isinstance(result.items, list)
+
+    async def test_search_entities_with_pagination(
+        self,
+        admin_registry: BackendAIClientRegistry,
+        domain_fixture: str,
+    ) -> None:
+        """Search entities with pagination returns correct page."""
+        result = await admin_registry.rbac.search_entities(
+            scope_type="domain",
+            scope_id=domain_fixture,
+            entity_type="user",
+            request=SearchEntitiesRequest(limit=1, offset=0),
+        )
+
+        assert isinstance(result, SearchEntitiesResponse)
+        assert result.pagination.limit == 1
+        assert len(result.items) <= 1
+
     async def test_regular_user_cannot_get_entity_types(
         self,
         user_registry: BackendAIClientRegistry,
     ) -> None:
         with pytest.raises(PermissionDeniedError):
             await user_registry.rbac.get_entity_types()
+
+    async def test_regular_user_cannot_search_entities(
+        self,
+        user_registry: BackendAIClientRegistry,
+        domain_fixture: str,
+    ) -> None:
+        """Regular user cannot search entities."""
+        # Entity search should be admin-only
+        with pytest.raises(PermissionDeniedError):
+            await user_registry.rbac.search_entities(
+                scope_type="domain",
+                scope_id=domain_fixture,
+                entity_type="user",
+                request=SearchEntitiesRequest(),
+            )

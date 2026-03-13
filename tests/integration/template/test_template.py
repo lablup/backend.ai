@@ -60,7 +60,6 @@ def _cluster_template_payload(
 
 @pytest.mark.integration
 class TestSessionTemplateLifecycle:
-    @pytest.mark.asyncio
     async def test_create_get_update_delete(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -114,7 +113,6 @@ class TestSessionTemplateLifecycle:
 
 @pytest.mark.integration
 class TestClusterTemplateLifecycle:
-    @pytest.mark.asyncio
     async def test_create_get_update_delete(
         self,
         admin_registry: BackendAIClientRegistry,

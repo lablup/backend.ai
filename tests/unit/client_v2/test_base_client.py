@@ -6,7 +6,7 @@ import pytest
 from yarl import URL
 
 from ai.backend.client.exceptions import BackendAPIError
-from ai.backend.client.v2.base_client import BackendAIClient
+from ai.backend.client.v2.base_client import BackendAIAnonymousClient, BackendAIAuthClient
 from ai.backend.client.v2.config import ClientConfig
 from ai.backend.client.v2.exceptions import (
     AuthenticationError,
@@ -36,8 +36,8 @@ _DEFAULT_CONFIG = ClientConfig(endpoint=URL("https://api.example.com"))
 def _make_client(
     mock_session: MagicMock | None = None,
     config: ClientConfig | None = None,
-) -> BackendAIClient:
-    return BackendAIClient(
+) -> BackendAIAuthClient:
+    return BackendAIAuthClient(
         config or _DEFAULT_CONFIG,
         MockAuth(),
         mock_session or MagicMock(),
@@ -53,6 +53,16 @@ def _make_request_session(resp: AsyncMock) -> MagicMock:
     mock_session = MagicMock()
     mock_session.request = MagicMock(return_value=mock_ctx)
     return mock_session
+
+
+def _make_anon_client(
+    mock_session: MagicMock | None = None,
+    config: ClientConfig | None = None,
+) -> BackendAIAnonymousClient:
+    return BackendAIAnonymousClient(
+        config or _DEFAULT_CONFIG,
+        mock_session or MagicMock(),
+    )
 
 
 class TestBackendAIClient:
@@ -76,19 +86,17 @@ class TestBackendAIClient:
         assert headers["Content-Type"] == "application/json"
 
     def test_docstring_mentions_pydantic(self) -> None:
-        assert "Pydantic" in (BackendAIClient.__doc__ or "")
+        assert "Pydantic" in (BackendAIAuthClient.__doc__ or "")
 
-    @pytest.mark.asyncio
     async def test_create_factory(self) -> None:
         config = ClientConfig(endpoint=URL("https://api.example.com"))
         with patch("ai.backend.client.v2.base_client.aiohttp.ClientSession") as mock_cls:
             mock_session = MagicMock()
             mock_cls.return_value = mock_session
-            client = await BackendAIClient.create(config, MockAuth())
+            client = await BackendAIAuthClient.create(config, MockAuth())
             assert client._session is mock_session
             mock_cls.assert_called_once()
 
-    @pytest.mark.asyncio
     async def test_request_success(self) -> None:
         mock_resp = AsyncMock()
         mock_resp.status = 200
@@ -99,7 +107,6 @@ class TestBackendAIClient:
         result = await client._request("GET", "/test")
         assert result == {"result": "ok"}
 
-    @pytest.mark.asyncio
     async def test_request_raises_on_4xx(self) -> None:
         mock_resp = AsyncMock()
         mock_resp.status = 404
@@ -111,7 +118,6 @@ class TestBackendAIClient:
         with pytest.raises(NotFoundError):
             await client._request("GET", "/nonexistent")
 
-    @pytest.mark.asyncio
     async def test_request_raises_on_5xx(self) -> None:
         mock_resp = AsyncMock()
         mock_resp.status = 500
@@ -123,7 +129,6 @@ class TestBackendAIClient:
         with pytest.raises(ServerError):
             await client._request("GET", "/error")
 
-    @pytest.mark.asyncio
     async def test_typed_request_deserializes_response(self) -> None:
         mock_resp = AsyncMock()
         mock_resp.status = 200
@@ -140,7 +145,6 @@ class TestBackendAIClient:
         assert result.name == "test"
         assert result.count == 42
 
-    @pytest.mark.asyncio
     async def test_typed_request_with_request_model(self) -> None:
         mock_resp = AsyncMock()
         mock_resp.status = 200
@@ -158,14 +162,12 @@ class TestBackendAIClient:
         call_kwargs = mock_session.request.call_args
         assert call_kwargs.kwargs["json"] == {"query": "test"}
 
-    @pytest.mark.asyncio
     async def test_close(self) -> None:
         mock_session = AsyncMock()
         client = _make_client(mock_session)
         await client.close()
         mock_session.close.assert_awaited_once()
 
-    @pytest.mark.asyncio
     async def test_request_returns_none_on_204(self) -> None:
         mock_resp = AsyncMock()
         mock_resp.status = 204
@@ -175,7 +177,6 @@ class TestBackendAIClient:
         result = await client._request("DELETE", "/resource/123")
         assert result is None
 
-    @pytest.mark.asyncio
     async def test_typed_request_no_content_success(self) -> None:
         mock_resp = AsyncMock()
         mock_resp.status = 204
@@ -184,7 +185,6 @@ class TestBackendAIClient:
         client = _make_client(mock_session)
         await client.typed_request_no_content("DELETE", "/resource/123")
 
-    @pytest.mark.asyncio
     async def test_typed_request_no_content_with_request_body(self) -> None:
         mock_resp = AsyncMock()
         mock_resp.status = 204
@@ -199,7 +199,6 @@ class TestBackendAIClient:
         call_kwargs = mock_session.request.call_args
         assert call_kwargs.kwargs["json"] == {"query": "update"}
 
-    @pytest.mark.asyncio
     async def test_typed_request_raises_on_unexpected_204(self) -> None:
         mock_resp = AsyncMock()
         mock_resp.status = 204
@@ -216,7 +215,6 @@ class TestBackendAIClient:
 
 
 class TestUpload:
-    @pytest.mark.asyncio
     async def test_upload_success_json_response(self) -> None:
         mock_resp = AsyncMock()
         mock_resp.status = 200
@@ -236,7 +234,6 @@ class TestUpload:
         assert "Authorization" in headers
         assert "Content-Type" not in headers
 
-    @pytest.mark.asyncio
     async def test_upload_returns_none_on_204(self) -> None:
         mock_resp = AsyncMock()
         mock_resp.status = 204
@@ -249,7 +246,6 @@ class TestUpload:
 
         assert result is None
 
-    @pytest.mark.asyncio
     async def test_upload_raises_on_error(self) -> None:
         mock_resp = AsyncMock()
         mock_resp.status = 500
@@ -265,7 +261,6 @@ class TestUpload:
 
 
 class TestDownload:
-    @pytest.mark.asyncio
     async def test_download_returns_bytes(self) -> None:
         mock_resp = AsyncMock()
         mock_resp.status = 200
@@ -281,7 +276,6 @@ class TestDownload:
         assert call_args.args[0] == "POST"
         assert call_args.kwargs["json"] == {"files": ["a.txt"]}
 
-    @pytest.mark.asyncio
     async def test_download_with_get_method(self) -> None:
         mock_resp = AsyncMock()
         mock_resp.status = 200
@@ -297,7 +291,6 @@ class TestDownload:
         assert call_args.args[0] == "GET"
         assert call_args.kwargs["params"] == {"taskId": "t-1"}
 
-    @pytest.mark.asyncio
     async def test_download_raises_on_error(self) -> None:
         mock_resp = AsyncMock()
         mock_resp.status = 404
@@ -345,7 +338,6 @@ def _make_sse_response_body(lines: list[bytes]) -> AsyncMock:
 
 
 class TestWSConnect:
-    @pytest.mark.asyncio
     async def test_ws_connect_success(self) -> None:
         mock_ws = _make_mock_ws()
         mock_session = MagicMock()
@@ -362,7 +354,6 @@ class TestWSConnect:
         assert "Authorization" in headers
         assert "X-BackendAI-Version" in headers
 
-    @pytest.mark.asyncio
     async def test_ws_connect_send_receive(self) -> None:
         mock_ws = _make_mock_ws()
         mock_session = MagicMock()
@@ -386,7 +377,6 @@ class TestWSConnect:
         mock_ws.send_bytes.assert_awaited_once_with(b"data")
         mock_ws.send_json.assert_awaited_once_with({"a": 1})
 
-    @pytest.mark.asyncio
     async def test_ws_connect_async_iteration(self) -> None:
         mock_ws = _make_mock_ws()
         msg1 = MagicMock(spec=aiohttp.WSMessage)
@@ -410,7 +400,6 @@ class TestWSConnect:
                 collected.append(msg.data)
         assert collected == ["first", "second"]
 
-    @pytest.mark.asyncio
     async def test_ws_connect_connection_error(self) -> None:
         mock_session = MagicMock()
         mock_session.ws_connect = AsyncMock(
@@ -422,7 +411,6 @@ class TestWSConnect:
             async with client.ws_connect("/stream/test"):
                 pass
 
-    @pytest.mark.asyncio
     async def test_ws_connect_closed_send_raises(self) -> None:
         mock_ws = _make_mock_ws(closed=True)
         mock_session = MagicMock()
@@ -435,7 +423,6 @@ class TestWSConnect:
             with pytest.raises(WebSocketError):
                 await ws.send_str("should fail")
 
-    @pytest.mark.asyncio
     async def test_ws_connect_handshake_error(self) -> None:
         mock_session = MagicMock()
         mock_session.ws_connect = AsyncMock(
@@ -455,7 +442,6 @@ class TestWSConnect:
 
 
 class TestSSEConnect:
-    @pytest.mark.asyncio
     async def test_sse_connect_success(self) -> None:
         mock_resp = _make_sse_response_body([
             b"event: ping\n",
@@ -475,7 +461,6 @@ class TestSSEConnect:
         assert "Authorization" in headers
         assert headers["Accept"] == "text/event-stream"
 
-    @pytest.mark.asyncio
     async def test_sse_connect_parses_events(self) -> None:
         mock_resp = _make_sse_response_body([
             b"event: update\n",
@@ -501,7 +486,6 @@ class TestSSEConnect:
         assert events[0] == SSEEvent(event="update", data="payload1", id="1", retry=None)
         assert events[1] == SSEEvent(event="update", data="payload2", id="2", retry=5000)
 
-    @pytest.mark.asyncio
     async def test_sse_connect_multi_line_data(self) -> None:
         mock_resp = _make_sse_response_body([
             b"data: line1\n",
@@ -521,7 +505,6 @@ class TestSSEConnect:
         assert len(events) == 1
         assert events[0].data == "line1\nline2\nline3"
 
-    @pytest.mark.asyncio
     async def test_sse_connect_ignores_comments(self) -> None:
         mock_resp = _make_sse_response_body([
             b": this is a comment\n",
@@ -540,7 +523,6 @@ class TestSSEConnect:
         assert len(events) == 1
         assert events[0].data == "actual"
 
-    @pytest.mark.asyncio
     async def test_sse_connect_server_close(self) -> None:
         mock_resp = _make_sse_response_body([
             b"data: first\n",
@@ -566,7 +548,6 @@ class TestSSEConnect:
         assert events[1].event == "server_close"
         assert events[1].data == "bye"
 
-    @pytest.mark.asyncio
     async def test_sse_connect_http_error(self) -> None:
         mock_resp = AsyncMock(spec=aiohttp.ClientResponse)
         mock_resp.status = 401
@@ -582,7 +563,6 @@ class TestSSEConnect:
             async with client.sse_connect("/events/test"):
                 pass
 
-    @pytest.mark.asyncio
     async def test_sse_connect_connection_error(self) -> None:
         mock_session = MagicMock()
         mock_session.get = AsyncMock(
@@ -594,7 +574,6 @@ class TestSSEConnect:
             async with client.sse_connect("/events/test"):
                 pass
 
-    @pytest.mark.asyncio
     async def test_sse_connect_default_event_type(self) -> None:
         """Events without explicit ``event:`` field default to ``message``."""
         mock_resp = _make_sse_response_body([
@@ -613,3 +592,47 @@ class TestSSEConnect:
         assert len(events) == 1
         assert events[0].event == "message"
         assert events[0].data == "hello"
+
+
+class TestBackendAIAnonymousClient:
+    async def test_extra_headers_merged_into_request(self) -> None:
+        mock_resp = AsyncMock()
+        mock_resp.status = 200
+        mock_resp.json = AsyncMock(return_value={"password_changed_at": "2025-01-01T00:00:00"})
+
+        mock_session = _make_request_session(mock_resp)
+        client = _make_anon_client(mock_session)
+
+        extra = {
+            "X-Forwarded-For": "10.0.0.1",
+            "X-Forwarded-Host": "example.com",
+            "X-Forwarded-Proto": "https",
+        }
+        await client._request("POST", "/auth/update-password-no-auth", json={}, extra_headers=extra)
+
+        call_kwargs = mock_session.request.call_args
+        headers = call_kwargs.kwargs["headers"]
+        assert headers["X-Forwarded-For"] == "10.0.0.1"
+        assert headers["X-Forwarded-Host"] == "example.com"
+        assert headers["X-Forwarded-Proto"] == "https"
+        # Default headers should still be present
+        assert "Date" in headers
+        assert "Content-Type" in headers
+        assert "X-BackendAI-Version" in headers
+
+    async def test_request_without_extra_headers(self) -> None:
+        mock_resp = AsyncMock()
+        mock_resp.status = 200
+        mock_resp.json = AsyncMock(return_value={"result": "ok"})
+
+        mock_session = _make_request_session(mock_resp)
+        client = _make_anon_client(mock_session)
+
+        await client._request("GET", "/test")
+
+        call_kwargs = mock_session.request.call_args
+        headers = call_kwargs.kwargs["headers"]
+        assert "Date" in headers
+        assert "Content-Type" in headers
+        assert "X-BackendAI-Version" in headers
+        assert "X-Forwarded-For" not in headers

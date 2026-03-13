@@ -3,8 +3,6 @@ from __future__ import annotations
 import uuid
 from typing import Any
 
-import pytest
-
 from ai.backend.client.v2.registry import BackendAIClientRegistry
 from ai.backend.common.dto.manager.error_log import (
     AppendErrorLogRequest,
@@ -39,7 +37,6 @@ def _make_append_request(
 
 
 class TestAppendErrorLog:
-    @pytest.mark.asyncio
     async def test_admin_appends_error_log(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -59,7 +56,6 @@ class TestAppendErrorLog:
         assert isinstance(result, AppendErrorLogResponse)
         assert result.success is True
 
-    @pytest.mark.asyncio
     async def test_admin_appends_error_log_minimal(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -74,7 +70,6 @@ class TestAppendErrorLog:
         assert isinstance(result, AppendErrorLogResponse)
         assert result.success is True
 
-    @pytest.mark.asyncio
     async def test_user_appends_error_log(
         self,
         user_registry: BackendAIClientRegistry,
@@ -91,7 +86,6 @@ class TestAppendErrorLog:
 
 
 class TestListErrorLogs:
-    @pytest.mark.asyncio
     async def test_admin_lists_error_logs(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -109,7 +103,6 @@ class TestListErrorLogs:
         assert log_entry.severity
         assert log_entry.is_cleared is not None  # admin sees is_cleared
 
-    @pytest.mark.asyncio
     async def test_user_lists_own_error_logs(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -130,15 +123,6 @@ class TestListErrorLogs:
         for log_entry in result.logs:
             assert log_entry.is_cleared is None  # non-admin does not see is_cleared
 
-    @pytest.mark.xfail(
-        strict=True,
-        reason=(
-            "Client SDK v2 HMAC signing omits query params; server verifies against"
-            " request.raw_path (including ?param=...). Endpoints passing query params"
-            " cause 401."
-        ),
-    )
-    @pytest.mark.asyncio
     async def test_list_logs_with_query_params(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -151,15 +135,6 @@ class TestListErrorLogs:
         )
         assert isinstance(result, ListErrorLogsResponse)
 
-    @pytest.mark.xfail(
-        strict=True,
-        reason=(
-            "Client SDK v2 HMAC signing omits query params; server verifies against"
-            " request.raw_path (including ?param=...). Endpoints passing query params"
-            " cause 401."
-        ),
-    )
-    @pytest.mark.asyncio
     async def test_list_logs_with_mark_read(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -174,7 +149,6 @@ class TestListErrorLogs:
 
 
 class TestMarkCleared:
-    @pytest.mark.asyncio
     async def test_admin_marks_log_cleared(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -201,7 +175,6 @@ class TestMarkCleared:
         assert cleared_log is not None
         assert cleared_log.is_cleared is True
 
-    @pytest.mark.asyncio
     async def test_user_marks_own_log_cleared(
         self,
         user_registry: BackendAIClientRegistry,

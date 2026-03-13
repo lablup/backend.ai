@@ -66,19 +66,20 @@ class ConfigClient(BaseDomainClient):
         )
 
     async def delete_user_dotfile(self, request: DeleteUserDotfileRequest) -> DeleteDotfileResponse:
+        params = request.model_dump(mode="json", exclude_none=True)
         return await self._client.typed_request(
             "DELETE",
             "/user-config/dotfiles",
-            request=request,
+            params={k: str(v) for k, v in params.items()},
             response_model=DeleteDotfileResponse,
         )
 
     async def get_bootstrap_script(self) -> GetBootstrapScriptResponse:
-        # The server returns a bare JSON string (not wrapped in an object),
-        # so we cannot use typed_request() which expects a dict response.
-        data = await self._client._request("GET", "/user-config/bootstrap-script")
-        script = data if isinstance(data, str) else ""
-        return GetBootstrapScriptResponse(script=script)
+        return await self._client.typed_request(
+            "GET",
+            "/user-config/bootstrap-script",
+            response_model=GetBootstrapScriptResponse,
+        )
 
     async def update_bootstrap_script(
         self, request: UpdateBootstrapScriptRequest
@@ -133,10 +134,11 @@ class ConfigClient(BaseDomainClient):
     async def delete_group_dotfile(
         self, request: DeleteGroupDotfileRequest
     ) -> DeleteDotfileResponse:
+        params = request.model_dump(mode="json", exclude_none=True)
         return await self._client.typed_request(
             "DELETE",
             "/group-config/dotfiles",
-            request=request,
+            params={k: str(v) for k, v in params.items()},
             response_model=DeleteDotfileResponse,
         )
 
@@ -183,9 +185,10 @@ class ConfigClient(BaseDomainClient):
     async def delete_domain_dotfile(
         self, request: DeleteDomainDotfileRequest
     ) -> DeleteDotfileResponse:
+        params = request.model_dump(mode="json", exclude_none=True)
         return await self._client.typed_request(
             "DELETE",
             "/domain-config/dotfiles",
-            request=request,
+            params={k: str(v) for k, v in params.items()},
             response_model=DeleteDotfileResponse,
         )

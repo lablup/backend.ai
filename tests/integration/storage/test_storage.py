@@ -11,7 +11,6 @@ from ai.backend.common.dto.manager.storage.response import (
 
 @pytest.mark.integration
 class TestObjectStorageLifecycle:
-    @pytest.mark.asyncio
     async def test_list_object_storages(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -27,7 +26,6 @@ class TestObjectStorageLifecycle:
 
 @pytest.mark.integration
 class TestVFSStorageLifecycle:
-    @pytest.mark.asyncio
     async def test_list_vfs_storages(
         self,
         admin_registry: BackendAIClientRegistry,

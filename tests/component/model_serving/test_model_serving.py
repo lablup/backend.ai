@@ -21,7 +21,6 @@ from ai.backend.common.dto.manager.model_serving import (
 
 
 class TestListServe:
-    @pytest.mark.asyncio
     async def test_admin_lists_empty_services(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -30,7 +29,6 @@ class TestListServe:
         assert isinstance(result, list)
         assert len(result) == 0
 
-    @pytest.mark.asyncio
     async def test_user_lists_empty_services(
         self,
         user_registry: BackendAIClientRegistry,
@@ -39,15 +37,6 @@ class TestListServe:
         assert isinstance(result, list)
         assert len(result) == 0
 
-    @pytest.mark.xfail(
-        strict=True,
-        reason=(
-            "Client SDK v2 HMAC signing omits query params; server verifies against"
-            " request.raw_path (including ?param=...). Endpoints passing query params"
-            " cause 401."
-        ),
-    )
-    @pytest.mark.asyncio
     async def test_list_serve_with_name_filter(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -58,7 +47,6 @@ class TestListServe:
 
 
 class TestSearchServices:
-    @pytest.mark.asyncio
     async def test_admin_searches_empty_services(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -72,7 +60,6 @@ class TestSearchServices:
         assert result.pagination.offset == 0
         assert result.pagination.limit == 20
 
-    @pytest.mark.asyncio
     async def test_search_with_pagination(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -86,7 +73,6 @@ class TestSearchServices:
 
 
 class TestListSupportedRuntimes:
-    @pytest.mark.asyncio
     async def test_admin_lists_runtimes(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -98,7 +84,6 @@ class TestListSupportedRuntimes:
             assert rt.name
             assert rt.human_readable_name
 
-    @pytest.mark.asyncio
     async def test_user_lists_runtimes(
         self,
         user_registry: BackendAIClientRegistry,
@@ -117,7 +102,6 @@ _RANDOM_ROUTE_ID = uuid.uuid4()
 
 
 class TestGetInfo:
-    @pytest.mark.asyncio
     async def test_get_info_nonexistent_service(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -127,7 +111,6 @@ class TestGetInfo:
 
 
 class TestDeleteService:
-    @pytest.mark.asyncio
     async def test_delete_nonexistent_service(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -137,7 +120,6 @@ class TestDeleteService:
 
 
 class TestSync:
-    @pytest.mark.asyncio
     async def test_sync_nonexistent_service(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -147,7 +129,6 @@ class TestSync:
 
 
 class TestScale:
-    @pytest.mark.asyncio
     async def test_scale_nonexistent_service(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -160,7 +141,6 @@ class TestScale:
 
 
 class TestUpdateRoute:
-    @pytest.mark.asyncio
     async def test_update_route_nonexistent_service(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -174,7 +154,6 @@ class TestUpdateRoute:
 
 
 class TestDeleteRoute:
-    @pytest.mark.asyncio
     async def test_delete_route_nonexistent_service(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -187,7 +166,6 @@ class TestDeleteRoute:
 
 
 class TestGenerateToken:
-    @pytest.mark.asyncio
     async def test_generate_token_nonexistent_service(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -200,7 +178,6 @@ class TestGenerateToken:
 
 
 class TestListErrors:
-    @pytest.mark.asyncio
     async def test_list_errors_nonexistent_service(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -210,7 +187,6 @@ class TestListErrors:
 
 
 class TestClearError:
-    @pytest.mark.asyncio
     async def test_clear_error_nonexistent_service(
         self,
         admin_registry: BackendAIClientRegistry,

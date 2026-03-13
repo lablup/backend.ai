@@ -63,15 +63,15 @@ class TestVFolderCreateResponse:
             max_files=0,
             cur_size=0,
         )
-        resp = VFolderCreateResponse(item=item)
-        assert resp.item.name == "test-folder"
-        assert resp.item.id == "abc123"
+        resp = VFolderCreateResponse(item)
+        assert resp.root.name == "test-folder"
+        assert resp.root.id == "abc123"
 
 
 class TestVFolderListResponse:
     def test_empty_list(self) -> None:
-        resp = VFolderListResponse()
-        assert resp.items == []
+        resp = VFolderListResponse([])
+        assert resp.root == []
 
     def test_with_items(self) -> None:
         item = VFolderItemField(
@@ -96,8 +96,8 @@ class TestVFolderListResponse:
             max_files=0,
             cur_size=0,
         )
-        resp = VFolderListResponse(items=[item])
-        assert len(resp.items) == 1
+        resp = VFolderListResponse([item])
+        assert len(resp.root) == 1
 
 
 class TestVFolderCreatedDTO:
@@ -252,8 +252,14 @@ class TestVFolderCloneResponse:
 
 class TestFileOperationResponses:
     def test_mkdir_response(self) -> None:
-        resp = MkdirResponse(results=["ok", "ok"])
-        assert len(resp.results) == 2
+        resp = MkdirResponse.model_validate({
+            "results": {
+                "success": [{"msg": None, "item": "test1"}],
+                "failed": [],
+            },
+        })
+        assert resp.results["success"][0]["item"] == "test1"
+        assert resp.results["failed"] == []
 
     def test_download_session_response(self) -> None:
         resp = CreateDownloadSessionResponse(token="tok-123", url="https://dl.example.com/file")
@@ -294,8 +300,8 @@ class TestAdminResponses:
         assert len(resp.allowed) == 2
 
     def test_allowed_types_response(self) -> None:
-        resp = ListAllowedTypesResponse(allowed_types=["user", "group"])
-        assert "user" in resp.allowed_types
+        resp = ListAllowedTypesResponse(["user", "group"])
+        assert "user" in resp.root
 
     def test_update_quota_response(self) -> None:
         resp = UpdateQuotaResponse(size_bytes=1024)

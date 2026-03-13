@@ -31,7 +31,6 @@ class MockConfig:
 class TestManagerClientProvider:
     """Test ManagerClientProvider lifecycle."""
 
-    @pytest.mark.asyncio
     @patch("ai.backend.web.dependencies.components.manager_client.ClientPool")
     async def test_provide_manager_client(self, mock_client_pool_class: MagicMock) -> None:
         """Provider should create and close manager client pool."""
@@ -59,7 +58,6 @@ class TestManagerClientProvider:
         # Client pool should be closed after context exit
         mock_pool.close.assert_called_once()
 
-    @pytest.mark.asyncio
     @patch("ai.backend.web.dependencies.components.manager_client.ClientPool")
     async def test_cleanup_on_exception(self, mock_client_pool_class: MagicMock) -> None:
         """Provider should cleanup client pool even on exception."""
@@ -85,7 +83,6 @@ class TestManagerClientProvider:
         # Client pool should still be closed
         mock_pool.close.assert_called_once()
 
-    @pytest.mark.asyncio
     @patch("ai.backend.web.dependencies.components.manager_client.ClientPool")
     async def test_stage_name(self, mock_client_pool_class: MagicMock) -> None:
         """Provider should have correct stage name."""

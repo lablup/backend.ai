@@ -108,7 +108,6 @@ class TestRescanGPUAllocMapsHandler:
         """Test handler returns correct manifest type."""
         assert RescanGPUAllocMapsHandler.manifest_type() == RescanGPUAllocMapsManifest
 
-    @pytest.mark.asyncio
     async def test_execute_success(
         self,
         handler: RescanGPUAllocMapsHandler,
@@ -140,7 +139,6 @@ class TestRescanGPUAllocMapsHandler:
             sample_alloc_map,
         )
 
-    @pytest.mark.asyncio
     async def test_execute_scan_failure(
         self,
         handler: RescanGPUAllocMapsHandler,

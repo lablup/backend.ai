@@ -35,7 +35,6 @@ def service(mock_repository: MagicMock) -> ResourceUsageService:
 
 
 class TestSearchDomainUsageBuckets:
-    @pytest.mark.asyncio
     async def test_search_domain_usage_buckets_returns_result(
         self,
         service: ResourceUsageService,
@@ -63,7 +62,6 @@ class TestSearchDomainUsageBuckets:
         assert result.items == [mock_bucket]
         assert result.total_count == 1
 
-    @pytest.mark.asyncio
     async def test_search_domain_usage_buckets_passes_querier(
         self,
         service: ResourceUsageService,
@@ -96,7 +94,6 @@ class TestSearchDomainUsageBuckets:
 
 
 class TestSearchProjectUsageBuckets:
-    @pytest.mark.asyncio
     async def test_search_project_usage_buckets_returns_result(
         self,
         service: ResourceUsageService,
@@ -124,7 +121,6 @@ class TestSearchProjectUsageBuckets:
         assert result.items == [mock_bucket]
         assert result.total_count == 1
 
-    @pytest.mark.asyncio
     async def test_search_project_usage_buckets_passes_querier(
         self,
         service: ResourceUsageService,
@@ -157,7 +153,6 @@ class TestSearchProjectUsageBuckets:
 
 
 class TestSearchUserUsageBuckets:
-    @pytest.mark.asyncio
     async def test_search_user_usage_buckets_returns_result(
         self,
         service: ResourceUsageService,
@@ -185,7 +180,6 @@ class TestSearchUserUsageBuckets:
         assert result.items == [mock_bucket]
         assert result.total_count == 1
 
-    @pytest.mark.asyncio
     async def test_search_user_usage_buckets_passes_querier(
         self,
         service: ResourceUsageService,

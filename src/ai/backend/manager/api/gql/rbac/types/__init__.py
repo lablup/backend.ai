@@ -21,9 +21,17 @@ from .permission import (
     PermissionOrderBy,
     PermissionOrderField,
     RBACElementTypeGQL,
+    ScopeEntityCombinationGQL,
+    UpdatePermissionInput,
 )
 from .role import (
     AssignRoleInput,
+    BulkAssignRoleErrorGQL,
+    BulkAssignRoleInputGQL,
+    BulkAssignRolePayloadGQL,
+    BulkRevokeRoleErrorGQL,
+    BulkRevokeRoleInputGQL,
+    BulkRevokeRolePayloadGQL,
     CreateRoleInput,
     DeleteRoleInput,
     DeleteRolePayload,
@@ -34,6 +42,9 @@ from .role import (
     RoleAssignmentEdge,
     RoleAssignmentFilter,
     RoleAssignmentGQL,
+    RoleAssignmentOrderBy,
+    RoleAssignmentOrderField,
+    RoleAssignmentRoleNestedFilterGQL,
     RoleConnection,
     RoleEdge,
     RoleFilter,
@@ -54,6 +65,7 @@ __all__ = [
     "RoleSourceGQL",
     "RoleStatusGQL",
     "RoleOrderField",
+    "RoleAssignmentOrderField",
     # Entity enums
     "EntityOrderField",
     # Types
@@ -65,13 +77,16 @@ __all__ = [
     "PermissionFilter",
     "RoleFilter",
     "RoleAssignmentFilter",
+    "RoleAssignmentRoleNestedFilterGQL",
     "EntityFilter",
     # OrderBy
     "PermissionOrderBy",
     "RoleOrderBy",
+    "RoleAssignmentOrderBy",
     "EntityOrderBy",
     # Inputs
     "CreatePermissionInput",
+    "UpdatePermissionInput",
     "DeletePermissionInput",
     "CreateRoleInput",
     "UpdateRoleInput",
@@ -79,10 +94,16 @@ __all__ = [
     "PurgeRoleInput",
     "AssignRoleInput",
     "RevokeRoleInput",
+    "BulkAssignRoleInputGQL",
+    "BulkRevokeRoleInputGQL",
     # Payloads
     "DeletePermissionPayload",
     "DeleteRolePayload",
     "PurgeRolePayload",
+    "BulkAssignRoleErrorGQL",
+    "BulkAssignRolePayloadGQL",
+    "BulkRevokeRoleErrorGQL",
+    "BulkRevokeRolePayloadGQL",
     # Connections
     "PermissionConnection",
     "PermissionEdge",
@@ -94,4 +115,6 @@ __all__ = [
     "EntityNode",
     "EntityEdge",
     "EntityConnection",
+    # Scope-entity combination
+    "ScopeEntityCombinationGQL",
 ]

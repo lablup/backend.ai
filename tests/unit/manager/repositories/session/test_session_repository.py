@@ -306,7 +306,6 @@ class TestSessionRepository:
     # Tests - SearchKernels
     # =========================================================================
 
-    @pytest.mark.asyncio
     async def test_search_kernels(
         self,
         repository: SessionRepository,
@@ -329,7 +328,6 @@ class TestSessionRepository:
         assert kernel_info.id == session_with_kernel.kernel_id
         assert kernel_info.session.session_id == str(session_with_kernel.session_id)
 
-    @pytest.mark.asyncio
     async def test_search_kernels_empty_result(
         self,
         repository: SessionRepository,
@@ -351,7 +349,6 @@ class TestSessionRepository:
     # Tests - SearchSessions
     # =========================================================================
 
-    @pytest.mark.asyncio
     async def test_search_sessions(
         self,
         repository: SessionRepository,
@@ -378,7 +375,6 @@ class TestSessionRepository:
         assert session_data.user_uuid == session_with_kernel.user_id
         assert session_data.access_key == session_with_kernel.access_key
 
-    @pytest.mark.asyncio
     async def test_search_sessions_empty_result(
         self,
         repository: SessionRepository,
@@ -653,7 +649,6 @@ class TestBatchPopulateSessionOccupiedSlots:
             access_key=access_key,
         )
 
-    @pytest.mark.asyncio
     async def test_batch_populate_computes_slots_from_resource_allocations(
         self,
         db_with_resource_tables: ExtendedAsyncSAEngine,
@@ -685,7 +680,6 @@ class TestBatchPopulateSessionOccupiedSlots:
             # mem: used=NULL -> requested=2147483648
             assert slots["mem"] == Decimal("2147483648")
 
-    @pytest.mark.asyncio
     async def test_batch_populate_empty_sessions(
         self,
         db_with_resource_tables: ExtendedAsyncSAEngine,
@@ -694,7 +688,6 @@ class TestBatchPopulateSessionOccupiedSlots:
         async with db_with_resource_tables.begin_readonly_session() as db_sess:
             await batch_populate_session_occupied_slots(db_sess, [])
 
-    @pytest.mark.asyncio
     async def test_search_returns_computed_occupied_slots(
         self,
         db_with_resource_tables: ExtendedAsyncSAEngine,

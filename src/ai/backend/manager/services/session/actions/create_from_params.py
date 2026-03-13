@@ -27,6 +27,7 @@ class CreateFromParamsActionParams:
     config: dict[str, Any]
     tag: str
     priority: int
+    is_preemptible: bool
     owner_access_key: AccessKey
     enqueue_only: bool
     max_wait_seconds: int

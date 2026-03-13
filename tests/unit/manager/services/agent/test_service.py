@@ -127,7 +127,6 @@ def sample_agent_info() -> AgentInfo:
 
 
 class TestAgentService:
-    @pytest.mark.asyncio
     async def test_handle_heartbeat_normal_update(
         self,
         agent_service: AgentService,
@@ -189,7 +188,6 @@ class TestAgentService:
             ),
         )
 
-    @pytest.mark.asyncio
     async def test_handle_heartbeat_agent_revival(
         self,
         agent_service: AgentService,
@@ -244,7 +242,6 @@ class TestAgentService:
             ),
         )
 
-    @pytest.mark.asyncio
     async def test_handle_heartbeat_new_agent(
         self,
         agent_service: AgentService,
@@ -283,7 +280,6 @@ class TestAgentService:
         mock_agent_repository.sync_installed_images.assert_called_once()
         mock_hook_plugin_ctx.notify.assert_called_once()
 
-    @pytest.mark.asyncio
     async def test_handle_heartbeat_with_resource_update(
         self,
         agent_service: AgentService,
@@ -348,7 +344,6 @@ class TestAgentService:
         assert hook_args[0] == "POST_AGENT_HEARTBEAT"
         assert hook_args[1][2] == agent_info.available_resource_slots
 
-    @pytest.mark.asyncio
     async def test_handle_heartbeat_concurrent_heartbeats(
         self,
         agent_service: AgentService,
@@ -489,7 +484,6 @@ class TestWatcher:
         ):
             yield agent_service
 
-    @pytest.mark.asyncio
     async def test_agent_start_success(
         self, watcher_service_ok: AgentService, agent_id: AgentId
     ) -> None:
@@ -501,7 +495,6 @@ class TestWatcher:
         # Then
         assert result.data == {"result": "ok"}
 
-    @pytest.mark.asyncio
     async def test_agent_stop_success(
         self, watcher_service_ok: AgentService, agent_id: AgentId
     ) -> None:
@@ -513,7 +506,6 @@ class TestWatcher:
         # Then
         assert result.data == {"result": "ok"}
 
-    @pytest.mark.asyncio
     async def test_agent_restart_success(
         self, watcher_service_ok: AgentService, agent_id: AgentId
     ) -> None:
@@ -525,7 +517,6 @@ class TestWatcher:
         # Then
         assert result.data == {"result": "ok"}
 
-    @pytest.mark.asyncio
     async def test_get_status_success(
         self, watcher_service_ok_get: AgentService, agent_id: AgentId
     ) -> None:
@@ -540,7 +531,6 @@ class TestWatcher:
 
     # ==================== Error Tests ====================
 
-    @pytest.mark.asyncio
     async def test_agent_start_forbidden(
         self, watcher_service_forbidden: AgentService, agent_id: AgentId
     ) -> None:
@@ -553,7 +543,6 @@ class TestWatcher:
         assert exc_info.value.status_code == HTTPStatus.FORBIDDEN
         assert "Agent watcher error" in str(exc_info.value)
 
-    @pytest.mark.asyncio
     async def test_agent_stop_internal_error(
         self, watcher_service_error: AgentService, agent_id: AgentId
     ) -> None:

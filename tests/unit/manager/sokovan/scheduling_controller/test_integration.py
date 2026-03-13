@@ -459,7 +459,17 @@ class TestMultiContainerSession:
                     },
                 ),
             },
-            vfolder_mounts=[],
+            vfolder_mounts=[
+                VFolderMount(
+                    name="my-model",
+                    vfid=VFolderID(quota_scope_id=None, folder_id=uuid.uuid4()),
+                    vfsubpath=PurePosixPath("."),
+                    host_path=PurePosixPath("/data/vfolders/model"),
+                    kernel_path=PurePosixPath("/home/work/model"),
+                    mount_perm=MountPermission.READ_ONLY,
+                    usage_mode=VFolderUsageMode.MODEL,
+                ),
+            ],
             dotfile_data={},
             container_user_info=ContainerUserInfo(),
         )
@@ -1002,7 +1012,17 @@ class TestMultiClusterScenarios:
                     },
                 )
             },
-            vfolder_mounts=[],
+            vfolder_mounts=[
+                VFolderMount(
+                    name="llm-weights",
+                    vfid=VFolderID(quota_scope_id=None, folder_id=uuid.uuid4()),
+                    vfsubpath=PurePosixPath("."),
+                    host_path=PurePosixPath("/data/vfolders/llm-weights"),
+                    kernel_path=PurePosixPath("/home/work/model"),
+                    mount_perm=MountPermission.READ_ONLY,
+                    usage_mode=VFolderUsageMode.MODEL,
+                ),
+            ],
             dotfile_data={},
             container_user_info=ContainerUserInfo(),
         )
@@ -1026,7 +1046,6 @@ class TestMultiClusterScenarios:
             assert kernel.image == "llm:server"
 
 
-@pytest.mark.asyncio
 class TestMarkSessionsForTermination:
     """Test cases for SchedulingController.mark_sessions_for_termination"""
 

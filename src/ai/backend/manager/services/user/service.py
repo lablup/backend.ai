@@ -59,6 +59,10 @@ from ai.backend.manager.services.user.actions.search_users_by_project import (
     SearchUsersByProjectAction,
     SearchUsersByProjectActionResult,
 )
+from ai.backend.manager.services.user.actions.search_users_by_role import (
+    SearchUsersByRoleAction,
+    SearchUsersByRoleActionResult,
+)
 from ai.backend.manager.services.user.actions.user_month_stats import (
     UserMonthStatsAction,
     UserMonthStatsActionResult,
@@ -357,6 +361,20 @@ class UserService:
             scope=action.scope, querier=action.querier
         )
         return SearchUsersByProjectActionResult(
+            users=result.items,
+            total_count=result.total_count,
+            has_next_page=result.has_next_page,
+            has_previous_page=result.has_previous_page,
+        )
+
+    async def search_users_by_role(
+        self, action: SearchUsersByRoleAction
+    ) -> SearchUsersByRoleActionResult:
+        """Search users assigned to a role."""
+        result = await self._user_repository.search_users_by_role(
+            scope=action.scope, querier=action.querier
+        )
+        return SearchUsersByRoleActionResult(
             users=result.items,
             total_count=result.total_count,
             has_next_page=result.has_next_page,

@@ -23,7 +23,6 @@ StorageNamespaceFactory = Callable[..., Coroutine[Any, Any, dict[str, Any]]]
 
 
 class TestListObjectStorages:
-    @pytest.mark.asyncio
     async def test_admin_lists_empty_storages(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -32,7 +31,6 @@ class TestListObjectStorages:
         assert isinstance(result, ObjectStorageListResponse)
         assert result.storages == []
 
-    @pytest.mark.asyncio
     async def test_admin_lists_storages(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -45,7 +43,6 @@ class TestListObjectStorages:
         names = [s.name for s in result.storages]
         assert created["name"] in names
 
-    @pytest.mark.asyncio
     async def test_user_lists_storages(
         self,
         user_registry: BackendAIClientRegistry,
@@ -59,7 +56,6 @@ class TestListObjectStorages:
 
 
 class TestGetAllBuckets:
-    @pytest.mark.asyncio
     async def test_admin_gets_all_buckets_empty(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -68,7 +64,6 @@ class TestGetAllBuckets:
         assert isinstance(result, ObjectStorageAllBucketsResponse)
         assert result.buckets_by_storage == {}
 
-    @pytest.mark.asyncio
     async def test_admin_gets_all_buckets(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -84,7 +79,6 @@ class TestGetAllBuckets:
 
 
 class TestGetBuckets:
-    @pytest.mark.asyncio
     async def test_admin_gets_buckets_for_storage(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -97,7 +91,6 @@ class TestGetBuckets:
         assert isinstance(result, ObjectStorageBucketsResponse)
         assert ns["namespace"] in result.buckets
 
-    @pytest.mark.asyncio
     async def test_admin_gets_buckets_empty_storage(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -110,7 +103,6 @@ class TestGetBuckets:
 
 
 class TestPresignedUploadURL:
-    @pytest.mark.asyncio
     async def test_upload_url_fails_without_reservoir_config(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -125,7 +117,6 @@ class TestPresignedUploadURL:
 
 
 class TestPresignedDownloadURL:
-    @pytest.mark.asyncio
     async def test_download_url_fails_without_reservoir_config(
         self,
         admin_registry: BackendAIClientRegistry,

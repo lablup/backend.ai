@@ -106,7 +106,6 @@ class TestOrphanKernelCleanupObserver:
 
     # ===== Tests =====
 
-    @pytest.mark.asyncio
     async def test_skip_when_no_agent_last_check(
         self,
         observer: OrphanKernelCleanupObserver,
@@ -121,7 +120,6 @@ class TestOrphanKernelCleanupObserver:
         # Should not call inject_container_lifecycle_event
         mock_agent.inject_container_lifecycle_event.assert_not_called()
 
-    @pytest.mark.asyncio
     async def test_skip_when_no_kernels_in_registry(
         self,
         observer: OrphanKernelCleanupObserver,
@@ -136,7 +134,6 @@ class TestOrphanKernelCleanupObserver:
 
         mock_agent.inject_container_lifecycle_event.assert_not_called()
 
-    @pytest.mark.asyncio
     async def test_skip_when_kernel_status_none(
         self,
         observer: OrphanKernelCleanupObserver,
@@ -158,7 +155,6 @@ class TestOrphanKernelCleanupObserver:
 
         mock_agent.inject_container_lifecycle_event.assert_not_called()
 
-    @pytest.mark.asyncio
     async def test_skip_when_kernel_last_check_is_none(
         self,
         observer: OrphanKernelCleanupObserver,
@@ -186,7 +182,6 @@ class TestOrphanKernelCleanupObserver:
         # Should not call inject_container_lifecycle_event when last_check is None
         mock_agent.inject_container_lifecycle_event.assert_not_called()
 
-    @pytest.mark.asyncio
     async def test_skip_when_kernel_recently_checked(
         self,
         observer: OrphanKernelCleanupObserver,
@@ -217,7 +212,6 @@ class TestOrphanKernelCleanupObserver:
 
         mock_agent.inject_container_lifecycle_event.assert_not_called()
 
-    @pytest.mark.asyncio
     async def test_skip_when_kernel_exactly_at_threshold(
         self,
         observer: OrphanKernelCleanupObserver,
@@ -248,7 +242,6 @@ class TestOrphanKernelCleanupObserver:
 
         mock_agent.inject_container_lifecycle_event.assert_not_called()
 
-    @pytest.mark.asyncio
     async def test_cleanup_orphan_kernel(
         self,
         observer: OrphanKernelCleanupObserver,
@@ -285,7 +278,6 @@ class TestOrphanKernelCleanupObserver:
             suppress_events=True,
         )
 
-    @pytest.mark.asyncio
     async def test_cleanup_multiple_orphan_kernels(
         self,
         observer: OrphanKernelCleanupObserver,
@@ -347,7 +339,6 @@ class TestOrphanKernelCleanupObserver:
         assert orphan_kernel_2 in called_kernel_ids
         assert healthy_kernel not in called_kernel_ids
 
-    @pytest.mark.asyncio
     async def test_continue_on_cleanup_failure(
         self,
         observer: OrphanKernelCleanupObserver,
@@ -398,7 +389,6 @@ class TestOrphanKernelCleanupObserver:
         # Both calls should have been attempted
         assert mock_agent.inject_container_lifecycle_event.call_count == 2
 
-    @pytest.mark.asyncio
     async def test_mixed_kernel_statuses(
         self,
         observer: OrphanKernelCleanupObserver,

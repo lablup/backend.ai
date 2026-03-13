@@ -10,7 +10,6 @@ from .conftest import SessionSeedData
 
 
 class TestGetStreamApps:
-    @pytest.mark.asyncio
     async def test_admin_gets_stream_apps(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -33,7 +32,6 @@ class TestGetStreamApps:
         assert ttyd_app.protocol == "http"
         assert ttyd_app.ports == [7681]
 
-    @pytest.mark.asyncio
     async def test_empty_stream_apps(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -46,7 +44,6 @@ class TestGetStreamApps:
         assert isinstance(result, GetStreamAppsResponse)
         assert result.root == []
 
-    @pytest.mark.asyncio
     async def test_session_not_found(
         self,
         admin_registry: BackendAIClientRegistry,

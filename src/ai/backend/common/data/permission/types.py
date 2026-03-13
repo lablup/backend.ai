@@ -98,6 +98,7 @@ class EntityType(enum.StrEnum):
     ERROR_LOG = "error_log"
     EXPORT = "export"
     GROUP = "group"
+    KERNEL = "kernel"
     KEYPAIR = "keypair"
     MODEL_SERVICE = "model_service"
     NETWORK = "network"
@@ -107,9 +108,17 @@ class EntityType(enum.StrEnum):
     PERMISSION = "permission"
     AGENT_RESOURCE = "agent_resource"
     RESOURCE_ALLOCATION = "resource_allocation"
+    RESOURCE_SLOT_TYPE = "resource_slot_type"
+    RESOURCE_OVERVIEW = "resource_overview"
     RESOURCE_GROUP = "resource_group"
+    PROMETHEUS_QUERY_PRESET = "prometheus_query_preset"
     RESOURCE_PRESET = "resource_preset"
     ROLE = "role"
+    ROUTING = "routing"
+    DOTFILE = "dotfile"
+    ETCD_CONFIG = "etcd_config"
+    MANAGER_ADMIN = "manager_admin"
+    SESSION_TEMPLATE = "session_template"
     STORAGE_NAMESPACE = "storage_namespace"
     VFS_STORAGE = "vfs_storage"
 
@@ -287,9 +296,9 @@ class EntityType(enum.StrEnum):
 class FieldType(enum.StrEnum):
     """Field types for RBAC field-scoped entities.
 
-    Fields are sub-resources that belong to a parent entity.
-    Unlike EntityType which represents scope-scoped entities,
-    FieldType represents entity-scoped sub-entities.
+    Deprecated: No longer actively used. The field-scoped entity concept
+    (RBACFieldCreator/RBACFieldPurger) was removed by BEP-1048.
+    Kept only for the existing entity_fields table schema compatibility.
     """
 
     KERNEL = "kernel"
@@ -311,10 +320,12 @@ class ScopeType(enum.StrEnum):
     # === Entity-level scopes ===
     SESSION = "session"
     DEPLOYMENT = "deployment"
+    MODEL_DEPLOYMENT = "model_deployment"
     VFOLDER = "vfolder"
     IMAGE = "image"
     ARTIFACT = "artifact"
     ARTIFACT_REVISION = "artifact_revision"
+    AGENT = "agent"
     ROLE = "role"
     NOTIFICATION_CHANNEL = "notification_channel"
 
@@ -349,7 +360,6 @@ class RBACElementType(enum.StrEnum):
     # === Root-query-enabled entities (scoped) ===
     SESSION = "session"
     VFOLDER = "vfolder"
-    DEPLOYMENT = "deployment"
     MODEL_DEPLOYMENT = "model_deployment"
     KEYPAIR = "keypair"
     NOTIFICATION_CHANNEL = "notification_channel"
@@ -357,6 +367,9 @@ class RBACElementType(enum.StrEnum):
     RESOURCE_GROUP = "resource_group"
     CONTAINER_REGISTRY = "container_registry"
     STORAGE_HOST = "storage_host"
+    AGENT = "agent"
+    KERNEL = "kernel"
+    ROUTING = "routing"
     IMAGE = "image"
     ARTIFACT = "artifact"
     ARTIFACT_REGISTRY = "artifact_registry"

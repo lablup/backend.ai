@@ -181,6 +181,7 @@ class ErrorDomain(enum.StrEnum):
     KEYPAIR_RESOURCE_POLICY = "keypair-resource-policy"
     DATABASE = "database"
     USER_RESOURCE_POLICY = "user-resource-policy"
+    PROMETHEUS_QUERY_PRESET = "prometheus-query-preset"
 
     EXTERNAL_SYSTEM = "external-system"  # Errors from external systems
 
@@ -1166,4 +1167,40 @@ class RBACTypeConversionError(BackendAIError, web.HTTPInternalServerError):
             domain=ErrorDomain.PERMISSION,
             operation=ErrorOperation.GENERIC,
             error_detail=ErrorDetail.INTERNAL_ERROR,
+        )
+
+
+class PrometheusQueryPresetNotFound(BackendAIError, web.HTTPNotFound):
+    error_type = "https://api.backend.ai/probs/prometheus-query-preset-not-found"
+    error_title = "The prometheus query preset does not exist."
+
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.PROMETHEUS_QUERY_PRESET,
+            operation=ErrorOperation.READ,
+            error_detail=ErrorDetail.NOT_FOUND,
+        )
+
+
+class PrometheusQueryPresetInvalidLabel(BackendAIError, web.HTTPBadRequest):
+    error_type = "https://api.backend.ai/probs/prometheus-query-preset-invalid-label"
+    error_title = "Invalid label specified for prometheus query preset execution."
+
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.PROMETHEUS_QUERY_PRESET,
+            operation=ErrorOperation.EXECUTE,
+            error_detail=ErrorDetail.INVALID_PARAMETERS,
+        )
+
+
+class CloudDetectionError(BackendAIError, web.HTTPInternalServerError):
+    error_type = "https://api.backend.ai/probs/cloud-detection-failed"
+    error_title = "Cloud Provider Detection Failed"
+
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.EXTERNAL_SYSTEM,
+            operation=ErrorOperation.READ,
+            error_detail=ErrorDetail.BAD_REQUEST,
         )

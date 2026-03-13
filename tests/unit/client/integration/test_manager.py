@@ -6,7 +6,6 @@ from ai.backend.client.session import Session
 pytestmark = pytest.mark.integration
 
 
-@pytest.mark.asyncio
 async def test_get_manager_status() -> None:
     with Session() as sess:
         resp = sess.Manager.status()

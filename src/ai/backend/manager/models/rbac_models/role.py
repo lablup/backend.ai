@@ -71,8 +71,12 @@ class RoleRow(Base):  # type: ignore[misc]
     created_at: Mapped[datetime] = mapped_column(
         "created_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.func.now()
     )
-    updated_at: Mapped[datetime | None] = mapped_column(
-        "updated_at", sa.DateTime(timezone=True), nullable=True
+    updated_at: Mapped[datetime] = mapped_column(
+        "updated_at",
+        sa.DateTime(timezone=True),
+        server_default=sa.func.now(),
+        onupdate=sa.func.now(),
+        nullable=False,
     )
     deleted_at: Mapped[datetime | None] = mapped_column(
         "deleted_at", sa.DateTime(timezone=True), nullable=True
@@ -97,7 +101,7 @@ class RoleRow(Base):  # type: ignore[misc]
             source=self.source,
             status=self.status,
             created_at=self.created_at,
-            updated_at=self.updated_at or self.created_at,
+            updated_at=self.updated_at,
             deleted_at=self.deleted_at,
             description=self.description,
         )
@@ -110,7 +114,7 @@ class RoleRow(Base):  # type: ignore[misc]
             source=self.source,
             status=self.status,
             created_at=self.created_at,
-            updated_at=self.updated_at or self.created_at,
+            updated_at=self.updated_at,
             deleted_at=self.deleted_at,
             description=self.description,
             object_permissions=[op_row.to_data() for op_row in self.object_permission_rows],

@@ -6,14 +6,12 @@ from types import SimpleNamespace
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock
 
-import pytest
 import sqlalchemy as sa
 
 from ai.backend.manager.api.gql_legacy.base import batch_result_in_scalar_stream
 from ai.backend.manager.models.base import DecimalType
 
 
-@pytest.mark.asyncio
 async def test_batch_result_in_scalar_stream() -> None:
     key_list = [1, 2, 3]
 

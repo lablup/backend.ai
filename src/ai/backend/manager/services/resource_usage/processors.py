@@ -7,6 +7,7 @@ from typing import override
 from ai.backend.manager.actions.monitors.monitor import ActionMonitor
 from ai.backend.manager.actions.processor import ActionProcessor
 from ai.backend.manager.actions.types import AbstractProcessorPackage, ActionSpec
+from ai.backend.manager.actions.validators import ActionValidators
 
 from .actions import (
     SearchDomainUsageBucketsAction,
@@ -54,7 +55,12 @@ class ResourceUsageProcessors(AbstractProcessorPackage):
         SearchScopedUserUsageBucketsAction, SearchScopedUserUsageBucketsActionResult
     ]
 
-    def __init__(self, service: ResourceUsageService, action_monitors: list[ActionMonitor]) -> None:
+    def __init__(
+        self,
+        service: ResourceUsageService,
+        action_monitors: list[ActionMonitor],
+        validators: ActionValidators,
+    ) -> None:
         # Domain Usage Buckets
         self.search_domain_usage_buckets = ActionProcessor(
             service.search_domain_usage_buckets, action_monitors

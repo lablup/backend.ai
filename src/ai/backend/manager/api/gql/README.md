@@ -493,13 +493,12 @@ GQL adapters are created once at server startup and reused across requests:
 ```python
 # server_gql_ctx.py
 @asynccontextmanager
-async def gql_adapters_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
+async def gql_adapters_ctx() -> AsyncIterator[GQLAdapters]:
     """Initialize GraphQL adapters as singletons."""
-    root_ctx.gql_adapters = GQLAdapters(
+    yield GQLAdapters(
         notification_channel=NotificationChannelGQLAdapter(),
         notification_rule=NotificationRuleGQLAdapter(),
     )
-    yield
 
 # Resolver usage
 @strawberry.field

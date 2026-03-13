@@ -14,7 +14,6 @@ class TestDeploymentLifecycle:
     available.
     """
 
-    @pytest.mark.asyncio
     async def test_create_get_update_search_destroy(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -29,7 +28,6 @@ class TestRevisionLifecycle:
     Requires a running manager with real infrastructure.
     """
 
-    @pytest.mark.asyncio
     async def test_create_and_search_revisions(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -44,7 +42,6 @@ class TestRouteOperations:
     Requires a running manager with real infrastructure.
     """
 
-    @pytest.mark.asyncio
     async def test_search_and_update_routes(
         self,
         admin_registry: BackendAIClientRegistry,

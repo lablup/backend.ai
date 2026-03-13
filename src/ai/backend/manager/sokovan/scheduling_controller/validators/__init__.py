@@ -7,6 +7,7 @@ from .base import (
     SessionValidatorRule,
 )
 from .cluster import ClusterValidationRule
+from .inference import InferenceModelFolderRule
 from .mount import MountNameValidationRule
 from .rules import (
     ContainerLimitRule,
@@ -23,6 +24,7 @@ from .validator import SessionValidator
 __all__ = [
     "ClusterValidationRule",
     "ContainerLimitRule",
+    "InferenceModelFolderRule",
     "MountNameValidationRule",
     "PublicPrivateFilterRule",
     "ResourceLimitRule",

@@ -5,7 +5,6 @@ from collections.abc import Sequence
 
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.deployment.types import (
-    DeploymentInfo,
     DeploymentLifecycleStatus,
     DeploymentStatusTransitions,
 )
@@ -15,7 +14,10 @@ from ai.backend.manager.sokovan.deployment.deployment_controller import Deployme
 from ai.backend.manager.sokovan.deployment.executor import DeploymentExecutor
 from ai.backend.manager.sokovan.deployment.route.route_controller import RouteController
 from ai.backend.manager.sokovan.deployment.route.types import RouteLifecycleType
-from ai.backend.manager.sokovan.deployment.types import DeploymentExecutionResult
+from ai.backend.manager.sokovan.deployment.types import (
+    DeploymentExecutionResult,
+    DeploymentWithHistory,
+)
 
 from .base import DeploymentHandler
 
@@ -46,23 +48,27 @@ class DestroyingDeploymentHandler(DeploymentHandler):
         return LockID.LOCKID_DEPLOYMENT_DESTROYING
 
     @classmethod
-    def target_statuses(cls) -> list[EndpointLifecycle]:
+    def target_statuses(cls) -> list[DeploymentLifecycleStatus]:
         """Get the target deployment statuses for this handler."""
-        return [EndpointLifecycle.DESTROYING]
+        return [DeploymentLifecycleStatus(lifecycle=EndpointLifecycle.DESTROYING)]
 
     @classmethod
     def status_transitions(cls) -> DeploymentStatusTransitions:
         """Define state transitions for destroying deployment handler (BEP-1030).
 
         - success: Deployment → DESTROYED
-        - failure: Deployment → DESTROYED (always proceed to destroyed)
+        - failure (all): Deployment → DESTROYED (always proceed to destroyed)
         """
         return DeploymentStatusTransitions(
             success=DeploymentLifecycleStatus(lifecycle=EndpointLifecycle.DESTROYED),
-            failure=DeploymentLifecycleStatus(lifecycle=EndpointLifecycle.DESTROYED),
+            need_retry=DeploymentLifecycleStatus(lifecycle=EndpointLifecycle.DESTROYED),
+            expired=DeploymentLifecycleStatus(lifecycle=EndpointLifecycle.DESTROYED),
+            give_up=DeploymentLifecycleStatus(lifecycle=EndpointLifecycle.DESTROYED),
         )
 
-    async def execute(self, deployments: Sequence[DeploymentInfo]) -> DeploymentExecutionResult:
+    async def execute(
+        self, deployments: Sequence[DeploymentWithHistory]
+    ) -> DeploymentExecutionResult:
         """Process deployments marked for destruction."""
         log.debug("Processing deployments marked for destruction")
 

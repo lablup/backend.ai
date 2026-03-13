@@ -3,6 +3,7 @@ from __future__ import annotations
 from pydantic import BaseModel, Field
 
 from ai.backend.common.api_handlers import BaseResponseModel
+from ai.backend.common.dto.manager.pagination import PaginationInfo
 
 __all__ = (
     "GetQuotaScopeResponse",
@@ -20,12 +21,6 @@ class QuotaScopeDTO(BaseModel):
     usage_bytes: int | None = Field(default=None, description="Current usage in bytes")
     usage_count: int | None = Field(default=None, description="Current usage count")
     hard_limit_bytes: int | None = Field(default=None, description="Hard limit in bytes")
-
-
-class PaginationInfo(BaseModel):
-    total: int = Field(description="Total number of items")
-    offset: int = Field(description="Number of items skipped")
-    limit: int | None = Field(default=None, description="Maximum items returned")
 
 
 class GetQuotaScopeResponse(BaseResponseModel):

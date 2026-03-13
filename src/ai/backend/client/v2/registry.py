@@ -4,7 +4,7 @@ from functools import cached_property
 from typing import TYPE_CHECKING
 
 from .auth import AuthStrategy
-from .base_client import BackendAIClient
+from .base_client import BackendAIAnonymousClient, BackendAIAuthClient
 from .config import ClientConfig
 
 if TYPE_CHECKING:
@@ -45,10 +45,16 @@ if TYPE_CHECKING:
 
 
 class BackendAIClientRegistry:
-    _client: BackendAIClient
+    _client: BackendAIAuthClient
+    _anon_client: BackendAIAnonymousClient
 
-    def __init__(self, client: BackendAIClient) -> None:
+    def __init__(
+        self,
+        client: BackendAIAuthClient,
+        anon_client: BackendAIAnonymousClient,
+    ) -> None:
         self._client = client
+        self._anon_client = anon_client
 
     @classmethod
     async def create(
@@ -56,11 +62,13 @@ class BackendAIClientRegistry:
         config: ClientConfig,
         auth: AuthStrategy,
     ) -> BackendAIClientRegistry:
-        client = await BackendAIClient.create(config, auth)
-        return cls(client)
+        client = await BackendAIAuthClient.create(config, auth)
+        anon_client = await BackendAIAnonymousClient.create(config)
+        return cls(client, anon_client)
 
     async def close(self) -> None:
         await self._client.close()
+        await self._anon_client.close()
 
     @cached_property
     def session(self) -> SessionClient:
@@ -84,7 +92,7 @@ class BackendAIClientRegistry:
     def auth(self) -> AuthClient:
         from .domains.auth import AuthClient
 
-        return AuthClient(self._client)
+        return AuthClient(self._client, self._anon_client)
 
     @cached_property
     def streaming(self) -> StreamingClient:

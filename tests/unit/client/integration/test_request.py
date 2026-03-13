@@ -26,7 +26,6 @@ def test_not_found() -> None:
         assert e.value.status == 404
 
 
-@pytest.mark.asyncio
 async def test_async_connection() -> None:
     async with AsyncSession():
         request = Request("GET", "/")

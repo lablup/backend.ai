@@ -21,7 +21,6 @@ from .conftest import SessionSeedData
 
 @pytest.mark.integration
 class TestSessionLifecycle:
-    @pytest.mark.asyncio
     async def test_session_read_and_update_lifecycle(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -59,7 +58,7 @@ class TestSessionLifecycle:
         # 5. status_history
         history_result = await admin_registry.session.get_status_history(new_name)
         assert isinstance(history_result, GetStatusHistoryResponse)
-        assert isinstance(history_result.result, dict)
+        assert isinstance(history_result.root, dict)
 
         # 6. destroy (forced, since no real agent to handle graceful shutdown)
         destroy_result = await admin_registry.session.destroy(
@@ -71,7 +70,6 @@ class TestSessionLifecycle:
 
 @pytest.mark.integration
 class TestSessionPermissions:
-    @pytest.mark.asyncio
     async def test_regular_user_denied_admin_session_operations(
         self,
         admin_registry: BackendAIClientRegistry,

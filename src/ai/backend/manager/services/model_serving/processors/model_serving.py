@@ -3,6 +3,7 @@ from typing import override
 from ai.backend.manager.actions.monitors.monitor import ActionMonitor
 from ai.backend.manager.actions.processor import ActionProcessor
 from ai.backend.manager.actions.types import AbstractProcessorPackage, ActionSpec
+from ai.backend.manager.actions.validators import ActionValidators
 from ai.backend.manager.services.model_serving.actions.clear_error import (
     ClearErrorAction,
     ClearErrorActionResult,
@@ -55,6 +56,10 @@ from ai.backend.manager.services.model_serving.actions.update_route import (
     UpdateRouteAction,
     UpdateRouteActionResult,
 )
+from ai.backend.manager.services.model_serving.actions.validate_model_service import (
+    ValidateModelServiceAction,
+    ValidateModelServiceActionResult,
+)
 from ai.backend.manager.services.model_serving.services.model_serving import (
     ModelServingService,
 )
@@ -76,11 +81,15 @@ class ModelServingProcessors(AbstractProcessorPackage):
     generate_token: ActionProcessor[GenerateTokenAction, GenerateTokenActionResult]
     modify_endpoint: ActionProcessor[ModifyEndpointAction, ModifyEndpointActionResult]
     search_services: ActionProcessor[SearchServicesAction, SearchServicesActionResult]
+    validate_model_service: ActionProcessor[
+        ValidateModelServiceAction, ValidateModelServiceActionResult
+    ]
 
     def __init__(
         self,
         service: ModelServingService,
         action_monitors: list[ActionMonitor],
+        validators: ActionValidators,
     ) -> None:
         self.create_model_service = ActionProcessor(service.create, action_monitors)
         self.list_model_service = ActionProcessor(service.list_serve, action_monitors)
@@ -97,6 +106,9 @@ class ModelServingProcessors(AbstractProcessorPackage):
         self.generate_token = ActionProcessor(service.generate_token, action_monitors)
         self.modify_endpoint = ActionProcessor(service.modify_endpoint, action_monitors)
         self.search_services = ActionProcessor(service.search_services, action_monitors)
+        self.validate_model_service = ActionProcessor(
+            service.validate_model_service, action_monitors
+        )
 
     @override
     def supported_actions(self) -> list[ActionSpec]:
@@ -114,4 +126,5 @@ class ModelServingProcessors(AbstractProcessorPackage):
             GenerateTokenAction.spec(),
             ModifyEndpointAction.spec(),
             SearchServicesAction.spec(),
+            ValidateModelServiceAction.spec(),
         ]

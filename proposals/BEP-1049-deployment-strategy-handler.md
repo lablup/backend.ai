@@ -28,15 +28,15 @@ Blue-Green deployment spans multiple coordinator cycles through several phases:
 
 Rolling Update similarly progresses gradually across cycles. Both strategies **keep the deployment in `DEPLOYING` state across multiple processing cycles until strategy completion or rollback.**
 
-### Evaluator + Sub-Step Handler Pattern
+### Flat Registry with Per-Handler Evaluation
 
-A single `evaluate()` call may produce different sub-steps for different deployments — some completed, others still PROGRESSING. To handle this, a **strategy evaluator** groups deployments by sub-step, and **per-sub-step handlers** process each group. Completed deployments are returned separately in `EvaluationResult.completed` and processed via the PROGRESSING handler's `post_process`.
+DEPLOYING sub-step handlers are registered **flat** in the coordinator's `HandlerRegistry` alongside other lifecycle handlers, keyed by `(lifecycle_type, sub_step)`. Each DEPLOYING handler calls the strategy evaluator and applier **directly in its `execute()` method** — there is no separate pre-step phase. The evaluator determines sub-step assignments and route mutations; the applier persists them to DB.
 
 | Aspect | How it works |
 |--------|-------------|
-| **State transition** | Each sub-step handler returns explicit `next_status()` → coordinator's generic path handles all transitions |
-| **Routing** | Coordinator branches to evaluator path for `DeploymentLifecycleType.DEPLOYING` |
-| **Cycles** | Evaluator runs strategy FSM + applies route changes → handlers process results → coordinator records history |
+| **State transition** | Each handler returns `status_transitions()` with `success/need_retry/expired/give_up` → coordinator's generic path handles all transitions |
+| **Dispatch** | Coordinator looks up handler by `(lifecycle_type, sub_step)` key and runs it directly |
+| **Evaluation** | Each handler calls `evaluator.evaluate()` + `applier.apply()` in its own `execute()` |
 
 
 ## Sub-documents
@@ -50,76 +50,88 @@ A single `evaluate()` call may produce different sub-steps for different deploym
 
 ### Overall Architecture
 
-Core idea: A **strategy evaluator** evaluates DEPLOYING-state deployments and groups them by sub-step, then **per-sub-step handlers** process each group. The coordinator's generic `_handle_status_transitions()` path handles all history recording and lifecycle transitions.
+Core idea: The coordinator maintains a `HandlerRegistry` with a flat `(lifecycle_type, sub_step)` key. Simple lifecycle types (CHECK_PENDING, SCALING, etc.) register with `sub_step=None`. DEPLOYING registers two handlers — one for PROVISIONING and one for PROGRESSING (which also handles COMPLETED and ROLLED_BACK terminal states). Each handler independently calls the strategy evaluator and applier.
 
 ```
 ┌──────────────────────────────────────────────────────────────────────────────┐
 │                          Periodic Task Scheduler                             │
 │                                                                              │
 │  DeploymentTaskSpec                                                          │
-│  ┌────────────────────────────┐                                              │
-│  │ check_pending: 2s / 30s    │                                              │
-│  │ check_replica: 5s / 30s    │                                              │
-│  │ scaling:       5s / 30s    │                                              │
-│  │ deploying:     5s / 30s    │  ← drives deployment strategy cycles         │
-│  │ reconcile:     -- / 30s    │                                              │
-│  │ destroying:    5s / 60s    │                                              │
-│  └─────────────┬──────────────┘                                              │
+│  ┌────────────────────────────────────────────────────────────────────┐      │
+│  │ check_pending:           2s / 30s                                  │      │
+│  │ check_replica:           5s / 30s                                  │      │
+│  │ scaling:                 5s / 30s                                  │      │
+│  │ deploying/provisioning:  5s / 30s  ← drives PROVISIONING cycle    │      │
+│  │ deploying/progressing:   5s / 30s  ← drives PROGRESSING cycle     │      │
+│  │ reconcile:               -- / 30s                                  │      │
+│  │ destroying:              5s / 60s                                  │      │
+│  └─────────────┬──────────────────────────────────────────────────────┘      │
 │                │                                                             │
 │                ▼                                                             │
 │  DoDeploymentLifecycleEvent                                                  │
 │  DoDeploymentLifecycleIfNeededEvent                                          │
-│  (lifecycle_type: str)                                                       │
+│  (lifecycle_type: str, sub_step: str | None)                                 │
 └────────────────┬─────────────────────────────────────────────────────────────┘
                  │
                  ▼
 ┌──────────────────────────────────────────────────────────────────────────────┐
 │                         DeploymentCoordinator                                │
 │                                                                              │
-│  process_deployment_lifecycle(type)                                          │
-│    evaluator = evaluators.get(type)                                          │
-│    ├─ evaluator exists → _process_with_evaluator() (evaluator path)          │
-│    └─ no evaluator → existing single-handler path                            │
+│  process_deployment_lifecycle(lifecycle_type, sub_step=None)                 │
+│    handler = registry.handlers[(lifecycle_type, sub_step)]                   │
+│    acquire lock if handler.lock_id                                          │
+│    _run_handler(handler)                                                     │
 │                                                                              │
-│  Handler map key: HandlerKey                                                 │
-│    DeploymentLifecycleType                        ← single handlers          │
-│    | (DeploymentLifecycleType, DeploymentSubStep) ← sub-step handlers        │
+│  HandlerRegistry:                                                            │
+│    handlers: dict[(DeploymentLifecycleType, DeploymentSubStep | None),       │
+│                   DeploymentHandler]                                          │
+│                                                                              │
+│    handlers = {                                                              │
+│      (CHECK_PENDING, None)           → CheckPendingHandler                   │
+│      (CHECK_REPLICA, None)           → CheckReplicaHandler                   │
+│      (SCALING, None)                 → ScalingHandler                        │
+│      (RECONCILE, None)               → ReconcileHandler                      │
+│      (DEPLOYING, PROVISIONING)       → DeployingProvisioningHandler          │
+│      (DEPLOYING, PROGRESSING)        → DeployingProgressingHandler           │
+│      (DESTROYING, None)              → DestroyingHandler                     │
+│    }                                                                         │
+│                                                                              │
+│  _run_handler(handler):                                                      │
+│    1. Query deployments by handler.target_statuses()                         │
+│    2. Build attempt context from scheduling history                          │
+│    3. Execute handler + handle status transitions                            │
+│    4. Classify failures (give_up / expired / need_retry)                     │
+│    5. Post-process (reschedule, trigger dependent lifecycles)                │
 │                                                                              │
 │  Result handling (same generic path for all handlers):                       │
-│    successes → next_status (transition + history)                            │
-│    errors → failure_status (transition + history)                            │
-│    skipped → keep (no transition)                                            │
+│    successes  → success status (transition + history + sub_step update)      │
+│    errors     → classified into give_up / expired / need_retry               │
+│    no matches → skip (no transition)                                         │
 └────────────────┬─────────────────────────────────────────────────────────────┘
                  │
-      ┌──────────┴──────────────────────────┐
-      ▼                                     ▼
-┌─────────────────────┐   ┌──────────────────────────────────────────────────┐
-│  DeploymentHandler   │   │  DeploymentStrategyEvaluator                     │
-│  (single-handler)    │   │  (evaluator path — DEPLOYING only)               │
-│                      │   │                                                  │
-│  Implementations:    │   │  evaluate(deployments) → EvaluationResult        │
-│  ├─ CheckPending     │   │    1. Load policies/routes                       │
-│  ├─ Scaling          │   │    2. Run strategy FSM → CycleEvaluationResult  │
-│  ├─ CheckReplica     │   │    3. Apply route changes (scale_out/scale_in)   │
-│  ├─ Reconcile        │   │    4. Group by sub-step                          │
-│  └─ Destroying       │   └───────────────┬──────────────────────────────────┘
-└─────────────────────┘                    │
-                                           ▼
-                            ┌──────────────────────────────────────┐
-                            │  Per-Sub-Step Handlers (composite)   │
-                            │                                      │
-                            │  (DEPLOYING, PROVISIONING)           │
-                            │    → DeployingProvisioningHandler    │
-                            │  (DEPLOYING, PROGRESSING)            │
-                            │    → DeployingProgressingHandler     │
-                            │      next_status: DEPLOYING          │
-                            │      post_process: revision swap     │
-                            │        for completed deployments     │
-                            │                                      │
-                            │  (DEPLOYING, ROLLED_BACK)            │
-                            │    → DeployingRolledBackHandler      │
-                            │      next_status: READY              │
-                            └──────────────────────────────────────┘
+                 ▼
+┌──────────────────────────────────────────────────────────────────────────────┐
+│  DeploymentHandler (base)                                                    │
+│  ├─ name()               → str                              ← abstract      │
+│  ├─ lock_id              → LockID | None                     ← abstract     │
+│  ├─ target_statuses()    → list[DeploymentLifecycleStatus]   ← abstract     │
+│  ├─ status_transitions() → DeploymentStatusTransitions       ← abstract     │
+│  ├─ execute(deployments) → DeploymentExecutionResult         ← abstract     │
+│  └─ post_process(result) → None                              ← abstract     │
+│                                                                              │
+│  DEPLOYING handlers (2 total):                                               │
+│  ├─ DeployingProvisioningHandler                                             │
+│  │    targets: [(DEPLOYING, PROVISIONING)]                                   │
+│  │    execute: evaluator.evaluate() + applier.apply()                        │
+│  │    success → stays DEPLOYING/PROVISIONING                                 │
+│  │                                                                           │
+│  └─ DeployingProgressingHandler                                              │
+│       targets: [(DEPLOYING, PROGRESSING),                                    │
+│                 (DEPLOYING, COMPLETED),                                      │
+│                 (DEPLOYING, ROLLED_BACK)]                                    │
+│       execute: evaluator.evaluate() + applier.apply()                        │
+│       success (COMPLETED) → READY, errors (ROLLED_BACK) → READY             │
+└──────────────────────────────────────────────────────────────────────────────┘
 ```
 
 ### Revision Activation Trigger Branching
@@ -160,19 +172,18 @@ Auto-scaling resumes automatically once the deployment completes and the endpoin
 
 ### Sub-Step Variants
 
-Both Blue-Green and Rolling Update cycle FSMs share a common set of **sub-step variants**. Each cycle evaluation directly returns one of these variants — no strategy-specific statuses or mapping layer exists:
+Both Blue-Green and Rolling Update cycle FSMs share a common set of **sub-step variants**. The evaluator assigns each deployment a sub-step; the applier writes it to the `sub_step` column.
 
-| Sub-Step | Description | Handler | Transition |
-|----------|-------------|---------|------------|
-| **provisioning** | New routes being created or still in PROVISIONING state | DeployingProvisioningHandler | DEPLOYING → DEPLOYING |
-| **progressing** | Strategy making active progress — health checks pending, promotion waiting, or routes being replaced | DeployingProgressingHandler | DEPLOYING → DEPLOYING |
-| **rolled_back** | Strategy failed — rolled back to previous revision | DeployingRolledBackHandler | DEPLOYING → READY |
-
-Completion is not a sub-step but a signal on `CycleEvaluationResult.completed`. When the strategy FSM detects that all new routes are healthy and no old routes remain, it returns `CycleEvaluationResult(sub_step=PROGRESSING, completed=True)`. The evaluator collects these into `EvaluationResult.completed`, and the coordinator passes them to the PROGRESSING handler's `post_process` for revision swap, then transitions to READY.
+| Sub-Step | Description | Handled by | Transition |
+|----------|-------------|------------|------------|
+| **PROVISIONING** | New routes being created or still provisioning | DeployingProvisioningHandler | DEPLOYING → DEPLOYING |
+| **PROGRESSING** | Strategy making active progress — routes being replaced | DeployingProgressingHandler | DEPLOYING → DEPLOYING (re-schedule) |
+| **COMPLETED** | All strategy conditions met — revision swap pending | DeployingProgressingHandler | DEPLOYING → READY (success) |
+| **ROLLED_BACK** | Strategy failed — rolled back to previous revision | DeployingProgressingHandler | DEPLOYING → READY (error) |
 
 ### DeploymentStrategyEvaluator
 
-`DeploymentStrategyEvaluator` evaluates DEPLOYING-state deployments and groups them by sub-step. It is a separate component (not a handler) that the coordinator invokes before handler execution.
+`DeploymentStrategyEvaluator` evaluates DEPLOYING-state deployments and determines their sub-step assignments and route mutations. Each DEPLOYING handler owns an evaluator+applier pair and calls them in `execute()`.
 
 #### Execution Flow
 
@@ -182,7 +193,7 @@ DeploymentStrategyEvaluator.evaluate(deployments)
     │  Phase 1: Load policies and routes
     │  ┌─────────────────────────────────────────────────────────┐
     │  │  policy_map = load_policies(deployments)                │
-    │  │  route_map = fetch_active_routes_by_endpoint_ids(...)   │
+    │  │  route_map = fetch_routes_by_endpoint_ids(...)           │
     │  └─────────────────────────────────────────────────────────┘
     │
     │  Phase 2: Run per-deployment strategy FSM
@@ -191,236 +202,209 @@ DeploymentStrategyEvaluator.evaluate(deployments)
     │  │    policy = policy_map[deployment.id]                   │
     │  │    routes = route_map[deployment.id]                    │
     │  │                                                         │
-    │  │    if policy.strategy == ROLLING:                       │
-    │  │      cycle_result = rolling_update_evaluate(...)        │
-    │  │    elif policy.strategy == BLUE_GREEN:                  │
-    │  │      cycle_result = blue_green_evaluate(...)            │
+    │  │    strategy_fsm = create_strategy(policy)                │
+    │  │    cycle_result = strategy_fsm.evaluate_cycle(...)      │
     │  │                                                         │
-    │  │    if cycle_result.completed:                            │
-    │  │      completed.append(deployment)                       │
-    │  │    else:                                                │
-    │  │      groups[cycle_result.sub_step].append(deployment)   │
-    │  └─────────────────────────────────────────────────────────┘
-    │
-    │  Phase 3: Apply route changes (in-progress only)
-    │  ┌─────────────────────────────────────────────────────────┐
-    │  │  Collect route changes from PROVISIONING/PROGRESSING:   │
-    │  │    scale_out_creators → create new routes               │
-    │  │    scale_in_updater → terminate old routes              │
-    │  │  repo.scale_routes(scale_out, scale_in)                │
+    │  │    assignments[deployment.id] = cycle_result.sub_step   │
+    │  │    route_changes.merge(cycle_result.route_changes)       │
     │  └─────────────────────────────────────────────────────────┘
     │
     ▼
-  EvaluationResult {
-    groups: {
-      PROVISIONING: [deploy_A],
-      PROGRESSING:  [deploy_B, deploy_C],
+  StrategyEvaluationSummary {
+    assignments: {
+      deploy_A_id: PROVISIONING,
+      deploy_B_id: PROGRESSING,
+      deploy_C_id: COMPLETED,
+      deploy_D_id: ROLLED_BACK,
     },
-    completed: [deploy_D],  # strategy completed (revision swap pending)
-    skipped: [deploy_E],    # no policy / unsupported strategy
-    errors:  [error_F],     # exception during evaluation
+    route_changes: RouteChanges {
+      rollout_specs:    [Creator, ...],  # new routes to create
+      drain_route_ids:  [UUID, ...],     # old routes to terminate
+    },
+    errors: [EvaluationErrorData, ...],
   }
 ```
 
 #### Key Design Principles
 
-1. **Route changes are applied by the evaluator**: scale_out/scale_in are applied once in the evaluator. Individual handlers do not touch routes.
-2. **Strategy FSMs live in the evaluator**: `_rolling_update_evaluate()`, `_blue_green_evaluate()` and other strategy FSM logic are internal helper methods of the evaluator.
-3. **Only grouping is returned**: The evaluator classifies deployments by sub-step; actual processing (revision swap, deploying_revision cleanup, etc.) is delegated to handlers.
+1. **Evaluator + Applier are called per handler**: Each DEPLOYING handler calls `evaluator.evaluate()` then `applier.apply()` in its `execute()`. The applier persists sub_step assignments and route mutations atomically via `StrategyTransaction`.
+2. **Strategy FSMs implement a common interface via registry**: All strategy implementations extend `AbstractDeploymentStrategy` and implement `evaluate_cycle()`. Concrete classes (`RollingUpdateStrategy`, `BlueGreenStrategy`) live in dedicated module files. The `DeploymentStrategyRegistry` is injected into the evaluator.
+3. **Terminal states (COMPLETED, ROLLED_BACK) are handled by ProgressingHandler**: The applier performs revision swap for COMPLETED deployments and clears deploying_revision for ROLLED_BACK ones. The handler then returns them as successes or errors respectively, flowing through the coordinator's standard transition path.
 
-### Per-Sub-Step Handlers
+### DEPLOYING Handlers
 
-Each handler is registered with a `(DeploymentLifecycleType, DeploymentSubStep)` composite key in the coordinator.
+Two handlers cover all DEPLOYING sub-steps:
 
-#### State Transition Type: `DeploymentLifecycleStatus`
+#### DeployingProvisioningHandler
 
-Handlers' `next_status()` and `failure_status()` return `DeploymentLifecycleStatus`. This type bundles `EndpointLifecycle` with an optional `DeploymentSubStatus`, conveying which sub-step triggered the transition to the coordinator's generic path:
-
-```python
-@dataclass(frozen=True)
-class DeploymentLifecycleStatus:
-    lifecycle: EndpointLifecycle
-    sub_status: DeploymentSubStatus | None = None
-```
-
-The coordinator's `_handle_status_transitions()` extracts `.lifecycle` for DB updates and history recording.
-
-#### DeployingInProgressHandler (base) → Provisioning / Progressing
-
-PROVISIONING and PROGRESSING share the same logic (evaluator already applied route changes; handler returns success + reschedules), so `DeployingInProgressHandler` base class defines common behavior, and subclasses hard-code their sub-step-specific `next_status()` and `status_transitions()`:
+Targets `(DEPLOYING, PROVISIONING)`. Routes for the new revision are being created and waiting to become healthy.
 
 ```python
-class DeployingInProgressHandler(DeploymentHandler):
-    """PROVISIONING / PROGRESSING common base."""
-
+class DeployingProvisioningHandler(DeploymentHandler):
     @classmethod
-    def target_statuses(cls) -> list[EndpointLifecycle]:
-        return [EndpointLifecycle.DEPLOYING]
-
-    @classmethod
-    def failure_status(cls) -> DeploymentLifecycleStatus | None:
-        return None
-
-    async def execute(self, deployments):
-        # Route changes already applied by evaluator
-        return DeploymentExecutionResult(successes=list(deployments))
-
-    async def post_process(self, result):
-        if result.successes:
-            await self._deployment_controller.mark_lifecycle_needed(
-                DeploymentLifecycleType.DEPLOYING       # reschedule next cycle
-            )
-        await self._route_controller.mark_lifecycle_needed(
-            RouteLifecycleType.PROVISIONING              # trigger new route provisioning
-        )
-        # Revision swap for completed deployments
-        # (coordinator attaches eval_result.completed to result.completed)
-        if result.completed:
-            swap_ids = [d.id for d in result.completed
-                        if d.deploying_revision_id is not None]
-            if swap_ids:
-                await repo.complete_deployment_revision_swap(swap_ids)
-
-
-class DeployingProvisioningHandler(DeployingInProgressHandler):
-    @classmethod
-    def next_status(cls) -> DeploymentLifecycleStatus | None:
-        return DeploymentLifecycleStatus(
+    def target_statuses(cls) -> list[DeploymentLifecycleStatus]:
+        return [DeploymentLifecycleStatus(
             lifecycle=EndpointLifecycle.DEPLOYING,
             sub_status=DeploymentSubStep.PROVISIONING,
-        )
-
-
-class DeployingProgressingHandler(DeployingInProgressHandler):
-    @classmethod
-    def next_status(cls) -> DeploymentLifecycleStatus | None:
-        return DeploymentLifecycleStatus(
-            lifecycle=EndpointLifecycle.DEPLOYING,
-            sub_status=DeploymentSubStep.PROGRESSING,
-        )
-```
-
-`next_status().lifecycle == DEPLOYING` so the coordinator records DEPLOYING→DEPLOYING SUCCESS history for in-progress deployments. The deployment stays in DEPLOYING state and is re-evaluated next cycle.
-
-For completed deployments, the coordinator passes `EvaluationResult.completed` to the PROGRESSING handler's `post_process` via `result.completed`. The handler performs the revision swap, then the coordinator transitions the deployment to READY with history recording.
-
-#### DeployingRolledBackHandler (ROLLED_BACK)
-
-```python
-class DeployingRolledBackHandler(DeploymentHandler):
-    @classmethod
-    def name(cls) -> str:
-        return "deploying-rolled-back"
+        )]
 
     @classmethod
-    def next_status(cls) -> DeploymentLifecycleStatus | None:
-        return DeploymentLifecycleStatus(
-            lifecycle=EndpointLifecycle.READY,
-            sub_status=DeploymentSubStep.ROLLED_BACK,
+    def status_transitions(cls) -> DeploymentStatusTransitions:
+        return DeploymentStatusTransitions(
+            success=DeploymentLifecycleStatus(
+                lifecycle=EndpointLifecycle.DEPLOYING,
+                sub_status=DeploymentSubStep.PROVISIONING,
+            ),
         )
 
     async def execute(self, deployments):
-        # deploying_revision = NULL (current_revision preserved)
-        clear_ids = [d.id for d in deployments if d.deploying_revision_id is not None]
-        if clear_ids:
-            await self._deployment_executor._deployment_repo.clear_deploying_revision(clear_ids)
-        return DeploymentExecutionResult(successes=list(deployments))
+        summary = await self._evaluator.evaluate(deployments)
+        await self._applier.apply(summary)
+        # Separate successes from evaluation errors
+        evaluated_ids = set(summary.assignments.keys())
+        successes = [d for d in deployments if d.id in evaluated_ids]
+        errors = [DeploymentExecutionError(...) for e in summary.errors]
+        return DeploymentExecutionResult(successes=successes, errors=errors)
+
+    async def post_process(self, result):
+        await self._deployment_controller.mark_lifecycle_needed(
+            DeploymentLifecycleType.DEPLOYING, sub_step=DeploymentSubStep.PROVISIONING
+        )
+        await self._route_controller.mark_lifecycle_needed(RouteLifecycleType.PROVISIONING)
 ```
 
-On rollback, only `deploying_revision` is cleared; `current_revision` is preserved. The coordinator transitions to READY.
+#### DeployingProgressingHandler
 
-### Coordinator Evaluator Path (`_process_with_evaluator`)
+Targets `(DEPLOYING, PROGRESSING)`, `(DEPLOYING, COMPLETED)`, and `(DEPLOYING, ROLLED_BACK)`. This single handler processes all three sub-steps:
 
-The coordinator takes a separate path for lifecycle types that have an evaluator registered in `_deployment_evaluators`:
+- **PROGRESSING**: Still replacing routes — re-evaluate next cycle
+- **COMPLETED**: Applier has swapped revision → returned as success → coordinator transitions to READY
+- **ROLLED_BACK**: Applier has cleared deploying_revision → returned as error → coordinator transitions to READY
 
-```
-_process_with_evaluator(lifecycle_type, evaluator)
-    │
-    │  1. Acquire distributed lock (evaluator.lock_id)
-    │  2. Query DEPLOYING-state deployments
-    │
-    │  3. Enter DeploymentRecorderContext.scope()
-    │  ┌───────────────────────────────────────────────────────────────┐
-    │  │                                                               │
-    │  │  eval_result = evaluator.evaluate(deployments)                │
-    │  │                                                               │
-    │  │  for sub_step, group in eval_result.groups:                   │
-    │  │    handler = handlers[(lifecycle_type, sub_step)]             │
-    │  │    result = handler.execute(group)                            │
-    │  │    handler_results[sub_step] = (handler, result)              │
-    │  │                                                               │
-    │  │  all_records = pool.build_all_records()                       │
-    │  │                                                               │
-    │  │  for sub_step, (handler, result) in handler_results:          │
-    │  │    _handle_status_transitions(handler, result, all_records)   │
-    │  │    ↑ same generic transition logic as single-handler path     │
-    │  │                                                               │
-    │  └───────────────────────────────────────────────────────────────┘
-    │
-    │  4. Attach completed deployments to PROGRESSING handler's result
-    │  if eval_result.completed:
-    │    handler_results[PROGRESSING].result.completed = eval_result.completed
-    │
-    │  5. Post-process outside RecorderContext scope
-    │  for sub_step, (handler, result) in handler_results:
-    │    handler.post_process(result)
-    │    ↑ PROGRESSING handler performs revision swap for result.completed
-    │
-    │  6. Lifecycle transition for completed deployments
-    │  if eval_result.completed:
-    │    _transition_completed_deployments(completed, all_records)
-    │    ↑ DEPLOYING → READY + history recording
-    │
-    ▼
+```python
+class DeployingProgressingHandler(DeploymentHandler):
+    @classmethod
+    def target_statuses(cls) -> list[DeploymentLifecycleStatus]:
+        return [
+            DeploymentLifecycleStatus(lifecycle=EndpointLifecycle.DEPLOYING,
+                                      sub_status=DeploymentSubStep.PROGRESSING),
+            DeploymentLifecycleStatus(lifecycle=EndpointLifecycle.DEPLOYING,
+                                      sub_status=DeploymentSubStep.COMPLETED),
+            DeploymentLifecycleStatus(lifecycle=EndpointLifecycle.DEPLOYING,
+                                      sub_status=DeploymentSubStep.ROLLED_BACK),
+        ]
+
+    @classmethod
+    def status_transitions(cls) -> DeploymentStatusTransitions:
+        ready = DeploymentLifecycleStatus(lifecycle=EndpointLifecycle.READY)
+        return DeploymentStatusTransitions(
+            success=ready, need_retry=ready, expired=ready, give_up=ready,
+        )
+
+    async def execute(self, deployments):
+        summary = await self._evaluator.evaluate(deployments)
+        apply_result = await self._applier.apply(summary)
+        # COMPLETED → successes, ROLLED_BACK → errors
+        completed = [deployment_map[eid] for eid in apply_result.completed_ids]
+        rolled_back = [DeploymentExecutionError(...) for eid in apply_result.rolled_back_ids]
+        return DeploymentExecutionResult(successes=completed, errors=rolled_back + eval_errors)
 ```
 
-Key: `_handle_status_transitions()` uses the **exact same generic method** as the single-handler path. It performs batch updates and history recording based on each handler's `next_status()`/`failure_status()`. Completed deployments bypass this path — their lifecycle transition is handled by `_transition_completed_deployments()` after the revision swap in `post_process`.
+### Failure Classification and Retry Logic
+
+The coordinator classifies handler errors using scheduling history to determine the appropriate response:
+
+```
+_handle_status_transitions(handler, result, records, attempt_ctx_map)
+    │
+    │  Success transitions:
+    │    result.successes → transitions.success status
+    │
+    │  Failure classification (priority order):
+    │    1. give_up:    attempts >= SERVICE_MAX_RETRIES
+    │    2. expired:    elapsed > DEPLOYMENT_STATUS_TIMEOUT_MAP threshold
+    │    3. need_retry: default (can be retried next cycle)
+    │
+    │  Each category uses its own transition from status_transitions():
+    │    give_up  → transitions.give_up
+    │    expired  → transitions.expired
+    │    need_retry → transitions.need_retry
+```
+
+`_AttemptContext` tracks per-deployment retry state from scheduling history:
+- `attempts`: Number of consecutive attempts in the same handler phase
+- `started_at`: Timestamp when the current phase began
+- `should_give_up(max_retries)`: Returns true if max retries exceeded
+- `is_expired(lifecycle, current_dbtime)`: Returns true if timeout exceeded (e.g., DEPLOYING: 30 min)
+
+### Coordinator Flow
+
+The coordinator uses a **single dispatch path** for all handlers:
+
+```
+process_deployment_lifecycle(lifecycle_type, sub_step=None)
+    │
+    │  handler = registry.handlers[(lifecycle_type, sub_step)]
+    │  acquire lock if handler.lock_id
+    │
+    │  _run_handler(handler):
+    │    │
+    │    │  1. Query deployments by handler.target_statuses()
+    │    │     (lifecycles + sub_steps extracted from DeploymentLifecycleStatus list)
+    │    │  2. Build attempt_ctx_map from scheduling history
+    │    │  3. Enter DeploymentRecorderContext.scope()
+    │    │  ┌───────────────────────────────────────────────────────┐
+    │    │  │  result = handler.execute(deployments)                │
+    │    │  │  all_records = pool.build_all_records()               │
+    │    │  │  _handle_status_transitions(                          │
+    │    │  │      handler, result, records, attempt_ctx_map)       │
+    │    │  └───────────────────────────────────────────────────────┘
+    │    │  4. handler.post_process(result)
+    │    │
+    │    ▼
+```
+
+Key design points:
+- The coordinator has **no DEPLOYING-specific logic**. All handlers (simple and sub-step) use the same `_run_handler()` and `_handle_status_transitions()` path.
+- DB filtering uses `target_statuses()` from the handler: lifecycles are extracted via `.lifecycle`, sub-steps via `.sub_status`.
+- `_handle_status_transitions()` applies `sub_status` from `status_transitions()` to `EndpointLifecycleBatchUpdaterSpec`, ensuring the `sub_step` column is updated alongside the lifecycle transition.
 
 ### Sub-Step Recording
 
-Each cycle evaluation produces sub-step variants recorded via the existing `DeploymentRecorderContext`. Both the evaluator and handlers execute within the same RecorderContext scope, so all sub-steps are collected into a single execution record.
+Each cycle evaluation produces sub-step variants recorded via the existing `DeploymentRecorderContext`. The coordinator's `_handle_status_transitions()` calls `extract_sub_steps_for_entity()` for each handler's result, including the deployment's sub-step information in the history.
 
-The coordinator's `_handle_status_transitions()` calls `extract_sub_steps_for_entity()` for each handler's result, including the deployment's sub-step information in the history.
+#### Sub-Step Recording: Route Mutation Granularity
 
-#### Rolling Update Per-Cycle Recording Examples
+Sub-steps are recorded at the **route mutation level** by the evaluator's `_record_route_changes()`. Each route mutation type (rollout, drain) is recorded as a separate sub-step entry with the count of affected routes.
 
-**PROVISIONING cycle** — new routes still being provisioned:
+**PROVISIONING cycle** — new routes created:
 
 ```
 sub_steps:
-  [rolling_update_evaluate] classify_routes      → success
-  [rolling_update_evaluate] wait_provisioning     → success
-  [strategy_result]         determine_sub_step    → success (message: "provisioning")
+  rollout       → SUCCESS (message: "3 new route(s)")
+  provisioning  → SUCCESS
 ```
 
 **PROGRESSING cycle** — creating new routes / terminating old routes:
 
 ```
 sub_steps:
-  [rolling_update_evaluate] classify_routes      → success
-  [rolling_update_evaluate] check_completion     → success
-  [rolling_update_evaluate] calculate_surge      → success
-  [rolling_update_evaluate] build_route_changes  → success
-  [strategy_result]         determine_sub_step   → success (message: "progressing")
+  rollout       → SUCCESS (message: "1 new route(s)")
+  drain         → SUCCESS (message: "1 route(s)")
+  progressing   → SUCCESS
 ```
 
-**COMPLETED cycle** — all new routes healthy, no old routes remaining:
+**COMPLETED cycle (Rolling Update)** — final drain:
 
 ```
 sub_steps:
-  [rolling_update_evaluate] classify_routes      → success
-  [rolling_update_evaluate] check_completion     → success
-  [strategy_result]         determine_sub_step   → success (message: "completed")
+  drain         → SUCCESS (message: "1 route(s)")
 ```
-
-The revision swap (`complete_deployment_revision_swap`) is performed by the PROGRESSING handler's `post_process` outside the recorder scope, so it does not appear in sub_steps. The coordinator then transitions the deployment to READY with history recording.
-
-Format is `[phase] step`. The `determine_sub_step` step's `message` field records the determined sub-step value. This information is stored as JSON in the `deployment_history` table's `sub_steps` column and is queryable via API/CLI.
 
 This enables:
 
-- **Observability**: Each deployment's progress is tracked per-entity with sub-step granularity (e.g., "provisioning", "progressing", "completed")
-- **Debugging**: The sub-step history shows exactly which phase each deployment was in at each cycle
+- **Observability**: Each deployment's progress is tracked per-entity with route mutation granularity
+- **Debugging**: The sub-step history shows exactly which route mutations occurred at each cycle
 - **Consistency**: All handlers use the same coordinator generic path
 
 ### Per-Strategy Configuration

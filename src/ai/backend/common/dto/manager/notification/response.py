@@ -19,6 +19,7 @@ from ai.backend.common.data.notification.types import (
     SMTPAuth,
     SMTPConnection,
 )
+from ai.backend.common.dto.manager.pagination import PaginationInfo
 
 __all__ = (
     "CreateNotificationChannelResponse",
@@ -107,14 +108,6 @@ class GetNotificationChannelResponse(BaseResponseModel):
     """Response for getting a notification channel."""
 
     channel: NotificationChannelDTO = Field(description="Channel data")
-
-
-class PaginationInfo(BaseModel):
-    """Pagination information."""
-
-    total: int = Field(description="Total number of items")
-    offset: int = Field(description="Number of items skipped")
-    limit: int | None = Field(default=None, description="Maximum items returned")
 
 
 class ListNotificationChannelsResponse(BaseResponseModel):

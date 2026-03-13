@@ -34,11 +34,15 @@ __all__ = (
     "SearchRoutesRequest",
     # Create requests
     "CreateDeploymentRequest",
+    "UpsertDeploymentPolicyRequest",
+    "AddRevisionRequest",
+    "SearchDeploymentPoliciesRequest",
     # Update requests
     "UpdateDeploymentRequest",
     "UpdateRouteTrafficStatusRequest",
     # Path params
     "DeploymentPathParam",
+    "DeploymentPolicyPathParam",
     "RevisionPathParam",
     "RoutePathParam",
     # Nested input types
@@ -283,3 +287,54 @@ class CreateDeploymentRequest(BaseRequestModel):
     )
     desired_replica_count: int = Field(ge=0, description="Desired number of replicas")
     initial_revision: RevisionInput = Field(description="Initial revision configuration")
+
+
+# ========== Deployment Policy Requests ==========
+
+
+class UpsertDeploymentPolicyRequest(BaseRequestModel):
+    """Request to create or update a deployment policy that governs how new revisions are rolled out.
+
+    If a policy already exists for the deployment, it is updated; otherwise a new one is created.
+    Exactly one of rolling_update or blue_green must be provided depending on the chosen strategy.
+    """
+
+    strategy: DeploymentStrategy = Field(
+        description="Rollout strategy: ROLLING replaces replicas gradually with configurable concurrency limits; BLUE_GREEN runs two parallel environments and switches traffic atomically"
+    )
+    rollback_on_failure: bool = Field(
+        default=False,
+        description="When true, the system automatically reverts to the previous stable revision if health checks fail during rollout",
+    )
+    rolling_update: RollingUpdateConfigInput | None = Field(
+        default=None,
+        description="Concurrency limits for rolling updates (max_surge, max_unavailable); required when strategy is ROLLING, ignored otherwise",
+    )
+    blue_green: BlueGreenConfigInput | None = Field(
+        default=None,
+        description="Promotion settings for blue-green rollouts (auto_promote, promote_delay_seconds); required when strategy is BLUE_GREEN, ignored otherwise",
+    )
+
+
+class SearchDeploymentPoliciesRequest(BaseRequestModel):
+    """Request body for searching deployment policies with pagination."""
+
+    limit: int = Field(default=50, ge=1, le=1000, description="Maximum items to return")
+    offset: int = Field(default=0, ge=0, description="Number of items to skip")
+
+
+class DeploymentPolicyPathParam(BaseRequestModel):
+    """Path parameters for deployment policy endpoints.
+
+    Identifies the deployment whose rollout policy is being managed.
+    """
+
+    deployment_id: UUID = Field(
+        description="UUID of the deployment whose policy is being read or modified"
+    )
+
+
+class AddRevisionRequest(BaseRequestModel):
+    """Request to add a new revision to an existing deployment."""
+
+    revision: RevisionInput = Field(description="Revision configuration")

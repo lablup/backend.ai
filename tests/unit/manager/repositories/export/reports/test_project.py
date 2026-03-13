@@ -14,7 +14,8 @@ import sqlalchemy as sa
 
 from ai.backend.common.container_registry import ContainerRegistryType
 from ai.backend.common.types import ResourceSlot
-from ai.backend.manager.api.export.adapter import ExportAdapter
+from ai.backend.manager.api.rest.export.adapter import ExportAdapter
+from ai.backend.manager.models.agent import AgentRow
 from ai.backend.manager.models.association_container_registries_groups import (
     AssociationContainerRegistriesGroupsRow,
 )
@@ -44,6 +45,9 @@ from ai.backend.manager.repositories.export.reports.project import (
     _serialize_json,
 )
 from ai.backend.testutils.db import with_tables
+
+# Reference Row models to prevent unused-import removal (mapper initialization).
+_MAPPER_ROWS = [AgentRow]
 
 
 @dataclass(frozen=True)
@@ -78,8 +82,8 @@ class TestProjectReportDefinition:
         assert PROJECT_REPORT.select_from is GroupRow.__table__
 
     def test_total_field_count(self) -> None:
-        """Should have 27 fields total."""
-        assert len(PROJECT_REPORT.fields) == 27
+        """Should have 28 fields total."""
+        assert len(PROJECT_REPORT.fields) == 28
 
 
 class TestProjectFieldDefinitions:
@@ -107,6 +111,10 @@ class TestProjectFieldDefinitions:
     def test_vfolder_hosts_field_exists(self, field_keys: set[str]) -> None:
         """allowed_vfolder_hosts field should exist."""
         assert "allowed_vfolder_hosts" in field_keys
+
+    def test_container_registry_field_exists(self, field_keys: set[str]) -> None:
+        """container_registry (image commit registry) field should exist."""
+        assert "container_registry" in field_keys
 
     def test_resource_policy_fields_exist(self, field_keys: set[str]) -> None:
         """Resource policy fields should exist."""
@@ -352,7 +360,7 @@ class TestBuildProjectQueryWithRealReport:
             statement_timeout_sec=60,
         )
 
-        assert len(query.fields) == 27
+        assert len(query.fields) == 28
 
     def test_multiple_fields_from_same_join_deduplicate(self, adapter: ExportAdapter) -> None:
         """Multiple fields from same join should not duplicate JOINs."""

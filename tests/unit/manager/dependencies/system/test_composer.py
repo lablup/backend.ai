@@ -2,8 +2,6 @@ from __future__ import annotations
 
 from unittest.mock import AsyncMock, MagicMock, patch
 
-import pytest
-
 from ai.backend.common.dependencies.stacks.builder import DependencyBuilderStack
 from ai.backend.manager.dependencies.system.background_task_manager import (
     BackgroundTaskManagerDependency,
@@ -56,7 +54,6 @@ class TestProviderStageNames:
 class TestSystemComposer:
     """Test SystemComposer lifecycle."""
 
-    @pytest.mark.asyncio
     @patch(
         "ai.backend.manager.dependencies.system.service_discovery.ETCDServiceDiscovery",
     )

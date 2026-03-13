@@ -22,8 +22,6 @@ from sqlalchemy.ext.asyncio import async_sessionmaker
 from sqlalchemy.orm import load_only, selectinload
 
 from ai.backend.common.data.permission.types import (
-    EntityType,
-    FieldType,
     RBACElementType,
 )
 from ai.backend.common.docker import ImageRef
@@ -90,10 +88,6 @@ from ai.backend.manager.repositories.base.rbac.entity_creator import (
     RBACEntityCreator,
     execute_rbac_entity_creator,
 )
-from ai.backend.manager.repositories.base.rbac.field_creator import (
-    RBACBulkFieldCreator,
-    execute_rbac_bulk_field_creator,
-)
 from ai.backend.manager.repositories.base.updater import BatchUpdater, execute_batch_updater
 from ai.backend.manager.repositories.resource_slot.types import (
     accumulate_to_quantities,
@@ -135,7 +129,6 @@ from ai.backend.manager.repositories.scheduling_history import (
     SessionSchedulingHistoryCreatorSpec,
 )
 from ai.backend.manager.repositories.session.creators import (
-    KernelRowCreatorSpec,
     SessionRowCreatorSpec,
 )
 from ai.backend.manager.sokovan.data import (
@@ -322,6 +315,7 @@ class ScheduleDBSource:
                 SessionRow.domain_name,
                 SessionRow.scaling_group_name,
                 SessionRow.priority,
+                SessionRow.is_preemptible,
                 SessionRow.session_type,
                 SessionRow.cluster_mode,
                 SessionRow.designated_agent_ids,
@@ -358,6 +352,7 @@ class ScheduleDBSource:
                     domain_name=row.domain_name,
                     scaling_group_name=row.scaling_group_name,
                     priority=row.priority,
+                    is_preemptible=row.is_preemptible,
                     session_type=row.session_type,
                     cluster_mode=row.cluster_mode,
                     starts_at=row.starts_at,
@@ -976,6 +971,15 @@ class ScheduleDBSource:
 
         # Mark kernels as TERMINATED directly
         if force_terminated_sessions:
+            # Fetch kernel_id and agent_id before updating status
+            kernel_agent_query = sa.select(KernelRow.id, KernelRow.agent).where(
+                sa.and_(
+                    KernelRow.session_id.in_(force_terminated_sessions),
+                    KernelRow.status.in_(KernelStatus.terminatable_statuses()),
+                )
+            )
+            kernel_agent_rows = (await db_sess.execute(kernel_agent_query)).all()
+
             await db_sess.execute(
                 sa.update(KernelRow)
                 .values(
@@ -999,6 +1003,31 @@ class ScheduleDBSource:
                     )
                 )
             )
+
+            # Free resource allocations and decrement agent_resources for each kernel
+            ar = AgentResourceRow.__table__
+            for kernel_id, agent_id in kernel_agent_rows:
+                released = (
+                    await db_sess.execute(
+                        sa.update(ResourceAllocationRow)
+                        .where(
+                            ResourceAllocationRow.kernel_id == kernel_id,
+                            ResourceAllocationRow.free_at.is_(None),
+                        )
+                        .values(free_at=sa.func.now())
+                        .returning(ResourceAllocationRow.slot_name, ResourceAllocationRow.used)
+                    )
+                ).all()
+                if agent_id and released:
+                    for r in released:
+                        if r.used is None:
+                            continue
+                        new_used = sa.func.greatest(ar.c.used - r.used, 0)
+                        await db_sess.execute(
+                            sa.update(ar)
+                            .where(ar.c.agent_id == agent_id, ar.c.slot_name == r.slot_name)
+                            .values(used=new_used)
+                        )
 
             # Record scheduling history for force-terminate transition
             history_specs = [
@@ -1322,18 +1351,16 @@ class ScheduleDBSource:
                     element_type=RBACElementType.USER,
                     element_id=str(session_data.user_uuid),
                 ),
-                additional_scope_refs=[],
+                additional_scope_refs=[
+                    RBACElementRef(
+                        element_type=RBACElementType.PROJECT,
+                        element_id=str(session_data.group_id),
+                    )
+                ],
             )
             await execute_rbac_entity_creator(db_sess, rbac_creator)
 
-            # Use RBACBulkFieldCreator to create kernels with RBAC field association
-            kernel_field_creator = RBACBulkFieldCreator(
-                specs=[KernelRowCreatorSpec(row=k) for k in kernels],
-                entity_type=EntityType.SESSION,
-                entity_id=str(session_data.id),
-                field_type=FieldType.KERNEL,
-            )
-            await execute_rbac_bulk_field_creator(db_sess, kernel_field_creator)
+            db_sess.add_all(kernels)
             await db_sess.flush()
 
             # Record requested resources in normalized resource_allocations table
@@ -2243,7 +2270,7 @@ class ScheduleDBSource:
                 for r in released:
                     if r.used is None:
                         continue
-                    new_used = ar.c.used - r.used
+                    new_used = sa.func.greatest(ar.c.used - r.used, 0)
                     await db_sess.execute(
                         sa.update(ar)
                         .where(ar.c.agent_id == agent_id, ar.c.slot_name == r.slot_name)
@@ -2300,6 +2327,39 @@ class ScheduleDBSource:
             result = await db_sess.execute(stmt)
             return cast(CursorResult[Any], result).rowcount
 
+    async def get_agent_ids_for_sessions(
+        self, session_ids: list[SessionId]
+    ) -> dict[SessionId, list[AgentId]]:
+        """
+        Get agent IDs assigned to kernels for the given sessions.
+
+        This is used before resetting kernels to PENDING to record
+        which agents failed, so the scheduler can deprioritize them on retry.
+
+        :param session_ids: List of session IDs to look up
+        :return: Mapping of session ID to list of assigned agent IDs
+        """
+        if not session_ids:
+            return {}
+
+        async with self._begin_readonly_read_committed() as db_conn:
+            stmt = sa.select(
+                KernelRow.session_id,
+                KernelRow.agent,
+            ).where(
+                sa.and_(
+                    KernelRow.session_id.in_(session_ids),
+                    KernelRow.agent.isnot(None),
+                    KernelRow.status.in_(KernelStatus.retriable_statuses()),
+                )
+            )
+            rows = (await db_conn.execute(stmt)).fetchall()
+
+        result: dict[SessionId, list[AgentId]] = defaultdict(list)
+        for row in rows:
+            result[row.session_id].append(AgentId(row.agent))
+        return dict(result)
+
     async def update_kernels_to_creating_for_sessions(
         self, session_ids: list[SessionId], reason: str
     ) -> int:
@@ -2355,6 +2415,13 @@ class ScheduleDBSource:
 
         async with self._begin_session_read_committed() as db_sess:
             now = await self._get_db_now_in_session(db_sess)
+
+            # Fetch kernel_id and agent_id before updating status
+            kernel_agent_query = sa.select(KernelRow.id, KernelRow.agent).where(
+                KernelRow.id.in_(kernel_uuids),
+            )
+            kernel_agent_rows = (await db_sess.execute(kernel_agent_query)).all()
+
             stmt = (
                 sa.update(KernelRow)
                 .where(KernelRow.id.in_(kernel_uuids))
@@ -2371,6 +2438,32 @@ class ScheduleDBSource:
                 )
             )
             result = await db_sess.execute(stmt)
+
+            # Free resource allocations and decrement agent_resources for each kernel
+            ar = AgentResourceRow.__table__
+            for kernel_id, agent_id in kernel_agent_rows:
+                released = (
+                    await db_sess.execute(
+                        sa.update(ResourceAllocationRow)
+                        .where(
+                            ResourceAllocationRow.kernel_id == kernel_id,
+                            ResourceAllocationRow.free_at.is_(None),
+                        )
+                        .values(free_at=sa.func.now())
+                        .returning(ResourceAllocationRow.slot_name, ResourceAllocationRow.used)
+                    )
+                ).all()
+                if agent_id and released:
+                    for r in released:
+                        if r.used is None:
+                            continue
+                        new_used = sa.func.greatest(ar.c.used - r.used, 0)
+                        await db_sess.execute(
+                            sa.update(ar)
+                            .where(ar.c.agent_id == agent_id, ar.c.slot_name == r.slot_name)
+                            .values(used=new_used)
+                        )
+
             return cast(CursorResult[Any], result).rowcount
 
     async def update_kernels_to_pulling_for_image(

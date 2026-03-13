@@ -6,7 +6,6 @@ from types import TracebackType
 from typing import Any
 
 import aiotools
-import pytest
 
 from ai.backend.common.events.dispatcher import (
     CoalescingOptions,
@@ -52,7 +51,6 @@ class DummyBroadcastEvent(AbstractBroadcastEvent):
 EVENT_DISPATCHER_CONSUMER_GROUP = "test"
 
 
-@pytest.mark.asyncio
 async def test_dispatch(test_valkey_stream_mq: RedisQueue, test_node_id: str) -> None:
     app = object()
 
@@ -94,7 +92,6 @@ async def test_dispatch(test_valkey_stream_mq: RedisQueue, test_node_id: str) ->
     await dispatcher.close()
 
 
-@pytest.mark.asyncio
 async def test_error_on_dispatch(test_valkey_stream_mq: RedisQueue, test_node_id: str) -> None:
     app = object()
     exception_log: list[str] = []
@@ -140,7 +137,6 @@ async def test_error_on_dispatch(test_valkey_stream_mq: RedisQueue, test_node_id
     await dispatcher.close()
 
 
-@pytest.mark.asyncio
 async def test_event_dispatcher_rate_control() -> None:
     opts = CoalescingOptions(max_wait=0.1, max_batch_size=5)
     state = CoalescingState()

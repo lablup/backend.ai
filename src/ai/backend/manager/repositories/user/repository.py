@@ -34,7 +34,11 @@ from ai.backend.manager.repositories.base.creator import Creator
 from ai.backend.manager.repositories.base.querier import BatchQuerier
 from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.repositories.user.db_source import UserDBSource
-from ai.backend.manager.repositories.user.types import DomainUserSearchScope, ProjectUserSearchScope
+from ai.backend.manager.repositories.user.types import (
+    DomainUserSearchScope,
+    ProjectUserSearchScope,
+    RoleUserSearchScope,
+)
 from ai.backend.manager.services.user.actions.create_user import UserCreateSpec
 from ai.backend.manager.services.user.actions.modify_user import UserUpdateSpec
 
@@ -259,6 +263,13 @@ class UserRepository:
             UserSearchResult with matching users and pagination info.
         """
         return await self._db_source.search_users_by_project(scope, querier)
+
+    @user_repository_resilience.apply()
+    async def search_users_by_role(
+        self, scope: RoleUserSearchScope, querier: BatchQuerier
+    ) -> UserSearchResult:
+        """Search users assigned to a role."""
+        return await self._db_source.search_users_by_role(scope, querier)
 
     async def _get_time_binned_monthly_stats(
         self,

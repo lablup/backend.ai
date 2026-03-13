@@ -655,7 +655,6 @@ class TestBulkPurgeUsers:
         mock_user_repository.get_user_by_uuid = AsyncMock(return_value=admin_user)
         return admin_user
 
-    @pytest.mark.asyncio
     async def test_bulk_purge_users_all_success(
         self,
         service: UserService,
@@ -684,7 +683,6 @@ class TestBulkPurgeUsers:
         assert result.data.failure_count() == 0
         assert result.data.purged_user_ids == user_ids
 
-    @pytest.mark.asyncio
     async def test_bulk_purge_users_partial_failure(
         self,
         service: UserService,
@@ -717,7 +715,6 @@ class TestBulkPurgeUsers:
         assert result.data.failures[0].user_id == user_ids[1]
         assert isinstance(result.data.failures[0].exception, UserPurgeFailure)
 
-    @pytest.mark.asyncio
     async def test_bulk_purge_users_all_failure(
         self,
         service: UserService,
@@ -743,7 +740,6 @@ class TestBulkPurgeUsers:
         failed_user_ids = [f.user_id for f in result.data.failures]
         assert failed_user_ids == user_ids
 
-    @pytest.mark.asyncio
     async def test_bulk_purge_users_empty_list(
         self,
         service: UserService,

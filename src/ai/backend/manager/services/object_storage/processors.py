@@ -3,6 +3,7 @@ from typing import override
 from ai.backend.manager.actions.monitors.monitor import ActionMonitor
 from ai.backend.manager.actions.processor import ActionProcessor
 from ai.backend.manager.actions.types import AbstractProcessorPackage, ActionSpec
+from ai.backend.manager.actions.validators import ActionValidators
 from ai.backend.manager.services.object_storage.actions.create import (
     CreateObjectStorageAction,
     CreateObjectStorageActionResult,
@@ -54,7 +55,12 @@ class ObjectStorageProcessors(AbstractProcessorPackage):
         SearchObjectStoragesAction, SearchObjectStoragesActionResult
     ]
 
-    def __init__(self, service: ObjectStorageService, action_monitors: list[ActionMonitor]) -> None:
+    def __init__(
+        self,
+        service: ObjectStorageService,
+        action_monitors: list[ActionMonitor],
+        validators: ActionValidators,
+    ) -> None:
         self.create = ActionProcessor(service.create, action_monitors)
         self.update = ActionProcessor(service.update, action_monitors)
         self.delete = ActionProcessor(service.delete, action_monitors)

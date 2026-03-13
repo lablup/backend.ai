@@ -39,7 +39,6 @@ def api_version_mock() -> mock.AsyncMock:
 class TestFairShareBulkUpsert:
     """Bulk upsert operations tests."""
 
-    @pytest.mark.asyncio
     async def test_bulk_upsert_domain_success(self, dummy_endpoint: str) -> None:
         """Should bulk upsert domain weights successfully."""
         with aioresponses() as m, Session():
@@ -62,7 +61,6 @@ class TestFairShareBulkUpsert:
             assert isinstance(result, BulkUpsertDomainFairShareWeightResponse)
             assert result.upserted_count == 2
 
-    @pytest.mark.asyncio
     async def test_bulk_upsert_domain_with_null_weight(self, dummy_endpoint: str) -> None:
         """Should handle null weight correctly."""
         with aioresponses() as m, Session():
@@ -83,7 +81,6 @@ class TestFairShareBulkUpsert:
 
             assert result.upserted_count == 1
 
-    @pytest.mark.asyncio
     async def test_bulk_upsert_domain_empty_list(self, dummy_endpoint: str) -> None:
         """Should handle empty input list."""
         with aioresponses() as m, Session():
@@ -102,7 +99,6 @@ class TestFairShareBulkUpsert:
 
             assert result.upserted_count == 0
 
-    @pytest.mark.asyncio
     async def test_bulk_upsert_project_success(self, dummy_endpoint: str) -> None:
         """Should bulk upsert project weights successfully."""
         with aioresponses() as m, Session():
@@ -136,7 +132,6 @@ class TestFairShareBulkUpsert:
             assert isinstance(result, BulkUpsertProjectFairShareWeightResponse)
             assert result.upserted_count == 2
 
-    @pytest.mark.asyncio
     async def test_bulk_upsert_project_with_null_weight(self, dummy_endpoint: str) -> None:
         """Should handle null weight correctly."""
         with aioresponses() as m, Session():
@@ -163,7 +158,6 @@ class TestFairShareBulkUpsert:
 
             assert result.upserted_count == 1
 
-    @pytest.mark.asyncio
     async def test_bulk_upsert_user_success(self, dummy_endpoint: str) -> None:
         """Should bulk upsert user weights successfully."""
         with aioresponses() as m, Session():
@@ -200,7 +194,6 @@ class TestFairShareBulkUpsert:
             assert isinstance(result, BulkUpsertUserFairShareWeightResponse)
             assert result.upserted_count == 2
 
-    @pytest.mark.asyncio
     async def test_bulk_upsert_user_with_null_weight(self, dummy_endpoint: str) -> None:
         """Should handle null weight correctly."""
         with aioresponses() as m, Session():

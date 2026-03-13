@@ -25,7 +25,6 @@ class TestEventDispatcherPluginDependency:
         dep = EventDispatcherPluginDependency()
         assert dep.stage_name == "event-dispatcher-plugin"
 
-    @pytest.mark.asyncio
     @patch("ai.backend.manager.dependencies.plugins.event_dispatcher.EventDispatcherPluginContext")
     async def test_provide_initializes_and_yields_context(self, mock_ctx_class: MagicMock) -> None:
         plugins_input = _make_plugins_input()
@@ -48,7 +47,6 @@ class TestEventDispatcherPluginDependency:
 
         mock_ctx.cleanup.assert_called_once()
 
-    @pytest.mark.asyncio
     @patch("ai.backend.manager.dependencies.plugins.event_dispatcher.EventDispatcherPluginContext")
     async def test_cleanup_on_exception(self, mock_ctx_class: MagicMock) -> None:
         plugins_input = _make_plugins_input()

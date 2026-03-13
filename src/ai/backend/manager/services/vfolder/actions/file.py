@@ -221,6 +221,33 @@ class DeleteFilesAsyncActionResult(BaseActionResult):
 
 
 @dataclass
+class MoveFileAction(VFolderFileAction):
+    user_uuid: uuid.UUID
+    vfolder_uuid: uuid.UUID
+
+    src: str
+    dst: str
+
+    @override
+    def entity_id(self) -> str | None:
+        return str(self.vfolder_uuid)
+
+    @override
+    @classmethod
+    def operation_type(cls) -> ActionOperationType:
+        return ActionOperationType.UPDATE
+
+
+@dataclass
+class MoveFileActionResult(BaseActionResult):
+    vfolder_uuid: uuid.UUID
+
+    @override
+    def entity_id(self) -> str | None:
+        return str(self.vfolder_uuid)
+
+
+@dataclass
 class MkdirAction(VFolderDirectoryAction):
     user_id: uuid.UUID
     vfolder_uuid: uuid.UUID

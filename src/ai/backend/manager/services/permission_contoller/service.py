@@ -12,6 +12,14 @@ from ai.backend.manager.services.permission_contoller.actions.assign_role import
     AssignRoleAction,
     AssignRoleActionResult,
 )
+from ai.backend.manager.services.permission_contoller.actions.bulk_assign_role import (
+    BulkAssignRoleAction,
+    BulkAssignRoleActionResult,
+)
+from ai.backend.manager.services.permission_contoller.actions.bulk_revoke_role import (
+    BulkRevokeRoleAction,
+    BulkRevokeRoleActionResult,
+)
 from ai.backend.manager.services.permission_contoller.actions.create_role import (
     CreateRoleAction,
     CreateRoleActionResult,
@@ -80,6 +88,10 @@ from ai.backend.manager.services.permission_contoller.actions.search_users_assig
     SearchUsersAssignedToRoleAction,
     SearchUsersAssignedToRoleActionResult,
 )
+from ai.backend.manager.services.permission_contoller.actions.update_permission import (
+    UpdatePermissionAction,
+    UpdatePermissionActionResult,
+)
 from ai.backend.manager.services.permission_contoller.actions.update_role import (
     UpdateRoleAction,
     UpdateRoleActionResult,
@@ -128,6 +140,15 @@ class PermissionControllerService:
         """
         result = await self._repository.delete_permission(action.purger)
         return DeletePermissionActionResult(data=result)
+
+    async def update_permission(
+        self, action: UpdatePermissionAction
+    ) -> UpdatePermissionActionResult:
+        """
+        Updates an existing permission in the repository.
+        """
+        result = await self._repository.update_permission(action.updater)
+        return UpdatePermissionActionResult(data=result)
 
     async def create_object_permission(
         self, action: CreateObjectPermissionAction
@@ -185,6 +206,16 @@ class PermissionControllerService:
         data = await self._repository.revoke_role(action.input)
 
         return RevokeRoleActionResult(data=data)
+
+    async def bulk_assign_role(self, action: BulkAssignRoleAction) -> BulkAssignRoleActionResult:
+        """Assigns a role to multiple users with partial failure support."""
+        data = await self._repository.bulk_assign_role(action.bulk_creator)
+        return BulkAssignRoleActionResult(data=data)
+
+    async def bulk_revoke_role(self, action: BulkRevokeRoleAction) -> BulkRevokeRoleActionResult:
+        """Revokes a role from multiple users with partial failure support."""
+        data = await self._repository.bulk_revoke_role(action.input)
+        return BulkRevokeRoleActionResult(data=data)
 
     async def get_role_detail(self, action: GetRoleDetailAction) -> GetRoleDetailActionResult:
         """Get role with all permission details and assigned users."""

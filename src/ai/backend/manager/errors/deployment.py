@@ -145,3 +145,15 @@ class RouteUnhealthy(BackendAIError):
             operation=ErrorOperation.READ,
             error_detail=ErrorDetail.INVALID_PARAMETERS,
         )
+
+
+class IncompleteRevisionData(BackendAIError, web.HTTPInternalServerError):
+    error_type = "https://api.backend.ai/probs/incomplete-revision-data"
+    error_title = "Revision data is missing required fields."
+
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.MODEL_SERVICE,
+            operation=ErrorOperation.READ,
+            error_detail=ErrorDetail.INVALID_PARAMETERS,
+        )

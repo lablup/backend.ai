@@ -69,7 +69,6 @@ async def proxy_app_fixture(
 @pytest.mark.xfail(
     reason="pytest-dev/pytest-asyncio#153 should be resolved to make this test working",
 )
-@pytest.mark.asyncio
 async def test_proxy_web(
     monkeypatch: Any,
     example_keypair: tuple[str, str],
@@ -97,7 +96,6 @@ async def test_proxy_web(
 @pytest.mark.xfail(
     reason="pytest-dev/pytest-asyncio#153 should be resolved to make this test working",
 )
-@pytest.mark.asyncio
 async def test_proxy_web_502(
     monkeypatch: Any,
     example_keypair: tuple[str, str],
@@ -124,7 +122,6 @@ async def test_proxy_web_502(
 @pytest.mark.xfail(
     reason="pytest-dev/pytest-asyncio#153 should be resolved to make this test working",
 )
-@pytest.mark.asyncio
 async def test_proxy_websocket(
     monkeypatch: Any,
     example_keypair: tuple[str, str],

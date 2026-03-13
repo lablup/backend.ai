@@ -6,7 +6,7 @@ from typing import override
 from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.models.scaling_group import ScalingGroupForDomainRow
-from ai.backend.manager.repositories.base.creator import BulkCreator
+from ai.backend.manager.repositories.base.rbac.scope_binder import RBACScopeBinder
 
 from .domain_base import ScalingGroupDomainAction
 
@@ -15,7 +15,7 @@ from .domain_base import ScalingGroupDomainAction
 class AssociateScalingGroupWithDomainsAction(ScalingGroupDomainAction):
     """Action to associate a scaling group with multiple domains."""
 
-    bulk_creator: BulkCreator[ScalingGroupForDomainRow]
+    binder: RBACScopeBinder[ScalingGroupForDomainRow]
 
     @override
     @classmethod

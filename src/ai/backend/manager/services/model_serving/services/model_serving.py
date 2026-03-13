@@ -33,7 +33,9 @@ from ai.backend.common.types import (
     AccessKey,
     ImageAlias,
     KernelEnqueueingConfig,
+    RuntimeVariant,
     SessionTypes,
+    VFolderID,
 )
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.config.provider import ManagerConfigProvider
@@ -64,7 +66,7 @@ from ai.backend.manager.errors.service import (
     ModelServiceNotFound,
     RouteNotFound,
 )
-from ai.backend.manager.models.endpoint import EndpointLifecycle, EndpointRow
+from ai.backend.manager.models.endpoint import EndpointLifecycle, EndpointRow, ModelServiceHelper
 from ai.backend.manager.models.routing import RouteStatus
 from ai.backend.manager.models.storage import StorageSessionManager
 from ai.backend.manager.registry import AgentRegistry
@@ -130,6 +132,10 @@ from ai.backend.manager.services.model_serving.actions.update_route import (
     UpdateRouteAction,
     UpdateRouteActionResult,
 )
+from ai.backend.manager.services.model_serving.actions.validate_model_service import (
+    ValidateModelServiceAction,
+    ValidateModelServiceActionResult,
+)
 from ai.backend.manager.services.model_serving.exceptions import (
     GenericForbidden,
     InvalidAPIParameters,
@@ -141,7 +147,7 @@ from ai.backend.manager.sokovan.deployment.revision_generator.registry import (
 )
 from ai.backend.manager.sokovan.deployment.types import DeploymentLifecycleType
 from ai.backend.manager.sokovan.scheduling_controller import SchedulingController
-from ai.backend.manager.types import UserScope
+from ai.backend.manager.types import MountOptionModel, UserScope
 
 log = BraceStyleAdapter(logging.getLogger(__name__))
 
@@ -881,3 +887,81 @@ class ModelServingService:
                 DeploymentLifecycleType.CHECK_REPLICA,
             )
         return ModifyEndpointActionResult(success=result.success, data=result.data)
+
+    async def validate_model_service(
+        self, action: ValidateModelServiceAction
+    ) -> ValidateModelServiceActionResult:
+        if action.replicas > action.max_session_count_per_model_session:
+            raise InvalidAPIParameters(
+                f"Cannot spawn more than {action.max_session_count_per_model_session}"
+                " sessions for a single service"
+            )
+
+        owner_access_key = action.owner_access_key
+        if action.owner_access_key_override is not None:
+            owner_access_key = action.owner_access_key_override
+
+        extra_mounts_typed: dict[uuid.UUID, MountOptionModel] = {
+            k: MountOptionModel(
+                mount_destination=v.mount_destination,
+                type=v.type,
+                permission=v.permission,
+            )
+            for k, v in action.config.extra_mounts.items()
+        }
+
+        # Delegate all DB-dependent resolution to the repository.
+        ctx = await self._repository.resolve_model_service_validation_context(
+            scaling_group=action.config.scaling_group,
+            owner_access_key=owner_access_key,
+            domain_name=action.domain_name,
+            group_name=action.group_name,
+            requester_uuid=action.requester_uuid,
+            requester_access_key=action.requester_access_key,
+            requester_role=action.requester_role,
+            requester_domain=action.requester_domain,
+            keypair_resource_policy=action.keypair_resource_policy,
+            owner_access_key_override=action.owner_access_key_override,
+            model=action.config.model,
+            model_mount_destination=action.config.model_mount_destination,
+            extra_mounts=extra_mounts_typed,
+            legacy_etcd_loader=self._config_provider.legacy_etcd_config_loader,
+            storage_manager=self._storage_manager,
+        )
+
+        if action.runtime_variant == RuntimeVariant.CUSTOM:
+            vfid = VFolderID(ctx.model_folder_quota_scope_id, ctx.model_id)
+            yaml_path = await ModelServiceHelper.validate_model_definition_file_exists(
+                self._storage_manager,
+                ctx.model_folder_host,
+                vfid,
+                action.config.model_definition_path,
+            )
+            await ModelServiceHelper.validate_model_definition(
+                self._storage_manager,
+                ctx.model_folder_host,
+                vfid,
+                yaml_path,
+            )
+        else:
+            if (
+                action.runtime_variant != RuntimeVariant.CMD
+                and action.config.model_mount_destination != "/models"
+            ):
+                raise InvalidAPIParameters(
+                    "Model mount destination must be /models for non-custom runtimes"
+                )
+            yaml_path = "model-definition.yaml"
+
+        return ValidateModelServiceActionResult(
+            model_id=ctx.model_id,
+            model_definition_path=yaml_path,
+            requester_access_key=ctx.requester_access_key,
+            owner_access_key=ctx.owner_access_key,
+            owner_uuid=ctx.owner_uuid,
+            owner_role=ctx.owner_role,
+            group_id=ctx.group_id,
+            resource_policy=ctx.resource_policy,
+            scaling_group=ctx.scaling_group,
+            extra_mounts=ctx.extra_mounts,
+        )

@@ -1,10 +1,9 @@
 from unittest.mock import AsyncMock, MagicMock
 from uuid import UUID
 
-import pytest
 from yarl import URL
 
-from ai.backend.client.v2.base_client import BackendAIClient
+from ai.backend.client.v2.base_client import BackendAIAuthClient
 from ai.backend.client.v2.config import ClientConfig
 from ai.backend.client.v2.domains.rbac import RBACClient
 from ai.backend.common.dto.manager.rbac.request import (
@@ -57,8 +56,8 @@ _ROLE_PAYLOAD = {
 def _make_client(
     mock_session: MagicMock | None = None,
     config: ClientConfig | None = None,
-) -> BackendAIClient:
-    return BackendAIClient(
+) -> BackendAIAuthClient:
+    return BackendAIAuthClient(
         config or _DEFAULT_CONFIG,
         MockAuth(),
         mock_session or MagicMock(),
@@ -79,7 +78,6 @@ def _make_request_session(resp: AsyncMock) -> MagicMock:
 class TestRBACClient:
     # ---- Role Management ----
 
-    @pytest.mark.asyncio
     async def test_create_role(self) -> None:
         mock_resp = AsyncMock()
         mock_resp.status = 201
@@ -106,7 +104,6 @@ class TestRBACClient:
         assert "/admin/rbac/roles" in str(call_args.args[1])
         assert call_args.kwargs["json"]["name"] == "admin"
 
-    @pytest.mark.asyncio
     async def test_search_roles(self) -> None:
         mock_resp = AsyncMock()
         mock_resp.status = 200
@@ -132,7 +129,6 @@ class TestRBACClient:
         assert call_args.args[0] == "POST"
         assert "/admin/rbac/roles/search" in str(call_args.args[1])
 
-    @pytest.mark.asyncio
     async def test_get_role(self) -> None:
         mock_resp = AsyncMock()
         mock_resp.status = 200
@@ -152,7 +148,6 @@ class TestRBACClient:
         assert f"/admin/rbac/roles/{_ROLE_ID}" in str(call_args.args[1])
         assert call_args.kwargs["json"] is None
 
-    @pytest.mark.asyncio
     async def test_update_role(self) -> None:
         updated = {**_ROLE_PAYLOAD, "name": "superadmin"}
         mock_resp = AsyncMock()
@@ -174,7 +169,6 @@ class TestRBACClient:
         assert f"/admin/rbac/roles/{_ROLE_ID}" in str(call_args.args[1])
         assert call_args.kwargs["json"]["name"] == "superadmin"
 
-    @pytest.mark.asyncio
     async def test_delete_role(self) -> None:
         mock_resp = AsyncMock()
         mock_resp.status = 200
@@ -195,7 +189,6 @@ class TestRBACClient:
         assert "/admin/rbac/roles/delete" in str(call_args.args[1])
         assert str(call_args.kwargs["json"]["role_id"]) == str(_ROLE_ID)
 
-    @pytest.mark.asyncio
     async def test_purge_role(self) -> None:
         mock_resp = AsyncMock()
         mock_resp.status = 200
@@ -218,7 +211,6 @@ class TestRBACClient:
 
     # ---- Role Assignment ----
 
-    @pytest.mark.asyncio
     async def test_assign_role(self) -> None:
         mock_resp = AsyncMock()
         mock_resp.status = 201
@@ -246,7 +238,6 @@ class TestRBACClient:
         assert "/admin/rbac/roles/assign" in str(call_args.args[1])
         assert str(call_args.kwargs["json"]["user_id"]) == str(_USER_ID)
 
-    @pytest.mark.asyncio
     async def test_revoke_role(self) -> None:
         mock_resp = AsyncMock()
         mock_resp.status = 200
@@ -273,7 +264,6 @@ class TestRBACClient:
         assert "/admin/rbac/roles/revoke" in str(call_args.args[1])
         assert str(call_args.kwargs["json"]["user_id"]) == str(_USER_ID)
 
-    @pytest.mark.asyncio
     async def test_search_assigned_users(self) -> None:
         mock_resp = AsyncMock()
         mock_resp.status = 200
@@ -307,7 +297,6 @@ class TestRBACClient:
 
     # ---- Scope Management ----
 
-    @pytest.mark.asyncio
     async def test_get_scope_types(self) -> None:
         mock_resp = AsyncMock()
         mock_resp.status = 200
@@ -327,7 +316,6 @@ class TestRBACClient:
         assert "/admin/rbac/scope-types" in str(call_args.args[1])
         assert call_args.kwargs["json"] is None
 
-    @pytest.mark.asyncio
     async def test_search_scopes(self) -> None:
         mock_resp = AsyncMock()
         mock_resp.status = 200
@@ -357,7 +345,6 @@ class TestRBACClient:
 
     # ---- Entity Management ----
 
-    @pytest.mark.asyncio
     async def test_get_entity_types(self) -> None:
         mock_resp = AsyncMock()
         mock_resp.status = 200
@@ -377,7 +364,6 @@ class TestRBACClient:
         assert "/admin/rbac/entity-types" in str(call_args.args[1])
         assert call_args.kwargs["json"] is None
 
-    @pytest.mark.asyncio
     async def test_search_entities(self) -> None:
         mock_resp = AsyncMock()
         mock_resp.status = 200

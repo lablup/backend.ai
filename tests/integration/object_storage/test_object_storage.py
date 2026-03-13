@@ -18,7 +18,6 @@ StorageNamespaceFactory = Callable[..., Coroutine[Any, Any, dict[str, Any]]]
 
 @pytest.mark.integration
 class TestObjectStorageLifecycle:
-    @pytest.mark.asyncio
     async def test_list_seed_and_query_lifecycle(
         self,
         admin_registry: BackendAIClientRegistry,

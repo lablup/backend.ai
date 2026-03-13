@@ -104,7 +104,6 @@ def mock_vfolder_service() -> MockVFolderService:
     return MockVFolderService()
 
 
-@pytest.mark.asyncio
 async def test_get_volume(mock_vfolder_service: MockVFolderService) -> None:
     handler = VFolderHandler(mock_vfolder_service)
 
@@ -120,7 +119,6 @@ async def test_get_volume(mock_vfolder_service: MockVFolderService) -> None:
     assert volume_response["volume_id"] == str(UUID)
 
 
-@pytest.mark.asyncio
 async def test_get_volumes(mock_vfolder_service: MockVFolderService) -> None:
     handler = VFolderHandler(mock_vfolder_service)
 
@@ -134,7 +132,6 @@ async def test_get_volumes(mock_vfolder_service: MockVFolderService) -> None:
     assert volume_response[0]["volume_id"] == str(UUID1)
 
 
-@pytest.mark.asyncio
 async def test_create_quota_scope(mock_vfolder_service: MockVFolderService) -> None:
     handler = VFolderHandler(mock_vfolder_service)
 
@@ -152,7 +149,6 @@ async def test_create_quota_scope(mock_vfolder_service: MockVFolderService) -> N
     assert response.status == 204
 
 
-@pytest.mark.asyncio
 async def test_get_quota_scope(mock_vfolder_service: MockVFolderService) -> None:
     handler = VFolderHandler(mock_vfolder_service)
 
@@ -173,7 +169,6 @@ async def test_get_quota_scope(mock_vfolder_service: MockVFolderService) -> None
     assert quota_response["limit_bytes"] == 2000
 
 
-@pytest.mark.asyncio
 async def test_update_quota_scope(mock_vfolder_service: MockVFolderService) -> None:
     handler = VFolderHandler(mock_vfolder_service)
 
@@ -191,7 +186,6 @@ async def test_update_quota_scope(mock_vfolder_service: MockVFolderService) -> N
     assert response.status == 204
 
 
-@pytest.mark.asyncio
 async def test_delete_quota_scope(mock_vfolder_service: MockVFolderService) -> None:
     handler = VFolderHandler(mock_vfolder_service)
 
@@ -208,7 +202,6 @@ async def test_delete_quota_scope(mock_vfolder_service: MockVFolderService) -> N
     assert response.status == 204
 
 
-@pytest.mark.asyncio
 async def test_create_vfolder(mock_vfolder_service: MockVFolderService) -> None:
     handler = VFolderHandler(mock_vfolder_service)
 
@@ -226,7 +219,6 @@ async def test_create_vfolder(mock_vfolder_service: MockVFolderService) -> None:
     assert response.status == 204
 
 
-@pytest.mark.asyncio
 async def test_clone_vfolder(mock_vfolder_service: MockVFolderService) -> None:
     handler = VFolderHandler(mock_vfolder_service)
 
@@ -250,7 +242,6 @@ async def test_clone_vfolder(mock_vfolder_service: MockVFolderService) -> None:
     assert response.status == 204
 
 
-@pytest.mark.asyncio
 async def test_get_vfolder_info(mock_vfolder_service: MockVFolderService) -> None:
     handler = VFolderHandler(mock_vfolder_service)
 
@@ -276,7 +267,6 @@ async def test_get_vfolder_info(mock_vfolder_service: MockVFolderService) -> Non
     assert vfolder_response["fs_used_bytes"] == 1000
 
 
-@pytest.mark.asyncio
 async def test_delete_vfolder(mock_vfolder_service: MockVFolderService) -> None:
     handler = VFolderHandler(mock_vfolder_service)
 

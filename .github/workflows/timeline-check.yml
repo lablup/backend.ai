@@ -9,7 +9,8 @@ permissions:
 jobs:
   assign-pr-number:
     if: |
-      !contains(github.event.pull_request.labels.*.name, 'skip:changelog')
+      github.event.pull_request.head.repo.full_name == github.repository
+      && !contains(github.event.pull_request.labels.*.name, 'skip:changelog')
       && !contains(fromJSON('["flow:merge-queue", "flow:hotfix"]'), github.event.label.name)
       && github.event.pull_request.number != null
       && github.event.pull_request.merged == false
@@ -19,6 +20,11 @@ jobs:
       WORKFLOW_PAT: ${{ secrets.OCTODOG }}
 
   towncrier:
+    if: |
+      always()
+      && !contains(github.event.pull_request.labels.*.name, 'skip:changelog')
+      && !contains(fromJSON('["flow:merge-queue", "flow:hotfix"]'), github.event.label.name)
+      && needs.assign-pr-number.result != 'failure'
     needs: [assign-pr-number]
     runs-on: ubuntu-latest
     steps:

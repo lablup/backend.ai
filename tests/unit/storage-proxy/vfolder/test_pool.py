@@ -51,7 +51,6 @@ def mock_storage_plugin_ctx() -> AsyncMock:
     return ctx
 
 
-@pytest.mark.asyncio
 async def test_get_volume(mock_volume: AsyncMock, mock_storage_plugin_ctx: AsyncMock) -> None:
     # Create a VolumePool with mocked volumes
     volume_id = VolumeID("550e8400-e29b-41d4-a716-446655440000")

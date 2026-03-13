@@ -56,18 +56,15 @@ class TestLIFOSequencer:
             known_slot_types={},
         )
 
-    @pytest.mark.asyncio
     async def test_name(self, sequencer: LIFOSequencer) -> None:
         assert sequencer.name == "LIFOSequencer"
 
-    @pytest.mark.asyncio
     async def test_empty_workload(
         self, scaling_group: str, sequencer: LIFOSequencer, system_snapshot: SystemSnapshot
     ) -> None:
         result = await sequencer.sequence(scaling_group, system_snapshot, [])
         assert result == []
 
-    @pytest.mark.asyncio
     async def test_reverses_order(
         self, scaling_group: str, sequencer: LIFOSequencer, system_snapshot: SystemSnapshot
     ) -> None:
@@ -112,7 +109,6 @@ class TestLIFOSequencer:
         assert result[1] == workloads[1]  # Middle stays middle
         assert result[2] == workloads[0]  # First becomes last
 
-    @pytest.mark.asyncio
     async def test_single_workload(
         self, scaling_group: str, sequencer: LIFOSequencer, system_snapshot: SystemSnapshot
     ) -> None:
@@ -135,7 +131,6 @@ class TestLIFOSequencer:
         assert len(result) == 1
         assert result[0] == workloads[0]
 
-    @pytest.mark.asyncio
     async def test_ignores_system_snapshot(
         self, scaling_group: str, sequencer: LIFOSequencer
     ) -> None:

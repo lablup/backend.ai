@@ -173,7 +173,6 @@ class TestResourcePresetCacheInvalidation:
         )
         yield repo
 
-    @pytest.mark.asyncio
     async def test_create_preset_invalidates_cache(
         self,
         resource_preset_repository: ResourcePresetRepository,
@@ -212,7 +211,6 @@ class TestResourcePresetCacheInvalidation:
         cached_list_after = await cache_source.get_preset_list(scaling_group=None)
         assert cached_list_after is None
 
-    @pytest.mark.asyncio
     async def test_invalidate_all_presets_deletes_all_keys(
         self,
         resource_preset_repository: ResourcePresetRepository,
@@ -288,7 +286,6 @@ class TestResourcePresetCacheInvalidation:
             is None
         )
 
-    @pytest.mark.asyncio
     async def test_invalidate_all_presets_handles_no_keys(
         self,
         resource_preset_repository: ResourcePresetRepository,
@@ -302,7 +299,6 @@ class TestResourcePresetCacheInvalidation:
         # Should not raise any errors when no keys exist
         await cache_source.invalidate_all_presets()
 
-    @pytest.mark.asyncio
     async def test_valkey_stat_invalidate_all_resource_presets(
         self,
         resource_preset_repository: ResourcePresetRepository,

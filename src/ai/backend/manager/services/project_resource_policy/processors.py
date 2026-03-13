@@ -3,6 +3,7 @@ from typing import override
 from ai.backend.manager.actions.monitors.monitor import ActionMonitor
 from ai.backend.manager.actions.processor import ActionProcessor
 from ai.backend.manager.actions.types import AbstractProcessorPackage, ActionSpec
+from ai.backend.manager.actions.validators import ActionValidators
 from ai.backend.manager.services.project_resource_policy.actions.create_project_resource_policy import (
     CreateProjectResourcePolicyAction,
     CreateProjectResourcePolicyActionResult,
@@ -30,7 +31,10 @@ class ProjectResourcePolicyProcessors(AbstractProcessorPackage):
     ]
 
     def __init__(
-        self, service: ProjectResourcePolicyService, action_monitors: list[ActionMonitor]
+        self,
+        service: ProjectResourcePolicyService,
+        action_monitors: list[ActionMonitor],
+        validators: ActionValidators,
     ) -> None:
         self.create_project_resource_policy = ActionProcessor(
             service.create_project_resource_policy, action_monitors

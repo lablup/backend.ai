@@ -38,7 +38,6 @@ class TestBulkUpsertDomainFairShareWeight:
         )
         return processors
 
-    @pytest.mark.asyncio
     async def test_successful_bulk_upsert(
         self,
         mock_processors_success: MagicMock,
@@ -61,7 +60,6 @@ class TestBulkUpsertDomainFairShareWeight:
         assert result.upserted_count == 2
         processors.fair_share.bulk_upsert_domain_fair_share_weight.wait_for_complete.assert_called_once()
 
-    @pytest.mark.asyncio
     async def test_action_has_correct_structure(
         self,
         mock_processors_success: MagicMock,
@@ -102,7 +100,6 @@ class TestBulkUpsertProjectFairShareWeight:
         )
         return processors
 
-    @pytest.mark.asyncio
     async def test_successful_bulk_upsert(
         self,
         mock_processors_success: MagicMock,
@@ -137,7 +134,6 @@ class TestBulkUpsertProjectFairShareWeight:
         assert result.upserted_count == 2
         processors.fair_share.bulk_upsert_project_fair_share_weight.wait_for_complete.assert_called_once()
 
-    @pytest.mark.asyncio
     async def test_action_has_correct_structure(
         self,
         mock_processors_success: MagicMock,
@@ -181,7 +177,6 @@ class TestBulkUpsertUserFairShareWeight:
         )
         return processors
 
-    @pytest.mark.asyncio
     async def test_successful_bulk_upsert(
         self,
         mock_processors_success: MagicMock,
@@ -217,7 +212,6 @@ class TestBulkUpsertUserFairShareWeight:
         assert result.upserted_count == 2
         processors.fair_share.bulk_upsert_user_fair_share_weight.wait_for_complete.assert_called_once()
 
-    @pytest.mark.asyncio
     async def test_action_has_correct_structure(
         self,
         mock_processors_success: MagicMock,

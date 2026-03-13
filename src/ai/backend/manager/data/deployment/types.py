@@ -157,6 +157,26 @@ class DeploymentSubStatus(enum.StrEnum):
     """
 
 
+class DeploymentSubStep(DeploymentSubStatus):
+    """Sub-steps for the DEPLOYING lifecycle phase.
+
+    Active states:
+    - PROVISIONING: New revision routes are being provisioned; waiting for readiness.
+    - PROGRESSING: Actively replacing old routes with new routes.
+    - ROLLING_BACK: Actively rolling back failed new routes to previous revision.
+
+    Terminal markers (no handler execution, trigger transition only):
+    - COMPLETED: All strategy conditions satisfied; ready for revision swap.
+    - ROLLED_BACK: Rollback finished; ready for cleanup and transition to READY.
+    """
+
+    PROVISIONING = "provisioning"
+    PROGRESSING = "progressing"
+    ROLLING_BACK = "rolling_back"
+    COMPLETED = "completed"
+    ROLLED_BACK = "rolled_back"
+
+
 @dataclass(frozen=True)
 class DeploymentLifecycleStatus:
     """Target lifecycle state for a deployment status transition.
@@ -179,15 +199,17 @@ class DeploymentLifecycleStatus:
 class DeploymentStatusTransitions:
     """Status transitions for deployment handlers.
 
-    Deployment handlers only have success/failure outcomes (no expired/give_up).
-
     Attributes:
         success: Target lifecycle when handler succeeds, None means no change
-        failure: Target lifecycle when handler fails, None means no change
+        need_retry: Target lifecycle when handler fails but can retry
+        expired: Target lifecycle when time elapsed in current state
+        give_up: Target lifecycle when retry count exceeded
     """
 
     success: DeploymentLifecycleStatus | None = None
-    failure: DeploymentLifecycleStatus | None = None
+    need_retry: DeploymentLifecycleStatus | None = None
+    expired: DeploymentLifecycleStatus | None = None
+    give_up: DeploymentLifecycleStatus | None = None
 
 
 @dataclass(frozen=True)
@@ -244,7 +266,7 @@ class MountSpec:
 @dataclass
 class MountInfo:
     vfolder_id: UUID
-    kernel_path: PurePosixPath
+    kernel_path: PurePosixPath | None = None
 
 
 @dataclass
@@ -353,11 +375,34 @@ class DeploymentInfo:
     network: DeploymentNetworkSpec
     model_revisions: list[ModelRevisionSpec]
     current_revision_id: UUID | None = None
+    policy: DeploymentPolicyData | None = None
+    deploying_revision_id: UUID | None = None
+    sub_step: DeploymentSubStep | None = None
 
     def target_revision(self) -> ModelRevisionSpec | None:
         if self.model_revisions:
             return self.model_revisions[0]
         return None
+
+
+@dataclass
+class DeploymentWithHistory:
+    """Bundles a deployment with its scheduling history context.
+
+    This is the primary data unit for deployment coordinator operations,
+    analogous to SessionWithKernels for session scheduling.
+
+    Attributes:
+        deployment_info: Deployment information including lifecycle data
+        phase_attempts: Number of attempts for current phase from scheduling history
+                       (used for failure classification: give_up when >= max_retries)
+        phase_started_at: When the current phase started from scheduling history
+                         (used for failure classification: expired when timeout exceeded)
+    """
+
+    deployment_info: DeploymentInfo
+    phase_attempts: int = 0
+    phase_started_at: datetime | None = None
 
 
 @dataclass
@@ -388,7 +433,7 @@ class RouteInfo:
     session_id: SessionId | None
     status: RouteStatus
     traffic_ratio: float
-    created_at: datetime | None
+    created_at: datetime
     revision_id: UUID | None
     traffic_status: RouteTrafficStatus
     error_data: dict[str, Any] = field(default_factory=dict)
@@ -521,7 +566,8 @@ class ModelDeploymentData:
     replica_state: ReplicaStateData
     default_deployment_strategy: DeploymentStrategy
     created_user_id: UUID
-    access_token_ids: UUID | None = None
+    policy: DeploymentPolicyData | None = None
+    access_token_ids: list[UUID] | None = None
 
 
 class DeploymentOrderField(enum.StrEnum):
@@ -677,6 +723,14 @@ class DeploymentPolicyData:
     rollback_on_failure: bool
     created_at: datetime
     updated_at: datetime
+
+
+@dataclass
+class DeploymentPolicyUpsertResult:
+    """Result of upserting a deployment policy."""
+
+    data: DeploymentPolicyData
+    created: bool
 
 
 @dataclass

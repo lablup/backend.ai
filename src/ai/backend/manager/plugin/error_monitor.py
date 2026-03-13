@@ -17,7 +17,6 @@ from ai.backend.manager.repositories.base import Creator
 from ai.backend.manager.repositories.error_log.creators import ErrorLogCreatorSpec
 
 if TYPE_CHECKING:
-    from ai.backend.manager.api.context import RootContext
     from ai.backend.manager.repositories.error_log import ErrorLogRepository
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
@@ -29,7 +28,7 @@ class ErrorMonitor(AbstractErrorReporterPlugin):
     async def init(self, context: Any | None = None) -> None:
         if context is None:
             log.warning(
-                "manager.plugin.error_monitor is initialized without the root context. "
+                "manager.plugin.error_monitor is initialized without a context. "
                 "The plugin is disabled.",
             )
             self.enabled = False
@@ -99,14 +98,13 @@ class ErrorEventDispatcher(AbstractEventDispatcherPlugin):
     async def init(self, context: Any | None = None) -> None:
         if context is None:
             log.warning(
-                "manager.plugin.error_event_dispatcher is initialized without the root context. "
+                "manager.plugin.error_event_dispatcher is initialized without a context. "
                 "The plugin is disabled.",
             )
             self.enabled = False
             return
         self.enabled = True
-        root_ctx: RootContext = context
-        self._error_log_repository = root_ctx.repositories.error_log.repository
+        self._error_log_repository = context["error_log_repository"]
 
     @override
     async def update_plugin_config(self, plugin_config: Mapping[str, Any]) -> None:

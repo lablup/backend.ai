@@ -137,7 +137,6 @@ def test_str_to_timedelta() -> None:
         assert str_to_timedelta("")
 
 
-@pytest.mark.asyncio
 async def test_curl_returns_stripped_body() -> None:
     with aioresponses() as m:
         m.get("http://example.com/test/url", status=200, body="success  ")
@@ -146,7 +145,6 @@ async def test_curl_returns_stripped_body() -> None:
         assert resp == "success"  # stripped body
 
 
-@pytest.mark.asyncio
 async def test_curl_returns_default_value_if_not_success() -> None:
     with aioresponses() as m:
         m.get("http://example.com/test/url", status=400, body="bad request")
@@ -207,7 +205,6 @@ class TestAsyncBarrier:
         assert barrier.num_parties == 5
         assert barrier.cond is not None  # default condition
 
-    @pytest.mark.asyncio
     async def test_wait_notify_all_if_cound_eq_num_parties(self, mocker: MockerFixture) -> None:
         mock_cond = mocker.patch.object(asyncio, "Condition")
         mock_resp = {
@@ -235,7 +232,6 @@ class TestAsyncBarrier:
         assert barrier.count == 0
 
 
-@pytest.mark.asyncio
 async def test_run_through() -> None:
     i = 0
 
@@ -277,7 +273,6 @@ async def test_run_through() -> None:
     assert i == 8
 
 
-@pytest.mark.asyncio
 async def test_async_file_writer_str() -> None:
     # 1. Get temporary filename
     with NamedTemporaryFile() as temp_file:
@@ -305,7 +300,6 @@ async def test_async_file_writer_str() -> None:
     assert init_str.upper() == final_str
 
 
-@pytest.mark.asyncio
 async def test_async_file_writer_bytes() -> None:
     # 1. Get temporary filename
     with NamedTemporaryFile() as temp_file:

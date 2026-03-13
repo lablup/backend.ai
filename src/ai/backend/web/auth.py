@@ -4,6 +4,7 @@ import json
 from typing import cast
 
 from aiohttp import web
+from multidict import CIMultiDict
 
 from ai.backend.client.config import APIConfig
 from ai.backend.client.session import AsyncSession as APISession
@@ -109,18 +110,29 @@ def get_client_ip(request: web.Request) -> str | None:
     return client_ip
 
 
+def build_forwarding_headers(request: web.Request) -> CIMultiDict[str]:
+    """Build forwarding headers from the incoming request.
+
+    Returns a ``CIMultiDict`` of ``X-Forwarded-*`` HTTP headers that can be
+    applied to outgoing requests via ``extra_headers`` parameters or
+    :func:`fill_forwarding_hdrs_to_api_session`.
+    """
+    headers: CIMultiDict[str] = CIMultiDict({
+        "X-Forwarded-Host": request.headers.get("X-Forwarded-Host", request.host),
+        "X-Forwarded-Proto": request.headers.get("X-Forwarded-Proto", request.scheme),
+    })
+    client_ip = get_client_ip(request)
+    if client_ip:
+        headers["X-Forwarded-For"] = client_ip
+    return headers
+
+
 def fill_forwarding_hdrs_to_api_session(
     request: web.Request,
     api_session: APISession,
 ) -> None:
-    _headers = {
-        "X-Forwarded-Host": request.headers.get("X-Forwarded-Host", request.host),
-        "X-Forwarded-Proto": request.headers.get("X-Forwarded-Proto", request.scheme),
-    }
-    client_ip = get_client_ip(request)
-    if client_ip:
-        _headers["X-Forwarded-For"] = client_ip
-        api_session.aiohttp_session.headers.update(_headers)
+    _headers = build_forwarding_headers(request)
+    api_session.aiohttp_session.headers.update(_headers)
 
 
 async def generate_jwt_token_for_session(

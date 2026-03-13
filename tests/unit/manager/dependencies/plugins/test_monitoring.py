@@ -26,7 +26,6 @@ class TestErrorMonitorDependency:
         dep = ErrorMonitorDependency()
         assert dep.stage_name == "error-monitor-plugin"
 
-    @pytest.mark.asyncio
     @patch("ai.backend.manager.dependencies.plugins.monitoring.ManagerErrorPluginContext")
     async def test_provide_initializes_and_yields_context(self, mock_ctx_class: MagicMock) -> None:
         monitoring_input = _make_monitoring_input()
@@ -50,9 +49,8 @@ class TestErrorMonitorDependency:
 
         mock_ctx.cleanup.assert_called_once()
 
-    @pytest.mark.asyncio
     @patch("ai.backend.manager.dependencies.plugins.monitoring.ManagerErrorPluginContext")
-    async def test_yields_none_on_init_failure(self, mock_ctx_class: MagicMock) -> None:
+    async def test_propagates_init_failure(self, mock_ctx_class: MagicMock) -> None:
         monitoring_input = _make_monitoring_input()
         mock_ctx = MagicMock()
         mock_ctx.init = AsyncMock(side_effect=Exception("init failed"))
@@ -61,12 +59,12 @@ class TestErrorMonitorDependency:
 
         dep = ErrorMonitorDependency()
 
-        async with dep.provide(monitoring_input) as ctx:
-            assert ctx is None
+        with pytest.raises(Exception, match="init failed"):
+            async with dep.provide(monitoring_input):
+                pass
 
         mock_ctx.cleanup.assert_not_called()
 
-    @pytest.mark.asyncio
     @patch("ai.backend.manager.dependencies.plugins.monitoring.ManagerErrorPluginContext")
     async def test_cleanup_on_exception(self, mock_ctx_class: MagicMock) -> None:
         monitoring_input = _make_monitoring_input()
@@ -91,7 +89,6 @@ class TestStatsMonitorDependency:
         dep = StatsMonitorDependency()
         assert dep.stage_name == "stats-monitor-plugin"
 
-    @pytest.mark.asyncio
     @patch("ai.backend.manager.dependencies.plugins.monitoring.ManagerStatsPluginContext")
     async def test_provide_initializes_and_yields_context(self, mock_ctx_class: MagicMock) -> None:
         monitoring_input = _make_monitoring_input()
@@ -114,9 +111,8 @@ class TestStatsMonitorDependency:
 
         mock_ctx.cleanup.assert_called_once()
 
-    @pytest.mark.asyncio
     @patch("ai.backend.manager.dependencies.plugins.monitoring.ManagerStatsPluginContext")
-    async def test_yields_none_on_init_failure(self, mock_ctx_class: MagicMock) -> None:
+    async def test_propagates_init_failure(self, mock_ctx_class: MagicMock) -> None:
         monitoring_input = _make_monitoring_input()
         mock_ctx = MagicMock()
         mock_ctx.init = AsyncMock(side_effect=Exception("init failed"))
@@ -125,12 +121,12 @@ class TestStatsMonitorDependency:
 
         dep = StatsMonitorDependency()
 
-        async with dep.provide(monitoring_input) as ctx:
-            assert ctx is None
+        with pytest.raises(Exception, match="init failed"):
+            async with dep.provide(monitoring_input):
+                pass
 
         mock_ctx.cleanup.assert_not_called()
 
-    @pytest.mark.asyncio
     @patch("ai.backend.manager.dependencies.plugins.monitoring.ManagerStatsPluginContext")
     async def test_cleanup_on_exception(self, mock_ctx_class: MagicMock) -> None:
         monitoring_input = _make_monitoring_input()

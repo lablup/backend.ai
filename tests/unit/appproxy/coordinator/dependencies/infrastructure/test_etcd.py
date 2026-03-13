@@ -66,7 +66,6 @@ class TestEtcdProvider:
         config.proxy_coordinator = proxy_config
         return config
 
-    @pytest.mark.asyncio
     async def test_provide_traefik_etcd_when_enabled(
         self,
         coordinator_config_with_traefik: ServerConfig,
@@ -83,7 +82,6 @@ class TestEtcdProvider:
             value = await etcd.get(test_key)
             assert value == test_value
 
-    @pytest.mark.asyncio
     async def test_provide_none_when_disabled(
         self,
         coordinator_config_without_traefik: ServerConfig,
@@ -94,7 +92,6 @@ class TestEtcdProvider:
         async with dependency.provide(coordinator_config_without_traefik) as etcd:
             assert etcd is None
 
-    @pytest.mark.asyncio
     async def test_cleanup_on_exception(
         self,
         coordinator_config_with_traefik: ServerConfig,

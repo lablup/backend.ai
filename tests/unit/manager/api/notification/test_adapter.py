@@ -33,7 +33,7 @@ from ai.backend.common.dto.manager.notification.request import (
     SearchNotificationChannelsRequest,
     SearchNotificationRulesRequest,
 )
-from ai.backend.manager.api.notification.adapter import (
+from ai.backend.manager.api.rest.notification.adapter import (
     NotificationChannelAdapter,
     NotificationRuleAdapter,
 )

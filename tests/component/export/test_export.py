@@ -16,7 +16,6 @@ from ai.backend.common.dto.manager.export import (
 
 
 class TestListReports:
-    @pytest.mark.asyncio
     async def test_admin_lists_reports(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -28,14 +27,6 @@ class TestListReports:
         report_keys = [r.report_key for r in result.reports]
         assert "users" in report_keys
 
-    @pytest.mark.xfail(
-        strict=True,
-        reason=(
-            "Client SDK v2 regular user auth yields 400 Bad Request"
-            " before server reaches 403 permission check in export handler."
-        ),
-    )
-    @pytest.mark.asyncio
     async def test_regular_user_forbidden(
         self,
         user_registry: BackendAIClientRegistry,
@@ -45,7 +36,6 @@ class TestListReports:
 
 
 class TestGetReport:
-    @pytest.mark.asyncio
     async def test_admin_gets_users_report(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -55,7 +45,6 @@ class TestGetReport:
         assert result.report.report_key == "users"
         assert len(result.report.fields) > 0
 
-    @pytest.mark.asyncio
     async def test_admin_gets_sessions_report(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -65,7 +54,6 @@ class TestGetReport:
         assert result.report.report_key == "sessions"
         assert len(result.report.fields) > 0
 
-    @pytest.mark.asyncio
     async def test_admin_gets_projects_report(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -75,7 +63,6 @@ class TestGetReport:
         assert result.report.report_key == "projects"
         assert len(result.report.fields) > 0
 
-    @pytest.mark.asyncio
     async def test_get_nonexistent_report(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -83,14 +70,6 @@ class TestGetReport:
         with pytest.raises((InvalidRequestError, NotFoundError)):
             await admin_registry.export.get_report("nonexistent")
 
-    @pytest.mark.xfail(
-        strict=True,
-        reason=(
-            "Client SDK v2 regular user auth yields 400 Bad Request"
-            " before server reaches 403 permission check in export handler."
-        ),
-    )
-    @pytest.mark.asyncio
     async def test_regular_user_forbidden(
         self,
         user_registry: BackendAIClientRegistry,
@@ -108,7 +87,6 @@ class TestDownloadUsersCSV:
             " returning 400 'Malformed request body'."
         ),
     )
-    @pytest.mark.asyncio
     async def test_admin_downloads_users_csv(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -117,7 +95,6 @@ class TestDownloadUsersCSV:
         assert isinstance(result, bytes)
         assert len(result) > 0
 
-    @pytest.mark.asyncio
     async def test_admin_downloads_with_fields(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -127,14 +104,6 @@ class TestDownloadUsersCSV:
         assert isinstance(result, bytes)
         assert len(result) > 0
 
-    @pytest.mark.xfail(
-        strict=True,
-        reason=(
-            "Client SDK v2 POST with json=None triggers 400 'Malformed request body'"
-            " from BodyParam parsing before server reaches 403 permission check."
-        ),
-    )
-    @pytest.mark.asyncio
     async def test_regular_user_forbidden(
         self,
         user_registry: BackendAIClientRegistry,
@@ -152,7 +121,6 @@ class TestDownloadSessionsCSV:
             " returning 400 'Malformed request body'."
         ),
     )
-    @pytest.mark.asyncio
     async def test_admin_downloads_sessions_csv(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -161,14 +129,6 @@ class TestDownloadSessionsCSV:
         assert isinstance(result, bytes)
         assert len(result) > 0
 
-    @pytest.mark.xfail(
-        strict=True,
-        reason=(
-            "Client SDK v2 POST with json=None triggers 400 'Malformed request body'"
-            " from BodyParam parsing before server reaches 403 permission check."
-        ),
-    )
-    @pytest.mark.asyncio
     async def test_regular_user_forbidden(
         self,
         user_registry: BackendAIClientRegistry,
@@ -186,7 +146,6 @@ class TestDownloadProjectsCSV:
             " returning 400 'Malformed request body'."
         ),
     )
-    @pytest.mark.asyncio
     async def test_admin_downloads_projects_csv(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -195,14 +154,6 @@ class TestDownloadProjectsCSV:
         assert isinstance(result, bytes)
         assert len(result) > 0
 
-    @pytest.mark.xfail(
-        strict=True,
-        reason=(
-            "Client SDK v2 POST with json=None triggers 400 'Malformed request body'"
-            " from BodyParam parsing before server reaches 403 permission check."
-        ),
-    )
-    @pytest.mark.asyncio
     async def test_regular_user_forbidden(
         self,
         user_registry: BackendAIClientRegistry,
@@ -220,7 +171,6 @@ class TestDownloadKeypairsCSV:
             " returning 400 'Malformed request body'."
         ),
     )
-    @pytest.mark.asyncio
     async def test_admin_downloads_keypairs_csv(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -229,14 +179,6 @@ class TestDownloadKeypairsCSV:
         assert isinstance(result, bytes)
         assert len(result) > 0
 
-    @pytest.mark.xfail(
-        strict=True,
-        reason=(
-            "Client SDK v2 POST with json=None triggers 400 'Malformed request body'"
-            " from BodyParam parsing before server reaches 403 permission check."
-        ),
-    )
-    @pytest.mark.asyncio
     async def test_regular_user_forbidden(
         self,
         user_registry: BackendAIClientRegistry,
@@ -254,7 +196,6 @@ class TestDownloadAuditLogsCSV:
             " returning 400 'Malformed request body'."
         ),
     )
-    @pytest.mark.asyncio
     async def test_admin_downloads_audit_logs_csv(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -263,14 +204,6 @@ class TestDownloadAuditLogsCSV:
         assert isinstance(result, bytes)
         assert len(result) > 0
 
-    @pytest.mark.xfail(
-        strict=True,
-        reason=(
-            "Client SDK v2 POST with json=None triggers 400 'Malformed request body'"
-            " from BodyParam parsing before server reaches 403 permission check."
-        ),
-    )
-    @pytest.mark.asyncio
     async def test_regular_user_forbidden(
         self,
         user_registry: BackendAIClientRegistry,

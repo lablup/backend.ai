@@ -30,7 +30,6 @@ DomainFactory = Callable[..., Coroutine[Any, Any, CreateDomainResponse]]
 
 
 class TestDomainCreate:
-    @pytest.mark.asyncio
     async def test_admin_creates_domain(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -46,7 +45,6 @@ class TestDomainCreate:
         assert result.domain.description == f"Test domain {unique}"
         assert result.domain.is_active is True
 
-    @pytest.mark.asyncio
     async def test_regular_user_cannot_create_domain(
         self,
         user_registry: BackendAIClientRegistry,
@@ -61,7 +59,6 @@ class TestDomainCreate:
 
 
 class TestDomainGet:
-    @pytest.mark.asyncio
     async def test_admin_gets_domain_by_name(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -72,7 +69,6 @@ class TestDomainGet:
         assert get_result.domain.name == target_domain.domain.name
         assert get_result.domain.description == target_domain.domain.description
 
-    @pytest.mark.asyncio
     async def test_get_nonexistent_domain_returns_not_found(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -82,7 +78,6 @@ class TestDomainGet:
 
 
 class TestDomainSearch:
-    @pytest.mark.asyncio
     async def test_admin_searches_domains(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -95,7 +90,6 @@ class TestDomainSearch:
         assert result.pagination.total >= 1
         assert len(result.domains) >= 1
 
-    @pytest.mark.asyncio
     async def test_search_with_name_filter(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -112,7 +106,6 @@ class TestDomainSearch:
         assert result.pagination.total >= 1
         assert any(d.name == marker for d in result.domains)
 
-    @pytest.mark.asyncio
     async def test_search_with_pagination(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -123,7 +116,6 @@ class TestDomainSearch:
         assert result.pagination.limit == 1
         assert len(result.domains) <= 1
 
-    @pytest.mark.asyncio
     async def test_regular_user_cannot_search_domains(
         self,
         user_registry: BackendAIClientRegistry,
@@ -133,7 +125,6 @@ class TestDomainSearch:
 
 
 class TestDomainUpdate:
-    @pytest.mark.asyncio
     async def test_admin_updates_domain_fields(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -150,7 +141,6 @@ class TestDomainUpdate:
         assert update_result.domain.description == f"Updated description {unique}"
         assert update_result.domain.name == target_domain.domain.name
 
-    @pytest.mark.asyncio
     async def test_regular_user_cannot_update_domain(
         self,
         user_registry: BackendAIClientRegistry,
@@ -164,7 +154,6 @@ class TestDomainUpdate:
 
 
 class TestDomainDelete:
-    @pytest.mark.asyncio
     async def test_admin_soft_deletes_domain(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -176,7 +165,6 @@ class TestDomainDelete:
         assert isinstance(delete_result, DeleteDomainResponse)
         assert delete_result.deleted is True
 
-    @pytest.mark.asyncio
     async def test_regular_user_cannot_delete_domain(
         self,
         user_registry: BackendAIClientRegistry,
@@ -187,7 +175,6 @@ class TestDomainDelete:
 
 
 class TestDomainPurge:
-    @pytest.mark.asyncio
     async def test_admin_purges_domain(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -205,7 +192,6 @@ class TestDomainPurge:
         with pytest.raises(NotFoundError):
             await admin_registry.domain.get(r.domain.name)
 
-    @pytest.mark.asyncio
     async def test_regular_user_cannot_purge_domain(
         self,
         user_registry: BackendAIClientRegistry,

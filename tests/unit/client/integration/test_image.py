@@ -9,7 +9,6 @@ from ai.backend.client.session import Session
 pytestmark = pytest.mark.integration
 
 
-@pytest.mark.asyncio
 async def test_list_images_by_admin() -> None:
     with Session() as sess:
         images = sess.Image.list()
@@ -20,7 +19,6 @@ async def test_list_images_by_admin() -> None:
     assert "hash" in image
 
 
-@pytest.mark.asyncio
 async def test_list_images_by_user(userconfig: Any) -> None:
     with Session() as sess:
         images = sess.Image.list()
@@ -31,7 +29,6 @@ async def test_list_images_by_user(userconfig: Any) -> None:
     assert "hash" in image
 
 
-@pytest.mark.asyncio
 async def test_alias_dealias_image_by_admin() -> None:
     with Session() as sess:
 
@@ -52,7 +49,6 @@ async def test_alias_dealias_image_by_admin() -> None:
         assert len(get_test_image_info()["aliases"]) == 0
 
 
-@pytest.mark.asyncio
 async def test_user_cannot_mutate_alias_dealias(userconfig: Any) -> None:
     with Session() as sess:
         test_alias = "testalias-b9f1ce136f584ca892d5fef3e78dd11d"

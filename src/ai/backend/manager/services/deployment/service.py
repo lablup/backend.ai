@@ -2,6 +2,7 @@
 
 import logging
 from datetime import UTC, datetime
+from uuid import UUID
 
 from ai.backend.common.data.endpoint.types import EndpointLifecycle
 from ai.backend.common.data.model_deployment.types import (
@@ -16,9 +17,11 @@ from ai.backend.common.types import (
     ResourceSlot,
 )
 from ai.backend.logging.utils import BraceStyleAdapter
+from ai.backend.manager.data.deployment.creator import ModelRevisionCreator
 from ai.backend.manager.data.deployment.types import (
     ClusterConfigData,
     DeploymentInfo,
+    DeploymentSubStep,
     ExtraVFolderMountData,
     ModelDeploymentAccessTokenData,
     ModelDeploymentData,
@@ -33,9 +36,12 @@ from ai.backend.manager.data.deployment.types import (
 )
 from ai.backend.manager.data.permission.types import RBACElementRef
 from ai.backend.manager.errors.service import RoutingNotFound
+from ai.backend.manager.models.deployment_policy import DeploymentPolicyRow
+from ai.backend.manager.models.deployment_revision import DeploymentRevisionRow
 from ai.backend.manager.models.endpoint import EndpointRow, EndpointTokenRow
 from ai.backend.manager.repositories.base import Creator
 from ai.backend.manager.repositories.base.rbac.entity_creator import RBACEntityCreator
+from ai.backend.manager.repositories.base.upserter import Upserter
 from ai.backend.manager.repositories.deployment import DeploymentRepository
 from ai.backend.manager.repositories.deployment.creators import (
     DeploymentCreatorSpec,
@@ -45,9 +51,11 @@ from ai.backend.manager.repositories.deployment.creators import (
     DeploymentNetworkFields,
     DeploymentReplicaFields,
     DeploymentResourceFields,
+    DeploymentRevisionCreatorSpec,
     EndpointTokenCreatorSpec,
     ModelRevisionFields,
 )
+from ai.backend.manager.repositories.deployment.upserters import DeploymentPolicyUpserterSpec
 from ai.backend.manager.services.deployment.actions.access_token.create_access_token import (
     CreateAccessTokenAction,
     CreateAccessTokenActionResult,
@@ -89,6 +97,8 @@ from ai.backend.manager.services.deployment.actions.deployment_policy import (
     GetDeploymentPolicyActionResult,
     SearchDeploymentPoliciesAction,
     SearchDeploymentPoliciesActionResult,
+    UpsertDeploymentPolicyAction,
+    UpsertDeploymentPolicyActionResult,
 )
 from ai.backend.manager.services.deployment.actions.destroy_deployment import (
     DestroyDeploymentAction,
@@ -141,6 +151,13 @@ from ai.backend.manager.services.deployment.actions.update_deployment import (
     UpdateDeploymentActionResult,
 )
 from ai.backend.manager.sokovan.deployment import DeploymentController
+from ai.backend.manager.sokovan.deployment.exceptions import (
+    DeploymentAlreadyInProgress,
+    InvalidEndpointState,
+)
+from ai.backend.manager.sokovan.deployment.revision_generator.registry import (
+    RevisionGeneratorRegistry,
+)
 from ai.backend.manager.sokovan.deployment.types import DeploymentLifecycleType
 
 log = BraceStyleAdapter(logging.getLogger(__name__))
@@ -229,6 +246,7 @@ def _convert_deployment_info_to_data(info: DeploymentInfo) -> ModelDeploymentDat
         ),
         default_deployment_strategy=DeploymentStrategy.ROLLING,
         created_user_id=info.metadata.created_user,
+        policy=info.policy,
     )
 
 
@@ -249,7 +267,7 @@ def _convert_route_info_to_replica_data(route: RouteInfo) -> ModelReplicaData:
         else ActivenessStatus.INACTIVE,
         weight=int(route.traffic_ratio * 100),  # Convert ratio to weight
         detail=route.error_data,
-        created_at=route.created_at or datetime.now(tz=UTC),
+        created_at=route.created_at,
     )
 
 
@@ -258,15 +276,18 @@ class DeploymentService:
 
     _deployment_controller: DeploymentController
     _deployment_repository: DeploymentRepository
+    _revision_generator_registry: RevisionGeneratorRegistry
 
     def __init__(
         self,
         deployment_controller: DeploymentController,
         deployment_repository: DeploymentRepository,
+        revision_generator_registry: RevisionGeneratorRegistry,
     ) -> None:
         """Initialize deployment service with controller and repository."""
         self._deployment_controller = deployment_controller
         self._deployment_repository = deployment_repository
+        self._revision_generator_registry = revision_generator_registry
 
     # ========== Deployment CRUD ==========
 
@@ -402,8 +423,13 @@ class DeploymentService:
 
         Returns:
             DestroyDeploymentActionResult: Result indicating success or failure
+
+        Raises:
+            EndpointNotFound: If the endpoint does not exist
         """
         log.info("Destroying deployment with ID: {}", action.endpoint_id)
+        # Validate endpoint exists before attempting destruction
+        await self._deployment_repository.get_endpoint_info(action.endpoint_id)
         success = await self._deployment_controller.destroy_deployment(action.endpoint_id)
         await self._deployment_controller.mark_lifecycle_needed(DeploymentLifecycleType.DESTROYING)
         return DestroyDeploymentActionResult(success=success)
@@ -474,21 +500,129 @@ class DeploymentService:
             has_previous_page=result.has_previous_page,
         )
 
+    async def upsert_deployment_policy(
+        self, action: UpsertDeploymentPolicyAction
+    ) -> UpsertDeploymentPolicyActionResult:
+        """Create or update a deployment policy using ON CONFLICT."""
+        policy_upserter = action.upserter
+        spec = DeploymentPolicyUpserterSpec(
+            endpoint_id=policy_upserter.deployment_id,
+            strategy=policy_upserter.strategy,
+            strategy_spec=policy_upserter.strategy_spec,
+            rollback_on_failure=policy_upserter.rollback_on_failure,
+        )
+        repo_upserter: Upserter[DeploymentPolicyRow] = Upserter(spec=spec)
+        result = await self._deployment_repository.upsert_deployment_policy(repo_upserter)
+        return UpsertDeploymentPolicyActionResult(data=result.data, created=result.created)
+
     # ========== Revision Operations ==========
+
+    async def _merge_service_definition(
+        self,
+        revision_creator: ModelRevisionCreator,
+    ) -> ModelRevisionCreator:
+        """Merge service-definition.toml defaults into the revision creator.
+
+        Loads the service definition from the model vfolder and merges
+        environ and resource_slots. The creator's values take precedence
+        over service definition defaults.
+
+        If loading the service definition fails (e.g. network error, malformed file),
+        the creator is returned as-is since service definitions are optional defaults.
+        """
+        generator = self._revision_generator_registry.get(
+            revision_creator.execution.runtime_variant
+        )
+        try:
+            service_def = await generator.load_service_definition(
+                vfolder_id=revision_creator.mounts.model_vfolder_id,
+                runtime_variant=revision_creator.execution.runtime_variant.value,
+            )
+        except Exception:
+            log.warning(
+                "Failed to load service definition for vfolder {}, proceeding without it",
+                revision_creator.mounts.model_vfolder_id,
+                exc_info=True,
+            )
+            return revision_creator
+        if service_def is None:
+            return revision_creator
+
+        merged_environ = revision_creator.execution.environ
+        if service_def.environ:
+            merged_environ = {**service_def.environ, **(revision_creator.execution.environ or {})}
+
+        merged_resource_slots = revision_creator.resource_spec.resource_slots
+        if service_def.resource_slots:
+            merged_resource_slots = {
+                **service_def.resource_slots,
+                **revision_creator.resource_spec.resource_slots,
+            }
+
+        return ModelRevisionCreator(
+            image_id=revision_creator.image_id,
+            resource_spec=revision_creator.resource_spec.model_copy(
+                update={"resource_slots": merged_resource_slots},
+            ),
+            mounts=revision_creator.mounts,
+            execution=revision_creator.execution.model_copy(
+                update={"environ": merged_environ},
+            ),
+        )
+
+    async def _build_revision(
+        self,
+        deployment_id: UUID,
+        revision_creator: ModelRevisionCreator,
+    ) -> ModelRevisionData:
+        """Build and create a revision from the given creator.
+
+        Uses an atomic read-then-write operation for revision_number
+        assignment to prevent race conditions from concurrent requests.
+        The revision_number placeholder (0) is replaced atomically
+        inside the repository.
+        """
+        endpoint_info = await self._deployment_repository.get_endpoint_info(deployment_id)
+
+        merged_creator = await self._merge_service_definition(revision_creator)
+
+        spec = DeploymentRevisionCreatorSpec(
+            endpoint_id=deployment_id,
+            image_id=merged_creator.image_id,
+            resource_group=endpoint_info.metadata.resource_group,
+            resource_slots=ResourceSlot(merged_creator.resource_spec.resource_slots),
+            # TODO: None and {} have different semantics (not provided vs empty options). CreatorSpec should accept Optional.
+            resource_opts=merged_creator.resource_spec.resource_opts or {},
+            cluster_mode=merged_creator.resource_spec.cluster_mode.value,
+            cluster_size=merged_creator.resource_spec.cluster_size,
+            model_id=merged_creator.mounts.model_vfolder_id,
+            model_mount_destination=merged_creator.mounts.model_mount_destination,
+            model_definition_path=merged_creator.mounts.model_definition_path,
+            # TODO: model_definition is always hardcoded to None. Should be propagated from input or loaded from service-definition.
+            model_definition=None,
+            startup_command=merged_creator.execution.startup_command,
+            bootstrap_script=merged_creator.execution.bootstrap_script,
+            # TODO: None and {} have different semantics (not provided vs empty environ). CreatorSpec should accept Optional.
+            environ=merged_creator.execution.environ or {},
+            callback_url=str(merged_creator.execution.callback_url)
+            if merged_creator.execution.callback_url
+            else None,
+            runtime_variant=merged_creator.execution.runtime_variant,
+            # TODO: Convert merged_creator.mounts.extra_mounts (list[MountInfo]) to Sequence[VFolderMount] instead of discarding.
+            extra_mounts=(),
+        )
+        creator: Creator[DeploymentRevisionRow] = Creator(spec=spec)
+        return await self._deployment_repository.create_revision_with_next_number(
+            creator, deployment_id
+        )
 
     async def add_model_revision(
         self, action: AddModelRevisionAction
     ) -> AddModelRevisionActionResult:
-        # TODO: Implement full revision creation logic
-        # This requires integration with the controller's revision generator system:
-        # 1. Get default architecture from scaling group
-        # 2. Use revision generator to resolve image and build ModelRevisionSpec
-        # 3. Get latest revision number via get_latest_revision_number()
-        # 4. Build DeploymentRevisionCreatorSpec and create revision
-        raise NotImplementedError(
-            "add_model_revision requires controller's revision generator for image resolution. "
-            "Use create_legacy_deployment for deployment creation with revision."
-        )
+        """Add a new model revision to an existing deployment."""
+        log.info("Adding model revision to deployment {}", action.model_deployment_id)
+        revision_data = await self._build_revision(action.model_deployment_id, action.adder)
+        return AddModelRevisionActionResult(revision=revision_data)
 
     async def get_revision_by_id(
         self, action: GetRevisionByIdAction
@@ -516,7 +650,11 @@ class DeploymentService:
     async def activate_revision(
         self, action: ActivateRevisionAction
     ) -> ActivateRevisionActionResult:
-        """Activate a specific revision to be the current revision.
+        """Activate a specific revision by initiating the deployment strategy.
+
+        Sets deploying_revision and transitions the deployment to DEPLOYING state.
+        The coordinator will execute the configured deployment strategy (rolling update,
+        blue-green, etc.) and swap deploying_revision → current_revision on completion.
 
         Args:
             action: Action containing deployment and revision IDs
@@ -527,24 +665,44 @@ class DeploymentService:
         # 1. Validate revision exists (raises exception if not found)
         _revision = await self._deployment_repository.get_revision(action.revision_id)
 
-        # 2. Update endpoint.current_revision and get previous revision
-        previous_revision_id = await self._deployment_repository.update_current_revision(
+        # 2. Validate deployment state
+        deployment_info = await self._deployment_repository.get_endpoint_info(action.deployment_id)
+        if deployment_info.deploying_revision_id is not None:
+            raise DeploymentAlreadyInProgress(
+                f"Deployment {action.deployment_id} already has deploying_revision "
+                f"{deployment_info.deploying_revision_id} in progress."
+            )
+        if deployment_info.current_revision_id == action.revision_id:
+            raise InvalidEndpointState(
+                f"Revision {action.revision_id} is already the current revision "
+                f"of deployment {action.deployment_id}."
+            )
+
+        # 3. Set deploying_revision and transition to DEPLOYING lifecycle.
+        # The DB WHERE clause includes ``deploying_revision IS NULL`` to guard
+        # against concurrent activations; updated=False means the guard fired.
+        previous_revision_id, updated = await self._deployment_repository.set_deploying_revision(
             action.deployment_id, action.revision_id
         )
+        if not updated:
+            raise DeploymentAlreadyInProgress(
+                f"Deployment {action.deployment_id} already has a deploying revision in progress "
+                f"(concurrent activation detected)."
+            )
 
-        # 3. Trigger lifecycle check to update routes with new revision
+        # 4. Trigger DEPLOYING lifecycle to start strategy execution
         await self._deployment_controller.mark_lifecycle_needed(
-            DeploymentLifecycleType.CHECK_REPLICA
+            DeploymentLifecycleType.DEPLOYING, sub_step=DeploymentSubStep.PROVISIONING
         )
 
         log.info(
-            "Activated revision {} for deployment {} (previous: {})",
+            "Started deploying revision {} for deployment {} (current: {})",
             action.revision_id,
             action.deployment_id,
             previous_revision_id,
         )
 
-        # 4. Get updated deployment info
+        # 5. Get updated deployment info
         deployment_info = await self._deployment_repository.get_endpoint_info(action.deployment_id)
 
         return ActivateRevisionActionResult(

@@ -66,7 +66,7 @@ def mock_processors() -> MagicMock:
 @pytest.fixture
 def handler(mock_processors: MagicMock) -> AuthHandler:
     """AuthHandler instance with mock processors."""
-    return AuthHandler(processors=mock_processors)
+    return AuthHandler(auth=mock_processors.auth)
 
 
 @pytest.fixture
@@ -76,6 +76,7 @@ def user_context() -> UserContext:
         user_uuid=uuid.uuid4(),
         user_email="test@example.com",
         user_domain="default",
+        user_role=UserRole.USER,
         access_key="AKTEST",
         is_admin=False,
         is_superadmin=False,
@@ -96,7 +97,6 @@ def request_ctx() -> RequestCtx:
 class TestTestGet:
     """Tests for test_get handler (GET /auth)."""
 
-    @pytest.mark.asyncio
     async def test_returns_authorized_yes(
         self,
         handler: AuthHandler,
@@ -108,6 +108,7 @@ class TestTestGet:
         assert response.status_code == HTTPStatus.OK
         data = response.to_json
         assert data is not None
+        assert isinstance(data, dict)
         assert data["authorized"] == "yes"
         assert data["echo"] == ""
 
@@ -115,7 +116,6 @@ class TestTestGet:
 class TestTestPost:
     """Tests for test_post handler (POST /auth)."""
 
-    @pytest.mark.asyncio
     async def test_returns_echo(
         self,
         handler: AuthHandler,
@@ -130,6 +130,7 @@ class TestTestPost:
         assert response.status_code == HTTPStatus.OK
         data = response.to_json
         assert data is not None
+        assert isinstance(data, dict)
         assert data["authorized"] == "yes"
         assert data["echo"] == "hello"
 
@@ -150,7 +151,6 @@ class TestAuthorize:
             ),
         )
 
-    @pytest.mark.asyncio
     async def test_calls_processor_and_returns_result(
         self,
         handler: AuthHandler,
@@ -176,10 +176,10 @@ class TestAuthorize:
         assert authorize_result.authorization_result is not None
         data = response.to_json
         assert data is not None
+        assert isinstance(data, dict)
         assert data["data"]["access_key"] == authorize_result.authorization_result.access_key
         assert data["data"]["secret_key"] == authorize_result.authorization_result.secret_key
 
-    @pytest.mark.asyncio
     async def test_passes_params_to_action(
         self,
         handler: AuthHandler,
@@ -210,7 +210,6 @@ class TestAuthorize:
         assert action.password == password
         assert action.stoken == stoken
 
-    @pytest.mark.asyncio
     async def test_stream_response_passthrough(
         self,
         handler: AuthHandler,
@@ -248,7 +247,6 @@ class TestSignup:
             secret_key="NEWSECRET",
         )
 
-    @pytest.mark.asyncio
     async def test_calls_processor_and_returns_created(
         self,
         handler: AuthHandler,
@@ -271,10 +269,10 @@ class TestSignup:
         assert response.status_code == HTTPStatus.CREATED
         data = response.to_json
         assert data is not None
+        assert isinstance(data, dict)
         assert data["access_key"] == signup_result.access_key
         assert data["secret_key"] == signup_result.secret_key
 
-    @pytest.mark.asyncio
     async def test_passes_optional_params_to_action(
         self,
         handler: AuthHandler,
@@ -310,7 +308,6 @@ class TestSignup:
 class TestSignout:
     """Tests for signout handler."""
 
-    @pytest.mark.asyncio
     async def test_calls_processor(
         self,
         handler: AuthHandler,
@@ -337,7 +334,6 @@ class TestSignout:
 class TestGetRole:
     """Tests for get_role handler."""
 
-    @pytest.mark.asyncio
     async def test_calls_processor_and_returns_roles(
         self,
         handler: AuthHandler,
@@ -363,11 +359,11 @@ class TestGetRole:
         assert response.status_code == HTTPStatus.OK
         data = response.to_json
         assert data is not None
+        assert isinstance(data, dict)
         assert data["global_role"] == global_role
         assert data["domain_role"] == domain_role
         assert data["group_role"] is None
 
-    @pytest.mark.asyncio
     async def test_passes_group_to_action(
         self,
         handler: AuthHandler,
@@ -391,7 +387,6 @@ class TestGetRole:
         action = mock_processors.auth.get_role.wait_for_complete.call_args[0][0]
         assert action.group_id == group_uuid
 
-    @pytest.mark.asyncio
     async def test_uses_admin_flags_from_context(
         self,
         handler: AuthHandler,
@@ -402,6 +397,7 @@ class TestGetRole:
             user_uuid=uuid.uuid4(),
             user_email="admin@example.com",
             user_domain="default",
+            user_role=UserRole.SUPERADMIN,
             access_key="AKADMIN",
             is_admin=True,
             is_superadmin=True,
@@ -426,7 +422,6 @@ class TestGetRole:
 class TestUpdatePassword:
     """Tests for update_password handler."""
 
-    @pytest.mark.asyncio
     async def test_calls_processor_on_success(
         self,
         handler: AuthHandler,
@@ -450,7 +445,6 @@ class TestUpdatePassword:
         mock_processors.auth.update_password.wait_for_complete.assert_called_once()
         assert response.status_code == HTTPStatus.OK
 
-    @pytest.mark.asyncio
     async def test_returns_bad_request_on_failure(
         self,
         handler: AuthHandler,
@@ -477,7 +471,6 @@ class TestUpdatePassword:
 class TestUpdatePasswordNoAuth:
     """Tests for update_password_no_auth handler (public endpoint)."""
 
-    @pytest.mark.asyncio
     async def test_calls_processor_and_returns_created(
         self,
         handler: AuthHandler,
@@ -512,7 +505,6 @@ class TestUpdatePasswordNoAuth:
 class TestUpdateFullName:
     """Tests for update_full_name handler."""
 
-    @pytest.mark.asyncio
     async def test_calls_processor(
         self,
         handler: AuthHandler,
@@ -538,7 +530,6 @@ class TestUpdateFullName:
 class TestGetSSHKeypair:
     """Tests for get_ssh_keypair handler."""
 
-    @pytest.mark.asyncio
     async def test_calls_processor_and_returns_public_key(
         self,
         handler: AuthHandler,
@@ -557,13 +548,13 @@ class TestGetSSHKeypair:
         assert response.status_code == HTTPStatus.OK
         data = response.to_json
         assert data is not None
+        assert isinstance(data, dict)
         assert data["ssh_public_key"] == public_key
 
 
 class TestGenerateSSHKeypair:
     """Tests for generate_ssh_keypair handler."""
 
-    @pytest.mark.asyncio
     async def test_calls_processor_and_returns_keypair(
         self,
         handler: AuthHandler,
@@ -588,6 +579,7 @@ class TestGenerateSSHKeypair:
         assert response.status_code == HTTPStatus.OK
         data = response.to_json
         assert data is not None
+        assert isinstance(data, dict)
         assert data["ssh_public_key"] == ssh_public_key
         assert data["ssh_private_key"] == ssh_private_key
 
@@ -595,7 +587,6 @@ class TestGenerateSSHKeypair:
 class TestUploadSSHKeypair:
     """Tests for upload_ssh_keypair handler."""
 
-    @pytest.mark.asyncio
     async def test_calls_processor_and_returns_keypair(
         self,
         handler: AuthHandler,

@@ -45,7 +45,6 @@ def service(mock_repository: MagicMock) -> FairShareService:
 class TestBulkUpsertDomainFairShareWeight:
     """Tests for bulk upsert domain fair share weight."""
 
-    @pytest.mark.asyncio
     async def test_bulk_upsert_single_domain_calls_repository(
         self,
         service: FairShareService,
@@ -69,7 +68,6 @@ class TestBulkUpsertDomainFairShareWeight:
         assert result.upserted_count == 1
         assert isinstance(result, BulkUpsertDomainFairShareWeightActionResult)
 
-    @pytest.mark.asyncio
     async def test_bulk_upsert_multiple_domains_calls_repository(
         self,
         service: FairShareService,
@@ -94,7 +92,6 @@ class TestBulkUpsertDomainFairShareWeight:
         mock_repository.bulk_upsert_domain_fair_share.assert_called_once()
         assert result.upserted_count == 3
 
-    @pytest.mark.asyncio
     async def test_bulk_upsert_creates_correct_specs(
         self,
         service: FairShareService,
@@ -129,7 +126,6 @@ class TestBulkUpsertDomainFairShareWeight:
         assert specs[1].domain_name == "domain2"
         assert specs[1].weight is None
 
-    @pytest.mark.asyncio
     async def test_bulk_upsert_empty_inputs_returns_zero(
         self,
         service: FairShareService,
@@ -153,7 +149,6 @@ class TestBulkUpsertDomainFairShareWeight:
 class TestBulkUpsertProjectFairShareWeight:
     """Tests for bulk upsert project fair share weight."""
 
-    @pytest.mark.asyncio
     async def test_bulk_upsert_single_project_calls_repository(
         self,
         service: FairShareService,
@@ -182,7 +177,6 @@ class TestBulkUpsertProjectFairShareWeight:
         assert result.upserted_count == 1
         assert isinstance(result, BulkUpsertProjectFairShareWeightActionResult)
 
-    @pytest.mark.asyncio
     async def test_bulk_upsert_multiple_projects_calls_repository(
         self,
         service: FairShareService,
@@ -220,7 +214,6 @@ class TestBulkUpsertProjectFairShareWeight:
         mock_repository.bulk_upsert_project_fair_share.assert_called_once()
         assert result.upserted_count == 3
 
-    @pytest.mark.asyncio
     async def test_bulk_upsert_creates_correct_specs(
         self,
         service: FairShareService,
@@ -266,7 +259,6 @@ class TestBulkUpsertProjectFairShareWeight:
         assert specs[1].domain_name == "domain2"
         assert specs[1].weight is None
 
-    @pytest.mark.asyncio
     async def test_bulk_upsert_empty_inputs_returns_zero(
         self,
         service: FairShareService,
@@ -290,7 +282,6 @@ class TestBulkUpsertProjectFairShareWeight:
 class TestBulkUpsertUserFairShareWeight:
     """Tests for bulk upsert user fair share weight."""
 
-    @pytest.mark.asyncio
     async def test_bulk_upsert_single_user_calls_repository(
         self,
         service: FairShareService,
@@ -321,7 +312,6 @@ class TestBulkUpsertUserFairShareWeight:
         assert result.upserted_count == 1
         assert isinstance(result, BulkUpsertUserFairShareWeightActionResult)
 
-    @pytest.mark.asyncio
     async def test_bulk_upsert_multiple_users_calls_repository(
         self,
         service: FairShareService,
@@ -363,7 +353,6 @@ class TestBulkUpsertUserFairShareWeight:
         mock_repository.bulk_upsert_user_fair_share.assert_called_once()
         assert result.upserted_count == 3
 
-    @pytest.mark.asyncio
     async def test_bulk_upsert_creates_correct_specs(
         self,
         service: FairShareService,
@@ -415,7 +404,6 @@ class TestBulkUpsertUserFairShareWeight:
         assert specs[1].domain_name == "domain2"
         assert specs[1].weight is None
 
-    @pytest.mark.asyncio
     async def test_bulk_upsert_empty_inputs_returns_zero(
         self,
         service: FairShareService,

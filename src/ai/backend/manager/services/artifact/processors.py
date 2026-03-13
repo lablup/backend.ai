@@ -3,6 +3,7 @@ from typing import override
 from ai.backend.manager.actions.monitors.monitor import ActionMonitor
 from ai.backend.manager.actions.processor import ActionProcessor
 from ai.backend.manager.actions.types import AbstractProcessorPackage, ActionSpec
+from ai.backend.manager.actions.validators import ActionValidators
 from ai.backend.manager.services.artifact.actions.delegate_scan import (
     DelegateScanArtifactsAction,
     DelegateScanArtifactsActionResult,
@@ -18,10 +19,6 @@ from ai.backend.manager.services.artifact.actions.get import (
 from ai.backend.manager.services.artifact.actions.get_revisions import (
     GetArtifactRevisionsAction,
     GetArtifactRevisionsActionResult,
-)
-from ai.backend.manager.services.artifact.actions.list_with_revisions import (
-    ListArtifactsWithRevisionsAction,
-    ListArtifactsWithRevisionsActionResult,
 )
 from ai.backend.manager.services.artifact.actions.restore_multi import (
     RestoreArtifactsAction,
@@ -66,9 +63,6 @@ class ArtifactProcessors(AbstractProcessorPackage):
     search_artifacts_with_revisions: ActionProcessor[
         SearchArtifactsWithRevisionsAction, SearchArtifactsWithRevisionsActionResult
     ]
-    list_artifacts_with_revisions: ActionProcessor[
-        ListArtifactsWithRevisionsAction, ListArtifactsWithRevisionsActionResult
-    ]
     get_revisions: ActionProcessor[GetArtifactRevisionsAction, GetArtifactRevisionsActionResult]
     update: ActionProcessor[UpdateArtifactAction, UpdateArtifactActionResult]
     upsert_artifacts_with_revisions: ActionProcessor[
@@ -81,16 +75,18 @@ class ArtifactProcessors(AbstractProcessorPackage):
 
     delegate_scan: ActionProcessor[DelegateScanArtifactsAction, DelegateScanArtifactsActionResult]
 
-    def __init__(self, service: ArtifactService, action_monitors: list[ActionMonitor]) -> None:
+    def __init__(
+        self,
+        service: ArtifactService,
+        action_monitors: list[ActionMonitor],
+        validators: ActionValidators,
+    ) -> None:
         # TODO: Move scan action to ArtifactRegistryService
         self.scan = ActionProcessor(service.scan, action_monitors)
         self.get = ActionProcessor(service.get, action_monitors)
         self.search_artifacts = ActionProcessor(service.search, action_monitors)
         self.search_artifacts_with_revisions = ActionProcessor(
             service.search_with_revisions, action_monitors
-        )
-        self.list_artifacts_with_revisions = ActionProcessor(
-            service.list_with_revisions, action_monitors
         )
         self.get_revisions = ActionProcessor(service.get_revisions, action_monitors)
         self.update = ActionProcessor(service.update, action_monitors)
@@ -111,7 +107,6 @@ class ArtifactProcessors(AbstractProcessorPackage):
             GetArtifactAction.spec(),
             SearchArtifactsAction.spec(),
             SearchArtifactsWithRevisionsAction.spec(),
-            ListArtifactsWithRevisionsAction.spec(),
             GetArtifactRevisionsAction.spec(),
             UpdateArtifactAction.spec(),
             UpsertArtifactsAction.spec(),

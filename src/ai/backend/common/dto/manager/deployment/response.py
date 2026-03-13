@@ -18,11 +18,13 @@ from ai.backend.common.data.model_deployment.types import (
     RouteStatus,
     RouteTrafficStatus,
 )
+from ai.backend.common.dto.manager.pagination import PaginationInfo
 from ai.backend.common.types import ClusterMode, RuntimeVariant
 
 __all__ = (
     # DTOs
     "DeploymentDTO",
+    "DeploymentPolicyDTO",
     "RevisionDTO",
     "RouteDTO",
     "NetworkConfigDTO",
@@ -33,11 +35,15 @@ __all__ = (
     "ReplicaStateDTO",
     # Responses
     "CreateDeploymentResponse",
+    "UpsertDeploymentPolicyResponse",
     "GetDeploymentResponse",
+    "GetDeploymentPolicyResponse",
+    "ListDeploymentPoliciesResponse",
     "ListDeploymentsResponse",
     "UpdateDeploymentResponse",
     "DestroyDeploymentResponse",
     "GetRevisionResponse",
+    "AddRevisionResponse",
     "ListRevisionsResponse",
     "ActivateRevisionResponse",
     "DeactivateRevisionResponse",
@@ -47,14 +53,6 @@ __all__ = (
     "PaginationInfo",
     "CursorPaginationInfo",
 )
-
-
-class PaginationInfo(BaseModel):
-    """Pagination information."""
-
-    total: int = Field(description="Total number of items")
-    offset: int = Field(description="Number of items skipped")
-    limit: int | None = Field(default=None, description="Maximum items returned")
 
 
 class NetworkConfigDTO(BaseModel):
@@ -89,7 +87,7 @@ class ModelMountConfigDTO(BaseModel):
     """Model mount configuration for revision."""
 
     vfolder_id: UUID = Field(description="VFolder ID for model")
-    mount_destination: str = Field(description="Mount destination path")
+    mount_destination: str | None = Field(description="Mount destination path")
     definition_path: str = Field(description="Model definition path")
 
 
@@ -133,6 +131,9 @@ class DeploymentDTO(BaseModel):
     current_revision: RevisionDTO | None = Field(
         default=None, description="Current active revision"
     )
+    deployment_policy: DeploymentPolicyDTO | None = Field(
+        default=None, description="Deployment rollout policy"
+    )
 
 
 class CreateDeploymentResponse(BaseResponseModel):
@@ -170,6 +171,12 @@ class GetRevisionResponse(BaseResponseModel):
     """Response for getting a revision."""
 
     revision: RevisionDTO = Field(description="Revision data")
+
+
+class AddRevisionResponse(BaseResponseModel):
+    """Response for adding a new revision to a deployment."""
+
+    revision: RevisionDTO = Field(description="Created revision")
 
 
 class ListRevisionsResponse(BaseResponseModel):
@@ -224,3 +231,56 @@ class UpdateRouteTrafficStatusResponse(BaseResponseModel):
     """Response for updating route traffic status."""
 
     route: RouteDTO = Field(description="Updated route")
+
+
+# ========== Deployment Policy DTOs ==========
+
+
+class DeploymentPolicyDTO(BaseModel):
+    """DTO representing the rollout policy for a deployment.
+
+    Controls how new revisions are promoted to production traffic,
+    including the update strategy and automatic rollback behavior.
+    """
+
+    id: UUID = Field(description="Unique identifier of this deployment policy")
+    deployment_id: UUID = Field(description="UUID of the deployment this policy belongs to")
+    strategy: DeploymentStrategy = Field(
+        description="Configured rollout strategy type (ROLLING for gradual replacement, BLUE_GREEN for parallel environment switching)"
+    )
+    strategy_spec: dict[str, Any] = Field(
+        description="Raw strategy-specific parameters stored as a dictionary; contains rolling update or blue-green fields depending on the active strategy"
+    )
+    rollback_on_failure: bool = Field(
+        description="Whether the system automatically reverts to the previous stable revision when health checks fail during rollout"
+    )
+    created_at: datetime = Field(
+        description="UTC timestamp when this deployment policy was created"
+    )
+    updated_at: datetime = Field(
+        description="UTC timestamp of the last modification to this deployment policy"
+    )
+
+
+class UpsertDeploymentPolicyResponse(BaseResponseModel):
+    """Response for creating or updating a deployment policy."""
+
+    deployment_policy: DeploymentPolicyDTO = Field(description="The deployment policy")
+    created: bool = Field(
+        description="True if a new policy was created, False if an existing one was updated"
+    )
+
+
+class ListDeploymentPoliciesResponse(BaseResponseModel):
+    """Response for listing deployment policies."""
+
+    deployment_policies: list[DeploymentPolicyDTO] = Field(
+        description="List of deployment policies"
+    )
+    pagination: PaginationInfo = Field(description="Pagination information")
+
+
+class GetDeploymentPolicyResponse(BaseResponseModel):
+    """Response for getting a deployment policy."""
+
+    deployment_policy: DeploymentPolicyDTO = Field(description="Deployment policy data")

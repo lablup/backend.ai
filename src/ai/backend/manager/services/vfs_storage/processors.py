@@ -3,6 +3,10 @@ from typing import override
 from ai.backend.manager.actions.monitors.monitor import ActionMonitor
 from ai.backend.manager.actions.processor import ActionProcessor
 from ai.backend.manager.actions.types import AbstractProcessorPackage, ActionSpec
+from ai.backend.manager.actions.validators import ActionValidators
+from ai.backend.manager.clients.storage_proxy.manager_facing_client import (
+    StorageProxyManagerFacingClient,
+)
 from ai.backend.manager.services.vfs_storage.actions.create import (
     CreateVFSStorageAction,
     CreateVFSStorageActionResult,
@@ -15,6 +19,10 @@ from ai.backend.manager.services.vfs_storage.actions.get import (
     GetVFSStorageAction,
     GetVFSStorageActionResult,
 )
+from ai.backend.manager.services.vfs_storage.actions.get_quota_scope import (
+    GetQuotaScopeAction,
+    GetQuotaScopeActionResult,
+)
 from ai.backend.manager.services.vfs_storage.actions.list import (
     ListVFSStorageAction,
     ListVFSStorageActionResult,
@@ -22,6 +30,18 @@ from ai.backend.manager.services.vfs_storage.actions.list import (
 from ai.backend.manager.services.vfs_storage.actions.search import (
     SearchVFSStoragesAction,
     SearchVFSStoragesActionResult,
+)
+from ai.backend.manager.services.vfs_storage.actions.search_quota_scopes import (
+    SearchQuotaScopesAction,
+    SearchQuotaScopesActionResult,
+)
+from ai.backend.manager.services.vfs_storage.actions.set_quota_scope import (
+    SetQuotaScopeAction,
+    SetQuotaScopeActionResult,
+)
+from ai.backend.manager.services.vfs_storage.actions.unset_quota_scope import (
+    UnsetQuotaScopeAction,
+    UnsetQuotaScopeActionResult,
 )
 from ai.backend.manager.services.vfs_storage.actions.update import (
     UpdateVFSStorageAction,
@@ -37,14 +57,36 @@ class VFSStorageProcessors(AbstractProcessorPackage):
     get: ActionProcessor[GetVFSStorageAction, GetVFSStorageActionResult]
     list_storages: ActionProcessor[ListVFSStorageAction, ListVFSStorageActionResult]
     search_vfs_storages: ActionProcessor[SearchVFSStoragesAction, SearchVFSStoragesActionResult]
+    get_quota_scope: ActionProcessor[GetQuotaScopeAction, GetQuotaScopeActionResult]
+    search_quota_scopes: ActionProcessor[SearchQuotaScopesAction, SearchQuotaScopesActionResult]
+    set_quota_scope: ActionProcessor[SetQuotaScopeAction, SetQuotaScopeActionResult]
+    unset_quota_scope: ActionProcessor[UnsetQuotaScopeAction, UnsetQuotaScopeActionResult]
 
-    def __init__(self, service: VFSStorageService, action_monitors: list[ActionMonitor]) -> None:
+    def __init__(
+        self,
+        service: VFSStorageService,
+        action_monitors: list[ActionMonitor],
+        validators: ActionValidators,
+    ) -> None:
+        self._service = service
         self.create = ActionProcessor(service.create, action_monitors)
         self.update = ActionProcessor(service.update, action_monitors)
         self.delete = ActionProcessor(service.delete, action_monitors)
         self.get = ActionProcessor(service.get, action_monitors)
         self.list_storages = ActionProcessor(service.list, action_monitors)
         self.search_vfs_storages = ActionProcessor(service.search, action_monitors)
+        self.get_quota_scope = ActionProcessor(service.get_quota_scope, action_monitors)
+        self.search_quota_scopes = ActionProcessor(service.search_quota_scopes, action_monitors)
+        self.set_quota_scope = ActionProcessor(service.set_quota_scope, action_monitors)
+        self.unset_quota_scope = ActionProcessor(service.unset_quota_scope, action_monitors)
+
+    def get_manager_facing_client(self, proxy_name: str) -> StorageProxyManagerFacingClient:
+        """Get a storage proxy client for the given proxy name.
+
+        Delegates to the underlying service's storage_manager.
+        """
+        storage_manager = self._service._ensure_storage_manager()
+        return storage_manager.get_manager_facing_client(proxy_name)
 
     @override
     def supported_actions(self) -> list[ActionSpec]:
@@ -55,4 +97,8 @@ class VFSStorageProcessors(AbstractProcessorPackage):
             GetVFSStorageAction.spec(),
             ListVFSStorageAction.spec(),
             SearchVFSStoragesAction.spec(),
+            GetQuotaScopeAction.spec(),
+            SearchQuotaScopesAction.spec(),
+            SetQuotaScopeAction.spec(),
+            UnsetQuotaScopeAction.spec(),
         ]

@@ -9,7 +9,6 @@ from ai.backend.manager.models.domain import verify_dotfile_name
 from ai.backend.manager.models.vfolder import verify_vfolder_name
 
 
-@pytest.mark.asyncio
 async def test_call_non_bursty() -> None:
     key = "x"
     execution_count = 0

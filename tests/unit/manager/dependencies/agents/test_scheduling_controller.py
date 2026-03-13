@@ -2,8 +2,6 @@ from __future__ import annotations
 
 from unittest.mock import MagicMock, patch
 
-import pytest
-
 from ai.backend.manager.dependencies.agents.scheduling_controller import (
     SchedulingControllerDependency,
     SchedulingControllerInput,
@@ -13,7 +11,6 @@ from ai.backend.manager.dependencies.agents.scheduling_controller import (
 class TestSchedulingControllerDependency:
     """Test SchedulingControllerDependency lifecycle."""
 
-    @pytest.mark.asyncio
     @patch(
         "ai.backend.manager.dependencies.agents.scheduling_controller.SchedulingController",
     )

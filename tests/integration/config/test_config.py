@@ -25,7 +25,6 @@ from .conftest import DomainDotfileFactory, GroupDotfileFactory, UserDotfileFact
 
 @pytest.mark.integration
 class TestUserDotfileLifecycle:
-    @pytest.mark.asyncio
     async def test_full_user_dotfile_lifecycle(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -69,7 +68,6 @@ class TestUserDotfileLifecycle:
 
 @pytest.mark.integration
 class TestBootstrapScriptLifecycle:
-    @pytest.mark.asyncio
     async def test_bootstrap_script_update_and_retrieve(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -99,7 +97,6 @@ class TestBootstrapScriptLifecycle:
 
 @pytest.mark.integration
 class TestGroupDotfileLifecycle:
-    @pytest.mark.asyncio
     async def test_full_group_dotfile_lifecycle(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -148,7 +145,6 @@ class TestGroupDotfileLifecycle:
 
 @pytest.mark.integration
 class TestDomainDotfileLifecycle:
-    @pytest.mark.asyncio
     async def test_full_domain_dotfile_lifecycle(
         self,
         admin_registry: BackendAIClientRegistry,

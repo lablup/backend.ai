@@ -30,6 +30,7 @@ class CreateFromTemplateActionParams:
     config: dict[str, Any]
     tag: str | Undefined
     priority: int
+    is_preemptible: bool
     owner_access_key: AccessKey | Undefined
     enqueue_only: bool
     max_wait_seconds: int

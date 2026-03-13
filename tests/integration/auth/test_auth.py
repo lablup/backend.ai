@@ -23,7 +23,6 @@ from .conftest import AuthUserFixtureData
 
 @pytest.mark.integration
 class TestSignupAndAuthorizeFlow:
-    @pytest.mark.asyncio
     async def test_signup_then_authorize(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -80,7 +79,6 @@ class TestSignupAndAuthorizeFlow:
 
 @pytest.mark.integration
 class TestSignoutFlow:
-    @pytest.mark.asyncio
     async def test_signout_deactivates_user(
         self,
         auth_user_registry: BackendAIClientRegistry,

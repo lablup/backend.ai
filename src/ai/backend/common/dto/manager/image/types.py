@@ -24,3 +24,4 @@ class ImageOrderField(StrEnum):
 
     NAME = "name"
     CREATED_AT = "created_at"
+    LAST_USED = "last_used"

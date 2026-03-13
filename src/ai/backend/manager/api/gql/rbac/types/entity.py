@@ -136,7 +136,6 @@ class EntityRefGQL(Node):
             case (
                 RBACElementType.SESSION
                 | RBACElementType.VFOLDER
-                | RBACElementType.DEPLOYMENT
                 | RBACElementType.KEYPAIR
                 | RBACElementType.NETWORK
                 | RBACElementType.CONTAINER_REGISTRY
@@ -151,6 +150,9 @@ class EntityRefGQL(Node):
                 | RBACElementType.PROJECT_RESOURCE_POLICY
                 | RBACElementType.AUDIT_LOG
                 | RBACElementType.EVENT_LOG
+                | RBACElementType.AGENT
+                | RBACElementType.KERNEL
+                | RBACElementType.ROUTING
             ):
                 return None
 

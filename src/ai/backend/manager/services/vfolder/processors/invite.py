@@ -3,6 +3,7 @@ from typing import override
 from ai.backend.manager.actions.monitors.monitor import ActionMonitor
 from ai.backend.manager.actions.processor import ActionProcessor
 from ai.backend.manager.actions.types import AbstractProcessorPackage, ActionSpec
+from ai.backend.manager.actions.validators import ActionValidators
 from ai.backend.manager.services.vfolder.actions.invite import (
     AcceptInvitationAction,
     AcceptInvitationActionResult,
@@ -12,6 +13,8 @@ from ai.backend.manager.services.vfolder.actions.invite import (
     LeaveInvitedVFolderActionResult,
     ListInvitationAction,
     ListInvitationActionResult,
+    ListSentInvitationsAction,
+    ListSentInvitationsActionResult,
     RejectInvitationAction,
     RejectInvitationActionResult,
     RevokeInvitedVFolderAction,
@@ -39,8 +42,16 @@ class VFolderInviteProcessors(AbstractProcessorPackage):
     update_invited_vfolder_mount_permission: ActionProcessor[
         UpdateInvitedVFolderMountPermissionAction, UpdateInvitedVFolderMountPermissionActionResult
     ]
+    list_sent_invitations: ActionProcessor[
+        ListSentInvitationsAction, ListSentInvitationsActionResult
+    ]
 
-    def __init__(self, service: VFolderInviteService, action_monitors: list[ActionMonitor]) -> None:
+    def __init__(
+        self,
+        service: VFolderInviteService,
+        action_monitors: list[ActionMonitor],
+        validators: ActionValidators,
+    ) -> None:
         self.invite_vfolder = ActionProcessor(service.invite, action_monitors)
         self.accept_invitation = ActionProcessor(service.accept_invitation, action_monitors)
         self.reject_invitation = ActionProcessor(service.reject_invitation, action_monitors)
@@ -53,6 +64,7 @@ class VFolderInviteProcessors(AbstractProcessorPackage):
         self.update_invited_vfolder_mount_permission = ActionProcessor(
             service.update_invited_vfolder_mount_permission, action_monitors
         )
+        self.list_sent_invitations = ActionProcessor(service.list_sent_invitations, action_monitors)
 
     @override
     def supported_actions(self) -> list[ActionSpec]:
@@ -65,4 +77,5 @@ class VFolderInviteProcessors(AbstractProcessorPackage):
             LeaveInvitedVFolderAction.spec(),
             RevokeInvitedVFolderAction.spec(),
             UpdateInvitedVFolderMountPermissionAction.spec(),
+            ListSentInvitationsAction.spec(),
         ]

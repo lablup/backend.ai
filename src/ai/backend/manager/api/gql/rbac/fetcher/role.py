@@ -14,6 +14,7 @@ from ai.backend.manager.api.gql.rbac.types import (
     RoleAssignmentConnection,
     RoleAssignmentFilter,
     RoleAssignmentGQL,
+    RoleAssignmentOrderBy,
     RoleConnection,
     RoleFilter,
     RoleGQL,
@@ -128,6 +129,7 @@ async def fetch_roles(
 async def fetch_role_assignments(
     info: Info[StrawberryGQLContext],
     filter: RoleAssignmentFilter | None = None,
+    order_by: list[RoleAssignmentOrderBy] | None = None,
     before: str | None = None,
     after: str | None = None,
     first: int | None = None,
@@ -147,6 +149,7 @@ async def fetch_role_assignments(
         ),
         get_role_assignment_pagination_spec(),
         filter=filter,
+        order_by=order_by,
         base_conditions=base_conditions,
     )
 

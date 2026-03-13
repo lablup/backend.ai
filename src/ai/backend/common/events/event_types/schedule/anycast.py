@@ -102,18 +102,20 @@ class DoDeploymentLifecycleIfNeededEvent(AbstractAnycastEvent):
     """Event to trigger deployment lifecycle processing if needed (short cycle)."""
 
     lifecycle_type: str
+    sub_step: str | None
 
-    def __init__(self, lifecycle_type: str) -> None:
+    def __init__(self, lifecycle_type: str, sub_step: str | None = None) -> None:
         self.lifecycle_type = lifecycle_type
+        self.sub_step = sub_step
 
     @override
     def serialize(self) -> tuple[Any, ...]:
-        return (self.lifecycle_type,)
+        return (self.lifecycle_type, self.sub_step)
 
     @classmethod
     @override
     def deserialize(cls, value: tuple[Any, ...]) -> Self:
-        return cls(lifecycle_type=value[0])
+        return cls(lifecycle_type=value[0], sub_step=value[1] if len(value) > 1 else None)
 
     @classmethod
     @override
@@ -138,18 +140,20 @@ class DoDeploymentLifecycleEvent(AbstractAnycastEvent):
     """Event to trigger deployment lifecycle processing unconditionally (long cycle)."""
 
     lifecycle_type: str
+    sub_step: str | None
 
-    def __init__(self, lifecycle_type: str) -> None:
+    def __init__(self, lifecycle_type: str, sub_step: str | None = None) -> None:
         self.lifecycle_type = lifecycle_type
+        self.sub_step = sub_step
 
     @override
     def serialize(self) -> tuple[Any, ...]:
-        return (self.lifecycle_type,)
+        return (self.lifecycle_type, self.sub_step)
 
     @classmethod
     @override
     def deserialize(cls, value: tuple[Any, ...]) -> Self:
-        return cls(lifecycle_type=value[0])
+        return cls(lifecycle_type=value[0], sub_step=value[1] if len(value) > 1 else None)
 
     @classmethod
     @override

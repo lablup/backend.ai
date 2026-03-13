@@ -100,10 +100,12 @@ class TestVFolderServicePurge:
     def vfolder_service(self, mock_vfolder_repository: MagicMock) -> VFolderService:
         return VFolderService(
             config_provider=MagicMock(),
+            etcd=MagicMock(),
             storage_manager=MagicMock(),
             background_task_manager=MagicMock(),
             vfolder_repository=mock_vfolder_repository,
             user_repository=MagicMock(),
+            valkey_stat_client=MagicMock(),
         )
 
     @pytest.fixture

@@ -11,12 +11,13 @@ from pydantic import HttpUrl
 from ai.backend.common.bgtask.bgtask import BackgroundTaskManager
 from ai.backend.common.contexts.user import with_user
 from ai.backend.common.data.user.types import UserData, UserRole
+from ai.backend.common.dto.manager.model_serving.request import ServiceFilterModel
 from ai.backend.common.dto.manager.query import StringFilter
 from ai.backend.common.events.dispatcher import EventDispatcher
 from ai.backend.common.events.hub import EventHub
 from ai.backend.common.types import ResourceSlot
 from ai.backend.manager.actions.monitors.monitor import ActionMonitor
-from ai.backend.manager.api.service import ServiceFilterModel
+from ai.backend.manager.actions.validators import ActionValidators
 from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.model_serving.types import (
@@ -168,6 +169,7 @@ class TestSearchServices:
         return ModelServingProcessors(
             service=model_serving_service,
             action_monitors=[mock_action_monitor],
+            validators=MagicMock(spec=ActionValidators),
         )
 
     @pytest.fixture
@@ -183,7 +185,6 @@ class TestSearchServices:
             ),
         )
 
-    @pytest.mark.asyncio
     async def test_empty_result(
         self,
         model_serving_processors: ModelServingProcessors,
@@ -212,7 +213,6 @@ class TestSearchServices:
         assert result.offset == 0
         assert result.limit == 20
 
-    @pytest.mark.asyncio
     async def test_services_with_active_routes(
         self,
         model_serving_processors: ModelServingProcessors,
@@ -260,7 +260,6 @@ class TestSearchServices:
         assert result.items[0].open_to_public is False
         assert result.total_count == 1
 
-    @pytest.mark.asyncio
     async def test_service_with_null_endpoint(
         self,
         model_serving_processors: ModelServingProcessors,
@@ -303,7 +302,6 @@ class TestSearchServices:
         assert result.items[0].active_route_count == 0
         assert result.items[0].open_to_public is True
 
-    @pytest.mark.asyncio
     async def test_pagination_metadata(
         self,
         model_serving_processors: ModelServingProcessors,
@@ -347,7 +345,6 @@ class TestSearchServices:
         assert result.offset == 5
         assert result.limit == 5
 
-    @pytest.mark.asyncio
     async def test_name_filter(
         self,
         model_serving_processors: ModelServingProcessors,

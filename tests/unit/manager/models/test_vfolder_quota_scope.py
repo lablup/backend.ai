@@ -302,7 +302,6 @@ class TestEnsureQuotaScopeAccessibleByUser:
 
         yield group_uuid
 
-    @pytest.mark.asyncio
     async def test_ensure_quota_scope_accessible_by_domain_admin_with_user_dict(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
@@ -320,7 +319,6 @@ class TestEnsureQuotaScopeAccessibleByUser:
                 domain_user_data_dict,
             )
 
-    @pytest.mark.asyncio
     async def test_ensure_quota_scope_not_accessible_by_admin_from_other_domain(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
@@ -338,7 +336,6 @@ class TestEnsureQuotaScopeAccessibleByUser:
                     domain_user_data_dict,
                 )
 
-    @pytest.mark.asyncio
     async def test_ensure_group_quota_scope_accessible_by_admin(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,

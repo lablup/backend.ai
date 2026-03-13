@@ -409,12 +409,35 @@ class SessionLauncher:
                         kernel_image_refs,
                     )
 
+            agent_ids_ordered: list[AgentId] = []
             create_tasks: list[Awaitable[None]] = []
             for agent_id, agent_kernels in kernels_by_agent.items():
+                agent_ids_ordered.append(agent_id)
                 create_tasks.append(create_kernels_on_agent(agent_id, agent_kernels))
 
             if create_tasks:
-                await asyncio.gather(*create_tasks, return_exceptions=True)
+                results = await asyncio.gather(*create_tasks, return_exceptions=True)
+                failed_agent_ids = [
+                    aid
+                    for aid, result in zip(agent_ids_ordered, results, strict=True)
+                    if isinstance(result, BaseException)
+                ]
+                if failed_agent_ids:
+                    log.warning(
+                        log_fmt + "recording failed agents: {}",
+                        *log_args,
+                        failed_agent_ids,
+                    )
+                    try:
+                        await self._valkey_schedule.record_session_failed_agents(
+                            session.session_id, failed_agent_ids
+                        )
+                    except Exception:
+                        log.warning(
+                            log_fmt + "failed to record failed agents in Valkey",
+                            *log_args,
+                            exc_info=True,
+                        )
 
             log.info(log_fmt + "started", *log_args)
 

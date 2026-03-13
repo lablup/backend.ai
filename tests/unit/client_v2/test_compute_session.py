@@ -2,10 +2,9 @@ from __future__ import annotations
 
 from unittest.mock import AsyncMock, MagicMock
 
-import pytest
 from yarl import URL
 
-from ai.backend.client.v2.base_client import BackendAIClient
+from ai.backend.client.v2.base_client import BackendAIAuthClient
 from ai.backend.client.v2.config import ClientConfig
 from ai.backend.client.v2.domains.compute_session import ComputeSessionClient
 from ai.backend.common.dto.manager.compute_session import (
@@ -34,8 +33,8 @@ def _make_request_session(resp: AsyncMock) -> MagicMock:
     return mock_session
 
 
-def _make_client(mock_session: MagicMock) -> BackendAIClient:
-    return BackendAIClient(_DEFAULT_CONFIG, MockAuth(), mock_session)
+def _make_client(mock_session: MagicMock) -> BackendAIAuthClient:
+    return BackendAIAuthClient(_DEFAULT_CONFIG, MockAuth(), mock_session)
 
 
 def _make_compute_session_client(mock_session: MagicMock) -> ComputeSessionClient:
@@ -43,7 +42,6 @@ def _make_compute_session_client(mock_session: MagicMock) -> ComputeSessionClien
 
 
 class TestSearchComputeSessions:
-    @pytest.mark.asyncio
     async def test_happy_path(self) -> None:
         mock_resp = AsyncMock()
         mock_resp.status = 200
@@ -90,7 +88,6 @@ class TestSearchComputeSessions:
         assert result.items[0].status == "RUNNING"
         assert result.pagination.total == 1
 
-    @pytest.mark.asyncio
     async def test_with_status_filter(self) -> None:
         mock_resp = AsyncMock()
         mock_resp.status = 200
@@ -115,7 +112,6 @@ class TestSearchComputeSessions:
         assert body["filter"]["status"] == ["RUNNING", "PREPARING"]
         assert isinstance(result, SearchComputeSessionsResponse)
 
-    @pytest.mark.asyncio
     async def test_with_ordering(self) -> None:
         mock_resp = AsyncMock()
         mock_resp.status = 200
@@ -148,7 +144,6 @@ class TestSearchComputeSessions:
         assert body["offset"] == 10
         assert isinstance(result, SearchComputeSessionsResponse)
 
-    @pytest.mark.asyncio
     async def test_nested_containers(self) -> None:
         mock_resp = AsyncMock()
         mock_resp.status = 200
@@ -200,7 +195,6 @@ class TestSearchComputeSessions:
 
 
 class TestGetComputeSession:
-    @pytest.mark.asyncio
     async def test_happy_path(self) -> None:
         mock_resp = AsyncMock()
         mock_resp.status = 200
@@ -241,7 +235,6 @@ class TestGetComputeSession:
         assert result.session.name == "my-session"
         assert result.session.status == "RUNNING"
 
-    @pytest.mark.asyncio
     async def test_with_nested_containers(self) -> None:
         mock_resp = AsyncMock()
         mock_resp.status = 200

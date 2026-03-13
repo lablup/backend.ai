@@ -3,6 +3,7 @@ from typing import override
 from ai.backend.manager.actions.monitors.monitor import ActionMonitor
 from ai.backend.manager.actions.processor import ActionProcessor
 from ai.backend.manager.actions.types import AbstractProcessorPackage, ActionSpec
+from ai.backend.manager.actions.validators import ActionValidators
 from ai.backend.manager.services.resource_preset.actions.check_presets import (
     CheckResourcePresetsAction,
     CheckResourcePresetsActionResult,
@@ -34,7 +35,10 @@ class ResourcePresetProcessors(AbstractProcessorPackage):
     check_presets: ActionProcessor[CheckResourcePresetsAction, CheckResourcePresetsActionResult]
 
     def __init__(
-        self, service: ResourcePresetService, action_monitors: list[ActionMonitor]
+        self,
+        service: ResourcePresetService,
+        action_monitors: list[ActionMonitor],
+        validators: ActionValidators,
     ) -> None:
         self.create_preset = ActionProcessor(service.create_preset, action_monitors)
         self.modify_preset = ActionProcessor(service.modify_preset, action_monitors)

@@ -11,6 +11,8 @@ from .request import (
     SearchServicesRequestModel,
     ServiceConfigModel,
     ServiceFilterModel,
+    ServiceIdPathParam,
+    ServiceRouteIdPathParam,
     TokenRequestModel,
     UpdateRouteRequestModel,
 )
@@ -32,6 +34,9 @@ from .response import (
 )
 
 __all__ = (
+    # Path param models
+    "ServiceIdPathParam",
+    "ServiceRouteIdPathParam",
     # Request models
     "ListServeRequestModel",
     "ServiceFilterModel",

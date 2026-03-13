@@ -13,7 +13,6 @@ from ai.backend.storage.volumes.abc import CAP_QUOTA, AbstractQuotaModel, Abstra
 MiB: Final = 2**20
 
 
-@pytest.mark.asyncio
 async def test_quota_capability(volume: AbstractVolume) -> None:
     caps = await volume.get_capabilities()
     print(caps)
@@ -39,7 +38,6 @@ async def wait_until_quota_changed(
     return qusage
 
 
-@pytest.mark.asyncio
 async def test_quota_scope_creation_and_deletion(volume: AbstractVolume) -> None:
     qs = QuotaScopeID(QuotaScopeType.USER, uuid.uuid4())
     await volume.quota_model.create_quota_scope(qs)
@@ -55,7 +53,6 @@ async def test_quota_scope_creation_and_deletion(volume: AbstractVolume) -> None
         assert not volume.quota_model.mangle_qspath(qs).exists()
 
 
-@pytest.mark.asyncio
 async def test_quota_limit(volume: AbstractVolume) -> None:
     caps = await volume.get_capabilities()
     if CAP_QUOTA not in caps:
@@ -84,7 +81,6 @@ async def test_quota_limit(volume: AbstractVolume) -> None:
     assert not qspath.exists()
 
 
-@pytest.mark.asyncio
 async def test_move_tree_between_quota_scopes(test_id: str, volume: AbstractVolume) -> None:
     """
     Tests if the storage backend could guarantee the correct behavior of the vfolder v2 -> v3 migration script.

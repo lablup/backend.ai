@@ -2,6 +2,12 @@ import strawberry
 from strawberry.federation import Schema
 from strawberry.schema.config import StrawberryConfig
 
+from ai.backend.manager.api.gql.extensions import (
+    GQLExceptionHandlerExtension,
+    GQLLoggingExtension,
+    GQLValidationExtension,
+)
+
 from .agent import (
     agent_stats,
     agents_v2,
@@ -166,8 +172,18 @@ from .project_v2 import (
     project_domain_v2,
     project_v2,
 )
+from .prometheus_query_preset import (
+    admin_create_prometheus_query_preset,
+    admin_delete_prometheus_query_preset,
+    admin_modify_prometheus_query_preset,
+    admin_prometheus_query_preset,
+    admin_prometheus_query_preset_result,
+    admin_prometheus_query_presets,
+)
 from .rbac import (
     admin_assign_role,
+    admin_bulk_assign_role,
+    admin_bulk_revoke_role,
     admin_create_permission,
     admin_create_role,
     admin_delete_permission,
@@ -179,7 +195,10 @@ from .rbac import (
     admin_role,
     admin_role_assignments,
     admin_roles,
+    admin_update_permission,
     admin_update_role,
+    my_roles,
+    rbac_scope_entity_combinations,
 )
 from .reservoir_registry import (
     create_reservoir_registry,
@@ -195,6 +214,7 @@ from .resource_group import (
     resource_groups,
     update_resource_group_fair_share_spec,
 )
+from .resource_slot.resolver import resource_slot_type, resource_slot_types
 from .resource_usage import (
     admin_domain_usage_buckets,
     admin_project_usage_buckets,
@@ -304,13 +324,22 @@ class Query:
     admin_images_v2 = admin_images_v2
     admin_kernels_v2 = admin_kernels_v2
     admin_sessions_v2 = admin_sessions_v2
+    resource_slot_type = resource_slot_type
+    resource_slot_types = resource_slot_types
     admin_image_aliases = admin_image_aliases
+    # Prometheus Query Preset Admin APIs
+    admin_prometheus_query_preset = admin_prometheus_query_preset
+    admin_prometheus_query_presets = admin_prometheus_query_presets
+    admin_prometheus_query_preset_result = admin_prometheus_query_preset_result
     # RBAC Admin APIs
     admin_role = admin_role
     admin_roles = admin_roles
     admin_permissions = admin_permissions
     admin_role_assignments = admin_role_assignments
     admin_entities = admin_entities
+    # RBAC User APIs
+    my_roles = my_roles
+    rbac_scope_entity_combinations = rbac_scope_entity_combinations
     # Session Scoped APIs
     session_kernels_v2 = session_kernels_v2
     # Resource Group Scoped APIs
@@ -468,15 +497,22 @@ class Mutation:
     admin_delete_users_v2 = admin_delete_users_v2
     admin_purge_user_v2 = admin_purge_user_v2
     admin_bulk_purge_users_v2 = admin_bulk_purge_users_v2
+    # Prometheus Query Preset - Admin APIs
+    admin_create_prometheus_query_preset = admin_create_prometheus_query_preset
+    admin_modify_prometheus_query_preset = admin_modify_prometheus_query_preset
+    admin_delete_prometheus_query_preset = admin_delete_prometheus_query_preset
     # RBAC Admin APIs
     admin_create_role = admin_create_role
     admin_update_role = admin_update_role
     admin_delete_role = admin_delete_role
     admin_purge_role = admin_purge_role
     admin_create_permission = admin_create_permission
+    admin_update_permission = admin_update_permission
     admin_delete_permission = admin_delete_permission
     admin_assign_role = admin_assign_role
     admin_revoke_role = admin_revoke_role
+    admin_bulk_assign_role = admin_bulk_assign_role
+    admin_bulk_revoke_role = admin_bulk_revoke_role
 
 
 @strawberry.type
@@ -505,4 +541,9 @@ schema = CustomizedSchema(
     subscription=Subscription,
     config=StrawberryConfig(auto_camel_case=True),
     enable_federation_2=True,
+    extensions=[
+        GQLLoggingExtension,
+        GQLValidationExtension,
+        GQLExceptionHandlerExtension,
+    ],
 )

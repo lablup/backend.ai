@@ -144,7 +144,6 @@ async def registry_ctx() -> AsyncGenerator[
         await registry.shutdown()
 
 
-@pytest.mark.asyncio
 async def test_convert_resource_spec_to_resource_slot(
     registry_ctx: tuple[
         AgentRegistry, MagicMock, MagicMock, MagicMock, ManagerConfigProvider, MagicMock, MagicMock

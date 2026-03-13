@@ -1,4 +1,6 @@
 from .assign_role import AssignRoleAction, AssignRoleActionResult
+from .bulk_assign_role import BulkAssignRoleAction, BulkAssignRoleActionResult
+from .bulk_revoke_role import BulkRevokeRoleAction, BulkRevokeRoleActionResult
 from .check_permission import CheckPermissionAction, CheckPermissionActionResult
 from .create_role import CreateRoleAction, CreateRoleActionResult
 from .delete_role import DeleteRoleAction, DeleteRoleActionResult
@@ -18,6 +20,7 @@ from .search_users_assigned_to_role import (
     SearchUsersAssignedToRoleAction,
     SearchUsersAssignedToRoleActionResult,
 )
+from .update_permission import UpdatePermissionAction, UpdatePermissionActionResult
 from .update_role import UpdateRoleAction, UpdateRoleActionResult
 from .update_role_permissions import (
     UpdateRolePermissionsAction,
@@ -27,6 +30,10 @@ from .update_role_permissions import (
 __all__ = [
     "AssignRoleAction",
     "AssignRoleActionResult",
+    "BulkAssignRoleAction",
+    "BulkAssignRoleActionResult",
+    "BulkRevokeRoleAction",
+    "BulkRevokeRoleActionResult",
     "CheckPermissionAction",
     "CheckPermissionActionResult",
     "CreateRoleAction",
@@ -47,6 +54,8 @@ __all__ = [
     "SearchPermissionsActionResult",
     "SearchUsersAssignedToRoleAction",
     "SearchUsersAssignedToRoleActionResult",
+    "UpdatePermissionAction",
+    "UpdatePermissionActionResult",
     "UpdateRoleAction",
     "UpdateRoleActionResult",
     "UpdateRolePermissionsAction",

@@ -107,6 +107,8 @@ __all__ = (
     "MountPoint",
     "MountTypes",
     "MovingStatValue",
+    "PreemptionMode",
+    "PreemptionOrder",
     "PromMetric",
     "PromMetricGroup",
     "PromMetricPrimitive",
@@ -1646,7 +1648,10 @@ def _stringify_number(v: BinarySize | int | float | Decimal) -> str:
         elif math.isinf(v) and v < 0:
             result = "-Infinity"
         else:
-            result = f"{v:f}"
+            if isinstance(v, Decimal):
+                result = f"{v.quantize(Decimal('0.01')).normalize():f}"
+            else:
+                result = f"{v:.2f}".rstrip("0").rstrip(".")
     elif isinstance(v, BinarySize):
         result = f"{int(v):d}"
     else:
@@ -1889,6 +1894,16 @@ class AgentSelectionStrategy(enum.StrEnum):
     ROUNDROBIN = "roundrobin"
     # LEGACY chooses the largest agent (the sort key is a tuple of resource slots).
     LEGACY = "legacy"
+
+
+class PreemptionMode(enum.StrEnum):
+    TERMINATE = "terminate"
+    RESCHEDULE = "reschedule"
+
+
+class PreemptionOrder(enum.StrEnum):
+    OLDEST = "oldest"
+    NEWEST = "newest"
 
 
 class SchedulerStatus(TypedDict):

@@ -7,6 +7,7 @@ from typing import override
 from ai.backend.manager.actions.monitors.monitor import ActionMonitor
 from ai.backend.manager.actions.processor import ActionProcessor
 from ai.backend.manager.actions.types import AbstractProcessorPackage, ActionSpec
+from ai.backend.manager.actions.validators import ActionValidators
 
 from .actions import (
     BulkUpsertDomainFairShareWeightAction,
@@ -99,7 +100,12 @@ class FairShareProcessors(AbstractProcessorPackage):
         BulkUpsertUserFairShareWeightAction, BulkUpsertUserFairShareWeightActionResult
     ]
 
-    def __init__(self, service: FairShareService, action_monitors: list[ActionMonitor]) -> None:
+    def __init__(
+        self,
+        service: FairShareService,
+        action_monitors: list[ActionMonitor],
+        validators: ActionValidators,
+    ) -> None:
         # Domain Fair Share
         self.get_domain_fair_share = ActionProcessor(service.get_domain_fair_share, action_monitors)
         self.search_domain_fair_shares = ActionProcessor(

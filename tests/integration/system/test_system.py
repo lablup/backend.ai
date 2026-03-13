@@ -8,7 +8,6 @@ from ai.backend.common.dto.manager.system import SystemVersionResponse
 
 @pytest.mark.integration
 class TestGetVersions:
-    @pytest.mark.asyncio
     async def test_admin_gets_versions(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -16,7 +15,6 @@ class TestGetVersions:
         result = await admin_registry.system.get_versions()
         assert isinstance(result, SystemVersionResponse)
 
-    @pytest.mark.asyncio
     async def test_user_gets_versions(
         self,
         user_registry: BackendAIClientRegistry,
@@ -24,7 +22,6 @@ class TestGetVersions:
         result = await user_registry.system.get_versions()
         assert isinstance(result, SystemVersionResponse)
 
-    @pytest.mark.asyncio
     async def test_response_version_format(
         self,
         admin_registry: BackendAIClientRegistry,

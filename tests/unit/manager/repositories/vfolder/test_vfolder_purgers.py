@@ -230,7 +230,6 @@ class TestVFolderPurgersIntegration:
                 await session.refresh(perm)
         return permissions
 
-    @pytest.mark.asyncio
     async def test_purge_vfolder_invitations(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
@@ -255,7 +254,6 @@ class TestVFolderPurgersIntegration:
             )
             assert count == 0
 
-    @pytest.mark.asyncio
     async def test_purge_vfolder_permissions(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,

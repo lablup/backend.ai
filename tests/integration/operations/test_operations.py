@@ -14,7 +14,6 @@ from ai.backend.common.dto.manager.operations.types import ErrorLogSeverity
 
 @pytest.mark.integration
 class TestErrorLogLifecycle:
-    @pytest.mark.asyncio
     async def test_append_list_clear_list(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -51,7 +50,6 @@ class TestErrorLogLifecycle:
 
 @pytest.mark.integration
 class TestAnnouncementLifecycle:
-    @pytest.mark.asyncio
     async def test_get_update_get_disable_get(
         self,
         admin_registry: BackendAIClientRegistry,

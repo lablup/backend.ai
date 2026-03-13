@@ -1,10 +1,9 @@
 import uuid
 from unittest.mock import AsyncMock, MagicMock
 
-import pytest
 from yarl import URL
 
-from ai.backend.client.v2.base_client import BackendAIClient
+from ai.backend.client.v2.base_client import BackendAIAuthClient
 from ai.backend.client.v2.config import ClientConfig
 from ai.backend.client.v2.domains.storage import StorageClient
 from ai.backend.common.dto.manager.storage.request import (
@@ -37,12 +36,11 @@ def _make_request_session(resp: AsyncMock) -> MagicMock:
     return mock_session
 
 
-def _make_client(mock_session: MagicMock) -> BackendAIClient:
-    return BackendAIClient(_DEFAULT_CONFIG, MockAuth(), mock_session)
+def _make_client(mock_session: MagicMock) -> BackendAIAuthClient:
+    return BackendAIAuthClient(_DEFAULT_CONFIG, MockAuth(), mock_session)
 
 
 class TestStorageClientObjectStorage:
-    @pytest.mark.asyncio
     async def test_list_object_storages(self) -> None:
         mock_resp = AsyncMock()
         mock_resp.status = 200
@@ -59,7 +57,6 @@ class TestStorageClientObjectStorage:
         assert call_args[0][0] == "GET"
         assert "/object-storages/" in str(call_args[0][1])
 
-    @pytest.mark.asyncio
     async def test_get_presigned_upload_url(self) -> None:
         rev_id = uuid.uuid4()
         mock_resp = AsyncMock()
@@ -80,7 +77,6 @@ class TestStorageClientObjectStorage:
         assert call_args[0][0] == "POST"
         assert "/object-storages/presigned/upload" in str(call_args[0][1])
 
-    @pytest.mark.asyncio
     async def test_get_presigned_download_url(self) -> None:
         rev_id = uuid.uuid4()
         mock_resp = AsyncMock()
@@ -99,7 +95,6 @@ class TestStorageClientObjectStorage:
         assert call_args[0][0] == "POST"
         assert "/object-storages/presigned/download" in str(call_args[0][1])
 
-    @pytest.mark.asyncio
     async def test_get_all_buckets(self) -> None:
         storage_id = uuid.uuid4()
         mock_resp = AsyncMock()
@@ -119,7 +114,6 @@ class TestStorageClientObjectStorage:
         assert call_args[0][0] == "GET"
         assert "/object-storages/buckets" in str(call_args[0][1])
 
-    @pytest.mark.asyncio
     async def test_get_buckets(self) -> None:
         mock_resp = AsyncMock()
         mock_resp.status = 200
@@ -139,7 +133,6 @@ class TestStorageClientObjectStorage:
 
 
 class TestStorageClientVFS:
-    @pytest.mark.asyncio
     async def test_list_vfs_storages(self) -> None:
         mock_resp = AsyncMock()
         mock_resp.status = 200
@@ -156,7 +149,6 @@ class TestStorageClientVFS:
         assert call_args[0][0] == "GET"
         assert "/vfs-storages/" in str(call_args[0][1])
 
-    @pytest.mark.asyncio
     async def test_get_vfs_storage(self) -> None:
         mock_resp = AsyncMock()
         mock_resp.status = 200
@@ -176,7 +168,6 @@ class TestStorageClientVFS:
         assert call_args[0][0] == "GET"
         assert "/vfs-storages/my-vfs" in str(call_args[0][1])
 
-    @pytest.mark.asyncio
     async def test_get_vfs_storage_path_interpolation(self) -> None:
         mock_resp = AsyncMock()
         mock_resp.status = 200
@@ -193,7 +184,6 @@ class TestStorageClientVFS:
         assert "special-name" in url
         assert "vfs-storages" in url
 
-    @pytest.mark.asyncio
     async def test_list_vfs_files(self) -> None:
         mock_resp = AsyncMock()
         mock_resp.status = 200

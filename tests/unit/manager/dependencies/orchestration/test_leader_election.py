@@ -18,7 +18,6 @@ class TestLeaderElectionDependency:
         dependency = LeaderElectionDependency()
         assert dependency.stage_name == "leader-election"
 
-    @pytest.mark.asyncio
     @patch("ai.backend.manager.dependencies.orchestration.leader_election.ValkeyLeaderClient")
     @patch("ai.backend.manager.dependencies.orchestration.leader_election.ValkeyLeaderElection")
     @patch("ai.backend.manager.dependencies.orchestration.leader_election.LeaderCron")
@@ -65,7 +64,6 @@ class TestLeaderElectionDependency:
 
         mock_election.stop.assert_awaited_once()
 
-    @pytest.mark.asyncio
     @patch("ai.backend.manager.dependencies.orchestration.leader_election.ValkeyLeaderClient")
     @patch("ai.backend.manager.dependencies.orchestration.leader_election.ValkeyLeaderElection")
     @patch("ai.backend.manager.dependencies.orchestration.leader_election.LeaderCron")
@@ -104,7 +102,6 @@ class TestLeaderElectionDependency:
             # (1 from orchestrator + 1 reservoir scan)
             assert mock_event_producer_task.call_count == 2
 
-    @pytest.mark.asyncio
     @patch("ai.backend.manager.dependencies.orchestration.leader_election.ValkeyLeaderClient")
     @patch("ai.backend.manager.dependencies.orchestration.leader_election.ValkeyLeaderElection")
     @patch("ai.backend.manager.dependencies.orchestration.leader_election.LeaderCron")

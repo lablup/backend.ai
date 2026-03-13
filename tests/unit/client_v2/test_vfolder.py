@@ -4,10 +4,9 @@ import uuid
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock
 
-import pytest
 from yarl import URL
 
-from ai.backend.client.v2.base_client import BackendAIClient
+from ai.backend.client.v2.base_client import BackendAIAuthClient
 from ai.backend.client.v2.config import ClientConfig
 from ai.backend.client.v2.domains.vfolder import VFolderClient
 from ai.backend.common.dto.manager.field import VFolderPermissionField
@@ -84,8 +83,8 @@ _DEFAULT_CONFIG = ClientConfig(endpoint=URL("https://api.example.com"))
 def _make_client(
     mock_session: MagicMock | None = None,
     config: ClientConfig | None = None,
-) -> BackendAIClient:
-    return BackendAIClient(
+) -> BackendAIAuthClient:
+    return BackendAIAuthClient(
         config or _DEFAULT_CONFIG,
         MockAuth(),
         mock_session or MagicMock(),
@@ -108,7 +107,7 @@ def _make_vfolder_client(mock_session: MagicMock) -> VFolderClient:
     return VFolderClient(client)
 
 
-def _mock_json_response(data: dict[str, Any], status: int = 200) -> AsyncMock:
+def _mock_json_response(data: dict[str, Any] | list[Any], status: int = 200) -> AsyncMock:
     resp = AsyncMock()
     resp.status = status
     resp.json = AsyncMock(return_value=data)
@@ -121,31 +120,28 @@ def _mock_json_response(data: dict[str, Any], status: int = 200) -> AsyncMock:
 
 
 class TestVFolderCRUD:
-    @pytest.mark.asyncio
     async def test_create(self) -> None:
         response_data = {
-            "item": {
-                "id": "abc123",
-                "name": "my-folder",
-                "quota_scope_id": "qs-1",
-                "host": "local:volume1",
-                "usage_mode": "general",
-                "permission": "rw",
-                "max_size": 0,
-                "creator": "user@test.com",
-                "ownership_type": "user",
-                "cloneable": False,
-                "status": "ready",
-                "created_at": "2025-01-01T00:00:00",
-                "is_owner": True,
-                "user_email": "user@test.com",
-                "group_name": "default",
-                "type": "user",
-                "max_files": 0,
-                "cur_size": 0,
-                "user": None,
-                "group": None,
-            }
+            "id": "abc123",
+            "name": "my-folder",
+            "quota_scope_id": "qs-1",
+            "host": "local:volume1",
+            "usage_mode": "general",
+            "permission": "rw",
+            "max_size": 0,
+            "creator": "user@test.com",
+            "ownership_type": "user",
+            "cloneable": False,
+            "status": "ready",
+            "created_at": "2025-01-01T00:00:00",
+            "is_owner": True,
+            "user_email": "user@test.com",
+            "group_name": "default",
+            "type": "user",
+            "max_files": 0,
+            "cur_size": 0,
+            "user": None,
+            "group": None,
         }
         mock_session = _make_request_session(_mock_json_response(response_data))
         vfolder = _make_vfolder_client(mock_session)
@@ -153,31 +149,29 @@ class TestVFolderCRUD:
         result = await vfolder.create(VFolderCreateReq(name="my-folder"))
 
         assert isinstance(result, VFolderCreateResponse)
-        assert result.item.name == "my-folder"
+        assert result.root.name == "my-folder"
 
         call_args = mock_session.request.call_args
         assert call_args[0][0] == "POST"
         assert call_args[0][1].endswith("/folders")
         assert call_args.kwargs["json"]["name"] == "my-folder"
 
-    @pytest.mark.asyncio
     async def test_list(self) -> None:
-        response_data: dict[str, Any] = {"items": []}
+        response_data: list[Any] = []
         mock_session = _make_request_session(_mock_json_response(response_data))
         vfolder = _make_vfolder_client(mock_session)
 
         result = await vfolder.list()
 
         assert isinstance(result, VFolderListResponse)
-        assert result.items == []
+        assert result.root == []
 
         call_args = mock_session.request.call_args
         assert call_args[0][0] == "GET"
         assert call_args[0][1].endswith("/folders")
 
-    @pytest.mark.asyncio
     async def test_list_with_query(self) -> None:
-        response_data: dict[str, Any] = {"items": []}
+        response_data: list[Any] = []
         mock_session = _make_request_session(_mock_json_response(response_data))
         vfolder = _make_vfolder_client(mock_session)
 
@@ -187,7 +181,6 @@ class TestVFolderCRUD:
         call_args = mock_session.request.call_args
         assert call_args.kwargs["params"]["all"] == "True"
 
-    @pytest.mark.asyncio
     async def test_get_info(self) -> None:
         response_data = {
             "item": {
@@ -218,7 +211,6 @@ class TestVFolderCRUD:
         assert call_args[0][0] == "GET"
         assert "/folders/test-folder" in call_args[0][1]
 
-    @pytest.mark.asyncio
     async def test_get_id(self) -> None:
         folder_id = uuid.uuid4()
         response_data = {"item": {"id": str(folder_id), "name": "my-folder"}}
@@ -235,7 +227,6 @@ class TestVFolderCRUD:
         assert "/folders/_/id" in call_args[0][1]
         assert call_args.kwargs["params"]["name"] == "my-folder"
 
-    @pytest.mark.asyncio
     async def test_rename(self) -> None:
         response_data = {"msg": "renamed"}
         mock_session = _make_request_session(_mock_json_response(response_data))
@@ -251,7 +242,6 @@ class TestVFolderCRUD:
         assert "/folders/old-name/rename" in call_args[0][1]
         assert call_args.kwargs["json"]["new_name"] == "new-name"
 
-    @pytest.mark.asyncio
     async def test_update_options(self) -> None:
         response_data = {"msg": "updated"}
         mock_session = _make_request_session(_mock_json_response(response_data))
@@ -265,7 +255,6 @@ class TestVFolderCRUD:
         assert "/folders/my-folder/update-options" in call_args[0][1]
         assert call_args.kwargs["json"]["cloneable"] is True
 
-    @pytest.mark.asyncio
     async def test_delete_by_id(self) -> None:
         folder_id = uuid.uuid4()
         response_data = {"msg": "deleted"}
@@ -280,7 +269,6 @@ class TestVFolderCRUD:
         assert call_args[0][1].endswith("/folders")
         assert str(call_args.kwargs["json"]["vfolder_id"]) == str(folder_id)
 
-    @pytest.mark.asyncio
     async def test_delete_by_name(self) -> None:
         response_data = {"msg": "deleted"}
         mock_session = _make_request_session(_mock_json_response(response_data))
@@ -293,7 +281,6 @@ class TestVFolderCRUD:
         assert call_args[0][0] == "DELETE"
         assert "/folders/my-folder" in call_args[0][1]
 
-    @pytest.mark.asyncio
     async def test_clone(self) -> None:
         response_data = {
             "item": {
@@ -320,7 +307,6 @@ class TestVFolderCRUD:
         assert call_args[0][0] == "POST"
         assert "/folders/original/clone" in call_args[0][1]
 
-    @pytest.mark.asyncio
     async def test_purge(self) -> None:
         folder_id = uuid.uuid4()
         response_data = {"msg": "purged"}
@@ -334,7 +320,6 @@ class TestVFolderCRUD:
         assert call_args[0][0] == "POST"
         assert "/folders/purge" in call_args[0][1]
 
-    @pytest.mark.asyncio
     async def test_restore(self) -> None:
         folder_id = uuid.uuid4()
         response_data = {"msg": "restored"}
@@ -347,7 +332,6 @@ class TestVFolderCRUD:
         call_args = mock_session.request.call_args
         assert "/folders/restore-from-trash-bin" in call_args[0][1]
 
-    @pytest.mark.asyncio
     async def test_delete_from_trash(self) -> None:
         folder_id = uuid.uuid4()
         response_data = {"msg": "deleted from trash"}
@@ -360,7 +344,6 @@ class TestVFolderCRUD:
         call_args = mock_session.request.call_args
         assert "/folders/delete-from-trash-bin" in call_args[0][1]
 
-    @pytest.mark.asyncio
     async def test_force_delete(self) -> None:
         folder_id = uuid.uuid4()
         response_data = {"msg": "force deleted"}
@@ -381,9 +364,8 @@ class TestVFolderCRUD:
 
 
 class TestVFolderFileOps:
-    @pytest.mark.asyncio
     async def test_mkdir(self) -> None:
-        response_data: dict[str, Any] = {"results": []}
+        response_data: dict[str, Any] = {"results": {"success": [], "failed": []}}
         mock_session = _make_request_session(_mock_json_response(response_data))
         vfolder = _make_vfolder_client(mock_session)
 
@@ -395,7 +377,6 @@ class TestVFolderFileOps:
         assert "/folders/my-folder/mkdir" in call_args[0][1]
         assert call_args.kwargs["json"]["path"] == "subdir"
 
-    @pytest.mark.asyncio
     async def test_create_download_session(self) -> None:
         response_data = {"token": "dl-token", "url": "https://storage/download"}
         mock_session = _make_request_session(_mock_json_response(response_data))
@@ -410,7 +391,6 @@ class TestVFolderFileOps:
         call_args = mock_session.request.call_args
         assert "/folders/my-folder/request-download" in call_args[0][1]
 
-    @pytest.mark.asyncio
     async def test_create_upload_session(self) -> None:
         response_data = {"token": "ul-token", "url": "https://storage/upload"}
         mock_session = _make_request_session(_mock_json_response(response_data))
@@ -426,7 +406,6 @@ class TestVFolderFileOps:
         assert "/folders/my-folder/request-upload" in call_args[0][1]
         assert call_args.kwargs["json"]["size"] == 1024
 
-    @pytest.mark.asyncio
     async def test_list_files(self) -> None:
         response_data = {"items": [{"name": "test.txt"}]}
         mock_session = _make_request_session(_mock_json_response(response_data))
@@ -440,7 +419,6 @@ class TestVFolderFileOps:
         assert "/folders/my-folder/files" in call_args[0][1]
         assert call_args.kwargs["params"]["path"] == "subdir"
 
-    @pytest.mark.asyncio
     async def test_rename_file(self) -> None:
         response_data = {"msg": "renamed"}
         mock_session = _make_request_session(_mock_json_response(response_data))
@@ -454,7 +432,6 @@ class TestVFolderFileOps:
         call_args = mock_session.request.call_args
         assert "/folders/my-folder/rename-file" in call_args[0][1]
 
-    @pytest.mark.asyncio
     async def test_move_file(self) -> None:
         response_data = {"msg": "moved"}
         mock_session = _make_request_session(_mock_json_response(response_data))
@@ -466,7 +443,6 @@ class TestVFolderFileOps:
         call_args = mock_session.request.call_args
         assert "/folders/my-folder/move-file" in call_args[0][1]
 
-    @pytest.mark.asyncio
     async def test_delete_files(self) -> None:
         response_data = {"msg": "deleted"}
         mock_session = _make_request_session(_mock_json_response(response_data))
@@ -480,7 +456,6 @@ class TestVFolderFileOps:
         assert "/folders/my-folder/delete-files" in call_args[0][1]
         assert call_args.kwargs["json"]["files"] == ["a.txt", "b.txt"]
 
-    @pytest.mark.asyncio
     async def test_delete_files_async(self) -> None:
         response_data = {"bgtask_id": "12345678-1234-5678-1234-567812345678"}
         mock_session = _make_request_session(_mock_json_response(response_data))
@@ -501,7 +476,6 @@ class TestVFolderFileOps:
 
 
 class TestVFolderSharing:
-    @pytest.mark.asyncio
     async def test_invite(self) -> None:
         response_data = {"invited_ids": ["user-1", "user-2"]}
         mock_session = _make_request_session(_mock_json_response(response_data))
@@ -517,7 +491,6 @@ class TestVFolderSharing:
         call_args = mock_session.request.call_args
         assert "/folders/my-folder/invite" in call_args[0][1]
 
-    @pytest.mark.asyncio
     async def test_share(self) -> None:
         response_data = {"shared_emails": ["a@test.com"]}
         mock_session = _make_request_session(_mock_json_response(response_data))
@@ -529,7 +502,6 @@ class TestVFolderSharing:
         call_args = mock_session.request.call_args
         assert "/folders/my-folder/share" in call_args[0][1]
 
-    @pytest.mark.asyncio
     async def test_unshare(self) -> None:
         response_data = {"unshared_emails": ["a@test.com"]}
         mock_session = _make_request_session(_mock_json_response(response_data))
@@ -541,7 +513,6 @@ class TestVFolderSharing:
         call_args = mock_session.request.call_args
         assert "/folders/my-folder/unshare" in call_args[0][1]
 
-    @pytest.mark.asyncio
     async def test_leave(self) -> None:
         response_data = {"msg": "left"}
         mock_session = _make_request_session(_mock_json_response(response_data))
@@ -553,7 +524,6 @@ class TestVFolderSharing:
         call_args = mock_session.request.call_args
         assert "/folders/my-folder/leave" in call_args[0][1]
 
-    @pytest.mark.asyncio
     async def test_list_invitations(self) -> None:
         response_data: dict[str, Any] = {"invitations": []}
         mock_session = _make_request_session(_mock_json_response(response_data))
@@ -566,7 +536,6 @@ class TestVFolderSharing:
         assert call_args[0][0] == "GET"
         assert "/folders/invitations/list" in call_args[0][1]
 
-    @pytest.mark.asyncio
     async def test_list_sent_invitations(self) -> None:
         response_data: dict[str, Any] = {"invitations": []}
         mock_session = _make_request_session(_mock_json_response(response_data))
@@ -578,7 +547,6 @@ class TestVFolderSharing:
         call_args = mock_session.request.call_args
         assert "/folders/invitations/list-sent" in call_args[0][1]
 
-    @pytest.mark.asyncio
     async def test_accept_invitation(self) -> None:
         response_data = {"msg": "accepted"}
         mock_session = _make_request_session(_mock_json_response(response_data))
@@ -591,7 +559,6 @@ class TestVFolderSharing:
         assert call_args[0][0] == "POST"
         assert "/folders/invitations/accept" in call_args[0][1]
 
-    @pytest.mark.asyncio
     async def test_delete_invitation(self) -> None:
         response_data = {"msg": "deleted"}
         mock_session = _make_request_session(_mock_json_response(response_data))
@@ -603,7 +570,6 @@ class TestVFolderSharing:
         call_args = mock_session.request.call_args
         assert "/folders/invitations/delete" in call_args[0][1]
 
-    @pytest.mark.asyncio
     async def test_update_invitation(self) -> None:
         response_data = {"msg": "updated"}
         mock_session = _make_request_session(_mock_json_response(response_data))
@@ -618,7 +584,6 @@ class TestVFolderSharing:
         call_args = mock_session.request.call_args
         assert "/folders/invitations/update/inv-1" in call_args[0][1]
 
-    @pytest.mark.asyncio
     async def test_list_shared(self) -> None:
         response_data: dict[str, Any] = {"shared": []}
         mock_session = _make_request_session(_mock_json_response(response_data))
@@ -631,7 +596,6 @@ class TestVFolderSharing:
         assert call_args[0][0] == "GET"
         assert "/folders/_/shared" in call_args[0][1]
 
-    @pytest.mark.asyncio
     async def test_update_shared(self) -> None:
         response_data = {"msg": "updated"}
         mock_session = _make_request_session(_mock_json_response(response_data))
@@ -652,7 +616,6 @@ class TestVFolderSharing:
         assert call_args[0][0] == "POST"
         assert "/folders/_/shared" in call_args[0][1]
 
-    @pytest.mark.asyncio
     async def test_update_sharing_status(self) -> None:
         response_data = {"msg": "updated"}
         mock_session = _make_request_session(_mock_json_response(response_data))
@@ -683,7 +646,6 @@ class TestVFolderSharing:
 
 
 class TestVFolderAdmin:
-    @pytest.mark.asyncio
     async def test_list_hosts(self) -> None:
         response_data = {"default": "local:vol", "allowed": ["local:vol"], "volume_info": {}}
         mock_session = _make_request_session(_mock_json_response(response_data))
@@ -697,7 +659,6 @@ class TestVFolderAdmin:
         assert call_args[0][0] == "GET"
         assert "/folders/_/hosts" in call_args[0][1]
 
-    @pytest.mark.asyncio
     async def test_list_all_hosts(self) -> None:
         response_data = {"default": "local:vol", "allowed": ["local:vol"]}
         mock_session = _make_request_session(_mock_json_response(response_data))
@@ -709,18 +670,16 @@ class TestVFolderAdmin:
         call_args = mock_session.request.call_args
         assert "/folders/_/all-hosts" in call_args[0][1]
 
-    @pytest.mark.asyncio
     async def test_list_allowed_types(self) -> None:
-        response_data = {"allowed_types": ["user", "group"]}
+        response_data = ["user", "group"]
         mock_session = _make_request_session(_mock_json_response(response_data))
         vfolder = _make_vfolder_client(mock_session)
 
         result = await vfolder.list_allowed_types()
 
         assert isinstance(result, ListAllowedTypesResponse)
-        assert result.allowed_types == ["user", "group"]
+        assert result.root == ["user", "group"]
 
-    @pytest.mark.asyncio
     async def test_get_quota(self) -> None:
         quota_id = uuid.uuid4()
         response_data = {"data": {"used_bytes": 1024, "limit_bytes": 10240}}
@@ -735,7 +694,6 @@ class TestVFolderAdmin:
         assert "/folders/_/quota" in call_args[0][1]
         assert call_args.kwargs["params"]["folder_host"] == "local:vol"
 
-    @pytest.mark.asyncio
     async def test_update_quota(self) -> None:
         quota_id = uuid.uuid4()
         response_data = {"size_bytes": 20480}
@@ -756,7 +714,6 @@ class TestVFolderAdmin:
         assert call_args[0][0] == "POST"
         assert "/folders/_/quota" in call_args[0][1]
 
-    @pytest.mark.asyncio
     async def test_get_volume_perf_metric(self) -> None:
         response_data = {"data": {"iops_read": 100}}
         mock_session = _make_request_session(_mock_json_response(response_data))
@@ -772,7 +729,6 @@ class TestVFolderAdmin:
         assert "/folders/_/perf-metric" in call_args[0][1]
         assert call_args.kwargs["params"]["folder_host"] == "local:vol"
 
-    @pytest.mark.asyncio
     async def test_get_usage(self) -> None:
         quota_id = uuid.uuid4()
         response_data = {"data": {"used_bytes": 512}}
@@ -785,7 +741,6 @@ class TestVFolderAdmin:
         call_args = mock_session.request.call_args
         assert "/folders/_/usage" in call_args[0][1]
 
-    @pytest.mark.asyncio
     async def test_get_used_bytes(self) -> None:
         quota_id = uuid.uuid4()
         response_data = {"data": {"used_bytes": 256}}
@@ -800,7 +755,6 @@ class TestVFolderAdmin:
         call_args = mock_session.request.call_args
         assert "/folders/_/used-bytes" in call_args[0][1]
 
-    @pytest.mark.asyncio
     async def test_get_fstab_contents(self) -> None:
         response_data = {"content": "nfs data", "node": "manager", "node_id": "mgr-1"}
         mock_session = _make_request_session(_mock_json_response(response_data))
@@ -813,7 +767,6 @@ class TestVFolderAdmin:
         call_args = mock_session.request.call_args
         assert "/folders/_/fstab" in call_args[0][1]
 
-    @pytest.mark.asyncio
     async def test_list_mounts(self) -> None:
         response_data = {
             "manager": {"success": True, "message": "ok"},
@@ -829,7 +782,6 @@ class TestVFolderAdmin:
         assert call_args[0][0] == "GET"
         assert "/folders/_/mounts" in call_args[0][1]
 
-    @pytest.mark.asyncio
     async def test_mount_host(self) -> None:
         response_data = {
             "manager": {"success": True, "message": "mounted"},
@@ -845,7 +797,6 @@ class TestVFolderAdmin:
         assert call_args[0][0] == "POST"
         assert "/folders/_/mounts" in call_args[0][1]
 
-    @pytest.mark.asyncio
     async def test_umount_host(self) -> None:
         response_data = {
             "manager": {"success": True, "message": "unmounted"},
@@ -861,7 +812,6 @@ class TestVFolderAdmin:
         assert call_args[0][0] == "POST"
         assert "/folders/_/umounts" in call_args[0][1]
 
-    @pytest.mark.asyncio
     async def test_change_ownership(self) -> None:
         vfolder_id = uuid.uuid4()
         response_data = {"msg": "ownership changed"}

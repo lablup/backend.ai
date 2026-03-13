@@ -48,11 +48,14 @@ __all__ = (
 )
 
 
-class CreateSessionResponse(BaseResponseModel):
+class CreateSessionResponse(BaseRootResponseModel[dict[str, Any]]):
     """Shared response for ``create_from_template``, ``create_from_params``,
-    and ``create_cluster``."""
+    and ``create_cluster``.
 
-    result: dict[str, Any] = Field(default_factory=dict)  # TODO: replace with typed model
+    Returns a flat JSON object (no wrapper key), so we use
+    ``BaseRootResponseModel`` to preserve the original response format.
+    Access the data via ``.root``.
+    """
 
 
 class StartServiceResponse(BaseResponseModel):
@@ -62,16 +65,22 @@ class StartServiceResponse(BaseResponseModel):
     wsproxy_addr: str
 
 
-class GetCommitStatusResponse(BaseResponseModel):
-    """GET ``/{session_name}/commit``"""
+class GetCommitStatusResponse(BaseRootResponseModel[dict[str, Any]]):
+    """GET ``/{session_name}/commit``
 
-    result: dict[str, Any] = Field(default_factory=dict)  # TODO: replace with typed model
+    Returns a flat JSON object (no wrapper key), so we use
+    ``BaseRootResponseModel`` to preserve the original response format.
+    Access the data via ``.root``.
+    """
 
 
-class GetAbusingReportResponse(BaseResponseModel):
-    """GET ``/{session_name}/abusing-report``"""
+class GetAbusingReportResponse(BaseRootResponseModel[dict[str, Any]]):
+    """GET ``/{session_name}/abusing-report``
 
-    result: dict[str, Any] = Field(default_factory=dict)  # TODO: replace with typed model
+    Returns a flat JSON object (no wrapper key), so we use
+    ``BaseRootResponseModel`` to preserve the original response format.
+    Access the data via ``.root``.
+    """
 
 
 class TransitSessionStatusResponse(BaseResponseModel):
@@ -80,10 +89,13 @@ class TransitSessionStatusResponse(BaseResponseModel):
     session_status_map: dict[SessionId, str]
 
 
-class CommitSessionResponse(BaseResponseModel):
-    """POST ``/{session_name}/commit``"""
+class CommitSessionResponse(BaseRootResponseModel[dict[str, Any]]):
+    """POST ``/{session_name}/commit``
 
-    result: dict[str, Any] = Field(default_factory=dict)  # TODO: replace with typed model
+    Returns a flat JSON object (no wrapper key), so we use
+    ``BaseRootResponseModel`` to preserve the original response format.
+    Access the data via ``.root``.
+    """
 
 
 class ConvertSessionToImageResponse(BaseResponseModel):
@@ -92,10 +104,13 @@ class ConvertSessionToImageResponse(BaseResponseModel):
     task_id: str
 
 
-class DestroySessionResponse(BaseResponseModel):
-    """DELETE ``/{session_name}``"""
+class DestroySessionResponse(BaseRootResponseModel[dict[str, Any]]):
+    """DELETE ``/{session_name}``
 
-    result: dict[str, Any] = Field(default_factory=dict)  # TODO: replace with typed model
+    Returns a flat JSON object (no wrapper key), so we use
+    ``BaseRootResponseModel`` to preserve the original response format.
+    Access the data via ``.root``.
+    """
 
 
 class GetSessionInfoResponse(BaseRootResponseModel[dict[str, Any]]):
@@ -107,10 +122,13 @@ class GetSessionInfoResponse(BaseRootResponseModel[dict[str, Any]]):
     """
 
 
-class GetDirectAccessInfoResponse(BaseResponseModel):
-    """GET ``/{session_name}/direct-access-info``"""
+class GetDirectAccessInfoResponse(BaseRootResponseModel[dict[str, Any]]):
+    """GET ``/{session_name}/direct-access-info``
 
-    result: dict[str, Any] = Field(default_factory=dict)  # TODO: replace with typed model
+    Returns a flat JSON object (no wrapper key), so we use
+    ``BaseRootResponseModel`` to preserve the original response format.
+    Access the data via ``.root``.
+    """
 
 
 class MatchSessionsResponse(BaseResponseModel):
@@ -119,37 +137,55 @@ class MatchSessionsResponse(BaseResponseModel):
     matches: list[Any] = Field(default_factory=list)
 
 
-class ExecuteResponse(BaseResponseModel):
-    """POST ``/{session_name}``"""
+class ExecuteResponse(BaseRootResponseModel[dict[str, Any]]):
+    """POST ``/{session_name}``
 
-    result: dict[str, Any] = Field(default_factory=dict)  # TODO: replace with typed model
-
-
-class CompleteResponse(BaseResponseModel):
-    """POST ``/{session_name}/complete``"""
-
-    result: dict[str, Any] = Field(default_factory=dict)  # TODO: replace with typed model
+    Returns a flat JSON object (no wrapper key), so we use
+    ``BaseRootResponseModel`` to preserve the original response format.
+    Access the data via ``.root``.
+    """
 
 
-class ListFilesResponse(BaseResponseModel):
-    """GET ``/{session_name}/files``"""
+class CompleteResponse(BaseRootResponseModel[dict[str, Any]]):
+    """POST ``/{session_name}/complete``
 
-    result: dict[str, Any] = Field(default_factory=dict)  # TODO: replace with typed model
-
-
-class GetContainerLogsResponse(BaseResponseModel):
-    """GET ``/{session_name}/logs``"""
-
-    result: dict[str, Any] = Field(default_factory=dict)  # TODO: replace with typed model
+    Returns a flat JSON object (no wrapper key), so we use
+    ``BaseRootResponseModel`` to preserve the original response format.
+    Access the data via ``.root``.
+    """
 
 
-class GetStatusHistoryResponse(BaseResponseModel):
-    """GET ``/{session_name}/status-history``"""
+class ListFilesResponse(BaseRootResponseModel[dict[str, Any]]):
+    """GET ``/{session_name}/files``
 
-    result: dict[str, Any] = Field(default_factory=dict)  # TODO: replace with typed model
+    Returns a flat JSON object (no wrapper key), so we use
+    ``BaseRootResponseModel`` to preserve the original response format.
+    Access the data via ``.root``.
+    """
 
 
-class GetDependencyGraphResponse(BaseResponseModel):
-    """GET ``/{session_name}/dependency-graph``"""
+class GetContainerLogsResponse(BaseRootResponseModel[dict[str, Any]]):
+    """GET ``/{session_name}/logs``
 
-    result: dict[str, Any] = Field(default_factory=dict)  # TODO: replace with typed model
+    Returns a flat JSON object (no wrapper key), so we use
+    ``BaseRootResponseModel`` to preserve the original response format.
+    Access the data via ``.root``.
+    """
+
+
+class GetStatusHistoryResponse(BaseRootResponseModel[dict[str, Any]]):
+    """GET ``/{session_name}/status-history``
+
+    Returns a flat JSON object (no wrapper key), so we use
+    ``BaseRootResponseModel`` to preserve the original response format.
+    Access the data via ``.root``.
+    """
+
+
+class GetDependencyGraphResponse(BaseRootResponseModel[dict[str, Any]]):
+    """GET ``/{session_name}/dependency-graph``
+
+    Returns a flat JSON object (no wrapper key), so we use
+    ``BaseRootResponseModel`` to preserve the original response format.
+    Access the data via ``.root``.
+    """

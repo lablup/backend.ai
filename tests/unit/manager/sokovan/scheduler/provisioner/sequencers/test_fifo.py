@@ -56,18 +56,15 @@ class TestFIFOSequencer:
             known_slot_types={},
         )
 
-    @pytest.mark.asyncio
     async def test_name(self, sequencer: FIFOSequencer) -> None:
         assert sequencer.name == "FIFOSequencer"
 
-    @pytest.mark.asyncio
     async def test_empty_workload(
         self, scaling_group: str, sequencer: FIFOSequencer, system_snapshot: SystemSnapshot
     ) -> None:
         result = await sequencer.sequence(scaling_group, system_snapshot, [])
         assert result == []
 
-    @pytest.mark.asyncio
     async def test_preserves_order(
         self, scaling_group: str, sequencer: FIFOSequencer, system_snapshot: SystemSnapshot
     ) -> None:
@@ -112,7 +109,6 @@ class TestFIFOSequencer:
         assert result[1] == workloads[1]
         assert result[2] == workloads[2]
 
-    @pytest.mark.asyncio
     async def test_ignores_system_snapshot(
         self, scaling_group: str, sequencer: FIFOSequencer
     ) -> None:

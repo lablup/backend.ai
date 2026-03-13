@@ -3,7 +3,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 from yarl import URL
 
-from ai.backend.client.v2.base_client import BackendAIClient
+from ai.backend.client.v2.base_client import BackendAIAnonymousClient, BackendAIAuthClient
 from ai.backend.client.v2.base_domain import BaseDomainClient
 from ai.backend.client.v2.config import ClientConfig
 from ai.backend.client.v2.domains.auth import AuthClient
@@ -35,16 +35,16 @@ class TestBackendAIClientRegistry:
     def registry(self) -> BackendAIClientRegistry:
         config = ClientConfig(endpoint=URL("https://api.example.com"))
         mock_session = MagicMock(spec_set=["request", "close"])
-        client = BackendAIClient(config, MockAuth(), mock_session)
-        return BackendAIClientRegistry(client)
+        client = BackendAIAuthClient(config, MockAuth(), mock_session)
+        anon_client = BackendAIAnonymousClient(config, MagicMock())
+        return BackendAIClientRegistry(client, anon_client)
 
-    @pytest.mark.asyncio
     async def test_create_factory(self) -> None:
         config = ClientConfig(endpoint=URL("https://api.example.com"))
         with patch("ai.backend.client.v2.base_client.aiohttp.ClientSession") as mock_cls:
             mock_cls.return_value = MagicMock()
             registry = await BackendAIClientRegistry.create(config, MockAuth())
-            assert isinstance(registry._client, BackendAIClient)
+            assert isinstance(registry._client, BackendAIAuthClient)
 
     def test_domain_clients_return_correct_types(self, registry: BackendAIClientRegistry) -> None:
         assert isinstance(registry.session, SessionClient)
@@ -81,11 +81,13 @@ class TestBackendAIClientRegistry:
     ) -> None:
         assert id(registry.session) != id(registry.vfolder)
 
-    @pytest.mark.asyncio
     async def test_close_delegates_to_client(self) -> None:
         mock_session = AsyncMock()
+        mock_anon_session = AsyncMock()
         config = ClientConfig(endpoint=URL("https://api.example.com"))
-        client = BackendAIClient(config, MockAuth(), mock_session)
-        registry = BackendAIClientRegistry(client)
+        client = BackendAIAuthClient(config, MockAuth(), mock_session)
+        anon_client = BackendAIAnonymousClient(config, mock_anon_session)
+        registry = BackendAIClientRegistry(client, anon_client)
         await registry.close()
         mock_session.close.assert_awaited_once()
+        mock_anon_session.close.assert_awaited_once()

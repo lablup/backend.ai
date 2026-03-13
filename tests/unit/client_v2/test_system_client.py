@@ -1,10 +1,9 @@
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock
 
-import pytest
 from yarl import URL
 
-from ai.backend.client.v2.base_client import BackendAIClient
+from ai.backend.client.v2.base_client import BackendAIAuthClient
 from ai.backend.client.v2.config import ClientConfig
 from ai.backend.client.v2.domains.system import SystemClient
 from ai.backend.common.dto.manager.system import SystemVersionResponse
@@ -17,8 +16,8 @@ _DEFAULT_CONFIG = ClientConfig(endpoint=URL("https://api.example.com"))
 def _make_client(
     mock_session: MagicMock | None = None,
     config: ClientConfig | None = None,
-) -> BackendAIClient:
-    return BackendAIClient(
+) -> BackendAIAuthClient:
+    return BackendAIAuthClient(
         config or _DEFAULT_CONFIG,
         MockAuth(),
         mock_session or MagicMock(),
@@ -44,7 +43,6 @@ def _ok_response(data: dict[str, Any]) -> AsyncMock:
 
 
 class TestSystemClient:
-    @pytest.mark.asyncio
     async def test_get_versions(self) -> None:
         mock_resp = _ok_response({
             "version": "v9.20250722",
@@ -64,7 +62,6 @@ class TestSystemClient:
         assert call_args.args[0] == "GET"
         assert str(call_args.args[1]).endswith("/")
 
-    @pytest.mark.asyncio
     async def test_get_versions_different_values(self) -> None:
         mock_resp = _ok_response({
             "version": "v8.20240315",

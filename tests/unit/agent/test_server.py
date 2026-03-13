@@ -58,7 +58,6 @@ async def agent(request, tmpdir, event_loop):
     await asyncio.sleep(3)
 
 
-@pytest.mark.asyncio
 async def test_get_extra_volumes(docker):
     # No extra volumes
     mnt_list = await get_extra_volumes(docker, 'python:latest')
@@ -78,7 +77,6 @@ async def test_get_extra_volumes(docker):
     assert mnt_list[0].name == 'deeplearning-samples'
 
 
-@pytest.mark.asyncio
 async def test_get_kernel_id_from_container(docker, container):
     container_list = await docker.containers.list()
     kid = await get_kernel_id_from_container(container_list[0])
@@ -124,7 +122,6 @@ def test_ping(agent):
 
 
 @pytest.mark.integration
-@pytest.mark.asyncio
 async def test_scan_running_containers(agent, kernel_info, docker):
     agent.container_registry.clear()
     assert kernel_info['id'] not in agent.container_registry
@@ -133,7 +130,6 @@ async def test_scan_running_containers(agent, kernel_info, docker):
 
 
 @pytest.mark.integration
-@pytest.mark.asyncio
 async def test_create_kernel(agent, docker):
     kernel_id = str(uuid.uuid4())
     config = {
@@ -164,7 +160,6 @@ async def test_create_kernel(agent, docker):
 
 
 @pytest.mark.integration
-@pytest.mark.asyncio
 async def test_destroy_kernel(agent, kernel_info):
     stat = await agent.destroy_kernel(kernel_info['id'])
 
@@ -181,7 +176,6 @@ async def test_destroy_kernel(agent, kernel_info):
 
 
 @pytest.mark.integration
-@pytest.mark.asyncio
 async def test_restart_kernel(agent, kernel_info):
     kernel_id = kernel_info['id']
     container_id = kernel_info['container_id']
@@ -197,7 +191,6 @@ async def test_restart_kernel(agent, kernel_info):
 
 
 @pytest.mark.integration
-@pytest.mark.asyncio
 async def test_restart_kernel_cancel_code_execution(
         agent, kernel_info, event_loop):
     async def execute_code():
@@ -247,7 +240,6 @@ async def test_restart_kernel_cancel_code_execution(
 
 
 @pytest.mark.integration
-@pytest.mark.asyncio
 async def test_execute(agent, kernel_info):
     # Test with lua:5.3-alpine image only
     api_ver = 2
@@ -271,7 +263,6 @@ async def test_execute(agent, kernel_info):
 
 
 @pytest.mark.integration
-@pytest.mark.asyncio
 async def test_execute_batch_mode(agent, kernel_info):
     # Test with lua:5.3-alpine image only
     api_ver = 2
@@ -312,7 +303,6 @@ async def test_execute_batch_mode(agent, kernel_info):
 
 
 @pytest.mark.integration
-@pytest.mark.asyncio
 async def test_upload_file(agent, kernel_info):
     fname = 'test.txt'
     await agent.upload_file(kernel_info['id'], fname, b'test content')
@@ -321,7 +311,6 @@ async def test_upload_file(agent, kernel_info):
 
 
 @pytest.mark.integration
-@pytest.mark.asyncio
 async def test_reset(agent, docker):
     kernel_ids = []
     container_ids = []

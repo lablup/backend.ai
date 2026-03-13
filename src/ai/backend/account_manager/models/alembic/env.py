@@ -8,7 +8,6 @@ from sqlalchemy import pool
 from sqlalchemy.engine import Connection
 from sqlalchemy.ext.asyncio import async_engine_from_config
 
-from ai.backend.account_manager.models.alembic import invoked_programmatically
 from ai.backend.account_manager.models.base import metadata
 
 # this is the Alembic Config object, which provides
@@ -84,8 +83,7 @@ def run_migrations_online() -> None:
         do_run_migrations(connectable)
 
 
-if not invoked_programmatically.get():  # when executed via `alembic` commands
-    if context.is_offline_mode():
-        run_migrations_offline()
-    else:
-        run_migrations_online()
+if context.is_offline_mode():
+    run_migrations_offline()
+else:
+    run_migrations_online()

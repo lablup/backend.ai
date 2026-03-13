@@ -11,6 +11,9 @@ import pytest
 from ai.backend.common.types import ResourceSlot, SlotQuantity
 from ai.backend.manager.api.gql.fair_share.types.common import ResourceSlotGQL
 from ai.backend.manager.api.gql.resource_group.types import (
+    PreemptionConfigGQL,
+    PreemptionModeGQL,
+    PreemptionOrderGQL,
     ResourceGroupGQL,
     ResourceGroupMetadataGQL,
     ResourceGroupNetworkConfigGQL,
@@ -227,7 +230,14 @@ class TestResourceGroupGQLResourceInfoResolver:
                 wsproxy_addr=None,
                 use_host_network=False,
             ),
-            scheduler=ResourceGroupSchedulerConfigGQL(type=SchedulerTypeGQL.FIFO),
+            scheduler=ResourceGroupSchedulerConfigGQL(
+                type=SchedulerTypeGQL.FIFO,
+                preemption=PreemptionConfigGQL(
+                    preemptible_priority=5,
+                    order=PreemptionOrderGQL.OLDEST,
+                    mode=PreemptionModeGQL.TERMINATE,
+                ),
+            ),
             _fair_share_spec_data=FairShareScalingGroupSpec(
                 half_life_days=7,
                 lookback_days=28,
@@ -249,7 +259,6 @@ class TestResourceGroupGQLResourceInfoResolver:
             free=[SlotQuantity("cpu", Decimal("3")), SlotQuantity("mem", Decimal("6442450944"))],
         )
 
-    @pytest.mark.asyncio
     async def test_resolver_calls_processor_with_correct_action(
         self,
         resource_group_gql: ResourceGroupGQL,
@@ -273,7 +282,6 @@ class TestResourceGroupGQLResourceInfoResolver:
         assert action.scaling_group == "test-group"
         assert isinstance(result, ResourceInfoGQL)
 
-    @pytest.mark.asyncio
     async def test_resolver_returns_converted_gql_type(
         self,
         resource_group_gql: ResourceGroupGQL,
@@ -305,7 +313,6 @@ class TestResourceGroupGQLResourceInfoResolver:
         assert free_entries["cpu"] == Decimal("3")
         assert free_entries["mem"] == Decimal("6442450944")
 
-    @pytest.mark.asyncio
     async def test_resolver_propagates_scaling_group_not_found(
         self,
         resource_group_gql: ResourceGroupGQL,

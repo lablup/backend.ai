@@ -9,6 +9,7 @@ from uuid import UUID
 from pydantic import BaseModel, Field
 
 from ai.backend.common.api_handlers import BaseResponseModel
+from ai.backend.common.dto.manager.pagination import PaginationInfo
 
 __all__ = (
     # Common
@@ -49,14 +50,6 @@ __all__ = (
     "ResourceGroupFairShareSpecDTO",
     "UpdateResourceGroupFairShareSpecResponse",
 )
-
-
-class PaginationInfo(BaseModel):
-    """Pagination information."""
-
-    total: int = Field(description="Total number of items")
-    offset: int = Field(description="Number of items skipped")
-    limit: int | None = Field(default=None, description="Maximum items returned")
 
 
 class ResourceSlotEntryDTO(BaseModel):

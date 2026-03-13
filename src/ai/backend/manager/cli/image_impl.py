@@ -178,6 +178,14 @@ async def rescan_images(
 ) -> None:
     if not registry_or_image:
         raise click.BadArgumentUsage("Please specify a valid registry or full image name.")
+    # Import AssociationScopesEntitiesRow to register it with the ORM metadata.
+    # Without this, the CLI rescan path doesn't load this table via the normal
+    # server bootstrap, causing SA to skip it during ORM queries.
+    from ai.backend.manager.models.rbac_models.association_scopes_entities import (
+        AssociationScopesEntitiesRow,
+    )
+
+    _ = AssociationScopesEntitiesRow
     bootstrap_config = await cli_ctx.get_bootstrap_config()
     async with (
         connect_database(bootstrap_config.db) as db,

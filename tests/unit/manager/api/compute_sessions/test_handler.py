@@ -30,7 +30,7 @@ from ai.backend.common.types import (
     SessionResult,
     SessionTypes,
 )
-from ai.backend.manager.api.compute_sessions.adapter import ComputeSessionsAdapter
+from ai.backend.manager.api.rest.compute_sessions.adapter import ComputeSessionsAdapter
 from ai.backend.manager.data.kernel.types import (
     ClusterConfig,
     ImageInfo,
@@ -65,6 +65,7 @@ def create_session_data(
         id=session_id or uuid4(),
         session_type=SessionTypes.INTERACTIVE,
         priority=0,
+        is_preemptible=True,
         cluster_mode=ClusterMode.SINGLE_NODE,
         cluster_size=1,
         domain_name="default",
@@ -493,7 +494,6 @@ class TestComputeSessionsHandler:
         )
         return processors
 
-    @pytest.mark.asyncio
     async def test_search_sessions_calls_both_processors(
         self,
         mock_processors: MagicMock,
@@ -509,7 +509,6 @@ class TestComputeSessionsHandler:
         )
         mock_processors.session.search_kernels.wait_for_complete.assert_called_once()
 
-    @pytest.mark.asyncio
     async def test_search_sessions_empty_result(
         self,
         mock_session_result_empty: MagicMock,
@@ -529,7 +528,6 @@ class TestComputeSessionsHandler:
         # search_kernels should not be called for empty sessions
         processors.session.search_kernels.wait_for_complete.assert_not_called()
 
-    @pytest.mark.asyncio
     async def test_session_result_has_correct_container_grouping(
         self,
         mock_processors: MagicMock,
@@ -555,7 +553,6 @@ class TestComputeSessionsHandler:
         assert len(items[0].containers) == 2
         assert len(items[1].containers) == 1
 
-    @pytest.mark.asyncio
     async def test_pagination_info_is_correct(
         self,
         mock_processors: MagicMock,
@@ -567,7 +564,6 @@ class TestComputeSessionsHandler:
 
         assert session_result.total_count == 2
 
-    @pytest.mark.asyncio
     async def test_multiple_containers_per_session(self) -> None:
         """Session with multiple containers should have all of them."""
         session_id = uuid4()
@@ -583,7 +579,6 @@ class TestComputeSessionsHandler:
         agents = {c.agent_id for c in dto.containers}
         assert len(agents) == 5
 
-    @pytest.mark.asyncio
     async def test_session_with_no_containers(self) -> None:
         """Session with no containers should have empty containers array."""
         session = create_session_data()

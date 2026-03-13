@@ -259,7 +259,6 @@ class TestFairShareRepository:
 
     # ==================== Domain Fair Share Tests ====================
 
-    @pytest.mark.asyncio
     async def test_create_domain_fair_share(
         self,
         fair_share_repository: FairShareRepository,
@@ -285,7 +284,6 @@ class TestFairShareRepository:
         )  # Default initial value
         assert result.data.calculation_snapshot.total_decayed_usage == []
 
-    @pytest.mark.asyncio
     async def test_upsert_domain_fair_share_insert(
         self,
         fair_share_repository: FairShareRepository,
@@ -310,7 +308,6 @@ class TestFairShareRepository:
         assert result.data.spec.weight == Decimal("1.5")
         assert result.data.calculation_snapshot.fair_share_factor == Decimal("1.0")
 
-    @pytest.mark.asyncio
     async def test_upsert_domain_fair_share_update(
         self,
         fair_share_repository: FairShareRepository,
@@ -347,7 +344,6 @@ class TestFairShareRepository:
         assert result.data.calculation_snapshot.fair_share_factor == Decimal("0.75")
         assert result.data.calculation_snapshot.normalized_usage == Decimal("0.5")
 
-    @pytest.mark.asyncio
     async def test_get_domain_fair_share(
         self,
         fair_share_repository: FairShareRepository,
@@ -375,7 +371,6 @@ class TestFairShareRepository:
         assert result.domain_name == test_domain_name
         assert result.data.spec.weight == Decimal("1.5")
 
-    @pytest.mark.asyncio
     async def test_get_domain_fair_share_not_found(
         self,
         fair_share_repository: FairShareRepository,
@@ -387,7 +382,6 @@ class TestFairShareRepository:
                 domain_name="non-existent-domain",
             )
 
-    @pytest.mark.asyncio
     async def test_search_domain_fair_shares(
         self,
         fair_share_repository: FairShareRepository,
@@ -435,7 +429,6 @@ class TestFairShareRepository:
 
     # ==================== Project Fair Share Tests ====================
 
-    @pytest.mark.asyncio
     async def test_create_project_fair_share(
         self,
         fair_share_repository: FairShareRepository,
@@ -460,7 +453,6 @@ class TestFairShareRepository:
         assert result.domain_name == test_domain_name
         assert result.data.spec.weight == Decimal("1.5")
 
-    @pytest.mark.asyncio
     async def test_upsert_project_fair_share(
         self,
         fair_share_repository: FairShareRepository,
@@ -485,7 +477,6 @@ class TestFairShareRepository:
         assert result.data.spec.weight == Decimal("2.0")
         assert result.data.calculation_snapshot.fair_share_factor == Decimal("0.8")
 
-    @pytest.mark.asyncio
     async def test_get_project_fair_share(
         self,
         fair_share_repository: FairShareRepository,
@@ -512,7 +503,6 @@ class TestFairShareRepository:
 
     # ==================== User Fair Share Tests ====================
 
-    @pytest.mark.asyncio
     async def test_create_user_fair_share(
         self,
         fair_share_repository: FairShareRepository,
@@ -539,7 +529,6 @@ class TestFairShareRepository:
         assert result.project_id == test_project_id
         assert result.data.spec.weight == Decimal("1.2")
 
-    @pytest.mark.asyncio
     async def test_upsert_user_fair_share(
         self,
         fair_share_repository: FairShareRepository,
@@ -566,7 +555,6 @@ class TestFairShareRepository:
         assert result.data.spec.weight == Decimal("1.5")
         assert result.data.calculation_snapshot.fair_share_factor == Decimal("0.9")
 
-    @pytest.mark.asyncio
     async def test_get_user_fair_share(
         self,
         fair_share_repository: FairShareRepository,
@@ -597,7 +585,6 @@ class TestFairShareRepository:
 
     # ==================== Upsert Without Resource Group Tests ====================
 
-    @pytest.mark.asyncio
     async def test_upsert_domain_fair_share_without_scaling_group(
         self,
         fair_share_repository: FairShareRepository,
@@ -639,7 +626,6 @@ class TestFairShareRepository:
         assert result.domain_name == domain_name
         assert result.data.spec.weight == Decimal("2.5")
 
-    @pytest.mark.asyncio
     async def test_upsert_project_fair_share_without_scaling_group(
         self,
         fair_share_repository: FairShareRepository,
@@ -691,7 +677,6 @@ class TestFairShareRepository:
         assert result.project_id == project_id
         assert result.data.spec.weight == Decimal("3.0")
 
-    @pytest.mark.asyncio
     async def test_upsert_user_fair_share_without_scaling_group(
         self,
         fair_share_repository: FairShareRepository,
@@ -780,7 +765,6 @@ class TestFairShareRepository:
 
         return project_id
 
-    @pytest.mark.asyncio
     async def test_get_domain_fair_share_without_rg_membership(
         self,
         fair_share_repository: FairShareRepository,
@@ -797,7 +781,6 @@ class TestFairShareRepository:
         assert result.resource_group == test_scaling_group
         assert result.data.use_default is True
 
-    @pytest.mark.asyncio
     async def test_get_project_fair_share_without_rg_membership(
         self,
         fair_share_repository: FairShareRepository,

@@ -13,6 +13,7 @@ import pytest
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
 from ai.backend.common.types import AccessKey
 from ai.backend.manager.actions.monitors.monitor import ActionMonitor
+from ai.backend.manager.actions.validators import ActionValidators
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.user.types import UserInfoContext
 from ai.backend.manager.models.hasher.types import PasswordInfo
@@ -74,9 +75,9 @@ class TestUserServiceCompatibility:
         return UserProcessors(
             user_service=user_service,
             action_monitors=[mock_dependencies["action_monitor"]],
+            validators=MagicMock(spec=ActionValidators),
         )
 
-    @pytest.mark.asyncio
     async def test_create_user_action_structure(
         self, user_service: UserService, mock_dependencies: dict[str, AsyncMock]
     ) -> None:
@@ -117,7 +118,6 @@ class TestUserServiceCompatibility:
         await user_service.create_user(action)
         mock_dependencies["user_repository"].create_user_validated.assert_called_once()
 
-    @pytest.mark.asyncio
     async def test_create_user_with_container_config(
         self, user_service: UserService, mock_dependencies: dict[str, AsyncMock]
     ) -> None:
@@ -156,7 +156,6 @@ class TestUserServiceCompatibility:
         assert user_data.spec.container_main_gid == 2000
         assert user_data.spec.container_gids == [2000, 2001]
 
-    @pytest.mark.asyncio
     async def test_modify_user_action_structure(
         self, user_service: UserService, mock_dependencies: dict[str, AsyncMock]
     ) -> None:
@@ -184,7 +183,6 @@ class TestUserServiceCompatibility:
         await user_service.modify_user(action)
         mock_dependencies["user_repository"].update_user_validated.assert_called_once()
 
-    @pytest.mark.asyncio
     async def test_delete_user_action_structure(
         self, user_service: UserService, mock_dependencies: dict[str, AsyncMock]
     ) -> None:
@@ -198,7 +196,6 @@ class TestUserServiceCompatibility:
             email="user@example.com",
         )
 
-    @pytest.mark.asyncio
     async def test_purge_user_action_structure(
         self, user_service: UserService, mock_dependencies: dict[str, AsyncMock]
     ) -> None:
@@ -231,7 +228,6 @@ class TestUserServiceCompatibility:
         await user_service.purge_user(action)
         mock_dependencies["user_repository"].purge_user.assert_called_once()
 
-    @pytest.mark.asyncio
     async def test_user_month_stats_action_structure(
         self, user_service: UserService, mock_dependencies: dict[str, AsyncMock]
     ) -> None:
@@ -250,7 +246,6 @@ class TestUserServiceCompatibility:
         assert result.stats == mock_stats
         mock_dependencies["user_repository"].get_user_time_binned_monthly_stats.assert_called_once()
 
-    @pytest.mark.asyncio
     async def test_admin_month_stats_action_structure(
         self, user_service: UserService, mock_dependencies: dict[str, AsyncMock]
     ) -> None:

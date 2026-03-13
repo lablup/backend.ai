@@ -1388,25 +1388,25 @@ class AbstractAgent[
     async def collect_container_stat(self, interval: float) -> None:
         if self.local_config.debug.log_stats:
             log.debug("collecting container statistics")
-        container_ids: list[ContainerId] = []
+        container_ids: set[ContainerId] = set()
         for kernel_obj in [*self.kernel_registry.values()]:
             if not kernel_obj.stats_enabled or kernel_obj.container_id is None:
                 continue
-            container_ids.append(ContainerId(kernel_obj.container_id))
+            container_ids.add(ContainerId(kernel_obj.container_id))
         async with asyncio.timeout(STAT_COLLECTION_TIMEOUT):
-            await self.stat_ctx.collect_container_stat(container_ids)
+            await self.stat_ctx.collect_container_stat(list(container_ids))
 
     @_observe_stat_task(stat_scope=StatScope.PROCESS)
     async def collect_process_stat(self, interval: float) -> None:
         if self.local_config.debug.log_stats:
             log.debug("collecting process statistics in container")
-        container_ids = []
+        container_ids: set[ContainerId] = set()
         for kernel_obj in [*self.kernel_registry.values()]:
             if not kernel_obj.stats_enabled or kernel_obj.container_id is None:
                 continue
-            container_ids.append(ContainerId(kernel_obj.container_id))
+            container_ids.add(ContainerId(kernel_obj.container_id))
         async with asyncio.timeout(STAT_COLLECTION_TIMEOUT):
-            await self.stat_ctx.collect_per_container_process_stat(container_ids)
+            await self.stat_ctx.collect_per_container_process_stat(list(container_ids))
 
     def _get_public_host(self) -> str:
         agent_config = self.local_config.agent
@@ -1425,6 +1425,8 @@ class AbstractAgent[
             kernel_obj = self.kernel_registry.get(ev.kernel_id)
             if kernel_obj is not None:
                 kernel_obj.state = KernelLifecycleStatus.RUNNING
+                if ev.container_id is not None:
+                    kernel_obj.set_container_id(ev.container_id)
         log.info("Kernel {0} started", ev.kernel_id)
 
     async def _handle_destroy_event(self, ev: ContainerLifecycleEvent) -> None:
@@ -1772,7 +1774,7 @@ class AbstractAgent[
                     # This will be overwritten by create_kernel() soon, but
                     # updating here improves consistency of kernel_id to container_id
                     # mapping earlier.
-                    kernel_obj["container_id"] = container_id
+                    kernel_obj.set_container_id(container_id)
                 elif container_id != kernel_obj["container_id"]:
                     # This should not happen!
                     log.warning(
@@ -3027,7 +3029,7 @@ class AbstractAgent[
                         )
                         cid = e.container_id
                         async with self.registry_lock:
-                            self.kernel_registry[ctx.kernel_id]["container_id"] = cid
+                            self.kernel_registry[ctx.kernel_id].set_container_id(ContainerId(cid))
                         await self.inject_container_lifecycle_event(
                             kernel_id,
                             session_id,
@@ -3064,6 +3066,10 @@ class AbstractAgent[
                     )
                     async with self.registry_lock:
                         self.kernel_registry[kernel_id].data.update(container_data)
+                        if "container_id" in container_data:
+                            self.kernel_registry[kernel_id].set_container_id(
+                                container_data["container_id"]
+                            )
                     await kernel_obj.init(self.event_producer)
                     log.info(
                         "create_kernel(kernel:{}, session:{}, container:{}) kernel object initialized",

@@ -72,7 +72,7 @@ class TestCreateGroupMutation:
 
         ctx = MagicMock()
         ctx.processors.group.create_group.wait_for_complete = AsyncMock(
-            return_value=CreateGroupActionResult(data=group_data_response)
+            return_value=CreateGroupActionResult(data=group_data_response, _domain_name="default")
         )
         # Required for privileged_mutation decorator
         ctx.user = {

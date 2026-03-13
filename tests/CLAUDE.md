@@ -11,7 +11,6 @@ For TDD workflow, see `/tdd-guide` skill.
 | Repository / Model (real DB, `with_tables`) | `tests/unit/{component}/repositories/` |
 | HTTP API layer (real aiohttp server + DB) | `tests/component/{component}/` |
 | E2E user scenarios (Client SDK v2) | `tests/integration/` |
-| Legacy DB tests — do NOT add new ones | `tests/manager/` |
 
 Each directory has its own `CLAUDE.md` with setup patterns.
 

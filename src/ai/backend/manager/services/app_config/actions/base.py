@@ -1,9 +1,15 @@
-"""Base action class for app_config service."""
+from typing import override
 
-from __future__ import annotations
+from ai.backend.common.data.permission.types import EntityType
+from ai.backend.manager.actions.action.scope import BaseScopeAction, BaseScopeActionResult
 
-from ai.backend.manager.actions.action import BaseAction
+
+class AppConfigScopeAction(BaseScopeAction):
+    @override
+    @classmethod
+    def entity_type(cls) -> EntityType:
+        return EntityType.APP_CONFIG
 
 
-class AppConfigAction(BaseAction):
-    """Base class for all app_config actions."""
+class AppConfigScopeActionResult(BaseScopeActionResult):
+    pass

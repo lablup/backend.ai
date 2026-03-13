@@ -46,7 +46,6 @@ class TestReportAllKernelCommitStatusMap:
         with patch("ai.backend.agent.agent.log") as _mock_log:
             yield _mock_log
 
-    @pytest.mark.asyncio
     @pytest.mark.parametrize(
         "scenario",
         [
@@ -91,7 +90,6 @@ class TestReportAllKernelCommitStatusMap:
         assert kernel_ids == scenario.expected_kernel_ids
         assert expire_sec == COMMIT_STATUS_EXPIRE
 
-    @pytest.mark.asyncio
     async def test_nonexistent_path_skips_scan(
         self,
         mock_agent: AsyncMock,
@@ -107,7 +105,6 @@ class TestReportAllKernelCommitStatusMap:
         kernel_ids = call_args[0][0]
         assert kernel_ids == []
 
-    @pytest.mark.asyncio
     async def test_oserror_during_scan_is_caught_and_logged(
         self,
         mock_agent: AsyncMock,
@@ -126,7 +123,6 @@ class TestReportAllKernelCommitStatusMap:
         mock_log.exception.assert_called_once()
         mock_agent.valkey_stat_client.update_kernel_commit_statuses.assert_not_called()
 
-    @pytest.mark.asyncio
     async def test_emfile_during_scan_logs_warning(
         self,
         mock_agent: AsyncMock,
@@ -146,7 +142,6 @@ class TestReportAllKernelCommitStatusMap:
         mock_log.exception.assert_not_called()
         mock_agent.valkey_stat_client.update_kernel_commit_statuses.assert_not_called()
 
-    @pytest.mark.asyncio
     async def test_non_oserror_exception_is_caught_and_logged(
         self,
         mock_agent: AsyncMock,

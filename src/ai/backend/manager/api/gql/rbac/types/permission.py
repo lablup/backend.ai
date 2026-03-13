@@ -23,11 +23,14 @@ from ai.backend.manager.errors.api import InvalidAPIParameters
 from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
 from ai.backend.manager.repositories.base import QueryCondition, QueryOrder
 from ai.backend.manager.repositories.base.creator import Creator
+from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.repositories.permission_controller.creators import PermissionCreatorSpec
 from ai.backend.manager.repositories.permission_controller.options import (
     ScopedPermissionConditions,
     ScopedPermissionOrders,
 )
+from ai.backend.manager.repositories.permission_controller.updaters import PermissionUpdaterSpec
+from ai.backend.manager.types import OptionalState
 
 if TYPE_CHECKING:
     from ai.backend.manager.api.gql.rbac.types.role import RoleGQL
@@ -48,7 +51,6 @@ class RBACElementTypeGQL(StrEnum):
     # Root-query-enabled entities (scoped)
     SESSION = "session"
     VFOLDER = "vfolder"
-    DEPLOYMENT = "deployment"
     MODEL_DEPLOYMENT = "model_deployment"
     KEYPAIR = "keypair"
     NOTIFICATION_CHANNEL = "notification_channel"
@@ -56,6 +58,9 @@ class RBACElementTypeGQL(StrEnum):
     RESOURCE_GROUP = "resource_group"
     CONTAINER_REGISTRY = "container_registry"
     STORAGE_HOST = "storage_host"
+    AGENT = "agent"
+    KERNEL = "kernel"
+    ROUTING = "routing"
     IMAGE = "image"
     ARTIFACT = "artifact"
     ARTIFACT_REGISTRY = "artifact_registry"
@@ -223,7 +228,6 @@ class PermissionGQL(Node):
             case (
                 RBACElementType.SESSION
                 | RBACElementType.VFOLDER
-                | RBACElementType.DEPLOYMENT
                 | RBACElementType.KEYPAIR
                 | RBACElementType.NOTIFICATION_CHANNEL
                 | RBACElementType.NETWORK
@@ -241,6 +245,9 @@ class PermissionGQL(Node):
                 | RBACElementType.AUDIT_LOG
                 | RBACElementType.EVENT_LOG
                 | RBACElementType.NOTIFICATION_RULE
+                | RBACElementType.AGENT
+                | RBACElementType.KERNEL
+                | RBACElementType.ROUTING
             ):
                 return None
 
@@ -330,6 +337,40 @@ class CreatePermissionInput:
         )
 
 
+@strawberry.input(description="Added in 26.3.0. Input for updating a scoped permission")
+class UpdatePermissionInput:
+    id: uuid.UUID
+    scope_type: RBACElementTypeGQL | None = None
+    scope_id: str | None = None
+    entity_type: RBACElementTypeGQL | None = None
+    operation: OperationTypeGQL | None = None
+
+    def to_updater(self) -> Updater[PermissionRow]:
+        spec = PermissionUpdaterSpec(
+            scope_type=(
+                OptionalState.update(self.scope_type.to_element().to_scope_type())
+                if self.scope_type is not None
+                else OptionalState.nop()
+            ),
+            scope_id=(
+                OptionalState.update(self.scope_id)
+                if self.scope_id is not None
+                else OptionalState.nop()
+            ),
+            entity_type=(
+                OptionalState.update(self.entity_type.to_element().to_entity_type())
+                if self.entity_type is not None
+                else OptionalState.nop()
+            ),
+            operation=(
+                OptionalState.update(self.operation.to_internal())
+                if self.operation is not None
+                else OptionalState.nop()
+            ),
+        )
+        return Updater(spec=spec, pk_value=self.id)
+
+
 @strawberry.input(description="Added in 26.3.0. Input for deleting a scoped permission")
 class DeletePermissionInput:
     id: uuid.UUID
@@ -344,6 +385,15 @@ class DeletePermissionPayload:
 
 
 # ==================== Connection Types ====================
+
+
+@strawberry.type(
+    name="ScopeEntityCombination",
+    description="Added in 26.3.0. Valid scope-entity type combination for RBAC permissions.",
+)
+class ScopeEntityCombinationGQL:
+    scope_type: RBACElementTypeGQL
+    valid_entity_types: list[RBACElementTypeGQL]
 
 
 PermissionEdge = Edge[PermissionGQL]

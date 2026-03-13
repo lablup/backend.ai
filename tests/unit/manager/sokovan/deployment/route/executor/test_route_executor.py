@@ -569,6 +569,8 @@ class TestSyncServiceDiscovery:
         Then: Route registered with service discovery
         """
         # Arrange
+        session_owner_uuid = uuid4()
+        project_uuid = uuid4()
         mock_discovery_info = MagicMock()
         mock_discovery_info.route_id = healthy_route.route_id
         mock_discovery_info.endpoint_id = healthy_route.endpoint_id
@@ -576,6 +578,8 @@ class TestSyncServiceDiscovery:
         mock_discovery_info.kernel_host = "10.0.0.1"
         mock_discovery_info.kernel_port = 8000
         mock_discovery_info.runtime_variant = "vllm"
+        mock_discovery_info.session_owner = session_owner_uuid
+        mock_discovery_info.project = project_uuid
         mock_deployment_repo.fetch_route_service_discovery_info.return_value = [mock_discovery_info]
 
         entity_ids = [healthy_route.route_id]
@@ -591,6 +595,8 @@ class TestSyncServiceDiscovery:
         discovery_infos = call_args[0][0]
         assert len(discovery_infos) == 1
         assert discovery_infos[0].route_id == healthy_route.route_id
+        assert discovery_infos[0].labels["session_owner"] == str(session_owner_uuid)
+        assert discovery_infos[0].labels["project"] == str(project_uuid)
 
     async def test_route_without_session_skipped(
         self,
@@ -655,6 +661,8 @@ class TestSyncServiceDiscovery:
             info.kernel_host = "10.0.0.1"
             info.kernel_port = 8000
             info.runtime_variant = "vllm"
+            info.session_owner = uuid4()
+            info.project = uuid4()
             mock_discovery_infos.append(info)
         mock_deployment_repo.fetch_route_service_discovery_info.return_value = mock_discovery_infos
 

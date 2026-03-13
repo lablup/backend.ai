@@ -53,7 +53,6 @@ def _webhook_channel_request(name: str = "test-webhook") -> CreateNotificationCh
 
 
 class TestChannelCreate:
-    @pytest.mark.asyncio
     async def test_admin_creates_webhook_channel(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -66,7 +65,6 @@ class TestChannelCreate:
         assert result.channel.channel_type == NotificationChannelType.WEBHOOK
         assert result.channel.enabled is True
 
-    @pytest.mark.asyncio
     async def test_admin_creates_email_channel(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -89,7 +87,6 @@ class TestChannelCreate:
         assert result.channel.name == "email-create"
         assert result.channel.channel_type == NotificationChannelType.EMAIL
 
-    @pytest.mark.asyncio
     async def test_regular_user_cannot_create_channel(
         self,
         user_registry: BackendAIClientRegistry,
@@ -102,7 +99,6 @@ class TestChannelCreate:
 
 
 class TestChannelSearch:
-    @pytest.mark.asyncio
     async def test_admin_searches_channels(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -119,7 +115,6 @@ class TestChannelSearch:
         names = [ch.name for ch in result.channels]
         assert "search-target" in names
 
-    @pytest.mark.asyncio
     async def test_admin_searches_channels_empty(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -136,7 +131,6 @@ class TestChannelSearch:
 
 
 class TestChannelGet:
-    @pytest.mark.asyncio
     async def test_admin_gets_channel(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -149,7 +143,6 @@ class TestChannelGet:
         assert result.channel.id == created.channel.id
         assert result.channel.name == "get-target"
 
-    @pytest.mark.asyncio
     async def test_admin_gets_nonexistent_channel(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -160,7 +153,6 @@ class TestChannelGet:
 
 
 class TestChannelUpdate:
-    @pytest.mark.asyncio
     async def test_admin_updates_channel(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -177,7 +169,6 @@ class TestChannelUpdate:
 
 
 class TestChannelDelete:
-    @pytest.mark.asyncio
     async def test_admin_deletes_channel(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -198,7 +189,6 @@ class TestChannelValidate:
             " validation. Remove xfail if test passes at runtime."
         ),
     )
-    @pytest.mark.asyncio
     async def test_admin_validates_channel(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -220,7 +210,6 @@ class TestChannelValidate:
 
 
 class TestRuleTypeList:
-    @pytest.mark.asyncio
     async def test_admin_lists_rule_types(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -231,7 +220,6 @@ class TestRuleTypeList:
 
 
 class TestRuleTypeSchema:
-    @pytest.mark.asyncio
     async def test_admin_gets_rule_type_schema(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -245,7 +233,6 @@ class TestRuleTypeSchema:
 
 
 class TestRuleCreate:
-    @pytest.mark.asyncio
     async def test_admin_creates_rule(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -267,7 +254,6 @@ class TestRuleCreate:
         assert result.rule.name == "test-rule"
         assert result.rule.rule_type == NotificationRuleType.SESSION_STARTED
 
-    @pytest.mark.asyncio
     async def test_regular_user_cannot_create_rule(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -289,7 +275,6 @@ class TestRuleCreate:
 
 
 class TestRuleSearch:
-    @pytest.mark.asyncio
     async def test_admin_searches_rules(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -315,7 +300,6 @@ class TestRuleSearch:
 
 
 class TestRuleGet:
-    @pytest.mark.asyncio
     async def test_admin_gets_rule(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -336,7 +320,6 @@ class TestRuleGet:
         assert result.rule.id == created.rule.id
         assert result.rule.name == "get-rule"
 
-    @pytest.mark.asyncio
     async def test_admin_gets_nonexistent_rule(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -347,7 +330,6 @@ class TestRuleGet:
 
 
 class TestRuleUpdate:
-    @pytest.mark.asyncio
     async def test_admin_updates_rule(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -372,7 +354,6 @@ class TestRuleUpdate:
 
 
 class TestRuleDelete:
-    @pytest.mark.asyncio
     async def test_admin_deletes_rule(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -401,7 +382,6 @@ class TestRuleValidate:
             " validation. Remove xfail if test passes at runtime."
         ),
     )
-    @pytest.mark.asyncio
     async def test_admin_validates_rule(
         self,
         admin_registry: BackendAIClientRegistry,
