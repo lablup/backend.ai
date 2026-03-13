@@ -66,9 +66,7 @@ from ai.backend.manager.services.scaling_group.service import ScalingGroupServic
 
 
 class ScalingGroupProcessors(AbstractProcessorPackage):
-    create_scaling_group: ScopeActionProcessor[
-        CreateScalingGroupAction, CreateScalingGroupActionResult
-    ]
+    create_scaling_group: ActionProcessor[CreateScalingGroupAction, CreateScalingGroupActionResult]
     purge_scaling_group: SingleEntityActionProcessor[
         PurgeScalingGroupAction, PurgeScalingGroupActionResult
     ]
@@ -112,9 +110,7 @@ class ScalingGroupProcessors(AbstractProcessorPackage):
         action_monitors: list[ActionMonitor],
         validators: ActionValidators,
     ) -> None:
-        self.create_scaling_group = ScopeActionProcessor(
-            service.create_scaling_group, action_monitors, validators=[validators.rbac.scope]
-        )
+        self.create_scaling_group = ActionProcessor(service.create_scaling_group, action_monitors)
         self.purge_scaling_group = SingleEntityActionProcessor(
             service.purge_scaling_group, action_monitors, validators=[validators.rbac.single_entity]
         )
