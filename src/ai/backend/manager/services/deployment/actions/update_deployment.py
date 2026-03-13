@@ -2,8 +2,10 @@ from dataclasses import dataclass
 from typing import override
 from uuid import UUID
 
-from ai.backend.common.data.permission.types import PermissionOperationType
+from ai.backend.common.data.permission.types import OperationType, RBACElementType
+from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.deployment.types import ModelDeploymentData
+from ai.backend.manager.data.permission.types import RBACElementRef
 from ai.backend.manager.models.endpoint import EndpointRow
 from ai.backend.manager.repositories.base import Updater
 from ai.backend.manager.services.deployment.actions.base import (
@@ -19,13 +21,17 @@ class UpdateDeploymentAction(DeploymentSingleEntityAction):
     updater: Updater[EndpointRow]
 
     @override
-    def target_entity_id(self) -> UUID:
-        return UUID(str(self.updater.pk_value))
+    @classmethod
+    def operation_type(cls) -> ActionOperationType:
+        return ActionOperationType.UPDATE
 
     @override
-    @classmethod
-    def permission_operation_type(cls) -> PermissionOperationType:
-        return PermissionOperationType.UPDATE
+    def target_entity_id(self) -> str:
+        return str(self.updater.pk_value)
+
+    @override
+    def target_element(self) -> RBACElementRef:
+        return RBACElementRef(RBACElementType.DEPLOYMENT, str(self.updater.pk_value))
 
 
 @dataclass

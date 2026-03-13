@@ -2,8 +2,10 @@ from dataclasses import dataclass
 from typing import override
 from uuid import UUID
 
-from ai.backend.common.data.permission.types import PermissionOperationType
+from ai.backend.common.data.permission.types import OperationType, RBACElementType
+from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.deployment.types import ModelDeploymentData
+from ai.backend.manager.data.permission.types import RBACElementRef
 from ai.backend.manager.services.deployment.actions.base import (
     DeploymentSingleEntityAction,
     DeploymentSingleEntityActionResult,
@@ -15,13 +17,17 @@ class GetDeploymentByIdAction(DeploymentSingleEntityAction):
     deployment_id: UUID
 
     @override
-    def target_entity_id(self) -> UUID:
-        return self.deployment_id
+    @classmethod
+    def operation_type(cls) -> ActionOperationType:
+        return ActionOperationType.GET
 
     @override
-    @classmethod
-    def permission_operation_type(cls) -> PermissionOperationType:
-        return PermissionOperationType.READ
+    def target_entity_id(self) -> str:
+        return str(self.deployment_id)
+
+    @override
+    def target_element(self) -> RBACElementRef:
+        return RBACElementRef(RBACElementType.DEPLOYMENT, str(self.deployment_id))
 
 
 @dataclass

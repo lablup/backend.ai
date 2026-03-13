@@ -4,7 +4,9 @@ from dataclasses import dataclass
 from typing import override
 from uuid import UUID
 
-from ai.backend.common.data.permission.types import PermissionOperationType
+from ai.backend.common.data.permission.types import OperationType, RBACElementType
+from ai.backend.manager.actions.types import ActionOperationType
+from ai.backend.manager.data.permission.types import RBACElementRef
 from ai.backend.manager.services.deployment.actions.base import (
     DeploymentSingleEntityAction,
     DeploymentSingleEntityActionResult,
@@ -18,13 +20,17 @@ class DestroyDeploymentAction(DeploymentSingleEntityAction):
     endpoint_id: UUID
 
     @override
-    def target_entity_id(self) -> UUID:
-        return self.endpoint_id
+    @classmethod
+    def operation_type(cls) -> ActionOperationType:
+        return ActionOperationType.DELETE
 
     @override
-    @classmethod
-    def permission_operation_type(cls) -> PermissionOperationType:
-        return PermissionOperationType.DELETE
+    def target_entity_id(self) -> str:
+        return str(self.endpoint_id)
+
+    @override
+    def target_element(self) -> RBACElementRef:
+        return RBACElementRef(RBACElementType.DEPLOYMENT, str(self.endpoint_id))
 
 
 @dataclass
