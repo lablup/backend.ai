@@ -415,7 +415,6 @@ class ModelServingService:
                 )
                 for endpoint in endpoints
             ],
-            _user_id=action.session_owener_id,
         )
 
     async def search_services(self, action: SearchServicesAction) -> SearchServicesActionResult:
