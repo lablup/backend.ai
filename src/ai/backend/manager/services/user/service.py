@@ -102,7 +102,6 @@ class UserService:
         )
         return CreateUserActionResult(
             data=user_data_result,
-            _domain_name=action.scope_id(),
         )
 
     async def bulk_create_users(self, action: BulkCreateUserAction) -> BulkCreateUserActionResult:

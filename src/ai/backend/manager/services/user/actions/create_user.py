@@ -1,5 +1,7 @@
+from __future__ import annotations
+
 from dataclasses import dataclass
-from typing import override
+from typing import TYPE_CHECKING, cast, override
 
 from ai.backend.common.data.permission.types import RBACElementType, ScopeType
 from ai.backend.manager.actions.action import BaseActionResult
@@ -14,11 +16,13 @@ from ai.backend.manager.services.user.actions.base import (
     UserScopeActionResult,
 )
 
+if TYPE_CHECKING:
+    from ai.backend.manager.repositories.user.creators import UserCreatorSpec
+
 
 @dataclass
 class CreateUserAction(UserScopeAction):
-    creator: Creator[UserRow]
-    _domain_name: str
+    creator: Creator[UserRow]  # spec: UserCreatorSpec
     group_ids: list[str] | None = None
 
     @override
@@ -32,17 +36,28 @@ class CreateUserAction(UserScopeAction):
 
     @override
     def scope_id(self) -> str:
-        return self._domain_name
+        if TYPE_CHECKING:
+            from ai.backend.manager.repositories.user.creators import UserCreatorSpec
+
+            spec = cast(UserCreatorSpec, self.creator.spec)
+        else:
+            spec = self.creator.spec
+        return spec.domain_name
 
     @override
     def target_element(self) -> RBACElementRef:
-        return RBACElementRef(RBACElementType.DOMAIN, self._domain_name)
+        if TYPE_CHECKING:
+            from ai.backend.manager.repositories.user.creators import UserCreatorSpec
+
+            spec = cast(UserCreatorSpec, self.creator.spec)
+        else:
+            spec = self.creator.spec
+        return RBACElementRef(RBACElementType.DOMAIN, spec.domain_name)
 
 
 @dataclass
 class CreateUserActionResult(UserScopeActionResult):
     data: UserCreateResultData
-    _domain_name: str
 
     @override
     def entity_id(self) -> str | None:
@@ -54,7 +69,8 @@ class CreateUserActionResult(UserScopeActionResult):
 
     @override
     def scope_id(self) -> str:
-        return self._domain_name
+        # UserCreateResultData always has domain_name set (from creator.spec.domain_name)
+        return self.data.user.domain_name or ""
 
 
 @dataclass
