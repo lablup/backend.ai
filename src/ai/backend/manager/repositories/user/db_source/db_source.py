@@ -19,7 +19,7 @@ from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeySta
 from ai.backend.common.data.permission.types import RBACElementType
 from ai.backend.common.types import AccessKey, VFolderID
 from ai.backend.logging.utils import BraceStyleAdapter
-from ai.backend.manager.data.keypair.types import KeyPairCreator
+from ai.backend.manager.data.keypair.types import GeneratedKeyPairData, KeyPairCreator
 from ai.backend.manager.data.permission.types import RBACElementRef
 from ai.backend.manager.data.user.types import (
     BulkUserCreateResultData,
@@ -58,7 +58,6 @@ from ai.backend.manager.models.keypair import (
     generate_keypair_data,
     keypairs,
 )
-from ai.backend.manager.data.keypair.types import GeneratedKeyPairData
 from ai.backend.manager.models.rbac_models.user_role import UserRoleRow
 from ai.backend.manager.models.resource_policy import UserResourcePolicyRow
 from ai.backend.manager.models.session import (
@@ -564,7 +563,8 @@ class UserDBSource:
             )
             # Soft delete user
             await conn.execute(
-                sa.update(users)
+                sa
+                .update(users)
                 .values(status=UserStatus.DELETED, status_info="admin-requested")
                 .where(users.c.email == email)
             )
@@ -658,7 +658,8 @@ class UserDBSource:
 
         async with self._db.begin_readonly() as conn:
             query = (
-                sa.select(
+                sa
+                .select(
                     kernels.c.id,
                     kernels.c.created_at,
                     kernels.c.terminated_at,
@@ -845,7 +846,8 @@ class UserDBSource:
         """Private method to validate and update main access key."""
         session = SASession(conn)
         keypair_query = (
-            sa.select(KeyPairRow)
+            sa
+            .select(KeyPairRow)
             .where(KeyPairRow.access_key == main_access_key)
             .options(
                 noload("*"),
@@ -867,7 +869,8 @@ class UserDBSource:
     ) -> None:
         """Private method to sync keypair roles with user role."""
         result = await conn.execute(
-            sa.select(
+            sa
+            .select(
                 keypairs.c.user,
                 keypairs.c.is_active,
                 keypairs.c.is_admin,
@@ -913,7 +916,8 @@ class UserDBSource:
 
             if kp_updates:
                 await conn.execute(
-                    sa.update(keypairs)
+                    sa
+                    .update(keypairs)
                     .values({
                         "is_admin": bindparam("is_admin"),
                         "is_active": bindparam("is_active"),
@@ -939,7 +943,8 @@ class UserDBSource:
 
         # Add to new groups
         result = await conn.execute(
-            sa.select(groups.c.id)
+            sa
+            .select(groups.c.id)
             .select_from(groups)
             .where(groups.c.domain_name == domain_name)
             .where(groups.c.id.in_(group_ids))
@@ -971,7 +976,8 @@ class UserDBSource:
         rows = result.fetchall()
         user_vfolder_ids = [row.id for row in rows]
         query = (
-            sa.select(kernels.c.mounts)
+            sa
+            .select(kernels.c.mounts)
             .select_from(kernels)
             .where(kernels.c.status.in_(AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES))
         )
@@ -999,7 +1005,8 @@ class UserDBSource:
         """
         # Gather target user's virtual folders' names.
         query = (
-            sa.select(vfolders.c.name)
+            sa
+            .select(vfolders.c.name)
             .select_from(vfolders)
             .where(vfolders.c.user == target_user_uuid)
         )
@@ -1013,7 +1020,8 @@ class UserDBSource:
             vfolder_permissions.c.vfolder == vfolders.c.id,
         )
         query = (
-            sa.select(vfolders.c.id, vfolders.c.name)
+            sa
+            .select(vfolders.c.id, vfolders.c.name)
             .select_from(j)
             .where(vfolders.c.user == deleted_user_uuid)
         )
@@ -1043,7 +1051,8 @@ class UserDBSource:
             rowcount = 0
             for item in migrate_updates:
                 update_query = (
-                    sa.update(vfolders)
+                    sa
+                    .update(vfolders)
                     .values(
                         user=target_user_uuid,
                         name=item["vname"],
@@ -1157,7 +1166,8 @@ class UserDBSource:
         """
         async with self._db.begin_readonly_session() as db_session:
             query = (
-                sa.select(UserRow)
+                sa
+                .select(UserRow)
                 .select_from(UserRow)
                 .join(
                     AssocGroupUserRow,
@@ -1185,7 +1195,8 @@ class UserDBSource:
         """
         async with self._db.begin_readonly_session() as db_session:
             query = (
-                sa.select(UserRow)
+                sa
+                .select(UserRow)
                 .select_from(UserRow)
                 .join(
                     UserRoleRow,
@@ -1202,15 +1213,13 @@ class UserDBSource:
                 has_previous_page=result.has_previous_page,
             )
 
-    async def issue_my_keypair(
-        self, user_uuid: UUID, email: str
-    ) -> GeneratedKeyPairData:
+    async def issue_my_keypair(self, user_uuid: UUID, email: str) -> GeneratedKeyPairData:
         """Issue a new keypair for the current user, inheriting settings from main keypair."""
-        async with self._db.begin_session() as db_sess:
-            session = SASession(db_sess)
+        async with self._db.begin_session() as session:
             user_row = (
                 await session.scalars(
-                    sa.select(UserRow)
+                    sa
+                    .select(UserRow)
                     .where(UserRow.uuid == user_uuid)
                     .options(load_only(UserRow.main_access_key, UserRow.email))
                 )
@@ -1222,7 +1231,8 @@ class UserDBSource:
             if user_row.main_access_key:
                 main_kp_row = (
                     await session.scalars(
-                        sa.select(KeyPairRow)
+                        sa
+                        .select(KeyPairRow)
                         .where(KeyPairRow.access_key == user_row.main_access_key)
                         .options(noload("*"))
                     )
@@ -1254,15 +1264,13 @@ class UserDBSource:
             await execute_creator(session, kp_creator)
             return generated
 
-    async def revoke_my_keypair(
-        self, user_uuid: UUID, email: str, access_key: str
-    ) -> None:
+    async def revoke_my_keypair(self, user_uuid: UUID, email: str, access_key: str) -> None:
         """Revoke a keypair owned by the current user."""
-        async with self._db.begin_session() as db_sess:
-            session = SASession(db_sess)
+        async with self._db.begin_session() as session:
             kp_row = (
                 await session.scalars(
-                    sa.select(KeyPairRow)
+                    sa
+                    .select(KeyPairRow)
                     .where(KeyPairRow.access_key == access_key)
                     .options(noload("*"))
                 )
@@ -1274,7 +1282,8 @@ class UserDBSource:
 
             user_row = (
                 await session.scalars(
-                    sa.select(UserRow)
+                    sa
+                    .select(UserRow)
                     .where(UserRow.uuid == user_uuid)
                     .options(load_only(UserRow.main_access_key))
                 )
@@ -1284,22 +1293,22 @@ class UserDBSource:
                     "Cannot revoke the main access key. Switch main access key first."
                 )
 
-            await db_sess.execute(
-                sa.delete(keypairs).where(keypairs.c.access_key == access_key)
-            )
+            await session.execute(sa.delete(keypairs).where(keypairs.c.access_key == access_key))
 
-    async def switch_my_main_access_key(
-        self, user_uuid: UUID, email: str, access_key: str
-    ) -> None:
+    async def switch_my_main_access_key(self, user_uuid: UUID, email: str, access_key: str) -> None:
         """Switch the main access key for the current user."""
-        async with self._db.begin_session() as db_sess:
-            session = SASession(db_sess)
+        async with self._db.begin_session() as session:
             kp_row = (
                 await session.scalars(
-                    sa.select(KeyPairRow)
+                    sa
+                    .select(KeyPairRow)
                     .where(KeyPairRow.access_key == access_key)
                     .options(
-                        noload("*"),
+                        load_only(
+                            KeyPairRow.access_key,
+                            KeyPairRow.user,
+                            KeyPairRow.is_active,
+                        ),
                         joinedload(KeyPairRow.user_row).options(load_only(UserRow.email)),
                     )
                 )
@@ -1307,12 +1316,12 @@ class UserDBSource:
             if not kp_row:
                 raise KeyPairNotFound("Cannot set non-existing access key as the main access key.")
             if kp_row.user_row.email != email:
-                raise KeyPairForbidden("Cannot set another user's access key as the main access key.")
+                raise KeyPairForbidden(
+                    "Cannot set another user's access key as the main access key."
+                )
             if not kp_row.is_active:
                 raise KeyPairForbidden("Cannot set an inactive keypair as the main access key.")
 
-            await db_sess.execute(
-                sa.update(users)
-                .where(users.c.email == email)
-                .values(main_access_key=access_key)
+            await session.execute(
+                sa.update(users).where(users.c.uuid == user_uuid).values(main_access_key=access_key)
             )
