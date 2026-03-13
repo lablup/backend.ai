@@ -15,6 +15,7 @@ from ai.backend.common.events.dispatcher import EventProducer
 from ai.backend.common.plugin.hook import HookPluginContext
 from ai.backend.common.types import QuotaScopeID, QuotaScopeType, VFolderUsageMode
 from ai.backend.manager.actions.validators import ActionValidators
+from ai.backend.manager.actions.validators.rbac import RBACValidators
 from ai.backend.manager.api.rest.deployment.handler import DeploymentAPIHandler
 from ai.backend.manager.api.rest.deployment.registry import register_deployment_routes
 from ai.backend.manager.api.rest.routing import RouteRegistry
@@ -108,7 +109,7 @@ def deployment_processors(
     )
     service = DeploymentService(deployment_controller, repo, revision_generator_registry)
     return DeploymentProcessors(
-        service=service, action_monitors=[], validators=MagicMock(spec=ActionValidators)
+        service=service, action_monitors=[], validators=ActionValidators(rbac=MagicMock(spec=RBACValidators))
     )
 
 
