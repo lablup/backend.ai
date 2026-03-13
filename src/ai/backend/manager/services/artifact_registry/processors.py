@@ -2,6 +2,8 @@ from typing import override
 
 from ai.backend.manager.actions.monitors.monitor import ActionMonitor
 from ai.backend.manager.actions.processor import ActionProcessor
+from ai.backend.manager.actions.processor.scope import ScopeActionProcessor
+from ai.backend.manager.actions.processor.single_entity import SingleEntityActionProcessor
 from ai.backend.manager.actions.types import AbstractProcessorPackage, ActionSpec
 from ai.backend.manager.actions.validators import ActionValidators
 from ai.backend.manager.services.artifact_registry.actions.common.get_meta import (
@@ -77,46 +79,46 @@ from .service import ArtifactRegistryService
 
 
 class ArtifactRegistryProcessors(AbstractProcessorPackage):
-    create_huggingface_registry: ActionProcessor[
+    create_huggingface_registry: ScopeActionProcessor[
         CreateHuggingFaceRegistryAction, CreateHuggingFaceRegistryActionResult
     ]
-    update_huggingface_registry: ActionProcessor[
+    update_huggingface_registry: SingleEntityActionProcessor[
         UpdateHuggingFaceRegistryAction, UpdateHuggingFaceRegistryActionResult
     ]
-    delete_huggingface_registry: ActionProcessor[
+    delete_huggingface_registry: SingleEntityActionProcessor[
         DeleteHuggingFaceRegistryAction, DeleteHuggingFaceRegistryActionResult
     ]
-    get_huggingface_registry: ActionProcessor[
+    get_huggingface_registry: SingleEntityActionProcessor[
         GetHuggingFaceRegistryAction, GetHuggingFaceRegistryActionResult
     ]
     get_huggingface_registries: ActionProcessor[
         GetHuggingFaceRegistriesAction, GetHuggingFaceRegistriesActionResult
     ]
-    list_huggingface_registries: ActionProcessor[
+    list_huggingface_registries: ScopeActionProcessor[
         ListHuggingFaceRegistryAction, ListHuggingFaceRegistryActionResult
     ]
-    search_huggingface_registries: ActionProcessor[
+    search_huggingface_registries: ScopeActionProcessor[
         SearchHuggingFaceRegistriesAction, SearchHuggingFaceRegistriesActionResult
     ]
-    create_reservoir_registry: ActionProcessor[
+    create_reservoir_registry: ScopeActionProcessor[
         CreateReservoirRegistryAction, CreateReservoirActionResult
     ]
-    update_reservoir_registry: ActionProcessor[
+    update_reservoir_registry: SingleEntityActionProcessor[
         UpdateReservoirRegistryAction, UpdateReservoirRegistryActionResult
     ]
-    delete_reservoir_registry: ActionProcessor[
+    delete_reservoir_registry: SingleEntityActionProcessor[
         DeleteReservoirRegistryAction, DeleteReservoirActionResult
     ]
-    get_reservoir_registry: ActionProcessor[
+    get_reservoir_registry: SingleEntityActionProcessor[
         GetReservoirRegistryAction, GetReservoirRegistryActionResult
     ]
     get_reservoir_registries: ActionProcessor[
         GetReservoirRegistriesAction, GetReservoirRegistriesActionResult
     ]
-    list_reservoir_registries: ActionProcessor[
+    list_reservoir_registries: ScopeActionProcessor[
         ListReservoirRegistriesAction, ListReservoirRegistriesActionResult
     ]
-    search_reservoir_registries: ActionProcessor[
+    search_reservoir_registries: ScopeActionProcessor[
         SearchReservoirRegistriesAction, SearchReservoirRegistriesActionResult
     ]
     get_registry_meta: ActionProcessor[
@@ -125,7 +127,7 @@ class ArtifactRegistryProcessors(AbstractProcessorPackage):
     get_registry_metas: ActionProcessor[
         GetArtifactRegistryMetasAction, GetArtifactRegistryMetasActionResult
     ]
-    search_artifact_registries: ActionProcessor[
+    search_artifact_registries: ScopeActionProcessor[
         SearchArtifactRegistriesAction, SearchArtifactRegistriesActionResult
     ]
 
@@ -135,53 +137,72 @@ class ArtifactRegistryProcessors(AbstractProcessorPackage):
         action_monitors: list[ActionMonitor],
         validators: ActionValidators,
     ) -> None:
-        self.create_huggingface_registry = ActionProcessor(
-            service.create_huggingface_registry, action_monitors
+        # Scope actions with RBAC validator
+        self.create_huggingface_registry = ScopeActionProcessor(
+            service.create_huggingface_registry, action_monitors, validators=[validators.rbac.scope]
         )
-        self.update_huggingface_registry = ActionProcessor(
-            service.update_huggingface_registry, action_monitors
+        self.list_huggingface_registries = ScopeActionProcessor(
+            service.list_huggingface_registry, action_monitors, validators=[validators.rbac.scope]
         )
-        self.delete_huggingface_registry = ActionProcessor(
-            service.delete_huggingface_registry, action_monitors
+        self.search_huggingface_registries = ScopeActionProcessor(
+            service.search_huggingface_registries,
+            action_monitors,
+            validators=[validators.rbac.scope],
         )
-        self.get_huggingface_registry = ActionProcessor(
-            service.get_huggingface_registry, action_monitors
+        self.create_reservoir_registry = ScopeActionProcessor(
+            service.create_reservoir_registry, action_monitors, validators=[validators.rbac.scope]
         )
+        self.list_reservoir_registries = ScopeActionProcessor(
+            service.list_reservoir_registries, action_monitors, validators=[validators.rbac.scope]
+        )
+        self.search_reservoir_registries = ScopeActionProcessor(
+            service.search_reservoir_registries, action_monitors, validators=[validators.rbac.scope]
+        )
+        self.search_artifact_registries = ScopeActionProcessor(
+            service.search_artifact_registries, action_monitors, validators=[validators.rbac.scope]
+        )
+
+        # Single entity actions with RBAC validator
+        self.update_huggingface_registry = SingleEntityActionProcessor(
+            service.update_huggingface_registry,
+            action_monitors,
+            validators=[validators.rbac.single_entity],
+        )
+        self.delete_huggingface_registry = SingleEntityActionProcessor(
+            service.delete_huggingface_registry,
+            action_monitors,
+            validators=[validators.rbac.single_entity],
+        )
+        self.get_huggingface_registry = SingleEntityActionProcessor(
+            service.get_huggingface_registry,
+            action_monitors,
+            validators=[validators.rbac.single_entity],
+        )
+        self.update_reservoir_registry = SingleEntityActionProcessor(
+            service.update_reservoir_registry,
+            action_monitors,
+            validators=[validators.rbac.single_entity],
+        )
+        self.delete_reservoir_registry = SingleEntityActionProcessor(
+            service.delete_reservoir_registry,
+            action_monitors,
+            validators=[validators.rbac.single_entity],
+        )
+        self.get_reservoir_registry = SingleEntityActionProcessor(
+            service.get_reservoir_registry,
+            action_monitors,
+            validators=[validators.rbac.single_entity],
+        )
+
+        # Internal/batch actions without RBAC
         self.get_huggingface_registries = ActionProcessor(
             service.get_huggingface_registries, action_monitors
-        )
-        self.list_huggingface_registries = ActionProcessor(
-            service.list_huggingface_registry, action_monitors
-        )
-        self.search_huggingface_registries = ActionProcessor(
-            service.search_huggingface_registries, action_monitors
-        )
-        self.create_reservoir_registry = ActionProcessor(
-            service.create_reservoir_registry, action_monitors
-        )
-        self.update_reservoir_registry = ActionProcessor(
-            service.update_reservoir_registry, action_monitors
-        )
-        self.delete_reservoir_registry = ActionProcessor(
-            service.delete_reservoir_registry, action_monitors
-        )
-        self.get_reservoir_registry = ActionProcessor(
-            service.get_reservoir_registry, action_monitors
         )
         self.get_reservoir_registries = ActionProcessor(
             service.get_reservoir_registries, action_monitors
         )
-        self.list_reservoir_registries = ActionProcessor(
-            service.list_reservoir_registries, action_monitors
-        )
-        self.search_reservoir_registries = ActionProcessor(
-            service.search_reservoir_registries, action_monitors
-        )
         self.get_registry_meta = ActionProcessor(service.get_registry_meta, action_monitors)
         self.get_registry_metas = ActionProcessor(service.get_registry_metas, action_monitors)
-        self.search_artifact_registries = ActionProcessor(
-            service.search_artifact_registries, action_monitors
-        )
 
     @override
     def supported_actions(self) -> list[ActionSpec]:
