@@ -3,17 +3,19 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import override
 
-from ai.backend.manager.actions.action import BaseActionResult
+from ai.backend.common.data.permission.types import RBACElementType, ScopeType
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.agent.types import AgentDetailData
+from ai.backend.manager.data.permission.types import RBACElementRef
 from ai.backend.manager.repositories.base import BatchQuerier
 
-from .base import AgentAction
+from .base import AgentScopeAction, AgentScopeActionResult
 
 
 @dataclass
-class SearchAgentsAction(AgentAction):
+class SearchAgentsAction(AgentScopeAction):
     querier: BatchQuerier
+    _domain_name: str
 
     @override
     @classmethod
@@ -21,19 +23,32 @@ class SearchAgentsAction(AgentAction):
         return ActionOperationType.SEARCH
 
     @override
-    def entity_id(self) -> str | None:
-        return None
+    def scope_type(self) -> ScopeType:
+        return ScopeType.DOMAIN
+
+    @override
+    def scope_id(self) -> str:
+        return self._domain_name
+
+    @override
+    def target_element(self) -> RBACElementRef:
+        return RBACElementRef(RBACElementType.DOMAIN, self._domain_name)
 
 
 @dataclass
-class SearchAgentsActionResult(BaseActionResult):
+class SearchAgentsActionResult(AgentScopeActionResult):
     """Result of searching agents with their permissions."""
 
     agents: list[AgentDetailData]
     total_count: int
     has_next_page: bool
     has_previous_page: bool
+    _domain_name: str
 
     @override
-    def entity_id(self) -> str | None:
-        return None
+    def scope_type(self) -> ScopeType:
+        return ScopeType.DOMAIN
+
+    @override
+    def scope_id(self) -> str:
+        return self._domain_name
