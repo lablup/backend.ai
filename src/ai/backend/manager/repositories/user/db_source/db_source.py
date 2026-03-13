@@ -563,8 +563,7 @@ class UserDBSource:
             )
             # Soft delete user
             await conn.execute(
-                sa
-                .update(users)
+                sa.update(users)
                 .values(status=UserStatus.DELETED, status_info="admin-requested")
                 .where(users.c.email == email)
             )
@@ -658,8 +657,7 @@ class UserDBSource:
 
         async with self._db.begin_readonly() as conn:
             query = (
-                sa
-                .select(
+                sa.select(
                     kernels.c.id,
                     kernels.c.created_at,
                     kernels.c.terminated_at,
@@ -846,8 +844,7 @@ class UserDBSource:
         """Private method to validate and update main access key."""
         session = SASession(conn)
         keypair_query = (
-            sa
-            .select(KeyPairRow)
+            sa.select(KeyPairRow)
             .where(KeyPairRow.access_key == main_access_key)
             .options(
                 noload("*"),
@@ -869,8 +866,7 @@ class UserDBSource:
     ) -> None:
         """Private method to sync keypair roles with user role."""
         result = await conn.execute(
-            sa
-            .select(
+            sa.select(
                 keypairs.c.user,
                 keypairs.c.is_active,
                 keypairs.c.is_admin,
@@ -916,8 +912,7 @@ class UserDBSource:
 
             if kp_updates:
                 await conn.execute(
-                    sa
-                    .update(keypairs)
+                    sa.update(keypairs)
                     .values({
                         "is_admin": bindparam("is_admin"),
                         "is_active": bindparam("is_active"),
@@ -943,8 +938,7 @@ class UserDBSource:
 
         # Add to new groups
         result = await conn.execute(
-            sa
-            .select(groups.c.id)
+            sa.select(groups.c.id)
             .select_from(groups)
             .where(groups.c.domain_name == domain_name)
             .where(groups.c.id.in_(group_ids))
@@ -976,8 +970,7 @@ class UserDBSource:
         rows = result.fetchall()
         user_vfolder_ids = [row.id for row in rows]
         query = (
-            sa
-            .select(kernels.c.mounts)
+            sa.select(kernels.c.mounts)
             .select_from(kernels)
             .where(kernels.c.status.in_(AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES))
         )
@@ -1005,8 +998,7 @@ class UserDBSource:
         """
         # Gather target user's virtual folders' names.
         query = (
-            sa
-            .select(vfolders.c.name)
+            sa.select(vfolders.c.name)
             .select_from(vfolders)
             .where(vfolders.c.user == target_user_uuid)
         )
@@ -1020,8 +1012,7 @@ class UserDBSource:
             vfolder_permissions.c.vfolder == vfolders.c.id,
         )
         query = (
-            sa
-            .select(vfolders.c.id, vfolders.c.name)
+            sa.select(vfolders.c.id, vfolders.c.name)
             .select_from(j)
             .where(vfolders.c.user == deleted_user_uuid)
         )
@@ -1051,8 +1042,7 @@ class UserDBSource:
             rowcount = 0
             for item in migrate_updates:
                 update_query = (
-                    sa
-                    .update(vfolders)
+                    sa.update(vfolders)
                     .values(
                         user=target_user_uuid,
                         name=item["vname"],
@@ -1166,8 +1156,7 @@ class UserDBSource:
         """
         async with self._db.begin_readonly_session() as db_session:
             query = (
-                sa
-                .select(UserRow)
+                sa.select(UserRow)
                 .select_from(UserRow)
                 .join(
                     AssocGroupUserRow,
@@ -1195,8 +1184,7 @@ class UserDBSource:
         """
         async with self._db.begin_readonly_session() as db_session:
             query = (
-                sa
-                .select(UserRow)
+                sa.select(UserRow)
                 .select_from(UserRow)
                 .join(
                     UserRoleRow,
@@ -1218,8 +1206,7 @@ class UserDBSource:
         async with self._db.begin_session() as session:
             user_row = (
                 await session.scalars(
-                    sa
-                    .select(UserRow)
+                    sa.select(UserRow)
                     .where(UserRow.uuid == user_uuid)
                     .options(load_only(UserRow.main_access_key, UserRow.email))
                 )
@@ -1231,8 +1218,7 @@ class UserDBSource:
             if user_row.main_access_key:
                 main_kp_row = (
                     await session.scalars(
-                        sa
-                        .select(KeyPairRow)
+                        sa.select(KeyPairRow)
                         .where(KeyPairRow.access_key == user_row.main_access_key)
                         .options(noload("*"))
                     )
@@ -1269,8 +1255,7 @@ class UserDBSource:
         async with self._db.begin_session() as session:
             kp_row = (
                 await session.scalars(
-                    sa
-                    .select(KeyPairRow)
+                    sa.select(KeyPairRow)
                     .where(KeyPairRow.access_key == access_key)
                     .options(noload("*"))
                 )
@@ -1282,8 +1267,7 @@ class UserDBSource:
 
             user_row = (
                 await session.scalars(
-                    sa
-                    .select(UserRow)
+                    sa.select(UserRow)
                     .where(UserRow.uuid == user_uuid)
                     .options(load_only(UserRow.main_access_key))
                 )
@@ -1300,8 +1284,7 @@ class UserDBSource:
         async with self._db.begin_session() as session:
             kp_row = (
                 await session.scalars(
-                    sa
-                    .select(KeyPairRow)
+                    sa.select(KeyPairRow)
                     .where(KeyPairRow.access_key == access_key)
                     .options(
                         load_only(
