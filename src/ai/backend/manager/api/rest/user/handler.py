@@ -104,7 +104,6 @@ class UserHandler:
         action_result = await self._user.create_user.wait_for_complete(
             CreateUserAction(
                 creator=creator,
-                _domain_name=body.parsed.domain_name,
                 group_ids=body.parsed.group_ids,
             )
         )

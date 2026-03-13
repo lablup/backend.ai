@@ -922,7 +922,6 @@ class UserInput(graphene.InputObjectType):  # type: ignore[misc]
                     container_gids=value_or_none(self.container_gids),
                 ),
             ),
-            _domain_name=str(self.domain_name),
             group_ids=value_or_none(self.group_ids),
         )
 
