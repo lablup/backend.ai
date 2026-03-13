@@ -6,6 +6,8 @@ from typing import TYPE_CHECKING, override
 
 from ai.backend.manager.actions.monitors.monitor import ActionMonitor
 from ai.backend.manager.actions.processor import ActionProcessor
+from ai.backend.manager.actions.processor.scope import ScopeActionProcessor
+from ai.backend.manager.actions.processor.single_entity import SingleEntityActionProcessor
 from ai.backend.manager.actions.types import AbstractProcessorPackage, ActionSpec
 from ai.backend.manager.actions.validators import ActionValidators
 from ai.backend.manager.services.deployment.actions.access_token.create_access_token import (
@@ -111,14 +113,20 @@ class DeploymentProcessors(AbstractProcessorPackage):
     """Processors for deployment operations."""
 
     # Deployment CRUD
-    create_deployment: ActionProcessor[CreateDeploymentAction, CreateDeploymentActionResult]
-    create_legacy_deployment: ActionProcessor[
+    create_deployment: ScopeActionProcessor[CreateDeploymentAction, CreateDeploymentActionResult]
+    create_legacy_deployment: ScopeActionProcessor[
         CreateLegacyDeploymentAction, CreateLegacyDeploymentActionResult
     ]
-    update_deployment: ActionProcessor[UpdateDeploymentAction, UpdateDeploymentActionResult]
-    destroy_deployment: ActionProcessor[DestroyDeploymentAction, DestroyDeploymentActionResult]
-    search_deployments: ActionProcessor[SearchDeploymentsAction, SearchDeploymentsActionResult]
-    get_deployment_by_id: ActionProcessor[GetDeploymentByIdAction, GetDeploymentByIdActionResult]
+    update_deployment: SingleEntityActionProcessor[
+        UpdateDeploymentAction, UpdateDeploymentActionResult
+    ]
+    destroy_deployment: SingleEntityActionProcessor[
+        DestroyDeploymentAction, DestroyDeploymentActionResult
+    ]
+    search_deployments: ScopeActionProcessor[SearchDeploymentsAction, SearchDeploymentsActionResult]
+    get_deployment_by_id: SingleEntityActionProcessor[
+        GetDeploymentByIdAction, GetDeploymentByIdActionResult
+    ]
     get_deployment_policy: ActionProcessor[
         GetDeploymentPolicyAction, GetDeploymentPolicyActionResult
     ]
@@ -172,14 +180,26 @@ class DeploymentProcessors(AbstractProcessorPackage):
         validators: ActionValidators,
     ) -> None:
         # Deployment CRUD
-        self.create_deployment = ActionProcessor(service.create_deployment, action_monitors)
-        self.create_legacy_deployment = ActionProcessor(
-            service.create_legacy_deployment, action_monitors
+        self.create_deployment = ScopeActionProcessor(
+            service.create_deployment, action_monitors, validators=[validators.rbac.scope]
         )
-        self.update_deployment = ActionProcessor(service.update_deployment, action_monitors)
-        self.destroy_deployment = ActionProcessor(service.destroy_deployment, action_monitors)
-        self.search_deployments = ActionProcessor(service.search_deployments, action_monitors)
-        self.get_deployment_by_id = ActionProcessor(service.get_deployment_by_id, action_monitors)
+        self.create_legacy_deployment = ScopeActionProcessor(
+            service.create_legacy_deployment, action_monitors, validators=[validators.rbac.scope]
+        )
+        self.update_deployment = SingleEntityActionProcessor(
+            service.update_deployment, action_monitors, validators=[validators.rbac.single_entity]
+        )
+        self.destroy_deployment = SingleEntityActionProcessor(
+            service.destroy_deployment, action_monitors, validators=[validators.rbac.single_entity]
+        )
+        self.search_deployments = ScopeActionProcessor(
+            service.search_deployments, action_monitors, validators=[validators.rbac.scope]
+        )
+        self.get_deployment_by_id = SingleEntityActionProcessor(
+            service.get_deployment_by_id,
+            action_monitors,
+            validators=[validators.rbac.single_entity],
+        )
         self.get_deployment_policy = ActionProcessor(service.get_deployment_policy, action_monitors)
         self.search_deployment_policies = ActionProcessor(
             service.search_deployment_policies, action_monitors
