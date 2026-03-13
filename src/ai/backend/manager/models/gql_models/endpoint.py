@@ -291,6 +291,7 @@ class EndpointAutoScalingRuleNode(graphene.ObjectType):
                         raise GenericForbidden
 
             query = query.filter(EndpointAutoScalingRuleRow.endpoint == _endpoint_id)
+            cnt_query = cnt_query.where(EndpointAutoScalingRuleRow.endpoint == _endpoint_id)
             group_rows = (await db_session.scalars(query)).all()
             result = [cls.from_row(graph_ctx, row) for row in group_rows]
             total_cnt = await db_session.scalar(cnt_query)
