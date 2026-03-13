@@ -34,6 +34,7 @@ from aiohttp.typedefs import Handler, Middleware
 from dateutil.parser import parse as dtparse
 from dateutil.tz import tzutc
 
+from ai.backend.common.contexts.client_ip import with_client_ip
 from ai.backend.common.contexts.user import with_user
 from ai.backend.common.data.user.types import UserData, UserRole
 from ai.backend.common.exception import InvalidIpAddressValue
@@ -652,6 +653,10 @@ def _setup_user_context(request: web.Request) -> ExitStack:
                     "user_id": str(user_id),
                 })
             )
+
+    raw_client_addr: str | None = request.headers.get("X-Forwarded-For") or request.remote
+    if raw_client_addr:
+        stack.enter_context(with_client_ip(raw_client_addr))
 
     return stack
 
