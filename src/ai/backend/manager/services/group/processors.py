@@ -80,14 +80,10 @@ class GroupProcessors(AbstractProcessorPackage):
         self.usage_per_period = ActionProcessor(group_service.usage_per_period, action_monitors)
         self.search_projects = ActionProcessor(group_service.search_projects, action_monitors)
         self.search_projects_by_domain = ScopeActionProcessor(
-            group_service.search_projects_by_domain,
-            action_monitors,
-            validators=[validators.rbac.scope],
+            group_service.search_projects_by_domain, action_monitors
         )
         self.search_projects_by_user = ScopeActionProcessor(
-            group_service.search_projects_by_user,
-            action_monitors,
-            validators=[validators.rbac.scope],
+            group_service.search_projects_by_user, action_monitors
         )
         self.get_project = SingleEntityActionProcessor(
             group_service.get_project, action_monitors, validators=[validators.rbac.single_entity]
