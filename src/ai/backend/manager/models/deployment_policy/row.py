@@ -54,7 +54,6 @@ class RollingUpdateSpec(BaseModel):
         return self
 
 
-
 class BlueGreenSpec(BaseModel):
     """Specification for blue-green deployment strategy."""
 
