@@ -90,7 +90,7 @@ class ContainerRegistryProcessors(AbstractProcessorPackage):
     ]
 
     # Scope actions (with RBAC validators)
-    get_container_registries: ScopeActionProcessor[
+    get_container_registries: ActionProcessor[
         GetContainerRegistriesAction, GetContainerRegistriesActionResult
     ]
     create_container_registry: ActionProcessor[
@@ -130,8 +130,8 @@ class ContainerRegistryProcessors(AbstractProcessorPackage):
         self.delete_registry_quota = ActionProcessor(service.delete_registry_quota, action_monitors)
 
         # Scope actions (with RBAC validators)
-        self.get_container_registries = ScopeActionProcessor(
-            service.get_container_registries, action_monitors, validators=[validators.rbac.scope]
+        self.get_container_registries = ActionProcessor(
+            service.get_container_registries, action_monitors
         )
         self.create_container_registry = ActionProcessor(
             service.create_container_registry, action_monitors
