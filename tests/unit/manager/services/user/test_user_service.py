@@ -46,14 +46,13 @@ from ai.backend.manager.services.user.actions.admin_month_stats import AdminMont
 from ai.backend.manager.services.user.actions.create_user import (
     BulkCreateUserAction,
     CreateUserAction,
-    UserCreateSpec,
 )
+from ai.backend.manager.services.user.types import UserCreateSpec, UserUpdateSpec
 from ai.backend.manager.services.user.actions.delete_user import DeleteUserAction
 from ai.backend.manager.services.user.actions.get_user import GetUserAction
 from ai.backend.manager.services.user.actions.modify_user import (
     BulkModifyUserAction,
     ModifyUserAction,
-    UserUpdateSpec,
 )
 from ai.backend.manager.services.user.actions.purge_user import (
     BulkPurgeUserAction,
@@ -744,7 +743,7 @@ class TestDeleteUser:
         """Email soft delete calls repository."""
         mock_user_repository.soft_delete_user_validated = AsyncMock(return_value=None)
 
-        action = DeleteUserAction(email="user@example.com")
+        action = DeleteUserAction(user_uuid=uuid.uuid4(), email="user@example.com")
         result = await service.delete_user(action)
 
         assert result is not None
@@ -762,7 +761,7 @@ class TestDeleteUser:
             side_effect=UserNotFound("User not found")
         )
 
-        action = DeleteUserAction(email="missing@example.com")
+        action = DeleteUserAction(user_uuid=uuid.uuid4(), email="missing@example.com")
 
         with pytest.raises(UserNotFound):
             await service.delete_user(action)

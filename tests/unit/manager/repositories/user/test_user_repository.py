@@ -51,8 +51,7 @@ from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.repositories.user.creators import UserCreatorSpec
 from ai.backend.manager.repositories.user.repository import UserRepository
 from ai.backend.manager.repositories.user.updaters import UserUpdaterSpec
-from ai.backend.manager.services.user.actions.create_user import UserCreateSpec
-from ai.backend.manager.services.user.actions.modify_user import UserUpdateSpec
+from ai.backend.manager.services.user.types import UserCreateSpec, UserUpdateSpec
 from ai.backend.manager.types import OptionalState
 from ai.backend.testutils.db import with_tables
 

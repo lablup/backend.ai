@@ -189,7 +189,7 @@ class TestUserServiceCompatibility:
         """Test that DeleteUserAction works as expected."""
         mock_dependencies["user_repository"].soft_delete_user_validated = AsyncMock()
 
-        action = DeleteUserAction(email="user@example.com")
+        action = DeleteUserAction(user_uuid=uuid.uuid4(), email="user@example.com")
         await user_service.delete_user(action)
 
         mock_dependencies["user_repository"].soft_delete_user_validated.assert_called_once_with(
