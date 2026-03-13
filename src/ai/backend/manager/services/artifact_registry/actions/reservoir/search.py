@@ -3,15 +3,19 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import override
 
-from ai.backend.manager.actions.action import BaseActionResult
+from ai.backend.common.data.permission.types import RBACElementType, ScopeType
 from ai.backend.manager.actions.types import ActionOperationType
+from ai.backend.manager.data.permission.types import RBACElementRef
 from ai.backend.manager.data.reservoir_registry.types import ReservoirRegistryData
 from ai.backend.manager.repositories.base import BatchQuerier
-from ai.backend.manager.services.artifact_registry.actions.base import ArtifactRegistryAction
+from ai.backend.manager.services.artifact_registry.actions.base import (
+    ArtifactRegistryScopeAction,
+    ArtifactRegistryScopeActionResult,
+)
 
 
 @dataclass
-class SearchReservoirRegistriesAction(ArtifactRegistryAction):
+class SearchReservoirRegistriesAction(ArtifactRegistryScopeAction):
     """Action to search Reservoir registries."""
 
     querier: BatchQuerier
@@ -22,12 +26,20 @@ class SearchReservoirRegistriesAction(ArtifactRegistryAction):
         return ActionOperationType.SEARCH
 
     @override
-    def entity_id(self) -> str | None:
-        return None
+    def scope_type(self) -> ScopeType:
+        return ScopeType.GLOBAL
+
+    @override
+    def scope_id(self) -> str:
+        return ""
+
+    @override
+    def target_element(self) -> RBACElementRef:
+        return RBACElementRef(RBACElementType.ARTIFACT_REGISTRY, "")
 
 
 @dataclass
-class SearchReservoirRegistriesActionResult(BaseActionResult):
+class SearchReservoirRegistriesActionResult(ArtifactRegistryScopeActionResult):
     """Result of searching Reservoir registries."""
 
     registries: list[ReservoirRegistryData]
@@ -36,5 +48,9 @@ class SearchReservoirRegistriesActionResult(BaseActionResult):
     has_previous_page: bool
 
     @override
-    def entity_id(self) -> str | None:
-        return None
+    def scope_type(self) -> ScopeType:
+        return ScopeType.GLOBAL
+
+    @override
+    def scope_id(self) -> str:
+        return ""
