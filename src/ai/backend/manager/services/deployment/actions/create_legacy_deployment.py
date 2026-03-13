@@ -2,9 +2,8 @@
 
 from dataclasses import dataclass
 from typing import override
-from uuid import UUID
 
-from ai.backend.common.data.permission.types import OperationType, RBACElementType, ScopeType
+from ai.backend.common.data.permission.types import RBACElementType, ScopeType
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.deployment.creator import DeploymentCreationDraft
 from ai.backend.manager.data.deployment.types import DeploymentInfo
@@ -53,4 +52,4 @@ class CreateLegacyDeploymentActionResult(DeploymentScopeActionResult):
 
     @override
     def scope_id(self) -> str:
-        return str(self.data.project_id)
+        return str(self.data.metadata.project)

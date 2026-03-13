@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from typing import override
 from uuid import UUID
 
-from ai.backend.common.data.permission.types import OperationType, RBACElementType
+from ai.backend.common.data.permission.types import RBACElementType
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.permission.types import RBACElementRef
 from ai.backend.manager.services.deployment.actions.base import (
