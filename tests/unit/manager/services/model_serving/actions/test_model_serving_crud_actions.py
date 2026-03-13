@@ -180,11 +180,12 @@ class ModelServingCRUDBaseFixtures:
         self,
         mock_action_monitor: MagicMock,
         model_serving_service: ModelServingService,
+        mock_action_validators: ActionValidators,
     ) -> ModelServingProcessors:
         return ModelServingProcessors(
             service=model_serving_service,
             action_monitors=[mock_action_monitor],
-            validators=MagicMock(spec=ActionValidators),
+            validators=mock_action_validators,
         )
 
     @pytest.fixture
@@ -488,7 +489,7 @@ class TestDeleteRoute(ModelServingCRUDBaseFixtures):
         action = DeleteRouteAction(service_id=service_id, route_id=route_id)
         result = await model_serving_processors.delete_route.wait_for_complete(action)
 
-        assert result.success is True
+        assert result.route_id == route_id
         mock_destroy_session.assert_called_once_with(
             mock_session_row,
             forced=False,
@@ -539,7 +540,7 @@ class TestDeleteRoute(ModelServingCRUDBaseFixtures):
         action = DeleteRouteAction(service_id=service_id, route_id=route_id)
         result = await model_serving_processors.delete_route.wait_for_complete(action)
 
-        assert result.success is True
+        assert result.route_id == route_id
         mock_destroy_session.assert_not_called()
         mock_decrease_endpoint_replicas.assert_called_once_with(service_id)
 

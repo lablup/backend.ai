@@ -234,11 +234,12 @@ class TestCreateModelService:
         self,
         mock_action_monitor: MagicMock,
         model_serving_service: ModelServingService,
+        mock_action_validators: ActionValidators,
     ) -> ModelServingProcessors:
         return ModelServingProcessors(
             service=model_serving_service,
             action_monitors=[mock_action_monitor],
-            validators=MagicMock(spec=ActionValidators),
+            validators=mock_action_validators,
         )
 
     @pytest.fixture
@@ -379,6 +380,7 @@ class TestCreateModelService:
                             extra_mounts=[],
                         ),
                     ),
+                    _project_id=uuid.UUID("00000000-0000-0000-0000-000000000002"),
                 ),
                 CreateModelServiceActionResult(
                     data=ServiceInfo(
@@ -394,6 +396,7 @@ class TestCreateModelService:
                         is_public=False,
                         runtime_variant=RuntimeVariant.CUSTOM,
                     ),
+                    _project_id=uuid.UUID("00000000-0000-0000-0000-000000000002"),
                 ),
             ),
             ScenarioBase.failure(
@@ -436,6 +439,7 @@ class TestCreateModelService:
                             extra_mounts=[],
                         ),
                     ),
+                    _project_id=uuid.UUID("00000000-0000-0000-0000-000000000002"),
                 ),
                 Exception,  # insufficient resources
             ),
@@ -479,6 +483,7 @@ class TestCreateModelService:
                             extra_mounts=[],
                         ),
                     ),
+                    _project_id=uuid.UUID("00000000-0000-0000-0000-000000000002"),
                 ),
                 InvalidAPIParameters,
             ),
@@ -522,6 +527,7 @@ class TestCreateModelService:
                             extra_mounts=[],
                         ),
                     ),
+                    _project_id=uuid.UUID("00000000-0000-0000-0000-000000000002"),
                 ),
                 CreateModelServiceActionResult(
                     data=ServiceInfo(
@@ -537,6 +543,7 @@ class TestCreateModelService:
                         is_public=True,
                         runtime_variant=RuntimeVariant.CUSTOM,
                     ),
+                    _project_id=uuid.UUID("00000000-0000-0000-0000-000000000002"),
                 ),
             ),
         ],
@@ -735,11 +742,12 @@ class TestCreateWithServiceDefinitionOverrides:
         self,
         mock_action_monitor: MagicMock,
         model_serving_service: ModelServingService,
+        mock_action_validators: ActionValidators,
     ) -> ModelServingProcessors:
         return ModelServingProcessors(
             service=model_serving_service,
             action_monitors=[mock_action_monitor],
-            validators=MagicMock(spec=ActionValidators),
+            validators=mock_action_validators,
         )
 
     @pytest.fixture
@@ -841,6 +849,7 @@ class TestCreateWithServiceDefinitionOverrides:
                     extra_mounts=[],
                 ),
             ),
+            _project_id=uuid.UUID("00000000-0000-0000-0000-000000000002"),
         )
 
     async def test_service_definition_overrides_applied(

@@ -158,11 +158,12 @@ class TestDeleteModelService:
         self,
         mock_action_monitor: MagicMock,
         model_serving_service: ModelServingService,
+        mock_action_validators: ActionValidators,
     ) -> ModelServingProcessors:
         return ModelServingProcessors(
             service=model_serving_service,
             action_monitors=[mock_action_monitor],
-            validators=MagicMock(spec=ActionValidators),
+            validators=mock_action_validators,
         )
 
     @pytest.fixture
@@ -222,7 +223,7 @@ class TestDeleteModelService:
                     service_id=uuid.UUID("cccccccc-dddd-eeee-ffff-111111111111"),
                 ),
                 DeleteModelServiceActionResult(
-                    success=True,
+                    service_id=uuid.UUID("cccccccc-dddd-eeee-ffff-111111111111"),
                 ),
             ),
             ScenarioBase.failure(

@@ -69,11 +69,12 @@ class TestDeleteAutoScalingRule:
         self,
         mock_action_monitor: MagicMock,
         auto_scaling_service: AutoScalingService,
+        mock_action_validators: ActionValidators,
     ) -> ModelServingAutoScalingProcessors:
         return ModelServingAutoScalingProcessors(
             service=auto_scaling_service,
             action_monitors=[mock_action_monitor],
-            validators=MagicMock(spec=ActionValidators),
+            validators=mock_action_validators,
         )
 
     @pytest.fixture
