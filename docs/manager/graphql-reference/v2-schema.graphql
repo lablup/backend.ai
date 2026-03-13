@@ -870,6 +870,105 @@ input AssignRoleInput {
   roleId: UUID!
 }
 
+"""Filter criteria for querying audit logs."""
+input AuditLogFilter {
+  entityType: StringFilter = null
+  operation: StringFilter = null
+  status: AuditLogStatusFilter = null
+  createdAt: DateTimeFilter = null
+  triggeredBy: StringFilter = null
+}
+
+"""Ordering specification for audit logs."""
+input AuditLogOrderBy {
+  field: AuditLogOrderField!
+  direction: OrderDirection! = DESC
+}
+
+"""Fields available for ordering audit logs."""
+enum AuditLogOrderField {
+  CREATED_AT
+  ENTITY_TYPE
+  OPERATION
+  STATUS
+}
+
+"""Status of an audit log entry."""
+enum AuditLogStatus {
+  SUCCESS
+  ERROR
+  UNKNOWN
+  RUNNING
+}
+
+"""Filter for audit log status field."""
+input AuditLogStatusFilter {
+  in: [AuditLogStatus!] = null
+  notIn: [AuditLogStatus!] = null
+}
+
+"""Represents an audit log entry tracking system operations."""
+type AuditLogV2 implements Node {
+  """The Globally Unique ID of this object"""
+  id: ID!
+
+  """UUID of the action that generated this log."""
+  actionId: UUID!
+
+  """Type of entity this log relates to."""
+  entityType: String!
+
+  """Operation performed (create, update, delete, etc.)."""
+  operation: String!
+
+  """ID of the affected entity, if applicable."""
+  entityId: String
+
+  """Timestamp when the audit log was created."""
+  createdAt: DateTime!
+
+  """Request ID that triggered this operation."""
+  requestId: String
+
+  """UUID string of the user who triggered the action."""
+  triggeredBy: String
+
+  """Human-readable description of the operation."""
+  description: String!
+
+  """Duration of the operation as a string representation."""
+  duration: String
+
+  """Status of the operation."""
+  status: AuditLogStatus!
+
+  """
+  The user who triggered this audit log entry, resolved from triggered_by UUID.
+  """
+  user: UserV2
+}
+
+"""Connection type for paginated audit log results."""
+type AuditLogV2Connection {
+  """Pagination data for this connection"""
+  pageInfo: PageInfo!
+
+  """Contains the nodes in this connection"""
+  edges: [AuditLogV2Edge!]!
+
+  """Total number of audit log entries matching the query."""
+  count: Int!
+}
+
+"""An edge in a connection."""
+type AuditLogV2Edge {
+  """A cursor for use in pagination"""
+  cursor: String!
+
+  """The item at the end of the edge"""
+  node: AuditLogV2!
+}
+
 """Added in 25.1.0"""
 enum AutoScalingMetricSource {
   KERNEL
@@ -5374,6 +5473,9 @@ type Query {
   Added in 26.2.0. Query kernels with pagination and filtering. (admin only)
   """
   adminKernelsV2(filter: KernelV2Filter = null, orderBy: [KernelV2OrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): KernelV2Connection
+
+  """Query audit logs with pagination and filtering. (admin only)"""
+  adminAuditLogsV2(filter: AuditLogFilter = null, orderBy: [AuditLogOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): AuditLogV2Connection!
 
   """
   Added in 26.3.0. Query sessions with pagination and filtering. (admin only)
