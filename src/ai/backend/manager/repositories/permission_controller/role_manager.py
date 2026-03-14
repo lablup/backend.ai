@@ -6,6 +6,10 @@ from typing import Protocol, cast
 import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
 
+from ai.backend.common.data.permission.types import (
+    RBACElementType,
+    RelationType,
+)
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.permission.id import ObjectId, ScopeId
 from ai.backend.manager.data.permission.object_permission import ObjectPermissionData
@@ -93,7 +97,17 @@ class RoleManager:
         return [row.to_data() for row in permission_rows]
 
     async def map_user_to_role(self, db_session: SASession, creator: Creator[UserRoleRow]) -> None:
-        await execute_creator(db_session, creator)
+        result = await execute_creator(db_session, creator)
+        user_role_row = result.row
+        db_session.add(
+            AssociationScopesEntitiesRow(
+                scope_type=RBACElementType.USER.to_scope_type(),
+                scope_id=str(user_role_row.user_id),
+                entity_type=RBACElementType.ROLE.to_entity_type(),
+                entity_id=str(user_role_row.role_id),
+                relation_type=RelationType.AUTO,
+            ),
+        )
 
     async def map_entity_to_scope(
         self,
