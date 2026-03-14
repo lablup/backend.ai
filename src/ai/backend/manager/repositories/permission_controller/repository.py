@@ -4,7 +4,7 @@ import uuid
 from collections.abc import Mapping
 from typing import cast
 
-from ai.backend.common.data.permission.types import GLOBAL_SCOPE_ID, OperationType
+from ai.backend.common.data.permission.types import GLOBAL_SCOPE_ID, OperationType, RBACElementType
 from ai.backend.common.exception import BackendAIError
 from ai.backend.common.metrics.metric import DomainType, LayerType
 from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPolicy
@@ -320,30 +320,28 @@ class PermissionControllerRepository:
     @permission_controller_repository_resilience.apply()
     async def search_scopes(
         self,
-        scope_type: ScopeType,
+        element_type: RBACElementType,
         querier: BatchQuerier,
     ) -> ScopeListResult:
-        """Search scopes based on scope type.
+        """Search scopes based on element type.
 
         Args:
-            scope_type: The type of scope to search.
+            element_type: The RBACElementType to search scopes for.
             querier: BatchQuerier with conditions, orders, and pagination.
 
         Returns:
             ScopeListResult with matching scopes.
         """
-        match scope_type:
-            case ScopeType.GLOBAL:
-                return self._get_global_scope()
-            case ScopeType.DOMAIN:
+        match element_type:
+            case RBACElementType.DOMAIN:
                 return await self._db_source.search_domain_scopes(querier)
-            case ScopeType.PROJECT:
+            case RBACElementType.PROJECT:
                 return await self._db_source.search_project_scopes(querier)
-            case ScopeType.USER:
+            case RBACElementType.USER:
                 return await self._db_source.search_user_scopes(querier)
             case _:
                 raise NotImplementedError(
-                    "This function will be deprecated and new repository functions will be implemented for each scope"
+                    f"search_scopes is not supported for element type {element_type!r}"
                 )
 
     @permission_controller_repository_resilience.apply()

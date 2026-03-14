@@ -6,6 +6,7 @@ from typing import Protocol, cast
 import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
 
+from ai.backend.common.data.permission.types import RBACElementType
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.permission.id import ObjectId, ScopeId
 from ai.backend.manager.data.permission.object_permission import ObjectPermissionData
@@ -15,7 +16,6 @@ from ai.backend.manager.data.permission.role import (
 )
 from ai.backend.manager.data.permission.status import RoleStatus
 from ai.backend.manager.data.permission.types import (
-    EntityType,
     OperationType,
     RoleSource,
 )
@@ -42,7 +42,7 @@ class ScopeSystemRoleData(Protocol):
 
     def role_name(self) -> str: ...
 
-    def entity_operations(self) -> Mapping[EntityType, Iterable[OperationType]]:
+    def entity_operations(self) -> Mapping[RBACElementType, Iterable[OperationType]]:
         """Returns a mapping of entity types to the set of operations that should be granted for each entity type."""
         ...
 
@@ -78,13 +78,13 @@ class RoleManager:
         role_id: uuid.UUID,
     ) -> list[PermissionData]:
         permission_rows: list[PermissionRow] = []
-        for entity, operations in data.entity_operations().items():
+        for element_type, operations in data.entity_operations().items():
             for operation in operations:
                 creator = PermissionCreator(
                     role_id=role_id,
                     scope_type=data.scope_id().scope_type,
                     scope_id=data.scope_id().scope_id,
-                    entity_type=entity,
+                    entity_type=element_type.to_entity_type(),
                     operation=operation,
                 )
                 permission_rows.append(PermissionRow.from_input(creator))
@@ -147,7 +147,7 @@ class RoleManager:
             Creator(
                 spec=ObjectPermissionCreatorSpec(
                     role_id=role_id,
-                    entity_type=entity_id.entity_type,
+                    entity_type=entity_id.entity_type.to_element(),
                     entity_id=entity_id.entity_id,
                     operation=operation,
                 )

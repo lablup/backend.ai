@@ -25,7 +25,6 @@ from ai.backend.manager.data.permission.types import (
     RBACElementRef,
     RBACElementType,
     RoleSource,
-    ScopeType,
 )
 from ai.backend.manager.data.vfolder.types import (
     ValidatedVFolderInfo,
@@ -349,9 +348,9 @@ class VfolderRepository:
                         entity_type=EntityType.VFOLDER,
                         entity_id=str(params.id),
                     ),
-                    granted_entity_scope_type=ScopeType.VFOLDER,
+                    granted_entity_scope_type=RBACElementType.VFOLDER.to_scope_type(),
                     target_scope_id=ScopeId(
-                        scope_type=ScopeType.USER,
+                        scope_type=RBACElementType.USER.to_scope_type(),
                         scope_id=str(params.user),
                     ),
                     target_role_ids=[user_role_id],
@@ -538,9 +537,9 @@ class VfolderRepository:
                     entity_type=EntityType.VFOLDER,
                     entity_id=str(vfolder_id),
                 ),
-                granted_entity_scope_type=ScopeType.VFOLDER,
+                granted_entity_scope_type=RBACElementType.VFOLDER.to_scope_type(),
                 target_scope_id=ScopeId(
-                    scope_type=ScopeType.USER,
+                    scope_type=RBACElementType.USER.to_scope_type(),
                     scope_id=str(user_id),
                 ),
                 target_role_ids=[user_role_id],
@@ -577,7 +576,7 @@ class VfolderRepository:
                     entity_type=EntityType.VFOLDER,
                     entity_id=str(vfolder_id),
                 ),
-                entity_scope_type=ScopeType.VFOLDER,
+                entity_scope_type=RBACElementType.VFOLDER.to_scope_type(),
                 target_role_ids=[user_role_id],
                 operations=None,  # Revoke all operations
             )
@@ -815,9 +814,9 @@ class VfolderRepository:
     def _get_vfolder_scope(self, vfolder: VFolderData) -> ScopeId:
         """Determine scope from vfolder ownership."""
         if vfolder.ownership_type == VFolderOwnershipType.USER:
-            return ScopeId(ScopeType.USER, str(vfolder.user))
+            return ScopeId(RBACElementType.USER.to_scope_type(), str(vfolder.user))
         # GROUP ownership
-        return ScopeId(ScopeType.PROJECT, str(vfolder.group))
+        return ScopeId(RBACElementType.PROJECT.to_scope_type(), str(vfolder.group))
 
     async def _validate_vfolder_ownership(
         self, session: SASession, vfolder_id: uuid.UUID, user_id: uuid.UUID

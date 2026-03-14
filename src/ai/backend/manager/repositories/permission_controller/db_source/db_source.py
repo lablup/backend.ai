@@ -9,6 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession as SASession
 from sqlalchemy.orm import contains_eager, selectinload
 
 from ai.backend.common.data.permission.types import (
+    RBACElementType,
     RelationType,
 )
 from ai.backend.logging.utils import BraceStyleAdapter
@@ -41,7 +42,6 @@ from ai.backend.manager.data.permission.status import (
     RoleStatus,
 )
 from ai.backend.manager.data.permission.types import (
-    EntityType,
     OperationType,
     RBACElementRef,
     ScopeData,
@@ -338,9 +338,9 @@ class PermissionDBSource:
                 perm_creator = Creator(
                     spec=PermissionCreatorSpec(
                         role_id=input_data.role_id,
-                        scope_type=scoped_perm_input.scope_type,
+                        scope_type=scoped_perm_input.scope_type.to_element(),
                         scope_id=scoped_perm_input.scope_id,
-                        entity_type=scoped_perm_input.entity_type,
+                        entity_type=scoped_perm_input.entity_type.to_element(),
                         operation=scoped_perm_input.operation,
                     )
                 )
@@ -356,7 +356,7 @@ class PermissionDBSource:
                 obj_perm_creator = Creator(
                     spec=ObjectPermissionCreatorSpec(
                         role_id=input_data.role_id,
-                        entity_type=obj_perm_input.entity_type,
+                        entity_type=obj_perm_input.entity_type.to_element(),
                         entity_id=obj_perm_input.entity_id,
                         operation=obj_perm_input.operation,
                         status=obj_perm_input.status,
@@ -723,7 +723,9 @@ class PermissionDBSource:
 
             items = [
                 ScopeData(
-                    id=ScopeId(scope_type=ScopeType.DOMAIN, scope_id=row.name),
+                    id=ScopeId(
+                        scope_type=RBACElementType.DOMAIN.to_scope_type(), scope_id=row.name
+                    ),
                     name=row.name,
                 )
                 for row in result.rows
@@ -752,7 +754,9 @@ class PermissionDBSource:
 
             items = [
                 ScopeData(
-                    id=ScopeId(scope_type=ScopeType.PROJECT, scope_id=str(row.id)),
+                    id=ScopeId(
+                        scope_type=RBACElementType.PROJECT.to_scope_type(), scope_id=str(row.id)
+                    ),
                     name=row.name,
                 )
                 for row in result.rows
@@ -781,7 +785,9 @@ class PermissionDBSource:
 
             items = [
                 ScopeData(
-                    id=ScopeId(scope_type=ScopeType.USER, scope_id=str(row.uuid)),
+                    id=ScopeId(
+                        scope_type=RBACElementType.USER.to_scope_type(), scope_id=str(row.uuid)
+                    ),
                     name=row.username if row.username is not None else row.email,
                 )
                 for row in result.rows
@@ -903,7 +909,7 @@ class PermissionDBSource:
         self,
         user_id: uuid.UUID,
         target_element_ref: RBACElementRef,
-        target_entity_type: EntityType,
+        target_element_type: RBACElementType,
         operation: OperationType,
     ) -> sa.sql.Select[Any]:
         """Build a query that checks permissions via CTE scope chain traversal."""
@@ -935,7 +941,7 @@ class PermissionDBSource:
                 sa.and_(
                     user_roles.c.user_id == user_id,
                     roles.c.status == RoleStatus.ACTIVE,
-                    permissions.c.entity_type == target_entity_type,
+                    permissions.c.entity_type == target_element_type.to_entity_type(),
                     permissions.c.operation == operation,
                 )
             )
@@ -946,8 +952,7 @@ class PermissionDBSource:
         self,
         user_id: uuid.UUID,
         target_element_ref: RBACElementRef,
-        target_entity_type: EntityType,
-        target_scope_type: ScopeType,
+        target_element_type: RBACElementType,
         operation: OperationType,
     ) -> sa.sql.Select[Any]:
         """Build a query that checks permissions scoped to the target entity itself."""
@@ -970,9 +975,9 @@ class PermissionDBSource:
                 sa.and_(
                     user_roles.c.user_id == user_id,
                     roles.c.status == RoleStatus.ACTIVE,
-                    permissions.c.scope_type == target_scope_type,
+                    permissions.c.scope_type == target_element_type.to_scope_type(),
                     permissions.c.scope_id == target_element_ref.element_id,
-                    permissions.c.entity_type == target_entity_type,
+                    permissions.c.entity_type == target_element_type.to_entity_type(),
                     permissions.c.operation == operation,
                 )
             )
@@ -991,22 +996,20 @@ class PermissionDBSource:
         1. Self-scope direct match — permission scoped to the target entity itself.
         2. Scope chain traversal — walks AUTO edges upward via CTE.
         """
-        target_entity_type = target_element_ref.element_type.to_entity_type()
-        target_scope_type = target_element_ref.element_type.to_scope_type()
+        target_element_type = target_element_ref.element_type
 
         combined_query = sa.select(
             sa.or_(
                 sa.exists(
                     self._build_scope_chain_permission_query(
-                        user_id, target_element_ref, target_entity_type, operation
+                        user_id, target_element_ref, target_element_type, operation
                     )
                 ),
                 sa.exists(
                     self._build_self_scope_permission_query(
                         user_id,
                         target_element_ref,
-                        target_entity_type,
-                        target_scope_type,
+                        target_element_type,
                         operation,
                     )
                 ),

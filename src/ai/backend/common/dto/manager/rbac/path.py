@@ -10,7 +10,7 @@ from uuid import UUID
 from pydantic import Field
 
 from ai.backend.common.api_handlers import BaseRequestModel
-from ai.backend.common.data.permission.types import EntityType, ScopeType
+from ai.backend.common.data.permission.types import RBACElementType
 
 __all__ = (
     "DeleteObjectPermissionPathParam",
@@ -54,24 +54,28 @@ class DeleteObjectPermissionPathParam(BaseRequestModel):
 
 
 class SearchScopesPathParam(BaseRequestModel):
-    """Path parameter for searching scopes."""
+    """Path parameter for searching scopes.
 
-    scope_type: ScopeType = Field(
-        description="Scope types", examples=["domain", "project", "user", "global"]
+    ``scope_type`` is ``None`` when the caller requests the GLOBAL scope,
+    which has no ``RBACElementType`` equivalent.
+    """
+
+    scope_type: RBACElementType | None = Field(
+        description="Scope types", examples=["domain", "project", "user"]
     )
 
 
 class SearchEntitiesPathParam(BaseRequestModel):
     """Path parameter for searching entities within a scope."""
 
-    scope_type: ScopeType = Field(
-        description="Scope type", examples=["domain", "project", "user", "global"]
+    scope_type: RBACElementType = Field(
+        description="Scope type", examples=["domain", "project", "user"]
     )
     scope_id: str = Field(
         description="Scope ID (domain name, project UUID, or user UUID)",
         examples=["default", "550e8400-e29b-41d4-a716-446655440000"],
     )
-    entity_type: EntityType = Field(
+    entity_type: RBACElementType = Field(
         description="Entity type to search",
         examples=["user", "vfolder", "session", "image"],
     )

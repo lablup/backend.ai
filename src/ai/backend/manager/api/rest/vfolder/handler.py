@@ -101,7 +101,7 @@ from ai.backend.common.types import (
     VFolderID,
 )
 from ai.backend.logging import BraceStyleAdapter
-from ai.backend.manager.data.permission.types import ScopeType
+from ai.backend.manager.data.permission.types import RBACElementType
 from ai.backend.manager.dto.context import (
     RequestCtx,
     UserContext,
@@ -250,10 +250,10 @@ class VFolderHandler:
         unmanaged_path = params.unmanaged_path
 
         if group_id_or_name is not None:
-            scope_type = ScopeType.PROJECT
+            scope_type = RBACElementType.PROJECT
             scope_id = str(group_id_or_name)
         else:
-            scope_type = ScopeType.USER
+            scope_type = RBACElementType.USER
             scope_id = str(ctx.user_uuid)
 
         try:
@@ -336,10 +336,10 @@ class VFolderHandler:
         owner_user_uuid = user_scope.owner_uuid
         group_id = params.group_id
         if group_id is not None:
-            scope_type = ScopeType.PROJECT
+            scope_type = RBACElementType.PROJECT
             scope_id = str(group_id)
         else:
-            scope_type = ScopeType.USER
+            scope_type = RBACElementType.USER
             scope_id = str(owner_user_uuid)
         result = await self._vfolder.list_vfolder.wait_for_complete(
             ListVFolderAction(

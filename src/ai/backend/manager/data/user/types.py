@@ -9,6 +9,7 @@ from uuid import UUID
 
 from sqlalchemy.engine import Row
 
+from ai.backend.common.data.permission.types import RBACElementType
 from ai.backend.common.data.user.types import UserRole
 from ai.backend.common.types import AccessKey
 from ai.backend.manager.data.keypair.types import KeyPairData
@@ -97,13 +98,13 @@ class UserData:
     def role_name(self) -> str:
         return f"user-{str(self.id)[:8]}"
 
-    def entity_operations(self) -> Mapping[EntityType, Iterable[OperationType]]:
+    def entity_operations(self) -> Mapping[RBACElementType, Iterable[OperationType]]:
         resource_entity_permissions = {
-            entity: OperationType.owner_operations()
+            entity.to_element(): OperationType.owner_operations()
             for entity in EntityType.owner_accessible_entity_types_in_user()
         }
         user_permissions = OperationType.owner_operations() - {OperationType.CREATE}
-        return {EntityType.USER: user_permissions, **resource_entity_permissions}
+        return {RBACElementType.USER: user_permissions, **resource_entity_permissions}
 
     @classmethod
     def from_row(cls, row: Row[Any]) -> Self:

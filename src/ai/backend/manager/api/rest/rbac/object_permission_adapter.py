@@ -46,7 +46,7 @@ class ObjectPermissionAdapter:
         creator = Creator(
             spec=ObjectPermissionCreatorSpec(
                 role_id=request.role_id,
-                entity_type=request.entity_type,
+                entity_type=request.entity_type.to_element(),
                 entity_id=request.entity_id,
                 operation=request.operation,
                 status=request.status,
