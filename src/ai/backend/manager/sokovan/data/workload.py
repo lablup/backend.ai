@@ -19,6 +19,19 @@ from ai.backend.manager.models.session import SessionStatus
 
 
 @dataclass(frozen=True)
+class RunningSessionData:
+    """Running session data for preemption candidate selection."""
+
+    session_id: SessionId
+    access_key: AccessKey
+    priority: int
+    is_preemptible: bool
+    occupied_slots: ResourceSlot
+    created_at: datetime
+    scaling_group_name: str
+
+
+@dataclass(frozen=True)
 class KeyPairResourcePolicy:
     """Resource policy for a keypair."""
 

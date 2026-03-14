@@ -140,6 +140,7 @@ from ai.backend.manager.sokovan.data import (
     KeypairOccupancy,
     KeyPairResourcePolicy,
     ResourceOccupancySnapshot,
+    RunningSessionData,
     SchedulingFailure,
     SessionAllocation,
     SessionDataForPull,
@@ -403,6 +404,52 @@ class ScheduleDBSource:
                 )
             )
         return agents
+
+    async def _fetch_running_sessions(
+        self, db_sess: SASession, scaling_group: str
+    ) -> list[RunningSessionData]:
+        """Fetch preemptible running sessions in the scaling group."""
+        query = (
+            sa.select(
+                SessionRow.id,
+                SessionRow.access_key,
+                SessionRow.priority,
+                SessionRow.is_preemptible,
+                SessionRow.occupying_slots,
+                SessionRow.created_at,
+                SessionRow.scaling_group_name,
+            )
+            .where(
+                sa.and_(
+                    SessionRow.scaling_group_name == scaling_group,
+                    SessionRow.status == SessionStatus.RUNNING,
+                    SessionRow.is_preemptible == sa.true(),
+                )
+            )
+            .order_by(SessionRow.created_at.asc())
+        )
+        result = await db_sess.execute(query)
+        running_sessions = []
+        for row in result:
+            running_sessions.append(
+                RunningSessionData(
+                    session_id=row.id,
+                    access_key=row.access_key,
+                    priority=row.priority,
+                    is_preemptible=row.is_preemptible,
+                    occupied_slots=row.occupying_slots,
+                    created_at=row.created_at,
+                    scaling_group_name=row.scaling_group_name,
+                )
+            )
+        return running_sessions
+
+    async def get_running_sessions_for_preemption(
+        self, scaling_group: str
+    ) -> list[RunningSessionData]:
+        """Get preemptible running sessions for a scaling group."""
+        async with self._begin_readonly_session_read_committed() as db_sess:
+            return await self._fetch_running_sessions(db_sess, scaling_group)
 
     async def _fetch_snapshot_data(
         self,

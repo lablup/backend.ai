@@ -42,6 +42,7 @@ from ai.backend.manager.repositories.base.updater import BatchUpdater
 from ai.backend.manager.sokovan.data import (
     AllocationBatch,
     KernelCreationInfo,
+    RunningSessionData,
     SessionRunningData,
     SessionsForPullWithImages,
     SessionsForStartWithImages,
@@ -174,6 +175,20 @@ class SchedulerRepository:
         For sokovan scheduler compatibility.
         """
         return await self._db_source.get_schedulable_scaling_groups()
+
+    @scheduler_repository_resilience.apply()
+    async def get_running_sessions_for_preemption(
+        self,
+        scaling_group: str,
+    ) -> list[RunningSessionData]:
+        """Get preemptible running sessions for a scaling group.
+
+        Used by PreemptSessionsLifecycleHandler to find candidate sessions for preemption.
+
+        :param scaling_group: The scaling group to query
+        :return: List of RunningSessionData for preemptible RUNNING sessions
+        """
+        return await self._db_source.get_running_sessions_for_preemption(scaling_group)
 
     @scheduler_repository_resilience.apply()
     async def get_terminating_sessions_by_ids(
