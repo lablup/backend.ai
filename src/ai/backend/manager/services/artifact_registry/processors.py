@@ -2,6 +2,7 @@ from typing import override
 
 from ai.backend.manager.actions.monitors.monitor import ActionMonitor
 from ai.backend.manager.actions.processor import ActionProcessor
+from ai.backend.manager.actions.processor.single_entity import SingleEntityActionProcessor
 from ai.backend.manager.actions.types import AbstractProcessorPackage, ActionSpec
 from ai.backend.manager.actions.validators import ActionValidators
 from ai.backend.manager.services.artifact_registry.actions.common.get_meta import (
@@ -80,13 +81,13 @@ class ArtifactRegistryProcessors(AbstractProcessorPackage):
     create_huggingface_registry: ActionProcessor[
         CreateHuggingFaceRegistryAction, CreateHuggingFaceRegistryActionResult
     ]
-    update_huggingface_registry: ActionProcessor[
+    update_huggingface_registry: SingleEntityActionProcessor[
         UpdateHuggingFaceRegistryAction, UpdateHuggingFaceRegistryActionResult
     ]
-    delete_huggingface_registry: ActionProcessor[
+    delete_huggingface_registry: SingleEntityActionProcessor[
         DeleteHuggingFaceRegistryAction, DeleteHuggingFaceRegistryActionResult
     ]
-    get_huggingface_registry: ActionProcessor[
+    get_huggingface_registry: SingleEntityActionProcessor[
         GetHuggingFaceRegistryAction, GetHuggingFaceRegistryActionResult
     ]
     get_huggingface_registries: ActionProcessor[
@@ -101,13 +102,13 @@ class ArtifactRegistryProcessors(AbstractProcessorPackage):
     create_reservoir_registry: ActionProcessor[
         CreateReservoirRegistryAction, CreateReservoirActionResult
     ]
-    update_reservoir_registry: ActionProcessor[
+    update_reservoir_registry: SingleEntityActionProcessor[
         UpdateReservoirRegistryAction, UpdateReservoirRegistryActionResult
     ]
-    delete_reservoir_registry: ActionProcessor[
+    delete_reservoir_registry: SingleEntityActionProcessor[
         DeleteReservoirRegistryAction, DeleteReservoirActionResult
     ]
-    get_reservoir_registry: ActionProcessor[
+    get_reservoir_registry: SingleEntityActionProcessor[
         GetReservoirRegistryAction, GetReservoirRegistryActionResult
     ]
     get_reservoir_registries: ActionProcessor[
@@ -119,7 +120,7 @@ class ArtifactRegistryProcessors(AbstractProcessorPackage):
     search_reservoir_registries: ActionProcessor[
         SearchReservoirRegistriesAction, SearchReservoirRegistriesActionResult
     ]
-    get_registry_meta: ActionProcessor[
+    get_registry_meta: SingleEntityActionProcessor[
         GetArtifactRegistryMetaAction, GetArtifactRegistryMetaActionResult
     ]
     get_registry_metas: ActionProcessor[
@@ -138,13 +139,13 @@ class ArtifactRegistryProcessors(AbstractProcessorPackage):
         self.create_huggingface_registry = ActionProcessor(
             service.create_huggingface_registry, action_monitors
         )
-        self.update_huggingface_registry = ActionProcessor(
+        self.update_huggingface_registry = SingleEntityActionProcessor(
             service.update_huggingface_registry, action_monitors
         )
-        self.delete_huggingface_registry = ActionProcessor(
+        self.delete_huggingface_registry = SingleEntityActionProcessor(
             service.delete_huggingface_registry, action_monitors
         )
-        self.get_huggingface_registry = ActionProcessor(
+        self.get_huggingface_registry = SingleEntityActionProcessor(
             service.get_huggingface_registry, action_monitors
         )
         self.get_huggingface_registries = ActionProcessor(
@@ -159,13 +160,13 @@ class ArtifactRegistryProcessors(AbstractProcessorPackage):
         self.create_reservoir_registry = ActionProcessor(
             service.create_reservoir_registry, action_monitors
         )
-        self.update_reservoir_registry = ActionProcessor(
+        self.update_reservoir_registry = SingleEntityActionProcessor(
             service.update_reservoir_registry, action_monitors
         )
-        self.delete_reservoir_registry = ActionProcessor(
+        self.delete_reservoir_registry = SingleEntityActionProcessor(
             service.delete_reservoir_registry, action_monitors
         )
-        self.get_reservoir_registry = ActionProcessor(
+        self.get_reservoir_registry = SingleEntityActionProcessor(
             service.get_reservoir_registry, action_monitors
         )
         self.get_reservoir_registries = ActionProcessor(
@@ -177,7 +178,9 @@ class ArtifactRegistryProcessors(AbstractProcessorPackage):
         self.search_reservoir_registries = ActionProcessor(
             service.search_reservoir_registries, action_monitors
         )
-        self.get_registry_meta = ActionProcessor(service.get_registry_meta, action_monitors)
+        self.get_registry_meta = SingleEntityActionProcessor(
+            service.get_registry_meta, action_monitors
+        )
         self.get_registry_metas = ActionProcessor(service.get_registry_metas, action_monitors)
         self.search_artifact_registries = ActionProcessor(
             service.search_artifact_registries, action_monitors
