@@ -148,7 +148,7 @@ class TestStrategyResultApplier:
         assert kwargs["completed_ids"] == set()
         assert kwargs["rolled_back_ids"] == set()
         assert kwargs["drain"] is None
-        assert not kwargs["rollout"].specs
+        assert not kwargs["rollout"]
         assert result.routes_created == 0
         assert result.routes_drained == 0
 
@@ -162,7 +162,7 @@ class TestStrategyResultApplier:
 
         mock_deployment_repo.apply_strategy_mutations.assert_called_once()
         kwargs = mock_deployment_repo.apply_strategy_mutations.call_args.kwargs
-        assert len(kwargs["rollout"].specs) == 1
+        assert len(kwargs["rollout"]) == 1
         assert result.routes_created == 1
 
     async def test_drain_passes_updater(
@@ -235,7 +235,7 @@ class TestStrategyResultApplier:
         kwargs = mock_deployment_repo.apply_strategy_mutations.call_args.kwargs
         assert kwargs["completed_ids"] == {completed_id}
         assert kwargs["rolled_back_ids"] == {rolled_back_id}
-        assert len(kwargs["rollout"].specs) == 1
+        assert len(kwargs["rollout"]) == 1
         assert kwargs["drain"] is not None
         assert result.completed_ids == {completed_id}
         assert result.rolled_back_ids == {rolled_back_id}

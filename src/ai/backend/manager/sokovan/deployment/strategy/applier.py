@@ -13,7 +13,6 @@ from ai.backend.manager.data.deployment.types import (
     RouteTrafficStatus,
 )
 from ai.backend.manager.models.routing import RoutingRow
-from ai.backend.manager.repositories.base.creator import BulkCreator
 from ai.backend.manager.repositories.base.updater import BatchUpdater
 from ai.backend.manager.repositories.deployment.creators import RouteBatchUpdaterSpec
 from ai.backend.manager.repositories.deployment.options import RouteConditions
@@ -82,11 +81,9 @@ class StrategyResultApplier:
                 conditions=[RouteConditions.by_ids(changes.drain_route_ids)],
             )
 
-        rollout: BulkCreator[RoutingRow] = BulkCreator(
-            specs=[c.spec for c in changes.rollout_specs],
-        )
+        rollout = changes.rollout_specs
 
-        if not (summary.assignments or rollout.specs or drain or completed_ids or rolled_back_ids):
+        if not (summary.assignments or rollout or drain or completed_ids or rolled_back_ids):
             return result
 
         swapped = await self._deployment_repo.apply_strategy_mutations(

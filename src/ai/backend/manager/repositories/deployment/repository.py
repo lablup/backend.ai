@@ -578,7 +578,7 @@ class DeploymentRepository:
     @deployment_repository_resilience.apply()
     async def scale_routes(
         self,
-        scale_out_creators: Sequence[Creator[RoutingRow]],
+        scale_out_creators: Sequence[RBACEntityCreator[RoutingRow]],
         scale_in_updater: BatchUpdater[RoutingRow] | None,
     ) -> None:
         await self._db_source.scale_routes(scale_out_creators, scale_in_updater)
@@ -1269,7 +1269,7 @@ class DeploymentRepository:
     @deployment_repository_resilience.apply()
     async def create_route(
         self,
-        creator: Creator[RoutingRow],
+        creator: RBACEntityCreator[RoutingRow],
     ) -> uuid.UUID:
         """Create a new route using the provided creator.
 
@@ -1407,7 +1407,7 @@ class DeploymentRepository:
     async def apply_strategy_mutations(
         self,
         assignments: Mapping[UUID, DeploymentSubStep],
-        rollout: BulkCreator[RoutingRow],
+        rollout: Sequence[RBACEntityCreator[RoutingRow]],
         drain: BatchUpdater[RoutingRow] | None,
         completed_ids: set[UUID],
         rolled_back_ids: set[UUID],
