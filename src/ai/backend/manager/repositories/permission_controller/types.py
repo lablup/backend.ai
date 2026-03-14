@@ -11,6 +11,7 @@ from ai.backend.manager.errors.permission import RoleNotFound
 from ai.backend.manager.models.rbac_models.permission.object_permission import ObjectPermissionRow
 from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
 from ai.backend.manager.models.rbac_models.role import RoleRow
+from ai.backend.manager.models.rbac_models.user_role import UserRoleRow
 from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.repositories.base import BatchQuerierResult
 from ai.backend.manager.repositories.base.types import ExistenceCheck, QueryCondition, SearchScope
@@ -72,3 +73,27 @@ class ObjectPermissionSearchScope(SearchScope):
                 error=RoleNotFound(),
             ),
         ]
+
+
+@dataclass(frozen=True)
+class RoleSearchScope(SearchScope):
+    """Scope for searching roles visible to a specific user via RBAC.
+
+    A role is visible to a user if the user has a role assignment via user_roles.
+    """
+
+    user_id: uuid.UUID
+
+    def to_condition(self) -> QueryCondition:
+        user_id = self.user_id
+
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return RoleRow.id.in_(
+                sa.select(UserRoleRow.role_id).where(UserRoleRow.user_id == user_id),
+            )
+
+        return inner
+
+    @property
+    def existence_checks(self) -> Sequence[ExistenceCheck[Any]]:
+        return []
