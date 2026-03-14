@@ -282,7 +282,7 @@ def info(name: str) -> None:
             print("- Owner:", result["is_owner"])
             print("- Permission:", result["permission"])
             print("- Status: {}".format(result["status"]))
-            print("- Number of files: {}".format(result["numFiles"]))
+            print("- Number of files: {}".format(result["num_files"]))
             print("- Ownership Type: {}".format(result["type"]))
             print("- Permission:", result["permission"])
             print("- Status:", result["status"])
@@ -676,11 +676,7 @@ def invitations() -> None:
                     perm = "read-only"
                 else:
                     perm = inv["perm"]
-                print(
-                    "[{}] {}, {}, {}".format(
-                        cnt + 1, inv["inviter_user_email"], inv["vfolder_id"], perm
-                    )
-                )
+                print("[{}] {}, {}, {}".format(cnt + 1, inv["inviter"], inv["vfolder_id"], perm))
 
             selection = input("Choose invitation number to manage: ")
             if selection.isdigit():
