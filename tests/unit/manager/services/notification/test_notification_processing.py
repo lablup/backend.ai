@@ -22,6 +22,7 @@ from ai.backend.common.data.notification.types import (
     WebhookSpec,
 )
 from ai.backend.manager.actions.validators import ActionValidators
+from ai.backend.manager.actions.validators.rbac import RBACValidators
 from ai.backend.manager.data.notification import (
     NotificationChannelData,
     NotificationRuleData,
@@ -55,12 +56,13 @@ def notification_processors(
     notification_center: NotificationCenter,
 ) -> NotificationProcessors:
     service = NotificationService(mock_repository, notification_center)
-    # Create properly structured ActionValidators mock with async validators
-    validators = MagicMock(spec=ActionValidators)
-    validators.rbac = MagicMock()
-    validators.rbac.scope = AsyncMock()
-    validators.rbac.single_entity = AsyncMock()
-    return NotificationProcessors(service=service, action_monitors=[], validators=validators)
+    return NotificationProcessors(
+        service=service,
+        action_monitors=[],
+        validators=ActionValidators(
+            rbac=RBACValidators(scope=AsyncMock(), single_entity=AsyncMock())
+        ),
+    )
 
 
 @pytest.fixture()
