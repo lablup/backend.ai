@@ -46,14 +46,12 @@ from ai.backend.manager.services.user.actions.admin_month_stats import AdminMont
 from ai.backend.manager.services.user.actions.create_user import (
     BulkCreateUserAction,
     CreateUserAction,
-    UserCreateSpec,
 )
 from ai.backend.manager.services.user.actions.delete_user import DeleteUserAction
 from ai.backend.manager.services.user.actions.get_user import GetUserAction
 from ai.backend.manager.services.user.actions.modify_user import (
     BulkModifyUserAction,
     ModifyUserAction,
-    UserUpdateSpec,
 )
 from ai.backend.manager.services.user.actions.purge_user import (
     BulkPurgeUserAction,
@@ -68,6 +66,7 @@ from ai.backend.manager.services.user.actions.search_users_by_project import (
 )
 from ai.backend.manager.services.user.actions.user_month_stats import UserMonthStatsAction
 from ai.backend.manager.services.user.service import UserService
+from ai.backend.manager.services.user.types import UserCreateSpec, UserUpdateSpec
 from ai.backend.manager.types import OptionalState
 
 

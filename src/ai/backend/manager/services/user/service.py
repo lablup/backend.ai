@@ -212,7 +212,7 @@ class UserService:
         # Finally purge the user completely
         await self._user_repository.purge_user(email)
 
-        return PurgeUserActionResult()
+        return PurgeUserActionResult(user_uuid=user_uuid)
 
     async def _purge_single_user(
         self,

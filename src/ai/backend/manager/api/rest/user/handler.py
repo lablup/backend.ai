@@ -102,7 +102,10 @@ class UserHandler:
         )
 
         action_result = await self._user.create_user.wait_for_complete(
-            CreateUserAction(creator=creator, group_ids=body.parsed.group_ids)
+            CreateUserAction(
+                creator=creator,
+                group_ids=body.parsed.group_ids,
+            )
         )
 
         resp = CreateUserResponse(user=self._adapter.convert_to_dto(action_result.data.user))
@@ -182,7 +185,7 @@ class UserHandler:
         updater = self._adapter.build_updater(body.parsed, email, password_info)
 
         action_result = await self._user.modify_user.wait_for_complete(
-            ModifyUserAction(email=email, updater=updater)
+            ModifyUserAction(user_uuid=path.parsed.user_id, email=email, updater=updater)
         )
 
         resp = UpdateUserResponse(user=self._adapter.convert_to_dto(action_result.data))
@@ -247,6 +250,7 @@ class UserHandler:
 
         await self._user.purge_user.wait_for_complete(
             PurgeUserAction(
+                user_uuid=body.parsed.user_id,
                 user_info_ctx=user_info_ctx,
                 email=get_result.user.email,
                 purge_shared_vfolders=purge_shared,

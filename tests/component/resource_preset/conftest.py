@@ -14,6 +14,7 @@ from ai.backend.common.events.dispatcher import EventProducer
 from ai.backend.common.plugin.hook import HookPluginContext
 from ai.backend.common.types import ResourceSlot
 from ai.backend.manager.actions.validators import ActionValidators
+from ai.backend.manager.actions.validators.rbac import RBACValidators
 from ai.backend.manager.api.rest.middleware import auth as _auth_api
 from ai.backend.manager.api.rest.resource.handler import ResourceHandler
 from ai.backend.manager.api.rest.resource.registry import register_resource_routes
@@ -51,6 +52,15 @@ PresetFixtureData = dict[str, Any]
 PresetFactory = Callable[..., Coroutine[Any, Any, PresetFixtureData]]
 
 
+def _create_mock_validators() -> MagicMock:
+    mock_rbac = MagicMock(spec=RBACValidators)
+    mock_rbac.scope = AsyncMock()
+    mock_rbac.single_entity = AsyncMock()
+    mock_validators = MagicMock(spec=ActionValidators)
+    mock_validators.rbac = mock_rbac
+    return mock_validators
+
+
 @pytest.fixture()
 def container_registry_processors(
     database_engine: ExtendedAsyncSAEngine,
@@ -58,7 +68,7 @@ def container_registry_processors(
     repo = ContainerRegistryRepository(database_engine)
     service = ContainerRegistryService(database_engine, repo)
     return ContainerRegistryProcessors(
-        service=service, action_monitors=[], validators=MagicMock(spec=ActionValidators)
+        service=service, action_monitors=[], validators=_create_mock_validators()
     )
 
 
@@ -71,7 +81,7 @@ def resource_preset_processors(
     repo = ResourcePresetRepository(database_engine, valkey_clients.stat, config_provider)
     service = ResourcePresetService(repo)
     return ResourcePresetProcessors(
-        service=service, action_monitors=[], validators=MagicMock(spec=ActionValidators)
+        service=service, action_monitors=[], validators=_create_mock_validators()
     )
 
 
@@ -103,7 +113,7 @@ def agent_processors(
         agent_cache=AsyncMock(),
     )
     return AgentProcessors(
-        service=service, action_monitors=[], validators=MagicMock(spec=ActionValidators)
+        service=service, action_monitors=[], validators=_create_mock_validators()
     )
 
 
@@ -120,7 +130,7 @@ def group_processors(
     group_repos = GroupRepositories(repository=group_repo)
     service = GroupService(storage_manager, config_provider, valkey_clients.stat, group_repos)
     return GroupProcessors(
-        group_service=service, action_monitors=[], validators=MagicMock(spec=ActionValidators)
+        group_service=service, action_monitors=[], validators=_create_mock_validators()
     )
 
 
@@ -133,7 +143,7 @@ def user_processors(
     user_repo = UserRepository(database_engine)
     service = UserService(storage_manager, valkey_clients.stat, AsyncMock(), user_repo)
     return UserProcessors(
-        user_service=service, action_monitors=[], validators=MagicMock(spec=ActionValidators)
+        user_service=service, action_monitors=[], validators=_create_mock_validators()
     )
 
 
