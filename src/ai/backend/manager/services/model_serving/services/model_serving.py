@@ -377,7 +377,7 @@ class ModelServingService:
         endpoint_id = endpoint_data.id
 
         return CreateModelServiceActionResult(
-            ServiceInfo(
+            data=ServiceInfo(
                 endpoint_id=endpoint_id,
                 model_id=endpoint_spec.model,
                 extra_mounts=[m.vfid.folder_id for m in endpoint_spec.extra_mounts],
@@ -389,7 +389,8 @@ class ModelServingService:
                 service_endpoint=None,
                 is_public=action.creator.open_to_public,
                 runtime_variant=action.creator.runtime_variant,
-            )
+            ),
+            _project_id=action._project_id,
         )
 
     async def list_serve(self, action: ListModelServiceAction) -> ListModelServiceActionResult:
@@ -413,7 +414,7 @@ class ModelServingService:
                     is_public=endpoint.open_to_public,
                 )
                 for endpoint in endpoints
-            ]
+            ],
         )
 
     async def search_services(self, action: SearchServicesAction) -> SearchServicesActionResult:
@@ -462,7 +463,7 @@ class ModelServingService:
         # Update endpoint lifecycle
         await self._repository.update_endpoint_lifecycle(service_id, lifecycle_stage, replicas)
 
-        return DeleteModelServiceActionResult(success=True)
+        return DeleteModelServiceActionResult(service_id=service_id)
 
     async def dry_run(self, action: DryRunModelServiceAction) -> DryRunModelServiceActionResult:
         # TODO: Seperate background task definition and trigger into different layer
@@ -746,7 +747,7 @@ class ModelServingService:
             updated_endpoint_data.id
         )
 
-        return UpdateRouteActionResult(success=True)
+        return UpdateRouteActionResult(route_id=action.route_id)
 
     async def delete_route(self, action: DeleteRouteAction) -> DeleteRouteActionResult:
         # Validate access
@@ -783,7 +784,7 @@ class ModelServingService:
         # Decrease endpoint replicas
         await self._repository.decrease_endpoint_replicas(action.service_id)
 
-        return DeleteRouteActionResult(success=True)
+        return DeleteRouteActionResult(route_id=action.route_id)
 
     async def generate_token(self, action: GenerateTokenAction) -> GenerateTokenActionResult:
         # Validate access
@@ -886,7 +887,9 @@ class ModelServingService:
             await self._deployment_controller.mark_lifecycle_needed(
                 DeploymentLifecycleType.CHECK_REPLICA,
             )
-        return ModifyEndpointActionResult(success=result.success, data=result.data)
+        return ModifyEndpointActionResult(
+            endpoint_id=action.endpoint_id, success=result.success, data=result.data
+        )
 
     async def validate_model_service(
         self, action: ValidateModelServiceAction
