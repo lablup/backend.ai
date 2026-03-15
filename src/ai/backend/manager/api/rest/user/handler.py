@@ -208,7 +208,7 @@ class UserHandler:
         )
 
         await self._user.delete_user.wait_for_complete(
-            DeleteUserAction(user_uuid=body.parsed.user_id, email=get_result.user.email)
+            DeleteUserAction(email=get_result.user.email)
         )
 
         resp = DeleteUserResponse(success=True)

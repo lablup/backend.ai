@@ -72,7 +72,7 @@ class UserProcessors(AbstractProcessorPackage):
     # Single entity actions with RBAC
     get_user: SingleEntityActionProcessor[GetUserAction, GetUserActionResult]
     modify_user: SingleEntityActionProcessor[ModifyUserAction, ModifyUserActionResult]
-    delete_user: SingleEntityActionProcessor[DeleteUserAction, DeleteUserActionResult]
+    delete_user: ActionProcessor[DeleteUserAction, DeleteUserActionResult]
     purge_user: SingleEntityActionProcessor[PurgeUserAction, PurgeUserActionResult]
     # Bulk actions without RBAC (special handling)
     bulk_create_users: ActionProcessor[BulkCreateUserAction, BulkCreateUserActionResult]
@@ -109,9 +109,7 @@ class UserProcessors(AbstractProcessorPackage):
         self.modify_user = SingleEntityActionProcessor(
             user_service.modify_user, action_monitors, validators=[validators.rbac.single_entity]
         )
-        self.delete_user = SingleEntityActionProcessor(
-            user_service.delete_user, action_monitors, validators=[validators.rbac.single_entity]
-        )
+        self.delete_user = ActionProcessor(user_service.delete_user, action_monitors)
         self.purge_user = SingleEntityActionProcessor(
             user_service.purge_user, action_monitors, validators=[validators.rbac.single_entity]
         )
