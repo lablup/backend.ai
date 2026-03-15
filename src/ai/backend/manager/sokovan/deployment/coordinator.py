@@ -323,6 +323,7 @@ class DeploymentCoordinator:
                     route_controller=self._route_controller,
                     evaluator=evaluator,
                     applier=applier,
+                    deployment_executor=executor,
                 ),
             ),
             (
@@ -332,6 +333,7 @@ class DeploymentCoordinator:
                     route_controller=self._route_controller,
                     evaluator=evaluator,
                     applier=applier,
+                    deployment_executor=executor,
                 ),
             ),
             (
@@ -376,12 +378,20 @@ class DeploymentCoordinator:
         handler_name = handler.name()
         target_statuses = handler.target_statuses()
         lifecycle_stages = [status.lifecycle for status in target_statuses]
+        target_sub_steps: list[DeploymentSubStep] = [
+            status.sub_status
+            for status in target_statuses
+            if isinstance(status.sub_status, DeploymentSubStep)
+        ]
         deployments = await self._deployment_repository.get_deployments_for_handler(
-            lifecycle_stages, handler_name
+            lifecycle_stages,
+            handler_name,
+            sub_steps=target_sub_steps or None,
         )
         if not deployments:
             log.trace("No deployments to process for handler: {}", handler_name)
             return
+
         log.info("handler: {} - processing {} deployments", handler_name, len(deployments))
 
         deployment_ids = [deployment.deployment_info.id for deployment in deployments]

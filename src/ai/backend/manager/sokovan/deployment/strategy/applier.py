@@ -32,7 +32,7 @@ class StrategyApplyResult:
     """Deployment IDs that completed and had their revision swapped."""
 
     rolled_back_ids: set[UUID] = field(default_factory=set)
-    """Deployment IDs that rolled back and had their deploying_revision cleared."""
+    """Deployment IDs whose strategy evaluator determined rollback."""
 
     routes_created: int = 0
     """Number of new routes rolled out."""
@@ -48,7 +48,10 @@ class StrategyResultApplier:
     1. Sub-step assignment updates
     2. Route rollout (create) and drain (terminate)
     3. Revision swap for COMPLETED deployments
-    4. Clear deploying_revision for ROLLED_BACK deployments
+
+    Note: Clearing ``deploying_revision`` for rolled-back deployments is NOT
+    done here — it is the responsibility of ``DeployingRollingBackHandler``
+    to explicitly call ``clear_deploying_revision`` after rollback completes.
     """
 
     def __init__(self, deployment_repo: DeploymentRepository) -> None:
@@ -86,7 +89,7 @@ class StrategyResultApplier:
             specs=[c.spec for c in changes.rollout_specs],
         )
 
-        if not (summary.assignments or rollout.specs or drain or completed_ids or rolled_back_ids):
+        if not (summary.assignments or rollout.specs or drain or completed_ids):
             return result
 
         swapped = await self._deployment_repo.apply_strategy_mutations(
@@ -94,7 +97,6 @@ class StrategyResultApplier:
             rollout=rollout,
             drain=drain,
             completed_ids=completed_ids,
-            rolled_back_ids=rolled_back_ids,
         )
 
         log.debug(
@@ -109,10 +111,13 @@ class StrategyResultApplier:
                 swapped,
                 len(completed_ids),
             )
-        if rolled_back_ids:
-            log.info(
-                "Cleared deploying_revision for {} rolled-back deployments",
-                len(rolled_back_ids),
-            )
 
         return result
+
+    async def clear_deploying_revision(self, deployment_ids: set[UUID]) -> None:
+        """Clear deploying_revision and sub_step for rolled-back deployments.
+
+        Called explicitly by ``DeployingRollingBackHandler`` after rollback
+        completes — NOT automatically during ``apply()``.
+        """
+        await self._deployment_repo.clear_deploying_revision(deployment_ids)

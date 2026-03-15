@@ -298,6 +298,7 @@ class DeploymentRepository:
         self,
         statuses: list[EndpointLifecycle],
         handler_name: str,
+        sub_steps: list[DeploymentSubStep] | None = None,
     ) -> list[DeploymentWithHistory]:
         """Get deployments for handler execution with history populated.
 
@@ -308,11 +309,14 @@ class DeploymentRepository:
         Args:
             statuses: Endpoint lifecycle statuses to include
             handler_name: Current handler phase name for history matching
+            sub_steps: Optional sub-step filter for DEPLOYING handlers
 
         Returns:
             List of DeploymentWithHistory with history fields populated.
         """
-        return await self._db_source.fetch_deployments_for_handler(statuses, handler_name)
+        return await self._db_source.fetch_deployments_for_handler(
+            statuses, handler_name, sub_steps
+        )
 
     @deployment_repository_resilience.apply()
     async def get_endpoint_info(
@@ -1410,12 +1414,14 @@ class DeploymentRepository:
         rollout: BulkCreator[RoutingRow],
         drain: BatchUpdater[RoutingRow] | None,
         completed_ids: set[UUID],
-        rolled_back_ids: set[UUID],
     ) -> int:
         """Apply all DB mutations from a strategy evaluation cycle.
 
-        Performs sub-step updates, route rollout/drain, revision swap,
-        and deploying_revision cleanup in a single transaction.
+        Performs sub-step updates, route rollout/drain, and revision swap
+        in a single transaction.
+
+        Note: Clearing deploying_revision for rolled-back deployments is NOT
+        done here — use ``clear_deploying_revision`` explicitly after rollback.
 
         Returns:
             Number of deployments whose revision was swapped.
@@ -1425,5 +1431,12 @@ class DeploymentRepository:
             rollout=rollout,
             drain=drain,
             completed_ids=completed_ids,
-            rolled_back_ids=rolled_back_ids,
         )
+
+    async def clear_deploying_revision(self, deployment_ids: set[UUID]) -> None:
+        """Clear deploying_revision and sub_step for rolled-back deployments.
+
+        This should be called explicitly by the RollingBackHandler after
+        rollback completes, NOT automatically by the applier.
+        """
+        await self._db_source.clear_deploying_revision(deployment_ids)
