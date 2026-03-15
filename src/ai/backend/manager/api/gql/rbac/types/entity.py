@@ -155,6 +155,7 @@ class EntityRefGQL(Node):
                 | RBACElementType.ROUTING
                 | RBACElementType.DEPLOYMENT_TOKEN
                 | RBACElementType.DEPLOYMENT_POLICY
+                | RBACElementType.DEPLOYMENT_REVISION
             ):
                 return None
 

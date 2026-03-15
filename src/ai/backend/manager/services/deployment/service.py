@@ -37,9 +37,7 @@ from ai.backend.manager.data.deployment.types import (
 from ai.backend.manager.data.permission.types import RBACElementRef
 from ai.backend.manager.errors.service import RoutingNotFound
 from ai.backend.manager.models.deployment_policy import DeploymentPolicyRow
-from ai.backend.manager.models.deployment_revision import DeploymentRevisionRow
 from ai.backend.manager.models.endpoint import EndpointRow, EndpointTokenRow
-from ai.backend.manager.repositories.base import Creator
 from ai.backend.manager.repositories.base.rbac.entity_creator import RBACEntityCreator
 from ai.backend.manager.repositories.base.upserter import Upserter
 from ai.backend.manager.repositories.deployment import DeploymentRepository
@@ -611,7 +609,14 @@ class DeploymentService:
             # TODO: Convert merged_creator.mounts.extra_mounts (list[MountInfo]) to Sequence[VFolderMount] instead of discarding.
             extra_mounts=(),
         )
-        creator: Creator[DeploymentRevisionRow] = Creator(spec=spec)
+        creator = RBACEntityCreator(
+            spec=spec,
+            element_type=RBACElementType.DEPLOYMENT_REVISION,
+            scope_ref=RBACElementRef(
+                element_type=RBACElementType.MODEL_DEPLOYMENT,
+                element_id=str(deployment_id),
+            ),
+        )
         return await self._deployment_repository.create_revision_with_next_number(
             creator, deployment_id
         )
