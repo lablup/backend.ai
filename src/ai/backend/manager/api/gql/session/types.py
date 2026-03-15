@@ -322,6 +322,10 @@ class SessionV2RuntimeInfoGQL:
     callback_url: str | None = strawberry.field(
         description="URL to call back when the session completes (e.g., for batch sessions)."
     )
+    persistent_mount_paths: list[str] = strawberry.field(
+        description="List of persistent vfolder mount paths inside the container. "
+        "Files outside these paths are ephemeral and will be lost on session termination.",
+    )
 
 
 @strawberry.type(
@@ -528,6 +532,9 @@ class SessionV2GQL(Node):
                 bootstrap_script=data.bootstrap_script,
                 startup_command=data.startup_command,
                 callback_url=data.callback_url,
+                persistent_mount_paths=[str(m.kernel_path) for m in data.vfolder_mounts]
+                if data.vfolder_mounts
+                else [],
             ),
             network=SessionV2NetworkInfoGQL(
                 use_host_network=data.use_host_network,

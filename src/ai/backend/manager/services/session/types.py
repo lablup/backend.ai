@@ -66,6 +66,7 @@ class LegacySessionInfo:
     num_queries_executed: int
     last_stat: dict[str, Any] | None
     idle_checks: Any
+    persistent_mount_paths: list[str]
 
     def asdict(self) -> dict[str, Any]:
         """
@@ -98,6 +99,7 @@ class LegacySessionInfo:
             "numQueriesExecuted": self.num_queries_executed,
             "lastStat": self.last_stat,
             "idleChecks": self.idle_checks,
+            "persistentMountPaths": self.persistent_mount_paths,
         }
 
 

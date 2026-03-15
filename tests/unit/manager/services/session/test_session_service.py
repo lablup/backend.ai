@@ -6,6 +6,7 @@ Tests the service layer with mocked repositories.
 from __future__ import annotations
 
 from datetime import datetime
+from pathlib import PurePosixPath
 from typing import Any, cast
 from unittest.mock import AsyncMock, MagicMock
 from uuid import UUID, uuid4
@@ -20,10 +21,14 @@ from ai.backend.common.types import (
     AccessKey,
     ClusterMode,
     KernelId,
+    MountPermission,
     ResourceSlot,
     SessionId,
     SessionResult,
     SessionTypes,
+    VFolderID,
+    VFolderMount,
+    VFolderUsageMode,
 )
 from ai.backend.manager.data.kernel.types import (
     ClusterConfig,
@@ -751,6 +756,7 @@ class TestGetSessionInfo:
         mock_session.terminated_at = None
         mock_session.num_queries = 0
         mock_session.last_stat = None
+        mock_session.vfolder_mounts = None
         mock_session.to_dataclass.return_value = sample_session_data
 
         mock_session_repository.get_session_validated = AsyncMock(return_value=mock_session)
@@ -766,9 +772,106 @@ class TestGetSessionInfo:
         assert result.session_info is not None
         assert result.session_info.domain_name == "default"
         assert result.session_info.image == "cr.backend.ai/stable/python:latest"
+        assert result.session_info.persistent_mount_paths == []
         assert result.session_data == sample_session_data
         mock_session_repository.get_session_validated.assert_called_once()
         mock_agent_registry.increment_session_usage.assert_called_once_with(mock_session)
+
+    @pytest.fixture
+    def mock_kernel(self) -> MagicMock:
+        kernel = MagicMock()
+        kernel.image = "cr.backend.ai/stable/python:latest"
+        kernel.architecture = "x86_64"
+        kernel.registry = "cr.backend.ai"
+        kernel.container_id = str(uuid4())
+        kernel.occupied_slots = ResourceSlot({"cpu": 1, "mem": 1024})
+        kernel.occupied_shares = {}
+        return kernel
+
+    @pytest.fixture
+    def mock_session(
+        self,
+        request: pytest.FixtureRequest,
+        mock_kernel: MagicMock,
+        mock_session_repository: MagicMock,
+        mock_idle_checker_host: MagicMock,
+        sample_session_id: SessionId,
+        sample_session_data: SessionData,
+        sample_user_id: UUID,
+        sample_group_id: UUID,
+    ) -> MagicMock:
+        vfolder_mounts: list[VFolderMount] | None = getattr(request, "param", None)
+
+        session = MagicMock()
+        session.id = sample_session_id
+        session.domain_name = "default"
+        session.group_id = sample_group_id
+        session.user_uuid = sample_user_id
+        session.tag = None
+        session.main_kernel = mock_kernel
+        session.occupying_slots = ResourceSlot({"cpu": 1, "mem": 1024})
+        session.requested_slots = ResourceSlot({"cpu": 1, "mem": 1024})
+        session.environ = {}
+        session.resource_opts = {}
+        session.status = SessionStatus.RUNNING
+        session.status_info = None
+        session.status_data = None
+        session.created_at = datetime.now(tzutc())
+        session.terminated_at = None
+        session.num_queries = 0
+        session.last_stat = None
+        session.vfolder_mounts = vfolder_mounts
+        session.to_dataclass.return_value = sample_session_data
+
+        mock_session_repository.get_session_validated = AsyncMock(return_value=session)
+
+        return session
+
+    @pytest.mark.parametrize(
+        ("mock_session", "expected_mount_paths"),
+        [
+            pytest.param([], [], id="no_mounts"),
+            pytest.param(
+                [
+                    VFolderMount(
+                        name="my-data",
+                        vfid=VFolderID(quota_scope_id=None, folder_id=uuid4()),
+                        vfsubpath=PurePosixPath("."),
+                        host_path=PurePosixPath("/data/vfolders/my-data"),
+                        kernel_path=PurePosixPath("/home/work/data"),
+                        mount_perm=MountPermission.READ_WRITE,
+                        usage_mode=VFolderUsageMode.GENERAL,
+                    ),
+                    VFolderMount(
+                        name="my-model",
+                        vfid=VFolderID(quota_scope_id=None, folder_id=uuid4()),
+                        vfsubpath=PurePosixPath("."),
+                        host_path=PurePosixPath("/data/vfolders/my-model"),
+                        kernel_path=PurePosixPath("/home/work/model"),
+                        mount_perm=MountPermission.READ_ONLY,
+                        usage_mode=VFolderUsageMode.MODEL,
+                    ),
+                ],
+                ["/home/work/data", "/home/work/model"],
+                id="with_vfolder_mounts",
+            ),
+        ],
+        indirect=["mock_session"],
+    )
+    async def test_persistent_mount_paths(
+        self,
+        session_service: SessionService,
+        mock_session: MagicMock,
+        expected_mount_paths: list[str],
+        sample_access_key: AccessKey,
+    ) -> None:
+        action = GetSessionInfoAction(
+            session_name="test-session",
+            owner_access_key=sample_access_key,
+        )
+        result = await session_service.get_session_info(action)
+
+        assert result.session_info.persistent_mount_paths == expected_mount_paths
 
     async def test_session_not_found(
         self,
