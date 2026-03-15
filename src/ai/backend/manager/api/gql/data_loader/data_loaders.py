@@ -76,6 +76,7 @@ from .rbac import (
     load_permissions_by_role_ids,
     load_role_assignments_by_ids,
     load_role_assignments_by_role_and_user_ids,
+    load_role_assignments_by_user_ids,
     load_roles_by_ids,
 )
 from .reservoir_registry import load_reservoir_registries_by_ids
@@ -364,6 +365,17 @@ class DataLoaders:
         return DataLoader(
             load_fn=partial(
                 load_role_assignments_by_role_and_user_ids,
+                self._processors.permission_controller,
+            )
+        )
+
+    @cached_property
+    def role_assignments_by_user_loader(
+        self,
+    ) -> DataLoader[uuid.UUID, list[AssignedUserData]]:
+        return DataLoader(
+            load_fn=partial(
+                load_role_assignments_by_user_ids,
                 self._processors.permission_controller,
             )
         )
