@@ -2,30 +2,39 @@ import uuid
 from dataclasses import dataclass
 from typing import override
 
-from ai.backend.manager.actions.action import BaseActionResult
+from ai.backend.common.data.permission.types import RBACElementType
 from ai.backend.manager.actions.types import ActionOperationType
-from ai.backend.manager.services.auth.actions.base import AuthAction
+from ai.backend.manager.data.permission.types import RBACElementRef
+from ai.backend.manager.services.auth.actions.base import (
+    KeypairSingleEntityAction,
+    KeypairSingleEntityActionResult,
+)
 
 
 @dataclass
-class GetSSHKeypairAction(AuthAction):
+class GetSSHKeypairAction(KeypairSingleEntityAction):
     user_id: uuid.UUID
     access_key: str
-
-    @override
-    def entity_id(self) -> str | None:
-        return str(self.user_id)
 
     @override
     @classmethod
     def operation_type(cls) -> ActionOperationType:
         return ActionOperationType.GET
 
-
-@dataclass
-class GetSSHKeypairActionResult(BaseActionResult):
-    public_key: str
+    @override
+    def target_entity_id(self) -> str:
+        return self.access_key
 
     @override
-    def entity_id(self) -> str | None:
-        return None
+    def target_element(self) -> RBACElementRef:
+        return RBACElementRef(RBACElementType.KEYPAIR, self.access_key)
+
+
+@dataclass
+class GetSSHKeypairActionResult(KeypairSingleEntityActionResult):
+    public_key: str
+    access_key: str
+
+    @override
+    def target_entity_id(self) -> str:
+        return self.access_key
