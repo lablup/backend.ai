@@ -84,13 +84,17 @@ class ArtifactProcessors(AbstractProcessorPackage):
     ) -> None:
         # TODO: Move scan action to ArtifactRegistryService
         self.scan = ActionProcessor(service.scan, action_monitors)
-        self.get = SingleEntityActionProcessor(service.get, action_monitors)
+        self.get = SingleEntityActionProcessor(
+            service.get, action_monitors, validators=[validators.rbac.single_entity]
+        )
         self.search_artifacts = ActionProcessor(service.search, action_monitors)
         self.search_artifacts_with_revisions = ActionProcessor(
             service.search_with_revisions, action_monitors
         )
         self.get_revisions = ActionProcessor(service.get_revisions, action_monitors)
-        self.update = SingleEntityActionProcessor(service.update, action_monitors)
+        self.update = SingleEntityActionProcessor(
+            service.update, action_monitors, validators=[validators.rbac.single_entity]
+        )
         self.upsert_artifacts_with_revisions = ActionProcessor(
             service.upsert_artifacts_with_revisions, action_monitors
         )
