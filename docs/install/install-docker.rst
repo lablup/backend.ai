@@ -1,7 +1,7 @@
 Install from Docker Containers
 ==============================
 
-This guide explains how to run Backend.AI components (manager, webserver, appproxy) using Docker containers built from the monorepo.
+This guide explains how to run Backend.AI components (manager, webserver, storage-proxy, appproxy) using Docker containers built from the monorepo.
 
 Prerequisites
 -------------
@@ -48,6 +48,13 @@ Build the Docker images:
      --build-arg PKGVER=${PKGVER} \
      .
 
+   # Build storage-proxy image
+   docker build -f docker/backend.ai-storage-proxy.dockerfile \
+     -t backend.ai/storage-proxy:${PKGVER} \
+     --build-arg PYTHON_VERSION=3.13 \
+     --build-arg PKGVER=${PKGVER} \
+     .
+     
    # Build appproxy coordinator image
    docker build -f docker/backend.ai-appproxy-coordinator.dockerfile \
      -t backend.ai/appproxy-coordinator:${PKGVER} \
@@ -223,6 +230,75 @@ Create ``webserver.conf`` with the following content:
    enabled = true
    endpoint = "http://host.docker.internal:4000"
 
+Storage Proxy Configuration
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Create ``storage-proxy.toml`` with the following content:
+
+.. code-block:: toml
+
+   # Backend.AI Storage Proxy configuration for Docker containers
+
+   [etcd]
+   namespace = "local"
+   addr = { host = "host.docker.internal", port = 8121 }
+   user = ""
+   password = ""
+
+   [storage-proxy]
+   node-id = "i-storage-proxy-local"
+   num-proc = 1
+   event-loop = "asyncio"
+   scandir-limit = 1000
+   max-upload-size = "100g"
+   secret = "some-secret-private-for-storage-proxy"
+   session-expire = "1d"
+
+   [api.client]
+   service-addr = { host = "0.0.0.0", port = 6021 }
+   ssl-enabled = false
+
+   [api.manager]
+   service-addr = { host = "0.0.0.0", port = 6022 }
+   internal-addr = { host = "0.0.0.0", port = 16023 }
+   ssl-enabled = true
+   ssl-cert = "/etc/backend.ai/ssl/manager-api-selfsigned.cert.pem"
+   ssl-privkey = "/etc/backend.ai/ssl/manager-api-selfsigned.key.pem"
+   secret = "some-secret-shared-with-manager"
+
+   [volume.local]
+   backend = "vfs"
+   path = "/vfolder"
+   
+   [logging]
+   level = "INFO"
+   drivers = ["console"]
+
+   [logging.console]
+   colored = true
+   format = "verbose"
+
+   [logging.pkg-ns]
+   "" = "WARNING"
+   "aiotools" = "INFO"
+   "aiohttp" = "INFO"
+   "ai.backend" = "INFO"
+
+   [debug]
+   enabled = false
+
+   [otel]
+   enabled = true
+   log-level = "INFO"
+   endpoint = "http://host.docker.internal:4317"
+
+The self-signed SSL certificates are provided at ``configs/storage-proxy/ssl/`` in the repository.
+Create a ``vfolder/`` directory for the VFS storage backend:
+
+.. code-block:: bash
+
+   mkdir -p vfolder
+
 AppProxy Coordinator Configuration
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -342,7 +418,7 @@ Running with Docker Compose
 
 The easiest way to run the components is using docker-compose.
 
-The ``docker-compose.monorepo.yml`` file includes manager, appproxy (coordinator + worker), and webserver.
+The ``docker-compose.monorepo.yml`` file includes manager, storage-proxy, appproxy (coordinator + worker), and webserver.
 Refer to the file in the repository for the latest configuration.
 
 Start the services:
@@ -373,6 +449,23 @@ Alternatively, you can run the containers manually:
      -e PYTHONUNBUFFERED=1 \
      --restart unless-stopped \
      backend.ai/manager:26.1.0rc1
+
+**Storage Proxy:**
+
+.. code-block:: bash
+
+   docker run -d \
+     --name backend-ai-storage-proxy \
+     --network backendai_half \
+     --add-host host.docker.internal:host-gateway \
+     -p 6021:6021 -p 6022:6022 -p 16023:16023 \
+     -v $(pwd)/storage-proxy.toml:/etc/backend.ai/storage-proxy.toml:ro \
+     -v $(pwd)/configs/storage-proxy/ssl:/etc/backend.ai/ssl:ro \
+     -v $(pwd)/vfolder:/vfolder \
+     -v /tmp/backend.ai/ipc:/tmp/backend.ai/ipc \
+     -e PYTHONUNBUFFERED=1 \
+     --restart unless-stopped \
+     backend.ai/storage-proxy:26.1.0rc1
 
 **AppProxy Coordinator:**
 
@@ -435,6 +528,7 @@ Check logs:
 .. code-block:: bash
 
    docker logs backend-ai-manager
+   docker logs backend-ai-storage-proxy
    docker logs backend-ai-appproxy-coordinator
    docker logs backend-ai-appproxy-worker
    docker logs backend-ai-webserver
@@ -473,5 +567,5 @@ Or manually:
 
 .. code-block:: bash
 
-   docker stop backend-ai-manager backend-ai-appproxy-coordinator backend-ai-appproxy-worker backend-ai-webserver
-   docker rm backend-ai-manager backend-ai-appproxy-coordinator backend-ai-appproxy-worker backend-ai-webserver
+   docker stop backend-ai-manager backend-ai-storage-proxy backend-ai-appproxy-coordinator backend-ai-appproxy-worker backend-ai-webserver
+   docker rm backend-ai-manager backend-ai-storage-proxy backend-ai-appproxy-coordinator backend-ai-appproxy-worker backend-ai-webserver
