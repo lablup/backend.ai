@@ -13,6 +13,7 @@ from ai.backend.common.clients.http_client.client_pool import (
     ClientPool,
     tcp_client_session_factory,
 )
+from ai.backend.common.config import ModelHealthCheck
 from ai.backend.common.exception import BackendAIError
 from ai.backend.common.metrics.metric import DomainType, LayerType
 from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPolicy
@@ -105,6 +106,25 @@ class AppProxyClient:
             resp.raise_for_status()
             result: dict[str, Any] = await resp.json()
             return result
+
+    @appproxy_client_resilience.apply()
+    async def update_health_check(
+        self,
+        endpoint_id: UUID,
+        health_check_config: ModelHealthCheck | None,
+    ) -> None:
+        async with self._client_session.put(
+            f"/v2/endpoints/{endpoint_id}/health-check",
+            json={
+                "health_check": health_check_config.model_dump(mode="json")
+                if health_check_config
+                else None
+            },
+            headers={
+                "X-BackendAI-Token": self._token,
+            },
+        ) as resp:
+            resp.raise_for_status()
 
     @appproxy_client_resilience.apply()
     async def delete_endpoint(
