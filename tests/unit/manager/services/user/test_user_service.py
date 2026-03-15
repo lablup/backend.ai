@@ -743,7 +743,7 @@ class TestDeleteUser:
         """Email soft delete calls repository."""
         mock_user_repository.soft_delete_user_validated = AsyncMock(return_value=None)
 
-        action = DeleteUserAction(user_uuid=uuid.uuid4(), email="user@example.com")
+        action = DeleteUserAction(email="user@example.com")
         result = await service.delete_user(action)
 
         assert result is not None
@@ -761,7 +761,7 @@ class TestDeleteUser:
             side_effect=UserNotFound("User not found")
         )
 
-        action = DeleteUserAction(user_uuid=uuid.uuid4(), email="missing@example.com")
+        action = DeleteUserAction(email="missing@example.com")
 
         with pytest.raises(UserNotFound):
             await service.delete_user(action)
