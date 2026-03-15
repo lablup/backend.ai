@@ -517,7 +517,7 @@ class VFolderHandler:
             usage_mode=result.base_info.usage_mode,
             cloneable=result.base_info.cloneable,
         )
-        resp = VFolderGetInfoResponse(item=dto)
+        resp = VFolderGetInfoResponse(dto)
         return APIResponse.build(HTTPStatus.OK, resp)
 
     # ------------------------------------------------------------------
@@ -1409,11 +1409,11 @@ class VFolderHandler:
 
     async def get_vfolder_id(
         self,
-        query: QueryParam[GetVFolderIDReq],
+        body: BodyParam[GetVFolderIDReq],
         ctx: UserContext,
         req: RequestCtx,
     ) -> APIResponse:
-        params = query.parsed
+        params = body.parsed
         folder_name = params.name
         resolved = await self._vfolder.get_accessible_vfolder.wait_for_complete(
             GetAccessibleVFolderAction(
@@ -1435,7 +1435,7 @@ class VFolderHandler:
             folder_name,
         )
         dto = CompactVFolderInfoDTO(id=row["id"], name=folder_name)
-        resp = VFolderGetIDResponse(item=dto)
+        resp = VFolderGetIDResponse(dto)
         return APIResponse.build(HTTPStatus.OK, resp)
 
     # ------------------------------------------------------------------

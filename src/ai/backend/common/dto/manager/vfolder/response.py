@@ -95,7 +95,7 @@ class VFolderInfoDTO(BaseModel):
     quota_scope_id: str = Field(description="Quota scope ID")
     host: str = Field(description="Host name")
     status: VFolderOperationStatusField = Field(description="Operation status")
-    num_files: int = Field(description="Number of files")
+    num_files: int = Field(description="Number of files", serialization_alias="numFiles")
     used_bytes: int = Field(description="Used bytes")
     created_at: str = Field(description="Creation timestamp")
     last_used: str | None = Field(default=None, description="Last used timestamp")
@@ -180,23 +180,19 @@ class MountResultDTO(BaseModel):
 
 
 class VFolderCreateResponse(BaseRootResponseModel[VFolderItemField]):
-    """Response for vfolder creation (flat object for backward compatibility)."""
+    """Response for vfolder creation."""
 
 
 class VFolderListResponse(BaseRootResponseModel[list[VFolderItemField]]):
-    """Response for listing vfolders (plain array for backward compatibility)."""
+    """Response for listing vfolders."""
 
 
-class VFolderGetInfoResponse(BaseResponseModel):
+class VFolderGetInfoResponse(BaseRootResponseModel[VFolderInfoDTO]):
     """Response for getting vfolder info."""
 
-    item: VFolderInfoDTO = Field(description="VFolder information")
 
-
-class VFolderGetIDResponse(BaseResponseModel):
+class VFolderGetIDResponse(BaseRootResponseModel[CompactVFolderInfoDTO]):
     """Response for getting vfolder ID by name."""
-
-    item: CompactVFolderInfoDTO = Field(description="Compact vfolder info")
 
 
 class VFolderCloneResponse(BaseResponseModel):

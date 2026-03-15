@@ -183,21 +183,19 @@ class TestVFolderCRUD:
 
     async def test_get_info(self) -> None:
         response_data = {
-            "item": {
-                "name": "test-folder",
-                "id": "abc123",
-                "quota_scope_id": "qs-1",
-                "host": "local:vol",
-                "status": "ready",
-                "num_files": 10,
-                "used_bytes": 1024,
-                "created_at": "2025-01-01T00:00:00",
-                "type": "user",
-                "is_owner": True,
-                "permission": "rw",
-                "usage_mode": "general",
-                "cloneable": False,
-            }
+            "name": "test-folder",
+            "id": "abc123",
+            "quota_scope_id": "qs-1",
+            "host": "local:vol",
+            "status": "ready",
+            "num_files": 10,
+            "used_bytes": 1024,
+            "created_at": "2025-01-01T00:00:00",
+            "type": "user",
+            "is_owner": True,
+            "permission": "rw",
+            "usage_mode": "general",
+            "cloneable": False,
         }
         mock_session = _make_request_session(_mock_json_response(response_data))
         vfolder = _make_vfolder_client(mock_session)
@@ -205,7 +203,7 @@ class TestVFolderCRUD:
         result = await vfolder.get_info("test-folder")
 
         assert isinstance(result, VFolderGetInfoResponse)
-        assert result.item.name == "test-folder"
+        assert result.root.name == "test-folder"
 
         call_args = mock_session.request.call_args
         assert call_args[0][0] == "GET"
@@ -213,14 +211,14 @@ class TestVFolderCRUD:
 
     async def test_get_id(self) -> None:
         folder_id = uuid.uuid4()
-        response_data = {"item": {"id": str(folder_id), "name": "my-folder"}}
+        response_data = {"id": str(folder_id), "name": "my-folder"}
         mock_session = _make_request_session(_mock_json_response(response_data))
         vfolder = _make_vfolder_client(mock_session)
 
         result = await vfolder.get_id(GetVFolderIDReq(name="my-folder"))
 
         assert isinstance(result, VFolderGetIDResponse)
-        assert result.item.name == "my-folder"
+        assert result.root.name == "my-folder"
 
         call_args = mock_session.request.call_args
         assert call_args[0][0] == "GET"
