@@ -16,14 +16,15 @@ from ai.backend.manager.services.user.actions.base import (
     UserScopeAction,
     UserScopeActionResult,
 )
+from ai.backend.manager.services.user.types import UserCreateSpec
 
-
-@dataclass
-class UserCreateSpec:
-    """Specification for creating a single user, including group assignments."""
-
-    creator: Creator[UserRow]
-    group_ids: list[str] | None = None
+__all__ = (
+    "CreateUserAction",
+    "CreateUserActionResult",
+    "UserCreateSpec",
+    "BulkCreateUserAction",
+    "BulkCreateUserActionResult",
+)
 
 
 @dataclass

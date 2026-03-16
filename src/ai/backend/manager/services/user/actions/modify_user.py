@@ -11,20 +11,20 @@ from ai.backend.manager.data.permission.types import RBACElementRef
 from ai.backend.manager.data.user.types import BulkUserUpdateResultData, UserData
 from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.repositories.base.updater import Updater
-from ai.backend.manager.repositories.user.updaters import UserUpdaterSpec
 from ai.backend.manager.services.user.actions.base import (
     UserAction,
     UserSingleEntityAction,
     UserSingleEntityActionResult,
 )
+from ai.backend.manager.services.user.types import UserUpdateSpec
 
-
-@dataclass
-class UserUpdateSpec:
-    """Specification for updating a single user, including the target user ID."""
-
-    user_id: UUID
-    updater_spec: UserUpdaterSpec
+__all__ = (
+    "ModifyUserAction",
+    "ModifyUserActionResult",
+    "UserUpdateSpec",
+    "BulkModifyUserAction",
+    "BulkModifyUserActionResult",
+)
 
 
 @dataclass
