@@ -170,7 +170,7 @@ class BulkPurgeUsersV2PayloadGQL:
 
 @strawberry.type(
     name="UpdateMyAllowedClientIPPayload",
-    description="Payload for updating the current user's allowed client IP list.",
+    description="Added in 26.4.0. Payload for updating the current user's allowed client IP list.",
 )
 class UpdateMyAllowedClientIPPayloadGQL:
     """Payload for updating the current user's allowed client IP list."""

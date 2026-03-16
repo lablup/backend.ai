@@ -270,7 +270,7 @@ class BulkPurgeUsersV2InputGQL:
 @strawberry.input(
     name="UpdateMyAllowedClientIPInput",
     description=(
-        "Input for updating the current user's allowed client IP list. "
+        "Added in 26.4.0. Input for updating the current user's allowed client IP list. "
         "Set allowed_client_ip to null to remove all restrictions. "
         "Use force=true to bypass the lockout safety check."
     ),

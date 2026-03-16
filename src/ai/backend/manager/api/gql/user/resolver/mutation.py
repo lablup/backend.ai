@@ -449,7 +449,7 @@ async def admin_bulk_purge_users_v2(
 
 @strawberry.mutation(
     description=(
-        "Update the current user's allowed client IP list. "
+        "Added in 26.4.0. Update the current user's allowed client IP list. "
         "Set allowed_client_ip to null to remove all IP restrictions. "
         "When force is false, the operation fails if the current request IP "
         "would be excluded by the new allowlist (lockout prevention)."
