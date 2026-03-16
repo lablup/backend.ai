@@ -30,7 +30,12 @@ from ai.backend.manager.data.permission.role import (
 )
 from ai.backend.manager.models.rbac_models.role import RoleRow
 from ai.backend.manager.models.rbac_models.user_role import UserRoleRow
-from ai.backend.manager.repositories.base import QueryCondition, QueryOrder
+from ai.backend.manager.repositories.base import (
+    QueryCondition,
+    QueryOrder,
+    combine_conditions_or,
+    negate_conditions,
+)
 from ai.backend.manager.repositories.base.creator import BulkCreator, Creator
 from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.repositories.permission_controller.creators import (
@@ -317,7 +322,7 @@ class RoleFilter(GQLFilter):
 
     AND: list[RoleFilter] | None = None
     OR: list[RoleFilter] | None = None
-    NOT: RoleFilter | None = None
+    NOT: list[RoleFilter] | None = None
 
     @override
     def build_conditions(self) -> list[QueryCondition]:
@@ -338,6 +343,27 @@ class RoleFilter(GQLFilter):
 
         if self.status is not None and len(self.status) > 0:
             conditions.append(RoleConditions.by_statuses([s.to_internal() for s in self.status]))
+
+        # Handle AND logical operator
+        if self.AND:
+            for sub_filter in self.AND:
+                conditions.extend(sub_filter.build_conditions())
+
+        # Handle OR logical operator
+        if self.OR:
+            or_sub_conditions: list[QueryCondition] = []
+            for sub_filter in self.OR:
+                or_sub_conditions.extend(sub_filter.build_conditions())
+            if or_sub_conditions:
+                conditions.append(combine_conditions_or(or_sub_conditions))
+
+        # Handle NOT logical operator
+        if self.NOT:
+            not_sub_conditions: list[QueryCondition] = []
+            for sub_filter in self.NOT:
+                not_sub_conditions.extend(sub_filter.build_conditions())
+            if not_sub_conditions:
+                conditions.append(negate_conditions(not_sub_conditions))
 
         return conditions
 
