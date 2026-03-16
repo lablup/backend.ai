@@ -2,14 +2,17 @@
 
 from __future__ import annotations
 
+import ipaddress
 from typing import cast
 from uuid import UUID
 
 import strawberry
 from strawberry import Info
 
+from ai.backend.common.contexts.client_ip import current_client_ip
 from ai.backend.common.contexts.user import current_user
-from ai.backend.common.exception import UnreachableError
+from ai.backend.common.exception import InvalidIpAddressValue, UnreachableError
+from ai.backend.common.types import ReadableCIDR
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.api.gql.user.types import (
     BulkCreateUsersV2PayloadGQL,
@@ -28,23 +31,29 @@ from ai.backend.manager.api.gql.user.types import (
     DeleteUsersPayloadGQL,
     PurgeUserInputGQL,
     PurgeUserPayloadGQL,
+    UpdateMyAllowedClientIPInputGQL,
+    UpdateMyAllowedClientIPPayloadGQL,
     UpdateUserPayloadGQL,
     UpdateUserV2InputGQL,
     UserV2GQL,
 )
 from ai.backend.manager.api.gql.utils import check_admin_only
 from ai.backend.manager.data.user.types import UserStatus
+from ai.backend.manager.errors.api import InvalidAPIParameters
 from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.user import UserRole
 from ai.backend.manager.repositories.base.creator import Creator
+from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.repositories.user.creators import UserCreatorSpec
 from ai.backend.manager.repositories.user.updaters import UserUpdaterSpec
 from ai.backend.manager.services.user.actions.create_user import (
     BulkCreateUserAction,
     UserCreateSpec,
 )
+from ai.backend.manager.services.user.actions.get_user import GetUserAction
 from ai.backend.manager.services.user.actions.modify_user import (
     BulkModifyUserAction,
+    ModifyUserAction,
     UserUpdateSpec,
 )
 from ai.backend.manager.services.user.actions.purge_user import BulkPurgeUserAction
@@ -433,3 +442,86 @@ async def admin_bulk_purge_users_v2(
         purged_count=result.data.purged_count(),
         failed=failed,
     )
+
+
+# IP Allowlist Mutations
+
+
+@strawberry.mutation(
+    description=(
+        "Added in 26.4.0. Update the current user's allowed client IP list. "
+        "Set allowed_client_ip to null to remove all IP restrictions. "
+        "When force is false, the operation fails if the current request IP "
+        "would be excluded by the new allowlist (lockout prevention)."
+    )
+)  # type: ignore[misc]
+async def update_my_allowed_client_ip(
+    info: Info[StrawberryGQLContext],
+    input: UpdateMyAllowedClientIPInputGQL,
+) -> UpdateMyAllowedClientIPPayloadGQL:
+    """Update the current user's allowed client IP addresses."""
+    me = current_user()
+    if me is None:
+        raise UnreachableError("User context is not available")
+    ctx = info.context
+
+    # Get user email (needed for ModifyUserAction)
+    user_result = await ctx.processors.user.get_user.wait_for_complete(
+        GetUserAction(user_uuid=me.user_id)
+    )
+    email = user_result.user.email
+
+    new_allowlist = input.allowed_client_ip
+
+    if new_allowlist is not None:
+        # Validate CIDR format for each entry
+        for ip_str in new_allowlist:
+            try:
+                ReadableCIDR(ip_str)
+            except (InvalidIpAddressValue, ValueError) as e:
+                raise InvalidAPIParameters(f"Invalid IP address or CIDR: {ip_str}") from e
+
+        # Lockout prevention when force=False
+        if not input.force:
+            if len(new_allowlist) == 0:
+                raise InvalidAPIParameters(
+                    "Empty allowlist would block all access. "
+                    "Use force=true to override this safety check."
+                )
+
+            client_ip = current_client_ip()
+            if client_ip is not None:
+                try:
+                    client_addr: ReadableCIDR[ipaddress.IPv4Network | ipaddress.IPv6Network] = (
+                        ReadableCIDR(client_ip, is_network=False)
+                    )
+                except (InvalidIpAddressValue, ValueError) as e:
+                    raise InvalidAPIParameters(
+                        "Cannot verify current client IP for lockout prevention. "
+                        "Use force=true to override this safety check."
+                    ) from e
+                allowed_networks: list[
+                    ReadableCIDR[ipaddress.IPv4Network | ipaddress.IPv6Network]
+                ] = [ReadableCIDR(ip_str) for ip_str in new_allowlist]
+                if not any(
+                    client_addr.address in network.address
+                    for network in allowed_networks
+                    if network.address is not None
+                ):
+                    raise InvalidAPIParameters(
+                        f"Current IP ({client_ip}) is not in the new allowlist. "
+                        "Use force=true to override this safety check."
+                    )
+
+        allowed_client_ip = TriState.update(new_allowlist)
+    else:
+        allowed_client_ip = TriState.nullify()
+
+    updater_spec = UserUpdaterSpec(allowed_client_ip=allowed_client_ip)
+    action = ModifyUserAction(
+        email=email,
+        updater=Updater(spec=updater_spec, pk_value=email),
+    )
+    await ctx.processors.user.modify_user.wait_for_complete(action)
+
+    return UpdateMyAllowedClientIPPayloadGQL(success=True)

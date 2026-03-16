@@ -22,6 +22,7 @@ from .inputs import (
     CreateUserInputGQL,
     DeleteUsersInputGQL,
     PurgeUserInputGQL,
+    UpdateMyAllowedClientIPInputGQL,
     UpdateUserV2InputGQL,
 )
 from .nested import (
@@ -49,6 +50,7 @@ from .payloads import (
     DeleteUsersPayloadGQL,
     PurgeUserPayloadGQL,
     PurgeUsersPayloadGQL,
+    UpdateMyAllowedClientIPPayloadGQL,
     UpdateUserPayloadGQL,
 )
 from .scopes import (
@@ -88,6 +90,7 @@ __all__ = [
     "BulkUpdateUserV2ItemInputGQL",
     "BulkUpdateUserV2InputGQL",
     "UpdateUserV2InputGQL",
+    "UpdateMyAllowedClientIPInputGQL",
     "DeleteUsersInputGQL",
     "PurgeUserInputGQL",
     "BulkPurgeUsersV2InputGQL",
@@ -99,6 +102,7 @@ __all__ = [
     "BulkUpdateUserV2ErrorGQL",
     "BulkUpdateUsersV2PayloadGQL",
     "UpdateUserPayloadGQL",
+    "UpdateMyAllowedClientIPPayloadGQL",
     "DeleteUserPayloadGQL",
     "DeleteUsersPayloadGQL",
     "PurgeUserPayloadGQL",

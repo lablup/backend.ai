@@ -164,8 +164,8 @@ class TestVFolderGetInfoResponse:
             usage_mode=VFolderUsageMode.GENERAL,
             cloneable=False,
         )
-        resp = VFolderGetInfoResponse(item=info)
-        assert resp.item.name == "test"
+        resp = VFolderGetInfoResponse(info)
+        assert resp.root.name == "test"
 
 
 class TestCompactVFolderInfoDTO:
@@ -179,8 +179,8 @@ class TestCompactVFolderInfoDTO:
 class TestVFolderGetIDResponse:
     def test_wraps_dto(self) -> None:
         vid = uuid.uuid4()
-        resp = VFolderGetIDResponse(item=CompactVFolderInfoDTO(id=vid, name="test"))
-        assert resp.item.id == vid
+        resp = VFolderGetIDResponse(CompactVFolderInfoDTO(id=vid, name="test"))
+        assert resp.root.id == vid
 
 
 class TestVFolderInvitationDTO:

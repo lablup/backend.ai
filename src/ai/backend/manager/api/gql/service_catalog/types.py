@@ -20,7 +20,12 @@ from ai.backend.manager.data.service_catalog.types import (
     ServiceCatalogEndpointData,
 )
 from ai.backend.manager.models.service_catalog.row import ServiceCatalogRow
-from ai.backend.manager.repositories.base import QueryCondition, QueryOrder
+from ai.backend.manager.repositories.base import (
+    QueryCondition,
+    QueryOrder,
+    combine_conditions_or,
+    negate_conditions,
+)
 
 __all__ = (
     "ServiceCatalogEndpointGQL",
@@ -168,6 +173,9 @@ class ServiceCatalogFilterGQL(GQLFilter):
         default=None,
         description="Filter by health status.",
     )
+    AND: list[ServiceCatalogFilterGQL] | None = None
+    OR: list[ServiceCatalogFilterGQL] | None = None
+    NOT: list[ServiceCatalogFilterGQL] | None = None
 
     def build_conditions(self) -> list[QueryCondition]:
         """Build query conditions from filter fields."""
@@ -178,4 +186,26 @@ class ServiceCatalogFilterGQL(GQLFilter):
         if self.status is not None:
             status_val = ServiceCatalogStatus(self.status.value)
             conditions.append(lambda: ServiceCatalogRow.status == status_val)
+
+        # Handle AND logical operator
+        if self.AND:
+            for sub_filter in self.AND:
+                conditions.extend(sub_filter.build_conditions())
+
+        # Handle OR logical operator
+        if self.OR:
+            or_sub_conditions: list[QueryCondition] = []
+            for sub_filter in self.OR:
+                or_sub_conditions.extend(sub_filter.build_conditions())
+            if or_sub_conditions:
+                conditions.append(combine_conditions_or(or_sub_conditions))
+
+        # Handle NOT logical operator
+        if self.NOT:
+            not_sub_conditions: list[QueryCondition] = []
+            for sub_filter in self.NOT:
+                not_sub_conditions.extend(sub_filter.build_conditions())
+            if not_sub_conditions:
+                conditions.append(negate_conditions(not_sub_conditions))
+
         return conditions

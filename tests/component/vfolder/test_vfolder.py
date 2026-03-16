@@ -103,8 +103,8 @@ class TestVFolderGetInfo:
         """Admin gets vfolder info by name."""
         result = await admin_registry.vfolder.get_info(target_vfolder["name"])
         assert isinstance(result, VFolderGetInfoResponse)
-        assert result.item.name == target_vfolder["name"]
-        assert result.item.id == target_vfolder["id"].hex
+        assert result.root.name == target_vfolder["name"]
+        assert result.root.id == target_vfolder["id"].hex
 
     async def test_get_nonexistent_vfolder_returns_error(
         self,
@@ -130,7 +130,7 @@ class TestVFolderGetID:
             GetVFolderIDReq(name=target_vfolder["name"]),
         )
         assert isinstance(result, VFolderGetIDResponse)
-        assert result.item.id == target_vfolder["id"].hex
+        assert result.root.id == target_vfolder["id"].hex
 
 
 class TestVFolderRename:
@@ -152,7 +152,7 @@ class TestVFolderRename:
         assert isinstance(result, MessageResponse)
         # Verify the rename took effect
         info = await admin_registry.vfolder.get_info(new_name)
-        assert info.item.name == new_name
+        assert info.root.name == new_name
 
     async def test_regular_user_cannot_rename_others_vfolder(
         self,
@@ -188,7 +188,7 @@ class TestVFolderUpdateOptions:
         assert isinstance(result, MessageResponse)
         # Verify the option was updated
         info = await admin_registry.vfolder.get_info(target_vfolder["name"])
-        assert info.item.cloneable is True
+        assert info.root.cloneable is True
 
 
 class TestVFolderDelete:

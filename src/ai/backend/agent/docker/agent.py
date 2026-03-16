@@ -749,6 +749,7 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
                             check=True,
                             capture_output=True,
                         )
+                        host_key_path.chmod(0o600)
                     except CalledProcessError as e:
                         stderr = e.stderr.decode("utf-8", "replace") if e.stderr else ""
                         stdout = e.stdout.decode("utf-8", "replace") if e.stdout else ""
@@ -763,7 +764,6 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
                             "failed to execute dropbearmulti for host key generation. Host key will regenerate on container startup: {}",
                             repr(e),
                         )
-                    host_key_path.chmod(0o600)
                 paths_to_chown.append(host_key_path)
 
                 # Write provided SSH keypair for cluster access if exists

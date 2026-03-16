@@ -22,7 +22,6 @@ if TYPE_CHECKING:
         ResourceAllocationConnectionGQL,
     )
     from ai.backend.manager.api.gql.session.types import SessionV2GQL
-    from ai.backend.manager.repositories.base import QueryCondition
 
 from ai.backend.manager.api.gql.agent.types import AgentV2GQL
 from ai.backend.manager.api.gql.common.types import (
@@ -39,7 +38,12 @@ from ai.backend.manager.api.gql.types import GQLFilter, GQLOrderBy, StrawberryGQ
 from ai.backend.manager.api.gql.user.types.node import UserV2GQL
 from ai.backend.manager.api.gql.utils import dedent_strip
 from ai.backend.manager.data.kernel.types import KernelInfo, KernelStatus, KernelStatusInMatchSpec
-from ai.backend.manager.repositories.base import QueryCondition, QueryOrder
+from ai.backend.manager.repositories.base import (
+    QueryCondition,
+    QueryOrder,
+    combine_conditions_or,
+    negate_conditions,
+)
 from ai.backend.manager.repositories.scheduler.options import KernelConditions, KernelOrders
 
 
@@ -169,6 +173,10 @@ class KernelV2FilterGQL(GQLFilter):
     status: KernelV2StatusFilterGQL | None = None
     session_id: UUIDFilter | None = None
 
+    AND: list[Self] | None = None
+    OR: list[Self] | None = None
+    NOT: list[Self] | None = None
+
     def build_conditions(self) -> list[QueryCondition]:
         conditions: list[QueryCondition] = []
         if self.id:
@@ -191,6 +199,28 @@ class KernelV2FilterGQL(GQLFilter):
             )
             if condition:
                 conditions.append(condition)
+
+        # Handle AND logical operator
+        if self.AND:
+            for sub_filter in self.AND:
+                conditions.extend(sub_filter.build_conditions())
+
+        # Handle OR logical operator
+        if self.OR:
+            or_sub_conditions: list[QueryCondition] = []
+            for sub_filter in self.OR:
+                or_sub_conditions.extend(sub_filter.build_conditions())
+            if or_sub_conditions:
+                conditions.append(combine_conditions_or(or_sub_conditions))
+
+        # Handle NOT logical operator
+        if self.NOT:
+            not_sub_conditions: list[QueryCondition] = []
+            for sub_filter in self.NOT:
+                not_sub_conditions.extend(sub_filter.build_conditions())
+            if not_sub_conditions:
+                conditions.append(negate_conditions(not_sub_conditions))
+
         return conditions
 
 

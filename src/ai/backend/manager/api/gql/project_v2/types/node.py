@@ -11,6 +11,7 @@ from strawberry import ID, Info
 from strawberry.relay import Connection, Edge, Node, NodeID
 
 from ai.backend.manager.api.gql.fair_share.types import ProjectFairShareGQL
+from ai.backend.manager.api.gql.resource_slot.overview_types import ActiveResourceOverviewGQL
 from ai.backend.manager.api.gql.resource_usage.types import (
     ProjectUsageBucketConnection,
     ProjectUsageBucketFilter,
@@ -103,6 +104,25 @@ class ProjectV2GQL(Node):
             resource_group_name=scope.resource_group_name,
             project_id=UUID(str(self.id)),
         )
+
+    @strawberry.field(  # type: ignore[misc]
+        description=(
+            "Added in 26.4.0. Active resource usage overview for this project. "
+            "Returns the currently occupied resource slots and the number of active sessions."
+        )
+    )
+    async def active_resource_overview(
+        self,
+        info: Info,
+    ) -> ActiveResourceOverviewGQL:
+        from ai.backend.manager.services.resource_slot.actions.get_project_resource_overview import (
+            GetProjectResourceOverviewAction,
+        )
+
+        result = await info.context.processors.resource_slot.get_project_resource_overview.wait_for_complete(
+            GetProjectResourceOverviewAction(project_id=UUID(str(self.id)))
+        )
+        return ActiveResourceOverviewGQL.from_occupancy(result.item)
 
     @strawberry.field(  # type: ignore[misc]
         description=(

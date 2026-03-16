@@ -44,6 +44,9 @@ input AccessTokenFilter {
   token: StringFilter = null
   validUntil: DateTimeFilter = null
   createdAt: DateTimeFilter = null
+  AND: [AccessTokenFilter!] = null
+  OR: [AccessTokenFilter!] = null
+  NOT: [AccessTokenFilter!] = null
 }
 
 """Added in 25.16.0"""
@@ -69,6 +72,21 @@ type ActivateRevisionPayload {
   deployment: ModelDeployment!
   previousRevisionId: ID
   activatedRevisionId: ID!
+}
+
+"""
+Added in 26.4.0. Active resource usage overview for a domain or project. Shows the currently occupied resource slots and the number of active sessions.
+"""
+type ActiveResourceOverview {
+  """
+  Resource slots currently occupied by active sessions. Each entry represents a resource type and the total quantity in use.
+  """
+  slots: ResourceSlot!
+
+  """
+  Number of active sessions contributing to the current resource occupancy.
+  """
+  sessionCount: Int!
 }
 
 """
@@ -212,6 +230,9 @@ type AgentResourceSlotEdge {
 """Added in 26.3.0. Filter criteria for querying agent resource slots."""
 input AgentResourceSlotFilter {
   slotName: StringFilter = null
+  AND: [AgentResourceSlotFilter!] = null
+  OR: [AgentResourceSlotFilter!] = null
+  NOT: [AgentResourceSlotFilter!] = null
 }
 
 """Added in 26.3.0. Ordering specification for agent resource slots."""
@@ -870,6 +891,108 @@ input AssignRoleInput {
   roleId: UUID!
 }
 
+"""Filter criteria for querying audit logs."""
+input AuditLogFilter {
+  entityType: StringFilter = null
+  operation: StringFilter = null
+  status: AuditLogStatusFilter = null
+  createdAt: DateTimeFilter = null
+  triggeredBy: StringFilter = null
+  AND: [AuditLogFilter!] = null
+  OR: [AuditLogFilter!] = null
+  NOT: [AuditLogFilter!] = null
+}
+
+"""Ordering specification for audit logs."""
+input AuditLogOrderBy {
+  field: AuditLogOrderField!
+  direction: OrderDirection! = DESC
+}
+
+"""Fields available for ordering audit logs."""
+enum AuditLogOrderField {
+  CREATED_AT
+  ENTITY_TYPE
+  OPERATION
+  STATUS
+}
+
+"""Status of an audit log entry."""
+enum AuditLogStatus {
+  SUCCESS
+  ERROR
+  UNKNOWN
+  RUNNING
+}
+
+"""Filter for audit log status field."""
+input AuditLogStatusFilter {
+  in: [AuditLogStatus!] = null
+  notIn: [AuditLogStatus!] = null
+}
+
+"""Represents an audit log entry tracking system operations."""
+type AuditLogV2 implements Node {
+  """The Globally Unique ID of this object"""
+  id: ID!
+
+  """UUID of the action that generated this log."""
+  actionId: UUID!
+
+  """Type of entity this log relates to."""
+  entityType: String!
+
+  """Operation performed (create, update, delete, etc.)."""
+  operation: String!
+
+  """ID of the affected entity, if applicable."""
+  entityId: String
+
+  """Timestamp when the audit log was created."""
+  createdAt: DateTime!
+
+  """Request ID that triggered this operation."""
+  requestId: String
+
+  """UUID string of the user who triggered the action."""
+  triggeredBy: String
+
+  """Human-readable description of the operation."""
+  description: String!
+
+  """Duration of the operation as a string representation."""
+  duration: String
+
+  """Status of the operation."""
+  status: AuditLogStatus!
+
+  """
+  The user who triggered this audit log entry, resolved from triggered_by UUID.
+  """
+  user: UserV2
+}
+
+"""Connection type for paginated audit log results."""
+type AuditLogV2Connection {
+  """Pagination data for this connection"""
+  pageInfo: PageInfo!
+
+  """Contains the nodes in this connection"""
+  edges: [AuditLogV2Edge!]!
+
+  """Total number of audit log entries matching the query."""
+  count: Int!
+}
+
+"""An edge in a connection."""
+type AuditLogV2Edge {
+  """A cursor for use in pagination"""
+  cursor: String!
+
+  """The item at the end of the edge"""
+  node: AuditLogV2!
+}
+
 """Added in 25.1.0"""
 enum AutoScalingMetricSource {
   KERNEL
@@ -928,6 +1051,9 @@ type AutoScalingRuleEdge {
 input AutoScalingRuleFilter {
   createdAt: DateTimeFilter = null
   lastTriggeredAt: DateTimeFilter = null
+  AND: [AutoScalingRuleFilter!] = null
+  OR: [AutoScalingRuleFilter!] = null
+  NOT: [AutoScalingRuleFilter!] = null
 }
 
 """Added in 25.19.0"""
@@ -1874,6 +2000,9 @@ input DeploymentHistoryFilter {
   message: StringFilter = null
   createdAt: DateTimeFilter = null
   updatedAt: DateTimeFilter = null
+  AND: [DeploymentHistoryFilter!] = null
+  OR: [DeploymentHistoryFilter!] = null
+  NOT: [DeploymentHistoryFilter!] = null
 }
 
 """Order by specification for deployment history"""
@@ -2337,6 +2466,11 @@ type DomainV2 implements Node @key(fields: "id") {
   fairShare(scope: DomainFairShareScope!): DomainFairShare!
 
   """
+  Added in 26.4.0. Active resource usage overview for this domain. Returns the currently occupied resource slots and the number of active sessions.
+  """
+  activeResourceOverview: ActiveResourceOverview!
+
+  """
   Usage buckets for this domain, filtered by resource group. Returns aggregated resource usage statistics over time.
   """
   usageBuckets(scope: DomainUsageScope!, filter: DomainUsageBucketFilter = null, orderBy: [DomainUsageBucketOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): DomainUsageBucketConnection!
@@ -2492,6 +2626,9 @@ type EntityEdge {
 input EntityFilter {
   entityType: RBACElementType = null
   entityId: StringFilter = null
+  AND: [EntityFilter!] = null
+  OR: [EntityFilter!] = null
+  NOT: [EntityFilter!] = null
 }
 
 union EntityNode = UserV2 | ProjectV2 | DomainV2 | VirtualFolderNode | ImageV2 | ComputeSessionNode | Artifact | ArtifactRegistry | AppConfig | NotificationChannel | NotificationRule | ModelDeployment | ResourceGroup | ArtifactRevision | Role
@@ -2878,6 +3015,9 @@ Supports filtering by alias string.
 """
 input ImageV2AliasFilterGQL {
   alias: StringFilter = null
+  AND: [ImageV2AliasFilterGQL!] = null
+  OR: [ImageV2AliasFilterGQL!] = null
+  NOT: [ImageV2AliasFilterGQL!] = null
 }
 
 """
@@ -3171,6 +3311,22 @@ input IntFilter {
 }
 
 """
+Payload returned after issuing a new keypair. The secret_key is only shown once.
+"""
+type IssueMyKeypairPayload {
+  """The newly generated access key."""
+  accessKey: String!
+
+  """
+  The newly generated secret key. This value is only returned at creation time.
+  """
+  secretKey: String!
+
+  """The generated SSH public key."""
+  sshPublicKey: String!
+}
+
+"""
 The `JSON` scalar type represents JSON values as specified by [ECMA-404](https://ecma-international.org/wp-content/uploads/ECMA-404_2nd_edition_december_2017.pdf).
 """
 scalar JSON @specifiedBy(url: "https://ecma-international.org/wp-content/uploads/ECMA-404_2nd_edition_december_2017.pdf")
@@ -3207,6 +3363,9 @@ Added in 26.3.0. Filter criteria for querying kernel resource allocations.
 """
 input KernelResourceAllocationFilter {
   slotName: StringFilter = null
+  AND: [KernelResourceAllocationFilter!] = null
+  OR: [KernelResourceAllocationFilter!] = null
+  NOT: [KernelResourceAllocationFilter!] = null
 }
 
 """
@@ -3317,6 +3476,9 @@ input KernelV2Filter {
   id: UUIDFilter = null
   status: KernelV2StatusFilter = null
   sessionId: UUIDFilter = null
+  AND: [KernelV2Filter!] = null
+  OR: [KernelV2Filter!] = null
+  NOT: [KernelV2Filter!] = null
 }
 
 """Added in 26.2.0. Lifecycle and status information for a kernel."""
@@ -4170,6 +4332,26 @@ type Mutation {
   """
   adminBulkPurgeUsersV2(input: BulkPurgeUsersV2Input!): BulkPurgeUsersV2Payload!
 
+  """
+  Issue a new keypair for the current user. Settings (resource_policy, rate_limit, is_admin) are inherited from the main keypair. The secret_key is only returned at creation time.
+  """
+  issueMyKeypair: IssueMyKeypairPayload!
+
+  """
+  Revoke a keypair owned by the current user. The main access key cannot be revoked — switch it first.
+  """
+  revokeMyKeypair(input: RevokeMyKeypairInput!): RevokeMyKeypairPayload!
+
+  """
+  Switch the main access key for the current user. The target keypair must be active and owned by the user.
+  """
+  switchMyMainAccessKey(input: SwitchMyMainAccessKeyInput!): SwitchMyMainAccessKeyPayload!
+
+  """
+  Added in 26.4.0. Update the current user's allowed client IP list. Set allowed_client_ip to null to remove all IP restrictions. When force is false, the operation fails if the current request IP would be excluded by the new allowlist (lockout prevention).
+  """
+  updateMyAllowedClientIp(input: UpdateMyAllowedClientIPInput!): UpdateMyAllowedClientIPPayload!
+
   """Added in 26.3.0. Create a new query definition (admin only)."""
   adminCreatePrometheusQueryPreset(input: CreateQueryDefinitionInput!): CreateQueryDefinitionPayload!
 
@@ -4473,6 +4655,9 @@ input PermissionFilter {
   roleId: UUID = null
   scopeType: RBACElementType = null
   entityType: RBACElementType = null
+  AND: [PermissionFilter!] = null
+  OR: [PermissionFilter!] = null
+  NOT: [PermissionFilter!] = null
 }
 
 """Added in 26.3.0. Order by specification for permissions"""
@@ -4987,6 +5172,11 @@ type ProjectV2 implements Node @key(fields: "id") {
   fairShare(scope: ProjectFairShareScope!): ProjectFairShare!
 
   """
+  Added in 26.4.0. Active resource usage overview for this project. Returns the currently occupied resource slots and the number of active sessions.
+  """
+  activeResourceOverview: ActiveResourceOverview!
+
+  """
   Usage buckets for this project, filtered by resource group. Returns aggregated resource usage statistics over time.
   """
   usageBuckets(scope: ProjectUsageScope!, filter: ProjectUsageBucketFilter = null, orderBy: [ProjectUsageBucketOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ProjectUsageBucketConnection!
@@ -5374,6 +5564,9 @@ type Query {
   Added in 26.2.0. Query kernels with pagination and filtering. (admin only)
   """
   adminKernelsV2(filter: KernelV2Filter = null, orderBy: [KernelV2OrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): KernelV2Connection
+
+  """Query audit logs with pagination and filtering. (admin only)"""
+  adminAuditLogsV2(filter: AuditLogFilter = null, orderBy: [AuditLogOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): AuditLogV2Connection!
 
   """
   Added in 26.3.0. Query sessions with pagination and filtering. (admin only)
@@ -6409,6 +6602,9 @@ input ResourceSlotTypeFilter {
   slotName: StringFilter = null
   slotType: StringFilter = null
   displayName: StringFilter = null
+  AND: [ResourceSlotTypeFilter!] = null
+  OR: [ResourceSlotTypeFilter!] = null
+  NOT: [ResourceSlotTypeFilter!] = null
 }
 
 """Added in 26.3.0. Ordering specification for resource slot types."""
@@ -6479,6 +6675,18 @@ Contains the artifacts that were restored from soft-deleted state.
 """
 type RestoreArtifactsPayload {
   artifacts: [Artifact!]!
+}
+
+"""Input for revoking a keypair owned by the current user."""
+input RevokeMyKeypairInput {
+  """Access key of the keypair to revoke. Must not be the main access key."""
+  accessKey: String!
+}
+
+"""Payload returned after revoking a keypair."""
+type RevokeMyKeypairPayload {
+  """Whether the revocation was successful."""
+  success: Boolean!
 }
 
 """Added in 26.3.0. Input for revoking a role from a user"""
@@ -6553,6 +6761,9 @@ input RoleAssignmentFilter {
   role: RoleAssignmentRoleNestedFilter = null
   username: StringFilter = null
   email: StringFilter = null
+  AND: [RoleAssignmentFilter!] = null
+  OR: [RoleAssignmentFilter!] = null
+  NOT: [RoleAssignmentFilter!] = null
 }
 
 """Added in 26.3.0. Order by specification for role assignments"""
@@ -6575,6 +6786,9 @@ input RoleAssignmentRoleNestedFilter {
   name: StringFilter = null
   source: [RoleSource!] = null
   status: [RoleStatus!] = null
+  AND: [RoleAssignmentRoleNestedFilter!] = null
+  OR: [RoleAssignmentRoleNestedFilter!] = null
+  NOT: [RoleAssignmentRoleNestedFilter!] = null
 }
 
 """Added in 26.3.0. Role connection"""
@@ -6603,7 +6817,7 @@ input RoleFilter {
   status: [RoleStatus!] = null
   AND: [RoleFilter!] = null
   OR: [RoleFilter!] = null
-  NOT: RoleFilter = null
+  NOT: [RoleFilter!] = null
 }
 
 """Added in 26.3.0. Order by specification for roles"""
@@ -6697,6 +6911,9 @@ type RouteEdge {
 input RouteFilter {
   status: [RouteStatus!] = null
   trafficStatus: [RouteTrafficStatus!] = null
+  AND: [RouteFilter!] = null
+  OR: [RouteFilter!] = null
+  NOT: [RouteFilter!] = null
 }
 
 """Route history record"""
@@ -6753,6 +6970,9 @@ input RouteHistoryFilter {
   message: StringFilter = null
   createdAt: DateTimeFilter = null
   updatedAt: DateTimeFilter = null
+  AND: [RouteHistoryFilter!] = null
+  OR: [RouteHistoryFilter!] = null
+  NOT: [RouteHistoryFilter!] = null
 }
 
 """Order by specification for route history"""
@@ -7004,6 +7224,9 @@ input ServiceCatalogFilter {
 
   """Filter by health status."""
   status: ServiceCatalogStatus = null
+  AND: [ServiceCatalogFilter!] = null
+  OR: [ServiceCatalogFilter!] = null
+  NOT: [ServiceCatalogFilter!] = null
 }
 
 """
@@ -7117,6 +7340,9 @@ input SessionSchedulingHistoryFilter {
   message: StringFilter = null
   createdAt: DateTimeFilter = null
   updatedAt: DateTimeFilter = null
+  AND: [SessionSchedulingHistoryFilter!] = null
+  OR: [SessionSchedulingHistoryFilter!] = null
+  NOT: [SessionSchedulingHistoryFilter!] = null
 }
 
 """Order by specification for session scheduling history"""
@@ -7216,6 +7442,9 @@ input SessionV2Filter {
   domainName: StringFilter = null
   projectId: UUIDFilter = null
   userUuid: UUIDFilter = null
+  AND: [SessionV2Filter!] = null
+  OR: [SessionV2Filter!] = null
+  NOT: [SessionV2Filter!] = null
 }
 
 """Added in 26.3.0. Lifecycle status and timestamps for a session."""
@@ -7485,6 +7714,20 @@ type Subscription {
   backgroundTaskEvents(taskId: ID!): BackgroundTaskEventPayload!
 }
 
+"""Input for switching the main access key of the current user."""
+input SwitchMyMainAccessKeyInput {
+  """
+  Access key to set as the new main access key. Must be active and owned by the user.
+  """
+  accessKey: String!
+}
+
+"""Payload returned after switching the main access key."""
+type SwitchMyMainAccessKeyPayload {
+  """Whether the switch was successful."""
+  success: Boolean!
+}
+
 """Added in 25.19.0"""
 input SyncReplicaInput {
   modelDeploymentId: ID!
@@ -7607,6 +7850,29 @@ input UpdateHuggingFaceRegistryInput {
 """Added in 25.14.0"""
 type UpdateHuggingFaceRegistryPayload {
   huggingfaceRegistry: HuggingFaceRegistry!
+}
+
+"""
+Added in 26.4.0. Input for updating the current user's allowed client IP list. Set allowed_client_ip to null to remove all restrictions. Use force=true to bypass the lockout safety check.
+"""
+input UpdateMyAllowedClientIPInput {
+  """
+  New allowed client IP addresses or CIDR ranges. Set to null to remove all IP restrictions.
+  """
+  allowedClientIp: [String!]
+
+  """
+  If false (default), the operation will fail if the current request IP is not included in the new allowlist. Set to true to override this safety check.
+  """
+  force: Boolean! = false
+}
+
+"""
+Added in 26.4.0. Payload for updating the current user's allowed client IP list.
+"""
+type UpdateMyAllowedClientIPPayload {
+  """Whether the update was successful."""
+  success: Boolean!
 }
 
 """Input for updating a notification channel"""

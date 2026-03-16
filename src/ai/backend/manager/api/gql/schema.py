@@ -46,6 +46,7 @@ from .artifact import (
     update_artifact,
 )
 from .artifact_registry import default_artifact_registry
+from .audit_log import admin_audit_logs_v2
 from .background_task import background_task_events
 from .deployment import (
     # Revision
@@ -131,6 +132,11 @@ from .image import (
     image_v2,
 )
 from .kernel.resolver import admin_kernels_v2, kernel_v2, session_kernels_v2
+from .keypair import (
+    issue_my_keypair,
+    revoke_my_keypair,
+    switch_my_main_access_key,
+)
 from .notification import (
     admin_create_notification_channel,
     admin_create_notification_rule,
@@ -263,6 +269,7 @@ from .user import (
     domain_users_v2,
     my_user_v2,
     project_users_v2,
+    update_my_allowed_client_ip,
     update_user_v2,
 )
 from .vfs_storage import (
@@ -324,6 +331,7 @@ class Query:
     admin_user_usage_buckets = admin_user_usage_buckets
     admin_images_v2 = admin_images_v2
     admin_kernels_v2 = admin_kernels_v2
+    admin_audit_logs_v2 = admin_audit_logs_v2
     admin_sessions_v2 = admin_sessions_v2
     resource_slot_type = resource_slot_type
     resource_slot_types = resource_slot_types
@@ -498,6 +506,12 @@ class Mutation:
     admin_delete_users_v2 = admin_delete_users_v2
     admin_purge_user_v2 = admin_purge_user_v2
     admin_bulk_purge_users_v2 = admin_bulk_purge_users_v2
+    # Keypair self-service mutations
+    issue_my_keypair = issue_my_keypair
+    revoke_my_keypair = revoke_my_keypair
+    switch_my_main_access_key = switch_my_main_access_key
+    # IP allowlist self-service mutation
+    update_my_allowed_client_ip = update_my_allowed_client_ip
     # Prometheus Query Preset - Admin APIs
     admin_create_prometheus_query_preset = admin_create_prometheus_query_preset
     admin_modify_prometheus_query_preset = admin_modify_prometheus_query_preset

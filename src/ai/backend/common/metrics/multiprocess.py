@@ -28,7 +28,7 @@ log = logging.getLogger(__spec__.name)
 
 _multiprocess_dir: Path | None = None
 
-_DEFAULT_BASE_DIR = Path("/tmp/backend.ai/prometheus")
+_DEFAULT_BASE_DIR = Path("./run/prometheus")
 
 
 def setup_prometheus_multiprocess_dir(
@@ -46,7 +46,7 @@ def setup_prometheus_multiprocess_dir(
     The base directory is resolved in the following priority order:
     1. ``base_dir`` argument (if provided)
     2. ``BACKENDAI_PROMETHEUS_DIR`` environment variable (if set)
-    3. Default: ``/tmp/backend.ai/prometheus/``
+    3. Default: ``./run/prometheus/``
 
     Args:
         component: Component name for directory naming (e.g., 'manager', 'agent')

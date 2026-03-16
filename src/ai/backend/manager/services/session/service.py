@@ -30,6 +30,7 @@ from ai.backend.common.exception import (
 from ai.backend.common.json import load_json
 from ai.backend.common.plugin.monitor import ErrorPluginContext
 from ai.backend.common.types import (
+    ContainerId,
     ImageAlias,
     SessionId,
     SessionTypes,
@@ -1089,9 +1090,9 @@ class SessionService:
             architecture=sess.main_kernel.architecture or "",
             registry=sess.main_kernel.registry,
             tag=sess.tag,
-            container_id=uuid.UUID(sess.main_kernel.container_id)
+            container_id=ContainerId(sess.main_kernel.container_id)
             if sess.main_kernel.container_id
-            else uuid.uuid4(),
+            else ContainerId(""),
             occupied_slots=str(sess.main_kernel.occupied_slots),  # legacy
             occupying_slots=str(sess.occupying_slots),
             requested_slots=str(sess.requested_slots),

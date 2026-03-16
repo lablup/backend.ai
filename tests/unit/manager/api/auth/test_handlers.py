@@ -538,8 +538,12 @@ class TestGetSSHKeypair:
     ) -> None:
         """Verify processor is called and public key is returned."""
         public_key = "ssh-rsa AAAAB3...\n"
+        access_key = "AKIAIOSFODNN7EXAMPLE"
         mock_processors.auth.get_ssh_keypair.wait_for_complete = AsyncMock(
-            return_value=GetSSHKeypairActionResult(public_key=public_key)
+            return_value=GetSSHKeypairActionResult(
+                public_key=public_key,
+                access_key=access_key,
+            )
         )
 
         response = await handler.get_ssh_keypair(user_context)
@@ -564,12 +568,14 @@ class TestGenerateSSHKeypair:
         """Verify processor is called and keypair is returned."""
         ssh_public_key = "ssh-rsa NEWPUB...\n"
         ssh_private_key = "-----BEGIN RSA PRIVATE KEY-----\n...\n"
+        user_id = user_context.user_uuid
         mock_processors.auth.generate_ssh_keypair.wait_for_complete = AsyncMock(
             return_value=GenerateSSHKeypairActionResult(
                 ssh_keypair=SSHKeypair(
                     ssh_public_key=ssh_public_key,
                     ssh_private_key=ssh_private_key,
-                )
+                ),
+                user_id=user_id,
             )
         )
 
@@ -599,12 +605,14 @@ class TestUploadSSHKeypair:
             "pubkey": "ssh-rsa AAAAB3...",
             "privkey": "-----BEGIN RSA PRIVATE KEY-----\n...",
         })
+        user_id = user_context.user_uuid
         mock_processors.auth.upload_ssh_keypair.wait_for_complete = AsyncMock(
             return_value=UploadSSHKeypairActionResult(
                 ssh_keypair=SSHKeypair(
                     ssh_public_key="ssh-rsa AAAAB3...\n",
                     ssh_private_key="-----BEGIN RSA PRIVATE KEY-----\n...\n",
-                )
+                ),
+                user_id=user_id,
             )
         )
 

@@ -407,7 +407,7 @@ class AuthService:
 
     async def get_ssh_keypair(self, action: GetSSHKeypairAction) -> GetSSHKeypairActionResult:
         pubkey = await self._auth_repository.get_ssh_public_key(action.access_key)
-        return GetSSHKeypairActionResult(public_key=pubkey or "")
+        return GetSSHKeypairActionResult(public_key=pubkey or "", access_key=action.access_key)
 
     async def generate_ssh_keypair(
         self, action: GenerateSSHKeypairAction
@@ -419,7 +419,8 @@ class AuthService:
             ssh_keypair=SSHKeypair(
                 ssh_public_key=pubkey,
                 ssh_private_key=privkey,
-            )
+            ),
+            user_id=action.user_id,
         )
 
     async def upload_ssh_keypair(
@@ -438,6 +439,7 @@ class AuthService:
                 ssh_public_key=pubkey,
                 ssh_private_key=privkey,
             ),
+            user_id=action.user_id,
         )
 
     async def resolve_access_key_scope(
