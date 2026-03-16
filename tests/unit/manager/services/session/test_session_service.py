@@ -729,7 +729,7 @@ class TestGetSessionInfo:
         mock_kernel.image = "cr.backend.ai/stable/python:latest"
         mock_kernel.architecture = "x86_64"
         mock_kernel.registry = "cr.backend.ai"
-        mock_kernel.container_id = str(uuid4())
+        mock_kernel.container_id = "a" * 64  # Docker container ID format (64-char hex SHA-256)
         mock_kernel.occupied_slots = ResourceSlot({"cpu": 1, "mem": 1024})
         mock_kernel.occupied_shares = {}
 
