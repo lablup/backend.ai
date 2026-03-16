@@ -11,12 +11,15 @@ from uuid import UUID
 from pydantic import Field
 
 from ai.backend.common.api_handlers import BaseResponseModel
-from ai.backend.common.data.artifact.types import (
+
+from .types import (
+    ArtifactAvailability,
+    ArtifactRegistryType,
+    ArtifactStatus,
+    ArtifactType,
     CombinedDownloadProgress,
     VerificationStepResult,
 )
-
-from .types import ArtifactAvailability, ArtifactRegistryType, ArtifactStatus, ArtifactType
 
 __all__ = (
     "ArtifactNode",
