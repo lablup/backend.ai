@@ -26,11 +26,8 @@ from ai.backend.manager.services.user.actions.get_user import (
 )
 from ai.backend.manager.services.user.actions.keypair_ops import (
     IssueMyKeypairAction,
-    IssueMyKeypairActionResult,
     RevokeMyKeypairAction,
-    RevokeMyKeypairActionResult,
     SwitchMyMainAccessKeyAction,
-    SwitchMyMainAccessKeyActionResult,
 )
 from ai.backend.manager.services.user.actions.modify_user import (
     BulkModifyUserAction,
