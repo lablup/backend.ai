@@ -1415,6 +1415,49 @@ input ContainerRegistryScope {
   registryId: UUID!
 }
 
+"""Added in 26.3.0. Container registry type."""
+enum ContainerRegistryType {
+  DOCKER
+  HARBOR
+  HARBOR2
+  GITHUB
+  GITLAB
+  ECR
+  ECR_PUB
+  LOCAL
+  OCP
+}
+
+"""Added in 26.3.0. Container registry node."""
+type ContainerRegistryV2 implements Node {
+  """The Globally Unique ID of this object"""
+  id: ID!
+
+  """URL of the container registry"""
+  url: String!
+
+  """Name of the container registry"""
+  registryName: String!
+
+  """Type of the container registry"""
+  type: ContainerRegistryType!
+
+  """Project or namespace within the registry"""
+  project: String
+
+  """Username for registry authentication"""
+  username: String
+
+  """Masked password for registry authentication"""
+  password: String
+
+  """Whether SSL verification is enabled"""
+  sslVerify: Boolean
+
+  """Whether this registry is globally accessible"""
+  isGlobal: Boolean
+}
+
 input CreateAccessTokenInput {
   """
   Added in 25.16.0: The ID of the model deployment for which the access token is created.
@@ -2631,7 +2674,7 @@ input EntityFilter {
   NOT: [EntityFilter!] = null
 }
 
-union EntityNode = UserV2 | ProjectV2 | DomainV2 | VirtualFolderNode | ImageV2 | ComputeSessionNode | Artifact | ArtifactRegistry | AppConfig | NotificationChannel | NotificationRule | ModelDeployment | ResourceGroup | ArtifactRevision | Role
+union EntityNode = UserV2 | ProjectV2 | DomainV2 | VirtualFolderNode | ImageV2 | ComputeSessionNode | Artifact | ArtifactRegistry | AppConfig | NotificationChannel | NotificationRule | ModelDeployment | ResourceGroup | ContainerRegistryV2 | ArtifactRevision | Role
 
 """Added in 26.3.0. Order by specification for entity associations"""
 input EntityOrderBy {

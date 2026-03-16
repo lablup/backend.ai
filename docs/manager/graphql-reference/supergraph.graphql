@@ -2391,9 +2391,57 @@ input ContainerRegistryScope
 scalar ContainerRegistryScopeField
   @join__type(graph: GRAPHENE)
 
+"""Added in 26.3.0. Container registry type."""
+enum ContainerRegistryType
+  @join__type(graph: STRAWBERRY)
+{
+  DOCKER @join__enumValue(graph: STRAWBERRY)
+  HARBOR @join__enumValue(graph: STRAWBERRY)
+  HARBOR2 @join__enumValue(graph: STRAWBERRY)
+  GITHUB @join__enumValue(graph: STRAWBERRY)
+  GITLAB @join__enumValue(graph: STRAWBERRY)
+  ECR @join__enumValue(graph: STRAWBERRY)
+  ECR_PUB @join__enumValue(graph: STRAWBERRY)
+  LOCAL @join__enumValue(graph: STRAWBERRY)
+  OCP @join__enumValue(graph: STRAWBERRY)
+}
+
 """Added in 24.09.0."""
 scalar ContainerRegistryTypeField
   @join__type(graph: GRAPHENE)
+
+"""Added in 26.3.0. Container registry node."""
+type ContainerRegistryV2 implements Node
+  @join__implements(graph: STRAWBERRY, interface: "Node")
+  @join__type(graph: STRAWBERRY)
+{
+  """The Globally Unique ID of this object"""
+  id: ID!
+
+  """URL of the container registry"""
+  url: String!
+
+  """Name of the container registry"""
+  registryName: String!
+
+  """Type of the container registry"""
+  type: ContainerRegistryType!
+
+  """Project or namespace within the registry"""
+  project: String
+
+  """Username for registry authentication"""
+  username: String
+
+  """Masked password for registry authentication"""
+  password: String
+
+  """Whether SSL verification is enabled"""
+  sslVerify: Boolean
+
+  """Whether this registry is globally accessible"""
+  isGlobal: Boolean
+}
 
 """Added in 25.6.0."""
 type ContainerUtilizationMetric
@@ -4595,9 +4643,10 @@ union EntityNode
   @join__unionMember(graph: STRAWBERRY, member: "NotificationRule")
   @join__unionMember(graph: STRAWBERRY, member: "ModelDeployment")
   @join__unionMember(graph: STRAWBERRY, member: "ResourceGroup")
+  @join__unionMember(graph: STRAWBERRY, member: "ContainerRegistryV2")
   @join__unionMember(graph: STRAWBERRY, member: "ArtifactRevision")
   @join__unionMember(graph: STRAWBERRY, member: "Role")
- = UserV2 | ProjectV2 | DomainV2 | VirtualFolderNode | ImageV2 | ComputeSessionNode | Artifact | ArtifactRegistry | AppConfig | NotificationChannel | NotificationRule | ModelDeployment | ResourceGroup | ArtifactRevision | Role
+ = UserV2 | ProjectV2 | DomainV2 | VirtualFolderNode | ImageV2 | ComputeSessionNode | Artifact | ArtifactRegistry | AppConfig | NotificationChannel | NotificationRule | ModelDeployment | ResourceGroup | ContainerRegistryV2 | ArtifactRevision | Role
 
 """Added in 26.3.0. Order by specification for entity associations"""
 input EntityOrderBy
