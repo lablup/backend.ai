@@ -26,7 +26,12 @@ from ai.backend.manager.data.resource_slot.types import (
     ResourceAllocationData,
     ResourceSlotTypeData,
 )
-from ai.backend.manager.repositories.base import QueryCondition, QueryOrder
+from ai.backend.manager.repositories.base import (
+    QueryCondition,
+    QueryOrder,
+    combine_conditions_or,
+    negate_conditions,
+)
 from ai.backend.manager.repositories.resource_slot.query import (
     AgentResourceQueryConditions,
     AgentResourceQueryOrders,
@@ -162,6 +167,10 @@ class ResourceSlotTypeFilterGQL(GQLFilter):
     slot_type: StringFilter | None = None
     display_name: StringFilter | None = None
 
+    AND: list[ResourceSlotTypeFilterGQL] | None = None
+    OR: list[ResourceSlotTypeFilterGQL] | None = None
+    NOT: list[ResourceSlotTypeFilterGQL] | None = None
+
     def build_conditions(self) -> list[QueryCondition]:
         conditions: list[QueryCondition] = []
         if self.slot_name:
@@ -191,6 +200,21 @@ class ResourceSlotTypeFilterGQL(GQLFilter):
             )
             if condition:
                 conditions.append(condition)
+        if self.AND:
+            for sub_filter in self.AND:
+                conditions.extend(sub_filter.build_conditions())
+        if self.OR:
+            or_sub_conditions: list[QueryCondition] = []
+            for sub_filter in self.OR:
+                or_sub_conditions.extend(sub_filter.build_conditions())
+            if or_sub_conditions:
+                conditions.append(combine_conditions_or(or_sub_conditions))
+        if self.NOT:
+            not_sub_conditions: list[QueryCondition] = []
+            for sub_filter in self.NOT:
+                not_sub_conditions.extend(sub_filter.build_conditions())
+            if not_sub_conditions:
+                conditions.append(negate_conditions(not_sub_conditions))
         return conditions
 
 
@@ -310,6 +334,10 @@ class AgentResourceSlotOrderFieldGQL(StrEnum):
 class AgentResourceSlotFilterGQL(GQLFilter):
     slot_name: StringFilter | None = None
 
+    AND: list[AgentResourceSlotFilterGQL] | None = None
+    OR: list[AgentResourceSlotFilterGQL] | None = None
+    NOT: list[AgentResourceSlotFilterGQL] | None = None
+
     def build_conditions(self) -> list[QueryCondition]:
         conditions: list[QueryCondition] = []
         if self.slot_name:
@@ -321,6 +349,21 @@ class AgentResourceSlotFilterGQL(GQLFilter):
             )
             if condition:
                 conditions.append(condition)
+        if self.AND:
+            for sub_filter in self.AND:
+                conditions.extend(sub_filter.build_conditions())
+        if self.OR:
+            or_sub_conditions: list[QueryCondition] = []
+            for sub_filter in self.OR:
+                or_sub_conditions.extend(sub_filter.build_conditions())
+            if or_sub_conditions:
+                conditions.append(combine_conditions_or(or_sub_conditions))
+        if self.NOT:
+            not_sub_conditions: list[QueryCondition] = []
+            for sub_filter in self.NOT:
+                not_sub_conditions.extend(sub_filter.build_conditions())
+            if not_sub_conditions:
+                conditions.append(negate_conditions(not_sub_conditions))
         return conditions
 
 
@@ -425,6 +468,10 @@ class KernelResourceAllocationOrderFieldGQL(StrEnum):
 class KernelResourceAllocationFilterGQL(GQLFilter):
     slot_name: StringFilter | None = None
 
+    AND: list[KernelResourceAllocationFilterGQL] | None = None
+    OR: list[KernelResourceAllocationFilterGQL] | None = None
+    NOT: list[KernelResourceAllocationFilterGQL] | None = None
+
     def build_conditions(self) -> list[QueryCondition]:
         conditions: list[QueryCondition] = []
         if self.slot_name:
@@ -436,6 +483,21 @@ class KernelResourceAllocationFilterGQL(GQLFilter):
             )
             if condition:
                 conditions.append(condition)
+        if self.AND:
+            for sub_filter in self.AND:
+                conditions.extend(sub_filter.build_conditions())
+        if self.OR:
+            or_sub_conditions: list[QueryCondition] = []
+            for sub_filter in self.OR:
+                or_sub_conditions.extend(sub_filter.build_conditions())
+            if or_sub_conditions:
+                conditions.append(combine_conditions_or(or_sub_conditions))
+        if self.NOT:
+            not_sub_conditions: list[QueryCondition] = []
+            for sub_filter in self.NOT:
+                not_sub_conditions.extend(sub_filter.build_conditions())
+            if not_sub_conditions:
+                conditions.append(negate_conditions(not_sub_conditions))
         return conditions
 
 
