@@ -17,7 +17,7 @@ from ai.backend.manager.data.container_registry.types import ContainerRegistryDa
 from ai.backend.manager.defs import PASSWORD_PLACEHOLDER
 
 
-@strawberry.enum(description="Added in 26.3.0. Container registry type.")
+@strawberry.enum(name="ContainerRegistryType", description="Added in 26.3.0. Container registry type.")
 class ContainerRegistryTypeGQL(StrEnum):
     DOCKER = "docker"
     HARBOR = "harbor"
@@ -83,7 +83,7 @@ class ContainerRegistryGQL(Node):
             type=ContainerRegistryTypeGQL.from_enum(data.type),
             project=data.project,
             username=data.username,
-            password=PASSWORD_PLACEHOLDER if data.password else None,
+            password=PASSWORD_PLACEHOLDER if data.password is not None else None,
             ssl_verify=data.ssl_verify,
             is_global=data.is_global,
         )
