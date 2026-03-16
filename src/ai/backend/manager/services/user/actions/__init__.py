@@ -15,8 +15,11 @@ from .base import (
     UserSingleEntityActionResult,
 )
 from .create_user import (
+    BulkCreateUserAction,
+    BulkCreateUserActionResult,
     CreateUserAction,
     CreateUserActionResult,
+    UserCreateSpec,
 )
 from .delete_user import (
     DeleteUserAction,
@@ -27,8 +30,11 @@ from .get_user import (
     GetUserActionResult,
 )
 from .modify_user import (
+    BulkModifyUserAction,
+    BulkModifyUserActionResult,
     ModifyUserAction,
     ModifyUserActionResult,
+    UserUpdateSpec,
 )
 from .purge_user import (
     BulkPurgeUserAction,
@@ -60,6 +66,12 @@ from .user_month_stats import (
 __all__ = (
     "AdminMonthStatsAction",
     "AdminMonthStatsActionResult",
+    "BulkCreateUserAction",
+    "BulkCreateUserActionResult",
+    "BulkModifyUserAction",
+    "BulkModifyUserActionResult",
+    "BulkPurgeUserAction",
+    "BulkPurgeUserActionResult",
     "CreateUserAction",
     "CreateUserActionResult",
     "DeleteUserAction",
@@ -68,8 +80,6 @@ __all__ = (
     "GetUserActionResult",
     "ModifyUserAction",
     "ModifyUserActionResult",
-    "BulkPurgeUserAction",
-    "BulkPurgeUserActionResult",
     "PurgeUserAction",
     "PurgeUserActionResult",
     "SearchUsersAction",
@@ -81,10 +91,12 @@ __all__ = (
     "SearchUsersByRoleAction",
     "SearchUsersByRoleActionResult",
     "UserAction",
+    "UserCreateSpec",
     "UserMonthStatsAction",
     "UserMonthStatsActionResult",
     "UserScopeAction",
     "UserScopeActionResult",
     "UserSingleEntityAction",
     "UserSingleEntityActionResult",
+    "UserUpdateSpec",
 )

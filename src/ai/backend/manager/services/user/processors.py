@@ -26,8 +26,11 @@ from ai.backend.manager.services.user.actions.get_user import (
 )
 from ai.backend.manager.services.user.actions.keypair_ops import (
     IssueMyKeypairAction,
+    IssueMyKeypairActionResult,
     RevokeMyKeypairAction,
+    RevokeMyKeypairActionResult,
     SwitchMyMainAccessKeyAction,
+    SwitchMyMainAccessKeyActionResult,
 )
 from ai.backend.manager.services.user.actions.modify_user import (
     BulkModifyUserAction,
@@ -87,6 +90,11 @@ class UserProcessors(AbstractProcessorPackage):
     user_month_stats: ActionProcessor[UserMonthStatsAction, UserMonthStatsActionResult]
     admin_month_stats: ActionProcessor[AdminMonthStatsAction, AdminMonthStatsActionResult]
     search_users: ActionProcessor[SearchUsersAction, SearchUsersActionResult]
+    issue_my_keypair: ActionProcessor[IssueMyKeypairAction, IssueMyKeypairActionResult]
+    revoke_my_keypair: ActionProcessor[RevokeMyKeypairAction, RevokeMyKeypairActionResult]
+    switch_my_main_access_key: ActionProcessor[
+        SwitchMyMainAccessKeyAction, SwitchMyMainAccessKeyActionResult
+    ]
 
     def __init__(
         self,
@@ -126,6 +134,11 @@ class UserProcessors(AbstractProcessorPackage):
         self.user_month_stats = ActionProcessor(user_service.user_month_stats, action_monitors)
         self.admin_month_stats = ActionProcessor(user_service.admin_month_stats, action_monitors)
         self.search_users = ActionProcessor(user_service.search_users, action_monitors)
+        self.issue_my_keypair = ActionProcessor(user_service.issue_my_keypair, action_monitors)
+        self.revoke_my_keypair = ActionProcessor(user_service.revoke_my_keypair, action_monitors)
+        self.switch_my_main_access_key = ActionProcessor(
+            user_service.switch_my_main_access_key, action_monitors
+        )
 
     @override
     def supported_actions(self) -> list[ActionSpec]:
