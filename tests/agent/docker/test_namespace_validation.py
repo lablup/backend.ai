@@ -3,7 +3,6 @@ from __future__ import annotations
 from collections.abc import Generator
 from contextlib import contextmanager
 from pathlib import Path
-from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -60,7 +59,7 @@ class TestMemoryPluginNamespaceValidation:
         with (
             patch(
                 "ai.backend.agent.docker.intrinsic.Docker",
-            ) as mock_docker_cls,
+            ),
             patch(
                 "ai.backend.agent.docker.intrinsic.DockerContainer",
             ) as mock_container_cls,
