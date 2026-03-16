@@ -7,8 +7,12 @@ from __future__ import annotations
 from pydantic import Field
 
 from ai.backend.common.api_handlers import BaseResponseModel
-
-from .types import AuthCredentialInfo, PasswordChangeInfo, RoleInfo, SSHKeypairInfo
+from ai.backend.common.dto.manager.v2.auth.types import (
+    AuthCredentialInfo,
+    PasswordChangeInfo,
+    RoleInfo,
+    SSHKeypairInfo,
+)
 
 __all__ = (
     "AuthorizePayload",
