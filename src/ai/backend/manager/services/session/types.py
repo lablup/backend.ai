@@ -9,7 +9,7 @@ from uuid import UUID
 import trafaret as t
 
 from ai.backend.common import validators as tx
-from ai.backend.common.types import ClusterMode, SessionTypes
+from ai.backend.common.types import ClusterMode, ContainerId, SessionTypes
 from ai.backend.manager.data.session.types import SessionStatus
 
 overwritten_param_check = t.Dict({
@@ -51,7 +51,7 @@ class LegacySessionInfo:
     architecture: str
     registry: str | None
     tag: str | None
-    container_id: UUID
+    container_id: ContainerId
     occupied_slots: str  # legacy
     occupying_slots: str
     requested_slots: str
@@ -81,7 +81,7 @@ class LegacySessionInfo:
             "architecture": self.architecture,
             "registry": self.registry,
             "tag": self.tag,
-            "containerId": str(self.container_id),
+            "containerId": self.container_id,
             "occupiedSlots": self.occupied_slots,
             "occupyingSlots": self.occupying_slots,
             "requestedSlots": self.requested_slots,
