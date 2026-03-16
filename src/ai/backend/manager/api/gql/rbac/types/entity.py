@@ -65,6 +65,7 @@ class EntityRefGQL(Node):
     ) -> EntityNode | None:
         from ai.backend.common.types import ImageID
         from ai.backend.manager.api.gql.artifact.types import ArtifactRevision
+        from ai.backend.manager.api.gql.container_registry.types import ContainerRegistryGQL
         from ai.backend.manager.api.gql.deployment.types.deployment import ModelDeployment
         from ai.backend.manager.api.gql.domain_v2.types.node import DomainV2GQL
         from ai.backend.manager.api.gql.image.types import ImageV2GQL
@@ -138,12 +139,18 @@ class EntityRefGQL(Node):
                 if rev_data is None:
                     return None
                 return ArtifactRevision.from_dataclass(rev_data)
+            case RBACElementType.CONTAINER_REGISTRY:
+                cr_data = await data_loaders.container_registry_loader.load(
+                    uuid.UUID(self.entity_id)
+                )
+                if cr_data is None:
+                    return None
+                return ContainerRegistryGQL.from_data(cr_data)
             case (
                 RBACElementType.SESSION
                 | RBACElementType.VFOLDER
                 | RBACElementType.KEYPAIR
                 | RBACElementType.NETWORK
-                | RBACElementType.CONTAINER_REGISTRY
                 | RBACElementType.STORAGE_HOST
                 | RBACElementType.ARTIFACT
                 | RBACElementType.ARTIFACT_REGISTRY

@@ -13,6 +13,7 @@ import strawberry
 from ai.backend.manager.api.gql.app_config import AppConfig
 from ai.backend.manager.api.gql.artifact.types import Artifact, ArtifactRevision
 from ai.backend.manager.api.gql.artifact_registry import ArtifactRegistry
+from ai.backend.manager.api.gql.container_registry.types import ContainerRegistryGQL
 from ai.backend.manager.api.gql.deployment.types.deployment import ModelDeployment
 from ai.backend.manager.api.gql.domain_v2.types.node import DomainV2GQL
 from ai.backend.manager.api.gql.image.types import ImageV2GQL
@@ -45,6 +46,7 @@ EntityNode = Annotated[
     | NotificationRule
     | ModelDeployment
     | ResourceGroupGQL
+    | ContainerRegistryGQL
     | ArtifactRevision
     | RoleGQL,
     strawberry.union("EntityNode"),
