@@ -16,6 +16,22 @@ Changes
 
 <!-- towncrier release notes start -->
 
+## 25.15.12 (2026-03-16)
+
+### Fixes
+* Remove the unnecessary `asyncio.Lock` from `StatContext` as self-concurrency is already prevented by `TimerDelayPolicy.CANCEL` and each collect method operates on independent data structures ([#9256](https://github.com/lablup/backend.ai/issues/9256))
+* Apply CANCEL delay policy to stat collection timers to prevent task accumulation ([#9257](https://github.com/lablup/backend.ai/issues/9257))
+* Fix `DatatypeMismatchError` on session creation caused by mismatched PostgreSQL enum type name (`sessionresult` vs `sessionresults`) in `SessionRow.result` column ORM definition. ([#9278](https://github.com/lablup/backend.ai/issues/9278))
+* `ModifyContainerRegistryNode` fails with duplicate association error after global toggle ([#9468](https://github.com/lablup/backend.ai/issues/9468))
+* Fix incorrect default group gid in AccountManagerConfig (use st_gid instead of st_uid). ([#9571](https://github.com/lablup/backend.ai/issues/9571))
+* Allow superadmin to bypass hide_agents restriction in agent_summary GraphQL resolvers ([#9623](https://github.com/lablup/backend.ai/issues/9623))
+* Strip `GPU-` prefix from DeviceId keys at the GQL resolver level when resolving the `gpu_alloc_map` field, fixing UUIDFloatMap validation errors. ([#9642](https://github.com/lablup/backend.ai/issues/9642))
+* Validate cloud detection IMDS responses and harden metadata JSON parsing to prevent false positives on non-major cloud providers ([#9653](https://github.com/lablup/backend.ai/issues/9653))
+* Fix container net_rx/net_tx stats reading host namespace counters by checking setns() return value ([#9681](https://github.com/lablup/backend.ai/issues/9681))
+* Fix service name lookup in CLI by replacing deprecated REST API with GraphQL-based paginated_list ([#9745](https://github.com/lablup/backend.ai/issues/9745))
+* Pre-validate namespace path before netstat_ns to prevent thread pool exhaustion ([#9782](https://github.com/lablup/backend.ai/issues/9782))
+
+
 ## 25.15.11 (2026-02-24)
 
 ### Fixes
