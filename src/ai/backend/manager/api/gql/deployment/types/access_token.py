@@ -18,7 +18,12 @@ from ai.backend.manager.data.deployment.types import (
     AccessTokenOrderField,
     ModelDeploymentAccessTokenData,
 )
-from ai.backend.manager.repositories.base import QueryCondition, QueryOrder
+from ai.backend.manager.repositories.base import (
+    QueryCondition,
+    QueryOrder,
+    combine_conditions_or,
+    negate_conditions,
+)
 from ai.backend.manager.repositories.deployment.options import (
     AccessTokenConditions,
     AccessTokenOrders,
@@ -32,6 +37,10 @@ class AccessTokenFilter(GQLFilter):
     token: StringFilter | None = None
     valid_until: DateTimeFilter | None = None
     created_at: DateTimeFilter | None = None
+
+    AND: list[AccessTokenFilter] | None = None
+    OR: list[AccessTokenFilter] | None = None
+    NOT: list[AccessTokenFilter] | None = None
 
     @override
     def build_conditions(self) -> list[QueryCondition]:
@@ -61,6 +70,27 @@ class AccessTokenFilter(GQLFilter):
             )
             if condition:
                 conditions.append(condition)
+
+        # Handle AND logical operator
+        if self.AND:
+            for sub_filter in self.AND:
+                conditions.extend(sub_filter.build_conditions())
+
+        # Handle OR logical operator
+        if self.OR:
+            or_sub_conditions: list[QueryCondition] = []
+            for sub_filter in self.OR:
+                or_sub_conditions.extend(sub_filter.build_conditions())
+            if or_sub_conditions:
+                conditions.append(combine_conditions_or(or_sub_conditions))
+
+        # Handle NOT logical operator
+        if self.NOT:
+            not_sub_conditions: list[QueryCondition] = []
+            for sub_filter in self.NOT:
+                not_sub_conditions.extend(sub_filter.build_conditions())
+            if not_sub_conditions:
+                conditions.append(negate_conditions(not_sub_conditions))
 
         return conditions
 

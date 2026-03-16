@@ -32,7 +32,12 @@ from ai.backend.manager.data.deployment.types import (
 )
 from ai.backend.manager.errors.deployment import EndpointNotFound
 from ai.backend.manager.models.routing.row import RoutingRow
-from ai.backend.manager.repositories.base import QueryCondition, QueryOrder
+from ai.backend.manager.repositories.base import (
+    QueryCondition,
+    QueryOrder,
+    combine_conditions_or,
+    negate_conditions,
+)
 from ai.backend.manager.repositories.deployment.options import RouteConditions, RouteOrders
 
 if TYPE_CHECKING:
@@ -174,6 +179,10 @@ class RouteFilter(GQLFilter):
     status: list[RouteStatusGQL] | None = None
     traffic_status: list[RouteTrafficStatusGQL] | None = None
 
+    AND: list[RouteFilter] | None = None
+    OR: list[RouteFilter] | None = None
+    NOT: list[RouteFilter] | None = None
+
     @override
     def build_conditions(self) -> list[QueryCondition]:
         """Build query conditions from this filter."""
@@ -188,6 +197,27 @@ class RouteFilter(GQLFilter):
                 RouteTrafficStatusEnum(ts.value) for ts in self.traffic_status
             ]
             conditions.append(RouteConditions.by_traffic_statuses(internal_traffic_statuses))
+
+        # Handle AND logical operator
+        if self.AND:
+            for sub_filter in self.AND:
+                conditions.extend(sub_filter.build_conditions())
+
+        # Handle OR logical operator
+        if self.OR:
+            or_sub_conditions: list[QueryCondition] = []
+            for sub_filter in self.OR:
+                or_sub_conditions.extend(sub_filter.build_conditions())
+            if or_sub_conditions:
+                conditions.append(combine_conditions_or(or_sub_conditions))
+
+        # Handle NOT logical operator
+        if self.NOT:
+            not_sub_conditions: list[QueryCondition] = []
+            for sub_filter in self.NOT:
+                not_sub_conditions.extend(sub_filter.build_conditions())
+            if not_sub_conditions:
+                conditions.append(negate_conditions(not_sub_conditions))
 
         return conditions
 

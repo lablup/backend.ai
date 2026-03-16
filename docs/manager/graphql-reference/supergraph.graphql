@@ -70,6 +70,9 @@ input AccessTokenFilter
   token: StringFilter = null
   validUntil: DateTimeFilter = null
   createdAt: DateTimeFilter = null
+  AND: [AccessTokenFilter!] = null
+  OR: [AccessTokenFilter!] = null
+  NOT: [AccessTokenFilter!] = null
 }
 
 """Added in 25.16.0"""
@@ -390,6 +393,9 @@ input AgentResourceSlotFilter
   @join__type(graph: STRAWBERRY)
 {
   slotName: StringFilter = null
+  AND: [AgentResourceSlotFilter!] = null
+  OR: [AgentResourceSlotFilter!] = null
+  NOT: [AgentResourceSlotFilter!] = null
 }
 
 """Added in 26.3.0. Ordering specification for agent resource slots."""
@@ -1398,6 +1404,9 @@ input AutoScalingRuleFilter
 {
   createdAt: DateTimeFilter = null
   lastTriggeredAt: DateTimeFilter = null
+  AND: [AutoScalingRuleFilter!] = null
+  OR: [AutoScalingRuleFilter!] = null
+  NOT: [AutoScalingRuleFilter!] = null
 }
 
 """Added in 25.19.0"""
@@ -3414,6 +3423,9 @@ input DeploymentHistoryFilter
   message: StringFilter = null
   createdAt: DateTimeFilter = null
   updatedAt: DateTimeFilter = null
+  AND: [DeploymentHistoryFilter!] = null
+  OR: [DeploymentHistoryFilter!] = null
+  NOT: [DeploymentHistoryFilter!] = null
 }
 
 """Order by specification for deployment history"""
@@ -4422,6 +4434,9 @@ input EntityFilter
 {
   entityType: RBACElementType = null
   entityId: StringFilter = null
+  AND: [EntityFilter!] = null
+  OR: [EntityFilter!] = null
+  NOT: [EntityFilter!] = null
 }
 
 union EntityNode
@@ -5188,6 +5203,9 @@ input ImageV2AliasFilterGQL
   @join__type(graph: STRAWBERRY)
 {
   alias: StringFilter = null
+  AND: [ImageV2AliasFilterGQL!] = null
+  OR: [ImageV2AliasFilterGQL!] = null
+  NOT: [ImageV2AliasFilterGQL!] = null
 }
 
 """
@@ -5674,6 +5692,9 @@ input KernelResourceAllocationFilter
   @join__type(graph: STRAWBERRY)
 {
   slotName: StringFilter = null
+  AND: [KernelResourceAllocationFilter!] = null
+  OR: [KernelResourceAllocationFilter!] = null
+  NOT: [KernelResourceAllocationFilter!] = null
 }
 
 """
@@ -5799,6 +5820,9 @@ input KernelV2Filter
   id: UUIDFilter = null
   status: KernelV2StatusFilter = null
   sessionId: UUIDFilter = null
+  AND: [KernelV2Filter!] = null
+  OR: [KernelV2Filter!] = null
+  NOT: [KernelV2Filter!] = null
 }
 
 """Added in 26.2.0. Lifecycle and status information for a kernel."""
@@ -8207,6 +8231,9 @@ input PermissionFilter
   roleId: UUID = null
   scopeType: RBACElementType = null
   entityType: RBACElementType = null
+  AND: [PermissionFilter!] = null
+  OR: [PermissionFilter!] = null
+  NOT: [PermissionFilter!] = null
 }
 
 """Added in 26.3.0. Order by specification for permissions"""
@@ -10858,6 +10885,9 @@ input ResourceSlotTypeFilter
   slotName: StringFilter = null
   slotType: StringFilter = null
   displayName: StringFilter = null
+  AND: [ResourceSlotTypeFilter!] = null
+  OR: [ResourceSlotTypeFilter!] = null
+  NOT: [ResourceSlotTypeFilter!] = null
 }
 
 """Added in 26.3.0. Ordering specification for resource slot types."""
@@ -11112,6 +11142,9 @@ input RoleAssignmentFilter
   role: RoleAssignmentRoleNestedFilter = null
   username: StringFilter = null
   email: StringFilter = null
+  AND: [RoleAssignmentFilter!] = null
+  OR: [RoleAssignmentFilter!] = null
+  NOT: [RoleAssignmentFilter!] = null
 }
 
 """Added in 26.3.0. Order by specification for role assignments"""
@@ -11140,6 +11173,9 @@ input RoleAssignmentRoleNestedFilter
   name: StringFilter = null
   source: [RoleSource!] = null
   status: [RoleStatus!] = null
+  AND: [RoleAssignmentRoleNestedFilter!] = null
+  OR: [RoleAssignmentRoleNestedFilter!] = null
+  NOT: [RoleAssignmentRoleNestedFilter!] = null
 }
 
 """Added in 26.3.0. Role connection"""
@@ -11174,7 +11210,7 @@ input RoleFilter
   status: [RoleStatus!] = null
   AND: [RoleFilter!] = null
   OR: [RoleFilter!] = null
-  NOT: RoleFilter = null
+  NOT: [RoleFilter!] = null
 }
 
 """Added in 26.3.0. Order by specification for roles"""
@@ -11287,6 +11323,9 @@ input RouteFilter
 {
   status: [RouteStatus!] = null
   trafficStatus: [RouteTrafficStatus!] = null
+  AND: [RouteFilter!] = null
+  OR: [RouteFilter!] = null
+  NOT: [RouteFilter!] = null
 }
 
 """Route history record"""
@@ -11352,6 +11391,9 @@ input RouteHistoryFilter
   message: StringFilter = null
   createdAt: DateTimeFilter = null
   updatedAt: DateTimeFilter = null
+  AND: [RouteHistoryFilter!] = null
+  OR: [RouteHistoryFilter!] = null
+  NOT: [RouteHistoryFilter!] = null
 }
 
 """Order by specification for route history"""
@@ -11760,6 +11802,9 @@ input ServiceCatalogFilter
 
   """Filter by health status."""
   status: ServiceCatalogStatus = null
+  AND: [ServiceCatalogFilter!] = null
+  OR: [ServiceCatalogFilter!] = null
+  NOT: [ServiceCatalogFilter!] = null
 }
 
 """
@@ -11974,6 +12019,9 @@ input SessionSchedulingHistoryFilter
   message: StringFilter = null
   createdAt: DateTimeFilter = null
   updatedAt: DateTimeFilter = null
+  AND: [SessionSchedulingHistoryFilter!] = null
+  OR: [SessionSchedulingHistoryFilter!] = null
+  NOT: [SessionSchedulingHistoryFilter!] = null
 }
 
 """Order by specification for session scheduling history"""
@@ -12090,6 +12138,9 @@ input SessionV2Filter
   domainName: StringFilter = null
   projectId: UUIDFilter = null
   userUuid: UUIDFilter = null
+  AND: [SessionV2Filter!] = null
+  OR: [SessionV2Filter!] = null
+  NOT: [SessionV2Filter!] = null
 }
 
 """Added in 26.3.0. Lifecycle status and timestamps for a session."""

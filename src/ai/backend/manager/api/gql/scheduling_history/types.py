@@ -25,7 +25,12 @@ from ai.backend.manager.data.session.types import (
     SessionSchedulingHistoryData,
     SubStepResult,
 )
-from ai.backend.manager.repositories.base import QueryCondition, QueryOrder
+from ai.backend.manager.repositories.base import (
+    QueryCondition,
+    QueryOrder,
+    combine_conditions_or,
+    negate_conditions,
+)
 from ai.backend.manager.repositories.scheduling_history.options import (
     DeploymentHistoryConditions,
     DeploymentHistoryOrders,
@@ -349,6 +354,10 @@ class SessionSchedulingHistoryFilter(GQLFilter):
     created_at: DateTimeFilter | None = None
     updated_at: DateTimeFilter | None = None
 
+    AND: list[SessionSchedulingHistoryFilter] | None = None
+    OR: list[SessionSchedulingHistoryFilter] | None = None
+    NOT: list[SessionSchedulingHistoryFilter] | None = None
+
     @override
     def build_conditions(self) -> list[QueryCondition]:
         """Build query conditions from this filter."""
@@ -431,6 +440,27 @@ class SessionSchedulingHistoryFilter(GQLFilter):
             if condition:
                 conditions.append(condition)
 
+        # Handle AND logical operator - these are implicitly ANDed with field conditions
+        if self.AND:
+            for sub_filter in self.AND:
+                conditions.extend(sub_filter.build_conditions())
+
+        # Handle OR logical operator
+        if self.OR:
+            or_sub_conditions: list[QueryCondition] = []
+            for sub_filter in self.OR:
+                or_sub_conditions.extend(sub_filter.build_conditions())
+            if or_sub_conditions:
+                conditions.append(combine_conditions_or(or_sub_conditions))
+
+        # Handle NOT logical operator
+        if self.NOT:
+            not_sub_conditions: list[QueryCondition] = []
+            for sub_filter in self.NOT:
+                not_sub_conditions.extend(sub_filter.build_conditions())
+            if not_sub_conditions:
+                conditions.append(negate_conditions(not_sub_conditions))
+
         return conditions
 
 
@@ -462,6 +492,10 @@ class DeploymentHistoryFilter(GQLFilter):
     message: StringFilter | None = None
     created_at: DateTimeFilter | None = None
     updated_at: DateTimeFilter | None = None
+
+    AND: list[DeploymentHistoryFilter] | None = None
+    OR: list[DeploymentHistoryFilter] | None = None
+    NOT: list[DeploymentHistoryFilter] | None = None
 
     @override
     def build_conditions(self) -> list[QueryCondition]:
@@ -543,6 +577,27 @@ class DeploymentHistoryFilter(GQLFilter):
             if condition:
                 conditions.append(condition)
 
+        # Handle AND logical operator - these are implicitly ANDed with field conditions
+        if self.AND:
+            for sub_filter in self.AND:
+                conditions.extend(sub_filter.build_conditions())
+
+        # Handle OR logical operator
+        if self.OR:
+            or_sub_conditions: list[QueryCondition] = []
+            for sub_filter in self.OR:
+                or_sub_conditions.extend(sub_filter.build_conditions())
+            if or_sub_conditions:
+                conditions.append(combine_conditions_or(or_sub_conditions))
+
+        # Handle NOT logical operator
+        if self.NOT:
+            not_sub_conditions: list[QueryCondition] = []
+            for sub_filter in self.NOT:
+                not_sub_conditions.extend(sub_filter.build_conditions())
+            if not_sub_conditions:
+                conditions.append(negate_conditions(not_sub_conditions))
+
         return conditions
 
 
@@ -575,6 +630,10 @@ class RouteHistoryFilter(GQLFilter):
     message: StringFilter | None = None
     created_at: DateTimeFilter | None = None
     updated_at: DateTimeFilter | None = None
+
+    AND: list[RouteHistoryFilter] | None = None
+    OR: list[RouteHistoryFilter] | None = None
+    NOT: list[RouteHistoryFilter] | None = None
 
     @override
     def build_conditions(self) -> list[QueryCondition]:
@@ -663,6 +722,27 @@ class RouteHistoryFilter(GQLFilter):
             )
             if condition:
                 conditions.append(condition)
+
+        # Handle AND logical operator - these are implicitly ANDed with field conditions
+        if self.AND:
+            for sub_filter in self.AND:
+                conditions.extend(sub_filter.build_conditions())
+
+        # Handle OR logical operator
+        if self.OR:
+            or_sub_conditions: list[QueryCondition] = []
+            for sub_filter in self.OR:
+                or_sub_conditions.extend(sub_filter.build_conditions())
+            if or_sub_conditions:
+                conditions.append(combine_conditions_or(or_sub_conditions))
+
+        # Handle NOT logical operator
+        if self.NOT:
+            not_sub_conditions: list[QueryCondition] = []
+            for sub_filter in self.NOT:
+                not_sub_conditions.extend(sub_filter.build_conditions())
+            if not_sub_conditions:
+                conditions.append(negate_conditions(not_sub_conditions))
 
         return conditions
 

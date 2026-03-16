@@ -21,7 +21,12 @@ from ai.backend.manager.api.gql.types import GQLFilter, GQLOrderBy, StrawberryGQ
 from ai.backend.manager.data.permission.permission import PermissionData
 from ai.backend.manager.errors.api import InvalidAPIParameters
 from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
-from ai.backend.manager.repositories.base import QueryCondition, QueryOrder
+from ai.backend.manager.repositories.base import (
+    QueryCondition,
+    QueryOrder,
+    combine_conditions_or,
+    negate_conditions,
+)
 from ai.backend.manager.repositories.base.creator import Creator
 from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.repositories.permission_controller.creators import PermissionCreatorSpec
@@ -277,6 +282,9 @@ class PermissionFilter(GQLFilter):
     role_id: uuid.UUID | None = None
     scope_type: RBACElementTypeGQL | None = None
     entity_type: RBACElementTypeGQL | None = None
+    AND: list[Self] | None = None
+    OR: list[Self] | None = None
+    NOT: list[Self] | None = None
 
     @override
     def build_conditions(self) -> list[QueryCondition]:
@@ -298,6 +306,27 @@ class PermissionFilter(GQLFilter):
                     self.entity_type.to_element().to_entity_type()
                 )
             )
+
+        # Handle AND logical operator
+        if self.AND:
+            for sub_filter in self.AND:
+                conditions.extend(sub_filter.build_conditions())
+
+        # Handle OR logical operator
+        if self.OR:
+            or_sub_conditions: list[QueryCondition] = []
+            for sub_filter in self.OR:
+                or_sub_conditions.extend(sub_filter.build_conditions())
+            if or_sub_conditions:
+                conditions.append(combine_conditions_or(or_sub_conditions))
+
+        # Handle NOT logical operator
+        if self.NOT:
+            not_sub_conditions: list[QueryCondition] = []
+            for sub_filter in self.NOT:
+                not_sub_conditions.extend(sub_filter.build_conditions())
+            if not_sub_conditions:
+                conditions.append(negate_conditions(not_sub_conditions))
 
         return conditions
 

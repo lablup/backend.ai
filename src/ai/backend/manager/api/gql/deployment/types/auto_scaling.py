@@ -22,7 +22,12 @@ from ai.backend.manager.data.deployment.types import (
     AutoScalingRuleOrderField,
     ModelDeploymentAutoScalingRuleData,
 )
-from ai.backend.manager.repositories.base import QueryCondition, QueryOrder
+from ai.backend.manager.repositories.base import (
+    QueryCondition,
+    QueryOrder,
+    combine_conditions_or,
+    negate_conditions,
+)
 from ai.backend.manager.repositories.deployment.options import (
     AutoScalingRuleConditions,
     AutoScalingRuleOrders,
@@ -46,6 +51,10 @@ class AutoScalingRuleFilter(GQLFilter):
     created_at: DateTimeFilter | None = None
     last_triggered_at: DateTimeFilter | None = None
 
+    AND: list[AutoScalingRuleFilter] | None = None
+    OR: list[AutoScalingRuleFilter] | None = None
+    NOT: list[AutoScalingRuleFilter] | None = None
+
     @override
     def build_conditions(self) -> list[QueryCondition]:
         """Build query conditions from this filter."""
@@ -68,6 +77,27 @@ class AutoScalingRuleFilter(GQLFilter):
             )
             if condition:
                 conditions.append(condition)
+
+        # Handle AND logical operator
+        if self.AND:
+            for sub_filter in self.AND:
+                conditions.extend(sub_filter.build_conditions())
+
+        # Handle OR logical operator
+        if self.OR:
+            or_sub_conditions: list[QueryCondition] = []
+            for sub_filter in self.OR:
+                or_sub_conditions.extend(sub_filter.build_conditions())
+            if or_sub_conditions:
+                conditions.append(combine_conditions_or(or_sub_conditions))
+
+        # Handle NOT logical operator
+        if self.NOT:
+            not_sub_conditions: list[QueryCondition] = []
+            for sub_filter in self.NOT:
+                not_sub_conditions.extend(sub_filter.build_conditions())
+            if not_sub_conditions:
+                conditions.append(negate_conditions(not_sub_conditions))
 
         return conditions
 
