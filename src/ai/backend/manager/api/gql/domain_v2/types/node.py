@@ -104,7 +104,7 @@ class DomainV2GQL(Node):
 
     @strawberry.field(  # type: ignore[misc]
         description=(
-            "Added in 26.3.0. Active resource usage overview for this domain. "
+            "Added in 26.4.0. Active resource usage overview for this domain. "
             "Returns the currently occupied resource slots and the number of active sessions."
         )
     )

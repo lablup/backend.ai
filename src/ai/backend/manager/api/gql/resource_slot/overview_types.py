@@ -13,7 +13,7 @@ from ai.backend.manager.data.resource_slot.types import ResourceOccupancy
 @strawberry.type(
     name="ActiveResourceOverview",
     description=(
-        "Added in 26.3.0. Active resource usage overview for a domain or project. "
+        "Added in 26.4.0. Active resource usage overview for a domain or project. "
         "Shows the currently occupied resource slots and the number of active sessions."
     ),
 )
