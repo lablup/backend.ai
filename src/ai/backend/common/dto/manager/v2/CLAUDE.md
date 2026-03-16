@@ -36,7 +36,6 @@ Per domain: `v2/{domain}/types.py`, `request.py`, `response.py`, `__init__.py`
 
 ## Conversion
 
-- Node models MUST have `from_data(cls, data: {Entity}Data) -> Self` classmethod
-- For detailed data: `from_detail_data(cls, data: {Entity}DetailData) -> Self` classmethod
-- No direct DB model imports — only domain data types from `common/data/` or `manager/data/`
-- Conversion classmethods must be type-safe (no `type: ignore`)
+- DTO is a pure data structure — no conversion logic inside DTOs
+- Conversion from domain Data types to DTOs is performed in the Adapter layer (`manager/api/rest/{domain}/adapter.py`)
+- No direct DB model or domain Data type imports in DTO modules
