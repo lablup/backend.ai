@@ -37,7 +37,7 @@ class ContainerRegistryTypeGQL(StrEnum):
 
 
 @strawberry.type(
-    name="ContainerRegistry",
+    name="ContainerRegistryV2",
     description="Added in 26.3.0. Container registry node.",
 )
 class ContainerRegistryGQL(Node):
