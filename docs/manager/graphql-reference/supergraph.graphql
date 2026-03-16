@@ -115,6 +115,23 @@ enum ActivenessStatus
   INACTIVE @join__enumValue(graph: STRAWBERRY)
 }
 
+"""
+Added in 26.3.0. Active resource usage overview for a domain or project. Shows the currently occupied resource slots and the number of active sessions.
+"""
+type ActiveResourceOverview
+  @join__type(graph: STRAWBERRY)
+{
+  """
+  Resource slots currently occupied by active sessions. Each entry represents a resource type and the total quantity in use.
+  """
+  slots: ResourceSlot!
+
+  """
+  Number of active sessions contributing to the current resource occupancy.
+  """
+  sessionCount: Int!
+}
+
 """Added in 25.19.0"""
 input AddRevisionInput
   @join__type(graph: STRAWBERRY)
@@ -4082,6 +4099,11 @@ type DomainV2 implements Node
   Fair share record for this domain in the specified resource group. Returns the scheduling priority configuration for this domain. Always returns an object, even if no explicit configuration exists (in which case default values are used).
   """
   fairShare(scope: DomainFairShareScope!): DomainFairShare!
+
+  """
+  Added in 26.3.0. Active resource usage overview for this domain. Returns the currently occupied resource slots and the number of active sessions.
+  """
+  activeResourceOverview: ActiveResourceOverview!
 
   """
   Usage buckets for this domain, filtered by resource group. Returns aggregated resource usage statistics over time.
@@ -8824,6 +8846,11 @@ type ProjectV2 implements Node
   Fair share record for this project in the specified resource group. Returns the scheduling priority configuration for this project. Always returns an object, even if no explicit configuration exists (in which case default values are used).
   """
   fairShare(scope: ProjectFairShareScope!): ProjectFairShare!
+
+  """
+  Added in 26.3.0. Active resource usage overview for this project. Returns the currently occupied resource slots and the number of active sessions.
+  """
+  activeResourceOverview: ActiveResourceOverview!
 
   """
   Usage buckets for this project, filtered by resource group. Returns aggregated resource usage statistics over time.
