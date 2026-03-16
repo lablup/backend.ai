@@ -57,46 +57,46 @@ class TestAppendErrorLogInput:
         assert inp.traceback is not None
 
     def test_context_env_parsed_from_json_string(self) -> None:
-        inp = AppendErrorLogInput(
-            severity="warning",
-            source="storage",
-            message="Low disk space",
-            context_lang="python",
-            context_env='{"disk_usage": 95, "path": "/data"}',  # type: ignore[arg-type]
-        )
+        inp = AppendErrorLogInput.model_validate({
+            "severity": "warning",
+            "source": "storage",
+            "message": "Low disk space",
+            "context_lang": "python",
+            "context_env": '{"disk_usage": 95, "path": "/data"}',
+        })
         assert isinstance(inp.context_env, dict)
         assert inp.context_env["disk_usage"] == 95
         assert inp.context_env["path"] == "/data"
 
     def test_context_env_json_string_empty_object(self) -> None:
-        inp = AppendErrorLogInput(
-            severity="info",
-            source="manager",
-            message="Info log",
-            context_lang="python",
-            context_env="{}",  # type: ignore[arg-type]
-        )
+        inp = AppendErrorLogInput.model_validate({
+            "severity": "info",
+            "source": "manager",
+            "message": "Info log",
+            "context_lang": "python",
+            "context_env": "{}",
+        })
         assert inp.context_env == {}
 
     def test_context_env_invalid_json_string_raises_validation_error(self) -> None:
         with pytest.raises(ValidationError):
-            AppendErrorLogInput(
-                severity="error",
-                source="manager",
-                message="Error",
-                context_lang="python",
-                context_env="not-valid-json",  # type: ignore[arg-type]
-            )
+            AppendErrorLogInput.model_validate({
+                "severity": "error",
+                "source": "manager",
+                "message": "Error",
+                "context_lang": "python",
+                "context_env": "not-valid-json",
+            })
 
     def test_context_env_json_non_object_raises_validation_error(self) -> None:
         with pytest.raises(ValidationError):
-            AppendErrorLogInput(
-                severity="error",
-                source="manager",
-                message="Error",
-                context_lang="python",
-                context_env="[1, 2, 3]",  # type: ignore[arg-type]
-            )
+            AppendErrorLogInput.model_validate({
+                "severity": "error",
+                "source": "manager",
+                "message": "Error",
+                "context_lang": "python",
+                "context_env": "[1, 2, 3]",
+            })
 
     def test_missing_required_field_raises_validation_error(self) -> None:
         with pytest.raises(ValidationError):
