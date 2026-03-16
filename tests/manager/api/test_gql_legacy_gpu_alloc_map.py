@@ -21,8 +21,8 @@ class TestResolveGpuAllocMap:
         from ai.backend.common.json import dump_json_str
 
         raw_data = {
-            "GPU-aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee": 0.5,
-            "GPU-11111111-2222-3333-4444-555555555555": 1.0,
+            "GPU-aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee": "0.50",
+            "GPU-11111111-2222-3333-4444-555555555555": "1.00",
         }
 
         with patch(

@@ -3,6 +3,7 @@ from __future__ import annotations
 import logging
 import uuid
 from collections.abc import Iterable, Mapping, Sequence
+from decimal import Decimal
 from typing import (
     TYPE_CHECKING,
     Any,
@@ -112,8 +113,12 @@ _queryorder_colmap: Mapping[str, OrderSpecItem] = {
 GPU_ALLOC_MAP_CACHE_PERIOD: Final[int] = 3600 * 24
 
 
-def _strip_gpu_prefix(alloc_map: dict[str, float]) -> dict[str, float]:
+def _strip_gpu_prefix(alloc_map: dict[str, Decimal]) -> dict[str, Decimal]:
     return {k.removeprefix("GPU-"): v for k, v in alloc_map.items()}
+
+
+def _decimal_to_float(alloc_map: dict[str, Decimal]) -> dict[str, float]:
+    return {k: float(v) for k, v in alloc_map.items()}
 
 
 async def _resolve_gpu_alloc_map(ctx: GraphQueryContext, agent_id: AgentId) -> dict[str, float]:
@@ -123,9 +128,8 @@ async def _resolve_gpu_alloc_map(ctx: GraphQueryContext, agent_id: AgentId) -> d
 
     if raw_alloc_map:
         alloc_map = load_json(raw_alloc_map)
-        return UUIDFloatMap.parse_value(
-            _strip_gpu_prefix({k: float(v) for k, v in alloc_map.items()})
-        )
+        decimal_map = {k: Decimal(v) for k, v in alloc_map.items()}
+        return UUIDFloatMap.parse_value(_decimal_to_float(_strip_gpu_prefix(decimal_map)))
     return {}
 
 
