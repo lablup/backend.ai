@@ -1092,7 +1092,7 @@ class SessionService:
             tag=sess.tag,
             container_id=ContainerId(sess.main_kernel.container_id)
             if sess.main_kernel.container_id
-            else ContainerId(""),
+            else None,
             occupied_slots=str(sess.main_kernel.occupied_slots),  # legacy
             occupying_slots=str(sess.occupying_slots),
             requested_slots=str(sess.requested_slots),

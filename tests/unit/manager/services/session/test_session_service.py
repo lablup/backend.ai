@@ -766,9 +766,64 @@ class TestGetSessionInfo:
         assert result.session_info is not None
         assert result.session_info.domain_name == "default"
         assert result.session_info.image == "cr.backend.ai/stable/python:latest"
+        assert result.session_info.container_id is not None
+        assert result.session_info.container_id == "a" * 64
         assert result.session_data == sample_session_data
         mock_session_repository.get_session_validated.assert_called_once()
         mock_agent_registry.increment_session_usage.assert_called_once_with(mock_session)
+
+    async def test_success_with_no_container_id(
+        self,
+        session_service: SessionService,
+        mock_session_repository: MagicMock,
+        mock_agent_registry: MagicMock,
+        mock_idle_checker_host: MagicMock,
+        sample_session_data: SessionData,
+        sample_session_id: SessionId,
+        sample_access_key: AccessKey,
+        sample_user_id: UUID,
+        sample_group_id: UUID,
+    ) -> None:
+        """Test getting session info when container_id is None (pre-RUNNING state)"""
+        mock_kernel = MagicMock()
+        mock_kernel.image = "cr.backend.ai/stable/python:latest"
+        mock_kernel.architecture = "x86_64"
+        mock_kernel.registry = "cr.backend.ai"
+        mock_kernel.container_id = None
+        mock_kernel.occupied_slots = ResourceSlot({"cpu": 1, "mem": 1024})
+        mock_kernel.occupied_shares = {}
+
+        mock_session = MagicMock()
+        mock_session.id = sample_session_id
+        mock_session.domain_name = "default"
+        mock_session.group_id = sample_group_id
+        mock_session.user_uuid = sample_user_id
+        mock_session.tag = None
+        mock_session.main_kernel = mock_kernel
+        mock_session.occupying_slots = ResourceSlot({"cpu": 1, "mem": 1024})
+        mock_session.requested_slots = ResourceSlot({"cpu": 1, "mem": 1024})
+        mock_session.environ = {}
+        mock_session.resource_opts = {}
+        mock_session.status = SessionStatus.PENDING
+        mock_session.status_info = None
+        mock_session.status_data = None
+        mock_session.created_at = datetime.now(tzutc())
+        mock_session.terminated_at = None
+        mock_session.num_queries = 0
+        mock_session.last_stat = None
+        mock_session.to_dataclass.return_value = sample_session_data
+
+        mock_session_repository.get_session_validated = AsyncMock(return_value=mock_session)
+        mock_idle_checker_host.get_idle_check_report = AsyncMock(return_value={})
+
+        action = GetSessionInfoAction(
+            session_name="test-session",
+            owner_access_key=sample_access_key,
+        )
+        result = await session_service.get_session_info(action)
+
+        assert isinstance(result, GetSessionInfoActionResult)
+        assert result.session_info.container_id is None
 
     async def test_session_not_found(
         self,

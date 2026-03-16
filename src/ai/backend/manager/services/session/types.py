@@ -51,7 +51,7 @@ class LegacySessionInfo:
     architecture: str
     registry: str | None
     tag: str | None
-    container_id: ContainerId
+    container_id: ContainerId | None
     occupied_slots: str  # legacy
     occupying_slots: str
     requested_slots: str
