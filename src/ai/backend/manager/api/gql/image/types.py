@@ -720,6 +720,10 @@ class ImageV2AliasConnectionGQL(Connection[ImageV2AliasGQL]):
 class ImageV2AliasFilterGQL(GQLFilter):
     alias: StringFilter | None = None
 
+    AND: list[ImageV2AliasFilterGQL] | None = None
+    OR: list[ImageV2AliasFilterGQL] | None = None
+    NOT: list[ImageV2AliasFilterGQL] | None = None
+
     def build_conditions(self) -> list[QueryCondition]:
         """Build query conditions from this filter."""
         field_conditions: list[QueryCondition] = []
@@ -733,6 +737,27 @@ class ImageV2AliasFilterGQL(GQLFilter):
             )
             if alias_condition:
                 field_conditions.append(alias_condition)
+
+        # Handle AND logical operator
+        if self.AND:
+            for sub_filter in self.AND:
+                field_conditions.extend(sub_filter.build_conditions())
+
+        # Handle OR logical operator
+        if self.OR:
+            or_sub_conditions: list[QueryCondition] = []
+            for sub_filter in self.OR:
+                or_sub_conditions.extend(sub_filter.build_conditions())
+            if or_sub_conditions:
+                field_conditions.append(combine_conditions_or(or_sub_conditions))
+
+        # Handle NOT logical operator
+        if self.NOT:
+            not_sub_conditions: list[QueryCondition] = []
+            for sub_filter in self.NOT:
+                not_sub_conditions.extend(sub_filter.build_conditions())
+            if not_sub_conditions:
+                field_conditions.append(negate_conditions(not_sub_conditions))
 
         return field_conditions
 
