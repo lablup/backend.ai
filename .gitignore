@@ -3,6 +3,9 @@ __pycache__/
 *.py[cod]
 *$py.class
 
+# Runtime data
+/run/
+
 # Distribution / packaging
 .Python
 /build/
