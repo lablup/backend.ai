@@ -1,6 +1,7 @@
 import json
 import logging
 from collections.abc import Mapping
+from decimal import Decimal
 from typing import (
     Any,
     Final,
@@ -158,7 +159,7 @@ class ValkeyStatClient:
             return None
 
     @valkey_decorator()
-    async def get_gpu_allocation_map(self, agent_id: str) -> Optional[dict[str, float]]:
+    async def get_gpu_allocation_map(self, agent_id: str) -> Optional[dict[str, Decimal]]:
         """
         Get GPU allocation mapping for an agent.
 
@@ -169,7 +170,8 @@ class ValkeyStatClient:
         if result is None:
             return None
         try:
-            return json.loads(result)
+            raw = json.loads(result)
+            return {k: Decimal(v) for k, v in raw.items()}
         except (json.JSONDecodeError, UnicodeDecodeError):
             log.warning(
                 "Failed to decode GPU allocation map for agent {}: {}",

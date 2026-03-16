@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from decimal import Decimal
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
@@ -16,8 +17,8 @@ class TestResolveGpuAllocMap:
         ctx = MagicMock()
         ctx.valkey_stat.get_gpu_allocation_map = AsyncMock(
             return_value={
-                "GPU-aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee": 0.5,
-                "GPU-11111111-2222-3333-4444-555555555555": 1.0,
+                "GPU-aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee": Decimal("0.5"),
+                "GPU-11111111-2222-3333-4444-555555555555": Decimal("1.0"),
             }
         )
         return ctx
