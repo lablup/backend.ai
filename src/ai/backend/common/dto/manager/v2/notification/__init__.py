@@ -1,0 +1,66 @@
+"""
+Notification DTOs v2 for Manager API.
+"""
+
+from ai.backend.common.dto.manager.v2.notification.request import (
+    CreateNotificationChannelInput,
+    CreateNotificationRuleInput,
+    DeleteNotificationChannelInput,
+    DeleteNotificationRuleInput,
+    UpdateNotificationChannelInput,
+    UpdateNotificationRuleInput,
+    ValidateNotificationChannelInput,
+    ValidateNotificationRuleInput,
+)
+from ai.backend.common.dto.manager.v2.notification.response import (
+    CreateNotificationChannelPayload,
+    CreateNotificationRulePayload,
+    DeleteNotificationChannelPayload,
+    DeleteNotificationRulePayload,
+    NotificationChannelNode,
+    NotificationRuleNode,
+    UpdateNotificationChannelPayload,
+    UpdateNotificationRulePayload,
+    ValidateNotificationChannelPayload,
+    ValidateNotificationRulePayload,
+)
+from ai.backend.common.dto.manager.v2.notification.types import (
+    EmailSpecInfo,
+    NotificationChannelOrderField,
+    NotificationChannelType,
+    NotificationRuleOrderField,
+    NotificationRuleType,
+    OrderDirection,
+    WebhookSpecInfo,
+)
+
+__all__ = (
+    # Types
+    "EmailSpecInfo",
+    "NotificationChannelOrderField",
+    "NotificationChannelType",
+    "NotificationRuleOrderField",
+    "NotificationRuleType",
+    "OrderDirection",
+    "WebhookSpecInfo",
+    # Input models (request)
+    "CreateNotificationChannelInput",
+    "CreateNotificationRuleInput",
+    "DeleteNotificationChannelInput",
+    "DeleteNotificationRuleInput",
+    "UpdateNotificationChannelInput",
+    "UpdateNotificationRuleInput",
+    "ValidateNotificationChannelInput",
+    "ValidateNotificationRuleInput",
+    # Node and Payload models (response)
+    "CreateNotificationChannelPayload",
+    "CreateNotificationRulePayload",
+    "DeleteNotificationChannelPayload",
+    "DeleteNotificationRulePayload",
+    "NotificationChannelNode",
+    "NotificationRuleNode",
+    "UpdateNotificationChannelPayload",
+    "UpdateNotificationRulePayload",
+    "ValidateNotificationChannelPayload",
+    "ValidateNotificationRulePayload",
+)
