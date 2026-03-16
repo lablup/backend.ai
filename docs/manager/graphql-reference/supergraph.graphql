@@ -116,7 +116,7 @@ enum ActivenessStatus
 }
 
 """
-Added in 26.3.0. Active resource usage overview for a domain or project. Shows the currently occupied resource slots and the number of active sessions.
+Added in 26.4.0. Active resource usage overview for a domain or project. Shows the currently occupied resource slots and the number of active sessions.
 """
 type ActiveResourceOverview
   @join__type(graph: STRAWBERRY)
@@ -4101,7 +4101,7 @@ type DomainV2 implements Node
   fairShare(scope: DomainFairShareScope!): DomainFairShare!
 
   """
-  Added in 26.3.0. Active resource usage overview for this domain. Returns the currently occupied resource slots and the number of active sessions.
+  Added in 26.4.0. Active resource usage overview for this domain. Returns the currently occupied resource slots and the number of active sessions.
   """
   activeResourceOverview: ActiveResourceOverview!
 
@@ -8848,7 +8848,7 @@ type ProjectV2 implements Node
   fairShare(scope: ProjectFairShareScope!): ProjectFairShare!
 
   """
-  Added in 26.3.0. Active resource usage overview for this project. Returns the currently occupied resource slots and the number of active sessions.
+  Added in 26.4.0. Active resource usage overview for this project. Returns the currently occupied resource slots and the number of active sessions.
   """
   activeResourceOverview: ActiveResourceOverview!
 
