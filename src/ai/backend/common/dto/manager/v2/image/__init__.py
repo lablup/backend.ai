@@ -12,6 +12,15 @@ from ai.backend.common.dto.manager.v2.image.request import (
     RescanImagesInput,
     SearchImagesInput,
 )
+from ai.backend.common.dto.manager.v2.image.response import (
+    AliasImagePayload,
+    ForgetImagePayload,
+    GetImagePayload,
+    ImageNode,
+    PurgeImagePayload,
+    RescanImagesPayload,
+    SearchImagesPayload,
+)
 from ai.backend.common.dto.manager.v2.image.types import (
     ImageLabelInfo,
     ImageOrderField,
@@ -40,4 +49,12 @@ __all__ = (
     "PurgeImageInput",
     "RescanImagesInput",
     "SearchImagesInput",
+    # Response models
+    "AliasImagePayload",
+    "ForgetImagePayload",
+    "GetImagePayload",
+    "ImageNode",
+    "PurgeImagePayload",
+    "RescanImagesPayload",
+    "SearchImagesPayload",
 )
