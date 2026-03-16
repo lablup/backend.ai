@@ -567,14 +567,18 @@ class TestAgentRepositoryCache:
         """Test GPU allocation map update is stored in cache"""
         agent_id = AgentId("agent-001")
         alloc_map: Mapping[str, Any] = {
-            "cuda:0": {"session_id": "sess-001"},
-            "cuda:1": {"session_id": "sess-002"},
+            "GPU-aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee": "0.50",
+            "GPU-11111111-2222-3333-4444-555555555555": "1.00",
         }
 
         await agent_repository.update_gpu_alloc_map(agent_id, alloc_map)
 
         stored_map = await valkey_stat_client.get_gpu_allocation_map(str(agent_id))
-        assert stored_map == alloc_map
+        assert stored_map is not None
+        assert stored_map == {
+            "GPU-aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee": Decimal("0.50"),
+            "GPU-11111111-2222-3333-4444-555555555555": Decimal("1.00"),
+        }
 
 
 @dataclass
