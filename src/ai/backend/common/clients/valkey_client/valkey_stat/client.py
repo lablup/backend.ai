@@ -1,6 +1,7 @@
 import json
 import logging
 from collections.abc import Mapping, Sequence
+from decimal import Decimal
 from typing import (
     Any,
     Final,
@@ -181,7 +182,7 @@ class ValkeyStatClient:
             return None
 
     @valkey_stat_resilience.apply()
-    async def get_gpu_allocation_map(self, agent_id: str) -> dict[str, float] | None:
+    async def get_gpu_allocation_map(self, agent_id: str) -> dict[str, Decimal] | None:
         """
         Get GPU allocation mapping for an agent.
 
@@ -192,7 +193,8 @@ class ValkeyStatClient:
         if result is None:
             return None
         try:
-            return cast(dict[str, float], json.loads(result))
+            raw = json.loads(result)
+            return {k: Decimal(v) for k, v in raw.items()}
         except (json.JSONDecodeError, UnicodeDecodeError):
             log.warning(
                 "Failed to decode GPU allocation map for agent {}: {}",
