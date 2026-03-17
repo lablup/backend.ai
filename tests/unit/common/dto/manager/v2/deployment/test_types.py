@@ -11,24 +11,32 @@ from ai.backend.common.data.model_deployment.types import (
     RouteStatus,
     RouteTrafficStatus,
 )
-from ai.backend.common.types import ClusterMode, RuntimeVariant
 from ai.backend.common.dto.manager.v2.deployment.types import (
     BlueGreenConfigInfo,
     DeploymentBasicInfo,
     DeploymentOrderField,
     DeploymentPolicyInfo,
     DeploymentRevisionInfo,
-    DeploymentStrategy as ExportedDeploymentStrategy,
-    ModelDeploymentStatus as ExportedModelDeploymentStatus,
     NetworkConfigInfo,
     OrderDirection,
     ReplicaStateInfo,
     RevisionOrderField,
     RollingUpdateConfigInfo,
     RouteOrderField,
+)
+from ai.backend.common.dto.manager.v2.deployment.types import (
+    DeploymentStrategy as ExportedDeploymentStrategy,
+)
+from ai.backend.common.dto.manager.v2.deployment.types import (
+    ModelDeploymentStatus as ExportedModelDeploymentStatus,
+)
+from ai.backend.common.dto.manager.v2.deployment.types import (
     RouteStatus as ExportedRouteStatus,
+)
+from ai.backend.common.dto.manager.v2.deployment.types import (
     RouteTrafficStatus as ExportedRouteTrafficStatus,
 )
+from ai.backend.common.types import ClusterMode, RuntimeVariant
 
 
 class TestOrderDirection:
