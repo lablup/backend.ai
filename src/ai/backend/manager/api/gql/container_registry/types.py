@@ -9,10 +9,11 @@ from uuid import UUID
 
 import strawberry
 from strawberry import Info
-from strawberry.relay import Node, NodeID
+from strawberry.relay import NodeID
 from strawberry.scalars import JSON
 
 from ai.backend.common.container_registry import ContainerRegistryType
+from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.data.container_registry.types import ContainerRegistryData
 from ai.backend.manager.defs import PASSWORD_PLACEHOLDER
@@ -41,7 +42,7 @@ class ContainerRegistryTypeGQL(StrEnum):
     name="ContainerRegistryV2",
     description="Added in 26.4.0. Container registry node.",
 )
-class ContainerRegistryGQL(Node):
+class ContainerRegistryGQL(PydanticNodeMixin):
     id: NodeID[str] = strawberry.field(
         description="Relay-style global node identifier for the container registry"
     )

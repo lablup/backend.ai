@@ -10,13 +10,22 @@ from uuid import UUID
 from pydantic import Field, field_validator
 
 from ai.backend.common.api_handlers import BaseRequestModel
+from ai.backend.common.dto.manager.query import StringFilter
 
-from .types import ContainerRegistryType
+from .types import (
+    ContainerRegistryOrderField,
+    ContainerRegistryType,
+    ContainerRegistryTypeFilter,
+    OrderDirection,
+)
 
 __all__ = (
     "AllowedGroupsInput",
+    "ContainerRegistryFilter",
+    "ContainerRegistryOrder",
     "CreateContainerRegistryInput",
     "DeleteContainerRegistryInput",
+    "AdminSearchContainerRegistriesInput",
     "UpdateContainerRegistryInput",
 )
 
@@ -135,3 +144,42 @@ class DeleteContainerRegistryInput(BaseRequestModel):
     """Input for deleting a container registry."""
 
     id: UUID = Field(description="Unique identifier of the registry to delete.")
+
+
+class ContainerRegistryFilter(BaseRequestModel):
+    """Filter conditions for container registry search."""
+
+    registry_name: StringFilter | None = Field(default=None, description="Filter by registry name.")
+    type: ContainerRegistryTypeFilter | None = Field(
+        default=None, description="Filter by registry type."
+    )
+    is_global: bool | None = Field(default=None, description="Filter by global accessibility.")
+
+
+class ContainerRegistryOrder(BaseRequestModel):
+    """Order specification for container registry search."""
+
+    field: ContainerRegistryOrderField = Field(description="Field to order by.")
+    direction: OrderDirection = Field(default=OrderDirection.ASC, description="Order direction.")
+
+
+class AdminSearchContainerRegistriesInput(BaseRequestModel):
+    """Input for searching container registries with filters, orders, and pagination.
+
+    Supports two pagination modes (mutually exclusive):
+    - Cursor-based: first/after (forward) or last/before (backward)
+    - Offset-based: limit/offset
+    """
+
+    filter: ContainerRegistryFilter | None = Field(default=None, description="Filter conditions.")
+    order: list[ContainerRegistryOrder] | None = Field(
+        default=None, description="Order specifications."
+    )
+    # Cursor-based pagination (Relay)
+    first: int | None = Field(default=None, ge=1, description="Number of items from the start.")
+    after: str | None = Field(default=None, description="Cursor to paginate forward from.")
+    last: int | None = Field(default=None, ge=1, description="Number of items from the end.")
+    before: str | None = Field(default=None, description="Cursor to paginate backward from.")
+    # Offset-based pagination
+    limit: int | None = Field(default=None, ge=1, description="Maximum number of items to return.")
+    offset: int | None = Field(default=None, ge=0, description="Number of items to skip.")

@@ -20,6 +20,7 @@ if TYPE_CHECKING:
         ValkeyRateLimitClient,
     )
     from ai.backend.common.plugin.monitor import ErrorPluginContext
+    from ai.backend.manager.api.adapters.registry import Adapters
     from ai.backend.manager.config.provider import ManagerConfigProvider
     from ai.backend.manager.event_dispatcher.handlers.stream_cleanup import (
         StreamCleanupEventHandler,
@@ -32,6 +33,7 @@ if TYPE_CHECKING:
 def build_api_routes(
     *,
     processors: Processors,
+    adapters: Adapters,
     cors_options: CORSOptions,
     config_provider: ManagerConfigProvider,
     error_monitor: ErrorPluginContext,
@@ -46,6 +48,8 @@ def build_api_routes(
     This is the composition root: all handlers are constructed here and
     passed to pure routing registrar functions.
     """
+    _ = adapters  # Will be wired to REST handlers as domain adapters are added
+
     # Lazy imports to avoid circular dependencies at module level
     from ai.backend.manager.api.gql.schema import schema as strawberry_schema
     from ai.backend.manager.api.gql_legacy.schema import graphene_schema

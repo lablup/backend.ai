@@ -4,10 +4,10 @@ import uuid
 from collections.abc import Sequence
 
 from ai.backend.manager.data.container_registry.types import ContainerRegistryData
-from ai.backend.manager.repositories.base import BatchQuerier, OffsetPagination
-from ai.backend.manager.repositories.container_registry.options import (
+from ai.backend.manager.models.container_registry.conditions import (
     ContainerRegistryConditions,
 )
+from ai.backend.manager.repositories.base import BatchQuerier, OffsetPagination
 from ai.backend.manager.services.container_registry.actions.search_container_registries import (
     SearchContainerRegistriesAction,
 )

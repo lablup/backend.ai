@@ -19,6 +19,7 @@ def setup_api(
     ``dep_resources.processing.processors`` is available) but **before**
     ``runner.setup()`` freezes the application router.
     """
+    from ai.backend.manager.api.adapters.registry import Adapters
     from ai.backend.manager.api.gql.adapter import BaseGQLAdapter
     from ai.backend.manager.api.gql.data_loader.data_loaders import DataLoaders
 
@@ -26,6 +27,7 @@ def setup_api(
     from .types import GQLContextDeps
 
     r = dep_resources
+    adapters = Adapters.create(r.processing.processors)
     gql_context_deps = GQLContextDeps(
         config_provider=r.bootstrap.config_provider,
         etcd=r.bootstrap.etcd,
@@ -47,11 +49,13 @@ def setup_api(
         agent_repository=r.domain.repositories.agent.repository,
         strawberry_gql_adapter=BaseGQLAdapter(),
         strawberry_data_loaders=DataLoaders(r.processing.processors),
+        adapters=adapters,
     )
 
     root_registry = RouteRegistry.create("", r.system.cors_options)
     for sub in build_api_routes(
         processors=r.processing.processors,
+        adapters=adapters,
         cors_options=r.system.cors_options,
         config_provider=r.bootstrap.config_provider,
         error_monitor=r.monitoring.error_monitor,

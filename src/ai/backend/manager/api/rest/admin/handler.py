@@ -214,6 +214,7 @@ class AdminHandler:
             gql_adapter=gql_deps.strawberry_gql_adapter,
             data_loaders=gql_deps.strawberry_data_loaders,
             metric_observer=gql_deps.metric_observer,
+            adapters=gql_deps.adapters,
         )
         result = await self._strawberry_schema.execute(
             params.query,
