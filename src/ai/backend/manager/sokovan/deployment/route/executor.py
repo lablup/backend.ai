@@ -400,7 +400,8 @@ class RouteExecutor:
 
                 # Fetch deployment context with all necessary data
                 deployment_context = await self._deployment_repo.fetch_deployment_context(
-                    deployment
+                    deployment,
+                    revision_id=route.revision_id,
                 )
 
                 # Create session with full context

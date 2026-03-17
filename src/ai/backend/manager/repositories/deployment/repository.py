@@ -707,16 +707,20 @@ class DeploymentRepository:
     async def fetch_deployment_context(
         self,
         deployment_info: DeploymentInfo,
+        revision_id: UUID | None = None,
     ) -> DeploymentContext:
         """Fetch all context data needed for session creation from deployment info.
 
         Args:
             deployment_info: Deployment information
+            revision_id: Specific revision to use for image resolution.
+                If provided, the image is resolved from this revision's DB row
+                instead of from ``deployment_info.target_revision()``.
 
         Returns:
             DeploymentContext: Context data needed for session creation
         """
-        return await self._db_source.fetch_deployment_context(deployment_info)
+        return await self._db_source.fetch_deployment_context(deployment_info, revision_id)
 
     # Auto-scaling operations
 
