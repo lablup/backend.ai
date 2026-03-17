@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from ai.backend.common.dto.manager.v2.scaling_group.response import (
     PreemptionConfigInfo,
@@ -41,7 +41,7 @@ def _make_scaling_group_node(name: str = "test-sgroup") -> ScalingGroupNode:
         status=ScalingGroupStatusInfo(is_active=True, is_public=False),
         metadata=ScalingGroupMetadataInfo(
             description="Test scaling group",
-            created_at=datetime(2024, 1, 1, tzinfo=timezone.utc),
+            created_at=datetime(2024, 1, 1, tzinfo=UTC),
         ),
         network=ScalingGroupNetworkInfo(wsproxy_addr=None, use_host_network=False),
         scheduler=_make_scheduler_info(),
@@ -61,13 +61,13 @@ class TestScalingGroupMetadataInfo:
     """Tests for ScalingGroupMetadataInfo model."""
 
     def test_valid_creation_with_description(self) -> None:
-        now = datetime(2024, 1, 1, tzinfo=timezone.utc)
+        now = datetime(2024, 1, 1, tzinfo=UTC)
         info = ScalingGroupMetadataInfo(description="desc", created_at=now)
         assert info.description == "desc"
         assert info.created_at == now
 
     def test_valid_creation_without_description(self) -> None:
-        now = datetime(2024, 1, 1, tzinfo=timezone.utc)
+        now = datetime(2024, 1, 1, tzinfo=UTC)
         info = ScalingGroupMetadataInfo(created_at=now)
         assert info.description is None
 

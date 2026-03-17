@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from ai.backend.common.dto.manager.v2.resource_policy.response import (
     CreateKeypairResourcePolicyPayload,
@@ -24,7 +24,7 @@ from ai.backend.common.dto.manager.v2.resource_policy.types import DefaultForUns
 def _make_keypair_policy_node(name: str = "default") -> KeypairResourcePolicyNode:
     return KeypairResourcePolicyNode(
         name=name,
-        created_at=datetime(2024, 1, 1, tzinfo=timezone.utc),
+        created_at=datetime(2024, 1, 1, tzinfo=UTC),
         default_for_unspecified=DefaultForUnspecified.LIMITED,
         total_resource_slots={"cpu": "4", "mem": "8g"},
         max_session_lifetime=3600,
@@ -41,7 +41,7 @@ def _make_keypair_policy_node(name: str = "default") -> KeypairResourcePolicyNod
 def _make_user_policy_node(name: str = "user-policy") -> UserResourcePolicyNode:
     return UserResourcePolicyNode(
         name=name,
-        created_at=datetime(2024, 1, 1, tzinfo=timezone.utc),
+        created_at=datetime(2024, 1, 1, tzinfo=UTC),
         max_vfolder_count=10,
         max_quota_scope_size=1073741824,
         max_session_count_per_model_session=5,
@@ -52,7 +52,7 @@ def _make_user_policy_node(name: str = "user-policy") -> UserResourcePolicyNode:
 def _make_project_policy_node(name: str = "project-policy") -> ProjectResourcePolicyNode:
     return ProjectResourcePolicyNode(
         name=name,
-        created_at=datetime(2024, 1, 1, tzinfo=timezone.utc),
+        created_at=datetime(2024, 1, 1, tzinfo=UTC),
         max_vfolder_count=20,
         max_quota_scope_size=10737418240,
         max_network_count=5,

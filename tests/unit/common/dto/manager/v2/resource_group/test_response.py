@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from ai.backend.common.dto.manager.v2.resource_group.response import (
     CreateResourceGroupPayload,
@@ -24,8 +24,8 @@ def _make_resource_group_node(name: str = "test-group") -> ResourceGroupNode:
         allowed_vfolder_hosts={"default": "rw"},
         integration_id=None,
         resource_policy=None,
-        created_at=datetime(2024, 1, 1, tzinfo=timezone.utc),
-        modified_at=datetime(2024, 6, 1, tzinfo=timezone.utc),
+        created_at=datetime(2024, 1, 1, tzinfo=UTC),
+        modified_at=datetime(2024, 6, 1, tzinfo=UTC),
     )
 
 
