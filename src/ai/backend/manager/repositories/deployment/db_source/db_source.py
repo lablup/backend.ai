@@ -1856,34 +1856,27 @@ class DeploymentDBSource:
                 or deployment_info.deploying_revision_id
                 or deployment_info.current_revision_id
             )
-            if target_revision_id is not None:
-                revision_query = (
-                    sa.select(DeploymentRevisionRow)
-                    .where(DeploymentRevisionRow.id == target_revision_id)
-                    .options(selectinload(DeploymentRevisionRow.image_row))
+            if target_revision_id is None:
+                raise DeploymentHasNoTargetRevision(
+                    "Deployment has no revision for image resolution"
                 )
-                revision_result = await db_sess.execute(revision_query)
-                revision_row = revision_result.scalar_one_or_none()
-                if revision_row is None or revision_row.image_row is None:
-                    raise DeploymentHasNoTargetRevision(
-                        f"Revision {target_revision_id} not found or has no image"
-                    )
-                image_identifier = ImageIdentifier(
-                    canonical=revision_row.image_row.name,
-                    architecture=revision_row.image_row.architecture,
+
+            revision_query = (
+                sa.select(DeploymentRevisionRow)
+                .where(DeploymentRevisionRow.id == target_revision_id)
+                .options(selectinload(DeploymentRevisionRow.image_row))
+            )
+            revision_result = await db_sess.execute(revision_query)
+            revision_row = revision_result.scalar_one_or_none()
+            if revision_row is None or revision_row.image_row is None:
+                raise DeploymentHasNoTargetRevision(
+                    f"Revision {target_revision_id} not found or has no image"
                 )
-                image_row = await ImageRow.resolve(db_sess, [image_identifier])
-            else:
-                # Legacy fallback: use current_revision_spec from model_revisions
-                current_spec = deployment_info.current_revision_spec()
-                if not current_spec:
-                    raise DeploymentHasNoTargetRevision(
-                        "Deployment has no revision for image resolution"
-                    )
-                image_row = await ImageRow.resolve(
-                    db_sess,
-                    [current_spec.image_identifier],
-                )
+            image_identifier = ImageIdentifier(
+                canonical=revision_row.image_row.name,
+                architecture=revision_row.image_row.architecture,
+            )
+            image_row = await ImageRow.resolve(db_sess, [image_identifier])
 
             # Build DeploymentContext
             return DeploymentContext(
