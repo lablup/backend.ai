@@ -54,6 +54,9 @@ from ai.backend.manager.models.group import GroupRow, ProjectType
 from ai.backend.manager.models.group import association_groups_users as agus
 from ai.backend.manager.models.kernel import kernels
 from ai.backend.manager.models.keypair import KeyPairRow, keypairs
+from ai.backend.manager.models.rbac_models.association_scopes_entities import (
+    AssociationScopesEntitiesRow,
+)
 from ai.backend.manager.models.rbac_models.role import RoleRow
 from ai.backend.manager.models.rbac_models.user_role import UserRoleRow
 from ai.backend.manager.models.resource_policy import keypair_resource_policies
@@ -1732,18 +1735,20 @@ class VfolderRepository:
                 user_uuid=user_info.uuid,
             )
 
-        # Step 2: Check vfolder host is accessible by new owner
+        # Step 2: Check vfolder host is accessible by new owner and get old owner
         async with self._db.begin_readonly_session() as session:
             conn = await session.connection()
             db_query = (
-                sa.select(vfolders.c.host)
+                sa.select(vfolders.c.host, vfolders.c.user)
                 .select_from(vfolders)
                 .where(
                     (vfolders.c.id == vfolder_id)
                     & (vfolders.c.ownership_type == VFolderOwnershipType.USER)
                 )
             )
-            folder_host = await conn.scalar(db_query)
+            row = (await conn.execute(db_query)).first()
+            folder_host = row.host if row else None
+            old_owner_uuid = row.user if row else None
         if folder_host not in allowed_hosts_by_user:
             raise VFolderOperationFailed(
                 "User to migrate vfolder needs an access to the storage host."
@@ -1781,6 +1786,37 @@ class VfolderRepository:
                 await conn.execute(del_query)
 
         await execute_with_retry(_delete_related_rows)
+
+        # Step 5: Clean up old owner's RBAC records for this vfolder
+        if old_owner_uuid is not None and old_owner_uuid != user_info.uuid:
+
+            async def _cleanup_old_owner_rbac() -> None:
+                async with self._db.begin_session() as session:
+                    user_role_id = await self._get_user_role_id(session, old_owner_uuid)
+                    # Revoke permissions
+                    revoker = RBACRevoker(
+                        entity_id=ObjectId(
+                            entity_type=EntityType.VFOLDER,
+                            entity_id=str(vfolder_id),
+                        ),
+                        entity_scope_type=ScopeType.VFOLDER,
+                        target_role_ids=[user_role_id],
+                        operations=None,
+                    )
+                    await execute_rbac_revoker(session, revoker)
+                    # Remove scope-entity mapping (visibility)
+                    await session.execute(
+                        sa.delete(AssociationScopesEntitiesRow).where(
+                            sa.and_(
+                                AssociationScopesEntitiesRow.scope_type == ScopeType.USER,
+                                AssociationScopesEntitiesRow.scope_id == str(old_owner_uuid),
+                                AssociationScopesEntitiesRow.entity_type == EntityType.VFOLDER,
+                                AssociationScopesEntitiesRow.entity_id == str(vfolder_id),
+                            )
+                        )
+                    )
+
+            await execute_with_retry(_cleanup_old_owner_rbac)
 
     @vfolder_repository_resilience.apply()
     async def get_alive_agent_ids(
