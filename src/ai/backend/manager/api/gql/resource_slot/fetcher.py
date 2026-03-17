@@ -26,13 +26,15 @@ from ai.backend.manager.models.resource_slot import (
     ResourceAllocationRow,
     ResourceSlotTypeRow,
 )
-from ai.backend.manager.repositories.resource_slot.query import (
-    AgentResourceQueryConditions,
-    AgentResourceQueryOrders,
-    CursorConditions,
-    QueryOrders,
-    ResourceAllocationQueryConditions,
-    ResourceAllocationQueryOrders,
+from ai.backend.manager.models.resource_slot.conditions import (
+    AgentResourceConditions,
+    ResourceAllocationConditions,
+    ResourceSlotTypeConditions,
+)
+from ai.backend.manager.models.resource_slot.orders import (
+    AgentResourceOrders,
+    ResourceAllocationOrders,
+    ResourceSlotTypeOrders,
 )
 from ai.backend.manager.services.resource_slot.actions.get_agent_resource_by_slot import (
     GetAgentResourceBySlotAction,
@@ -75,10 +77,10 @@ from .types import (
 @lru_cache(maxsize=1)
 def _get_slot_type_pagination_spec() -> PaginationSpec:
     return PaginationSpec(
-        forward_order=QueryOrders.slot_name(ascending=True),
-        backward_order=QueryOrders.slot_name(ascending=False),
-        forward_condition_factory=CursorConditions.by_cursor_forward,
-        backward_condition_factory=CursorConditions.by_cursor_backward,
+        forward_order=ResourceSlotTypeOrders.slot_name(ascending=True),
+        backward_order=ResourceSlotTypeOrders.slot_name(ascending=False),
+        forward_condition_factory=ResourceSlotTypeConditions.by_cursor_forward,
+        backward_condition_factory=ResourceSlotTypeConditions.by_cursor_backward,
         tiebreaker_order=ResourceSlotTypeRow.slot_name.asc(),
     )
 
@@ -86,10 +88,10 @@ def _get_slot_type_pagination_spec() -> PaginationSpec:
 @lru_cache(maxsize=1)
 def _get_agent_resource_pagination_spec() -> PaginationSpec:
     return PaginationSpec(
-        forward_order=AgentResourceQueryOrders.slot_name(ascending=True),
-        backward_order=AgentResourceQueryOrders.slot_name(ascending=False),
-        forward_condition_factory=AgentResourceQueryConditions.by_cursor_forward,
-        backward_condition_factory=AgentResourceQueryConditions.by_cursor_backward,
+        forward_order=AgentResourceOrders.slot_name(ascending=True),
+        backward_order=AgentResourceOrders.slot_name(ascending=False),
+        forward_condition_factory=AgentResourceConditions.by_cursor_forward,
+        backward_condition_factory=AgentResourceConditions.by_cursor_backward,
         tiebreaker_order=AgentResourceRow.slot_name.asc(),
     )
 
@@ -97,10 +99,10 @@ def _get_agent_resource_pagination_spec() -> PaginationSpec:
 @lru_cache(maxsize=1)
 def _get_resource_allocation_pagination_spec() -> PaginationSpec:
     return PaginationSpec(
-        forward_order=ResourceAllocationQueryOrders.slot_name(ascending=True),
-        backward_order=ResourceAllocationQueryOrders.slot_name(ascending=False),
-        forward_condition_factory=ResourceAllocationQueryConditions.by_cursor_forward,
-        backward_condition_factory=ResourceAllocationQueryConditions.by_cursor_backward,
+        forward_order=ResourceAllocationOrders.slot_name(ascending=True),
+        backward_order=ResourceAllocationOrders.slot_name(ascending=False),
+        forward_condition_factory=ResourceAllocationConditions.by_cursor_forward,
+        backward_condition_factory=ResourceAllocationConditions.by_cursor_backward,
         tiebreaker_order=ResourceAllocationRow.slot_name.asc(),
     )
 
@@ -190,7 +192,7 @@ async def fetch_agent_resources(
         pagination_spec=_get_agent_resource_pagination_spec(),
         filter=filter,
         order_by=order_by,
-        base_conditions=[AgentResourceQueryConditions.by_agent_id(agent_id)],
+        base_conditions=[AgentResourceConditions.by_agent_id(agent_id)],
     )
 
     action_result = (
@@ -242,7 +244,7 @@ async def fetch_kernel_allocations(
         pagination_spec=_get_resource_allocation_pagination_spec(),
         filter=filter,
         order_by=order_by,
-        base_conditions=[ResourceAllocationQueryConditions.by_kernel_id(_uuid.UUID(kernel_id))],
+        base_conditions=[ResourceAllocationConditions.by_kernel_id(_uuid.UUID(kernel_id))],
     )
 
     action_result = (

@@ -15,9 +15,10 @@ from typing import Any, Self
 
 import strawberry
 from strawberry import ID, Info
-from strawberry.relay import Connection, Edge, Node, NodeID
+from strawberry.relay import Connection, Edge, NodeID
 
 from ai.backend.manager.api.gql.base import OrderDirection, StringFilter
+from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin
 from ai.backend.manager.api.gql.types import GQLFilter, GQLOrderBy, StrawberryGQLContext
 from ai.backend.manager.api.gql.utils import dedent_strip
 from ai.backend.manager.data.resource_slot.types import (
@@ -26,19 +27,21 @@ from ai.backend.manager.data.resource_slot.types import (
     ResourceAllocationData,
     ResourceSlotTypeData,
 )
+from ai.backend.manager.models.resource_slot.conditions import (
+    AgentResourceConditions,
+    ResourceAllocationConditions,
+    ResourceSlotTypeConditions,
+)
+from ai.backend.manager.models.resource_slot.orders import (
+    AgentResourceOrders,
+    ResourceAllocationOrders,
+    ResourceSlotTypeOrders,
+)
 from ai.backend.manager.repositories.base import (
     QueryCondition,
     QueryOrder,
     combine_conditions_or,
     negate_conditions,
-)
-from ai.backend.manager.repositories.resource_slot.query import (
-    AgentResourceQueryConditions,
-    AgentResourceQueryOrders,
-    QueryConditions,
-    QueryOrders,
-    ResourceAllocationQueryConditions,
-    ResourceAllocationQueryOrders,
 )
 
 # ========== NumberFormat ==========
@@ -69,7 +72,7 @@ class NumberFormatGQL:
         and formatting rules for a specific resource (e.g., cpu, mem, cuda.device).
     """),
 )
-class ResourceSlotTypeGQL(Node):
+class ResourceSlotTypeGQL(PydanticNodeMixin):
     id: NodeID[str]
     slot_name: str = strawberry.field(
         description="Unique identifier for the resource slot (e.g., 'cpu', 'mem', 'cuda.device')."
@@ -175,28 +178,28 @@ class ResourceSlotTypeFilterGQL(GQLFilter):
         conditions: list[QueryCondition] = []
         if self.slot_name:
             condition = self.slot_name.build_query_condition(
-                contains_factory=QueryConditions.by_slot_name_contains,
-                equals_factory=QueryConditions.by_slot_name_equals,
-                starts_with_factory=QueryConditions.by_slot_name_starts_with,
-                ends_with_factory=QueryConditions.by_slot_name_ends_with,
+                contains_factory=ResourceSlotTypeConditions.by_slot_name_contains,
+                equals_factory=ResourceSlotTypeConditions.by_slot_name_equals,
+                starts_with_factory=ResourceSlotTypeConditions.by_slot_name_starts_with,
+                ends_with_factory=ResourceSlotTypeConditions.by_slot_name_ends_with,
             )
             if condition:
                 conditions.append(condition)
         if self.slot_type:
             condition = self.slot_type.build_query_condition(
-                contains_factory=QueryConditions.by_slot_type_contains,
-                equals_factory=QueryConditions.by_slot_type_equals,
-                starts_with_factory=QueryConditions.by_slot_type_starts_with,
-                ends_with_factory=QueryConditions.by_slot_type_ends_with,
+                contains_factory=ResourceSlotTypeConditions.by_slot_type_contains,
+                equals_factory=ResourceSlotTypeConditions.by_slot_type_equals,
+                starts_with_factory=ResourceSlotTypeConditions.by_slot_type_starts_with,
+                ends_with_factory=ResourceSlotTypeConditions.by_slot_type_ends_with,
             )
             if condition:
                 conditions.append(condition)
         if self.display_name:
             condition = self.display_name.build_query_condition(
-                contains_factory=QueryConditions.by_display_name_contains,
-                equals_factory=QueryConditions.by_display_name_equals,
-                starts_with_factory=QueryConditions.by_display_name_starts_with,
-                ends_with_factory=QueryConditions.by_display_name_ends_with,
+                contains_factory=ResourceSlotTypeConditions.by_display_name_contains,
+                equals_factory=ResourceSlotTypeConditions.by_display_name_equals,
+                starts_with_factory=ResourceSlotTypeConditions.by_display_name_starts_with,
+                ends_with_factory=ResourceSlotTypeConditions.by_display_name_ends_with,
             )
             if condition:
                 conditions.append(condition)
@@ -230,11 +233,11 @@ class ResourceSlotTypeOrderByGQL(GQLOrderBy):
         ascending = self.direction == OrderDirection.ASC
         match self.field:
             case ResourceSlotTypeOrderFieldGQL.SLOT_NAME:
-                return QueryOrders.slot_name(ascending)
+                return ResourceSlotTypeOrders.slot_name(ascending)
             case ResourceSlotTypeOrderFieldGQL.RANK:
-                return QueryOrders.rank(ascending)
+                return ResourceSlotTypeOrders.rank(ascending)
             case ResourceSlotTypeOrderFieldGQL.DISPLAY_NAME:
-                return QueryOrders.display_name(ascending)
+                return ResourceSlotTypeOrders.display_name(ascending)
             case _:
                 raise ValueError(f"Unhandled ResourceSlotTypeOrderFieldGQL value: {self.field!r}")
 
@@ -249,7 +252,7 @@ class ResourceSlotTypeOrderByGQL(GQLOrderBy):
         Represents one row from the agent_resources table.
     """),
 )
-class AgentResourceSlotGQL(Node):
+class AgentResourceSlotGQL(PydanticNodeMixin):
     """Per-agent, per-slot resource capacity and usage."""
 
     id: NodeID[str]
@@ -342,10 +345,10 @@ class AgentResourceSlotFilterGQL(GQLFilter):
         conditions: list[QueryCondition] = []
         if self.slot_name:
             condition = self.slot_name.build_query_condition(
-                contains_factory=AgentResourceQueryConditions.by_slot_name_contains,
-                equals_factory=AgentResourceQueryConditions.by_slot_name_equals,
-                starts_with_factory=AgentResourceQueryConditions.by_slot_name_starts_with,
-                ends_with_factory=AgentResourceQueryConditions.by_slot_name_ends_with,
+                contains_factory=AgentResourceConditions.by_slot_name_contains,
+                equals_factory=AgentResourceConditions.by_slot_name_equals,
+                starts_with_factory=AgentResourceConditions.by_slot_name_starts_with,
+                ends_with_factory=AgentResourceConditions.by_slot_name_ends_with,
             )
             if condition:
                 conditions.append(condition)
@@ -379,11 +382,11 @@ class AgentResourceSlotOrderByGQL(GQLOrderBy):
         ascending = self.direction == OrderDirection.ASC
         match self.field:
             case AgentResourceSlotOrderFieldGQL.SLOT_NAME:
-                return AgentResourceQueryOrders.slot_name(ascending)
+                return AgentResourceOrders.slot_name(ascending)
             case AgentResourceSlotOrderFieldGQL.CAPACITY:
-                return AgentResourceQueryOrders.capacity(ascending)
+                return AgentResourceOrders.capacity(ascending)
             case AgentResourceSlotOrderFieldGQL.USED:
-                return AgentResourceQueryOrders.used(ascending)
+                return AgentResourceOrders.used(ascending)
             case _:
                 raise ValueError(f"Unhandled AgentResourceSlotOrderFieldGQL value: {self.field!r}")
 
@@ -398,7 +401,7 @@ class AgentResourceSlotOrderByGQL(GQLOrderBy):
         Represents one row from the resource_allocations table.
     """),
 )
-class KernelResourceAllocationGQL(Node):
+class KernelResourceAllocationGQL(PydanticNodeMixin):
     """Per-kernel, per-slot resource allocation."""
 
     id: NodeID[str]
@@ -476,10 +479,10 @@ class KernelResourceAllocationFilterGQL(GQLFilter):
         conditions: list[QueryCondition] = []
         if self.slot_name:
             condition = self.slot_name.build_query_condition(
-                contains_factory=ResourceAllocationQueryConditions.by_slot_name_contains,
-                equals_factory=ResourceAllocationQueryConditions.by_slot_name_equals,
-                starts_with_factory=ResourceAllocationQueryConditions.by_slot_name_starts_with,
-                ends_with_factory=ResourceAllocationQueryConditions.by_slot_name_ends_with,
+                contains_factory=ResourceAllocationConditions.by_slot_name_contains,
+                equals_factory=ResourceAllocationConditions.by_slot_name_equals,
+                starts_with_factory=ResourceAllocationConditions.by_slot_name_starts_with,
+                ends_with_factory=ResourceAllocationConditions.by_slot_name_ends_with,
             )
             if condition:
                 conditions.append(condition)
@@ -513,11 +516,11 @@ class KernelResourceAllocationOrderByGQL(GQLOrderBy):
         ascending = self.direction == OrderDirection.ASC
         match self.field:
             case KernelResourceAllocationOrderFieldGQL.SLOT_NAME:
-                return ResourceAllocationQueryOrders.slot_name(ascending)
+                return ResourceAllocationOrders.slot_name(ascending)
             case KernelResourceAllocationOrderFieldGQL.REQUESTED:
-                return ResourceAllocationQueryOrders.requested(ascending)
+                return ResourceAllocationOrders.requested(ascending)
             case KernelResourceAllocationOrderFieldGQL.USED:
-                return ResourceAllocationQueryOrders.used(ascending)
+                return ResourceAllocationOrders.used(ascending)
             case _:
                 raise ValueError(
                     f"Unhandled KernelResourceAllocationOrderFieldGQL value: {self.field!r}"
