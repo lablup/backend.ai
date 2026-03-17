@@ -2519,38 +2519,22 @@ class DeploymentDBSource:
 
     async def apply_strategy_mutations(
         self,
-        assignments: Mapping[uuid.UUID, DeploymentSubStep],
         rollout: Sequence[RBACEntityCreator[RoutingRow]],
         drain: BatchUpdater[RoutingRow] | None,
         completed_ids: set[uuid.UUID],
-        rolled_back_ids: set[uuid.UUID],
     ) -> int:
-        """Apply all DB mutations from a strategy evaluation cycle in a single transaction.
+        """Apply route mutations from a strategy evaluation cycle in a single transaction.
+
+        Sub-step transitions are handled exclusively by the coordinator
+        via ``EndpointLifecycleBatchUpdaterSpec``.
 
         Returns:
             Number of deployments whose revision was swapped.
         """
         async with self._begin_session_read_committed() as db_sess:
-            await self._update_sub_steps(db_sess, assignments)
             await self._create_routes(db_sess, rollout)
             await self._drain_routes(db_sess, drain)
-            swapped = await self._complete_deployment_revision_swap(db_sess, completed_ids)
-            await self._clear_deploying_revision(db_sess, rolled_back_ids)
-            return swapped
-
-    @staticmethod
-    async def _update_sub_steps(
-        db_sess: SASession,
-        assignments: Mapping[uuid.UUID, DeploymentSubStep],
-    ) -> None:
-        """Update deployment sub-step assignments."""
-        for endpoint_id, sub_step in assignments.items():
-            query = (
-                sa.update(EndpointRow)
-                .where(EndpointRow.id == endpoint_id)
-                .values(sub_step=sub_step)
-            )
-            await db_sess.execute(query)
+            return await self._complete_deployment_revision_swap(db_sess, completed_ids)
 
     @staticmethod
     async def _create_routes(
@@ -2593,20 +2577,24 @@ class DeploymentDBSource:
         result = await db_sess.execute(query)
         return cast(CursorResult[Any], result).rowcount
 
-    @staticmethod
-    async def _clear_deploying_revision(
-        db_sess: SASession,
-        rolled_back_ids: set[uuid.UUID],
+    async def clear_deploying_revision(
+        self,
+        deployment_ids: set[uuid.UUID],
     ) -> None:
-        """Clear deploying_revision for rolled-back deployments."""
-        if not rolled_back_ids:
+        """Clear deploying_revision and sub_step for rolled-back deployments.
+
+        This is called explicitly by the RollingBackHandler after rollback
+        completes, NOT automatically by apply_strategy_mutations.
+        """
+        if not deployment_ids:
             return
-        query = (
-            sa.update(EndpointRow)
-            .where(EndpointRow.id.in_(rolled_back_ids))
-            .values(
-                deploying_revision=None,
-                sub_step=None,
+        async with self._begin_session_read_committed() as db_sess:
+            query = (
+                sa.update(EndpointRow)
+                .where(EndpointRow.id.in_(deployment_ids))
+                .values(
+                    deploying_revision=None,
+                    sub_step=None,
+                )
             )
-        )
-        await db_sess.execute(query)
+            await db_sess.execute(query)

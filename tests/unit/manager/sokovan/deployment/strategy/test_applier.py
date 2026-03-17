@@ -135,20 +135,19 @@ class TestStrategyResultApplier:
         assert result.routes_created == 0
         assert result.routes_drained == 0
 
-    async def test_assignments_only(
+    async def test_assignments_only_no_db_call(
         self,
         applier: StrategyResultApplier,
         mock_deployment_repo: AsyncMock,
         provisioning_summary: StrategyEvaluationSummary,
     ) -> None:
+        """Assignments without route changes should not trigger DB mutations.
+
+        Sub-step transitions are handled exclusively by the coordinator.
+        """
         result = await applier.apply(provisioning_summary)
 
-        mock_deployment_repo.apply_strategy_mutations.assert_called_once()
-        kwargs = mock_deployment_repo.apply_strategy_mutations.call_args.kwargs
-        assert kwargs["completed_ids"] == set()
-        assert kwargs["rolled_back_ids"] == set()
-        assert kwargs["drain"] is None
-        assert not kwargs["rollout"]
+        mock_deployment_repo.apply_strategy_mutations.assert_not_called()
         assert result.routes_created == 0
         assert result.routes_drained == 0
 
@@ -182,9 +181,13 @@ class TestStrategyResultApplier:
         self,
         applier: StrategyResultApplier,
         mock_deployment_repo: AsyncMock,
-        provisioning_summary: StrategyEvaluationSummary,
     ) -> None:
-        await applier.apply(provisioning_summary)
+        """Summary with only rollout should pass drain=None."""
+        summary = _build_summary(
+            {uuid4(): DeploymentSubStep.PROVISIONING},
+            route_changes=RouteChanges(rollout_specs=[MagicMock()]),
+        )
+        await applier.apply(summary)
 
         kwargs = mock_deployment_repo.apply_strategy_mutations.call_args.kwargs
         assert kwargs["drain"] is None
@@ -202,23 +205,25 @@ class TestStrategyResultApplier:
 
         kwargs = mock_deployment_repo.apply_strategy_mutations.call_args.kwargs
         assert kwargs["completed_ids"] == completed_ids
-        assert kwargs["rolled_back_ids"] == set()
         assert result.completed_ids == completed_ids
 
-    async def test_rolled_back_passes_rolled_back_ids(
+    async def test_rolled_back_sets_result_ids(
         self,
         applier: StrategyResultApplier,
         mock_deployment_repo: AsyncMock,
         rolled_back_summary: tuple[StrategyEvaluationSummary, set[UUID]],
     ) -> None:
+        """Rolled-back IDs are tracked in result but not passed to DB mutations.
+
+        The RollingBackHandler is responsible for clearing deploying_revision.
+        """
         summary, rolled_back_ids = rolled_back_summary
 
         result = await applier.apply(summary)
 
-        kwargs = mock_deployment_repo.apply_strategy_mutations.call_args.kwargs
-        assert kwargs["rolled_back_ids"] == rolled_back_ids
-        assert kwargs["completed_ids"] == set()
         assert result.rolled_back_ids == rolled_back_ids
+        # No route mutations, so apply_strategy_mutations should not be called
+        mock_deployment_repo.apply_strategy_mutations.assert_not_called()
 
     async def test_mixed_assignments_handles_all(
         self,
@@ -234,7 +239,6 @@ class TestStrategyResultApplier:
         mock_deployment_repo.apply_strategy_mutations.assert_called_once()
         kwargs = mock_deployment_repo.apply_strategy_mutations.call_args.kwargs
         assert kwargs["completed_ids"] == {completed_id}
-        assert kwargs["rolled_back_ids"] == {rolled_back_id}
         assert len(kwargs["rollout"]) == 1
         assert kwargs["drain"] is not None
         assert result.completed_ids == {completed_id}
