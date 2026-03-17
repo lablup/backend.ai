@@ -2391,7 +2391,7 @@ input ContainerRegistryScope
 scalar ContainerRegistryScopeField
   @join__type(graph: GRAPHENE)
 
-"""Added in 26.3.0. Container registry type."""
+"""Added in 26.4.0. Container registry type."""
 enum ContainerRegistryType
   @join__type(graph: STRAWBERRY)
 {
@@ -2410,7 +2410,7 @@ enum ContainerRegistryType
 scalar ContainerRegistryTypeField
   @join__type(graph: GRAPHENE)
 
-"""Added in 26.3.0. Container registry node."""
+"""Added in 26.4.0. Container registry node."""
 type ContainerRegistryV2 implements Node
   @join__implements(graph: STRAWBERRY, interface: "Node")
   @join__type(graph: STRAWBERRY)
@@ -2441,6 +2441,9 @@ type ContainerRegistryV2 implements Node
 
   """Whether this registry is globally accessible"""
   isGlobal: Boolean
+
+  """Extra metadata for the container registry"""
+  extra: JSON
 }
 
 """Added in 25.6.0."""

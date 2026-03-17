@@ -1415,7 +1415,7 @@ input ContainerRegistryScope {
   registryId: UUID!
 }
 
-"""Added in 26.3.0. Container registry type."""
+"""Added in 26.4.0. Container registry type."""
 enum ContainerRegistryType {
   DOCKER
   HARBOR
@@ -1428,7 +1428,7 @@ enum ContainerRegistryType {
   OCP
 }
 
-"""Added in 26.3.0. Container registry node."""
+"""Added in 26.4.0. Container registry node."""
 type ContainerRegistryV2 implements Node {
   """The Globally Unique ID of this object"""
   id: ID!
@@ -1456,6 +1456,9 @@ type ContainerRegistryV2 implements Node {
 
   """Whether this registry is globally accessible"""
   isGlobal: Boolean
+
+  """Extra metadata for the container registry"""
+  extra: JSON
 }
 
 input CreateAccessTokenInput {
