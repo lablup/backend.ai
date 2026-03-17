@@ -23,11 +23,11 @@ from ai.backend.manager.api.gql.prometheus_query_preset.types import (
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.data.prometheus_query_preset import ExecutePresetOptions
 from ai.backend.manager.models.prometheus_query_preset import PrometheusQueryPresetRow
-from ai.backend.manager.repositories.base import QueryCondition
-from ai.backend.manager.repositories.prometheus_query_preset.options import (
+from ai.backend.manager.models.prometheus_query_preset.conditions import (
     PrometheusQueryPresetConditions,
-    PrometheusQueryPresetOrders,
 )
+from ai.backend.manager.models.prometheus_query_preset.orders import PrometheusQueryPresetOrders
+from ai.backend.manager.repositories.base import QueryCondition
 from ai.backend.manager.services.prometheus_query_preset.actions import (
     ExecutePresetAction,
     GetPresetAction,

@@ -12,15 +12,15 @@ from ai.backend.manager.api.gql.base import (
     StringFilter,
 )
 from ai.backend.manager.api.gql.types import GQLFilter, GQLOrderBy
+from ai.backend.manager.models.prometheus_query_preset.conditions import (
+    PrometheusQueryPresetConditions,
+)
+from ai.backend.manager.models.prometheus_query_preset.orders import PrometheusQueryPresetOrders
 from ai.backend.manager.repositories.base import (
     QueryCondition,
     QueryOrder,
     combine_conditions_or,
     negate_conditions,
-)
-from ai.backend.manager.repositories.prometheus_query_preset.options import (
-    PrometheusQueryPresetConditions,
-    PrometheusQueryPresetOrders,
 )
 
 

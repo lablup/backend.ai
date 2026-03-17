@@ -7,7 +7,9 @@ from typing import TYPE_CHECKING, Any, Self
 
 import strawberry
 from strawberry import ID
-from strawberry.relay import Connection, Edge, Node, NodeID
+from strawberry.relay import Connection, Edge, NodeID
+
+from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin
 
 from .payloads import QueryDefinitionOptionsGQL
 
@@ -19,7 +21,7 @@ if TYPE_CHECKING:
     name="QueryDefinition",
     description="Added in 26.3.0. Prometheus query definition entity implementing Relay Node pattern.",
 )
-class QueryDefinitionGQL(Node):
+class QueryDefinitionGQL(PydanticNodeMixin):
     id: NodeID[str] = strawberry.field(description="Query definition UUID (primary key).")
     name: str = strawberry.field(description="Human-readable query definition identifier.")
     metric_name: str = strawberry.field(description="Prometheus metric name.")
