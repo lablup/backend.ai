@@ -11,17 +11,15 @@ from uuid import UUID
 from pydantic import Field
 
 from ai.backend.common.api_handlers import BaseResponseModel
-from ai.backend.common.data.artifact.types import (
-    ArtifactRegistryType,
-    VerificationStepResult,
-)
 from ai.backend.common.dto.manager.v2.artifact.response import (
     ArtifactNode,
     ArtifactRevisionImportTaskInfo,
     ArtifactRevisionNode,
 )
+from ai.backend.common.dto.manager.v2.artifact.types import VerificationStepResult
 
 from .types import (
+    ArtifactRegistryType,
     ArtifactRevisionReadmeInfo,
 )
 

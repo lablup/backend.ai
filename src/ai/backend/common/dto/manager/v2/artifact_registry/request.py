@@ -9,9 +9,10 @@ from uuid import UUID
 from pydantic import Field
 
 from ai.backend.common.api_handlers import BaseRequestModel
-from ai.backend.common.data.artifact.types import ArtifactRegistryType
 from ai.backend.common.data.storage.registries.types import ModelTarget
 from ai.backend.common.dto.manager.query import StringFilter
+
+from .types import ArtifactRegistryType
 
 __all__ = (
     # Nested input types

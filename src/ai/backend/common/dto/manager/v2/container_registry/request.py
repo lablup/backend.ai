@@ -10,7 +10,8 @@ from uuid import UUID
 from pydantic import Field, field_validator
 
 from ai.backend.common.api_handlers import BaseRequestModel
-from ai.backend.common.container_registry import ContainerRegistryType
+
+from .types import ContainerRegistryType
 
 __all__ = (
     "AllowedGroupsInput",
