@@ -14,6 +14,7 @@ from ai.backend.common.dto.manager.query import StringFilter
 from .types import ImageOrderField, OrderDirection
 
 __all__ = (
+    "AdminSearchImagesInput",
     "AliasImageInput",
     "DealiasImageInput",
     "ForgetImageInput",
@@ -86,3 +87,16 @@ class PurgeImageInput(BaseRequestModel):
     """Input for purging (hard-deleting) an image."""
 
     image_id: UUID = Field(description="ID of the image to purge")
+
+
+class AdminSearchImagesInput(BaseRequestModel):
+    """Input for admin search of images with cursor and offset pagination."""
+
+    filter: ImageFilter | None = Field(default=None, description="Filter conditions.")
+    order: list[ImageOrder] | None = Field(default=None, description="Order specifications.")
+    first: int | None = Field(default=None, description="Cursor pagination: number of items.")
+    after: str | None = Field(default=None, description="Cursor pagination: after cursor.")
+    last: int | None = Field(default=None, description="Cursor pagination: last N items.")
+    before: str | None = Field(default=None, description="Cursor pagination: before cursor.")
+    limit: int | None = Field(default=None, description="Offset pagination: maximum items.")
+    offset: int | None = Field(default=None, description="Offset pagination: number to skip.")

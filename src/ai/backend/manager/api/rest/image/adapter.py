@@ -21,13 +21,14 @@ from ai.backend.common.dto.manager.image.response import (
 from ai.backend.common.dto.manager.image.types import ImageOrderField, OrderDirection
 from ai.backend.manager.api.rest.adapter import BaseFilterAdapter
 from ai.backend.manager.data.image.types import ImageData, ImageDataWithDetails
+from ai.backend.manager.models.image.conditions import ImageConditions
+from ai.backend.manager.models.image.orders import ImageOrders
 from ai.backend.manager.repositories.base import (
     BatchQuerier,
     OffsetPagination,
     QueryCondition,
     QueryOrder,
 )
-from ai.backend.manager.repositories.image.options import ImageConditions, ImageOrders
 
 
 class ImageAdapter(BaseFilterAdapter):

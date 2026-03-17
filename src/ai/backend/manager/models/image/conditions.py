@@ -1,0 +1,322 @@
+"""Query conditions for image rows."""
+
+from __future__ import annotations
+
+import uuid
+from collections.abc import Collection
+from datetime import datetime
+
+import sqlalchemy as sa
+
+from ai.backend.common.data.filter_specs import StringMatchSpec
+from ai.backend.common.types import ImageID
+from ai.backend.manager.data.image.types import ImageStatus
+from ai.backend.manager.models.image import ImageAliasRow, ImageRow
+from ai.backend.manager.models.kernel.row import KernelRow
+from ai.backend.manager.repositories.base import QueryCondition
+
+
+class ImageConditions:
+    """Query conditions for images."""
+
+    @staticmethod
+    def by_ids(image_ids: Collection[ImageID]) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return ImageRow.id.in_(image_ids)
+
+        return inner
+
+    @staticmethod
+    def by_canonicals(canonicals: Collection[str]) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return ImageRow.name.in_(canonicals)
+
+        return inner
+
+    @staticmethod
+    def by_statuses(statuses: Collection[ImageStatus]) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return ImageRow.status.in_(statuses)
+
+        return inner
+
+    @staticmethod
+    def by_architecture(architecture: str) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return ImageRow.architecture == architecture
+
+        return inner
+
+    @staticmethod
+    def by_registry_id(registry_id: uuid.UUID) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return ImageRow.registry_id == registry_id
+
+        return inner
+
+    # String filter factories for name
+    @staticmethod
+    def by_name_contains(spec: StringMatchSpec) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            if spec.case_insensitive:
+                condition = ImageRow.name.ilike(f"%{spec.value}%")
+            else:
+                condition = ImageRow.name.like(f"%{spec.value}%")
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
+
+        return inner
+
+    @staticmethod
+    def by_name_equals(spec: StringMatchSpec) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            if spec.case_insensitive:
+                condition = sa.func.lower(ImageRow.name) == spec.value.lower()
+            else:
+                condition = ImageRow.name == spec.value
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
+
+        return inner
+
+    @staticmethod
+    def by_name_starts_with(spec: StringMatchSpec) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            if spec.case_insensitive:
+                condition = ImageRow.name.ilike(f"{spec.value}%")
+            else:
+                condition = ImageRow.name.like(f"{spec.value}%")
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
+
+        return inner
+
+    @staticmethod
+    def by_name_ends_with(spec: StringMatchSpec) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            if spec.case_insensitive:
+                condition = ImageRow.name.ilike(f"%{spec.value}")
+            else:
+                condition = ImageRow.name.like(f"%{spec.value}")
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
+
+        return inner
+
+    # String filter factories for architecture
+    @staticmethod
+    def by_architecture_contains(spec: StringMatchSpec) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            if spec.case_insensitive:
+                condition = ImageRow.architecture.ilike(f"%{spec.value}%")
+            else:
+                condition = ImageRow.architecture.like(f"%{spec.value}%")
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
+
+        return inner
+
+    @staticmethod
+    def by_architecture_equals(spec: StringMatchSpec) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            if spec.case_insensitive:
+                condition = sa.func.lower(ImageRow.architecture) == spec.value.lower()
+            else:
+                condition = ImageRow.architecture == spec.value
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
+
+        return inner
+
+    @staticmethod
+    def by_architecture_starts_with(spec: StringMatchSpec) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            if spec.case_insensitive:
+                condition = ImageRow.architecture.ilike(f"{spec.value}%")
+            else:
+                condition = ImageRow.architecture.like(f"{spec.value}%")
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
+
+        return inner
+
+    @staticmethod
+    def by_architecture_ends_with(spec: StringMatchSpec) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            if spec.case_insensitive:
+                condition = ImageRow.architecture.ilike(f"%{spec.value}")
+            else:
+                condition = ImageRow.architecture.like(f"%{spec.value}")
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
+
+        return inner
+
+    # DateTime filter factories for last_used (computed from KernelRow)
+    @staticmethod
+    def _last_used_subquery() -> sa.ScalarSelect[datetime | None]:
+        return (
+            sa.select(sa.func.max(KernelRow.created_at))
+            .where(
+                sa.and_(
+                    KernelRow.image == ImageRow.name,
+                    KernelRow.architecture == ImageRow.architecture,
+                )
+            )
+            .correlate(ImageRow)
+            .scalar_subquery()
+        )
+
+    @staticmethod
+    def by_last_used_before(dt: datetime) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return ImageConditions._last_used_subquery() < dt
+
+        return inner
+
+    @staticmethod
+    def by_last_used_after(dt: datetime) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return ImageConditions._last_used_subquery() > dt
+
+        return inner
+
+    # String filter factories for alias (exists subquery-based)
+    @staticmethod
+    def by_alias_contains(spec: StringMatchSpec) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            subq = sa.select(sa.literal(1)).where(ImageAliasRow.image_id == ImageRow.id)
+            if spec.case_insensitive:
+                subq = subq.where(ImageAliasRow.alias.ilike(f"%{spec.value}%"))
+            else:
+                subq = subq.where(ImageAliasRow.alias.like(f"%{spec.value}%"))
+            condition: sa.sql.expression.ColumnElement[bool] = sa.exists(subq)
+            if spec.negated:
+                condition = ~condition
+            return condition
+
+        return inner
+
+    @staticmethod
+    def by_alias_equals(spec: StringMatchSpec) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            subq = sa.select(sa.literal(1)).where(ImageAliasRow.image_id == ImageRow.id)
+            if spec.case_insensitive:
+                subq = subq.where(sa.func.lower(ImageAliasRow.alias) == spec.value.lower())
+            else:
+                subq = subq.where(ImageAliasRow.alias == spec.value)
+            condition: sa.sql.expression.ColumnElement[bool] = sa.exists(subq)
+            if spec.negated:
+                condition = ~condition
+            return condition
+
+        return inner
+
+    @staticmethod
+    def by_alias_starts_with(spec: StringMatchSpec) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            subq = sa.select(sa.literal(1)).where(ImageAliasRow.image_id == ImageRow.id)
+            if spec.case_insensitive:
+                subq = subq.where(ImageAliasRow.alias.ilike(f"{spec.value}%"))
+            else:
+                subq = subq.where(ImageAliasRow.alias.like(f"{spec.value}%"))
+            condition: sa.sql.expression.ColumnElement[bool] = sa.exists(subq)
+            if spec.negated:
+                condition = ~condition
+            return condition
+
+        return inner
+
+    @staticmethod
+    def by_alias_ends_with(spec: StringMatchSpec) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            subq = sa.select(sa.literal(1)).where(ImageAliasRow.image_id == ImageRow.id)
+            if spec.case_insensitive:
+                subq = subq.where(ImageAliasRow.alias.ilike(f"%{spec.value}"))
+            else:
+                subq = subq.where(ImageAliasRow.alias.like(f"%{spec.value}"))
+            condition: sa.sql.expression.ColumnElement[bool] = sa.exists(subq)
+            if spec.negated:
+                condition = ~condition
+            return condition
+
+        return inner
+
+
+class ImageAliasConditions:
+    """Query conditions for image aliases."""
+
+    @staticmethod
+    def by_ids(alias_ids: Collection[uuid.UUID]) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return ImageAliasRow.id.in_(alias_ids)
+
+        return inner
+
+    @staticmethod
+    def by_image_ids(image_ids: Collection[ImageID]) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return ImageAliasRow.image_id.in_(image_ids)
+
+        return inner
+
+    # String filter factories for alias
+    @staticmethod
+    def by_alias_contains(spec: StringMatchSpec) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            if spec.case_insensitive:
+                condition = ImageAliasRow.alias.ilike(f"%{spec.value}%")
+            else:
+                condition = ImageAliasRow.alias.like(f"%{spec.value}%")
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
+
+        return inner
+
+    @staticmethod
+    def by_alias_equals(spec: StringMatchSpec) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            if spec.case_insensitive:
+                condition = sa.func.lower(ImageAliasRow.alias) == spec.value.lower()
+            else:
+                condition = ImageAliasRow.alias == spec.value
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
+
+        return inner
+
+    @staticmethod
+    def by_alias_starts_with(spec: StringMatchSpec) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            if spec.case_insensitive:
+                condition = ImageAliasRow.alias.ilike(f"{spec.value}%")
+            else:
+                condition = ImageAliasRow.alias.like(f"{spec.value}%")
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
+
+        return inner
+
+    @staticmethod
+    def by_alias_ends_with(spec: StringMatchSpec) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            if spec.case_insensitive:
+                condition = ImageAliasRow.alias.ilike(f"%{spec.value}")
+            else:
+                condition = ImageAliasRow.alias.like(f"%{spec.value}")
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
+
+        return inner

@@ -4,8 +4,8 @@ import uuid
 from collections.abc import Sequence
 
 from ai.backend.manager.data.image.types import ImageAliasData
+from ai.backend.manager.models.image.conditions import ImageAliasConditions
 from ai.backend.manager.repositories.base import BatchQuerier, NoPagination
-from ai.backend.manager.repositories.image.options import ImageAliasConditions
 from ai.backend.manager.services.image.actions.search_aliases import SearchAliasesAction
 from ai.backend.manager.services.image.processors import ImageProcessors
 

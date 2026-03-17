@@ -14,7 +14,7 @@ from strawberry import ID, Info
 from ai.backend.common.types import ImageID
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.api.gql.utils import check_admin_only, dedent_strip
-from ai.backend.manager.repositories.image.options import ImageAliasConditions, ImageConditions
+from ai.backend.manager.models.image.conditions import ImageAliasConditions, ImageConditions
 
 from .fetcher import fetch_image, fetch_image_alias, fetch_image_aliases, fetch_images
 from .types import (

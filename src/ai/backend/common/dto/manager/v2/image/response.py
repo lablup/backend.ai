@@ -21,6 +21,7 @@ from .types import (
 )
 
 __all__ = (
+    "AdminSearchImagesPayload",
     "AliasImagePayload",
     "ForgetImagePayload",
     "GetImagePayload",
@@ -93,3 +94,12 @@ class PurgeImagePayload(BaseResponseModel):
     """Payload for image purge (hard-delete) result."""
 
     item: ImageNode = Field(description="Purged image")
+
+
+class AdminSearchImagesPayload(BaseResponseModel):
+    """Payload for admin-scoped paginated image search results."""
+
+    items: list[ImageNode] = Field(description="List of image nodes.")
+    total_count: int = Field(description="Total number of images matching the filter.")
+    has_next_page: bool = Field(description="Whether there is a next page.")
+    has_previous_page: bool = Field(description="Whether there is a previous page.")

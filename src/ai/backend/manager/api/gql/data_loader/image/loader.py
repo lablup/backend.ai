@@ -4,8 +4,8 @@ from collections.abc import Sequence
 
 from ai.backend.common.types import ImageID
 from ai.backend.manager.data.image.types import ImageData
+from ai.backend.manager.models.image.conditions import ImageConditions
 from ai.backend.manager.repositories.base import BatchQuerier, NoPagination
-from ai.backend.manager.repositories.image.options import ImageConditions
 from ai.backend.manager.services.image.actions.search_images import SearchImagesAction
 from ai.backend.manager.services.image.processors import ImageProcessors
 

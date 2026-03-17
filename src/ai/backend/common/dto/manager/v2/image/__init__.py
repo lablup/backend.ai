@@ -3,6 +3,7 @@ Image DTOs v2 for Manager API.
 """
 
 from ai.backend.common.dto.manager.v2.image.request import (
+    AdminSearchImagesInput,
     AliasImageInput,
     DealiasImageInput,
     ForgetImageInput,
@@ -13,6 +14,7 @@ from ai.backend.common.dto.manager.v2.image.request import (
     SearchImagesInput,
 )
 from ai.backend.common.dto.manager.v2.image.response import (
+    AdminSearchImagesPayload,
     AliasImagePayload,
     ForgetImagePayload,
     GetImagePayload,
@@ -41,6 +43,7 @@ __all__ = (
     "ImageTypeEnum",
     "OrderDirection",
     # Input models (request)
+    "AdminSearchImagesInput",
     "AliasImageInput",
     "DealiasImageInput",
     "ForgetImageInput",
@@ -50,6 +53,7 @@ __all__ = (
     "RescanImagesInput",
     "SearchImagesInput",
     # Response models
+    "AdminSearchImagesPayload",
     "AliasImagePayload",
     "ForgetImagePayload",
     "GetImagePayload",

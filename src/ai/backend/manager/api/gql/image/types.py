@@ -14,10 +14,11 @@ from typing import Any, Self
 
 import strawberry
 from strawberry import Info
-from strawberry.relay import Connection, Edge, Node, NodeID
+from strawberry.relay import Connection, Edge, NodeID
 
 from ai.backend.common.types import ImageID
 from ai.backend.manager.api.gql.base import DateTimeFilter, OrderDirection, StringFilter
+from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin
 from ai.backend.manager.api.gql.types import GQLFilter, GQLOrderBy, StrawberryGQLContext
 from ai.backend.manager.api.gql.utils import dedent_strip
 from ai.backend.manager.data.image.types import (
@@ -27,18 +28,14 @@ from ai.backend.manager.data.image.types import (
     ImageStatus,
     ResourceLimit,
 )
+from ai.backend.manager.models.image.conditions import ImageAliasConditions, ImageConditions
+from ai.backend.manager.models.image.orders import ImageAliasOrders, ImageOrders
 from ai.backend.manager.models.rbac.permission_defs import ImagePermission
 from ai.backend.manager.repositories.base import (
     QueryCondition,
     QueryOrder,
     combine_conditions_or,
     negate_conditions,
-)
-from ai.backend.manager.repositories.image.options import (
-    ImageAliasConditions,
-    ImageAliasOrders,
-    ImageConditions,
-    ImageOrders,
 )
 
 # =============================================================================
@@ -157,7 +154,7 @@ class ImageV2TagEntryGQL:
     Aliases provide alternative names for images.
     """),
 )
-class ImageV2AliasGQL(Node):
+class ImageV2AliasGQL(PydanticNodeMixin):
     id: NodeID[uuid.UUID]
     alias: str = strawberry.field(description="The alias string for the image.")
 
@@ -341,7 +338,7 @@ class ImageV2PermissionInfoGQL:
     connections as part of BEP-1010 migration.
     """),
 )
-class ImageV2GQL(Node):
+class ImageV2GQL(PydanticNodeMixin):
     _image_id: strawberry.Private[ImageID]
 
     id: NodeID[uuid.UUID]
