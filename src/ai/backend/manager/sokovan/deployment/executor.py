@@ -127,11 +127,18 @@ class DeploymentExecutor:
         valid_deployments: list[DeploymentWithHistory] = []
         for deployment in deployments:
             info = deployment.deployment_info
-            current_revision = info.current_revision_spec()
-            if not current_revision:
+            if info.current_revision_id is None:
                 log.warning(
                     "Deployment {} has no current revision, skipping",
                     info.id,
+                )
+                continue
+            current_revision = info.resolve_revision_spec(info.current_revision_id)
+            if not current_revision:
+                log.warning(
+                    "Deployment {} current revision {} not found in model_revisions, skipping",
+                    info.id,
+                    info.current_revision_id,
                 )
                 continue
             targets = scaling_group_targets[info.metadata.resource_group]
@@ -443,10 +450,14 @@ class DeploymentExecutor:
 
         with recorder.phase("register_endpoint"):
             with recorder.step("check_target_revision"):
-                current_revision = deployment.current_revision_spec()
-                if not current_revision:
+                if deployment.current_revision_id is None:
                     raise ModelDefinitionNotFound(
                         f"No current revision for deployment {deployment.id}"
+                    )
+                current_revision = deployment.resolve_revision_spec(deployment.current_revision_id)
+                if not current_revision:
+                    raise ModelDefinitionNotFound(
+                        f"Current revision {deployment.current_revision_id} not found for deployment {deployment.id}"
                     )
 
             with recorder.step("generate_model_definition"):

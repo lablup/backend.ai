@@ -147,11 +147,14 @@ class DeploymentController:
         modified_endpoint = await self._deployment_repository.get_modified_endpoint(
             endpoint_id=endpoint_id, updater=updater
         )
-        current_revision = modified_endpoint.current_revision_spec()
-        if current_revision:
-            await self._scheduling_controller.validate_session_spec(
-                SessionValidationSpec.from_revision(model_revision=current_revision)
+        if modified_endpoint.current_revision_id is not None:
+            current_revision = modified_endpoint.resolve_revision_spec(
+                modified_endpoint.current_revision_id
             )
+            if current_revision:
+                await self._scheduling_controller.validate_session_spec(
+                    SessionValidationSpec.from_revision(model_revision=current_revision)
+                )
         res = await self._deployment_repository.update_endpoint_with_spec(updater)
         try:
             await self.mark_lifecycle_needed(DeploymentLifecycleType.CHECK_REPLICA)
