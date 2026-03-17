@@ -3,8 +3,8 @@ from __future__ import annotations
 from collections.abc import Sequence
 
 from ai.backend.manager.data.scaling_group.types import ScalingGroupData
+from ai.backend.manager.models.scaling_group.conditions import ScalingGroupConditions
 from ai.backend.manager.repositories.base import BatchQuerier, OffsetPagination
-from ai.backend.manager.repositories.scaling_group.options import ScalingGroupConditions
 from ai.backend.manager.services.scaling_group.actions.list_scaling_groups import (
     SearchScalingGroupsAction,
 )

@@ -8,12 +8,20 @@ from enum import StrEnum
 
 __all__ = (
     "OrderDirection",
+    "ResourceGroupOrderDirection",
     "ResourceGroupOrderField",
 )
 
 
 class OrderDirection(StrEnum):
     """Order direction for sorting."""
+
+    ASC = "asc"
+    DESC = "desc"
+
+
+class ResourceGroupOrderDirection(StrEnum):
+    """Order direction for resource group sorting."""
 
     ASC = "asc"
     DESC = "desc"

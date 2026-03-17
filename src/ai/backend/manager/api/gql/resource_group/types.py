@@ -10,7 +10,7 @@ from typing import Self, assert_never, override
 
 import strawberry
 from strawberry import Info
-from strawberry.relay import Node, NodeID
+from strawberry.relay import NodeID
 
 from ai.backend.common.types import PreemptionMode, PreemptionOrder, ResourceSlot
 from ai.backend.manager.api.gql.base import OrderDirection, StringFilter
@@ -19,6 +19,7 @@ from ai.backend.manager.api.gql.fair_share.types.common import (
     ResourceWeightEntryGQL,
     ResourceWeightEntryInputGQL,
 )
+from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin
 from ai.backend.manager.api.gql.types import GQLFilter, GQLOrderBy, StrawberryGQLContext
 from ai.backend.manager.api.gql.utils import dedent_strip
 from ai.backend.manager.data.scaling_group.types import (
@@ -29,16 +30,14 @@ from ai.backend.manager.data.scaling_group.types import (
     ScalingGroupData,
     SchedulerType,
 )
+from ai.backend.manager.models.scaling_group.conditions import ScalingGroupConditions
+from ai.backend.manager.models.scaling_group.orders import ScalingGroupOrders
 from ai.backend.manager.models.scaling_group.types import FairShareScalingGroupSpec
 from ai.backend.manager.repositories.base import (
     QueryCondition,
     QueryOrder,
     combine_conditions_or,
     negate_conditions,
-)
-from ai.backend.manager.repositories.scaling_group.options import (
-    ScalingGroupConditions,
-    ScalingGroupOrders,
 )
 from ai.backend.manager.services.scaling_group.actions.get_resource_info import (
     GetResourceInfoAction,
@@ -346,7 +345,7 @@ class ResourceInfoGQL:
     name="ResourceGroup",
     description="Added in 26.1.0. Resource group with structured configuration",
 )
-class ResourceGroupGQL(Node):
+class ResourceGroupGQL(PydanticNodeMixin):
     id: NodeID[str] = strawberry.field(
         description="Relay-style global node identifier for the resource group"
     )

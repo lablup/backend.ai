@@ -20,12 +20,10 @@ from ai.backend.manager.data.scaling_group.types import (
 from ai.backend.manager.data.scaling_group.types import (
     SchedulerType,
 )
+from ai.backend.manager.models.scaling_group.conditions import ScalingGroupConditions
+from ai.backend.manager.models.scaling_group.orders import ScalingGroupOrders
 from ai.backend.manager.models.scaling_group.row import ScalingGroupRow
 from ai.backend.manager.repositories.base.updater import Updater
-from ai.backend.manager.repositories.scaling_group.options import (
-    ScalingGroupConditions,
-    ScalingGroupOrders,
-)
 from ai.backend.manager.repositories.scaling_group.updaters import (
     ScalingGroupMetadataUpdaterSpec,
     ScalingGroupNetworkConfigUpdaterSpec,

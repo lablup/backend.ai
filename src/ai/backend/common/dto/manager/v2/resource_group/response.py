@@ -13,6 +13,7 @@ from pydantic import Field
 from ai.backend.common.api_handlers import BaseResponseModel
 
 __all__ = (
+    "AdminSearchResourceGroupsPayload",
     "CreateResourceGroupPayload",
     "DeleteResourceGroupPayload",
     "ResourceGroupNode",
@@ -71,3 +72,12 @@ class DeleteResourceGroupPayload(BaseResponseModel):
     """Payload for resource group deletion mutation result."""
 
     id: UUID = Field(description="UUID of the deleted resource group.")
+
+
+class AdminSearchResourceGroupsPayload(BaseResponseModel):
+    """Payload for admin-scoped paginated resource group search results."""
+
+    items: list[ResourceGroupNode] = Field(description="List of resource group nodes.")
+    total_count: int = Field(description="Total number of resource groups matching the filter.")
+    has_next_page: bool = Field(description="Whether there is a next page.")
+    has_previous_page: bool = Field(description="Whether there is a previous page.")

@@ -10,11 +10,19 @@ from uuid import UUID
 from pydantic import Field, field_validator
 
 from ai.backend.common.api_handlers import SENTINEL, BaseRequestModel, Sentinel
+from ai.backend.common.dto.manager.query import StringFilter
+from ai.backend.common.dto.manager.v2.resource_group.types import (
+    ResourceGroupOrderDirection,
+    ResourceGroupOrderField,
+)
 
 __all__ = (
+    "AdminSearchResourceGroupsInput",
     "CreateResourceGroupInput",
-    "UpdateResourceGroupInput",
     "DeleteResourceGroupInput",
+    "ResourceGroupFilter",
+    "ResourceGroupOrder",
+    "UpdateResourceGroupInput",
 )
 
 
@@ -108,3 +116,34 @@ class DeleteResourceGroupInput(BaseRequestModel):
     id: UUID = Field(
         description="UUID of the resource group to delete.",
     )
+
+
+class ResourceGroupFilter(BaseRequestModel):
+    """Filter criteria for searching resource groups."""
+
+    name: StringFilter | None = Field(default=None, description="Filter by name.")
+    is_active: bool | None = Field(default=None, description="Filter by active status.")
+
+
+class ResourceGroupOrder(BaseRequestModel):
+    """Order specification for resource group search results."""
+
+    field: ResourceGroupOrderField = Field(description="Field to order by.")
+    direction: ResourceGroupOrderDirection = Field(
+        default=ResourceGroupOrderDirection.ASC, description="Order direction."
+    )
+
+
+class AdminSearchResourceGroupsInput(BaseRequestModel):
+    """Input for admin search of resource groups with cursor and offset pagination."""
+
+    filter: ResourceGroupFilter | None = Field(default=None, description="Filter conditions.")
+    order: list[ResourceGroupOrder] | None = Field(
+        default=None, description="Order specifications."
+    )
+    first: int | None = Field(default=None, description="Cursor pagination: number of items.")
+    after: str | None = Field(default=None, description="Cursor pagination: after cursor.")
+    last: int | None = Field(default=None, description="Cursor pagination: last N items.")
+    before: str | None = Field(default=None, description="Cursor pagination: before cursor.")
+    limit: int | None = Field(default=None, description="Offset pagination: maximum items.")
+    offset: int | None = Field(default=None, description="Offset pagination: number to skip.")

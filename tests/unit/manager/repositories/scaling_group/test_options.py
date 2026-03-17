@@ -26,14 +26,12 @@ from ai.backend.manager.models.resource_policy import (
 from ai.backend.manager.models.resource_preset import ResourcePresetRow
 from ai.backend.manager.models.routing import RoutingRow
 from ai.backend.manager.models.scaling_group import ScalingGroupRow
+from ai.backend.manager.models.scaling_group.conditions import ScalingGroupConditions
+from ai.backend.manager.models.scaling_group.orders import ScalingGroupOrders
 from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.vfolder import VFolderRow
-from ai.backend.manager.repositories.scaling_group.options import (
-    ScalingGroupConditions,
-    ScalingGroupOrders,
-)
 from ai.backend.testutils.db import with_tables
 
 # Define the tables list in FK dependency order for mapper initialization

@@ -16,12 +16,10 @@ from ai.backend.manager.api.gql.resource_group.types import (
     ResourceGroupOrderByGQL,
     ResourceGroupOrderFieldGQL,
 )
+from ai.backend.manager.models.scaling_group.conditions import ScalingGroupConditions
+from ai.backend.manager.models.scaling_group.orders import ScalingGroupOrders
 from ai.backend.manager.models.scaling_group.row import ScalingGroupRow
 from ai.backend.manager.repositories.base import OffsetPagination
-from ai.backend.manager.repositories.scaling_group.options import (
-    ScalingGroupConditions,
-    ScalingGroupOrders,
-)
 
 
 def _get_pagination_spec() -> PaginationSpec:

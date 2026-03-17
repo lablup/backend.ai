@@ -9,6 +9,7 @@ from ai.backend.manager.api.adapters.container_registry import ContainerRegistry
 from ai.backend.manager.api.adapters.domain import DomainAdapter
 from ai.backend.manager.api.adapters.image import ImageAdapter
 from ai.backend.manager.api.adapters.project import ProjectAdapter
+from ai.backend.manager.api.adapters.resource_group import ResourceGroupAdapter
 from ai.backend.manager.api.adapters.resource_slot import ResourceSlotAdapter
 from ai.backend.manager.api.adapters.scheduling_history import SchedulingHistoryAdapter
 from ai.backend.manager.api.adapters.service_catalog import ServiceCatalogAdapter
@@ -33,6 +34,7 @@ class Adapters:
         domain: DomainAdapter,
         image: ImageAdapter,
         project: ProjectAdapter,
+        resource_group: ResourceGroupAdapter,
         resource_slot: ResourceSlotAdapter,
         scheduling_history: SchedulingHistoryAdapter,
         service_catalog: ServiceCatalogAdapter,
@@ -43,6 +45,7 @@ class Adapters:
         self.domain = domain
         self.image = image
         self.project = project
+        self.resource_group = resource_group
         self.resource_slot = resource_slot
         self.scheduling_history = scheduling_history
         self.service_catalog = service_catalog
@@ -57,6 +60,7 @@ class Adapters:
             domain=DomainAdapter(processors),
             image=ImageAdapter(processors),
             project=ProjectAdapter(processors),
+            resource_group=ResourceGroupAdapter(processors),
             resource_slot=ResourceSlotAdapter(processors),
             scheduling_history=SchedulingHistoryAdapter(processors),
             service_catalog=ServiceCatalogAdapter(processors),
