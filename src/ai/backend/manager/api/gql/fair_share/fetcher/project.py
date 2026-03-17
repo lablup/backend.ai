@@ -19,12 +19,10 @@ from ai.backend.manager.api.gql.fair_share.types import (
     RGProjectFairShareFilter,
 )
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
+from ai.backend.manager.models.fair_share.conditions import ProjectFairShareConditions
+from ai.backend.manager.models.fair_share.orders import ProjectFairShareOrders
 from ai.backend.manager.models.fair_share.row import ProjectFairShareRow
 from ai.backend.manager.repositories.base import QueryCondition
-from ai.backend.manager.repositories.fair_share.options import (
-    ProjectFairShareConditions,
-    ProjectFairShareOrders,
-)
 from ai.backend.manager.repositories.fair_share.types import ProjectFairShareSearchScope
 from ai.backend.manager.services.fair_share.actions import (
     GetProjectFairShareAction,

@@ -9,21 +9,22 @@ from typing import TYPE_CHECKING, Annotated, Any, override
 
 import strawberry
 from strawberry import ID, Info
-from strawberry.relay import Connection, Edge, Node, NodeID
+from strawberry.relay import Connection, Edge, NodeID
 
 from ai.backend.manager.api.gql.base import OrderDirection, StringFilter
+from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin
 from ai.backend.manager.api.gql.types import GQLFilter, GQLOrderBy, StrawberryGQLContext
 from ai.backend.manager.data.fair_share.types import DomainFairShareData
+from ai.backend.manager.models.fair_share.conditions import (
+    DomainFairShareConditions,
+    RGDomainFairShareConditions,
+)
+from ai.backend.manager.models.fair_share.orders import DomainFairShareOrders
 from ai.backend.manager.repositories.base import (
     QueryCondition,
     QueryOrder,
     combine_conditions_or,
     negate_conditions,
-)
-from ai.backend.manager.repositories.fair_share.options import (
-    DomainFairShareConditions,
-    DomainFairShareOrders,
-    RGDomainFairShareConditions,
 )
 
 from .common import (
@@ -41,7 +42,7 @@ if TYPE_CHECKING:
     name="DomainFairShare",
     description="Added in 26.1.0. Domain-level fair share data representing scheduling priority for an entire domain. The fair share factor determines resource allocation relative to other domains.",
 )
-class DomainFairShareGQL(Node):
+class DomainFairShareGQL(PydanticNodeMixin):
     """Domain-level fair share data with calculated fair share factor."""
 
     id: NodeID[str]

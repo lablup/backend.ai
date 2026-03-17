@@ -29,6 +29,11 @@ from ai.backend.manager.models.fair_share import (
     ProjectFairShareRow,
     UserFairShareRow,
 )
+from ai.backend.manager.models.fair_share.conditions import (
+    RGDomainFairShareConditions,
+    RGProjectFairShareConditions,
+    RGUserFairShareConditions,
+)
 from ai.backend.manager.models.group import AssocGroupUserRow, GroupRow
 from ai.backend.manager.models.keypair import KeyPairRow
 from ai.backend.manager.models.rbac_models import UserRoleRow
@@ -59,11 +64,6 @@ from ai.backend.manager.repositories.fair_share import (
     FairShareRepository,
     ProjectFairShareCreatorSpec,
     UserFairShareCreatorSpec,
-)
-from ai.backend.manager.repositories.fair_share.options import (
-    RGDomainFairShareConditions,
-    RGProjectFairShareConditions,
-    RGUserFairShareConditions,
 )
 from ai.backend.manager.repositories.fair_share.types import (
     DomainFairShareSearchScope,

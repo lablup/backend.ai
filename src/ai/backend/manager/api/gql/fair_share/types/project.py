@@ -10,22 +10,23 @@ from uuid import UUID
 
 import strawberry
 from strawberry import ID, Info
-from strawberry.relay import Connection, Edge, Node, NodeID
+from strawberry.relay import Connection, Edge, NodeID
 
 from ai.backend.manager.api.gql.base import OrderDirection, StringFilter, UUIDFilter
+from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin
 from ai.backend.manager.api.gql.types import GQLFilter, GQLOrderBy, StrawberryGQLContext
 from ai.backend.manager.data.fair_share.types import ProjectFairShareData
 from ai.backend.manager.data.group.types import ProjectType
+from ai.backend.manager.models.fair_share.conditions import (
+    ProjectFairShareConditions,
+    RGProjectFairShareConditions,
+)
+from ai.backend.manager.models.fair_share.orders import ProjectFairShareOrders
 from ai.backend.manager.repositories.base import (
     QueryCondition,
     QueryOrder,
     combine_conditions_or,
     negate_conditions,
-)
-from ai.backend.manager.repositories.fair_share.options import (
-    ProjectFairShareConditions,
-    ProjectFairShareOrders,
-    RGProjectFairShareConditions,
 )
 
 from .common import (
@@ -44,7 +45,7 @@ if TYPE_CHECKING:
     name="ProjectFairShare",
     description="Added in 26.1.0. Project-level fair share data representing scheduling priority for a specific project. The fair share factor determines resource allocation relative to other projects in the same domain.",
 )
-class ProjectFairShareGQL(Node):
+class ProjectFairShareGQL(PydanticNodeMixin):
     """Project-level fair share data with calculated fair share factor."""
 
     id: NodeID[str]

@@ -19,12 +19,10 @@ from ai.backend.manager.api.gql.fair_share.types import (
     UserFairShareOrderBy,
 )
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
+from ai.backend.manager.models.fair_share.conditions import UserFairShareConditions
+from ai.backend.manager.models.fair_share.orders import UserFairShareOrders
 from ai.backend.manager.models.fair_share.row import UserFairShareRow
 from ai.backend.manager.repositories.base import QueryCondition
-from ai.backend.manager.repositories.fair_share.options import (
-    UserFairShareConditions,
-    UserFairShareOrders,
-)
 from ai.backend.manager.repositories.fair_share.types import UserFairShareSearchScope
 from ai.backend.manager.services.fair_share.actions import (
     GetUserFairShareAction,

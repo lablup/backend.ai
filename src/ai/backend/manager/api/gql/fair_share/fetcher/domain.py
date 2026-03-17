@@ -18,12 +18,10 @@ from ai.backend.manager.api.gql.fair_share.types import (
     RGDomainFairShareFilter,
 )
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
+from ai.backend.manager.models.fair_share.conditions import DomainFairShareConditions
+from ai.backend.manager.models.fair_share.orders import DomainFairShareOrders
 from ai.backend.manager.models.fair_share.row import DomainFairShareRow
 from ai.backend.manager.repositories.base import QueryCondition
-from ai.backend.manager.repositories.fair_share.options import (
-    DomainFairShareConditions,
-    DomainFairShareOrders,
-)
 from ai.backend.manager.repositories.fair_share.types import DomainFairShareSearchScope
 from ai.backend.manager.services.fair_share.actions import (
     GetDomainFairShareAction,

@@ -10,21 +10,22 @@ from uuid import UUID
 
 import strawberry
 from strawberry import ID, Info
-from strawberry.relay import Connection, Edge, Node, NodeID
+from strawberry.relay import Connection, Edge, NodeID
 
 from ai.backend.manager.api.gql.base import OrderDirection, StringFilter, UUIDFilter
+from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin
 from ai.backend.manager.api.gql.types import GQLFilter, GQLOrderBy, StrawberryGQLContext
 from ai.backend.manager.data.fair_share.types import UserFairShareData
+from ai.backend.manager.models.fair_share.conditions import (
+    RGUserFairShareConditions,
+    UserFairShareConditions,
+)
+from ai.backend.manager.models.fair_share.orders import UserFairShareOrders
 from ai.backend.manager.repositories.base import (
     QueryCondition,
     QueryOrder,
     combine_conditions_or,
     negate_conditions,
-)
-from ai.backend.manager.repositories.fair_share.options import (
-    RGUserFairShareConditions,
-    UserFairShareConditions,
-    UserFairShareOrders,
 )
 
 from .common import (
@@ -44,7 +45,7 @@ if TYPE_CHECKING:
     name="UserFairShare",
     description="Added in 26.1.0. User-level fair share data representing scheduling priority for an individual user. This is the most granular level of fair share calculation.",
 )
-class UserFairShareGQL(Node):
+class UserFairShareGQL(PydanticNodeMixin):
     """User-level fair share data with calculated fair share factor."""
 
     id: NodeID[str]
