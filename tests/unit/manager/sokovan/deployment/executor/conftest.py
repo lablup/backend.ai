@@ -106,7 +106,10 @@ def _create_deployment_info(
 ) -> DeploymentInfo:
     """Create DeploymentInfo for tests."""
     dep_id = deployment_id or uuid4()
+    rev_id = uuid4()
     revision = MagicMock() if has_revision else None
+    if revision is not None:
+        revision.revision_id = rev_id
 
     return DeploymentInfo(
         id=dep_id,
@@ -133,7 +136,7 @@ def _create_deployment_info(
             url=None,
         ),
         model_revisions=[revision] if has_revision else [],  # type: ignore[list-item]
-        current_revision_id=uuid4() if has_revision else None,
+        current_revision_id=rev_id if has_revision else None,
     )
 
 

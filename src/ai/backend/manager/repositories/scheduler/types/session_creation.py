@@ -109,14 +109,26 @@ class SessionCreationSpec:
 
     @classmethod
     def from_deployment_info(
-        cls, deployment_info: DeploymentInfo, context: DeploymentContext, route_id: UUID
+        cls,
+        deployment_info: DeploymentInfo,
+        context: DeploymentContext,
+        route_id: UUID,
+        revision_id: UUID | None = None,
     ) -> Self:
         session_creation_id = secrets.token_urlsafe(16)
-        target_revision = deployment_info.target_revision()
-        if target_revision is None:
-            raise DeploymentHasNoTargetRevision(
-                "Deployment has no target revision for session creation"
+        # Use the specified revision, falling back to deploying then current.
+        target_revision = None
+        if revision_id:
+            target_revision = next(
+                (r for r in deployment_info.model_revisions if r.revision_id == revision_id),
+                None,
             )
+        if target_revision is None:
+            target_revision = (
+                deployment_info.deploying_revision_spec() or deployment_info.current_revision_spec()
+            )
+        if target_revision is None:
+            raise DeploymentHasNoTargetRevision("Deployment has no revision for session creation")
 
         # Prepare mount spec
         mount_spec = target_revision.mounts.to_mount_spec()

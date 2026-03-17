@@ -714,8 +714,8 @@ class DeploymentRepository:
         Args:
             deployment_info: Deployment information
             revision_id: Specific revision to use for image resolution.
-                If provided, the image is resolved from this revision's DB row
-                instead of from ``deployment_info.target_revision()``.
+                If provided, the image is resolved from this revision's DB row.
+                Otherwise falls back to deploying_revision_id → current_revision_id.
 
         Returns:
             DeploymentContext: Context data needed for session creation

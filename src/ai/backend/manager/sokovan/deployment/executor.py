@@ -127,10 +127,10 @@ class DeploymentExecutor:
         valid_deployments: list[DeploymentWithHistory] = []
         for deployment in deployments:
             info = deployment.deployment_info
-            target_revision = info.target_revision()
-            if not target_revision:
+            current_revision = info.current_revision_spec()
+            if not current_revision:
                 log.warning(
-                    "Deployment {} has no target revision, skipping",
+                    "Deployment {} has no current revision, skipping",
                     info.id,
                 )
                 continue
@@ -443,16 +443,16 @@ class DeploymentExecutor:
 
         with recorder.phase("register_endpoint"):
             with recorder.step("check_target_revision"):
-                target_revision = deployment.target_revision()
-                if not target_revision:
+                current_revision = deployment.current_revision_spec()
+                if not current_revision:
                     raise ModelDefinitionNotFound(
-                        f"No target revision for deployment {deployment.id}"
+                        f"No current revision for deployment {deployment.id}"
                     )
 
             with recorder.step("generate_model_definition"):
                 model_definition = (
                     await self._model_definition_generator_registry.generate_model_definition(
-                        target_revision
+                        current_revision
                     )
                 )
                 health_check_config = model_definition.health_check_config()

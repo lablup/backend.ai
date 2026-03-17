@@ -147,10 +147,10 @@ class DeploymentController:
         modified_endpoint = await self._deployment_repository.get_modified_endpoint(
             endpoint_id=endpoint_id, updater=updater
         )
-        target_revision = modified_endpoint.target_revision()
-        if target_revision:
+        current_revision = modified_endpoint.current_revision_spec()
+        if current_revision:
             await self._scheduling_controller.validate_session_spec(
-                SessionValidationSpec.from_revision(model_revision=target_revision)
+                SessionValidationSpec.from_revision(model_revision=current_revision)
             )
         res = await self._deployment_repository.update_endpoint_with_spec(updater)
         try:

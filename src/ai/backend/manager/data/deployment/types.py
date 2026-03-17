@@ -322,6 +322,7 @@ class ExecutionSpec(ConfiguredModel):
 
 
 class ModelRevisionSpec(ConfiguredModel):
+    revision_id: UUID | None = None
     image_identifier: ImageIdentifier
     resource_spec: ResourceSpec
     mounts: MountMetadata
@@ -373,16 +374,27 @@ class DeploymentInfo:
     state: DeploymentState
     replica_spec: ReplicaSpec
     network: DeploymentNetworkSpec
-    model_revisions: list[ModelRevisionSpec]
+    model_revisions: list[ModelRevisionSpec] = field(default_factory=list)
     current_revision_id: UUID | None = None
     policy: DeploymentPolicyData | None = None
     deploying_revision_id: UUID | None = None
     sub_step: DeploymentSubStep | None = None
 
-    def target_revision(self) -> ModelRevisionSpec | None:
-        if self.model_revisions:
-            return self.model_revisions[0]
-        return None
+    def current_revision_spec(self) -> ModelRevisionSpec | None:
+        if self.current_revision_id is None:
+            return None
+        return next(
+            (r for r in self.model_revisions if r.revision_id == self.current_revision_id),
+            None,
+        )
+
+    def deploying_revision_spec(self) -> ModelRevisionSpec | None:
+        if self.deploying_revision_id is None:
+            return None
+        return next(
+            (r for r in self.model_revisions if r.revision_id == self.deploying_revision_id),
+            None,
+        )
 
 
 @dataclass

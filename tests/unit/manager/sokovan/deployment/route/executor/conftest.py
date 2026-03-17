@@ -136,7 +136,7 @@ def _create_deployment_info(
             open_to_public=False,
             url="http://test.endpoint",
         ),
-        model_revisions=[revision],
+        model_revisions=[],
         current_revision_id=uuid4(),
     )
 
