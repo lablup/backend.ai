@@ -4,6 +4,7 @@ Based on BEP-1033 test scenarios for route executor testing.
 
 Test Scenarios:
 - RP-001 ~ RP-003: Route Provisioning
+- RP-004 ~ RP-005: Route Provisioning Revision ID (BA-5278)
 - RH-001 ~ RH-004: Route Health Check
 - RR-001 ~ RR-004: Running Route Check
 - RE-001 ~ RE-003: Route Eviction
@@ -13,10 +14,14 @@ Test Scenarios:
 
 from __future__ import annotations
 
+from datetime import datetime
 from unittest.mock import AsyncMock, MagicMock
 from uuid import uuid4
 
+from dateutil.tz import tzutc
+
 from ai.backend.common.types import SessionId
+from ai.backend.manager.data.deployment.types import RouteStatus
 from ai.backend.manager.repositories.deployment.types import RouteData
 from ai.backend.manager.sokovan.deployment.route.executor import RouteExecutor
 from ai.backend.manager.sokovan.deployment.route.recorder.context import RouteRecorderContext
@@ -121,6 +126,85 @@ class TestProvisionRoutes:
         # Assert
         assert len(result.successes) == 0
         assert len(result.errors) == 1
+
+    async def test_provision_route_passes_revision_id_to_context(
+        self,
+        route_executor: RouteExecutor,
+        mock_deployment_repo: AsyncMock,
+        mock_scheduling_controller: AsyncMock,
+    ) -> None:
+        """RP-004: Provisioning passes route's revision_id to fetch_deployment_context.
+
+        Given: PROVISIONING route with a specific revision_id set
+        When: Provision routes
+        Then: fetch_deployment_context is called with that revision_id
+        """
+        # Arrange
+        specific_revision_id = uuid4()
+        route_with_revision = RouteData(
+            route_id=uuid4(),
+            endpoint_id=uuid4(),
+            session_id=None,
+            status=RouteStatus.PROVISIONING,
+            traffic_ratio=1.0,
+            created_at=datetime.now(tzutc()),
+            revision_id=specific_revision_id,
+        )
+        deployment = MagicMock()
+        deployment.id = route_with_revision.endpoint_id
+        mock_deployment_repo.get_endpoints_by_ids.return_value = [deployment]
+
+        entity_ids = [route_with_revision.route_id]
+        with RouteRecorderContext.scope("test", entity_ids=entity_ids):
+            # Act
+            result = await route_executor.provision_routes([route_with_revision])
+
+        # Assert
+        assert len(result.successes) == 1
+        assert len(result.errors) == 0
+        mock_deployment_repo.fetch_deployment_context.assert_awaited_once_with(
+            deployment,
+            revision_id=specific_revision_id,
+        )
+
+    async def test_provision_route_passes_none_revision_id_when_not_set(
+        self,
+        route_executor: RouteExecutor,
+        mock_deployment_repo: AsyncMock,
+        mock_scheduling_controller: AsyncMock,
+    ) -> None:
+        """RP-005: Provisioning passes revision_id=None when route has no revision_id.
+
+        Given: PROVISIONING route without revision_id (revision_id=None)
+        When: Provision routes
+        Then: fetch_deployment_context is called with revision_id=None
+        """
+        # Arrange
+        route_without_revision = RouteData(
+            route_id=uuid4(),
+            endpoint_id=uuid4(),
+            session_id=None,
+            status=RouteStatus.PROVISIONING,
+            traffic_ratio=1.0,
+            created_at=datetime.now(tzutc()),
+            revision_id=None,
+        )
+        deployment = MagicMock()
+        deployment.id = route_without_revision.endpoint_id
+        mock_deployment_repo.get_endpoints_by_ids.return_value = [deployment]
+
+        entity_ids = [route_without_revision.route_id]
+        with RouteRecorderContext.scope("test", entity_ids=entity_ids):
+            # Act
+            result = await route_executor.provision_routes([route_without_revision])
+
+        # Assert
+        assert len(result.successes) == 1
+        assert len(result.errors) == 0
+        mock_deployment_repo.fetch_deployment_context.assert_awaited_once_with(
+            deployment,
+            revision_id=None,
+        )
 
 
 # =============================================================================
