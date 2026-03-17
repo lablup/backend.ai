@@ -64,7 +64,7 @@ log = BraceStyleAdapter(logging.getLogger(__name__))
 
 
 class DeployingProvisioningHandler(DeploymentHandler):
-    """Handler for the DEPLOYING lifecycle (PROVISIONING + ROLLED_BACK sub-steps).
+    """Handler for the DEPLOYING / PROVISIONING sub-step.
 
     Runs the strategy FSM each cycle to create/drain routes and check
     for completion.  Classification:
@@ -73,9 +73,6 @@ class DeployingProvisioningHandler(DeploymentHandler):
       PROVISIONING with a new history record for progress tracking.
     - **No changes** (routes still warming up): skipped — no history.
     - **Completed** (all old routes replaced): success → READY.
-
-    ROLLED_BACK deployments (cleared by RollingBackHandler) are
-    transitioned to READY directly without FSM evaluation.
     """
 
     def __init__(
@@ -172,21 +169,19 @@ class DeployingProvisioningHandler(DeploymentHandler):
                     )
                 )
 
-        # Classify remaining: route mutations happened → rewind (history logged),
+        # Classify rest: route mutations happened → rewind (history logged),
         # no changes → skipped (no history).
         completed_or_error_ids = apply_result.completed_ids | {
             e.deployment.id for e in summary.errors
         }
         has_route_mutations = bool(apply_result.routes_created or apply_result.routes_drained)
-        for deployment in remaining:
+        for deployment in deployments:
             endpoint_id = deployment.deployment_info.id
             if endpoint_id in completed_or_error_ids or endpoint_id in destroying_ids:
                 continue
             if has_route_mutations:
-                # Routes were created/drained this cycle → rewind to log progress
                 rewind.append(deployment)
             else:
-                # No changes, still waiting → skipped
                 skipped.append(deployment)
 
         return DeploymentExecutionResult(

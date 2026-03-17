@@ -153,28 +153,22 @@ class DeploymentSubStatus(enum.StrEnum):
 
     Each lifecycle type can define its own sub-status enum by
     inheriting from this class.  For example, DEPLOYING handlers
-    use ``DeploymentSubStep`` (provisioning, progressing, …).
+    use ``DeploymentSubStep`` (provisioning, rolling_back, …).
     """
 
 
 class DeploymentSubStep(DeploymentSubStatus):
     """Sub-steps for the DEPLOYING lifecycle phase.
 
-    Active states:
-    - PROVISIONING: New revision routes are being provisioned; waiting for readiness.
-    - PROGRESSING: Actively replacing old routes with new routes.
-    - ROLLING_BACK: Actively rolling back failed new routes to previous revision.
-
-    Terminal markers (no handler execution, trigger transition only):
-    - COMPLETED: All strategy conditions satisfied; ready for revision swap.
-    - ROLLED_BACK: Rollback finished; ready for cleanup and transition to READY.
+    - PROVISIONING: New revision routes are being provisioned and old routes
+      are being drained.  The main handler for rolling updates.
+    - ROLLING_BACK: Clearing deploying_revision and transitioning to READY.
+    - COMPLETED: All strategy conditions satisfied; triggers revision swap.
     """
 
     PROVISIONING = "provisioning"
-    PROGRESSING = "progressing"
     ROLLING_BACK = "rolling_back"
     COMPLETED = "completed"
-    ROLLED_BACK = "rolled_back"
 
 
 @dataclass(frozen=True)
@@ -204,10 +198,11 @@ class DeploymentStatusTransitions:
         need_retry: Target lifecycle when handler fails but can retry
         expired: Target lifecycle when time elapsed in current state
         give_up: Target lifecycle when retry count exceeded
-        rewind: Target lifecycle for normal forward progress that returns to a
-            previous sub-step (e.g. progressing → provisioning for the next
-            batch in rolling update). Unlike need_retry, rewind does NOT
-            increment phase_attempts.
+            rewind: Target lifecycle when route mutations were executed but
+            the deployment stays in the same sub-step (e.g. PROVISIONING
+            → PROVISIONING after create/drain).  Unlike need_retry, rewind
+            does NOT increment phase_attempts.  Each rewind creates a
+            separate history record (allow_merge=False) for progress tracking.
     """
 
     success: DeploymentLifecycleStatus | None = None
