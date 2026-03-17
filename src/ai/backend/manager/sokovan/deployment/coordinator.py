@@ -61,7 +61,6 @@ from .executor import DeploymentExecutor
 from .handlers import (
     CheckPendingDeploymentHandler,
     CheckReplicaDeploymentHandler,
-    DeployingProgressingHandler,
     DeployingProvisioningHandler,
     DeployingRollingBackHandler,
     DeploymentHandler,
@@ -326,20 +325,10 @@ class DeploymentCoordinator:
                 ),
             ),
             (
-                (DeploymentLifecycleType.DEPLOYING, DeploymentSubStep.PROGRESSING),
-                DeployingProgressingHandler(
-                    deployment_controller=self._deployment_controller,
-                    route_controller=self._route_controller,
-                    evaluator=evaluator,
-                    applier=applier,
-                ),
-            ),
-            (
                 (DeploymentLifecycleType.DEPLOYING, DeploymentSubStep.ROLLING_BACK),
                 DeployingRollingBackHandler(
                     deployment_controller=self._deployment_controller,
                     route_controller=self._route_controller,
-                    evaluator=evaluator,
                     applier=applier,
                 ),
             ),
@@ -438,11 +427,12 @@ class DeploymentCoordinator:
         transitions = handler.status_transitions()
 
         # Success and rewind both advance without incrementing phase_attempts.
-        # Rewind returns to a previous sub-step as normal forward progress
-        # (e.g. progressing → provisioning for the next batch of routes).
-        for deployments, lifecycle_status in (
-            (result.successes, transitions.success),
-            (result.rewind, transitions.rewind),
+        # Rewind records route mutations within the same phase (e.g.
+        # PROVISIONING → PROVISIONING) — each rewind creates a separate
+        # history record (allow_merge=False) so progress is visible.
+        for deployments, lifecycle_status, allow_merge in (
+            (result.successes, transitions.success, True),
+            (result.rewind, transitions.rewind, False),
         ):
             if not deployments or lifecycle_status is None:
                 continue
@@ -453,6 +443,7 @@ class DeploymentCoordinator:
                 target_lifecycles=target_statuses,
                 records=records,
                 timestamp_now=timestamp_now,
+                allow_merge=allow_merge,
             )
             batch_updaters.append(transition.updater)
             all_history_specs.extend(transition.history_specs)
@@ -532,6 +523,7 @@ class DeploymentCoordinator:
         target_lifecycles: list[DeploymentLifecycleStatus],
         records: Mapping[UUID, ExecutionRecord],
         timestamp_now: str,
+        allow_merge: bool = True,
     ) -> _TransitionResult:
         next_lifecycle = lifecycle_status.lifecycle
         target_lifecycle_stages = [status.lifecycle for status in target_lifecycles]
@@ -544,6 +536,7 @@ class DeploymentCoordinator:
                 message=f"{handler_name} completed successfully",
                 from_status=deployment.deployment_info.state.lifecycle,
                 to_status=next_lifecycle,
+                allow_merge=allow_merge,
                 sub_steps=self._build_history_sub_steps(
                     deployment.deployment_info.id,
                     records,
