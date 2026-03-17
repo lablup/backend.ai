@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import json
-from datetime import date, datetime, timezone
+from datetime import UTC, date, datetime
 from decimal import Decimal
 
 from ai.backend.common.dto.manager.v2.fair_share.types import (
@@ -253,7 +253,7 @@ class TestFairShareCalculationSnapshotInfo:
             normalized_usage=Decimal("100.5"),
             lookback_start=date(2025, 1, 1),
             lookback_end=date(2025, 3, 31),
-            last_calculated_at=datetime(2025, 3, 31, 12, 0, 0, tzinfo=timezone.utc),
+            last_calculated_at=datetime(2025, 3, 31, 12, 0, 0, tzinfo=UTC),
         )
         assert snapshot.fair_share_factor == Decimal("0.25")
         assert snapshot.normalized_usage == Decimal("100.5")
@@ -267,7 +267,7 @@ class TestFairShareCalculationSnapshotInfo:
             normalized_usage=Decimal("50.0"),
             lookback_start=date(2025, 1, 1),
             lookback_end=date(2025, 3, 31),
-            last_calculated_at=datetime(2025, 3, 31, 0, 0, 0, tzinfo=timezone.utc),
+            last_calculated_at=datetime(2025, 3, 31, 0, 0, 0, tzinfo=UTC),
         )
         assert isinstance(snapshot.total_decayed_usage, ResourceSlotInfo)
         assert snapshot.total_decayed_usage.entries[0].resource_type == "cpu"
@@ -279,7 +279,7 @@ class TestFairShareCalculationSnapshotInfo:
             normalized_usage=Decimal("200.0"),
             lookback_start=date(2025, 2, 1),
             lookback_end=date(2025, 3, 1),
-            last_calculated_at=datetime(2025, 3, 1, 0, 0, 0, tzinfo=timezone.utc),
+            last_calculated_at=datetime(2025, 3, 1, 0, 0, 0, tzinfo=UTC),
         )
         json_str = snapshot.model_dump_json()
         restored = FairShareCalculationSnapshotInfo.model_validate_json(json_str)
@@ -296,7 +296,7 @@ class TestUsageBucketMetadataInfo:
         )
 
     def test_creation_with_all_fields(self) -> None:
-        now = datetime(2025, 3, 17, 0, 0, 0, tzinfo=timezone.utc)
+        now = datetime(2025, 3, 17, 0, 0, 0, tzinfo=UTC)
         meta = UsageBucketMetadataInfo(
             period_start=date(2025, 3, 16),
             period_end=date(2025, 3, 17),
@@ -311,7 +311,7 @@ class TestUsageBucketMetadataInfo:
         assert meta.decay_unit_days == 1
 
     def test_nested_average_daily_usage(self) -> None:
-        now = datetime(2025, 3, 17, 0, 0, 0, tzinfo=timezone.utc)
+        now = datetime(2025, 3, 17, 0, 0, 0, tzinfo=UTC)
         meta = UsageBucketMetadataInfo(
             period_start=date(2025, 3, 16),
             period_end=date(2025, 3, 17),
@@ -325,7 +325,7 @@ class TestUsageBucketMetadataInfo:
         assert isinstance(meta.usage_capacity_ratio, ResourceSlotInfo)
 
     def test_round_trip_serialization(self) -> None:
-        now = datetime(2025, 3, 17, 0, 0, 0, tzinfo=timezone.utc)
+        now = datetime(2025, 3, 17, 0, 0, 0, tzinfo=UTC)
         meta = UsageBucketMetadataInfo(
             period_start=date(2025, 3, 1),
             period_end=date(2025, 3, 2),
