@@ -16,13 +16,13 @@ from ai.backend.manager.api.gql.base import (
 )
 from ai.backend.manager.api.gql.types import GQLFilter, GQLOrderBy
 from ai.backend.manager.data.user.types import UserStatus
+from ai.backend.manager.models.domain.conditions import DomainConditions
 from ai.backend.manager.repositories.base import (
     QueryCondition,
     QueryOrder,
     combine_conditions_or,
     negate_conditions,
 )
-from ai.backend.manager.repositories.domain.options import DomainConditions
 from ai.backend.manager.repositories.group.options import GroupConditions
 from ai.backend.manager.repositories.user.options import UserConditions, UserOrders
 

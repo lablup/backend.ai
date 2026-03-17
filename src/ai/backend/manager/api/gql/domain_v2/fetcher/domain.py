@@ -17,8 +17,9 @@ from ai.backend.manager.api.gql.domain_v2.types import (
     DomainV2OrderBy,
 )
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
+from ai.backend.manager.models.domain.conditions import DomainConditions
+from ai.backend.manager.models.domain.orders import DomainOrders
 from ai.backend.manager.models.domain.row import DomainRow
-from ai.backend.manager.repositories.domain.options import DomainConditions, DomainOrders
 from ai.backend.manager.repositories.domain.types import DomainSearchScope
 from ai.backend.manager.services.domain.actions.get_domain import GetDomainAction
 from ai.backend.manager.services.domain.actions.search_domains import SearchDomainsAction

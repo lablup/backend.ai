@@ -21,6 +21,8 @@ from ai.backend.manager.models.deployment_auto_scaling_policy import (
 from ai.backend.manager.models.deployment_policy import DeploymentPolicyRow
 from ai.backend.manager.models.deployment_revision import DeploymentRevisionRow
 from ai.backend.manager.models.domain import DomainRow
+from ai.backend.manager.models.domain.conditions import DomainConditions
+from ai.backend.manager.models.domain.orders import DomainOrders
 from ai.backend.manager.models.endpoint import EndpointRow
 from ai.backend.manager.models.group import GroupRow
 from ai.backend.manager.models.hasher.types import PasswordInfo
@@ -42,10 +44,6 @@ from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.vfolder import VFolderRow
 from ai.backend.manager.repositories.base import BatchQuerier, OffsetPagination, QueryCondition
 from ai.backend.manager.repositories.domain.db_source import DomainDBSource
-from ai.backend.manager.repositories.domain.options import (
-    DomainConditions,
-    DomainOrders,
-)
 from ai.backend.testutils.db import with_tables
 
 

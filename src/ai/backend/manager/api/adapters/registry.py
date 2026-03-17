@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING
 
 from ai.backend.manager.api.adapters.agent import AgentAdapter
 from ai.backend.manager.api.adapters.container_registry import ContainerRegistryAdapter
+from ai.backend.manager.api.adapters.domain import DomainAdapter
 from ai.backend.manager.api.adapters.image import ImageAdapter
 from ai.backend.manager.api.adapters.resource_slot import ResourceSlotAdapter
 from ai.backend.manager.api.adapters.scheduling_history import SchedulingHistoryAdapter
@@ -28,6 +29,7 @@ class Adapters:
         self,
         agent: AgentAdapter,
         container_registry: ContainerRegistryAdapter,
+        domain: DomainAdapter,
         image: ImageAdapter,
         resource_slot: ResourceSlotAdapter,
         scheduling_history: SchedulingHistoryAdapter,
@@ -36,6 +38,7 @@ class Adapters:
     ) -> None:
         self.agent = agent
         self.container_registry = container_registry
+        self.domain = domain
         self.image = image
         self.resource_slot = resource_slot
         self.scheduling_history = scheduling_history
@@ -48,6 +51,7 @@ class Adapters:
         return cls(
             agent=AgentAdapter(processors),
             container_registry=ContainerRegistryAdapter(processors),
+            domain=DomainAdapter(processors),
             image=ImageAdapter(processors),
             resource_slot=ResourceSlotAdapter(processors),
             scheduling_history=SchedulingHistoryAdapter(processors),

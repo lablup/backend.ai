@@ -3,8 +3,8 @@ from __future__ import annotations
 from collections.abc import Sequence
 
 from ai.backend.manager.data.domain.types import DomainData
+from ai.backend.manager.models.domain.conditions import DomainConditions
 from ai.backend.manager.repositories.base import BatchQuerier, NoPagination
-from ai.backend.manager.repositories.domain.options import DomainConditions
 from ai.backend.manager.services.domain.actions.search_domains import SearchDomainsAction
 from ai.backend.manager.services.domain.processors import DomainProcessors
 

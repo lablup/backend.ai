@@ -7,9 +7,10 @@ from typing import TYPE_CHECKING, Annotated, Any, Self
 
 import strawberry
 from strawberry import ID, Info
-from strawberry.relay import Connection, Edge, Node, NodeID
+from strawberry.relay import Connection, Edge, NodeID
 
 from ai.backend.manager.api.gql.fair_share.types import DomainFairShareGQL
+from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin
 from ai.backend.manager.api.gql.resource_slot.overview_types import ActiveResourceOverviewGQL
 from ai.backend.manager.api.gql.resource_usage.types import (
     DomainUsageBucketConnection,
@@ -65,7 +66,7 @@ class DomainUsageScopeGQL:
         "Resource allocation and storage permissions are provided through separate dedicated APIs."
     ),
 )
-class DomainV2GQL(Node):
+class DomainV2GQL(PydanticNodeMixin):
     """Domain entity with structured field groups."""
 
     id: NodeID[str] = strawberry.field(description="Domain name (primary key).")
