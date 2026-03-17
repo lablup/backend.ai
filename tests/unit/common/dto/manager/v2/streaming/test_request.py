@@ -27,7 +27,7 @@ class TestPtyStdinInput:
 
     def test_type_literal_value(self) -> None:
         req = PtyStdinInput(type=PtyInputMessageType.STDIN, chars="a")
-        assert req.type == "stdin"
+        assert req.type.value == "stdin"
 
     def test_from_dict(self) -> None:
         req = PtyStdinInput.model_validate({"type": "stdin", "chars": "test"})

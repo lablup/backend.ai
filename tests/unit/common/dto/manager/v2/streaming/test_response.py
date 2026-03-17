@@ -22,7 +22,7 @@ class TestPtyOutputNode:
 
     def test_type_literal_value(self) -> None:
         node = PtyOutputNode(type=PtyOutputMessageType.OUT, data="abc")
-        assert node.type == "out"
+        assert node.type.value == "out"
 
     def test_from_dict(self) -> None:
         node = PtyOutputNode.model_validate({"type": "out", "data": "dGVzdA=="})

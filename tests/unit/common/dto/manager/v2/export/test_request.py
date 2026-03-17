@@ -133,6 +133,7 @@ class TestSessionExportCSVInput:
         f = SessionExportFilter(status=["RUNNING", "PENDING"])
         req = SessionExportCSVInput(filter=f)
         assert req.filter is not None
+        assert req.filter.status is not None
         assert len(req.filter.status) == 2
 
     def test_creation_with_name_filter(self) -> None:
