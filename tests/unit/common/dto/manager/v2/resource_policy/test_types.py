@@ -15,10 +15,10 @@ class TestOrderDirection:
     """Tests for OrderDirection enum."""
 
     def test_asc_value(self) -> None:
-        assert OrderDirection.ASC == "asc"
+        assert OrderDirection.ASC.value == "asc"
 
     def test_desc_value(self) -> None:
-        assert OrderDirection.DESC == "desc"
+        assert OrderDirection.DESC.value == "desc"
 
     def test_all_values_present(self) -> None:
         values = {e.value for e in OrderDirection}
@@ -29,10 +29,10 @@ class TestDefaultForUnspecified:
     """Tests for DefaultForUnspecified re-export."""
 
     def test_limited_value(self) -> None:
-        assert DefaultForUnspecified.LIMITED == "LIMITED"
+        assert DefaultForUnspecified.LIMITED.value == "LIMITED"
 
     def test_unlimited_value(self) -> None:
-        assert DefaultForUnspecified.UNLIMITED == "UNLIMITED"
+        assert DefaultForUnspecified.UNLIMITED.value == "UNLIMITED"
 
     def test_all_values_present(self) -> None:
         values = {e.value for e in DefaultForUnspecified}
@@ -44,10 +44,10 @@ class TestKeypairResourcePolicyOrderField:
     """Tests for KeypairResourcePolicyOrderField enum."""
 
     def test_name_value(self) -> None:
-        assert KeypairResourcePolicyOrderField.NAME == "name"
+        assert KeypairResourcePolicyOrderField.NAME.value == "name"
 
     def test_created_at_value(self) -> None:
-        assert KeypairResourcePolicyOrderField.CREATED_AT == "created_at"
+        assert KeypairResourcePolicyOrderField.CREATED_AT.value == "created_at"
 
     def test_all_values_present(self) -> None:
         values = {e.value for e in KeypairResourcePolicyOrderField}
@@ -58,10 +58,10 @@ class TestUserResourcePolicyOrderField:
     """Tests for UserResourcePolicyOrderField enum."""
 
     def test_name_value(self) -> None:
-        assert UserResourcePolicyOrderField.NAME == "name"
+        assert UserResourcePolicyOrderField.NAME.value == "name"
 
     def test_created_at_value(self) -> None:
-        assert UserResourcePolicyOrderField.CREATED_AT == "created_at"
+        assert UserResourcePolicyOrderField.CREATED_AT.value == "created_at"
 
     def test_all_values_present(self) -> None:
         values = {e.value for e in UserResourcePolicyOrderField}
@@ -72,10 +72,10 @@ class TestProjectResourcePolicyOrderField:
     """Tests for ProjectResourcePolicyOrderField enum."""
 
     def test_name_value(self) -> None:
-        assert ProjectResourcePolicyOrderField.NAME == "name"
+        assert ProjectResourcePolicyOrderField.NAME.value == "name"
 
     def test_created_at_value(self) -> None:
-        assert ProjectResourcePolicyOrderField.CREATED_AT == "created_at"
+        assert ProjectResourcePolicyOrderField.CREATED_AT.value == "created_at"
 
     def test_all_values_present(self) -> None:
         values = {e.value for e in ProjectResourcePolicyOrderField}

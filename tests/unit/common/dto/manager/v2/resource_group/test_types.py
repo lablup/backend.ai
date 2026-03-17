@@ -12,10 +12,10 @@ class TestOrderDirection:
     """Tests for OrderDirection enum."""
 
     def test_asc_value(self) -> None:
-        assert OrderDirection.ASC == "asc"
+        assert OrderDirection.ASC.value == "asc"
 
     def test_desc_value(self) -> None:
-        assert OrderDirection.DESC == "desc"
+        assert OrderDirection.DESC.value == "desc"
 
     def test_all_values_present(self) -> None:
         values = {e.value for e in OrderDirection}
@@ -26,13 +26,13 @@ class TestResourceGroupOrderField:
     """Tests for ResourceGroupOrderField enum."""
 
     def test_name_value(self) -> None:
-        assert ResourceGroupOrderField.NAME == "name"
+        assert ResourceGroupOrderField.NAME.value == "name"
 
     def test_created_at_value(self) -> None:
-        assert ResourceGroupOrderField.CREATED_AT == "created_at"
+        assert ResourceGroupOrderField.CREATED_AT.value == "created_at"
 
     def test_modified_at_value(self) -> None:
-        assert ResourceGroupOrderField.MODIFIED_AT == "modified_at"
+        assert ResourceGroupOrderField.MODIFIED_AT.value == "modified_at"
 
     def test_all_values_present(self) -> None:
         values = {e.value for e in ResourceGroupOrderField}
