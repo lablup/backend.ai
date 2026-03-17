@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING, Annotated, Any, Self
 
 import strawberry
 from strawberry import ID, Info
-from strawberry.relay import Connection, Edge, Node, NodeID
+from strawberry.relay import Connection, Edge, NodeID
 from strawberry.scalars import JSON
 
 from ai.backend.common.types import AgentId
@@ -30,10 +30,12 @@ if TYPE_CHECKING:
         SessionV2FilterGQL,
         SessionV2OrderByGQL,
     )
+from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin
 from ai.backend.manager.api.gql.utils import dedent_strip
 from ai.backend.manager.data.agent.types import AgentDetailData, AgentStatus
+from ai.backend.manager.models.agent.conditions import AgentConditions
+from ai.backend.manager.models.agent.orders import AgentOrders
 from ai.backend.manager.models.rbac.permission_defs import AgentPermission
-from ai.backend.manager.repositories.agent.options import AgentConditions, AgentOrders
 from ai.backend.manager.repositories.base import (
     QueryCondition,
     QueryOrder,
@@ -357,7 +359,7 @@ class AgentNetworkInfoGQL:
 @strawberry.type(
     name="AgentV2", description="Added in 26.1.0. Strawberry-based Agent type replacing AgentNode."
 )
-class AgentV2GQL(Node):
+class AgentV2GQL(PydanticNodeMixin):
     _agent_id: strawberry.Private[AgentId]
     id: NodeID[str]
     resource_info: AgentResourceGQL = strawberry.field(

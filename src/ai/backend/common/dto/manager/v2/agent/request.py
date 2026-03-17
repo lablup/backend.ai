@@ -18,6 +18,7 @@ from ai.backend.common.dto.manager.v2.agent.types import (
 )
 
 __all__ = (
+    "AdminSearchAgentsInput",
     "AgentFilter",
     "AgentOrder",
     "AgentPathParam",
@@ -77,3 +78,18 @@ class SearchAgentsInput(BaseRequestModel):
     order: list[AgentOrder] | None = None
     limit: int = Field(default=DEFAULT_PAGE_LIMIT, ge=1, le=MAX_PAGE_LIMIT)
     offset: int = Field(default=0, ge=0)
+
+
+class AdminSearchAgentsInput(BaseRequestModel):
+    """Input for admin-scoped paginated agent search with cursor and offset pagination."""
+
+    filter: AgentFilter | None = None
+    order: list[AgentOrder] | None = None
+    # Cursor pagination
+    first: int | None = None
+    after: str | None = None
+    last: int | None = None
+    before: str | None = None
+    # Offset pagination
+    limit: int | None = None
+    offset: int | None = None

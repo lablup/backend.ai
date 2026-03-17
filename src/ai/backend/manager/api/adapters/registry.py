@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+from ai.backend.manager.api.adapters.agent import AgentAdapter
 from ai.backend.manager.api.adapters.container_registry import ContainerRegistryAdapter
 from ai.backend.manager.api.adapters.service_catalog import ServiceCatalogAdapter
 
@@ -21,9 +22,11 @@ class Adapters:
 
     def __init__(
         self,
+        agent: AgentAdapter,
         container_registry: ContainerRegistryAdapter,
         service_catalog: ServiceCatalogAdapter,
     ) -> None:
+        self.agent = agent
         self.container_registry = container_registry
         self.service_catalog = service_catalog
 
@@ -31,6 +34,7 @@ class Adapters:
     def create(cls, processors: Processors) -> Adapters:
         """Factory that wires up all adapters from the shared Processors."""
         return cls(
+            agent=AgentAdapter(processors),
             container_registry=ContainerRegistryAdapter(processors),
             service_catalog=ServiceCatalogAdapter(processors),
         )

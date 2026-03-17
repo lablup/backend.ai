@@ -1,20 +1,29 @@
+"""Query conditions for agent rows."""
+
+from __future__ import annotations
+
 from collections.abc import Collection
 
 import sqlalchemy as sa
 
 from ai.backend.common.data.filter_specs import StringMatchSpec
 from ai.backend.manager.data.agent.types import AgentStatus
-from ai.backend.manager.models.agent import AgentRow
-from ai.backend.manager.repositories.base import QueryCondition, QueryOrder
+from ai.backend.manager.repositories.base import QueryCondition
+
+from .row import AgentRow
 
 
 class AgentConditions:
+    """Query condition factories for filtering agent rows."""
+
     @staticmethod
     def by_ids(ids: Collection[str]) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
             return AgentRow.id.in_(ids)
 
         return inner
+
+    # --- id string conditions ---
 
     @staticmethod
     def by_id_contains(spec: StringMatchSpec) -> QueryCondition:
@@ -23,9 +32,7 @@ class AgentConditions:
                 condition = AgentRow.id.ilike(f"%{spec.value}%")
             else:
                 condition = AgentRow.id.like(f"%{spec.value}%")
-            if spec.negated:
-                condition = sa.not_(condition)
-            return condition
+            return ~condition if spec.negated else condition
 
         return inner
 
@@ -36,9 +43,7 @@ class AgentConditions:
                 condition = sa.func.lower(AgentRow.id) == spec.value.lower()
             else:
                 condition = AgentRow.id == spec.value
-            if spec.negated:
-                condition = sa.not_(condition)
-            return condition
+            return ~condition if spec.negated else condition
 
         return inner
 
@@ -49,9 +54,7 @@ class AgentConditions:
                 condition = AgentRow.id.ilike(f"{spec.value}%")
             else:
                 condition = AgentRow.id.like(f"{spec.value}%")
-            if spec.negated:
-                condition = sa.not_(condition)
-            return condition
+            return ~condition if spec.negated else condition
 
         return inner
 
@@ -62,11 +65,11 @@ class AgentConditions:
                 condition = AgentRow.id.ilike(f"%{spec.value}")
             else:
                 condition = AgentRow.id.like(f"%{spec.value}")
-            if spec.negated:
-                condition = sa.not_(condition)
-            return condition
+            return ~condition if spec.negated else condition
 
         return inner
+
+    # --- status enum conditions ---
 
     @staticmethod
     def by_status_contains(statuses: Collection[AgentStatus]) -> QueryCondition:
@@ -83,11 +86,29 @@ class AgentConditions:
         return inner
 
     @staticmethod
+    def by_status_not_equals(status: AgentStatus) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return AgentRow.status != status
+
+        return inner
+
+    @staticmethod
+    def by_status_not_in(statuses: Collection[AgentStatus]) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return AgentRow.status.not_in(statuses)
+
+        return inner
+
+    # --- schedulable boolean condition ---
+
+    @staticmethod
     def by_schedulable(schedulable: bool) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
             return AgentRow.schedulable.is_(schedulable)
 
         return inner
+
+    # --- scaling_group string conditions ---
 
     @staticmethod
     def by_scaling_group_contains(spec: StringMatchSpec) -> QueryCondition:
@@ -96,9 +117,7 @@ class AgentConditions:
                 condition = AgentRow.scaling_group.ilike(f"%{spec.value}%")
             else:
                 condition = AgentRow.scaling_group.like(f"%{spec.value}%")
-            if spec.negated:
-                condition = sa.not_(condition)
-            return condition
+            return ~condition if spec.negated else condition
 
         return inner
 
@@ -109,9 +128,7 @@ class AgentConditions:
                 condition = sa.func.lower(AgentRow.scaling_group) == spec.value.lower()
             else:
                 condition = AgentRow.scaling_group == spec.value
-            if spec.negated:
-                condition = sa.not_(condition)
-            return condition
+            return ~condition if spec.negated else condition
 
         return inner
 
@@ -122,9 +139,7 @@ class AgentConditions:
                 condition = AgentRow.scaling_group.ilike(f"{spec.value}%")
             else:
                 condition = AgentRow.scaling_group.like(f"{spec.value}%")
-            if spec.negated:
-                condition = sa.not_(condition)
-            return condition
+            return ~condition if spec.negated else condition
 
         return inner
 
@@ -135,11 +150,11 @@ class AgentConditions:
                 condition = AgentRow.scaling_group.ilike(f"%{spec.value}")
             else:
                 condition = AgentRow.scaling_group.like(f"%{spec.value}")
-            if spec.negated:
-                condition = sa.not_(condition)
-            return condition
+            return ~condition if spec.negated else condition
 
         return inner
+
+    # --- cursor pagination conditions ---
 
     @staticmethod
     def by_cursor_forward(cursor_id: str) -> QueryCondition:
@@ -170,35 +185,3 @@ class AgentConditions:
             return AgentRow.first_contact > subquery
 
         return inner
-
-
-class AgentOrders:
-    @staticmethod
-    def id(ascending: bool = True) -> QueryOrder:
-        if ascending:
-            return AgentRow.id.asc()
-        return AgentRow.id.desc()
-
-    @staticmethod
-    def status(ascending: bool = True) -> QueryOrder:
-        if ascending:
-            return AgentRow.status.asc()
-        return AgentRow.status.desc()
-
-    @staticmethod
-    def scaling_group(ascending: bool = True) -> QueryOrder:
-        if ascending:
-            return AgentRow.scaling_group.asc()
-        return AgentRow.scaling_group.desc()
-
-    @staticmethod
-    def first_contact(ascending: bool = True) -> QueryOrder:
-        if ascending:
-            return AgentRow.first_contact.asc()
-        return AgentRow.first_contact.desc()
-
-    @staticmethod
-    def schedulable(ascending: bool = True) -> QueryOrder:
-        if ascending:
-            return AgentRow.schedulable.asc()
-        return AgentRow.schedulable.desc()

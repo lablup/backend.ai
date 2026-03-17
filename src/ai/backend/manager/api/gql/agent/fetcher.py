@@ -16,7 +16,7 @@ from ai.backend.manager.api.gql.agent.types import (
 from ai.backend.manager.api.gql.base import to_global_id
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.models.agent import AgentRow
-from ai.backend.manager.repositories.agent.options import AgentConditions
+from ai.backend.manager.models.agent.conditions import AgentConditions
 from ai.backend.manager.services.agent.actions.search_agents import SearchAgentsAction
 
 

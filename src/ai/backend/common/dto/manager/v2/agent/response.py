@@ -16,6 +16,7 @@ from ai.backend.common.api_handlers import BaseResponseModel
 from ai.backend.common.dto.manager.pagination import PaginationInfo
 
 __all__ = (
+    "AdminSearchAgentsPayload",
     "AgentNetworkInfo",
     "AgentNode",
     "AgentResourceInfo",
@@ -163,6 +164,15 @@ class SearchAgentsPayload(BaseResponseModel):
 
     items: list[AgentNode] = Field(description="List of agent nodes.")
     pagination: PaginationInfo = Field(description="Pagination metadata.")
+
+
+class AdminSearchAgentsPayload(BaseResponseModel):
+    """Payload for admin-scoped paginated agent search results."""
+
+    items: list[AgentNode] = Field(description="List of agent nodes.")
+    total_count: int = Field(description="Total number of agents matching the filter.")
+    has_next_page: bool = Field(description="Whether there is a next page.")
+    has_previous_page: bool = Field(description="Whether there is a previous page.")
 
 
 class AgentResourceStatsPayload(BaseResponseModel):

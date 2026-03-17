@@ -2,7 +2,7 @@ from collections.abc import Sequence
 
 from ai.backend.common.types import AgentId
 from ai.backend.manager.data.agent.types import AgentDetailData
-from ai.backend.manager.repositories.agent.options import AgentConditions
+from ai.backend.manager.models.agent.conditions import AgentConditions
 from ai.backend.manager.repositories.base import BatchQuerier, NoPagination
 from ai.backend.manager.services.agent.actions.load_container_counts import (
     LoadContainerCountsAction,
