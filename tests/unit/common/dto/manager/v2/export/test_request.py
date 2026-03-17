@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 
-from ai.backend.common.dto.manager.query import DateTimeRangeFilter, StringFilter
+from ai.backend.common.dto.manager.query import StringFilter
 from ai.backend.common.dto.manager.v2.export.request import (
     AuditLogExportCSVInput,
     AuditLogExportFilter,
@@ -68,7 +68,11 @@ class TestUserExportCSVInput:
             filter=UserExportFilter(
                 status=["active"],
             ),
-            order=[UserExportOrder(field=UserExportOrderField.CREATED_AT, direction=OrderDirection.DESC)],
+            order=[
+                UserExportOrder(
+                    field=UserExportOrderField.CREATED_AT, direction=OrderDirection.DESC
+                )
+            ],
             encoding="utf-8",
         )
         json_data = req.model_dump_json()
@@ -178,9 +182,7 @@ class TestProjectExportCSVInput:
 
     def test_creation_with_order(self) -> None:
         order = [
-            ProjectExportOrder(
-                field=ProjectExportOrderField.NAME, direction=OrderDirection.DESC
-            )
+            ProjectExportOrder(field=ProjectExportOrderField.NAME, direction=OrderDirection.DESC)
         ]
         req = ProjectExportCSVInput(order=order)
         assert req.order is not None
@@ -198,7 +200,11 @@ class TestProjectExportCSVInput:
         req = ProjectExportCSVInput(
             fields=["name", "domain_name"],
             filter=ProjectExportFilter(is_active=BooleanFilter(equals=False)),
-            order=[ProjectExportOrder(field=ProjectExportOrderField.NAME, direction=OrderDirection.DESC)],
+            order=[
+                ProjectExportOrder(
+                    field=ProjectExportOrderField.NAME, direction=OrderDirection.DESC
+                )
+            ],
         )
         json_data = req.model_dump_json()
         restored = ProjectExportCSVInput.model_validate_json(json_data)
@@ -253,10 +259,12 @@ class TestAuditLogExportCSVInput:
         req = AuditLogExportCSVInput(
             fields=["entity_type", "operation", "status"],
             filter=AuditLogExportFilter(status=["success", "failure"]),
-            order=[AuditLogExportOrder(
-                field=AuditLogExportOrderField.CREATED_AT,
-                direction=OrderDirection.DESC,
-            )],
+            order=[
+                AuditLogExportOrder(
+                    field=AuditLogExportOrderField.CREATED_AT,
+                    direction=OrderDirection.DESC,
+                )
+            ],
         )
         json_data = req.model_dump_json()
         restored = AuditLogExportCSVInput.model_validate_json(json_data)

@@ -8,7 +8,10 @@ from ai.backend.common.dto.manager.streaming.types import (
 from ai.backend.common.dto.manager.streaming.types import (
     SessionEventScope as OrigSessionEventScope,
 )
-from ai.backend.common.dto.manager.v2.event_stream.types import BgtaskSSEEventName, SessionEventScope
+from ai.backend.common.dto.manager.v2.event_stream.types import (
+    BgtaskSSEEventName,
+    SessionEventScope,
+)
 
 
 class TestSessionEventScope:

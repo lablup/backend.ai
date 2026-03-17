@@ -154,9 +154,7 @@ class TestBgtaskUpdatedNode:
         assert restored.total_progress == node.total_progress
 
     def test_model_dump_json_has_snake_case_keys(self) -> None:
-        node = BgtaskUpdatedNode(
-            task_id="t", message="m", current_progress=1.0, total_progress=2.0
-        )
+        node = BgtaskUpdatedNode(task_id="t", message="m", current_progress=1.0, total_progress=2.0)
         data = json.loads(node.model_dump_json())
         assert "task_id" in data
         assert "current_progress" in data
