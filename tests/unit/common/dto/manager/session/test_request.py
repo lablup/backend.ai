@@ -106,6 +106,28 @@ class TestCreateFromTemplateRequest:
         })
         assert req.dependencies == ["sess-a", "sess-b"]
 
+    def test_batch_timeout_int(self) -> None:
+        req = CreateFromTemplateRequest.model_validate({
+            "template_id": str(uuid4()),
+            "batch_timeout": 300,
+        })
+        assert isinstance(req.batch_timeout, int)
+        assert req.batch_timeout == 300
+
+    def test_batch_timeout_str_duration(self) -> None:
+        req = CreateFromTemplateRequest.model_validate({
+            "template_id": str(uuid4()),
+            "batch_timeout": "30s",
+        })
+        assert req.batch_timeout == 30
+
+    def test_batch_timeout_camel_alias_int(self) -> None:
+        req = CreateFromTemplateRequest.model_validate({
+            "templateId": str(uuid4()),
+            "batchTimeout": 300,
+        })
+        assert req.batch_timeout == 300
+
 
 class TestCreateFromParamsRequest:
     def test_required_fields(self) -> None:
@@ -165,6 +187,31 @@ class TestCreateFromParamsRequest:
             "image": "python:3.11",
         })
         assert req.dependencies is None
+
+    def test_batch_timeout_int(self) -> None:
+        req = CreateFromParamsRequest.model_validate({
+            "session_name": "s",
+            "image": "python:3.11",
+            "batch_timeout": 300,
+        })
+        assert isinstance(req.batch_timeout, int)
+        assert req.batch_timeout == 300
+
+    def test_batch_timeout_str_duration(self) -> None:
+        req = CreateFromParamsRequest.model_validate({
+            "session_name": "s",
+            "image": "python:3.11",
+            "batch_timeout": "30s",
+        })
+        assert req.batch_timeout == 30
+
+    def test_batch_timeout_camel_alias_int(self) -> None:
+        req = CreateFromParamsRequest.model_validate({
+            "session_name": "s",
+            "image": "python:3.11",
+            "batchTimeout": 300,
+        })
+        assert req.batch_timeout == 300
 
 
 class TestCreateClusterRequest:
