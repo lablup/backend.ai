@@ -24,6 +24,8 @@ from ai.backend.manager.models.deployment_revision import DeploymentRevisionRow
 from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.endpoint import EndpointRow
 from ai.backend.manager.models.group import AssocGroupUserRow, GroupRow
+from ai.backend.manager.models.group.conditions import GroupConditions
+from ai.backend.manager.models.group.orders import GroupOrders
 from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.image import ImageRow
 from ai.backend.manager.models.kernel import KernelRow
@@ -43,10 +45,6 @@ from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.vfolder import VFolderRow
 from ai.backend.manager.repositories.base import BatchQuerier, OffsetPagination, QueryCondition
 from ai.backend.manager.repositories.group.db_source import GroupDBSource
-from ai.backend.manager.repositories.group.options import (
-    GroupConditions,
-    GroupOrders,
-)
 from ai.backend.testutils.db import with_tables
 
 # Row imports above ensure mapper initialization (FK dependency order).

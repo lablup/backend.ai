@@ -15,6 +15,7 @@ from ai.backend.common.dto.manager.query import StringFilter
 from ai.backend.common.dto.manager.v2.group.types import GroupOrderField, OrderDirection
 
 __all__ = (
+    "AdminSearchGroupsInput",
     "CreateGroupInput",
     "DeleteGroupInput",
     "GroupFilter",
@@ -117,3 +118,16 @@ class SearchGroupsRequest(BaseRequestModel):
         description="Maximum items to return.",
     )
     offset: int = Field(default=0, ge=0, description="Number of items to skip.")
+
+
+class AdminSearchGroupsInput(BaseRequestModel):
+    """Input for admin search of groups with cursor and offset pagination."""
+
+    filter: GroupFilter | None = Field(default=None, description="Filter conditions.")
+    order: list[GroupOrder] | None = Field(default=None, description="Order specifications.")
+    first: int | None = Field(default=None, description="Cursor pagination: number of items.")
+    after: str | None = Field(default=None, description="Cursor pagination: after cursor.")
+    last: int | None = Field(default=None, description="Cursor pagination: last N items.")
+    before: str | None = Field(default=None, description="Cursor pagination: before cursor.")
+    limit: int | None = Field(default=None, description="Offset pagination: maximum items.")
+    offset: int | None = Field(default=None, description="Offset pagination: number to skip.")

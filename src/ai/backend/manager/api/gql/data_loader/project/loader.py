@@ -5,8 +5,8 @@ from collections.abc import Sequence
 
 from ai.backend.common.data.filter_specs import UUIDInMatchSpec
 from ai.backend.manager.data.group.types import GroupData
+from ai.backend.manager.models.group.conditions import GroupConditions
 from ai.backend.manager.repositories.base import BatchQuerier, NoPagination
-from ai.backend.manager.repositories.group.options import GroupConditions
 from ai.backend.manager.services.group.actions.search_projects import SearchProjectsAction
 from ai.backend.manager.services.group.processors import GroupProcessors
 

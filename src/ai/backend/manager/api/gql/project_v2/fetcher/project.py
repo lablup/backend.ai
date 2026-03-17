@@ -20,9 +20,10 @@ from ai.backend.manager.api.gql.project_v2.types import (
     ProjectV2OrderBy,
 )
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
+from ai.backend.manager.models.group.conditions import GroupConditions
+from ai.backend.manager.models.group.orders import GroupOrders
 from ai.backend.manager.models.group.row import GroupRow
 from ai.backend.manager.repositories.base import QueryCondition
-from ai.backend.manager.repositories.group.options import GroupConditions, GroupOrders
 from ai.backend.manager.repositories.group.types import (
     DomainProjectSearchScope,
     UserProjectSearchScope,

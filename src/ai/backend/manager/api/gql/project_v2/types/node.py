@@ -8,9 +8,10 @@ from uuid import UUID
 
 import strawberry
 from strawberry import ID, Info
-from strawberry.relay import Connection, Edge, Node, NodeID
+from strawberry.relay import Connection, Edge, NodeID
 
 from ai.backend.manager.api.gql.fair_share.types import ProjectFairShareGQL
+from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin
 from ai.backend.manager.api.gql.resource_slot.overview_types import ActiveResourceOverviewGQL
 from ai.backend.manager.api.gql.resource_usage.types import (
     ProjectUsageBucketConnection,
@@ -65,7 +66,7 @@ class ProjectUsageScopeGQL:
         "Resource allocation and container registry are provided through separate dedicated APIs."
     ),
 )
-class ProjectV2GQL(Node):
+class ProjectV2GQL(PydanticNodeMixin):
     """Project entity with structured field groups."""
 
     id: NodeID[str] = strawberry.field(description="Unique identifier for the project (UUID).")
