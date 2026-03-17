@@ -37,6 +37,14 @@ from ai.backend.manager.data.notification import (
 )
 from ai.backend.manager.errors.notification import InvalidNotificationSpec
 from ai.backend.manager.models.notification import NotificationChannelRow, NotificationRuleRow
+from ai.backend.manager.models.notification.conditions import (
+    NotificationChannelConditions,
+    NotificationRuleConditions,
+)
+from ai.backend.manager.models.notification.orders import (
+    NotificationChannelOrders,
+    NotificationRuleOrders,
+)
 from ai.backend.manager.repositories.base import (
     BatchQuerier,
     OffsetPagination,
@@ -44,12 +52,6 @@ from ai.backend.manager.repositories.base import (
     QueryOrder,
 )
 from ai.backend.manager.repositories.base.updater import Updater
-from ai.backend.manager.repositories.notification.options import (
-    NotificationChannelConditions,
-    NotificationChannelOrders,
-    NotificationRuleConditions,
-    NotificationRuleOrders,
-)
 from ai.backend.manager.repositories.notification.updaters import (
     NotificationChannelUpdaterSpec,
     NotificationRuleUpdaterSpec,

@@ -22,6 +22,8 @@ __all__ = (
     "CreateNotificationRulePayload",
     "DeleteNotificationChannelPayload",
     "DeleteNotificationRulePayload",
+    "GetNotificationChannelPayload",
+    "GetNotificationRulePayload",
     "NotificationChannelNode",
     "NotificationRuleNode",
     "UpdateNotificationChannelPayload",
@@ -58,6 +60,18 @@ class NotificationRuleNode(BaseResponseModel):
     created_at: datetime = Field(description="Creation timestamp")
     created_by: UUID = Field(description="ID of user who created the rule")
     updated_at: datetime = Field(description="Last update timestamp")
+
+
+class GetNotificationChannelPayload(BaseResponseModel):
+    """Payload for notification channel get result."""
+
+    item: NotificationChannelNode = Field(description="Retrieved notification channel")
+
+
+class GetNotificationRulePayload(BaseResponseModel):
+    """Payload for notification rule get result."""
+
+    item: NotificationRuleNode = Field(description="Retrieved notification rule")
 
 
 class CreateNotificationChannelPayload(BaseResponseModel):

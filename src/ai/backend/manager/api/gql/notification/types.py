@@ -10,7 +10,7 @@ from typing import Self, override
 
 import strawberry
 from strawberry import ID, UNSET, Info
-from strawberry.relay import Node, NodeID
+from strawberry.relay import NodeID
 
 from ai.backend.common.data.notification import (
     NotificationChannelType,
@@ -26,6 +26,7 @@ from ai.backend.common.data.notification.types import (
 from ai.backend.common.data.permission.types import RBACElementType
 from ai.backend.common.exception import InvalidNotificationChannelSpec
 from ai.backend.manager.api.gql.base import OrderDirection, StringFilter
+from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin
 from ai.backend.manager.api.gql.types import GQLFilter, GQLOrderBy, StrawberryGQLContext
 from ai.backend.manager.data.notification import (
     NotificationChannelData,
@@ -33,6 +34,14 @@ from ai.backend.manager.data.notification import (
 )
 from ai.backend.manager.data.permission.types import RBACElementRef
 from ai.backend.manager.models.notification import NotificationChannelRow, NotificationRuleRow
+from ai.backend.manager.models.notification.conditions import (
+    NotificationChannelConditions,
+    NotificationRuleConditions,
+)
+from ai.backend.manager.models.notification.orders import (
+    NotificationChannelOrders,
+    NotificationRuleOrders,
+)
 from ai.backend.manager.repositories.base import (
     QueryCondition,
     QueryOrder,
@@ -44,12 +53,6 @@ from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.repositories.notification.creators import (
     NotificationChannelCreatorSpec,
     NotificationRuleCreatorSpec,
-)
-from ai.backend.manager.repositories.notification.options import (
-    NotificationChannelConditions,
-    NotificationChannelOrders,
-    NotificationRuleConditions,
-    NotificationRuleOrders,
 )
 from ai.backend.manager.repositories.notification.updaters import (
     NotificationChannelUpdaterSpec,
@@ -198,7 +201,7 @@ class EmailSpecGQL(NotificationChannelSpecGQL):
 
 
 @strawberry.type(description="Notification channel")
-class NotificationChannel(Node):
+class NotificationChannel(PydanticNodeMixin):
     id: NodeID[str]
     name: str
     description: str | None
@@ -248,7 +251,7 @@ class NotificationChannel(Node):
 
 
 @strawberry.type(description="Notification rule")
-class NotificationRule(Node):
+class NotificationRule(PydanticNodeMixin):
     id: NodeID[str]
     name: str
     description: str | None

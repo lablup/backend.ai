@@ -4,11 +4,11 @@ import uuid
 from collections.abc import Sequence
 
 from ai.backend.manager.data.notification import NotificationChannelData, NotificationRuleData
-from ai.backend.manager.repositories.base import BatchQuerier, OffsetPagination
-from ai.backend.manager.repositories.notification.options import (
+from ai.backend.manager.models.notification.conditions import (
     NotificationChannelConditions,
     NotificationRuleConditions,
 )
+from ai.backend.manager.repositories.base import BatchQuerier, OffsetPagination
 from ai.backend.manager.services.notification.actions.list_channels import SearchChannelsAction
 from ai.backend.manager.services.notification.actions.list_rules import SearchRulesAction
 from ai.backend.manager.services.notification.processors import NotificationProcessors

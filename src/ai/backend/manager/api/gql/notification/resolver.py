@@ -16,13 +16,15 @@ from ai.backend.manager.api.gql.base import encode_cursor
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.api.gql.utils import check_admin_only
 from ai.backend.manager.errors.auth import InvalidAuthParameters
-from ai.backend.manager.models.notification.row import NotificationChannelRow, NotificationRuleRow
-from ai.backend.manager.repositories.notification.options import (
+from ai.backend.manager.models.notification.conditions import (
     NotificationChannelConditions,
-    NotificationChannelOrders,
     NotificationRuleConditions,
+)
+from ai.backend.manager.models.notification.orders import (
+    NotificationChannelOrders,
     NotificationRuleOrders,
 )
+from ai.backend.manager.models.notification.row import NotificationChannelRow, NotificationRuleRow
 from ai.backend.manager.services.notification.actions import (
     CreateChannelAction,
     CreateRuleAction,

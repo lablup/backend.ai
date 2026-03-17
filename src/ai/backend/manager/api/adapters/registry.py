@@ -8,6 +8,7 @@ from ai.backend.manager.api.adapters.agent import AgentAdapter
 from ai.backend.manager.api.adapters.container_registry import ContainerRegistryAdapter
 from ai.backend.manager.api.adapters.domain import DomainAdapter
 from ai.backend.manager.api.adapters.image import ImageAdapter
+from ai.backend.manager.api.adapters.notification import NotificationAdapter
 from ai.backend.manager.api.adapters.object_storage import ObjectStorageAdapter
 from ai.backend.manager.api.adapters.project import ProjectAdapter
 from ai.backend.manager.api.adapters.prometheus_query_preset import PrometheusQueryPresetAdapter
@@ -35,6 +36,7 @@ class Adapters:
         container_registry: ContainerRegistryAdapter,
         domain: DomainAdapter,
         image: ImageAdapter,
+        notification: NotificationAdapter,
         object_storage: ObjectStorageAdapter,
         project: ProjectAdapter,
         prometheus_query_preset: PrometheusQueryPresetAdapter,
@@ -48,6 +50,7 @@ class Adapters:
         self.container_registry = container_registry
         self.domain = domain
         self.image = image
+        self.notification = notification
         self.object_storage = object_storage
         self.project = project
         self.prometheus_query_preset = prometheus_query_preset
@@ -65,6 +68,7 @@ class Adapters:
             container_registry=ContainerRegistryAdapter(processors),
             domain=DomainAdapter(processors),
             image=ImageAdapter(processors),
+            notification=NotificationAdapter(processors),
             object_storage=ObjectStorageAdapter(processors),
             project=ProjectAdapter(processors),
             prometheus_query_preset=PrometheusQueryPresetAdapter(processors),
