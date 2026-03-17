@@ -380,32 +380,24 @@ class DeploymentInfo:
     deploying_revision_id: UUID | None = None
     sub_step: DeploymentSubStep | None = None
 
-    def current_revision_spec(self) -> ModelRevisionSpec | None:
-        if self.current_revision_id is None:
-            return None
-        return next(
-            (r for r in self.model_revisions if r.revision_id == self.current_revision_id),
-            None,
-        )
-
-    def deploying_revision_spec(self) -> ModelRevisionSpec | None:
-        if self.deploying_revision_id is None:
-            return None
-        return next(
-            (r for r in self.model_revisions if r.revision_id == self.deploying_revision_id),
-            None,
-        )
-
     def resolve_revision_spec(self, revision_id: UUID | None = None) -> ModelRevisionSpec | None:
         """Resolve a revision spec with fallback: revision_id → deploying → current."""
-        if revision_id is not None:
+        for candidate_id in (revision_id, self.deploying_revision_id, self.current_revision_id):
+            if candidate_id is None:
+                continue
             found = next(
-                (r for r in self.model_revisions if r.revision_id == revision_id),
+                (r for r in self.model_revisions if r.revision_id == candidate_id),
                 None,
             )
             if found is not None:
                 return found
-        return self.deploying_revision_spec() or self.current_revision_spec()
+        return None
+
+    def current_revision_spec(self) -> ModelRevisionSpec | None:
+        return self.resolve_revision_spec(self.current_revision_id)
+
+    def deploying_revision_spec(self) -> ModelRevisionSpec | None:
+        return self.resolve_revision_spec(self.deploying_revision_id)
 
 
 @dataclass
