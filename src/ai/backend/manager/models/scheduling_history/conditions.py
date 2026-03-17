@@ -1,3 +1,5 @@
+"""Query conditions for scheduling history rows."""
+
 from __future__ import annotations
 
 import uuid
@@ -12,13 +14,14 @@ from ai.backend.common.types import KernelId, SessionId
 from ai.backend.manager.data.deployment.types import RouteStatus
 from ai.backend.manager.data.kernel.types import KernelSchedulingPhase
 from ai.backend.manager.data.session.types import SchedulingResult, SessionStatus
-from ai.backend.manager.models.scheduling_history import (
+from ai.backend.manager.repositories.base import QueryCondition
+
+from .row import (
     DeploymentHistoryRow,
     KernelSchedulingHistoryRow,
     RouteHistoryRow,
     SessionSchedulingHistoryRow,
 )
-from ai.backend.manager.repositories.base import QueryCondition, QueryOrder
 
 # ========== Session Scheduling History ==========
 
@@ -375,25 +378,6 @@ class SessionSchedulingHistoryConditions:
         return inner
 
 
-class SessionSchedulingHistoryOrders:
-    """Query orders for session scheduling history."""
-
-    @staticmethod
-    def created_at(ascending: bool = True) -> QueryOrder:
-        if ascending:
-            return SessionSchedulingHistoryRow.created_at.asc()
-        return SessionSchedulingHistoryRow.created_at.desc()
-
-    @staticmethod
-    def updated_at(ascending: bool = True) -> QueryOrder:
-        if ascending:
-            return SessionSchedulingHistoryRow.updated_at.asc()
-        return SessionSchedulingHistoryRow.updated_at.desc()
-
-
-# ========== Kernel Scheduling History ==========
-
-
 class KernelSchedulingHistoryConditions:
     """Query conditions for kernel scheduling history."""
 
@@ -474,25 +458,6 @@ class KernelSchedulingHistoryConditions:
             return KernelSchedulingHistoryRow.created_at > subquery
 
         return inner
-
-
-class KernelSchedulingHistoryOrders:
-    """Query orders for kernel scheduling history."""
-
-    @staticmethod
-    def created_at(ascending: bool = True) -> QueryOrder:
-        if ascending:
-            return KernelSchedulingHistoryRow.created_at.asc()
-        return KernelSchedulingHistoryRow.created_at.desc()
-
-    @staticmethod
-    def updated_at(ascending: bool = True) -> QueryOrder:
-        if ascending:
-            return KernelSchedulingHistoryRow.updated_at.asc()
-        return KernelSchedulingHistoryRow.updated_at.desc()
-
-
-# ========== Deployment History ==========
 
 
 class DeploymentHistoryConditions:
@@ -832,25 +797,6 @@ class DeploymentHistoryConditions:
             return DeploymentHistoryRow.updated_at == dt
 
         return inner
-
-
-class DeploymentHistoryOrders:
-    """Query orders for deployment history."""
-
-    @staticmethod
-    def created_at(ascending: bool = True) -> QueryOrder:
-        if ascending:
-            return DeploymentHistoryRow.created_at.asc()
-        return DeploymentHistoryRow.created_at.desc()
-
-    @staticmethod
-    def updated_at(ascending: bool = True) -> QueryOrder:
-        if ascending:
-            return DeploymentHistoryRow.updated_at.asc()
-        return DeploymentHistoryRow.updated_at.desc()
-
-
-# ========== Route History ==========
 
 
 class RouteHistoryConditions:
@@ -1234,19 +1180,3 @@ class RouteHistoryConditions:
             return RouteHistoryRow.updated_at == dt
 
         return inner
-
-
-class RouteHistoryOrders:
-    """Query orders for route history."""
-
-    @staticmethod
-    def created_at(ascending: bool = True) -> QueryOrder:
-        if ascending:
-            return RouteHistoryRow.created_at.asc()
-        return RouteHistoryRow.created_at.desc()
-
-    @staticmethod
-    def updated_at(ascending: bool = True) -> QueryOrder:
-        if ascending:
-            return RouteHistoryRow.updated_at.asc()
-        return RouteHistoryRow.updated_at.desc()

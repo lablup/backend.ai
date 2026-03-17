@@ -15,6 +15,9 @@ from ai.backend.common.dto.manager.pagination import PaginationInfo
 from .types import SubStepResultInfo
 
 __all__ = (
+    "AdminSearchDeploymentHistoriesPayload",
+    "AdminSearchRouteHistoriesPayload",
+    "AdminSearchSessionHistoriesPayload",
     "DeploymentHistoryNode",
     "ListDeploymentHistoryPayload",
     "ListRouteHistoryPayload",
@@ -101,3 +104,30 @@ class ListRouteHistoryPayload(BaseResponseModel):
 
     items: list[RouteHistoryNode] = Field(description="List of route history records")
     pagination: PaginationInfo = Field(description="Pagination information")
+
+
+class AdminSearchSessionHistoriesPayload(BaseResponseModel):
+    """Payload for admin search of session scheduling histories."""
+
+    items: list[SessionHistoryNode] = Field(description="List of session history nodes.")
+    total_count: int = Field(description="Total number of records matching the filter.")
+    has_next_page: bool = Field(description="Whether there is a next page.")
+    has_previous_page: bool = Field(description="Whether there is a previous page.")
+
+
+class AdminSearchDeploymentHistoriesPayload(BaseResponseModel):
+    """Payload for admin search of deployment histories."""
+
+    items: list[DeploymentHistoryNode] = Field(description="List of deployment history nodes.")
+    total_count: int = Field(description="Total number of records matching the filter.")
+    has_next_page: bool = Field(description="Whether there is a next page.")
+    has_previous_page: bool = Field(description="Whether there is a previous page.")
+
+
+class AdminSearchRouteHistoriesPayload(BaseResponseModel):
+    """Payload for admin search of route histories."""
+
+    items: list[RouteHistoryNode] = Field(description="List of route history nodes.")
+    total_count: int = Field(description="Total number of records matching the filter.")
+    has_next_page: bool = Field(description="Whether there is a next page.")
+    has_previous_page: bool = Field(description="Whether there is a previous page.")

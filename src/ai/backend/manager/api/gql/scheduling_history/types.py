@@ -10,7 +10,7 @@ from uuid import UUID
 
 import strawberry
 from strawberry import ID, Info
-from strawberry.relay import Node, NodeID
+from strawberry.relay import NodeID
 
 from ai.backend.manager.api.gql.base import (
     DateTimeFilter,
@@ -18,6 +18,7 @@ from ai.backend.manager.api.gql.base import (
     StringFilter,
     UUIDFilter,
 )
+from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin
 from ai.backend.manager.api.gql.types import GQLFilter, GQLOrderBy, StrawberryGQLContext
 from ai.backend.manager.data.deployment.types import DeploymentHistoryData, RouteHistoryData
 from ai.backend.manager.data.session.types import (
@@ -25,19 +26,21 @@ from ai.backend.manager.data.session.types import (
     SessionSchedulingHistoryData,
     SubStepResult,
 )
+from ai.backend.manager.models.scheduling_history.conditions import (
+    DeploymentHistoryConditions,
+    RouteHistoryConditions,
+    SessionSchedulingHistoryConditions,
+)
+from ai.backend.manager.models.scheduling_history.orders import (
+    DeploymentHistoryOrders,
+    RouteHistoryOrders,
+    SessionSchedulingHistoryOrders,
+)
 from ai.backend.manager.repositories.base import (
     QueryCondition,
     QueryOrder,
     combine_conditions_or,
     negate_conditions,
-)
-from ai.backend.manager.repositories.scheduling_history.options import (
-    DeploymentHistoryConditions,
-    DeploymentHistoryOrders,
-    RouteHistoryConditions,
-    RouteHistoryOrders,
-    SessionSchedulingHistoryConditions,
-    SessionSchedulingHistoryOrders,
 )
 
 __all__ = (
@@ -159,7 +162,7 @@ class SubStepResultGQL:
 
 
 @strawberry.type(description="Session scheduling history record")
-class SessionSchedulingHistory(Node):
+class SessionSchedulingHistory(PydanticNodeMixin):
     id: NodeID[str]
     _session_id: strawberry.Private[UUID]
     phase: str
@@ -209,7 +212,7 @@ class SessionSchedulingHistory(Node):
 
 
 @strawberry.type(description="Deployment history record")
-class DeploymentHistory(Node):
+class DeploymentHistory(PydanticNodeMixin):
     id: NodeID[str]
     _deployment_id: strawberry.Private[UUID]
     phase: str
@@ -259,7 +262,7 @@ class DeploymentHistory(Node):
 
 
 @strawberry.type(description="Route history record")
-class RouteHistory(Node):
+class RouteHistory(PydanticNodeMixin):
     id: NodeID[str]
     _route_id: strawberry.Private[UUID]
     _deployment_id: strawberry.Private[UUID]

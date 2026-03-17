@@ -3,6 +3,9 @@ Scheduling history DTOs v2 for Manager API.
 """
 
 from ai.backend.common.dto.manager.v2.scheduling_history.request import (
+    AdminSearchDeploymentHistoriesInput,
+    AdminSearchRouteHistoriesInput,
+    AdminSearchSessionHistoriesInput,
     DeploymentHistoryFilter,
     DeploymentHistoryOrder,
     RouteHistoryFilter,
@@ -14,6 +17,9 @@ from ai.backend.common.dto.manager.v2.scheduling_history.request import (
     SessionHistoryOrder,
 )
 from ai.backend.common.dto.manager.v2.scheduling_history.response import (
+    AdminSearchDeploymentHistoriesPayload,
+    AdminSearchRouteHistoriesPayload,
+    AdminSearchSessionHistoriesPayload,
     DeploymentHistoryNode,
     ListDeploymentHistoryPayload,
     ListRouteHistoryPayload,
@@ -39,6 +45,9 @@ __all__ = (
     "SessionHistoryOrderField",
     "SubStepResultInfo",
     # Input models (request)
+    "AdminSearchDeploymentHistoriesInput",
+    "AdminSearchRouteHistoriesInput",
+    "AdminSearchSessionHistoriesInput",
     "DeploymentHistoryFilter",
     "DeploymentHistoryOrder",
     "RouteHistoryFilter",
@@ -49,6 +58,9 @@ __all__ = (
     "SessionHistoryFilter",
     "SessionHistoryOrder",
     # Response models
+    "AdminSearchDeploymentHistoriesPayload",
+    "AdminSearchRouteHistoriesPayload",
+    "AdminSearchSessionHistoriesPayload",
     "DeploymentHistoryNode",
     "ListDeploymentHistoryPayload",
     "ListRouteHistoryPayload",

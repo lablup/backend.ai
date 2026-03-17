@@ -7,12 +7,12 @@ from collections.abc import Sequence
 
 from ai.backend.manager.data.deployment.types import DeploymentHistoryData, RouteHistoryData
 from ai.backend.manager.data.session.types import SessionSchedulingHistoryData
-from ai.backend.manager.repositories.base import BatchQuerier, OffsetPagination
-from ai.backend.manager.repositories.scheduling_history.options import (
+from ai.backend.manager.models.scheduling_history.conditions import (
     DeploymentHistoryConditions,
     RouteHistoryConditions,
     SessionSchedulingHistoryConditions,
 )
+from ai.backend.manager.repositories.base import BatchQuerier, OffsetPagination
 from ai.backend.manager.services.scheduling_history.actions.search_deployment_history import (
     SearchDeploymentHistoryAction,
 )

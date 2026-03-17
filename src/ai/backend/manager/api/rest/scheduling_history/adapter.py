@@ -33,19 +33,21 @@ from ai.backend.manager.data.session.types import (
     SessionSchedulingHistoryData,
     SubStepResult,
 )
+from ai.backend.manager.models.scheduling_history.conditions import (
+    DeploymentHistoryConditions,
+    RouteHistoryConditions,
+    SessionSchedulingHistoryConditions,
+)
+from ai.backend.manager.models.scheduling_history.orders import (
+    DeploymentHistoryOrders,
+    RouteHistoryOrders,
+    SessionSchedulingHistoryOrders,
+)
 from ai.backend.manager.repositories.base import (
     BatchQuerier,
     OffsetPagination,
     QueryCondition,
     QueryOrder,
-)
-from ai.backend.manager.repositories.scheduling_history.options import (
-    DeploymentHistoryConditions,
-    DeploymentHistoryOrders,
-    RouteHistoryConditions,
-    RouteHistoryOrders,
-    SessionSchedulingHistoryConditions,
-    SessionSchedulingHistoryOrders,
 )
 
 __all__ = ("SchedulingHistoryAdapter",)

@@ -15,18 +15,20 @@ from ai.backend.manager.api.gql.adapter import PaginationOptions, PaginationSpec
 from ai.backend.manager.api.gql.base import encode_cursor
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.api.gql.utils import check_admin_only
+from ai.backend.manager.models.scheduling_history.conditions import (
+    DeploymentHistoryConditions,
+    RouteHistoryConditions,
+    SessionSchedulingHistoryConditions,
+)
+from ai.backend.manager.models.scheduling_history.orders import (
+    DeploymentHistoryOrders,
+    RouteHistoryOrders,
+    SessionSchedulingHistoryOrders,
+)
 from ai.backend.manager.models.scheduling_history.row import (
     DeploymentHistoryRow,
     RouteHistoryRow,
     SessionSchedulingHistoryRow,
-)
-from ai.backend.manager.repositories.scheduling_history.options import (
-    DeploymentHistoryConditions,
-    DeploymentHistoryOrders,
-    RouteHistoryConditions,
-    RouteHistoryOrders,
-    SessionSchedulingHistoryConditions,
-    SessionSchedulingHistoryOrders,
 )
 from ai.backend.manager.services.scheduling_history.actions import (
     SearchDeploymentHistoryAction,
