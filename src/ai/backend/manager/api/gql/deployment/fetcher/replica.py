@@ -17,12 +17,10 @@ from ai.backend.manager.api.gql.deployment.types.replica import (
     ReplicaOrderBy,
 )
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
+from ai.backend.manager.models.routing.conditions import RouteConditions
+from ai.backend.manager.models.routing.orders import RouteOrders
 from ai.backend.manager.models.routing.row import RoutingRow
 from ai.backend.manager.repositories.base import QueryCondition
-from ai.backend.manager.repositories.deployment.options import (
-    RouteConditions,
-    RouteOrders,
-)
 from ai.backend.manager.services.deployment.actions.search_replicas import (
     SearchReplicasAction,
 )

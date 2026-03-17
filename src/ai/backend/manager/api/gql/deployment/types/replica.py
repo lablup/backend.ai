@@ -9,7 +9,7 @@ from uuid import UUID
 
 import strawberry
 from strawberry import ID, Info
-from strawberry.relay import Connection, Edge, Node, NodeID, PageInfo
+from strawberry.relay import Connection, Edge, NodeID, PageInfo
 
 from ai.backend.common.data.model_deployment.types import ActivenessStatus as CommonActivenessStatus
 from ai.backend.common.data.model_deployment.types import LivenessStatus as CommonLivenessStatus
@@ -18,6 +18,7 @@ from ai.backend.manager.api.gql.base import (
     OrderDirection,
     to_global_id,
 )
+from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin
 from ai.backend.manager.api.gql.session_federation import Session
 from ai.backend.manager.api.gql.types import GQLFilter, GQLOrderBy, StrawberryGQLContext
 from ai.backend.manager.api.gql_legacy.session import ComputeSessionNode
@@ -27,8 +28,9 @@ from ai.backend.manager.data.deployment.types import (
     RouteStatus,
     RouteTrafficStatus,
 )
+from ai.backend.manager.models.routing.conditions import RouteConditions
+from ai.backend.manager.models.routing.orders import RouteOrders
 from ai.backend.manager.repositories.base import QueryCondition, QueryOrder
-from ai.backend.manager.repositories.deployment.options import RouteConditions, RouteOrders
 from ai.backend.manager.services.deployment.actions.model_revision.get_revision_by_id import (
     GetRevisionByIdAction,
 )
@@ -138,7 +140,7 @@ class ReplicaOrderBy(GQLOrderBy):
 
 
 @strawberry.type
-class ModelReplica(Node):
+class ModelReplica(PydanticNodeMixin):
     """
     Added in 25.19.0.
 

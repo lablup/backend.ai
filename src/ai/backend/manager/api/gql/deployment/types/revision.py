@@ -10,7 +10,7 @@ from uuid import UUID
 
 import strawberry
 from strawberry import ID, Info
-from strawberry.relay import Connection, Edge, Node, NodeID, PageInfo
+from strawberry.relay import Connection, Edge, NodeID, PageInfo
 from strawberry.scalars import JSON
 
 from ai.backend.common.types import ClusterMode as CommonClusterMode
@@ -28,6 +28,7 @@ from ai.backend.manager.api.gql.common.types import (
 )
 from ai.backend.manager.api.gql.fair_share.types.common import ResourceSlotGQL
 from ai.backend.manager.api.gql.image_federation import Image
+from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin
 from ai.backend.manager.api.gql.resource_group.federation import ResourceGroup
 from ai.backend.manager.api.gql.types import GQLFilter, GQLOrderBy, StrawberryGQLContext
 from ai.backend.manager.api.gql.vfolder import ExtraVFolderMountConnection, VFolder
@@ -46,13 +47,14 @@ from ai.backend.manager.data.deployment.types import (
     ResourceConfigData,
     ResourceSpec,
 )
+from ai.backend.manager.models.deployment_revision.conditions import RevisionConditions
+from ai.backend.manager.models.deployment_revision.orders import RevisionOrders
 from ai.backend.manager.repositories.base import (
     QueryCondition,
     QueryOrder,
     combine_conditions_or,
     negate_conditions,
 )
-from ai.backend.manager.repositories.deployment.options import RevisionConditions, RevisionOrders
 
 if TYPE_CHECKING:
     from .deployment import ModelDeployment
@@ -221,7 +223,7 @@ class ClusterConfig:
 
 
 @strawberry.type
-class ModelRevision(Node):
+class ModelRevision(PydanticNodeMixin):
     """
     Added in 25.19.0.
 

@@ -37,12 +37,10 @@ from ai.backend.manager.data.session.types import SchedulingResult, SubStepResul
 from ai.backend.manager.defs import SERVICE_MAX_RETRIES
 from ai.backend.manager.models.deployment_policy import BlueGreenSpec, RollingUpdateSpec
 from ai.backend.manager.models.endpoint import EndpointRow
+from ai.backend.manager.models.endpoint.conditions import DeploymentConditions
 from ai.backend.manager.repositories.base.creator import BulkCreator
 from ai.backend.manager.repositories.base.updater import BatchUpdater
-from ai.backend.manager.repositories.deployment import (
-    DeploymentConditions,
-    DeploymentRepository,
-)
+from ai.backend.manager.repositories.deployment import DeploymentRepository
 from ai.backend.manager.repositories.deployment.creators import (
     EndpointLifecycleBatchUpdaterSpec,
 )

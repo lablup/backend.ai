@@ -38,13 +38,13 @@ from ai.backend.manager.data.resource.types import ScalingGroupProxyTarget
 from ai.backend.manager.errors.deployment import ReplicaCountMismatch
 from ai.backend.manager.errors.service import ModelDefinitionNotFound
 from ai.backend.manager.models.routing import RoutingRow
+from ai.backend.manager.models.routing.conditions import RouteConditions
 from ai.backend.manager.repositories.base.rbac.entity_creator import RBACEntityCreator
 from ai.backend.manager.repositories.base.updater import BatchUpdater
 from ai.backend.manager.repositories.deployment.creators import (
     RouteBatchUpdaterSpec,
     RouteCreatorSpec,
 )
-from ai.backend.manager.repositories.deployment.options import RouteConditions
 from ai.backend.manager.repositories.deployment.repository import (
     AutoScalingMetricsData,
     DeploymentRepository,

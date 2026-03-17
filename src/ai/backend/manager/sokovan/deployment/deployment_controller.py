@@ -22,13 +22,13 @@ from ai.backend.manager.data.deployment.types import (
 from ai.backend.manager.data.permission.types import RBACElementRef
 from ai.backend.manager.models.endpoint import EndpointRow
 from ai.backend.manager.models.routing import RoutingRow
+from ai.backend.manager.models.routing.conditions import RouteConditions
 from ai.backend.manager.models.storage import StorageSessionManager
 from ai.backend.manager.repositories.base import BatchQuerier, OffsetPagination
 from ai.backend.manager.repositories.base.rbac.entity_creator import RBACEntityCreator
 from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.repositories.deployment import DeploymentRepository
 from ai.backend.manager.repositories.deployment.creators.endpoint import LegacyEndpointCreatorSpec
-from ai.backend.manager.repositories.deployment.options import RouteConditions
 from ai.backend.manager.repositories.deployment.updaters import (
     DeploymentUpdaterSpec,
     RouteUpdaterSpec,

@@ -17,12 +17,10 @@ from ai.backend.manager.api.gql.deployment.types.access_token import (
     AccessTokenOrderBy,
 )
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
+from ai.backend.manager.models.endpoint.conditions import AccessTokenConditions
+from ai.backend.manager.models.endpoint.orders import AccessTokenOrders
 from ai.backend.manager.models.endpoint.row import EndpointTokenRow
 from ai.backend.manager.repositories.base import QueryCondition
-from ai.backend.manager.repositories.deployment.options import (
-    AccessTokenConditions,
-    AccessTokenOrders,
-)
 from ai.backend.manager.services.deployment.actions.access_token.search_access_tokens import (
     SearchAccessTokensAction,
 )

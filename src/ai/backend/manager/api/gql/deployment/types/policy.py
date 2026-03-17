@@ -8,9 +8,10 @@ from uuid import UUID
 
 import strawberry
 from strawberry import ID
-from strawberry.relay import Node, NodeID
+from strawberry.relay import NodeID
 
 from ai.backend.common.data.model_deployment.types import DeploymentStrategy
+from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin
 from ai.backend.manager.api.gql.utils import dedent_strip
 from ai.backend.manager.data.deployment.types import DeploymentPolicyData
 from ai.backend.manager.data.deployment.upserter import DeploymentPolicyUpserter
@@ -58,7 +59,7 @@ class BlueGreenStrategySpecGQL(DeploymentStrategySpecGQL):
     name="DeploymentPolicy",
     description="Added in 25.19.0. Deployment policy configuration.",
 )
-class DeploymentPolicyGQL(Node):
+class DeploymentPolicyGQL(PydanticNodeMixin):
     id: NodeID[str]
     strategy_spec: DeploymentStrategySpecGQL
     rollback_on_failure: bool

@@ -9,24 +9,23 @@ from uuid import UUID
 
 import strawberry
 from strawberry import ID, Info
-from strawberry.relay import Connection, Edge, Node, NodeID
+from strawberry.relay import Connection, Edge, NodeID
 
 from ai.backend.manager.api.gql.base import DateTimeFilter, OrderDirection, StringFilter
+from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin
 from ai.backend.manager.api.gql.types import GQLFilter, GQLOrderBy, StrawberryGQLContext
 from ai.backend.manager.data.deployment.access_token import ModelDeploymentAccessTokenCreator
 from ai.backend.manager.data.deployment.types import (
     AccessTokenOrderField,
     ModelDeploymentAccessTokenData,
 )
+from ai.backend.manager.models.endpoint.conditions import AccessTokenConditions
+from ai.backend.manager.models.endpoint.orders import AccessTokenOrders
 from ai.backend.manager.repositories.base import (
     QueryCondition,
     QueryOrder,
     combine_conditions_or,
     negate_conditions,
-)
-from ai.backend.manager.repositories.deployment.options import (
-    AccessTokenConditions,
-    AccessTokenOrders,
 )
 
 
@@ -110,7 +109,7 @@ class AccessTokenOrderBy(GQLOrderBy):
 
 
 @strawberry.type
-class AccessToken(Node):
+class AccessToken(PydanticNodeMixin):
     id: NodeID[str]
     token: str = strawberry.field(description="Added in 25.16.0: The access token.")
     created_at: datetime = strawberry.field(

@@ -14,15 +14,15 @@ from ai.backend.manager.data.deployment.types import (
     ModelRevisionData,
     RouteInfo,
 )
-from ai.backend.manager.repositories.base import BatchQuerier, NoPagination, OffsetPagination
-from ai.backend.manager.repositories.deployment.options import (
+from ai.backend.manager.models.deployment_policy.conditions import DeploymentPolicyConditions
+from ai.backend.manager.models.deployment_revision.conditions import RevisionConditions
+from ai.backend.manager.models.endpoint.conditions import (
     AccessTokenConditions,
     AutoScalingRuleConditions,
     DeploymentConditions,
-    DeploymentPolicyConditions,
-    RevisionConditions,
-    RouteConditions,
 )
+from ai.backend.manager.models.routing.conditions import RouteConditions
+from ai.backend.manager.repositories.base import BatchQuerier, NoPagination, OffsetPagination
 from ai.backend.manager.services.deployment.actions.access_token.search_access_tokens import (
     SearchAccessTokensAction,
 )

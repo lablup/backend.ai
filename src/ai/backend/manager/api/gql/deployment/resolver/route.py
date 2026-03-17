@@ -19,7 +19,7 @@ from ai.backend.manager.api.gql.deployment.types.route import (
 )
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.data.deployment.types import RouteTrafficStatus as RouteTrafficStatusEnum
-from ai.backend.manager.repositories.deployment.options import RouteConditions
+from ai.backend.manager.models.routing.conditions import RouteConditions
 from ai.backend.manager.services.deployment.actions.route import (
     UpdateRouteTrafficStatusAction,
 )

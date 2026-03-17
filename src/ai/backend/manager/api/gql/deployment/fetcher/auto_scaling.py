@@ -17,12 +17,10 @@ from ai.backend.manager.api.gql.deployment.types.auto_scaling import (
     AutoScalingRuleOrderBy,
 )
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
+from ai.backend.manager.models.endpoint.conditions import AutoScalingRuleConditions
+from ai.backend.manager.models.endpoint.orders import AutoScalingRuleOrders
 from ai.backend.manager.models.endpoint.row import EndpointAutoScalingRuleRow
 from ai.backend.manager.repositories.base import QueryCondition
-from ai.backend.manager.repositories.deployment.options import (
-    AutoScalingRuleConditions,
-    AutoScalingRuleOrders,
-)
 from ai.backend.manager.services.deployment.actions.auto_scaling_rule.search_auto_scaling_rules import (
     SearchAutoScalingRulesAction,
 )

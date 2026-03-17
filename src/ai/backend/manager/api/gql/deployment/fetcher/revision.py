@@ -18,12 +18,10 @@ from ai.backend.manager.api.gql.deployment.types.revision import (
     ModelRevisionOrderBy,
 )
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
+from ai.backend.manager.models.deployment_revision.conditions import RevisionConditions
+from ai.backend.manager.models.deployment_revision.orders import RevisionOrders
 from ai.backend.manager.models.deployment_revision.row import DeploymentRevisionRow
 from ai.backend.manager.repositories.base import QueryCondition
-from ai.backend.manager.repositories.deployment.options import (
-    RevisionConditions,
-    RevisionOrders,
-)
 from ai.backend.manager.services.deployment.actions.model_revision.search_revisions import (
     SearchRevisionsAction,
 )

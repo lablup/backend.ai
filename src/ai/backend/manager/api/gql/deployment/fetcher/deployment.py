@@ -18,11 +18,9 @@ from ai.backend.manager.api.gql.deployment.types.deployment import (
     ModelDeploymentEdge,
 )
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
+from ai.backend.manager.models.endpoint.conditions import DeploymentConditions
+from ai.backend.manager.models.endpoint.orders import DeploymentOrders
 from ai.backend.manager.models.endpoint.row import EndpointRow
-from ai.backend.manager.repositories.deployment.options import (
-    DeploymentConditions,
-    DeploymentOrders,
-)
 from ai.backend.manager.services.deployment.actions.search_deployments import (
     SearchDeploymentsAction,
 )

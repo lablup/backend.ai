@@ -11,7 +11,7 @@ from uuid import UUID
 
 import strawberry
 from strawberry import ID, Info
-from strawberry.relay import Connection, Edge, Node, NodeID
+from strawberry.relay import Connection, Edge, NodeID
 from strawberry.scalars import JSON
 
 from ai.backend.manager.api.gql.adapter import PaginationSpec
@@ -19,6 +19,7 @@ from ai.backend.manager.api.gql.base import (
     OrderDirection,
     to_global_id,
 )
+from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin
 from ai.backend.manager.api.gql.types import GQLFilter, GQLOrderBy, StrawberryGQLContext
 from ai.backend.manager.api.gql_legacy.session import ComputeSessionNode
 from ai.backend.manager.data.deployment.types import (
@@ -31,6 +32,8 @@ from ai.backend.manager.data.deployment.types import (
     RouteTrafficStatus as RouteTrafficStatusEnum,
 )
 from ai.backend.manager.errors.deployment import EndpointNotFound
+from ai.backend.manager.models.routing.conditions import RouteConditions
+from ai.backend.manager.models.routing.orders import RouteOrders
 from ai.backend.manager.models.routing.row import RoutingRow
 from ai.backend.manager.repositories.base import (
     QueryCondition,
@@ -38,7 +41,6 @@ from ai.backend.manager.repositories.base import (
     combine_conditions_or,
     negate_conditions,
 )
-from ai.backend.manager.repositories.deployment.options import RouteConditions, RouteOrders
 
 if TYPE_CHECKING:
     from ai.backend.manager.api.gql.deployment.types.deployment import ModelDeployment
@@ -61,7 +63,7 @@ RouteTrafficStatusGQL = strawberry.enum(
     name="Route",
     description="Added in 25.19.0. Represents a route for a model deployment.",
 )
-class Route(Node):
+class Route(PydanticNodeMixin):
     id: NodeID[str]
     _deployment_id: strawberry.Private[UUID]
     _session_id: strawberry.Private[UUID | None]

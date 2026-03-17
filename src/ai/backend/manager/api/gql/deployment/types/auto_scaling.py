@@ -11,10 +11,11 @@ from uuid import UUID
 
 import strawberry
 from strawberry import ID, Info
-from strawberry.relay import Connection, Edge, Node, NodeID
+from strawberry.relay import Connection, Edge, NodeID
 
 from ai.backend.common.types import AutoScalingMetricSource as CommonAutoScalingMetricSource
 from ai.backend.manager.api.gql.base import DateTimeFilter, OrderDirection
+from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin
 from ai.backend.manager.api.gql.types import GQLFilter, GQLOrderBy, StrawberryGQLContext
 from ai.backend.manager.data.deployment.scale import ModelDeploymentAutoScalingRuleCreator
 from ai.backend.manager.data.deployment.scale_modifier import ModelDeploymentAutoScalingRuleModifier
@@ -22,15 +23,13 @@ from ai.backend.manager.data.deployment.types import (
     AutoScalingRuleOrderField,
     ModelDeploymentAutoScalingRuleData,
 )
+from ai.backend.manager.models.endpoint.conditions import AutoScalingRuleConditions
+from ai.backend.manager.models.endpoint.orders import AutoScalingRuleOrders
 from ai.backend.manager.repositories.base import (
     QueryCondition,
     QueryOrder,
     combine_conditions_or,
     negate_conditions,
-)
-from ai.backend.manager.repositories.deployment.options import (
-    AutoScalingRuleConditions,
-    AutoScalingRuleOrders,
 )
 from ai.backend.manager.services.deployment.actions.auto_scaling_rule.update_auto_scaling_rule import (
     UpdateAutoScalingRuleAction,
@@ -117,7 +116,7 @@ class AutoScalingRuleOrderBy(GQLOrderBy):
 
 
 @strawberry.type
-class AutoScalingRule(Node):
+class AutoScalingRule(PydanticNodeMixin):
     id: NodeID[str]
 
     metric_source: AutoScalingMetricSource = strawberry.field(

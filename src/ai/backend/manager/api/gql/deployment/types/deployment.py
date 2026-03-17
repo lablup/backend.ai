@@ -9,7 +9,7 @@ from uuid import UUID, uuid4
 
 import strawberry
 from strawberry import ID, Info
-from strawberry.relay import Connection, Edge, Node, NodeID
+from strawberry.relay import Connection, Edge, NodeID
 
 from ai.backend.common.contexts.user import current_user
 from ai.backend.common.data.model_deployment.types import (
@@ -54,6 +54,7 @@ from ai.backend.manager.api.gql.deployment.types.revision import (
 )
 from ai.backend.manager.api.gql.domain import Domain
 from ai.backend.manager.api.gql.project import Project
+from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin
 from ai.backend.manager.api.gql.types import GQLFilter, GQLOrderBy, StrawberryGQLContext
 from ai.backend.manager.api.gql.user_federation import User
 from ai.backend.manager.api.gql_legacy.domain import DomainNode
@@ -69,21 +70,21 @@ from ai.backend.manager.data.deployment.types import (
     ReplicaSpec,
 )
 from ai.backend.manager.errors.user import UserNotFound
+from ai.backend.manager.models.deployment_revision.conditions import RevisionConditions
 from ai.backend.manager.models.endpoint import EndpointRow
+from ai.backend.manager.models.endpoint.conditions import (
+    AccessTokenConditions,
+    AutoScalingRuleConditions,
+    DeploymentConditions,
+)
+from ai.backend.manager.models.endpoint.orders import DeploymentOrders
+from ai.backend.manager.models.routing.conditions import RouteConditions
 from ai.backend.manager.repositories.base import (
     QueryCondition,
     QueryOrder,
     Updater,
     combine_conditions_or,
     negate_conditions,
-)
-from ai.backend.manager.repositories.deployment.options import (
-    AccessTokenConditions,
-    AutoScalingRuleConditions,
-    DeploymentConditions,
-    DeploymentOrders,
-    RevisionConditions,
-    RouteConditions,
 )
 from ai.backend.manager.repositories.deployment.updaters import (
     DeploymentMetadataUpdaterSpec,
@@ -303,7 +304,7 @@ class ModelDeploymentNetworkAccess:
 
 # Main ModelDeployment Type
 @strawberry.type
-class ModelDeployment(Node):
+class ModelDeployment(PydanticNodeMixin):
     """
     Added in 25.19.0.
 
