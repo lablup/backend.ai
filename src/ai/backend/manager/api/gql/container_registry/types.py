@@ -10,6 +10,7 @@ from uuid import UUID
 import strawberry
 from strawberry import Info
 from strawberry.relay import Node, NodeID
+from strawberry.scalars import JSON
 
 from ai.backend.common.container_registry import ContainerRegistryType
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
@@ -62,6 +63,9 @@ class ContainerRegistryGQL(Node):
     is_global: bool | None = strawberry.field(
         description="Whether this registry is globally accessible", default=None
     )
+    extra: JSON | None = strawberry.field(
+        description="Extra metadata for the container registry", default=None
+    )
 
     @classmethod
     async def resolve_nodes(  # type: ignore[override]  # Strawberry Node uses AwaitableOrValue overloads incompatible with async def
@@ -88,4 +92,5 @@ class ContainerRegistryGQL(Node):
             password=PASSWORD_PLACEHOLDER if data.password is not None else None,
             ssl_verify=data.ssl_verify,
             is_global=data.is_global,
+            extra=data.extra,
         )
