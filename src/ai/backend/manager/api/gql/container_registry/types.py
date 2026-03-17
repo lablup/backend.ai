@@ -19,7 +19,7 @@ from ai.backend.manager.defs import PASSWORD_PLACEHOLDER
 
 
 @strawberry.enum(
-    name="ContainerRegistryType", description="Added in 26.3.0. Container registry type."
+    name="ContainerRegistryType", description="Added in 26.4.0. Container registry type."
 )
 class ContainerRegistryTypeGQL(StrEnum):
     DOCKER = "docker"
@@ -39,7 +39,7 @@ class ContainerRegistryTypeGQL(StrEnum):
 
 @strawberry.type(
     name="ContainerRegistryV2",
-    description="Added in 26.3.0. Container registry node.",
+    description="Added in 26.4.0. Container registry node.",
 )
 class ContainerRegistryGQL(Node):
     id: NodeID[str] = strawberry.field(
