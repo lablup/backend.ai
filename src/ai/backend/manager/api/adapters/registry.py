@@ -8,6 +8,7 @@ from ai.backend.manager.api.adapters.agent import AgentAdapter
 from ai.backend.manager.api.adapters.container_registry import ContainerRegistryAdapter
 from ai.backend.manager.api.adapters.domain import DomainAdapter
 from ai.backend.manager.api.adapters.image import ImageAdapter
+from ai.backend.manager.api.adapters.object_storage import ObjectStorageAdapter
 from ai.backend.manager.api.adapters.project import ProjectAdapter
 from ai.backend.manager.api.adapters.resource_group import ResourceGroupAdapter
 from ai.backend.manager.api.adapters.resource_slot import ResourceSlotAdapter
@@ -33,6 +34,7 @@ class Adapters:
         container_registry: ContainerRegistryAdapter,
         domain: DomainAdapter,
         image: ImageAdapter,
+        object_storage: ObjectStorageAdapter,
         project: ProjectAdapter,
         resource_group: ResourceGroupAdapter,
         resource_slot: ResourceSlotAdapter,
@@ -44,6 +46,7 @@ class Adapters:
         self.container_registry = container_registry
         self.domain = domain
         self.image = image
+        self.object_storage = object_storage
         self.project = project
         self.resource_group = resource_group
         self.resource_slot = resource_slot
@@ -59,6 +62,7 @@ class Adapters:
             container_registry=ContainerRegistryAdapter(processors),
             domain=DomainAdapter(processors),
             image=ImageAdapter(processors),
+            object_storage=ObjectStorageAdapter(processors),
             project=ProjectAdapter(processors),
             resource_group=ResourceGroupAdapter(processors),
             resource_slot=ResourceSlotAdapter(processors),

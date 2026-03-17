@@ -7,9 +7,10 @@ from typing import Self
 
 import strawberry
 from strawberry import ID, UNSET, Info
-from strawberry.relay import Connection, Edge, Node, NodeID
+from strawberry.relay import Connection, Edge, NodeID
 
 from ai.backend.manager.api.gql.base import encode_cursor
+from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin
 from ai.backend.manager.data.object_storage.types import ObjectStorageData
 from ai.backend.manager.models.object_storage import ObjectStorageRow
 from ai.backend.manager.repositories.base.creator import Creator
@@ -37,7 +38,7 @@ from .types import StrawberryGQLContext
 
 
 @strawberry.type(description="Added in 25.14.0")
-class ObjectStorage(Node):
+class ObjectStorage(PydanticNodeMixin):
     id: NodeID[str]
     name: str
     host: str

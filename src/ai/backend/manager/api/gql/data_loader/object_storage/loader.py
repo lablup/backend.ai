@@ -4,8 +4,8 @@ import uuid
 from collections.abc import Sequence
 
 from ai.backend.manager.data.object_storage.types import ObjectStorageData
+from ai.backend.manager.models.object_storage.conditions import ObjectStorageConditions
 from ai.backend.manager.repositories.base import BatchQuerier, OffsetPagination
-from ai.backend.manager.repositories.object_storage.options import ObjectStorageConditions
 from ai.backend.manager.services.object_storage.actions.search import SearchObjectStoragesAction
 from ai.backend.manager.services.object_storage.processors import ObjectStorageProcessors
 

@@ -9,12 +9,20 @@ from uuid import UUID
 from pydantic import Field, field_validator
 
 from ai.backend.common.api_handlers import SENTINEL, BaseRequestModel, Sentinel
+from ai.backend.common.dto.manager.query import StringFilter
+from ai.backend.common.dto.manager.v2.object_storage.types import (
+    ObjectStorageOrderField,
+    OrderDirection,
+)
 
 __all__ = (
+    "AdminSearchObjectStoragesInput",
     "CreateObjectStorageInput",
     "DeleteObjectStorageInput",
     "GetPresignedDownloadURLInput",
     "GetPresignedUploadURLInput",
+    "ObjectStorageFilter",
+    "ObjectStorageOrder",
     "UpdateObjectStorageInput",
 )
 
@@ -67,6 +75,29 @@ class GetPresignedUploadURLInput(BaseRequestModel):
     expiration: int | None = Field(default=None, ge=1, description="URL expiration time in seconds")
     min_size: int | None = Field(default=None, ge=0, description="Minimum file size in bytes")
     max_size: int | None = Field(default=None, ge=0, description="Maximum file size in bytes")
+
+
+class ObjectStorageFilter(BaseRequestModel):
+    """Filter criteria for object storage search."""
+
+    name: StringFilter | None = Field(default=None, description="Filter by storage name.")
+    host: StringFilter | None = Field(default=None, description="Filter by storage host.")
+
+
+class ObjectStorageOrder(BaseRequestModel):
+    """Single ordering criterion for object storage search."""
+
+    field: ObjectStorageOrderField = Field(description="Field to order by.")
+    direction: OrderDirection = Field(default=OrderDirection.ASC, description="Sort direction.")
+
+
+class AdminSearchObjectStoragesInput(BaseRequestModel):
+    """Input for admin-scoped paginated object storage search."""
+
+    filter: ObjectStorageFilter | None = Field(default=None, description="Filter criteria.")
+    order: list[ObjectStorageOrder] | None = Field(default=None, description="Ordering criteria.")
+    limit: int | None = Field(default=None, ge=1, description="Maximum number of results.")
+    offset: int | None = Field(default=None, ge=0, description="Number of results to skip.")
 
 
 class GetPresignedDownloadURLInput(BaseRequestModel):
