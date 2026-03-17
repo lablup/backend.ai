@@ -87,6 +87,8 @@ async def webapp_plugin_ctx(
         blocklist=r.bootstrap.config_provider.config.manager.disabled_plugins,
     )
     cors_options = r.system.cors_options
+    root_app["_db"] = r.infrastructure.db
+    root_app["_config_provider"] = r.bootstrap.config_provider
     for plugin_name, plugin_instance in plugin_ctx.plugins.items():
         if pidx == 0:
             log.info("Loading webapp plugin: {0}", plugin_name)
