@@ -181,15 +181,6 @@ def provisioning_route_with_session() -> RouteData:
 
 
 @pytest.fixture
-def provisioning_route_with_revision() -> RouteData:
-    """PROVISIONING route with a specific revision_id."""
-    return _create_route_data(
-        status=RouteStatus.PROVISIONING,
-        revision_id=uuid4(),
-    )
-
-
-@pytest.fixture
 def provisioning_routes_multiple() -> list[RouteData]:
     """Multiple PROVISIONING routes."""
     endpoint_id = uuid4()
