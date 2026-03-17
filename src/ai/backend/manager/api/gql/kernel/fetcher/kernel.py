@@ -19,8 +19,8 @@ from ai.backend.manager.api.gql.kernel.types import (
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.errors.user import UserNotFound
 from ai.backend.manager.models.kernel import KernelRow
+from ai.backend.manager.models.kernel.conditions import KernelConditions
 from ai.backend.manager.repositories.base import QueryCondition
-from ai.backend.manager.repositories.scheduler.options import KernelConditions
 from ai.backend.manager.services.session.actions.search_kernel import SearchKernelsAction
 
 

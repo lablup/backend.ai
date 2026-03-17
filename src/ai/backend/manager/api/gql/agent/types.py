@@ -35,16 +35,14 @@ from ai.backend.manager.api.gql.utils import dedent_strip
 from ai.backend.manager.data.agent.types import AgentDetailData, AgentStatus
 from ai.backend.manager.models.agent.conditions import AgentConditions
 from ai.backend.manager.models.agent.orders import AgentOrders
+from ai.backend.manager.models.kernel.conditions import KernelConditions
 from ai.backend.manager.models.rbac.permission_defs import AgentPermission
+from ai.backend.manager.models.session.conditions import SessionConditions
 from ai.backend.manager.repositories.base import (
     QueryCondition,
     QueryOrder,
     combine_conditions_or,
     negate_conditions,
-)
-from ai.backend.manager.repositories.scheduler.options import (
-    KernelConditions,
-    SessionConditions,
 )
 
 

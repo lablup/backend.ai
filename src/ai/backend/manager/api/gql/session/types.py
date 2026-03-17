@@ -10,7 +10,7 @@ from uuid import UUID
 
 import strawberry
 from strawberry import ID, Info
-from strawberry.relay import Connection, Edge, Node, NodeID
+from strawberry.relay import Connection, Edge, NodeID
 
 from ai.backend.common.contexts.user import current_user
 from ai.backend.common.types import SessionId
@@ -34,6 +34,7 @@ from ai.backend.manager.api.gql.kernel.types import (
     ResourceAllocationGQL,
 )
 from ai.backend.manager.api.gql.project_v2.types.node import ProjectV2GQL
+from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin
 from ai.backend.manager.api.gql.resource_group.resolver import (
     ResourceGroupConnection,
     ResourceGroupEdge,
@@ -43,6 +44,9 @@ from ai.backend.manager.api.gql.types import GQLFilter, GQLOrderBy, StrawberryGQ
 from ai.backend.manager.api.gql.user.types.node import UserV2GQL
 from ai.backend.manager.data.session.types import SessionData, SessionStatus
 from ai.backend.manager.errors.user import UserNotFound
+from ai.backend.manager.models.kernel.conditions import KernelConditions
+from ai.backend.manager.models.session.conditions import SessionConditions
+from ai.backend.manager.models.session.orders import SessionOrders
 from ai.backend.manager.repositories.base import (
     BatchQuerier,
     NoPagination,
@@ -50,11 +54,6 @@ from ai.backend.manager.repositories.base import (
     QueryOrder,
     combine_conditions_or,
     negate_conditions,
-)
-from ai.backend.manager.repositories.scheduler.options import (
-    KernelConditions,
-    SessionConditions,
-    SessionOrders,
 )
 from ai.backend.manager.services.session.actions.search_kernel import SearchKernelsAction
 
@@ -373,7 +372,7 @@ class SessionV2NetworkInfoGQL:
     name="SessionV2",
     description="Added in 26.3.0. Represents a compute session in Backend.AI.",
 )
-class SessionV2GQL(Node):
+class SessionV2GQL(PydanticNodeMixin):
     """Session type representing a compute session."""
 
     id: NodeID[str]

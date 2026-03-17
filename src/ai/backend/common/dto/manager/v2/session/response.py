@@ -16,6 +16,7 @@ from ai.backend.common.api_handlers import BaseResponseModel
 from ai.backend.common.dto.manager.pagination import PaginationInfo
 
 __all__ = (
+    "AdminSearchSessionsPayload",
     "CommitSessionPayload",
     "DestroySessionPayload",
     "ExecutePayload",
@@ -202,3 +203,12 @@ class SearchSessionsPayload(BaseResponseModel):
 
     items: list[SessionNode] = Field(description="List of session nodes.")
     pagination: PaginationInfo = Field(description="Pagination metadata.")
+
+
+class AdminSearchSessionsPayload(BaseResponseModel):
+    """Payload for admin search of sessions."""
+
+    items: list[SessionNode] = Field(description="List of session nodes.")
+    total_count: int = Field(description="Total number of records matching the filter.")
+    has_next_page: bool = Field(description="Whether there is a next page.")
+    has_previous_page: bool = Field(description="Whether there is a previous page.")

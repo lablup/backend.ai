@@ -10,7 +10,7 @@ from uuid import UUID
 
 import strawberry
 from strawberry import ID, Info
-from strawberry.relay import Connection, Edge, Node, NodeID
+from strawberry.relay import Connection, Edge, NodeID
 
 from ai.backend.common.types import AgentId, KernelId, SessionTypes
 from ai.backend.manager.api.gql.base import OrderDirection, UUIDFilter
@@ -33,18 +33,20 @@ from ai.backend.manager.api.gql.common.types import (
 from ai.backend.manager.api.gql.domain_v2.types.node import DomainV2GQL
 from ai.backend.manager.api.gql.fair_share.types.common import ResourceSlotGQL
 from ai.backend.manager.api.gql.project_v2.types.node import ProjectV2GQL
+from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin
 from ai.backend.manager.api.gql.resource_group.types import ResourceGroupGQL
 from ai.backend.manager.api.gql.types import GQLFilter, GQLOrderBy, StrawberryGQLContext
 from ai.backend.manager.api.gql.user.types.node import UserV2GQL
 from ai.backend.manager.api.gql.utils import dedent_strip
 from ai.backend.manager.data.kernel.types import KernelInfo, KernelStatus, KernelStatusInMatchSpec
+from ai.backend.manager.models.kernel.conditions import KernelConditions
+from ai.backend.manager.models.kernel.orders import KernelOrders
 from ai.backend.manager.repositories.base import (
     QueryCondition,
     QueryOrder,
     combine_conditions_or,
     negate_conditions,
 )
-from ai.backend.manager.repositories.scheduler.options import KernelConditions, KernelOrders
 
 
 @strawberry.enum(
@@ -389,7 +391,7 @@ class KernelV2LifecycleInfoGQL:
     name="KernelV2",
     description="Added in 26.2.0. Represents a kernel (compute container) in Backend.AI.",
 )
-class KernelV2GQL(Node):
+class KernelV2GQL(PydanticNodeMixin):
     """Kernel type representing a compute container."""
 
     id: NodeID[str]

@@ -18,8 +18,9 @@ from ai.backend.manager.api.gql.session.types import (
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.errors.user import UserNotFound
 from ai.backend.manager.models.session import SessionRow
+from ai.backend.manager.models.session.conditions import SessionConditions
+from ai.backend.manager.models.session.orders import SessionOrders
 from ai.backend.manager.repositories.base import QueryCondition
-from ai.backend.manager.repositories.scheduler.options import SessionConditions, SessionOrders
 from ai.backend.manager.services.session.actions.search import SearchSessionsAction
 
 

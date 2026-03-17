@@ -56,6 +56,7 @@ from ai.backend.manager.models.dotfile import prepare_dotfiles
 from ai.backend.manager.models.group import GroupRow
 from ai.backend.manager.models.image import ImageRow
 from ai.backend.manager.models.kernel import USER_RESOURCE_OCCUPYING_KERNEL_STATUSES, KernelRow
+from ai.backend.manager.models.kernel.conditions import KernelConditions
 from ai.backend.manager.models.keypair import KeyPairRow
 from ai.backend.manager.models.resource_policy import (
     DefaultForUnspecified,
@@ -93,7 +94,7 @@ from ai.backend.manager.repositories.resource_slot.types import (
     accumulate_to_quantities,
     resource_slot_to_quantities,
 )
-from ai.backend.manager.repositories.scheduler.options import ImageConditions, KernelConditions
+from ai.backend.manager.repositories.scheduler.options import ImageConditions
 from ai.backend.manager.repositories.scheduler.types.agent import AgentMeta
 from ai.backend.manager.repositories.scheduler.types.base import SchedulingSpec
 from ai.backend.manager.repositories.scheduler.types.results import (

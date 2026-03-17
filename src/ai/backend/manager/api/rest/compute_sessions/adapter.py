@@ -23,17 +23,15 @@ from ai.backend.common.types import SessionId
 from ai.backend.manager.api.rest.adapter import BaseFilterAdapter
 from ai.backend.manager.data.kernel.types import KernelInfo
 from ai.backend.manager.data.session.types import SessionData, SessionStatus
+from ai.backend.manager.models.kernel.conditions import KernelConditions
+from ai.backend.manager.models.session.conditions import SessionConditions
+from ai.backend.manager.models.session.orders import SessionOrders
 from ai.backend.manager.repositories.base import (
     BatchQuerier,
     NoPagination,
     OffsetPagination,
     QueryCondition,
     QueryOrder,
-)
-from ai.backend.manager.repositories.scheduler.options import (
-    KernelConditions,
-    SessionConditions,
-    SessionOrders,
 )
 
 

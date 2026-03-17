@@ -16,7 +16,7 @@ from ai.backend.manager.api.gql.kernel.types import (
 from ai.backend.manager.api.gql.scheduling_history import SessionScope
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.api.gql.utils import check_admin_only
-from ai.backend.manager.repositories.scheduler.options import KernelConditions
+from ai.backend.manager.models.kernel.conditions import KernelConditions
 
 
 @strawberry.field(description="Added in 26.2.0. Query a single kernel by ID.")  # type: ignore[misc]

@@ -21,6 +21,7 @@ from ai.backend.common.dto.manager.v2.session.types import (
 )
 
 __all__ = (
+    "AdminSearchSessionsInput",
     "CommitSessionInput",
     "DestroySessionInput",
     "DownloadFilesInput",
@@ -81,6 +82,19 @@ class SearchSessionsInput(BaseRequestModel):
     order: SessionOrder | None = None
     limit: int = Field(default=DEFAULT_PAGE_LIMIT, ge=1, le=MAX_PAGE_LIMIT)
     offset: int = Field(default=0, ge=0)
+
+
+class AdminSearchSessionsInput(BaseRequestModel):
+    """Input for admin search of sessions with cursor and offset pagination."""
+
+    filter: SessionFilter | None = Field(default=None, description="Filter conditions.")
+    order: list[SessionOrder] | None = Field(default=None, description="Order specifications.")
+    first: int | None = Field(default=None, description="Cursor pagination: number of items.")
+    after: str | None = Field(default=None, description="Cursor pagination: after cursor.")
+    last: int | None = Field(default=None, description="Cursor pagination: last N items.")
+    before: str | None = Field(default=None, description="Cursor pagination: before cursor.")
+    limit: int | None = Field(default=None, description="Offset pagination: maximum items.")
+    offset: int | None = Field(default=None, description="Offset pagination: number to skip.")
 
 
 # ---------------------------------------------------------------------------

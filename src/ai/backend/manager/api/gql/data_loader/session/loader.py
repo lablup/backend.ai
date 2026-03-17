@@ -6,8 +6,8 @@ from ai.backend.common.contexts.user import current_user
 from ai.backend.common.types import SessionId
 from ai.backend.manager.data.session.types import SessionData
 from ai.backend.manager.errors.user import UserNotFound
+from ai.backend.manager.models.session.conditions import SessionConditions
 from ai.backend.manager.repositories.base import BatchQuerier, NoPagination
-from ai.backend.manager.repositories.scheduler.options import SessionConditions
 from ai.backend.manager.services.session.actions.search import SearchSessionsAction
 from ai.backend.manager.services.session.processors import SessionProcessors
 
