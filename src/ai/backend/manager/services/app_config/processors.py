@@ -54,31 +54,32 @@ class AppConfigProcessors(AbstractProcessorPackage):
         action_monitors: list[ActionMonitor],
         validators: ActionValidators,
     ) -> None:
+        scope_rbac_validators = [validators.rbac.scope]
         # Domain config processors
         self.get_domain_config = ScopeActionProcessor(
-            service.get_domain_config, action_monitors, validators=[validators.rbac.scope]
+            service.get_domain_config, action_monitors, validators=scope_rbac_validators
         )
         self.upsert_domain_config = ScopeActionProcessor(
-            service.upsert_domain_config, action_monitors, validators=[validators.rbac.scope]
+            service.upsert_domain_config, action_monitors, validators=scope_rbac_validators
         )
         self.delete_domain_config = ScopeActionProcessor(
-            service.delete_domain_config, action_monitors, validators=[validators.rbac.scope]
+            service.delete_domain_config, action_monitors, validators=scope_rbac_validators
         )
 
         # User config processors
         self.get_user_config = ScopeActionProcessor(
-            service.get_user_config, action_monitors, validators=[validators.rbac.scope]
+            service.get_user_config, action_monitors, validators=scope_rbac_validators
         )
         self.upsert_user_config = ScopeActionProcessor(
-            service.upsert_user_config, action_monitors, validators=[validators.rbac.scope]
+            service.upsert_user_config, action_monitors, validators=scope_rbac_validators
         )
         self.delete_user_config = ScopeActionProcessor(
-            service.delete_user_config, action_monitors, validators=[validators.rbac.scope]
+            service.delete_user_config, action_monitors, validators=scope_rbac_validators
         )
 
         # Merged config processor
         self.get_merged_config = ScopeActionProcessor(
-            service.get_merged_config, action_monitors, validators=[validators.rbac.scope]
+            service.get_merged_config, action_monitors, validators=scope_rbac_validators
         )
 
     @override
