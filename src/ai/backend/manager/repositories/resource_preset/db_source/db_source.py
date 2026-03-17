@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 from collections.abc import Mapping
+from decimal import Decimal
 from typing import Any, cast
 from uuid import UUID
 
@@ -466,7 +467,14 @@ class ResourcePresetDBSource:
         )
 
         result = await db_sess.execute(query)
-        return [SlotQuantity(row.slot_name, row.total) for row in result if row.total is not None]
+        quantities = [
+            SlotQuantity(row.slot_name, row.total) for row in result if row.total is not None
+        ]
+        if not quantities:
+            return [
+                SlotQuantity(str(slot_name), Decimal(0)) for slot_name in known_slot_types.keys()
+            ]
+        return quantities
 
     async def _get_keypair_resource_usage(
         self,
