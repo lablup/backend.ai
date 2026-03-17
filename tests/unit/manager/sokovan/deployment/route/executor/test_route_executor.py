@@ -3,8 +3,7 @@
 Based on BEP-1033 test scenarios for route executor testing.
 
 Test Scenarios:
-- RP-001 ~ RP-003: Route Provisioning
-- RP-004 ~ RP-005: Route Provisioning Revision ID (BA-5278)
+- RP-001 ~ RP-004: Route Provisioning
 - RH-001 ~ RH-004: Route Health Check
 - RR-001 ~ RR-004: Running Route Check
 - RE-001 ~ RE-003: Route Eviction
@@ -14,8 +13,11 @@ Test Scenarios:
 
 from __future__ import annotations
 
+import dataclasses
 from unittest.mock import AsyncMock, MagicMock
-from uuid import uuid4
+from uuid import UUID, uuid4
+
+import pytest
 
 from ai.backend.common.types import SessionId
 from ai.backend.manager.repositories.deployment.types import RouteData
@@ -123,66 +125,37 @@ class TestProvisionRoutes:
         assert len(result.successes) == 0
         assert len(result.errors) == 1
 
+    @pytest.mark.parametrize(
+        "revision_id",
+        [uuid4(), None],
+        ids=["with_revision", "without_revision"],
+    )
     async def test_provision_route_passes_revision_id_to_context(
         self,
         route_executor: RouteExecutor,
         mock_deployment_repo: AsyncMock,
         mock_scheduling_controller: AsyncMock,
-        provisioning_route_with_revision: RouteData,
+        provisioning_route: RouteData,
+        revision_id: UUID | None,
     ) -> None:
-        """RP-004: Provisioning passes route's revision_id to fetch_deployment_context.
-
-        Given: PROVISIONING route with a specific revision_id set
-        When: Provision routes
-        Then: fetch_deployment_context is called with that revision_id
-        """
+        """RP-004: Provisioning passes route's revision_id to fetch_deployment_context."""
         # Arrange
+        route = dataclasses.replace(provisioning_route, revision_id=revision_id)
         deployment = MagicMock()
-        deployment.id = provisioning_route_with_revision.endpoint_id
+        deployment.id = route.endpoint_id
         mock_deployment_repo.get_endpoints_by_ids.return_value = [deployment]
 
-        entity_ids = [provisioning_route_with_revision.route_id]
+        entity_ids = [route.route_id]
         with RouteRecorderContext.scope("test", entity_ids=entity_ids):
             # Act
-            result = await route_executor.provision_routes([provisioning_route_with_revision])
+            result = await route_executor.provision_routes([route])
 
         # Assert
         assert len(result.successes) == 1
         assert len(result.errors) == 0
         mock_deployment_repo.fetch_deployment_context.assert_awaited_once_with(
             deployment,
-            revision_id=provisioning_route_with_revision.revision_id,
-        )
-
-    async def test_provision_route_passes_none_revision_id_when_not_set(
-        self,
-        route_executor: RouteExecutor,
-        mock_deployment_repo: AsyncMock,
-        mock_scheduling_controller: AsyncMock,
-        provisioning_route_without_revision: RouteData,
-    ) -> None:
-        """RP-005: Provisioning passes revision_id=None when route has no revision_id.
-
-        Given: PROVISIONING route without revision_id (revision_id=None)
-        When: Provision routes
-        Then: fetch_deployment_context is called with revision_id=None
-        """
-        # Arrange
-        deployment = MagicMock()
-        deployment.id = provisioning_route_without_revision.endpoint_id
-        mock_deployment_repo.get_endpoints_by_ids.return_value = [deployment]
-
-        entity_ids = [provisioning_route_without_revision.route_id]
-        with RouteRecorderContext.scope("test", entity_ids=entity_ids):
-            # Act
-            result = await route_executor.provision_routes([provisioning_route_without_revision])
-
-        # Assert
-        assert len(result.successes) == 1
-        assert len(result.errors) == 0
-        mock_deployment_repo.fetch_deployment_context.assert_awaited_once_with(
-            deployment,
-            revision_id=None,
+            revision_id=revision_id,
         )
 
 
