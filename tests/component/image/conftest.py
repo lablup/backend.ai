@@ -9,6 +9,12 @@ import sqlalchemy as sa
 from sqlalchemy.ext.asyncio.engine import AsyncEngine as SAEngine
 
 from ai.backend.common.container_registry import ContainerRegistryType
+from ai.backend.manager.actions.validators import ActionValidators
+from ai.backend.manager.actions.validators.rbac import RBACValidators
+from ai.backend.manager.actions.validators.rbac.scope import ScopeActionRBACValidator
+from ai.backend.manager.actions.validators.rbac.single_entity import (
+    SingleEntityActionRBACValidator,
+)
 from ai.backend.manager.api.rest.admin.handler import AdminHandler
 from ai.backend.manager.api.rest.admin.registry import register_admin_routes
 from ai.backend.manager.api.rest.image.handler import ImageHandler
@@ -36,10 +42,14 @@ def image_processors(
 ) -> ImageProcessors:
     repo = ImageRepository(database_engine, valkey_clients.image, config_provider)
     service = ImageService(agent_registry, repo, config_provider)
-    mock_validators = MagicMock()
-    mock_validators.rbac.scope.validate = AsyncMock()
-    mock_validators.rbac.single_entity.validate = AsyncMock()
-    return ImageProcessors(service=service, action_monitors=[], validators=mock_validators)
+    mock_scope = MagicMock(spec=ScopeActionRBACValidator)
+    mock_scope.validate = AsyncMock()
+    mock_single_entity = MagicMock(spec=SingleEntityActionRBACValidator)
+    mock_single_entity.validate = AsyncMock()
+    validators = ActionValidators(
+        rbac=RBACValidators(scope=mock_scope, single_entity=mock_single_entity),
+    )
+    return ImageProcessors(service=service, action_monitors=[], validators=validators)
 
 
 @pytest.fixture()

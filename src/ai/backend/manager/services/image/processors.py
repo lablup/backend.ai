@@ -164,6 +164,8 @@ class ImageProcessors(AbstractProcessorPackage):
         self.purge_image_by_id = SingleEntityActionProcessor(
             service.purge_image_by_id, action_monitors, validators=[validators.rbac.single_entity]
         )
+        # Superadmin-only mutations — access is enforced by check_admin_only at the API layer,
+        # so per-entity RBAC validation is not required here.
         self.alias_image = ActionProcessor(service.alias_image, action_monitors)
         self.alias_image_by_id = ActionProcessor(service.alias_image_by_id, action_monitors)
         self.dealias_image = ActionProcessor(service.dealias_image, action_monitors)
