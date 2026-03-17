@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from ai.backend.manager.api.adapters.container_registry import ContainerRegistryAdapter
+from ai.backend.manager.api.adapters.service_catalog import ServiceCatalogAdapter
 
 if TYPE_CHECKING:
     from ai.backend.manager.services.processors import Processors
@@ -21,12 +22,15 @@ class Adapters:
     def __init__(
         self,
         container_registry: ContainerRegistryAdapter,
+        service_catalog: ServiceCatalogAdapter,
     ) -> None:
         self.container_registry = container_registry
+        self.service_catalog = service_catalog
 
     @classmethod
     def create(cls, processors: Processors) -> Adapters:
         """Factory that wires up all adapters from the shared Processors."""
         return cls(
             container_registry=ContainerRegistryAdapter(processors),
+            service_catalog=ServiceCatalogAdapter(processors),
         )

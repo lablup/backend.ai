@@ -96,7 +96,7 @@ class PydanticNodeMixin(Node):
         resolved_hints = get_type_hints(cls, include_extras=True)
 
         kwargs: dict[str, Any] = {}
-        for field in dataclasses.fields(cls):  # type: ignore[arg-type]
+        for field in dataclasses.fields(cls):
             field_name = field.name
             # Extra overrides take priority
             if field_name in extra:

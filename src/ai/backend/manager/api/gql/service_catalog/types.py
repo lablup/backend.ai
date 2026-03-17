@@ -8,11 +8,13 @@ from enum import StrEnum
 from typing import Self
 
 import strawberry
-from strawberry.relay import Node, NodeID
+from strawberry.relay import NodeID
 from strawberry.scalars import JSON
 
+from ai.backend.common.dto.manager.v2.service_catalog.types import EndpointInfo
 from ai.backend.common.types import ServiceCatalogStatus
 from ai.backend.manager.api.gql.base import OrderDirection
+from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin
 from ai.backend.manager.api.gql.types import GQLFilter, GQLOrderBy
 from ai.backend.manager.api.gql.utils import dedent_strip
 from ai.backend.manager.data.service_catalog.types import (
@@ -56,6 +58,10 @@ class ServiceCatalogStatusGQL(StrEnum):
             case ServiceCatalogStatus.DEREGISTERED:
                 return cls.DEREGISTERED
 
+    @classmethod
+    def from_enum(cls, value: ServiceCatalogStatus) -> ServiceCatalogStatusGQL:
+        return cls.from_status(value)
+
 
 @strawberry.type(
     name="ServiceCatalogEndpoint",
@@ -82,12 +88,24 @@ class ServiceCatalogEndpointGQL:
             metadata=data.metadata,
         )
 
+    @classmethod
+    def from_pydantic(cls, info: EndpointInfo) -> Self:
+        """Convert an EndpointInfo Pydantic DTO to this GQL type."""
+        return cls(
+            role=info.role,
+            scope=info.scope,
+            address=info.address,
+            port=info.port,
+            protocol=info.protocol,
+            metadata=info.metadata,
+        )
+
 
 @strawberry.type(
     name="ServiceCatalog",
     description="Added in 26.3.0. A registered service instance in the catalog.",
 )
-class ServiceCatalogGQL(Node):
+class ServiceCatalogGQL(PydanticNodeMixin):
     id: NodeID[str] = strawberry.field(description="Relay-style global node ID.")
     service_group: str = strawberry.field(
         description=dedent_strip("""

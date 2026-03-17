@@ -17,6 +17,7 @@ from ai.backend.common.dto.manager.v2.service_catalog.types import (
 )
 
 __all__ = (
+    "AdminSearchServiceCatalogsPayload",
     "CreateServiceCatalogPayload",
     "DeleteServiceCatalogPayload",
     "HeartbeatPayload",
@@ -67,3 +68,12 @@ class HeartbeatPayload(BaseResponseModel):
 
     success: bool = Field(description="Whether the heartbeat was recorded successfully")
     last_heartbeat: datetime = Field(description="Updated last heartbeat timestamp")
+
+
+class AdminSearchServiceCatalogsPayload(BaseResponseModel):
+    """Payload for admin service catalog search results."""
+
+    items: list[ServiceCatalogNode] = Field(description="List of matching service catalog entries.")
+    total_count: int = Field(description="Total number of matching entries.")
+    has_next_page: bool = Field(description="Whether there are more items after this page.")
+    has_previous_page: bool = Field(description="Whether there are more items before this page.")

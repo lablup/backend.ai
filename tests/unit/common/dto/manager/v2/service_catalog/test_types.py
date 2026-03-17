@@ -43,6 +43,9 @@ class TestOrderDirection:
 class TestServiceCatalogOrderField:
     """Tests for ServiceCatalogOrderField enum."""
 
+    def test_service_group_value(self) -> None:
+        assert ServiceCatalogOrderField.SERVICE_GROUP.value == "service_group"
+
     def test_display_name_value(self) -> None:
         assert ServiceCatalogOrderField.DISPLAY_NAME.value == "display_name"
 
@@ -61,7 +64,7 @@ class TestServiceCatalogOrderField:
 
     def test_enum_members_count(self) -> None:
         members = list(ServiceCatalogOrderField)
-        assert len(members) == 4
+        assert len(members) == 5
 
     def test_from_string_display_name(self) -> None:
         assert ServiceCatalogOrderField("display_name") is ServiceCatalogOrderField.DISPLAY_NAME

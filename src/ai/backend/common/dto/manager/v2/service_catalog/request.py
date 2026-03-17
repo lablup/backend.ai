@@ -11,13 +11,19 @@ from uuid import UUID
 from pydantic import Field, field_validator
 
 from ai.backend.common.api_handlers import SENTINEL, BaseRequestModel, Sentinel
+from ai.backend.common.dto.manager.query import StringFilter
 from ai.backend.common.types import ServiceCatalogStatus
 
+from .types import OrderDirection, ServiceCatalogOrderField, ServiceCatalogStatusFilter
+
 __all__ = (
+    "AdminSearchServiceCatalogsInput",
     "CreateServiceCatalogInput",
     "DeleteServiceCatalogInput",
     "EndpointInput",
     "HeartbeatInput",
+    "ServiceCatalogFilter",
+    "ServiceCatalogOrder",
     "UpdateServiceCatalogInput",
 )
 
@@ -115,3 +121,43 @@ class HeartbeatInput(BaseRequestModel):
     """Input for updating the heartbeat of a service catalog entry."""
 
     id: UUID = Field(description="Service catalog entry ID to heartbeat")
+
+
+class ServiceCatalogFilter(BaseRequestModel):
+    """Filter conditions for service catalog search."""
+
+    service_group: StringFilter | None = Field(
+        default=None, description="Filter by service group name."
+    )
+    status: ServiceCatalogStatusFilter | None = Field(
+        default=None, description="Filter by health status."
+    )
+
+
+class ServiceCatalogOrder(BaseRequestModel):
+    """Order specification for service catalog search."""
+
+    field: ServiceCatalogOrderField = Field(description="Field to order by.")
+    direction: OrderDirection = Field(default=OrderDirection.ASC, description="Order direction.")
+
+
+class AdminSearchServiceCatalogsInput(BaseRequestModel):
+    """Input for searching service catalog entries with filters, orders, and pagination.
+
+    Supports two pagination modes (mutually exclusive):
+    - Cursor-based: first/after (forward) or last/before (backward)
+    - Offset-based: limit/offset
+    """
+
+    filter: ServiceCatalogFilter | None = Field(default=None, description="Filter conditions.")
+    order: list[ServiceCatalogOrder] | None = Field(
+        default=None, description="Order specifications."
+    )
+    # Cursor-based pagination (Relay)
+    first: int | None = Field(default=None, ge=1, description="Number of items from the start.")
+    after: str | None = Field(default=None, description="Cursor to paginate forward from.")
+    last: int | None = Field(default=None, ge=1, description="Number of items from the end.")
+    before: str | None = Field(default=None, description="Cursor to paginate backward from.")
+    # Offset-based pagination
+    limit: int | None = Field(default=None, ge=1, description="Maximum number of items to return.")
+    offset: int | None = Field(default=None, ge=0, description="Number of items to skip.")

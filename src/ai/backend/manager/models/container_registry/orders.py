@@ -2,6 +2,11 @@
 
 from __future__ import annotations
 
+from typing import Any
+
+import sqlalchemy as sa
+from sqlalchemy.orm import InstrumentedAttribute
+
 from ai.backend.common.dto.manager.v2.container_registry.types import (
     ContainerRegistryOrderField,
     OrderDirection,
@@ -10,7 +15,9 @@ from ai.backend.manager.repositories.base import QueryOrder
 
 from .row import ContainerRegistryRow
 
-ORDER_FIELD_MAP: dict[ContainerRegistryOrderField, QueryOrder] = {
+_OrderColumn = sa.ColumnElement[Any] | InstrumentedAttribute[Any]
+
+ORDER_FIELD_MAP: dict[ContainerRegistryOrderField, _OrderColumn] = {
     ContainerRegistryOrderField.REGISTRY_NAME: ContainerRegistryRow.registry_name,
     ContainerRegistryOrderField.URL: ContainerRegistryRow.url,
     ContainerRegistryOrderField.TYPE: ContainerRegistryRow.type,
