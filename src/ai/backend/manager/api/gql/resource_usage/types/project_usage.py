@@ -7,7 +7,7 @@ from uuid import UUID
 
 import strawberry
 from strawberry import ID, Info
-from strawberry.relay import Connection, Edge, Node, NodeID
+from strawberry.relay import Connection, Edge, NodeID
 
 from ai.backend.common.data.filter_specs import UUIDEqualMatchSpec
 from ai.backend.manager.api.gql.base import (
@@ -17,6 +17,7 @@ from ai.backend.manager.api.gql.base import (
     UUIDFilter,
 )
 from ai.backend.manager.api.gql.fair_share.types import ResourceSlotGQL
+from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin
 from ai.backend.manager.api.gql.types import GQLFilter, GQLOrderBy, StrawberryGQLContext
 from ai.backend.manager.repositories.base import (
     QueryCondition,
@@ -53,7 +54,7 @@ from .user_usage import (
         "used to calculate fair share factors."
     ),
 )
-class ProjectUsageBucketGQL(Node):
+class ProjectUsageBucketGQL(PydanticNodeMixin):
     """Project-level usage bucket containing aggregated resource usage for a period."""
 
     id: NodeID[str]

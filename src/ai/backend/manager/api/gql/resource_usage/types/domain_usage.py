@@ -6,7 +6,7 @@ from typing import Any, override
 
 import strawberry
 from strawberry import ID, Info
-from strawberry.relay import Connection, Edge, Node, NodeID
+from strawberry.relay import Connection, Edge, NodeID
 
 from ai.backend.manager.api.gql.base import (
     DateFilter,
@@ -14,6 +14,7 @@ from ai.backend.manager.api.gql.base import (
     StringFilter,
 )
 from ai.backend.manager.api.gql.fair_share.types import ResourceSlotGQL
+from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin
 from ai.backend.manager.api.gql.types import GQLFilter, GQLOrderBy, StrawberryGQLContext
 from ai.backend.manager.repositories.base import (
     QueryCondition,
@@ -50,7 +51,7 @@ from .project_usage import (
         "used to calculate fair share factors."
     ),
 )
-class DomainUsageBucketGQL(Node):
+class DomainUsageBucketGQL(PydanticNodeMixin):
     """Domain-level usage bucket containing aggregated resource usage for a period."""
 
     id: NodeID[str]

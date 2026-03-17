@@ -10,9 +10,10 @@ from uuid import UUID
 
 import strawberry
 from strawberry import ID, Info
-from strawberry.relay import Connection, Edge, Node, NodeID
+from strawberry.relay import Connection, Edge, NodeID
 
 from ai.backend.manager.actions.types import OperationStatus
+from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.data.audit_log.types import AuditLogData
 
@@ -49,7 +50,7 @@ class AuditLogStatusGQL(StrEnum):
     name="AuditLogV2",
     description="Represents an audit log entry tracking system operations.",
 )
-class AuditLogV2GQL(Node):
+class AuditLogV2GQL(PydanticNodeMixin):
     id: NodeID[str] = strawberry.field(
         description="Unique identifier of the audit log entry (UUID)."
     )

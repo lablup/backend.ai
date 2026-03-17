@@ -7,7 +7,7 @@ from uuid import UUID
 
 import strawberry
 from strawberry import ID
-from strawberry.relay import Connection, Edge, Node, NodeID
+from strawberry.relay import Connection, Edge, NodeID
 
 from ai.backend.manager.api.gql.base import (
     DateFilter,
@@ -16,6 +16,7 @@ from ai.backend.manager.api.gql.base import (
     UUIDFilter,
 )
 from ai.backend.manager.api.gql.fair_share.types import ResourceSlotGQL
+from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin
 from ai.backend.manager.api.gql.types import GQLFilter, GQLOrderBy
 from ai.backend.manager.repositories.base import (
     QueryCondition,
@@ -45,7 +46,7 @@ from .common_calculations import (
         "consumption for a specific time period. This is the most granular level of usage tracking."
     ),
 )
-class UserUsageBucketGQL(Node):
+class UserUsageBucketGQL(PydanticNodeMixin):
     """User-level usage bucket containing aggregated resource usage for a period."""
 
     id: NodeID[str]
