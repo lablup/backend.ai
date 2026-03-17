@@ -204,12 +204,17 @@ class DeploymentStatusTransitions:
         need_retry: Target lifecycle when handler fails but can retry
         expired: Target lifecycle when time elapsed in current state
         give_up: Target lifecycle when retry count exceeded
+        rewind: Target lifecycle for normal forward progress that returns to a
+            previous sub-step (e.g. progressing → provisioning for the next
+            batch in rolling update). Unlike need_retry, rewind does NOT
+            increment phase_attempts.
     """
 
     success: DeploymentLifecycleStatus | None = None
     need_retry: DeploymentLifecycleStatus | None = None
     expired: DeploymentLifecycleStatus | None = None
     give_up: DeploymentLifecycleStatus | None = None
+    rewind: DeploymentLifecycleStatus | None = None
 
 
 @dataclass(frozen=True)

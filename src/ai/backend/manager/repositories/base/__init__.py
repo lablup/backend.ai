@@ -62,6 +62,8 @@ from .types import (
     QueryCondition,
     QueryOrder,
     SearchScope,
+    and_conditions,
+    or_conditions,
 )
 from .updater import (
     BatchUpdater,
@@ -169,4 +171,6 @@ __all__ = [
     # Utils
     "combine_conditions_or",
     "negate_conditions",
+    "or_conditions",
+    "and_conditions",
 ]

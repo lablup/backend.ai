@@ -19,6 +19,39 @@ if TYPE_CHECKING:
 # QueryCondition now returns a ColumnElement (whereclause) instead of modifying stmt
 type QueryCondition = Callable[[], sa.sql.expression.ColumnElement[bool]]
 
+
+def or_conditions(*conditions: QueryCondition) -> QueryCondition:
+    """Combine multiple QueryConditions with OR.
+
+    Args:
+        *conditions: Two or more QueryCondition callables to combine.
+
+    Returns:
+        A single QueryCondition that evaluates to the OR of all inputs.
+    """
+
+    def inner() -> sa.sql.expression.ColumnElement[bool]:
+        return sa.or_(*[c() for c in conditions])
+
+    return inner
+
+
+def and_conditions(*conditions: QueryCondition) -> QueryCondition:
+    """Combine multiple QueryConditions with AND.
+
+    Args:
+        *conditions: Two or more QueryCondition callables to combine.
+
+    Returns:
+        A single QueryCondition that evaluates to the AND of all inputs.
+    """
+
+    def inner() -> sa.sql.expression.ColumnElement[bool]:
+        return sa.and_(*[c() for c in conditions])
+
+    return inner
+
+
 T = TypeVar("T")
 
 

@@ -41,6 +41,7 @@ class DeploymentExecutionResult:
     successes: list[DeploymentWithHistory] = field(default_factory=list)
     errors: list[DeploymentExecutionError] = field(default_factory=list)
     skipped: list[DeploymentWithHistory] = field(default_factory=list)
+    rewind: list[DeploymentWithHistory] = field(default_factory=list)
 
 
 @dataclass

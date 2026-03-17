@@ -437,12 +437,19 @@ class DeploymentCoordinator:
 
         transitions = handler.status_transitions()
 
-        # Success transitions (None = stay in current state)
-        if transitions.success is not None and result.successes:
+        # Success and rewind both advance without incrementing phase_attempts.
+        # Rewind returns to a previous sub-step as normal forward progress
+        # (e.g. progressing → provisioning for the next batch of routes).
+        for deployments, lifecycle_status in (
+            (result.successes, transitions.success),
+            (result.rewind, transitions.rewind),
+        ):
+            if not deployments or lifecycle_status is None:
+                continue
             transition = self._build_success_transition(
                 handler_name=handler_name,
-                deployments=result.successes,
-                lifecycle_status=transitions.success,
+                deployments=deployments,
+                lifecycle_status=lifecycle_status,
                 target_lifecycles=target_statuses,
                 records=records,
                 timestamp_now=timestamp_now,
