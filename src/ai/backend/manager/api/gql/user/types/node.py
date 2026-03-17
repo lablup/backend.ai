@@ -8,10 +8,11 @@ from uuid import UUID
 
 import strawberry
 from strawberry import ID, Info
-from strawberry.relay import Connection, Edge, Node, NodeID
+from strawberry.relay import Connection, Edge, NodeID
 
 from ai.backend.common.exception import InvalidAPIParameters
 from ai.backend.manager.api.gql.fair_share.types import UserFairShareGQL
+from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin
 from ai.backend.manager.api.gql.resource_usage.types import (
     UserUsageBucketConnection,
     UserUsageBucketFilter,
@@ -73,7 +74,7 @@ class UserUsageScopeGQL:
         "security (auth settings), container (execution settings), and timestamps."
     ),
 )
-class UserV2GQL(Node):
+class UserV2GQL(PydanticNodeMixin):
     """User entity with structured field groups."""
 
     id: NodeID[str] = strawberry.field(description="Unique identifier for the user (UUID).")

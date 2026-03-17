@@ -5,8 +5,8 @@ from collections.abc import Sequence
 
 from ai.backend.common.data.filter_specs import UUIDInMatchSpec
 from ai.backend.manager.data.user.types import UserData
+from ai.backend.manager.models.user.conditions import UserConditions
 from ai.backend.manager.repositories.base import BatchQuerier, NoPagination
-from ai.backend.manager.repositories.user.options import UserConditions
 from ai.backend.manager.services.user.actions.search_users import SearchUsersAction
 from ai.backend.manager.services.user.processors import UserProcessors
 

@@ -18,13 +18,13 @@ from ai.backend.manager.data.group.types import ProjectType
 from ai.backend.manager.models.domain.conditions import DomainConditions
 from ai.backend.manager.models.group.conditions import GroupConditions
 from ai.backend.manager.models.group.orders import GroupOrders
+from ai.backend.manager.models.user.conditions import UserConditions
 from ai.backend.manager.repositories.base import (
     QueryCondition,
     QueryOrder,
     combine_conditions_or,
     negate_conditions,
 )
-from ai.backend.manager.repositories.user.options import UserConditions
 
 from .enums import ProjectTypeEnum
 

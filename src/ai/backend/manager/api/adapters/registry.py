@@ -17,6 +17,7 @@ from ai.backend.manager.api.adapters.resource_slot import ResourceSlotAdapter
 from ai.backend.manager.api.adapters.scheduling_history import SchedulingHistoryAdapter
 from ai.backend.manager.api.adapters.service_catalog import ServiceCatalogAdapter
 from ai.backend.manager.api.adapters.session import SessionAdapter
+from ai.backend.manager.api.adapters.user import UserAdapter
 
 if TYPE_CHECKING:
     from ai.backend.manager.services.processors import Processors
@@ -45,6 +46,7 @@ class Adapters:
         scheduling_history: SchedulingHistoryAdapter,
         service_catalog: ServiceCatalogAdapter,
         session: SessionAdapter,
+        user: UserAdapter,
     ) -> None:
         self.agent = agent
         self.container_registry = container_registry
@@ -59,6 +61,7 @@ class Adapters:
         self.scheduling_history = scheduling_history
         self.service_catalog = service_catalog
         self.session = session
+        self.user = user
 
     @classmethod
     def create(cls, processors: Processors) -> Adapters:
@@ -77,4 +80,5 @@ class Adapters:
             scheduling_history=SchedulingHistoryAdapter(processors),
             service_catalog=ServiceCatalogAdapter(processors),
             session=SessionAdapter(processors),
+            user=UserAdapter(processors),
         )
