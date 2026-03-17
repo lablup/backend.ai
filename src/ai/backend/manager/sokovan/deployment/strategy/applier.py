@@ -43,14 +43,14 @@ class StrategyApplyResult:
 class StrategyResultApplier:
     """Applies a ``StrategyEvaluationSummary`` to the database.
 
-    Handles all DB mutations from a strategy evaluation cycle:
-    1. Sub-step assignment updates
-    2. Route rollout (create) and drain (terminate)
-    3. Revision swap for COMPLETED deployments
+    Handles route mutations from a strategy evaluation cycle:
+    1. Route rollout (create) and drain (terminate)
+    2. Revision swap for COMPLETED deployments
 
-    Note: Clearing ``deploying_revision`` for rolled-back deployments is NOT
-    done here — it is the responsibility of ``DeployingRollingBackHandler``
-    to explicitly call ``clear_deploying_revision`` after rollback completes.
+    Sub-step transitions are handled exclusively by the coordinator.
+    Clearing ``deploying_revision`` for rolled-back deployments is the
+    responsibility of ``DeployingRollingBackHandler``, which explicitly
+    calls ``clear_deploying_revision`` after rollback completes.
     """
 
     def __init__(self, deployment_repo: DeploymentRepository) -> None:

@@ -2583,8 +2583,8 @@ class DeploymentDBSource:
     ) -> None:
         """Clear deploying_revision and sub_step for rolled-back deployments.
 
-        This is called explicitly by the RollingBackHandler after rollback
-        completes, NOT automatically by apply_strategy_mutations.
+        This is called explicitly by ``DeployingRollingBackHandler`` after
+        rollback completes, NOT automatically by apply_strategy_mutations.
         """
         if not deployment_ids:
             return

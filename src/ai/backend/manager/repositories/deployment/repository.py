@@ -1406,6 +1406,7 @@ class DeploymentRepository:
         """
         return await self._db_source.search_deployment_policies(querier)
 
+    @deployment_repository_resilience.apply()
     async def apply_strategy_mutations(
         self,
         rollout: Sequence[RBACEntityCreator[RoutingRow]],
@@ -1427,6 +1428,7 @@ class DeploymentRepository:
             completed_ids=completed_ids,
         )
 
+    @deployment_repository_resilience.apply()
     async def clear_deploying_revision(self, deployment_ids: set[UUID]) -> None:
         """Clear deploying_revision and sub_step for rolled-back deployments.
 

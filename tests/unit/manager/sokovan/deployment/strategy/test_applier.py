@@ -189,6 +189,7 @@ class TestStrategyResultApplier:
         )
         await applier.apply(summary)
 
+        mock_deployment_repo.apply_strategy_mutations.assert_called_once()
         kwargs = mock_deployment_repo.apply_strategy_mutations.call_args.kwargs
         assert kwargs["drain"] is None
 
@@ -215,7 +216,7 @@ class TestStrategyResultApplier:
     ) -> None:
         """Rolled-back IDs are tracked in result but not passed to DB mutations.
 
-        The RollingBackHandler is responsible for clearing deploying_revision.
+        The DeployingRollingBackHandler is responsible for clearing deploying_revision.
         """
         summary, rolled_back_ids = rolled_back_summary
 
