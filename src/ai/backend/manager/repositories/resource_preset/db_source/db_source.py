@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 from collections.abc import Mapping
+from decimal import Decimal
 from typing import Any, cast
 from uuid import UUID
 
@@ -347,6 +348,14 @@ class ResourcePresetDBSource:
                     SlotQuantity(row.slot_name, row.total)
                 )
 
+        # Fill missing slot types with zero for each scaling group so callers always
+        # receive a complete list of known slots (not an empty list when no sessions exist).
+        for sg in sgroup_names:
+            existing_slots = {sq.slot_name for sq in per_sgroup_occupancy[sg]}
+            for slot_name in known_slot_types.keys():
+                if str(slot_name) not in existing_slots:
+                    per_sgroup_occupancy[sg].append(SlotQuantity(str(slot_name), Decimal(0)))
+
         return per_sgroup_occupancy
 
     async def _get_agent_available_resources(
@@ -466,7 +475,14 @@ class ResourcePresetDBSource:
         )
 
         result = await db_sess.execute(query)
-        return [SlotQuantity(row.slot_name, row.total) for row in result if row.total is not None]
+        quantities = [
+            SlotQuantity(row.slot_name, row.total) for row in result if row.total is not None
+        ]
+        if not quantities:
+            return [
+                SlotQuantity(str(slot_name), Decimal(0)) for slot_name in known_slot_types.keys()
+            ]
+        return quantities
 
     async def _get_keypair_resource_usage(
         self,

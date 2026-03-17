@@ -14,9 +14,13 @@ from ai.backend.common.types import (
 def resource_slot_to_quantities(slot: ResourceSlot) -> list[SlotQuantity]:
     """Convert a ResourceSlot dict to a list of SlotQuantity entries.
 
-    Skips entries with falsy (zero/None) values.
+    Preserves zero-valued slots; only skips None values.
     """
-    return [SlotQuantity(slot_name=k, quantity=Decimal(str(v))) for k, v in slot.items() if v]
+    return [
+        SlotQuantity(slot_name=k, quantity=Decimal(str(v)))
+        for k, v in slot.items()
+        if v is not None
+    ]
 
 
 def add_quantities(a: list[SlotQuantity], b: list[SlotQuantity]) -> list[SlotQuantity]:
