@@ -12,6 +12,7 @@ from ai.backend.manager.api.adapters.notification import NotificationAdapter
 from ai.backend.manager.api.adapters.object_storage import ObjectStorageAdapter
 from ai.backend.manager.api.adapters.project import ProjectAdapter
 from ai.backend.manager.api.adapters.prometheus_query_preset import PrometheusQueryPresetAdapter
+from ai.backend.manager.api.adapters.rbac import RBACAdapter
 from ai.backend.manager.api.adapters.resource_group import ResourceGroupAdapter
 from ai.backend.manager.api.adapters.resource_slot import ResourceSlotAdapter
 from ai.backend.manager.api.adapters.scheduling_history import SchedulingHistoryAdapter
@@ -41,6 +42,7 @@ class Adapters:
         object_storage: ObjectStorageAdapter,
         project: ProjectAdapter,
         prometheus_query_preset: PrometheusQueryPresetAdapter,
+        rbac: RBACAdapter,
         resource_group: ResourceGroupAdapter,
         resource_slot: ResourceSlotAdapter,
         scheduling_history: SchedulingHistoryAdapter,
@@ -56,6 +58,7 @@ class Adapters:
         self.object_storage = object_storage
         self.project = project
         self.prometheus_query_preset = prometheus_query_preset
+        self.rbac = rbac
         self.resource_group = resource_group
         self.resource_slot = resource_slot
         self.scheduling_history = scheduling_history
@@ -75,6 +78,7 @@ class Adapters:
             object_storage=ObjectStorageAdapter(processors),
             project=ProjectAdapter(processors),
             prometheus_query_preset=PrometheusQueryPresetAdapter(processors),
+            rbac=RBACAdapter(processors),
             resource_group=ResourceGroupAdapter(processors),
             resource_slot=ResourceSlotAdapter(processors),
             scheduling_history=SchedulingHistoryAdapter(processors),

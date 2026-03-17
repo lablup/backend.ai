@@ -11,13 +11,13 @@ from ai.backend.manager.data.permission.entity import EntityData
 from ai.backend.manager.data.permission.id import ObjectId
 from ai.backend.manager.data.permission.permission import PermissionData
 from ai.backend.manager.data.permission.role import AssignedUserData, RoleData
-from ai.backend.manager.repositories.base import BatchQuerier, NoPagination
-from ai.backend.manager.repositories.permission_controller.options import (
+from ai.backend.manager.models.rbac_models.conditions import (
     AssignedUserConditions,
     EntityScopeConditions,
     RoleConditions,
     ScopedPermissionConditions,
 )
+from ai.backend.manager.repositories.base import BatchQuerier, NoPagination
 from ai.backend.manager.services.permission_contoller.actions.search_element_associations import (
     SearchElementAssociationsAction,
 )

@@ -17,12 +17,10 @@ from ai.backend.manager.api.gql.rbac.types import (
 )
 from ai.backend.manager.api.gql.rbac.types.permission import PermissionEdge
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
+from ai.backend.manager.models.rbac_models.conditions import ScopedPermissionConditions
+from ai.backend.manager.models.rbac_models.orders import ScopedPermissionOrders
 from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
 from ai.backend.manager.repositories.base import QueryCondition
-from ai.backend.manager.repositories.permission_controller.options import (
-    ScopedPermissionConditions,
-    ScopedPermissionOrders,
-)
 from ai.backend.manager.services.permission_contoller.actions.search_permissions import (
     SearchPermissionsAction,
 )

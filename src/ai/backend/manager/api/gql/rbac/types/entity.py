@@ -10,25 +10,24 @@ from typing import Self, override
 
 import strawberry
 from strawberry import ID, Info
-from strawberry.relay import Node, NodeID
+from strawberry.relay import NodeID
 
 from ai.backend.common.data.permission.types import RBACElementType
 from ai.backend.manager.api.gql.base import OrderDirection, StringFilter
+from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin
 from ai.backend.manager.api.gql.rbac.types.entity_node import EntityNode
 from ai.backend.manager.api.gql.rbac.types.permission import RBACElementTypeGQL
 from ai.backend.manager.api.gql.types import GQLFilter, GQLOrderBy, StrawberryGQLContext
 from ai.backend.manager.data.permission.association_scopes_entities import (
     AssociationScopesEntitiesData,
 )
+from ai.backend.manager.models.rbac_models.conditions import EntityScopeConditions
+from ai.backend.manager.models.rbac_models.orders import EntityScopeOrders
 from ai.backend.manager.repositories.base import (
     QueryCondition,
     QueryOrder,
     combine_conditions_or,
     negate_conditions,
-)
-from ai.backend.manager.repositories.permission_controller.options import (
-    EntityScopeConditions,
-    EntityScopeOrders,
 )
 
 # ==================== Enums ====================
@@ -47,7 +46,7 @@ class EntityOrderField(StrEnum):
     name="EntityRef",
     description="Added in 26.3.0. Entity reference from the association_scopes_entities table",
 )
-class EntityRefGQL(Node):
+class EntityRefGQL(PydanticNodeMixin):
     id: NodeID[str]
     scope_type: RBACElementTypeGQL
     scope_id: str

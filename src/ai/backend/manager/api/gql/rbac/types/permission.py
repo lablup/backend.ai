@@ -9,7 +9,7 @@ from typing import TYPE_CHECKING, Annotated, Any, Self, override
 
 import strawberry
 from strawberry import ID, Info
-from strawberry.relay import Connection, Edge, Node, NodeID
+from strawberry.relay import Connection, Edge, NodeID
 
 from ai.backend.common.data.permission.types import (
     OperationType,
@@ -17,10 +17,13 @@ from ai.backend.common.data.permission.types import (
 )
 from ai.backend.common.types import SessionId
 from ai.backend.manager.api.gql.base import OrderDirection
+from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin
 from ai.backend.manager.api.gql.rbac.types.entity_node import EntityNode
 from ai.backend.manager.api.gql.types import GQLFilter, GQLOrderBy, StrawberryGQLContext
 from ai.backend.manager.data.permission.permission import PermissionData
 from ai.backend.manager.errors.api import InvalidAPIParameters
+from ai.backend.manager.models.rbac_models.conditions import ScopedPermissionConditions
+from ai.backend.manager.models.rbac_models.orders import ScopedPermissionOrders
 from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
 from ai.backend.manager.repositories.base import (
     QueryCondition,
@@ -31,10 +34,6 @@ from ai.backend.manager.repositories.base import (
 from ai.backend.manager.repositories.base.creator import Creator
 from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.repositories.permission_controller.creators import PermissionCreatorSpec
-from ai.backend.manager.repositories.permission_controller.options import (
-    ScopedPermissionConditions,
-    ScopedPermissionOrders,
-)
 from ai.backend.manager.repositories.permission_controller.updaters import PermissionUpdaterSpec
 from ai.backend.manager.types import OptionalState
 
@@ -143,7 +142,7 @@ class PermissionOrderField(StrEnum):
 
 
 @strawberry.type(name="Permission", description="Added in 26.3.0. RBAC scoped permission")
-class PermissionGQL(Node):
+class PermissionGQL(PydanticNodeMixin):
     id: NodeID[str]
     role_id: uuid.UUID
     scope_type: RBACElementTypeGQL

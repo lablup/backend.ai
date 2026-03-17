@@ -40,10 +40,10 @@ from ai.backend.manager.api.gql.rbac.types import (
 )
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.api.gql.utils import check_admin_only
+from ai.backend.manager.models.rbac_models.conditions import AssignedUserConditions
 from ai.backend.manager.models.rbac_models.role import RoleRow
 from ai.backend.manager.repositories.base.purger import Purger
 from ai.backend.manager.repositories.base.updater import Updater
-from ai.backend.manager.repositories.permission_controller.options import AssignedUserConditions
 from ai.backend.manager.repositories.permission_controller.updaters import RoleUpdaterSpec
 from ai.backend.manager.services.permission_contoller.actions.assign_role import (
     AssignRoleAction,

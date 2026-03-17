@@ -10,13 +10,14 @@ from typing import TYPE_CHECKING, Annotated, Any, Self, override
 
 import strawberry
 from strawberry import ID, UNSET, Info
-from strawberry.relay import Connection, Edge, Node, NodeID
+from strawberry.relay import Connection, Edge, NodeID
 
 from ai.backend.common.data.permission.types import (
     RoleSource,
     RoleStatus,
 )
 from ai.backend.manager.api.gql.base import OrderDirection, StringFilter
+from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin
 from ai.backend.manager.api.gql.types import GQLFilter, GQLOrderBy, StrawberryGQLContext
 from ai.backend.manager.data.permission.role import (
     AssignedUserData,
@@ -27,6 +28,14 @@ from ai.backend.manager.data.permission.role import (
     UserRoleAssignmentInput,
     UserRoleRevocationData,
     UserRoleRevocationInput,
+)
+from ai.backend.manager.models.rbac_models.conditions import (
+    AssignedUserConditions,
+    RoleConditions,
+)
+from ai.backend.manager.models.rbac_models.orders import (
+    AssignedUserOrders,
+    RoleOrders,
 )
 from ai.backend.manager.models.rbac_models.role import RoleRow
 from ai.backend.manager.models.rbac_models.user_role import UserRoleRow
@@ -41,12 +50,6 @@ from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.repositories.permission_controller.creators import (
     RoleCreatorSpec,
     UserRoleCreatorSpec,
-)
-from ai.backend.manager.repositories.permission_controller.options import (
-    AssignedUserConditions,
-    AssignedUserOrders,
-    RoleConditions,
-    RoleOrders,
 )
 from ai.backend.manager.repositories.permission_controller.updaters import RoleUpdaterSpec
 from ai.backend.manager.types import OptionalState, TriState
@@ -100,7 +103,7 @@ class RoleOrderField(StrEnum):
 
 
 @strawberry.type(name="Role", description="Added in 26.3.0. RBAC role")
-class RoleGQL(Node):
+class RoleGQL(PydanticNodeMixin):
     id: NodeID[str]
     name: str
     description: str | None
@@ -234,7 +237,7 @@ class RoleGQL(Node):
     name="RoleAssignment",
     description="Added in 26.3.0. RBAC role assignment (user-role association)",
 )
-class RoleAssignmentGQL(Node):
+class RoleAssignmentGQL(PydanticNodeMixin):
     id: NodeID[str]
     user_id: uuid.UUID = strawberry.field(description="The assigned user ID.")
     role_id: uuid.UUID = strawberry.field(description="The assigned role ID.")

@@ -19,11 +19,9 @@ from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.models.rbac_models.association_scopes_entities import (
     AssociationScopesEntitiesRow,
 )
+from ai.backend.manager.models.rbac_models.conditions import EntityScopeConditions
+from ai.backend.manager.models.rbac_models.orders import EntityScopeOrders
 from ai.backend.manager.repositories.base import QueryCondition
-from ai.backend.manager.repositories.permission_controller.options import (
-    EntityScopeConditions,
-    EntityScopeOrders,
-)
 from ai.backend.manager.services.permission_contoller.actions.search_element_associations import (
     SearchElementAssociationsAction,
 )

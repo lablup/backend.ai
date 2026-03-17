@@ -22,15 +22,17 @@ from ai.backend.manager.api.gql.rbac.types import (
 )
 from ai.backend.manager.api.gql.rbac.types.role import RoleAssignmentEdge, RoleEdge
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
+from ai.backend.manager.models.rbac_models.conditions import (
+    AssignedUserConditions,
+    RoleConditions,
+)
+from ai.backend.manager.models.rbac_models.orders import (
+    AssignedUserOrders,
+    RoleOrders,
+)
 from ai.backend.manager.models.rbac_models.role import RoleRow
 from ai.backend.manager.models.rbac_models.user_role import UserRoleRow
 from ai.backend.manager.repositories.base import QueryCondition
-from ai.backend.manager.repositories.permission_controller.options import (
-    AssignedUserConditions,
-    AssignedUserOrders,
-    RoleConditions,
-    RoleOrders,
-)
 from ai.backend.manager.services.permission_contoller.actions.get_role_detail import (
     GetRoleDetailAction,
 )
