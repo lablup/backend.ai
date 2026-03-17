@@ -348,6 +348,14 @@ class ResourcePresetDBSource:
                     SlotQuantity(row.slot_name, row.total)
                 )
 
+        # Fill missing slot types with zero for each scaling group so callers always
+        # receive a complete list of known slots (not an empty list when no sessions exist).
+        for sg in sgroup_names:
+            existing_slots = {sq.slot_name for sq in per_sgroup_occupancy[sg]}
+            for slot_name in known_slot_types.keys():
+                if str(slot_name) not in existing_slots:
+                    per_sgroup_occupancy[sg].append(SlotQuantity(str(slot_name), Decimal(0)))
+
         return per_sgroup_occupancy
 
     async def _get_agent_available_resources(
