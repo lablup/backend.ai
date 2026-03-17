@@ -7,7 +7,7 @@ from typing import Any, Self
 
 import strawberry
 from strawberry import ID, UNSET, Info
-from strawberry.relay import Connection, Edge, Node, NodeID
+from strawberry.relay import Connection, Edge, NodeID
 from strawberry.scalars import JSON
 
 from ai.backend.common.data.artifact.types import (
@@ -22,6 +22,7 @@ from ai.backend.manager.api.gql.base import (
     StringFilter,
     UUIDFilter,
 )
+from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin
 from ai.backend.manager.api.gql.types import GQLFilter, GQLOrderBy, StrawberryGQLContext
 from ai.backend.manager.api.gql.utils import dedent_strip
 from ai.backend.manager.data.artifact.types import (
@@ -36,12 +37,10 @@ from ai.backend.manager.data.artifact.types import (
 )
 from ai.backend.manager.data.artifact.types import DelegateeTarget as DelegateeTargetData
 from ai.backend.manager.defs import ARTIFACT_MAX_SCAN_LIMIT
-from ai.backend.manager.repositories.artifact.options import (
-    ArtifactConditions,
-    ArtifactOrders,
-    ArtifactRevisionConditions,
-    ArtifactRevisionOrders,
-)
+from ai.backend.manager.models.artifact.conditions import ArtifactConditions
+from ai.backend.manager.models.artifact.orders import ArtifactOrders
+from ai.backend.manager.models.artifact_revision.conditions import ArtifactRevisionConditions
+from ai.backend.manager.models.artifact_revision.orders import ArtifactRevisionOrders
 from ai.backend.manager.repositories.base import (
     QueryCondition,
     QueryOrder,
@@ -775,7 +774,7 @@ class SourceInfo:
     - Source: Original external registry where it was discovered
     """)
 )
-class Artifact(Node):
+class Artifact(PydanticNodeMixin):
     id: NodeID[str]
     name: str
     type: ArtifactType
@@ -851,7 +850,7 @@ class Artifact(Node):
     Most HuggingFace models only have a 'main' revision.
     """)
 )
-class ArtifactRevision(Node):
+class ArtifactRevision(PydanticNodeMixin):
     id: NodeID[str]
     status: ArtifactStatus
     remote_status: ArtifactRemoteStatus | None = strawberry.field(description="Added in 25.15.0")

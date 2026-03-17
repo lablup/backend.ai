@@ -4,7 +4,7 @@ import uuid
 from collections.abc import Sequence
 
 from ai.backend.manager.data.artifact.types import ArtifactData
-from ai.backend.manager.repositories.artifact.options import ArtifactConditions
+from ai.backend.manager.models.artifact.conditions import ArtifactConditions
 from ai.backend.manager.repositories.base import BatchQuerier, OffsetPagination
 from ai.backend.manager.services.artifact.actions.search import SearchArtifactsAction
 from ai.backend.manager.services.artifact.processors import ArtifactProcessors
