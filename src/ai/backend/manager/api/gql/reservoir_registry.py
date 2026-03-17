@@ -4,10 +4,11 @@ from typing import Self
 
 import strawberry
 from strawberry import ID, UNSET, Info
-from strawberry.relay import Connection, Edge, Node, NodeID
+from strawberry.relay import Connection, Edge, NodeID
 
 from ai.backend.manager.api.gql.artifact_registry_meta import ArtifactRegistryMetaConnection
 from ai.backend.manager.api.gql.base import encode_cursor
+from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin
 from ai.backend.manager.data.artifact_registries.types import (
     ArtifactRegistryCreatorMeta,
     ArtifactRegistryModifierMeta,
@@ -43,7 +44,7 @@ from .types import StrawberryGQLContext
 
 
 @strawberry.type(description="Added in 25.14.0")
-class ReservoirRegistry(Node):
+class ReservoirRegistry(PydanticNodeMixin):
     id: NodeID[str]
     name: str
     endpoint: str

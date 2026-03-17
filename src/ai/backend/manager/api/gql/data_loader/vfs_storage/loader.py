@@ -4,8 +4,8 @@ import uuid
 from collections.abc import Sequence
 
 from ai.backend.manager.data.vfs_storage.types import VFSStorageData
+from ai.backend.manager.models.vfs_storage.conditions import VFSStorageConditions
 from ai.backend.manager.repositories.base import BatchQuerier, OffsetPagination
-from ai.backend.manager.repositories.vfs_storage.options import VFSStorageConditions
 from ai.backend.manager.services.vfs_storage.actions.search import SearchVFSStoragesAction
 from ai.backend.manager.services.vfs_storage.processors import VFSStorageProcessors
 

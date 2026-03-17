@@ -4,9 +4,7 @@ import uuid
 from collections.abc import Sequence
 
 from ai.backend.manager.data.artifact_registries.types import ArtifactRegistryData
-from ai.backend.manager.repositories.artifact_registry.options import (
-    ArtifactRegistryConditions,
-)
+from ai.backend.manager.models.artifact_registries.conditions import ArtifactRegistryConditions
 from ai.backend.manager.repositories.base import BatchQuerier, OffsetPagination
 from ai.backend.manager.services.artifact_registry.actions.common.search import (
     SearchArtifactRegistriesAction,

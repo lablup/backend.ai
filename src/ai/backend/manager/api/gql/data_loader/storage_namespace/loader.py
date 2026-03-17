@@ -4,8 +4,8 @@ import uuid
 from collections.abc import Sequence
 
 from ai.backend.manager.data.storage_namespace.types import StorageNamespaceData
+from ai.backend.manager.models.storage_namespace.conditions import StorageNamespaceConditions
 from ai.backend.manager.repositories.base import BatchQuerier, OffsetPagination
-from ai.backend.manager.repositories.storage_namespace.options import StorageNamespaceConditions
 from ai.backend.manager.services.storage_namespace.actions.search import (
     SearchStorageNamespacesAction,
 )

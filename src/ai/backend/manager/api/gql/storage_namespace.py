@@ -6,8 +6,9 @@ from typing import Self
 
 import strawberry
 from strawberry import ID, Info
-from strawberry.relay import Connection, Edge, Node, NodeID
+from strawberry.relay import Connection, Edge, NodeID
 
+from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin
 from ai.backend.manager.api.gql.utils import dedent_strip
 from ai.backend.manager.data.storage_namespace.types import StorageNamespaceData
 from ai.backend.manager.models.storage_namespace import StorageNamespaceRow
@@ -35,7 +36,7 @@ from .types import StrawberryGQLContext
     - File System (VFS): Uses directory path prefix for namespace distinction
     """)
 )
-class StorageNamespace(Node):
+class StorageNamespace(PydanticNodeMixin):
     id: NodeID[str]
     storage_id: ID
     namespace: str

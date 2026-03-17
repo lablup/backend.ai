@@ -3,8 +3,9 @@ from uuid import UUID
 
 import strawberry
 from strawberry import ID, Info
-from strawberry.relay import Connection, Edge, Node, NodeID, PageInfo
+from strawberry.relay import Connection, Edge, NodeID, PageInfo
 
+from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.api.gql_legacy.gql_relay import AsyncNode
 from ai.backend.manager.data.deployment.types import ExtraVFolderMountData
@@ -20,7 +21,7 @@ class VFolder:
 
 
 @strawberry.type
-class ExtraVFolderMount(Node):
+class ExtraVFolderMount(PydanticNodeMixin):
     id: NodeID[str]
     mount_destination: str
     _vfolder_id: strawberry.Private[UUID]

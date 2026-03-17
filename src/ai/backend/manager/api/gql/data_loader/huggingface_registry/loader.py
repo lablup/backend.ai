@@ -4,10 +4,8 @@ import uuid
 from collections.abc import Sequence
 
 from ai.backend.manager.data.huggingface_registry.types import HuggingFaceRegistryData
+from ai.backend.manager.models.huggingface_registry.conditions import HuggingFaceRegistryConditions
 from ai.backend.manager.repositories.base import BatchQuerier, OffsetPagination
-from ai.backend.manager.repositories.huggingface_registry.options import (
-    HuggingFaceRegistryConditions,
-)
 from ai.backend.manager.services.artifact_registry.actions.huggingface.search import (
     SearchHuggingFaceRegistriesAction,
 )

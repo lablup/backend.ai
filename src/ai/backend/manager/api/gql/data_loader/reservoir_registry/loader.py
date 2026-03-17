@@ -4,10 +4,8 @@ import uuid
 from collections.abc import Sequence
 
 from ai.backend.manager.data.reservoir_registry.types import ReservoirRegistryData
+from ai.backend.manager.models.reservoir_registry.conditions import ReservoirRegistryConditions
 from ai.backend.manager.repositories.base import BatchQuerier, OffsetPagination
-from ai.backend.manager.repositories.reservoir_registry.options import (
-    ReservoirRegistryConditions,
-)
 from ai.backend.manager.services.artifact_registry.actions.reservoir.search import (
     SearchReservoirRegistriesAction,
 )

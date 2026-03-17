@@ -6,9 +6,10 @@ from typing import Any, Self
 
 import strawberry
 from strawberry import ID
-from strawberry.relay import Connection, Edge, Node, NodeID
+from strawberry.relay import Connection, Edge, NodeID
 
 from ai.backend.common.data.artifact.types import ArtifactRegistryType
+from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin
 from ai.backend.manager.api.gql.utils import dedent_strip
 from ai.backend.manager.data.artifact_registries.types import (
     ArtifactRegistryData,
@@ -29,7 +30,7 @@ from .types import StrawberryGQLContext
     All artifact registry nodes expose that information regardless of type.
 """)
 )
-class ArtifactRegistryMeta(Node):
+class ArtifactRegistryMeta(PydanticNodeMixin):
     id: NodeID[str]
     name: str
     registry_id: ID

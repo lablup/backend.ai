@@ -6,9 +6,10 @@ from typing import Self
 
 import strawberry
 from strawberry import ID, UNSET, Info
-from strawberry.relay import Connection, Edge, Node, NodeID
+from strawberry.relay import Connection, Edge, NodeID
 
 from ai.backend.manager.api.gql.base import encode_cursor
+from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin
 from ai.backend.manager.data.vfs_storage.types import VFSStorageData
 from ai.backend.manager.models.vfs_storage import VFSStorageRow
 from ai.backend.manager.repositories.base.creator import Creator
@@ -26,7 +27,7 @@ from .types import StrawberryGQLContext
 
 
 @strawberry.type(description="Added in 25.16.0. VFS Storage configuration")
-class VFSStorage(Node):
+class VFSStorage(PydanticNodeMixin):
     id: NodeID[str]
     name: str
     host: str
