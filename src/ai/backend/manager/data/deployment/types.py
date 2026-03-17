@@ -396,6 +396,17 @@ class DeploymentInfo:
             None,
         )
 
+    def resolve_revision_spec(self, revision_id: UUID | None = None) -> ModelRevisionSpec | None:
+        """Resolve a revision spec with fallback: revision_id → deploying → current."""
+        if revision_id is not None:
+            found = next(
+                (r for r in self.model_revisions if r.revision_id == revision_id),
+                None,
+            )
+            if found is not None:
+                return found
+        return self.deploying_revision_spec() or self.current_revision_spec()
+
 
 @dataclass
 class DeploymentWithHistory:

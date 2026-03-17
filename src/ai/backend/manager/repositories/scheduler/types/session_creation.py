@@ -117,16 +117,7 @@ class SessionCreationSpec:
     ) -> Self:
         session_creation_id = secrets.token_urlsafe(16)
         # Use the specified revision, falling back to deploying then current.
-        target_revision = None
-        if revision_id:
-            target_revision = next(
-                (r for r in deployment_info.model_revisions if r.revision_id == revision_id),
-                None,
-            )
-        if target_revision is None:
-            target_revision = (
-                deployment_info.deploying_revision_spec() or deployment_info.current_revision_spec()
-            )
+        target_revision = deployment_info.resolve_revision_spec(revision_id)
         if target_revision is None:
             raise DeploymentHasNoTargetRevision("Deployment has no revision for session creation")
 
