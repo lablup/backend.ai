@@ -7,12 +7,27 @@ from uuid import UUID
 import strawberry
 from strawberry import UNSET
 
+from ai.backend.common.api_handlers import SENTINEL
+from ai.backend.common.dto.manager.v2.user.request import (
+    CreateUserInput as CreateUserInputDTO,
+)
+from ai.backend.common.dto.manager.v2.user.request import (
+    UpdateUserInput as UpdateUserInputDTO,
+)
+from ai.backend.common.dto.manager.v2.user.types import (
+    UserRole as DtoUserRole,
+)
+from ai.backend.common.dto.manager.v2.user.types import (
+    UserStatus as DtoUserStatus,
+)
+
 from .enums import UserRoleEnumGQL, UserStatusEnumGQL
 
 # Create User Inputs
 
 
-@strawberry.input(
+@strawberry.experimental.pydantic.input(
+    model=CreateUserInputDTO,
     name="CreateUserV2Input",
     description=(
         "Added in 26.2.0. Input for creating a new user. "
@@ -76,6 +91,27 @@ class CreateUserInputGQL:
         description="Supplementary group IDs for container processes.",
     )
 
+    def to_pydantic(self) -> CreateUserInputDTO:
+        return CreateUserInputDTO(
+            email=self.email,
+            username=self.username,
+            password=self.password,
+            domain_name=self.domain_name,
+            need_password_change=self.need_password_change,
+            status=DtoUserStatus(self.status.value),
+            role=DtoUserRole(self.role.value),
+            full_name=self.full_name,
+            description=self.description,
+            group_ids=self.group_ids,
+            allowed_client_ip=self.allowed_client_ip,
+            totp_activated=self.totp_activated,
+            resource_policy=self.resource_policy,
+            sudo_session_enabled=self.sudo_session_enabled,
+            container_uid=self.container_uid,
+            container_main_gid=self.container_main_gid,
+            container_gids=self.container_gids,
+        )
+
 
 @strawberry.input(
     name="BulkCreateUserV2Input",
@@ -93,7 +129,8 @@ class BulkCreateUserV2InputGQL:
 # Update User Inputs
 
 
-@strawberry.input(
+@strawberry.experimental.pydantic.input(
+    model=UpdateUserInputDTO,
     name="UpdateUserV2Input",
     description=(
         "Added in 26.3.0. Input for updating user information. "
@@ -167,6 +204,40 @@ class UpdateUserV2InputGQL:
         default=UNSET,
         description="New container supplementary group IDs.",
     )
+
+    def to_pydantic(self) -> UpdateUserInputDTO:
+        return UpdateUserInputDTO(
+            username=None if self.username is UNSET else self.username,
+            password=None if self.password is UNSET else self.password,
+            full_name=SENTINEL if self.full_name is UNSET else self.full_name,
+            description=SENTINEL if self.description is UNSET else self.description,
+            status=(
+                None
+                if (self.status is UNSET or self.status is None)
+                else DtoUserStatus(self.status.value)
+            ),
+            role=(
+                None if (self.role is UNSET or self.role is None) else DtoUserRole(self.role.value)
+            ),
+            domain_name=None if self.domain_name is UNSET else self.domain_name,
+            group_ids=SENTINEL if self.group_ids is UNSET else self.group_ids,
+            allowed_client_ip=SENTINEL
+            if self.allowed_client_ip is UNSET
+            else self.allowed_client_ip,
+            need_password_change=None
+            if self.need_password_change is UNSET
+            else self.need_password_change,
+            resource_policy=None if self.resource_policy is UNSET else self.resource_policy,
+            sudo_session_enabled=None
+            if self.sudo_session_enabled is UNSET
+            else self.sudo_session_enabled,
+            main_access_key=SENTINEL if self.main_access_key is UNSET else self.main_access_key,
+            container_uid=SENTINEL if self.container_uid is UNSET else self.container_uid,
+            container_main_gid=SENTINEL
+            if self.container_main_gid is UNSET
+            else self.container_main_gid,
+            container_gids=SENTINEL if self.container_gids is UNSET else self.container_gids,
+        )
 
 
 @strawberry.input(

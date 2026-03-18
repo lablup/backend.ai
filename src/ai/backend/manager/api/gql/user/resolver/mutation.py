@@ -9,6 +9,7 @@ from uuid import UUID
 import strawberry
 from strawberry import Info
 
+from ai.backend.common.api_handlers import Sentinel
 from ai.backend.common.contexts.client_ip import current_client_ip
 from ai.backend.common.contexts.user import current_user
 from ai.backend.common.exception import InvalidIpAddressValue, UnreachableError
@@ -116,33 +117,34 @@ async def admin_bulk_create_users_v2(
     # Build list of UserCreateSpec from input
     items: list[UserCreateSpec] = []
     for user_input in input.users:
+        dto = user_input.to_pydantic()
         password_info = PasswordInfo(
-            password=user_input.password,
+            password=dto.password,
             algorithm=auth_config.password_hash_algorithm,
             rounds=auth_config.password_hash_rounds,
             salt_size=auth_config.password_hash_salt_size,
         )
 
         spec = UserCreatorSpec(
-            email=user_input.email,
-            username=user_input.username,
+            email=dto.email,
+            username=dto.username,
             password=password_info,
-            need_password_change=user_input.need_password_change,
-            domain_name=user_input.domain_name,
-            full_name=user_input.full_name,
-            description=user_input.description,
-            status=UserStatus(user_input.status.value),
-            role=user_input.role.value,
-            allowed_client_ip=user_input.allowed_client_ip,
-            totp_activated=user_input.totp_activated,
-            resource_policy=user_input.resource_policy,
-            sudo_session_enabled=user_input.sudo_session_enabled,
-            container_uid=user_input.container_uid,
-            container_main_gid=user_input.container_main_gid,
-            container_gids=user_input.container_gids,
+            need_password_change=dto.need_password_change,
+            domain_name=dto.domain_name,
+            full_name=dto.full_name,
+            description=dto.description,
+            status=UserStatus(dto.status),
+            role=str(dto.role),
+            allowed_client_ip=dto.allowed_client_ip,
+            totp_activated=dto.totp_activated,
+            resource_policy=dto.resource_policy,
+            sudo_session_enabled=dto.sudo_session_enabled,
+            container_uid=dto.container_uid,
+            container_main_gid=dto.container_main_gid,
+            container_gids=dto.container_gids,
         )
 
-        group_ids = [str(gid) for gid in user_input.group_ids] if user_input.group_ids else None
+        group_ids = [str(gid) for gid in dto.group_ids] if dto.group_ids else None
         items.append(UserCreateSpec(creator=Creator(spec=spec), group_ids=group_ids))
 
     action = BulkCreateUserAction(items=items)
@@ -223,33 +225,95 @@ async def admin_bulk_update_users_v2(
 
     items: list[UserUpdateSpec] = []
     for user_item in input.users:
-        user_input = user_item.input
+        dto = user_item.input.to_pydantic()
 
         updater_spec = UserUpdaterSpec(
-            username=OptionalState.from_graphql(user_input.username),
-            password=OptionalState.from_graphql(user_input.password).map(
-                lambda pw: PasswordInfo(
-                    password=pw,
-                    algorithm=auth_config.password_hash_algorithm,
-                    rounds=auth_config.password_hash_rounds,
-                    salt_size=auth_config.password_hash_salt_size,
-                )
+            username=(
+                OptionalState.update(dto.username)
+                if dto.username is not None
+                else OptionalState.nop()
             ),
-            need_password_change=OptionalState.from_graphql(user_input.need_password_change),
-            full_name=OptionalState.from_graphql(user_input.full_name),
-            description=OptionalState.from_graphql(user_input.description),
-            status=OptionalState.from_graphql(user_input.status).map(lambda s: UserStatus(s.value)),
-            domain_name=OptionalState.from_graphql(user_input.domain_name),
-            role=OptionalState.from_graphql(user_input.role).map(lambda r: UserRole(r.value)),
-            allowed_client_ip=TriState.from_graphql(user_input.allowed_client_ip),
-            resource_policy=OptionalState.from_graphql(user_input.resource_policy),
-            sudo_session_enabled=OptionalState.from_graphql(user_input.sudo_session_enabled),
-            main_access_key=TriState.from_graphql(user_input.main_access_key),
-            container_uid=TriState.from_graphql(user_input.container_uid),
-            container_main_gid=TriState.from_graphql(user_input.container_main_gid),
-            container_gids=TriState.from_graphql(user_input.container_gids),
-            group_ids=OptionalState.from_graphql(user_input.group_ids).map(
-                lambda gids: [str(gid) for gid in gids]
+            password=(
+                OptionalState.update(
+                    PasswordInfo(
+                        password=dto.password,
+                        algorithm=auth_config.password_hash_algorithm,
+                        rounds=auth_config.password_hash_rounds,
+                        salt_size=auth_config.password_hash_salt_size,
+                    )
+                )
+                if dto.password is not None
+                else OptionalState.nop()
+            ),
+            need_password_change=(
+                OptionalState.update(dto.need_password_change)
+                if dto.need_password_change is not None
+                else OptionalState.nop()
+            ),
+            full_name=(
+                OptionalState.nop()
+                if isinstance(dto.full_name, Sentinel) or dto.full_name is None
+                else OptionalState.update(dto.full_name)
+            ),
+            description=(
+                OptionalState.nop()
+                if isinstance(dto.description, Sentinel) or dto.description is None
+                else OptionalState.update(dto.description)
+            ),
+            status=(
+                OptionalState.update(UserStatus(dto.status))
+                if dto.status is not None
+                else OptionalState.nop()
+            ),
+            domain_name=(
+                OptionalState.update(dto.domain_name)
+                if dto.domain_name is not None
+                else OptionalState.nop()
+            ),
+            role=(
+                OptionalState.update(UserRole(dto.role))
+                if dto.role is not None
+                else OptionalState.nop()
+            ),
+            allowed_client_ip=(
+                TriState.nop()
+                if isinstance(dto.allowed_client_ip, Sentinel)
+                else TriState.from_graphql(dto.allowed_client_ip)
+            ),
+            resource_policy=(
+                OptionalState.update(dto.resource_policy)
+                if dto.resource_policy is not None
+                else OptionalState.nop()
+            ),
+            sudo_session_enabled=(
+                OptionalState.update(dto.sudo_session_enabled)
+                if dto.sudo_session_enabled is not None
+                else OptionalState.nop()
+            ),
+            main_access_key=(
+                TriState.nop()
+                if isinstance(dto.main_access_key, Sentinel)
+                else TriState.from_graphql(dto.main_access_key)
+            ),
+            container_uid=(
+                TriState.nop()
+                if isinstance(dto.container_uid, Sentinel)
+                else TriState.from_graphql(dto.container_uid)
+            ),
+            container_main_gid=(
+                TriState.nop()
+                if isinstance(dto.container_main_gid, Sentinel)
+                else TriState.from_graphql(dto.container_main_gid)
+            ),
+            container_gids=(
+                TriState.nop()
+                if isinstance(dto.container_gids, Sentinel)
+                else TriState.from_graphql(dto.container_gids)
+            ),
+            group_ids=(
+                OptionalState.nop()
+                if isinstance(dto.group_ids, Sentinel) or dto.group_ids is None
+                else OptionalState.update([str(gid) for gid in dto.group_ids])
             ),
         )
 
