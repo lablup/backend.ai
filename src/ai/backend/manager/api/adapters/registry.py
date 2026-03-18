@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING
 
 from ai.backend.manager.api.adapters.agent import AgentAdapter
 from ai.backend.manager.api.adapters.artifact import ArtifactAdapter
+from ai.backend.manager.api.adapters.audit_log import AuditLogAdapter
 from ai.backend.manager.api.adapters.container_registry import ContainerRegistryAdapter
 from ai.backend.manager.api.adapters.deployment import DeploymentAdapter
 from ai.backend.manager.api.adapters.domain import DomainAdapter
@@ -43,6 +44,7 @@ class Adapters:
         self,
         agent: AgentAdapter,
         artifact: ArtifactAdapter,
+        audit_log: AuditLogAdapter,
         container_registry: ContainerRegistryAdapter,
         deployment: DeploymentAdapter,
         domain: DomainAdapter,
@@ -66,6 +68,7 @@ class Adapters:
     ) -> None:
         self.agent = agent
         self.artifact = artifact
+        self.audit_log = audit_log
         self.container_registry = container_registry
         self.deployment = deployment
         self.domain = domain
@@ -93,6 +96,7 @@ class Adapters:
         return cls(
             agent=AgentAdapter(processors),
             artifact=ArtifactAdapter(processors),
+            audit_log=AuditLogAdapter(processors),
             container_registry=ContainerRegistryAdapter(processors),
             deployment=DeploymentAdapter(processors),
             domain=DomainAdapter(processors),
