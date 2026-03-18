@@ -16,6 +16,9 @@ from ai.backend.common.data.artifact.types import (
 )
 from ai.backend.common.data.storage.registries.types import ModelTarget as ModelTargetData
 from ai.backend.common.dto.manager.v2.artifact.request import (
+    ApproveArtifactInput as ApproveArtifactInputDTO,
+)
+from ai.backend.common.dto.manager.v2.artifact.request import (
     CancelImportTaskInput as CancelArtifactInputDTO,
 )
 from ai.backend.common.dto.manager.v2.artifact.request import (
@@ -23,6 +26,12 @@ from ai.backend.common.dto.manager.v2.artifact.request import (
 )
 from ai.backend.common.dto.manager.v2.artifact.request import (
     DeleteArtifactsInput as DeleteArtifactsInputDTO,
+)
+from ai.backend.common.dto.manager.v2.artifact.request import (
+    RejectArtifactInput as RejectArtifactInputDTO,
+)
+from ai.backend.common.dto.manager.v2.artifact.request import (
+    RestoreArtifactsInput as RestoreArtifactsInputDTO,
 )
 from ai.backend.manager.api.gql.base import (
     ByteSize,
@@ -666,43 +675,55 @@ class DeleteArtifactsInput:
     artifact_ids: list[ID]
 
 
-@strawberry.input(
+@strawberry.experimental.pydantic.input(
+    model=RestoreArtifactsInputDTO,
     description=dedent_strip("""
     Added in 25.15.0.
 
     Input for restoring previously deleted artifacts.
 
     Reverses the soft-delete operation, making the artifacts available again.
-    """)
+    """),
 )
 class RestoreArtifactsInput:
     artifact_ids: list[ID]
 
+    def to_pydantic(self) -> RestoreArtifactsInputDTO:
+        return RestoreArtifactsInputDTO(artifact_ids=[uuid.UUID(i) for i in self.artifact_ids])
 
-@strawberry.input(
+
+@strawberry.experimental.pydantic.input(
+    model=ApproveArtifactInputDTO,
     description=dedent_strip("""
     Added in 25.14.0.
 
     Input for approving an artifact revision.
 
     Admin-only operation to approve artifact revisions for general use.
-    """)
+    """),
 )
 class ApproveArtifactInput:
     artifact_revision_id: ID
 
+    def to_pydantic(self) -> ApproveArtifactInputDTO:
+        return ApproveArtifactInputDTO(artifact_revision_id=uuid.UUID(self.artifact_revision_id))
 
-@strawberry.input(
+
+@strawberry.experimental.pydantic.input(
+    model=RejectArtifactInputDTO,
     description=dedent_strip("""
     Added in 25.14.0.
 
     Input for rejecting an artifact revision.
 
     Admin-only operation to reject artifact revisions, preventing their use.
-    """)
+    """),
 )
 class RejectArtifactInput:
     artifact_revision_id: ID
+
+    def to_pydantic(self) -> RejectArtifactInputDTO:
+        return RejectArtifactInputDTO(artifact_revision_id=uuid.UUID(self.artifact_revision_id))
 
 
 @strawberry.input(

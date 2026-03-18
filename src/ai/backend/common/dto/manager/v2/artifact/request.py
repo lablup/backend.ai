@@ -20,12 +20,15 @@ from .types import (
 
 __all__ = (
     "AdminSearchArtifactsInput",
+    "ApproveArtifactInput",
     "ArtifactFilter",
     "ArtifactOrder",
     "CancelImportTaskInput",
     "CleanupRevisionsInput",
     "DeleteArtifactsInput",
     "ImportArtifactsInput",
+    "RejectArtifactInput",
+    "RestoreArtifactsInput",
     "UpdateArtifactInput",
 )
 
@@ -123,4 +126,26 @@ class CancelImportTaskInput(BaseRequestModel):
 
     artifact_revision_id: UUID = Field(
         description="The artifact revision ID whose import task should be cancelled.",
+    )
+
+
+class RestoreArtifactsInput(BaseRequestModel):
+    """Input for restoring previously deleted artifacts."""
+
+    artifact_ids: list[UUID] = Field(description="List of artifact IDs to restore.")
+
+
+class ApproveArtifactInput(BaseRequestModel):
+    """Input for approving an artifact revision."""
+
+    artifact_revision_id: UUID = Field(
+        description="The artifact revision ID to approve.",
+    )
+
+
+class RejectArtifactInput(BaseRequestModel):
+    """Input for rejecting an artifact revision."""
+
+    artifact_revision_id: UUID = Field(
+        description="The artifact revision ID to reject.",
     )
