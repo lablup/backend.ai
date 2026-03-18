@@ -12,15 +12,28 @@ import strawberry
 from strawberry import ID, UNSET, Info
 from strawberry.relay import Connection, Edge, NodeID
 
+from ai.backend.common.api_handlers import SENTINEL
 from ai.backend.common.data.permission.types import (
     RoleSource,
     RoleStatus,
+)
+from ai.backend.common.dto.manager.v2.rbac.request import (
+    CreateRoleInput as CreateRoleInputDTO,
 )
 from ai.backend.common.dto.manager.v2.rbac.request import (
     DeleteRoleInput as DeleteRoleInputDTO,
 )
 from ai.backend.common.dto.manager.v2.rbac.request import (
     PurgeRoleInput as PurgeRoleInputDTO,
+)
+from ai.backend.common.dto.manager.v2.rbac.request import (
+    UpdateRoleInput as UpdateRoleInputDTO,
+)
+from ai.backend.common.dto.manager.v2.rbac.types import (
+    RoleSource as RoleSourceV2,
+)
+from ai.backend.common.dto.manager.v2.rbac.types import (
+    RoleStatus as RoleStatusV2,
 )
 from ai.backend.manager.api.gql.base import OrderDirection, StringFilter
 from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin
@@ -43,7 +56,6 @@ from ai.backend.manager.models.rbac_models.orders import (
     AssignedUserOrders,
     RoleOrders,
 )
-from ai.backend.manager.models.rbac_models.role import RoleRow
 from ai.backend.manager.models.rbac_models.user_role import UserRoleRow
 from ai.backend.manager.repositories.base import (
     QueryCondition,
@@ -51,14 +63,8 @@ from ai.backend.manager.repositories.base import (
     combine_conditions_or,
     negate_conditions,
 )
-from ai.backend.manager.repositories.base.creator import BulkCreator, Creator
-from ai.backend.manager.repositories.base.updater import Updater
-from ai.backend.manager.repositories.permission_controller.creators import (
-    RoleCreatorSpec,
-    UserRoleCreatorSpec,
-)
-from ai.backend.manager.repositories.permission_controller.updaters import RoleUpdaterSpec
-from ai.backend.manager.types import OptionalState, TriState
+from ai.backend.manager.repositories.base.creator import BulkCreator
+from ai.backend.manager.repositories.permission_controller.creators import UserRoleCreatorSpec
 
 if TYPE_CHECKING:
     from ai.backend.manager.api.gql.rbac.types.permission import (
@@ -80,6 +86,10 @@ class RoleSourceGQL(StrEnum):
     def from_internal(cls, value: RoleSource) -> RoleSourceGQL:
         return cls(value.value)
 
+    @classmethod
+    def from_enum(cls, value: Any) -> RoleSourceGQL:
+        return cls(value.value)
+
     def to_internal(self) -> RoleSource:
         return RoleSource(self.value)
 
@@ -92,6 +102,10 @@ class RoleStatusGQL(StrEnum):
 
     @classmethod
     def from_internal(cls, value: RoleStatus) -> RoleStatusGQL:
+        return cls(value.value)
+
+    @classmethod
+    def from_enum(cls, value: Any) -> RoleStatusGQL:
         return cls(value.value)
 
     def to_internal(self) -> RoleStatus:
@@ -323,11 +337,49 @@ class RoleAssignmentGQL(PydanticNodeMixin):
 # ==================== Filter Types ====================
 
 
+@strawberry.input(
+    name="RoleSourceFilter",
+    description="Added in 26.3.0. Filter for role source with equality and membership operators.",
+)
+class RoleSourceFilterGQL:
+    equals: RoleSourceGQL | None = strawberry.field(
+        default=None, description="Matches roles with this exact source."
+    )
+    in_: list[RoleSourceGQL] | None = strawberry.field(
+        name="in", default=None, description="Matches roles whose source is in this list."
+    )
+    not_equals: RoleSourceGQL | None = strawberry.field(
+        default=None, description="Excludes roles with this exact source."
+    )
+    not_in: list[RoleSourceGQL] | None = strawberry.field(
+        default=None, description="Excludes roles whose source is in this list."
+    )
+
+
+@strawberry.input(
+    name="RoleStatusFilter",
+    description="Added in 26.3.0. Filter for role status with equality and membership operators.",
+)
+class RoleStatusFilterGQL:
+    equals: RoleStatusGQL | None = strawberry.field(
+        default=None, description="Matches roles with this exact status."
+    )
+    in_: list[RoleStatusGQL] | None = strawberry.field(
+        name="in", default=None, description="Matches roles whose status is in this list."
+    )
+    not_equals: RoleStatusGQL | None = strawberry.field(
+        default=None, description="Excludes roles with this exact status."
+    )
+    not_in: list[RoleStatusGQL] | None = strawberry.field(
+        default=None, description="Excludes roles whose status is in this list."
+    )
+
+
 @strawberry.input(description="Added in 26.3.0. Filter for roles")
 class RoleFilter(GQLFilter):
     name: StringFilter | None = None
-    source: list[RoleSourceGQL] | None = None
-    status: list[RoleStatusGQL] | None = None
+    source: RoleSourceFilterGQL | None = None
+    status: RoleStatusFilterGQL | None = None
 
     AND: list[RoleFilter] | None = None
     OR: list[RoleFilter] | None = None
@@ -347,11 +399,31 @@ class RoleFilter(GQLFilter):
             if condition:
                 conditions.append(condition)
 
-        if self.source is not None and len(self.source) > 0:
-            conditions.append(RoleConditions.by_sources([s.to_internal() for s in self.source]))
+        if self.source is not None:
+            src = self.source
+            if src.equals is not None:
+                conditions.append(RoleConditions.by_source_equals(src.equals.to_internal()))
+            if src.in_ is not None and len(src.in_) > 0:
+                conditions.append(RoleConditions.by_sources([s.to_internal() for s in src.in_]))
+            if src.not_equals is not None:
+                conditions.append(RoleConditions.by_source_not_equals(src.not_equals.to_internal()))
+            if src.not_in is not None and len(src.not_in) > 0:
+                conditions.append(
+                    RoleConditions.by_source_not_in([s.to_internal() for s in src.not_in])
+                )
 
-        if self.status is not None and len(self.status) > 0:
-            conditions.append(RoleConditions.by_statuses([s.to_internal() for s in self.status]))
+        if self.status is not None:
+            st = self.status
+            if st.equals is not None:
+                conditions.append(RoleConditions.by_status_equals(st.equals.to_internal()))
+            if st.in_ is not None and len(st.in_) > 0:
+                conditions.append(RoleConditions.by_statuses([s.to_internal() for s in st.in_]))
+            if st.not_equals is not None:
+                conditions.append(RoleConditions.by_status_not_equals(st.not_equals.to_internal()))
+            if st.not_in is not None and len(st.not_in) > 0:
+                conditions.append(
+                    RoleConditions.by_status_not_in([s.to_internal() for s in st.not_in])
+                )
 
         # Handle AND logical operator
         if self.AND:
@@ -389,8 +461,8 @@ class RoleFilter(GQLFilter):
 )
 class RoleAssignmentRoleNestedFilterGQL:
     name: StringFilter | None = None
-    source: list[RoleSourceGQL] | None = None
-    status: list[RoleStatusGQL] | None = None
+    source: RoleSourceFilterGQL | None = None
+    status: RoleStatusFilterGQL | None = None
 
     AND: list[RoleAssignmentRoleNestedFilterGQL] | None = None
     OR: list[RoleAssignmentRoleNestedFilterGQL] | None = None
@@ -407,12 +479,34 @@ class RoleAssignmentRoleNestedFilterGQL:
             )
             if condition:
                 raw_conditions.append(condition)
-        if self.source is not None and len(self.source) > 0:
-            raw_conditions.append(RoleConditions.by_sources([s.to_internal() for s in self.source]))
-        if self.status is not None and len(self.status) > 0:
-            raw_conditions.append(
-                RoleConditions.by_statuses([s.to_internal() for s in self.status])
-            )
+        if self.source is not None:
+            src = self.source
+            if src.equals is not None:
+                raw_conditions.append(RoleConditions.by_source_equals(src.equals.to_internal()))
+            if src.in_ is not None and len(src.in_) > 0:
+                raw_conditions.append(RoleConditions.by_sources([s.to_internal() for s in src.in_]))
+            if src.not_equals is not None:
+                raw_conditions.append(
+                    RoleConditions.by_source_not_equals(src.not_equals.to_internal())
+                )
+            if src.not_in is not None and len(src.not_in) > 0:
+                raw_conditions.append(
+                    RoleConditions.by_source_not_in([s.to_internal() for s in src.not_in])
+                )
+        if self.status is not None:
+            st = self.status
+            if st.equals is not None:
+                raw_conditions.append(RoleConditions.by_status_equals(st.equals.to_internal()))
+            if st.in_ is not None and len(st.in_) > 0:
+                raw_conditions.append(RoleConditions.by_statuses([s.to_internal() for s in st.in_]))
+            if st.not_equals is not None:
+                raw_conditions.append(
+                    RoleConditions.by_status_not_equals(st.not_equals.to_internal())
+                )
+            if st.not_in is not None and len(st.not_in) > 0:
+                raw_conditions.append(
+                    RoleConditions.by_status_not_in([s.to_internal() for s in st.not_in])
+                )
         conditions: list[QueryCondition] = []
         if raw_conditions:
             conditions.append(AssignedUserConditions.exists_role_combined(raw_conditions))
@@ -553,37 +647,41 @@ class RoleAssignmentOrderBy(GQLOrderBy):
 # ==================== Input Types ====================
 
 
-@strawberry.input(description="Added in 26.3.0. Input for creating a role")
+@strawberry.experimental.pydantic.input(
+    model=CreateRoleInputDTO,
+    description="Added in 26.3.0. Input for creating a role",
+)
 class CreateRoleInput:
     name: str
     description: str | None = None
     source: RoleSourceGQL | None = None
 
-    def to_creator(self) -> Creator[RoleRow]:
-        return Creator(
-            spec=RoleCreatorSpec(
-                name=self.name,
-                source=self.source.to_internal() if self.source is not None else RoleSource.CUSTOM,
-                status=RoleStatus.ACTIVE,
-                description=self.description,
-            )
+    def to_pydantic(self) -> CreateRoleInputDTO:
+        return CreateRoleInputDTO(
+            name=self.name,
+            description=self.description,
+            source=RoleSourceV2(self.source.value)
+            if self.source is not None
+            else RoleSourceV2.CUSTOM,
         )
 
 
-@strawberry.input(description="Added in 26.3.0. Input for updating a role")
+@strawberry.experimental.pydantic.input(
+    model=UpdateRoleInputDTO,
+    description="Added in 26.3.0. Input for updating a role",
+)
 class UpdateRoleInput:
     id: uuid.UUID
     name: str | None = UNSET
     description: str | None = UNSET
     status: RoleStatusGQL | None = UNSET
 
-    def to_updater(self) -> Updater[RoleRow]:
-        spec = RoleUpdaterSpec(
-            name=OptionalState.from_graphql(self.name),
-            description=TriState.from_graphql(self.description),
-            status=OptionalState.from_graphql(self.status).map(lambda s: s.to_internal()),
+    def to_pydantic(self) -> UpdateRoleInputDTO:
+        return UpdateRoleInputDTO(
+            name=self.name,
+            description=SENTINEL if self.description is None else self.description,
+            status=RoleStatusV2(self.status.value) if self.status is not None else None,
         )
-        return Updater(spec=spec, pk_value=self.id)
 
 
 @strawberry.input(description="Added in 26.3.0. Input for assigning a role to a user")

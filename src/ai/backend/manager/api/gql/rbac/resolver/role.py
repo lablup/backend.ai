@@ -54,9 +54,6 @@ from ai.backend.manager.services.permission_contoller.actions.bulk_assign_role i
 from ai.backend.manager.services.permission_contoller.actions.bulk_revoke_role import (
     BulkRevokeRoleAction,
 )
-from ai.backend.manager.services.permission_contoller.actions.create_role import (
-    CreateRoleAction,
-)
 from ai.backend.manager.services.permission_contoller.actions.delete_role import (
     DeleteRoleAction,
 )
@@ -65,9 +62,6 @@ from ai.backend.manager.services.permission_contoller.actions.purge_role import 
 )
 from ai.backend.manager.services.permission_contoller.actions.revoke_role import (
     RevokeRoleAction,
-)
-from ai.backend.manager.services.permission_contoller.actions.update_role import (
-    UpdateRoleAction,
 )
 from ai.backend.manager.types import OptionalState
 
@@ -182,12 +176,8 @@ async def admin_create_role(
     input: CreateRoleInput,
 ) -> RoleGQL:
     check_admin_only()
-    action_result = (
-        await info.context.processors.permission_controller.create_role.wait_for_complete(
-            CreateRoleAction(creator=input.to_creator())
-        )
-    )
-    return RoleGQL.from_dataclass(action_result.data)
+    payload = await info.context.adapters.rbac.create(input.to_pydantic())
+    return RoleGQL.from_pydantic(payload.role)
 
 
 @strawberry.mutation(description="Added in 26.3.0. Update an existing role (admin only).")  # type: ignore[misc]
@@ -196,12 +186,8 @@ async def admin_update_role(
     input: UpdateRoleInput,
 ) -> RoleGQL:
     check_admin_only()
-    action_result = (
-        await info.context.processors.permission_controller.update_role.wait_for_complete(
-            UpdateRoleAction(updater=input.to_updater())
-        )
-    )
-    return RoleGQL.from_dataclass(action_result.data)
+    payload = await info.context.adapters.rbac.update(input.id, input.to_pydantic())
+    return RoleGQL.from_pydantic(payload.role)
 
 
 @strawberry.mutation(description="Added in 26.3.0. Soft-delete a role (admin only).")  # type: ignore[misc]
