@@ -37,6 +37,7 @@ class AuthorizeAction(AuthAction):
             "password": self.password,
             "stoken": self.stoken or "",
             "sToken": self.stoken or "",
+            "otp": self.stoken or "",
         }
 
 
