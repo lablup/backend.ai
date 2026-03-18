@@ -3,6 +3,7 @@ from typing import override
 from ai.backend.manager.actions.monitors.monitor import ActionMonitor
 from ai.backend.manager.actions.processor import ActionProcessor
 from ai.backend.manager.actions.types import AbstractProcessorPackage, ActionSpec
+from ai.backend.manager.actions.validators import ActionValidators
 from ai.backend.manager.services.domain.actions.create_domain import (
     CreateDomainAction,
     CreateDomainActionResult,
@@ -14,6 +15,10 @@ from ai.backend.manager.services.domain.actions.create_domain_node import (
 from ai.backend.manager.services.domain.actions.delete_domain import (
     DeleteDomainAction,
     DeleteDomainActionResult,
+)
+from ai.backend.manager.services.domain.actions.get_domain import (
+    GetDomainAction,
+    GetDomainActionResult,
 )
 from ai.backend.manager.services.domain.actions.modify_domain import (
     ModifyDomainAction,
@@ -27,6 +32,14 @@ from ai.backend.manager.services.domain.actions.purge_domain import (
     PurgeDomainAction,
     PurgeDomainActionResult,
 )
+from ai.backend.manager.services.domain.actions.search_domains import (
+    SearchDomainsAction,
+    SearchDomainsActionResult,
+)
+from ai.backend.manager.services.domain.actions.search_rg_domains import (
+    SearchRGDomainsAction,
+    SearchRGDomainsActionResult,
+)
 
 from .service import DomainService
 
@@ -38,14 +51,25 @@ class DomainProcessors(AbstractProcessorPackage):
     modify_domain: ActionProcessor[ModifyDomainAction, ModifyDomainActionResult]
     delete_domain: ActionProcessor[DeleteDomainAction, DeleteDomainActionResult]
     purge_domain: ActionProcessor[PurgeDomainAction, PurgeDomainActionResult]
+    get_domain: ActionProcessor[GetDomainAction, GetDomainActionResult]
+    search_domains: ActionProcessor[SearchDomainsAction, SearchDomainsActionResult]
+    search_rg_domains: ActionProcessor[SearchRGDomainsAction, SearchRGDomainsActionResult]
 
-    def __init__(self, service: DomainService, action_monitors: list[ActionMonitor]) -> None:
+    def __init__(
+        self,
+        service: DomainService,
+        action_monitors: list[ActionMonitor],
+        validators: ActionValidators,
+    ) -> None:
         self.create_domain_node = ActionProcessor(service.create_domain_node, action_monitors)
         self.modify_domain_node = ActionProcessor(service.modify_domain_node, action_monitors)
         self.create_domain = ActionProcessor(service.create_domain, action_monitors)
         self.modify_domain = ActionProcessor(service.modify_domain, action_monitors)
         self.delete_domain = ActionProcessor(service.delete_domain, action_monitors)
         self.purge_domain = ActionProcessor(service.purge_domain, action_monitors)
+        self.get_domain = ActionProcessor(service.get_domain, action_monitors)
+        self.search_domains = ActionProcessor(service.search_domains, action_monitors)
+        self.search_rg_domains = ActionProcessor(service.search_rg_domains, action_monitors)
 
     @override
     def supported_actions(self) -> list[ActionSpec]:
@@ -56,4 +80,7 @@ class DomainProcessors(AbstractProcessorPackage):
             ModifyDomainAction.spec(),
             DeleteDomainAction.spec(),
             PurgeDomainAction.spec(),
+            GetDomainAction.spec(),
+            SearchDomainsAction.spec(),
+            SearchRGDomainsAction.spec(),
         ]

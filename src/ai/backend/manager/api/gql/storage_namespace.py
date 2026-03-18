@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import uuid
+from collections.abc import Iterable
 from typing import Self
 
 import strawberry
@@ -38,6 +39,19 @@ class StorageNamespace(Node):
     id: NodeID[str]
     storage_id: ID
     namespace: str
+
+    @classmethod
+    async def resolve_nodes(  # type: ignore[override]  # Strawberry Node uses AwaitableOrValue overloads incompatible with async def
+        cls,
+        *,
+        info: Info[StrawberryGQLContext],
+        node_ids: Iterable[str],
+        required: bool = False,
+    ) -> Iterable[Self | None]:
+        results = await info.context.data_loaders.storage_namespace_loader.load_many([
+            uuid.UUID(nid) for nid in node_ids
+        ])
+        return [cls.from_dataclass(data) if data is not None else None for data in results]
 
     @classmethod
     def from_dataclass(cls, data: StorageNamespaceData) -> Self:

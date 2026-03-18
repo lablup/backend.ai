@@ -500,6 +500,8 @@ def test_json_string() -> None:
     assert iv.check("{}") == {}
     assert iv.check('{"a":123}') == {"a": 123}
     assert iv.check("[]") == []
+    assert iv.check({"a": 123}) == {"a": 123}
+    assert iv.check({}) == {}
     with pytest.raises(ValueError):
         iv.check("x")
 

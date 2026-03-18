@@ -3,7 +3,7 @@ from __future__ import annotations
 import uuid
 from collections.abc import Callable
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import date, datetime
 from enum import StrEnum
 from typing import TYPE_CHECKING, Any, Protocol, TypeVar
 
@@ -12,40 +12,17 @@ import strawberry
 from graphql import StringValueNode
 from graphql.language.ast import ValueNode
 from graphql_relay.utils import base64, unbase64
+from strawberry.relay import Edge, Node
 from strawberry.types import get_object_definition, has_object_definition
 
-from ai.backend.manager.data.common.types import IntFilterData, StringFilterData
+from ai.backend.common.data.filter_specs import StringMatchSpec, UUIDEqualMatchSpec, UUIDInMatchSpec
+from ai.backend.manager.data.common.types import IntFilterData, SearchResult, StringFilterData
 
 if TYPE_CHECKING:
     from ai.backend.manager.repositories.base import QueryCondition
     from ai.backend.manager.types import (
         PaginationOptions,
     )
-
-
-@dataclass(frozen=True)
-class StringMatchSpec:
-    """Specification for string matching operations in query conditions."""
-
-    value: str
-    case_insensitive: bool
-    negated: bool
-
-
-@dataclass(frozen=True)
-class UUIDEqualMatchSpec:
-    """Specification for UUID equality operations (=, !=)."""
-
-    value: uuid.UUID
-    negated: bool
-
-
-@dataclass(frozen=True)
-class UUIDInMatchSpec:
-    """Specification for UUID IN operations (IN, NOT IN)."""
-
-    values: list[uuid.UUID]
-    negated: bool
 
 
 @strawberry.scalar
@@ -311,6 +288,44 @@ class DateTimeFilter:
         return None
 
 
+@strawberry.input
+class DateFilter:
+    """Filter for date fields (not datetime)."""
+
+    before: date | None = None
+    after: date | None = None
+    equals: date | None = None
+    not_equals: date | None = None
+
+    def build_query_condition(
+        self,
+        before_factory: Callable[[date], QueryCondition],
+        after_factory: Callable[[date], QueryCondition],
+        equals_factory: Callable[[date], QueryCondition],
+        not_equals_factory: Callable[[date], QueryCondition],
+    ) -> QueryCondition | None:
+        """Build query condition using factory callables.
+
+        Args:
+            before_factory: Factory function for < comparison
+            after_factory: Factory function for > comparison
+            equals_factory: Factory function for = comparison
+            not_equals_factory: Factory function for != comparison
+
+        Returns:
+            QueryCondition if any filter field is set, None otherwise
+        """
+        if self.not_equals:
+            return not_equals_factory(self.not_equals)
+        if self.equals:
+            return equals_factory(self.equals)
+        if self.before:
+            return before_factory(self.before)
+        if self.after:
+            return after_factory(self.after)
+        return None
+
+
 @strawberry.enum
 class OrderDirection(StrEnum):
     ASC = "ASC"
@@ -475,4 +490,27 @@ def build_page_info[TEdge: HasCursor](
         has_previous_page=has_previous_page,
         start_cursor=edges[0].cursor if edges else None,
         end_cursor=edges[-1].cursor if edges else None,
+    )
+
+
+def build_connection[TData, TNode: Node, TConn](
+    *,
+    result: SearchResult[TData],
+    to_node: Callable[[TData], TNode],
+    id_getter: Callable[[TNode], str],
+    edge_type: type[Edge[TNode]],
+    connection_type: Callable[..., TConn],
+) -> TConn:
+    """Build a relay Connection from a SearchResult."""
+    nodes = [to_node(item) for item in result.items]
+    edges = [edge_type(node=node, cursor=encode_cursor(id_getter(node))) for node in nodes]
+    return connection_type(
+        edges=edges,
+        page_info=strawberry.relay.PageInfo(
+            has_next_page=result.has_next_page,
+            has_previous_page=result.has_previous_page,
+            start_cursor=edges[0].cursor if edges else None,
+            end_cursor=edges[-1].cursor if edges else None,
+        ),
+        count=result.total_count,
     )

@@ -2,6 +2,7 @@ from dataclasses import dataclass
 from typing import override
 
 from ai.backend.manager.actions.action import BaseActionResult
+from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.object_storage.types import ObjectStorageData
 from ai.backend.manager.models.object_storage import ObjectStorageRow
 from ai.backend.manager.repositories.base.updater import Updater
@@ -18,8 +19,8 @@ class UpdateObjectStorageAction(ObjectStorageAction):
 
     @override
     @classmethod
-    def operation_type(cls) -> str:
-        return "update"
+    def operation_type(cls) -> ActionOperationType:
+        return ActionOperationType.UPDATE
 
 
 @dataclass

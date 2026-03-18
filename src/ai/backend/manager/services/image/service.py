@@ -58,6 +58,10 @@ from ai.backend.manager.services.image.actions.get_images import (
     GetImagesByCanonicalsAction,
     GetImagesByCanonicalsActionResult,
 )
+from ai.backend.manager.services.image.actions.load_image_last_used import (
+    LoadImageLastUsedAction,
+    LoadImageLastUsedActionResult,
+)
 from ai.backend.manager.services.image.actions.modify_image import (
     ModifyImageAction,
     ModifyImageActionResult,
@@ -79,6 +83,10 @@ from ai.backend.manager.services.image.actions.purge_images import (
 from ai.backend.manager.services.image.actions.scan_image import (
     ScanImageAction,
     ScanImageActionResult,
+)
+from ai.backend.manager.services.image.actions.search_aliases import (
+    SearchAliasesAction,
+    SearchAliasesActionResult,
 )
 from ai.backend.manager.services.image.actions.search_images import (
     SearchImagesAction,
@@ -441,3 +449,23 @@ class ImageService:
             action.resource_limit,
         )
         return SetImageResourceLimitByIdActionResult(image_data=image_data)
+
+    async def search_aliases(self, action: SearchAliasesAction) -> SearchAliasesActionResult:
+        """
+        Search image aliases using a batch querier with conditions, pagination, and ordering.
+        """
+        result = await self._image_repository.search_aliases(action.querier)
+        return SearchAliasesActionResult(
+            data=result.items,
+            image_ids=result.image_ids,
+            total_count=result.total_count,
+            has_next_page=result.has_next_page,
+            has_previous_page=result.has_previous_page,
+        )
+
+    async def load_image_last_used(
+        self, action: LoadImageLastUsedAction
+    ) -> LoadImageLastUsedActionResult:
+        """Load last used timestamps for images."""
+        last_used_map = await self._image_repository.load_image_last_used(action.image_ids)
+        return LoadImageLastUsedActionResult(last_used_map=last_used_map)

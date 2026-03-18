@@ -9,18 +9,16 @@ from sqlalchemy.engine import CursorResult
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
 from sqlalchemy.ext.asyncio import async_sessionmaker
 from sqlalchemy.orm import selectinload
-from sqlalchemy.sql import Select
 
 from ai.backend.common.data.artifact.types import ArtifactRegistryType, VerificationStepResult
+from ai.backend.common.data.permission.types import RBACElementType
 from ai.backend.common.data.storage.registries.types import ModelData
 from ai.backend.common.data.storage.types import ArtifactStorageType
 from ai.backend.manager.data.artifact.types import (
     ArtifactAvailability,
     ArtifactData,
     ArtifactDataWithRevisions,
-    ArtifactFilterOptions,
     ArtifactListResult,
-    ArtifactOrderingOptions,
     ArtifactRemoteStatus,
     ArtifactRevisionData,
     ArtifactRevisionListResult,
@@ -29,6 +27,7 @@ from ai.backend.manager.data.artifact.types import (
     ArtifactWithRevisionsListResult,
 )
 from ai.backend.manager.data.association.types import AssociationArtifactsStoragesData
+from ai.backend.manager.data.permission.types import RBACElementRef
 from ai.backend.manager.errors.artifact import (
     ArtifactAssociationDeletionError,
     ArtifactAssociationNotFoundError,
@@ -38,170 +37,16 @@ from ai.backend.manager.errors.artifact import (
     ArtifactUpdateError,
 )
 from ai.backend.manager.models.artifact import ArtifactRow
-from ai.backend.manager.models.artifact_registries import ArtifactRegistryRow
 from ai.backend.manager.models.artifact_revision import ArtifactRevisionRow
 from ai.backend.manager.models.association_artifacts_storages import AssociationArtifactsStorageRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.manager.repositories.artifact.types import (
-    ArtifactRemoteStatusFilterType,
-    ArtifactRevisionFilterOptions,
-    ArtifactRevisionOrderingOptions,
-    ArtifactStatusFilterType,
-)
+from ai.backend.manager.repositories.artifact.creators import ArtifactCreatorSpec
 from ai.backend.manager.repositories.base import BatchQuerier, execute_batch_querier
-from ai.backend.manager.repositories.base.updater import Updater, execute_updater
-from ai.backend.manager.repositories.types import (
-    BaseFilterApplier,
-    BaseOrderingApplier,
-    GenericQueryBuilder,
+from ai.backend.manager.repositories.base.rbac.entity_creator import (
+    RBACEntityCreator,
+    execute_rbac_entity_creator,
 )
-from ai.backend.manager.types import PaginationOptions
-
-
-class ArtifactFilterApplier(BaseFilterApplier[ArtifactFilterOptions]):
-    """Applies artifact-specific filters to queries"""
-
-    def apply_entity_filters(
-        self, stmt: Select[Any], filters: ArtifactFilterOptions
-    ) -> tuple[list[sa.sql.expression.ColumnElement[bool]], Select[Any]]:
-        """Apply artifact-specific filters and return list of conditions and updated statement"""
-        conditions: list[sa.sql.expression.ColumnElement[bool]] = []
-
-        # Handle basic filters
-        if filters.artifact_type:
-            conditions.append(ArtifactRow.type.in_(filters.artifact_type))
-
-        # Handle StringFilter-based filters
-        if filters.name_filter is not None:
-            name_condition = filters.name_filter.apply_to_column(
-                cast(sa.sql.elements.ColumnElement[str], ArtifactRow.name)
-            )
-            if name_condition is not None:
-                conditions.append(name_condition)
-
-        # Handle registry_filter by joining with registry tables
-        if filters.registry_filter is not None:
-            registry_condition = filters.registry_filter.apply_to_column(
-                cast(sa.sql.elements.ColumnElement[str], ArtifactRegistryRow.name)
-            )
-            if registry_condition is not None:
-                # Join with artifact registry table and add condition
-                stmt = stmt.join(
-                    ArtifactRegistryRow,
-                    ArtifactRegistryRow.registry_id == ArtifactRow.registry_id,
-                )
-                conditions.append(registry_condition)
-
-        # Handle source_filter by joining with source registry tables
-        if filters.source_filter is not None:
-            source_registry = sa.orm.aliased(ArtifactRegistryRow)
-            source_condition = filters.source_filter.apply_to_column(
-                cast(sa.sql.elements.ColumnElement[str], source_registry.name)
-            )
-            if source_condition is not None:
-                # Join with source registry table (using alias to avoid conflicts)
-                stmt = stmt.join(
-                    source_registry,
-                    source_registry.registry_id == ArtifactRow.source_registry_id,
-                )
-                conditions.append(source_condition)
-
-        # Handle ID and type filters
-        if filters.registry_id is not None:
-            conditions.append(ArtifactRow.registry_id == filters.registry_id)
-        if filters.registry_type is not None:
-            conditions.append(ArtifactRow.registry_type == filters.registry_type)
-        if filters.source_registry_id is not None:
-            conditions.append(ArtifactRow.source_registry_id == filters.source_registry_id)
-        if filters.source_registry_type is not None:
-            conditions.append(ArtifactRow.source_registry_type == filters.source_registry_type)
-
-        # Handle availability filter
-        if filters.availability:
-            conditions.append(ArtifactRow.availability.in_(filters.availability))
-
-        return conditions, stmt
-
-
-class ArtifactOrderingApplier(BaseOrderingApplier[ArtifactOrderingOptions]):
-    """Applies artifact-specific ordering to queries"""
-
-    def get_order_column(self, field: Any) -> Any:
-        """Get the SQLAlchemy column for the given artifact field"""
-        return getattr(ArtifactRow, field.value.lower(), ArtifactRow.name)
-
-
-class ArtifactModelConverter:
-    """Converts ArtifactRow to ArtifactData"""
-
-    def convert_to_data(self, model: ArtifactRow) -> ArtifactData:
-        """Convert ArtifactRow instance to ArtifactData"""
-        return model.to_dataclass()
-
-
-class ArtifactRevisionFilterApplier(BaseFilterApplier[ArtifactRevisionFilterOptions]):
-    """Applies artifact revision-specific filters to queries"""
-
-    def apply_entity_filters(
-        self, stmt: Select[Any], filters: ArtifactRevisionFilterOptions
-    ) -> tuple[list[Any], Select[Any]]:
-        """Apply artifact revision-specific filters and return list of conditions and updated statement"""
-        conditions = []
-
-        # Handle basic filters
-        if filters.artifact_id is not None:
-            conditions.append(ArtifactRevisionRow.artifact_id == filters.artifact_id)
-        if filters.status_filter is not None:
-            # Handle different status filter types
-            status_values = [status.value for status in filters.status_filter.values]
-            if filters.status_filter.type == ArtifactStatusFilterType.IN:
-                conditions.append(ArtifactRevisionRow.status.in_(status_values))
-            elif filters.status_filter.type == ArtifactStatusFilterType.EQUALS:
-                conditions.append(ArtifactRevisionRow.status == status_values[0])
-
-        if filters.remote_status_filter is not None:
-            # Handle different remote status filter types
-            remote_status_values = [status.value for status in filters.remote_status_filter.values]
-            if filters.remote_status_filter.type == ArtifactRemoteStatusFilterType.IN:
-                conditions.append(ArtifactRevisionRow.remote_status.in_(remote_status_values))
-            elif filters.remote_status_filter.type == ArtifactRemoteStatusFilterType.EQUALS:
-                conditions.append(ArtifactRevisionRow.remote_status == remote_status_values[0])
-
-        # Handle StringFilter-based version filter
-        if filters.version_filter is not None:
-            version_filter = filters.version_filter.to_dataclass()
-            version_condition = version_filter.apply_to_column(
-                cast(sa.sql.elements.ColumnElement[str], ArtifactRevisionRow.version)
-            )
-            if version_condition is not None:
-                conditions.append(version_condition)
-
-        # Handle IntFilter-based size filter
-        if filters.size_filter is not None:
-            size_filter = filters.size_filter.to_dataclass()
-            size_condition = size_filter.apply_to_column(
-                cast(sa.sql.elements.ColumnElement[int], ArtifactRevisionRow.size)
-            )
-            if size_condition is not None:
-                conditions.append(size_condition)
-
-        return conditions, stmt
-
-
-class ArtifactRevisionOrderingApplier(BaseOrderingApplier[ArtifactRevisionOrderingOptions]):
-    """Applies artifact revision-specific ordering to queries"""
-
-    def get_order_column(self, field: Any) -> Any:
-        """Get the SQLAlchemy column for the given artifact revision field"""
-        return getattr(ArtifactRevisionRow, field.value.lower(), ArtifactRevisionRow.created_at)
-
-
-class ArtifactRevisionModelConverter:
-    """Converts ArtifactRevisionRow to ArtifactRevisionData"""
-
-    def convert_to_data(self, model: ArtifactRevisionRow) -> ArtifactRevisionData:
-        """Convert ArtifactRevisionRow instance to ArtifactRevisionData"""
-        return model.to_dataclass()
+from ai.backend.manager.repositories.base.updater import Updater, execute_updater
 
 
 class ArtifactDBSource:
@@ -213,7 +58,7 @@ class ArtifactDBSource:
         self._db = db
 
     async def get_artifact_by_id(self, artifact_id: uuid.UUID) -> ArtifactData:
-        async with self._db.begin_session() as db_sess:
+        async with self._db.begin_readonly_session_read_committed() as db_sess:
             result = await db_sess.execute(
                 sa.select(ArtifactRow).where(ArtifactRow.id == artifact_id)
             )
@@ -223,7 +68,7 @@ class ArtifactDBSource:
             return row.to_dataclass()
 
     async def get_artifact_revision_by_id(self, revision_id: uuid.UUID) -> ArtifactRevisionData:
-        async with self._db.begin_session() as db_sess:
+        async with self._db.begin_readonly_session_read_committed() as db_sess:
             result = await db_sess.execute(
                 sa.select(ArtifactRevisionRow).where(ArtifactRevisionRow.id == revision_id)
             )
@@ -235,7 +80,7 @@ class ArtifactDBSource:
             return row.to_dataclass()
 
     async def get_model_artifact(self, model_id: str, registry_id: uuid.UUID) -> ArtifactData:
-        async with self._db.begin_session() as db_sess:
+        async with self._db.begin_readonly_session_read_committed() as db_sess:
             result = await db_sess.execute(
                 sa.select(ArtifactRow).where(
                     sa.and_(ArtifactRow.name == model_id, ArtifactRow.registry_id == registry_id)
@@ -251,7 +96,7 @@ class ArtifactDBSource:
     async def get_artifact_revision(
         self, artifact_id: uuid.UUID, revision: str
     ) -> ArtifactRevisionData:
-        async with self._db.begin_session() as db_sess:
+        async with self._db.begin_readonly_session_read_committed() as db_sess:
             result = await db_sess.execute(
                 sa.select(ArtifactRevisionRow).where(
                     sa.and_(
@@ -285,7 +130,7 @@ class ArtifactDBSource:
             return result.row.to_dataclass()
 
     async def list_artifact_revisions(self, artifact_id: uuid.UUID) -> list[ArtifactRevisionData]:
-        async with self._db.begin_session() as db_sess:
+        async with self._db.begin_readonly_session_read_committed() as db_sess:
             result = await db_sess.execute(
                 sa.select(ArtifactRevisionRow).where(ArtifactRevisionRow.artifact_id == artifact_id)
             )
@@ -313,21 +158,27 @@ class ArtifactDBSource:
                 existing_artifact = artifact_query_result.scalar_one_or_none()
 
                 if existing_artifact is None:
-                    # Create new artifact
-                    new_artifact = ArtifactRow(
-                        id=artifact_data.id,
-                        name=artifact_data.name,
-                        type=artifact_data.type,
-                        description=artifact_data.description,
-                        registry_id=artifact_data.registry_id,
-                        source_registry_id=artifact_data.source_registry_id,
-                        registry_type=artifact_data.registry_type,
-                        source_registry_type=artifact_data.source_registry_type,
-                        readonly=True,  # always overwrite readonly to True
-                        extra=artifact_data.extra,
+                    # Create new artifact with RBAC scope association
+                    rbac_creator = RBACEntityCreator(
+                        spec=ArtifactCreatorSpec(
+                            name=artifact_data.name,
+                            type=artifact_data.type,
+                            description=artifact_data.description,
+                            registry_id=artifact_data.registry_id,
+                            registry_type=artifact_data.registry_type,
+                            source_registry_id=artifact_data.source_registry_id,
+                            source_registry_type=artifact_data.source_registry_type,
+                            readonly=True,
+                            extra=artifact_data.extra,
+                        ),
+                        element_type=RBACElementType.ARTIFACT,
+                        scope_ref=RBACElementRef(
+                            RBACElementType.ARTIFACT_REGISTRY,
+                            str(artifact_data.registry_id),
+                        ),
                     )
-                    db_sess.add(new_artifact)
-                    await db_sess.flush()
+                    creator_result = await execute_rbac_entity_creator(db_sess, rbac_creator)
+                    new_artifact = creator_result.row
                     await db_sess.refresh(
                         new_artifact, attribute_names=["scanned_at", "updated_at"]
                     )
@@ -460,19 +311,26 @@ class ArtifactDBSource:
                 artifact_row = artifact_query_result.scalar_one_or_none()
 
                 if artifact_row is None:
-                    # Create new artifact
-                    artifact_row = ArtifactRow(
-                        type=ArtifactType.MODEL,
-                        name=model.id,
-                        registry_id=registry_id,
-                        registry_type=ArtifactRegistryType.HUGGINGFACE,
-                        source_registry_id=registry_id,
-                        source_registry_type=ArtifactRegistryType.HUGGINGFACE,
-                        readonly=True,
-                        extra=model.extra,
+                    # Create new artifact with RBAC scope association
+                    rbac_creator = RBACEntityCreator(
+                        spec=ArtifactCreatorSpec(
+                            name=model.id,
+                            type=ArtifactType.MODEL,
+                            registry_id=registry_id,
+                            registry_type=ArtifactRegistryType.HUGGINGFACE,
+                            source_registry_id=registry_id,
+                            source_registry_type=ArtifactRegistryType.HUGGINGFACE,
+                            readonly=True,
+                            extra=model.extra,
+                        ),
+                        element_type=RBACElementType.ARTIFACT,
+                        scope_ref=RBACElementRef(
+                            RBACElementType.ARTIFACT_REGISTRY,
+                            str(registry_id),
+                        ),
                     )
-                    db_sess.add(artifact_row)
-                    await db_sess.flush()
+                    creator_result = await execute_rbac_entity_creator(db_sess, rbac_creator)
+                    artifact_row = creator_result.row
                     await db_sess.refresh(
                         artifact_row, attribute_names=["scanned_at", "updated_at"]
                     )
@@ -810,80 +668,13 @@ class ArtifactDBSource:
             return artifact_revision_id
 
     async def get_artifact_revision_readme(self, artifact_revision_id: uuid.UUID) -> str | None:
-        async with self._db.begin_session() as db_sess:
+        async with self._db.begin_readonly_session_read_committed() as db_sess:
             result = await db_sess.execute(
                 sa.select(ArtifactRevisionRow.readme).where(
                     ArtifactRevisionRow.id == artifact_revision_id
                 )
             )
             return result.scalar_one_or_none()
-
-    async def list_artifacts_with_revisions_paginated(
-        self,
-        *,
-        pagination: PaginationOptions | None = None,
-        ordering: ArtifactOrderingOptions | None = None,
-        filters: ArtifactFilterOptions | None = None,
-    ) -> tuple[list[ArtifactDataWithRevisions], int | None]:
-        """List artifacts with their revisions using pagination and filtering.
-
-        Args:
-            pagination: Pagination options for the query
-            ordering: Ordering options for the query
-            filters: Filtering options for artifacts
-
-        Returns:
-            Tuple of (artifacts with revisions list, total count)
-        """
-        # Set defaults
-        if ordering is None:
-            ordering = ArtifactOrderingOptions()
-        if filters is None:
-            filters = ArtifactFilterOptions()
-
-        # Initialize the generic paginator with artifact-specific components
-        artifact_paginator = GenericQueryBuilder[
-            ArtifactRow, ArtifactData, ArtifactFilterOptions, ArtifactOrderingOptions
-        ](
-            model_class=ArtifactRow,
-            filter_applier=ArtifactFilterApplier(),
-            ordering_applier=ArtifactOrderingApplier(),
-            model_converter=ArtifactModelConverter(),
-            cursor_type_name="Artifact",
-        )
-
-        # Build query using the generic paginator with eager loading of revisions
-        querybuild_result = artifact_paginator.build_pagination_queries(
-            pagination=pagination or PaginationOptions(),
-            ordering=ordering,
-            filters=filters,
-            select_options=[selectinload(ArtifactRow.revision_rows)],
-        )
-
-        async with self._db.begin_session() as db_sess:
-            # Execute data query
-            result = await db_sess.execute(querybuild_result.data_query)
-            rows = result.scalars().all()
-
-            # Build count query with same filters applied
-            count_stmt = sa.select(sa.func.count()).select_from(ArtifactRow)
-            if filters is not None:
-                count_stmt = artifact_paginator.filter_applier.apply_filters(count_stmt, filters)
-            count_result = await db_sess.execute(count_stmt)
-            total_count = count_result.scalar()
-
-            # Convert to ArtifactDataWithRevisions objects
-            data_objects: list[ArtifactDataWithRevisions] = []
-            for row in rows:
-                artifact_data = row.to_dataclass()
-                revisions_data = [revision.to_dataclass() for revision in row.revision_rows]
-                data_objects.append(
-                    ArtifactDataWithRevisions.from_dataclasses(
-                        artifact_data=artifact_data, revisions=revisions_data
-                    )
-                )
-
-            return data_objects, total_count
 
     async def search_artifacts(
         self,

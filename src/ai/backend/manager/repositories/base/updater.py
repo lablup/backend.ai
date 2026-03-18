@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
+from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, TypeVar, cast
 from uuid import UUID
@@ -12,7 +13,8 @@ from sqlalchemy.engine import CursorResult
 
 from ai.backend.manager.models.base import Base
 
-from .types import QueryCondition
+from .integrity import match_integrity_error, parse_integrity_error
+from .types import IntegrityErrorCheck, QueryCondition
 
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession as SASession
@@ -45,6 +47,15 @@ class UpdaterSpec[TRow: Base](ABC):
             Dict mapping column names to values
         """
         raise NotImplementedError
+
+    @property
+    def integrity_error_checks(self) -> Sequence[IntegrityErrorCheck]:
+        """Return integrity error checks for declarative error matching.
+
+        Override in subclasses to map constraint violations to domain errors.
+        Default returns empty sequence (no checks, fallback behavior).
+        """
+        return ()
 
     def apply_to_row(self, row: TRow) -> None:
         """Apply update values to a row object via setattr.
@@ -81,6 +92,15 @@ class BatchUpdaterSpec[TRow: Base](ABC):
             Dict mapping column names to values
         """
         raise NotImplementedError
+
+    @property
+    def integrity_error_checks(self) -> Sequence[IntegrityErrorCheck]:
+        """Return integrity error checks for declarative error matching.
+
+        Override in subclasses to map constraint violations to domain errors.
+        Default returns empty sequence (no checks, fallback behavior).
+        """
+        return ()
 
 
 @dataclass
@@ -121,6 +141,24 @@ class BatchUpdaterResult:
     """Result of executing a batch update operation."""
 
     updated_count: int
+
+
+@dataclass
+class BulkUpdaterError[TRow: Base]:
+    """Error information for a failed bulk update operation.
+
+    Contains the spec that failed and the exception for debugging.
+    Follows the same pattern as BulkCreatorError.
+
+    Attributes:
+        spec: The UpdaterSpec that failed
+        exception: The exception that occurred
+        index: Original position in specs list for traceability
+    """
+
+    spec: UpdaterSpec[TRow]
+    exception: Exception
+    index: int
 
 
 async def execute_updater[TRow: Base](
@@ -179,7 +217,11 @@ async def execute_updater[TRow: Base](
     # Use from_statement to properly construct ORM objects
     # This allows SQLAlchemy to handle column mapping correctly
     select_stmt = sa.select(row_class).from_statement(update_stmt)
-    result = await db_sess.execute(select_stmt)
+    try:
+        result = await db_sess.execute(select_stmt)
+    except sa.exc.IntegrityError as e:
+        parsed = parse_integrity_error(e)
+        match_integrity_error(parsed, updater.spec.integrity_error_checks)
     updated_row = result.scalar_one_or_none()
 
     if updated_row is None:
@@ -229,5 +271,9 @@ async def execute_batch_updater[TRow: Base](
     for condition in updater.conditions:
         stmt = stmt.where(condition())
 
-    result = await db_sess.execute(stmt)
+    try:
+        result = await db_sess.execute(stmt)
+    except sa.exc.IntegrityError as e:
+        parsed = parse_integrity_error(e)
+        match_integrity_error(parsed, updater.spec.integrity_error_checks)
     return BatchUpdaterResult(updated_count=cast(CursorResult[Any], result).rowcount)

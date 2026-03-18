@@ -16,6 +16,7 @@ from ai.backend.manager.api.gql.resource_group.types import (
     ResourceGroupOrderByGQL,
     ResourceGroupOrderFieldGQL,
 )
+from ai.backend.manager.models.scaling_group.row import ScalingGroupRow
 from ai.backend.manager.repositories.base import OffsetPagination
 from ai.backend.manager.repositories.scaling_group.options import (
     ScalingGroupConditions,
@@ -35,6 +36,7 @@ def _get_pagination_spec() -> PaginationSpec:
         backward_order=ScalingGroupOrders.created_at(ascending=True),
         forward_condition_factory=ScalingGroupConditions.by_cursor_forward,
         backward_condition_factory=ScalingGroupConditions.by_cursor_backward,
+        tiebreaker_order=ScalingGroupRow.name.asc(),
     )
 
 
@@ -50,8 +52,8 @@ class TestBaseGQLAdapter:
         )
 
         assert len(querier.conditions) == 0
-        # Default order is applied for offset pagination when order_by is not provided
-        assert len(querier.orders) == 1
+        # Default order + tiebreaker order
+        assert len(querier.orders) == 2
         # Default pagination is applied
         assert querier.pagination is not None
         assert isinstance(querier.pagination, OffsetPagination)
@@ -161,7 +163,7 @@ class TestBaseGQLAdapter:
             order_by=order_by,
         )
 
-        assert len(querier.orders) == 1
+        assert len(querier.orders) == 2
         assert querier.orders[0] is not None
 
     def test_order_by_name_descending(self) -> None:
@@ -179,7 +181,7 @@ class TestBaseGQLAdapter:
             order_by=order_by,
         )
 
-        assert len(querier.orders) == 1
+        assert len(querier.orders) == 2
         assert querier.orders[0] is not None
 
     def test_pagination_limit_offset(self) -> None:

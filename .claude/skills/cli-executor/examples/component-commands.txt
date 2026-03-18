@@ -1,0 +1,291 @@
+# Backend.AI Component Commands Reference
+
+## Manager (mgr)
+
+**Purpose:** Core orchestration and API server
+
+**Common Commands:**
+
+```bash
+# Health and status
+./backend.ai mgr health                  # Check manager health
+./backend.ai mgr status                  # Show manager status (if running)
+
+# Server operations
+./backend.ai mgr start-server            # Start manager server (blocking)
+
+# Database operations
+./backend.ai mgr dbschema show           # Show current schema version
+./backend.ai mgr dbschema migrate        # Apply pending migrations
+./backend.ai mgr dbschema history        # Show migration history
+
+# Administrative commands
+./backend.ai mgr clear-history           # Clear session history
+./backend.ai mgr vacuum-sessions         # Clean up terminated sessions
+```
+
+**Infrastructure Requirements:**
+- PostgreSQL (port 5432)
+- Redis (port 6379)
+- etcd (port 2379)
+
+**Configuration:** `configs/manager.toml`
+
+---
+
+## Agent (ag)
+
+**Purpose:** Compute resource manager and container orchestrator
+
+**Common Commands:**
+
+```bash
+# Health and status
+./backend.ai ag health                   # Check agent health
+./backend.ai ag status                   # Show agent registration status
+
+# Server operations
+./backend.ai ag start-server             # Start agent server (blocking)
+
+# Resource information
+./backend.ai ag list-slots               # Show available resource slots
+./backend.ai ag status                   # Show current containers and resources
+```
+
+**Infrastructure Requirements:**
+- Manager accessible
+- Docker daemon running
+- GPU drivers (for GPU agents)
+
+**Configuration:** `configs/agent.toml`
+
+**Hardware-Specific Notes:**
+- GPU agents require NVIDIA drivers and nvidia-docker
+- CPU-only agents need Docker only
+
+---
+
+## Storage Proxy (storage)
+
+**Purpose:** Storage backend abstraction layer
+
+**Common Commands:**
+
+```bash
+# Health and status
+./backend.ai storage health              # Check storage proxy health
+
+# Server operations
+./backend.ai storage start-server        # Start storage proxy (blocking)
+
+# Volume operations
+./backend.ai storage volume list         # List available volumes
+./backend.ai storage volume get <name>   # Get volume information
+./backend.ai storage volume create <name> # Create new volume
+```
+
+**Infrastructure Requirements:**
+- Manager accessible
+- Storage backend (S3, NFS, local, etc.)
+
+**Configuration:** `configs/storage-proxy.toml`
+
+**Backend-Specific Notes:**
+- S3: Requires AWS credentials
+- NFS: Requires mount permissions
+- Local: Requires directory permissions
+
+---
+
+## Web Server (web)
+
+**Purpose:** Web UI and static asset server
+
+**Common Commands:**
+
+```bash
+# Health and status
+./backend.ai web health                  # Check web server health
+
+# Server operations
+./backend.ai web start-server            # Start web server (blocking)
+```
+
+**Infrastructure Requirements:**
+- Manager accessible
+- Static assets built (run `npm run build` in web UI repo)
+
+**Configuration:** `configs/web.toml`
+
+**Development Notes:**
+- For development, use Web UI dev server instead
+- Production uses built static assets
+
+---
+
+## App Proxy Coordinator (app-proxy-coordinator)
+
+**Purpose:** Application proxy coordinator for service routing
+
+**Common Commands:**
+
+```bash
+# Health and status
+./backend.ai app-proxy-coordinator health          # Check coordinator health
+
+# Server operations
+./backend.ai app-proxy-coordinator start-server    # Start coordinator (blocking)
+```
+
+**Infrastructure Requirements:**
+- PostgreSQL (port 5432, separate from manager DB)
+- Redis (port 6379)
+- Database migrations applied
+
+**Configuration:** `configs/app-proxy-coordinator.toml`
+
+**Database Notes:**
+- Uses separate database from manager
+- Check migrations: /db-status --component=appproxy
+- Apply migrations: /db-migrate --component=appproxy
+
+---
+
+## App Proxy Worker (app-proxy-worker)
+
+**Purpose:** Application proxy worker for request handling
+
+**Common Commands:**
+
+```bash
+# Health and status
+./backend.ai app-proxy-worker health               # Check worker health
+
+# Server operations
+./backend.ai app-proxy-worker start-server         # Start worker (blocking)
+```
+
+**Infrastructure Requirements:**
+- App Proxy Coordinator accessible
+- Redis (port 6379)
+
+**Configuration:** `configs/app-proxy-worker.toml`
+
+**Deployment Notes:**
+- Multiple workers can run in parallel
+- Workers register with Coordinator
+- Load balanced by Coordinator
+
+---
+
+## Component Dependencies
+
+```
+Manager
+  ├─ PostgreSQL (manager DB)
+  ├─ Redis
+  └─ etcd
+
+Agent
+  ├─ Manager
+  └─ Docker
+
+Storage Proxy
+  ├─ Manager
+  └─ Storage Backend (S3/NFS/local)
+
+Web Server
+  └─ Manager
+
+App Proxy Coordinator
+  ├─ PostgreSQL (appproxy DB)
+  └─ Redis
+
+App Proxy Worker
+  ├─ App Proxy Coordinator
+  └─ Redis
+```
+
+---
+
+## Typical Startup Order
+
+For full Backend.AI stack:
+
+1. **Infrastructure:**
+   ```bash
+   ./scripts/run-dev.sh  # Starts PostgreSQL, Redis, etcd
+   ```
+
+2. **Core Services:**
+   ```bash
+   # Terminal 1: Manager
+   ./backend.ai mgr start-server
+
+   # Terminal 2: Storage Proxy
+   ./backend.ai storage start-server
+
+   # Terminal 3: Agent
+   ./backend.ai ag start-server
+   ```
+
+3. **Optional Services:**
+   ```bash
+   # Terminal 4: Web Server (if using)
+   ./backend.ai web start-server
+
+   # Terminal 5: App Proxy Coordinator (if using)
+   ./backend.ai app-proxy-coordinator start-server
+
+   # Terminal 6: App Proxy Worker (if using)
+   ./backend.ai app-proxy-worker start-server
+   ```
+
+**Better approach:** Use `screen` or `tmux` for managing multiple terminals.
+
+---
+
+## Quick Reference
+
+**Check all component health:**
+```bash
+for component in mgr ag storage web; do
+  echo "=== $component ==="
+  ./backend.ai $component health
+done
+```
+
+**Start minimal development stack:**
+```bash
+# Terminal 1: Infrastructure
+./scripts/run-dev.sh
+
+# Terminal 2: Manager
+./backend.ai mgr start-server
+
+# Terminal 3: Agent
+./backend.ai ag start-server
+```
+
+**Stop all components:**
+- Press `Ctrl+C` in each terminal
+- Or use process manager (`screen -X quit`, `tmux kill-server`)
+
+---
+
+## Help and Documentation
+
+**Get command help:**
+```bash
+./backend.ai <component> --help          # Show component help
+./backend.ai <component> <command> --help # Show command help
+```
+
+**Configuration templates:**
+- Sample configs in `configs/*.sample.toml`
+- Copy to `configs/*.toml` and modify
+
+**More documentation:**
+- Component README: `src/ai/backend/<component>/README.md`
+- Configuration guide: `docs/config/`
+- Development guide: `docs/dev/`

@@ -51,6 +51,7 @@ class PendingSessionData:
     domain_name: str
     scaling_group_name: str
     priority: int
+    is_preemptible: bool
     session_type: SessionTypes
     cluster_mode: ClusterMode
     starts_at: datetime | None
@@ -74,6 +75,7 @@ class PendingSessionData:
             cluster_mode=self.cluster_mode,
             starts_at=self.starts_at,
             is_private=self.is_private,
+            is_preemptible=self.is_preemptible,
             kernels=kernel_workloads,
             designated_agent_ids=self.designated_agent_ids,
         )
@@ -168,14 +170,21 @@ class MarkTerminatingResult:
 
     cancelled_sessions: list[SessionId]  # Sessions that were cancelled (PENDING)
     terminating_sessions: list[SessionId]  # Sessions marked as TERMINATING
+    force_terminated_sessions: list[SessionId]  # Sessions directly set to TERMINATED (forced)
     skipped_sessions: list[
         SessionId
     ]  # Sessions not processed (already terminated, not found, etc.)
 
     def has_processed(self) -> bool:
         """Check if any sessions were actually processed (state changed)."""
-        return bool(self.cancelled_sessions or self.terminating_sessions)
+        return bool(
+            self.cancelled_sessions or self.terminating_sessions or self.force_terminated_sessions
+        )
 
     def processed_count(self) -> int:
         """Get count of sessions that were actually processed."""
-        return len(self.cancelled_sessions) + len(self.terminating_sessions)
+        return (
+            len(self.cancelled_sessions)
+            + len(self.terminating_sessions)
+            + len(self.force_terminated_sessions)
+        )

@@ -100,8 +100,26 @@ class KernelUsagePreparationResult:
 
 
 @dataclass
+class BucketDelta:
+    """Separated resource amount and duration for a usage bucket.
+
+    Stores raw resource amounts and duration separately instead of
+    pre-multiplied resource-seconds.  The product ``amount * duration_seconds``
+    is computed at SQL query time where PostgreSQL auto-extends NUMERIC precision,
+    eliminating overflow risk for large memory values.
+
+    Attributes:
+        slots: Raw resource amounts (e.g., {"cpu": 2, "mem": 4096000000})
+        duration_seconds: Total usage duration in seconds
+    """
+
+    slots: ResourceSlot = field(default_factory=ResourceSlot)
+    duration_seconds: int = 0
+
+
+@dataclass
 class UsageBucketAggregationResult:
-    """Result of aggregating kernel usage into hourly buckets.
+    """Result of aggregating kernel usage into daily buckets.
 
     Attributes:
         user_usage_deltas: Aggregated usage deltas by user for bucket updates
@@ -109,9 +127,9 @@ class UsageBucketAggregationResult:
         domain_usage_deltas: Aggregated usage deltas by domain for bucket updates
     """
 
-    user_usage_deltas: dict[UserUsageBucketKey, ResourceSlot] = field(default_factory=dict)
-    project_usage_deltas: dict[ProjectUsageBucketKey, ResourceSlot] = field(default_factory=dict)
-    domain_usage_deltas: dict[DomainUsageBucketKey, ResourceSlot] = field(default_factory=dict)
+    user_usage_deltas: dict[UserUsageBucketKey, BucketDelta] = field(default_factory=dict)
+    project_usage_deltas: dict[ProjectUsageBucketKey, BucketDelta] = field(default_factory=dict)
+    domain_usage_deltas: dict[DomainUsageBucketKey, BucketDelta] = field(default_factory=dict)
 
 
 class FairShareAggregator:
@@ -182,19 +200,20 @@ class FairShareAggregator:
         Returns:
             UsageBucketAggregationResult with deltas for each bucket
         """
-        user_deltas: dict[UserUsageBucketKey, ResourceSlot] = defaultdict(ResourceSlot)
-        project_deltas: dict[ProjectUsageBucketKey, ResourceSlot] = defaultdict(ResourceSlot)
-        domain_deltas: dict[DomainUsageBucketKey, ResourceSlot] = defaultdict(ResourceSlot)
+        user_deltas: dict[UserUsageBucketKey, BucketDelta] = defaultdict(BucketDelta)
+        project_deltas: dict[ProjectUsageBucketKey, BucketDelta] = defaultdict(BucketDelta)
+        domain_deltas: dict[DomainUsageBucketKey, BucketDelta] = defaultdict(BucketDelta)
 
         for spec in specs:
             # Split spec across day boundaries and aggregate
             daily_splits = self._split_spec_by_day(spec)
 
-            for period_date, resource_usage in daily_splits:
+            for period_date, raw_slots, segment_seconds in daily_splits:
                 self._add_to_bucket_deltas(
                     spec=spec,
                     period_date=period_date,
-                    resource_usage=resource_usage,
+                    raw_slots=raw_slots,
+                    segment_seconds=segment_seconds,
                     user_deltas=user_deltas,
                     project_deltas=project_deltas,
                     domain_deltas=domain_deltas,
@@ -209,19 +228,25 @@ class FairShareAggregator:
     def _split_spec_by_day(
         self,
         spec: KernelUsageRecordCreatorSpec,
-    ) -> list[tuple[date, ResourceSlot]]:
+    ) -> list[tuple[date, ResourceSlot, int]]:
         """Split a spec's resource usage across day boundaries.
 
         Most 5-minute specs will fit within a single day, but specs crossing
         midnight (e.g., 23:57-00:02) need to be split.
 
+        Returns the raw (un-multiplied) occupied_slots and the segment
+        duration in seconds so that callers can store them separately
+        in the normalized usage_bucket_entries table.
+
         Args:
             spec: Kernel usage record spec to split
 
         Returns:
-            List of (period_date, resource_usage) tuples
+            List of (period_date, raw_slots, segment_seconds) tuples.
+            ``raw_slots`` is the kernel's occupied_slots (not resource-seconds).
         """
-        result: list[tuple[date, ResourceSlot]] = []
+        raw_slots = spec.occupied_slots or ResourceSlot()
+        result: list[tuple[date, ResourceSlot, int]] = []
 
         total_seconds = (spec.period_end - spec.period_start).total_seconds()
         if total_seconds <= 0:
@@ -229,7 +254,7 @@ class FairShareAggregator:
 
         # Fast path: most specs don't cross midnight
         if spec.period_start.date() == spec.period_end.date():
-            return [(spec.period_start.date(), spec.resource_usage)]
+            return [(spec.period_start.date(), raw_slots, int(total_seconds))]
 
         # Slow path: split across day boundaries
         current_start = spec.period_start
@@ -245,15 +270,10 @@ class FairShareAggregator:
 
             # Segment ends at next midnight or spec end, whichever is earlier
             segment_end = min(next_midnight, spec.period_end)
-            segment_seconds = (segment_end - current_start).total_seconds()
+            segment_seconds = int((segment_end - current_start).total_seconds())
 
             if segment_seconds > 0:
-                # Proportionally allocate resource usage
-                proportion = Decimal(str(segment_seconds)) / Decimal(str(total_seconds))
-                segment_usage = ResourceSlot({
-                    key: value * proportion for key, value in spec.resource_usage.items()
-                })
-                result.append((current_date, segment_usage))
+                result.append((current_date, raw_slots, segment_seconds))
 
             current_start = segment_end
 
@@ -263,17 +283,24 @@ class FairShareAggregator:
         self,
         spec: KernelUsageRecordCreatorSpec,
         period_date: date,
-        resource_usage: ResourceSlot,
-        user_deltas: dict[UserUsageBucketKey, ResourceSlot],
-        project_deltas: dict[ProjectUsageBucketKey, ResourceSlot],
-        domain_deltas: dict[DomainUsageBucketKey, ResourceSlot],
+        raw_slots: ResourceSlot,
+        segment_seconds: int,
+        user_deltas: dict[UserUsageBucketKey, BucketDelta],
+        project_deltas: dict[ProjectUsageBucketKey, BucketDelta],
+        domain_deltas: dict[DomainUsageBucketKey, BucketDelta],
     ) -> None:
         """Add resource usage to bucket deltas for a day.
+
+        Accumulates raw resource amounts and duration separately.
+        Slots are accumulated additively (sum of ``raw_slots`` across all
+        slices within the same bucket key) while ``duration_seconds`` tracks
+        total observation time.
 
         Args:
             spec: Original spec (for entity identifiers)
             period_date: Date of the bucket
-            resource_usage: Resource usage for this day segment
+            raw_slots: Raw occupied_slots (not pre-multiplied)
+            segment_seconds: Duration of this segment in seconds
             user_deltas: User deltas to update (mutated)
             project_deltas: Project deltas to update (mutated)
             domain_deltas: Domain deltas to update (mutated)
@@ -286,7 +313,11 @@ class FairShareAggregator:
             resource_group=spec.resource_group,
             period_date=period_date,
         )
-        user_deltas[user_key] = user_deltas[user_key] + resource_usage
+        ud = user_deltas[user_key]
+        user_deltas[user_key] = BucketDelta(
+            slots=ud.slots + raw_slots,
+            duration_seconds=ud.duration_seconds + segment_seconds,
+        )
 
         # Project bucket key
         project_key = ProjectUsageBucketKey(
@@ -295,7 +326,11 @@ class FairShareAggregator:
             resource_group=spec.resource_group,
             period_date=period_date,
         )
-        project_deltas[project_key] = project_deltas[project_key] + resource_usage
+        pd = project_deltas[project_key]
+        project_deltas[project_key] = BucketDelta(
+            slots=pd.slots + raw_slots,
+            duration_seconds=pd.duration_seconds + segment_seconds,
+        )
 
         # Domain bucket key
         domain_key = DomainUsageBucketKey(
@@ -303,7 +338,11 @@ class FairShareAggregator:
             resource_group=spec.resource_group,
             period_date=period_date,
         )
-        domain_deltas[domain_key] = domain_deltas[domain_key] + resource_usage
+        dd = domain_deltas[domain_key]
+        domain_deltas[domain_key] = BucketDelta(
+            slots=dd.slots + raw_slots,
+            duration_seconds=dd.duration_seconds + segment_seconds,
+        )
 
     def _prepare_kernel_usage_specs(
         self,
@@ -452,6 +491,7 @@ class FairShareAggregator:
                 period_start=current_start,
                 period_end=current_end,
                 resource_usage=resource_seconds,
+                occupied_slots=kernel.resource.occupied_slots,
             )
             specs.append(spec)
 

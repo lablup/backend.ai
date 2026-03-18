@@ -103,7 +103,6 @@ def create_mock_info(context: MagicMock) -> MagicMock:
 class TestBulkUpsertDomainFairShareWeightMutation:
     """Tests for bulk_upsert_domain_fair_share_weight mutation."""
 
-    @pytest.mark.asyncio
     async def test_mutation_calls_processor_with_correct_action(
         self,
         mock_superadmin_user: MagicMock,
@@ -125,7 +124,7 @@ class TestBulkUpsertDomainFairShareWeightMutation:
         )
 
         input_data = BulkUpsertDomainFairShareWeightInput(
-            resource_group="default",
+            resource_group_name="default",
             inputs=[
                 DomainWeightInputItem(domain_name="domain1", weight=Decimal("1.5")),
                 DomainWeightInputItem(domain_name="domain2", weight=None),
@@ -151,7 +150,6 @@ class TestBulkUpsertDomainFairShareWeightMutation:
         assert isinstance(result, BulkUpsertDomainFairShareWeightPayload)
         assert result.upserted_count == 2
 
-    @pytest.mark.asyncio
     async def test_mutation_returns_correct_count(
         self,
         mock_superadmin_user: MagicMock,
@@ -173,7 +171,7 @@ class TestBulkUpsertDomainFairShareWeightMutation:
         )
 
         input_data = BulkUpsertDomainFairShareWeightInput(
-            resource_group="default",
+            resource_group_name="default",
             inputs=[
                 DomainWeightInputItem(domain_name=f"domain{i}", weight=Decimal(str(i)))
                 for i in range(5)
@@ -187,7 +185,6 @@ class TestBulkUpsertDomainFairShareWeightMutation:
         # Then
         assert result.upserted_count == 5
 
-    @pytest.mark.asyncio
     async def test_mutation_requires_superadmin(
         self,
         mock_regular_user: MagicMock,
@@ -206,7 +203,7 @@ class TestBulkUpsertDomainFairShareWeightMutation:
         )
 
         input_data = BulkUpsertDomainFairShareWeightInput(
-            resource_group="default",
+            resource_group_name="default",
             inputs=[DomainWeightInputItem(domain_name="domain1", weight=Decimal("1.0"))],
         )
 
@@ -224,7 +221,6 @@ class TestBulkUpsertDomainFairShareWeightMutation:
 class TestBulkUpsertProjectFairShareWeightMutation:
     """Tests for bulk_upsert_project_fair_share_weight mutation."""
 
-    @pytest.mark.asyncio
     async def test_mutation_calls_processor_with_correct_action(
         self,
         mock_superadmin_user: MagicMock,
@@ -248,7 +244,7 @@ class TestBulkUpsertProjectFairShareWeightMutation:
         )
 
         input_data = BulkUpsertProjectFairShareWeightInput(
-            resource_group="default",
+            resource_group_name="default",
             inputs=[
                 ProjectWeightInputItem(
                     project_id=project_id1,
@@ -284,7 +280,6 @@ class TestBulkUpsertProjectFairShareWeightMutation:
         assert isinstance(result, BulkUpsertProjectFairShareWeightPayload)
         assert result.upserted_count == 2
 
-    @pytest.mark.asyncio
     async def test_mutation_requires_superadmin(
         self,
         mock_regular_user: MagicMock,
@@ -303,7 +298,7 @@ class TestBulkUpsertProjectFairShareWeightMutation:
         )
 
         input_data = BulkUpsertProjectFairShareWeightInput(
-            resource_group="default",
+            resource_group_name="default",
             inputs=[
                 ProjectWeightInputItem(
                     project_id=uuid.uuid4(),
@@ -327,7 +322,6 @@ class TestBulkUpsertProjectFairShareWeightMutation:
 class TestBulkUpsertUserFairShareWeightMutation:
     """Tests for bulk_upsert_user_fair_share_weight mutation."""
 
-    @pytest.mark.asyncio
     async def test_mutation_calls_processor_with_correct_action(
         self,
         mock_superadmin_user: MagicMock,
@@ -353,7 +347,7 @@ class TestBulkUpsertUserFairShareWeightMutation:
         )
 
         input_data = BulkUpsertUserFairShareWeightInput(
-            resource_group="default",
+            resource_group_name="default",
             inputs=[
                 UserWeightInputItem(
                     user_uuid=user_uuid1,
@@ -393,7 +387,6 @@ class TestBulkUpsertUserFairShareWeightMutation:
         assert isinstance(result, BulkUpsertUserFairShareWeightPayload)
         assert result.upserted_count == 2
 
-    @pytest.mark.asyncio
     async def test_mutation_requires_superadmin(
         self,
         mock_regular_user: MagicMock,
@@ -412,7 +405,7 @@ class TestBulkUpsertUserFairShareWeightMutation:
         )
 
         input_data = BulkUpsertUserFairShareWeightInput(
-            resource_group="default",
+            resource_group_name="default",
             inputs=[
                 UserWeightInputItem(
                     user_uuid=uuid.uuid4(),

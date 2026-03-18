@@ -19,14 +19,29 @@ from ai.backend.common.resilience.resilience import Resilience
 from ai.backend.common.types import AccessKey, SlotName
 from ai.backend.common.utils import nmget
 from ai.backend.logging.utils import BraceStyleAdapter
-from ai.backend.manager.data.user.types import UserCreateResultData, UserData
+from ai.backend.manager.data.keypair.types import GeneratedKeyPairData
+from ai.backend.manager.data.user.types import (
+    BulkUserCreateResultData,
+    BulkUserUpdateResultData,
+    UserCreateResultData,
+    UserData,
+    UserSearchResult,
+)
 from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.models.storage import StorageSessionManager
 from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.base.creator import Creator
+from ai.backend.manager.repositories.base.querier import BatchQuerier
 from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.repositories.user.db_source import UserDBSource
+from ai.backend.manager.repositories.user.types import (
+    DomainUserSearchScope,
+    ProjectUserSearchScope,
+    RoleUserSearchScope,
+)
+from ai.backend.manager.services.user.actions.create_user import UserCreateSpec
+from ai.backend.manager.services.user.actions.modify_user import UserUpdateSpec
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -81,6 +96,16 @@ class UserRepository:
         return await self._db_source.create_user_validated(creator, group_ids)
 
     @user_repository_resilience.apply()
+    async def bulk_create_users_validated(
+        self,
+        items: list[UserCreateSpec],
+    ) -> BulkUserCreateResultData:
+        """
+        Create multiple users with partial failure support.
+        """
+        return await self._db_source.bulk_create_users_validated(items)
+
+    @user_repository_resilience.apply()
     async def update_user_validated(
         self,
         email: str,
@@ -90,6 +115,16 @@ class UserRepository:
         Update user with ownership validation and handle role/group changes.
         """
         return await self._db_source.update_user_validated(email, updater)
+
+    @user_repository_resilience.apply()
+    async def bulk_update_users_validated(
+        self,
+        items: list[UserUpdateSpec],
+    ) -> BulkUserUpdateResultData:
+        """
+        Update multiple users with partial failure support.
+        """
+        return await self._db_source.bulk_update_users_validated(items)
 
     @user_repository_resilience.apply()
     async def soft_delete_user_validated(self, email: str) -> None:
@@ -102,6 +137,11 @@ class UserRepository:
     async def purge_user(self, email: str) -> None:
         """Completely purge user and all associated data."""
         await self._db_source.purge_user(email)
+
+    @user_repository_resilience.apply()
+    async def purge_user_by_uuid(self, user_uuid: UUID) -> None:
+        """Completely purge user and all associated data by UUID."""
+        await self._db_source.purge_user_by_uuid(user_uuid)
 
     @user_repository_resilience.apply()
     async def check_user_vfolder_mounted_to_active_kernels(self, user_uuid: UUID) -> bool:
@@ -182,6 +222,70 @@ class UserRepository:
     ) -> int:
         """Delete user's keypairs including Valkey concurrency cleanup."""
         return await self._db_source.delete_keypairs_with_valkey(user_uuid, valkey_stat_client)
+
+    @user_repository_resilience.apply()
+    async def search_users(self, querier: BatchQuerier) -> UserSearchResult:
+        """Search all users with pagination and filters (admin only).
+
+        Args:
+            querier: BatchQuerier containing conditions, orders, and pagination.
+
+        Returns:
+            UserSearchResult with matching users and pagination info.
+        """
+        return await self._db_source.search_users(querier=querier)
+
+    @user_repository_resilience.apply()
+    async def search_users_by_domain(
+        self, scope: DomainUserSearchScope, querier: BatchQuerier
+    ) -> UserSearchResult:
+        """Search users within a domain.
+
+        Args:
+            scope: DomainUserSearchScope defining the domain to search within.
+            querier: BatchQuerier containing conditions, orders, and pagination.
+
+        Returns:
+            UserSearchResult with matching users and pagination info.
+        """
+        return await self._db_source.search_users_by_domain(scope, querier)
+
+    @user_repository_resilience.apply()
+    async def search_users_by_project(
+        self, scope: ProjectUserSearchScope, querier: BatchQuerier
+    ) -> UserSearchResult:
+        """Search users within a project.
+
+        Args:
+            scope: ProjectUserSearchScope defining the project to search within.
+            querier: BatchQuerier containing conditions, orders, and pagination.
+
+        Returns:
+            UserSearchResult with matching users and pagination info.
+        """
+        return await self._db_source.search_users_by_project(scope, querier)
+
+    @user_repository_resilience.apply()
+    async def search_users_by_role(
+        self, scope: RoleUserSearchScope, querier: BatchQuerier
+    ) -> UserSearchResult:
+        """Search users assigned to a role."""
+        return await self._db_source.search_users_by_role(scope, querier)
+
+    @user_repository_resilience.apply()
+    async def issue_my_keypair(self, user_uuid: UUID, email: str) -> GeneratedKeyPairData:
+        """Issue a new keypair for the current user."""
+        return await self._db_source.issue_my_keypair(user_uuid, email)
+
+    @user_repository_resilience.apply()
+    async def revoke_my_keypair(self, user_uuid: UUID, email: str, access_key: str) -> None:
+        """Revoke a keypair owned by the current user."""
+        await self._db_source.revoke_my_keypair(user_uuid, email, access_key)
+
+    @user_repository_resilience.apply()
+    async def switch_my_main_access_key(self, user_uuid: UUID, email: str, access_key: str) -> None:
+        """Switch the main access key for the current user."""
+        await self._db_source.switch_my_main_access_key(user_uuid, email, access_key)
 
     async def _get_time_binned_monthly_stats(
         self,

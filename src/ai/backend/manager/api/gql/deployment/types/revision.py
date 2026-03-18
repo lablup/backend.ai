@@ -2,11 +2,10 @@
 
 from __future__ import annotations
 
-from collections.abc import Mapping, Sequence
+from collections.abc import Iterable, Mapping, Sequence
 from datetime import datetime
-from enum import StrEnum
 from pathlib import PurePosixPath
-from typing import TYPE_CHECKING, Annotated, Any, cast, override
+from typing import TYPE_CHECKING, Annotated, Any, Self, cast, override
 from uuid import UUID
 
 import strawberry
@@ -21,6 +20,11 @@ from ai.backend.manager.api.gql.base import (
     OrderDirection,
     StringFilter,
     to_global_id,
+)
+from ai.backend.manager.api.gql.common.types import (
+    ClusterModeGQL,
+    ResourceOptsGQL,
+    ResourceOptsInput,
 )
 from ai.backend.manager.api.gql.fair_share.types.common import ResourceSlotGQL
 from ai.backend.manager.api.gql.image_federation import Image
@@ -58,12 +62,6 @@ MountPermission: type[CommonMountPermission] = strawberry.enum(
     name="MountPermission",
     description="Added in 25.19.0. This enum represents the permission level for a mounted volume. It can be ro, rw, wd",
 )
-
-
-@strawberry.enum(description="Added in 25.19.0")
-class ClusterMode(StrEnum):
-    SINGLE_NODE = "SINGLE_NODE"
-    MULTI_NODE = "MULTI_NODE"
 
 
 @strawberry.type(
@@ -165,41 +163,6 @@ class ModelRuntimeConfig:
         )
 
 
-@strawberry.type(
-    name="ResourceOptsEntry",
-    description=(
-        "Added in 26.1.0. A single key-value entry representing a resource option. "
-        "Contains additional resource configuration such as shared memory settings."
-    ),
-)
-class ResourceOptsEntryGQL:
-    """Single resource option entry with name and value."""
-
-    name: str = strawberry.field(description="The name of this resource option. Example: 'shmem'.")
-    value: str = strawberry.field(description="The value for this resource option. Example: '64m'.")
-
-
-@strawberry.type(
-    name="ResourceOpts",
-    description=(
-        "Added in 26.1.0. A collection of additional resource options for a deployment. "
-        "Contains key-value pairs for resource configuration like shared memory."
-    ),
-)
-class ResourceOptsGQL:
-    """Resource options containing multiple key-value entries."""
-
-    entries: list[ResourceOptsEntryGQL] = strawberry.field(
-        description="List of resource option entries. Each entry contains a key-value pair."
-    )
-
-    @classmethod
-    def from_mapping(cls, data: Mapping[str, str]) -> ResourceOptsGQL:
-        """Convert a Mapping to GraphQL type."""
-        entries = [ResourceOptsEntryGQL(name=k, value=v) for k, v in data.items()]
-        return cls(entries=entries)
-
-
 @strawberry.type
 class ResourceConfig:
     """
@@ -246,13 +209,13 @@ class ClusterConfig:
     Defines the clustering mode and number of replicas.
     """
 
-    mode: ClusterMode = strawberry.field(description="The clustering mode (e.g., SINGLE_NODE).")
+    mode: ClusterModeGQL = strawberry.field(description="The clustering mode (e.g., SINGLE_NODE).")
     size: int = strawberry.field(description="Number of replicas in the cluster.")
 
     @classmethod
     def from_dataclass(cls, data: ClusterConfigData) -> ClusterConfig:
         return cls(
-            mode=ClusterMode(data.mode.name),
+            mode=ClusterModeGQL(data.mode.name),
             size=data.size,
         )
 
@@ -295,7 +258,20 @@ class ModelRevision(Node):
         return Image(id=ID(image_global_id))
 
     @classmethod
-    def from_dataclass(cls, data: ModelRevisionData) -> ModelRevision:
+    async def resolve_nodes(  # type: ignore[override]  # Strawberry Node uses AwaitableOrValue overloads incompatible with async def
+        cls,
+        *,
+        info: Info[StrawberryGQLContext],
+        node_ids: Iterable[str],
+        required: bool = False,
+    ) -> Iterable[Self | None]:
+        results = await info.context.data_loaders.revision_loader.load_many([
+            UUID(nid) for nid in node_ids
+        ])
+        return [cls.from_dataclass(data) if data is not None else None for data in results]
+
+    @classmethod
+    def from_dataclass(cls, data: ModelRevisionData) -> Self:
         return cls(
             id=ID(str(data.id)),
             name=data.name,
@@ -393,11 +369,6 @@ class AddRevisionPayload:
     revision: ModelRevision
 
 
-@strawberry.type(description="Added in 25.16.0")
-class CreateRevisionPayload:
-    revision: ModelRevision
-
-
 @strawberry.input(
     name="ActivateRevisionInput",
     description="Added in 25.19.0. Input for activating a revision to be the current revision.",
@@ -420,7 +391,7 @@ class ActivateRevisionPayloadGQL:
 # Input Types
 @strawberry.input(description="Added in 25.19.0")
 class ClusterConfigInput:
-    mode: ClusterMode
+    mode: ClusterModeGQL
     size: int
 
 
@@ -451,27 +422,6 @@ class ResourceSlotInput:
 
     entries: list[ResourceSlotEntryInput] = strawberry.field(
         description="List of resource allocations."
-    )
-
-
-@strawberry.input(
-    description=("Added in 26.1.0. A single key-value entry representing a resource option.")
-)
-class ResourceOptsEntryInput:
-    """Single resource option entry input with name and value."""
-
-    name: str = strawberry.field(description="The name of this resource option (e.g., 'shmem').")
-    value: str = strawberry.field(description="The value for this resource option (e.g., '64m').")
-
-
-@strawberry.input(
-    description=("Added in 26.1.0. A collection of additional resource options for input.")
-)
-class ResourceOptsInput:
-    """Resource options input containing multiple key-value entries."""
-
-    entries: list[ResourceOptsEntryInput] = strawberry.field(
-        description="List of resource option entries."
     )
 
 
@@ -541,7 +491,7 @@ class ExtraVFolderMountInput:
 
 
 @strawberry.input(
-    description="Added in 25.19.0. Input for creating a revision without attaching to a deployment."
+    description="Added in 25.19.0. Input for specifying revision configuration within a deployment."
 )
 class CreateRevisionInput:
     name: str | None = None
@@ -565,11 +515,9 @@ class CreateRevisionInput:
             extra_mounts = [
                 MountInfo(
                     vfolder_id=UUID(str(extra_mount.vfolder_id)),
-                    kernel_path=PurePosixPath(
-                        extra_mount.mount_destination
-                        if extra_mount.mount_destination is not None
-                        else ""
-                    ),
+                    kernel_path=PurePosixPath(extra_mount.mount_destination)
+                    if extra_mount.mount_destination
+                    else None,
                 )
                 for extra_mount in self.extra_mounts
             ]
@@ -624,11 +572,9 @@ class AddRevisionInput:
             extra_mounts = [
                 MountInfo(
                     vfolder_id=UUID(str(extra_mount.vfolder_id)),
-                    kernel_path=PurePosixPath(
-                        extra_mount.mount_destination
-                        if extra_mount.mount_destination is not None
-                        else ""
-                    ),
+                    kernel_path=PurePosixPath(extra_mount.mount_destination)
+                    if extra_mount.mount_destination
+                    else None,
                 )
                 for extra_mount in self.extra_mounts
             ]

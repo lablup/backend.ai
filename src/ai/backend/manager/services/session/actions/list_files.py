@@ -5,12 +5,13 @@ from typing import Any, override
 
 from ai.backend.common.types import AccessKey
 from ai.backend.manager.actions.action import BaseActionResult
+from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.session.types import SessionData
-from ai.backend.manager.services.session.base import SessionAction
+from ai.backend.manager.services.session.actions.file_base import SessionFileAction
 
 
 @dataclass
-class ListFilesAction(SessionAction):
+class ListFilesAction(SessionFileAction):
     user_id: uuid.UUID
     path: str
     session_name: str
@@ -22,8 +23,8 @@ class ListFilesAction(SessionAction):
 
     @override
     @classmethod
-    def operation_type(cls) -> str:
-        return "list_files"
+    def operation_type(cls) -> ActionOperationType:
+        return ActionOperationType.SEARCH
 
 
 @dataclass

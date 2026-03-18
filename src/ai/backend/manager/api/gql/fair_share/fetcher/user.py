@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from functools import lru_cache
+from uuid import UUID
 
 from strawberry import Info
 from strawberry.relay import PageInfo
@@ -10,6 +11,7 @@ from strawberry.relay import PageInfo
 from ai.backend.manager.api.gql.adapter import PaginationOptions, PaginationSpec
 from ai.backend.manager.api.gql.base import encode_cursor
 from ai.backend.manager.api.gql.fair_share.types import (
+    RGUserFairShareFilter,
     UserFairShareConnection,
     UserFairShareEdge,
     UserFairShareFilter,
@@ -17,6 +19,7 @@ from ai.backend.manager.api.gql.fair_share.types import (
     UserFairShareOrderBy,
 )
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
+from ai.backend.manager.models.fair_share.row import UserFairShareRow
 from ai.backend.manager.repositories.base import QueryCondition
 from ai.backend.manager.repositories.fair_share.options import (
     UserFairShareConditions,
@@ -24,6 +27,7 @@ from ai.backend.manager.repositories.fair_share.options import (
 )
 from ai.backend.manager.repositories.fair_share.types import UserFairShareSearchScope
 from ai.backend.manager.services.fair_share.actions import (
+    GetUserFairShareAction,
     SearchRGUserFairSharesAction,
     SearchUserFairSharesAction,
 )
@@ -36,6 +40,7 @@ def get_user_fair_share_pagination_spec() -> PaginationSpec:
         backward_order=UserFairShareOrders.by_created_at(ascending=True),
         forward_condition_factory=UserFairShareConditions.by_cursor_forward,
         backward_condition_factory=UserFairShareConditions.by_cursor_backward,
+        tiebreaker_order=UserFairShareRow.id.asc(),
     )
 
 
@@ -104,7 +109,7 @@ async def fetch_user_fair_shares(
 async def fetch_rg_user_fair_shares(
     info: Info[StrawberryGQLContext],
     scope: UserFairShareSearchScope,
-    filter: UserFairShareFilter | None = None,
+    filter: RGUserFairShareFilter | None = None,
     order_by: list[UserFairShareOrderBy] | None = None,
     before: str | None = None,
     after: str | None = None,
@@ -117,6 +122,8 @@ async def fetch_rg_user_fair_shares(
     """Fetch user fair shares using resource group scope.
 
     Returns all users in the scope, including those without records (with defaults).
+    Uses RGUserFairShareFilter whose build_conditions() references INNER JOIN'd
+    columns to avoid NULL exclusion.
     """
     processors = info.context.processors
 
@@ -155,3 +162,27 @@ async def fetch_rg_user_fair_shares(
         ),
         count=action_result.total_count,
     )
+
+
+async def fetch_single_user_fair_share(
+    info: Info[StrawberryGQLContext],
+    resource_group_name: str,
+    project_id: UUID,
+    user_uuid: UUID,
+) -> UserFairShareGQL:
+    """Fetch a single user fair share record.
+
+    Returns the fair share record for the specified user, project, and resource group.
+    If no record exists, returns a default-generated object (repository handles defaults).
+    """
+    processors = info.context.processors
+
+    action_result = await processors.fair_share.get_user_fair_share.wait_for_complete(
+        GetUserFairShareAction(
+            resource_group=resource_group_name,
+            project_id=project_id,
+            user_uuid=user_uuid,
+        )
+    )
+
+    return UserFairShareGQL.from_dataclass(action_result.data)

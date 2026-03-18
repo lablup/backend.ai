@@ -56,6 +56,7 @@ from ai.backend.manager.models.resource_policy import (
     UserResourcePolicyRow,
 )
 from ai.backend.manager.models.resource_preset import ResourcePresetRow
+from ai.backend.manager.models.resource_slot import AgentResourceRow, ResourceSlotTypeRow
 from ai.backend.manager.models.routing import RoutingRow
 from ai.backend.manager.models.scaling_group import ScalingGroupOpts, ScalingGroupRow
 from ai.backend.manager.models.session import SessionRow
@@ -117,8 +118,21 @@ class TestAgentRepositoryDB:
                 KernelRow,
                 RoutingRow,
                 ResourcePresetRow,
+                ResourceSlotTypeRow,
+                AgentResourceRow,
             ],
         ):
+            # Seed default resource slot types (FK target for agent_resources)
+            async with database_connection.begin_session() as db_sess:
+                for slot_name, slot_type in [
+                    ("cpu", "count"),
+                    ("mem", "bytes"),
+                    ("cuda.shares", "count"),
+                    ("rocm.device", "count"),
+                ]:
+                    db_sess.add(
+                        ResourceSlotTypeRow(slot_name=slot_name, slot_type=slot_type, rank=0)
+                    )
             yield database_connection
 
     @pytest.fixture
@@ -553,14 +567,18 @@ class TestAgentRepositoryCache:
         """Test GPU allocation map update is stored in cache"""
         agent_id = AgentId("agent-001")
         alloc_map: Mapping[str, Any] = {
-            "cuda:0": {"session_id": "sess-001"},
-            "cuda:1": {"session_id": "sess-002"},
+            "GPU-aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee": "0.50",
+            "GPU-11111111-2222-3333-4444-555555555555": "1.00",
         }
 
         await agent_repository.update_gpu_alloc_map(agent_id, alloc_map)
 
         stored_map = await valkey_stat_client.get_gpu_allocation_map(str(agent_id))
-        assert stored_map == alloc_map
+        assert stored_map is not None
+        assert stored_map == {
+            "GPU-aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee": Decimal("0.50"),
+            "GPU-11111111-2222-3333-4444-555555555555": Decimal("1.00"),
+        }
 
 
 @dataclass
@@ -607,8 +625,13 @@ class TestAgentDBSourceKernelFiltering:
                 KernelRow,
                 RoutingRow,
                 ResourcePresetRow,
+                ResourceSlotTypeRow,
+                AgentResourceRow,
             ],
         ):
+            # Seed default resource slot types
+            async with database_connection.begin_session() as db_sess:
+                db_sess.add(ResourceSlotTypeRow(slot_name="cpu", slot_type="count", rank=0))
             yield database_connection
 
     @pytest.fixture
@@ -730,6 +753,18 @@ class TestAgentDBSourceKernelFiltering:
                 auto_terminate_abusing_kernel=False,
             )
             db_sess.add(agent)
+            await db_sess.flush()
+
+            # Seed AgentResourceRow with expected occupied value
+            expected_used = test_case.cpu_per_kernel * test_case.occupied_kernel_count
+            db_sess.add(
+                AgentResourceRow(
+                    agent_id=actual_agent_id,
+                    slot_name="cpu",
+                    capacity=Decimal("16"),
+                    used=expected_used,
+                )
+            )
             await db_sess.flush()
 
             # Create session for all kernels

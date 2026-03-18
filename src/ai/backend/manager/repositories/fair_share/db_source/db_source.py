@@ -4,19 +4,22 @@ from __future__ import annotations
 
 import uuid
 from collections.abc import Sequence
-from datetime import date, timedelta
+from datetime import UTC, date, datetime, timedelta
 from decimal import Decimal
 from typing import TYPE_CHECKING, cast
 
 import sqlalchemy as sa
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 
-from ai.backend.common.types import ResourceSlot
+from ai.backend.common.types import ResourceSlot, SlotQuantity
 from ai.backend.manager.data.fair_share import (
     DomainFairShareData,
     DomainFairShareSearchResult,
     FairShareCalculationContext,
+    FairShareCalculationSnapshot,
+    FairShareData,
     FairSharesByLevel,
+    FairShareSpec,
     ProjectFairShareData,
     ProjectFairShareSearchResult,
     ProjectUserIds,
@@ -26,8 +29,8 @@ from ai.backend.manager.data.fair_share import (
     UserFairShareSearchResult,
     UserProjectKey,
 )
-from ai.backend.manager.errors.fair_share import FairShareNotFoundError
-from ai.backend.manager.errors.resource import ScalingGroupNotFound
+from ai.backend.manager.errors.resource import DomainNotFound, ProjectNotFound, ScalingGroupNotFound
+from ai.backend.manager.errors.user import UserNotFound
 from ai.backend.manager.models.agent import AgentRow, AgentStatus
 from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.fair_share import (
@@ -36,17 +39,16 @@ from ai.backend.manager.models.fair_share import (
     UserFairShareRow,
 )
 from ai.backend.manager.models.group import AssocGroupUserRow, GroupRow
+from ai.backend.manager.models.resource_slot import AgentResourceRow, ResourceSlotTypeRow
 from ai.backend.manager.models.resource_usage_history import (
     DomainUsageBucketRow,
     ProjectUsageBucketRow,
+    UsageBucketEntryRow,
     UserUsageBucketRow,
 )
-from ai.backend.manager.models.scaling_group import (
-    ScalingGroupForDomainRow,
-    ScalingGroupForProjectRow,
-    ScalingGroupRow,
-)
+from ai.backend.manager.models.scaling_group import ScalingGroupRow
 from ai.backend.manager.models.scaling_group.types import FairShareScalingGroupSpec
+from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.repositories.base import (
     BatchQuerier,
     BulkUpserter,
@@ -59,13 +61,10 @@ from ai.backend.manager.repositories.base import (
     execute_upserter,
 )
 from ai.backend.manager.repositories.fair_share.types import (
-    DomainFairShareEntityItem,
     DomainFairShareEntitySearchResult,
     DomainFairShareSearchScope,
-    ProjectFairShareEntityItem,
     ProjectFairShareEntitySearchResult,
     ProjectFairShareSearchScope,
-    UserFairShareEntityItem,
     UserFairShareEntitySearchResult,
     UserFairShareSearchScope,
 )
@@ -97,8 +96,13 @@ class FairShareDBSource:
         """Create a new domain fair share record."""
         async with self._db.begin_session_read_committed() as db_sess:
             result = await execute_creator(db_sess, creator)
-            spec = await self._fetch_fair_share_spec(db_sess, result.row.resource_group)
-            return result.row.to_data(spec.default_weight)
+            sg_row = await self._fetch_scaling_group_row(db_sess, result.row.resource_group)
+            fair_share_spec = sg_row.fair_share_spec or FairShareScalingGroupSpec()
+            available_slots = await self._fetch_available_slots(db_sess, result.row.resource_group)
+            return result.row.to_data(
+                default_weight=fair_share_spec.default_weight,
+                available_slots=available_slots,
+            )
 
     async def upsert_domain_fair_share(
         self,
@@ -111,34 +115,62 @@ class FairShareDBSource:
                 upserter,
                 index_elements=["resource_group", "domain_name"],
             )
-            spec = await self._fetch_fair_share_spec(db_sess, result.row.resource_group)
-            return result.row.to_data(spec.default_weight)
+            fair_share_spec, available_slots = await self._try_fetch_scaling_group_context(
+                db_sess, result.row.resource_group
+            )
+            return result.row.to_data(
+                default_weight=fair_share_spec.default_weight,
+                available_slots=available_slots,
+            )
 
     async def get_domain_fair_share(
         self,
         resource_group: str,
         domain_name: str,
     ) -> DomainFairShareData:
-        """Get a domain fair share record by scaling group and domain name.
+        """Get domain fair share data.
+
+        Steps:
+        1. Check if domain exists
+        2. Query fair share record with (resource_group, domain_name)
+        3. If record exists, convert and return
+        4. If no record, create default from scaling group spec
 
         Raises:
-            FairShareNotFoundError: If the domain fair share is not found.
+            DomainNotFound: If domain does not exist
         """
         async with self._db.begin_readonly_session_read_committed() as db_sess:
-            query = sa.select(DomainFairShareRow).where(
-                sa.and_(
-                    DomainFairShareRow.resource_group == resource_group,
-                    DomainFairShareRow.domain_name == domain_name,
-                )
+            # Step 1: Check domain existence (no RG membership required)
+            domain_query = sa.select(DomainRow.name).where(DomainRow.name == domain_name)
+            domain_result = await db_sess.execute(domain_query)
+            if domain_result.one_or_none() is None:
+                raise DomainNotFound(domain_name)
+
+            # Step 2: Query fair share record
+            fs_query = sa.select(DomainFairShareRow).where(
+                DomainFairShareRow.resource_group == resource_group,
+                DomainFairShareRow.domain_name == domain_name,
             )
-            result = await db_sess.execute(query)
-            row = result.scalar_one_or_none()
-            if row is None:
-                raise FairShareNotFoundError(
-                    f"Domain fair share not found: resource_group={resource_group}, domain_name={domain_name}"
+            fs_result = await db_sess.execute(fs_query)
+            fs_row = fs_result.scalar_one_or_none()
+
+            # Step 3: Fetch scaling group row and available slots
+            sg_row = await self._fetch_scaling_group_row(db_sess, resource_group)
+            fair_share_spec = sg_row.fair_share_spec or FairShareScalingGroupSpec()
+            available_slots = await self._fetch_available_slots(db_sess, resource_group)
+
+            # Step 4: Return existing record (with merged resource weights)
+            if fs_row is not None:
+                return fs_row.to_data(
+                    default_weight=fair_share_spec.default_weight,
+                    available_slots=available_slots,
                 )
-            spec = await self._fetch_fair_share_spec(db_sess, resource_group)
-            return row.to_data(spec.default_weight)
+
+            # Step 5: Create default from scaling group spec
+            now = datetime.now(UTC)
+            return self._create_default_domain_fair_share(
+                resource_group, domain_name, fair_share_spec, available_slots, now
+            )
 
     async def search_domain_fair_shares(
         self,
@@ -146,17 +178,22 @@ class FairShareDBSource:
     ) -> DomainFairShareSearchResult:
         """Search domain fair shares with pagination."""
         async with self._db.begin_readonly_session_read_committed() as db_sess:
-            query = sa.select(DomainFairShareRow)
+            query = sa.select(DomainFairShareRow).outerjoin(
+                DomainRow, DomainFairShareRow.domain_name == DomainRow.name
+            )
             result = await execute_batch_querier(db_sess, query, querier)
 
-            # Collect unique resource groups and fetch their specs
+            # Collect unique resource groups and fetch their specs and capacities
             resource_groups = {row.DomainFairShareRow.resource_group for row in result.rows}
-            specs = await self._fetch_fair_share_specs_batch(db_sess, list(resource_groups))
+            resource_groups_list = list(resource_groups)
+            specs = await self._fetch_fair_share_specs_batch(db_sess, resource_groups_list)
+            capacities = await self._fetch_cluster_capacities_batch(db_sess, resource_groups_list)
 
-            # Convert rows to data with appropriate default_weight
+            # Convert rows to data with appropriate default_weight and available_slots
             items = [
                 row.DomainFairShareRow.to_data(
-                    specs[row.DomainFairShareRow.resource_group].default_weight
+                    specs[row.DomainFairShareRow.resource_group].default_weight,
+                    capacities[row.DomainFairShareRow.resource_group],
                 )
                 for row in result.rows
             ]
@@ -167,52 +204,56 @@ class FairShareDBSource:
                 has_previous_page=result.has_previous_page,
             )
 
-    async def search_domain_fair_share_entities(
+    async def search_rg_domain_fair_shares(
         self,
         scope: DomainFairShareSearchScope,
         querier: BatchQuerier,
     ) -> DomainFairShareEntitySearchResult:
-        """Search domain entities with their fair share records.
+        """Search domain fair shares within a resource group.
 
-        This method returns all domains associated with a resource group,
-        regardless of whether they have fair share records.
+        This method returns all domains with complete fair share data
+        (either from records or defaults). Domains do not need to be
+        registered in the resource group to appear in results.
 
         Args:
             scope: Required scope with resource_group.
             querier: Pagination, conditions, and orders for the query.
 
         Returns:
-            DomainFairShareEntitySearchResult with domain entities and their optional fair share details.
+            DomainFairShareEntitySearchResult with domain entities and their complete fair share details.
         """
         async with self._db.begin_readonly_session_read_committed() as db_sess:
-            # Build LEFT JOIN query: domains associated with resource_group LEFT JOIN fair_share
+            # Build LEFT JOIN query: all domains LEFT JOIN fair_share (filtered by resource_group)
             query = (
                 sa.select(
-                    ScalingGroupForDomainRow.scaling_group,
-                    ScalingGroupForDomainRow.domain,
+                    DomainRow.name.label("domain_name"),
                     DomainFairShareRow,
                 )
-                .select_from(ScalingGroupForDomainRow)
+                .select_from(DomainRow)
                 .outerjoin(
                     DomainFairShareRow,
                     sa.and_(
-                        ScalingGroupForDomainRow.scaling_group == DomainFairShareRow.resource_group,
-                        ScalingGroupForDomainRow.domain == DomainFairShareRow.domain_name,
+                        DomainRow.name == DomainFairShareRow.domain_name,
+                        DomainFairShareRow.resource_group == scope.resource_group,
                     ),
                 )
             )
 
             result = await execute_batch_querier(db_sess, query, querier, scope)
 
-            # Fetch scaling group spec for default_weight
+            # Fetch scaling group spec AND available_slots for default generation
             spec = await self._fetch_fair_share_spec(db_sess, scope.resource_group)
+            available_slots = await self._fetch_available_slots(db_sess, scope.resource_group)
+            now = datetime.now(UTC)
 
             items = [
-                self._build_domain_entity_item(
-                    resource_group=row.scaling_group,
-                    domain_name=row.domain,
+                self._build_domain_data(
+                    resource_group=scope.resource_group,
+                    domain_name=row.domain_name,
                     fair_share_row=row.DomainFairShareRow,
-                    default_weight=spec.default_weight,
+                    spec=spec,
+                    available_slots=available_slots,
+                    now=now,
                 )
                 for row in result.rows
             ]
@@ -224,18 +265,29 @@ class FairShareDBSource:
                 has_previous_page=result.has_previous_page,
             )
 
-    def _build_domain_entity_item(
+    def _build_domain_data(
         self,
         resource_group: str,
         domain_name: str,
         fair_share_row: DomainFairShareRow | None,
-        default_weight: Decimal,
-    ) -> DomainFairShareEntityItem:
-        """Build domain entity item from query result."""
-        return DomainFairShareEntityItem(
-            resource_group=resource_group,
-            domain_name=domain_name,
-            details=fair_share_row.to_data(default_weight) if fair_share_row is not None else None,
+        spec: FairShareScalingGroupSpec,
+        available_slots: list[SlotQuantity],
+        now: datetime,
+    ) -> DomainFairShareData:
+        """Build domain fair share data with complete information.
+
+        Always returns complete DomainFairShareData - either from existing record
+        or generated default values.
+        """
+        if fair_share_row is not None:
+            # Has record: convert with merged resource weights
+            return fair_share_row.to_data(
+                default_weight=spec.default_weight,
+                available_slots=available_slots,
+            )
+        # No record: create default
+        return self._create_default_domain_fair_share(
+            resource_group, domain_name, spec, available_slots, now
         )
 
     # ==================== Project Fair Share ====================
@@ -247,8 +299,13 @@ class FairShareDBSource:
         """Create a new project fair share record."""
         async with self._db.begin_session_read_committed() as db_sess:
             result = await execute_creator(db_sess, creator)
-            spec = await self._fetch_fair_share_spec(db_sess, result.row.resource_group)
-            return result.row.to_data(spec.default_weight)
+            sg_row = await self._fetch_scaling_group_row(db_sess, result.row.resource_group)
+            fair_share_spec = sg_row.fair_share_spec or FairShareScalingGroupSpec()
+            available_slots = await self._fetch_available_slots(db_sess, result.row.resource_group)
+            return result.row.to_data(
+                default_weight=fair_share_spec.default_weight,
+                available_slots=available_slots,
+            )
 
     async def upsert_project_fair_share(
         self,
@@ -261,34 +318,64 @@ class FairShareDBSource:
                 upserter,
                 index_elements=["resource_group", "project_id"],
             )
-            spec = await self._fetch_fair_share_spec(db_sess, result.row.resource_group)
-            return result.row.to_data(spec.default_weight)
+            fair_share_spec, available_slots = await self._try_fetch_scaling_group_context(
+                db_sess, result.row.resource_group
+            )
+            return result.row.to_data(
+                default_weight=fair_share_spec.default_weight,
+                available_slots=available_slots,
+            )
 
     async def get_project_fair_share(
         self,
         resource_group: str,
         project_id: uuid.UUID,
     ) -> ProjectFairShareData:
-        """Get a project fair share record by scaling group and project ID.
+        """Get project fair share data.
+
+        Steps:
+        1. Check if project exists and get domain_name
+        2. Query fair share record with (resource_group, project_id)
+        3. If record exists, convert and return
+        4. If no record, create default from scaling group spec
 
         Raises:
-            FairShareNotFoundError: If the project fair share is not found.
+            ProjectNotFound: If project does not exist
         """
         async with self._db.begin_readonly_session_read_committed() as db_sess:
-            query = sa.select(ProjectFairShareRow).where(
-                sa.and_(
-                    ProjectFairShareRow.resource_group == resource_group,
-                    ProjectFairShareRow.project_id == project_id,
-                )
+            # Step 1: Check project existence and get domain_name (no RG membership required)
+            project_query = sa.select(GroupRow.domain_name).where(GroupRow.id == project_id)
+            project_result = await db_sess.execute(project_query)
+            project_row = project_result.one_or_none()
+            if project_row is None:
+                raise ProjectNotFound(str(project_id))
+            domain_name = project_row[0]
+
+            # Step 2: Query fair share record
+            fs_query = sa.select(ProjectFairShareRow).where(
+                ProjectFairShareRow.resource_group == resource_group,
+                ProjectFairShareRow.project_id == project_id,
             )
-            result = await db_sess.execute(query)
-            row = result.scalar_one_or_none()
-            if row is None:
-                raise FairShareNotFoundError(
-                    f"Project fair share not found: resource_group={resource_group}, project_id={project_id}"
+            fs_result = await db_sess.execute(fs_query)
+            fs_row = fs_result.scalar_one_or_none()
+
+            # Step 3: Fetch scaling group row and available slots
+            sg_row = await self._fetch_scaling_group_row(db_sess, resource_group)
+            fair_share_spec = sg_row.fair_share_spec or FairShareScalingGroupSpec()
+            available_slots = await self._fetch_available_slots(db_sess, resource_group)
+
+            # Step 4: Return existing record (with merged resource weights)
+            if fs_row is not None:
+                return fs_row.to_data(
+                    default_weight=fair_share_spec.default_weight,
+                    available_slots=available_slots,
                 )
-            spec = await self._fetch_fair_share_spec(db_sess, resource_group)
-            return row.to_data(spec.default_weight)
+
+            # Step 5: Create default from scaling group spec
+            now = datetime.now(UTC)
+            return self._create_default_project_fair_share(
+                resource_group, project_id, domain_name, fair_share_spec, available_slots, now
+            )
 
     async def search_project_fair_shares(
         self,
@@ -296,17 +383,22 @@ class FairShareDBSource:
     ) -> ProjectFairShareSearchResult:
         """Search project fair shares with pagination."""
         async with self._db.begin_readonly_session_read_committed() as db_sess:
-            query = sa.select(ProjectFairShareRow)
+            query = sa.select(ProjectFairShareRow).outerjoin(
+                GroupRow, ProjectFairShareRow.project_id == GroupRow.id
+            )
             result = await execute_batch_querier(db_sess, query, querier)
 
-            # Collect unique resource groups and fetch their specs
+            # Collect unique resource groups and fetch their specs and capacities
             resource_groups = {row.ProjectFairShareRow.resource_group for row in result.rows}
-            specs = await self._fetch_fair_share_specs_batch(db_sess, list(resource_groups))
+            resource_groups_list = list(resource_groups)
+            specs = await self._fetch_fair_share_specs_batch(db_sess, resource_groups_list)
+            capacities = await self._fetch_cluster_capacities_batch(db_sess, resource_groups_list)
 
-            # Convert rows to data with appropriate default_weight
+            # Convert rows to data with appropriate default_weight and available_slots
             items = [
                 row.ProjectFairShareRow.to_data(
-                    specs[row.ProjectFairShareRow.resource_group].default_weight
+                    specs[row.ProjectFairShareRow.resource_group].default_weight,
+                    capacities[row.ProjectFairShareRow.resource_group],
                 )
                 for row in result.rows
             ]
@@ -317,57 +409,59 @@ class FairShareDBSource:
                 has_previous_page=result.has_previous_page,
             )
 
-    async def search_project_fair_share_entities(
+    async def search_rg_project_fair_shares(
         self,
         scope: ProjectFairShareSearchScope,
         querier: BatchQuerier,
     ) -> ProjectFairShareEntitySearchResult:
-        """Search project entities with their fair share records.
+        """Search project fair shares within a resource group.
 
-        This method returns all projects associated with a resource group,
-        regardless of whether they have fair share records.
+        This method returns all projects with complete fair share data
+        (either from records or defaults). Projects do not need to be
+        registered in the resource group to appear in results.
 
         Args:
             scope: Required scope with resource_group.
             querier: Pagination, conditions, and orders for the query.
 
         Returns:
-            ProjectFairShareEntitySearchResult with project entities and their optional fair share details.
+            ProjectFairShareEntitySearchResult with project entities and their complete fair share details.
         """
         async with self._db.begin_readonly_session_read_committed() as db_sess:
-            # Build LEFT JOIN query: projects associated with resource_group LEFT JOIN fair_share
+            # Build LEFT JOIN query: all projects LEFT JOIN fair_share (filtered by resource_group)
             query = (
                 sa.select(
-                    ScalingGroupForProjectRow.scaling_group,
-                    ScalingGroupForProjectRow.group.label("project_id"),
-                    DomainRow.name.label("domain_name"),
+                    GroupRow.id.label("project_id"),
+                    GroupRow.domain_name.label("domain_name"),
                     ProjectFairShareRow,
                 )
-                .select_from(ScalingGroupForProjectRow)
-                .join(GroupRow, ScalingGroupForProjectRow.group == GroupRow.id)
+                .select_from(GroupRow)
                 .join(DomainRow, GroupRow.domain_name == DomainRow.name)
                 .outerjoin(
                     ProjectFairShareRow,
                     sa.and_(
-                        ScalingGroupForProjectRow.scaling_group
-                        == ProjectFairShareRow.resource_group,
-                        ScalingGroupForProjectRow.group == ProjectFairShareRow.project_id,
+                        GroupRow.id == ProjectFairShareRow.project_id,
+                        ProjectFairShareRow.resource_group == scope.resource_group,
                     ),
                 )
             )
 
             result = await execute_batch_querier(db_sess, query, querier, scope)
 
-            # Fetch scaling group spec for default_weight
+            # Fetch scaling group spec AND available_slots for default generation
             spec = await self._fetch_fair_share_spec(db_sess, scope.resource_group)
+            available_slots = await self._fetch_available_slots(db_sess, scope.resource_group)
+            now = datetime.now(UTC)
 
             items = [
-                self._build_project_entity_item(
-                    resource_group=row.scaling_group,
+                self._build_project_data(
+                    resource_group=scope.resource_group,
                     project_id=row.project_id,
                     domain_name=row.domain_name,
                     fair_share_row=row.ProjectFairShareRow,
-                    default_weight=spec.default_weight,
+                    spec=spec,
+                    available_slots=available_slots,
+                    now=now,
                 )
                 for row in result.rows
             ]
@@ -379,20 +473,30 @@ class FairShareDBSource:
                 has_previous_page=result.has_previous_page,
             )
 
-    def _build_project_entity_item(
+    def _build_project_data(
         self,
         resource_group: str,
         project_id: uuid.UUID,
         domain_name: str,
         fair_share_row: ProjectFairShareRow | None,
-        default_weight: Decimal,
-    ) -> ProjectFairShareEntityItem:
-        """Build project entity item from query result."""
-        return ProjectFairShareEntityItem(
-            resource_group=resource_group,
-            project_id=project_id,
-            domain_name=domain_name,
-            details=fair_share_row.to_data(default_weight) if fair_share_row is not None else None,
+        spec: FairShareScalingGroupSpec,
+        available_slots: list[SlotQuantity],
+        now: datetime,
+    ) -> ProjectFairShareData:
+        """Build project fair share data with complete information.
+
+        Always returns complete ProjectFairShareData - either from existing record
+        or generated default values.
+        """
+        if fair_share_row is not None:
+            # Has record: convert with merged resource weights
+            return fair_share_row.to_data(
+                default_weight=spec.default_weight,
+                available_slots=available_slots,
+            )
+        # No record: create default
+        return self._create_default_project_fair_share(
+            resource_group, project_id, domain_name, spec, available_slots, now
         )
 
     # ==================== User Fair Share ====================
@@ -404,8 +508,13 @@ class FairShareDBSource:
         """Create a new user fair share record."""
         async with self._db.begin_session_read_committed() as db_sess:
             result = await execute_creator(db_sess, creator)
-            spec = await self._fetch_fair_share_spec(db_sess, result.row.resource_group)
-            return result.row.to_data(spec.default_weight)
+            sg_row = await self._fetch_scaling_group_row(db_sess, result.row.resource_group)
+            fair_share_spec = sg_row.fair_share_spec or FairShareScalingGroupSpec()
+            available_slots = await self._fetch_available_slots(db_sess, result.row.resource_group)
+            return result.row.to_data(
+                default_weight=fair_share_spec.default_weight,
+                available_slots=available_slots,
+            )
 
     async def upsert_user_fair_share(
         self,
@@ -418,8 +527,13 @@ class FairShareDBSource:
                 upserter,
                 index_elements=["resource_group", "user_uuid", "project_id"],
             )
-            spec = await self._fetch_fair_share_spec(db_sess, result.row.resource_group)
-            return result.row.to_data(spec.default_weight)
+            fair_share_spec, available_slots = await self._try_fetch_scaling_group_context(
+                db_sess, result.row.resource_group
+            )
+            return result.row.to_data(
+                default_weight=fair_share_spec.default_weight,
+                available_slots=available_slots,
+            )
 
     # ==================== Bulk Upsert Operations ====================
 
@@ -486,28 +600,66 @@ class FairShareDBSource:
         project_id: uuid.UUID,
         user_uuid: uuid.UUID,
     ) -> UserFairShareData:
-        """Get a user fair share record by scaling group, project ID, and user UUID.
+        """Get user fair share data.
+
+        Steps:
+        1. Check if user exists in project (AssocGroupUserRow)
+        2. Query fair share record with (resource_group, user_uuid, project_id)
+        3. If record exists, convert and return
+        4. If no record, create default from scaling group spec
 
         Raises:
-            FairShareNotFoundError: If the user fair share is not found.
+            UserNotFound: If user does not exist in the project
         """
         async with self._db.begin_readonly_session_read_committed() as db_sess:
-            query = sa.select(UserFairShareRow).where(
-                sa.and_(
-                    UserFairShareRow.resource_group == resource_group,
-                    UserFairShareRow.project_id == project_id,
-                    UserFairShareRow.user_uuid == user_uuid,
+            # Step 1: Check user-project association and get domain_name
+            assoc_query = (
+                sa.select(GroupRow.domain_name)
+                .select_from(AssocGroupUserRow)
+                .join(GroupRow, AssocGroupUserRow.group_id == GroupRow.id)
+                .where(
+                    AssocGroupUserRow.group_id == project_id,
+                    AssocGroupUserRow.user_id == user_uuid,
                 )
             )
-            result = await db_sess.execute(query)
-            row = result.scalar_one_or_none()
-            if row is None:
-                raise FairShareNotFoundError(
-                    f"User fair share not found: resource_group={resource_group}, "
-                    f"project_id={project_id}, user_uuid={user_uuid}"
+            assoc_result = await db_sess.execute(assoc_query)
+            assoc_row = assoc_result.one_or_none()
+            if assoc_row is None:
+                raise UserNotFound(f"User {user_uuid} not found in project {project_id}")
+            domain_name = assoc_row[0]
+
+            # Step 2: Query fair share record
+            fs_query = sa.select(UserFairShareRow).where(
+                UserFairShareRow.resource_group == resource_group,
+                UserFairShareRow.user_uuid == user_uuid,
+                UserFairShareRow.project_id == project_id,
+            )
+            fs_result = await db_sess.execute(fs_query)
+            fs_row = fs_result.scalar_one_or_none()
+
+            # Step 3: Fetch scaling group row and available slots
+            sg_row = await self._fetch_scaling_group_row(db_sess, resource_group)
+            fair_share_spec = sg_row.fair_share_spec or FairShareScalingGroupSpec()
+            available_slots = await self._fetch_available_slots(db_sess, resource_group)
+
+            # Step 4: Return existing record (with merged resource weights)
+            if fs_row is not None:
+                return fs_row.to_data(
+                    default_weight=fair_share_spec.default_weight,
+                    available_slots=available_slots,
                 )
-            spec = await self._fetch_fair_share_spec(db_sess, resource_group)
-            return row.to_data(spec.default_weight)
+
+            # Step 5: Create default from scaling group spec
+            now = datetime.now(UTC)
+            return self._create_default_user_fair_share(
+                resource_group,
+                user_uuid,
+                project_id,
+                domain_name,
+                fair_share_spec,
+                available_slots,
+                now,
+            )
 
     async def get_user_project_info(
         self,
@@ -583,85 +735,92 @@ class FairShareDBSource:
     ) -> UserFairShareSearchResult:
         """Search user fair shares with pagination."""
         async with self._db.begin_readonly_session_read_committed() as db_sess:
-            query = sa.select(UserFairShareRow)
+            query = sa.select(UserFairShareRow).outerjoin(
+                UserRow, UserFairShareRow.user_uuid == UserRow.uuid
+            )
             result = await execute_batch_querier(db_sess, query, querier)
 
-            # Collect unique resource groups and fetch their specs
+            # Collect unique resource groups and fetch their specs and capacities
             resource_groups = {row.UserFairShareRow.resource_group for row in result.rows}
-            specs = await self._fetch_fair_share_specs_batch(db_sess, list(resource_groups))
+            resource_groups_list = list(resource_groups)
+            specs = await self._fetch_fair_share_specs_batch(db_sess, resource_groups_list)
+            capacities = await self._fetch_cluster_capacities_batch(db_sess, resource_groups_list)
 
-            # Convert rows to data with appropriate default_weight
+            # Convert rows to data with appropriate default_weight and available_slots
             items = [
                 row.UserFairShareRow.to_data(
-                    specs[row.UserFairShareRow.resource_group].default_weight
+                    specs[row.UserFairShareRow.resource_group].default_weight,
+                    capacities[row.UserFairShareRow.resource_group],
                 )
                 for row in result.rows
             ]
             return UserFairShareSearchResult(
                 items=items,
                 total_count=result.total_count,
-                has_next_page=result.has_next_page,
+                has_next_page=result.has_previous_page,
                 has_previous_page=result.has_previous_page,
             )
 
-    async def search_user_fair_share_entities(
+    async def search_rg_user_fair_shares(
         self,
         scope: UserFairShareSearchScope,
         querier: BatchQuerier,
     ) -> UserFairShareEntitySearchResult:
-        """Search user entities with their fair share records.
+        """Search user fair shares within a resource group.
 
-        This method returns all users associated with a resource group (via project membership),
-        regardless of whether they have fair share records.
+        This method returns all users (via project membership) with complete
+        fair share data (either from records or defaults). Users do not need
+        to be in a project registered in the resource group to appear in results.
 
         Args:
             scope: Required scope with resource_group.
             querier: Pagination, conditions, and orders for the query.
 
         Returns:
-            UserFairShareEntitySearchResult with user entities and their optional fair share details.
+            UserFairShareEntitySearchResult with user entities and their complete fair share details.
         """
         async with self._db.begin_readonly_session_read_committed() as db_sess:
             # Build LEFT JOIN query:
-            # Users in projects associated with resource_group LEFT JOIN fair_share
-            # Path: ScalingGroupForProjectRow -> AssocGroupUserRow -> UserFairShareRow
+            # Users via project membership LEFT JOIN fair_share (filtered by resource_group)
+            # Path: AssocGroupUserRow -> GroupRow -> DomainRow -> UserRow -> LEFT JOIN UserFairShareRow
             query = (
                 sa.select(
-                    ScalingGroupForProjectRow.scaling_group,
                     AssocGroupUserRow.user_id.label("user_uuid"),
                     AssocGroupUserRow.group_id.label("project_id"),
                     DomainRow.name.label("domain_name"),
                     UserFairShareRow,
                 )
-                .select_from(ScalingGroupForProjectRow)
-                .join(
-                    AssocGroupUserRow, ScalingGroupForProjectRow.group == AssocGroupUserRow.group_id
-                )
-                .join(GroupRow, ScalingGroupForProjectRow.group == GroupRow.id)
+                .select_from(AssocGroupUserRow)
+                .join(GroupRow, AssocGroupUserRow.group_id == GroupRow.id)
                 .join(DomainRow, GroupRow.domain_name == DomainRow.name)
+                .join(UserRow, AssocGroupUserRow.user_id == UserRow.uuid)
                 .outerjoin(
                     UserFairShareRow,
                     sa.and_(
-                        ScalingGroupForProjectRow.scaling_group == UserFairShareRow.resource_group,
                         AssocGroupUserRow.user_id == UserFairShareRow.user_uuid,
                         AssocGroupUserRow.group_id == UserFairShareRow.project_id,
+                        UserFairShareRow.resource_group == scope.resource_group,
                     ),
                 )
             )
 
             result = await execute_batch_querier(db_sess, query, querier, scope)
 
-            # Fetch scaling group spec for default_weight
+            # Fetch scaling group spec AND available_slots for default generation
             spec = await self._fetch_fair_share_spec(db_sess, scope.resource_group)
+            available_slots = await self._fetch_available_slots(db_sess, scope.resource_group)
+            now = datetime.now(UTC)
 
             items = [
-                self._build_user_entity_item(
-                    resource_group=row.scaling_group,
+                self._build_user_data(
+                    resource_group=scope.resource_group,
                     user_uuid=row.user_uuid,
                     project_id=row.project_id,
                     domain_name=row.domain_name,
                     fair_share_row=row.UserFairShareRow,
-                    default_weight=spec.default_weight,
+                    spec=spec,
+                    available_slots=available_slots,
+                    now=now,
                 )
                 for row in result.rows
             ]
@@ -673,22 +832,31 @@ class FairShareDBSource:
                 has_previous_page=result.has_previous_page,
             )
 
-    def _build_user_entity_item(
+    def _build_user_data(
         self,
         resource_group: str,
         user_uuid: uuid.UUID,
         project_id: uuid.UUID,
         domain_name: str,
         fair_share_row: UserFairShareRow | None,
-        default_weight: Decimal,
-    ) -> UserFairShareEntityItem:
-        """Build user entity item from query result."""
-        return UserFairShareEntityItem(
-            resource_group=resource_group,
-            user_uuid=user_uuid,
-            project_id=project_id,
-            domain_name=domain_name,
-            details=fair_share_row.to_data(default_weight) if fair_share_row is not None else None,
+        spec: FairShareScalingGroupSpec,
+        available_slots: list[SlotQuantity],
+        now: datetime,
+    ) -> UserFairShareData:
+        """Build user fair share data with complete information.
+
+        Always returns complete UserFairShareData - either from existing record
+        or generated default values.
+        """
+        if fair_share_row is not None:
+            # Has record: convert with merged resource weights
+            return fair_share_row.to_data(
+                default_weight=spec.default_weight,
+                available_slots=available_slots,
+            )
+        # No record: create default
+        return self._create_default_user_fair_share(
+            resource_group, user_uuid, project_id, domain_name, spec, available_slots, now
         )
 
     async def get_user_scheduling_ranks_batch(
@@ -807,6 +975,7 @@ class FairShareDBSource:
                 upsert_stmt = insert_stmt.on_conflict_do_update(
                     index_elements=["resource_group", "project_id"],
                     set_={
+                        "domain_name": insert_stmt.excluded.domain_name,
                         "fair_share_factor": insert_stmt.excluded.fair_share_factor,
                         "total_decayed_usage": insert_stmt.excluded.total_decayed_usage,
                         "normalized_usage": insert_stmt.excluded.normalized_usage,
@@ -836,6 +1005,7 @@ class FairShareDBSource:
                 upsert_stmt = insert_stmt.on_conflict_do_update(
                     index_elements=["resource_group", "user_uuid", "project_id"],
                     set_={
+                        "domain_name": insert_stmt.excluded.domain_name,
                         "fair_share_factor": insert_stmt.excluded.fair_share_factor,
                         "total_decayed_usage": insert_stmt.excluded.total_decayed_usage,
                         "normalized_usage": insert_stmt.excluded.normalized_usage,
@@ -960,16 +1130,28 @@ class FairShareDBSource:
             lookback_start = today - timedelta(days=spec.lookback_days)
             lookback_end = today
 
-            # 2. Fetch fair shares
-            fair_shares = await self._fetch_fair_shares(db_sess, scaling_group, spec.default_weight)
+            # 2. Fetch cluster capacity (sum of ALIVE schedulable agents' available_slots)
+            cluster_capacity = await self._fetch_cluster_capacity(db_sess, scaling_group)
 
-            # 3. Fetch raw usage buckets (no decay applied)
+            # 3. Fetch fair shares with resource weights merged
+            fair_shares = await self._fetch_fair_shares(
+                db_sess,
+                scaling_group,
+                spec.default_weight,
+                cluster_capacity,
+            )
+
+            # 4. Fetch raw usage buckets (no decay applied)
             raw_usage_buckets = await self._fetch_raw_usage_buckets(
                 db_sess, scaling_group, lookback_start, lookback_end
             )
 
-            # 4. Fetch cluster capacity (sum of ALIVE schedulable agents' available_slots)
-            cluster_capacity = await self._fetch_cluster_capacity(db_sess, scaling_group)
+            # 5. Collect project_ids from raw usage buckets and fetch domain names
+            project_ids: set[uuid.UUID] = set()
+            project_ids.update(raw_usage_buckets.project.keys())
+            for user_key in raw_usage_buckets.user:
+                project_ids.add(user_key.project_id)
+            project_domain_names = await self._fetch_project_domain_names(db_sess, project_ids)
 
         return FairShareCalculationContext(
             fair_shares=fair_shares,
@@ -980,7 +1162,28 @@ class FairShareDBSource:
             resource_weights=spec.resource_weights,
             cluster_capacity=cluster_capacity,
             today=today,
+            project_domain_names=project_domain_names,
         )
+
+    async def _fetch_project_domain_names(
+        self,
+        db_sess: SASession,
+        project_ids: set[uuid.UUID],
+    ) -> dict[uuid.UUID, str]:
+        """Fetch domain_name for projects from GroupRow.
+
+        Args:
+            db_sess: Database session
+            project_ids: Set of project IDs to look up
+
+        Returns:
+            Mapping from project_id to domain_name
+        """
+        if not project_ids:
+            return {}
+        query = sa.select(GroupRow.id, GroupRow.domain_name).where(GroupRow.id.in_(project_ids))
+        result = await db_sess.execute(query)
+        return {row.id: row.domain_name for row in result}
 
     async def _fetch_fair_share_spec(
         self,
@@ -1002,6 +1205,193 @@ class FairShareDBSource:
             return cast(FairShareScalingGroupSpec, row.fair_share_spec)
 
         return FairShareScalingGroupSpec()
+
+    async def _fetch_scaling_group_row(
+        self,
+        db_sess: SASession,
+        resource_group: str,
+    ) -> ScalingGroupRow:
+        """Fetch scaling group row.
+
+        Raises:
+            ScalingGroupNotFound: If scaling group does not exist
+        """
+        result = await db_sess.execute(
+            sa.select(ScalingGroupRow).where(ScalingGroupRow.name == resource_group)
+        )
+        row = result.scalar_one_or_none()
+        if row is None:
+            raise ScalingGroupNotFound(resource_group)
+        return row
+
+    async def _try_fetch_scaling_group_context(
+        self,
+        db_sess: SASession,
+        resource_group: str,
+    ) -> tuple[FairShareScalingGroupSpec, list[SlotQuantity]]:
+        """Fetch scaling group context for response building, with graceful fallback.
+
+        Returns defaults when scaling group doesn't exist.
+        Used by upsert methods where the scaling group may not exist.
+        """
+        try:
+            sg_row = await self._fetch_scaling_group_row(db_sess, resource_group)
+            fair_share_spec = sg_row.fair_share_spec or FairShareScalingGroupSpec()
+            available_slots = await self._fetch_available_slots(db_sess, resource_group)
+        except ScalingGroupNotFound:
+            fair_share_spec = FairShareScalingGroupSpec()
+            available_slots = []
+        return fair_share_spec, available_slots
+
+    async def _fetch_available_slots(
+        self,
+        db_sess: SASession,
+        resource_group: str,
+    ) -> list[SlotQuantity]:
+        """Fetch total available slots from all ALIVE schedulable agents.
+
+        Uses normalized agent_resources table to sum capacity per slot,
+        ordered by resource_slot_types.rank.
+
+        Args:
+            db_sess: Database session
+            resource_group: Scaling group name
+
+        Returns:
+            Sum of capacity from all ALIVE schedulable agents, rank-ordered
+        """
+        j = sa.join(AgentResourceRow, AgentRow, AgentResourceRow.agent_id == AgentRow.id).join(
+            ResourceSlotTypeRow, AgentResourceRow.slot_name == ResourceSlotTypeRow.slot_name
+        )
+        query = (
+            sa.select(
+                AgentResourceRow.slot_name,
+                sa.func.sum(AgentResourceRow.capacity).label("total_capacity"),
+            )
+            .select_from(j)
+            .where(
+                AgentRow.scaling_group == resource_group,
+                AgentRow.status == AgentStatus.ALIVE,
+                AgentRow.schedulable.is_(True),
+            )
+            .group_by(AgentResourceRow.slot_name, ResourceSlotTypeRow.rank)
+            .order_by(ResourceSlotTypeRow.rank)
+        )
+        result = await db_sess.execute(query)
+        return [SlotQuantity(row.slot_name, row.total_capacity) for row in result]
+
+    def _create_default_fair_share_data(
+        self,
+        scaling_group_spec: FairShareScalingGroupSpec,
+        available_slots: list[SlotQuantity],
+        now: datetime,
+    ) -> FairShareData:
+        """Create default FairShareData from scaling group spec.
+
+        Used when entity exists but has no fair share record.
+        Always sets use_default=True and all resources use default weights.
+
+        Args:
+            scaling_group_spec: Scaling group configuration
+            available_slots: Scaling group's available slots (for resource keys)
+            now: Current datetime for snapshot calculation
+        """
+        return FairShareData(
+            spec=FairShareSpec(
+                weight=scaling_group_spec.default_weight,  # Use default_weight
+                half_life_days=scaling_group_spec.half_life_days,
+                lookback_days=scaling_group_spec.lookback_days,
+                decay_unit_days=scaling_group_spec.decay_unit_days,
+                resource_weights=scaling_group_spec.resource_weights,
+            ),
+            calculation_snapshot=FairShareCalculationSnapshot.create_default(
+                scaling_group_spec.lookback_days, available_slots, now
+            ),
+            metadata=None,  # No metadata for default-generated records
+            use_default=True,  # Explicitly mark as default
+            uses_default_resources=frozenset(
+                sq.slot_name for sq in available_slots
+            ),  # All resources use defaults
+        )
+
+    def _create_default_domain_fair_share(
+        self,
+        resource_group: str,
+        domain_name: str,
+        scaling_group_spec: FairShareScalingGroupSpec,
+        available_slots: list[SlotQuantity],
+        now: datetime,
+    ) -> DomainFairShareData:
+        """Create default DomainFairShareData.
+
+        Args:
+            resource_group: Scaling group name
+            domain_name: Domain name
+            scaling_group_spec: Scaling group configuration for defaults
+            available_slots: Scaling group's available slots (for resource keys)
+            now: Current datetime for snapshot calculation
+        """
+        return DomainFairShareData(
+            resource_group=resource_group,
+            domain_name=domain_name,
+            data=self._create_default_fair_share_data(scaling_group_spec, available_slots, now),
+        )
+
+    def _create_default_project_fair_share(
+        self,
+        resource_group: str,
+        project_id: uuid.UUID,
+        domain_name: str,
+        scaling_group_spec: FairShareScalingGroupSpec,
+        available_slots: list[SlotQuantity],
+        now: datetime,
+    ) -> ProjectFairShareData:
+        """Create default ProjectFairShareData.
+
+        Args:
+            resource_group: Scaling group name
+            project_id: Project ID
+            domain_name: Domain name
+            scaling_group_spec: Scaling group configuration for defaults
+            available_slots: Scaling group's available slots (for resource keys)
+            now: Current datetime for snapshot calculation
+        """
+        return ProjectFairShareData(
+            resource_group=resource_group,
+            project_id=project_id,
+            domain_name=domain_name,
+            data=self._create_default_fair_share_data(scaling_group_spec, available_slots, now),
+        )
+
+    def _create_default_user_fair_share(
+        self,
+        resource_group: str,
+        user_uuid: uuid.UUID,
+        project_id: uuid.UUID,
+        domain_name: str,
+        scaling_group_spec: FairShareScalingGroupSpec,
+        available_slots: list[SlotQuantity],
+        now: datetime,
+    ) -> UserFairShareData:
+        """Create default UserFairShareData.
+
+        Args:
+            resource_group: Scaling group name
+            user_uuid: User UUID
+            project_id: Project ID
+            domain_name: Domain name
+            scaling_group_spec: Scaling group configuration for defaults
+            available_slots: Scaling group's available slots (for resource keys)
+            now: Current datetime for snapshot calculation
+        """
+        return UserFairShareData(
+            resource_group=resource_group,
+            user_uuid=user_uuid,
+            project_id=project_id,
+            domain_name=domain_name,
+            data=self._create_default_fair_share_data(scaling_group_spec, available_slots, now),
+            scheduling_rank=None,
+        )
 
     async def _fetch_fair_share_specs_batch(
         self,
@@ -1036,48 +1426,105 @@ class FairShareDBSource:
         self,
         db_sess: SASession,
         scaling_group: str,
-    ) -> ResourceSlot:
-        """Fetch total available slots from ALIVE schedulable agents in scaling group.
+    ) -> list[SlotQuantity]:
+        """Fetch total capacity from ALIVE schedulable agents in scaling group.
+
+        Uses normalized agent_resources table to sum capacity per slot,
+        ordered by resource_slot_types.rank.
 
         Args:
             db_sess: Database session
             scaling_group: The scaling group name
 
         Returns:
-            Sum of available_slots from all ALIVE schedulable agents
+            Sum of capacity from all ALIVE schedulable agents, rank-ordered
         """
-        query = sa.select(AgentRow.available_slots).where(
-            sa.and_(
-                AgentRow.scaling_group == scaling_group,
-                AgentRow.status == AgentStatus.ALIVE,
-                AgentRow.schedulable == sa.true(),
+        j = sa.join(AgentResourceRow, AgentRow, AgentResourceRow.agent_id == AgentRow.id).join(
+            ResourceSlotTypeRow, AgentResourceRow.slot_name == ResourceSlotTypeRow.slot_name
+        )
+        query = (
+            sa.select(
+                AgentResourceRow.slot_name,
+                sa.func.sum(AgentResourceRow.capacity).label("total_capacity"),
             )
+            .select_from(j)
+            .where(
+                sa.and_(
+                    AgentRow.scaling_group == scaling_group,
+                    AgentRow.status == AgentStatus.ALIVE,
+                    AgentRow.schedulable == sa.true(),
+                )
+            )
+            .group_by(AgentResourceRow.slot_name, ResourceSlotTypeRow.rank)
+            .order_by(ResourceSlotTypeRow.rank)
         )
         result = await db_sess.execute(query)
-        available_slots_list = result.scalars().all()
+        return [SlotQuantity(row.slot_name, row.total_capacity) for row in result]
 
-        # Sum all available_slots in Python (JSONB aggregation not straightforward in SQL)
-        total_capacity = ResourceSlot()
-        for slots in available_slots_list:
-            if slots:
-                total_capacity = total_capacity + slots
+    async def _fetch_cluster_capacities_batch(
+        self,
+        db_sess: SASession,
+        scaling_groups: Sequence[str],
+    ) -> dict[str, list[SlotQuantity]]:
+        """Fetch total capacity for multiple scaling groups.
 
-        return total_capacity
+        Uses normalized agent_resources table to sum capacity per slot per scaling group,
+        ordered by resource_slot_types.rank.
+
+        Args:
+            db_sess: Database session
+            scaling_groups: List of scaling group names
+
+        Returns:
+            Mapping from scaling group name to its cluster capacity (sum of capacity)
+        """
+        if not scaling_groups:
+            return {}
+
+        j = sa.join(AgentResourceRow, AgentRow, AgentResourceRow.agent_id == AgentRow.id).join(
+            ResourceSlotTypeRow, AgentResourceRow.slot_name == ResourceSlotTypeRow.slot_name
+        )
+        query = (
+            sa.select(
+                AgentRow.scaling_group,
+                AgentResourceRow.slot_name,
+                sa.func.sum(AgentResourceRow.capacity).label("total_capacity"),
+            )
+            .select_from(j)
+            .where(
+                sa.and_(
+                    AgentRow.scaling_group.in_(scaling_groups),
+                    AgentRow.status == AgentStatus.ALIVE,
+                    AgentRow.schedulable == sa.true(),
+                )
+            )
+            .group_by(AgentRow.scaling_group, AgentResourceRow.slot_name, ResourceSlotTypeRow.rank)
+            .order_by(AgentRow.scaling_group, ResourceSlotTypeRow.rank)
+        )
+        result = await db_sess.execute(query)
+
+        capacities: dict[str, list[SlotQuantity]] = {sg: [] for sg in scaling_groups}
+        for row in result:
+            capacities[row.scaling_group].append(SlotQuantity(row.slot_name, row.total_capacity))
+
+        return capacities
 
     async def _fetch_fair_shares(
         self,
         db_sess: SASession,
         scaling_group: str,
         default_weight: Decimal,
+        available_slots: list[SlotQuantity],
     ) -> FairSharesByLevel:
-        """Fetch all fair share records for a resource group."""
+        """Fetch all fair share records for a resource group with merged resource weights."""
         # Get domain fair shares
         domain_query = sa.select(DomainFairShareRow).where(
             DomainFairShareRow.resource_group == scaling_group
         )
         domain_result = await db_sess.execute(domain_query)
         domain_fair_shares = {
-            row.domain_name: row.to_data(default_weight) for row in domain_result.scalars()
+            row.domain_name: row.to_data(default_weight, available_slots)
+            for row in domain_result.scalars()
         }
 
         # Get project fair shares
@@ -1086,7 +1533,8 @@ class FairShareDBSource:
         )
         project_result = await db_sess.execute(project_query)
         project_fair_shares = {
-            row.project_id: row.to_data(default_weight) for row in project_result.scalars()
+            row.project_id: row.to_data(default_weight, available_slots)
+            for row in project_result.scalars()
         }
 
         # Get user fair shares
@@ -1095,7 +1543,9 @@ class FairShareDBSource:
         )
         user_result = await db_sess.execute(user_query)
         user_fair_shares = {
-            UserProjectKey(row.user_uuid, row.project_id): row.to_data(default_weight)
+            UserProjectKey(row.user_uuid, row.project_id): row.to_data(
+                default_weight, available_slots
+            )
             for row in user_result.scalars()
         }
 
@@ -1112,79 +1562,124 @@ class FairShareDBSource:
         lookback_start: date,
         lookback_end: date,
     ) -> RawUsageBucketsByLevel:
-        """Fetch raw usage buckets without applying decay.
+        """Fetch raw usage buckets from normalized entries without applying decay.
 
-        Returns per-date buckets for each entity. The Calculator is responsible
-        for applying time decay to these raw values.
+        Reads from usage_bucket_entries joined with parent bucket tables.
+        Returns per-date ResourceSlot buckets for each entity.
+        The Calculator is responsible for applying time decay to these raw values.
         """
-        # Fetch user usage buckets
-        user_query = sa.select(
-            UserUsageBucketRow.user_uuid,
-            UserUsageBucketRow.project_id,
-            UserUsageBucketRow.period_start,
-            UserUsageBucketRow.resource_usage,
-        ).where(
-            sa.and_(
-                UserUsageBucketRow.resource_group == scaling_group,
-                UserUsageBucketRow.period_start >= lookback_start,
-                UserUsageBucketRow.period_start <= lookback_end,
+        ube = UsageBucketEntryRow.__table__
+
+        # Fetch user usage buckets via normalized entries
+        user_query = (
+            sa.select(
+                UserUsageBucketRow.user_uuid,
+                UserUsageBucketRow.project_id,
+                UserUsageBucketRow.period_start,
+                ube.c.slot_name,
+                ube.c.amount,
+            )
+            .select_from(
+                sa.join(
+                    UserUsageBucketRow.__table__,
+                    ube,
+                    UserUsageBucketRow.__table__.c.id == ube.c.bucket_id,
+                )
+            )
+            .where(
+                sa.and_(
+                    UserUsageBucketRow.resource_group == scaling_group,
+                    UserUsageBucketRow.period_start >= lookback_start,
+                    UserUsageBucketRow.period_start <= lookback_end,
+                    ube.c.bucket_type == "user",
+                )
             )
         )
         user_result = await db_sess.execute(user_query)
         user_rows = user_result.all()
 
-        # Fetch project usage buckets
-        project_query = sa.select(
-            ProjectUsageBucketRow.project_id,
-            ProjectUsageBucketRow.period_start,
-            ProjectUsageBucketRow.resource_usage,
-        ).where(
-            sa.and_(
-                ProjectUsageBucketRow.resource_group == scaling_group,
-                ProjectUsageBucketRow.period_start >= lookback_start,
-                ProjectUsageBucketRow.period_start <= lookback_end,
+        # Fetch project usage buckets via normalized entries
+        project_query = (
+            sa.select(
+                ProjectUsageBucketRow.project_id,
+                ProjectUsageBucketRow.period_start,
+                ube.c.slot_name,
+                ube.c.amount,
+            )
+            .select_from(
+                sa.join(
+                    ProjectUsageBucketRow.__table__,
+                    ube,
+                    ProjectUsageBucketRow.__table__.c.id == ube.c.bucket_id,
+                )
+            )
+            .where(
+                sa.and_(
+                    ProjectUsageBucketRow.resource_group == scaling_group,
+                    ProjectUsageBucketRow.period_start >= lookback_start,
+                    ProjectUsageBucketRow.period_start <= lookback_end,
+                    ube.c.bucket_type == "project",
+                )
             )
         )
         project_result = await db_sess.execute(project_query)
         project_rows = project_result.all()
 
-        # Fetch domain usage buckets
-        domain_query = sa.select(
-            DomainUsageBucketRow.domain_name,
-            DomainUsageBucketRow.period_start,
-            DomainUsageBucketRow.resource_usage,
-        ).where(
-            sa.and_(
-                DomainUsageBucketRow.resource_group == scaling_group,
-                DomainUsageBucketRow.period_start >= lookback_start,
-                DomainUsageBucketRow.period_start <= lookback_end,
+        # Fetch domain usage buckets via normalized entries
+        domain_query = (
+            sa.select(
+                DomainUsageBucketRow.domain_name,
+                DomainUsageBucketRow.period_start,
+                ube.c.slot_name,
+                ube.c.amount,
+            )
+            .select_from(
+                sa.join(
+                    DomainUsageBucketRow.__table__,
+                    ube,
+                    DomainUsageBucketRow.__table__.c.id == ube.c.bucket_id,
+                )
+            )
+            .where(
+                sa.and_(
+                    DomainUsageBucketRow.resource_group == scaling_group,
+                    DomainUsageBucketRow.period_start >= lookback_start,
+                    DomainUsageBucketRow.period_start <= lookback_end,
+                    ube.c.bucket_type == "domain",
+                )
             )
         )
         domain_result = await db_sess.execute(domain_query)
         domain_rows = domain_result.all()
 
-        # Organize into per-date buckets (no decay applied)
+        # Organize into per-date ResourceSlot buckets (no decay applied)
         user_buckets: dict[UserProjectKey, dict[date, ResourceSlot]] = {}
-        for user_row in user_rows:
-            key = UserProjectKey(user_row.user_uuid, user_row.project_id)
+        for row in user_rows:
+            key = UserProjectKey(row.user_uuid, row.project_id)
             if key not in user_buckets:
                 user_buckets[key] = {}
-            user_buckets[key][user_row.period_start] = user_row.resource_usage
+            if row.period_start not in user_buckets[key]:
+                user_buckets[key][row.period_start] = ResourceSlot()
+            user_buckets[key][row.period_start][row.slot_name] = Decimal(str(row.amount))
 
         project_buckets: dict[uuid.UUID, dict[date, ResourceSlot]] = {}
-        for project_row in project_rows:
-            if project_row.project_id not in project_buckets:
-                project_buckets[project_row.project_id] = {}
-            project_buckets[project_row.project_id][project_row.period_start] = (
-                project_row.resource_usage
+        for row in project_rows:
+            if row.project_id not in project_buckets:
+                project_buckets[row.project_id] = {}
+            if row.period_start not in project_buckets[row.project_id]:
+                project_buckets[row.project_id][row.period_start] = ResourceSlot()
+            project_buckets[row.project_id][row.period_start][row.slot_name] = Decimal(
+                str(row.amount)
             )
 
         domain_buckets: dict[str, dict[date, ResourceSlot]] = {}
-        for domain_row in domain_rows:
-            if domain_row.domain_name not in domain_buckets:
-                domain_buckets[domain_row.domain_name] = {}
-            domain_buckets[domain_row.domain_name][domain_row.period_start] = (
-                domain_row.resource_usage
+        for row in domain_rows:
+            if row.domain_name not in domain_buckets:
+                domain_buckets[row.domain_name] = {}
+            if row.period_start not in domain_buckets[row.domain_name]:
+                domain_buckets[row.domain_name][row.period_start] = ResourceSlot()
+            domain_buckets[row.domain_name][row.period_start][row.slot_name] = Decimal(
+                str(row.amount)
             )
 
         return RawUsageBucketsByLevel(

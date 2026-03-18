@@ -82,11 +82,11 @@ class RoutingRow(Base):  # type: ignore[misc]
     )
     weight: Mapped[int | None] = mapped_column("weight", sa.Integer(), nullable=True, default=None)
     traffic_ratio: Mapped[float] = mapped_column("traffic_ratio", sa.Float(), nullable=False)
-    created_at: Mapped[datetime | None] = mapped_column(
+    created_at: Mapped[datetime] = mapped_column(
         "created_at",
         sa.DateTime(timezone=True),
         server_default=sa.text("now()"),
-        nullable=True,
+        nullable=False,
     )
 
     error_data: Mapped[dict[str, Any] | None] = mapped_column(

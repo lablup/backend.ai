@@ -12,6 +12,7 @@ from pydantic import BaseModel, Field
 
 from ai.backend.common.api_handlers import BaseResponseModel
 from ai.backend.common.data.permission.types import ScopeType
+from ai.backend.common.dto.manager.pagination import PaginationInfo
 
 from .types import EntityType, OperationType, RoleSource, RoleStatus
 
@@ -61,14 +62,6 @@ class AssignedUserDTO(BaseModel):
     user_id: UUID = Field(description="User ID")
     granted_by: UUID | None = Field(default=None, description="ID of user who granted this role")
     granted_at: datetime = Field(description="Timestamp when the role was granted")
-
-
-class PaginationInfo(BaseModel):
-    """Pagination information."""
-
-    total: int = Field(description="Total number of items")
-    offset: int = Field(description="Number of items skipped")
-    limit: int | None = Field(default=None, description="Maximum items returned")
 
 
 class CreateRoleResponse(BaseResponseModel):
@@ -128,7 +121,6 @@ class PermissionDTO(BaseModel):
     """DTO for permission data."""
 
     id: UUID = Field(description="Permission ID")
-    permission_group_id: UUID = Field(description="Permission group ID")
     entity_type: EntityType = Field(description="Entity type")
     operation: OperationType = Field(description="Operation type")
 

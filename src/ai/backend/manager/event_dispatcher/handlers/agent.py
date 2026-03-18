@@ -19,6 +19,7 @@ from ai.backend.common.types import AgentId
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.errors.resource import InstanceNotFound
 from ai.backend.manager.models.agent import AgentStatus, agents
+from ai.backend.manager.models.resource_slot import AgentResourceRow
 from ai.backend.manager.models.utils import (
     ExtendedAsyncSAEngine,
 )
@@ -161,14 +162,17 @@ class AgentEventHandler:
         self, _context: None, source: AgentId, _event: DoAgentResourceCheckEvent
     ) -> None:
         async with self._db.begin_readonly() as conn:
-            query = (
-                sa.select(agents.c.occupied_slots).select_from(agents).where(agents.c.id == source)
-            )
-            result = await conn.execute(query)
-            row = result.first()
-            if not row:
+            # Check agent existence
+            agent_query = sa.select(sa.literal(1)).select_from(agents).where(agents.c.id == source)
+            agent_result = await conn.execute(agent_query)
+            if agent_result.first() is None:
                 raise InstanceNotFound(source)
-            log.info("agent@{0} occupied slots: {1}", source, row.occupied_slots.to_json())
+            # Read used slots from normalized agent_resources table
+            ar = AgentResourceRow.__table__
+            query = sa.select(ar.c.slot_name, ar.c.used).where(ar.c.agent_id == source)
+            result = await conn.execute(query)
+            used_slots = {row.slot_name: row.used for row in result}
+            log.info("agent@{0} used slots: {1}", source, used_slots)
 
     async def handle_agent_error(
         self,

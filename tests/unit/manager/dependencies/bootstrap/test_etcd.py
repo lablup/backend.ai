@@ -33,7 +33,6 @@ class TestEtcdDependency:
         # Create a minimal BootstrapConfig with just etcd settings
         return BootstrapConfig(etcd=etcd_config)
 
-    @pytest.mark.asyncio
     async def test_provide_etcd_client(
         self,
         bootstrap_config: BootstrapConfig,
@@ -48,7 +47,6 @@ class TestEtcdDependency:
             value = await etcd.get("test_key")
             assert value == "test_value"
 
-    @pytest.mark.asyncio
     async def test_cleanup_on_exception(
         self,
         bootstrap_config: BootstrapConfig,

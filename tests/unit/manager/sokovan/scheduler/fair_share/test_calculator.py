@@ -15,11 +15,12 @@ from uuid import uuid4
 
 import pytest
 
-from ai.backend.common.types import ResourceSlot
+from ai.backend.common.types import ResourceSlot, SlotQuantity
 from ai.backend.manager.data.fair_share import (
     DomainFairShareData,
     FairShareCalculationContext,
     FairShareCalculationSnapshot,
+    FairShareData,
     FairShareMetadata,
     FairSharesByLevel,
     FairShareSpec,
@@ -53,7 +54,7 @@ def make_calculation_snapshot() -> FairShareCalculationSnapshot:
     """Create a dummy calculation snapshot for testing."""
     return FairShareCalculationSnapshot(
         fair_share_factor=Decimal("1.0"),
-        total_decayed_usage=ResourceSlot(),
+        total_decayed_usage=[],
         normalized_usage=Decimal("0"),
         lookback_start=date(2024, 1, 1),
         lookback_end=date(2024, 1, 15),
@@ -82,15 +83,15 @@ def today() -> date:
 
 
 @pytest.fixture
-def cluster_capacity() -> ResourceSlot:
+def cluster_capacity() -> list[SlotQuantity]:
     """Default cluster capacity for testing.
 
     Large enough to produce normalized_usage values in 0~1 range.
     """
-    return ResourceSlot({
-        "cpu": Decimal("100"),  # 100 CPUs
-        "mem": Decimal("1000000000000"),  # 1TB memory
-    })
+    return [
+        SlotQuantity("cpu", Decimal("100")),  # 100 CPUs
+        SlotQuantity("mem", Decimal("1000000000000")),  # 1TB memory
+    ]
 
 
 class TestApplyTimeDecay:
@@ -116,7 +117,10 @@ class TestApplyTimeDecay:
             lookback_days=30,
             default_weight=Decimal("1.0"),
             resource_weights=ResourceSlot({"cpu": Decimal("1.0"), "mem": Decimal("1.0")}),
-            cluster_capacity=ResourceSlot({"cpu": Decimal("100"), "mem": Decimal("1000000000000")}),
+            cluster_capacity=[
+                SlotQuantity("cpu", Decimal("100")),
+                SlotQuantity("mem", Decimal("1000000000000")),
+            ],
             today=today,
         )
 
@@ -145,7 +149,10 @@ class TestApplyTimeDecay:
             lookback_days=30,
             default_weight=Decimal("1.0"),
             resource_weights=ResourceSlot({"cpu": Decimal("1.0")}),
-            cluster_capacity=ResourceSlot({"cpu": Decimal("100"), "mem": Decimal("1000000000000")}),
+            cluster_capacity=[
+                SlotQuantity("cpu", Decimal("100")),
+                SlotQuantity("mem", Decimal("1000000000000")),
+            ],
             today=today,
         )
 
@@ -173,7 +180,10 @@ class TestApplyTimeDecay:
             lookback_days=30,
             default_weight=Decimal("1.0"),
             resource_weights=ResourceSlot({"cpu": Decimal("1.0")}),
-            cluster_capacity=ResourceSlot({"cpu": Decimal("100"), "mem": Decimal("1000000000000")}),
+            cluster_capacity=[
+                SlotQuantity("cpu", Decimal("100")),
+                SlotQuantity("mem", Decimal("1000000000000")),
+            ],
             today=today,
         )
 
@@ -205,7 +215,10 @@ class TestApplyTimeDecay:
             lookback_days=30,
             default_weight=Decimal("1.0"),
             resource_weights=ResourceSlot({"cpu": Decimal("1.0")}),
-            cluster_capacity=ResourceSlot({"cpu": Decimal("100"), "mem": Decimal("1000000000000")}),
+            cluster_capacity=[
+                SlotQuantity("cpu", Decimal("100")),
+                SlotQuantity("mem", Decimal("1000000000000")),
+            ],
             today=today,
         )
 
@@ -234,7 +247,10 @@ class TestApplyTimeDecay:
             lookback_days=30,
             default_weight=Decimal("1.0"),
             resource_weights=ResourceSlot({"cpu": Decimal("1.0")}),
-            cluster_capacity=ResourceSlot({"cpu": Decimal("100"), "mem": Decimal("1000000000000")}),
+            cluster_capacity=[
+                SlotQuantity("cpu", Decimal("100")),
+                SlotQuantity("mem", Decimal("1000000000000")),
+            ],
             today=today,
         )
 
@@ -250,7 +266,10 @@ class TestApplyTimeDecay:
             lookback_days=30,
             default_weight=Decimal("1.0"),
             resource_weights=ResourceSlot({"cpu": Decimal("1.0")}),
-            cluster_capacity=ResourceSlot({"cpu": Decimal("100"), "mem": Decimal("1000000000000")}),
+            cluster_capacity=[
+                SlotQuantity("cpu", Decimal("100")),
+                SlotQuantity("mem", Decimal("1000000000000")),
+            ],
             today=today,
         )
 
@@ -280,7 +299,7 @@ class TestCalculateNormalizedUsage:
         # capacity_seconds = 100 * 30 * 86400 = 259,200,000
         # ratio = 8,640,000 / 259,200,000 = 0.0333...
         usage = ResourceSlot({"cpu": Decimal("8640000")})
-        cluster_capacity = ResourceSlot({"cpu": Decimal("100")})
+        cluster_capacity = [SlotQuantity("cpu", Decimal("100"))]
         lookback_days = 30
         weights = ResourceSlot({"cpu": Decimal("1.0")})
 
@@ -302,10 +321,10 @@ class TestCalculateNormalizedUsage:
             "cpu": Decimal("8640000"),
             "mem": Decimal("259200000000"),
         })
-        cluster_capacity = ResourceSlot({
-            "cpu": Decimal("100"),
-            "mem": Decimal("1000000000"),  # 1GB
-        })
+        cluster_capacity = [
+            SlotQuantity("cpu", Decimal("100")),
+            SlotQuantity("mem", Decimal("1000000000")),  # 1GB
+        ]
         lookback_days = 30
         weights = ResourceSlot({"cpu": Decimal("1.0"), "mem": Decimal("1.0")})
 
@@ -329,10 +348,10 @@ class TestCalculateNormalizedUsage:
             "cpu": Decimal("8640000"),
             "mem": Decimal("259200000000"),
         })
-        cluster_capacity = ResourceSlot({
-            "cpu": Decimal("100"),
-            "mem": Decimal("1000000000"),
-        })
+        cluster_capacity = [
+            SlotQuantity("cpu", Decimal("100")),
+            SlotQuantity("mem", Decimal("1000000000")),
+        ]
         lookback_days = 30
 
         # Equal weights
@@ -354,7 +373,7 @@ class TestCalculateNormalizedUsage:
     def test_empty_usage_returns_zero(self, calculator: FairShareFactorCalculator) -> None:
         """Empty usage should return zero normalized value."""
         usage = ResourceSlot()
-        cluster_capacity = ResourceSlot({"cpu": Decimal("100")})
+        cluster_capacity = [SlotQuantity("cpu", Decimal("100"))]
         lookback_days = 30
         weights = ResourceSlot({"cpu": Decimal("1.0")})
 
@@ -367,7 +386,7 @@ class TestCalculateNormalizedUsage:
     def test_zero_capacity_resource_ignored(self, calculator: FairShareFactorCalculator) -> None:
         """Resources with zero capacity are skipped."""
         usage = ResourceSlot({"cpu": Decimal("1000"), "gpu": Decimal("500")})
-        cluster_capacity = ResourceSlot({"cpu": Decimal("100"), "gpu": Decimal("0")})
+        cluster_capacity = [SlotQuantity("cpu", Decimal("100")), SlotQuantity("gpu", Decimal("0"))]
         lookback_days = 30
         weights = ResourceSlot({"cpu": Decimal("1.0"), "gpu": Decimal("1.0")})
 
@@ -392,7 +411,7 @@ class TestCalculateFactor:
         usage = ResourceSlot()
         weight = Decimal("1.0")
         resource_weights = ResourceSlot({"cpu": Decimal("1.0")})
-        cluster_capacity = ResourceSlot({"cpu": Decimal("100")})
+        cluster_capacity = [SlotQuantity("cpu", Decimal("100"))]
         lookback_days = 30
 
         normalized, factor = calculator._calculate_factor(
@@ -410,7 +429,7 @@ class TestCalculateFactor:
         # capacity_seconds = 100 * 30 * 86400 = 259,200,000
         # usage should equal capacity_seconds for 100% utilization
         weight = Decimal("1.0")
-        cluster_capacity = ResourceSlot({"cpu": Decimal("100")})
+        cluster_capacity = [SlotQuantity("cpu", Decimal("100"))]
         lookback_days = 30
         capacity_seconds = Decimal("100") * 30 * 86400  # 259,200,000
 
@@ -429,7 +448,7 @@ class TestCalculateFactor:
     def test_higher_weight_gives_higher_factor(self, calculator: FairShareFactorCalculator) -> None:
         """Higher weight should result in higher factor for same usage."""
         # 50% utilization
-        cluster_capacity = ResourceSlot({"cpu": Decimal("100")})
+        cluster_capacity = [SlotQuantity("cpu", Decimal("100"))]
         lookback_days = 30
         capacity_seconds = Decimal("100") * 30 * 86400
         usage = ResourceSlot({"cpu": capacity_seconds / 2})  # 50% utilization
@@ -448,7 +467,7 @@ class TestCalculateFactor:
     def test_factor_clamped_to_valid_range(self, calculator: FairShareFactorCalculator) -> None:
         """Factor should be clamped to [0, 1] range."""
         resource_weights = ResourceSlot({"cpu": Decimal("1.0")})
-        cluster_capacity = ResourceSlot({"cpu": Decimal("100")})
+        cluster_capacity = [SlotQuantity("cpu", Decimal("100"))]
         lookback_days = 30
         weight = Decimal("1.0")
 
@@ -483,7 +502,10 @@ class TestCalculateFactors:
             lookback_days=30,
             default_weight=Decimal("1.0"),
             resource_weights=ResourceSlot({"cpu": Decimal("1.0")}),
-            cluster_capacity=ResourceSlot({"cpu": Decimal("100"), "mem": Decimal("1000000000000")}),
+            cluster_capacity=[
+                SlotQuantity("cpu", Decimal("100")),
+                SlotQuantity("mem", Decimal("1000000000000")),
+            ],
             today=today,
         )
 
@@ -507,38 +529,42 @@ class TestCalculateFactors:
             fair_shares=FairSharesByLevel(
                 domain={
                     domain_name: DomainFairShareData(
-                        id=uuid4(),
                         resource_group="default",
                         domain_name=domain_name,
-                        spec=make_fair_share_spec(weight=Decimal("1.0")),
-                        calculation_snapshot=make_calculation_snapshot(),
-                        metadata=make_metadata(),
-                        default_weight=Decimal("1.0"),
+                        data=FairShareData(
+                            spec=make_fair_share_spec(weight=Decimal("1.0")),
+                            calculation_snapshot=make_calculation_snapshot(),
+                            metadata=make_metadata(),
+                            use_default=False,
+                        ),
                     )
                 },
                 project={
                     project_id: ProjectFairShareData(
-                        id=uuid4(),
                         resource_group="default",
                         project_id=project_id,
                         domain_name=domain_name,
-                        spec=make_fair_share_spec(weight=Decimal("1.0")),
-                        calculation_snapshot=make_calculation_snapshot(),
-                        metadata=make_metadata(),
-                        default_weight=Decimal("1.0"),
+                        data=FairShareData(
+                            spec=make_fair_share_spec(weight=Decimal("1.0")),
+                            calculation_snapshot=make_calculation_snapshot(),
+                            metadata=make_metadata(),
+                            use_default=False,
+                        ),
                     )
                 },
                 user={
                     user_key: UserFairShareData(
-                        id=uuid4(),
                         resource_group="default",
                         user_uuid=user_uuid,
                         project_id=project_id,
                         domain_name=domain_name,
-                        spec=make_fair_share_spec(weight=Decimal("1.0")),
-                        calculation_snapshot=make_calculation_snapshot(),
-                        metadata=make_metadata(),
-                        default_weight=Decimal("1.0"),
+                        data=FairShareData(
+                            spec=make_fair_share_spec(weight=Decimal("1.0")),
+                            calculation_snapshot=make_calculation_snapshot(),
+                            metadata=make_metadata(),
+                            use_default=False,
+                        ),
+                        scheduling_rank=None,
                     )
                 },
             ),
@@ -551,7 +577,10 @@ class TestCalculateFactors:
             lookback_days=30,
             default_weight=Decimal("1.0"),
             resource_weights=ResourceSlot({"cpu": Decimal("1.0")}),
-            cluster_capacity=ResourceSlot({"cpu": Decimal("100"), "mem": Decimal("1000000000000")}),
+            cluster_capacity=[
+                SlotQuantity("cpu", Decimal("100")),
+                SlotQuantity("mem", Decimal("1000000000000")),
+            ],
             today=today,
         )
 
@@ -590,7 +619,10 @@ class TestCalculateFactors:
             lookback_days=30,
             default_weight=Decimal("1.0"),
             resource_weights=ResourceSlot({"cpu": Decimal("1.0")}),
-            cluster_capacity=ResourceSlot({"cpu": Decimal("100"), "mem": Decimal("1000000000000")}),
+            cluster_capacity=[
+                SlotQuantity("cpu", Decimal("100")),
+                SlotQuantity("mem", Decimal("1000000000000")),
+            ],
             today=today,
         )
 
@@ -602,7 +634,10 @@ class TestCalculateFactors:
             lookback_days=30,
             default_weight=Decimal("1.0"),
             resource_weights=ResourceSlot({"cpu": Decimal("1.0")}),
-            cluster_capacity=ResourceSlot({"cpu": Decimal("100"), "mem": Decimal("1000000000000")}),
+            cluster_capacity=[
+                SlotQuantity("cpu", Decimal("100")),
+                SlotQuantity("mem", Decimal("1000000000000")),
+            ],
             today=today,
         )
 
@@ -631,13 +666,14 @@ class TestCalculateFactors:
             fair_shares=FairSharesByLevel(
                 domain={
                     domain_name: DomainFairShareData(
-                        id=uuid4(),
                         resource_group="default",
                         domain_name=domain_name,
-                        spec=make_fair_share_spec(weight=Decimal("0.5")),
-                        calculation_snapshot=make_calculation_snapshot(),
-                        metadata=make_metadata(),
-                        default_weight=Decimal("1.0"),
+                        data=FairShareData(
+                            spec=make_fair_share_spec(weight=Decimal("0.5")),
+                            calculation_snapshot=make_calculation_snapshot(),
+                            metadata=make_metadata(),
+                            use_default=False,
+                        ),
                     )
                 },
                 project={},
@@ -648,7 +684,10 @@ class TestCalculateFactors:
             lookback_days=30,
             default_weight=Decimal("1.0"),
             resource_weights=ResourceSlot({"cpu": Decimal("1.0")}),
-            cluster_capacity=ResourceSlot({"cpu": Decimal("100"), "mem": Decimal("1000000000000")}),
+            cluster_capacity=[
+                SlotQuantity("cpu", Decimal("100")),
+                SlotQuantity("mem", Decimal("1000000000000")),
+            ],
             today=today,
         )
 
@@ -657,13 +696,14 @@ class TestCalculateFactors:
             fair_shares=FairSharesByLevel(
                 domain={
                     domain_name: DomainFairShareData(
-                        id=uuid4(),
                         resource_group="default",
                         domain_name=domain_name,
-                        spec=make_fair_share_spec(weight=Decimal("2.0")),
-                        calculation_snapshot=make_calculation_snapshot(),
-                        metadata=make_metadata(),
-                        default_weight=Decimal("1.0"),
+                        data=FairShareData(
+                            spec=make_fair_share_spec(weight=Decimal("2.0")),
+                            calculation_snapshot=make_calculation_snapshot(),
+                            metadata=make_metadata(),
+                            use_default=False,
+                        ),
                     )
                 },
                 project={},
@@ -674,7 +714,10 @@ class TestCalculateFactors:
             lookback_days=30,
             default_weight=Decimal("1.0"),
             resource_weights=ResourceSlot({"cpu": Decimal("1.0")}),
-            cluster_capacity=ResourceSlot({"cpu": Decimal("100"), "mem": Decimal("1000000000000")}),
+            cluster_capacity=[
+                SlotQuantity("cpu", Decimal("100")),
+                SlotQuantity("mem", Decimal("1000000000000")),
+            ],
             today=today,
         )
 
@@ -715,7 +758,10 @@ class TestCalculateSchedulingRanks:
             lookback_days=30,
             default_weight=Decimal("1.0"),
             resource_weights=ResourceSlot({"cpu": Decimal("1.0")}),
-            cluster_capacity=ResourceSlot({"cpu": Decimal("100"), "mem": Decimal("1000000000000")}),
+            cluster_capacity=[
+                SlotQuantity("cpu", Decimal("100")),
+                SlotQuantity("mem", Decimal("1000000000000")),
+            ],
             today=today,
         )
 
@@ -749,7 +795,10 @@ class TestCalculateSchedulingRanks:
             lookback_days=30,
             default_weight=Decimal("1.0"),
             resource_weights=ResourceSlot({"cpu": Decimal("1.0")}),
-            cluster_capacity=ResourceSlot({"cpu": Decimal("100"), "mem": Decimal("1000000000000")}),
+            cluster_capacity=[
+                SlotQuantity("cpu", Decimal("100")),
+                SlotQuantity("mem", Decimal("1000000000000")),
+            ],
             today=today,
         )
 
@@ -784,7 +833,10 @@ class TestCalculateSchedulingRanks:
             lookback_days=30,
             default_weight=Decimal("1.0"),
             resource_weights=ResourceSlot({"cpu": Decimal("1.0")}),
-            cluster_capacity=ResourceSlot({"cpu": Decimal("100"), "mem": Decimal("1000000000000")}),
+            cluster_capacity=[
+                SlotQuantity("cpu", Decimal("100")),
+                SlotQuantity("mem", Decimal("1000000000000")),
+            ],
             today=today,
         )
 
@@ -839,7 +891,10 @@ class TestIntegrationScenarios:
             lookback_days=30,
             default_weight=Decimal("1.0"),
             resource_weights=ResourceSlot({"cpu": Decimal("1.0")}),
-            cluster_capacity=ResourceSlot({"cpu": Decimal("100"), "mem": Decimal("1000000000000")}),
+            cluster_capacity=[
+                SlotQuantity("cpu", Decimal("100")),
+                SlotQuantity("mem", Decimal("1000000000000")),
+            ],
             today=today,
         )
 
@@ -874,68 +929,76 @@ class TestIntegrationScenarios:
             fair_shares=FairSharesByLevel(
                 domain={
                     domain_a: DomainFairShareData(
-                        id=uuid4(),
                         resource_group="default",
                         domain_name=domain_a,
-                        spec=make_fair_share_spec(),
-                        calculation_snapshot=make_calculation_snapshot(),
-                        metadata=make_metadata(),
-                        default_weight=Decimal("1.0"),
+                        data=FairShareData(
+                            spec=make_fair_share_spec(),
+                            calculation_snapshot=make_calculation_snapshot(),
+                            metadata=make_metadata(),
+                            use_default=False,
+                        ),
                     ),
                     domain_b: DomainFairShareData(
-                        id=uuid4(),
                         resource_group="default",
                         domain_name=domain_b,
-                        spec=make_fair_share_spec(),
-                        calculation_snapshot=make_calculation_snapshot(),
-                        metadata=make_metadata(),
-                        default_weight=Decimal("1.0"),
+                        data=FairShareData(
+                            spec=make_fair_share_spec(),
+                            calculation_snapshot=make_calculation_snapshot(),
+                            metadata=make_metadata(),
+                            use_default=False,
+                        ),
                     ),
                 },
                 project={
                     project_a: ProjectFairShareData(
-                        id=uuid4(),
                         resource_group="default",
                         project_id=project_a,
                         domain_name=domain_a,
-                        spec=make_fair_share_spec(),
-                        calculation_snapshot=make_calculation_snapshot(),
-                        metadata=make_metadata(),
-                        default_weight=Decimal("1.0"),
+                        data=FairShareData(
+                            spec=make_fair_share_spec(),
+                            calculation_snapshot=make_calculation_snapshot(),
+                            metadata=make_metadata(),
+                            use_default=False,
+                        ),
                     ),
                     project_b: ProjectFairShareData(
-                        id=uuid4(),
                         resource_group="default",
                         project_id=project_b,
                         domain_name=domain_b,
-                        spec=make_fair_share_spec(),
-                        calculation_snapshot=make_calculation_snapshot(),
-                        metadata=make_metadata(),
-                        default_weight=Decimal("1.0"),
+                        data=FairShareData(
+                            spec=make_fair_share_spec(),
+                            calculation_snapshot=make_calculation_snapshot(),
+                            metadata=make_metadata(),
+                            use_default=False,
+                        ),
                     ),
                 },
                 user={
                     user_a: UserFairShareData(
-                        id=uuid4(),
                         resource_group="default",
                         user_uuid=user_a.user_uuid,
                         project_id=project_a,
                         domain_name=domain_a,
-                        spec=make_fair_share_spec(),
-                        calculation_snapshot=make_calculation_snapshot(),
-                        metadata=make_metadata(),
-                        default_weight=Decimal("1.0"),
+                        data=FairShareData(
+                            spec=make_fair_share_spec(),
+                            calculation_snapshot=make_calculation_snapshot(),
+                            metadata=make_metadata(),
+                            use_default=False,
+                        ),
+                        scheduling_rank=None,
                     ),
                     user_b: UserFairShareData(
-                        id=uuid4(),
                         resource_group="default",
                         user_uuid=user_b.user_uuid,
                         project_id=project_b,
                         domain_name=domain_b,
-                        spec=make_fair_share_spec(),
-                        calculation_snapshot=make_calculation_snapshot(),
-                        metadata=make_metadata(),
-                        default_weight=Decimal("1.0"),
+                        data=FairShareData(
+                            spec=make_fair_share_spec(),
+                            calculation_snapshot=make_calculation_snapshot(),
+                            metadata=make_metadata(),
+                            use_default=False,
+                        ),
+                        scheduling_rank=None,
                     ),
                 },
             ),
@@ -961,7 +1024,10 @@ class TestIntegrationScenarios:
             lookback_days=30,
             default_weight=Decimal("1.0"),
             resource_weights=ResourceSlot({"cpu": Decimal("1.0")}),
-            cluster_capacity=ResourceSlot({"cpu": Decimal("100"), "mem": Decimal("1000000000000")}),
+            cluster_capacity=[
+                SlotQuantity("cpu", Decimal("100")),
+                SlotQuantity("mem", Decimal("1000000000000")),
+            ],
             today=today,
         )
 
@@ -974,3 +1040,181 @@ class TestIntegrationScenarios:
 
         # User B (in low-usage domain) should have better rank despite higher personal usage
         assert rank_b.rank < rank_a.rank
+
+
+class TestDomainNameResolution:
+    """Tests for domain_name resolution in calculate_factors.
+
+    Verifies that domain_name is correctly resolved from:
+    1. fair_shares (existing record) - primary source
+    2. project_domain_names (GroupRow lookup) - fallback
+    3. Empty string - when project is deleted and no source available
+    """
+
+    def test_project_domain_name_from_fair_shares(
+        self, calculator: FairShareFactorCalculator, today: date
+    ) -> None:
+        """When fair_shares has the project, domain_name comes from there."""
+        project_id = uuid4()
+        domain_name = "existing-domain"
+
+        context = FairShareCalculationContext(
+            fair_shares=FairSharesByLevel(
+                domain={},
+                project={
+                    project_id: ProjectFairShareData(
+                        resource_group="default",
+                        project_id=project_id,
+                        domain_name=domain_name,
+                        data=FairShareData(
+                            spec=make_fair_share_spec(),
+                            calculation_snapshot=make_calculation_snapshot(),
+                            metadata=make_metadata(),
+                            use_default=False,
+                        ),
+                    )
+                },
+                user={},
+            ),
+            raw_usage_buckets=RawUsageBucketsByLevel(
+                domain={},
+                project={project_id: {today: ResourceSlot({"cpu": Decimal("1000")})}},
+                user={},
+            ),
+            half_life_days=7,
+            lookback_days=30,
+            default_weight=Decimal("1.0"),
+            resource_weights=ResourceSlot({"cpu": Decimal("1.0")}),
+            cluster_capacity=[SlotQuantity("cpu", Decimal("100"))],
+            today=today,
+            project_domain_names={project_id: "fallback-domain"},
+        )
+
+        result = calculator.calculate_factors(context)
+
+        assert result.project_results[project_id].domain_name == domain_name
+
+    def test_project_domain_name_fallback(
+        self, calculator: FairShareFactorCalculator, today: date
+    ) -> None:
+        """When fair_shares doesn't have the project, fallback to project_domain_names."""
+        project_id = uuid4()
+        fallback_domain = "fallback-domain"
+
+        context = FairShareCalculationContext(
+            fair_shares=FairSharesByLevel(domain={}, project={}, user={}),
+            raw_usage_buckets=RawUsageBucketsByLevel(
+                domain={},
+                project={project_id: {today: ResourceSlot({"cpu": Decimal("1000")})}},
+                user={},
+            ),
+            half_life_days=7,
+            lookback_days=30,
+            default_weight=Decimal("1.0"),
+            resource_weights=ResourceSlot({"cpu": Decimal("1.0")}),
+            cluster_capacity=[SlotQuantity("cpu", Decimal("100"))],
+            today=today,
+            project_domain_names={project_id: fallback_domain},
+        )
+
+        result = calculator.calculate_factors(context)
+
+        assert result.project_results[project_id].domain_name == fallback_domain
+
+    def test_user_domain_name_fallback(
+        self, calculator: FairShareFactorCalculator, today: date
+    ) -> None:
+        """When fair_shares doesn't have the user, fallback to project_domain_names."""
+        project_id = uuid4()
+        user_uuid = uuid4()
+        user_key = UserProjectKey(user_uuid, project_id)
+        fallback_domain = "fallback-domain"
+
+        context = FairShareCalculationContext(
+            fair_shares=FairSharesByLevel(domain={}, project={}, user={}),
+            raw_usage_buckets=RawUsageBucketsByLevel(
+                domain={},
+                project={},
+                user={user_key: {today: ResourceSlot({"cpu": Decimal("1000")})}},
+            ),
+            half_life_days=7,
+            lookback_days=30,
+            default_weight=Decimal("1.0"),
+            resource_weights=ResourceSlot({"cpu": Decimal("1.0")}),
+            cluster_capacity=[SlotQuantity("cpu", Decimal("100"))],
+            today=today,
+            project_domain_names={project_id: fallback_domain},
+        )
+
+        result = calculator.calculate_factors(context)
+
+        assert result.user_results[user_key].domain_name == fallback_domain
+
+    def test_domain_name_empty_when_no_source(
+        self, calculator: FairShareFactorCalculator, today: date
+    ) -> None:
+        """When neither fair_shares nor project_domain_names has the project, domain_name is empty."""
+        project_id = uuid4()
+
+        context = FairShareCalculationContext(
+            fair_shares=FairSharesByLevel(domain={}, project={}, user={}),
+            raw_usage_buckets=RawUsageBucketsByLevel(
+                domain={},
+                project={project_id: {today: ResourceSlot({"cpu": Decimal("1000")})}},
+                user={},
+            ),
+            half_life_days=7,
+            lookback_days=30,
+            default_weight=Decimal("1.0"),
+            resource_weights=ResourceSlot({"cpu": Decimal("1.0")}),
+            cluster_capacity=[SlotQuantity("cpu", Decimal("100"))],
+            today=today,
+            project_domain_names={},
+        )
+
+        result = calculator.calculate_factors(context)
+
+        assert result.project_results[project_id].domain_name == ""
+
+    def test_project_fair_share_with_empty_domain_uses_fallback(
+        self, calculator: FairShareFactorCalculator, today: date
+    ) -> None:
+        """When fair_shares has the project but domain_name is empty, fallback is used."""
+        project_id = uuid4()
+        fallback_domain = "correct-domain"
+
+        context = FairShareCalculationContext(
+            fair_shares=FairSharesByLevel(
+                domain={},
+                project={
+                    project_id: ProjectFairShareData(
+                        resource_group="default",
+                        project_id=project_id,
+                        domain_name="",
+                        data=FairShareData(
+                            spec=make_fair_share_spec(),
+                            calculation_snapshot=make_calculation_snapshot(),
+                            metadata=make_metadata(),
+                            use_default=False,
+                        ),
+                    )
+                },
+                user={},
+            ),
+            raw_usage_buckets=RawUsageBucketsByLevel(
+                domain={},
+                project={project_id: {today: ResourceSlot({"cpu": Decimal("1000")})}},
+                user={},
+            ),
+            half_life_days=7,
+            lookback_days=30,
+            default_weight=Decimal("1.0"),
+            resource_weights=ResourceSlot({"cpu": Decimal("1.0")}),
+            cluster_capacity=[SlotQuantity("cpu", Decimal("100"))],
+            today=today,
+            project_domain_names={project_id: fallback_domain},
+        )
+
+        result = calculator.calculate_factors(context)
+
+        assert result.project_results[project_id].domain_name == fallback_domain

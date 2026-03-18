@@ -110,9 +110,9 @@ class TestSearchScopes:
         result = await service.search_scopes(action)
 
         mock_repository.search_scopes.assert_called_once_with(ScopeType.DOMAIN, querier)
-        assert result.total_count == total_count
-        assert len(result.items) == total_count
-        assert result.items[0].id.scope_type == ScopeType.DOMAIN
+        assert result.result.total_count == total_count
+        assert len(result.result.items) == total_count
+        assert result.result.items[0].id.scope_type == ScopeType.DOMAIN
 
     async def test_search_scopes_returns_action_result(
         self,
@@ -154,10 +154,10 @@ class TestSearchScopes:
 
         result = await service.search_scopes(action)
 
-        assert result.total_count == total_count
-        assert len(result.items) == items_count
-        assert result.has_next_page is True
-        assert result.has_previous_page is False
+        assert result.result.total_count == total_count
+        assert len(result.result.items) == items_count
+        assert result.result.has_next_page is True
+        assert result.result.has_previous_page is False
 
     async def test_search_scopes_global_type(
         self,
@@ -191,5 +191,5 @@ class TestSearchScopes:
         result = await service.search_scopes(action)
 
         mock_repository.search_scopes.assert_called_once_with(ScopeType.GLOBAL, querier)
-        assert result.total_count == total_count
-        assert result.items[0].id.scope_type == ScopeType.GLOBAL
+        assert result.result.total_count == total_count
+        assert result.result.items[0].id.scope_type == ScopeType.GLOBAL

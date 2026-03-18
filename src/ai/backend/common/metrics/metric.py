@@ -4,9 +4,11 @@ import os
 from typing import Self
 
 import psutil
-from prometheus_client import Counter, Gauge, Histogram, generate_latest
+from prometheus_client import Counter, Gauge, Histogram
 
+from ai.backend.common.data.permission.types import EntityType
 from ai.backend.common.exception import BackendAIError, ErrorCode
+from ai.backend.common.metrics.multiprocess import generate_latest_multiprocess
 
 
 class APIMetricObserver:
@@ -284,6 +286,7 @@ class BgTaskMetricObserver:
             name="backendai_bgtask_count",
             documentation="Total number of background tasks processed",
             labelnames=["task_name"],
+            multiprocess_mode="livesum",
         )
         self._bgtask_done_count = Counter(
             name="backendai_bgtask_done_count",
@@ -368,7 +371,7 @@ class ActionMetricObserver:
     def observe_action(
         self,
         *,
-        entity_type: str,
+        entity_type: EntityType,
         operation_type: str,
         status: str,
         duration: float,
@@ -410,6 +413,10 @@ class LayerType(enum.StrEnum):
     CONTAINER_REGISTRY_REPOSITORY = "container_registry_repository"
     DEPLOYMENT_REPOSITORY = "deployment_repository"
     DOMAIN_REPOSITORY = "domain_repository"
+    DOTFILE_REPOSITORY = "dotfile_repository"
+    ETCD_CONFIG_REPOSITORY = "etcd_config_repository"
+    MANAGER_ADMIN_REPOSITORY = "manager_admin_repository"
+    TEMPLATE_REPOSITORY = "template_repository"
     ERROR_LOG_REPOSITORY = "error_log_repository"
     GROUP_REPOSITORY = "group_repository"
     HUGGINGFACE_REGISTRY_REPOSITORY = "huggingface_registry_repository"
@@ -420,6 +427,7 @@ class LayerType(enum.StrEnum):
     NOTIFICATION_REPOSITORY = "notification_repository"
     OBJECT_STORAGE_REPOSITORY = "object_storage_repository"
     PERMISSION_CONTROLLER_REPOSITORY = "permission_controller_repository"
+    PROMETHEUS_QUERY_PRESET_REPOSITORY = "prometheus_query_preset_repository"
     PROJECT_RESOURCE_POLICY_REPOSITORY = "project_resource_policy_repository"
     RESERVOIR_REGISTRY_REPOSITORY = "reservoir_registry_repository"
     RESOURCE_PRESET_REPOSITORY = "resource_preset_repository"
@@ -435,13 +443,17 @@ class LayerType(enum.StrEnum):
     VFS_STORAGE_REPOSITORY = "vfs_storage_repository"
     FAIR_SHARE_REPOSITORY = "fair_share_repository"
     RESOURCE_USAGE_HISTORY_REPOSITORY = "resource_usage_history_repository"
+    RESOURCE_SLOT_REPOSITORY = "resource_slot_repository"
 
     # DB Source layers
     AUDIT_LOG_DB_SOURCE = "audit_log_db_source"
     AUTH_DB_SOURCE = "auth_db_source"
     AGENT_DB_SOURCE = "agent_db_source"
     DEPLOYMENT_DB_SOURCE = "deployment_db_source"
+    ETCD_CONFIG_DB_SOURCE = "etcd_config_db_source"
     ERROR_LOG_DB_SOURCE = "error_log_db_source"
+    MANAGER_ADMIN_DB_SOURCE = "manager_admin_db_source"
+    TEMPLATE_DB_SOURCE = "template_db_source"
     PERMISSION_CONTROLLER_DB_SOURCE = "permission_controller_db_source"
     RESOURCE_PRESET_DB_SOURCE = "resource_preset_db_source"
     SCHEDULE_DB_SOURCE = "schedule_db_source"
@@ -493,6 +505,7 @@ class LayerMetricObserver:
             name="backendai_layer_operation_triggered_count",
             documentation="Number of layer operations triggered",
             labelnames=["domain", "layer", "operation"],
+            multiprocess_mode="livesum",
         )
         self._layer_operation_count = Counter(
             name="backendai_layer_operation_count",
@@ -600,18 +613,22 @@ class SystemMetricObserver:
         self._async_task_count = Gauge(
             name="backendai_async_task_count",
             documentation="Number of active async tasks",
+            multiprocess_mode="livesum",
         )
         self._cpu_usage_percent = Gauge(
             name="backendai_cpu_usage_percent",
             documentation="CPU usage of the process",
+            multiprocess_mode="livesum",
         )
         self._memory_used_rss = Gauge(
             name="backendai_memory_used_rss",
             documentation="Memory used by the process in RSS",
+            multiprocess_mode="livesum",
         )
         self._memory_used_vms = Gauge(
             name="backendai_memory_used_vms",
             documentation="Memory used by the process in VMS",
+            multiprocess_mode="livesum",
         )
 
     @classmethod
@@ -671,11 +688,13 @@ class EventPropagatorMetricObserver:
         self._propagator_count = Gauge(
             name="backendai_event_propagator_count",
             documentation="Current number of active event propagators",
+            multiprocess_mode="livesum",
         )
         self._propagator_alias_count = Gauge(
             name="backendai_event_propagator_alias_count",
             documentation="Current number of event propagator aliases",
             labelnames=["domain", "alias_id"],
+            multiprocess_mode="livesum",
         )
         self._propagator_registration_count = Counter(
             name="backendai_event_propagator_registration_count",
@@ -733,7 +752,7 @@ class CommonMetricRegistry:
 
     def to_prometheus(self) -> str:
         self.system.observe()
-        return generate_latest().decode("utf-8")
+        return generate_latest_multiprocess().decode("utf-8")
 
 
 class StageObserver:

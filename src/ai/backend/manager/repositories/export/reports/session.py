@@ -5,12 +5,10 @@ from __future__ import annotations
 import json
 from typing import Any
 
-import sqlalchemy as sa
-
-from ai.backend.manager.defs import DEFAULT_ROLE
 from ai.backend.manager.models.group import GroupRow
 from ai.backend.manager.models.kernel import KernelRow
 from ai.backend.manager.models.resource_policy import ProjectResourcePolicyRow
+from ai.backend.manager.models.scaling_group import ScalingGroupRow
 from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.repositories.base.export import (
@@ -71,13 +69,10 @@ KERNEL_JOIN = JoinDef(
     condition=SessionRow.id == KernelRow.session_id,
 )
 
-# Main Kernel JOIN (N:1, no duplication - main kernel only)
-MAIN_KERNEL_JOIN = JoinDef(
-    table=KernelRow.__table__,
-    condition=sa.and_(
-        SessionRow.id == KernelRow.session_id,
-        KernelRow.cluster_role == DEFAULT_ROLE,
-    ),
+# Scaling Group JOIN (N:1, no duplication)
+SCALING_GROUP_JOIN = JoinDef(
+    table=ScalingGroupRow.__table__,
+    condition=SessionRow.scaling_group_name == ScalingGroupRow.name,
 )
 
 # Field definitions for session export
@@ -134,13 +129,6 @@ SESSION_FIELDS: list[ExportFieldDef] = [
         column=SessionRow.status_info,
     ),
     ExportFieldDef(
-        key="scaling_group_name",
-        name="Scaling Group",
-        description="Scaling group name",
-        field_type=ExportFieldType.STRING,
-        column=SessionRow.scaling_group_name,
-    ),
-    ExportFieldDef(
         key="cluster_size",
         name="Cluster Size",
         description="Number of cluster nodes",
@@ -148,11 +136,19 @@ SESSION_FIELDS: list[ExportFieldDef] = [
         column=SessionRow.cluster_size,
     ),
     ExportFieldDef(
-        key="occupying_slots",
-        name="Resources",
+        key="resource_used",
+        name="Resources Used",
         description="Occupied resource slots",
         field_type=ExportFieldType.JSON,
         column=SessionRow.occupying_slots,
+        formatter=lambda v: json.dumps(dict(v), default=str) if v else "",
+    ),
+    ExportFieldDef(
+        key="resource_requested",
+        name="Resources Requested",
+        description="Requested resource slots",
+        field_type=ExportFieldType.JSON,
+        column=SessionRow.requested_slots,
         formatter=lambda v: json.dumps(dict(v), default=str) if v else "",
     ),
     ExportFieldDef(
@@ -170,41 +166,6 @@ SESSION_FIELDS: list[ExportFieldDef] = [
         field_type=ExportFieldType.DATETIME,
         column=SessionRow.terminated_at,
         formatter=lambda v: v.isoformat() if v else "",
-    ),
-    # =========================================================================
-    # Main Kernel Fields (N:1, no duplication)
-    # =========================================================================
-    ExportFieldDef(
-        key="main_kernel_image",
-        name="Main Kernel Image",
-        description="Main kernel image canonical name",
-        field_type=ExportFieldType.STRING,
-        column=KernelRow.image,
-        joins=frozenset({MAIN_KERNEL_JOIN}),
-    ),
-    ExportFieldDef(
-        key="main_kernel_architecture",
-        name="Main Kernel Architecture",
-        description="Main kernel architecture",
-        field_type=ExportFieldType.STRING,
-        column=KernelRow.architecture,
-        joins=frozenset({MAIN_KERNEL_JOIN}),
-    ),
-    ExportFieldDef(
-        key="main_kernel_registry",
-        name="Main Kernel Registry",
-        description="Main kernel container registry",
-        field_type=ExportFieldType.STRING,
-        column=KernelRow.registry,
-        joins=frozenset({MAIN_KERNEL_JOIN}),
-    ),
-    ExportFieldDef(
-        key="main_kernel_tag",
-        name="Main Kernel Tag",
-        description="Main kernel image tag",
-        field_type=ExportFieldType.STRING,
-        column=KernelRow.tag,
-        joins=frozenset({MAIN_KERNEL_JOIN}),
     ),
     # =========================================================================
     # Project Fields (N:1, no duplication)
@@ -314,6 +275,58 @@ SESSION_FIELDS: list[ExportFieldDef] = [
         joins=frozenset({USER_JOIN}),
     ),
     # =========================================================================
+    # Resource Group Fields (N:1, no duplication)
+    # =========================================================================
+    ExportFieldDef(
+        key="resource_group_name",
+        name="Resource Group Name",
+        description="Resource group name",
+        field_type=ExportFieldType.STRING,
+        column=ScalingGroupRow.name,
+        joins=frozenset({SCALING_GROUP_JOIN}),
+    ),
+    ExportFieldDef(
+        key="resource_group_description",
+        name="Resource Group Description",
+        description="Resource group description",
+        field_type=ExportFieldType.STRING,
+        column=ScalingGroupRow.description,
+        joins=frozenset({SCALING_GROUP_JOIN}),
+    ),
+    ExportFieldDef(
+        key="resource_group_is_active",
+        name="Resource Group Active",
+        description="Resource group active status",
+        field_type=ExportFieldType.BOOLEAN,
+        column=ScalingGroupRow.is_active,
+        joins=frozenset({SCALING_GROUP_JOIN}),
+    ),
+    ExportFieldDef(
+        key="resource_group_is_public",
+        name="Resource Group Public",
+        description="Resource group public status",
+        field_type=ExportFieldType.BOOLEAN,
+        column=ScalingGroupRow.is_public,
+        joins=frozenset({SCALING_GROUP_JOIN}),
+    ),
+    ExportFieldDef(
+        key="resource_group_scheduler",
+        name="Resource Group Scheduler",
+        description="Resource group scheduler type",
+        field_type=ExportFieldType.STRING,
+        column=ScalingGroupRow.scheduler,
+        joins=frozenset({SCALING_GROUP_JOIN}),
+    ),
+    ExportFieldDef(
+        key="resource_group_created_at",
+        name="Resource Group Created At",
+        description="Resource group creation time",
+        field_type=ExportFieldType.DATETIME,
+        column=ScalingGroupRow.created_at,
+        formatter=lambda v: v.isoformat() if v else "",
+        joins=frozenset({SCALING_GROUP_JOIN}),
+    ),
+    # =========================================================================
     # Kernel Fields (1:N, causes duplication)
     # =========================================================================
     ExportFieldDef(
@@ -347,6 +360,30 @@ SESSION_FIELDS: list[ExportFieldDef] = [
         description="Kernel image name",
         field_type=ExportFieldType.STRING,
         column=KernelRow.image,
+        joins=frozenset({KERNEL_JOIN}),
+    ),
+    ExportFieldDef(
+        key="kernel_architecture",
+        name="Kernel Architecture",
+        description="Kernel architecture",
+        field_type=ExportFieldType.STRING,
+        column=KernelRow.architecture,
+        joins=frozenset({KERNEL_JOIN}),
+    ),
+    ExportFieldDef(
+        key="kernel_registry",
+        name="Kernel Registry",
+        description="Kernel container registry",
+        field_type=ExportFieldType.STRING,
+        column=KernelRow.registry,
+        joins=frozenset({KERNEL_JOIN}),
+    ),
+    ExportFieldDef(
+        key="kernel_tag",
+        name="Kernel Tag",
+        description="Kernel image tag",
+        field_type=ExportFieldType.STRING,
+        column=KernelRow.tag,
         joins=frozenset({KERNEL_JOIN}),
     ),
     ExportFieldDef(

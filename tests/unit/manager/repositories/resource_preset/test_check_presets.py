@@ -30,6 +30,7 @@ from ai.backend.common.types import (
     SessionResult,
     SessionTypes,
     SlotName,
+    SlotQuantity,
     SlotTypes,
     ValkeyTarget,
 )
@@ -55,6 +56,11 @@ from ai.backend.manager.models.resource_policy import (
     UserResourcePolicyRow,
 )
 from ai.backend.manager.models.resource_preset import ResourcePresetRow
+from ai.backend.manager.models.resource_slot import (
+    AgentResourceRow,
+    ResourceAllocationRow,
+    ResourceSlotTypeRow,
+)
 from ai.backend.manager.models.routing import RoutingRow
 from ai.backend.manager.models.scaling_group import (
     ScalingGroupOpts,
@@ -74,6 +80,14 @@ from ai.backend.manager.repositories.resource_preset.types import (
     CheckPresetsResult,
 )
 from ai.backend.testutils.db import with_tables
+
+
+def _qty(slots: list[SlotQuantity], name: str) -> Decimal:
+    """Find a SlotQuantity by slot_name and return its quantity."""
+    return next(
+        (sq.quantity for sq in slots if sq.slot_name == name),
+        Decimal("0"),
+    )
 
 
 class TestCheckPresetsOccupiedSlots:
@@ -112,12 +126,21 @@ class TestCheckPresetsOccupiedSlots:
                 KernelRow,
                 RoutingRow,
                 ResourcePresetRow,
+                ResourceSlotTypeRow,
+                AgentResourceRow,
+                ResourceAllocationRow,
                 sgroups_for_domains,  # association table
                 sgroups_for_keypairs,  # association table
                 sgroups_for_groups,  # association table
                 association_groups_users,  # association table
             ],
         ):
+            # Seed default resource slot types (FK target for normalized tables)
+            async with database_connection.begin_session() as db_sess:
+                for slot_name, slot_type in [("cpu", "count"), ("mem", "bytes")]:
+                    db_sess.add(
+                        ResourceSlotTypeRow(slot_name=slot_name, slot_type=slot_type, rank=0)
+                    )
             yield database_connection
 
     @pytest.fixture
@@ -376,6 +399,14 @@ class TestCheckPresetsOccupiedSlots:
     ) -> AgentId:
         """Helper method to create an agent with specified status and resources."""
         agent_id = AgentId(f"agent-{status.name.lower()}-{uuid.uuid4().hex[:8]}")
+        _available = available_slots or ResourceSlot({
+            "cpu": Decimal("16"),
+            "mem": Decimal("32768"),
+        })
+        _occupied = occupied_slots or ResourceSlot({
+            "cpu": Decimal("0"),
+            "mem": Decimal("0"),
+        })
         async with db.begin_session() as db_sess:
             agent = AgentRow(
                 id=agent_id,
@@ -384,15 +415,24 @@ class TestCheckPresetsOccupiedSlots:
                 region="test-region",
                 scaling_group=scaling_group_name,
                 schedulable=schedulable,
-                available_slots=available_slots
-                or ResourceSlot({"cpu": Decimal("16"), "mem": Decimal("32768")}),
-                occupied_slots=occupied_slots
-                or ResourceSlot({"cpu": Decimal("0"), "mem": Decimal("0")}),
+                available_slots=_available,
+                occupied_slots=_occupied,
                 addr=addr,
                 version="v25.03.0",
                 architecture="x86_64",
             )
             db_sess.add(agent)
+            await db_sess.flush()
+            # Seed normalized agent_resources rows
+            for slot_name, capacity in _available.items():
+                db_sess.add(
+                    AgentResourceRow(
+                        agent_id=agent_id,
+                        slot_name=slot_name,
+                        capacity=Decimal(str(capacity)),
+                        used=Decimal(str(_occupied.get(slot_name, 0))),
+                    )
+                )
             await db_sess.flush()
         return agent_id
 
@@ -608,6 +648,27 @@ class TestCheckPresetsOccupiedSlots:
             db_sess.add(session)
             db_sess.add(kernel)
             await db_sess.flush()
+            # Seed normalized resource_allocations for this kernel
+            for slot_name, value in kernel.occupied_slots.items():
+                db_sess.add(
+                    ResourceAllocationRow(
+                        kernel_id=kernel.id,
+                        slot_name=slot_name,
+                        requested=Decimal(str(value)),
+                        used=Decimal(str(value)),
+                    )
+                )
+            # Update AgentResourceRow.used to match kernel occupied slots
+            for slot_name, value in kernel.occupied_slots.items():
+                await db_sess.execute(
+                    sa.update(AgentResourceRow)
+                    .where(
+                        (AgentResourceRow.agent_id == test_agent_id)
+                        & (AgentResourceRow.slot_name == slot_name)
+                    )
+                    .values(used=Decimal(str(value)))
+                )
+            await db_sess.flush()
 
         # Test: Repository.check_presets should calculate from kernel (cache miss → DB)
         # Get group name for the API call
@@ -641,10 +702,10 @@ class TestCheckPresetsOccupiedSlots:
 
         # Verify: available (16 CPU, 32GB) - occupied (4 CPU, 8GB) = remaining (12 CPU, 24GB)
         sg_data = result.scaling_groups[test_scaling_group_name]
-        assert sg_data.remaining["cpu"] == Decimal("12")
-        assert sg_data.remaining["mem"] == Decimal("24576")
-        assert sg_data.using["cpu"] == Decimal("4")
-        assert sg_data.using["mem"] == Decimal("8192")
+        assert _qty(sg_data.remaining, "cpu") == Decimal("12")
+        assert _qty(sg_data.remaining, "mem") == Decimal("24576")
+        assert _qty(sg_data.using, "cpu") == Decimal("4")
+        assert _qty(sg_data.using, "mem") == Decimal("8192")
 
     async def test_terminating_kernels_count_towards_occupied_slots(
         self,
@@ -720,6 +781,25 @@ class TestCheckPresetsOccupiedSlots:
             db_sess.add(session)
             db_sess.add(kernel)
             await db_sess.flush()
+            for slot_name, value in kernel.occupied_slots.items():
+                db_sess.add(
+                    ResourceAllocationRow(
+                        kernel_id=kernel.id,
+                        slot_name=slot_name,
+                        requested=Decimal(str(value)),
+                        used=Decimal(str(value)),
+                    )
+                )
+            for slot_name, value in kernel.occupied_slots.items():
+                await db_sess.execute(
+                    sa.update(AgentResourceRow)
+                    .where(
+                        (AgentResourceRow.agent_id == test_agent_id)
+                        & (AgentResourceRow.slot_name == slot_name)
+                    )
+                    .values(used=Decimal(str(value)))
+                )
+            await db_sess.flush()
 
         # Test: Repository.check_presets should include TERMINATING kernels
         async with db_with_cleanup.begin_readonly_session() as db_sess:
@@ -752,10 +832,10 @@ class TestCheckPresetsOccupiedSlots:
 
         # Verify: available (16 CPU, 32GB) - occupied (2 CPU, 4GB) = remaining (14 CPU, 28GB)
         sg_data = result.scaling_groups[test_scaling_group_name]
-        assert sg_data.remaining["cpu"] == Decimal("14")
-        assert sg_data.remaining["mem"] == Decimal("28672")
-        assert sg_data.using["cpu"] == Decimal("2")
-        assert sg_data.using["mem"] == Decimal("4096")
+        assert _qty(sg_data.remaining, "cpu") == Decimal("14")
+        assert _qty(sg_data.remaining, "mem") == Decimal("28672")
+        assert _qty(sg_data.using, "cpu") == Decimal("2")
+        assert _qty(sg_data.using, "mem") == Decimal("4096")
 
     async def test_pending_kernels_do_not_count_towards_occupied_slots(
         self,
@@ -831,6 +911,17 @@ class TestCheckPresetsOccupiedSlots:
             db_sess.add(session)
             db_sess.add(kernel)
             await db_sess.flush()
+            # PENDING kernel: allocation exists with requested but no used
+            for slot_name, value in kernel.requested_slots.items():
+                db_sess.add(
+                    ResourceAllocationRow(
+                        kernel_id=kernel.id,
+                        slot_name=slot_name,
+                        requested=Decimal(str(value)),
+                        used=None,
+                    )
+                )
+            await db_sess.flush()
 
         # Test: Repository.check_presets should ignore PENDING kernels
         async with db_with_cleanup.begin_readonly_session() as db_sess:
@@ -863,10 +954,10 @@ class TestCheckPresetsOccupiedSlots:
 
         # Verify: available (16 CPU, 32GB) - occupied (0) = remaining (16 CPU, 32GB)
         sg_data = result.scaling_groups[test_scaling_group_name]
-        assert sg_data.remaining["cpu"] == Decimal("16")
-        assert sg_data.remaining["mem"] == Decimal("32768")
-        assert sg_data.using["cpu"] == Decimal("0")
-        assert sg_data.using["mem"] == Decimal("0")
+        assert _qty(sg_data.remaining, "cpu") == Decimal("16")
+        assert _qty(sg_data.remaining, "mem") == Decimal("32768")
+        assert _qty(sg_data.using, "cpu") == Decimal("0")
+        assert _qty(sg_data.using, "mem") == Decimal("0")
 
     async def test_ignores_cached_occupied_slots_in_agent_row(
         self,
@@ -909,6 +1000,17 @@ class TestCheckPresetsOccupiedSlots:
                 architecture="x86_64",
             )
             db_sess.add(agent)
+            await db_sess.flush()
+            # Seed normalized agent_resources (ACTUAL occupied = 3 CPU, 6144 mem)
+            for slot_name, capacity in agent.available_slots.items():
+                db_sess.add(
+                    AgentResourceRow(
+                        agent_id=agent_id,
+                        slot_name=slot_name,
+                        capacity=Decimal(str(capacity)),
+                        used=Decimal("0"),
+                    )
+                )
             await db_sess.flush()
 
             # Create session and RUNNING kernel with ACTUAL occupied slots
@@ -969,6 +1071,26 @@ class TestCheckPresetsOccupiedSlots:
             db_sess.add(session)
             db_sess.add(kernel)
             await db_sess.flush()
+            for slot_name, value in kernel.occupied_slots.items():
+                db_sess.add(
+                    ResourceAllocationRow(
+                        kernel_id=kernel.id,
+                        slot_name=slot_name,
+                        requested=Decimal(str(value)),
+                        used=Decimal(str(value)),
+                    )
+                )
+            # Update AgentResourceRow.used to match ACTUAL kernel occupied (3 CPU, 6144 mem)
+            for slot_name, value in kernel.occupied_slots.items():
+                await db_sess.execute(
+                    sa.update(AgentResourceRow)
+                    .where(
+                        (AgentResourceRow.agent_id == agent_id)
+                        & (AgentResourceRow.slot_name == slot_name)
+                    )
+                    .values(used=Decimal(str(value)))
+                )
+            await db_sess.flush()
 
         # Test: Repository.check_presets should use ACTUAL kernel occupied slots, not cached agent value
         async with db_with_cleanup.begin_readonly_session() as db_sess:
@@ -1002,10 +1124,10 @@ class TestCheckPresetsOccupiedSlots:
         # Verify: Should use actual kernel occupied (3 CPU, 6GB) NOT cached (10 CPU, 20GB)
         # available (16 CPU, 32GB) - actual occupied (3 CPU, 6GB) = remaining (13 CPU, 26GB)
         sg_data = result.scaling_groups[test_scaling_group_name]
-        assert sg_data.remaining["cpu"] == Decimal("13")
-        assert sg_data.remaining["mem"] == Decimal("26624")
-        assert sg_data.using["cpu"] == Decimal("3")
-        assert sg_data.using["mem"] == Decimal("6144")
+        assert _qty(sg_data.remaining, "cpu") == Decimal("13")
+        assert _qty(sg_data.remaining, "mem") == Decimal("26624")
+        assert _qty(sg_data.using, "cpu") == Decimal("3")
+        assert _qty(sg_data.using, "mem") == Decimal("6144")
 
     async def test_non_alive_agents_excluded_from_remaining_calculation(
         self,
@@ -1034,5 +1156,482 @@ class TestCheckPresetsOccupiedSlots:
         # Verify: Only ALIVE agents (2 x 16 CPU, 2 x 32GB) should be counted
         # Non-ALIVE agents (3 x 100 CPU) should be excluded
         sg_data = result.scaling_groups[test_scaling_group_name]
-        assert sg_data.remaining["cpu"] == Decimal("32")
-        assert sg_data.remaining["mem"] == Decimal("65536")
+        assert _qty(sg_data.remaining, "cpu") == Decimal("32")
+        assert _qty(sg_data.remaining, "mem") == Decimal("65536")
+
+
+class TestCheckPresetsZeroValues:
+    """
+    Regression tests for BA-5275: check_presets must return zero-valued slots
+    (not empty dicts) when no sessions exist.
+
+    Verifies that:
+    - scaling_group.using contains known slot types with Decimal(0) when no sessions exist
+    - keypair_using (occupied) contains known slot types with Decimal(0) when no sessions exist
+    - keypair_remaining is non-empty (contains known slot types) when no sessions exist
+    """
+
+    @pytest.fixture
+    async def db_with_cleanup(
+        self,
+        database_connection: ExtendedAsyncSAEngine,
+    ) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
+        """Database connection with tables created. TRUNCATE CASCADE handles cleanup."""
+        async with with_tables(
+            database_connection,
+            [
+                # FK dependency order: parents before children
+                DomainRow,
+                ScalingGroupRow,
+                UserResourcePolicyRow,
+                ProjectResourcePolicyRow,
+                KeyPairResourcePolicyRow,
+                UserRoleRow,
+                UserRow,
+                KeyPairRow,
+                GroupRow,
+                ImageRow,
+                VFolderRow,
+                EndpointRow,
+                DeploymentPolicyRow,
+                DeploymentAutoScalingPolicyRow,
+                DeploymentRevisionRow,
+                SessionRow,
+                AgentRow,
+                KernelRow,
+                RoutingRow,
+                ResourcePresetRow,
+                ResourceSlotTypeRow,
+                AgentResourceRow,
+                ResourceAllocationRow,
+                sgroups_for_domains,  # association table
+                sgroups_for_keypairs,  # association table
+                sgroups_for_groups,  # association table
+                association_groups_users,  # association table
+            ],
+        ):
+            # Seed default resource slot types (FK target for normalized tables)
+            async with database_connection.begin_session() as db_sess:
+                for slot_name, slot_type in [("cpu", "count"), ("mem", "bytes")]:
+                    db_sess.add(
+                        ResourceSlotTypeRow(slot_name=slot_name, slot_type=slot_type, rank=0)
+                    )
+            yield database_connection
+
+    @pytest.fixture
+    async def test_domain_name(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+    ) -> AsyncGenerator[str, None]:
+        """Create test domain and return domain name."""
+        domain_name = f"test-domain-zero-{uuid.uuid4().hex[:8]}"
+
+        async with db_with_cleanup.begin_session() as db_sess:
+            domain = DomainRow(
+                name=domain_name,
+                total_resource_slots=ResourceSlot({
+                    "cpu": Decimal("1000"),
+                    "mem": Decimal("1048576"),
+                }),
+            )
+            db_sess.add(domain)
+            await db_sess.flush()
+
+        try:
+            yield domain_name
+        finally:
+            pass
+
+    @pytest.fixture
+    async def test_scaling_group_name(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        test_domain_name: str,
+    ) -> AsyncGenerator[str, None]:
+        """Create test scaling group and return scaling group name."""
+        sg_name = f"test-sgroup-zero-{uuid.uuid4().hex[:8]}"
+
+        async with db_with_cleanup.begin_session() as db_sess:
+            sg = ScalingGroupRow(
+                name=sg_name,
+                driver="test-driver",
+                scheduler="fifo",
+                scheduler_opts=ScalingGroupOpts(
+                    allowed_session_types=[SessionTypes.INTERACTIVE, SessionTypes.BATCH],
+                    pending_timeout=timedelta(seconds=300),
+                    agent_selection_strategy=AgentSelectionStrategy.ROUNDROBIN,
+                ),
+                driver_opts={},
+                use_host_network=False,
+                is_active=True,
+            )
+            db_sess.add(sg)
+            await db_sess.flush()
+
+            # Associate scaling group with domain
+            await db_sess.execute(
+                sa.insert(sgroups_for_domains).values(
+                    scaling_group=sg_name,
+                    domain=test_domain_name,
+                )
+            )
+            await db_sess.flush()
+
+        try:
+            yield sg_name
+        finally:
+            pass
+
+    @pytest.fixture
+    async def test_resource_policy_name(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+    ) -> AsyncGenerator[str, None]:
+        """Create test resource policies and return policy name."""
+        policy_name = f"test-policy-zero-{uuid.uuid4().hex[:8]}"
+
+        async with db_with_cleanup.begin_session() as db_sess:
+            user_policy = UserResourcePolicyRow(
+                name=policy_name,
+                max_vfolder_count=10,
+                max_quota_scope_size=-1,
+                max_session_count_per_model_session=10,
+                max_customized_image_count=10,
+            )
+            project_policy = ProjectResourcePolicyRow(
+                name=policy_name,
+                max_vfolder_count=10,
+                max_quota_scope_size=-1,
+                max_network_count=10,
+            )
+            kp_policy = KeyPairResourcePolicyRow(
+                name=policy_name,
+                total_resource_slots=ResourceSlot({
+                    "cpu": Decimal("100"),
+                    "mem": Decimal("102400"),
+                }),
+                max_concurrent_sessions=10,
+                max_concurrent_sftp_sessions=2,
+                max_pending_session_count=5,
+                max_pending_session_resource_slots=ResourceSlot({
+                    "cpu": Decimal("50"),
+                    "mem": Decimal("51200"),
+                }),
+                max_containers_per_session=10,
+                idle_timeout=3600,
+            )
+            db_sess.add(user_policy)
+            db_sess.add(project_policy)
+            db_sess.add(kp_policy)
+            await db_sess.flush()
+
+        try:
+            yield policy_name
+        finally:
+            pass
+
+    @pytest.fixture
+    async def test_user_uuid(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        test_domain_name: str,
+        test_resource_policy_name: str,
+    ) -> AsyncGenerator[uuid.UUID, None]:
+        """Create test user and return user UUID."""
+        user_uuid = uuid.uuid4()
+
+        password_info = PasswordInfo(
+            password="dummy",
+            algorithm=PasswordHashAlgorithm.PBKDF2_SHA256,
+            rounds=600_000,
+            salt_size=32,
+        )
+
+        async with db_with_cleanup.begin_session() as db_sess:
+            user = UserRow(
+                uuid=user_uuid,
+                username=f"testuser-zero-{user_uuid.hex[:8]}",
+                email=f"test-zero-{user_uuid.hex[:8]}@example.com",
+                password=password_info,
+                domain_name=test_domain_name,
+                role=UserRole.USER,
+                resource_policy=test_resource_policy_name,
+            )
+            db_sess.add(user)
+            await db_sess.flush()
+
+        try:
+            yield user_uuid
+        finally:
+            pass
+
+    @pytest.fixture
+    async def test_group_id(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        test_domain_name: str,
+        test_resource_policy_name: str,
+        test_user_uuid: uuid.UUID,
+    ) -> AsyncGenerator[uuid.UUID, None]:
+        """Create test group and return group ID."""
+        group_id = uuid.uuid4()
+
+        async with db_with_cleanup.begin_session() as db_sess:
+            group = GroupRow(
+                id=group_id,
+                name=f"test-group-zero-{group_id.hex[:8]}",
+                domain_name=test_domain_name,
+                total_resource_slots=ResourceSlot({
+                    "cpu": Decimal("500"),
+                    "mem": Decimal("524288"),
+                }),
+                resource_policy=test_resource_policy_name,
+            )
+            db_sess.add(group)
+            await db_sess.flush()
+
+            # Add user to group
+            await db_sess.execute(
+                sa.insert(association_groups_users).values(
+                    user_id=test_user_uuid,
+                    group_id=group_id,
+                )
+            )
+            await db_sess.flush()
+
+        try:
+            yield group_id
+        finally:
+            pass
+
+    @pytest.fixture
+    async def test_keypair_access_key(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        test_user_uuid: uuid.UUID,
+        test_resource_policy_name: str,
+    ) -> AsyncGenerator[AccessKey, None]:
+        """Create test keypair and return access key."""
+        access_key = AccessKey(f"test-ak-{uuid.uuid4().hex[:8]}")
+
+        async with db_with_cleanup.begin_session() as db_sess:
+            # Get user email for user_id field
+            user_result = await db_sess.execute(
+                sa.select(UserRow.email).where(UserRow.uuid == test_user_uuid)
+            )
+            user_email = user_result.scalar_one()
+
+            keypair = KeyPairRow(
+                access_key=access_key,
+                secret_key="test-secret",
+                user_id=user_email,
+                user=test_user_uuid,
+                is_active=True,
+                resource_policy=test_resource_policy_name,
+            )
+            db_sess.add(keypair)
+            await db_sess.flush()
+
+        try:
+            yield access_key
+        finally:
+            pass
+
+    @pytest.fixture
+    def mock_config_provider(self) -> MagicMock:
+        """Create mocked ManagerConfigProvider for repository."""
+        mock = MagicMock()
+        mock.legacy_etcd_config_loader.get_resource_slots = AsyncMock(
+            return_value={
+                SlotName("cpu"): SlotTypes("count"),
+                SlotName("mem"): SlotTypes("bytes"),
+            }
+        )
+        mock.legacy_etcd_config_loader.get_raw = AsyncMock(
+            return_value="true"  # group_resource_visibility
+        )
+        return mock
+
+    @pytest.fixture
+    async def valkey_stat_client(
+        self,
+        redis_container: tuple[str, tuple[str, int]],
+    ) -> AsyncGenerator[ValkeyStatClient, None]:
+        """Create ValkeyStatClient with real Redis container."""
+        _, redis_addr = redis_container
+
+        valkey_target = ValkeyTarget(
+            addr=f"{redis_addr[0]}:{redis_addr[1]}",
+        )
+
+        client = await ValkeyStatClient.create(
+            valkey_target=valkey_target,
+            db_id=0,
+            human_readable_name="test-valkey-stat-zero",
+        )
+
+        try:
+            yield client
+        finally:
+            await client.close()
+
+    @pytest.fixture
+    async def repository(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        valkey_stat_client: ValkeyStatClient,
+        mock_config_provider: MagicMock,
+    ) -> AsyncGenerator[ResourcePresetRepository, None]:
+        """Create ResourcePresetRepository instance with real cache."""
+        repo = ResourcePresetRepository(
+            db=db_with_cleanup,
+            valkey_stat=valkey_stat_client,
+            config_provider=mock_config_provider,
+        )
+        yield repo
+
+    async def _create_agent(
+        self,
+        db: ExtendedAsyncSAEngine,
+        scaling_group_name: str,
+        addr: str,
+        *,
+        available_slots: ResourceSlot | None = None,
+    ) -> AgentId:
+        """Helper method to create an ALIVE agent with specified resources."""
+        agent_id = AgentId(f"agent-zero-{uuid.uuid4().hex[:8]}")
+        _available = available_slots or ResourceSlot({
+            "cpu": Decimal("16"),
+            "mem": Decimal("32768"),
+        })
+        _occupied = ResourceSlot({
+            "cpu": Decimal("0"),
+            "mem": Decimal("0"),
+        })
+        async with db.begin_session() as db_sess:
+            agent = AgentRow(
+                id=agent_id,
+                status=AgentStatus.ALIVE,
+                status_changed=datetime.now(tzutc()),
+                region="test-region",
+                scaling_group=scaling_group_name,
+                schedulable=True,
+                available_slots=_available,
+                occupied_slots=_occupied,
+                addr=addr,
+                version="v25.03.0",
+                architecture="x86_64",
+            )
+            db_sess.add(agent)
+            await db_sess.flush()
+            # Seed normalized agent_resources rows (used = 0 since no sessions)
+            for slot_name, capacity in _available.items():
+                db_sess.add(
+                    AgentResourceRow(
+                        agent_id=agent_id,
+                        slot_name=slot_name,
+                        capacity=Decimal(str(capacity)),
+                        used=Decimal("0"),
+                    )
+                )
+            await db_sess.flush()
+        return agent_id
+
+    async def test_returns_zero_slots_when_no_sessions_exist(
+        self,
+        repository: ResourcePresetRepository,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        test_domain_name: str,
+        test_scaling_group_name: str,
+        test_resource_policy_name: str,
+        test_group_id: uuid.UUID,
+        test_user_uuid: uuid.UUID,
+        test_keypair_access_key: AccessKey,
+    ) -> None:
+        """
+        Regression test for BA-5275.
+
+        When a user has no active sessions, check_presets must return zero-valued
+        slot dicts (not empty dicts) for:
+        - scaling_group.using  (user occupancy per scaling group)
+        - keypair_using        (keypair occupancy)
+
+        Previously these returned {} because:
+        1. resource_slot_to_quantities dropped zero-valued slots (if v filter)
+        2. _get_user_session_occupancy_per_sgroup returned empty lists when no sessions exist
+        3. _get_resource_occupancy returned empty list when no sessions match
+        """
+        # Create an ALIVE agent so scaling group is available (no sessions)
+        await self._create_agent(db_with_cleanup, test_scaling_group_name, "10.0.0.10:2001")
+
+        # Get group name for the API call
+        async with db_with_cleanup.begin_readonly_session() as db_sess:
+            group_result = await db_sess.execute(
+                sa.select(GroupRow.name).where(GroupRow.id == test_group_id)
+            )
+            group_name = group_result.scalar_one()
+
+        # Get resource policy data
+        async with db_with_cleanup.begin_readonly_session() as db_sess:
+            kp_policy_result = await db_sess.execute(
+                sa.select(KeyPairResourcePolicyRow).where(
+                    KeyPairResourcePolicyRow.name == test_resource_policy_name
+                )
+            )
+            kp_policy = kp_policy_result.scalar_one()
+            resource_policy_dict = {
+                "total_resource_slots": kp_policy.total_resource_slots.to_json(),
+                "default_for_unspecified": str(kp_policy.default_for_unspecified),
+            }
+
+        result: CheckPresetsResult = await repository.check_presets(
+            access_key=test_keypair_access_key,
+            user_id=test_user_uuid,
+            group_name=group_name,
+            domain_name=test_domain_name,
+            resource_policy=resource_policy_dict,
+            scaling_group=test_scaling_group_name,
+        )
+
+        # Verify: scaling_group.using must contain known slot types with zero values,
+        # not an empty list/dict -- this was the regression (BA-5275)
+        sg_data = result.scaling_groups[test_scaling_group_name]
+        sg_using_slots = {sq.slot_name for sq in sg_data.using}
+        assert "cpu" in sg_using_slots, (
+            "scaling_group.using must contain 'cpu' slot even when no sessions exist"
+        )
+        assert "mem" in sg_using_slots, (
+            "scaling_group.using must contain 'mem' slot even when no sessions exist"
+        )
+        assert _qty(sg_data.using, "cpu") == Decimal("0"), (
+            "scaling_group.using['cpu'] must be 0 when no sessions exist"
+        )
+        assert _qty(sg_data.using, "mem") == Decimal("0"), (
+            "scaling_group.using['mem'] must be 0 when no sessions exist"
+        )
+
+        # Verify: keypair_using (occupied) must also contain known slot types with zero values
+        keypair_using_slots = {sq.slot_name for sq in result.keypair_using}
+        assert "cpu" in keypair_using_slots, (
+            "keypair_using must contain 'cpu' slot even when no sessions exist"
+        )
+        assert "mem" in keypair_using_slots, (
+            "keypair_using must contain 'mem' slot even when no sessions exist"
+        )
+        assert _qty(result.keypair_using, "cpu") == Decimal("0"), (
+            "keypair_using['cpu'] must be 0 when no sessions exist"
+        )
+        assert _qty(result.keypair_using, "mem") == Decimal("0"), (
+            "keypair_using['mem'] must be 0 when no sessions exist"
+        )
+
+        # Verify: keypair_remaining must be non-empty (limits - 0 = limits)
+        keypair_remaining_slots = {sq.slot_name for sq in result.keypair_remaining}
+        assert "cpu" in keypair_remaining_slots, "keypair_remaining must contain 'cpu' slot"
+        assert "mem" in keypair_remaining_slots, "keypair_remaining must contain 'mem' slot"
+        assert _qty(result.keypair_remaining, "cpu") == Decimal("100"), (
+            "keypair_remaining['cpu'] must equal keypair limit (100) when no sessions exist"
+        )
+        assert _qty(result.keypair_remaining, "mem") == Decimal("102400"), (
+            "keypair_remaining['mem'] must equal keypair limit (102400) when no sessions exist"
+        )

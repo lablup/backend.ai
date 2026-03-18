@@ -214,6 +214,8 @@ class Enum[T_enum: enum.Enum](t.Trafaret):
 
 class JSONString(t.Trafaret):
     def check_and_return(self, value: Any) -> dict[str, Any]:
+        if isinstance(value, dict):
+            return value
         try:
             result: dict[str, Any] = json.loads(value)
             return result

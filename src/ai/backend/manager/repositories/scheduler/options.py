@@ -3,16 +3,26 @@
 from __future__ import annotations
 
 from collections.abc import Collection
+from typing import TYPE_CHECKING
 from uuid import UUID
 
 import sqlalchemy as sa
 
-from ai.backend.common.types import SessionId
+from ai.backend.manager.models.scaling_group.row import ScalingGroupRow
+
+if TYPE_CHECKING:
+    from ai.backend.common.data.filter_specs import (
+        StringMatchSpec,
+        UUIDEqualMatchSpec,
+        UUIDInMatchSpec,
+    )
+    from ai.backend.manager.data.kernel.types import KernelStatusInMatchSpec
+
+from ai.backend.common.types import AgentId, KernelId, SessionId
 from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.data.session.types import KernelMatchType, SessionStatus
 from ai.backend.manager.models.image import ImageRow
 from ai.backend.manager.models.kernel import KernelRow
-from ai.backend.manager.models.scaling_group import ScalingGroupRow
 from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.repositories.base import QueryCondition, QueryOrder
@@ -42,6 +52,214 @@ class SessionConditions:
     def by_scaling_group(scaling_group: str) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
             return SessionRow.scaling_group_name == scaling_group
+
+        return inner
+
+    @staticmethod
+    def by_name_contains(spec: StringMatchSpec) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            if spec.case_insensitive:
+                condition = SessionRow.name.ilike(f"%{spec.value}%")
+            else:
+                condition = SessionRow.name.like(f"%{spec.value}%")
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
+
+        return inner
+
+    @staticmethod
+    def by_name_equals(spec: StringMatchSpec) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            if spec.case_insensitive:
+                condition = sa.func.lower(SessionRow.name) == spec.value.lower()
+            else:
+                condition = SessionRow.name == spec.value
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
+
+        return inner
+
+    @staticmethod
+    def by_name_starts_with(spec: StringMatchSpec) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            if spec.case_insensitive:
+                condition = SessionRow.name.ilike(f"{spec.value}%")
+            else:
+                condition = SessionRow.name.like(f"{spec.value}%")
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
+
+        return inner
+
+    @staticmethod
+    def by_name_ends_with(spec: StringMatchSpec) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            if spec.case_insensitive:
+                condition = SessionRow.name.ilike(f"%{spec.value}")
+            else:
+                condition = SessionRow.name.like(f"%{spec.value}")
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
+
+        return inner
+
+    @staticmethod
+    def by_access_key_contains(spec: StringMatchSpec) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            if spec.case_insensitive:
+                condition = SessionRow.access_key.ilike(f"%{spec.value}%")
+            else:
+                condition = SessionRow.access_key.like(f"%{spec.value}%")
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
+
+        return inner
+
+    @staticmethod
+    def by_access_key_equals(spec: StringMatchSpec) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            if spec.case_insensitive:
+                condition = sa.func.lower(SessionRow.access_key) == spec.value.lower()
+            else:
+                condition = SessionRow.access_key == spec.value
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
+
+        return inner
+
+    @staticmethod
+    def by_access_key_starts_with(spec: StringMatchSpec) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            if spec.case_insensitive:
+                condition = SessionRow.access_key.ilike(f"{spec.value}%")
+            else:
+                condition = SessionRow.access_key.like(f"{spec.value}%")
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
+
+        return inner
+
+    @staticmethod
+    def by_access_key_ends_with(spec: StringMatchSpec) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            if spec.case_insensitive:
+                condition = SessionRow.access_key.ilike(f"%{spec.value}")
+            else:
+                condition = SessionRow.access_key.like(f"%{spec.value}")
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
+
+        return inner
+
+    @staticmethod
+    def by_domain_name_contains(spec: StringMatchSpec) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            if spec.case_insensitive:
+                condition = SessionRow.domain_name.ilike(f"%{spec.value}%")
+            else:
+                condition = SessionRow.domain_name.like(f"%{spec.value}%")
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
+
+        return inner
+
+    @staticmethod
+    def by_domain_name_equals(spec: StringMatchSpec) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            if spec.case_insensitive:
+                condition = sa.func.lower(SessionRow.domain_name) == spec.value.lower()
+            else:
+                condition = SessionRow.domain_name == spec.value
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
+
+        return inner
+
+    @staticmethod
+    def by_domain_name_starts_with(spec: StringMatchSpec) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            if spec.case_insensitive:
+                condition = SessionRow.domain_name.ilike(f"{spec.value}%")
+            else:
+                condition = SessionRow.domain_name.like(f"{spec.value}%")
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
+
+        return inner
+
+    @staticmethod
+    def by_domain_name_ends_with(spec: StringMatchSpec) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            if spec.case_insensitive:
+                condition = SessionRow.domain_name.ilike(f"%{spec.value}")
+            else:
+                condition = SessionRow.domain_name.like(f"%{spec.value}")
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
+
+        return inner
+
+    @staticmethod
+    def by_scaling_group_contains(spec: StringMatchSpec) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            if spec.case_insensitive:
+                condition = SessionRow.scaling_group_name.ilike(f"%{spec.value}%")
+            else:
+                condition = SessionRow.scaling_group_name.like(f"%{spec.value}%")
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
+
+        return inner
+
+    @staticmethod
+    def by_scaling_group_equals(spec: StringMatchSpec) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            if spec.case_insensitive:
+                condition = sa.func.lower(SessionRow.scaling_group_name) == spec.value.lower()
+            else:
+                condition = SessionRow.scaling_group_name == spec.value
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
+
+        return inner
+
+    @staticmethod
+    def by_scaling_group_starts_with(spec: StringMatchSpec) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            if spec.case_insensitive:
+                condition = SessionRow.scaling_group_name.ilike(f"{spec.value}%")
+            else:
+                condition = SessionRow.scaling_group_name.like(f"{spec.value}%")
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
+
+        return inner
+
+    @staticmethod
+    def by_scaling_group_ends_with(spec: StringMatchSpec) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            if spec.case_insensitive:
+                condition = SessionRow.scaling_group_name.ilike(f"%{spec.value}")
+            else:
+                condition = SessionRow.scaling_group_name.like(f"%{spec.value}")
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
 
         return inner
 
@@ -153,6 +371,130 @@ class SessionConditions:
             case KernelMatchType.NOT_ANY:
                 return SessionConditions.no_kernel_in_statuses(statuses)
 
+    @staticmethod
+    def by_id_filter_equals(spec: UUIDEqualMatchSpec) -> QueryCondition:
+        """Factory for id equality filter."""
+
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            if spec.negated:
+                return SessionRow.id != SessionId(spec.value)
+            return SessionRow.id == SessionId(spec.value)
+
+        return inner
+
+    @staticmethod
+    def by_id_filter_in(spec: UUIDInMatchSpec) -> QueryCondition:
+        """Factory for id IN filter."""
+
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            session_ids = [SessionId(v) for v in spec.values]
+            if spec.negated:
+                return SessionRow.id.notin_(session_ids)
+            return SessionRow.id.in_(session_ids)
+
+        return inner
+
+    @staticmethod
+    def by_status_in(statuses: Collection[SessionStatus]) -> QueryCondition:
+        """Factory for status IN filter."""
+
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return SessionRow.status.in_(statuses)
+
+        return inner
+
+    @staticmethod
+    def by_status_not_in(statuses: Collection[SessionStatus]) -> QueryCondition:
+        """Factory for status NOT IN filter."""
+
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return SessionRow.status.notin_(statuses)
+
+        return inner
+
+    @staticmethod
+    def by_user_uuid_filter_equals(spec: UUIDEqualMatchSpec) -> QueryCondition:
+        """Factory for user UUID equality filter."""
+
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            if spec.negated:
+                return SessionRow.user_uuid != spec.value
+            return SessionRow.user_uuid == spec.value
+
+        return inner
+
+    @staticmethod
+    def by_user_uuid_filter_in(spec: UUIDInMatchSpec) -> QueryCondition:
+        """Factory for user UUID IN filter."""
+
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            if spec.negated:
+                return SessionRow.user_uuid.notin_(spec.values)
+            return SessionRow.user_uuid.in_(spec.values)
+
+        return inner
+
+    @staticmethod
+    def by_group_id_filter_equals(spec: UUIDEqualMatchSpec) -> QueryCondition:
+        """Factory for group (project) ID equality filter."""
+
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            if spec.negated:
+                return SessionRow.group_id != spec.value
+            return SessionRow.group_id == spec.value
+
+        return inner
+
+    @staticmethod
+    def by_group_id_filter_in(spec: UUIDInMatchSpec) -> QueryCondition:
+        """Factory for group (project) ID IN filter."""
+
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            if spec.negated:
+                return SessionRow.group_id.notin_(spec.values)
+            return SessionRow.group_id.in_(spec.values)
+
+        return inner
+
+    @staticmethod
+    def by_agent_id(agent_id: AgentId) -> QueryCondition:
+        """Filter sessions that have kernels running on the given agent."""
+
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return sa.literal(agent_id) == sa.any_(SessionRow.agent_ids)
+
+        return inner
+
+    @staticmethod
+    def by_cursor_forward(cursor_id: str) -> QueryCondition:
+        """Cursor condition for forward pagination (after cursor).
+
+        Uses subquery to get created_at of the cursor row and compare.
+        """
+
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            subquery = (
+                sa.select(SessionRow.created_at).where(SessionRow.id == cursor_id).scalar_subquery()
+            )
+            return SessionRow.created_at < subquery
+
+        return inner
+
+    @staticmethod
+    def by_cursor_backward(cursor_id: str) -> QueryCondition:
+        """Cursor condition for backward pagination (before cursor).
+
+        Uses subquery to get created_at of the cursor row and compare.
+        """
+
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            subquery = (
+                sa.select(SessionRow.created_at).where(SessionRow.id == cursor_id).scalar_subquery()
+            )
+            return SessionRow.created_at > subquery
+
+        return inner
+
 
 class SessionOrders:
     """Query orders for sessions."""
@@ -169,13 +511,91 @@ class SessionOrders:
             return SessionRow.id.asc()
         return SessionRow.id.desc()
 
+    @staticmethod
+    def terminated_at(ascending: bool = True) -> QueryOrder:
+        if ascending:
+            return SessionRow.terminated_at.asc()
+        return SessionRow.terminated_at.desc()
+
+    @staticmethod
+    def status(ascending: bool = True) -> QueryOrder:
+        if ascending:
+            return SessionRow.status.asc()
+        return SessionRow.status.desc()
+
+    @staticmethod
+    def name(ascending: bool = True) -> QueryOrder:
+        if ascending:
+            return SessionRow.name.asc()
+        return SessionRow.name.desc()
+
 
 class KernelConditions:
     """Query conditions for kernels."""
 
     @staticmethod
+    def by_id(kernel_id: KernelId) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return KernelRow.id == kernel_id
+
+        return inner
+
+    @staticmethod
+    def by_ids(kernel_ids: Collection[KernelId]) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return KernelRow.id.in_(kernel_ids)
+
+        return inner
+
+    @staticmethod
+    def by_id_filter_equals(spec: UUIDEqualMatchSpec) -> QueryCondition:
+        """Factory for id equality filter."""
+
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            if spec.negated:
+                return KernelRow.id != KernelId(spec.value)
+            return KernelRow.id == KernelId(spec.value)
+
+        return inner
+
+    @staticmethod
+    def by_id_filter_in(spec: UUIDInMatchSpec) -> QueryCondition:
+        """Factory for id IN filter."""
+
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            kernel_ids = [KernelId(v) for v in spec.values]
+            if spec.negated:
+                return KernelRow.id.notin_(kernel_ids)
+            return KernelRow.id.in_(kernel_ids)
+
+        return inner
+
+    @staticmethod
     def by_session_ids(session_ids: Collection[SessionId]) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return KernelRow.session_id.in_(session_ids)
+
+        return inner
+
+    @staticmethod
+    def by_session_id_filter_equals(spec: UUIDEqualMatchSpec) -> QueryCondition:
+        """Factory for session_id equality filter."""
+
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            if spec.negated:
+                return KernelRow.session_id != SessionId(spec.value)
+            return KernelRow.session_id == SessionId(spec.value)
+
+        return inner
+
+    @staticmethod
+    def by_session_id_filter_in(spec: UUIDInMatchSpec) -> QueryCondition:
+        """Factory for session_id IN filter."""
+
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            session_ids = [SessionId(v) for v in spec.values]
+            if spec.negated:
+                return KernelRow.session_id.notin_(session_ids)
             return KernelRow.session_id.in_(session_ids)
 
         return inner
@@ -188,11 +608,61 @@ class KernelConditions:
         return inner
 
     @staticmethod
+    def by_status_filter_in(spec: KernelStatusInMatchSpec) -> QueryCondition:
+        """Factory for status IN filter."""
+
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            if spec.negated:
+                return KernelRow.status.notin_(spec.values)
+            return KernelRow.status.in_(spec.values)
+
+        return inner
+
+    @staticmethod
     def by_scaling_group(scaling_group: str) -> QueryCondition:
         """Filter kernels by scaling group."""
 
         def inner() -> sa.sql.expression.ColumnElement[bool]:
             return KernelRow.scaling_group == scaling_group
+
+        return inner
+
+    @staticmethod
+    def by_agent_id(agent_id: AgentId) -> QueryCondition:
+        """Filter kernels by agent ID."""
+
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return KernelRow.agent == agent_id
+
+        return inner
+
+    @staticmethod
+    def by_cursor_forward(cursor_id: str) -> QueryCondition:
+        """Cursor condition for forward pagination (after cursor).
+
+        Uses subquery to get created_at of the cursor row and compare.
+        """
+
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            subquery = (
+                sa.select(KernelRow.created_at).where(KernelRow.id == cursor_id).scalar_subquery()
+            )
+            return KernelRow.created_at < subquery
+
+        return inner
+
+    @staticmethod
+    def by_cursor_backward(cursor_id: str) -> QueryCondition:
+        """Cursor condition for backward pagination (before cursor).
+
+        Uses subquery to get created_at of the cursor row and compare.
+        """
+
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            subquery = (
+                sa.select(KernelRow.created_at).where(KernelRow.id == cursor_id).scalar_subquery()
+            )
+            return KernelRow.created_at > subquery
 
         return inner
 
@@ -265,6 +735,36 @@ class KernelOrders:
         if ascending:
             return KernelRow.cluster_idx.asc()
         return KernelRow.cluster_idx.desc()
+
+    @staticmethod
+    def created_at(ascending: bool = True) -> QueryOrder:
+        if ascending:
+            return KernelRow.created_at.asc()
+        return KernelRow.created_at.desc()
+
+    @staticmethod
+    def terminated_at(ascending: bool = True) -> QueryOrder:
+        if ascending:
+            return KernelRow.terminated_at.asc()
+        return KernelRow.terminated_at.desc()
+
+    @staticmethod
+    def status(ascending: bool = True) -> QueryOrder:
+        if ascending:
+            return KernelRow.status.asc()
+        return KernelRow.status.desc()
+
+    @staticmethod
+    def cluster_mode(ascending: bool = True) -> QueryOrder:
+        if ascending:
+            return KernelRow.cluster_mode.asc()
+        return KernelRow.cluster_mode.desc()
+
+    @staticmethod
+    def cluster_hostname(ascending: bool = True) -> QueryOrder:
+        if ascending:
+            return KernelRow.cluster_hostname.asc()
+        return KernelRow.cluster_hostname.desc()
 
 
 class UserConditions:

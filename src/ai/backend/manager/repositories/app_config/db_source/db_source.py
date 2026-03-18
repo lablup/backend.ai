@@ -16,7 +16,10 @@ from ai.backend.manager.models.app_config import AppConfigRow, AppConfigScopeTyp
 from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.app_config.updaters import AppConfigUpdaterSpec
-from ai.backend.manager.repositories.base.creator import Creator, execute_creator
+from ai.backend.manager.repositories.base.rbac.entity_creator import (
+    RBACEntityCreator,
+    execute_rbac_entity_creator,
+)
 
 
 class AppConfigDBSource:
@@ -36,7 +39,7 @@ class AppConfigDBSource:
         scope_id: str,
     ) -> AppConfigData | None:
         """Get app configuration for a specific scope."""
-        async with self._db.begin_readonly_session() as db_sess:
+        async with self._db.begin_readonly_session_read_committed() as db_sess:
             result = await db_sess.execute(
                 sa.select(AppConfigRow).where(
                     sa.and_(
@@ -106,10 +109,10 @@ class AppConfigDBSource:
                 merged_config=merged_config,
             )
 
-    async def create_config(self, creator: Creator[AppConfigRow]) -> AppConfigData:
+    async def create_config(self, creator: RBACEntityCreator[AppConfigRow]) -> AppConfigData:
         """Create a new app configuration."""
         async with self._db.begin_session() as db_sess:
-            result = await execute_creator(db_sess, creator)
+            result = await execute_rbac_entity_creator(db_sess, creator)
             return result.row.to_data()
 
     async def upsert_config(

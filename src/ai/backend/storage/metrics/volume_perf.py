@@ -26,36 +26,43 @@ class VolumePerfMetricObserver:
             name="backendai_storage_volume_iops_read",
             documentation="Read IOPS for the volume",
             labelnames=["volume"],
+            multiprocess_mode="livemostrecent",
         )
         self._iops_write = Gauge(
             name="backendai_storage_volume_iops_write",
             documentation="Write IOPS for the volume",
             labelnames=["volume"],
+            multiprocess_mode="livemostrecent",
         )
         self._throughput_bytes_read = Gauge(
             name="backendai_storage_volume_throughput_bytes_read",
             documentation="Read throughput in bytes per second for the volume",
             labelnames=["volume"],
+            multiprocess_mode="livemostrecent",
         )
         self._throughput_bytes_write = Gauge(
             name="backendai_storage_volume_throughput_bytes_write",
             documentation="Write throughput in bytes per second for the volume",
             labelnames=["volume"],
+            multiprocess_mode="livemostrecent",
         )
         self._latency_usec_read = Gauge(
             name="backendai_storage_volume_latency_usec_read",
             documentation="Read latency in microseconds for the volume",
             labelnames=["volume"],
+            multiprocess_mode="livemostrecent",
         )
         self._latency_usec_write = Gauge(
             name="backendai_storage_volume_latency_usec_write",
             documentation="Write latency in microseconds for the volume",
             labelnames=["volume"],
+            multiprocess_mode="livemostrecent",
         )
         self._last_updated_timestamp = Gauge(
             name="backendai_storage_volume_metric_last_updated_timestamp",
             documentation="Unix timestamp of the last metric update for the volume",
             labelnames=["volume"],
+            multiprocess_mode="max",
         )
 
     @classmethod

@@ -21,6 +21,7 @@ class ImageStatus(enum.StrEnum):
 class ImageOrderField(enum.StrEnum):
     NAME = "NAME"
     CREATED_AT = "CREATED_AT"
+    LAST_USED = "LAST_USED"
 
 
 class ImageType(CIStrEnum):
@@ -166,6 +167,17 @@ class ImageListResult:
     """Search result with total count and pagination info for images."""
 
     items: list[ImageData]
+    total_count: int
+    has_next_page: bool
+    has_previous_page: bool
+
+
+@dataclass
+class ImageAliasListResult:
+    """Search result with total count and pagination info for image aliases."""
+
+    items: list[ImageAliasData]
+    image_ids: list[ImageID]
     total_count: int
     has_next_page: bool
     has_previous_page: bool

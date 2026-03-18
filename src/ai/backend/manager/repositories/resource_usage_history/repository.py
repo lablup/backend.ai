@@ -5,6 +5,7 @@ from __future__ import annotations
 import uuid
 from collections.abc import Mapping
 from datetime import date, datetime
+from decimal import Decimal
 from typing import TYPE_CHECKING
 
 from ai.backend.common.metrics.metric import DomainType, LayerType
@@ -23,12 +24,15 @@ from .db_source import ResourceUsageHistoryDBSource
 from .types import (
     DomainUsageBucketData,
     DomainUsageBucketSearchResult,
+    DomainUsageBucketSearchScope,
     KernelUsageRecordData,
     KernelUsageRecordSearchResult,
     ProjectUsageBucketData,
     ProjectUsageBucketSearchResult,
+    ProjectUsageBucketSearchScope,
     UserUsageBucketData,
     UserUsageBucketSearchResult,
+    UserUsageBucketSearchScope,
 )
 
 if TYPE_CHECKING:
@@ -181,9 +185,10 @@ class ResourceUsageHistoryRepository:
     async def search_domain_usage_buckets(
         self,
         querier: BatchQuerier,
+        scope: DomainUsageBucketSearchScope | None = None,
     ) -> DomainUsageBucketSearchResult:
         """Search domain usage buckets with pagination."""
-        return await self._db_source.search_domain_usage_buckets(querier)
+        return await self._db_source.search_domain_usage_buckets(querier, scope)
 
     # ==================== Project Usage Buckets ====================
 
@@ -207,9 +212,10 @@ class ResourceUsageHistoryRepository:
     async def search_project_usage_buckets(
         self,
         querier: BatchQuerier,
+        scope: ProjectUsageBucketSearchScope | None = None,
     ) -> ProjectUsageBucketSearchResult:
         """Search project usage buckets with pagination."""
-        return await self._db_source.search_project_usage_buckets(querier)
+        return await self._db_source.search_project_usage_buckets(querier, scope)
 
     # ==================== User Usage Buckets ====================
 
@@ -233,9 +239,10 @@ class ResourceUsageHistoryRepository:
     async def search_user_usage_buckets(
         self,
         querier: BatchQuerier,
+        scope: UserUsageBucketSearchScope | None = None,
     ) -> UserUsageBucketSearchResult:
         """Search user usage buckets with pagination."""
-        return await self._db_source.search_user_usage_buckets(querier)
+        return await self._db_source.search_user_usage_buckets(querier, scope)
 
     # ==================== Aggregation Queries ====================
 
@@ -309,3 +316,15 @@ class ResourceUsageHistoryRepository:
             decay_unit_days: Decay unit days for new buckets (default: 1)
         """
         return await self._db_source.increment_usage_buckets(aggregation_result, decay_unit_days)
+
+    @resource_usage_history_repository_resilience.apply()
+    async def update_bucket_entry_capacities(
+        self,
+        scaling_group: str,
+        capacity_by_slot: Mapping[str, Decimal],
+    ) -> None:
+        """Update capacity on usage_bucket_entries for a scaling group.
+
+        Called after cluster capacity is fetched during fair share calculation.
+        """
+        await self._db_source.update_bucket_entry_capacities(scaling_group, capacity_by_slot)

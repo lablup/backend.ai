@@ -168,6 +168,12 @@ def mock_scheduling_controller() -> MagicMock:
 
 
 @pytest.fixture
+def mock_appproxy_client_pool() -> MagicMock:
+    """Create mocked AppProxy client pool."""
+    return MagicMock()
+
+
+@pytest.fixture
 async def session_service(
     mock_session_repository: MagicMock,
     mock_agent_registry: MagicMock,
@@ -177,6 +183,7 @@ async def session_service(
     mock_error_monitor: MagicMock,
     mock_idle_checker_host: MagicMock,
     mock_scheduling_controller: MagicMock,
+    mock_appproxy_client_pool: MagicMock,
 ) -> SessionService:
     """Create SessionService with mocked dependencies."""
     args = SessionServiceArgs(
@@ -188,6 +195,7 @@ async def session_service(
         idle_checker_host=mock_idle_checker_host,
         session_repository=mock_session_repository,
         scheduling_controller=mock_scheduling_controller,
+        appproxy_client_pool=mock_appproxy_client_pool,
     )
     return SessionService(args)
 
@@ -230,6 +238,7 @@ def sample_session_data(
         name="test-session",
         session_type=SessionTypes.INTERACTIVE,
         priority=0,
+        is_preemptible=True,
         cluster_mode=ClusterMode.SINGLE_NODE,
         cluster_size=1,
         agent_ids=["i-ubuntu"],
@@ -271,7 +280,6 @@ def sample_session_data(
 # ==================== MatchSessions Tests ====================
 
 
-@pytest.mark.asyncio
 class TestMatchSessions:
     """Test cases for SessionService.match_sessions"""
 
@@ -330,6 +338,7 @@ class TestMatchSessions:
                 name=f"test-session-{i}",
                 session_type=SessionTypes.INTERACTIVE,
                 priority=0,
+                is_preemptible=True,
                 cluster_mode=ClusterMode.SINGLE_NODE,
                 cluster_size=1,
                 agent_ids=[],
@@ -384,7 +393,6 @@ class TestMatchSessions:
 # ==================== GetStatusHistory Tests ====================
 
 
-@pytest.mark.asyncio
 class TestGetStatusHistory:
     """Test cases for SessionService.get_status_history"""
 
@@ -462,7 +470,6 @@ class TestGetStatusHistory:
 # ==================== DestroySession Tests ====================
 
 
-@pytest.mark.asyncio
 class TestDestroySession:
     """Test cases for SessionService.destroy_session"""
 
@@ -480,6 +487,7 @@ class TestDestroySession:
             return_value=MarkTerminatingResult(
                 cancelled_sessions=[sample_session_id],
                 terminating_sessions=[],
+                force_terminated_sessions=[],
                 skipped_sessions=[],
             )
         )
@@ -507,12 +515,48 @@ class TestDestroySession:
         sample_session_id: SessionId,
         sample_access_key: AccessKey,
     ) -> None:
-        """Test successfully destroying session (terminated status)"""
+        """Test successfully destroying session (terminated status via normal termination)"""
         mock_session_repository.get_target_session_ids = AsyncMock(return_value=[sample_session_id])
         mock_scheduling_controller.mark_sessions_for_termination = AsyncMock(
             return_value=MarkTerminatingResult(
                 cancelled_sessions=[],
                 terminating_sessions=[sample_session_id],
+                force_terminated_sessions=[],
+                skipped_sessions=[],
+            )
+        )
+
+        action = DestroySessionAction(
+            user_role=UserRole.USER,
+            session_name="test-session",
+            forced=False,
+            recursive=False,
+            owner_access_key=sample_access_key,
+        )
+        result = await session_service.destroy_session(action)
+
+        assert result.result == {"stats": {"status": "terminated"}}
+        mock_scheduling_controller.mark_sessions_for_termination.assert_called_once_with(
+            [sample_session_id],
+            reason="user-requested",
+            forced=False,
+        )
+
+    async def test_force_terminate_directly_terminated(
+        self,
+        session_service: SessionService,
+        mock_session_repository: MagicMock,
+        mock_scheduling_controller: MagicMock,
+        sample_session_id: SessionId,
+        sample_access_key: AccessKey,
+    ) -> None:
+        """Test force-terminate skips TERMINATING and goes directly to TERMINATED"""
+        mock_session_repository.get_target_session_ids = AsyncMock(return_value=[sample_session_id])
+        mock_scheduling_controller.mark_sessions_for_termination = AsyncMock(
+            return_value=MarkTerminatingResult(
+                cancelled_sessions=[],
+                terminating_sessions=[],
+                force_terminated_sessions=[sample_session_id],
                 skipped_sessions=[],
             )
         )
@@ -527,6 +571,11 @@ class TestDestroySession:
         result = await session_service.destroy_session(action)
 
         assert result.result == {"stats": {"status": "terminated"}}
+        mock_scheduling_controller.mark_sessions_for_termination.assert_called_once_with(
+            [sample_session_id],
+            reason="force-terminated",
+            forced=True,
+        )
 
     async def test_recursive_destroy(
         self,
@@ -542,6 +591,7 @@ class TestDestroySession:
             return_value=MarkTerminatingResult(
                 cancelled_sessions=session_ids,
                 terminating_sessions=[],
+                force_terminated_sessions=[],
                 skipped_sessions=[],
             )
         )
@@ -573,6 +623,7 @@ class TestDestroySession:
             return_value=MarkTerminatingResult(
                 cancelled_sessions=[],
                 terminating_sessions=[],
+                force_terminated_sessions=[],
                 skipped_sessions=[],
             )
         )
@@ -592,7 +643,6 @@ class TestDestroySession:
 # ==================== Complete Tests ====================
 
 
-@pytest.mark.asyncio
 class TestComplete:
     """Test cases for SessionService.complete"""
 
@@ -658,7 +708,6 @@ class TestComplete:
 # ==================== GetSessionInfo Tests ====================
 
 
-@pytest.mark.asyncio
 class TestGetSessionInfo:
     """Test cases for SessionService.get_session_info"""
 
@@ -680,7 +729,7 @@ class TestGetSessionInfo:
         mock_kernel.image = "cr.backend.ai/stable/python:latest"
         mock_kernel.architecture = "x86_64"
         mock_kernel.registry = "cr.backend.ai"
-        mock_kernel.container_id = str(uuid4())
+        mock_kernel.container_id = "a" * 64  # Docker container ID format (64-char hex SHA-256)
         mock_kernel.occupied_slots = ResourceSlot({"cpu": 1, "mem": 1024})
         mock_kernel.occupied_shares = {}
 
@@ -744,7 +793,6 @@ class TestGetSessionInfo:
 # ==================== DownloadFiles Tests ====================
 
 
-@pytest.mark.asyncio
 class TestDownloadFiles:
     """Test cases for SessionService.download_files"""
 
@@ -827,7 +875,6 @@ class TestDownloadFiles:
 # ==================== GetDirectAccessInfo Tests ====================
 
 
-@pytest.mark.asyncio
 class TestGetDirectAccessInfo:
     """Test cases for SessionService.get_direct_access_info"""
 
@@ -880,7 +927,6 @@ class TestGetDirectAccessInfo:
 # ==================== RenameSession Tests ====================
 
 
-@pytest.mark.asyncio
 class TestRenameSession:
     """Test cases for SessionService.rename_session"""
 
@@ -935,7 +981,6 @@ class TestRenameSession:
 # ==================== RestartSession Tests ====================
 
 
-@pytest.mark.asyncio
 class TestRestartSession:
     """Test cases for SessionService.restart_session"""
 
@@ -989,7 +1034,6 @@ class TestRestartSession:
 # ==================== ShutdownService Tests ====================
 
 
-@pytest.mark.asyncio
 class TestShutdownService:
     """Test cases for SessionService.shutdown_service"""
 
@@ -1044,7 +1088,6 @@ class TestShutdownService:
 # ==================== UploadFiles Tests ====================
 
 
-@pytest.mark.asyncio
 class TestUploadFiles:
     """Test cases for SessionService.upload_files"""
 
@@ -1117,7 +1160,6 @@ class TestUploadFiles:
 # ==================== Execute Tests ====================
 
 
-@pytest.mark.asyncio
 class TestExecute:
     """Test cases for SessionService.execute"""
 
@@ -1197,7 +1239,6 @@ class TestExecute:
 # ==================== Interrupt Tests ====================
 
 
-@pytest.mark.asyncio
 class TestInterrupt:
     """Test cases for SessionService.interrupt"""
 
@@ -1250,7 +1291,6 @@ class TestInterrupt:
 # ==================== ListFiles Tests ====================
 
 
-@pytest.mark.asyncio
 class TestListFiles:
     """Test cases for SessionService.list_files"""
 
@@ -1311,7 +1351,6 @@ class TestListFiles:
 # ==================== GetContainerLogs Tests ====================
 
 
-@pytest.mark.asyncio
 class TestGetContainerLogs:
     """Test cases for SessionService.get_container_logs"""
 
@@ -1371,7 +1410,6 @@ class TestGetContainerLogs:
 # ==================== CheckAndTransitStatus Tests ====================
 
 
-@pytest.mark.asyncio
 class TestCheckAndTransitStatus:
     """Test cases for SessionService.check_and_transit_status"""
 
@@ -1527,7 +1565,6 @@ class TestCheckAndTransitStatus:
 # ==================== Search Tests ====================
 
 
-@pytest.mark.asyncio
 class TestSearch:
     """Test cases for SessionService.search"""
 
@@ -1619,7 +1656,6 @@ class TestSearch:
 # ==================== SearchKernels Tests ====================
 
 
-@pytest.mark.asyncio
 class TestSearchKernels:
     """Test cases for SessionService.search_kernels"""
 

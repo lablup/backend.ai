@@ -1,8 +1,6 @@
 from abc import abstractmethod
 from typing import TypeVar, override
 
-from ai.backend.manager.data.permission.types import OperationType
-
 from .base import BaseAction, BaseActionResult
 from .types import BatchFieldData
 
@@ -23,11 +21,6 @@ class BaseBatchAction(BaseAction):
         action's targets exist as fields of another entity.
         Returns None if these entities are not fields.
         """
-        raise NotImplementedError
-
-    @classmethod
-    @abstractmethod
-    def permission_operation_type(cls) -> OperationType:
         raise NotImplementedError
 
 

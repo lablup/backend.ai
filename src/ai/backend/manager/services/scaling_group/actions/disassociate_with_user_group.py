@@ -4,22 +4,25 @@ from dataclasses import dataclass
 from typing import override
 
 from ai.backend.manager.actions.action import BaseActionResult
+from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.models.scaling_group import ScalingGroupForProjectRow
-from ai.backend.manager.repositories.base.purger import BatchPurger
+from ai.backend.manager.repositories.base.rbac.scope_unbinder import (
+    RBACScopeEntityUnbinder,
+)
 
-from .base import ScalingGroupAction
+from .user_group_base import ScalingGroupUserGroupAction
 
 
 @dataclass
-class DisassociateScalingGroupWithUserGroupsAction(ScalingGroupAction):
-    """Action to disassociate a single scaling group from a user group (project)."""
+class DisassociateScalingGroupWithUserGroupsAction(ScalingGroupUserGroupAction):
+    """Action to disassociate scaling groups from a project."""
 
-    purger: BatchPurger[ScalingGroupForProjectRow]
+    unbinder: RBACScopeEntityUnbinder[ScalingGroupForProjectRow]
 
     @override
     @classmethod
-    def operation_type(cls) -> str:
-        return "disassociate_with_user_groups"
+    def operation_type(cls) -> ActionOperationType:
+        return ActionOperationType.DELETE
 
     @override
     def entity_id(self) -> str | None:

@@ -300,7 +300,6 @@ class TestDeploymentAutoScalingPolicyRow:
 
         yield endpoint
 
-    @pytest.mark.asyncio
     async def test_create_auto_scaling_policy(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
@@ -332,7 +331,6 @@ class TestDeploymentAutoScalingPolicyRow:
             assert policy.scale_up_threshold == Decimal("80")
             assert policy.scale_down_threshold == Decimal("30")
 
-    @pytest.mark.asyncio
     async def test_create_policy_with_defaults(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
@@ -357,7 +355,6 @@ class TestDeploymentAutoScalingPolicyRow:
             assert policy.scale_up_threshold is None
             assert policy.scale_down_threshold is None
 
-    @pytest.mark.asyncio
     async def test_to_data(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
@@ -399,7 +396,6 @@ class TestDeploymentAutoScalingPolicyRow:
             assert data.cooldown_seconds == 600
             assert data.created_at is not None
 
-    @pytest.mark.asyncio
     async def test_unique_constraint_endpoint(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
@@ -429,7 +425,6 @@ class TestDeploymentAutoScalingPolicyRow:
             # Rollback to clean up the session state after the expected error
             await db_sess.rollback()
 
-    @pytest.mark.asyncio
     async def test_nullable_thresholds(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,

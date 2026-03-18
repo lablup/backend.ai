@@ -233,21 +233,23 @@ class ProgressBarWithSpinner(tqdm):  # type: ignore[type-arg]
 
     @staticmethod
     def alt_format_meter(
-        _n: int | float,
-        _total: int | float | None,
-        _elapsed: float,
-        _ncols: int | None = None,
+        n: int | float,
+        total: int | float | None,
+        elapsed: float,
+        ncols: int | None = None,
         prefix: str = "",
-        _ascii: bool = False,
-        _unit: str = "it",
-        _unit_scale: bool = False,
-        _rate: float | None = None,
-        _bar_format: str | None = None,
+        ascii: bool = False,
+        unit: str = "it",
+        unit_scale: bool = False,
+        rate: float | None = None,
+        bar_format: str | None = None,
         postfix: str | None = None,
-        *_args: Any,
-        **_kwargs: Any,
+        *args: Any,
+        **kwargs: Any,
     ) -> str:
         # Return the prefix string only.
+        # Suppress unused variable warnings (params required for tqdm compatibility)
+        _ = n, total, elapsed, ncols, ascii, unit, unit_scale, rate, bar_format, args, kwargs
         return str(prefix) + str(postfix)
 
     def __init__(

@@ -9,7 +9,7 @@ from decimal import Decimal
 
 import pytest
 
-from ai.backend.common.types import ResourceSlot
+from ai.backend.common.types import ResourceSlot, SlotQuantity
 from ai.backend.manager.data.agent.types import AgentStatus
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.kernel.types import KernelStatus
@@ -27,6 +27,7 @@ from ai.backend.manager.models.resource_policy import (
     ProjectResourcePolicyRow,
     UserResourcePolicyRow,
 )
+from ai.backend.manager.models.resource_slot import AgentResourceRow, ResourceSlotTypeRow
 from ai.backend.manager.models.scaling_group import (
     ScalingGroupOpts,
     ScalingGroupRow,
@@ -36,6 +37,11 @@ from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.scaling_group.db_source import ScalingGroupDBSource
 from ai.backend.testutils.db import with_tables
+
+
+def _quantities_to_resource_slot(quantities: list[SlotQuantity]) -> ResourceSlot:
+    """Convert list[SlotQuantity] to ResourceSlot for comparison."""
+    return ResourceSlot({sq.slot_name: sq.quantity for sq in quantities})
 
 
 def _create_kernel(
@@ -74,6 +80,26 @@ def _create_kernel(
     )
 
 
+def _create_agent_resource_rows(
+    agent_id: str,
+    slots: ResourceSlot,
+    used: ResourceSlot | None = None,
+) -> list[AgentResourceRow]:
+    """Create AgentResourceRow entries for each slot in the ResourceSlot."""
+    rows = []
+    for slot_name, capacity_val in slots.items():
+        used_val = Decimal(str(used.get(slot_name, 0))) if used else Decimal(0)
+        rows.append(
+            AgentResourceRow(
+                agent_id=agent_id,
+                slot_name=slot_name,
+                capacity=Decimal(str(capacity_val)),
+                used=used_val,
+            )
+        )
+    return rows
+
+
 class TestResourceInfo:
     """Tests for get_resource_info method in ScalingGroupDBSource."""
 
@@ -99,8 +125,16 @@ class TestResourceInfo:
                 SessionRow,
                 AgentRow,
                 KernelRow,
+                ResourceSlotTypeRow,
+                AgentResourceRow,
             ],
         ):
+            # Seed default resource slot types (FK target for agent_resources)
+            async with database_connection.begin_session() as db_sess:
+                for slot_name, slot_type in [("cpu", "count"), ("mem", "bytes")]:
+                    db_sess.add(
+                        ResourceSlotTypeRow(slot_name=slot_name, slot_type=slot_type, rank=0)
+                    )
             yield database_connection
 
     @pytest.fixture
@@ -109,7 +143,9 @@ class TestResourceInfo:
         db_with_cleanup: ExtendedAsyncSAEngine,
     ) -> ScalingGroupDBSource:
         """Create ScalingGroupDBSource instance."""
-        return ScalingGroupDBSource(db=db_with_cleanup)
+        return ScalingGroupDBSource(
+            db=db_with_cleanup,
+        )
 
     @pytest.fixture
     async def base_scaling_group(
@@ -154,8 +190,9 @@ class TestResourceInfo:
 
         async with db_with_cleanup.begin_session() as db_sess:
             for i, slots in enumerate(agent_slots):
+                agent_id = f"agent-alive-sched-{i}-{uuid.uuid4().hex[:8]}"
                 agent = AgentRow(
-                    id=f"agent-alive-sched-{i}-{uuid.uuid4().hex[:8]}",
+                    id=agent_id,
                     status=AgentStatus.ALIVE,
                     scaling_group=base_scaling_group,
                     schedulable=True,
@@ -170,6 +207,9 @@ class TestResourceInfo:
                     compute_plugins={},
                 )
                 db_sess.add(agent)
+                await db_sess.flush()
+                for ar in _create_agent_resource_rows(agent_id, slots):
+                    db_sess.add(ar)
 
         yield base_scaling_group, agent_slots
 
@@ -192,9 +232,10 @@ class TestResourceInfo:
 
         async with db_with_cleanup.begin_session() as db_sess:
             # ALIVE agent - should be counted
+            alive_id = f"agent-alive-{uuid.uuid4().hex[:8]}"
             db_sess.add(
                 AgentRow(
-                    id=f"agent-alive-{uuid.uuid4().hex[:8]}",
+                    id=alive_id,
                     status=AgentStatus.ALIVE,
                     scaling_group=base_scaling_group,
                     schedulable=True,
@@ -211,9 +252,10 @@ class TestResourceInfo:
             )
 
             # LOST agent - should NOT be counted
+            lost_id = f"agent-lost-{uuid.uuid4().hex[:8]}"
             db_sess.add(
                 AgentRow(
-                    id=f"agent-lost-{uuid.uuid4().hex[:8]}",
+                    id=lost_id,
                     status=AgentStatus.LOST,
                     scaling_group=base_scaling_group,
                     schedulable=True,
@@ -230,9 +272,10 @@ class TestResourceInfo:
             )
 
             # TERMINATED agent - should NOT be counted
+            terminated_id = f"agent-terminated-{uuid.uuid4().hex[:8]}"
             db_sess.add(
                 AgentRow(
-                    id=f"agent-terminated-{uuid.uuid4().hex[:8]}",
+                    id=terminated_id,
                     status=AgentStatus.TERMINATED,
                     scaling_group=base_scaling_group,
                     schedulable=True,
@@ -247,6 +290,16 @@ class TestResourceInfo:
                     compute_plugins={},
                 )
             )
+            await db_sess.flush()
+
+            # Add agent_resources for all agents
+            for aid, slots in [
+                (alive_id, alive_slots),
+                (lost_id, lost_slots),
+                (terminated_id, terminated_slots),
+            ]:
+                for ar in _create_agent_resource_rows(aid, slots):
+                    db_sess.add(ar)
 
         yield base_scaling_group, alive_slots
 
@@ -268,9 +321,10 @@ class TestResourceInfo:
 
         async with db_with_cleanup.begin_session() as db_sess:
             # Schedulable agent - should be counted
+            sched_id = f"agent-sched-{uuid.uuid4().hex[:8]}"
             db_sess.add(
                 AgentRow(
-                    id=f"agent-sched-{uuid.uuid4().hex[:8]}",
+                    id=sched_id,
                     status=AgentStatus.ALIVE,
                     scaling_group=base_scaling_group,
                     schedulable=True,
@@ -286,10 +340,11 @@ class TestResourceInfo:
                 )
             )
 
-            # Non-schedulable agent - should NOT be counted
+            # Non-schedulable agent - should NOT be counted for capacity
+            non_sched_id = f"agent-non-sched-{uuid.uuid4().hex[:8]}"
             db_sess.add(
                 AgentRow(
-                    id=f"agent-non-sched-{uuid.uuid4().hex[:8]}",
+                    id=non_sched_id,
                     status=AgentStatus.ALIVE,
                     scaling_group=base_scaling_group,
                     schedulable=False,
@@ -304,6 +359,15 @@ class TestResourceInfo:
                     compute_plugins={},
                 )
             )
+            await db_sess.flush()
+
+            # Add agent_resources for both agents
+            for aid, slots in [
+                (sched_id, schedulable_slots),
+                (non_sched_id, non_schedulable_slots),
+            ]:
+                for ar in _create_agent_resource_rows(aid, slots):
+                    db_sess.add(ar)
 
         yield base_scaling_group, schedulable_slots
 
@@ -406,6 +470,7 @@ class TestResourceInfo:
             ResourceSlot({"cpu": Decimal("2"), "mem": Decimal("4294967296")}),
             ResourceSlot({"cpu": Decimal("4"), "mem": Decimal("8589934592")}),
         ]
+        total_used = kernel_slots[0] + kernel_slots[1]
 
         async with db_with_cleanup.begin_session() as db_sess:
             # Create agent
@@ -428,6 +493,10 @@ class TestResourceInfo:
                 )
             )
             await db_sess.flush()
+
+            # Add agent_resources with used = sum of kernel occupied slots
+            for ar in _create_agent_resource_rows(agent_id, agent_capacity, used=total_used):
+                db_sess.add(ar)
 
             # Create session and kernels
             session_id = SessionId(uuid.uuid4())
@@ -487,10 +556,10 @@ class TestResourceInfo:
     ) -> AsyncGenerator[tuple[str, ResourceSlot, ResourceSlot], None]:
         """Create scaling group with kernels in various statuses.
 
-        Only RUNNING and TERMINATING kernels should be counted for used.
+        Used is now sourced from agent_resources.used (not from kernel occupied_slots).
 
         Returns:
-            Tuple of (scaling_group_name, agent_capacity, expected_used from RUNNING/TERMINATING only)
+            Tuple of (scaling_group_name, agent_capacity, expected_used)
         """
         user_uuid, domain_name, group_id = test_user_domain_group
 
@@ -499,6 +568,9 @@ class TestResourceInfo:
         terminating_slots = ResourceSlot({"cpu": Decimal("4"), "mem": Decimal("8589934592")})
         terminated_slots = ResourceSlot({"cpu": Decimal("8"), "mem": Decimal("17179869184")})
         pending_slots = ResourceSlot({"cpu": Decimal("1"), "mem": Decimal("2147483648")})
+
+        # Only RUNNING + TERMINATING count as used in agent_resources
+        expected_used = running_slots + terminating_slots
 
         async with db_with_cleanup.begin_session() as db_sess:
             # Create agent
@@ -521,6 +593,10 @@ class TestResourceInfo:
                 )
             )
             await db_sess.flush()
+
+            # Add agent_resources with used = only RUNNING + TERMINATING
+            for ar in _create_agent_resource_rows(agent_id, agent_capacity, used=expected_used):
+                db_sess.add(ar)
 
             # Create session
             session_id = SessionId(uuid.uuid4())
@@ -601,7 +677,6 @@ class TestResourceInfo:
                 )
             )
 
-        expected_used = running_slots + terminating_slots
         yield base_scaling_group, agent_capacity, expected_used
 
     # =========================
@@ -613,13 +688,13 @@ class TestResourceInfo:
         db_source: ScalingGroupDBSource,
         scaling_group_with_alive_schedulable_agents: tuple[str, list[ResourceSlot]],
     ) -> None:
-        """Capacity should sum available_slots from ALIVE, schedulable agents."""
+        """Capacity should sum capacity from agent_resources for ALIVE, schedulable agents."""
         scaling_group, agent_slots = scaling_group_with_alive_schedulable_agents
 
         result = await db_source.get_resource_info(scaling_group)
 
         expected_capacity = agent_slots[0] + agent_slots[1]
-        assert result.capacity == expected_capacity
+        assert _quantities_to_resource_slot(result.capacity) == expected_capacity
 
     async def test_excludes_not_alive_agents(
         self,
@@ -631,7 +706,7 @@ class TestResourceInfo:
 
         result = await db_source.get_resource_info(scaling_group)
 
-        assert result.capacity == expected_capacity
+        assert _quantities_to_resource_slot(result.capacity) == expected_capacity
 
     async def test_excludes_non_schedulable_agents(
         self,
@@ -643,32 +718,32 @@ class TestResourceInfo:
 
         result = await db_source.get_resource_info(scaling_group)
 
-        assert result.capacity == expected_capacity
+        assert _quantities_to_resource_slot(result.capacity) == expected_capacity
 
-    async def test_used_sums_occupied_slots_from_running_terminating_kernels(
+    async def test_used_sums_from_agent_resources(
         self,
         db_source: ScalingGroupDBSource,
         scaling_group_with_running_kernels: tuple[str, ResourceSlot, list[ResourceSlot]],
     ) -> None:
-        """Used should sum occupied_slots from RUNNING/TERMINATING kernels."""
+        """Used should sum agent_resources.used from ALIVE agents."""
         scaling_group, _, kernel_slots = scaling_group_with_running_kernels
 
         result = await db_source.get_resource_info(scaling_group)
 
         expected_used = kernel_slots[0] + kernel_slots[1]
-        assert result.used == expected_used
+        assert _quantities_to_resource_slot(result.used) == expected_used
 
-    async def test_used_excludes_non_resource_occupied_kernels(
+    async def test_used_reflects_agent_resources(
         self,
         db_source: ScalingGroupDBSource,
         scaling_group_with_mixed_kernel_statuses: tuple[str, ResourceSlot, ResourceSlot],
     ) -> None:
-        """Used should only count kernels in resource_occupied_statuses (RUNNING, TERMINATING)."""
+        """Used should reflect agent_resources.used values."""
         scaling_group, _, expected_used = scaling_group_with_mixed_kernel_statuses
 
         result = await db_source.get_resource_info(scaling_group)
 
-        assert result.used == expected_used
+        assert _quantities_to_resource_slot(result.used) == expected_used
 
     async def test_free_equals_capacity_minus_used(
         self,
@@ -682,7 +757,7 @@ class TestResourceInfo:
 
         expected_used = kernel_slots[0] + kernel_slots[1]
         expected_free = agent_capacity - expected_used
-        assert result.free == expected_free
+        assert _quantities_to_resource_slot(result.free) == expected_free
 
     async def test_returns_empty_slots_when_no_agents(
         self,
@@ -692,9 +767,9 @@ class TestResourceInfo:
         """Should return empty ResourceSlots when no agents exist."""
         result = await db_source.get_resource_info(base_scaling_group)
 
-        assert result.capacity == ResourceSlot()
-        assert result.used == ResourceSlot()
-        assert result.free == ResourceSlot()
+        assert _quantities_to_resource_slot(result.capacity) == ResourceSlot()
+        assert _quantities_to_resource_slot(result.used) == ResourceSlot()
+        assert _quantities_to_resource_slot(result.free) == ResourceSlot()
 
     async def test_raises_error_for_nonexistent_scaling_group(
         self,

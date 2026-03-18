@@ -109,8 +109,10 @@ class FairShareRepository:
     ) -> DomainFairShareData:
         """Get a domain fair share record by scaling group and domain name.
 
+        Returns default values if the domain exists but has no fair share record.
+
         Raises:
-            FairShareNotFoundError: If the domain fair share is not found.
+            DomainNotFound: If the domain does not exist.
         """
         return await self._db_source.get_domain_fair_share(resource_group, domain_name)
 
@@ -123,24 +125,23 @@ class FairShareRepository:
         return await self._db_source.search_domain_fair_shares(querier)
 
     @fair_share_repository_resilience.apply()
-    async def search_domain_fair_share_entities(
+    async def search_rg_domain_fair_shares(
         self,
         scope: DomainFairShareSearchScope,
         querier: BatchQuerier,
     ) -> DomainFairShareEntitySearchResult:
-        """Search domain entities with their fair share records.
+        """Search domain fair shares within a resource group.
 
-        Returns all domains associated with a resource group,
-        regardless of whether they have fair share records.
+        Returns all domains associated with a resource group with complete fair share data.
 
         Args:
             scope: Required scope with resource_group.
             querier: Pagination, conditions, and orders for the query.
 
         Returns:
-            DomainFairShareEntitySearchResult with domain entities and their optional details.
+            DomainFairShareEntitySearchResult with domain entities and their complete details.
         """
-        return await self._db_source.search_domain_fair_share_entities(scope, querier)
+        return await self._db_source.search_rg_domain_fair_shares(scope, querier)
 
     # ==================== Project Fair Share ====================
 
@@ -168,8 +169,10 @@ class FairShareRepository:
     ) -> ProjectFairShareData:
         """Get a project fair share record by scaling group and project ID.
 
+        Returns default values if the project exists but has no fair share record.
+
         Raises:
-            FairShareNotFoundError: If the project fair share is not found.
+            ProjectNotFound: If the project does not exist.
         """
         return await self._db_source.get_project_fair_share(resource_group, project_id)
 
@@ -182,24 +185,23 @@ class FairShareRepository:
         return await self._db_source.search_project_fair_shares(querier)
 
     @fair_share_repository_resilience.apply()
-    async def search_project_fair_share_entities(
+    async def search_rg_project_fair_shares(
         self,
         scope: ProjectFairShareSearchScope,
         querier: BatchQuerier,
     ) -> ProjectFairShareEntitySearchResult:
-        """Search project entities with their fair share records.
+        """Search project fair shares within a resource group.
 
-        Returns all projects associated with a resource group,
-        regardless of whether they have fair share records.
+        Returns all projects associated with a resource group with complete fair share data.
 
         Args:
             scope: Required scope with resource_group.
             querier: Pagination, conditions, and orders for the query.
 
         Returns:
-            ProjectFairShareEntitySearchResult with project entities and their optional details.
+            ProjectFairShareEntitySearchResult with project entities and their complete details.
         """
-        return await self._db_source.search_project_fair_share_entities(scope, querier)
+        return await self._db_source.search_rg_project_fair_shares(scope, querier)
 
     # ==================== User Fair Share ====================
 
@@ -254,8 +256,10 @@ class FairShareRepository:
     ) -> UserFairShareData:
         """Get a user fair share record by scaling group, project ID, and user UUID.
 
+        Returns default values if the user exists in the project but has no fair share record.
+
         Raises:
-            FairShareNotFoundError: If the user fair share is not found.
+            UserNotFound: If the user does not exist in the project.
         """
         return await self._db_source.get_user_fair_share(resource_group, project_id, user_uuid)
 
@@ -268,24 +272,24 @@ class FairShareRepository:
         return await self._db_source.search_user_fair_shares(querier)
 
     @fair_share_repository_resilience.apply()
-    async def search_user_fair_share_entities(
+    async def search_rg_user_fair_shares(
         self,
         scope: UserFairShareSearchScope,
         querier: BatchQuerier,
     ) -> UserFairShareEntitySearchResult:
-        """Search user entities with their fair share records.
+        """Search user fair shares within a resource group.
 
-        Returns all users associated with a resource group (via project membership),
-        regardless of whether they have fair share records.
+        Returns all users associated with a resource group (via project membership)
+        with complete fair share data.
 
         Args:
             scope: Required scope with resource_group.
             querier: Pagination, conditions, and orders for the query.
 
         Returns:
-            UserFairShareEntitySearchResult with user entities and their optional details.
+            UserFairShareEntitySearchResult with user entities and their complete details.
         """
-        return await self._db_source.search_user_fair_share_entities(scope, querier)
+        return await self._db_source.search_rg_user_fair_shares(scope, querier)
 
     # ==================== Entity Info & Spec ====================
 

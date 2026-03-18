@@ -27,6 +27,7 @@ def _get_agent_pagination_spec() -> PaginationSpec:
         backward_order=AgentRow.id.desc(),
         forward_condition_factory=AgentConditions.by_cursor_forward,
         backward_condition_factory=AgentConditions.by_cursor_backward,
+        tiebreaker_order=AgentRow.id.asc(),
     )
 
 

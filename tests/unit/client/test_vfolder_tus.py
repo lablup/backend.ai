@@ -38,7 +38,6 @@ def api_version() -> Iterator[None]:
         yield
 
 
-@pytest.mark.asyncio
 async def test_upload_jwt_generation(tmp_path: Path) -> None:
     with aioresponses() as m:
         async with AsyncSession() as session:
@@ -77,7 +76,6 @@ async def test_upload_jwt_generation(tmp_path: Path) -> None:
                 assert "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9" in res["token"]
 
 
-@pytest.mark.asyncio
 async def test_tus_upload(tmp_path: Path) -> None:
     basedir = tmp_path / "example.bin"
     mock_file = basedir
@@ -142,7 +140,6 @@ async def test_tus_upload(tmp_path: Path) -> None:
         assert res is None
 
 
-@pytest.mark.asyncio
 async def test_vfolder_download(mocker: object) -> None:
     mock_reader = AsyncMock()
     mock_reader.next = AsyncMock()

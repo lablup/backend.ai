@@ -5,51 +5,80 @@ This module provides ImageV2 types as part of the Strawberry GraphQL migration (
 See BEP-1038 for detailed specifications.
 """
 
-from .fetcher import fetch_image, fetch_images
-from .resolver import image_v2, images_v2
+from .fetcher import fetch_image, fetch_image_alias, fetch_image_aliases, fetch_images
+from .resolver import (
+    admin_image_aliases,
+    admin_images_v2,
+    container_registry_images_v2,
+    image_alias,
+    image_scoped_aliases,
+    image_v2,
+)
 from .types import (
-    ImageConnectionV2GQL,
-    ImageEdgeGQL,
-    ImageFilterGQL,
-    ImageIdentityInfoGQL,
-    ImageLabelEntryGQL,
-    ImageMetadataInfoGQL,
-    ImageOrderByGQL,
-    ImageOrderFieldGQL,
-    ImagePermissionGQL,
-    ImagePermissionInfoGQL,
-    ImageRequirementsInfoGQL,
-    ImageResourceLimitGQL,
-    ImageStatusGQL,
-    ImageTagEntryGQL,
+    ContainerRegistryScopeGQL,
+    ImageV2AliasConnectionGQL,
+    ImageV2AliasEdgeGQL,
+    ImageV2AliasFilterGQL,
+    ImageV2AliasGQL,
+    ImageV2AliasOrderByGQL,
+    ImageV2AliasOrderFieldGQL,
+    ImageV2ConnectionGQL,
+    ImageV2EdgeGQL,
+    ImageV2FilterGQL,
     ImageV2GQL,
+    ImageV2IdentityInfoGQL,
+    ImageV2LabelEntryGQL,
+    ImageV2MetadataInfoGQL,
+    ImageV2OrderByGQL,
+    ImageV2OrderFieldGQL,
+    ImageV2PermissionGQL,
+    ImageV2PermissionInfoGQL,
+    ImageV2RequirementsInfoGQL,
+    ImageV2ResourceLimitGQL,
+    ImageV2ScopeGQL,
+    ImageV2StatusGQL,
+    ImageV2TagEntryGQL,
 )
 
 __all__ = [
     # Enums
-    "ImageStatusGQL",
-    "ImagePermissionGQL",
-    "ImageOrderFieldGQL",
+    "ImageV2StatusGQL",
+    "ImageV2PermissionGQL",
+    "ImageV2OrderFieldGQL",
+    "ImageV2AliasOrderFieldGQL",
     # Sub-Info Types
-    "ImageTagEntryGQL",
-    "ImageLabelEntryGQL",
-    "ImageResourceLimitGQL",
+    "ImageV2TagEntryGQL",
+    "ImageV2LabelEntryGQL",
+    "ImageV2ResourceLimitGQL",
     # Info Types
-    "ImageIdentityInfoGQL",
-    "ImageMetadataInfoGQL",
-    "ImageRequirementsInfoGQL",
-    "ImagePermissionInfoGQL",
+    "ImageV2IdentityInfoGQL",
+    "ImageV2MetadataInfoGQL",
+    "ImageV2RequirementsInfoGQL",
+    "ImageV2PermissionInfoGQL",
     # Main Types
     "ImageV2GQL",
-    "ImageEdgeGQL",
-    "ImageConnectionV2GQL",
-    # Filter and OrderBy Types
-    "ImageFilterGQL",
-    "ImageOrderByGQL",
+    "ImageV2EdgeGQL",
+    "ImageV2ConnectionGQL",
+    "ImageV2AliasGQL",
+    "ImageV2AliasEdgeGQL",
+    "ImageV2AliasConnectionGQL",
+    # Filter, OrderBy, and Scope Types
+    "ImageV2FilterGQL",
+    "ImageV2OrderByGQL",
+    "ImageV2AliasFilterGQL",
+    "ImageV2AliasOrderByGQL",
+    "ContainerRegistryScopeGQL",
+    "ImageV2ScopeGQL",
     # Fetcher functions
     "fetch_images",
     "fetch_image",
+    "fetch_image_alias",
+    "fetch_image_aliases",
     # Resolver fields
-    "images_v2",
+    "admin_images_v2",
     "image_v2",
+    "container_registry_images_v2",
+    "image_alias",
+    "image_scoped_aliases",
+    "admin_image_aliases",
 ]

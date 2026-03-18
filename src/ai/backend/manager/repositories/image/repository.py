@@ -1,6 +1,10 @@
-from collections.abc import Mapping
+from __future__ import annotations
+
+from collections.abc import Mapping, Sequence
+from datetime import datetime
 from uuid import UUID
 
+from ai.backend.common.bgtask.reporter import ProgressReporter
 from ai.backend.common.clients.valkey_client.valkey_image.client import ValkeyImageClient
 from ai.backend.common.docker import ImageRef
 from ai.backend.common.exception import BackendAIError
@@ -13,6 +17,7 @@ from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.image.types import (
     ImageAgentInstallStatus,
     ImageAliasData,
+    ImageAliasListResult,
     ImageData,
     ImageDataWithDetails,
     ImageListResult,
@@ -314,3 +319,42 @@ class ImageRepository:
         Returns ImageListResult with items and pagination info.
         """
         return await self._db_source.search_images(querier)
+
+    @image_repository_resilience.apply()
+    async def search_aliases(self, querier: BatchQuerier) -> ImageAliasListResult:
+        """
+        Search image aliases using a batch querier with conditions, pagination, and ordering.
+        Returns ImageAliasListResult with items and pagination info.
+        """
+        return await self._db_source.search_aliases(querier)
+
+    @image_repository_resilience.apply()
+    async def rescan_images(
+        self,
+        registry_or_image: str | None = None,
+        project: str | None = None,
+        *,
+        reporter: ProgressReporter | None = None,
+    ) -> RescanImagesResult:
+        """
+        Rescan container registries and update images table.
+
+        If registry name is provided for `registry_or_image`, scans all images in the specified registry.
+        If image canonical name is provided for `registry_or_image`, only scan the image.
+        If the `registry_or_image` is not provided, scan all configured registries.
+
+        If `project` is provided, only scan the registries associated with the project.
+        """
+        return await self._db_source.rescan_images(
+            registry_or_image,
+            project,
+            reporter=reporter,
+        )
+
+    @image_repository_resilience.apply()
+    async def load_image_last_used(
+        self,
+        image_ids: Sequence[ImageID],
+    ) -> Mapping[ImageID, datetime]:
+        """Load last used timestamps for images by querying the kernels table."""
+        return await self._db_source.load_image_last_used(image_ids)

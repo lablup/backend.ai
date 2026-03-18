@@ -270,3 +270,17 @@ class ArtifactVerificationFailedError(BackendAIError, web.HTTPBadRequest):
             operation=ErrorOperation.ACCESS,
             error_detail=ErrorDetail.MISMATCH,
         )
+
+
+class UnsupportedFileTypeError(BackendAIError, web.HTTPBadRequest):
+    """Raised when an unsupported file type is encountered."""
+
+    error_type = "https://api.backend.ai/probs/storage/unsupported-file-type"
+    error_title = "Unsupported File Type"
+
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.VFS_STORAGE,
+            operation=ErrorOperation.READ,
+            error_detail=ErrorDetail.INVALID_PARAMETERS,
+        )

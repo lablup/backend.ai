@@ -3,6 +3,7 @@ from __future__ import annotations
 import logging
 import uuid
 from collections.abc import Mapping, Sequence
+from decimal import Decimal
 from typing import (
     TYPE_CHECKING,
     Any,
@@ -15,7 +16,6 @@ import sqlalchemy as sa
 from dateutil.parser import parse as dtparse
 from graphene.types.datetime import DateTime as GQLDateTime
 from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
-from sqlalchemy.orm import contains_eager
 
 from ai.backend.common.types import (
     AccessKey,
@@ -35,7 +35,6 @@ from ai.backend.manager.models.agent import (
     get_permission_ctx,
 )
 from ai.backend.manager.models.group import AssocGroupUserRow
-from ai.backend.manager.models.kernel import KernelRow
 from ai.backend.manager.models.keypair import keypairs
 from ai.backend.manager.models.minilang import FieldSpecItem, OrderSpecItem
 from ai.backend.manager.models.minilang.ordering import QueryOrderParser
@@ -108,10 +107,18 @@ _queryorder_colmap: Mapping[str, OrderSpecItem] = {
 }
 
 
+def _strip_gpu_prefix(alloc_map: dict[str, Decimal]) -> dict[str, Decimal]:
+    return {k.removeprefix("GPU-"): v for k, v in alloc_map.items()}
+
+
+def _decimal_to_float(alloc_map: dict[str, Decimal]) -> dict[str, float]:
+    return {k: float(v) for k, v in alloc_map.items()}
+
+
 async def _resolve_gpu_alloc_map(ctx: GraphQueryContext, agent_id: AgentId) -> dict[str, float]:
     raw_alloc_map = await ctx.valkey_stat.get_gpu_allocation_map(str(agent_id))
     if raw_alloc_map:
-        return UUIDFloatMap.parse_value({k: float(v) for k, v in raw_alloc_map.items()})
+        return UUIDFloatMap.parse_value(_decimal_to_float(_strip_gpu_prefix(raw_alloc_map)))
     return {}
 
 
@@ -552,7 +559,7 @@ class Agent(graphene.ObjectType):  # type: ignore[misc]
     ) -> Sequence[Agent]:
         conditions = []
         if scaling_group is not None:
-            conditions.append(QueryConditions.by_scaling_group(scaling_group))
+            conditions.append(QueryConditions.by_resource_group(scaling_group))
         if raw_status is not None:
             conditions.append(QueryConditions.by_statuses([AgentStatus[raw_status]]))
 
@@ -735,19 +742,8 @@ class AgentSummary(graphene.ObjectType):  # type: ignore[misc]
     ) -> Sequence[Self | None]:
         query = (
             sa.select(AgentRow)
-            .select_from(
-                sa.join(
-                    AgentRow,
-                    KernelRow,
-                    sa.and_(
-                        AgentRow.id == KernelRow.agent,
-                        KernelRow.status.in_(KernelStatus.resource_occupied_statuses()),
-                    ),
-                    isouter=True,
-                )
-            )
             .where(AgentRow.id.in_(agent_ids))
-            .options(contains_eager(AgentRow.kernels))
+            .options(sa.orm.selectinload(AgentRow.agent_resource_rows))
             .order_by(
                 AgentRow.id,
             )

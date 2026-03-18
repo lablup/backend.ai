@@ -4,7 +4,6 @@ from collections.abc import Awaitable, Callable
 from http import HTTPStatus
 from typing import Any, Self
 
-import pytest
 from aiohttp import web
 from pydantic import Field
 
@@ -35,7 +34,6 @@ class TestEmptyHandler:
         )
 
 
-@pytest.mark.asyncio
 async def test_empty_parameter_handler_in_class(aiohttp_client: Any) -> None:
     handler = TestEmptyHandler()
     app = web.Application()
@@ -94,7 +92,6 @@ class CombinedParamsHandler:
         )
 
 
-@pytest.mark.asyncio
 async def test_combined_parameters_handler_in_class(aiohttp_client: Any) -> None:
     handler = CombinedParamsHandler()
     app = web.Application()
@@ -132,7 +129,6 @@ class TestMessageHandler:
         )
 
 
-@pytest.mark.asyncio
 async def test_empty_parameter(aiohttp_client: Any) -> None:
     handler = TestMessageHandler()
     app = web.Application()
@@ -166,7 +162,6 @@ class TestPostUserHandler:
         )
 
 
-@pytest.mark.asyncio
 async def test_body_parameter(aiohttp_client: Any) -> None:
     handler = TestPostUserHandler()
     app = web.Application()
@@ -204,7 +199,6 @@ class TestSearchQueryHandler:
         )
 
 
-@pytest.mark.asyncio
 async def test_query_parameter(aiohttp_client: Any) -> None:
     handler = TestSearchQueryHandler()
     app = web.Application()
@@ -237,7 +231,6 @@ class TestAuthHeaderHandler:
         )
 
 
-@pytest.mark.asyncio
 async def test_header_parameter(aiohttp_client: Any) -> None:
     handler = TestAuthHeaderHandler()
     app = web.Application()
@@ -270,7 +263,6 @@ class TestUserPathHandler:
         )
 
 
-@pytest.mark.asyncio
 async def test_path_parameter(aiohttp_client: Any) -> None:
     handler = TestUserPathHandler()
     app = web.Application()
@@ -305,7 +297,6 @@ class TestAuthHandler:
         )
 
 
-@pytest.mark.asyncio
 async def test_middleware_parameter(aiohttp_client: Any) -> None:
     handler = TestAuthHandler()
 
@@ -337,7 +328,6 @@ class TestInvalidAuthHandler:
         )
 
 
-@pytest.mark.asyncio
 async def test_middleware_parameter_invalid_type(aiohttp_client: Any) -> None:
     handler = TestInvalidAuthHandler()
 
@@ -404,7 +394,6 @@ class TestMultipleParamsHandler:
         )
 
 
-@pytest.mark.asyncio
 async def test_multiple_parameters(aiohttp_client: Any) -> None:
     handler = TestMultipleParamsHandler()
 
@@ -450,7 +439,6 @@ class TestRegisterUserHandler:
         )
 
 
-@pytest.mark.asyncio
 async def test_invalid_body(aiohttp_client: Any) -> None:
     handler = TestRegisterUserHandler()
     app = web.Application()
@@ -484,7 +472,6 @@ class TestProductSearchHandler:
         )
 
 
-@pytest.mark.asyncio
 async def test_invalid_query_parameter(aiohttp_client: Any) -> None:
     handler = TestProductSearchHandler()
     app = web.Application()

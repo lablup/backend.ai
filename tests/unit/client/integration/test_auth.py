@@ -60,7 +60,6 @@ def test_auth_missing_body() -> None:
         assert e.value.status == 400
 
 
-@pytest.mark.asyncio
 async def test_async_auth() -> None:
     random_msg = uuid.uuid4().hex
     async with AsyncSession():

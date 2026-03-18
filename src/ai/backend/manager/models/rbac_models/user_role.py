@@ -70,6 +70,7 @@ class UserRoleRow(Base):  # type: ignore[misc]
 
     def to_data(self) -> UserRoleAssignmentData:
         return UserRoleAssignmentData(
+            id=self.id,
             user_id=self.user_id,
             role_id=self.role_id,
             granted_by=self.granted_by,

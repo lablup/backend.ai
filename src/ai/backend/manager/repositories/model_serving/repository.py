@@ -3,6 +3,7 @@ import uuid
 from typing import Any, cast
 
 import sqlalchemy as sa
+from pydantic import HttpUrl
 from sqlalchemy.exc import IntegrityError, NoResultFound, StatementError
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
 from sqlalchemy.orm import selectinload
@@ -10,7 +11,7 @@ from sqlalchemy.orm import selectinload
 from ai.backend.common.clients.valkey_client.valkey_live.client import ValkeyLiveClient
 from ai.backend.common.contexts.user import current_user
 from ai.backend.common.docker import ImageRef
-from ai.backend.common.exception import BackendAIError
+from ai.backend.common.exception import BackendAIError, VFolderNotFound
 from ai.backend.common.metrics.metric import DomainType, LayerType
 from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPolicy
 from ai.backend.common.resilience.policies.retry import BackoffStrategy, RetryArgs, RetryPolicy
@@ -30,11 +31,16 @@ from ai.backend.manager.data.model_serving.types import (
     EndpointAutoScalingRuleListResult,
     EndpointData,
     EndpointTokenData,
+    ModelServiceValidationContext,
     MutationResult,
     RoutingData,
     ScalingGroupData,
+    ServiceSearchItem,
+    ServiceSearchResult,
     UserData,
 )
+from ai.backend.manager.data.vfolder.types import VFolderOwnershipType
+from ai.backend.manager.errors.auth import InvalidAuthParameters
 from ai.backend.manager.errors.common import ObjectNotFound
 from ai.backend.manager.errors.resource import DatabaseConnectionUnavailable
 from ai.backend.manager.errors.service import EndpointNotFound
@@ -57,7 +63,8 @@ from ai.backend.manager.models.session import KernelLoadingStrategy, SessionRow
 from ai.backend.manager.models.storage import StorageSessionManager
 from ai.backend.manager.models.user import UserRole, UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine, execute_with_retry
-from ai.backend.manager.models.vfolder import VFolderRow
+from ai.backend.manager.models.vfolder import VFolderRow, VFolderUsageMode
+from ai.backend.manager.models.vfolder.row import query_accessible_vfolders, vfolders
 from ai.backend.manager.registry import AgentRegistry
 from ai.backend.manager.repositories.base import (
     BatchQuerier,
@@ -67,6 +74,10 @@ from ai.backend.manager.repositories.base import (
     execute_creator,
     execute_updater,
 )
+from ai.backend.manager.repositories.base.rbac.entity_creator import (
+    RBACEntityCreator,
+    execute_rbac_entity_creator,
+)
 from ai.backend.manager.repositories.model_serving.updaters import EndpointUpdaterSpec
 from ai.backend.manager.services.model_serving.actions.modify_endpoint import ModifyEndpointAction
 from ai.backend.manager.services.model_serving.exceptions import (
@@ -74,6 +85,7 @@ from ai.backend.manager.services.model_serving.exceptions import (
     InvalidAPIParameters,
 )
 from ai.backend.manager.types import MountOptionModel, UserScope
+from ai.backend.manager.utils import query_userinfo
 
 model_serving_repository_resilience = Resilience(
     policies=[
@@ -104,7 +116,7 @@ class ModelServingRepository:
         Get endpoint by ID.
         Returns None if endpoint doesn't exist.
         """
-        async with self._db.begin_readonly_session() as session:
+        async with self._db.begin_readonly_session_read_committed() as session:
             endpoint = await self._get_endpoint_by_id(
                 session,
                 endpoint_id,
@@ -126,7 +138,7 @@ class ModelServingRepository:
         Get minimal endpoint data required for access validation.
         Returns None if endpoint doesn't exist.
         """
-        async with self._db.begin_readonly_session() as session:
+        async with self._db.begin_readonly_session_read_committed() as session:
             stmt = (
                 sa.select(EndpointRow)
                 .where(EndpointRow.id == endpoint_id)
@@ -153,7 +165,7 @@ class ModelServingRepository:
         Get endpoint by name with ownership validation.
         Returns None if endpoint doesn't exist or user doesn't own it.
         """
-        async with self._db.begin_readonly_session() as session:
+        async with self._db.begin_readonly_session_read_committed() as session:
             endpoint = await self._get_endpoint_by_name(session, name, user_id)
             if not endpoint:
                 return None
@@ -166,7 +178,7 @@ class ModelServingRepository:
         """
         List endpoints owned by a specific user with optional name filter.
         """
-        async with self._db.begin_readonly_session() as session:
+        async with self._db.begin_readonly_session_read_committed() as session:
             query_conds = (EndpointRow.session_owner == session_owner_id) & (
                 EndpointRow.lifecycle_stage == EndpointLifecycle.CREATED
             )
@@ -188,7 +200,7 @@ class ModelServingRepository:
         Check if endpoint name is unique (not already taken by non-destroyed endpoints).
         Returns True if name is available, False if taken.
         """
-        async with self._db.begin_readonly_session() as session:
+        async with self._db.begin_readonly_session_read_committed() as session:
             query = sa.select(EndpointRow).where(
                 (EndpointRow.lifecycle_stage != EndpointLifecycle.DESTROYED)
                 & (EndpointRow.name == name)
@@ -200,13 +212,13 @@ class ModelServingRepository:
 
     @model_serving_repository_resilience.apply()
     async def create_endpoint_validated(
-        self, creator: Creator[EndpointRow], registry: AgentRegistry
+        self, creator: RBACEntityCreator[EndpointRow], registry: AgentRegistry
     ) -> EndpointData:
         """
         Create a new endpoint after validation.
         """
         async with self._db.begin_session() as db_sess:
-            result = await execute_creator(db_sess, creator)
+            result = await execute_rbac_entity_creator(db_sess, creator)
             endpoint_row = await EndpointRow.get(
                 db_sess,
                 result.row.id,
@@ -286,7 +298,7 @@ class ModelServingRepository:
         Get route by ID.
         Returns None if route doesn't exist or doesn't belong to service.
         """
-        async with self._db.begin_readonly_session() as session:
+        async with self._db.begin_readonly_session_read_committed() as session:
             route = await self._get_route_by_id(session, route_id, load_endpoint=True)
             if not route or route.endpoint != service_id:
                 return None
@@ -372,7 +384,7 @@ class ModelServingRepository:
         """
         Get scaling group information (wsproxy details).
         """
-        async with self._db.begin_readonly_session() as session:
+        async with self._db.begin_readonly_session_read_committed() as session:
             query = (
                 sa.select(scaling_groups.c.wsproxy_addr, scaling_groups.c.wsproxy_api_token)
                 .select_from(scaling_groups)
@@ -392,7 +404,7 @@ class ModelServingRepository:
         """
         Get user information by ID.
         """
-        async with self._db.begin_readonly_session() as session:
+        async with self._db.begin_readonly_session_read_committed() as session:
             query = sa.select(UserRow).where(UserRow.uuid == user_id)
             result = await session.execute(query)
             user_row: UserRow | None = result.scalar()
@@ -484,21 +496,31 @@ class ModelServingRepository:
                 return owner.uuid == user_id
 
     @model_serving_repository_resilience.apply()
-    async def get_vfolder_by_id(self, vfolder_id: uuid.UUID) -> VFolderRow | None:
+    async def get_vfolder_ownership_type(self, vfolder_id: uuid.UUID) -> VFolderOwnershipType:
         """
-        Get VFolder by ID.
+        Get VFolder ownership type by VFolder ID.
+        Raises VFolderNotFound if vfolder not found by the given ID.
         """
-        async with self._db.begin_readonly_session() as session:
-            return await VFolderRow.get(session, vfolder_id)
+        async with self._db.begin_readonly_session_read_committed() as session:
+            stmt = sa.select(VFolderRow.ownership_type).where(VFolderRow.id == vfolder_id)
+            result = await session.execute(stmt)
+            vfolder_ownership_type = result.scalar_one_or_none()
+
+            if vfolder_ownership_type is None:
+                raise VFolderNotFound(f"VFolder with ID {vfolder_id} not found.")
+
+            return vfolder_ownership_type
 
     @model_serving_repository_resilience.apply()
     async def get_user_with_keypair(self, user_id: uuid.UUID) -> Any | None:
         """
         Get user with their main access key.
         """
-        async with self._db.begin_readonly_session() as session:
-            query = sa.select(sa.join(UserRow, KeyPairRow, KeyPairRow.user == UserRow.uuid)).where(
-                UserRow.uuid == user_id
+        async with self._db.begin_readonly_session_read_committed() as session:
+            query = (
+                sa.select(UserRow, KeyPairRow)
+                .select_from(sa.join(UserRow, KeyPairRow, KeyPairRow.user == UserRow.uuid))
+                .where(UserRow.uuid == user_id)
             )
             result = await session.execute(query)
             return result.fetchone()
@@ -508,7 +530,7 @@ class ModelServingRepository:
         """
         Get keypair resource policy by name.
         """
-        async with self._db.begin_readonly_session() as session:
+        async with self._db.begin_readonly_session_read_committed() as session:
             query = (
                 sa.select(keypair_resource_policies)
                 .select_from(keypair_resource_policies)
@@ -522,7 +544,7 @@ class ModelServingRepository:
         """
         Get endpoint with routes loaded for AppProxy updates.
         """
-        async with self._db.begin_readonly_session() as session:
+        async with self._db.begin_readonly_session_read_committed() as session:
             return await self._get_endpoint_by_id(session, service_id, load_routes=True)
 
     @model_serving_repository_resilience.apply()
@@ -530,7 +552,7 @@ class ModelServingRepository:
         """
         Get route with endpoint and session data loaded.
         """
-        async with self._db.begin_readonly_session() as session:
+        async with self._db.begin_readonly_session_read_committed() as session:
             return await self._get_route_by_id(
                 session, route_id, load_endpoint=True, load_session=True
             )
@@ -567,7 +589,7 @@ class ModelServingRepository:
         Get auto scaling rule by ID.
         Returns None if rule doesn't exist.
         """
-        async with self._db.begin_readonly_session() as session:
+        async with self._db.begin_readonly_session_read_committed() as session:
             try:
                 rule = await EndpointAutoScalingRuleRow.get(session, rule_id, load_endpoint=True)
                 if not rule:
@@ -672,7 +694,7 @@ class ModelServingRepository:
         """
         Resolve group name or ID to group ID.
         """
-        async with self._db.begin_readonly_session() as session:
+        async with self._db.begin_readonly_session_read_committed() as session:
             conn = await session.connection()
             if conn is None:
                 raise DatabaseConnectionUnavailable("Database connection is not available")
@@ -685,7 +707,7 @@ class ModelServingRepository:
         """
         Get session by ID with specified kernel loading strategy.
         """
-        async with self._db.begin_readonly_session() as session:
+        async with self._db.begin_readonly_session_read_committed() as session:
             try:
                 return await SessionRow.get_session(
                     session, session_id, None, kernel_loading_strategy=kernel_loading_strategy
@@ -702,7 +724,7 @@ class ModelServingRepository:
         This is a special case where we need the actual ImageRow object
         because EndpointRow constructor requires it.
         """
-        async with self._db.begin_readonly_session() as session:
+        async with self._db.begin_readonly_session_read_committed() as session:
             return await ImageRow.resolve(session, identifiers)
 
     @model_serving_repository_resilience.apply()
@@ -951,3 +973,179 @@ class ModelServingRepository:
                 has_next_page=result.has_next_page,
                 has_previous_page=result.has_previous_page,
             )
+
+    @model_serving_repository_resilience.apply()
+    async def search_services_paginated(
+        self,
+        session_owner_id: uuid.UUID,
+        querier: BatchQuerier,
+    ) -> ServiceSearchResult:
+        """
+        Search services with pagination.
+        Base conditions (session_owner, lifecycle_stage) are applied as security constraints.
+        Additional filter/pagination conditions come from the querier.
+        """
+        async with self._db.begin_readonly_session_read_committed() as session:
+            query = (
+                sa.select(EndpointRow)
+                .where(EndpointRow.session_owner == session_owner_id)
+                .where(EndpointRow.lifecycle_stage == EndpointLifecycle.CREATED)
+                .options(selectinload(EndpointRow.routings))
+            )
+
+            result = await execute_batch_querier(session, query, querier)
+
+            items: list[ServiceSearchItem] = []
+            for row in result.rows:
+                ep = row.EndpointRow
+                routings_data = [r.to_data() for r in ep.routings] if ep.routings else None
+                active_route_count = (
+                    len([r for r in ep.routings if r.status == RouteStatus.HEALTHY])
+                    if ep.routings
+                    else 0
+                )
+                items.append(
+                    ServiceSearchItem(
+                        id=ep.id,
+                        name=ep.name,
+                        replicas=ep.replicas,
+                        active_route_count=active_route_count,
+                        service_endpoint=HttpUrl(ep.url) if ep.url else None,
+                        open_to_public=ep.open_to_public or False,
+                        resource_slots=ep.resource_slots,
+                        resource_group=ep.resource_group,
+                        routings=routings_data,
+                    )
+                )
+
+            return ServiceSearchResult(
+                items=items,
+                total_count=result.total_count,
+                has_next_page=result.has_next_page,
+                has_previous_page=result.has_previous_page,
+            )
+
+    @model_serving_repository_resilience.apply()
+    async def resolve_model_service_validation_context(
+        self,
+        *,
+        scaling_group: str,
+        owner_access_key: AccessKey,
+        domain_name: str,
+        group_name: str,
+        requester_uuid: uuid.UUID,
+        requester_access_key: AccessKey,
+        requester_role: UserRole,
+        requester_domain: str,
+        keypair_resource_policy: dict[str, Any],
+        owner_access_key_override: AccessKey | None,
+        model: str,
+        model_mount_destination: str,
+        extra_mounts: dict[uuid.UUID, MountOptionModel],
+        legacy_etcd_loader: LegacyEtcdLoader,
+        storage_manager: StorageSessionManager,
+    ) -> ModelServiceValidationContext:
+        """Resolve all DB-dependent data needed for model service validation.
+
+        This method owns the DB transaction boundary for the full validation flow:
+        scaling group check, user info resolution, model vfolder lookup, and extra
+        mount validation.  External dependencies (``legacy_etcd_loader``,
+        ``storage_manager``) are accepted as parameters — following the same pattern
+        used by ``SchedulerRepository.prepare_vfolder_mounts``.
+        """
+        async with self._db.begin_readonly() as conn:
+            checked_scaling_group = await ModelServiceHelper.check_scaling_group(
+                conn,
+                scaling_group,
+                owner_access_key,
+                domain_name,
+                group_name,
+            )
+
+            try:
+                owner_uuid, group_id, resource_policy = await query_userinfo(
+                    conn,
+                    requester_uuid,
+                    requester_access_key,
+                    requester_role,
+                    requester_domain,
+                    keypair_resource_policy,
+                    domain_name or requester_domain,
+                    group_name,
+                    query_on_behalf_of=owner_access_key_override,
+                )
+            except ValueError as e:
+                raise InvalidAPIParameters(str(e)) from e
+
+            owner_role_query = sa.select(UserRow.role).where(UserRow.uuid == owner_uuid)
+            owner_role = (await conn.execute(owner_role_query)).scalar()
+            if not owner_role:
+                raise InvalidAuthParameters("Owner role is required to create a model service")
+
+            allowed_vfolder_types = await legacy_etcd_loader.get_vfolder_types()
+            try:
+                extra_vf_conds = vfolders.c.id == uuid.UUID(model)
+                matched_vfolders = await query_accessible_vfolders(
+                    conn,
+                    owner_uuid,
+                    user_role=owner_role,
+                    domain_name=domain_name,
+                    allowed_vfolder_types=allowed_vfolder_types,
+                    extra_vf_conds=extra_vf_conds,
+                )
+            except Exception as e:
+                if isinstance(e, (ValueError, VFolderNotFound)):
+                    try:
+                        extra_vf_conds = (vfolders.c.name == model) & (
+                            vfolders.c.usage_mode == VFolderUsageMode.MODEL
+                        )
+                        matched_vfolders = await query_accessible_vfolders(
+                            conn,
+                            owner_uuid,
+                            user_role=owner_role,
+                            domain_name=domain_name,
+                            allowed_vfolder_types=allowed_vfolder_types,
+                            extra_vf_conds=extra_vf_conds,
+                        )
+                    except VFolderNotFound as e:
+                        raise VFolderNotFound("Cannot find model folder") from e
+                else:
+                    raise
+            if len(matched_vfolders) == 0:
+                raise VFolderNotFound
+            folder_row = matched_vfolders[0]
+            if folder_row["usage_mode"] != VFolderUsageMode.MODEL:
+                raise InvalidAPIParameters("Selected VFolder is not a model folder")
+
+            model_id = folder_row["id"]
+
+            vfolder_mounts = await ModelServiceHelper.check_extra_mounts(
+                conn,
+                legacy_etcd_loader,
+                storage_manager,
+                model_id,
+                model_mount_destination,
+                extra_mounts,
+                UserScope(
+                    domain_name=domain_name,
+                    group_id=group_id,
+                    user_uuid=owner_uuid,
+                    user_role=owner_role,
+                ),
+                resource_policy,
+            )
+
+        return ModelServiceValidationContext(
+            model_id=model_id,
+            model_folder_host=folder_row["host"],
+            model_folder_quota_scope_id=folder_row["quota_scope_id"],
+            model_folder_usage_mode=str(folder_row["usage_mode"]),
+            requester_access_key=requester_access_key,
+            owner_access_key=owner_access_key,
+            owner_uuid=owner_uuid,
+            owner_role=owner_role,
+            group_id=group_id,
+            resource_policy=resource_policy,
+            scaling_group=checked_scaling_group,
+            extra_mounts=vfolder_mounts,
+        )

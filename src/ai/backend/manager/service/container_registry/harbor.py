@@ -12,10 +12,10 @@ from ai.backend.manager.clients.container_registry.harbor import (
     HarborProjectInfo,
     PerProjectHarborQuotaClient,
 )
+from ai.backend.manager.data.container_registry.types import PerProjectContainerRegistryInfo
 from ai.backend.manager.errors.common import GenericBadRequest
 from ai.backend.manager.models.rbac import ProjectScope
-from ai.backend.manager.service.container_registry.base import (
-    ContainerRegistryRowInfo,
+from ai.backend.manager.repositories.container_registry_quota.repository import (
     PerProjectRegistryQuotaRepository,
 )
 
@@ -74,7 +74,7 @@ class PerProjectContainerRegistryQuotaService(AbstractPerProjectContainerRegistr
         self._client_pool = client_pool
 
     def _registry_row_to_harbor_project_info(
-        self, registry_info: ContainerRegistryRowInfo
+        self, registry_info: PerProjectContainerRegistryInfo
     ) -> HarborProjectInfo:
         return HarborProjectInfo(
             url=registry_info.url,

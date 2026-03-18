@@ -1,9 +1,9 @@
 from __future__ import annotations
 
-from collections.abc import Mapping
+from collections.abc import Iterable, Mapping
 from datetime import datetime
 from enum import StrEnum
-from typing import Any, Self
+from typing import TYPE_CHECKING, Annotated, Any, Self
 
 import strawberry
 from strawberry import ID, Info
@@ -13,6 +13,23 @@ from strawberry.scalars import JSON
 from ai.backend.common.types import AgentId
 from ai.backend.manager.api.gql.base import OrderDirection, StringFilter
 from ai.backend.manager.api.gql.types import GQLFilter, GQLOrderBy, StrawberryGQLContext
+
+if TYPE_CHECKING:
+    from ai.backend.manager.api.gql.kernel.types import (
+        KernelV2ConnectionGQL,
+        KernelV2FilterGQL,
+        KernelV2OrderByGQL,
+    )
+    from ai.backend.manager.api.gql.resource_slot.types import (
+        AgentResourceConnectionGQL,
+        AgentResourceSlotFilterGQL,
+        AgentResourceSlotOrderByGQL,
+    )
+    from ai.backend.manager.api.gql.session.types import (
+        SessionV2ConnectionGQL,
+        SessionV2FilterGQL,
+        SessionV2OrderByGQL,
+    )
 from ai.backend.manager.api.gql.utils import dedent_strip
 from ai.backend.manager.data.agent.types import AgentDetailData, AgentStatus
 from ai.backend.manager.models.rbac.permission_defs import AgentPermission
@@ -22,6 +39,10 @@ from ai.backend.manager.repositories.base import (
     QueryOrder,
     combine_conditions_or,
     negate_conditions,
+)
+from ai.backend.manager.repositories.scheduler.options import (
+    KernelConditions,
+    SessionConditions,
 )
 
 
@@ -54,6 +75,7 @@ class AgentPermissionGQL(StrEnum):
 )
 class AgentOrderFieldGQL(StrEnum):
     ID = "id"
+    STATUS = "status"
     FIRST_CONTACT = "first_contact"
     SCALING_GROUP = "scaling_group"
     SCHEDULABLE = "schedulable"
@@ -145,6 +167,8 @@ class AgentOrderByGQL(GQLOrderBy):
         match self.field:
             case AgentOrderFieldGQL.ID:
                 return AgentOrders.id(ascending)
+            case AgentOrderFieldGQL.STATUS:
+                return AgentOrders.status(ascending)
             case AgentOrderFieldGQL.FIRST_CONTACT:
                 return AgentOrders.first_contact(ascending)
             case AgentOrderFieldGQL.SCALING_GROUP:
@@ -387,6 +411,145 @@ class AgentV2GQL(Node):
         Get the container count for a specific agent.
         """
         return await info.context.data_loaders.container_count_loader.load(self._agent_id)
+
+    @strawberry.field(  # type: ignore[misc]
+        description="Added in 26.2.0. List of kernels running on this agent with pagination support."
+    )
+    async def kernels(
+        self,
+        info: Info[StrawberryGQLContext],
+        filter: Annotated[
+            KernelV2FilterGQL, strawberry.lazy("ai.backend.manager.api.gql.kernel.types")
+        ]
+        | None = None,
+        order_by: list[
+            Annotated[
+                KernelV2OrderByGQL, strawberry.lazy("ai.backend.manager.api.gql.kernel.types")
+            ]
+        ]
+        | None = None,
+        before: str | None = None,
+        after: str | None = None,
+        first: int | None = None,
+        last: int | None = None,
+        limit: int | None = None,
+        offset: int | None = None,
+    ) -> Annotated[
+        KernelV2ConnectionGQL, strawberry.lazy("ai.backend.manager.api.gql.kernel.types")
+    ]:
+        """Fetch kernels associated with this agent."""
+        from ai.backend.manager.api.gql.kernel.fetcher import fetch_kernels
+
+        return await fetch_kernels(
+            info=info,
+            filter=filter,
+            order_by=order_by,
+            before=before,
+            after=after,
+            first=first,
+            last=last,
+            limit=limit,
+            offset=offset,
+            base_conditions=[KernelConditions.by_agent_id(self._agent_id)],
+        )
+
+    @strawberry.field(  # type: ignore[misc]
+        description="Added in 26.3.0. List of sessions running on this agent with pagination support."
+    )
+    async def sessions(
+        self,
+        info: Info[StrawberryGQLContext],
+        filter: Annotated[
+            SessionV2FilterGQL, strawberry.lazy("ai.backend.manager.api.gql.session.types")
+        ]
+        | None = None,
+        order_by: list[
+            Annotated[
+                SessionV2OrderByGQL, strawberry.lazy("ai.backend.manager.api.gql.session.types")
+            ]
+        ]
+        | None = None,
+        before: str | None = None,
+        after: str | None = None,
+        first: int | None = None,
+        last: int | None = None,
+        limit: int | None = None,
+        offset: int | None = None,
+    ) -> Annotated[
+        SessionV2ConnectionGQL, strawberry.lazy("ai.backend.manager.api.gql.session.types")
+    ]:
+        """Fetch sessions associated with this agent."""
+        from ai.backend.manager.api.gql.session.fetcher.session import fetch_sessions
+
+        return await fetch_sessions(
+            info=info,
+            filter=filter,
+            order_by=order_by,
+            before=before,
+            after=after,
+            first=first,
+            last=last,
+            limit=limit,
+            offset=offset,
+            base_conditions=[SessionConditions.by_agent_id(self._agent_id)],
+        )
+
+    @strawberry.field(  # type: ignore[misc]
+        description="Added in 26.3.0. Per-slot resource capacity and usage for this agent."
+    )
+    async def resource_slots(
+        self,
+        info: Info[StrawberryGQLContext],
+        filter: Annotated[
+            AgentResourceSlotFilterGQL,
+            strawberry.lazy("ai.backend.manager.api.gql.resource_slot.types"),
+        ]
+        | None = None,
+        order_by: list[
+            Annotated[
+                AgentResourceSlotOrderByGQL,
+                strawberry.lazy("ai.backend.manager.api.gql.resource_slot.types"),
+            ]
+        ]
+        | None = None,
+        first: int | None = None,
+        after: str | None = None,
+        last: int | None = None,
+        before: str | None = None,
+        limit: int | None = None,
+        offset: int | None = None,
+    ) -> Annotated[
+        AgentResourceConnectionGQL,
+        strawberry.lazy("ai.backend.manager.api.gql.resource_slot.types"),
+    ]:
+        """Fetch per-slot resource capacity and usage for this agent."""
+        from ai.backend.manager.api.gql.resource_slot.fetcher import fetch_agent_resources
+
+        return await fetch_agent_resources(
+            info=info,
+            agent_id=str(self._agent_id),
+            filter=filter,
+            order_by=order_by,
+            first=first,
+            after=after,
+            last=last,
+            before=before,
+            limit=limit,
+            offset=offset,
+        )
+
+    @classmethod
+    async def resolve_nodes(  # type: ignore[override]  # Strawberry Node uses AwaitableOrValue overloads incompatible with async def
+        cls,
+        *,
+        info: Info[StrawberryGQLContext],
+        node_ids: Iterable[str],
+        required: bool = False,
+    ) -> Iterable[Self | None]:
+        results = await info.context.data_loaders.agent_loader.load_many([
+            AgentId(nid) for nid in node_ids
+        ])
+        return [cls.from_agent_detail_data(data) if data is not None else None for data in results]
 
     @classmethod
     def from_agent_detail_data(cls, detail_data: AgentDetailData) -> Self:

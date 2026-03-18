@@ -31,7 +31,7 @@ from .pglock import PgAdvisoryLock
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 _max_cpu_count = os.cpu_count()
-_file_perm = (Path(__file__).parent / "server.py").stat()
+_file_perm = Path(__file__).stat()
 
 DEFAULT_CHUNK_SIZE: Final = 256 * 1024  # 256 KiB
 DEFAULT_INFLIGHT_CHUNKS: Final = 8

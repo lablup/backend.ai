@@ -1,0 +1,97 @@
+"""
+Common types for artifact DTO v2.
+"""
+
+from __future__ import annotations
+
+from datetime import datetime
+from enum import StrEnum
+from uuid import UUID
+
+from pydantic import Field
+
+from ai.backend.common.api_handlers import BaseResponseModel
+from ai.backend.common.data.artifact.types import (
+    ArtifactRegistryType,
+    CombinedDownloadProgress,
+    VerificationStepResult,
+)
+
+__all__ = (
+    "ArtifactAvailability",
+    "ArtifactOrderField",
+    "ArtifactRegistryType",
+    "ArtifactRevisionInfo",
+    "ArtifactRevisionOrderField",
+    "ArtifactStatus",
+    "ArtifactType",
+    "CombinedDownloadProgress",
+    "OrderDirection",
+    "VerificationStepResult",
+)
+
+
+class ArtifactType(StrEnum):
+    """Type of artifact."""
+
+    MODEL = "MODEL"
+    PACKAGE = "PACKAGE"
+    IMAGE = "IMAGE"
+
+
+class ArtifactStatus(StrEnum):
+    """Status of an artifact revision."""
+
+    SCANNED = "SCANNED"
+    PULLING = "PULLING"
+    PULLED = "PULLED"
+    VERIFYING = "VERIFYING"
+    NEEDS_APPROVAL = "NEEDS_APPROVAL"
+    AVAILABLE = "AVAILABLE"
+    FAILED = "FAILED"
+    REJECTED = "REJECTED"
+
+
+class ArtifactAvailability(StrEnum):
+    """Availability of an artifact."""
+
+    ALIVE = "ALIVE"
+    DELETED = "DELETED"
+
+
+class ArtifactOrderField(StrEnum):
+    """Fields available for ordering artifacts."""
+
+    NAME = "NAME"
+    TYPE = "TYPE"
+    SIZE = "SIZE"
+    SCANNED_AT = "SCANNED_AT"
+    UPDATED_AT = "UPDATED_AT"
+
+
+class ArtifactRevisionOrderField(StrEnum):
+    """Fields available for ordering artifact revisions."""
+
+    VERSION = "VERSION"
+    SIZE = "SIZE"
+    CREATED_AT = "CREATED_AT"
+    UPDATED_AT = "UPDATED_AT"
+    STATUS = "STATUS"
+
+
+class OrderDirection(StrEnum):
+    """Order direction for sorting."""
+
+    ASC = "asc"
+    DESC = "desc"
+
+
+class ArtifactRevisionInfo(BaseResponseModel):
+    """Compact revision view for embedding inside ArtifactNode."""
+
+    id: UUID = Field(description="Artifact revision ID")
+    version: str = Field(description="Revision version string")
+    size: int | None = Field(default=None, description="Revision size in bytes")
+    status: ArtifactStatus = Field(description="Revision status")
+    created_at: datetime | None = Field(default=None, description="Creation timestamp")
+    updated_at: datetime | None = Field(default=None, description="Last update timestamp")

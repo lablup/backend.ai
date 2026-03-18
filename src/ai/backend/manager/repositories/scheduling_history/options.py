@@ -1,13 +1,14 @@
 from __future__ import annotations
 
 import uuid
+from collections.abc import Collection
 from datetime import datetime
 from typing import cast
 
 import sqlalchemy as sa
 
+from ai.backend.common.data.filter_specs import StringMatchSpec, UUIDEqualMatchSpec, UUIDInMatchSpec
 from ai.backend.common.types import KernelId, SessionId
-from ai.backend.manager.api.gql.base import StringMatchSpec, UUIDEqualMatchSpec, UUIDInMatchSpec
 from ai.backend.manager.data.deployment.types import RouteStatus
 from ai.backend.manager.data.kernel.types import KernelSchedulingPhase
 from ai.backend.manager.data.session.types import SchedulingResult, SessionStatus
@@ -41,6 +42,13 @@ class SessionSchedulingHistoryConditions:
             if spec.negated:
                 return SessionSchedulingHistoryRow.id.notin_(spec.values)
             return SessionSchedulingHistoryRow.id.in_(spec.values)
+
+        return inner
+
+    @staticmethod
+    def by_ids(ids: Collection[uuid.UUID]) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return SessionSchedulingHistoryRow.id.in_(ids)
 
         return inner
 
@@ -510,6 +518,13 @@ class DeploymentHistoryConditions:
         return inner
 
     @staticmethod
+    def by_ids(ids: Collection[uuid.UUID]) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return DeploymentHistoryRow.id.in_(ids)
+
+        return inner
+
+    @staticmethod
     def by_deployment_id(deployment_id: uuid.UUID) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
             return DeploymentHistoryRow.deployment_id == deployment_id
@@ -857,6 +872,13 @@ class RouteHistoryConditions:
             if spec.negated:
                 return RouteHistoryRow.id.notin_(spec.values)
             return RouteHistoryRow.id.in_(spec.values)
+
+        return inner
+
+    @staticmethod
+    def by_ids(ids: Collection[uuid.UUID]) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return RouteHistoryRow.id.in_(ids)
 
         return inner
 

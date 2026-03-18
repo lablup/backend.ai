@@ -44,7 +44,7 @@ from ai.backend.manager.models.rbac_models.association_scopes_entities import (
 )
 from ai.backend.manager.models.rbac_models.entity_field import EntityFieldRow
 from ai.backend.manager.models.rbac_models.permission.object_permission import ObjectPermissionRow
-from ai.backend.manager.models.rbac_models.permission.permission_group import PermissionGroupRow
+from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
 from ai.backend.manager.models.rbac_models.role import RoleRow
 from ai.backend.manager.models.resource_policy import (
     KeyPairResourcePolicyRow,
@@ -131,8 +131,8 @@ class TestVfolderRepository:
                 ResourcePresetRow,
                 VFolderPermissionRow,
                 AssociationScopesEntitiesRow,
-                PermissionGroupRow,
                 ObjectPermissionRow,
+                PermissionRow,
             ],
         ):
             yield database_connection

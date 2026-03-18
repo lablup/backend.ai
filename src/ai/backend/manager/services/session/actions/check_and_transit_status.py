@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING, override
 
 from ai.backend.common.types import SessionId
 from ai.backend.manager.actions.action import BaseActionResult, BaseBatchActionResult
+from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.session.types import SessionData
 from ai.backend.manager.services.session.base import SessionAction, SessionBatchAction
 
@@ -25,8 +26,8 @@ class CheckAndTransitStatusAction(SessionAction):
 
     @override
     @classmethod
-    def operation_type(cls) -> str:
-        return "check_and_transit_status"
+    def operation_type(cls) -> ActionOperationType:
+        return ActionOperationType.UPDATE
 
 
 @dataclass
@@ -53,8 +54,8 @@ class CheckAndTransitStatusBatchAction(SessionBatchAction):
 
     @override
     @classmethod
-    def operation_type(cls) -> str:
-        return "check_and_transit_status_multi"
+    def operation_type(cls) -> ActionOperationType:
+        return ActionOperationType.UPDATE
 
 
 @dataclass

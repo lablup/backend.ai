@@ -52,6 +52,7 @@ class SessionTransitionInfo:
     session_id: SessionId
     from_status: SessionStatus
     reason: str | None = None
+    error_code: str | None = None
     creation_id: str | None = None
     access_key: AccessKey | None = None
 

@@ -1,30 +1,14 @@
 import uuid
 from typing import Any
 
-from pydantic import AliasChoices, Field
+from pydantic import Field
 
 from ai.backend.common.api_handlers import BaseRequestModel
-from ai.backend.common.typed_validators import VFolderName
-from ai.backend.common.types import VFolderUsageMode
 
-from .field import VFolderPermissionField
-
-
-class VFolderCreateReq(BaseRequestModel):
-    name: VFolderName = Field(description="Name of the vfolder")
-    folder_host: str | None = Field(default=None, alias="host")
-    usage_mode: VFolderUsageMode = Field(default=VFolderUsageMode.GENERAL)
-    permission: VFolderPermissionField = Field(default=VFolderPermissionField.READ_WRITE)
-    unmanaged_path: str | None = Field(default=None, alias="unmanagedPath")
-    group_id: uuid.UUID | None = Field(
-        default=None,
-        validation_alias=AliasChoices("group", "groupId"),
-    )
-    cloneable: bool = Field(default=False)
-
-
-class RenameVFolderReq(BaseRequestModel):
-    new_name: VFolderName = Field(description="Name of the vfolder")
+from .vfolder.request import DeleteFilesAsyncBodyParam as DeleteFilesAsyncBodyParam
+from .vfolder.request import DeleteFilesAsyncPathParam as DeleteFilesAsyncPathParam
+from .vfolder.request import RenameVFolderReq as RenameVFolderReq
+from .vfolder.request import VFolderCreateReq as VFolderCreateReq
 
 
 class GraphQLReq(BaseRequestModel):
@@ -132,27 +116,3 @@ class GetPresignedUploadURLReq(BaseRequestModel):
     expiration: int | None = Field(default=None, description="URL expiration time in seconds")
     min_size: int | None = Field(default=None, description="Minimum file size")
     max_size: int | None = Field(default=None, description="Maximum file size")
-
-
-class DeleteFilesAsyncPathParam(BaseRequestModel):
-    """Path parameter for delete_files_async endpoint."""
-
-    name: str = Field(description="VFolder name or ID to resolve")
-
-
-class DeleteFilesAsyncBodyParam(BaseRequestModel):
-    """Body parameter for delete_files_async endpoint."""
-
-    files: list[str] = Field(
-        description="""
-        List of file paths to delete within the vfolder.
-        Paths are relative to the vfolder root.
-        """,
-    )
-    recursive: bool = Field(
-        default=False,
-        description="""
-        Whether to delete directories recursively.
-        Set to True when deleting non-empty directories.
-        """,
-    )

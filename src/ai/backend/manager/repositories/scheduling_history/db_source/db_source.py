@@ -26,6 +26,11 @@ from ai.backend.manager.repositories.base import (
     BatchQuerier,
     execute_batch_querier,
 )
+from ai.backend.manager.repositories.scheduling_history.types import (
+    DeploymentHistorySearchScope,
+    RouteHistorySearchScope,
+    SessionSchedulingHistorySearchScope,
+)
 
 if TYPE_CHECKING:
     from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
@@ -42,13 +47,13 @@ class SchedulingHistoryDBSource:
     def __init__(self, db: ExtendedAsyncSAEngine) -> None:
         self._db = db
 
-    # ========== Session History ==========
+    # ========== Session History (Admin) ==========
 
     async def search_session_history(
         self,
         querier: BatchQuerier,
     ) -> SessionSchedulingHistoryListResult:
-        """Search session scheduling history with pagination."""
+        """Search session scheduling history with pagination (admin API)."""
         async with self._db.begin_readonly_session() as db_sess:
             query = sa.select(SessionSchedulingHistoryRow)
 
@@ -57,6 +62,28 @@ class SchedulingHistoryDBSource:
                 query,
                 querier,
             )
+
+            items = [row.SessionSchedulingHistoryRow.to_data() for row in result.rows]
+
+            return SessionSchedulingHistoryListResult(
+                items=items,
+                total_count=result.total_count,
+                has_next_page=result.has_next_page,
+                has_previous_page=result.has_previous_page,
+            )
+
+    # ========== Session History (Scoped) ==========
+
+    async def search_session_scoped_history(
+        self,
+        querier: BatchQuerier,
+        scope: SessionSchedulingHistorySearchScope,
+    ) -> SessionSchedulingHistoryListResult:
+        """Search session scheduling history within scope."""
+        async with self._db.begin_readonly_session() as db_sess:
+            query = sa.select(SessionSchedulingHistoryRow)
+
+            result = await execute_batch_querier(db_sess, query, querier, scope)
 
             items = [row.SessionSchedulingHistoryRow.to_data() for row in result.rows]
 
@@ -92,13 +119,13 @@ class SchedulingHistoryDBSource:
                 has_previous_page=result.has_previous_page,
             )
 
-    # ========== Deployment History ==========
+    # ========== Deployment History (Admin) ==========
 
     async def search_deployment_history(
         self,
         querier: BatchQuerier,
     ) -> DeploymentHistoryListResult:
-        """Search deployment history with pagination."""
+        """Search deployment history with pagination (admin API)."""
         async with self._db.begin_readonly_session() as db_sess:
             query = sa.select(DeploymentHistoryRow)
 
@@ -117,13 +144,35 @@ class SchedulingHistoryDBSource:
                 has_previous_page=result.has_previous_page,
             )
 
-    # ========== Route History ==========
+    # ========== Deployment History (Scoped) ==========
+
+    async def search_deployment_scoped_history(
+        self,
+        querier: BatchQuerier,
+        scope: DeploymentHistorySearchScope,
+    ) -> DeploymentHistoryListResult:
+        """Search deployment history within scope."""
+        async with self._db.begin_readonly_session() as db_sess:
+            query = sa.select(DeploymentHistoryRow)
+
+            result = await execute_batch_querier(db_sess, query, querier, scope)
+
+            items = [row.DeploymentHistoryRow.to_data() for row in result.rows]
+
+            return DeploymentHistoryListResult(
+                items=items,
+                total_count=result.total_count,
+                has_next_page=result.has_next_page,
+                has_previous_page=result.has_previous_page,
+            )
+
+    # ========== Route History (Admin) ==========
 
     async def search_route_history(
         self,
         querier: BatchQuerier,
     ) -> RouteHistoryListResult:
-        """Search route history with pagination."""
+        """Search route history with pagination (admin API)."""
         async with self._db.begin_readonly_session() as db_sess:
             query = sa.select(RouteHistoryRow)
 
@@ -132,6 +181,28 @@ class SchedulingHistoryDBSource:
                 query,
                 querier,
             )
+
+            items = [row.RouteHistoryRow.to_data() for row in result.rows]
+
+            return RouteHistoryListResult(
+                items=items,
+                total_count=result.total_count,
+                has_next_page=result.has_next_page,
+                has_previous_page=result.has_previous_page,
+            )
+
+    # ========== Route History (Scoped) ==========
+
+    async def search_route_scoped_history(
+        self,
+        querier: BatchQuerier,
+        scope: RouteHistorySearchScope,
+    ) -> RouteHistoryListResult:
+        """Search route history within scope."""
+        async with self._db.begin_readonly_session() as db_sess:
+            query = sa.select(RouteHistoryRow)
+
+            result = await execute_batch_querier(db_sess, query, querier, scope)
 
             items = [row.RouteHistoryRow.to_data() for row in result.rows]
 

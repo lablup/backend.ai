@@ -2,13 +2,14 @@
 
 from __future__ import annotations
 
+from collections.abc import Iterable
 from datetime import datetime
 from enum import StrEnum
 from typing import Self, override
 from uuid import UUID
 
 import strawberry
-from strawberry import ID
+from strawberry import ID, Info
 from strawberry.relay import Node, NodeID
 
 from ai.backend.manager.api.gql.base import (
@@ -17,14 +18,19 @@ from ai.backend.manager.api.gql.base import (
     StringFilter,
     UUIDFilter,
 )
-from ai.backend.manager.api.gql.types import GQLFilter, GQLOrderBy
+from ai.backend.manager.api.gql.types import GQLFilter, GQLOrderBy, StrawberryGQLContext
 from ai.backend.manager.data.deployment.types import DeploymentHistoryData, RouteHistoryData
 from ai.backend.manager.data.session.types import (
     SchedulingResult,
     SessionSchedulingHistoryData,
     SubStepResult,
 )
-from ai.backend.manager.repositories.base import QueryCondition, QueryOrder
+from ai.backend.manager.repositories.base import (
+    QueryCondition,
+    QueryOrder,
+    combine_conditions_or,
+    negate_conditions,
+)
 from ai.backend.manager.repositories.scheduling_history.options import (
     DeploymentHistoryConditions,
     DeploymentHistoryOrders,
@@ -52,6 +58,10 @@ __all__ = (
     "DeploymentHistoryOrderBy",
     "RouteHistoryFilter",
     "RouteHistoryOrderBy",
+    # Scope types (added in 26.2.0)
+    "SessionScope",
+    "DeploymentScope",
+    "RouteScope",
 )
 
 
@@ -168,6 +178,19 @@ class SessionSchedulingHistory(Node):
         return ID(str(self._session_id))
 
     @classmethod
+    async def resolve_nodes(  # type: ignore[override]  # Strawberry Node uses AwaitableOrValue overloads incompatible with async def
+        cls,
+        *,
+        info: Info[StrawberryGQLContext],
+        node_ids: Iterable[str],
+        required: bool = False,
+    ) -> Iterable[Self | None]:
+        results = await info.context.data_loaders.session_history_loader.load_many([
+            UUID(nid) for nid in node_ids
+        ])
+        return [cls.from_dataclass(data) if data is not None else None for data in results]
+
+    @classmethod
     def from_dataclass(cls, data: SessionSchedulingHistoryData) -> Self:
         return cls(
             id=ID(str(data.id)),
@@ -203,6 +226,19 @@ class DeploymentHistory(Node):
     @strawberry.field(description="The deployment ID this history record belongs to.")  # type: ignore[misc]
     def deployment_id(self) -> ID:
         return ID(str(self._deployment_id))
+
+    @classmethod
+    async def resolve_nodes(  # type: ignore[override]  # Strawberry Node uses AwaitableOrValue overloads incompatible with async def
+        cls,
+        *,
+        info: Info[StrawberryGQLContext],
+        node_ids: Iterable[str],
+        required: bool = False,
+    ) -> Iterable[Self | None]:
+        results = await info.context.data_loaders.deployment_history_loader.load_many([
+            UUID(nid) for nid in node_ids
+        ])
+        return [cls.from_dataclass(data) if data is not None else None for data in results]
 
     @classmethod
     def from_dataclass(cls, data: DeploymentHistoryData) -> Self:
@@ -247,6 +283,19 @@ class RouteHistory(Node):
         return ID(str(self._deployment_id))
 
     @classmethod
+    async def resolve_nodes(  # type: ignore[override]  # Strawberry Node uses AwaitableOrValue overloads incompatible with async def
+        cls,
+        *,
+        info: Info[StrawberryGQLContext],
+        node_ids: Iterable[str],
+        required: bool = False,
+    ) -> Iterable[Self | None]:
+        results = await info.context.data_loaders.route_history_loader.load_many([
+            UUID(nid) for nid in node_ids
+        ])
+        return [cls.from_dataclass(data) if data is not None else None for data in results]
+
+    @classmethod
     def from_dataclass(cls, data: RouteHistoryData) -> Self:
         return cls(
             id=ID(str(data.id)),
@@ -265,6 +314,30 @@ class RouteHistory(Node):
         )
 
 
+# Scope input types (added in 26.2.0)
+
+
+@strawberry.input(description="Scope for session scheduling history query")
+class SessionScope:
+    """Scope for session-level scheduling history queries."""
+
+    session_id: UUID = strawberry.field(description="Session ID to get history for")
+
+
+@strawberry.input(description="Scope for deployment scheduling history query")
+class DeploymentScope:
+    """Scope for deployment-level scheduling history queries."""
+
+    deployment_id: UUID = strawberry.field(description="Deployment ID to get history for")
+
+
+@strawberry.input(description="Scope for route scheduling history query")
+class RouteScope:
+    """Scope for route-level scheduling history queries."""
+
+    route_id: UUID = strawberry.field(description="Route ID to get history for")
+
+
 # Filters
 
 
@@ -280,6 +353,10 @@ class SessionSchedulingHistoryFilter(GQLFilter):
     message: StringFilter | None = None
     created_at: DateTimeFilter | None = None
     updated_at: DateTimeFilter | None = None
+
+    AND: list[SessionSchedulingHistoryFilter] | None = None
+    OR: list[SessionSchedulingHistoryFilter] | None = None
+    NOT: list[SessionSchedulingHistoryFilter] | None = None
 
     @override
     def build_conditions(self) -> list[QueryCondition]:
@@ -363,6 +440,27 @@ class SessionSchedulingHistoryFilter(GQLFilter):
             if condition:
                 conditions.append(condition)
 
+        # Handle AND logical operator - these are implicitly ANDed with field conditions
+        if self.AND:
+            for sub_filter in self.AND:
+                conditions.extend(sub_filter.build_conditions())
+
+        # Handle OR logical operator
+        if self.OR:
+            or_sub_conditions: list[QueryCondition] = []
+            for sub_filter in self.OR:
+                or_sub_conditions.extend(sub_filter.build_conditions())
+            if or_sub_conditions:
+                conditions.append(combine_conditions_or(or_sub_conditions))
+
+        # Handle NOT logical operator
+        if self.NOT:
+            not_sub_conditions: list[QueryCondition] = []
+            for sub_filter in self.NOT:
+                not_sub_conditions.extend(sub_filter.build_conditions())
+            if not_sub_conditions:
+                conditions.append(negate_conditions(not_sub_conditions))
+
         return conditions
 
 
@@ -394,6 +492,10 @@ class DeploymentHistoryFilter(GQLFilter):
     message: StringFilter | None = None
     created_at: DateTimeFilter | None = None
     updated_at: DateTimeFilter | None = None
+
+    AND: list[DeploymentHistoryFilter] | None = None
+    OR: list[DeploymentHistoryFilter] | None = None
+    NOT: list[DeploymentHistoryFilter] | None = None
 
     @override
     def build_conditions(self) -> list[QueryCondition]:
@@ -475,6 +577,27 @@ class DeploymentHistoryFilter(GQLFilter):
             if condition:
                 conditions.append(condition)
 
+        # Handle AND logical operator - these are implicitly ANDed with field conditions
+        if self.AND:
+            for sub_filter in self.AND:
+                conditions.extend(sub_filter.build_conditions())
+
+        # Handle OR logical operator
+        if self.OR:
+            or_sub_conditions: list[QueryCondition] = []
+            for sub_filter in self.OR:
+                or_sub_conditions.extend(sub_filter.build_conditions())
+            if or_sub_conditions:
+                conditions.append(combine_conditions_or(or_sub_conditions))
+
+        # Handle NOT logical operator
+        if self.NOT:
+            not_sub_conditions: list[QueryCondition] = []
+            for sub_filter in self.NOT:
+                not_sub_conditions.extend(sub_filter.build_conditions())
+            if not_sub_conditions:
+                conditions.append(negate_conditions(not_sub_conditions))
+
         return conditions
 
 
@@ -507,6 +630,10 @@ class RouteHistoryFilter(GQLFilter):
     message: StringFilter | None = None
     created_at: DateTimeFilter | None = None
     updated_at: DateTimeFilter | None = None
+
+    AND: list[RouteHistoryFilter] | None = None
+    OR: list[RouteHistoryFilter] | None = None
+    NOT: list[RouteHistoryFilter] | None = None
 
     @override
     def build_conditions(self) -> list[QueryCondition]:
@@ -595,6 +722,27 @@ class RouteHistoryFilter(GQLFilter):
             )
             if condition:
                 conditions.append(condition)
+
+        # Handle AND logical operator - these are implicitly ANDed with field conditions
+        if self.AND:
+            for sub_filter in self.AND:
+                conditions.extend(sub_filter.build_conditions())
+
+        # Handle OR logical operator
+        if self.OR:
+            or_sub_conditions: list[QueryCondition] = []
+            for sub_filter in self.OR:
+                or_sub_conditions.extend(sub_filter.build_conditions())
+            if or_sub_conditions:
+                conditions.append(combine_conditions_or(or_sub_conditions))
+
+        # Handle NOT logical operator
+        if self.NOT:
+            not_sub_conditions: list[QueryCondition] = []
+            for sub_filter in self.NOT:
+                not_sub_conditions.extend(sub_filter.build_conditions())
+            if not_sub_conditions:
+                conditions.append(negate_conditions(not_sub_conditions))
 
         return conditions
 

@@ -7,6 +7,7 @@ from typing import override
 from uuid import UUID
 
 from ai.backend.manager.actions.action import BaseActionResult
+from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.deployment.types import RouteInfo, RouteTrafficStatus
 
 from .base import RouteBaseAction
@@ -25,8 +26,8 @@ class UpdateRouteTrafficStatusAction(RouteBaseAction):
 
     @override
     @classmethod
-    def operation_type(cls) -> str:
-        return "update_traffic_status"
+    def operation_type(cls) -> ActionOperationType:
+        return ActionOperationType.UPDATE
 
 
 @dataclass

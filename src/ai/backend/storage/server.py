@@ -13,6 +13,7 @@ import sys
 import traceback
 from collections.abc import AsyncGenerator, AsyncIterator, Callable, Sequence
 from contextlib import AsyncExitStack, asynccontextmanager
+from datetime import UTC, datetime
 from pathlib import Path
 from pprint import pformat, pprint
 from typing import TYPE_CHECKING, Any
@@ -53,6 +54,7 @@ from ai.backend.common.message_queue.hiredis_queue import HiRedisQueue
 from ai.backend.common.message_queue.queue import AbstractMessageQueue
 from ai.backend.common.message_queue.redis_queue import RedisMQArgs, RedisQueue
 from ai.backend.common.metrics.metric import CommonMetricRegistry
+from ai.backend.common.metrics.multiprocess import cleanup_prometheus_multiprocess_dir
 from ai.backend.common.metrics.profiler import Profiler, PyroscopeArgs
 from ai.backend.common.msgpack import DEFAULT_PACK_OPTS, DEFAULT_UNPACK_OPTS
 from ai.backend.common.plugin import AbstractPlugin, BasePluginContext
@@ -61,6 +63,7 @@ from ai.backend.common.service_discovery.etcd_discovery.service_discovery import
     ETCDServiceDiscovery,
     ETCDServiceDiscoveryArgs,
 )
+from ai.backend.common.service_discovery.event_publisher import ServiceDiscoveryEventPublisher
 from ai.backend.common.service_discovery.redis_discovery.service_discovery import (
     RedisServiceDiscovery,
     RedisServiceDiscoveryArgs,
@@ -494,6 +497,7 @@ async def service_discovery_ctx(
     local_config: StorageProxyUnifiedConfig,
     etcd: AsyncEtcd,
     redis_config: RedisConfig,
+    event_producer: EventProducer | None = None,
 ) -> AsyncGenerator[None]:
     announce_addr_config = local_config.api.manager.announce_addr
     announce_addr = CommonHostPortPair(
@@ -537,16 +541,34 @@ async def service_discovery_ctx(
     if local_config.otel.enabled:
         meta = sd_loop.metadata
         otel_spec = OpenTelemetrySpec(
-            service_id=meta.id,
             service_name=meta.service_group,
             service_version=meta.version,
             log_level=local_config.otel.log_level,
             endpoint=local_config.otel.endpoint,
+            service_instance_id=meta.id,
+            service_instance_name=meta.display_name,
+            max_queue_size=local_config.otel.max_queue_size,
+            max_export_batch_size=local_config.otel.max_export_batch_size,
         )
         BraceStyleAdapter.apply_otel(otel_spec)
+
+    # Start event-based SD publishing if config has service_group set
+    sd_config = local_config.service_discovery
+    sd_event_publisher: ServiceDiscoveryEventPublisher | None = None
+    if sd_config.service_group and event_producer is not None:
+        sd_event_publisher = ServiceDiscoveryEventPublisher(
+            event_producer=event_producer,
+            config=sd_config,
+            component_version=VERSION,
+            startup_time=datetime.now(tz=UTC),
+        )
+        await sd_event_publisher.start()
+
     try:
         yield
     finally:
+        if sd_event_publisher is not None:
+            await sd_event_publisher.stop()
         sd_loop.close()
 
 
@@ -724,7 +746,7 @@ async def server_main(
         monitor.console_locals["internal_api_app"] = internal_api_app
 
         await storage_init_stack.enter_async_context(
-            service_discovery_ctx(local_config, etcd, redis_config)
+            service_discovery_ctx(local_config, etcd, redis_config, event_producer)
         )
 
         if _is_root():
@@ -864,13 +886,16 @@ def main(
                 else:
                     extra_procs = tuple()
 
-                aiotools.start_server(
-                    server_main_logwrapper,
-                    num_workers=num_workers,
-                    extra_procs=extra_procs,
-                    args=(local_config, log_endpoint),
-                    runner=runner,
-                )
+                try:
+                    aiotools.start_server(
+                        server_main_logwrapper,
+                        num_workers=num_workers,
+                        extra_procs=extra_procs,
+                        args=(local_config, log_endpoint),
+                        runner=runner,
+                    )
+                finally:
+                    cleanup_prometheus_multiprocess_dir()
                 log.info("exit.")
         finally:
             if local_config.storage_proxy.pid_file.is_file():

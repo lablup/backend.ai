@@ -126,7 +126,7 @@ class AuthDBSource:
                 assoc_query = association_groups_users.insert().values(values)
                 await conn.execute(assoc_query)
 
-            return self._user_row_to_data(UserRow.from_row(user_row))
+            return self._user_row_to_data(user_row)
 
     @auth_db_source_resilience.apply()
     async def modify_user_full_name(self, email: str, domain_name: str, full_name: str) -> None:
@@ -215,7 +215,7 @@ class AuthDBSource:
             query = keypairs.update().values(data).where(keypairs.c.access_key == access_key)
             await conn.execute(query)
 
-    def _user_row_to_data(self, row: UserRow) -> UserData:
+    def _user_row_to_data(self, row: UserRow | sa.Row[Any]) -> UserData:
         """Convert UserRow to UserData."""
         return UserData(
             uuid=row.uuid,
@@ -237,6 +237,42 @@ class AuthDBSource:
             resource_policy=row.resource_policy,
             sudo_session_enabled=row.sudo_session_enabled,
         )
+
+    @auth_db_source_resilience.apply()
+    async def fetch_user_info_by_access_key(self, access_key: str) -> tuple[str, UserRole]:
+        """Join keypairs→users to get (domain_name, role) for the owner of *access_key*.
+
+        Raises ``ValueError`` if the access key is unknown.
+        """
+        async with self._db.begin_readonly() as conn:
+            query = (
+                sa.select(users.c.domain_name, users.c.role)
+                .select_from(sa.join(keypairs, users, keypairs.c.user == users.c.uuid))
+                .where(keypairs.c.access_key == access_key)
+            )
+            result = await conn.execute(query)
+            row = result.first()
+            if row is None:
+                raise ValueError("Unknown owner access key")
+            return row.domain_name, row.role
+
+    @auth_db_source_resilience.apply()
+    async def fetch_user_info_by_email(self, email: str) -> tuple[UUID, UserRole, str]:
+        """Fetch (uuid, role, domain_name) for a user identified by *email*.
+
+        Raises ``ValueError`` if the user is not found.
+        """
+        async with self._db.begin_readonly() as conn:
+            query = (
+                sa.select(users.c.uuid, users.c.role, users.c.domain_name)
+                .select_from(users)
+                .where(users.c.email == email)
+            )
+            result = await conn.execute(query)
+            row = result.first()
+            if row is None:
+                raise ValueError("Cannot delegate an unknown user")
+            return row.uuid, row.role, row.domain_name
 
     @auth_db_source_resilience.apply()
     async def verify_credential_with_migration(
@@ -271,7 +307,7 @@ class AuthDBSource:
     @auth_db_source_resilience.apply()
     async def fetch_user_row_by_uuid(self, user_uuid: UUID) -> UserRow:
         """Fetch user row by UUID from database."""
-        async with self._db.begin_session() as db_session:
+        async with self._db.begin_readonly_session_read_committed() as db_session:
             user_query = (
                 sa.select(UserRow)
                 .where(UserRow.uuid == user_uuid)

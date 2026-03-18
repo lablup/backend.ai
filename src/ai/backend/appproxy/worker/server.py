@@ -16,6 +16,7 @@ import traceback
 import uuid
 from collections.abc import AsyncGenerator, AsyncIterator, Callable, Iterable, Mapping, Sequence
 from contextlib import AsyncExitStack, asynccontextmanager
+from datetime import UTC, datetime
 from functools import partial
 from pathlib import Path
 from typing import Any, Final, cast
@@ -91,7 +92,9 @@ from ai.backend.common.message_queue.hiredis_queue import HiRedisQueue
 from ai.backend.common.message_queue.queue import AbstractMessageQueue
 from ai.backend.common.message_queue.redis_queue import RedisMQArgs, RedisQueue
 from ai.backend.common.metrics.http import build_api_metric_middleware
+from ai.backend.common.metrics.multiprocess import cleanup_prometheus_multiprocess_dir
 from ai.backend.common.msgpack import DEFAULT_PACK_OPTS, DEFAULT_UNPACK_OPTS
+from ai.backend.common.service_discovery.event_publisher import ServiceDiscoveryEventPublisher
 from ai.backend.common.service_discovery.redis_discovery.service_discovery import (
     RedisServiceDiscovery,
     RedisServiceDiscoveryArgs,
@@ -554,16 +557,34 @@ async def service_discovery_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     if root_ctx.local_config.otel.enabled:
         meta = sd_loop.metadata
         otel_spec = OpenTelemetrySpec(
-            service_id=meta.id,
             service_name=meta.service_group,
             service_version=meta.version,
             log_level=root_ctx.local_config.otel.log_level,
             endpoint=root_ctx.local_config.otel.endpoint,
+            service_instance_id=meta.id,
+            service_instance_name=meta.display_name,
+            max_queue_size=root_ctx.local_config.otel.max_queue_size,
+            max_export_batch_size=root_ctx.local_config.otel.max_export_batch_size,
         )
         BraceStyleAdapter.apply_otel(otel_spec)
+
+    # Start event-based SD publishing if config has service_group set
+    sd_config = root_ctx.local_config.service_discovery
+    sd_event_publisher: ServiceDiscoveryEventPublisher | None = None
+    if sd_config.service_group and hasattr(root_ctx, "event_producer"):
+        sd_event_publisher = ServiceDiscoveryEventPublisher(
+            event_producer=root_ctx.event_producer,
+            config=sd_config,
+            component_version=__version__,
+            startup_time=datetime.now(tz=UTC),
+        )
+        await sd_event_publisher.start()
+
     try:
         yield
     finally:
+        if sd_event_publisher is not None:
+            await sd_event_publisher.stop()
         sd_loop.close()
 
 
@@ -1006,6 +1027,7 @@ def main(ctx: click.Context, config_path: Path, debug: bool, log_level: LogLevel
                         runner=runner,
                     )
                 finally:
+                    cleanup_prometheus_multiprocess_dir()
                     log.info("terminated.")
         finally:
             if server_config.proxy_worker.pid_file.is_file():

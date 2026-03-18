@@ -3,12 +3,13 @@
 from __future__ import annotations
 
 import uuid
+from collections.abc import Iterable
 from datetime import datetime
 from enum import StrEnum
 from typing import Self, override
 
 import strawberry
-from strawberry import ID, UNSET
+from strawberry import ID, UNSET, Info
 from strawberry.relay import Node, NodeID
 
 from ai.backend.common.data.notification import (
@@ -22,21 +23,23 @@ from ai.backend.common.data.notification.types import (
     SMTPAuth,
     SMTPConnection,
 )
+from ai.backend.common.data.permission.types import RBACElementType
 from ai.backend.common.exception import InvalidNotificationChannelSpec
 from ai.backend.manager.api.gql.base import OrderDirection, StringFilter
-from ai.backend.manager.api.gql.types import GQLFilter, GQLOrderBy
+from ai.backend.manager.api.gql.types import GQLFilter, GQLOrderBy, StrawberryGQLContext
 from ai.backend.manager.data.notification import (
     NotificationChannelData,
     NotificationRuleData,
 )
+from ai.backend.manager.data.permission.types import RBACElementRef
 from ai.backend.manager.models.notification import NotificationChannelRow, NotificationRuleRow
 from ai.backend.manager.repositories.base import (
-    Creator,
     QueryCondition,
     QueryOrder,
     combine_conditions_or,
     negate_conditions,
 )
+from ai.backend.manager.repositories.base.rbac.entity_creator import RBACEntityCreator
 from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.repositories.notification.creators import (
     NotificationChannelCreatorSpec,
@@ -205,6 +208,19 @@ class NotificationChannel(Node):
     created_at: datetime
 
     @classmethod
+    async def resolve_nodes(  # type: ignore[override]  # Strawberry Node uses AwaitableOrValue overloads incompatible with async def
+        cls,
+        *,
+        info: Info[StrawberryGQLContext],
+        node_ids: Iterable[str],
+        required: bool = False,
+    ) -> Iterable[Self | None]:
+        results = await info.context.data_loaders.notification_channel_loader.load_many([
+            uuid.UUID(nid) for nid in node_ids
+        ])
+        return [cls.from_dataclass(data) if data is not None else None for data in results]
+
+    @classmethod
     def from_dataclass(cls, data: NotificationChannelData) -> Self:
         final_spec: NotificationChannelSpecGQL
         match data.channel_type:
@@ -241,6 +257,19 @@ class NotificationRule(Node):
     message_template: str
     enabled: bool
     created_at: datetime
+
+    @classmethod
+    async def resolve_nodes(  # type: ignore[override]  # Strawberry Node uses AwaitableOrValue overloads incompatible with async def
+        cls,
+        *,
+        info: Info[StrawberryGQLContext],
+        node_ids: Iterable[str],
+        required: bool = False,
+    ) -> Iterable[Self | None]:
+        results = await info.context.data_loaders.notification_rule_loader.load_many([
+            uuid.UUID(nid) for nid in node_ids
+        ])
+        return [cls.from_dataclass(data) if data is not None else None for data in results]
 
     @classmethod
     def from_dataclass(cls, data: NotificationRuleData) -> Self:
@@ -534,8 +563,8 @@ class CreateNotificationChannelInput:
     spec: NotificationChannelSpecInput
     enabled: bool = True
 
-    def to_creator(self, created_by: uuid.UUID) -> Creator[NotificationChannelRow]:
-        return Creator(
+    def to_creator(self, created_by: uuid.UUID) -> RBACEntityCreator[NotificationChannelRow]:
+        return RBACEntityCreator(
             spec=NotificationChannelCreatorSpec(
                 name=self.name,
                 description=self.description,
@@ -543,7 +572,9 @@ class CreateNotificationChannelInput:
                 spec=self.spec.to_dataclass(),
                 enabled=self.enabled,
                 created_by=created_by,
-            )
+            ),
+            element_type=RBACElementType.NOTIFICATION_CHANNEL,
+            scope_ref=RBACElementRef(RBACElementType.USER, str(created_by)),
         )
 
 
@@ -586,8 +617,8 @@ class CreateNotificationRuleInput:
     message_template: str
     enabled: bool = True
 
-    def to_creator(self, created_by: uuid.UUID) -> Creator[NotificationRuleRow]:
-        return Creator(
+    def to_creator(self, created_by: uuid.UUID) -> RBACEntityCreator[NotificationRuleRow]:
+        return RBACEntityCreator(
             spec=NotificationRuleCreatorSpec(
                 name=self.name,
                 description=self.description,
@@ -596,7 +627,9 @@ class CreateNotificationRuleInput:
                 message_template=self.message_template,
                 enabled=self.enabled,
                 created_by=created_by,
-            )
+            ),
+            element_type=RBACElementType.NOTIFICATION_RULE,
+            scope_ref=RBACElementRef(RBACElementType.NOTIFICATION_CHANNEL, str(self.channel_id)),
         )
 
 

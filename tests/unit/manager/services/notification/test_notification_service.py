@@ -18,6 +18,7 @@ from ai.backend.common.data.notification import (
     SessionTerminatedMessage,
     WebhookSpec,
 )
+from ai.backend.common.data.permission.types import RBACElementType
 from ai.backend.common.events.event_types.notification import NotificationTriggeredEvent
 from ai.backend.manager.data.notification import (
     NotificationChannelData,
@@ -25,13 +26,15 @@ from ai.backend.manager.data.notification import (
     NotificationRuleData,
     NotificationRuleListResult,
 )
+from ai.backend.manager.data.permission.types import RBACElementRef
 from ai.backend.manager.errors.notification import (
     NotificationChannelNotFound,
     NotificationRuleNotFound,
     NotificationTemplateRenderingFailure,
 )
 from ai.backend.manager.notification.notification_center import NotificationCenter
-from ai.backend.manager.repositories.base import BatchQuerier, Creator, OffsetPagination
+from ai.backend.manager.repositories.base import BatchQuerier, OffsetPagination
+from ai.backend.manager.repositories.base.rbac.entity_creator import RBACEntityCreator
 from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.repositories.notification import NotificationRepository
 from ai.backend.manager.repositories.notification.creators import (
@@ -154,7 +157,6 @@ class TestNotificationService:
             ).model_dump(),
         )
 
-    @pytest.mark.asyncio
     async def test_process_notification_with_matching_rules(
         self,
         notification_service: NotificationService,
@@ -182,7 +184,6 @@ class TestNotificationService:
             NotificationRuleType.SESSION_STARTED, enabled_only=True
         )
 
-    @pytest.mark.asyncio
     async def test_process_notification_with_no_matching_rules(
         self,
         notification_service: NotificationService,
@@ -203,7 +204,6 @@ class TestNotificationService:
         assert result.rules_matched == 0
         assert len(result.successes) == 0
 
-    @pytest.mark.asyncio
     async def test_template_rendering_with_data_fields(
         self,
         notification_service: NotificationService,
@@ -228,7 +228,6 @@ class TestNotificationService:
         # The actual rendered message should contain the substituted values
         mock_repository.get_matching_rules.assert_called_once()
 
-    @pytest.mark.asyncio
     async def test_process_notification_with_multiple_rules(
         self,
         notification_service: NotificationService,
@@ -279,7 +278,6 @@ class TestNotificationService:
         assert result.rules_matched == 2
         assert len(result.successes) == 2
 
-    @pytest.mark.asyncio
     async def test_template_rendering_fallback_on_error(
         self,
         notification_service: NotificationService,
@@ -317,7 +315,6 @@ class TestNotificationService:
         # Rule should not be counted as processed due to template error
         assert len(result.successes) == 0
 
-    @pytest.mark.asyncio
     async def test_template_with_timestamp(
         self,
         notification_service: NotificationService,
@@ -365,7 +362,6 @@ class TestNotificationService:
 
         assert len(result.successes) == 1
 
-    @pytest.mark.asyncio
     async def test_template_with_nested_data(
         self,
         notification_service: NotificationService,
@@ -414,7 +410,6 @@ class TestNotificationService:
 
         assert len(result.successes) == 1
 
-    @pytest.mark.asyncio
     async def test_process_notification_with_different_rule_types(
         self,
         notification_service: NotificationService,
@@ -444,7 +439,6 @@ class TestNotificationService:
 
     # CRUD action tests
 
-    @pytest.mark.asyncio
     async def test_create_channel(
         self,
         notification_service: NotificationService,
@@ -454,7 +448,7 @@ class TestNotificationService:
         """Test creating a notification channel"""
         # TODO: Remove isinstance check when Email channel is implemented
         assert isinstance(sample_webhook_channel.spec, WebhookSpec)
-        creator = Creator(
+        creator = RBACEntityCreator(
             spec=NotificationChannelCreatorSpec(
                 name=sample_webhook_channel.name,
                 description=sample_webhook_channel.description,
@@ -462,7 +456,9 @@ class TestNotificationService:
                 spec=sample_webhook_channel.spec,
                 enabled=sample_webhook_channel.enabled,
                 created_by=sample_webhook_channel.created_by,
-            )
+            ),
+            element_type=RBACElementType.NOTIFICATION_CHANNEL,
+            scope_ref=RBACElementRef(RBACElementType.USER, str(sample_webhook_channel.created_by)),
         )
         mock_repository.create_channel = AsyncMock(return_value=sample_webhook_channel)
 
@@ -472,7 +468,6 @@ class TestNotificationService:
         assert result.channel_data == sample_webhook_channel
         mock_repository.create_channel.assert_called_once_with(creator)
 
-    @pytest.mark.asyncio
     async def test_create_rule(
         self,
         notification_service: NotificationService,
@@ -480,7 +475,7 @@ class TestNotificationService:
         sample_rule: NotificationRuleData,
     ) -> None:
         """Test creating a notification rule"""
-        creator = Creator(
+        creator = RBACEntityCreator(
             spec=NotificationRuleCreatorSpec(
                 name=sample_rule.name,
                 description=sample_rule.description,
@@ -489,7 +484,11 @@ class TestNotificationService:
                 message_template=sample_rule.message_template,
                 enabled=sample_rule.enabled,
                 created_by=sample_rule.created_by,
-            )
+            ),
+            element_type=RBACElementType.NOTIFICATION_RULE,
+            scope_ref=RBACElementRef(
+                RBACElementType.NOTIFICATION_CHANNEL, str(sample_rule.channel.id)
+            ),
         )
         mock_repository.create_rule = AsyncMock(return_value=sample_rule)
 
@@ -499,7 +498,6 @@ class TestNotificationService:
         assert result.rule_data == sample_rule
         mock_repository.create_rule.assert_called_once_with(creator)
 
-    @pytest.mark.asyncio
     async def test_get_channel(
         self,
         notification_service: NotificationService,
@@ -515,7 +513,6 @@ class TestNotificationService:
         assert result.channel_data == sample_webhook_channel
         mock_repository.get_channel_by_id.assert_called_once_with(sample_webhook_channel.id)
 
-    @pytest.mark.asyncio
     async def test_get_rule(
         self,
         notification_service: NotificationService,
@@ -531,7 +528,6 @@ class TestNotificationService:
         assert result.rule_data == sample_rule
         mock_repository.get_rule_by_id.assert_called_once_with(sample_rule.id)
 
-    @pytest.mark.asyncio
     async def test_update_channel(
         self,
         notification_service: NotificationService,
@@ -566,7 +562,6 @@ class TestNotificationService:
         assert result.channel_data == updated_channel
         mock_repository.update_channel.assert_called_once_with(updater=updater)
 
-    @pytest.mark.asyncio
     async def test_update_rule(
         self,
         notification_service: NotificationService,
@@ -602,7 +597,6 @@ class TestNotificationService:
         assert result.rule_data == updated_rule
         mock_repository.update_rule.assert_called_once_with(updater=updater)
 
-    @pytest.mark.asyncio
     async def test_delete_channel(
         self,
         notification_service: NotificationService,
@@ -618,7 +612,6 @@ class TestNotificationService:
         assert result.deleted is True
         mock_repository.delete_channel.assert_called_once_with(sample_webhook_channel.id)
 
-    @pytest.mark.asyncio
     async def test_delete_rule(
         self,
         notification_service: NotificationService,
@@ -634,7 +627,6 @@ class TestNotificationService:
         assert result.deleted is True
         mock_repository.delete_rule.assert_called_once_with(sample_rule.id)
 
-    @pytest.mark.asyncio
     async def test_search_channels(
         self,
         notification_service: NotificationService,
@@ -663,7 +655,6 @@ class TestNotificationService:
         assert result.total_count == 1
         mock_repository.search_channels.assert_called_once_with(querier=querier)
 
-    @pytest.mark.asyncio
     async def test_search_rules(
         self,
         notification_service: NotificationService,
@@ -692,7 +683,6 @@ class TestNotificationService:
         assert result.total_count == 1
         mock_repository.search_rules.assert_called_once_with(querier=querier)
 
-    @pytest.mark.asyncio
     async def test_validate_channel_success(
         self,
         notification_service: NotificationService,
@@ -726,7 +716,6 @@ class TestNotificationService:
         assert result is not None
         mock_repository.get_channel_by_id.assert_called_once_with(sample_webhook_channel.id)
 
-    @pytest.mark.asyncio
     async def test_validate_channel_not_found(
         self,
         notification_service: NotificationService,
@@ -745,7 +734,6 @@ class TestNotificationService:
         with pytest.raises(NotificationChannelNotFound):
             await notification_service.validate_channel(action)
 
-    @pytest.mark.asyncio
     async def test_validate_rule_success(
         self,
         notification_service: NotificationService,
@@ -793,7 +781,6 @@ class TestNotificationService:
         assert result.message is not None
         mock_repository.get_rule_by_id.assert_called_once_with(sample_rule.id)
 
-    @pytest.mark.asyncio
     async def test_validate_rule_template_error(
         self,
         notification_service: NotificationService,
@@ -833,7 +820,6 @@ class TestNotificationService:
         with pytest.raises(NotificationTemplateRenderingFailure):
             await notification_service.validate_rule(action)
 
-    @pytest.mark.asyncio
     async def test_validate_rule_not_found(
         self,
         notification_service: NotificationService,

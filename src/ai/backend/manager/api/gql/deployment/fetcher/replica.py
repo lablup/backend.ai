@@ -17,6 +17,7 @@ from ai.backend.manager.api.gql.deployment.types.replica import (
     ReplicaOrderBy,
 )
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
+from ai.backend.manager.models.routing.row import RoutingRow
 from ai.backend.manager.repositories.base import QueryCondition
 from ai.backend.manager.repositories.deployment.options import (
     RouteConditions,
@@ -40,6 +41,7 @@ def get_replica_pagination_spec() -> PaginationSpec:
         backward_order=RouteOrders.created_at(ascending=True),
         forward_condition_factory=RouteConditions.by_cursor_forward,
         backward_condition_factory=RouteConditions.by_cursor_backward,
+        tiebreaker_order=RoutingRow.id.asc(),
     )
 
 

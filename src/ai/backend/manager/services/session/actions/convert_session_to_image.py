@@ -5,6 +5,7 @@ from typing import override
 from ai.backend.common.data.session.types import CustomizedImageVisibilityScope
 from ai.backend.common.types import AccessKey
 from ai.backend.manager.actions.action import BaseActionResult
+from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.session.types import SessionData
 from ai.backend.manager.services.session.base import SessionAction
 
@@ -25,8 +26,8 @@ class ConvertSessionToImageAction(SessionAction):
 
     @override
     @classmethod
-    def operation_type(cls) -> str:
-        return "convert_to_image"
+    def operation_type(cls) -> ActionOperationType:
+        return ActionOperationType.UPDATE
 
 
 @dataclass

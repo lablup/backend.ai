@@ -19,13 +19,12 @@ def _create_mock_sgroup(name: str, allowed_session_types: list[str]) -> MagicMoc
     """Create a mock scaling group with proper attribute access."""
     mock = MagicMock()
     mock.name = name
-    mock.scheduler_opts = ScalingGroupOpts.from_json({
+    mock.scheduler_opts = ScalingGroupOpts.model_validate({
         "allowed_session_types": allowed_session_types,
     })
     return mock
 
 
-@pytest.mark.asyncio
 @mock.patch("ai.backend.manager.registry.query_allowed_sgroups")
 async def test_allowed_session_types_check(mock_query: MagicMock) -> None:
     mock_query.return_value = [

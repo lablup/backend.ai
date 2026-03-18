@@ -2,10 +2,11 @@
 
 from __future__ import annotations
 
+from collections.abc import Iterable
 from datetime import datetime
 from enum import StrEnum
 from functools import lru_cache
-from typing import TYPE_CHECKING, Annotated, Any, override
+from typing import TYPE_CHECKING, Annotated, Any, Self, override
 from uuid import UUID
 
 import strawberry
@@ -30,7 +31,13 @@ from ai.backend.manager.data.deployment.types import (
     RouteTrafficStatus as RouteTrafficStatusEnum,
 )
 from ai.backend.manager.errors.deployment import EndpointNotFound
-from ai.backend.manager.repositories.base import QueryCondition, QueryOrder
+from ai.backend.manager.models.routing.row import RoutingRow
+from ai.backend.manager.repositories.base import (
+    QueryCondition,
+    QueryOrder,
+    combine_conditions_or,
+    negate_conditions,
+)
 from ai.backend.manager.repositories.deployment.options import RouteConditions, RouteOrders
 
 if TYPE_CHECKING:
@@ -116,7 +123,20 @@ class Route(Node):
         return ModelRevision.from_dataclass(revision_data)
 
     @classmethod
-    def from_dataclass(cls, data: RouteInfo) -> Route:
+    async def resolve_nodes(  # type: ignore[override]  # Strawberry Node uses AwaitableOrValue overloads incompatible with async def
+        cls,
+        *,
+        info: Info[StrawberryGQLContext],
+        node_ids: Iterable[str],
+        required: bool = False,
+    ) -> Iterable[Self | None]:
+        results = await info.context.data_loaders.route_loader.load_many([
+            UUID(nid) for nid in node_ids
+        ])
+        return [cls.from_dataclass(data) if data is not None else None for data in results]
+
+    @classmethod
+    def from_dataclass(cls, data: RouteInfo) -> Self:
         return cls(
             id=ID(str(data.route_id)),
             _deployment_id=data.endpoint_id,
@@ -159,6 +179,10 @@ class RouteFilter(GQLFilter):
     status: list[RouteStatusGQL] | None = None
     traffic_status: list[RouteTrafficStatusGQL] | None = None
 
+    AND: list[RouteFilter] | None = None
+    OR: list[RouteFilter] | None = None
+    NOT: list[RouteFilter] | None = None
+
     @override
     def build_conditions(self) -> list[QueryCondition]:
         """Build query conditions from this filter."""
@@ -173,6 +197,27 @@ class RouteFilter(GQLFilter):
                 RouteTrafficStatusEnum(ts.value) for ts in self.traffic_status
             ]
             conditions.append(RouteConditions.by_traffic_statuses(internal_traffic_statuses))
+
+        # Handle AND logical operator
+        if self.AND:
+            for sub_filter in self.AND:
+                conditions.extend(sub_filter.build_conditions())
+
+        # Handle OR logical operator
+        if self.OR:
+            or_sub_conditions: list[QueryCondition] = []
+            for sub_filter in self.OR:
+                or_sub_conditions.extend(sub_filter.build_conditions())
+            if or_sub_conditions:
+                conditions.append(combine_conditions_or(or_sub_conditions))
+
+        # Handle NOT logical operator
+        if self.NOT:
+            not_sub_conditions: list[QueryCondition] = []
+            for sub_filter in self.NOT:
+                not_sub_conditions.extend(sub_filter.build_conditions())
+            if not_sub_conditions:
+                conditions.append(negate_conditions(not_sub_conditions))
 
         return conditions
 
@@ -205,6 +250,7 @@ def get_route_pagination_spec() -> PaginationSpec:
         backward_order=RouteOrders.created_at(ascending=True),
         forward_condition_factory=RouteConditions.by_cursor_forward,
         backward_condition_factory=RouteConditions.by_cursor_backward,
+        tiebreaker_order=RoutingRow.id.asc(),
     )
 
 

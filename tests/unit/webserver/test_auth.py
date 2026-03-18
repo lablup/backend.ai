@@ -41,7 +41,6 @@ async def client_pool() -> ClientPool:
     return ClientPool(factory, cleanup_interval_seconds=100)
 
 
-@pytest.mark.asyncio
 async def test_get_api_session(mocker: MockerFixture, client_pool: ClientPool) -> None:
     mock_request = DummyRequest({
         "config": DummyConfig(
@@ -92,7 +91,6 @@ async def test_get_api_session(mocker: MockerFixture, client_pool: ClientPool) -
         assert api_session.config.secret_key == "xyz"
 
 
-@pytest.mark.asyncio
 async def test_get_api_session_with_specific_api_endpoint(
     mocker: MockerFixture, client_pool: ClientPool
 ) -> None:
@@ -120,7 +118,6 @@ async def test_get_api_session_with_specific_api_endpoint(
         assert str(api_session.config.endpoint) == specific_api_endpoint
 
 
-@pytest.mark.asyncio
 async def test_get_anonymous_session(mocker: MockerFixture, client_pool: ClientPool) -> None:
     mock_request = DummyRequest({
         "config": DummyConfig(
@@ -144,7 +141,6 @@ async def test_get_anonymous_session(mocker: MockerFixture, client_pool: ClientP
         assert api_session.config.secret_key == ""
 
 
-@pytest.mark.asyncio
 async def test_get_anonymous_session_with_specific_api_endpoint(
     mocker: MockerFixture, client_pool: ClientPool
 ) -> None:

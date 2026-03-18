@@ -23,11 +23,7 @@ from ai.backend.manager.errors.resource import (
 )
 from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.group import GroupRow
-from ai.backend.manager.models.scaling_group import (
-    ScalingGroupForDomainRow,
-    ScalingGroupForProjectRow,
-    ScalingGroupRow,
-)
+from ai.backend.manager.models.scaling_group import ScalingGroupRow
 from ai.backend.manager.repositories.base import ExistenceCheck, QueryCondition, SearchScope
 
 __all__ = (
@@ -35,10 +31,6 @@ __all__ = (
     "DomainFairShareSearchScope",
     "ProjectFairShareSearchScope",
     "UserFairShareSearchScope",
-    # Entity-based result items
-    "DomainFairShareEntityItem",
-    "ProjectFairShareEntityItem",
-    "UserFairShareEntityItem",
     # Entity-based search results
     "DomainFairShareEntitySearchResult",
     "ProjectFairShareEntitySearchResult",
@@ -60,11 +52,14 @@ class DomainFairShareSearchScope(SearchScope):
     """Required. The scaling group to search within."""
 
     def to_condition(self) -> QueryCondition:
-        """Convert scope to a query condition for ScalingGroupForDomainRow."""
-        resource_group = self.resource_group
+        """Convert scope to a query condition for DomainRow.
+
+        Returns a trivial condition since all domains are included;
+        the resource_group filter is applied in the LEFT JOIN condition.
+        """
 
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return ScalingGroupForDomainRow.scaling_group == resource_group
+            return sa.literal(True)
 
         return inner
 
@@ -94,15 +89,15 @@ class ProjectFairShareSearchScope(SearchScope):
     """Required. The domain to search within."""
 
     def to_condition(self) -> QueryCondition:
-        """Convert scope to a query condition for ScalingGroupForProjectRow joined with DomainRow."""
-        resource_group = self.resource_group
+        """Convert scope to a query condition for GroupRow filtered by domain.
+
+        The resource_group filter is applied in the LEFT JOIN condition,
+        so only the domain filter is needed here.
+        """
         domain_name = self.domain_name
 
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return sa.and_(
-                ScalingGroupForProjectRow.scaling_group == resource_group,
-                DomainRow.name == domain_name,
-            )
+            return GroupRow.domain_name == domain_name
 
         return inner
 
@@ -140,15 +135,17 @@ class UserFairShareSearchScope(SearchScope):
     """Required. The project to search within."""
 
     def to_condition(self) -> QueryCondition:
-        """Convert scope to a query condition for ScalingGroupForProjectRow joined with DomainRow and GroupRow."""
-        resource_group = self.resource_group
+        """Convert scope to a query condition for GroupRow filtered by domain and project.
+
+        The resource_group filter is applied in the LEFT JOIN condition,
+        so only domain and project filters are needed here.
+        """
         domain_name = self.domain_name
         project_id = self.project_id
 
         def inner() -> sa.sql.expression.ColumnElement[bool]:
             return sa.and_(
-                ScalingGroupForProjectRow.scaling_group == resource_group,
-                DomainRow.name == domain_name,
+                GroupRow.domain_name == domain_name,
                 GroupRow.id == project_id,
             )
 
@@ -178,72 +175,6 @@ class UserFairShareSearchScope(SearchScope):
         ]
 
 
-# ==================== Entity-based Search Result Items ====================
-
-
-@dataclass(frozen=True)
-class DomainFairShareEntityItem:
-    """Entity-based search result item for domain fair share.
-
-    Represents a domain that may or may not have a fair share record.
-    If no record exists, `details` will be None.
-    """
-
-    resource_group: str
-    """The scaling group this domain is associated with."""
-
-    domain_name: str
-    """The name of the domain."""
-
-    details: DomainFairShareData | None
-    """Fair share record details. None if no record exists."""
-
-
-@dataclass(frozen=True)
-class ProjectFairShareEntityItem:
-    """Entity-based search result item for project fair share.
-
-    Represents a project that may or may not have a fair share record.
-    If no record exists, `details` will be None.
-    """
-
-    resource_group: str
-    """The scaling group this project is associated with."""
-
-    project_id: uuid.UUID
-    """The UUID of the project."""
-
-    domain_name: str
-    """The domain this project belongs to."""
-
-    details: ProjectFairShareData | None
-    """Fair share record details. None if no record exists."""
-
-
-@dataclass(frozen=True)
-class UserFairShareEntityItem:
-    """Entity-based search result item for user fair share.
-
-    Represents a user that may or may not have a fair share record.
-    If no record exists, `details` will be None.
-    """
-
-    resource_group: str
-    """The scaling group this user is associated with."""
-
-    user_uuid: uuid.UUID
-    """The UUID of the user."""
-
-    project_id: uuid.UUID
-    """The project this user belongs to (for this resource group)."""
-
-    domain_name: str
-    """The domain this user belongs to."""
-
-    details: UserFairShareData | None
-    """Fair share record details. None if no record exists."""
-
-
 # ==================== Entity-based Search Results ====================
 
 
@@ -255,8 +186,8 @@ class DomainFairShareEntitySearchResult:
     regardless of whether they have fair share records.
     """
 
-    items: list[DomainFairShareEntityItem]
-    """List of domain fair share items."""
+    items: list[DomainFairShareData]
+    """List of domain fair share data."""
 
     total_count: int
     """Total number of items matching the query (before pagination)."""
@@ -276,8 +207,8 @@ class ProjectFairShareEntitySearchResult:
     regardless of whether they have fair share records.
     """
 
-    items: list[ProjectFairShareEntityItem]
-    """List of project fair share items."""
+    items: list[ProjectFairShareData]
+    """List of project fair share data."""
 
     total_count: int
     """Total number of items matching the query (before pagination)."""
@@ -297,8 +228,8 @@ class UserFairShareEntitySearchResult:
     regardless of whether they have fair share records.
     """
 
-    items: list[UserFairShareEntityItem]
-    """List of user fair share items."""
+    items: list[UserFairShareData]
+    """List of user fair share data."""
 
     total_count: int
     """Total number of items matching the query (before pagination)."""

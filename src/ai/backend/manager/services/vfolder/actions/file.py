@@ -9,13 +9,14 @@ from typing import (
 from ai.backend.common.bgtask.types import TaskID
 from ai.backend.common.types import ResultSet
 from ai.backend.manager.actions.action import BaseActionResult
+from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.services.vfolder.types import FileInfo
 
-from .base import VFolderAction
+from .base import VFolderDirectoryAction, VFolderFileAction
 
 
 @dataclass
-class CreateUploadSessionAction(VFolderAction):
+class CreateUploadSessionAction(VFolderFileAction):
     keypair_resource_policy: Mapping[str, Any]
     user_uuid: uuid.UUID
 
@@ -30,8 +31,8 @@ class CreateUploadSessionAction(VFolderAction):
 
     @override
     @classmethod
-    def operation_type(cls) -> str:
-        return "upload"
+    def operation_type(cls) -> ActionOperationType:
+        return ActionOperationType.CREATE
 
 
 @dataclass
@@ -47,7 +48,7 @@ class CreateUploadSessionActionResult(BaseActionResult):
 
 
 @dataclass
-class CreateDownloadSessionAction(VFolderAction):
+class CreateDownloadSessionAction(VFolderFileAction):
     keypair_resource_policy: Mapping[str, Any]
     user_uuid: uuid.UUID
 
@@ -62,8 +63,8 @@ class CreateDownloadSessionAction(VFolderAction):
 
     @override
     @classmethod
-    def operation_type(cls) -> str:
-        return "download"
+    def operation_type(cls) -> ActionOperationType:
+        return ActionOperationType.GET
 
 
 @dataclass
@@ -79,7 +80,37 @@ class CreateDownloadSessionActionResult(BaseActionResult):
 
 
 @dataclass
-class ListFilesAction(VFolderAction):
+class CreateArchiveDownloadSessionAction(VFolderFileAction):
+    keypair_resource_policy: Mapping[str, Any]
+
+    vfolder_uuid: uuid.UUID
+
+    files: list[str]
+
+    @override
+    def entity_id(self) -> str | None:
+        return str(self.vfolder_uuid)
+
+    @override
+    @classmethod
+    def operation_type(cls) -> ActionOperationType:
+        return ActionOperationType.GET
+
+
+@dataclass
+class CreateArchiveDownloadSessionActionResult(BaseActionResult):
+    vfolder_uuid: uuid.UUID
+
+    token: str
+    url: str
+
+    @override
+    def entity_id(self) -> str | None:
+        return str(self.vfolder_uuid)
+
+
+@dataclass
+class ListFilesAction(VFolderFileAction):
     user_uuid: uuid.UUID
     vfolder_uuid: uuid.UUID
 
@@ -91,8 +122,8 @@ class ListFilesAction(VFolderAction):
 
     @override
     @classmethod
-    def operation_type(cls) -> str:
-        return "list_files"
+    def operation_type(cls) -> ActionOperationType:
+        return ActionOperationType.SEARCH
 
 
 @dataclass
@@ -106,7 +137,7 @@ class ListFilesActionResult(BaseActionResult):
 
 
 @dataclass
-class RenameFileAction(VFolderAction):
+class RenameFileAction(VFolderFileAction):
     user_uuid: uuid.UUID
     keypair_resource_policy: Mapping[str, Any]
 
@@ -121,8 +152,8 @@ class RenameFileAction(VFolderAction):
 
     @override
     @classmethod
-    def operation_type(cls) -> str:
-        return "rename"
+    def operation_type(cls) -> ActionOperationType:
+        return ActionOperationType.UPDATE
 
 
 @dataclass
@@ -135,7 +166,7 @@ class RenameFileActionResult(BaseActionResult):
 
 
 @dataclass
-class DeleteFilesAction(VFolderAction):
+class DeleteFilesAction(VFolderFileAction):
     user_uuid: uuid.UUID
     vfolder_uuid: uuid.UUID
 
@@ -148,8 +179,8 @@ class DeleteFilesAction(VFolderAction):
 
     @override
     @classmethod
-    def operation_type(cls) -> str:
-        return "delete_files"
+    def operation_type(cls) -> ActionOperationType:
+        return ActionOperationType.DELETE
 
 
 @dataclass
@@ -162,7 +193,7 @@ class DeleteFilesActionResult(BaseActionResult):
 
 
 @dataclass
-class DeleteFilesAsyncAction(VFolderAction):
+class DeleteFilesAsyncAction(VFolderFileAction):
     user_uuid: uuid.UUID
     vfolder_uuid: uuid.UUID
 
@@ -175,8 +206,8 @@ class DeleteFilesAsyncAction(VFolderAction):
 
     @override
     @classmethod
-    def operation_type(cls) -> str:
-        return "delete_files_async"
+    def operation_type(cls) -> ActionOperationType:
+        return ActionOperationType.DELETE
 
 
 @dataclass
@@ -190,7 +221,34 @@ class DeleteFilesAsyncActionResult(BaseActionResult):
 
 
 @dataclass
-class MkdirAction(VFolderAction):
+class MoveFileAction(VFolderFileAction):
+    user_uuid: uuid.UUID
+    vfolder_uuid: uuid.UUID
+
+    src: str
+    dst: str
+
+    @override
+    def entity_id(self) -> str | None:
+        return str(self.vfolder_uuid)
+
+    @override
+    @classmethod
+    def operation_type(cls) -> ActionOperationType:
+        return ActionOperationType.UPDATE
+
+
+@dataclass
+class MoveFileActionResult(BaseActionResult):
+    vfolder_uuid: uuid.UUID
+
+    @override
+    def entity_id(self) -> str | None:
+        return str(self.vfolder_uuid)
+
+
+@dataclass
+class MkdirAction(VFolderDirectoryAction):
     user_id: uuid.UUID
     vfolder_uuid: uuid.UUID
 
@@ -204,8 +262,8 @@ class MkdirAction(VFolderAction):
 
     @override
     @classmethod
-    def operation_type(cls) -> str:
-        return "mkdir"
+    def operation_type(cls) -> ActionOperationType:
+        return ActionOperationType.CREATE
 
 
 @dataclass

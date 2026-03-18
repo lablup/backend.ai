@@ -5,14 +5,14 @@ from __future__ import annotations
 from datetime import datetime
 from decimal import Decimal
 from enum import StrEnum
-from typing import Any, override
+from typing import TYPE_CHECKING, Annotated, Any, override
 
 import strawberry
 from strawberry import ID, Info
 from strawberry.relay import Connection, Edge, Node, NodeID
 
 from ai.backend.manager.api.gql.base import OrderDirection, StringFilter
-from ai.backend.manager.api.gql.types import GQLFilter, GQLOrderBy
+from ai.backend.manager.api.gql.types import GQLFilter, GQLOrderBy, StrawberryGQLContext
 from ai.backend.manager.data.fair_share.types import DomainFairShareData
 from ai.backend.manager.repositories.base import (
     QueryCondition,
@@ -23,6 +23,7 @@ from ai.backend.manager.repositories.base import (
 from ai.backend.manager.repositories.fair_share.options import (
     DomainFairShareConditions,
     DomainFairShareOrders,
+    RGDomainFairShareConditions,
 )
 
 from .common import (
@@ -30,11 +31,10 @@ from .common import (
     FairShareSpecGQL,
     ResourceSlotGQL,
 )
-from .project import (
-    ProjectFairShareConnection,
-    ProjectFairShareFilter,
-    ProjectFairShareOrderBy,
-)
+
+if TYPE_CHECKING:
+    from ai.backend.manager.api.gql.domain_v2.types.node import DomainV2GQL
+    from ai.backend.manager.api.gql.resource_group.types import ResourceGroupGQL
 
 
 @strawberry.type(
@@ -45,7 +45,7 @@ class DomainFairShareGQL(Node):
     """Domain-level fair share data with calculated fair share factor."""
 
     id: NodeID[str]
-    resource_group: str = strawberry.field(
+    resource_group_name: str = strawberry.field(
         description="Name of the scaling group this fair share belongs to."
     )
     domain_name: str = strawberry.field(
@@ -63,64 +63,83 @@ class DomainFairShareGQL(Node):
     )
 
     @strawberry.field(  # type: ignore[misc]
-        description=(
-            "Added in 26.1.0. List project fair shares belonging to this domain. "
-            "Returns fair share data for all projects within this domain and scaling group, "
-            "including projects without fair share records (which use default values)."
-        )
+        description=("Added in 26.2.0. The domain entity associated with this fair share record.")
     )
-    async def project_fair_shares(
+    async def domain(
         self,
-        info: Info,
-        filter: ProjectFairShareFilter | None = None,
-        order_by: list[ProjectFairShareOrderBy] | None = None,
-        before: str | None = None,
-        after: str | None = None,
-        first: int | None = None,
-        last: int | None = None,
-        limit: int | None = None,
-        offset: int | None = None,
-    ) -> ProjectFairShareConnection:
-        from ai.backend.manager.api.gql.fair_share.fetcher import fetch_rg_project_fair_shares
-        from ai.backend.manager.repositories.fair_share.types import ProjectFairShareSearchScope
+        info: Info[StrawberryGQLContext],
+    ) -> (
+        Annotated[
+            DomainV2GQL,
+            strawberry.lazy("ai.backend.manager.api.gql.domain_v2.types.node"),
+        ]
+        | None
+    ):
+        from ai.backend.manager.api.gql.domain_v2.types.node import DomainV2GQL
 
-        scope = ProjectFairShareSearchScope(
-            resource_group=self.resource_group,
-            domain_name=self.domain_name,
-        )
+        domain_data = await info.context.data_loaders.domain_loader.load(self.domain_name)
+        if domain_data is None:
+            return None
+        return DomainV2GQL.from_data(domain_data)
 
-        return await fetch_rg_project_fair_shares(
-            info=info,
-            scope=scope,
-            filter=filter,
-            order_by=order_by,
-            before=before,
-            after=after,
-            first=first,
-            last=last,
-            limit=limit,
-            offset=offset,
+    @strawberry.field(  # type: ignore[misc]
+        description=("Added in 26.2.0. The resource group associated with this fair share record."),
+    )
+    async def resource_group(
+        self,
+        info: Info[StrawberryGQLContext],
+    ) -> (
+        Annotated[
+            ResourceGroupGQL,
+            strawberry.lazy("ai.backend.manager.api.gql.resource_group.types"),
+        ]
+        | None
+    ):
+        from ai.backend.manager.api.gql.resource_group.types import ResourceGroupGQL
+
+        rg_data = await info.context.data_loaders.resource_group_loader.load(
+            self.resource_group_name
         )
+        if rg_data is None:
+            return None
+        return ResourceGroupGQL.from_dataclass(rg_data)
 
     @classmethod
     def from_dataclass(cls, data: DomainFairShareData) -> DomainFairShareGQL:
+        """Convert DomainFairShareData to GraphQL type.
+
+        No async needed - Repository provides complete data.
+        Note: metadata can be None for default-generated records.
+        """
         return cls(
-            id=ID(str(data.id)),
-            resource_group=data.resource_group,
+            id=ID(f"{data.resource_group}:{data.domain_name}"),
+            resource_group_name=data.resource_group,
             domain_name=data.domain_name,
-            spec=FairShareSpecGQL.from_spec(data.spec, data.default_weight),
-            calculation_snapshot=FairShareCalculationSnapshotGQL(
-                fair_share_factor=data.calculation_snapshot.fair_share_factor,
-                total_decayed_usage=ResourceSlotGQL.from_resource_slot(
-                    data.calculation_snapshot.total_decayed_usage
-                ),
-                normalized_usage=data.calculation_snapshot.normalized_usage,
-                lookback_start=data.calculation_snapshot.lookback_start,
-                lookback_end=data.calculation_snapshot.lookback_end,
-                last_calculated_at=data.calculation_snapshot.last_calculated_at,
+            spec=FairShareSpecGQL.from_spec(
+                data.data.spec,
+                data.data.use_default,
+                data.data.uses_default_resources,
             ),
-            created_at=data.metadata.created_at,
-            updated_at=data.metadata.updated_at,
+            calculation_snapshot=FairShareCalculationSnapshotGQL(
+                fair_share_factor=data.data.calculation_snapshot.fair_share_factor,
+                total_decayed_usage=ResourceSlotGQL.from_slot_quantities(
+                    data.data.calculation_snapshot.total_decayed_usage
+                ),
+                normalized_usage=data.data.calculation_snapshot.normalized_usage,
+                lookback_start=data.data.calculation_snapshot.lookback_start,
+                lookback_end=data.data.calculation_snapshot.lookback_end,
+                last_calculated_at=data.data.calculation_snapshot.last_calculated_at,
+            ),
+            created_at=(
+                data.data.metadata.created_at
+                if data.data.metadata
+                else data.data.calculation_snapshot.last_calculated_at
+            ),
+            updated_at=(
+                data.data.metadata.updated_at
+                if data.data.metadata
+                else data.data.calculation_snapshot.last_calculated_at
+            ),
         )
 
 
@@ -142,6 +161,28 @@ class DomainFairShareConnection(Connection[DomainFairShareGQL]):
     def __init__(self, *args: Any, count: int, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
         self.count = count
+
+
+@strawberry.input(
+    name="DomainFairShareDomainNestedFilter",
+    description=(
+        "Added in 26.2.0. Nested filter for domain entity fields in domain fair share queries. "
+        "Allows filtering by domain properties such as active status."
+    ),
+)
+class DomainFairShareDomainNestedFilter:
+    """Nested filter for domain entity within domain fair share."""
+
+    is_active: bool | None = strawberry.field(
+        default=None,
+        description="Filter by domain active status.",
+    )
+
+    def build_conditions(self) -> list[QueryCondition]:
+        conditions: list[QueryCondition] = []
+        if self.is_active is not None:
+            conditions.append(DomainFairShareConditions.by_domain_is_active(self.is_active))
+        return conditions
 
 
 @strawberry.input(
@@ -169,6 +210,13 @@ class DomainFairShareFilter(GQLFilter):
             "Supports equals, contains, startsWith, and endsWith operations."
         ),
     )
+    domain: DomainFairShareDomainNestedFilter | None = strawberry.field(
+        default=None,
+        description=(
+            "Added in 26.2.0. Nested filter for domain entity properties. "
+            "Allows filtering by domain active status."
+        ),
+    )
 
     AND: list[DomainFairShareFilter] | None = strawberry.field(
         default=None,
@@ -189,31 +237,104 @@ class DomainFairShareFilter(GQLFilter):
 
         if self.resource_group:
             sg_condition = self.resource_group.build_query_condition(
-                contains_factory=lambda spec: DomainFairShareConditions.by_resource_group(
-                    spec.value
-                ),
-                equals_factory=lambda spec: DomainFairShareConditions.by_resource_group(spec.value),
-                starts_with_factory=lambda spec: DomainFairShareConditions.by_resource_group(
-                    spec.value
-                ),
-                ends_with_factory=lambda spec: DomainFairShareConditions.by_resource_group(
-                    spec.value
-                ),
+                contains_factory=DomainFairShareConditions.by_resource_group_contains,
+                equals_factory=DomainFairShareConditions.by_resource_group_equals,
+                starts_with_factory=DomainFairShareConditions.by_resource_group_starts_with,
+                ends_with_factory=DomainFairShareConditions.by_resource_group_ends_with,
             )
             if sg_condition:
                 conditions.append(sg_condition)
 
         if self.domain_name:
             dn_condition = self.domain_name.build_query_condition(
-                contains_factory=lambda spec: DomainFairShareConditions.by_domain_name(spec.value),
-                equals_factory=lambda spec: DomainFairShareConditions.by_domain_name(spec.value),
-                starts_with_factory=lambda spec: DomainFairShareConditions.by_domain_name(
-                    spec.value
-                ),
-                ends_with_factory=lambda spec: DomainFairShareConditions.by_domain_name(spec.value),
+                contains_factory=DomainFairShareConditions.by_domain_name_contains,
+                equals_factory=DomainFairShareConditions.by_domain_name_equals,
+                starts_with_factory=DomainFairShareConditions.by_domain_name_starts_with,
+                ends_with_factory=DomainFairShareConditions.by_domain_name_ends_with,
             )
             if dn_condition:
                 conditions.append(dn_condition)
+
+        if self.domain:
+            conditions.extend(self.domain.build_conditions())
+
+        if self.AND:
+            for sub_filter in self.AND:
+                conditions.extend(sub_filter.build_conditions())
+
+        if self.OR:
+            or_conditions: list[QueryCondition] = []
+            for sub_filter in self.OR:
+                or_conditions.extend(sub_filter.build_conditions())
+            if or_conditions:
+                conditions.append(combine_conditions_or(or_conditions))
+
+        if self.NOT:
+            not_conditions: list[QueryCondition] = []
+            for sub_filter in self.NOT:
+                not_conditions.extend(sub_filter.build_conditions())
+            if not_conditions:
+                conditions.append(negate_conditions(not_conditions))
+
+        return conditions
+
+
+@strawberry.input(
+    name="RGDomainFairShareFilter",
+    description=(
+        "Added in 26.2.0. Filter for domain fair shares within a resource group scope. "
+        "References resource group membership columns to avoid excluding domains without fair share records."
+    ),
+)
+class RGDomainFairShareFilter(GQLFilter):
+    """Filter for domain fair shares in RG context (uses INNER JOIN'd columns)."""
+
+    resource_group: StringFilter | None = strawberry.field(
+        default=None, description="Filter by scaling group name."
+    )
+    domain_name: StringFilter | None = strawberry.field(
+        default=None, description="Filter by domain name."
+    )
+    domain: DomainFairShareDomainNestedFilter | None = strawberry.field(
+        default=None, description="Filter by domain properties."
+    )
+
+    AND: list[RGDomainFairShareFilter] | None = strawberry.field(
+        default=None, description="Combine with AND logic."
+    )
+    OR: list[RGDomainFairShareFilter] | None = strawberry.field(
+        default=None, description="Combine with OR logic."
+    )
+    NOT: list[RGDomainFairShareFilter] | None = strawberry.field(
+        default=None, description="Negate filters."
+    )
+
+    @override
+    def build_conditions(self) -> list[QueryCondition]:
+        conditions: list[QueryCondition] = []
+
+        if self.resource_group:
+            sg_condition = self.resource_group.build_query_condition(
+                contains_factory=RGDomainFairShareConditions.by_resource_group_contains,
+                equals_factory=RGDomainFairShareConditions.by_resource_group_equals,
+                starts_with_factory=RGDomainFairShareConditions.by_resource_group_starts_with,
+                ends_with_factory=RGDomainFairShareConditions.by_resource_group_ends_with,
+            )
+            if sg_condition:
+                conditions.append(sg_condition)
+
+        if self.domain_name:
+            dn_condition = self.domain_name.build_query_condition(
+                contains_factory=RGDomainFairShareConditions.by_domain_name_contains,
+                equals_factory=RGDomainFairShareConditions.by_domain_name_equals,
+                starts_with_factory=RGDomainFairShareConditions.by_domain_name_starts_with,
+                ends_with_factory=RGDomainFairShareConditions.by_domain_name_ends_with,
+            )
+            if dn_condition:
+                conditions.append(dn_condition)
+
+        if self.domain:
+            conditions.extend(self.domain.build_conditions())
 
         if self.AND:
             for sub_filter in self.AND:
@@ -242,13 +363,15 @@ class DomainFairShareFilter(GQLFilter):
         "Added in 26.1.0. Fields available for ordering domain fair share query results. "
         "FAIR_SHARE_FACTOR: Order by the calculated fair share factor (0-1 range, lower = higher priority). "
         "DOMAIN_NAME: Order alphabetically by domain name. "
-        "CREATED_AT: Order by record creation timestamp."
+        "CREATED_AT: Order by record creation timestamp. "
+        "DOMAIN_IS_ACTIVE: Order by domain active status (added in 26.2.0)."
     ),
 )
 class DomainFairShareOrderField(StrEnum):
     FAIR_SHARE_FACTOR = "fair_share_factor"
     DOMAIN_NAME = "domain_name"
     CREATED_AT = "created_at"
+    DOMAIN_IS_ACTIVE = "domain_is_active"
 
 
 @strawberry.input(
@@ -283,6 +406,8 @@ class DomainFairShareOrderBy(GQLOrderBy):
                 return DomainFairShareOrders.by_domain_name(ascending)
             case DomainFairShareOrderField.CREATED_AT:
                 return DomainFairShareOrders.by_created_at(ascending)
+            case DomainFairShareOrderField.DOMAIN_IS_ACTIVE:
+                return DomainFairShareOrders.by_domain_is_active(ascending)
 
 
 # Mutation Input/Payload Types
@@ -299,7 +424,7 @@ class DomainFairShareOrderBy(GQLOrderBy):
 class UpsertDomainFairShareWeightInput:
     """Input for upserting domain fair share weight."""
 
-    resource_group: str = strawberry.field(
+    resource_group_name: str = strawberry.field(
         description="Name of the scaling group (resource group) for this fair share."
     )
     domain_name: str = strawberry.field(description="Name of the domain to update weight for.")
@@ -357,7 +482,7 @@ class DomainWeightInputItem:
 class BulkUpsertDomainFairShareWeightInput:
     """Input for bulk upserting domain fair share weights."""
 
-    resource_group: str = strawberry.field(
+    resource_group_name: str = strawberry.field(
         description="Name of the scaling group (resource group) for all fair shares."
     )
     inputs: list[DomainWeightInputItem] = strawberry.field(

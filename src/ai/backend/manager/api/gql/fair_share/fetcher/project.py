@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from functools import lru_cache
+from uuid import UUID
 
 from strawberry import Info
 from strawberry.relay import PageInfo
@@ -15,8 +16,10 @@ from ai.backend.manager.api.gql.fair_share.types import (
     ProjectFairShareFilter,
     ProjectFairShareGQL,
     ProjectFairShareOrderBy,
+    RGProjectFairShareFilter,
 )
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
+from ai.backend.manager.models.fair_share.row import ProjectFairShareRow
 from ai.backend.manager.repositories.base import QueryCondition
 from ai.backend.manager.repositories.fair_share.options import (
     ProjectFairShareConditions,
@@ -24,6 +27,7 @@ from ai.backend.manager.repositories.fair_share.options import (
 )
 from ai.backend.manager.repositories.fair_share.types import ProjectFairShareSearchScope
 from ai.backend.manager.services.fair_share.actions import (
+    GetProjectFairShareAction,
     SearchProjectFairSharesAction,
     SearchRGProjectFairSharesAction,
 )
@@ -36,6 +40,7 @@ def get_project_fair_share_pagination_spec() -> PaginationSpec:
         backward_order=ProjectFairShareOrders.by_created_at(ascending=True),
         forward_condition_factory=ProjectFairShareConditions.by_cursor_forward,
         backward_condition_factory=ProjectFairShareConditions.by_cursor_backward,
+        tiebreaker_order=ProjectFairShareRow.id.asc(),
     )
 
 
@@ -104,7 +109,7 @@ async def fetch_project_fair_shares(
 async def fetch_rg_project_fair_shares(
     info: Info[StrawberryGQLContext],
     scope: ProjectFairShareSearchScope,
-    filter: ProjectFairShareFilter | None = None,
+    filter: RGProjectFairShareFilter | None = None,
     order_by: list[ProjectFairShareOrderBy] | None = None,
     before: str | None = None,
     after: str | None = None,
@@ -117,6 +122,8 @@ async def fetch_rg_project_fair_shares(
     """Fetch project fair shares using resource group scope.
 
     Returns all projects in the scope, including those without records (with defaults).
+    Uses RGProjectFairShareFilter whose build_conditions() references INNER JOIN'd
+    columns to avoid NULL exclusion.
     """
     processors = info.context.processors
 
@@ -155,3 +162,25 @@ async def fetch_rg_project_fair_shares(
         ),
         count=action_result.total_count,
     )
+
+
+async def fetch_single_project_fair_share(
+    info: Info[StrawberryGQLContext],
+    resource_group_name: str,
+    project_id: UUID,
+) -> ProjectFairShareGQL:
+    """Fetch a single project fair share record.
+
+    Returns the fair share record for the specified project and resource group.
+    If no record exists, returns a default-generated object (repository handles defaults).
+    """
+    processors = info.context.processors
+
+    action_result = await processors.fair_share.get_project_fair_share.wait_for_complete(
+        GetProjectFairShareAction(
+            resource_group=resource_group_name,
+            project_id=project_id,
+        )
+    )
+
+    return ProjectFairShareGQL.from_dataclass(action_result.data)

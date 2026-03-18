@@ -295,6 +295,7 @@ class EndpointAutoScalingRuleNode(graphene.ObjectType):  # type: ignore[misc]
                         raise GenericForbidden
 
             query = query.filter(EndpointAutoScalingRuleRow.endpoint == _endpoint_id)
+            cnt_query = cnt_query.where(EndpointAutoScalingRuleRow.endpoint == _endpoint_id)
             group_rows = (await db_session.scalars(query)).all()
             result = [cls.from_row(graph_ctx, row) for row in group_rows]
             total_cnt = await db_session.scalar(cnt_query)
@@ -886,12 +887,16 @@ class Endpoint(graphene.ObjectType):  # type: ignore[misc]
             case EndpointLifecycle.DESTROYING.name:
                 return EndpointStatus.DESTROYING
             case _:
+                active_route_status_names = {s.name for s in RouteStatus.active_route_statuses()}
+                active_routings = [
+                    r for r in self.routings if r.status in active_route_status_names
+                ]
                 healthy_count = sum(
-                    1 for r in self.routings if r.status == RouteStatus.HEALTHY.name
+                    1 for r in active_routings if r.status == RouteStatus.HEALTHY.name
                 )
                 if healthy_count == 0:
                     return EndpointStatus.UNHEALTHY
-                if healthy_count == len(self.routings):
+                if healthy_count == len(active_routings):
                     return EndpointStatus.HEALTHY
                 return EndpointStatus.DEGRADED
 

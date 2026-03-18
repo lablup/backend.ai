@@ -3,6 +3,7 @@ from __future__ import annotations
 import uuid
 from dataclasses import dataclass
 
+from ai.backend.manager.data.common.types import SearchResult
 from ai.backend.manager.types import OptionalState
 
 from .id import ObjectId
@@ -31,7 +32,6 @@ class ObjectPermissionCreateInput:
     Used when adding object permissions to a role that already exists.
     """
 
-    permission_group_id: uuid.UUID
     entity_type: EntityType
     entity_id: str
     operation: OperationType
@@ -54,6 +54,12 @@ class ObjectPermissionDeleteInput:
 class ObjectPermissionData:
     id: uuid.UUID
     role_id: uuid.UUID
-    permission_group_id: uuid.UUID
     object_id: ObjectId
     operation: OperationType
+
+
+@dataclass(frozen=True)
+class ObjectPermissionListResult(SearchResult[ObjectPermissionData]):
+    """Result of object permission search with pagination info."""
+
+    pass

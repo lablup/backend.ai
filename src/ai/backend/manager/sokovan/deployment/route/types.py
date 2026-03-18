@@ -24,6 +24,7 @@ class RouteExecutionError:
     route_info: RouteData
     reason: str
     error_detail: str
+    error_code: str | None = None
 
 
 @dataclass

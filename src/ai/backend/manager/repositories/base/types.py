@@ -14,6 +14,8 @@ from ai.backend.common.exception import BackendAIError
 if TYPE_CHECKING:
     from sqlalchemy.engine import Row
 
+    from ai.backend.manager.errors.repository import RepositoryIntegrityError
+
 # QueryCondition now returns a ColumnElement (whereclause) instead of modifying stmt
 type QueryCondition = Callable[[], sa.sql.expression.ColumnElement[bool]]
 
@@ -67,3 +69,21 @@ type QueryOrder = sa.sql.expression.UnaryExpression[Any] | sa.sql.expression.Col
 type CursorConditionFactory = Callable[[str], QueryCondition]
 
 TRow = TypeVar("TRow", bound="Row[Any]")
+
+
+@dataclass(frozen=True)
+class IntegrityErrorCheck:
+    """Defines an integrity error check for declarative error matching.
+
+    Used to match parsed integrity errors against expected constraint violations
+    and raise domain-specific errors.
+    """
+
+    violation_type: type[RepositoryIntegrityError]
+    """The integrity error subclass to match (e.g., UniqueConstraintViolationError)."""
+
+    error: BackendAIError
+    """The domain error to raise when matched."""
+
+    constraint_name: str | None = None
+    """Optional constraint name filter. If None, matches any constraint of the given type."""

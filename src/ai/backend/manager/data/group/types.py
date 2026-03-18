@@ -33,7 +33,8 @@ class ProjectType(enum.StrEnum):
                 return cls.GENERAL
             case "MODEL_STORE" | "MODEL-STORE":
                 return cls.MODEL_STORE
-        return None
+            case _:
+                return None
 
 
 @dataclass

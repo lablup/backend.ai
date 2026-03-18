@@ -16,7 +16,7 @@ from ai.backend.manager.services.agent.actions.get_total_resources import GetTot
 
 
 @strawberry.field(description="Added in 25.15.0")  # type: ignore[misc]
-async def agent_stats(info: Info[StrawberryGQLContext]) -> AgentStatsGQL:
+async def agent_stats(info: Info[StrawberryGQLContext]) -> AgentStatsGQL | None:
     result = await info.context.processors.agent.get_total_resources.wait_for_complete(
         GetTotalResourcesAction()
     )
@@ -41,7 +41,7 @@ async def agents_v2(
     last: int | None = None,
     limit: int | None = None,
     offset: int | None = None,
-) -> AgentV2Connection:
+) -> AgentV2Connection | None:
     return await fetch_agents(
         info,
         filter=filter,

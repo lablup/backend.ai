@@ -10,6 +10,7 @@ from strawberry import ID
 from strawberry.relay import Connection, Edge, Node, NodeID
 
 from ai.backend.manager.api.gql.base import (
+    DateFilter,
     OrderDirection,
     StringFilter,
     UUIDFilter,
@@ -31,6 +32,10 @@ from ai.backend.manager.repositories.resource_usage_history.types import (
 )
 
 from .common import UsageBucketMetadataGQL, UsageBucketOrderField
+from .common_calculations import (
+    calculate_average_daily_usage,
+    calculate_usage_capacity_ratio,
+)
 
 
 @strawberry.type(
@@ -47,7 +52,7 @@ class UserUsageBucketGQL(Node):
     user_uuid: UUID = strawberry.field(description="UUID of the user this usage bucket belongs to.")
     project_id: UUID = strawberry.field(description="UUID of the project the user belongs to.")
     domain_name: str = strawberry.field(description="Name of the domain the user belongs to.")
-    resource_group: str = strawberry.field(
+    resource_group_name: str = strawberry.field(
         description="Name of the scaling group this usage was recorded in."
     )
     metadata: UsageBucketMetadataGQL = strawberry.field(
@@ -67,6 +72,36 @@ class UserUsageBucketGQL(Node):
         )
     )
 
+    @strawberry.field(  # type: ignore[misc]
+        description=(
+            "Added in 26.2.0. Average daily resource usage during this period. "
+            "Calculated as resource_usage divided by bucket duration in days. "
+            "For each resource type, this represents the average amount consumed per day. "
+            "Units match the resource type (e.g., CPU cores, memory bytes)."
+        )
+    )
+    def average_daily_usage(self) -> ResourceSlotGQL:
+        return calculate_average_daily_usage(
+            self.resource_usage,
+            self.metadata.period_start,
+            self.metadata.period_end,
+        )
+
+    @strawberry.field(  # type: ignore[misc]
+        description=(
+            "Added in 26.2.0. Usage ratio against total available capacity for each resource. "
+            "Calculated as resource_usage divided by capacity_snapshot. "
+            "Represents the fraction of total capacity consumed (resource-seconds / resource). "
+            "The result is in seconds, where 86400 means full utilization for one day. "
+            "Values can exceed this if usage exceeds capacity."
+        )
+    )
+    def usage_capacity_ratio(self) -> ResourceSlotGQL:
+        return calculate_usage_capacity_ratio(
+            self.resource_usage,
+            self.capacity_snapshot,
+        )
+
     @classmethod
     def from_dataclass(cls, data: UserUsageBucketData) -> UserUsageBucketGQL:
         return cls(
@@ -74,7 +109,7 @@ class UserUsageBucketGQL(Node):
             user_uuid=data.user_uuid,
             project_id=data.project_id,
             domain_name=data.domain_name,
-            resource_group=data.resource_group,
+            resource_group_name=data.resource_group,
             metadata=UsageBucketMetadataGQL(
                 period_start=data.period_start,
                 period_end=data.period_end,
@@ -147,6 +182,12 @@ class UserUsageBucketFilter(GQLFilter):
             "Supports equals, contains, startsWith, and endsWith operations."
         ),
     )
+    period_start: DateFilter | None = strawberry.field(
+        default=None, description="Filter by usage measurement period start date."
+    )
+    period_end: DateFilter | None = strawberry.field(
+        default=None, description="Filter by usage measurement period end date."
+    )
 
     AND: list[UserUsageBucketFilter] | None = strawberry.field(
         default=None,
@@ -167,47 +208,59 @@ class UserUsageBucketFilter(GQLFilter):
 
         if self.resource_group:
             sg_condition = self.resource_group.build_query_condition(
-                contains_factory=lambda spec: UserUsageBucketConditions.by_resource_group(
-                    spec.value
-                ),
-                equals_factory=lambda spec: UserUsageBucketConditions.by_resource_group(spec.value),
-                starts_with_factory=lambda spec: UserUsageBucketConditions.by_resource_group(
-                    spec.value
-                ),
-                ends_with_factory=lambda spec: UserUsageBucketConditions.by_resource_group(
-                    spec.value
-                ),
+                contains_factory=UserUsageBucketConditions.by_resource_group_contains,
+                equals_factory=UserUsageBucketConditions.by_resource_group_equals,
+                starts_with_factory=UserUsageBucketConditions.by_resource_group_starts_with,
+                ends_with_factory=UserUsageBucketConditions.by_resource_group_ends_with,
             )
             if sg_condition:
                 conditions.append(sg_condition)
 
         if self.user_uuid:
             uuid_condition = self.user_uuid.build_query_condition(
-                equals_factory=lambda spec: UserUsageBucketConditions.by_user_uuid(spec.value),
-                in_factory=lambda spec: UserUsageBucketConditions.by_user_uuid(spec.values[0]),
+                equals_factory=UserUsageBucketConditions.by_user_uuid,
+                in_factory=UserUsageBucketConditions.by_user_uuids,
             )
             if uuid_condition:
                 conditions.append(uuid_condition)
 
         if self.project_id:
             pid_condition = self.project_id.build_query_condition(
-                equals_factory=lambda spec: UserUsageBucketConditions.by_project_id(spec.value),
-                in_factory=lambda spec: UserUsageBucketConditions.by_project_id(spec.values[0]),
+                equals_factory=UserUsageBucketConditions.by_project_id,
+                in_factory=UserUsageBucketConditions.by_project_ids,
             )
             if pid_condition:
                 conditions.append(pid_condition)
 
         if self.domain_name:
             dn_condition = self.domain_name.build_query_condition(
-                contains_factory=lambda spec: UserUsageBucketConditions.by_domain_name(spec.value),
-                equals_factory=lambda spec: UserUsageBucketConditions.by_domain_name(spec.value),
-                starts_with_factory=lambda spec: UserUsageBucketConditions.by_domain_name(
-                    spec.value
-                ),
-                ends_with_factory=lambda spec: UserUsageBucketConditions.by_domain_name(spec.value),
+                contains_factory=UserUsageBucketConditions.by_domain_name_contains,
+                equals_factory=UserUsageBucketConditions.by_domain_name_equals,
+                starts_with_factory=UserUsageBucketConditions.by_domain_name_starts_with,
+                ends_with_factory=UserUsageBucketConditions.by_domain_name_ends_with,
             )
             if dn_condition:
                 conditions.append(dn_condition)
+
+        if self.period_start:
+            ps_condition = self.period_start.build_query_condition(
+                before_factory=UserUsageBucketConditions.by_period_start_before,
+                after_factory=UserUsageBucketConditions.by_period_start_after,
+                equals_factory=UserUsageBucketConditions.by_period_start,
+                not_equals_factory=UserUsageBucketConditions.by_period_start_not_equals,
+            )
+            if ps_condition:
+                conditions.append(ps_condition)
+
+        if self.period_end:
+            pe_condition = self.period_end.build_query_condition(
+                before_factory=UserUsageBucketConditions.by_period_end_before,
+                after_factory=UserUsageBucketConditions.by_period_end_after,
+                equals_factory=UserUsageBucketConditions.by_period_end,
+                not_equals_factory=UserUsageBucketConditions.by_period_end_not_equals,
+            )
+            if pe_condition:
+                conditions.append(pe_condition)
 
         if self.AND:
             for sub_filter in self.AND:

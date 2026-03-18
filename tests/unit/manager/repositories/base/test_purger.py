@@ -12,6 +12,10 @@ import sqlalchemy as sa
 from sqlalchemy.dialects.postgresql import UUID as PGUUID
 from sqlalchemy.orm import Mapped, mapped_column
 
+from ai.backend.manager.errors.repository import (
+    ForeignKeyViolationError,
+    RepositoryIntegrityError,
+)
 from ai.backend.manager.models.base import Base
 from ai.backend.manager.repositories.base import (
     BatchPurger,
@@ -750,3 +754,172 @@ class TestBatchPurgerCompositePK:
 
             count_result = await db_sess.execute(sa.select(sa.func.count()).select_from(row_class))
             assert count_result.scalar() == 15
+
+
+# =============================================================================
+# IntegrityError Handling Tests
+# =============================================================================
+
+
+class PurgerParentRow(Base):  # type: ignore[misc]
+    """Parent ORM model for IntegrityError testing."""
+
+    __tablename__ = "test_purger_ie_parent"
+    __table_args__ = {"extend_existing": True}
+
+    id: Mapped[int] = mapped_column(sa.Integer, primary_key=True)
+    name: Mapped[str] = mapped_column(sa.String(50), nullable=False)
+
+
+class PurgerChildRow(Base):  # type: ignore[misc]
+    """Child ORM model with FK reference to parent for IntegrityError testing."""
+
+    __tablename__ = "test_purger_ie_child"
+    __table_args__ = {"extend_existing": True}
+
+    id: Mapped[int] = mapped_column(sa.Integer, primary_key=True)
+    parent_id: Mapped[int] = mapped_column(
+        sa.Integer,
+        sa.ForeignKey("test_purger_ie_parent.id"),
+        nullable=False,
+    )
+    name: Mapped[str] = mapped_column(sa.String(50), nullable=False)
+
+
+class TestPurgerIntegrityError:
+    """Tests for IntegrityError → RepositoryIntegrityError conversion in execute_purger()."""
+
+    @pytest.fixture
+    async def fk_tables(
+        self,
+        database_connection: ExtendedAsyncSAEngine,
+    ) -> AsyncGenerator[tuple[type[PurgerParentRow], type[PurgerChildRow]], None]:
+        """Create parent and child tables with FK constraint."""
+        async with database_connection.begin() as conn:
+            await conn.run_sync(
+                lambda c: Base.metadata.create_all(
+                    c, [PurgerParentRow.__table__, PurgerChildRow.__table__]
+                )
+            )
+
+        yield PurgerParentRow, PurgerChildRow
+
+        async with database_connection.begin() as conn:
+            await conn.execute(sa.text("DROP TABLE IF EXISTS test_purger_ie_child CASCADE"))
+            await conn.execute(sa.text("DROP TABLE IF EXISTS test_purger_ie_parent CASCADE"))
+
+    async def test_delete_with_fk_violation_raises_repository_integrity_error(
+        self,
+        database_connection: ExtendedAsyncSAEngine,
+        fk_tables: tuple[type[PurgerParentRow], type[PurgerChildRow]],
+    ) -> None:
+        """Deleting a parent row referenced by a child raises ForeignKeyViolationError."""
+        parent_cls, child_cls = fk_tables
+
+        # Insert parent first, then child (explicit flush to ensure FK order)
+        async with database_connection.begin_session() as db_sess:
+            db_sess.add(PurgerParentRow(id=1, name="parent-1"))
+            await db_sess.flush()
+            db_sess.add(PurgerChildRow(id=1, parent_id=1, name="child-1"))
+
+        # Attempt to delete parent → FK violation
+        async with database_connection.begin_session() as db_sess:
+            purger: Purger[PurgerParentRow] = Purger(row_class=parent_cls, pk_value=1)
+            with pytest.raises(ForeignKeyViolationError) as exc_info:
+                await execute_purger(db_sess, purger)
+
+            err = exc_info.value
+            assert isinstance(err, RepositoryIntegrityError)
+            assert err.__cause__ is not None
+
+    async def test_delete_without_fk_violation_succeeds(
+        self,
+        database_connection: ExtendedAsyncSAEngine,
+        fk_tables: tuple[type[PurgerParentRow], type[PurgerChildRow]],
+    ) -> None:
+        """Deleting a parent row with no child references succeeds normally."""
+        parent_cls, _ = fk_tables
+
+        # Insert parent only (no child)
+        async with database_connection.begin_session() as db_sess:
+            db_sess.add(PurgerParentRow(id=1, name="parent-1"))
+
+        # Delete parent → should succeed
+        async with database_connection.begin_session() as db_sess:
+            purger: Purger[PurgerParentRow] = Purger(row_class=parent_cls, pk_value=1)
+            result = await execute_purger(db_sess, purger)
+
+            assert result is not None
+            assert isinstance(result, PurgerResult)
+            assert result.row.id == 1
+            assert result.row.name == "parent-1"
+
+
+class TestBatchPurgerIntegrityError:
+    """Tests for IntegrityError → RepositoryIntegrityError conversion in execute_batch_purger()."""
+
+    @pytest.fixture
+    async def fk_tables(
+        self,
+        database_connection: ExtendedAsyncSAEngine,
+    ) -> AsyncGenerator[tuple[type[PurgerParentRow], type[PurgerChildRow]], None]:
+        """Create parent and child tables with FK constraint."""
+        async with database_connection.begin() as conn:
+            await conn.run_sync(
+                lambda c: Base.metadata.create_all(
+                    c, [PurgerParentRow.__table__, PurgerChildRow.__table__]
+                )
+            )
+
+        yield PurgerParentRow, PurgerChildRow
+
+        async with database_connection.begin() as conn:
+            await conn.execute(sa.text("DROP TABLE IF EXISTS test_purger_ie_child CASCADE"))
+            await conn.execute(sa.text("DROP TABLE IF EXISTS test_purger_ie_parent CASCADE"))
+
+    async def test_batch_delete_with_fk_violation_raises_repository_integrity_error(
+        self,
+        database_connection: ExtendedAsyncSAEngine,
+        fk_tables: tuple[type[PurgerParentRow], type[PurgerChildRow]],
+    ) -> None:
+        """Batch-deleting parent rows referenced by children raises ForeignKeyViolationError."""
+        parent_cls, child_cls = fk_tables
+
+        # Insert parents first, then child (explicit flush to ensure FK order)
+        async with database_connection.begin_session() as db_sess:
+            db_sess.add(PurgerParentRow(id=1, name="parent-1"))
+            db_sess.add(PurgerParentRow(id=2, name="parent-2"))
+            await db_sess.flush()
+            db_sess.add(PurgerChildRow(id=1, parent_id=1, name="child-1"))
+
+        # Batch delete all parents → FK violation on parent-1
+        async with database_connection.begin_session() as db_sess:
+            spec = SimpleBatchPurgerSpec(row_class=parent_cls)
+            purger = BatchPurger(spec=spec)
+            with pytest.raises(ForeignKeyViolationError) as exc_info:
+                await execute_batch_purger(db_sess, purger)
+
+            err = exc_info.value
+            assert isinstance(err, RepositoryIntegrityError)
+
+    async def test_batch_delete_without_fk_violation_succeeds(
+        self,
+        database_connection: ExtendedAsyncSAEngine,
+        fk_tables: tuple[type[PurgerParentRow], type[PurgerChildRow]],
+    ) -> None:
+        """Batch-deleting parent rows with no child references succeeds normally."""
+        parent_cls, _ = fk_tables
+
+        # Insert parents only (no children)
+        async with database_connection.begin_session() as db_sess:
+            db_sess.add(PurgerParentRow(id=1, name="parent-1"))
+            db_sess.add(PurgerParentRow(id=2, name="parent-2"))
+
+        # Batch delete all parents → should succeed
+        async with database_connection.begin_session() as db_sess:
+            spec = SimpleBatchPurgerSpec(row_class=parent_cls)
+            purger = BatchPurger(spec=spec)
+            result = await execute_batch_purger(db_sess, purger)
+
+            assert isinstance(result, BatchPurgerResult)
+            assert result.deleted_count == 2

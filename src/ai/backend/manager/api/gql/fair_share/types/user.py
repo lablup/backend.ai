@@ -5,15 +5,15 @@ from __future__ import annotations
 from datetime import datetime
 from decimal import Decimal
 from enum import StrEnum
-from typing import Any, override
+from typing import TYPE_CHECKING, Annotated, Any, override
 from uuid import UUID
 
 import strawberry
-from strawberry import ID
+from strawberry import ID, Info
 from strawberry.relay import Connection, Edge, Node, NodeID
 
 from ai.backend.manager.api.gql.base import OrderDirection, StringFilter, UUIDFilter
-from ai.backend.manager.api.gql.types import GQLFilter, GQLOrderBy
+from ai.backend.manager.api.gql.types import GQLFilter, GQLOrderBy, StrawberryGQLContext
 from ai.backend.manager.data.fair_share.types import UserFairShareData
 from ai.backend.manager.repositories.base import (
     QueryCondition,
@@ -22,6 +22,7 @@ from ai.backend.manager.repositories.base import (
     negate_conditions,
 )
 from ai.backend.manager.repositories.fair_share.options import (
+    RGUserFairShareConditions,
     UserFairShareConditions,
     UserFairShareOrders,
 )
@@ -32,6 +33,12 @@ from .common import (
     ResourceSlotGQL,
 )
 
+if TYPE_CHECKING:
+    from ai.backend.manager.api.gql.domain_v2.types.node import DomainV2GQL
+    from ai.backend.manager.api.gql.project_v2.types.node import ProjectV2GQL
+    from ai.backend.manager.api.gql.resource_group.types import ResourceGroupGQL
+    from ai.backend.manager.api.gql.user.types.node import UserV2GQL
+
 
 @strawberry.type(
     name="UserFairShare",
@@ -41,7 +48,7 @@ class UserFairShareGQL(Node):
     """User-level fair share data with calculated fair share factor."""
 
     id: NodeID[str]
-    resource_group: str = strawberry.field(
+    resource_group_name: str = strawberry.field(
         description="Name of the scaling group this fair share belongs to."
     )
     user_uuid: UUID = strawberry.field(
@@ -60,27 +67,126 @@ class UserFairShareGQL(Node):
         description="Timestamp when this record was last updated."
     )
 
+    @strawberry.field(  # type: ignore[misc]
+        description=("Added in 26.2.0. The user entity associated with this fair share record.")
+    )
+    async def user(
+        self,
+        info: Info[StrawberryGQLContext],
+    ) -> (
+        Annotated[
+            UserV2GQL,
+            strawberry.lazy("ai.backend.manager.api.gql.user.types.node"),
+        ]
+        | None
+    ):
+        from ai.backend.manager.api.gql.user.types.node import UserV2GQL
+
+        user_data = await info.context.data_loaders.user_loader.load(self.user_uuid)
+        if user_data is None:
+            return None
+        return UserV2GQL.from_data(user_data)
+
+    @strawberry.field(  # type: ignore[misc]
+        description=("Added in 26.2.0. The domain entity associated with this fair share record."),
+    )
+    async def domain(
+        self,
+        info: Info[StrawberryGQLContext],
+    ) -> (
+        Annotated[
+            DomainV2GQL,
+            strawberry.lazy("ai.backend.manager.api.gql.domain_v2.types.node"),
+        ]
+        | None
+    ):
+        from ai.backend.manager.api.gql.domain_v2.types.node import DomainV2GQL
+
+        domain_data = await info.context.data_loaders.domain_loader.load(self.domain_name)
+        if domain_data is None:
+            return None
+        return DomainV2GQL.from_data(domain_data)
+
+    @strawberry.field(  # type: ignore[misc]
+        description=("Added in 26.2.0. The project entity associated with this fair share record."),
+    )
+    async def project(
+        self,
+        info: Info[StrawberryGQLContext],
+    ) -> (
+        Annotated[
+            ProjectV2GQL,
+            strawberry.lazy("ai.backend.manager.api.gql.project_v2.types.node"),
+        ]
+        | None
+    ):
+        from ai.backend.manager.api.gql.project_v2.types.node import ProjectV2GQL
+
+        project_data = await info.context.data_loaders.project_loader.load(self.project_id)
+        if project_data is None:
+            return None
+        return ProjectV2GQL.from_data(project_data)
+
+    @strawberry.field(  # type: ignore[misc]
+        description=("Added in 26.2.0. The resource group associated with this fair share record."),
+    )
+    async def resource_group(
+        self,
+        info: Info[StrawberryGQLContext],
+    ) -> (
+        Annotated[
+            ResourceGroupGQL,
+            strawberry.lazy("ai.backend.manager.api.gql.resource_group.types"),
+        ]
+        | None
+    ):
+        from ai.backend.manager.api.gql.resource_group.types import ResourceGroupGQL
+
+        rg_data = await info.context.data_loaders.resource_group_loader.load(
+            self.resource_group_name
+        )
+        if rg_data is None:
+            return None
+        return ResourceGroupGQL.from_dataclass(rg_data)
+
     @classmethod
     def from_dataclass(cls, data: UserFairShareData) -> UserFairShareGQL:
+        """Convert UserFairShareData to GraphQL type.
+
+        No async needed - Repository provides complete data.
+        Note: metadata can be None for default-generated records.
+        """
         return cls(
-            id=ID(str(data.id)),
-            resource_group=data.resource_group,
+            id=ID(f"{data.resource_group}:{data.project_id}:{data.user_uuid}"),
+            resource_group_name=data.resource_group,
             user_uuid=data.user_uuid,
             project_id=data.project_id,
             domain_name=data.domain_name,
-            spec=FairShareSpecGQL.from_spec(data.spec, data.default_weight),
-            calculation_snapshot=FairShareCalculationSnapshotGQL(
-                fair_share_factor=data.calculation_snapshot.fair_share_factor,
-                total_decayed_usage=ResourceSlotGQL.from_resource_slot(
-                    data.calculation_snapshot.total_decayed_usage
-                ),
-                normalized_usage=data.calculation_snapshot.normalized_usage,
-                lookback_start=data.calculation_snapshot.lookback_start,
-                lookback_end=data.calculation_snapshot.lookback_end,
-                last_calculated_at=data.calculation_snapshot.last_calculated_at,
+            spec=FairShareSpecGQL.from_spec(
+                data.data.spec,
+                data.data.use_default,
+                data.data.uses_default_resources,
             ),
-            created_at=data.metadata.created_at,
-            updated_at=data.metadata.updated_at,
+            calculation_snapshot=FairShareCalculationSnapshotGQL(
+                fair_share_factor=data.data.calculation_snapshot.fair_share_factor,
+                total_decayed_usage=ResourceSlotGQL.from_slot_quantities(
+                    data.data.calculation_snapshot.total_decayed_usage
+                ),
+                normalized_usage=data.data.calculation_snapshot.normalized_usage,
+                lookback_start=data.data.calculation_snapshot.lookback_start,
+                lookback_end=data.data.calculation_snapshot.lookback_end,
+                last_calculated_at=data.data.calculation_snapshot.last_calculated_at,
+            ),
+            created_at=(
+                data.data.metadata.created_at
+                if data.data.metadata
+                else data.data.calculation_snapshot.last_calculated_at
+            ),
+            updated_at=(
+                data.data.metadata.updated_at
+                if data.data.metadata
+                else data.data.calculation_snapshot.last_calculated_at
+            ),
         )
 
 
@@ -102,6 +208,54 @@ class UserFairShareConnection(Connection[UserFairShareGQL]):
     def __init__(self, *args: Any, count: int, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
         self.count = count
+
+
+@strawberry.input(
+    name="UserFairShareUserNestedFilter",
+    description=(
+        "Added in 26.2.0. Nested filter for user entity fields in user fair share queries. "
+        "Allows filtering by user properties such as username, email, and active status."
+    ),
+)
+class UserFairShareUserNestedFilter:
+    """Nested filter for user entity within user fair share."""
+
+    username: StringFilter | None = strawberry.field(
+        default=None,
+        description="Filter by username. Supports equals, contains, startsWith, and endsWith.",
+    )
+    email: StringFilter | None = strawberry.field(
+        default=None,
+        description="Filter by email. Supports equals, contains, startsWith, and endsWith.",
+    )
+    is_active: bool | None = strawberry.field(
+        default=None,
+        description="Filter by user active status (based on user status field).",
+    )
+
+    def build_conditions(self) -> list[QueryCondition]:
+        conditions: list[QueryCondition] = []
+        if self.username:
+            username_condition = self.username.build_query_condition(
+                contains_factory=UserFairShareConditions.by_user_username_contains,
+                equals_factory=UserFairShareConditions.by_user_username_equals,
+                starts_with_factory=UserFairShareConditions.by_user_username_starts_with,
+                ends_with_factory=UserFairShareConditions.by_user_username_ends_with,
+            )
+            if username_condition:
+                conditions.append(username_condition)
+        if self.email:
+            email_condition = self.email.build_query_condition(
+                contains_factory=UserFairShareConditions.by_user_email_contains,
+                equals_factory=UserFairShareConditions.by_user_email_equals,
+                starts_with_factory=UserFairShareConditions.by_user_email_starts_with,
+                ends_with_factory=UserFairShareConditions.by_user_email_ends_with,
+            )
+            if email_condition:
+                conditions.append(email_condition)
+        if self.is_active is not None:
+            conditions.append(UserFairShareConditions.by_user_is_active(self.is_active))
+        return conditions
 
 
 @strawberry.input(
@@ -145,6 +299,13 @@ class UserFairShareFilter(GQLFilter):
             "Supports equals, contains, startsWith, and endsWith operations."
         ),
     )
+    user: UserFairShareUserNestedFilter | None = strawberry.field(
+        default=None,
+        description=(
+            "Added in 26.2.0. Nested filter for user entity properties. "
+            "Allows filtering by username, email, and active status."
+        ),
+    )
 
     AND: list[UserFairShareFilter] | None = strawberry.field(
         default=None,
@@ -165,43 +326,142 @@ class UserFairShareFilter(GQLFilter):
 
         if self.resource_group:
             sg_condition = self.resource_group.build_query_condition(
-                contains_factory=lambda spec: UserFairShareConditions.by_resource_group(spec.value),
-                equals_factory=lambda spec: UserFairShareConditions.by_resource_group(spec.value),
-                starts_with_factory=lambda spec: UserFairShareConditions.by_resource_group(
-                    spec.value
-                ),
-                ends_with_factory=lambda spec: UserFairShareConditions.by_resource_group(
-                    spec.value
-                ),
+                contains_factory=UserFairShareConditions.by_resource_group_contains,
+                equals_factory=UserFairShareConditions.by_resource_group_equals,
+                starts_with_factory=UserFairShareConditions.by_resource_group_starts_with,
+                ends_with_factory=UserFairShareConditions.by_resource_group_ends_with,
             )
             if sg_condition:
                 conditions.append(sg_condition)
 
         if self.user_uuid:
             uuid_condition = self.user_uuid.build_query_condition(
-                equals_factory=lambda spec: UserFairShareConditions.by_user_uuid(spec.value),
-                in_factory=lambda spec: UserFairShareConditions.by_user_uuids(spec.values),
+                equals_factory=UserFairShareConditions.by_user_uuid,
+                in_factory=UserFairShareConditions.by_user_uuids,
             )
             if uuid_condition:
                 conditions.append(uuid_condition)
 
         if self.project_id:
             pid_condition = self.project_id.build_query_condition(
-                equals_factory=lambda spec: UserFairShareConditions.by_project_id(spec.value),
-                in_factory=lambda spec: UserFairShareConditions.by_project_ids(spec.values),
+                equals_factory=UserFairShareConditions.by_project_id,
+                in_factory=UserFairShareConditions.by_project_ids,
             )
             if pid_condition:
                 conditions.append(pid_condition)
 
         if self.domain_name:
             dn_condition = self.domain_name.build_query_condition(
-                contains_factory=lambda spec: UserFairShareConditions.by_domain_name(spec.value),
-                equals_factory=lambda spec: UserFairShareConditions.by_domain_name(spec.value),
-                starts_with_factory=lambda spec: UserFairShareConditions.by_domain_name(spec.value),
-                ends_with_factory=lambda spec: UserFairShareConditions.by_domain_name(spec.value),
+                contains_factory=UserFairShareConditions.by_domain_name_contains,
+                equals_factory=UserFairShareConditions.by_domain_name_equals,
+                starts_with_factory=UserFairShareConditions.by_domain_name_starts_with,
+                ends_with_factory=UserFairShareConditions.by_domain_name_ends_with,
             )
             if dn_condition:
                 conditions.append(dn_condition)
+
+        if self.user:
+            conditions.extend(self.user.build_conditions())
+
+        if self.AND:
+            for sub_filter in self.AND:
+                conditions.extend(sub_filter.build_conditions())
+
+        if self.OR:
+            or_conditions: list[QueryCondition] = []
+            for sub_filter in self.OR:
+                or_conditions.extend(sub_filter.build_conditions())
+            if or_conditions:
+                conditions.append(combine_conditions_or(or_conditions))
+
+        if self.NOT:
+            not_conditions: list[QueryCondition] = []
+            for sub_filter in self.NOT:
+                not_conditions.extend(sub_filter.build_conditions())
+            if not_conditions:
+                conditions.append(negate_conditions(not_conditions))
+
+        return conditions
+
+
+@strawberry.input(
+    name="RGUserFairShareFilter",
+    description=(
+        "Added in 26.2.0. Filter for user fair shares within a resource group scope. "
+        "References resource group membership columns to avoid excluding users without fair share records."
+    ),
+)
+class RGUserFairShareFilter(GQLFilter):
+    """Filter for user fair shares in RG context (uses INNER JOIN'd columns)."""
+
+    resource_group: StringFilter | None = strawberry.field(
+        default=None, description="Filter by scaling group name."
+    )
+    user_uuid: UUIDFilter | None = strawberry.field(
+        default=None, description="Filter by user UUID."
+    )
+    project_id: UUIDFilter | None = strawberry.field(
+        default=None, description="Filter by project UUID."
+    )
+    domain_name: StringFilter | None = strawberry.field(
+        default=None, description="Filter by domain name."
+    )
+    user: UserFairShareUserNestedFilter | None = strawberry.field(
+        default=None, description="Filter by user properties."
+    )
+
+    AND: list[RGUserFairShareFilter] | None = strawberry.field(
+        default=None, description="Combine with AND logic."
+    )
+    OR: list[RGUserFairShareFilter] | None = strawberry.field(
+        default=None, description="Combine with OR logic."
+    )
+    NOT: list[RGUserFairShareFilter] | None = strawberry.field(
+        default=None, description="Negate filters."
+    )
+
+    @override
+    def build_conditions(self) -> list[QueryCondition]:
+        conditions: list[QueryCondition] = []
+
+        if self.resource_group:
+            sg_condition = self.resource_group.build_query_condition(
+                contains_factory=RGUserFairShareConditions.by_resource_group_contains,
+                equals_factory=RGUserFairShareConditions.by_resource_group_equals,
+                starts_with_factory=RGUserFairShareConditions.by_resource_group_starts_with,
+                ends_with_factory=RGUserFairShareConditions.by_resource_group_ends_with,
+            )
+            if sg_condition:
+                conditions.append(sg_condition)
+
+        if self.user_uuid:
+            uuid_condition = self.user_uuid.build_query_condition(
+                equals_factory=RGUserFairShareConditions.by_user_uuid,
+                in_factory=RGUserFairShareConditions.by_user_uuids,
+            )
+            if uuid_condition:
+                conditions.append(uuid_condition)
+
+        if self.project_id:
+            pid_condition = self.project_id.build_query_condition(
+                equals_factory=RGUserFairShareConditions.by_project_id,
+                in_factory=RGUserFairShareConditions.by_project_ids,
+            )
+            if pid_condition:
+                conditions.append(pid_condition)
+
+        if self.domain_name:
+            dn_condition = self.domain_name.build_query_condition(
+                contains_factory=RGUserFairShareConditions.by_domain_name_contains,
+                equals_factory=RGUserFairShareConditions.by_domain_name_equals,
+                starts_with_factory=RGUserFairShareConditions.by_domain_name_starts_with,
+                ends_with_factory=RGUserFairShareConditions.by_domain_name_ends_with,
+            )
+            if dn_condition:
+                conditions.append(dn_condition)
+
+        if self.user:
+            conditions.extend(self.user.build_conditions())
 
         if self.AND:
             for sub_filter in self.AND:
@@ -229,12 +489,16 @@ class UserFairShareFilter(GQLFilter):
     description=(
         "Added in 26.1.0. Fields available for ordering user fair share query results. "
         "FAIR_SHARE_FACTOR: Order by the calculated fair share factor (0-1 range, lower = higher priority). "
-        "CREATED_AT: Order by record creation timestamp."
+        "CREATED_AT: Order by record creation timestamp. "
+        "USER_USERNAME: Order alphabetically by username (added in 26.2.0). "
+        "USER_EMAIL: Order alphabetically by email (added in 26.2.0)."
     ),
 )
 class UserFairShareOrderField(StrEnum):
     FAIR_SHARE_FACTOR = "fair_share_factor"
     CREATED_AT = "created_at"
+    USER_USERNAME = "user_username"
+    USER_EMAIL = "user_email"
 
 
 @strawberry.input(
@@ -267,6 +531,10 @@ class UserFairShareOrderBy(GQLOrderBy):
                 return UserFairShareOrders.by_fair_share_factor(ascending)
             case UserFairShareOrderField.CREATED_AT:
                 return UserFairShareOrders.by_created_at(ascending)
+            case UserFairShareOrderField.USER_USERNAME:
+                return UserFairShareOrders.by_user_username(ascending)
+            case UserFairShareOrderField.USER_EMAIL:
+                return UserFairShareOrders.by_user_email(ascending)
 
 
 # Mutation Input/Payload Types
@@ -283,7 +551,7 @@ class UserFairShareOrderBy(GQLOrderBy):
 class UpsertUserFairShareWeightInput:
     """Input for upserting user fair share weight."""
 
-    resource_group: str = strawberry.field(
+    resource_group_name: str = strawberry.field(
         description="Name of the scaling group (resource group) for this fair share."
     )
     project_id: UUID = strawberry.field(description="UUID of the project the user belongs to.")
@@ -347,7 +615,7 @@ class UserWeightInputItem:
 class BulkUpsertUserFairShareWeightInput:
     """Input for bulk upserting user fair share weights."""
 
-    resource_group: str = strawberry.field(
+    resource_group_name: str = strawberry.field(
         description="Name of the scaling group (resource group) for all fair shares."
     )
     inputs: list[UserWeightInputItem] = strawberry.field(

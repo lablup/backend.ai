@@ -12,7 +12,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from ai.backend.common.types import AgentSelectionStrategy, ResourceSlot, SessionTypes
+from ai.backend.common.types import AgentSelectionStrategy, ResourceSlot, SessionTypes, SlotQuantity
 from ai.backend.manager.data.scaling_group.types import (
     ResourceInfo,
     ScalingGroupData,
@@ -83,8 +83,8 @@ def _create_scaling_group(
 
 
 def _create_capacity(resources: dict[str, Decimal]) -> ResourceInfo:
-    slot = ResourceSlot(resources)
-    return ResourceInfo(capacity=slot, used=ResourceSlot(), free=slot)
+    slot = [SlotQuantity(k, v) for k, v in resources.items()]
+    return ResourceInfo(capacity=slot, used=[], free=slot)
 
 
 # =============================================================================

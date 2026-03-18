@@ -804,3 +804,798 @@ def resource_group_specs_cmd(
         except Exception as e:
             ctx.output.print_error(e)
             sys.exit(ExitCode.FAILURE)
+
+
+# =============================================================================
+# RG-Scoped Domain Fair Share Commands (Resource Group Scope)
+# =============================================================================
+
+
+@fair_share.group("rg-domain")
+def rg_domain() -> None:
+    """Domain fair share operations within resource group scope."""
+
+
+@rg_domain.command("get")
+@pass_ctx_obj
+@click.argument("resource_group", type=str)
+@click.argument("domain_name", type=str)
+@click.option("--json", "as_json", is_flag=True, help="Output as JSON")
+def rg_domain_get_cmd(
+    ctx: CLIContext,
+    resource_group: str,
+    domain_name: str,
+    as_json: bool,
+) -> None:
+    """Get domain fair share data within resource group scope."""
+    from ai.backend.cli.types import ExitCode
+    from ai.backend.client.session import Session
+
+    with Session() as api_session:
+        try:
+            response = api_session.FairShare.rg_get_domain_fair_share(resource_group, domain_name)
+            if response.item is None:
+                print("No domain fair share found")
+                return
+
+            if as_json:
+                print(json.dumps(response.item.model_dump(mode="json"), indent=2, default=str))
+            else:
+                fs = response.item
+                print(f"Resource Group: {fs.resource_group}")
+                print(f"Domain: {fs.domain_name}")
+                print(f"Weight: {fs.spec.weight}")
+                print(f"Fair Share Factor: {fs.calculation_snapshot.fair_share_factor}")
+                print(f"Normalized Usage: {fs.calculation_snapshot.normalized_usage}")
+                print(
+                    f"Lookback: {fs.calculation_snapshot.lookback_start} ~ "
+                    f"{fs.calculation_snapshot.lookback_end}"
+                )
+                print(f"Created: {fs.created_at}")
+                print(f"Updated: {fs.updated_at}")
+        except Exception as e:
+            ctx.output.print_error(e)
+            sys.exit(ExitCode.FAILURE)
+
+
+@rg_domain.command("list")
+@pass_ctx_obj
+@click.argument("resource_group", type=str)
+@click.option("--domain-name", type=str, default=None, help="Filter by domain name")
+@click.option("--limit", type=int, default=20, help="Maximum number of records to return")
+@click.option("--offset", type=int, default=0, help="Offset for pagination")
+@click.option(
+    "--order-by",
+    type=click.Choice(["fair_share_factor", "domain_name", "created_at"]),
+    default="fair_share_factor",
+    help="Order by field",
+)
+@click.option(
+    "--order",
+    type=click.Choice(["ASC", "DESC"]),
+    default="DESC",
+    help="Order direction",
+)
+@click.option("--json", "as_json", is_flag=True, help="Output as JSON")
+def rg_domain_list_cmd(
+    ctx: CLIContext,
+    resource_group: str,
+    domain_name: str | None,
+    limit: int,
+    offset: int,
+    order_by: str,
+    order: str,
+    as_json: bool,
+) -> None:
+    """List domain fair shares within resource group scope."""
+    from ai.backend.cli.types import ExitCode
+    from ai.backend.client.session import Session
+    from ai.backend.common.dto.manager.fair_share import (
+        DomainFairShareFilter,
+        DomainFairShareOrder,
+        DomainFairShareOrderField,
+        OrderDirection,
+        SearchDomainFairSharesRequest,
+    )
+    from ai.backend.common.dto.manager.query import StringFilter
+
+    with Session() as api_session:
+        try:
+            filter_cond = None
+            if domain_name:
+                filter_cond = DomainFairShareFilter(
+                    domain_name=StringFilter(equals=domain_name),
+                )
+
+            order_spec = DomainFairShareOrder(
+                field=DomainFairShareOrderField(order_by),
+                direction=OrderDirection(order.lower()),
+            )
+
+            request = SearchDomainFairSharesRequest(
+                filter=filter_cond,
+                order=[order_spec],
+                limit=limit,
+                offset=offset,
+            )
+            response = api_session.FairShare.rg_search_domain_fair_shares(resource_group, request)
+
+            if as_json:
+                print(
+                    json.dumps(
+                        [fs.model_dump(mode="json") for fs in response.items],
+                        indent=2,
+                        default=str,
+                    )
+                )
+            else:
+                items = response.items
+                if not items:
+                    print("No domain fair shares found")
+                    return
+                print(f"Total: {response.pagination.total}")
+                print()
+                for fs in items:
+                    print(f"ID: {fs.id}")
+                    print(f"Resource Group: {fs.resource_group}")
+                    print(f"Domain: {fs.domain_name}")
+                    print(f"Weight: {fs.spec.weight}")
+                    print(f"Fair Share Factor: {fs.calculation_snapshot.fair_share_factor}")
+                    print(f"Normalized Usage: {fs.calculation_snapshot.normalized_usage}")
+                    print(f"Created: {fs.created_at}")
+                    print("---")
+        except Exception as e:
+            ctx.output.print_error(e)
+            sys.exit(ExitCode.FAILURE)
+
+
+# =============================================================================
+# RG-Scoped Project Fair Share Commands (Resource Group Scope)
+# =============================================================================
+
+
+@fair_share.group("rg-project")
+def rg_project() -> None:
+    """Project fair share operations within resource group scope."""
+
+
+@rg_project.command("get")
+@pass_ctx_obj
+@click.argument("resource_group", type=str)
+@click.argument("domain_name", type=str)
+@click.argument("project_id", type=str)
+@click.option("--json", "as_json", is_flag=True, help="Output as JSON")
+def rg_project_get_cmd(
+    ctx: CLIContext,
+    resource_group: str,
+    domain_name: str,
+    project_id: str,
+    as_json: bool,
+) -> None:
+    """Get project fair share data within resource group scope."""
+    from ai.backend.cli.types import ExitCode
+    from ai.backend.client.session import Session
+
+    with Session() as api_session:
+        try:
+            response = api_session.FairShare.rg_get_project_fair_share(
+                resource_group, domain_name, UUID(project_id)
+            )
+            if response.item is None:
+                print("No project fair share found")
+                return
+
+            if as_json:
+                print(json.dumps(response.item.model_dump(mode="json"), indent=2, default=str))
+            else:
+                fs = response.item
+                print(f"Resource Group: {fs.resource_group}")
+                print(f"Project ID: {fs.project_id}")
+                print(f"Domain: {fs.domain_name}")
+                print(f"Weight: {fs.spec.weight}")
+                print(f"Fair Share Factor: {fs.calculation_snapshot.fair_share_factor}")
+                print(f"Normalized Usage: {fs.calculation_snapshot.normalized_usage}")
+                print(
+                    f"Lookback: {fs.calculation_snapshot.lookback_start} ~ "
+                    f"{fs.calculation_snapshot.lookback_end}"
+                )
+                print(f"Created: {fs.created_at}")
+                print(f"Updated: {fs.updated_at}")
+        except Exception as e:
+            ctx.output.print_error(e)
+            sys.exit(ExitCode.FAILURE)
+
+
+@rg_project.command("list")
+@pass_ctx_obj
+@click.argument("resource_group", type=str)
+@click.argument("domain_name", type=str)
+@click.option("--project-id", type=str, default=None, help="Filter by project ID")
+@click.option("--limit", type=int, default=20, help="Maximum number of records to return")
+@click.option("--offset", type=int, default=0, help="Offset for pagination")
+@click.option(
+    "--order-by",
+    type=click.Choice(["fair_share_factor", "created_at"]),
+    default="fair_share_factor",
+    help="Order by field",
+)
+@click.option(
+    "--order",
+    type=click.Choice(["ASC", "DESC"]),
+    default="DESC",
+    help="Order direction",
+)
+@click.option("--json", "as_json", is_flag=True, help="Output as JSON")
+def rg_project_list_cmd(
+    ctx: CLIContext,
+    resource_group: str,
+    domain_name: str,
+    project_id: str | None,
+    limit: int,
+    offset: int,
+    order_by: str,
+    order: str,
+    as_json: bool,
+) -> None:
+    """List project fair shares within resource group scope."""
+    from ai.backend.cli.types import ExitCode
+    from ai.backend.client.session import Session
+    from ai.backend.common.dto.manager.fair_share import (
+        OrderDirection,
+        ProjectFairShareFilter,
+        ProjectFairShareOrder,
+        ProjectFairShareOrderField,
+        SearchProjectFairSharesRequest,
+    )
+    from ai.backend.common.dto.manager.query import UUIDFilter
+
+    with Session() as api_session:
+        try:
+            filter_cond = None
+            if project_id:
+                filter_cond = ProjectFairShareFilter(
+                    project_id=UUIDFilter(equals=UUID(project_id)),
+                )
+
+            order_spec = ProjectFairShareOrder(
+                field=ProjectFairShareOrderField(order_by),
+                direction=OrderDirection(order.lower()),
+            )
+
+            request = SearchProjectFairSharesRequest(
+                filter=filter_cond,
+                order=[order_spec],
+                limit=limit,
+                offset=offset,
+            )
+            response = api_session.FairShare.rg_search_project_fair_shares(
+                resource_group, domain_name, request
+            )
+
+            if as_json:
+                print(
+                    json.dumps(
+                        [fs.model_dump(mode="json") for fs in response.items],
+                        indent=2,
+                        default=str,
+                    )
+                )
+            else:
+                items = response.items
+                if not items:
+                    print("No project fair shares found")
+                    return
+                print(f"Total: {response.pagination.total}")
+                print()
+                for fs in items:
+                    print(f"ID: {fs.id}")
+                    print(f"Resource Group: {fs.resource_group}")
+                    print(f"Project ID: {fs.project_id}")
+                    print(f"Domain: {fs.domain_name}")
+                    print(f"Weight: {fs.spec.weight}")
+                    print(f"Fair Share Factor: {fs.calculation_snapshot.fair_share_factor}")
+                    print(f"Normalized Usage: {fs.calculation_snapshot.normalized_usage}")
+                    print(f"Created: {fs.created_at}")
+                    print("---")
+        except Exception as e:
+            ctx.output.print_error(e)
+            sys.exit(ExitCode.FAILURE)
+
+
+# =============================================================================
+# RG-Scoped User Fair Share Commands (Resource Group Scope)
+# =============================================================================
+
+
+@fair_share.group("rg-user")
+def rg_user() -> None:
+    """User fair share operations within resource group scope."""
+
+
+@rg_user.command("get")
+@pass_ctx_obj
+@click.argument("resource_group", type=str)
+@click.argument("domain_name", type=str)
+@click.argument("project_id", type=str)
+@click.argument("user_uuid", type=str)
+@click.option("--json", "as_json", is_flag=True, help="Output as JSON")
+def rg_user_get_cmd(
+    ctx: CLIContext,
+    resource_group: str,
+    domain_name: str,
+    project_id: str,
+    user_uuid: str,
+    as_json: bool,
+) -> None:
+    """Get user fair share data within resource group scope."""
+    from ai.backend.cli.types import ExitCode
+    from ai.backend.client.session import Session
+
+    with Session() as api_session:
+        try:
+            response = api_session.FairShare.rg_get_user_fair_share(
+                resource_group, domain_name, UUID(project_id), UUID(user_uuid)
+            )
+            if response.item is None:
+                print("No user fair share found")
+                return
+
+            if as_json:
+                print(json.dumps(response.item.model_dump(mode="json"), indent=2, default=str))
+            else:
+                fs = response.item
+                print(f"Resource Group: {fs.resource_group}")
+                print(f"User UUID: {fs.user_uuid}")
+                print(f"Project ID: {fs.project_id}")
+                print(f"Domain: {fs.domain_name}")
+                print(f"Weight: {fs.spec.weight}")
+                print(f"Fair Share Factor: {fs.calculation_snapshot.fair_share_factor}")
+                print(f"Normalized Usage: {fs.calculation_snapshot.normalized_usage}")
+                print(
+                    f"Lookback: {fs.calculation_snapshot.lookback_start} ~ "
+                    f"{fs.calculation_snapshot.lookback_end}"
+                )
+                print(f"Created: {fs.created_at}")
+                print(f"Updated: {fs.updated_at}")
+        except Exception as e:
+            ctx.output.print_error(e)
+            sys.exit(ExitCode.FAILURE)
+
+
+@rg_user.command("list")
+@pass_ctx_obj
+@click.argument("resource_group", type=str)
+@click.argument("domain_name", type=str)
+@click.argument("project_id", type=str)
+@click.option("--user-uuid", type=str, default=None, help="Filter by user UUID")
+@click.option("--limit", type=int, default=20, help="Maximum number of records to return")
+@click.option("--offset", type=int, default=0, help="Offset for pagination")
+@click.option(
+    "--order-by",
+    type=click.Choice(["fair_share_factor", "created_at"]),
+    default="fair_share_factor",
+    help="Order by field",
+)
+@click.option(
+    "--order",
+    type=click.Choice(["ASC", "DESC"]),
+    default="DESC",
+    help="Order direction",
+)
+@click.option("--json", "as_json", is_flag=True, help="Output as JSON")
+def rg_user_list_cmd(
+    ctx: CLIContext,
+    resource_group: str,
+    domain_name: str,
+    project_id: str,
+    user_uuid: str | None,
+    limit: int,
+    offset: int,
+    order_by: str,
+    order: str,
+    as_json: bool,
+) -> None:
+    """List user fair shares within resource group scope."""
+    from ai.backend.cli.types import ExitCode
+    from ai.backend.client.session import Session
+    from ai.backend.common.dto.manager.fair_share import (
+        OrderDirection,
+        SearchUserFairSharesRequest,
+        UserFairShareFilter,
+        UserFairShareOrder,
+        UserFairShareOrderField,
+    )
+    from ai.backend.common.dto.manager.query import UUIDFilter
+
+    with Session() as api_session:
+        try:
+            filter_cond = None
+            if user_uuid:
+                filter_cond = UserFairShareFilter(
+                    user_uuid=UUIDFilter(equals=UUID(user_uuid)),
+                )
+
+            order_spec = UserFairShareOrder(
+                field=UserFairShareOrderField(order_by),
+                direction=OrderDirection(order.lower()),
+            )
+
+            request = SearchUserFairSharesRequest(
+                filter=filter_cond,
+                order=[order_spec],
+                limit=limit,
+                offset=offset,
+            )
+            response = api_session.FairShare.rg_search_user_fair_shares(
+                resource_group, domain_name, UUID(project_id), request
+            )
+
+            if as_json:
+                print(
+                    json.dumps(
+                        [fs.model_dump(mode="json") for fs in response.items],
+                        indent=2,
+                        default=str,
+                    )
+                )
+            else:
+                items = response.items
+                if not items:
+                    print("No user fair shares found")
+                    return
+                print(f"Total: {response.pagination.total}")
+                print()
+                for fs in items:
+                    print(f"ID: {fs.id}")
+                    print(f"Resource Group: {fs.resource_group}")
+                    print(f"User UUID: {fs.user_uuid}")
+                    print(f"Project ID: {fs.project_id}")
+                    print(f"Domain: {fs.domain_name}")
+                    print(f"Weight: {fs.spec.weight}")
+                    print(f"Fair Share Factor: {fs.calculation_snapshot.fair_share_factor}")
+                    print(f"Normalized Usage: {fs.calculation_snapshot.normalized_usage}")
+                    print(f"Created: {fs.created_at}")
+                    print("---")
+        except Exception as e:
+            ctx.output.print_error(e)
+            sys.exit(ExitCode.FAILURE)
+
+
+# =============================================================================
+# RG-Scoped Domain Usage Bucket Commands
+# =============================================================================
+
+
+@fair_share.group("rg-domain-usage")
+def rg_domain_usage() -> None:
+    """Domain usage buckets within resource group scope."""
+
+
+@rg_domain_usage.command("list")
+@pass_ctx_obj
+@click.argument("resource_group", type=str)
+@click.option("--domain-name", type=str, default=None, help="Filter by domain name")
+@click.option(
+    "--period-start-after",
+    type=click.DateTime(formats=["%Y-%m-%d"]),
+    default=None,
+    help="Filter buckets with period_start >= this date (YYYY-MM-DD)",
+)
+@click.option(
+    "--period-start-before",
+    type=click.DateTime(formats=["%Y-%m-%d"]),
+    default=None,
+    help="Filter buckets with period_start <= this date (YYYY-MM-DD)",
+)
+@click.option("--limit", type=int, default=20, help="Maximum number of records to return")
+@click.option("--offset", type=int, default=0, help="Offset for pagination")
+@click.option("--json", "as_json", is_flag=True, help="Output as JSON")
+def rg_domain_usage_list_cmd(
+    ctx: CLIContext,
+    resource_group: str,
+    domain_name: str | None,
+    period_start_after: click.DateTime | None,
+    period_start_before: click.DateTime | None,
+    limit: int,
+    offset: int,
+    as_json: bool,
+) -> None:
+    """List domain usage buckets within resource group scope."""
+    from ai.backend.cli.types import ExitCode
+    from ai.backend.client.session import Session
+    from ai.backend.common.dto.manager.fair_share import (
+        DomainUsageBucketFilter,
+        DomainUsageBucketOrder,
+        DomainUsageBucketOrderField,
+        OrderDirection,
+        SearchDomainUsageBucketsRequest,
+    )
+    from ai.backend.common.dto.manager.query import DateRangeFilter, StringFilter
+
+    with Session() as api_session:
+        try:
+            filter_cond = None
+            if domain_name or period_start_after or period_start_before:
+                period_start_filter = None
+                if period_start_after or period_start_before:
+                    period_start_filter = DateRangeFilter(
+                        after=period_start_after.date() if period_start_after else None,
+                        before=period_start_before.date() if period_start_before else None,
+                    )
+
+                filter_cond = DomainUsageBucketFilter(
+                    domain_name=StringFilter(equals=domain_name) if domain_name else None,
+                    period_start=period_start_filter,
+                )
+
+            order_spec = DomainUsageBucketOrder(
+                field=DomainUsageBucketOrderField.PERIOD_START,
+                direction=OrderDirection.DESC,
+            )
+
+            request = SearchDomainUsageBucketsRequest(
+                filter=filter_cond,
+                order=[order_spec],
+                limit=limit,
+                offset=offset,
+            )
+            response = api_session.FairShare.rg_search_domain_usage_buckets(resource_group, request)
+
+            if as_json:
+                print(
+                    json.dumps(
+                        [item.model_dump(mode="json") for item in response.items],
+                        indent=2,
+                        default=str,
+                    )
+                )
+            else:
+                items = response.items
+                if not items:
+                    print("No domain usage buckets found")
+                    return
+                print(f"Total: {response.pagination.total}")
+                print()
+                for bucket in items:
+                    print(f"Period: {bucket.metadata.period_start} ~ {bucket.metadata.period_end}")
+                    print(f"Domain: {bucket.domain_name}")
+                    print(f"Resource Group: {bucket.resource_group}")
+                    print("Resource Usage:")
+                    for entry in bucket.resource_usage.entries:
+                        print(f"  {entry.resource_type}: {entry.quantity}")
+                    print(f"Created: {bucket.metadata.created_at}")
+                    print("---")
+        except Exception as e:
+            ctx.output.print_error(e)
+            sys.exit(ExitCode.FAILURE)
+
+
+# =============================================================================
+# RG-Scoped Project Usage Bucket Commands
+# =============================================================================
+
+
+@fair_share.group("rg-project-usage")
+def rg_project_usage() -> None:
+    """Project usage buckets within resource group scope."""
+
+
+@rg_project_usage.command("list")
+@pass_ctx_obj
+@click.argument("resource_group", type=str)
+@click.argument("domain_name", type=str)
+@click.option("--project-id", type=str, default=None, help="Filter by project ID (UUID)")
+@click.option(
+    "--period-start-after",
+    type=click.DateTime(formats=["%Y-%m-%d"]),
+    default=None,
+    help="Filter buckets with period_start >= this date (YYYY-MM-DD)",
+)
+@click.option(
+    "--period-start-before",
+    type=click.DateTime(formats=["%Y-%m-%d"]),
+    default=None,
+    help="Filter buckets with period_start <= this date (YYYY-MM-DD)",
+)
+@click.option("--limit", type=int, default=20, help="Maximum number of records to return")
+@click.option("--offset", type=int, default=0, help="Offset for pagination")
+@click.option("--json", "as_json", is_flag=True, help="Output as JSON")
+def rg_project_usage_list_cmd(
+    ctx: CLIContext,
+    resource_group: str,
+    domain_name: str,
+    project_id: str | None,
+    period_start_after: click.DateTime | None,
+    period_start_before: click.DateTime | None,
+    limit: int,
+    offset: int,
+    as_json: bool,
+) -> None:
+    """List project usage buckets within resource group scope."""
+    from ai.backend.cli.types import ExitCode
+    from ai.backend.client.session import Session
+    from ai.backend.common.dto.manager.fair_share import (
+        OrderDirection,
+        ProjectUsageBucketFilter,
+        ProjectUsageBucketOrder,
+        ProjectUsageBucketOrderField,
+        SearchProjectUsageBucketsRequest,
+    )
+    from ai.backend.common.dto.manager.query import DateRangeFilter, UUIDFilter
+
+    with Session() as api_session:
+        try:
+            filter_cond = None
+            if project_id or period_start_after or period_start_before:
+                period_start_filter = None
+                if period_start_after or period_start_before:
+                    period_start_filter = DateRangeFilter(
+                        after=period_start_after.date() if period_start_after else None,
+                        before=period_start_before.date() if period_start_before else None,
+                    )
+
+                filter_cond = ProjectUsageBucketFilter(
+                    project_id=UUIDFilter(equals=UUID(project_id)) if project_id else None,
+                    period_start=period_start_filter,
+                )
+
+            order_spec = ProjectUsageBucketOrder(
+                field=ProjectUsageBucketOrderField.PERIOD_START,
+                direction=OrderDirection.DESC,
+            )
+
+            request = SearchProjectUsageBucketsRequest(
+                filter=filter_cond,
+                order=[order_spec],
+                limit=limit,
+                offset=offset,
+            )
+            response = api_session.FairShare.rg_search_project_usage_buckets(
+                resource_group, domain_name, request
+            )
+
+            if as_json:
+                print(
+                    json.dumps(
+                        [item.model_dump(mode="json") for item in response.items],
+                        indent=2,
+                        default=str,
+                    )
+                )
+            else:
+                items = response.items
+                if not items:
+                    print("No project usage buckets found")
+                    return
+                print(f"Total: {response.pagination.total}")
+                print()
+                for bucket in items:
+                    print(f"Period: {bucket.metadata.period_start} ~ {bucket.metadata.period_end}")
+                    print(f"Project ID: {bucket.project_id}")
+                    print(f"Domain: {bucket.domain_name}")
+                    print(f"Resource Group: {bucket.resource_group}")
+                    print("Resource Usage:")
+                    for entry in bucket.resource_usage.entries:
+                        print(f"  {entry.resource_type}: {entry.quantity}")
+                    print(f"Created: {bucket.metadata.created_at}")
+                    print("---")
+        except Exception as e:
+            ctx.output.print_error(e)
+            sys.exit(ExitCode.FAILURE)
+
+
+# =============================================================================
+# RG-Scoped User Usage Bucket Commands
+# =============================================================================
+
+
+@fair_share.group("rg-user-usage")
+def rg_user_usage() -> None:
+    """User usage buckets within resource group scope."""
+
+
+@rg_user_usage.command("list")
+@pass_ctx_obj
+@click.argument("resource_group", type=str)
+@click.argument("domain_name", type=str)
+@click.argument("project_id", type=str)
+@click.option("--user-uuid", type=str, default=None, help="Filter by user UUID")
+@click.option(
+    "--period-start-after",
+    type=click.DateTime(formats=["%Y-%m-%d"]),
+    default=None,
+    help="Filter buckets with period_start >= this date (YYYY-MM-DD)",
+)
+@click.option(
+    "--period-start-before",
+    type=click.DateTime(formats=["%Y-%m-%d"]),
+    default=None,
+    help="Filter buckets with period_start <= this date (YYYY-MM-DD)",
+)
+@click.option("--limit", type=int, default=20, help="Maximum number of records to return")
+@click.option("--offset", type=int, default=0, help="Offset for pagination")
+@click.option("--json", "as_json", is_flag=True, help="Output as JSON")
+def rg_user_usage_list_cmd(
+    ctx: CLIContext,
+    resource_group: str,
+    domain_name: str,
+    project_id: str,
+    user_uuid: str | None,
+    period_start_after: click.DateTime | None,
+    period_start_before: click.DateTime | None,
+    limit: int,
+    offset: int,
+    as_json: bool,
+) -> None:
+    """List user usage buckets within resource group scope."""
+    from ai.backend.cli.types import ExitCode
+    from ai.backend.client.session import Session
+    from ai.backend.common.dto.manager.fair_share import (
+        OrderDirection,
+        SearchUserUsageBucketsRequest,
+        UserUsageBucketFilter,
+        UserUsageBucketOrder,
+        UserUsageBucketOrderField,
+    )
+    from ai.backend.common.dto.manager.query import DateRangeFilter, UUIDFilter
+
+    with Session() as api_session:
+        try:
+            filter_cond = None
+            if user_uuid or period_start_after or period_start_before:
+                period_start_filter = None
+                if period_start_after or period_start_before:
+                    period_start_filter = DateRangeFilter(
+                        after=period_start_after.date() if period_start_after else None,
+                        before=period_start_before.date() if period_start_before else None,
+                    )
+
+                filter_cond = UserUsageBucketFilter(
+                    user_uuid=UUIDFilter(equals=UUID(user_uuid)) if user_uuid else None,
+                    period_start=period_start_filter,
+                )
+
+            order_spec = UserUsageBucketOrder(
+                field=UserUsageBucketOrderField.PERIOD_START,
+                direction=OrderDirection.DESC,
+            )
+
+            request = SearchUserUsageBucketsRequest(
+                filter=filter_cond,
+                order=[order_spec],
+                limit=limit,
+                offset=offset,
+            )
+            response = api_session.FairShare.rg_search_user_usage_buckets(
+                resource_group, domain_name, UUID(project_id), request
+            )
+
+            if as_json:
+                print(
+                    json.dumps(
+                        [item.model_dump(mode="json") for item in response.items],
+                        indent=2,
+                        default=str,
+                    )
+                )
+            else:
+                items = response.items
+                if not items:
+                    print("No user usage buckets found")
+                    return
+                print(f"Total: {response.pagination.total}")
+                print()
+                for bucket in items:
+                    print(f"Period: {bucket.metadata.period_start} ~ {bucket.metadata.period_end}")
+                    print(f"User UUID: {bucket.user_uuid}")
+                    print(f"Project ID: {bucket.project_id}")
+                    print(f"Domain: {bucket.domain_name}")
+                    print(f"Resource Group: {bucket.resource_group}")
+                    print("Resource Usage:")
+                    for entry in bucket.resource_usage.entries:
+                        print(f"  {entry.resource_type}: {entry.quantity}")
+                    print(f"Created: {bucket.metadata.created_at}")
+                    print("---")
+        except Exception as e:
+            ctx.output.print_error(e)
+            sys.exit(ExitCode.FAILURE)

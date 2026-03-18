@@ -36,6 +36,7 @@ from ai.backend.common.metrics.metric import (
     EventMetricObserver,
     SystemMetricObserver,
 )
+from ai.backend.common.metrics.multiprocess import generate_latest_multiprocess
 from ai.backend.common.types import (
     MetricKey,
     MetricValue,
@@ -105,6 +106,7 @@ class ProxyMetricObserver:
             name="appproxy_pending_requests_http",
             labelnames=["remote"],
             documentation="Ongoing HTTP proxy requests initiated by downstream",
+            multiprocess_mode="livesum",
         )
         self._pending_requests_http.labels(remote="").set(0)
         self._proxy_request_iteration_duration_http = prometheus_client.Histogram(
@@ -135,6 +137,7 @@ class ProxyMetricObserver:
         self._pending_connections_ws = prometheus_client.Gauge(
             name="appproxy_pending_connections_ws",
             documentation="Ongoing WebSocket proxy connections",
+            multiprocess_mode="livesum",
         )
         self._pending_connections_ws.set(0)
         self._proxy_request_iteration_duration_ws = prometheus_client.Histogram(
@@ -163,6 +166,7 @@ class ProxyMetricObserver:
         self._pending_connections_tcp = prometheus_client.Gauge(
             name="appproxy_pending_connections_tcp",
             documentation="Ongoing TCP proxy connections",
+            multiprocess_mode="livesum",
         )
         self._pending_connections_tcp.set(0)
         self._proxy_request_iteration_duration_tcp = prometheus_client.Histogram(
@@ -251,6 +255,7 @@ class CircuitMetricObserver:
             name="appproxy_alive_circuits",
             labelnames=["protocol"],
             documentation="Total number of AppProxy circuits created on this Worker. `endpoint_id` is provided only when circuit is INFERENCE type. `user_id` is provided only when circuit is INTERACTIVE type.",
+            multiprocess_mode="livesum",
         )
         self._alive_circuits.labels(protocol="").set(0)
 
@@ -286,7 +291,7 @@ class WorkerMetricRegistry:
 
     def to_prometheus(self) -> str:
         self.system.observe()
-        return prometheus_client.generate_latest().decode("utf-8")
+        return generate_latest_multiprocess().decode("utf-8")
 
 
 @dataclass

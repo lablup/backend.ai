@@ -71,7 +71,6 @@ def port_frontend(mocker: pytest_mock.MockerFixture) -> PortFrontend:
     return frontend
 
 
-@pytest.mark.asyncio
 async def test_ensure_slot_unregistered_port(
     mocker: pytest_mock.MockerFixture,
     port_frontend: PortFrontend,
@@ -89,7 +88,6 @@ async def test_ensure_slot_unregistered_port(
         await port_frontend.ensure_slot_middleware(request, handler)
 
 
-@pytest.mark.asyncio
 async def test_ensure_slot_no_circuit(
     mocker: pytest_mock.MockerFixture,
     port_frontend: PortFrontend,
@@ -110,7 +108,6 @@ async def test_ensure_slot_no_circuit(
         await port_frontend.ensure_slot_middleware(request, handler)
 
 
-@pytest.mark.asyncio
 async def test_ensure_slot(
     mocker: pytest_mock.MockerFixture,
     port_frontend: PortFrontend,

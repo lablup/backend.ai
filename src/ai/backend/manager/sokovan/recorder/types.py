@@ -27,6 +27,7 @@ class StepRecord(BaseModel):
     started_at: datetime
     ended_at: datetime
     detail: str | None
+    error_code: str | None = None
 
 
 class PhaseRecord(BaseModel):

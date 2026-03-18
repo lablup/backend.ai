@@ -23,7 +23,7 @@ from decimal import Decimal
 from typing import TYPE_CHECKING, TypedDict
 from uuid import UUID
 
-from ai.backend.common.types import ResourceSlot
+from ai.backend.common.types import ResourceSlot, SlotQuantity
 
 if TYPE_CHECKING:
     from ai.backend.manager.data.fair_share.types import (
@@ -183,7 +183,7 @@ class FairShareFactorCalculator:
         for domain_name, usage in decayed_usages["domain"].items():
             weight = default_weight
             if domain_name in fair_shares.domain:
-                spec_weight = fair_shares.domain[domain_name].spec.weight
+                spec_weight = fair_shares.domain[domain_name].data.spec.weight
                 if spec_weight is not None:
                     weight = spec_weight
 
@@ -209,10 +209,12 @@ class FairShareFactorCalculator:
             weight = default_weight
             domain_name = ""
             if project_id in fair_shares.project:
-                spec_weight = fair_shares.project[project_id].spec.weight
+                spec_weight = fair_shares.project[project_id].data.spec.weight
                 if spec_weight is not None:
                     weight = spec_weight
                 domain_name = fair_shares.project[project_id].domain_name
+            if not domain_name:
+                domain_name = context.project_domain_names.get(project_id, "")
 
             factor_result = self._calculate_factor(
                 usage=usage,
@@ -237,10 +239,12 @@ class FairShareFactorCalculator:
             weight = default_weight
             domain_name = ""
             if user_key in fair_shares.user:
-                spec_weight = fair_shares.user[user_key].spec.weight
+                spec_weight = fair_shares.user[user_key].data.spec.weight
                 if spec_weight is not None:
                     weight = spec_weight
                 domain_name = fair_shares.user[user_key].domain_name
+            if not domain_name:
+                domain_name = context.project_domain_names.get(user_key.project_id, "")
 
             factor_result = self._calculate_factor(
                 usage=usage,
@@ -369,7 +373,7 @@ class FairShareFactorCalculator:
             ResourceSlot with weights for each resource type
         """
         if fair_share_data is not None:
-            spec_weights = fair_share_data.spec.resource_weights
+            spec_weights = fair_share_data.data.spec.resource_weights
             if spec_weights and len(spec_weights) > 0:
                 return spec_weights
         return default_weights
@@ -379,7 +383,7 @@ class FairShareFactorCalculator:
         usage: ResourceSlot,
         weight: Decimal,
         resource_weights: ResourceSlot,
-        cluster_capacity: ResourceSlot,
+        cluster_capacity: list[SlotQuantity],
         lookback_days: int,
     ) -> tuple[Decimal, Decimal]:
         """Calculate normalized_usage and fair_share_factor.
@@ -415,7 +419,7 @@ class FairShareFactorCalculator:
     def _calculate_normalized_usage(
         self,
         usage: ResourceSlot,
-        cluster_capacity: ResourceSlot,
+        cluster_capacity: list[SlotQuantity],
         lookback_days: int,
         resource_weights: ResourceSlot,
     ) -> Decimal:
@@ -438,8 +442,10 @@ class FairShareFactorCalculator:
         total_weighted_ratio = Decimal("0")
         total_weight = Decimal("0")
 
+        capacity_map = {sq.slot_name: sq.quantity for sq in cluster_capacity}
+
         for resource_key, usage_value in usage.items():
-            capacity_value = cluster_capacity.get(resource_key, Decimal("0"))
+            capacity_value = capacity_map.get(resource_key, Decimal("0"))
             res_weight = resource_weights.get(resource_key, Decimal("1.0"))
 
             if capacity_value > 0:

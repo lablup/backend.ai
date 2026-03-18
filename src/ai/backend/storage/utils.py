@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import enum
 import logging
+import urllib.parse
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager as actxmgr
 from datetime import UTC, datetime
@@ -9,7 +10,7 @@ from pathlib import PurePath
 from typing import Any
 
 import trafaret as t
-from aiohttp import web
+from aiohttp import hdrs, web
 
 from ai.backend.common.json import dump_json_str
 from ai.backend.logging import BraceStyleAdapter
@@ -220,3 +221,32 @@ def normalize_filepath(filepath: str) -> str:
 
     # Remove leading slash if present (we want relative paths)
     return normalized.removeprefix("/")
+
+
+def build_attachment_headers(
+    filename: str,
+    content_type: str | None = None,
+) -> dict[str, str]:
+    """Build RFC-compliant attachment headers with UTF-8 filename support.
+
+    Args:
+        filename: The filename to include in Content-Disposition header.
+        content_type: MIME type for Content-Type header. Defaults to application/octet-stream.
+
+    Returns:
+        Dictionary containing Content-Type and Content-Disposition headers.
+
+    Note:
+        This function generates headers compliant with:
+        - RFC-2616 sec2.2: Basic filename in ASCII
+        - RFC-5987: Extended filename with UTF-8 encoding for international characters
+    """
+    ascii_filename = filename.encode("ascii", errors="ignore").decode("ascii").replace('"', r"\"")
+    encoded_filename = urllib.parse.quote(filename, encoding="utf-8")
+    return {
+        hdrs.CONTENT_TYPE: content_type or "application/octet-stream",
+        hdrs.CONTENT_DISPOSITION: " ".join([
+            f'attachment;filename="{ascii_filename}";',
+            f"filename*=UTF-8''{encoded_filename}",
+        ]),
+    }

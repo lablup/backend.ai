@@ -8,6 +8,7 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal, DecimalException
 from typing import Any, cast
+from uuid import UUID
 
 import tomli
 from pydantic import HttpUrl
@@ -47,6 +48,11 @@ from ai.backend.manager.data.deployment.types import (
     DeploymentInfo,
     DeploymentInfoSearchResult,
     DeploymentInfoWithAutoScalingRules,
+    DeploymentPolicyData,
+    DeploymentPolicySearchResult,
+    DeploymentPolicyUpsertResult,
+    DeploymentSubStep,
+    DeploymentWithHistory,
     ModelDeploymentAutoScalingRuleData,
     ModelRevisionData,
     RevisionSearchResult,
@@ -64,10 +70,7 @@ from ai.backend.manager.models.deployment_auto_scaling_policy import (
     DeploymentAutoScalingPolicyData,
     DeploymentAutoScalingPolicyRow,
 )
-from ai.backend.manager.models.deployment_policy import (
-    DeploymentPolicyData,
-    DeploymentPolicyRow,
-)
+from ai.backend.manager.models.deployment_policy import DeploymentPolicyRow
 from ai.backend.manager.models.deployment_revision import DeploymentRevisionRow
 from ai.backend.manager.models.endpoint import EndpointRow, EndpointTokenRow
 from ai.backend.manager.models.routing import RoutingRow
@@ -83,6 +86,7 @@ from ai.backend.manager.repositories.base.creator import BulkCreator
 from ai.backend.manager.repositories.base.purger import Purger, PurgerResult
 from ai.backend.manager.repositories.base.rbac.entity_creator import RBACEntityCreator
 from ai.backend.manager.repositories.base.updater import BatchUpdater, Updater
+from ai.backend.manager.repositories.base.upserter import Upserter
 from ai.backend.manager.repositories.scheduler.types.session_creation import DeploymentContext
 
 from .db_source import DeploymentDBSource
@@ -284,9 +288,31 @@ class DeploymentRepository:
     async def get_endpoints_by_statuses(
         self,
         statuses: list[EndpointLifecycle],
+        sub_steps: list[DeploymentSubStep] | None = None,
     ) -> list[DeploymentInfo]:
-        """Get endpoints by lifecycle statuses."""
-        return await self._db_source.get_endpoints_by_statuses(statuses)
+        """Get endpoints by lifecycle statuses, optionally filtered by sub_steps."""
+        return await self._db_source.get_endpoints_by_statuses(statuses, sub_steps=sub_steps)
+
+    @deployment_repository_resilience.apply()
+    async def get_deployments_for_handler(
+        self,
+        statuses: list[EndpointLifecycle],
+        handler_name: str,
+    ) -> list[DeploymentWithHistory]:
+        """Get deployments for handler execution with history populated.
+
+        Queries endpoints and their latest scheduling history in a single
+        transaction. History fields (phase_attempts, phase_started_at) are
+        populated when the latest record matches the handler_name.
+
+        Args:
+            statuses: Endpoint lifecycle statuses to include
+            handler_name: Current handler phase name for history matching
+
+        Returns:
+            List of DeploymentWithHistory with history fields populated.
+        """
+        return await self._db_source.fetch_deployments_for_handler(statuses, handler_name)
 
     @deployment_repository_resilience.apply()
     async def get_endpoint_info(
@@ -1037,6 +1063,18 @@ class DeploymentRepository:
         return await self._db_source.create_revision(creator)
 
     @deployment_repository_resilience.apply()
+    async def create_revision_with_next_number(
+        self,
+        creator: Creator[DeploymentRevisionRow],
+        endpoint_id: uuid.UUID,
+    ) -> ModelRevisionData:
+        """Atomically read the latest revision number and create a new revision.
+
+        This avoids the race condition of separate read-then-write operations.
+        """
+        return await self._db_source.create_revision_with_next_number(creator, endpoint_id)
+
+    @deployment_repository_resilience.apply()
     async def get_revision(
         self,
         revision_id: uuid.UUID,
@@ -1115,17 +1153,18 @@ class DeploymentRepository:
         return await self._db_source.update_endpoint(updater)
 
     @deployment_repository_resilience.apply()
-    async def update_current_revision(
+    async def set_deploying_revision(
         self,
         endpoint_id: uuid.UUID,
         revision_id: uuid.UUID,
-    ) -> uuid.UUID | None:
-        """Update the current revision of a deployment.
+    ) -> tuple[uuid.UUID | None, bool]:
+        """Set deploying_revision and transition lifecycle to DEPLOYING.
 
         Returns:
-            The previous revision ID, or None if there was no previous revision.
+            Tuple of (previous_current_revision_id, updated).
+            ``updated=False`` means a concurrent activation guard fired.
         """
-        return await self._db_source.update_current_revision(endpoint_id, revision_id)
+        return await self._db_source.set_deploying_revision(endpoint_id, revision_id)
 
     # ========== Deployment Auto-Scaling Policy Operations ==========
 
@@ -1174,12 +1213,12 @@ class DeploymentRepository:
         return await self._db_source.delete_auto_scaling_policy(purger)
 
     @deployment_repository_resilience.apply()
-    async def create_deployment_policy(
+    async def upsert_deployment_policy(
         self,
-        creator: Creator[DeploymentPolicyRow],
-    ) -> DeploymentPolicyData:
-        """Create a new deployment policy for an endpoint."""
-        return await self._db_source.create_deployment_policy(creator)
+        upserter: Upserter[DeploymentPolicyRow],
+    ) -> DeploymentPolicyUpsertResult:
+        """Create or update a deployment policy using ON CONFLICT."""
+        return await self._db_source.upsert_deployment_policy(upserter)
 
     @deployment_repository_resilience.apply()
     async def get_deployment_policy(
@@ -1194,18 +1233,6 @@ class DeploymentRepository:
         return await self._db_source.get_deployment_policy(endpoint_id)
 
     @deployment_repository_resilience.apply()
-    async def update_deployment_policy(
-        self,
-        updater: Updater[DeploymentPolicyRow],
-    ) -> DeploymentPolicyData:
-        """Update a deployment policy.
-
-        Raises:
-            DeploymentPolicyNotFound: If the policy does not exist.
-        """
-        return await self._db_source.update_deployment_policy(updater)
-
-    @deployment_repository_resilience.apply()
     async def delete_deployment_policy(
         self,
         purger: Purger[DeploymentPolicyRow],
@@ -1216,6 +1243,24 @@ class DeploymentRepository:
             PurgerResult containing the deleted row, or None if no policy existed.
         """
         return await self._db_source.delete_deployment_policy(purger)
+
+    @deployment_repository_resilience.apply()
+    async def get_last_deployment_histories(
+        self,
+        deployment_ids: list[uuid.UUID],
+    ) -> dict[uuid.UUID, DeploymentHistoryRow]:
+        """Get last history records for multiple deployments.
+
+        Returns the most recent history record for each deployment. The caller
+        should compare history.phase with the current phase to determine
+        if attempts should be used or reset to 0.
+        """
+        return await self._db_source.get_last_deployment_histories(deployment_ids)
+
+    @deployment_repository_resilience.apply()
+    async def get_db_now(self) -> datetime:
+        """Get current database server time."""
+        return await self._db_source.get_db_now()
 
     # ===================
     # Route operations
@@ -1300,12 +1345,12 @@ class DeploymentRepository:
     @deployment_repository_resilience.apply()
     async def create_access_token(
         self,
-        creator: Creator[EndpointTokenRow],
+        creator: RBACEntityCreator[EndpointTokenRow],
     ) -> EndpointTokenRow:
         """Create a new access token for a model deployment.
 
         Args:
-            creator: Creator containing the EndpointTokenCreatorSpec.
+            creator: RBACEntityCreator containing the EndpointTokenCreatorSpec.
 
         Returns:
             Created EndpointTokenRow.
@@ -1343,3 +1388,42 @@ class DeploymentRepository:
             AccessTokenSearchResult with items, total_count, and pagination info.
         """
         return await self._db_source.search_access_tokens(querier)
+
+    @deployment_repository_resilience.apply()
+    async def search_deployment_policies(
+        self,
+        querier: BatchQuerier,
+    ) -> DeploymentPolicySearchResult:
+        """Search deployment policies with pagination and filtering.
+
+        Args:
+            querier: BatchQuerier containing conditions, orders, and pagination.
+
+        Returns:
+            DeploymentPolicySearchResult with items, total_count, and pagination info.
+        """
+        return await self._db_source.search_deployment_policies(querier)
+
+    async def apply_strategy_mutations(
+        self,
+        assignments: Mapping[UUID, DeploymentSubStep],
+        rollout: BulkCreator[RoutingRow],
+        drain: BatchUpdater[RoutingRow] | None,
+        completed_ids: set[UUID],
+        rolled_back_ids: set[UUID],
+    ) -> int:
+        """Apply all DB mutations from a strategy evaluation cycle.
+
+        Performs sub-step updates, route rollout/drain, revision swap,
+        and deploying_revision cleanup in a single transaction.
+
+        Returns:
+            Number of deployments whose revision was swapped.
+        """
+        return await self._db_source.apply_strategy_mutations(
+            assignments=assignments,
+            rollout=rollout,
+            drain=drain,
+            completed_ids=completed_ids,
+            rolled_back_ids=rolled_back_ids,
+        )

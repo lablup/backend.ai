@@ -2,6 +2,13 @@ import strawberry
 from strawberry.federation import Schema
 from strawberry.schema.config import StrawberryConfig
 
+from ai.backend.manager.api.gql.extensions import (
+    GQLExceptionHandlerExtension,
+    GQLLoggingExtension,
+    GQLMetricExtension,
+    GQLValidationExtension,
+)
+
 from .agent import (
     agent_stats,
     agents_v2,
@@ -39,6 +46,7 @@ from .artifact import (
     update_artifact,
 )
 from .artifact_registry import default_artifact_registry
+from .audit_log import admin_audit_logs_v2
 from .background_task import background_task_events
 from .deployment import (
     # Revision
@@ -50,7 +58,6 @@ from .deployment import (
     create_auto_scaling_rule,
     # Deployment
     create_model_deployment,
-    create_model_revision,
     delete_auto_scaling_rule,
     delete_model_deployment,
     deployment,
@@ -71,6 +78,11 @@ from .deployment import (
     update_auto_scaling_rule,
     update_model_deployment,
     update_route_traffic_status,
+)
+from .domain_v2 import (
+    admin_domains_v2,
+    domain_v2,
+    rg_domains_v2,
 )
 from .fair_share import (
     admin_bulk_upsert_domain_fair_share_weight,
@@ -112,8 +124,18 @@ from .huggingface_registry import (
     update_huggingface_registry,
 )
 from .image import (
+    admin_image_aliases,
+    admin_images_v2,
+    container_registry_images_v2,
+    image_alias,
+    image_scoped_aliases,
     image_v2,
-    images_v2,
+)
+from .kernel.resolver import admin_kernels_v2, kernel_v2, session_kernels_v2
+from .keypair import (
+    issue_my_keypair,
+    revoke_my_keypair,
+    switch_my_main_access_key,
 )
 from .notification import (
     admin_create_notification_channel,
@@ -151,6 +173,40 @@ from .object_storage import (
     object_storages,
     update_object_storage,
 )
+from .project_v2 import (
+    admin_projects_v2,
+    domain_projects_v2,
+    project_domain_v2,
+    project_v2,
+)
+from .prometheus_query_preset import (
+    admin_create_prometheus_query_preset,
+    admin_delete_prometheus_query_preset,
+    admin_modify_prometheus_query_preset,
+    admin_prometheus_query_preset,
+    admin_prometheus_query_preset_result,
+    admin_prometheus_query_presets,
+)
+from .rbac import (
+    admin_assign_role,
+    admin_bulk_assign_role,
+    admin_bulk_revoke_role,
+    admin_create_permission,
+    admin_create_role,
+    admin_delete_permission,
+    admin_delete_role,
+    admin_entities,
+    admin_permissions,
+    admin_purge_role,
+    admin_revoke_role,
+    admin_role,
+    admin_role_assignments,
+    admin_roles,
+    admin_update_permission,
+    admin_update_role,
+    my_roles,
+    rbac_scope_entity_combinations,
+)
 from .reservoir_registry import (
     create_reservoir_registry,
     delete_reservoir_registry,
@@ -160,10 +216,12 @@ from .reservoir_registry import (
 )
 from .resource_group import (
     admin_resource_groups,
+    admin_update_resource_group,
     admin_update_resource_group_fair_share_spec,
     resource_groups,
     update_resource_group_fair_share_spec,
 )
+from .resource_slot.resolver import resource_slot_type, resource_slot_types
 from .resource_usage import (
     admin_domain_usage_buckets,
     admin_project_usage_buckets,
@@ -183,12 +241,36 @@ from .scheduling_history import (
     admin_route_histories,
     admin_session_scheduling_histories,
     deployment_histories,
+    deployment_scoped_scheduling_histories,
     route_histories,
+    route_scoped_scheduling_histories,
     session_scheduling_histories,
+    session_scoped_scheduling_histories,
 )
+from .service_catalog import admin_service_catalogs
+from .session.resolver import admin_sessions_v2
 from .storage_namespace import (
     register_storage_namespace,
     unregister_storage_namespace,
+)
+from .user import (
+    # Mutations
+    admin_bulk_create_users_v2,
+    admin_bulk_purge_users_v2,
+    admin_bulk_update_users_v2,
+    admin_create_user_v2,
+    admin_delete_user_v2,
+    admin_delete_users_v2,
+    admin_purge_user_v2,
+    admin_update_user_v2,
+    # Queries
+    admin_user_v2,
+    admin_users_v2,
+    domain_users_v2,
+    my_user_v2,
+    project_users_v2,
+    update_my_allowed_client_ip,
+    update_user_v2,
 )
 from .vfs_storage import (
     create_vfs_storage,
@@ -224,8 +306,12 @@ class Query:
     huggingface_registries = huggingface_registries
     reservoir_registry = reservoir_registry
     reservoir_registries = reservoir_registries
+    image_v2 = image_v2
+    kernel_v2 = kernel_v2
+    image_alias = image_alias
     # Admin APIs
     admin_resource_groups = admin_resource_groups
+    admin_service_catalogs = admin_service_catalogs
     admin_session_scheduling_histories = admin_session_scheduling_histories
     admin_deployment_histories = admin_deployment_histories
     admin_route_histories = admin_route_histories
@@ -243,6 +329,28 @@ class Query:
     admin_domain_usage_buckets = admin_domain_usage_buckets
     admin_project_usage_buckets = admin_project_usage_buckets
     admin_user_usage_buckets = admin_user_usage_buckets
+    admin_images_v2 = admin_images_v2
+    admin_kernels_v2 = admin_kernels_v2
+    admin_audit_logs_v2 = admin_audit_logs_v2
+    admin_sessions_v2 = admin_sessions_v2
+    resource_slot_type = resource_slot_type
+    resource_slot_types = resource_slot_types
+    admin_image_aliases = admin_image_aliases
+    # Prometheus Query Preset Admin APIs
+    admin_prometheus_query_preset = admin_prometheus_query_preset
+    admin_prometheus_query_presets = admin_prometheus_query_presets
+    admin_prometheus_query_preset_result = admin_prometheus_query_preset_result
+    # RBAC Admin APIs
+    admin_role = admin_role
+    admin_roles = admin_roles
+    admin_permissions = admin_permissions
+    admin_role_assignments = admin_role_assignments
+    admin_entities = admin_entities
+    # RBAC User APIs
+    my_roles = my_roles
+    rbac_scope_entity_combinations = rbac_scope_entity_combinations
+    # Session Scoped APIs
+    session_kernels_v2 = session_kernels_v2
     # Resource Group Scoped APIs
     rg_domain_fair_share = rg_domain_fair_share
     rg_domain_fair_shares = rg_domain_fair_shares
@@ -253,6 +361,14 @@ class Query:
     rg_domain_usage_buckets = rg_domain_usage_buckets
     rg_project_usage_buckets = rg_project_usage_buckets
     rg_user_usage_buckets = rg_user_usage_buckets
+    # Container Registry Scoped APIs
+    container_registry_images_v2 = container_registry_images_v2
+    # Image Scoped APIs
+    image_scoped_aliases = image_scoped_aliases
+    # Entity Scoped APIs (added in 26.2.0)
+    session_scoped_scheduling_histories = session_scoped_scheduling_histories
+    deployment_scoped_scheduling_histories = deployment_scoped_scheduling_histories
+    route_scoped_scheduling_histories = route_scoped_scheduling_histories
     # Legacy APIs (deprecated)
     resource_groups = resource_groups
     domain_app_config = domain_app_config
@@ -277,8 +393,21 @@ class Query:
     session_scheduling_histories = session_scheduling_histories
     deployment_histories = deployment_histories
     route_histories = route_histories
-    image_v2 = image_v2
-    images_v2 = images_v2
+    # User V2 APIs
+    admin_user_v2 = admin_user_v2
+    admin_users_v2 = admin_users_v2
+    domain_users_v2 = domain_users_v2
+    my_user_v2 = my_user_v2
+    project_users_v2 = project_users_v2
+    # Domain V2 APIs
+    domain_v2 = domain_v2
+    admin_domains_v2 = admin_domains_v2
+    rg_domains_v2 = rg_domains_v2
+    # Project V2 APIs
+    project_v2 = project_v2
+    admin_projects_v2 = admin_projects_v2
+    domain_projects_v2 = domain_projects_v2
+    project_domain_v2 = project_domain_v2
 
 
 @strawberry.type
@@ -300,7 +429,6 @@ class Mutation:
     delete_model_deployment = delete_model_deployment
     sync_replicas = sync_replicas
     add_model_revision = add_model_revision
-    create_model_revision = create_model_revision
     # Notification - Admin APIs
     admin_create_notification_channel = admin_create_notification_channel
     admin_update_notification_channel = admin_update_notification_channel
@@ -365,8 +493,41 @@ class Mutation:
     bulk_upsert_user_fair_share_weight = bulk_upsert_user_fair_share_weight
     # Resource Group - Admin APIs
     admin_update_resource_group_fair_share_spec = admin_update_resource_group_fair_share_spec
+    admin_update_resource_group = admin_update_resource_group
     # Resource Group - Legacy (deprecated)
     update_resource_group_fair_share_spec = update_resource_group_fair_share_spec
+    # User V2 APIs
+    admin_create_user_v2 = admin_create_user_v2
+    admin_bulk_create_users_v2 = admin_bulk_create_users_v2
+    admin_bulk_update_users_v2 = admin_bulk_update_users_v2
+    admin_update_user_v2 = admin_update_user_v2
+    update_user_v2 = update_user_v2
+    admin_delete_user_v2 = admin_delete_user_v2
+    admin_delete_users_v2 = admin_delete_users_v2
+    admin_purge_user_v2 = admin_purge_user_v2
+    admin_bulk_purge_users_v2 = admin_bulk_purge_users_v2
+    # Keypair self-service mutations
+    issue_my_keypair = issue_my_keypair
+    revoke_my_keypair = revoke_my_keypair
+    switch_my_main_access_key = switch_my_main_access_key
+    # IP allowlist self-service mutation
+    update_my_allowed_client_ip = update_my_allowed_client_ip
+    # Prometheus Query Preset - Admin APIs
+    admin_create_prometheus_query_preset = admin_create_prometheus_query_preset
+    admin_modify_prometheus_query_preset = admin_modify_prometheus_query_preset
+    admin_delete_prometheus_query_preset = admin_delete_prometheus_query_preset
+    # RBAC Admin APIs
+    admin_create_role = admin_create_role
+    admin_update_role = admin_update_role
+    admin_delete_role = admin_delete_role
+    admin_purge_role = admin_purge_role
+    admin_create_permission = admin_create_permission
+    admin_update_permission = admin_update_permission
+    admin_delete_permission = admin_delete_permission
+    admin_assign_role = admin_assign_role
+    admin_revoke_role = admin_revoke_role
+    admin_bulk_assign_role = admin_bulk_assign_role
+    admin_bulk_revoke_role = admin_bulk_revoke_role
 
 
 @strawberry.type
@@ -395,4 +556,10 @@ schema = CustomizedSchema(
     subscription=Subscription,
     config=StrawberryConfig(auto_camel_case=True),
     enable_federation_2=True,
+    extensions=[
+        GQLLoggingExtension,
+        GQLMetricExtension,
+        GQLValidationExtension,
+        GQLExceptionHandlerExtension,
+    ],
 )

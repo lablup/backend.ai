@@ -15,10 +15,18 @@ from ai.backend.common.events.dispatcher import EventProducer
 from ai.backend.common.events.event_types.model_serving.anycast import (
     EndpointRouteListUpdatedEvent,
 )
-from ai.backend.common.types import AgentId, ResourceSlot, SessionId, SessionTypes
+from ai.backend.common.types import (
+    AgentId,
+    KernelId,
+    ResourceSlot,
+    SessionId,
+    SessionTypes,
+    SlotQuantity,
+)
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.clients.agent.pool import AgentClientPool
 from ai.backend.manager.repositories.deployment.repository import DeploymentRepository
+from ai.backend.manager.repositories.resource_slot.types import resource_slot_to_quantities
 from ai.backend.manager.sokovan.data import SessionRunningData, SessionWithKernels
 from ai.backend.manager.sokovan.recorder.context import RecorderContext
 
@@ -100,7 +108,21 @@ class RunningTransitionHook(StatusTransitionHook):
                 occupying_slots=total_occupied_slots,
             )
         ]
-        await self._deps.scheduler_repository.update_sessions_to_running(running_data)
+
+        # Record allocations in normalized resource_allocations / agent_resources tables.
+        allocations: list[tuple[KernelId, str, list[SlotQuantity]]] = []
+        for kernel_info in session.kernel_infos:
+            agent_id = kernel_info.resource.agent
+            if agent_id and kernel_info.resource.occupied_slots:
+                quantities = resource_slot_to_quantities(kernel_info.resource.occupied_slots)
+                if quantities:
+                    allocations.append((kernel_info.id, agent_id, quantities))
+
+        # Single transaction: session update + resource allocation are atomic.
+        await self._deps.scheduler_repository.update_running_and_allocate_resources(
+            running_data, allocations
+        )
+
         log.debug(
             "Updated occupied_slots for session {} transitioning to RUNNING",
             session.session_info.identity.id,

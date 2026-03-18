@@ -10,6 +10,7 @@ import pathlib
 import click
 
 from ai.backend.agent.config.unified import AgentUnifiedConfig
+from ai.backend.common.cli import LazyGroup
 from ai.backend.common.configs.generator import (
     GeneratorConfig,
     TOMLGenerator,
@@ -107,6 +108,11 @@ Generated using BackendAIConfigMeta annotations.
         log.info("Sample configuration file generated successfully: {}", output)
     except Exception as e:
         raise click.ClickException(f"Failed to generate sample configuration: {e}") from e
+
+
+@cli.group(cls=LazyGroup, import_name="ai.backend.agent.cli.config_migrate:cli")
+def migrate() -> None:
+    """Migrate legacy configuration fields."""
 
 
 if __name__ == "__main__":

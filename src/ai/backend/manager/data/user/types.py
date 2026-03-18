@@ -4,7 +4,7 @@ import enum
 from collections.abc import Iterable, Mapping
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Any, Self, override
+from typing import TYPE_CHECKING, Any, Self, override
 from uuid import UUID
 
 from sqlalchemy.engine import Row
@@ -19,6 +19,11 @@ from ai.backend.manager.data.permission.types import (
     ScopeType,
 )
 from ai.backend.manager.errors.resource import DataTransformationFailed
+
+if TYPE_CHECKING:
+    from ai.backend.manager.models.user import UserRow
+    from ai.backend.manager.repositories.base.creator import BulkCreatorError
+    from ai.backend.manager.repositories.base.updater import BulkUpdaterError
 
 
 class UserStatus(enum.StrEnum):
@@ -136,3 +141,96 @@ class UserData:
 class UserCreateResultData:
     user: UserData
     keypair: KeyPairData
+
+
+@dataclass
+class UserSearchResult:
+    """Result of user search operations."""
+
+    items: list[UserData]
+    """List of user data items."""
+
+    total_count: int
+    """Total number of items matching the query (before pagination)."""
+
+    has_next_page: bool
+    """Whether there are more items after the current page."""
+
+    has_previous_page: bool
+    """Whether there are items before the current page."""
+
+
+@dataclass
+class BulkUserCreateResultData:
+    """Result of bulk user creation operation.
+
+    Attributes:
+        successes: Successfully created users
+        failures: Failed user creation attempts with error info
+    """
+
+    successes: list[UserData] = field(default_factory=list)
+    failures: list[BulkCreatorError[UserRow]] = field(default_factory=list)
+
+    def success_count(self) -> int:
+        """Get count of successfully created users."""
+        return len(self.successes)
+
+    def failure_count(self) -> int:
+        """Get count of failed user creations."""
+        return len(self.failures)
+
+
+@dataclass
+class BulkUserUpdateResultData:
+    """Result of bulk user update operation.
+
+    Attributes:
+        successes: Successfully updated users
+        failures: Failed user update attempts with error info
+    """
+
+    successes: list[UserData] = field(default_factory=list)
+    failures: list[BulkUpdaterError[UserRow]] = field(default_factory=list)
+
+    def success_count(self) -> int:
+        """Get count of successfully updated users."""
+        return len(self.successes)
+
+    def failure_count(self) -> int:
+        """Get count of failed user updates."""
+        return len(self.failures)
+
+
+@dataclass
+class BulkPurgeError:
+    """Error information for a failed bulk purge operation.
+
+    Attributes:
+        user_id: UUID of the user that failed to purge
+        exception: The exception that occurred
+    """
+
+    user_id: UUID
+    exception: Exception
+
+
+@dataclass
+class BulkUserPurgeResultData:
+    """Result of bulk user purge operation.
+
+    Attributes:
+        purged_user_ids: UUIDs of successfully purged users
+        failures: Failed user purge attempts with error info
+    """
+
+    purged_user_ids: list[UUID] = field(default_factory=list)
+    failures: list[BulkPurgeError] = field(default_factory=list)
+
+    def purged_count(self) -> int:
+        """Get count of successfully purged users."""
+        return len(self.purged_user_ids)
+
+    def failure_count(self) -> int:
+        """Get count of failed user purges."""
+        return len(self.failures)

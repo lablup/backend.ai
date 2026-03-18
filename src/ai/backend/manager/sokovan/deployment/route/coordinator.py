@@ -258,7 +258,7 @@ class RouteCoordinator:
                     message=e.reason,
                     from_status=from_status,
                     to_status=failure_status,
-                    error_code=None,  # RouteExecutionError doesn't have error_code
+                    error_code=e.error_code,
                     sub_steps=extract_sub_steps_for_entity(e.route_info.route_id, records),
                 )
                 for e in result.errors

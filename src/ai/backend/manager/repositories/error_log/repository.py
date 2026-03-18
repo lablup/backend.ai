@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import uuid
 from typing import TYPE_CHECKING
 
 from ai.backend.common.exception import BackendAIError
@@ -52,3 +53,45 @@ class ErrorLogRepository:
     ) -> ErrorLogListResult:
         """Search error logs with querier pattern."""
         return await self._db_source.search(querier=querier)
+
+    @error_log_repository_resilience.apply()
+    async def list_logs(
+        self,
+        *,
+        user_uuid: uuid.UUID,
+        user_domain: str,
+        is_superadmin: bool,
+        is_admin: bool,
+        page_no: int,
+        page_size: int,
+        mark_read: bool,
+    ) -> tuple[list[ErrorLogData], int]:
+        """List error logs with role-based visibility filtering."""
+        return await self._db_source.list_logs(
+            user_uuid=user_uuid,
+            user_domain=user_domain,
+            is_superadmin=is_superadmin,
+            is_admin=is_admin,
+            page_no=page_no,
+            page_size=page_size,
+            mark_read=mark_read,
+        )
+
+    @error_log_repository_resilience.apply()
+    async def mark_cleared(
+        self,
+        *,
+        log_id: uuid.UUID,
+        user_uuid: uuid.UUID,
+        user_domain: str,
+        is_superadmin: bool,
+        is_admin: bool,
+    ) -> int:
+        """Mark an error log as cleared. Returns number of rows updated."""
+        return await self._db_source.mark_cleared(
+            log_id=log_id,
+            user_uuid=user_uuid,
+            user_domain=user_domain,
+            is_superadmin=is_superadmin,
+            is_admin=is_admin,
+        )

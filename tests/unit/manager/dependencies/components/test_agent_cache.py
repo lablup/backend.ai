@@ -33,7 +33,6 @@ class TestAgentCacheDependency:
     Test AgentCacheDependency lifecycle.
     """
 
-    @pytest.mark.asyncio
     @patch("ai.backend.manager.dependencies.components.agent_cache.load_certificate")
     @patch("ai.backend.manager.dependencies.components.agent_cache.AgentRPCCache")
     async def test_provide_agent_cache(
@@ -62,7 +61,6 @@ class TestAgentCacheDependency:
             mock_load_cert.assert_called_once_with(Path("/test/keypair"))
             mock_cache_class.assert_called_once()
 
-    @pytest.mark.asyncio
     @patch("ai.backend.manager.dependencies.components.agent_cache.load_certificate")
     async def test_missing_secret_key_raises_error(
         self,

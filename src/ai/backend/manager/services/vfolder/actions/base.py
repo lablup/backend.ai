@@ -3,6 +3,7 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Any, override
 
+from ai.backend.common.data.permission.types import EntityType, RBACElementType, ScopeType
 from ai.backend.common.types import (
     AccessKey,
     KernelId,
@@ -10,20 +11,24 @@ from ai.backend.common.types import (
     VFolderUsageMode,
 )
 from ai.backend.manager.actions.action import BaseAction
+from ai.backend.manager.actions.action.base import BaseActionResult
 from ai.backend.manager.actions.action.scope import BaseScopeAction, BaseScopeActionResult
 from ai.backend.manager.actions.action.single_entity import (
     BaseSingleEntityAction,
     BaseSingleEntityActionResult,
 )
 from ai.backend.manager.actions.action.types import FieldData
-from ai.backend.manager.data.permission.types import OperationType
+from ai.backend.manager.actions.types import ActionOperationType
+from ai.backend.manager.data.permission.types import RBACElementRef
 from ai.backend.manager.data.vfolder.types import VFolderData
 from ai.backend.manager.models.user import UserRole
 from ai.backend.manager.models.vfolder import (
     VFolderOperationStatus,
     VFolderOwnershipType,
     VFolderPermission,
+    VFolderPermissionSetAlias,
     VFolderRow,
+    VFolderStatusSet,
 )
 from ai.backend.manager.repositories.base.rbac.entity_purger import RBACEntityPurger
 from ai.backend.manager.repositories.base.updater import Updater
@@ -37,15 +42,29 @@ from ai.backend.manager.services.vfolder.types import (
 class VFolderAction(BaseAction):
     @override
     @classmethod
-    def entity_type(cls) -> str:
-        return "vfolder"
+    def entity_type(cls) -> EntityType:
+        return EntityType.VFOLDER
+
+
+class VFolderFileAction(VFolderAction):
+    @override
+    @classmethod
+    def entity_type(cls) -> EntityType:
+        return EntityType.VFOLDER_FILE
+
+
+class VFolderDirectoryAction(VFolderAction):
+    @override
+    @classmethod
+    def entity_type(cls) -> EntityType:
+        return EntityType.VFOLDER_DIRECTORY
 
 
 class VFolderScopeAction(BaseScopeAction):
     @override
     @classmethod
-    def entity_type(cls) -> str:
-        return "vfolder"
+    def entity_type(cls) -> EntityType:
+        return EntityType.VFOLDER
 
 
 class VFolderScopeActionResult(BaseScopeActionResult):
@@ -55,8 +74,8 @@ class VFolderScopeActionResult(BaseScopeActionResult):
 class VFolderSingleEntityAction(BaseSingleEntityAction):
     @override
     @classmethod
-    def entity_type(cls) -> str:
-        return "vfolder"
+    def entity_type(cls) -> EntityType:
+        return EntityType.VFOLDER
 
     @override
     def field_data(self) -> FieldData | None:
@@ -81,7 +100,7 @@ class CreateVFolderAction(VFolderScopeAction):
     cloneable: bool
 
     _scope_id: str
-    _scope_type: str
+    _scope_type: ScopeType
 
     # User identifier
     # TODO: Distinguish between creator and owner
@@ -95,21 +114,23 @@ class CreateVFolderAction(VFolderScopeAction):
 
     @override
     @classmethod
-    def operation_type(cls) -> str:
-        return "create"
+    def operation_type(cls) -> ActionOperationType:
+        return ActionOperationType.CREATE
 
     @override
-    @classmethod
-    def permission_operation_type(cls) -> OperationType:
-        return OperationType.CREATE
-
-    @override
-    def scope_type(self) -> str:
+    def scope_type(self) -> ScopeType:
         return self._scope_type
 
     @override
     def scope_id(self) -> str:
         return self._scope_id
+
+    @override
+    def target_element(self) -> RBACElementRef:
+        return RBACElementRef(
+            element_type=RBACElementType(self._scope_type.value),
+            element_id=self._scope_id,
+        )
 
 
 @dataclass
@@ -133,8 +154,8 @@ class CreateVFolderActionResult(VFolderScopeActionResult):
         return str(self.id)
 
     @override
-    def scope_type(self) -> str:
-        return self.quota_scope_id.scope_type.value
+    def scope_type(self) -> ScopeType:
+        return ScopeType(self.quota_scope_id.scope_type.value)
 
     @override
     def scope_id(self) -> str:
@@ -153,17 +174,19 @@ class UpdateVFolderAttributeAction(VFolderSingleEntityAction):
 
     @override
     @classmethod
-    def operation_type(cls) -> str:
-        return "update"
-
-    @override
-    @classmethod
-    def permission_operation_type(cls) -> OperationType:
-        return OperationType.UPDATE
+    def operation_type(cls) -> ActionOperationType:
+        return ActionOperationType.UPDATE
 
     @override
     def target_entity_id(self) -> str:
         return str(self.vfolder_uuid)
+
+    @override
+    def target_element(self) -> RBACElementRef:
+        return RBACElementRef(
+            element_type=RBACElementType.VFOLDER,
+            element_id=str(self.vfolder_uuid),
+        )
 
 
 @dataclass
@@ -190,17 +213,19 @@ class GetVFolderAction(VFolderSingleEntityAction):
 
     @override
     @classmethod
-    def operation_type(cls) -> str:
-        return "get"
-
-    @override
-    @classmethod
-    def permission_operation_type(cls) -> OperationType:
-        return OperationType.READ
+    def operation_type(cls) -> ActionOperationType:
+        return ActionOperationType.GET
 
     @override
     def target_entity_id(self) -> str:
         return str(self.vfolder_uuid)
+
+    @override
+    def target_element(self) -> RBACElementRef:
+        return RBACElementRef(
+            element_type=RBACElementType.VFOLDER,
+            element_id=str(self.vfolder_uuid),
+        )
 
 
 @dataclass
@@ -222,7 +247,7 @@ class GetVFolderActionResult(VFolderSingleEntityActionResult):
 @dataclass
 class ListVFolderAction(VFolderScopeAction):
     user_uuid: uuid.UUID
-    _scope_type: str
+    _scope_type: ScopeType
     _scope_id: str
 
     @override
@@ -231,28 +256,30 @@ class ListVFolderAction(VFolderScopeAction):
 
     @override
     @classmethod
-    def operation_type(cls) -> str:
-        return "list"
+    def operation_type(cls) -> ActionOperationType:
+        return ActionOperationType.SEARCH
 
     @override
-    @classmethod
-    def permission_operation_type(cls) -> OperationType:
-        return OperationType.READ
-
-    @override
-    def scope_type(self) -> str:
+    def scope_type(self) -> ScopeType:
         return self._scope_type
 
     @override
     def scope_id(self) -> str:
         return self._scope_id
 
+    @override
+    def target_element(self) -> RBACElementRef:
+        return RBACElementRef(
+            element_type=RBACElementType(self._scope_type.value),
+            element_id=self._scope_id,
+        )
+
 
 @dataclass
 class ListVFolderActionResult(VFolderScopeActionResult):
     user_uuid: uuid.UUID
     vfolders: list[tuple[VFolderBaseInfo, VFolderOwnershipInfo]]
-    _scope_type: str
+    _scope_type: ScopeType
     _scope_id: str
 
     @override
@@ -260,7 +287,7 @@ class ListVFolderActionResult(VFolderScopeActionResult):
         return str(self.user_uuid)
 
     @override
-    def scope_type(self) -> str:
+    def scope_type(self) -> ScopeType:
         return self._scope_type
 
     @override
@@ -281,17 +308,19 @@ class MoveToTrashVFolderAction(VFolderSingleEntityAction):
 
     @override
     @classmethod
-    def operation_type(cls) -> str:
-        return "move_to_trash"
-
-    @override
-    @classmethod
-    def permission_operation_type(cls) -> OperationType:
-        return OperationType.SOFT_DELETE
+    def operation_type(cls) -> ActionOperationType:
+        return ActionOperationType.DELETE
 
     @override
     def target_entity_id(self) -> str:
         return str(self.vfolder_uuid)
+
+    @override
+    def target_element(self) -> RBACElementRef:
+        return RBACElementRef(
+            element_type=RBACElementType.VFOLDER,
+            element_id=str(self.vfolder_uuid),
+        )
 
 
 @dataclass
@@ -319,17 +348,19 @@ class RestoreVFolderFromTrashAction(VFolderSingleEntityAction):
 
     @override
     @classmethod
-    def operation_type(cls) -> str:
-        return "restore"
-
-    @override
-    @classmethod
-    def permission_operation_type(cls) -> OperationType:
-        return OperationType.SOFT_DELETE
+    def operation_type(cls) -> ActionOperationType:
+        return ActionOperationType.UPDATE
 
     @override
     def target_entity_id(self) -> str:
         return str(self.vfolder_uuid)
+
+    @override
+    def target_element(self) -> RBACElementRef:
+        return RBACElementRef(
+            element_type=RBACElementType.VFOLDER,
+            element_id=str(self.vfolder_uuid),
+        )
 
 
 @dataclass
@@ -357,17 +388,19 @@ class DeleteForeverVFolderAction(VFolderSingleEntityAction):
 
     @override
     @classmethod
-    def operation_type(cls) -> str:
-        return "delete_forever"
-
-    @override
-    @classmethod
-    def permission_operation_type(cls) -> OperationType:
-        return OperationType.HARD_DELETE
+    def operation_type(cls) -> ActionOperationType:
+        return ActionOperationType.PURGE
 
     @override
     def target_entity_id(self) -> str:
         return str(self.vfolder_uuid)
+
+    @override
+    def target_element(self) -> RBACElementRef:
+        return RBACElementRef(
+            element_type=RBACElementType.VFOLDER,
+            element_id=str(self.vfolder_uuid),
+        )
 
 
 @dataclass
@@ -393,17 +426,19 @@ class PurgeVFolderAction(VFolderSingleEntityAction):
 
     @override
     @classmethod
-    def operation_type(cls) -> str:
-        return "purge"
-
-    @override
-    @classmethod
-    def permission_operation_type(cls) -> OperationType:
-        return OperationType.HARD_DELETE
+    def operation_type(cls) -> ActionOperationType:
+        return ActionOperationType.PURGE
 
     @override
     def target_entity_id(self) -> str:
         return str(self.purger.pk_value)
+
+    @override
+    def target_element(self) -> RBACElementRef:
+        return RBACElementRef(
+            element_type=RBACElementType.VFOLDER,
+            element_id=str(self.purger.pk_value),
+        )
 
 
 @dataclass
@@ -435,17 +470,19 @@ class ForceDeleteVFolderAction(VFolderSingleEntityAction):
 
     @override
     @classmethod
-    def operation_type(cls) -> str:
-        return "force_delete"
-
-    @override
-    @classmethod
-    def permission_operation_type(cls) -> OperationType:
-        return OperationType.HARD_DELETE
+    def operation_type(cls) -> ActionOperationType:
+        return ActionOperationType.PURGE
 
     @override
     def target_entity_id(self) -> str:
         return str(self.vfolder_uuid)
+
+    @override
+    def target_element(self) -> RBACElementRef:
+        return RBACElementRef(
+            element_type=RBACElementType.VFOLDER,
+            element_id=str(self.vfolder_uuid),
+        )
 
 
 @dataclass
@@ -478,17 +515,19 @@ class CloneVFolderAction(VFolderSingleEntityAction):
 
     @override
     @classmethod
-    def operation_type(cls) -> str:
-        return "clone"
-
-    @override
-    @classmethod
-    def permission_operation_type(cls) -> OperationType:
-        return OperationType.READ
+    def operation_type(cls) -> ActionOperationType:
+        return ActionOperationType.CREATE
 
     @override
     def target_entity_id(self) -> str:
         return str(self.source_vfolder_uuid)
+
+    @override
+    def target_element(self) -> RBACElementRef:
+        return RBACElementRef(
+            element_type=RBACElementType.VFOLDER,
+            element_id=str(self.source_vfolder_uuid),
+        )
 
 
 @dataclass
@@ -518,6 +557,8 @@ class CloneVFolderActionResult(VFolderSingleEntityActionResult):
 
 @dataclass
 class GetTaskLogsAction(VFolderSingleEntityAction):
+    # TODO: Migrate to a session/kernel action with RBACElementRef(SESSION, session_id).
+    # Currently target_element() returns USER scope which always passes validation.
     user_id: uuid.UUID
     domain_name: str
     user_role: UserRole
@@ -533,17 +574,19 @@ class GetTaskLogsAction(VFolderSingleEntityAction):
 
     @override
     @classmethod
-    def operation_type(cls) -> str:
-        return "get_task_logs"
-
-    @override
-    @classmethod
-    def permission_operation_type(cls) -> OperationType:
-        return OperationType.READ
+    def operation_type(cls) -> ActionOperationType:
+        return ActionOperationType.GET
 
     @override
     def target_entity_id(self) -> str:
         return str(self.kernel_id)
+
+    @override
+    def target_element(self) -> RBACElementRef:
+        return RBACElementRef(
+            element_type=RBACElementType.USER,
+            element_id=str(self.user_id),
+        )
 
 
 @dataclass
@@ -559,3 +602,35 @@ class GetTaskLogsActionResult(VFolderSingleEntityActionResult):
     @override
     def target_entity_id(self) -> str:
         return str(self.vfolder_data.id)
+
+
+@dataclass
+class GetAccessibleVFolderAction(VFolderAction):
+    """Resolve and validate a single accessible vfolder by ID or name."""
+
+    user_uuid: uuid.UUID
+    user_role: UserRole
+    domain_name: str
+    is_admin: bool
+    perm: VFolderPermissionSetAlias | VFolderPermission
+    folder_id_or_name: str | uuid.UUID
+    required_status: VFolderStatusSet | None = None
+    allow_privileged_access: bool = False
+
+    @override
+    @classmethod
+    def operation_type(cls) -> ActionOperationType:
+        return ActionOperationType.GET
+
+    @override
+    def entity_id(self) -> str | None:
+        return str(self.folder_id_or_name)
+
+
+@dataclass
+class GetAccessibleVFolderActionResult(BaseActionResult):
+    row: Mapping[str, Any]
+
+    @override
+    def entity_id(self) -> str | None:
+        return str(self.row.get("id")) if self.row else None

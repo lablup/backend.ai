@@ -6,6 +6,7 @@ from typing import override
 
 from ai.backend.common.types import AgentId
 from ai.backend.manager.actions.action import BaseActionResult
+from ai.backend.manager.actions.types import ActionOperationType
 
 from .base import AgentAction
 
@@ -18,8 +19,8 @@ class LoadContainerCountsAction(AgentAction):
 
     @override
     @classmethod
-    def operation_type(cls) -> str:
-        return "load_container_counts"
+    def operation_type(cls) -> ActionOperationType:
+        return ActionOperationType.GET
 
     @override
     def entity_id(self) -> str | None:

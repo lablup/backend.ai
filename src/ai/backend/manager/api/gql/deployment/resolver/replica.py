@@ -36,7 +36,7 @@ async def replicas(
     last: int | None = None,
     limit: int | None = None,
     offset: int | None = None,
-) -> ModelReplicaConnection:
+) -> ModelReplicaConnection | None:
     """List replicas with optional filtering and pagination."""
     return await fetch_replicas(
         info=info,

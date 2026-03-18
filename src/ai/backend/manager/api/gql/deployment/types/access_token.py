@@ -2,22 +2,28 @@
 
 from __future__ import annotations
 
+from collections.abc import Iterable
 from datetime import datetime
 from typing import Any, Self, override
 from uuid import UUID
 
 import strawberry
-from strawberry import ID
+from strawberry import ID, Info
 from strawberry.relay import Connection, Edge, Node, NodeID
 
 from ai.backend.manager.api.gql.base import DateTimeFilter, OrderDirection, StringFilter
-from ai.backend.manager.api.gql.types import GQLFilter, GQLOrderBy
+from ai.backend.manager.api.gql.types import GQLFilter, GQLOrderBy, StrawberryGQLContext
 from ai.backend.manager.data.deployment.access_token import ModelDeploymentAccessTokenCreator
 from ai.backend.manager.data.deployment.types import (
     AccessTokenOrderField,
     ModelDeploymentAccessTokenData,
 )
-from ai.backend.manager.repositories.base import QueryCondition, QueryOrder
+from ai.backend.manager.repositories.base import (
+    QueryCondition,
+    QueryOrder,
+    combine_conditions_or,
+    negate_conditions,
+)
 from ai.backend.manager.repositories.deployment.options import (
     AccessTokenConditions,
     AccessTokenOrders,
@@ -31,6 +37,10 @@ class AccessTokenFilter(GQLFilter):
     token: StringFilter | None = None
     valid_until: DateTimeFilter | None = None
     created_at: DateTimeFilter | None = None
+
+    AND: list[AccessTokenFilter] | None = None
+    OR: list[AccessTokenFilter] | None = None
+    NOT: list[AccessTokenFilter] | None = None
 
     @override
     def build_conditions(self) -> list[QueryCondition]:
@@ -61,6 +71,27 @@ class AccessTokenFilter(GQLFilter):
             if condition:
                 conditions.append(condition)
 
+        # Handle AND logical operator
+        if self.AND:
+            for sub_filter in self.AND:
+                conditions.extend(sub_filter.build_conditions())
+
+        # Handle OR logical operator
+        if self.OR:
+            or_sub_conditions: list[QueryCondition] = []
+            for sub_filter in self.OR:
+                or_sub_conditions.extend(sub_filter.build_conditions())
+            if or_sub_conditions:
+                conditions.append(combine_conditions_or(or_sub_conditions))
+
+        # Handle NOT logical operator
+        if self.NOT:
+            not_sub_conditions: list[QueryCondition] = []
+            for sub_filter in self.NOT:
+                not_sub_conditions.extend(sub_filter.build_conditions())
+            if not_sub_conditions:
+                conditions.append(negate_conditions(not_sub_conditions))
+
         return conditions
 
 
@@ -88,6 +119,19 @@ class AccessToken(Node):
     valid_until: datetime = strawberry.field(
         description="Added in 25.16.0: The expiration timestamp of the access token."
     )
+
+    @classmethod
+    async def resolve_nodes(  # type: ignore[override]  # Strawberry Node uses AwaitableOrValue overloads incompatible with async def
+        cls,
+        *,
+        info: Info[StrawberryGQLContext],
+        node_ids: Iterable[str],
+        required: bool = False,
+    ) -> Iterable[Self | None]:
+        results = await info.context.data_loaders.access_token_loader.load_many([
+            UUID(nid) for nid in node_ids
+        ])
+        return [cls.from_dataclass(data) if data is not None else None for data in results]
 
     @classmethod
     def from_dataclass(cls, data: ModelDeploymentAccessTokenData) -> Self:

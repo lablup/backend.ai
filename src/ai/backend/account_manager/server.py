@@ -36,6 +36,7 @@ from ai.backend.common.metrics.http import (
     build_prometheus_metrics_handler,
 )
 from ai.backend.common.metrics.metric import CommonMetricRegistry
+from ai.backend.common.metrics.multiprocess import cleanup_prometheus_multiprocess_dir
 from ai.backend.common.metrics.profiler import Profiler, PyroscopeArgs
 from ai.backend.common.msgpack import DEFAULT_PACK_OPTS, DEFAULT_UNPACK_OPTS
 from ai.backend.common.types import HostPortPair
@@ -468,6 +469,7 @@ def main(
                         wait_timeout=5.0,
                     )
                 finally:
+                    cleanup_prometheus_multiprocess_dir()
                     log.info("terminated.")
         finally:
             if account_manager_cfg.pid_file.is_file():

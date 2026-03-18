@@ -1,7 +1,9 @@
 from dataclasses import dataclass
 from typing import override
 
+from ai.backend.common.data.permission.types import EntityType
 from ai.backend.manager.actions.action import BaseAction, BaseActionResult
+from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.permission.object_permission import ObjectPermissionData
 from ai.backend.manager.models.rbac_models.permission.object_permission import ObjectPermissionRow
 from ai.backend.manager.repositories.base.creator import Creator
@@ -12,8 +14,8 @@ from ai.backend.manager.repositories.base.purger import Purger
 class ObjectPermissionAction(BaseAction):
     @override
     @classmethod
-    def entity_type(cls) -> str:
-        return "object_permission"
+    def entity_type(cls) -> EntityType:
+        return EntityType.OBJECT_PERMISSION
 
 
 @dataclass
@@ -26,13 +28,13 @@ class CreateObjectPermissionAction(ObjectPermissionAction):
 
     @override
     @classmethod
-    def entity_type(cls) -> str:
-        return "object_permission"
+    def entity_type(cls) -> EntityType:
+        return EntityType.OBJECT_PERMISSION
 
     @override
     @classmethod
-    def operation_type(cls) -> str:
-        return "create"
+    def operation_type(cls) -> ActionOperationType:
+        return ActionOperationType.CREATE
 
 
 @dataclass
@@ -54,13 +56,13 @@ class DeleteObjectPermissionAction(ObjectPermissionAction):
 
     @override
     @classmethod
-    def entity_type(cls) -> str:
-        return "object_permission"
+    def entity_type(cls) -> EntityType:
+        return EntityType.OBJECT_PERMISSION
 
     @override
     @classmethod
-    def operation_type(cls) -> str:
-        return "delete"
+    def operation_type(cls) -> ActionOperationType:
+        return ActionOperationType.DELETE
 
 
 @dataclass

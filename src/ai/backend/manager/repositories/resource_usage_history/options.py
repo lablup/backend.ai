@@ -7,6 +7,7 @@ from datetime import date, datetime
 
 import sqlalchemy as sa
 
+from ai.backend.common.data.filter_specs import StringMatchSpec, UUIDEqualMatchSpec, UUIDInMatchSpec
 from ai.backend.manager.models.resource_usage_history import (
     DomainUsageBucketRow,
     KernelUsageRecordRow,
@@ -92,6 +93,110 @@ class DomainUsageBucketConditions:
         return inner
 
     @staticmethod
+    def by_resource_group_contains(spec: StringMatchSpec) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            if spec.case_insensitive:
+                condition = DomainUsageBucketRow.resource_group.ilike(f"%{spec.value}%")
+            else:
+                condition = DomainUsageBucketRow.resource_group.like(f"%{spec.value}%")
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
+
+        return inner
+
+    @staticmethod
+    def by_resource_group_equals(spec: StringMatchSpec) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            if spec.case_insensitive:
+                condition = sa.func.lower(DomainUsageBucketRow.resource_group) == spec.value.lower()
+            else:
+                condition = DomainUsageBucketRow.resource_group == spec.value
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
+
+        return inner
+
+    @staticmethod
+    def by_resource_group_starts_with(spec: StringMatchSpec) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            if spec.case_insensitive:
+                condition = DomainUsageBucketRow.resource_group.ilike(f"{spec.value}%")
+            else:
+                condition = DomainUsageBucketRow.resource_group.like(f"{spec.value}%")
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
+
+        return inner
+
+    @staticmethod
+    def by_resource_group_ends_with(spec: StringMatchSpec) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            if spec.case_insensitive:
+                condition = DomainUsageBucketRow.resource_group.ilike(f"%{spec.value}")
+            else:
+                condition = DomainUsageBucketRow.resource_group.like(f"%{spec.value}")
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
+
+        return inner
+
+    @staticmethod
+    def by_domain_name_contains(spec: StringMatchSpec) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            if spec.case_insensitive:
+                condition = DomainUsageBucketRow.domain_name.ilike(f"%{spec.value}%")
+            else:
+                condition = DomainUsageBucketRow.domain_name.like(f"%{spec.value}%")
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
+
+        return inner
+
+    @staticmethod
+    def by_domain_name_equals(spec: StringMatchSpec) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            if spec.case_insensitive:
+                condition = sa.func.lower(DomainUsageBucketRow.domain_name) == spec.value.lower()
+            else:
+                condition = DomainUsageBucketRow.domain_name == spec.value
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
+
+        return inner
+
+    @staticmethod
+    def by_domain_name_starts_with(spec: StringMatchSpec) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            if spec.case_insensitive:
+                condition = DomainUsageBucketRow.domain_name.ilike(f"{spec.value}%")
+            else:
+                condition = DomainUsageBucketRow.domain_name.like(f"{spec.value}%")
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
+
+        return inner
+
+    @staticmethod
+    def by_domain_name_ends_with(spec: StringMatchSpec) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            if spec.case_insensitive:
+                condition = DomainUsageBucketRow.domain_name.ilike(f"%{spec.value}")
+            else:
+                condition = DomainUsageBucketRow.domain_name.like(f"%{spec.value}")
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
+
+        return inner
+
+    @staticmethod
     def by_period_range(start: date, end: date) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
             return sa.and_(
@@ -107,6 +212,61 @@ class DomainUsageBucketConditions:
 
         def inner() -> sa.sql.expression.ColumnElement[bool]:
             return DomainUsageBucketRow.period_start == period_start
+
+        return inner
+
+    @staticmethod
+    def by_period_start_not_equals(period_start: date) -> QueryCondition:
+        """Filter by period start date not equal to the given value."""
+
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return DomainUsageBucketRow.period_start != period_start
+
+        return inner
+
+    @staticmethod
+    def by_period_start_before(before: date) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return DomainUsageBucketRow.period_start < before
+
+        return inner
+
+    @staticmethod
+    def by_period_start_after(after: date) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return DomainUsageBucketRow.period_start > after
+
+        return inner
+
+    @staticmethod
+    def by_period_end(period_end: date) -> QueryCondition:
+        """Filter by exact period end date."""
+
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return DomainUsageBucketRow.period_end == period_end
+
+        return inner
+
+    @staticmethod
+    def by_period_end_not_equals(period_end: date) -> QueryCondition:
+        """Filter by period end date not equal to the given value."""
+
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return DomainUsageBucketRow.period_end != period_end
+
+        return inner
+
+    @staticmethod
+    def by_period_end_before(before: date) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return DomainUsageBucketRow.period_end < before
+
+        return inner
+
+    @staticmethod
+    def by_period_end_after(after: date) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return DomainUsageBucketRow.period_end > after
 
         return inner
 
@@ -174,9 +334,128 @@ class ProjectUsageBucketConditions:
         return inner
 
     @staticmethod
-    def by_project_id(project_id: uuid.UUID) -> QueryCondition:
+    def by_resource_group_contains(spec: StringMatchSpec) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return ProjectUsageBucketRow.project_id == project_id
+            if spec.case_insensitive:
+                condition = ProjectUsageBucketRow.resource_group.ilike(f"%{spec.value}%")
+            else:
+                condition = ProjectUsageBucketRow.resource_group.like(f"%{spec.value}%")
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
+
+        return inner
+
+    @staticmethod
+    def by_resource_group_equals(spec: StringMatchSpec) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            if spec.case_insensitive:
+                condition = (
+                    sa.func.lower(ProjectUsageBucketRow.resource_group) == spec.value.lower()
+                )
+            else:
+                condition = ProjectUsageBucketRow.resource_group == spec.value
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
+
+        return inner
+
+    @staticmethod
+    def by_resource_group_starts_with(spec: StringMatchSpec) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            if spec.case_insensitive:
+                condition = ProjectUsageBucketRow.resource_group.ilike(f"{spec.value}%")
+            else:
+                condition = ProjectUsageBucketRow.resource_group.like(f"{spec.value}%")
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
+
+        return inner
+
+    @staticmethod
+    def by_resource_group_ends_with(spec: StringMatchSpec) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            if spec.case_insensitive:
+                condition = ProjectUsageBucketRow.resource_group.ilike(f"%{spec.value}")
+            else:
+                condition = ProjectUsageBucketRow.resource_group.like(f"%{spec.value}")
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
+
+        return inner
+
+    @staticmethod
+    def by_domain_name_contains(spec: StringMatchSpec) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            if spec.case_insensitive:
+                condition = ProjectUsageBucketRow.domain_name.ilike(f"%{spec.value}%")
+            else:
+                condition = ProjectUsageBucketRow.domain_name.like(f"%{spec.value}%")
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
+
+        return inner
+
+    @staticmethod
+    def by_domain_name_equals(spec: StringMatchSpec) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            if spec.case_insensitive:
+                condition = sa.func.lower(ProjectUsageBucketRow.domain_name) == spec.value.lower()
+            else:
+                condition = ProjectUsageBucketRow.domain_name == spec.value
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
+
+        return inner
+
+    @staticmethod
+    def by_domain_name_starts_with(spec: StringMatchSpec) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            if spec.case_insensitive:
+                condition = ProjectUsageBucketRow.domain_name.ilike(f"{spec.value}%")
+            else:
+                condition = ProjectUsageBucketRow.domain_name.like(f"{spec.value}%")
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
+
+        return inner
+
+    @staticmethod
+    def by_domain_name_ends_with(spec: StringMatchSpec) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            if spec.case_insensitive:
+                condition = ProjectUsageBucketRow.domain_name.ilike(f"%{spec.value}")
+            else:
+                condition = ProjectUsageBucketRow.domain_name.like(f"%{spec.value}")
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
+
+        return inner
+
+    @staticmethod
+    def by_project_id(spec: UUIDEqualMatchSpec) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            condition = ProjectUsageBucketRow.project_id == spec.value
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
+
+        return inner
+
+    @staticmethod
+    def by_project_ids(spec: UUIDInMatchSpec) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            condition = ProjectUsageBucketRow.project_id.in_(spec.values)
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
 
         return inner
 
@@ -196,6 +475,61 @@ class ProjectUsageBucketConditions:
 
         def inner() -> sa.sql.expression.ColumnElement[bool]:
             return ProjectUsageBucketRow.period_start == period_start
+
+        return inner
+
+    @staticmethod
+    def by_period_start_not_equals(period_start: date) -> QueryCondition:
+        """Filter by period start date not equal to the given value."""
+
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return ProjectUsageBucketRow.period_start != period_start
+
+        return inner
+
+    @staticmethod
+    def by_period_start_before(before: date) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return ProjectUsageBucketRow.period_start < before
+
+        return inner
+
+    @staticmethod
+    def by_period_start_after(after: date) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return ProjectUsageBucketRow.period_start > after
+
+        return inner
+
+    @staticmethod
+    def by_period_end(period_end: date) -> QueryCondition:
+        """Filter by exact period end date."""
+
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return ProjectUsageBucketRow.period_end == period_end
+
+        return inner
+
+    @staticmethod
+    def by_period_end_not_equals(period_end: date) -> QueryCondition:
+        """Filter by period end date not equal to the given value."""
+
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return ProjectUsageBucketRow.period_end != period_end
+
+        return inner
+
+    @staticmethod
+    def by_period_end_before(before: date) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return ProjectUsageBucketRow.period_end < before
+
+        return inner
+
+    @staticmethod
+    def by_period_end_after(after: date) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return ProjectUsageBucketRow.period_end > after
 
         return inner
 
@@ -263,16 +597,146 @@ class UserUsageBucketConditions:
         return inner
 
     @staticmethod
-    def by_user_uuid(user_uuid: uuid.UUID) -> QueryCondition:
+    def by_resource_group_contains(spec: StringMatchSpec) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return UserUsageBucketRow.user_uuid == user_uuid
+            if spec.case_insensitive:
+                condition = UserUsageBucketRow.resource_group.ilike(f"%{spec.value}%")
+            else:
+                condition = UserUsageBucketRow.resource_group.like(f"%{spec.value}%")
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
 
         return inner
 
     @staticmethod
-    def by_project_id(project_id: uuid.UUID) -> QueryCondition:
+    def by_resource_group_equals(spec: StringMatchSpec) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return UserUsageBucketRow.project_id == project_id
+            if spec.case_insensitive:
+                condition = sa.func.lower(UserUsageBucketRow.resource_group) == spec.value.lower()
+            else:
+                condition = UserUsageBucketRow.resource_group == spec.value
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
+
+        return inner
+
+    @staticmethod
+    def by_resource_group_starts_with(spec: StringMatchSpec) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            if spec.case_insensitive:
+                condition = UserUsageBucketRow.resource_group.ilike(f"{spec.value}%")
+            else:
+                condition = UserUsageBucketRow.resource_group.like(f"{spec.value}%")
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
+
+        return inner
+
+    @staticmethod
+    def by_resource_group_ends_with(spec: StringMatchSpec) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            if spec.case_insensitive:
+                condition = UserUsageBucketRow.resource_group.ilike(f"%{spec.value}")
+            else:
+                condition = UserUsageBucketRow.resource_group.like(f"%{spec.value}")
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
+
+        return inner
+
+    @staticmethod
+    def by_domain_name_contains(spec: StringMatchSpec) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            if spec.case_insensitive:
+                condition = UserUsageBucketRow.domain_name.ilike(f"%{spec.value}%")
+            else:
+                condition = UserUsageBucketRow.domain_name.like(f"%{spec.value}%")
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
+
+        return inner
+
+    @staticmethod
+    def by_domain_name_equals(spec: StringMatchSpec) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            if spec.case_insensitive:
+                condition = sa.func.lower(UserUsageBucketRow.domain_name) == spec.value.lower()
+            else:
+                condition = UserUsageBucketRow.domain_name == spec.value
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
+
+        return inner
+
+    @staticmethod
+    def by_domain_name_starts_with(spec: StringMatchSpec) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            if spec.case_insensitive:
+                condition = UserUsageBucketRow.domain_name.ilike(f"{spec.value}%")
+            else:
+                condition = UserUsageBucketRow.domain_name.like(f"{spec.value}%")
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
+
+        return inner
+
+    @staticmethod
+    def by_domain_name_ends_with(spec: StringMatchSpec) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            if spec.case_insensitive:
+                condition = UserUsageBucketRow.domain_name.ilike(f"%{spec.value}")
+            else:
+                condition = UserUsageBucketRow.domain_name.like(f"%{spec.value}")
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
+
+        return inner
+
+    @staticmethod
+    def by_user_uuid(spec: UUIDEqualMatchSpec) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            condition = UserUsageBucketRow.user_uuid == spec.value
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
+
+        return inner
+
+    @staticmethod
+    def by_user_uuids(spec: UUIDInMatchSpec) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            condition = UserUsageBucketRow.user_uuid.in_(spec.values)
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
+
+        return inner
+
+    @staticmethod
+    def by_project_id(spec: UUIDEqualMatchSpec) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            condition = UserUsageBucketRow.project_id == spec.value
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
+
+        return inner
+
+    @staticmethod
+    def by_project_ids(spec: UUIDInMatchSpec) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            condition = UserUsageBucketRow.project_id.in_(spec.values)
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
 
         return inner
 
@@ -292,6 +756,61 @@ class UserUsageBucketConditions:
 
         def inner() -> sa.sql.expression.ColumnElement[bool]:
             return UserUsageBucketRow.period_start == period_start
+
+        return inner
+
+    @staticmethod
+    def by_period_start_not_equals(period_start: date) -> QueryCondition:
+        """Filter by period start date not equal to the given value."""
+
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return UserUsageBucketRow.period_start != period_start
+
+        return inner
+
+    @staticmethod
+    def by_period_start_before(before: date) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return UserUsageBucketRow.period_start < before
+
+        return inner
+
+    @staticmethod
+    def by_period_start_after(after: date) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return UserUsageBucketRow.period_start > after
+
+        return inner
+
+    @staticmethod
+    def by_period_end(period_end: date) -> QueryCondition:
+        """Filter by exact period end date."""
+
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return UserUsageBucketRow.period_end == period_end
+
+        return inner
+
+    @staticmethod
+    def by_period_end_not_equals(period_end: date) -> QueryCondition:
+        """Filter by period end date not equal to the given value."""
+
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return UserUsageBucketRow.period_end != period_end
+
+        return inner
+
+    @staticmethod
+    def by_period_end_before(before: date) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return UserUsageBucketRow.period_end < before
+
+        return inner
+
+    @staticmethod
+    def by_period_end_after(after: date) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return UserUsageBucketRow.period_end > after
 
         return inner
 

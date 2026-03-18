@@ -41,7 +41,7 @@ async def routes(
     last: int | None = None,
     limit: int | None = None,
     offset: int | None = None,
-) -> RouteConnection:
+) -> RouteConnection | None:
     """List routes for a deployment with optional filters."""
     _, endpoint_id = resolve_global_id(deployment_id)
     return await fetch_routes(

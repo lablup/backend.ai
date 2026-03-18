@@ -84,6 +84,8 @@ storage:
 
 overrides:
   defaults:
+    global:
+      max_bytes_per_trace: 50000000  # 50 MB (default: 5 MB). Increased for OTel GraphQL traces.
     metrics_generator:
       processors: [service-graphs, span-metrics, local-blocks] # enables metrics generator
       generate_native_histograms: both

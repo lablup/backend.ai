@@ -3,6 +3,7 @@ from typing import override
 from ai.backend.manager.actions.monitors.monitor import ActionMonitor
 from ai.backend.manager.actions.processor import ActionProcessor
 from ai.backend.manager.actions.types import AbstractProcessorPackage, ActionSpec
+from ai.backend.manager.actions.validators import ActionValidators
 from ai.backend.manager.services.session.actions.check_and_transit_status import (
     CheckAndTransitStatusAction,
     CheckAndTransitStatusActionResult,
@@ -99,6 +100,14 @@ from ai.backend.manager.services.session.actions.restart_session import (
     RestartSessionAction,
     RestartSessionActionResult,
 )
+from ai.backend.manager.services.session.actions.search import (
+    SearchSessionsAction,
+    SearchSessionsActionResult,
+)
+from ai.backend.manager.services.session.actions.search_kernel import (
+    SearchKernelsAction,
+    SearchKernelsActionResult,
+)
 from ai.backend.manager.services.session.actions.shutdown_service import (
     ShutdownServiceAction,
     ShutdownServiceActionResult,
@@ -147,6 +156,8 @@ class SessionProcessors(AbstractProcessorPackage):
     match_sessions: ActionProcessor[MatchSessionsAction, MatchSessionsActionResult]
     rename_session: ActionProcessor[RenameSessionAction, RenameSessionActionResult]
     restart_session: ActionProcessor[RestartSessionAction, RestartSessionActionResult]
+    search_kernels: ActionProcessor[SearchKernelsAction, SearchKernelsActionResult]
+    search_sessions: ActionProcessor[SearchSessionsAction, SearchSessionsActionResult]
     shutdown_service: ActionProcessor[ShutdownServiceAction, ShutdownServiceActionResult]
     start_service: ActionProcessor[StartServiceAction, StartServiceActionResult]
     upload_files: ActionProcessor[UploadFilesAction, UploadFilesActionResult]
@@ -155,7 +166,12 @@ class SessionProcessors(AbstractProcessorPackage):
         CheckAndTransitStatusAction, CheckAndTransitStatusActionResult
     ]
 
-    def __init__(self, service: SessionService, action_monitors: list[ActionMonitor]) -> None:
+    def __init__(
+        self,
+        service: SessionService,
+        action_monitors: list[ActionMonitor],
+        validators: ActionValidators,
+    ) -> None:
         self.commit_session = ActionProcessor(service.commit_session, action_monitors)
         self.complete = ActionProcessor(service.complete, action_monitors)
         self.convert_session_to_image = ActionProcessor(
@@ -182,6 +198,8 @@ class SessionProcessors(AbstractProcessorPackage):
         self.match_sessions = ActionProcessor(service.match_sessions, action_monitors)
         self.rename_session = ActionProcessor(service.rename_session, action_monitors)
         self.restart_session = ActionProcessor(service.restart_session, action_monitors)
+        self.search_kernels = ActionProcessor(service.search_kernels, action_monitors)
+        self.search_sessions = ActionProcessor(service.search, action_monitors)
         self.shutdown_service = ActionProcessor(service.shutdown_service, action_monitors)
         self.start_service = ActionProcessor(service.start_service, action_monitors)
         self.upload_files = ActionProcessor(service.upload_files, action_monitors)
@@ -215,6 +233,8 @@ class SessionProcessors(AbstractProcessorPackage):
             MatchSessionsAction.spec(),
             RenameSessionAction.spec(),
             RestartSessionAction.spec(),
+            SearchKernelsAction.spec(),
+            SearchSessionsAction.spec(),
             ShutdownServiceAction.spec(),
             StartServiceAction.spec(),
             UploadFilesAction.spec(),

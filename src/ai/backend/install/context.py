@@ -418,6 +418,10 @@ class Context(metaclass=ABCMeta):
         ) as path:
             await self.run_manager_cli(["mgr", "fixture", "populate", str(path)])
         with self.resource_path(
+            "ai.backend.install.fixtures", "example-resource-slot-types.json"
+        ) as path:
+            await self.run_manager_cli(["mgr", "fixture", "populate", str(path)])
+        with self.resource_path(
             "ai.backend.install.fixtures", "example-resource-presets.json"
         ) as path:
             await self.run_manager_cli(["mgr", "fixture", "populate", str(path)])

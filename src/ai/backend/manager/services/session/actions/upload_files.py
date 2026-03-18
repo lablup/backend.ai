@@ -5,12 +5,13 @@ from aiohttp import MultipartReader
 
 from ai.backend.common.types import AccessKey
 from ai.backend.manager.actions.action import BaseActionResult
+from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.session.types import SessionData
-from ai.backend.manager.services.session.base import SessionAction
+from ai.backend.manager.services.session.actions.file_base import SessionFileAction
 
 
 @dataclass
-class UploadFilesAction(SessionAction):
+class UploadFilesAction(SessionFileAction):
     session_name: str
     owner_access_key: AccessKey
     # TODO: Refactor this.
@@ -22,8 +23,8 @@ class UploadFilesAction(SessionAction):
 
     @override
     @classmethod
-    def operation_type(cls) -> str:
-        return "upload_files"
+    def operation_type(cls) -> ActionOperationType:
+        return ActionOperationType.UPDATE
 
 
 @dataclass

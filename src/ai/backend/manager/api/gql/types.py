@@ -7,15 +7,15 @@ from typing import TYPE_CHECKING
 import strawberry
 
 from ai.backend.manager.api.gql.data_loader.data_loaders import DataLoaders
-from ai.backend.manager.api.gql.data_loader.registry import DataLoaderRegistry
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.repositories.base import QueryCondition, QueryOrder
-from ai.backend.manager.services.processors import Processors
 
 if TYPE_CHECKING:
     from ai.backend.common.events.fetcher import EventFetcher
     from ai.backend.common.events.hub.hub import EventHub
+    from ai.backend.common.metrics.metric import GraphQLMetricObserver
     from ai.backend.manager.api.gql.adapter import BaseGQLAdapter
+    from ai.backend.manager.services.processors import Processors  # pants: no-infer-dep
 
 
 class GQLFilter(ABC):
@@ -58,9 +58,9 @@ class StrawberryGQLContext:
     config_provider: ManagerConfigProvider
     event_hub: EventHub
     event_fetcher: EventFetcher
-    dataloader_registry: DataLoaderRegistry  # TODO: Remove this.
     gql_adapter: BaseGQLAdapter
     data_loaders: DataLoaders
+    metric_observer: GraphQLMetricObserver
 
 
 # Scope input types for BEP-1041 Resource Group scoped APIs
@@ -70,14 +70,18 @@ class StrawberryGQLContext:
 class ResourceGroupDomainScope:
     """Scope for domain-level APIs within a resource group context."""
 
-    resource_group: str = strawberry.field(description="Resource group name to scope the operation")
+    resource_group_name: str = strawberry.field(
+        description="Resource group name to scope the operation"
+    )
 
 
 @strawberry.input(description="Resource group + domain scope for project-level operations")
 class ResourceGroupProjectScope:
     """Scope for project-level APIs within a resource group and domain context."""
 
-    resource_group: str = strawberry.field(description="Resource group name to scope the operation")
+    resource_group_name: str = strawberry.field(
+        description="Resource group name to scope the operation"
+    )
     domain_name: str = strawberry.field(description="Domain name to scope the operation")
 
 
@@ -85,6 +89,38 @@ class ResourceGroupProjectScope:
 class ResourceGroupUserScope:
     """Scope for user-level APIs within a resource group, domain, and project context."""
 
-    resource_group: str = strawberry.field(description="Resource group name to scope the operation")
+    resource_group_name: str = strawberry.field(
+        description="Resource group name to scope the operation"
+    )
     domain_name: str = strawberry.field(description="Domain name to scope the operation")
     project_id: str = strawberry.field(description="Project ID to scope the operation")
+
+
+# Scope input types for Usage Bucket scoped APIs
+
+
+@strawberry.input(description="Domain scope for usage bucket queries")
+class DomainUsageBucketScope:
+    """Scope for domain-level usage bucket APIs."""
+
+    resource_group_name: str = strawberry.field(description="Resource group name")
+    domain_name: str = strawberry.field(description="Domain name to retrieve usage buckets for")
+
+
+@strawberry.input(description="Project scope for usage bucket queries")
+class ProjectUsageBucketScope:
+    """Scope for project-level usage bucket APIs."""
+
+    resource_group_name: str = strawberry.field(description="Resource group name")
+    domain_name: str = strawberry.field(description="Domain name")
+    project_id: str = strawberry.field(description="Project ID (will be converted to UUID)")
+
+
+@strawberry.input(description="User scope for usage bucket queries")
+class UserUsageBucketScope:
+    """Scope for user-level usage bucket APIs."""
+
+    resource_group_name: str = strawberry.field(description="Resource group name")
+    domain_name: str = strawberry.field(description="Domain name")
+    project_id: str = strawberry.field(description="Project ID (will be converted to UUID)")
+    user_uuid: str = strawberry.field(description="User UUID (will be converted to UUID)")

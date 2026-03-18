@@ -6,7 +6,6 @@ import itertools
 import logging
 import secrets
 import uuid
-from collections import defaultdict
 from collections.abc import (
     Mapping,
     MutableMapping,
@@ -114,7 +113,9 @@ from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.data.model_serving.types import EndpointData
 from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.models.endpoint import ModelServiceHelper
+from ai.backend.manager.models.resource_slot import AgentResourceRow, ResourceAllocationRow
 from ai.backend.manager.plugin.network import NetworkPluginContext
+from ai.backend.manager.repositories.resource_slot import ResourceSlotRepository
 from ai.backend.manager.repositories.scheduler.types.session_creation import SessionCreationSpec
 from ai.backend.manager.sokovan.scheduling_controller import SchedulingController
 
@@ -155,13 +156,11 @@ from .models.keypair import query_bootstrap_script
 from .models.network import NetworkRow, NetworkType
 from .models.scaling_group import query_allowed_sgroups, scaling_groups
 from .models.session import (
-    AGENT_RESOURCE_OCCUPYING_SESSION_STATUSES,
     PRIVATE_SESSION_TYPES,
     SESSION_KERNEL_STATUS_MAPPING,
     USER_RESOURCE_OCCUPYING_SESSION_STATUSES,
     ConcurrencyUsed,
     KernelLoadingStrategy,
-    SessionLifecycleManager,
     SessionRow,
     handle_session_exception,
 )
@@ -176,6 +175,7 @@ from .models.utils import (
 )
 from .models.vfolder import VFolderRow, verify_vfolder_name
 from .scheduler.types import KernelAgentBinding
+from .services.session.lifecycle import SessionLifecycleManager
 from .types import UserScope
 
 type MSetType = Mapping[str | bytes, bytes | float | int | str]
@@ -372,6 +372,7 @@ class AgentRegistry:
         enqueue_only: bool = False,
         max_wait_seconds: int = 0,
         priority: int = SESSION_PRIORITY_DEFAULT,
+        is_preemptible: bool = True,
         bootstrap_script: str | None = None,
         dependencies: list[uuid.UUID] | None = None,
         startup_command: str | None = None,
@@ -577,6 +578,7 @@ class AgentRegistry:
                         resource_policy,
                         user_scope=user_scope,
                         priority=priority,
+                        is_preemptible=is_preemptible,
                         cluster_mode=cluster_mode,
                         cluster_size=cluster_size,
                         session_tag=tag,
@@ -924,6 +926,7 @@ class AgentRegistry:
         sudo_session_enabled: bool,
         network: NetworkRow | None,
         startup_command: str | None,
+        is_preemptible: bool,
     ) -> SessionId:
         """Enqueue session using Sokovan scheduling controller."""
         kernel_enqueue_configs: list[KernelEnqueueingConfig] = session_enqueue_configs[
@@ -956,6 +959,7 @@ class AgentRegistry:
             internal_data=internal_data,
             public_sgroup_only=public_sgroup_only,
             startup_command=startup_command,
+            is_preemptible=is_preemptible,
         )
 
         # Delegate to scheduling controller
@@ -973,6 +977,7 @@ class AgentRegistry:
         *,
         user_scope: UserScope,
         priority: int = SESSION_PRIORITY_DEFAULT,
+        is_preemptible: bool = True,
         public_sgroup_only: bool = True,
         cluster_mode: ClusterMode = ClusterMode.SINGLE_NODE,
         cluster_size: int = 1,
@@ -998,6 +1003,7 @@ class AgentRegistry:
             resource_policy=resource_policy,
             user_scope=user_scope,
             priority=priority,
+            is_preemptible=is_preemptible,
             public_sgroup_only=public_sgroup_only,
             cluster_mode=cluster_mode,
             cluster_size=cluster_size,
@@ -1065,18 +1071,23 @@ class AgentRegistry:
 
         async def _query() -> ResourceSlot:
             async with reenter_txn_session(self.db, db_sess) as _sess:
-                query = sa.select(KernelRow.occupied_slots).where(
-                    (KernelRow.user_uuid == user_id)
-                    & (KernelRow.status.in_(USER_RESOURCE_OCCUPYING_KERNEL_STATUSES))
-                    & (KernelRow.session_type.not_in(PRIVATE_SESSION_TYPES))
+                ra = ResourceAllocationRow.__table__
+                k = KernelRow.__table__
+                effective = sa.func.coalesce(ra.c.used, ra.c.requested)
+                query = (
+                    sa.select(ra.c.slot_name, sa.func.sum(effective).label("total"))
+                    .select_from(ra.join(k, ra.c.kernel_id == k.c.id))
+                    .where(
+                        k.c.user_uuid == user_id,
+                        k.c.status.in_(USER_RESOURCE_OCCUPYING_KERNEL_STATUSES),
+                        k.c.session_type.not_in(PRIVATE_SESSION_TYPES),
+                        ra.c.free_at.is_(None),
+                    )
+                    .group_by(ra.c.slot_name)
                 )
-                zero = ResourceSlot()
-                user_occupied = sum(
-                    [row.occupied_slots async for row in (await _sess.stream(query))], zero
-                )
-                # drop no-longer used slot types
+                rows = (await _sess.execute(query)).all()
                 return ResourceSlot({
-                    key: val for key, val in user_occupied.items() if key in known_slot_types
+                    r.slot_name: r.total for r in rows if r.slot_name in known_slot_types
                 })
 
         return await execute_with_retry(_query)
@@ -1088,84 +1099,80 @@ class AgentRegistry:
 
         async def _query() -> ResourceSlot:
             async with reenter_txn_session(self.db, db_sess) as _sess:
+                ra = ResourceAllocationRow.__table__
+                k = KernelRow.__table__
+                effective = sa.func.coalesce(ra.c.used, ra.c.requested)
                 query = (
-                    sa.select(KernelRow.occupied_slots)
-                    .select_from(KernelRow)
+                    sa.select(ra.c.slot_name, sa.func.sum(effective).label("total"))
+                    .select_from(ra.join(k, ra.c.kernel_id == k.c.id))
                     .where(
-                        (KernelRow.access_key == access_key)
-                        & (KernelRow.status.in_(USER_RESOURCE_OCCUPYING_KERNEL_STATUSES))
-                        & (KernelRow.session_type.not_in(PRIVATE_SESSION_TYPES)),
+                        k.c.access_key == access_key,
+                        k.c.status.in_(USER_RESOURCE_OCCUPYING_KERNEL_STATUSES),
+                        k.c.session_type.not_in(PRIVATE_SESSION_TYPES),
+                        ra.c.free_at.is_(None),
                     )
+                    .group_by(ra.c.slot_name)
                 )
-                zero = ResourceSlot()
-                key_occupied = sum(
-                    [row.occupied_slots async for row in (await _sess.stream(query))], zero
-                )
-                # drop no-longer used slot types
-                drops = [k for k in key_occupied.keys() if k not in known_slot_types]
-                for k in drops:
-                    del key_occupied[k]
-                return key_occupied
+                rows = (await _sess.execute(query)).all()
+                return ResourceSlot({
+                    r.slot_name: r.total for r in rows if r.slot_name in known_slot_types
+                })
 
         return await execute_with_retry(_query)
 
     async def get_domain_occupancy(
         self, domain_name: str, *, db_sess: AsyncSession | None = None
     ) -> ResourceSlot:
-        # TODO: store domain occupied_slots in Redis?
         known_slot_types = await self.config_provider.legacy_etcd_config_loader.get_resource_slots()
 
         async def _query() -> ResourceSlot:
             async with reenter_txn_session(self.db, db_sess) as _sess:
+                ra = ResourceAllocationRow.__table__
+                k = KernelRow.__table__
+                effective = sa.func.coalesce(ra.c.used, ra.c.requested)
                 query = (
-                    sa.select(KernelRow.occupied_slots)
-                    .select_from(KernelRow)
+                    sa.select(ra.c.slot_name, sa.func.sum(effective).label("total"))
+                    .select_from(ra.join(k, ra.c.kernel_id == k.c.id))
                     .where(
-                        (KernelRow.domain_name == domain_name)
-                        & (KernelRow.status.in_(USER_RESOURCE_OCCUPYING_KERNEL_STATUSES))
-                        & (KernelRow.session_type.not_in(PRIVATE_SESSION_TYPES)),
+                        k.c.domain_name == domain_name,
+                        k.c.status.in_(USER_RESOURCE_OCCUPYING_KERNEL_STATUSES),
+                        k.c.session_type.not_in(PRIVATE_SESSION_TYPES),
+                        ra.c.free_at.is_(None),
                     )
+                    .group_by(ra.c.slot_name)
                 )
-                zero = ResourceSlot()
-                key_occupied = sum(
-                    [row.occupied_slots async for row in (await _sess.stream(query))],
-                    zero,
-                )
-                # drop no-longer used slot types
-                drops = [k for k in key_occupied.keys() if k not in known_slot_types]
-                for k in drops:
-                    del key_occupied[k]
-                return key_occupied
+                rows = (await _sess.execute(query)).all()
+                return ResourceSlot({
+                    r.slot_name: r.total for r in rows if r.slot_name in known_slot_types
+                })
 
         return await execute_with_retry(_query)
 
     async def get_group_occupancy(
         self, group_id: uuid.UUID, *, db_sess: AsyncSession | None = None
     ) -> ResourceSlot:
-        # TODO: store domain occupied_slots in Redis?
         known_slot_types = await self.config_provider.legacy_etcd_config_loader.get_resource_slots()
 
         async def _query() -> ResourceSlot:
             async with reenter_txn_session(self.db, db_sess) as _sess:
+                ra = ResourceAllocationRow.__table__
+                k = KernelRow.__table__
+                effective = sa.func.coalesce(ra.c.used, ra.c.requested)
                 query = (
-                    sa.select(KernelRow.occupied_slots)
-                    .select_from(KernelRow)
+                    sa.select(ra.c.slot_name, sa.func.sum(effective).label("total"))
+                    .select_from(ra.join(k, ra.c.kernel_id == k.c.id))
                     .where(
-                        (KernelRow.group_id == group_id)
-                        & (KernelRow.status.in_(USER_RESOURCE_OCCUPYING_KERNEL_STATUSES))
-                        & (KernelRow.session_type.not_in(PRIVATE_SESSION_TYPES)),
+                        k.c.group_id == group_id,
+                        k.c.status.in_(USER_RESOURCE_OCCUPYING_KERNEL_STATUSES),
+                        k.c.session_type.not_in(PRIVATE_SESSION_TYPES),
+                        ra.c.free_at.is_(None),
                     )
+                    .group_by(ra.c.slot_name)
                 )
-                zero = ResourceSlot()
-                key_occupied = sum(
-                    [row.occupied_slots async for row in (await _sess.stream(query))],
-                    zero,
-                )
-                # drop no-longer used slot types
-                drops = [k for k in key_occupied.keys() if k not in known_slot_types]
-                for k in drops:
-                    del key_occupied[k]
-                return key_occupied
+                rows = (await _sess.execute(query)).all()
+                return ResourceSlot({
+                    r.slot_name: r.total for r in rows if r.slot_name in known_slot_types
+                })
 
         return await execute_with_retry(_query)
 
@@ -1204,47 +1211,28 @@ class AgentRegistry:
                 else:  # something's wrong; just fall back to requested slot value
                     actual_allocated_slots += kernel_agent_binding.kernel.requested_slots
 
-            # perform DB update only if requested slots and actual allocated value differs
+            # Phase 3 (BA-4308): Legacy JSONB write to agents.occupied_slots removed.
+            # Agent occupied slots are now solely managed by the normalized
+            # agent_resources table.  The agents.occupied_slots JSONB column is
+            # retained for historical audit but no longer written to.
             if actual_allocated_slots != requested_slots:
-                log.debug("calibrating resource slot usage for agent {}", agent_id)
-
-                async def _update_agent_resource() -> None:
-                    async with self.db.begin_session() as db_sess:
-                        select_query = sa.select(AgentRow.occupied_slots).where(
-                            AgentRow.id == agent_id
-                        )
-                        result = await db_sess.execute(select_query)
-                        occupied_slots = result.scalar() or ResourceSlot({})
-                        diff = actual_allocated_slots - requested_slots
-                        update_query = (
-                            sa.update(AgentRow)
-                            .values(
-                                occupied_slots=ResourceSlot.from_json(occupied_slots) + diff,
-                            )
-                            .where(AgentRow.id == agent_id)
-                        )
-                        await db_sess.execute(update_query)
-
-                await execute_with_retry(_update_agent_resource)
+                log.debug(
+                    "agent {} has slot calibration diff (requested != actual); "
+                    "agent_resources table is the source of truth",
+                    agent_id,
+                )
 
     async def recalc_resource_usage(self, do_fullscan: bool = False) -> None:
         async def _recalc() -> Mapping[AccessKey, ConcurrencyUsed]:
-            occupied_slots_per_agent: MutableMapping[str, ResourceSlot] = defaultdict(
-                lambda: ResourceSlot({"cpu": 0, "mem": 0})
-            )
             access_key_to_concurrency_used: dict[AccessKey, ConcurrencyUsed] = {}
 
             async with self.db.begin_session() as db_sess:
-                # Query running containers and calculate concurrency_used per AK and
-                # occupied_slots per agent.
+                # Query running containers and calculate concurrency_used per AK.
+                # Agent occupied slots are now managed by the normalized
+                # agent_resources table, so only concurrency tracking remains here.
                 session_query = (
                     sa.select(SessionRow)
-                    .where(
-                        SessionRow.status.in_({
-                            *AGENT_RESOURCE_OCCUPYING_SESSION_STATUSES,
-                            *USER_RESOURCE_OCCUPYING_SESSION_STATUSES,
-                        })
-                    )
+                    .where(SessionRow.status.in_(USER_RESOURCE_OCCUPYING_SESSION_STATUSES))
                     .options(
                         load_only(
                             SessionRow.id,
@@ -1252,66 +1240,41 @@ class AgentRegistry:
                             SessionRow.status,
                             SessionRow.session_type,
                         ),
-                        selectinload(SessionRow.kernels).options(
-                            load_only(KernelRow.agent, KernelRow.occupied_slots)
-                        ),
                     )
                 )
                 async for session_row in await db_sess.stream_scalars(session_query):
-                    for kernel in session_row.kernels:
-                        session_status = session_row.status
-                        if session_status in AGENT_RESOURCE_OCCUPYING_SESSION_STATUSES:
-                            if kernel.agent is not None:
-                                occupied_slots_per_agent[kernel.agent] += ResourceSlot(
-                                    kernel.occupied_slots
-                                )
-                        if session_row.status in USER_RESOURCE_OCCUPYING_SESSION_STATUSES:
-                            access_key = cast(AccessKey, session_row.access_key)
-                            if access_key not in access_key_to_concurrency_used:
-                                access_key_to_concurrency_used[access_key] = ConcurrencyUsed(
-                                    access_key
-                                )
-                            if session_row.session_type in PRIVATE_SESSION_TYPES:
-                                access_key_to_concurrency_used[access_key].system_session_ids.add(
-                                    session_row.id
-                                )
-                            else:
-                                access_key_to_concurrency_used[access_key].compute_session_ids.add(
-                                    session_row.id
-                                )
-
-                if len(occupied_slots_per_agent) > 0:
-                    # Update occupied_slots for agents with running containers.
-                    await db_sess.execute(
-                        (
-                            sa.update(AgentRow.__table__)
-                            .where(AgentRow.id == sa.bindparam("agent_id"))
-                            .values(occupied_slots=sa.bindparam("occupied_slots"))
-                        ),
-                        [
-                            {"agent_id": aid, "occupied_slots": slots}
-                            for aid, slots in occupied_slots_per_agent.items()
-                        ],
-                    )
-                    await db_sess.execute(
-                        sa.update(AgentRow.__table__)
-                        .values(occupied_slots=ResourceSlot({}))
-                        .where(AgentRow.status == AgentStatus.ALIVE)
-                        .where(sa.not_(AgentRow.id.in_(occupied_slots_per_agent.keys()))),
-                    )
-                else:
-                    query = (
-                        sa.update(AgentRow.__table__)
-                        .values(occupied_slots=ResourceSlot({}))
-                        .where(AgentRow.status == AgentStatus.ALIVE)
-                    )
-                    await db_sess.execute(
-                        query,
-                    )
+                    access_key = cast(AccessKey, session_row.access_key)
+                    if access_key not in access_key_to_concurrency_used:
+                        access_key_to_concurrency_used[access_key] = ConcurrencyUsed(access_key)
+                    if session_row.session_type in PRIVATE_SESSION_TYPES:
+                        access_key_to_concurrency_used[access_key].system_session_ids.add(
+                            session_row.id
+                        )
+                    else:
+                        access_key_to_concurrency_used[access_key].compute_session_ids.add(
+                            session_row.id
+                        )
             return access_key_to_concurrency_used
 
         access_key_to_concurrency_used = await execute_with_retry(_recalc)
         await self._update_concurrency(access_key_to_concurrency_used, do_fullscan)
+        await self._reconcile_agent_resources()
+
+    async def _reconcile_agent_resources(self) -> None:
+        """Reconcile agent_resources.used against actual resource_allocations.
+
+        Delegates to ResourceSlotRepository for DB operations and logs any drift found.
+        """
+        repo = ResourceSlotRepository(self.db)
+        drifts = await repo.reconcile_agent_resources()
+        for d in drifts:
+            log.warning(
+                "agent_resources drift detected for {}:{}: tracked={}, actual={}",
+                d.agent_id,
+                d.slot_name,
+                d.tracked,
+                d.actual,
+            )
 
     async def _update_concurrency(
         self,
@@ -2235,7 +2198,44 @@ class AgentRegistry:
 
         if result is None:
             return
+
+        # Free resources in normalized tables
+        if result.agent is not None:
+            await self._free_kernel_resources(kernel_id, result.agent)
+
         await self.session_lifecycle_mgr.register_status_updatable_session([session_id])
+
+    async def _free_kernel_resources(
+        self,
+        kernel_id: uuid.UUID,
+        agent_id: str,
+    ) -> int:
+        """Free normalized resource allocations and decrement agent_resources.used."""
+        ar = AgentResourceRow.__table__
+        async with self.db.begin_session() as db_sess:
+            released = (
+                await db_sess.execute(
+                    sa.update(ResourceAllocationRow)
+                    .where(
+                        ResourceAllocationRow.kernel_id == kernel_id,
+                        ResourceAllocationRow.free_at.is_(None),
+                    )
+                    .values(free_at=sa.func.now())
+                    .returning(ResourceAllocationRow.slot_name, ResourceAllocationRow.used)
+                )
+            ).all()
+            if not released:
+                return 0
+            for r in released:
+                if r.used is None:
+                    continue
+                new_used = sa.func.greatest(ar.c.used - r.used, 0)
+                await db_sess.execute(
+                    sa.update(ar)
+                    .where(ar.c.agent_id == agent_id, ar.c.slot_name == r.slot_name)
+                    .values(used=new_used)
+                )
+            return len(released)
 
     async def _get_user_email(
         self,

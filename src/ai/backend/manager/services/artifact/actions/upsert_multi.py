@@ -2,6 +2,7 @@ from dataclasses import dataclass
 from typing import override
 
 from ai.backend.manager.actions.action import BaseActionResult
+from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.artifact.types import ArtifactDataWithRevisions
 from ai.backend.manager.services.artifact.actions.base import ArtifactAction
 
@@ -16,8 +17,8 @@ class UpsertArtifactsAction(ArtifactAction):
 
     @override
     @classmethod
-    def operation_type(cls) -> str:
-        return "upsert_multi"
+    def operation_type(cls) -> ActionOperationType:
+        return ActionOperationType.UPDATE
 
 
 @dataclass

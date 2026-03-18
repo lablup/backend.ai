@@ -88,11 +88,13 @@ from ai.backend.common.metrics.http import (
     build_prometheus_metrics_handler,
 )
 from ai.backend.common.metrics.metric import CommonMetricRegistry
+from ai.backend.common.metrics.multiprocess import cleanup_prometheus_multiprocess_dir
 from ai.backend.common.metrics.profiler import Profiler, PyroscopeArgs
 from ai.backend.common.service_discovery.etcd_discovery.service_discovery import (
     ETCDServiceDiscovery,
     ETCDServiceDiscoveryArgs,
 )
+from ai.backend.common.service_discovery.event_publisher import ServiceDiscoveryEventPublisher
 from ai.backend.common.service_discovery.redis_discovery.service_discovery import (
     RedisServiceDiscovery,
     RedisServiceDiscoveryArgs,
@@ -1515,16 +1517,37 @@ async def service_discovery_ctx(
     if local_config.otel.enabled:
         meta = sd_loop.metadata
         otel_spec = OpenTelemetrySpec(
-            service_id=meta.id,
             service_name=meta.service_group,
             service_version=meta.version,
             log_level=local_config.otel.log_level,
             endpoint=local_config.otel.endpoint,
+            service_instance_id=meta.id,
+            service_instance_name=meta.display_name,
+            max_queue_size=local_config.otel.max_queue_size,
+            max_export_batch_size=local_config.otel.max_export_batch_size,
         )
         BraceStyleAdapter.apply_otel(otel_spec)
+
+    # Start event-based SD publishing if config has service_group set
+    sd_config = local_config.service_discovery
+    sd_event_publisher: ServiceDiscoveryEventPublisher | None = None
+    if sd_config.service_group:
+        from datetime import UTC, datetime
+
+        default_agent = agent_server.runtime.get_agent(None)
+        sd_event_publisher = ServiceDiscoveryEventPublisher(
+            event_producer=default_agent.event_producer,
+            config=sd_config,
+            component_version=VERSION,
+            startup_time=datetime.now(tz=UTC),
+        )
+        await sd_event_publisher.start()
+
     try:
         yield
     finally:
+        if sd_event_publisher is not None:
+            await sd_event_publisher.stop()
         sd_loop.close()
 
 
@@ -1697,13 +1720,16 @@ def main(
                         log.info("Using uvloop as the event loop backend")
                     case EventLoopType.ASYNCIO:
                         runner = asyncio.run
-                aiotools.start_server(
-                    server_main_logwrapper,
-                    num_workers=1,
-                    args=(server_config, log_endpoint),
-                    wait_timeout=5.0,
-                    runner=runner,
-                )
+                try:
+                    aiotools.start_server(
+                        server_main_logwrapper,
+                        num_workers=1,
+                        args=(server_config, log_endpoint),
+                        wait_timeout=5.0,
+                        runner=runner,
+                    )
+                finally:
+                    cleanup_prometheus_multiprocess_dir()
                 log.info("exit.")
         finally:
             if server_config.agent_common.pid_file.is_file():

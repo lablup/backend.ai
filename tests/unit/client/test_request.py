@@ -121,7 +121,6 @@ def test_build_correct_url(mock_request_params: dict[str, Any]) -> None:
     assert str(rqst._build_url()) == canonical_url
 
 
-@pytest.mark.asyncio
 async def test_fetch_invalid_method(mock_request_params: dict[str, Any]) -> None:
     mock_request_params["method"] = "STRANGE"
     rqst = Request(**mock_request_params)
@@ -131,7 +130,6 @@ async def test_fetch_invalid_method(mock_request_params: dict[str, Any]) -> None
             pass
 
 
-@pytest.mark.asyncio
 async def test_fetch(dummy_endpoint: str) -> None:
     with aioresponses() as m, Session():
         body = b"hello world"
@@ -170,7 +168,6 @@ async def test_fetch(dummy_endpoint: str) -> None:
             assert resp.content_length == len(body)
 
 
-@pytest.mark.asyncio
 async def test_streaming_fetch(dummy_endpoint: str) -> None:
     # Read content by chunks.
     with aioresponses() as m, Session():
@@ -192,7 +189,6 @@ async def test_streaming_fetch(dummy_endpoint: str) -> None:
                 assert await resp.text()
 
 
-@pytest.mark.asyncio
 async def test_invalid_requests(dummy_endpoint: str) -> None:
     with aioresponses() as m, Session():
         body = json.dumps({
@@ -217,7 +213,6 @@ async def test_invalid_requests(dummy_endpoint: str) -> None:
             assert e.data["title"] == "Kernel Not Found"
 
 
-@pytest.mark.asyncio
 async def test_fetch_invalid_method_async() -> None:
     async with AsyncSession():
         rqst = Request("STRANGE", "/")
@@ -226,7 +221,6 @@ async def test_fetch_invalid_method_async() -> None:
                 pass
 
 
-@pytest.mark.asyncio
 async def test_fetch_client_error_async(dummy_endpoint: str) -> None:
     with aioresponses() as m:
         async with AsyncSession():
@@ -238,7 +232,6 @@ async def test_fetch_client_error_async(dummy_endpoint: str) -> None:
 
 
 @pytest.mark.xfail
-@pytest.mark.asyncio
 async def test_fetch_cancellation_async(dummy_endpoint: str) -> None:
     # It seems that aiohttp swallows asyncio.CancelledError
     with aioresponses() as m:
@@ -250,7 +243,6 @@ async def test_fetch_cancellation_async(dummy_endpoint: str) -> None:
                     pass
 
 
-@pytest.mark.asyncio
 async def test_fetch_timeout_async(dummy_endpoint: str) -> None:
     with aioresponses() as m:
         async with AsyncSession():
@@ -261,7 +253,6 @@ async def test_fetch_timeout_async(dummy_endpoint: str) -> None:
                     pass
 
 
-@pytest.mark.asyncio
 async def test_response_async(defconfig: APIConfig, dummy_endpoint: str) -> None:
     body = b'{"test": 5678}'
     with aioresponses() as m:

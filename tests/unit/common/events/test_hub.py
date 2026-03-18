@@ -4,8 +4,6 @@ import uuid
 from typing import Self
 from unittest.mock import AsyncMock
 
-import pytest
-
 from ai.backend.common.events.hub import WILDCARD, EventHub, EventPropagator
 from ai.backend.common.events.types import AbstractEvent, DeliveryPattern, EventDomain
 from ai.backend.common.events.user_event.user_event import UserEvent
@@ -66,7 +64,6 @@ class DummyEventPropagator(EventPropagator):
         pass
 
 
-@pytest.mark.asyncio
 async def test_hub_normal_aliases() -> None:
     hub = EventHub()
     aliases = [
@@ -110,7 +107,6 @@ async def test_hub_normal_aliases() -> None:
     ]
 
 
-@pytest.mark.asyncio
 async def test_hub_wildcard_aliases() -> None:
     hub = EventHub()
     aliases = [
@@ -153,7 +149,6 @@ async def test_hub_wildcard_aliases() -> None:
     ]
 
 
-@pytest.mark.asyncio
 async def test_hub_close_by_alias() -> None:
     hub = EventHub()
     aliases = [
@@ -185,7 +180,6 @@ async def test_hub_close_by_alias() -> None:
     assert mock_close2.await_count == 2
 
 
-@pytest.mark.asyncio
 async def test_hub_shutdown() -> None:
     hub = EventHub()
     aliases = [

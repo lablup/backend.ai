@@ -18,6 +18,7 @@ import traceback
 import uuid
 from collections.abc import AsyncGenerator, AsyncIterator, Callable, Iterable, Mapping, Sequence
 from contextlib import AsyncExitStack, asynccontextmanager
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Final, cast
 from uuid import UUID
@@ -71,6 +72,7 @@ from ai.backend.appproxy.common.utils import (
     mime_match,
     ping_redis_connection,
 )
+from ai.backend.appproxy.coordinator.api.types import AppProxyStatusResponse
 from ai.backend.appproxy.coordinator.models.worker import WorkerStatus
 from ai.backend.common import redis_helper
 from ai.backend.common.clients.valkey_client.valkey_leader.client import ValkeyLeaderClient
@@ -99,7 +101,9 @@ from ai.backend.common.message_queue.hiredis_queue import HiRedisQueue
 from ai.backend.common.message_queue.queue import AbstractMessageQueue
 from ai.backend.common.message_queue.redis_queue import RedisMQArgs, RedisQueue
 from ai.backend.common.metrics.http import build_api_metric_middleware
+from ai.backend.common.metrics.multiprocess import cleanup_prometheus_multiprocess_dir
 from ai.backend.common.msgpack import DEFAULT_PACK_OPTS, DEFAULT_UNPACK_OPTS
+from ai.backend.common.service_discovery.event_publisher import ServiceDiscoveryEventPublisher
 from ai.backend.common.service_discovery.redis_discovery.service_discovery import (
     RedisServiceDiscovery,
     RedisServiceDiscoveryArgs,
@@ -760,16 +764,34 @@ async def service_discovery_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     if root_ctx.local_config.otel.enabled:
         meta = sd_loop.metadata
         otel_spec = OpenTelemetrySpec(
-            service_id=meta.id,
             service_name=meta.service_group,
             service_version=meta.version,
             log_level=root_ctx.local_config.otel.log_level,
             endpoint=root_ctx.local_config.otel.endpoint,
+            service_instance_id=meta.id,
+            service_instance_name=meta.display_name,
+            max_queue_size=root_ctx.local_config.otel.max_queue_size,
+            max_export_batch_size=root_ctx.local_config.otel.max_export_batch_size,
         )
         BraceStyleAdapter.apply_otel(otel_spec)
+
+    # Start event-based SD publishing if config has service_group set
+    sd_config = root_ctx.local_config.service_discovery
+    sd_event_publisher: ServiceDiscoveryEventPublisher | None = None
+    if sd_config.service_group and hasattr(root_ctx, "event_producer"):
+        sd_event_publisher = ServiceDiscoveryEventPublisher(
+            event_producer=root_ctx.event_producer,
+            config=sd_config,
+            component_version=__version__,
+            startup_time=datetime.now(tz=UTC),
+        )
+        await sd_event_publisher.start()
+
     try:
         yield
     finally:
+        if sd_event_publisher is not None:
+            await sd_event_publisher.stop()
         sd_loop.close()
 
 
@@ -844,10 +866,11 @@ async def status(request: web.Request) -> web.Response:
     root_ctx: RootContext = request.app["_root.context"]
     request["do_not_print_access_log"] = True
     advertised_addr = root_ctx.local_config.proxy_coordinator.advertise_base_url
-    return web.json_response({
-        "api_version": "v2",
-        "advertise_address": advertised_addr,
-    })
+    response = AppProxyStatusResponse(
+        api_version="v2",
+        advertise_address=advertised_addr,
+    )
+    return web.json_response(response.model_dump(mode="json"))
 
 
 def handle_loop_error(
@@ -1213,6 +1236,7 @@ def main(ctx: click.Context, config_path: Path | None, debug: bool, log_level: L
                         runner=runner,
                     )
                 finally:
+                    cleanup_prometheus_multiprocess_dir()
                     log.info("terminated.")
         finally:
             if server_config.proxy_coordinator.pid_file.is_file():

@@ -12,6 +12,7 @@ from ai.backend.common.clients.http_client.client_pool import (
 )
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
 from ai.backend.common.config import ModelHealthCheck
+from ai.backend.common.exception import BackendAIError
 from ai.backend.common.types import (
     RuntimeVariant,
 )
@@ -56,11 +57,26 @@ from ai.backend.manager.sokovan.scheduling_controller import SchedulingControlle
 from .types import (
     DeploymentExecutionError,
     DeploymentExecutionResult,
+    DeploymentWithHistory,
 )
 
 log = BraceStyleAdapter(logging.getLogger(__name__))
 
 REGISTER_ENDPOINT_TIMEOUT_SEC = 30
+
+
+def _extract_error_code(exception: BaseException) -> str | None:
+    """Extract error code from exception if available.
+
+    Args:
+        exception: The exception to extract error code from.
+
+    Returns:
+        Error code string if exception is BackendAIError, None otherwise.
+    """
+    if isinstance(exception, BackendAIError):
+        return str(exception.error_code())
+    return None
 
 
 class DeploymentExecutor:
@@ -94,40 +110,43 @@ class DeploymentExecutor:
         )
 
     async def check_pending_deployments(
-        self, deployments: Sequence[DeploymentInfo]
+        self, deployments: Sequence[DeploymentWithHistory]
     ) -> DeploymentExecutionResult:
         # Phase 1: Load configuration
         with DeploymentRecorderContext.shared_phase("load_configuration"):
             with DeploymentRecorderContext.shared_step("load_proxy_targets"):
-                scaling_groups = {deployment.metadata.resource_group for deployment in deployments}
+                scaling_groups = {
+                    dep.deployment_info.metadata.resource_group for dep in deployments
+                }
                 scaling_group_targets = (
                     await self._deployment_repo.fetch_scaling_group_proxy_targets(scaling_groups)
                 )
 
         # Collect registration tasks
         registration_tasks: list[Coroutine[Any, Any, str]] = []
-        valid_deployments: list[DeploymentInfo] = []
+        valid_deployments: list[DeploymentWithHistory] = []
         for deployment in deployments:
-            target_revision = deployment.target_revision()
+            info = deployment.deployment_info
+            target_revision = info.target_revision()
             if not target_revision:
                 log.warning(
                     "Deployment {} has no target revision, skipping",
-                    deployment.id,
+                    info.id,
                 )
                 continue
-            targets = scaling_group_targets[deployment.metadata.resource_group]
+            targets = scaling_group_targets[info.metadata.resource_group]
             if not targets:
                 log.warning(
                     "No proxy target found for scaling group {}, skipping deployment {}",
-                    deployment.metadata.resource_group,
-                    deployment.id,
+                    info.metadata.resource_group,
+                    info.id,
                 )
                 continue
-            registration_tasks.append(self._register_endpoint(deployment, targets))
+            registration_tasks.append(self._register_endpoint(info, targets))
             valid_deployments.append(deployment)
 
         # Wait for all tasks to complete
-        successful_deployments: list[DeploymentInfo] = []
+        successful_deployments: list[DeploymentWithHistory] = []
         errors: list[DeploymentExecutionError] = []
         url_updates: dict[UUID, str] = {}
 
@@ -136,10 +155,11 @@ class DeploymentExecutor:
             results = await asyncio.gather(*registration_tasks, return_exceptions=True)
 
             for deployment, result in zip(valid_deployments, results, strict=True):
+                dep_id = deployment.deployment_info.id
                 if isinstance(result, BaseException):
                     log.error(
                         "Failed to register endpoint for deployment {}: {}",
-                        deployment.id,
+                        dep_id,
                         result,
                     )
                     errors.append(
@@ -147,15 +167,16 @@ class DeploymentExecutor:
                             deployment_info=deployment,
                             reason=str(result),
                             error_detail="Failed to register endpoint",
+                            error_code=_extract_error_code(result),
                         )
                     )
                 else:
                     # Result is the endpoint URL string returned from _register_endpoint
-                    url_updates[deployment.id] = result
+                    url_updates[dep_id] = result
                     successful_deployments.append(deployment)
                     log.info(
                         "Successfully registered endpoint for deployment {} with URL: {}",
-                        deployment.id,
+                        dep_id,
                         result,
                     )
 
@@ -173,28 +194,28 @@ class DeploymentExecutor:
         )
 
     async def check_ready_deployments_that_need_scaling(
-        self, deployments: Sequence[DeploymentInfo]
+        self, deployments: Sequence[DeploymentWithHistory]
     ) -> DeploymentExecutionResult:
         # Phase 1: Load routes
         with DeploymentRecorderContext.shared_phase("load_routes"):
             with DeploymentRecorderContext.shared_step("load_active_routes"):
-                endpoint_ids = {deployment.id for deployment in deployments}
+                endpoint_ids = {dep.deployment_info.id for dep in deployments}
                 route_map = await self._deployment_repo.fetch_active_routes_by_endpoint_ids(
                     endpoint_ids
                 )
 
-        successes: list[DeploymentInfo] = []
+        successes: list[DeploymentWithHistory] = []
         errors: list[DeploymentExecutionError] = []
 
         # Phase 2: Verify replicas (per-deployment)
         for deployment in deployments:
             try:
-                self._verify_deployment_replicas(deployment, route_map)
+                self._verify_deployment_replicas(deployment.deployment_info, route_map)
                 successes.append(deployment)
             except ReplicaCountMismatch as e:
                 log.warning(
                     "Deployment {} has mismatched active routes: {}",
-                    deployment.id,
+                    deployment.deployment_info.id,
                     e,
                 )
                 errors.append(
@@ -202,6 +223,7 @@ class DeploymentExecutor:
                         deployment_info=deployment,
                         reason="Mismatched active routes",
                         error_detail=str(e),
+                        error_code=_extract_error_code(e),
                     )
                 )
 
@@ -211,27 +233,27 @@ class DeploymentExecutor:
         )
 
     async def scale_deployment(
-        self, deployments: Sequence[DeploymentInfo]
+        self, deployments: Sequence[DeploymentWithHistory]
     ) -> DeploymentExecutionResult:
         # Phase 1: Load routes
         with DeploymentRecorderContext.shared_phase("load_routes"):
             with DeploymentRecorderContext.shared_step("load_active_routes"):
-                endpoint_ids = {deployment.id for deployment in deployments}
+                endpoint_ids = {dep.deployment_info.id for dep in deployments}
                 route_map = await self._deployment_repo.fetch_active_routes_by_endpoint_ids(
                     endpoint_ids
                 )
 
         scale_out_creators: list[Creator[RoutingRow]] = []
         scale_in_route_ids: list[UUID] = []
-        successes: list[DeploymentInfo] = []
-        skipped: list[DeploymentInfo] = []
+        successes: list[DeploymentWithHistory] = []
+        skipped: list[DeploymentWithHistory] = []
         errors: list[DeploymentExecutionError] = []
 
         # Phase 2: Evaluate scaling (per-deployment)
         for deployment in deployments:
             try:
                 out_creators, in_route_ids = self._evaluate_deployment_scaling(
-                    deployment, route_map
+                    deployment.deployment_info, route_map
                 )
                 if out_creators or in_route_ids:
                     scale_out_creators.extend(out_creators)
@@ -241,12 +263,13 @@ class DeploymentExecutor:
                     # No scaling action needed
                     skipped.append(deployment)
             except Exception as e:
-                log.warning("Failed to scale deployment {}: {}", deployment.id, e)
+                log.warning("Failed to scale deployment {}: {}", deployment.deployment_info.id, e)
                 errors.append(
                     DeploymentExecutionError(
                         deployment_info=deployment,
                         reason=str(e),
                         error_detail="Failed to scale deployment",
+                        error_code=_extract_error_code(e),
                     )
                 )
 
@@ -265,7 +288,7 @@ class DeploymentExecutor:
         # Phase 3: Apply scaling (only for successful deployments)
         if scale_out_creators or scale_in_updater:
             with DeploymentRecorderContext.shared_phase(
-                "apply_scaling", entity_ids={d.id for d in successes}
+                "apply_scaling", entity_ids={dep.deployment_info.id for dep in successes}
             ):
                 with DeploymentRecorderContext.shared_step("scale_routes"):
                     await self._deployment_repo.scale_routes(scale_out_creators, scale_in_updater)
@@ -277,12 +300,12 @@ class DeploymentExecutor:
         )
 
     async def calculate_desired_replicas(
-        self, deployments: Sequence[DeploymentInfo]
+        self, deployments: Sequence[DeploymentWithHistory]
     ) -> DeploymentExecutionResult:
         # Phase 1: Load autoscaling configuration
         with DeploymentRecorderContext.shared_phase("load_autoscaling_config"):
             with DeploymentRecorderContext.shared_step("load_autoscaling_rules"):
-                endpoint_ids = {deployment.id for deployment in deployments}
+                endpoint_ids = {dep.deployment_info.id for dep in deployments}
                 auto_scaling_rules = (
                     await self._deployment_repo.fetch_auto_scaling_rules_by_endpoint_ids(
                         endpoint_ids
@@ -291,27 +314,31 @@ class DeploymentExecutor:
 
             with DeploymentRecorderContext.shared_step("load_metrics"):
                 # Fetch all metrics data upfront
+                deployment_infos = [dep.deployment_info for dep in deployments]
                 metrics_data = await self._deployment_repo.fetch_metrics_for_autoscaling(
-                    deployments, auto_scaling_rules
+                    deployment_infos, auto_scaling_rules
                 )
 
-        successes: list[DeploymentInfo] = []
-        skipped: list[DeploymentInfo] = []
+        successes: list[DeploymentWithHistory] = []
+        skipped: list[DeploymentWithHistory] = []
         errors: list[DeploymentExecutionError] = []
         desired_replicas_map: dict[UUID, int] = {}
 
         # Phase 2: Calculate replicas (per-deployment via asyncio.gather)
         calculation_tasks = [
-            self._calculate_deployment_replicas(deployment, auto_scaling_rules, metrics_data)
+            self._calculate_deployment_replicas(
+                deployment.deployment_info, auto_scaling_rules, metrics_data
+            )
             for deployment in deployments
         ]
         results = await asyncio.gather(*calculation_tasks, return_exceptions=True)
 
         for deployment, result in zip(deployments, results, strict=True):
+            dep_id = deployment.deployment_info.id
             if isinstance(result, BaseException):
                 log.warning(
                     "Failed to calculate desired replicas for deployment {}: {}",
-                    deployment.id,
+                    dep_id,
                     result,
                 )
                 errors.append(
@@ -319,12 +346,13 @@ class DeploymentExecutor:
                         deployment_info=deployment,
                         reason=str(result),
                         error_detail="Failed to calculate desired replicas",
+                        error_code=_extract_error_code(result),
                     )
                 )
             elif result is None:
                 skipped.append(deployment)
             else:
-                desired_replicas_map[deployment.id] = result
+                desired_replicas_map[dep_id] = result
                 successes.append(deployment)
 
         # Phase 3: Save scaling decision (only for successful deployments)
@@ -342,18 +370,20 @@ class DeploymentExecutor:
         )
 
     async def destroy_deployment(
-        self, deployments: Sequence[DeploymentInfo]
+        self, deployments: Sequence[DeploymentWithHistory]
     ) -> DeploymentExecutionResult:
         # Phase 1: Load termination configuration
         with DeploymentRecorderContext.shared_phase("load_termination_config"):
             with DeploymentRecorderContext.shared_step("load_routes"):
-                endpoint_ids = {deployment.id for deployment in deployments}
+                endpoint_ids = {dep.deployment_info.id for dep in deployments}
                 routes = await self._deployment_repo.fetch_active_routes_by_endpoint_ids(
                     endpoint_ids
                 )
 
             with DeploymentRecorderContext.shared_step("load_proxy_config"):
-                scaling_groups = {deployment.metadata.resource_group for deployment in deployments}
+                scaling_groups = {
+                    dep.deployment_info.metadata.resource_group for dep in deployments
+                }
                 proxy_targets = await self._deployment_repo.fetch_scaling_group_proxy_targets(
                     scaling_groups
                 )
@@ -368,12 +398,13 @@ class DeploymentExecutor:
             with DeploymentRecorderContext.shared_step("mark_routes_terminating"):
                 await self._deployment_repo.mark_terminating_route_status_bulk(route_ids)
 
-        successes: list[DeploymentInfo] = []
+        successes: list[DeploymentWithHistory] = []
         errors: list[DeploymentExecutionError] = []
 
         # Phase 3: Unregister endpoints (per-deployment via asyncio.gather)
         unregister_tasks = [
-            self._unregister_endpoint(deployment, proxy_targets) for deployment in deployments
+            self._unregister_endpoint(deployment.deployment_info, proxy_targets)
+            for deployment in deployments
         ]
         results = await asyncio.gather(*unregister_tasks, return_exceptions=True)
 
@@ -381,7 +412,7 @@ class DeploymentExecutor:
             if isinstance(result, BaseException):
                 log.warning(
                     "Failed to unregister endpoint {}: {}",
-                    deployment.id,
+                    deployment.deployment_info.id,
                     result,
                 )
                 errors.append(
@@ -389,6 +420,7 @@ class DeploymentExecutor:
                         deployment_info=deployment,
                         reason="Failed to unregister endpoint",
                         error_detail=str(result),
+                        error_code=_extract_error_code(result),
                     )
                 )
             else:

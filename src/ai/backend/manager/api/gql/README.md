@@ -341,6 +341,7 @@ def get_deployment_pagination_spec() -> PaginationSpec:
         backward_order=DeploymentOrders.created_at(ascending=True),
         forward_condition_factory=DeploymentConditions.by_cursor_forward,
         backward_condition_factory=DeploymentConditions.by_cursor_backward,
+        tiebreaker_order=EndpointRow.id.asc(),
     )
 ```
 
@@ -492,13 +493,12 @@ GQL adapters are created once at server startup and reused across requests:
 ```python
 # server_gql_ctx.py
 @asynccontextmanager
-async def gql_adapters_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
+async def gql_adapters_ctx() -> AsyncIterator[GQLAdapters]:
     """Initialize GraphQL adapters as singletons."""
-    root_ctx.gql_adapters = GQLAdapters(
+    yield GQLAdapters(
         notification_channel=NotificationChannelGQLAdapter(),
         notification_rule=NotificationRuleGQLAdapter(),
     )
-    yield
 
 # Resolver usage
 @strawberry.field

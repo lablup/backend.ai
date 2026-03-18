@@ -5,11 +5,14 @@ Re-exports all public APIs for backward compatibility.
 
 from .creator import (
     BulkCreator,
+    BulkCreatorError,
     BulkCreatorResult,
+    BulkCreatorResultWithFailures,
     Creator,
     CreatorResult,
     CreatorSpec,
     execute_bulk_creator,
+    execute_bulk_creator_partial,
     execute_creator,
 )
 from .export import (
@@ -22,6 +25,10 @@ from .export import (
     ReportDef,
     StreamingExportQuery,
     execute_streaming_export,
+)
+from .integrity import (
+    match_integrity_error,
+    parse_integrity_error,
 )
 from .pagination import (
     CursorBackwardPagination,
@@ -51,6 +58,7 @@ from .querier import (
 from .types import (
     CursorConditionFactory,
     ExistenceCheck,
+    IntegrityErrorCheck,
     QueryCondition,
     QueryOrder,
     SearchScope,
@@ -59,6 +67,7 @@ from .updater import (
     BatchUpdater,
     BatchUpdaterResult,
     BatchUpdaterSpec,
+    BulkUpdaterError,
     Updater,
     UpdaterResult,
     UpdaterSpec,
@@ -85,7 +94,11 @@ __all__ = [
     "QueryOrder",
     "CursorConditionFactory",
     "ExistenceCheck",
+    "IntegrityErrorCheck",
     "SearchScope",
+    # Integrity
+    "parse_integrity_error",
+    "match_integrity_error",
     # Export
     "ExportDataStream",
     "ExportFieldDef",
@@ -118,8 +131,11 @@ __all__ = [
     "execute_creator",
     # BulkCreator
     "BulkCreator",
+    "BulkCreatorError",
     "BulkCreatorResult",
+    "BulkCreatorResultWithFailures",
     "execute_bulk_creator",
+    "execute_bulk_creator_partial",
     # Updater
     "UpdaterSpec",
     "Updater",
@@ -130,6 +146,8 @@ __all__ = [
     "BatchUpdater",
     "BatchUpdaterResult",
     "execute_batch_updater",
+    # BulkUpdater
+    "BulkUpdaterError",
     # Upserter
     "UpserterSpec",
     "Upserter",

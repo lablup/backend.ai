@@ -28,7 +28,6 @@ def auth_service(
     )
 
 
-@pytest.mark.asyncio
 async def test_update_full_name_successful(
     auth_service: AuthService,
     mock_auth_repository: AsyncMock,
@@ -52,7 +51,6 @@ async def test_update_full_name_successful(
     assert result.success is True
 
 
-@pytest.mark.asyncio
 async def test_update_full_name_fails_for_nonexistent_user(
     auth_service: AuthService,
     mock_auth_repository: AsyncMock,
@@ -79,7 +77,6 @@ async def test_update_full_name_fails_for_nonexistent_user(
     )
 
 
-@pytest.mark.asyncio
 async def test_update_full_name_repository_call(
     auth_service: AuthService,
     mock_auth_repository: AsyncMock,

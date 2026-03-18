@@ -20,7 +20,6 @@ from ai.backend.common import validators as tx
 from ai.backend.common.types import HostPortPair, RedisTarget
 
 
-@pytest.mark.asyncio
 async def test_connect_with_intrinsic_retry(redis_container: tuple[str, HostPortPair]) -> None:
     addr = redis_container[1]
     r = Redis.from_url(
@@ -35,7 +34,6 @@ async def test_connect_with_intrinsic_retry(redis_container: tuple[str, HostPort
     await r.ping()
 
 
-@pytest.mark.asyncio
 async def test_connect_with_tenacity_retry(redis_container: tuple[str, HostPortPair]) -> None:
     addr = redis_container[1]
     r = Redis.from_url(
@@ -55,7 +53,6 @@ async def test_connect_with_tenacity_retry(redis_container: tuple[str, HostPortP
 
 
 @pytest.mark.redis
-@pytest.mark.asyncio
 async def test_instantiate_redisconninfo() -> None:
     """Test RedisConnectionInfo instantiation with Sentinel configuration."""
     sentinels = "127.0.0.1:26379,127.0.0.1:26380,127.0.0.1:26381"

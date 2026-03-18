@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from typing import override
 
 from ai.backend.manager.actions.action import BaseActionResult
+from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.vfs_storage.types import VFSStorageData
 from ai.backend.manager.repositories.base import BatchQuerier
 from ai.backend.manager.services.vfs_storage.actions.base import VFSStorageAction
@@ -17,8 +18,8 @@ class SearchVFSStoragesAction(VFSStorageAction):
 
     @override
     @classmethod
-    def operation_type(cls) -> str:
-        return "search_vfs_storages"
+    def operation_type(cls) -> ActionOperationType:
+        return ActionOperationType.SEARCH
 
     @override
     def entity_id(self) -> str | None:

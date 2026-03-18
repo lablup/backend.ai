@@ -10,7 +10,7 @@ import graphql
 import sqlalchemy as sa
 from graphql import Undefined, UndefinedType
 
-from ai.backend.common.container_registry import ContainerRegistryType
+from ai.backend.common.container_registry import AllowedGroupsModel, ContainerRegistryType
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.container_registry.types import ContainerRegistryData
 from ai.backend.manager.defs import PASSWORD_PLACEHOLDER
@@ -28,10 +28,15 @@ from ai.backend.manager.models.rbac import (
     ScopeType,
     SystemScope,
 )
+from ai.backend.manager.repositories.base.creator import Creator
 from ai.backend.manager.repositories.base.purger import Purger
 from ai.backend.manager.repositories.base.updater import Updater
+from ai.backend.manager.repositories.container_registry.creators import ContainerRegistryCreatorSpec
 from ai.backend.manager.repositories.container_registry.updaters import (
     ContainerRegistryUpdaterSpec,
+)
+from ai.backend.manager.services.container_registry.actions.create_container_registry import (
+    CreateContainerRegistryAction,
 )
 from ai.backend.manager.services.container_registry.actions.delete_container_registry import (
     DeleteContainerRegistryAction,
@@ -306,6 +311,12 @@ class AllowedGroups(graphene.InputObjectType):  # type: ignore[misc]
         description="List of group_ids to remove associations. Added in 25.3.0.",
     )
 
+    def to_model(self) -> AllowedGroupsModel:
+        return AllowedGroupsModel(
+            add=[] if (self.add is Undefined or self.add is None) else self.add,
+            remove=[] if (self.remove is Undefined or self.remove is None) else self.remove,
+        )
+
 
 class CreateContainerRegistryNode(graphene.Mutation):  # type: ignore[misc]
     """
@@ -358,32 +369,35 @@ class CreateContainerRegistryNode(graphene.Mutation):  # type: ignore[misc]
 
         validator.validate()
 
-        input_config: dict[str, Any] = {
-            "registry_name": registry_name,
-            "url": url,
-            "type": type,
-        }
+        def value_or_none(val: Any) -> Any | None:
+            return None if val is Undefined else val
 
-        def _set_if_set(name: str, val: Any) -> None:
-            if val is not Undefined:
-                input_config[name] = val
-
-        _set_if_set("project", project)
-        _set_if_set("username", username)
-        _set_if_set("password", password)
-        _set_if_set("ssl_verify", ssl_verify)
-        _set_if_set("is_global", is_global)
-        _set_if_set("extra", extra)
-
-        async with ctx.db.begin_session() as db_session:
-            reg_row = ContainerRegistryRow(id=uuid.uuid4(), **input_config)
-            db_session.add(reg_row)
-            await db_session.flush()
-            await db_session.refresh(reg_row)
-
-            return cls(
-                container_registry=ContainerRegistryNode.from_row(ctx, reg_row),
+        action = CreateContainerRegistryAction(
+            creator=Creator(
+                spec=ContainerRegistryCreatorSpec(
+                    url=url,
+                    type=type,
+                    registry_name=registry_name,
+                    is_global=value_or_none(is_global),
+                    project=value_or_none(project),
+                    username=value_or_none(username),
+                    password=value_or_none(password),
+                    ssl_verify=value_or_none(ssl_verify),
+                    extra=value_or_none(extra),
+                    allowed_groups=None,  # allowed groups are not supported in v1 mutation
+                )
             )
+        )
+
+        result = (
+            await ctx.processors.container_registry.create_container_registry.wait_for_complete(
+                action
+            )
+        )
+
+        return cls(
+            container_registry=ContainerRegistryNode.from_dataclass(result.data),
+        )
 
 
 class ModifyContainerRegistryNode(graphene.Mutation):  # type: ignore[misc]

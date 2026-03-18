@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import uuid
-from collections.abc import AsyncGenerator, Callable
+from collections.abc import AsyncGenerator, Callable, Sequence
 from typing import TYPE_CHECKING, Any
 from uuid import UUID
 
@@ -13,6 +13,10 @@ from sqlalchemy.dialects.postgresql import UUID as PGUUID
 from sqlalchemy.orm import Mapped, mapped_column
 from sqlalchemy.sql.elements import ColumnElement
 
+from ai.backend.manager.errors.repository import (
+    ForeignKeyViolationError,
+    UniqueConstraintViolationError,
+)
 from ai.backend.manager.models.base import Base
 from ai.backend.manager.repositories.base import (
     BatchUpdater,
@@ -24,6 +28,7 @@ from ai.backend.manager.repositories.base import (
     execute_batch_updater,
     execute_updater,
 )
+from ai.backend.manager.repositories.base.types import IntegrityErrorCheck
 
 if TYPE_CHECKING:
     from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
@@ -620,3 +625,239 @@ class TestBatchUpdater:
 
             assert isinstance(result, BatchUpdaterResult)
             assert result.updated_count == 0
+
+
+# --- Integrity error handling tests ---
+
+
+class UpdaterTestRowWithUnique(Base):  # type: ignore[misc]
+    """ORM model for updater integrity error testing with a unique constraint on name."""
+
+    __tablename__ = "test_updater_unique"
+    __table_args__ = (
+        sa.UniqueConstraint("name", name="uq_test_updater_unique_name"),
+        {"extend_existing": True},
+    )
+
+    id: Mapped[int] = mapped_column(sa.Integer, primary_key=True)
+    name: Mapped[str] = mapped_column(sa.String(50), nullable=False)
+    status: Mapped[str] = mapped_column(sa.String(20), nullable=False, default="pending")
+
+
+class _DuplicateNameError(UniqueConstraintViolationError):
+    """Test domain error for duplicate name."""
+
+    error_type = "https://test/duplicate-name"
+    error_title = "Name already exists."
+
+
+class UniqueNameUpdaterSpec(UpdaterSpec[UpdaterTestRowWithUnique]):
+    """Updater spec that triggers unique constraint violation."""
+
+    def __init__(
+        self,
+        new_name: str,
+        checks: Sequence[IntegrityErrorCheck] = (),
+    ) -> None:
+        self._new_name = new_name
+        self._checks = checks
+
+    @property
+    def row_class(self) -> type[UpdaterTestRowWithUnique]:
+        return UpdaterTestRowWithUnique
+
+    def build_values(self) -> dict[str, Any]:
+        return {"name": self._new_name}
+
+    @property
+    def integrity_error_checks(self) -> Sequence[IntegrityErrorCheck]:
+        return self._checks
+
+
+class UniqueNameBatchUpdaterSpec(BatchUpdaterSpec[UpdaterTestRowWithUnique]):
+    """Batch updater spec that triggers unique constraint violation."""
+
+    def __init__(
+        self,
+        new_name: str,
+        checks: Sequence[IntegrityErrorCheck] = (),
+    ) -> None:
+        self._new_name = new_name
+        self._checks = checks
+
+    @property
+    def row_class(self) -> type[UpdaterTestRowWithUnique]:
+        return UpdaterTestRowWithUnique
+
+    def build_values(self) -> dict[str, Any]:
+        return {"name": self._new_name}
+
+    @property
+    def integrity_error_checks(self) -> Sequence[IntegrityErrorCheck]:
+        return self._checks
+
+
+class TestUpdaterIntegrityError:
+    """Tests for integrity error handling in execute_updater."""
+
+    @pytest.fixture
+    async def unique_row_class(
+        self,
+        database_connection: ExtendedAsyncSAEngine,
+    ) -> AsyncGenerator[type[UpdaterTestRowWithUnique], None]:
+        async with database_connection.begin() as conn:
+            await conn.run_sync(
+                lambda c: Base.metadata.create_all(c, [UpdaterTestRowWithUnique.__table__])
+            )
+        yield UpdaterTestRowWithUnique
+        async with database_connection.begin() as conn:
+            await conn.execute(sa.text("DROP TABLE IF EXISTS test_updater_unique CASCADE"))
+
+    @pytest.fixture
+    async def two_rows(
+        self,
+        database_connection: ExtendedAsyncSAEngine,
+        unique_row_class: type[UpdaterTestRowWithUnique],
+    ) -> AsyncGenerator[list[int], None]:
+        ids: list[int] = []
+        async with database_connection.begin_session() as db_sess:
+            for name in ("alice", "bob"):
+                row = UpdaterTestRowWithUnique(name=name, status="active")
+                db_sess.add(row)
+                await db_sess.flush()
+                ids.append(row.id)
+        yield ids
+
+    async def test_integrity_error_with_matching_check(
+        self,
+        database_connection: ExtendedAsyncSAEngine,
+        unique_row_class: type[UpdaterTestRowWithUnique],
+        two_rows: list[int],
+    ) -> None:
+        """Matching check converts IntegrityError to domain error."""
+        domain_error = _DuplicateNameError(extra_msg="name taken")
+        checks = [
+            IntegrityErrorCheck(
+                violation_type=UniqueConstraintViolationError,
+                error=domain_error,
+            ),
+        ]
+        async with database_connection.begin_session() as db_sess:
+            updater: Updater[UpdaterTestRowWithUnique] = Updater(
+                spec=UniqueNameUpdaterSpec("bob", checks=checks),
+                pk_value=two_rows[0],  # alice → bob (duplicate)
+            )
+            with pytest.raises(_DuplicateNameError) as exc_info:
+                await execute_updater(db_sess, updater)
+            assert exc_info.value is domain_error
+
+    async def test_integrity_error_with_empty_checks(
+        self,
+        database_connection: ExtendedAsyncSAEngine,
+        unique_row_class: type[UpdaterTestRowWithUnique],
+        two_rows: list[int],
+    ) -> None:
+        """Empty checks raises parsed fallback (UniqueConstraintViolationError)."""
+        async with database_connection.begin_session() as db_sess:
+            updater: Updater[UpdaterTestRowWithUnique] = Updater(
+                spec=UniqueNameUpdaterSpec("bob"),  # default empty checks
+                pk_value=two_rows[0],  # alice → bob (duplicate)
+            )
+            with pytest.raises(UniqueConstraintViolationError):
+                await execute_updater(db_sess, updater)
+
+    async def test_integrity_error_with_non_matching_check(
+        self,
+        database_connection: ExtendedAsyncSAEngine,
+        unique_row_class: type[UpdaterTestRowWithUnique],
+        two_rows: list[int],
+    ) -> None:
+        """Non-matching check (wrong violation type) raises parsed fallback."""
+        checks = [
+            IntegrityErrorCheck(
+                violation_type=ForeignKeyViolationError,
+                error=_DuplicateNameError(extra_msg="should not match"),
+            ),
+        ]
+        async with database_connection.begin_session() as db_sess:
+            updater: Updater[UpdaterTestRowWithUnique] = Updater(
+                spec=UniqueNameUpdaterSpec("bob", checks=checks),
+                pk_value=two_rows[0],
+            )
+            with pytest.raises(UniqueConstraintViolationError):
+                await execute_updater(db_sess, updater)
+
+
+class TestBatchUpdaterIntegrityError:
+    """Tests for integrity error handling in execute_batch_updater."""
+
+    @pytest.fixture
+    async def unique_row_class(
+        self,
+        database_connection: ExtendedAsyncSAEngine,
+    ) -> AsyncGenerator[type[UpdaterTestRowWithUnique], None]:
+        async with database_connection.begin() as conn:
+            await conn.run_sync(
+                lambda c: Base.metadata.create_all(c, [UpdaterTestRowWithUnique.__table__])
+            )
+        yield UpdaterTestRowWithUnique
+        async with database_connection.begin() as conn:
+            await conn.execute(sa.text("DROP TABLE IF EXISTS test_updater_unique CASCADE"))
+
+    @pytest.fixture
+    async def two_rows(
+        self,
+        database_connection: ExtendedAsyncSAEngine,
+        unique_row_class: type[UpdaterTestRowWithUnique],
+    ) -> AsyncGenerator[list[int], None]:
+        ids: list[int] = []
+        async with database_connection.begin_session() as db_sess:
+            for name in ("alice", "bob"):
+                row = UpdaterTestRowWithUnique(name=name, status="active")
+                db_sess.add(row)
+                await db_sess.flush()
+                ids.append(row.id)
+        yield ids
+
+    async def test_batch_integrity_error_with_matching_check(
+        self,
+        database_connection: ExtendedAsyncSAEngine,
+        unique_row_class: type[UpdaterTestRowWithUnique],
+        two_rows: list[int],
+    ) -> None:
+        """Matching check converts IntegrityError to domain error in batch update."""
+        domain_error = _DuplicateNameError(extra_msg="name taken")
+        checks = [
+            IntegrityErrorCheck(
+                violation_type=UniqueConstraintViolationError,
+                error=domain_error,
+            ),
+        ]
+        async with database_connection.begin_session() as db_sess:
+            # Update all rows to have the same name → unique violation
+            updater: BatchUpdater[UpdaterTestRowWithUnique] = BatchUpdater(
+                spec=UniqueNameBatchUpdaterSpec("alice", checks=checks),
+                conditions=[
+                    lambda: UpdaterTestRowWithUnique.__table__.c.name == "bob",
+                ],
+            )
+            with pytest.raises(_DuplicateNameError) as exc_info:
+                await execute_batch_updater(db_sess, updater)
+            assert exc_info.value is domain_error
+
+    async def test_batch_integrity_error_with_empty_checks(
+        self,
+        database_connection: ExtendedAsyncSAEngine,
+        unique_row_class: type[UpdaterTestRowWithUnique],
+        two_rows: list[int],
+    ) -> None:
+        """Empty checks raises parsed fallback in batch update."""
+        async with database_connection.begin_session() as db_sess:
+            updater: BatchUpdater[UpdaterTestRowWithUnique] = BatchUpdater(
+                spec=UniqueNameBatchUpdaterSpec("alice"),  # default empty checks
+                conditions=[
+                    lambda: UpdaterTestRowWithUnique.__table__.c.name == "bob",
+                ],
+            )
+            with pytest.raises(UniqueConstraintViolationError):
+                await execute_batch_updater(db_sess, updater)

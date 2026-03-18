@@ -8,6 +8,7 @@ from uuid import UUID
 
 import graphene
 
+from ai.backend.common.dto.clients.prometheus.request import QueryTimeRange
 from ai.backend.manager.services.metric.actions.container import (
     ContainerMetricAction,
 )
@@ -76,9 +77,7 @@ class UserUtilizationMetric(graphene.ObjectType):  # type: ignore[misc]
                     labels=ContainerMetricOptionalLabel(
                         user_id=user_id, value_type=param.value_type
                     ),
-                    start=param.start,
-                    end=param.end,
-                    step=param.step,
+                    time_range=QueryTimeRange(start=param.start, end=param.end, step=param.step),
                 )
             )
         )

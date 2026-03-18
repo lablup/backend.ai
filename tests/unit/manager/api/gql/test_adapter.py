@@ -48,8 +48,17 @@ class TestBaseGQLAdapterBuildPagination:
         return MagicMock()
 
     @pytest.fixture
+    def mock_tiebreaker_order(self) -> Any:
+        """Create a mock tiebreaker order."""
+        return MagicMock()
+
+    @pytest.fixture
     def pagination_spec(
-        self, mock_cursor_factory: MagicMock, mock_forward_order: Any, mock_backward_order: Any
+        self,
+        mock_cursor_factory: MagicMock,
+        mock_forward_order: Any,
+        mock_backward_order: Any,
+        mock_tiebreaker_order: Any,
     ) -> PaginationSpec:
         """Create PaginationSpec with mocks."""
         return PaginationSpec(
@@ -57,6 +66,7 @@ class TestBaseGQLAdapterBuildPagination:
             backward_order=mock_backward_order,
             forward_condition_factory=mock_cursor_factory,
             backward_condition_factory=mock_cursor_factory,
+            tiebreaker_order=mock_tiebreaker_order,
         )
 
     def test_build_pagination_forward_cursor(
@@ -95,6 +105,7 @@ class TestBaseGQLAdapterBuildPagination:
             backward_order=mock_backward_order,
             forward_condition_factory=mock_cursor_factory,
             backward_condition_factory=backward_factory,
+            tiebreaker_order=MagicMock(),
         )
         querier = adapter.build_querier(
             PaginationOptions(last=5, before=cursor),
@@ -264,6 +275,7 @@ class TestBaseGQLAdapterBuildPagination:
         self,
         adapter: BaseGQLAdapter,
         mock_forward_order: Any,
+        mock_tiebreaker_order: Any,
         pagination_spec: PaginationSpec,
     ) -> None:
         """Test that offset pagination uses forward_order as default when order_by is not provided."""
@@ -273,13 +285,15 @@ class TestBaseGQLAdapterBuildPagination:
         )
 
         assert isinstance(querier.pagination, OffsetPagination)
-        assert len(querier.orders) == 1
+        assert len(querier.orders) == 2
         assert querier.orders[0] is mock_forward_order
+        assert querier.orders[-1] is mock_tiebreaker_order
 
     def test_default_pagination_applies_default_order_when_order_by_is_none(
         self,
         adapter: BaseGQLAdapter,
         mock_forward_order: Any,
+        mock_tiebreaker_order: Any,
         pagination_spec: PaginationSpec,
     ) -> None:
         """Test that default pagination (no params) uses forward_order as default."""
@@ -289,13 +303,15 @@ class TestBaseGQLAdapterBuildPagination:
         )
 
         assert isinstance(querier.pagination, OffsetPagination)
-        assert len(querier.orders) == 1
+        assert len(querier.orders) == 2
         assert querier.orders[0] is mock_forward_order
+        assert querier.orders[-1] is mock_tiebreaker_order
 
     def test_offset_pagination_does_not_apply_default_order_when_order_by_is_provided(
         self,
         adapter: BaseGQLAdapter,
         mock_forward_order: Any,
+        mock_tiebreaker_order: Any,
         pagination_spec: PaginationSpec,
     ) -> None:
         """Test that offset pagination does not add default order when order_by is provided."""
@@ -310,13 +326,15 @@ class TestBaseGQLAdapterBuildPagination:
         )
 
         assert isinstance(querier.pagination, OffsetPagination)
-        assert len(querier.orders) == 1
+        assert len(querier.orders) == 2
         assert querier.orders[0] is mock_query_order
         assert querier.orders[0] is not mock_forward_order
+        assert querier.orders[-1] is mock_tiebreaker_order
 
     def test_cursor_pagination_does_not_add_default_order_to_querier_orders(
         self,
         adapter: BaseGQLAdapter,
+        mock_tiebreaker_order: Any,
         pagination_spec: PaginationSpec,
     ) -> None:
         """Test that cursor pagination does not add forward_order to querier.orders."""
@@ -328,4 +346,6 @@ class TestBaseGQLAdapterBuildPagination:
         assert isinstance(querier.pagination, CursorForwardPagination)
         # Cursor pagination should NOT add default order to querier.orders
         # (it uses cursor_order internally in pagination object)
-        assert len(querier.orders) == 0
+        # But tiebreaker is always appended
+        assert len(querier.orders) == 1
+        assert querier.orders[0] is mock_tiebreaker_order

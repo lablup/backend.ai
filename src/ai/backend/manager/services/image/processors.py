@@ -2,7 +2,9 @@ from typing import override
 
 from ai.backend.manager.actions.monitors.monitor import ActionMonitor
 from ai.backend.manager.actions.processor import ActionProcessor
+from ai.backend.manager.actions.processor.single_entity import SingleEntityActionProcessor
 from ai.backend.manager.actions.types import AbstractProcessorPackage, ActionSpec
+from ai.backend.manager.actions.validators import ActionValidators
 from ai.backend.manager.services.image.actions.alias_image import (
     AliasImageAction,
     AliasImageActionResult,
@@ -41,6 +43,10 @@ from ai.backend.manager.services.image.actions.get_images import (
     GetImagesByCanonicalsAction,
     GetImagesByCanonicalsActionResult,
 )
+from ai.backend.manager.services.image.actions.load_image_last_used import (
+    LoadImageLastUsedAction,
+    LoadImageLastUsedActionResult,
+)
 from ai.backend.manager.services.image.actions.modify_image import (
     ModifyImageAction,
     ModifyImageActionResult,
@@ -60,6 +66,10 @@ from ai.backend.manager.services.image.actions.purge_images import (
 from ai.backend.manager.services.image.actions.scan_image import (
     ScanImageAction,
     ScanImageActionResult,
+)
+from ai.backend.manager.services.image.actions.search_aliases import (
+    SearchAliasesAction,
+    SearchAliasesActionResult,
 )
 from ai.backend.manager.services.image.actions.search_images import (
     SearchImagesAction,
@@ -83,8 +93,10 @@ from .service import ImageService
 
 class ImageProcessors(AbstractProcessorPackage):
     forget_image: ActionProcessor[ForgetImageAction, ForgetImageActionResult]
-    forget_image_by_id: ActionProcessor[ForgetImageByIdAction, ForgetImageByIdActionResult]
-    purge_image_by_id: ActionProcessor[PurgeImageByIdAction, PurgeImageByIdActionResult]
+    forget_image_by_id: SingleEntityActionProcessor[
+        ForgetImageByIdAction, ForgetImageByIdActionResult
+    ]
+    purge_image_by_id: SingleEntityActionProcessor[PurgeImageByIdAction, PurgeImageByIdActionResult]
     alias_image: ActionProcessor[AliasImageAction, AliasImageActionResult]
     alias_image_by_id: ActionProcessor[AliasImageByIdAction, AliasImageByIdActionResult]
     dealias_image: ActionProcessor[DealiasImageAction, DealiasImageActionResult]
@@ -120,12 +132,19 @@ class ImageProcessors(AbstractProcessorPackage):
     ]
     get_all_images: ActionProcessor[GetAllImagesAction, GetAllImagesActionResult]
     search_images: ActionProcessor[SearchImagesAction, SearchImagesActionResult]
+    search_aliases: ActionProcessor[SearchAliasesAction, SearchAliasesActionResult]
+    load_image_last_used: ActionProcessor[LoadImageLastUsedAction, LoadImageLastUsedActionResult]
 
-    def __init__(self, service: ImageService, action_monitors: list[ActionMonitor]) -> None:
+    def __init__(
+        self,
+        service: ImageService,
+        action_monitors: list[ActionMonitor],
+        validators: ActionValidators,
+    ) -> None:
+        # Actions without RBAC validation (internal/system or special entity types)
         self.get_image_installed_agents = ActionProcessor(
             service.get_image_installed_agents, action_monitors
         )
-        self.get_all_images = ActionProcessor(service.get_all_images, action_monitors)
         self.get_images_by_canonicals = ActionProcessor(
             service.get_images_by_canonicals, action_monitors
         )
@@ -134,8 +153,19 @@ class ImageProcessors(AbstractProcessorPackage):
         )
         self.get_image_by_id = ActionProcessor(service.get_image_by_id, action_monitors)
         self.forget_image = ActionProcessor(service.forget_image, action_monitors)
-        self.forget_image_by_id = ActionProcessor(service.forget_image_by_id, action_monitors)
-        self.purge_image_by_id = ActionProcessor(service.purge_image_by_id, action_monitors)
+
+        self.get_all_images = ActionProcessor(service.get_all_images, action_monitors)
+        self.search_images = ActionProcessor(service.search_images, action_monitors)
+
+        # Single entity actions with RBAC validation
+        self.forget_image_by_id = SingleEntityActionProcessor(
+            service.forget_image_by_id, action_monitors, validators=[validators.rbac.single_entity]
+        )
+        self.purge_image_by_id = SingleEntityActionProcessor(
+            service.purge_image_by_id, action_monitors, validators=[validators.rbac.single_entity]
+        )
+        # Superadmin-only mutations — access is enforced by check_admin_only at the API layer,
+        # so per-entity RBAC validation is not required here.
         self.alias_image = ActionProcessor(service.alias_image, action_monitors)
         self.alias_image_by_id = ActionProcessor(service.alias_image_by_id, action_monitors)
         self.dealias_image = ActionProcessor(service.dealias_image, action_monitors)
@@ -157,7 +187,8 @@ class ImageProcessors(AbstractProcessorPackage):
         self.set_image_resource_limit_by_id = ActionProcessor(
             service.set_image_resource_limit_by_id, action_monitors
         )
-        self.search_images = ActionProcessor(service.search_images, action_monitors)
+        self.search_aliases = ActionProcessor(service.search_aliases, action_monitors)
+        self.load_image_last_used = ActionProcessor(service.load_image_last_used, action_monitors)
 
     @override
     def supported_actions(self) -> list[ActionSpec]:
@@ -177,4 +208,5 @@ class ImageProcessors(AbstractProcessorPackage):
             ClearImageCustomResourceLimitAction.spec(),
             ClearImageCustomResourceLimitByIdAction.spec(),
             SetImageResourceLimitByIdAction.spec(),
+            LoadImageLastUsedAction.spec(),
         ]

@@ -13,7 +13,6 @@ from ai.backend.logging.types import LogLevel
 
 
 class TestAgentConfigLoaderDependency:
-    @pytest.mark.asyncio
     async def test_config_loader_loads_valid_config(self, tmp_path: Path) -> None:
         """Test that config loader can load a valid config file."""
         config_path = tmp_path / "agent.toml"
@@ -46,7 +45,6 @@ reserved-cpu = 1
             assert config.etcd.namespace == "test"
             assert config.container.scratch_root.resolve() == Path("/tmp/test").resolve()
 
-    @pytest.mark.asyncio
     async def test_config_loader_applies_env_overrides(
         self,
         tmp_path: Path,
@@ -88,7 +86,6 @@ reserved-cpu = 1
             # Non-overridden values should remain
             assert config.agent.id == "original-id"
 
-    @pytest.mark.asyncio
     async def test_config_loader_raises_on_invalid_config(self, tmp_path: Path) -> None:
         """Test that config loader raises ValidationError on invalid config."""
         config_path = tmp_path / "agent.toml"
@@ -108,7 +105,6 @@ reserved-cpu = 1
             async with loader.provide(input_data):
                 pass
 
-    @pytest.mark.asyncio
     async def test_config_loader_with_debug_log_level(self, tmp_path: Path) -> None:
         """Test that config loader respects log level in validation context."""
         config_path = tmp_path / "agent.toml"

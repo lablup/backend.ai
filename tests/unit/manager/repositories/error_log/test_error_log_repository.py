@@ -174,7 +174,6 @@ class TestErrorLogRepository:
         """Create ErrorLogRepository instance with database"""
         return ErrorLogRepository(db=db_with_cleanup)
 
-    @pytest.mark.asyncio
     async def test_create_multiple_error_logs(
         self,
         error_log_repository: ErrorLogRepository,
@@ -346,7 +345,6 @@ class TestErrorLogRepository:
     # Tests - Search with filtering
     # =========================================================================
 
-    @pytest.mark.asyncio
     async def test_search_error_logs_filter_by_source(
         self,
         error_log_repository: ErrorLogRepository,
@@ -370,7 +368,6 @@ class TestErrorLogRepository:
         assert sample_error_logs_for_filtering["manager"] in result_ids
         assert sample_error_logs_for_filtering["agent"] not in result_ids
 
-    @pytest.mark.asyncio
     async def test_search_error_logs_filter_by_severity(
         self,
         error_log_repository: ErrorLogRepository,
@@ -395,7 +392,6 @@ class TestErrorLogRepository:
     # Tests - Search with ordering
     # =========================================================================
 
-    @pytest.mark.asyncio
     async def test_search_error_logs_order_by_source_ascending(
         self,
         error_log_repository: ErrorLogRepository,
@@ -415,7 +411,6 @@ class TestErrorLogRepository:
         assert result_sources[0] == "alpha-source"
         assert result_sources[-1] == "gamma-source"
 
-    @pytest.mark.asyncio
     async def test_search_error_logs_order_by_source_descending(
         self,
         error_log_repository: ErrorLogRepository,
@@ -439,7 +434,6 @@ class TestErrorLogRepository:
     # Tests - Search with pagination
     # =========================================================================
 
-    @pytest.mark.asyncio
     async def test_search_error_logs_offset_pagination_first_page(
         self,
         error_log_repository: ErrorLogRepository,
@@ -457,7 +451,6 @@ class TestErrorLogRepository:
         assert len(result.items) == 10
         assert result.total_count == 25
 
-    @pytest.mark.asyncio
     async def test_search_error_logs_offset_pagination_second_page(
         self,
         error_log_repository: ErrorLogRepository,
@@ -475,7 +468,6 @@ class TestErrorLogRepository:
         assert len(result.items) == 10
         assert result.total_count == 25
 
-    @pytest.mark.asyncio
     async def test_search_error_logs_offset_pagination_last_page(
         self,
         error_log_repository: ErrorLogRepository,
@@ -497,7 +489,6 @@ class TestErrorLogRepository:
     # Tests - Search with combined query
     # =========================================================================
 
-    @pytest.mark.asyncio
     async def test_search_error_logs_with_pagination_filter_and_order(
         self,
         error_log_repository: ErrorLogRepository,

@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
-from collections.abc import Sequence
+from collections.abc import Iterable, Sequence
 from datetime import datetime
-from typing import Any, override
+from typing import Any, Self, override
 from uuid import UUID, uuid4
 
 import strawberry
@@ -55,7 +55,7 @@ from ai.backend.manager.api.gql.deployment.types.revision import (
 from ai.backend.manager.api.gql.domain import Domain
 from ai.backend.manager.api.gql.project import Project
 from ai.backend.manager.api.gql.types import GQLFilter, GQLOrderBy, StrawberryGQLContext
-from ai.backend.manager.api.gql.user import User
+from ai.backend.manager.api.gql.user_federation import User
 from ai.backend.manager.api.gql_legacy.domain import DomainNode
 from ai.backend.manager.api.gql_legacy.group import GroupNode
 from ai.backend.manager.api.gql_legacy.user import UserNode
@@ -68,7 +68,6 @@ from ai.backend.manager.data.deployment.types import (
     ModelDeploymentMetadataInfo,
     ReplicaSpec,
 )
-from ai.backend.manager.errors.service import DeploymentPolicyNotFound
 from ai.backend.manager.errors.user import UserNotFound
 from ai.backend.manager.models.endpoint import EndpointRow
 from ai.backend.manager.repositories.base import (
@@ -93,9 +92,6 @@ from ai.backend.manager.repositories.deployment.updaters import (
     DeploymentUpdaterSpec,
     ReplicaSpecUpdaterSpec,
     RevisionStateUpdaterSpec,
-)
-from ai.backend.manager.services.deployment.actions.deployment_policy import (
-    GetDeploymentPolicyAction,
 )
 from ai.backend.manager.types import OptionalState, TriState
 
@@ -345,15 +341,12 @@ class ModelDeployment(Node):
         self, info: Info[StrawberryGQLContext]
     ) -> DeploymentPolicyGQL | None:
         """Get the deployment policy for this deployment."""
-        processor = info.context.processors.deployment
-
-        try:
-            result = await processor.get_deployment_policy.wait_for_complete(
-                GetDeploymentPolicyAction(endpoint_id=self._deployment_id)
-            )
-            return DeploymentPolicyGQL.from_data(result.data)
-        except DeploymentPolicyNotFound:
+        policy_data = await info.context.data_loaders.deployment_policy_by_endpoint_loader.load(
+            self._deployment_id
+        )
+        if policy_data is None:
             return None
+        return DeploymentPolicyGQL.from_data(policy_data)
 
     @strawberry.field
     async def revision_history(
@@ -384,10 +377,23 @@ class ModelDeployment(Node):
         )
 
     @classmethod
+    async def resolve_nodes(  # type: ignore[override]  # Strawberry Node uses AwaitableOrValue overloads incompatible with async def
+        cls,
+        *,
+        info: Info[StrawberryGQLContext],
+        node_ids: Iterable[str],
+        required: bool = False,
+    ) -> Iterable[Self | None]:
+        results = await info.context.data_loaders.deployment_loader.load_many([
+            UUID(nid) for nid in node_ids
+        ])
+        return [cls.from_dataclass(data) if data is not None else None for data in results]
+
+    @classmethod
     def from_dataclass(
         cls,
         data: ModelDeploymentData,
-    ) -> ModelDeployment:
+    ) -> Self:
         metadata = ModelDeploymentMetadata(
             name=data.metadata.name,
             status=DeploymentStatusGQL(data.metadata.status),
@@ -725,11 +731,11 @@ class UpdateDeploymentInput:
             return None
 
         # Validate and convert
-        policy_config = self.default_deployment_strategy.to_policy_config()
+        creator = self.default_deployment_strategy.to_policy_config()
         return DeploymentPolicyUpdaterSpec(
-            strategy=OptionalState.update(policy_config.strategy),
-            strategy_spec=OptionalState.update(policy_config.strategy_spec),
-            rollback_on_failure=OptionalState.update(policy_config.rollback_on_failure),
+            strategy=OptionalState.update(creator.strategy),
+            strategy_spec=OptionalState.update(creator.strategy_spec),
+            rollback_on_failure=OptionalState.update(creator.rollback_on_failure),
         )
 
 

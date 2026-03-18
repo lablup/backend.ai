@@ -30,15 +30,16 @@ from ai.backend.common.exception import (
 from ai.backend.common.json import load_json
 from ai.backend.common.plugin.monitor import ErrorPluginContext
 from ai.backend.common.types import (
+    ContainerId,
     ImageAlias,
     SessionId,
     SessionTypes,
 )
 from ai.backend.logging.utils import BraceStyleAdapter
-from ai.backend.manager.api.scaling_group import query_wsproxy_status
 from ai.backend.manager.api.utils import undefined
 from ai.backend.manager.bgtask.tasks.commit_session import CommitSessionManifest
 from ai.backend.manager.bgtask.types import ManagerBgtaskName
+from ai.backend.manager.clients.appproxy.client import AppProxyClientPool
 from ai.backend.manager.data.image.types import ImageIdentifier
 from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.errors.common import (
@@ -211,6 +212,7 @@ class SessionServiceArgs:
     idle_checker_host: IdleCheckerHost
     session_repository: SessionRepository
     scheduling_controller: SchedulingController
+    appproxy_client_pool: AppProxyClientPool
 
 
 class SessionService:
@@ -222,6 +224,7 @@ class SessionService:
     _idle_checker_host: IdleCheckerHost
     _session_repository: SessionRepository
     _scheduling_controller: SchedulingController
+    _appproxy_client_pool: AppProxyClientPool
     _database_ptask_group: aiotools.PersistentTaskGroup
     _rpc_ptask_group: aiotools.PersistentTaskGroup
 
@@ -237,6 +240,7 @@ class SessionService:
         self._idle_checker_host = args.idle_checker_host
         self._session_repository = args.session_repository
         self._scheduling_controller = args.scheduling_controller
+        self._appproxy_client_pool = args.appproxy_client_pool
         self._database_ptask_group = aiotools.PersistentTaskGroup()
         self._rpc_ptask_group = aiotools.PersistentTaskGroup()
         self._webhook_ptask_group = aiotools.PersistentTaskGroup()
@@ -461,6 +465,7 @@ class SessionService:
         image = action.params.image
         architecture = action.params.architecture
         priority = action.params.priority
+        is_preemptible = action.params.is_preemptible
         bootstrap_script = action.params.bootstrap_script
         dependencies = action.params.dependencies
         startup_command = action.params.startup_command
@@ -506,6 +511,7 @@ class SessionService:
                 cluster_size,
                 reuse=reuse_if_exists,
                 priority=priority,
+                is_preemptible=is_preemptible,
                 enqueue_only=enqueue_only,
                 max_wait_seconds=max_wait_seconds,
                 bootstrap_script=bootstrap_script,
@@ -659,6 +665,7 @@ class SessionService:
         image = params["image"]
         architecture = params["architecture"]
         priority = params["priority"]
+        is_preemptible = params.get("is_preemptible", True)
         bootstrap_script = params["bootstrap_script"]
         dependencies = params["dependencies"]
         startup_command = params["startup_command"]
@@ -705,6 +712,7 @@ class SessionService:
                 cluster_size,
                 reuse=reuse_if_exists,
                 priority=priority,
+                is_preemptible=is_preemptible,
                 enqueue_only=enqueue_only,
                 max_wait_seconds=max_wait_seconds,
                 bootstrap_script=bootstrap_script,
@@ -749,12 +757,13 @@ class SessionService:
         mark_result = await self._scheduling_controller.mark_sessions_for_termination(
             session_ids,
             reason=reason.value,
+            forced=forced,
         )
 
-        # Build stats for response - prioritize cancelled over terminating
+        # Build stats for response - prioritize cancelled over terminating/force-terminated
         if mark_result.cancelled_sessions:
             last_stat = {"status": "cancelled"}
-        elif mark_result.terminating_sessions:
+        elif mark_result.terminating_sessions or mark_result.force_terminated_sessions:
             last_stat = {"status": "terminated"}
         else:
             last_stat = {}
@@ -1040,7 +1049,7 @@ class SessionService:
                 )
             public_host = sess.main_kernel.agent_row.public_host
             found_ports: dict[str, list[str]] = {}
-            service_ports = cast(list[dict[str, Any]] | None, sess.main_kernel.service_ports)
+            service_ports = sess.main_kernel.service_ports
             if service_ports is None:
                 raise KernelNotReady(
                     f"Kernel of the session has no service ports yet (kernel: {sess.main_kernel.id}, kernel status: {sess.main_kernel.status.name})"
@@ -1081,9 +1090,9 @@ class SessionService:
             architecture=sess.main_kernel.architecture or "",
             registry=sess.main_kernel.registry,
             tag=sess.tag,
-            container_id=uuid.UUID(sess.main_kernel.container_id)
+            container_id=ContainerId(sess.main_kernel.container_id)
             if sess.main_kernel.container_id
-            else uuid.uuid4(),
+            else ContainerId(""),
             occupied_slots=str(sess.main_kernel.occupied_slots),  # legacy
             occupying_slots=str(sess.occupying_slots),
             requested_slots=str(sess.requested_slots),
@@ -1255,9 +1264,10 @@ class SessionService:
         )
         if not wsproxy_addr:
             raise ServiceUnavailable("No coordinator configured for this resource group")
-        wsproxy_status = await query_wsproxy_status(wsproxy_addr)
-        if advertise_addr := wsproxy_status.get("advertise_address"):
-            wsproxy_advertise_addr = advertise_addr
+        client = self._appproxy_client_pool.load_client(wsproxy_addr, "")
+        wsproxy_status = await client.fetch_status()
+        if wsproxy_status.advertise_address:
+            wsproxy_advertise_addr = wsproxy_status.advertise_address
         else:
             wsproxy_advertise_addr = wsproxy_addr
 
@@ -1265,9 +1275,7 @@ class SessionService:
             kernel_host = urlparse(session.main_kernel.agent_addr).hostname
         else:
             kernel_host = session.main_kernel.kernel_host
-        service_ports: list[dict[str, Any]] = cast(
-            list[dict[str, Any]], session.main_kernel.service_ports or []
-        )
+        service_ports: list[dict[str, Any]] = session.main_kernel.service_ports or []
         sport: dict[str, Any] = {}
         host_port: int
         for sport in service_ports:

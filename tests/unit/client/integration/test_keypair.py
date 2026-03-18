@@ -10,7 +10,6 @@ from ai.backend.client.session import Session
 pytestmark = pytest.mark.integration
 
 
-@pytest.mark.asyncio
 async def test_keypair_manipulation_operations() -> None:
     email = "testion" + uuid.uuid4().hex + "@test.mars"
     access_key = None
@@ -56,7 +55,6 @@ async def test_keypair_manipulation_operations() -> None:
             raise
 
 
-@pytest.mark.asyncio
 async def test_user_cannot_create_keypair(userconfig: Any) -> None:
     email = "testion" + uuid.uuid4().hex + "@test.mars"
     with Session() as sess, pytest.raises(BackendAPIError):
@@ -69,7 +67,6 @@ async def test_user_cannot_create_keypair(userconfig: Any) -> None:
         )
 
 
-@pytest.mark.asyncio
 async def test_keypair_info() -> None:
     current_config = get_config()
     with Session() as sess:

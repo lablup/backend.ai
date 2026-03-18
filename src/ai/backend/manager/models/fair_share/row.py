@@ -16,10 +16,11 @@ from typing import TYPE_CHECKING
 import sqlalchemy as sa
 from sqlalchemy.orm import Mapped, foreign, mapped_column, relationship
 
-from ai.backend.common.types import ResourceSlot
+from ai.backend.common.types import ResourceSlot, SlotQuantity
 from ai.backend.manager.data.fair_share import (
     DomainFairShareData,
     FairShareCalculationSnapshot,
+    FairShareData,
     FairShareMetadata,
     FairShareSpec,
     ProjectFairShareData,
@@ -47,6 +48,44 @@ __all__ = (
 DEFAULT_HALF_LIFE_DAYS = 7
 DEFAULT_LOOKBACK_DAYS = 28
 DEFAULT_DECAY_UNIT_DAYS = 1
+
+
+def _merge_resource_weights(
+    row_weights: ResourceSlot,
+    default_weight: Decimal,
+    available_slots: list[SlotQuantity],
+) -> tuple[ResourceSlot, frozenset[str]]:
+    """Merge explicit and default resource weights.
+
+    Args:
+        row_weights: Entity's configured weights (may be incomplete)
+        default_weight: Scaling group's default weight (single value for all resources)
+        available_slots: Available resource types in cluster
+
+    Returns:
+        Tuple of (merged_weights, uses_default_resources)
+        - merged_weights: Complete ResourceSlot with all available resource types
+        - uses_default_resources: Set of resource types using default weight
+    """
+    merged = {}
+    uses_default = []
+
+    for sq in available_slots:
+        resource_type = sq.slot_name
+        if resource_type in row_weights:
+            # Use explicit weight
+            merged[resource_type] = row_weights[resource_type]
+        else:
+            # Use default_weight for all missing resources
+            merged[resource_type] = default_weight
+            uses_default.append(resource_type)
+
+    return ResourceSlot(merged), frozenset(uses_default)
+
+
+def _resource_slot_to_slot_quantities(slot: ResourceSlot) -> list[SlotQuantity]:
+    """Convert a ResourceSlot to list[SlotQuantity] (unordered)."""
+    return [SlotQuantity(slot_name=k, quantity=Decimal(str(v))) for k, v in slot.items()]
 
 
 def _get_domain_fair_share_domain_join_condition() -> sa.ColumnElement[bool]:
@@ -207,36 +246,63 @@ class DomainFairShareRow(Base):  # type: ignore[misc]
         sa.Index("ix_domain_fair_share_lookup", "resource_group", "domain_name"),
     )
 
-    def to_data(self, default_weight: Decimal) -> DomainFairShareData:
-        """Convert to DomainFairShareData.
+    def to_data(
+        self,
+        default_weight: Decimal,
+        available_slots: list[SlotQuantity],
+    ) -> DomainFairShareData:
+        """Convert to DomainFairShareData with merged resource weights.
 
         Args:
-            default_weight: The resource group's default weight for entities without explicit weight.
+            default_weight: Scaling group's default weight (used when self.weight is NULL
+                           and as fallback for missing resource weights)
+            available_slots: Available resource types in the cluster
+
+        Note: self.weight can be NULL in DB.
+        - NULL means "use default weight" (use_default=True)
+        - NOT NULL means "explicit weight" (use_default=False)
         """
+        # Handle entity weight (existing logic)
+        if self.weight is None:
+            weight = default_weight
+            use_default = True
+        else:
+            weight = self.weight
+            use_default = False
+
+        # Merge resource weights (new)
+        merged_weights, uses_default_resources = _merge_resource_weights(
+            self.resource_weights,
+            default_weight,
+            available_slots,
+        )
+
         return DomainFairShareData(
-            id=self.id,
             resource_group=self.resource_group,
             domain_name=self.domain_name,
-            spec=FairShareSpec(
-                weight=self.weight,
-                half_life_days=self.half_life_days,
-                lookback_days=self.lookback_days,
-                decay_unit_days=self.decay_unit_days,
-                resource_weights=self.resource_weights,
+            data=FairShareData(
+                spec=FairShareSpec(
+                    weight=weight,
+                    half_life_days=self.half_life_days,
+                    lookback_days=self.lookback_days,
+                    decay_unit_days=self.decay_unit_days,
+                    resource_weights=merged_weights,  # Use merged weights
+                ),
+                calculation_snapshot=FairShareCalculationSnapshot(
+                    fair_share_factor=self.fair_share_factor,
+                    total_decayed_usage=_resource_slot_to_slot_quantities(self.total_decayed_usage),
+                    normalized_usage=self.normalized_usage,
+                    lookback_start=self.lookback_start,
+                    lookback_end=self.lookback_end,
+                    last_calculated_at=self.last_calculated_at,
+                ),
+                metadata=FairShareMetadata(
+                    created_at=self.created_at,
+                    updated_at=self.updated_at,
+                ),
+                use_default=use_default,  # True if weight was NULL
+                uses_default_resources=uses_default_resources,  # New field
             ),
-            calculation_snapshot=FairShareCalculationSnapshot(
-                fair_share_factor=self.fair_share_factor,
-                total_decayed_usage=self.total_decayed_usage,
-                normalized_usage=self.normalized_usage,
-                lookback_start=self.lookback_start,
-                lookback_end=self.lookback_end,
-                last_calculated_at=self.last_calculated_at,
-            ),
-            metadata=FairShareMetadata(
-                created_at=self.created_at,
-                updated_at=self.updated_at,
-            ),
-            default_weight=default_weight,
         )
 
 
@@ -396,37 +462,64 @@ class ProjectFairShareRow(Base):  # type: ignore[misc]
         sa.Index("ix_project_fair_share_lookup", "resource_group", "project_id"),
     )
 
-    def to_data(self, default_weight: Decimal) -> ProjectFairShareData:
-        """Convert to ProjectFairShareData.
+    def to_data(
+        self,
+        default_weight: Decimal,
+        available_slots: list[SlotQuantity],
+    ) -> ProjectFairShareData:
+        """Convert to ProjectFairShareData with merged resource weights.
 
         Args:
-            default_weight: The resource group's default weight for entities without explicit weight.
+            default_weight: Scaling group's default weight (used when self.weight is NULL
+                           and as fallback for missing resource weights)
+            available_slots: Available resource types in the cluster
+
+        Note: self.weight can be NULL in DB.
+        - NULL means "use default weight" (use_default=True)
+        - NOT NULL means "explicit weight" (use_default=False)
         """
+        # Handle entity weight (existing logic)
+        if self.weight is None:
+            weight = default_weight
+            use_default = True
+        else:
+            weight = self.weight
+            use_default = False
+
+        # Merge resource weights (new)
+        merged_weights, uses_default_resources = _merge_resource_weights(
+            self.resource_weights,
+            default_weight,
+            available_slots,
+        )
+
         return ProjectFairShareData(
-            id=self.id,
             resource_group=self.resource_group,
             project_id=self.project_id,
             domain_name=self.domain_name,
-            spec=FairShareSpec(
-                weight=self.weight,
-                half_life_days=self.half_life_days,
-                lookback_days=self.lookback_days,
-                decay_unit_days=self.decay_unit_days,
-                resource_weights=self.resource_weights,
+            data=FairShareData(
+                spec=FairShareSpec(
+                    weight=weight,
+                    half_life_days=self.half_life_days,
+                    lookback_days=self.lookback_days,
+                    decay_unit_days=self.decay_unit_days,
+                    resource_weights=merged_weights,  # Use merged weights
+                ),
+                calculation_snapshot=FairShareCalculationSnapshot(
+                    fair_share_factor=self.fair_share_factor,
+                    total_decayed_usage=_resource_slot_to_slot_quantities(self.total_decayed_usage),
+                    normalized_usage=self.normalized_usage,
+                    lookback_start=self.lookback_start,
+                    lookback_end=self.lookback_end,
+                    last_calculated_at=self.last_calculated_at,
+                ),
+                metadata=FairShareMetadata(
+                    created_at=self.created_at,
+                    updated_at=self.updated_at,
+                ),
+                use_default=use_default,  # True if weight was NULL
+                uses_default_resources=uses_default_resources,  # New field
             ),
-            calculation_snapshot=FairShareCalculationSnapshot(
-                fair_share_factor=self.fair_share_factor,
-                total_decayed_usage=self.total_decayed_usage,
-                normalized_usage=self.normalized_usage,
-                lookback_start=self.lookback_start,
-                lookback_end=self.lookback_end,
-                last_calculated_at=self.last_calculated_at,
-            ),
-            metadata=FairShareMetadata(
-                created_at=self.created_at,
-                updated_at=self.updated_at,
-            ),
-            default_weight=default_weight,
         )
 
 
@@ -616,37 +709,64 @@ class UserFairShareRow(Base):  # type: ignore[misc]
         sa.Index("ix_user_fair_share_lookup", "resource_group", "user_uuid", "project_id"),
     )
 
-    def to_data(self, default_weight: Decimal) -> UserFairShareData:
-        """Convert to UserFairShareData.
+    def to_data(
+        self,
+        default_weight: Decimal,
+        available_slots: list[SlotQuantity],
+    ) -> UserFairShareData:
+        """Convert to UserFairShareData with merged resource weights.
 
         Args:
-            default_weight: The resource group's default weight for entities without explicit weight.
+            default_weight: Scaling group's default weight (used when self.weight is NULL
+                           and as fallback for missing resource weights)
+            available_slots: Available resource types in the cluster
+
+        Note: self.weight can be NULL in DB.
+        - NULL means "use default weight" (use_default=True)
+        - NOT NULL means "explicit weight" (use_default=False)
         """
+        # Handle entity weight (existing logic)
+        if self.weight is None:
+            weight = default_weight
+            use_default = True
+        else:
+            weight = self.weight
+            use_default = False
+
+        # Merge resource weights (new)
+        merged_weights, uses_default_resources = _merge_resource_weights(
+            self.resource_weights,
+            default_weight,
+            available_slots,
+        )
+
         return UserFairShareData(
-            id=self.id,
             resource_group=self.resource_group,
             user_uuid=self.user_uuid,
             project_id=self.project_id,
             domain_name=self.domain_name,
-            spec=FairShareSpec(
-                weight=self.weight,
-                half_life_days=self.half_life_days,
-                lookback_days=self.lookback_days,
-                decay_unit_days=self.decay_unit_days,
-                resource_weights=self.resource_weights,
+            data=FairShareData(
+                spec=FairShareSpec(
+                    weight=weight,
+                    half_life_days=self.half_life_days,
+                    lookback_days=self.lookback_days,
+                    decay_unit_days=self.decay_unit_days,
+                    resource_weights=merged_weights,  # Use merged weights
+                ),
+                calculation_snapshot=FairShareCalculationSnapshot(
+                    fair_share_factor=self.fair_share_factor,
+                    total_decayed_usage=_resource_slot_to_slot_quantities(self.total_decayed_usage),
+                    normalized_usage=self.normalized_usage,
+                    lookback_start=self.lookback_start,
+                    lookback_end=self.lookback_end,
+                    last_calculated_at=self.last_calculated_at,
+                ),
+                metadata=FairShareMetadata(
+                    created_at=self.created_at,
+                    updated_at=self.updated_at,
+                ),
+                use_default=use_default,  # True if weight was NULL
+                uses_default_resources=uses_default_resources,  # New field
             ),
-            calculation_snapshot=FairShareCalculationSnapshot(
-                fair_share_factor=self.fair_share_factor,
-                total_decayed_usage=self.total_decayed_usage,
-                normalized_usage=self.normalized_usage,
-                lookback_start=self.lookback_start,
-                lookback_end=self.lookback_end,
-                last_calculated_at=self.last_calculated_at,
-            ),
-            metadata=FairShareMetadata(
-                created_at=self.created_at,
-                updated_at=self.updated_at,
-            ),
-            default_weight=default_weight,
             scheduling_rank=self.scheduling_rank,
         )

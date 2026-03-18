@@ -3,6 +3,7 @@ from .types import (
     DomainFairShareSearchResult,
     FairShareCalculationContext,
     FairShareCalculationSnapshot,
+    FairShareData,
     FairShareMetadata,
     FairSharesByLevel,
     FairShareSpec,
@@ -20,6 +21,7 @@ __all__ = (
     # Shared types
     "FairShareSpec",
     "FairShareCalculationSnapshot",
+    "FairShareData",
     "FairShareMetadata",
     "ProjectUserIds",
     "UserProjectKey",

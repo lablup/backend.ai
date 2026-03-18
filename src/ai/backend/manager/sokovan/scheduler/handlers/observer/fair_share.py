@@ -216,6 +216,14 @@ class FairShareObserver(KernelObserver):
                 context.raw_usage_buckets.is_empty(),
             )
 
+            # Update capacity on normalized bucket entries
+            if context.cluster_capacity:
+                capacity_by_slot = {sq.slot_name: sq.quantity for sq in context.cluster_capacity}
+                await self._resource_usage_repository.update_bucket_entry_capacities(
+                    scaling_group,
+                    capacity_by_slot,
+                )
+
             # Skip if no usage data
             if context.raw_usage_buckets.is_empty():
                 log.debug("[FairShareObserver] No usage data, skipping factor calculation")

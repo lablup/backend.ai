@@ -1,22 +1,24 @@
 from __future__ import annotations
 
-from collections.abc import Collection
 from dataclasses import dataclass
 from uuid import UUID
 
-import sqlalchemy as sa
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
 
 from ai.backend.common.data.permission.types import (
     OperationType,
+    RelationType,
+    ScopeType,
 )
 from ai.backend.manager.data.permission.id import (
     ObjectId,
     ScopeId,
 )
-from ai.backend.manager.models.rbac_models.permission.object_permission import ObjectPermissionRow
-from ai.backend.manager.models.rbac_models.permission.permission_group import PermissionGroupRow
+from ai.backend.manager.models.rbac_models.association_scopes_entities import (
+    AssociationScopesEntitiesRow,
+)
+from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
 
 # =============================================================================
 # Data Classes
@@ -26,93 +28,27 @@ from ai.backend.manager.models.rbac_models.permission.permission_group import Pe
 @dataclass
 class RBACGranter:
     """
-    Data class for granting object-level permissions to specific role(s).
+    Data class for granting permissions to specific role(s) using entity-as-scope pattern.
+
+    This performs two operations:
+    1. Insert a ref edge in association_scopes_entities (visibility).
+    2. Insert entity-scope permissions in the permissions table (access control).
 
     Note: Only entity-level granting is supported. Field-level granting is not supported.
 
     Attributes:
         granted_entity_id: The entity to grant access to (must be entity, not field).
-        granted_entity_scope_id: The original scope where the entity belongs.
+        granted_entity_scope_type: The scope_type for entity-as-scope in permissions table.
+        target_scope_id: The scope to associate the entity with (e.g., invitee's User scope).
         target_role_ids: The role ID(s) to grant permissions to.
         operations: The operations to grant on the entity.
     """
 
     granted_entity_id: ObjectId
-    granted_entity_scope_id: ScopeId
+    granted_entity_scope_type: ScopeType
+    target_scope_id: ScopeId
     target_role_ids: list[UUID]
     operations: list[OperationType]
-
-
-# =============================================================================
-# Insert Helpers
-# =============================================================================
-
-
-async def _upsert_permission_groups(
-    db_sess: SASession,
-    role_ids: Collection[UUID],
-    scope_id: ScopeId,
-) -> dict[UUID, UUID]:
-    """
-    Upsert permission groups for each role and return role_id -> permission_group_id mapping.
-
-    Uses INSERT ... ON CONFLICT DO UPDATE ... RETURNING to atomically get IDs.
-    """
-    if not role_ids:
-        return {}
-
-    values_list = [
-        {
-            "role_id": role_id,
-            "scope_type": scope_id.scope_type,
-            "scope_id": scope_id.scope_id,
-        }
-        for role_id in role_ids
-    ]
-
-    stmt = (
-        pg_insert(PermissionGroupRow)
-        .values(values_list)
-        .on_conflict_do_update(
-            constraint="uq_permission_groups_role_scope",
-            set_={
-                "scope_type": sa.text("EXCLUDED.scope_type")
-            },  # no-op update to trigger RETURNING
-        )
-        .returning(PermissionGroupRow.role_id, PermissionGroupRow.id)
-    )
-
-    result = await db_sess.execute(stmt)
-    return {row.role_id: row.id for row in result.fetchall()}
-
-
-async def _insert_object_permissions(
-    db_sess: SASession,
-    role_id_to_perm_group_id: dict[UUID, UUID],
-    entity_id: ObjectId,
-    operations: Collection[OperationType],
-) -> None:
-    """
-    Insert object permissions with permission_group_id FK.
-
-    Raises IntegrityError on unique constraint violation (duplicate permission).
-    """
-    if not role_id_to_perm_group_id or not operations:
-        return
-
-    obj_perms = [
-        ObjectPermissionRow(
-            role_id=role_id,
-            permission_group_id=perm_group_id,
-            entity_type=entity_id.entity_type,
-            entity_id=entity_id.entity_id,
-            operation=operation,
-        )
-        for role_id, perm_group_id in role_id_to_perm_group_id.items()
-        for operation in operations
-    ]
-    db_sess.add_all(obj_perms)
-    await db_sess.flush()
 
 
 # =============================================================================
@@ -125,34 +61,49 @@ async def execute_rbac_granter(
     granter: RBACGranter,
 ) -> None:
     """
-    Grant object-level permissions to specified roles.
+    Grant permissions to specified roles using entity-as-scope pattern.
 
     This is used when sharing an existing entity with specific roles.
     For example, when user A invites user B to a VFolder:
-    - User B's role (provided by caller) gets object permissions for that VFolder.
-
-    Flow:
-    1. Upsert PermissionGroups and get their IDs
-    2. Insert ObjectPermissions with permission_group_id FK
-
-    Raises:
-        IntegrityError: If duplicate object permission already exists.
+    - User B's role (provided by caller) gets permissions for that VFolder.
 
     Args:
         db_sess: Async SQLAlchemy session (must be writable).
         granter: Granter instance containing granted_entity_id, target_role_ids, and operations.
     """
     role_ids = granter.target_role_ids
-    entity_scope_id = granter.granted_entity_scope_id
     entity_id = granter.granted_entity_id
 
-    if not role_ids:
+    if not role_ids or not granter.operations:
         return
 
-    # 1. Upsert permission groups and get IDs
-    role_id_to_perm_group_id = await _upsert_permission_groups(db_sess, role_ids, entity_scope_id)
-
-    # 2. Insert object permissions (raises on conflict)
-    await _insert_object_permissions(
-        db_sess, role_id_to_perm_group_id, entity_id, granter.operations
+    # 1. Insert ref edge in association_scopes_entities (visibility)
+    #    Use ON CONFLICT DO NOTHING to safely handle repeated grants for the
+    #    same (scope_type, scope_id, entity_id) triple.
+    ref_edge_stmt = (
+        pg_insert(AssociationScopesEntitiesRow)
+        .values(
+            scope_type=granter.target_scope_id.scope_type,
+            scope_id=granter.target_scope_id.scope_id,
+            entity_type=entity_id.entity_type,
+            entity_id=entity_id.entity_id,
+            relation_type=RelationType.REF,
+        )
+        .on_conflict_do_nothing(constraint="uq_scope_id_entity_id")
     )
+    await db_sess.execute(ref_edge_stmt)
+
+    # 2. Insert entity-scope permissions (access control)
+    perms = [
+        PermissionRow(
+            role_id=role_id,
+            scope_type=granter.granted_entity_scope_type,
+            scope_id=entity_id.entity_id,
+            entity_type=entity_id.entity_type,
+            operation=operation,
+        )
+        for role_id in role_ids
+        for operation in granter.operations
+    ]
+    db_sess.add_all(perms)
+    await db_sess.flush()

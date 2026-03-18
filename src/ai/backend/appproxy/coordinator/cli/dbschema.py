@@ -36,7 +36,6 @@ def show(_cli_ctx: CLIContext, alembic_config: str) -> None:
     from alembic.script import ScriptDirectory
     from sqlalchemy.engine import Connection
 
-    from ai.backend.appproxy.coordinator.models.alembic import invoked_programmatically
     from ai.backend.appproxy.coordinator.models.utils import create_async_engine
 
     def _get_current_rev_sync(connection: Connection) -> str | None:
@@ -44,7 +43,6 @@ def show(_cli_ctx: CLIContext, alembic_config: str) -> None:
         return context.get_current_revision()
 
     async def _show(sa_url: str) -> None:
-        invoked_programmatically.set(True)
         engine = create_async_engine(sa_url)
         async with engine.begin() as connection:
             current_rev = await connection.run_sync(_get_current_rev_sync)
@@ -81,13 +79,11 @@ def oneshot(_cli_ctx: CLIContext, alembic_config: str) -> None:
     Reference: http://alembic.sqlalchemy.org/en/latest/cookbook.html
                #building-an-up-to-date-database-from-scratch
     """
-    from alembic import command
     from alembic.config import Config
     from alembic.runtime.migration import MigrationContext
     from alembic.script import ScriptDirectory
     from sqlalchemy.engine import Connection, Engine
 
-    from ai.backend.appproxy.coordinator.models.alembic import invoked_programmatically
     from ai.backend.appproxy.coordinator.models.base import metadata_obj as metadata
     from ai.backend.appproxy.coordinator.models.utils import create_async_engine
 
@@ -104,12 +100,7 @@ def oneshot(_cli_ctx: CLIContext, alembic_config: str) -> None:
         connection.exec_driver_sql("CREATE TABLE alembic_version (\nversion_num varchar(32)\n);")
         connection.exec_driver_sql(f"INSERT INTO alembic_version VALUES('{head_rev}')")
 
-    def _upgrade_sync(connection: Connection) -> None:
-        alembic_cfg.attributes["connection"] = connection
-        command.upgrade(alembic_cfg, "head")
-
     async def _oneshot(sa_url: str) -> None:
-        invoked_programmatically.set(True)
         engine = create_async_engine(sa_url)
         async with engine.begin() as connection:
             await connection.exec_driver_sql('CREATE EXTENSION IF NOT EXISTS "uuid-ossp";')
@@ -121,17 +112,16 @@ def oneshot(_cli_ctx: CLIContext, alembic_config: str) -> None:
             log.info("Creating tables...")
             async with engine.begin() as connection:
                 await connection.run_sync(_create_all_sync, engine=engine.sync_engine)
+            log.info(
+                "If you don't need old migrations, delete them and set "
+                '"down_revision" value in the earliest migration to "None".'
+            )
         else:
-            # If alembic version info is already available, perform incremental upgrade.
-            log.info("Detected an existing database.")
-            log.info("Performing schema upgrade to head...")
-            async with engine.begin() as connection:
-                await connection.run_sync(_upgrade_sync)
-
-        log.info(
-            "If you don't need old migrations, delete them and set "
-            '"down_revision" value in the earliest migration to "None".'
-        )
+            log.info(
+                "Detected an existing database (current revision: {}).",
+                current_rev,
+            )
+            log.info("Use 'alembic upgrade head' to apply pending migrations.")
 
     alembic_cfg = Config(alembic_config)
     sa_url = alembic_cfg.get_main_option("sqlalchemy.url")

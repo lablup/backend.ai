@@ -3,8 +3,6 @@ from __future__ import annotations
 from dataclasses import dataclass
 from unittest.mock import AsyncMock, MagicMock, patch
 
-import pytest
-
 from ai.backend.common.dependencies.stacks.builder import DependencyBuilderStack
 from ai.backend.common.typed_validators import CommaSeparatedStrList
 from ai.backend.web.dependencies.components.composer import (
@@ -43,7 +41,6 @@ class MockConfig:
 class TestComponentComposer:
     """Test ComponentComposer lifecycle."""
 
-    @pytest.mark.asyncio
     @patch("ai.backend.web.dependencies.components.manager_client.ClientPool")
     @patch("ai.backend.web.dependencies.components.hive_router_client.ClientPool")
     async def test_compose_with_hive_router_enabled(
@@ -87,7 +84,6 @@ class TestComponentComposer:
                 assert resources.hive_router_client.client_pool is mock_hive_pool
                 assert resources.hive_router_client.endpoints == config.apollo_router.endpoints
 
-    @pytest.mark.asyncio
     @patch("ai.backend.web.dependencies.components.manager_client.ClientPool")
     @patch("ai.backend.web.dependencies.components.hive_router_client.ClientPool")
     async def test_compose_with_hive_router_disabled(
@@ -129,7 +125,6 @@ class TestComponentComposer:
         # Hive router client pool should not be created
         mock_hive_pool_class.assert_not_called()
 
-    @pytest.mark.asyncio
     async def test_stage_name(self) -> None:
         """Composer should have correct stage name."""
         composer = ComponentComposer()

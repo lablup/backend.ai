@@ -14,6 +14,7 @@ from ai.backend.common.data.user.types import UserData, UserRole
 from ai.backend.common.events.dispatcher import EventDispatcher
 from ai.backend.common.events.hub import EventHub
 from ai.backend.manager.actions.monitors.monitor import ActionMonitor
+from ai.backend.manager.actions.validators import ActionValidators
 from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.errors.service import ModelServiceNotFound
@@ -28,6 +29,9 @@ from ai.backend.manager.services.model_serving.processors.model_serving import (
 )
 from ai.backend.manager.services.model_serving.services.model_serving import ModelServingService
 from ai.backend.manager.sokovan.deployment.deployment_controller import DeploymentController
+from ai.backend.manager.sokovan.deployment.revision_generator.registry import (
+    RevisionGeneratorRegistry,
+)
 from ai.backend.manager.sokovan.scheduling_controller import SchedulingController
 from ai.backend.testutils.scenario import ScenarioBase
 
@@ -96,6 +100,12 @@ class TestUpdateRoute:
         return mock
 
     @pytest.fixture
+    def mock_deployment_repository(self) -> MagicMock:
+        mock = MagicMock()
+        mock.get_default_architecture_from_scaling_group = AsyncMock(return_value=None)
+        return mock
+
+    @pytest.fixture
     def mock_event_hub(self) -> MagicMock:
         mock = MagicMock(spec=EventHub)
         mock.register_event_propagator = MagicMock()
@@ -110,6 +120,10 @@ class TestUpdateRoute:
         return mock
 
     @pytest.fixture
+    def mock_revision_generator_registry(self) -> MagicMock:
+        return MagicMock(spec=RevisionGeneratorRegistry)
+
+    @pytest.fixture
     def model_serving_service(
         self,
         mock_storage_manager: MagicMock,
@@ -120,8 +134,10 @@ class TestUpdateRoute:
         mock_config_provider: MagicMock,
         mock_valkey_live: MagicMock,
         mock_repositories: MagicMock,
+        mock_deployment_repository: MagicMock,
         mock_deployment_controller: MagicMock,
         mock_scheduling_controller: MagicMock,
+        mock_revision_generator_registry: MagicMock,
     ) -> ModelServingService:
         return ModelServingService(
             agent_registry=mock_agent_registry,
@@ -132,8 +148,10 @@ class TestUpdateRoute:
             config_provider=mock_config_provider,
             valkey_live=mock_valkey_live,
             repository=mock_repositories.repository,
+            deployment_repository=mock_deployment_repository,
             deployment_controller=mock_deployment_controller,
             scheduling_controller=mock_scheduling_controller,
+            revision_generator_registry=mock_revision_generator_registry,
         )
 
     @pytest.fixture
@@ -141,10 +159,12 @@ class TestUpdateRoute:
         self,
         mock_action_monitor: MagicMock,
         model_serving_service: ModelServingService,
+        mock_action_validators: ActionValidators,
     ) -> ModelServingProcessors:
         return ModelServingProcessors(
             service=model_serving_service,
             action_monitors=[mock_action_monitor],
+            validators=mock_action_validators,
         )
 
     @pytest.fixture
@@ -224,11 +244,10 @@ class TestUpdateRoute:
                     route_id=uuid.UUID("11111111-1111-1111-1111-111111111111"),
                     traffic_ratio=0.7,
                 ),
-                UpdateRouteActionResult(success=True),
+                UpdateRouteActionResult(route_id=uuid.UUID("11111111-1111-1111-1111-111111111111")),
             ),
         ],
     )
-    @pytest.mark.asyncio
     async def test_update_route(
         self,
         scenario: ScenarioBase[UpdateRouteAction, UpdateRouteActionResult],
@@ -293,7 +312,6 @@ class TestUpdateRoute:
             ),
         ],
     )
-    @pytest.mark.asyncio
     async def test_update_route_failure(
         self,
         scenario: ScenarioBase[UpdateRouteAction, Exception],
@@ -319,7 +337,6 @@ class TestUpdateRoute:
 
         await scenario.test(update_route)
 
-    @pytest.mark.asyncio
     async def test_update_route_appproxy_failure(
         self,
         user_data: UserData,

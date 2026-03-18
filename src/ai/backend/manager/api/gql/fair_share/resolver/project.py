@@ -9,7 +9,10 @@ from aiohttp import web
 from strawberry import Info
 
 from ai.backend.common.contexts.user import current_user
-from ai.backend.manager.api.gql.fair_share.fetcher import fetch_project_fair_shares
+from ai.backend.manager.api.gql.fair_share.fetcher import (
+    fetch_project_fair_shares,
+    fetch_rg_project_fair_shares,
+)
 from ai.backend.manager.api.gql.fair_share.types import (
     BulkUpsertProjectFairShareWeightInput,
     BulkUpsertProjectFairShareWeightPayload,
@@ -17,11 +20,15 @@ from ai.backend.manager.api.gql.fair_share.types import (
     ProjectFairShareFilter,
     ProjectFairShareGQL,
     ProjectFairShareOrderBy,
+    RGProjectFairShareFilter,
     UpsertProjectFairShareWeightInput,
     UpsertProjectFairShareWeightPayload,
 )
 from ai.backend.manager.api.gql.types import ResourceGroupProjectScope, StrawberryGQLContext
 from ai.backend.manager.api.gql.utils import check_admin_only
+from ai.backend.manager.repositories.fair_share.types import (
+    ProjectFairShareSearchScope,
+)
 from ai.backend.manager.services.fair_share.actions import (
     BulkUpsertProjectFairShareWeightAction,
     GetProjectFairShareAction,
@@ -35,7 +42,7 @@ from ai.backend.manager.services.fair_share.actions import (
 @strawberry.field(description="Added in 26.2.0. Get project fair share data (admin only).")  # type: ignore[misc]
 async def admin_project_fair_share(
     info: Info[StrawberryGQLContext],
-    resource_group: str,
+    resource_group_name: str,
     project_id: uuid.UUID,
 ) -> ProjectFairShareGQL | None:
     """Get a single project fair share record (admin only)."""
@@ -44,7 +51,7 @@ async def admin_project_fair_share(
     processors = info.context.processors
     action_result = await processors.fair_share.get_project_fair_share.wait_for_complete(
         GetProjectFairShareAction(
-            resource_group=resource_group,
+            resource_group=resource_group_name,
             project_id=project_id,
         )
     )
@@ -63,7 +70,7 @@ async def admin_project_fair_shares(
     last: int | None = None,
     limit: int | None = None,
     offset: int | None = None,
-) -> ProjectFairShareConnection:
+) -> ProjectFairShareConnection | None:
     """Search project fair shares with pagination (admin only)."""
     check_admin_only()
 
@@ -84,10 +91,7 @@ async def admin_project_fair_shares(
 
 
 @strawberry.field(  # type: ignore[misc]
-    description=(
-        "Added in 26.2.0. Get project fair share data within resource group scope. "
-        "This API is not yet implemented."
-    )
+    description="Added in 26.2.0. Get project fair share data within resource group scope."
 )
 async def rg_project_fair_share(
     info: Info[StrawberryGQLContext],
@@ -95,19 +99,24 @@ async def rg_project_fair_share(
     project_id: uuid.UUID,
 ) -> ProjectFairShareGQL | None:
     """Get a single project fair share record within resource group scope."""
-    raise NotImplementedError("rg_project_fair_share is not yet implemented")
+    processors = info.context.processors
+    action_result = await processors.fair_share.get_project_fair_share.wait_for_complete(
+        GetProjectFairShareAction(
+            resource_group=scope.resource_group_name,
+            project_id=project_id,
+        )
+    )
+
+    return ProjectFairShareGQL.from_dataclass(action_result.data)
 
 
 @strawberry.field(  # type: ignore[misc]
-    description=(
-        "Added in 26.2.0. List project fair shares within resource group scope. "
-        "This API is not yet implemented."
-    )
+    description="Added in 26.2.0. List project fair shares within resource group scope."
 )
 async def rg_project_fair_shares(
     info: Info[StrawberryGQLContext],
     scope: ResourceGroupProjectScope,
-    filter: ProjectFairShareFilter | None = None,
+    filter: RGProjectFairShareFilter | None = None,
     order_by: list[ProjectFairShareOrderBy] | None = None,
     before: str | None = None,
     after: str | None = None,
@@ -115,9 +124,24 @@ async def rg_project_fair_shares(
     last: int | None = None,
     limit: int | None = None,
     offset: int | None = None,
-) -> ProjectFairShareConnection:
+) -> ProjectFairShareConnection | None:
     """Search project fair shares within resource group scope."""
-    raise NotImplementedError("rg_project_fair_shares is not yet implemented")
+    repo_scope = ProjectFairShareSearchScope(
+        resource_group=scope.resource_group_name,
+        domain_name=scope.domain_name,
+    )
+    return await fetch_rg_project_fair_shares(
+        info=info,
+        scope=repo_scope,
+        filter=filter,
+        order_by=order_by,
+        before=before,
+        after=after,
+        first=first,
+        last=last,
+        limit=limit,
+        offset=offset,
+    )
 
 
 # Legacy APIs (deprecated)
@@ -132,7 +156,7 @@ async def rg_project_fair_shares(
 )
 async def project_fair_share(
     info: Info[StrawberryGQLContext],
-    resource_group: str,
+    resource_group_name: str,
     project_id: uuid.UUID,
 ) -> ProjectFairShareGQL | None:
     """Get a single project fair share record."""
@@ -143,7 +167,7 @@ async def project_fair_share(
     processors = info.context.processors
     action_result = await processors.fair_share.get_project_fair_share.wait_for_complete(
         GetProjectFairShareAction(
-            resource_group=resource_group,
+            resource_group=resource_group_name,
             project_id=project_id,
         )
     )
@@ -168,7 +192,7 @@ async def project_fair_shares(
     last: int | None = None,
     limit: int | None = None,
     offset: int | None = None,
-) -> ProjectFairShareConnection:
+) -> ProjectFairShareConnection | None:
     """Search project fair shares with pagination."""
     me = current_user()
     if me is None or not me.is_superadmin:
@@ -206,7 +230,7 @@ async def admin_upsert_project_fair_share_weight(
     processors = info.context.processors
     action_result = await processors.fair_share.upsert_project_fair_share_weight.wait_for_complete(
         UpsertProjectFairShareWeightAction(
-            resource_group=input.resource_group,
+            resource_group=input.resource_group_name,
             project_id=input.project_id,
             domain_name=input.domain_name,
             weight=input.weight,
@@ -235,7 +259,7 @@ async def admin_bulk_upsert_project_fair_share_weight(
     action_result = (
         await processors.fair_share.bulk_upsert_project_fair_share_weight.wait_for_complete(
             BulkUpsertProjectFairShareWeightAction(
-                resource_group=input.resource_group,
+                resource_group=input.resource_group_name,
                 inputs=[
                     ProjectWeightInput(
                         project_id=item.project_id,
@@ -276,7 +300,7 @@ async def upsert_project_fair_share_weight(
     processors = info.context.processors
     action_result = await processors.fair_share.upsert_project_fair_share_weight.wait_for_complete(
         UpsertProjectFairShareWeightAction(
-            resource_group=input.resource_group,
+            resource_group=input.resource_group_name,
             project_id=input.project_id,
             domain_name=input.domain_name,
             weight=input.weight,
@@ -311,7 +335,7 @@ async def bulk_upsert_project_fair_share_weight(
     action_result = (
         await processors.fair_share.bulk_upsert_project_fair_share_weight.wait_for_complete(
             BulkUpsertProjectFairShareWeightAction(
-                resource_group=input.resource_group,
+                resource_group=input.resource_group_name,
                 inputs=[
                     ProjectWeightInput(
                         project_id=item.project_id,

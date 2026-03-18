@@ -2493,6 +2493,24 @@ class StorageProxyClientTimeoutConfig(BaseConfigSchema):
             composite=CompositeType.FIELD,
         ),
     ]
+    create_archive_download_session: Annotated[
+        HttpTimeoutConfig,
+        Field(
+            default_factory=lambda: _DEFAULT_TIMEOUT,
+            validation_alias=AliasChoices(
+                "create-archive-download-session", "create_archive_download_session"
+            ),
+            serialization_alias="create-archive-download-session",
+        ),
+        BackendAIConfigMeta(
+            description=(
+                "Timeout for archive download session creation (token issuance). "
+                "Does not affect the subsequent archive download streaming."
+            ),
+            added_version="26.3.0",
+            composite=CompositeType.FIELD,
+        ),
+    ]
     list_files: Annotated[
         HttpTimeoutConfig,
         Field(

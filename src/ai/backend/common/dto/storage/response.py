@@ -221,3 +221,9 @@ class GetVerificationResultResponse(BaseResponseModel):
         default=None,
         description="The verification result for the artifact revision.",
     )
+
+
+class CreateArchiveDownloadSessionResponse(BaseResponseModel):
+    """Response for archive download session creation."""
+
+    token: str = Field(description="JWT token for archive download authorization")

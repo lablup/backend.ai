@@ -5,7 +5,7 @@ import uuid
 from dataclasses import dataclass
 
 from ai.backend.common.clients.valkey_client.valkey_schedule import ValkeyScheduleClient
-from ai.backend.common.data.permission.types import EntityType, ScopeType
+from ai.backend.common.data.permission.types import RBACElementType
 from ai.backend.common.events.dispatcher import EventProducer
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.config.provider import ManagerConfigProvider
@@ -13,11 +13,13 @@ from ai.backend.manager.data.deployment.creator import DeploymentCreationDraft
 from ai.backend.manager.data.deployment.scale import AutoScalingRule, AutoScalingRuleCreator
 from ai.backend.manager.data.deployment.types import (
     DeploymentInfo,
+    DeploymentPolicyData,
+    DeploymentSubStep,
     RouteInfo,
     RouteSearchResult,
     RouteTrafficStatus,
 )
-from ai.backend.manager.models.deployment_policy import DeploymentPolicyData
+from ai.backend.manager.data.permission.types import RBACElementRef
 from ai.backend.manager.models.endpoint import EndpointRow
 from ai.backend.manager.models.routing import RoutingRow
 from ai.backend.manager.models.storage import StorageSessionManager
@@ -28,13 +30,11 @@ from ai.backend.manager.repositories.deployment import DeploymentRepository
 from ai.backend.manager.repositories.deployment.creators.endpoint import LegacyEndpointCreatorSpec
 from ai.backend.manager.repositories.deployment.options import RouteConditions
 from ai.backend.manager.repositories.deployment.updaters import (
-    DeploymentPolicyUpdaterSpec,
     DeploymentUpdaterSpec,
     RouteUpdaterSpec,
 )
 from ai.backend.manager.sokovan.deployment.revision_generator.registry import (
     RevisionGeneratorRegistry,
-    RevisionGeneratorRegistryArgs,
 )
 from ai.backend.manager.sokovan.deployment.types import DeploymentLifecycleType
 from ai.backend.manager.sokovan.scheduling_controller import SchedulingController
@@ -54,6 +54,7 @@ class DeploymentControllerArgs:
     storage_manager: StorageSessionManager
     event_producer: EventProducer
     valkey_schedule: ValkeyScheduleClient
+    revision_generator_registry: RevisionGeneratorRegistry
 
 
 class DeploymentController:
@@ -75,9 +76,7 @@ class DeploymentController:
         self._storage_manager = args.storage_manager
         self._event_producer = args.event_producer
         self._valkey_schedule = args.valkey_schedule
-        self._revision_generator_registry = RevisionGeneratorRegistry(
-            RevisionGeneratorRegistryArgs(deployment_repository=self._deployment_repository)
-        )
+        self._revision_generator_registry = args.revision_generator_registry
 
     async def create_deployment(
         self,
@@ -107,7 +106,6 @@ class DeploymentController:
         model_revision = await generator.generate_revision(
             draft_revision=draft.draft_model_revision,
             vfolder_id=draft.draft_model_revision.mounts.model_vfolder_id,
-            model_definition_path=draft.draft_model_revision.mounts.model_definition_path,
             default_architecture=default_architecture,
         )
         await self._scheduling_controller.validate_session_spec(
@@ -121,9 +119,11 @@ class DeploymentController:
         )
         creator = RBACEntityCreator(
             spec=spec,
-            scope_type=ScopeType.USER,
-            scope_id=str(draft.metadata.created_user),
-            entity_type=EntityType.MODEL_DEPLOYMENT,
+            element_type=RBACElementType.MODEL_DEPLOYMENT,
+            scope_ref=RBACElementRef(
+                element_type=RBACElementType.USER, element_id=str(draft.metadata.created_user)
+            ),
+            additional_scope_refs=[],
         )
         return await self._deployment_repository.create_endpoint_legacy(creator)
 
@@ -199,7 +199,11 @@ class DeploymentController:
             rule_id,
         )
 
-    async def mark_lifecycle_needed(self, lifecycle_type: DeploymentLifecycleType) -> None:
+    async def mark_lifecycle_needed(
+        self,
+        lifecycle_type: DeploymentLifecycleType,
+        sub_step: DeploymentSubStep | None = None,
+    ) -> None:
         """
         Mark that a deployment lifecycle operation is needed for the next cycle.
 
@@ -208,9 +212,15 @@ class DeploymentController:
 
         Args:
             lifecycle_type: Type of deployment lifecycle to mark as needed
+            sub_step: Optional sub-step for finer-grained dispatch
         """
-        await self._valkey_schedule.mark_deployment_needed(lifecycle_type.value)
-        log.debug("Marked deployment lifecycle needed for type: {}", lifecycle_type.value)
+        sub_step_value = sub_step.value if sub_step is not None else None
+        await self._valkey_schedule.mark_deployment_needed(lifecycle_type.value, sub_step_value)
+        log.debug(
+            "Marked deployment lifecycle needed for type: {}, sub_step: {}",
+            lifecycle_type.value,
+            sub_step_value,
+        )
 
     # ========== Deployment Policy Methods ==========
 
@@ -227,26 +237,6 @@ class DeploymentController:
             DeploymentPolicyData: Policy data
         """
         return await self._deployment_repository.get_deployment_policy(endpoint_id)
-
-    async def update_deployment_policy(
-        self,
-        endpoint_id: uuid.UUID,
-        updater_spec: DeploymentPolicyUpdaterSpec,
-    ) -> DeploymentPolicyData:
-        """Update the deployment policy for an endpoint.
-
-        Args:
-            endpoint_id: ID of the endpoint
-            updater_spec: Policy update specification
-
-        Returns:
-            DeploymentPolicyData: Updated policy data
-        """
-        # First get the policy to find its ID (primary key)
-        policy = await self._deployment_repository.get_deployment_policy(endpoint_id)
-        return await self._deployment_repository.update_deployment_policy(
-            Updater(spec=updater_spec, pk_value=policy.id)
-        )
 
     # Route operations
 

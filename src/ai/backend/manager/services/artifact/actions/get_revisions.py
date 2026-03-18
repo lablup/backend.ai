@@ -2,7 +2,9 @@ import uuid
 from dataclasses import dataclass
 from typing import override
 
+from ai.backend.common.data.permission.types import EntityType
 from ai.backend.manager.actions.action import BaseActionResult
+from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.artifact.types import ArtifactRevisionData
 from ai.backend.manager.services.artifact.actions.base import ArtifactAction
 
@@ -12,13 +14,18 @@ class GetArtifactRevisionsAction(ArtifactAction):
     artifact_id: uuid.UUID
 
     @override
+    @classmethod
+    def entity_type(cls) -> EntityType:
+        return EntityType.ARTIFACT_REVISION
+
+    @override
     def entity_id(self) -> str | None:
         return str(self.artifact_id)
 
     @override
     @classmethod
-    def operation_type(cls) -> str:
-        return "get_revisions"
+    def operation_type(cls) -> ActionOperationType:
+        return ActionOperationType.SEARCH
 
 
 @dataclass

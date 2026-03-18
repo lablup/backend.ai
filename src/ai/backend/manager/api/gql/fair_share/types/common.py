@@ -2,14 +2,38 @@
 
 from __future__ import annotations
 
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from datetime import date, datetime
 from decimal import Decimal
 from typing import Self
 
 import strawberry
 
+from ai.backend.common.types import SlotQuantity
 from ai.backend.manager.data.fair_share.types import FairShareSpec
+from ai.backend.manager.errors.fair_share import FairShareError
+
+
+def _normalize_quantity(value: Decimal) -> Decimal:
+    """Normalize a Decimal by removing trailing zeros without scientific notation.
+
+    PostgreSQL NUMERIC(24, 6) preserves scale=6 through SUM() aggregation,
+    producing values like Decimal('7.000000'). This function strips trailing
+    zeros while avoiding scientific notation for large integer values.
+
+    Examples:
+        Decimal('7.000000') -> Decimal('7')
+        Decimal('0.500000') -> Decimal('0.5')
+        Decimal('4294967296.000000') -> Decimal('4294967296')
+    """
+    normalized = value.normalize()
+    sign, digits, exponent = normalized.as_tuple()
+    if isinstance(exponent, int) and exponent > 0:
+        # normalize() may produce scientific notation for large integers
+        # (e.g., Decimal('1000000000') -> Decimal('1E+9')).
+        # Convert back to plain integer representation.
+        return Decimal(int(normalized))
+    return normalized
 
 
 @strawberry.type(
@@ -98,6 +122,49 @@ class ResourceSlotGQL:
         ]
         return cls(entries=entries)
 
+    @classmethod
+    def from_slot_quantities(cls, quantities: Sequence[SlotQuantity]) -> ResourceSlotGQL:
+        """Convert a list of SlotQuantity to GraphQL type."""
+        entries = [
+            ResourceSlotEntryGQL(
+                resource_type=sq.slot_name, quantity=_normalize_quantity(sq.quantity)
+            )
+            for sq in quantities
+        ]
+        return cls(entries=entries)
+
+
+@strawberry.type(
+    name="ResourceWeightEntry",
+    description=(
+        "Added in 26.2.0. Resource weight with default indicator. "
+        "Shows whether this resource type's weight was explicitly set or uses default."
+    ),
+)
+class ResourceWeightEntryGQL:
+    """Individual resource type weight with default usage flag."""
+
+    resource_type: str = strawberry.field(
+        description=(
+            "Resource type identifier (e.g., 'cpu', 'mem', 'cuda.device'). "
+            "Matches the resource types available in the scaling group."
+        )
+    )
+
+    weight: Decimal = strawberry.field(
+        description=(
+            "Weight multiplier for this resource type in fair share calculations. "
+            "Higher weight means more contribution to normalized usage."
+        )
+    )
+
+    uses_default: bool = strawberry.field(
+        description=(
+            "Whether this resource uses the resource group's default weight. "
+            "True means no explicit weight was configured for this type."
+        )
+    )
+
 
 @strawberry.type(
     name="FairShareSpec",
@@ -140,35 +207,56 @@ class FairShareSpecGQL:
             "Smaller values provide more precision but require more storage. Typically 1 day."
         )
     )
-    resource_weights: ResourceSlotGQL = strawberry.field(
+    resource_weights: list[ResourceWeightEntryGQL] = strawberry.field(
         description=(
-            "Weights for each resource type when calculating normalized usage. "
+            "Added in 26.2.0. Weights for each resource type with default indicators. "
+            "Shows which resources use explicit vs default weights. "
             "Allows different resources to contribute differently to the fair share calculation. "
             "For example, GPU usage might be weighted higher than CPU usage."
         )
     )
 
     @classmethod
-    def from_spec(cls, spec: FairShareSpec, default_weight: Decimal) -> Self:
+    def from_spec(
+        cls,
+        spec: FairShareSpec,
+        use_default: bool,
+        uses_default_resources: frozenset[str],
+    ) -> Self:
         """Convert from data layer FairShareSpec to GQL type.
 
+        No DB queries - all data comes from Repository layer.
+        Repository ensures spec.weight is always set (either explicit or default_weight).
+
         Args:
-            spec: The fair share spec from data layer.
-            default_weight: The default weight from the resource group's fair share spec.
+            spec: FairShareSpec with weight already resolved
+            use_default: Whether this spec uses default values (from FairShareData)
+            uses_default_resources: Set of resource types using default weights
 
         Returns:
             FairShareSpecGQL with effective weight and uses_default flag.
         """
-        uses_default = spec.weight is None
-        effective_weight = default_weight if spec.weight is None else spec.weight
+        # spec.weight is never None here - Repository sets it to default_weight if needed
+        if spec.weight is None:
+            raise FairShareError("Repository must set spec.weight")
+
+        # Convert ResourceSlot to list[ResourceWeightEntryGQL]
+        weight_entries = [
+            ResourceWeightEntryGQL(
+                resource_type=resource_type,
+                weight=weight,
+                uses_default=resource_type in uses_default_resources,
+            )
+            for resource_type, weight in spec.resource_weights.items()
+        ]
 
         return cls(
-            weight=effective_weight,
-            uses_default=uses_default,
+            weight=spec.weight,
+            uses_default=use_default,
             half_life_days=spec.half_life_days,
             lookback_days=spec.lookback_days,
             decay_unit_days=spec.decay_unit_days,
-            resource_weights=ResourceSlotGQL.from_resource_slot(spec.resource_weights),
+            resource_weights=weight_entries,
         )
 
 
@@ -221,3 +309,22 @@ class FairShareCalculationSnapshotGQL:
             "Fair share factors are recalculated periodically by the scheduler."
         )
     )
+
+    @strawberry.field(  # type: ignore[misc]
+        description=(
+            "Added in 26.2.0. Average daily decayed resource usage during the lookback period. "
+            "Calculated as total_decayed_usage divided by lookback duration in days. "
+            "For each resource type, this represents the average decayed amount consumed per day. "
+            "Units match the resource type (e.g., CPU cores, memory bytes)."
+        )
+    )
+    def average_daily_decayed_usage(self) -> ResourceSlotGQL:
+        from ai.backend.manager.api.gql.resource_usage.types.common_calculations import (
+            calculate_average_daily_usage,
+        )
+
+        return calculate_average_daily_usage(
+            self.total_decayed_usage,
+            self.lookback_start,
+            self.lookback_end,
+        )

@@ -9,10 +9,10 @@ import pytest
 import sqlalchemy as sa
 from graphql_relay.utils import base64
 
+from ai.backend.common.data.filter_specs import StringMatchSpec
 from ai.backend.manager.api.gql.base import (
     CURSOR_VERSION,
     StringFilter,
-    StringMatchSpec,
     decode_cursor,
     encode_cursor,
 )

@@ -36,6 +36,7 @@ if TYPE_CHECKING:
     from ai.backend.common.events.hub.hub import EventHub
     from ai.backend.manager.models.image import ImageRow
     from ai.backend.manager.registry import AgentRegistry
+    from ai.backend.manager.repositories.image.repository import ImageRepository
     from ai.backend.manager.repositories.session.repository import SessionRepository
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
@@ -75,6 +76,7 @@ class CommitSessionHandler(BaseBackgroundTaskHandler[CommitSessionManifest, Comm
     """
 
     _session_repository: SessionRepository
+    _image_repository: ImageRepository
     _agent_registry: AgentRegistry
     _event_hub: EventHub
     _event_fetcher: EventFetcher
@@ -82,11 +84,13 @@ class CommitSessionHandler(BaseBackgroundTaskHandler[CommitSessionManifest, Comm
     def __init__(
         self,
         session_repository: SessionRepository,
+        image_repository: ImageRepository,
         agent_registry: AgentRegistry,
         event_hub: EventHub,
         event_fetcher: EventFetcher,
     ) -> None:
         self._session_repository = session_repository
+        self._image_repository = image_repository
         self._agent_registry = agent_registry
         self._event_hub = event_hub
         self._event_fetcher = event_fetcher
@@ -227,7 +231,7 @@ class CommitSessionHandler(BaseBackgroundTaskHandler[CommitSessionManifest, Comm
 
             # Rescan updated image
             log.info("Rescanning image")
-            rescan_result = await self._session_repository.rescan_images(
+            rescan_result = await self._image_repository.rescan_images(
                 new_image_ref.canonical,
                 manifest.registry_project,
                 reporter=None,

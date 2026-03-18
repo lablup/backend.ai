@@ -12,6 +12,14 @@ from ai.backend.manager.services.permission_contoller.actions.assign_role import
     AssignRoleAction,
     AssignRoleActionResult,
 )
+from ai.backend.manager.services.permission_contoller.actions.bulk_assign_role import (
+    BulkAssignRoleAction,
+    BulkAssignRoleActionResult,
+)
+from ai.backend.manager.services.permission_contoller.actions.bulk_revoke_role import (
+    BulkRevokeRoleAction,
+    BulkRevokeRoleActionResult,
+)
 from ai.backend.manager.services.permission_contoller.actions.create_role import (
     CreateRoleAction,
     CreateRoleActionResult,
@@ -52,9 +60,21 @@ from ai.backend.manager.services.permission_contoller.actions.revoke_role import
     RevokeRoleAction,
     RevokeRoleActionResult,
 )
+from ai.backend.manager.services.permission_contoller.actions.search_element_associations import (
+    SearchElementAssociationsAction,
+    SearchElementAssociationsActionResult,
+)
 from ai.backend.manager.services.permission_contoller.actions.search_entities import (
     SearchEntitiesAction,
     SearchEntitiesActionResult,
+)
+from ai.backend.manager.services.permission_contoller.actions.search_object_permissions import (
+    SearchObjectPermissionsAction,
+    SearchObjectPermissionsActionResult,
+)
+from ai.backend.manager.services.permission_contoller.actions.search_permissions import (
+    SearchPermissionsAction,
+    SearchPermissionsActionResult,
 )
 from ai.backend.manager.services.permission_contoller.actions.search_roles import (
     SearchRolesAction,
@@ -67,6 +87,10 @@ from ai.backend.manager.services.permission_contoller.actions.search_scopes impo
 from ai.backend.manager.services.permission_contoller.actions.search_users_assigned_to_role import (
     SearchUsersAssignedToRoleAction,
     SearchUsersAssignedToRoleActionResult,
+)
+from ai.backend.manager.services.permission_contoller.actions.update_permission import (
+    UpdatePermissionAction,
+    UpdatePermissionActionResult,
 )
 from ai.backend.manager.services.permission_contoller.actions.update_role import (
     UpdateRoleAction,
@@ -92,7 +116,6 @@ class PermissionControllerService:
         """
         input_data = CreateRoleInput(
             creator=action.creator,
-            permission_groups=action.permission_groups,
             object_permissions=action.object_permissions,
         )
         result = await self._repository.create_role(input_data)
@@ -117,6 +140,15 @@ class PermissionControllerService:
         """
         result = await self._repository.delete_permission(action.purger)
         return DeletePermissionActionResult(data=result)
+
+    async def update_permission(
+        self, action: UpdatePermissionAction
+    ) -> UpdatePermissionActionResult:
+        """
+        Updates an existing permission in the repository.
+        """
+        result = await self._repository.update_permission(action.updater)
+        return UpdatePermissionActionResult(data=result)
 
     async def create_object_permission(
         self, action: CreateObjectPermissionAction
@@ -175,6 +207,16 @@ class PermissionControllerService:
 
         return RevokeRoleActionResult(data=data)
 
+    async def bulk_assign_role(self, action: BulkAssignRoleAction) -> BulkAssignRoleActionResult:
+        """Assigns a role to multiple users with partial failure support."""
+        data = await self._repository.bulk_assign_role(action.bulk_creator)
+        return BulkAssignRoleActionResult(data=data)
+
+    async def bulk_revoke_role(self, action: BulkRevokeRoleAction) -> BulkRevokeRoleActionResult:
+        """Revokes a role from multiple users with partial failure support."""
+        data = await self._repository.bulk_revoke_role(action.input)
+        return BulkRevokeRoleActionResult(data=data)
+
     async def get_role_detail(self, action: GetRoleDetailAction) -> GetRoleDetailActionResult:
         """Get role with all permission details and assigned users."""
         role_data = await self._repository.get_role_with_permissions(action.role_id)
@@ -183,12 +225,21 @@ class PermissionControllerService:
     async def search_roles(self, action: SearchRolesAction) -> SearchRolesActionResult:
         """Search roles with pagination and filtering."""
         result = await self._repository.search_roles(action.querier)
-        return SearchRolesActionResult(
-            items=result.items,
-            total_count=result.total_count,
-            has_next_page=result.has_next_page,
-            has_previous_page=result.has_previous_page,
-        )
+        return SearchRolesActionResult(result=result)
+
+    async def search_permissions(
+        self, action: SearchPermissionsAction
+    ) -> SearchPermissionsActionResult:
+        """Search scoped permissions with pagination and filtering."""
+        result = await self._repository.search_permissions(action.querier)
+        return SearchPermissionsActionResult(result=result)
+
+    async def search_object_permissions(
+        self, action: SearchObjectPermissionsAction
+    ) -> SearchObjectPermissionsActionResult:
+        """Search object permissions with pagination and filtering."""
+        result = await self._repository.search_object_permissions(action.querier)
+        return SearchObjectPermissionsActionResult(result=result)
 
     async def search_users_assigned_to_role(
         self, action: SearchUsersAssignedToRoleAction
@@ -197,12 +248,7 @@ class PermissionControllerService:
         result = await self._repository.search_users_assigned_to_role(
             querier=action.querier,
         )
-        return SearchUsersAssignedToRoleActionResult(
-            items=result.items,
-            total_count=result.total_count,
-            has_next_page=result.has_next_page,
-            has_previous_page=result.has_previous_page,
-        )
+        return SearchUsersAssignedToRoleActionResult(result=result)
 
     async def update_role_permissions(
         self, action: UpdateRolePermissionsAction
@@ -216,12 +262,7 @@ class PermissionControllerService:
     async def search_scopes(self, action: SearchScopesAction) -> SearchScopesActionResult:
         """Search scopes based on scope type."""
         result = await self._repository.search_scopes(action.scope_type, action.querier)
-        return SearchScopesActionResult(
-            items=result.items,
-            total_count=result.total_count,
-            has_next_page=result.has_next_page,
-            has_previous_page=result.has_previous_page,
-        )
+        return SearchScopesActionResult(result=result)
 
     async def get_scope_types(self, _action: GetScopeTypesAction) -> GetScopeTypesActionResult:
         """Get all available scope types."""
@@ -234,9 +275,11 @@ class PermissionControllerService:
     async def search_entities(self, action: SearchEntitiesAction) -> SearchEntitiesActionResult:
         """Search entities within a scope."""
         result = await self._repository.search_entities(action.querier)
-        return SearchEntitiesActionResult(
-            items=result.items,
-            total_count=result.total_count,
-            has_next_page=result.has_next_page,
-            has_previous_page=result.has_previous_page,
-        )
+        return SearchEntitiesActionResult(result=result)
+
+    async def search_element_associations(
+        self, action: SearchElementAssociationsAction
+    ) -> SearchElementAssociationsActionResult:
+        """Search element associations (full association rows) within a scope."""
+        result = await self._repository.search_element_associations(action.querier)
+        return SearchElementAssociationsActionResult(result=result)

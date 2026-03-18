@@ -6,19 +6,21 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+from ai.backend.common.configs.loader import (
+    ConfigOverrider,
+    EtcdConfigLoader,
+    EtcdConfigWatcher,
+    LoaderChain,
+    TomlConfigLoader,
+)
 from ai.backend.common.dependencies import NonMonitorableDependencyProvider
 from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.logging.types import LogLevel
-from ai.backend.manager.config.loader.config_overrider import ConfigOverrider
-from ai.backend.manager.config.loader.etcd_loader import (
-    EtcdCommonConfigLoader,
-    EtcdManagerConfigLoader,
+from ai.backend.manager.config.loader.legacy_etcd_loader import (
+    LegacyEtcdLoader,
+    LegacyEtcdVolumesLoader,
 )
-from ai.backend.manager.config.loader.legacy_etcd_loader import LegacyEtcdLoader
-from ai.backend.manager.config.loader.loader_chain import LoaderChain
-from ai.backend.manager.config.loader.toml_loader import TomlConfigLoader
 from ai.backend.manager.config.provider import ManagerConfigProvider
-from ai.backend.manager.config.watchers.etcd import EtcdConfigWatcher
 
 
 @dataclass
@@ -69,9 +71,12 @@ class ConfigProviderDependency(
         legacy_etcd_loader = LegacyEtcdLoader(setup_input.etcd)
         loaders.append(legacy_etcd_loader)
 
+        # Add legacy etcd volumes loader (volumes/ prefix)
+        loaders.append(LegacyEtcdVolumesLoader(setup_input.etcd))
+
         # Add etcd config loaders
-        loaders.append(EtcdCommonConfigLoader(setup_input.etcd))
-        loaders.append(EtcdManagerConfigLoader(setup_input.etcd))
+        loaders.append(EtcdConfigLoader(setup_input.etcd, prefix="ai/backend/config/common"))
+        loaders.append(EtcdConfigLoader(setup_input.etcd, prefix="ai/backend/config/manager"))
 
         # Add overrides
         overrides: list[tuple[tuple[str, ...], Any]] = [

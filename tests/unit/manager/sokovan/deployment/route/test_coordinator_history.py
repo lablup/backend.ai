@@ -273,7 +273,6 @@ def coordinator_without_routes(
 class TestProcessRouteLifecycle:
     """Tests for process_route_lifecycle public method."""
 
-    @pytest.mark.asyncio
     async def test_records_history_on_success(
         self,
         coordinator_with_provisioning_routes: RouteCoordinator,
@@ -291,7 +290,6 @@ class TestProcessRouteLifecycle:
 
         mock_deployment_repository.update_route_status_bulk_with_history.assert_called_once()
 
-    @pytest.mark.asyncio
     async def test_records_history_on_failure(
         self,
         coordinator_with_provisioning_routes: RouteCoordinator,
@@ -309,7 +307,6 @@ class TestProcessRouteLifecycle:
 
         mock_deployment_repository.update_route_status_bulk_with_history.assert_called_once()
 
-    @pytest.mark.asyncio
     async def test_records_history_on_stale(
         self,
         coordinator_with_provisioning_routes: RouteCoordinator,
@@ -340,7 +337,6 @@ class TestProcessRouteLifecycle:
 
         mock_deployment_repository.update_route_status_bulk_with_history.assert_called_once()
 
-    @pytest.mark.asyncio
     async def test_skips_history_when_no_routes(
         self,
         coordinator_without_routes: RouteCoordinator,
@@ -351,7 +347,6 @@ class TestProcessRouteLifecycle:
 
         mock_deployment_repository.update_route_status_bulk_with_history.assert_not_called()
 
-    @pytest.mark.asyncio
     async def test_skips_history_when_handler_returns_empty(
         self,
         coordinator_with_provisioning_routes: RouteCoordinator,

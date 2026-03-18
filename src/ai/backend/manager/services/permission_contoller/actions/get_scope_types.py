@@ -5,6 +5,7 @@ from typing import override
 
 from ai.backend.common.data.permission.types import ScopeType
 from ai.backend.manager.actions.action import BaseActionResult
+from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.services.permission_contoller.actions.base import RoleAction
 
 
@@ -22,8 +23,8 @@ class GetScopeTypesAction(RoleAction):
 
     @override
     @classmethod
-    def operation_type(cls) -> str:
-        return "get_scope_types"
+    def operation_type(cls) -> ActionOperationType:
+        return ActionOperationType.GET
 
 
 @dataclass

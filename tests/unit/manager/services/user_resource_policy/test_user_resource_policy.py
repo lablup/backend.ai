@@ -9,6 +9,8 @@ import pytest
 
 from ai.backend.common.exception import UserResourcePolicyNotFound
 from ai.backend.manager.actions.monitors.monitor import ActionMonitor
+from ai.backend.manager.actions.types import ActionOperationType
+from ai.backend.manager.actions.validators import ActionValidators
 from ai.backend.manager.data.resource.types import UserResourcePolicyData
 from ai.backend.manager.repositories.base.creator import Creator
 from ai.backend.manager.repositories.base.updater import Updater
@@ -70,6 +72,7 @@ def processors(
     return UserResourcePolicyProcessors(
         service=service,
         action_monitors=[mock_action_monitor],
+        validators=MagicMock(spec=ActionValidators),
     )
 
 
@@ -106,7 +109,7 @@ class TestActionStructure:
 
         assert action.creator == creator
         assert action.entity_id() is None
-        assert action.operation_type() == "create"
+        assert action.operation_type() == ActionOperationType.CREATE
 
     def test_modify_action_structure(self) -> None:
         """Test ModifyUserResourcePolicyAction structure"""
@@ -123,7 +126,7 @@ class TestActionStructure:
         assert action.name == "test-policy"
         assert action.updater == updater
         assert action.entity_id() is None
-        assert action.operation_type() == "modify"
+        assert action.operation_type() == ActionOperationType.UPDATE
 
     def test_delete_action_structure(self) -> None:
         """Test DeleteUserResourcePolicyAction structure"""
@@ -131,7 +134,7 @@ class TestActionStructure:
 
         assert action.name == "test-policy"
         assert action.entity_id() is None
-        assert action.operation_type() == "delete"
+        assert action.operation_type() == ActionOperationType.DELETE
 
 
 # ==================== UpdaterSpec Tests ====================

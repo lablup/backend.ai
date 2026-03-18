@@ -3,7 +3,10 @@
 from __future__ import annotations
 
 import json
+from decimal import Decimal
 from typing import Any
+
+import sqlalchemy as sa
 
 from ai.backend.manager.models.association_container_registries_groups import (
     AssociationContainerRegistriesGroupsRow,
@@ -25,11 +28,13 @@ from ai.backend.manager.repositories.base.export import (
 
 
 def _serialize_json(value: Any) -> str:
-    """Serialize value to JSON string, converting sets to lists."""
+    """Serialize value to JSON string, converting sets to lists and Decimals to strings."""
     if not value:
         return ""
 
     def convert(obj: Any) -> Any:
+        if isinstance(obj, Decimal):
+            return str(obj)
         if isinstance(obj, set):
             return sorted(obj)
         if isinstance(obj, dict):
@@ -62,16 +67,25 @@ SCALING_GROUP_JOIN = JoinDef(
 )
 SCALING_GROUP_JOINS = (SCALING_GROUP_FOR_PROJECT_JOIN, SCALING_GROUP_JOIN)
 
-# Container Registry JOINs (1:N, causes duplication)
-CONTAINER_REGISTRY_ASSOC_JOIN = JoinDef(
-    table=AssociationContainerRegistriesGroupsRow.__table__,
-    condition=GroupRow.id == AssociationContainerRegistriesGroupsRow.group_id,
-)
+# Container Registry JOIN (1:N, causes duplication)
+# Matches both global registries (available to all projects) and
+# explicitly associated registries (via the association table).
+_assoc_table = AssociationContainerRegistriesGroupsRow.__table__
 CONTAINER_REGISTRY_JOIN = JoinDef(
     table=ContainerRegistryRow.__table__,
-    condition=AssociationContainerRegistriesGroupsRow.registry_id == ContainerRegistryRow.id,
+    condition=sa.or_(
+        ContainerRegistryRow.is_global.is_(True),
+        sa.select(sa.literal(1))
+        .where(
+            sa.and_(
+                _assoc_table.c.group_id == GroupRow.id,
+                _assoc_table.c.registry_id == ContainerRegistryRow.id,
+            ),
+        )
+        .correlate(GroupRow.__table__, ContainerRegistryRow.__table__)
+        .exists(),
+    ),
 )
-CONTAINER_REGISTRY_JOINS = (CONTAINER_REGISTRY_ASSOC_JOIN, CONTAINER_REGISTRY_JOIN)
 
 # Field definitions for project export
 PROJECT_FIELDS: list[ExportFieldDef] = [
@@ -146,6 +160,17 @@ PROJECT_FIELDS: list[ExportFieldDef] = [
         formatter=_serialize_json,
     ),
     # =========================================================================
+    # Container Registry for Image Commit (no JOIN needed, already in GroupRow as JSONB)
+    # =========================================================================
+    ExportFieldDef(
+        key="container_registry",
+        name="Container Registry",
+        description="Container registry and project for image commit",
+        field_type=ExportFieldType.JSON,
+        column=GroupRow.container_registry,
+        formatter=_serialize_json,
+    ),
+    # =========================================================================
     # Resource Policy Fields (N:1, no duplication)
     # =========================================================================
     ExportFieldDef(
@@ -153,7 +178,8 @@ PROJECT_FIELDS: list[ExportFieldDef] = [
         name="Resource Policy Name",
         description="Project resource policy name",
         field_type=ExportFieldType.STRING,
-        column=GroupRow.resource_policy,
+        column=ProjectResourcePolicyRow.name,
+        joins=frozenset({RESOURCE_POLICY_JOIN}),
     ),
     ExportFieldDef(
         key="resource_policy_max_vfolder_count",
@@ -257,7 +283,7 @@ PROJECT_FIELDS: list[ExportFieldDef] = [
         description="Container registry UUID",
         field_type=ExportFieldType.UUID,
         column=ContainerRegistryRow.id,
-        joins=CONTAINER_REGISTRY_JOINS,
+        joins=(CONTAINER_REGISTRY_JOIN,),
     ),
     ExportFieldDef(
         key="container_registry_url",
@@ -265,7 +291,7 @@ PROJECT_FIELDS: list[ExportFieldDef] = [
         description="Container registry URL",
         field_type=ExportFieldType.STRING,
         column=ContainerRegistryRow.url,
-        joins=CONTAINER_REGISTRY_JOINS,
+        joins=(CONTAINER_REGISTRY_JOIN,),
     ),
     ExportFieldDef(
         key="container_registry_name",
@@ -273,7 +299,7 @@ PROJECT_FIELDS: list[ExportFieldDef] = [
         description="Container registry name",
         field_type=ExportFieldType.STRING,
         column=ContainerRegistryRow.registry_name,
-        joins=CONTAINER_REGISTRY_JOINS,
+        joins=(CONTAINER_REGISTRY_JOIN,),
     ),
     ExportFieldDef(
         key="container_registry_type",
@@ -282,7 +308,7 @@ PROJECT_FIELDS: list[ExportFieldDef] = [
         field_type=ExportFieldType.ENUM,
         column=ContainerRegistryRow.type,
         formatter=lambda v: str(v) if v else "",
-        joins=CONTAINER_REGISTRY_JOINS,
+        joins=(CONTAINER_REGISTRY_JOIN,),
     ),
     ExportFieldDef(
         key="container_registry_project",
@@ -290,7 +316,7 @@ PROJECT_FIELDS: list[ExportFieldDef] = [
         description="Container registry project",
         field_type=ExportFieldType.STRING,
         column=ContainerRegistryRow.project,
-        joins=CONTAINER_REGISTRY_JOINS,
+        joins=(CONTAINER_REGISTRY_JOIN,),
     ),
     ExportFieldDef(
         key="container_registry_is_global",
@@ -298,7 +324,7 @@ PROJECT_FIELDS: list[ExportFieldDef] = [
         description="Container registry global status",
         field_type=ExportFieldType.BOOLEAN,
         column=ContainerRegistryRow.is_global,
-        joins=CONTAINER_REGISTRY_JOINS,
+        joins=(CONTAINER_REGISTRY_JOIN,),
     ),
 ]
 

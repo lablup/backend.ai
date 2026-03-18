@@ -4,7 +4,6 @@ Test for selective table loading infrastructure (BA-3612).
 
 from __future__ import annotations
 
-import pytest
 import sqlalchemy as sa
 
 from ai.backend.manager.models.base import Base
@@ -17,7 +16,6 @@ class TestSampleRow(Base):  # type: ignore[misc]
     name = sa.Column(sa.String(64), primary_key=True)
 
 
-@pytest.mark.asyncio
 async def test_with_tables_creates_and_truncates(
     database_connection: ExtendedAsyncSAEngine,
 ) -> None:

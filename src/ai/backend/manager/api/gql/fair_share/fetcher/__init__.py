@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from .domain import (
     fetch_domain_fair_shares,
+    fetch_rg_domain_fair_shares,
     get_domain_fair_share_pagination_spec,
 )
 from .project import (
@@ -20,6 +21,7 @@ from .user import (
 __all__ = [
     # Domain
     "fetch_domain_fair_shares",
+    "fetch_rg_domain_fair_shares",
     "get_domain_fair_share_pagination_spec",
     # Project
     "fetch_project_fair_shares",

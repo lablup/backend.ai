@@ -2,6 +2,7 @@ from dataclasses import dataclass
 from typing import override
 
 from ai.backend.manager.actions.action import BaseActionResult
+from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.huggingface_registry.types import HuggingFaceRegistryData
 from ai.backend.manager.services.artifact_registry.actions.base import ArtifactRegistryAction
 
@@ -14,8 +15,8 @@ class ListHuggingFaceRegistryAction(ArtifactRegistryAction):
 
     @override
     @classmethod
-    def operation_type(cls) -> str:
-        return "list_huggingface_registries"
+    def operation_type(cls) -> ActionOperationType:
+        return ActionOperationType.SEARCH
 
 
 @dataclass

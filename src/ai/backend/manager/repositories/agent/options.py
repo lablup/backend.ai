@@ -2,13 +2,20 @@ from collections.abc import Collection
 
 import sqlalchemy as sa
 
-from ai.backend.manager.api.gql.base import StringMatchSpec
+from ai.backend.common.data.filter_specs import StringMatchSpec
 from ai.backend.manager.data.agent.types import AgentStatus
 from ai.backend.manager.models.agent import AgentRow
 from ai.backend.manager.repositories.base import QueryCondition, QueryOrder
 
 
 class AgentConditions:
+    @staticmethod
+    def by_ids(ids: Collection[str]) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return AgentRow.id.in_(ids)
+
+        return inner
+
     @staticmethod
     def by_id_contains(spec: StringMatchSpec) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
@@ -171,6 +178,12 @@ class AgentOrders:
         if ascending:
             return AgentRow.id.asc()
         return AgentRow.id.desc()
+
+    @staticmethod
+    def status(ascending: bool = True) -> QueryOrder:
+        if ascending:
+            return AgentRow.status.asc()
+        return AgentRow.status.desc()
 
     @staticmethod
     def scaling_group(ascending: bool = True) -> QueryOrder:

@@ -17,6 +17,7 @@ from ai.backend.manager.api.gql.deployment.types.access_token import (
     AccessTokenOrderBy,
 )
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
+from ai.backend.manager.models.endpoint.row import EndpointTokenRow
 from ai.backend.manager.repositories.base import QueryCondition
 from ai.backend.manager.repositories.deployment.options import (
     AccessTokenConditions,
@@ -40,6 +41,7 @@ def get_access_token_pagination_spec() -> PaginationSpec:
         backward_order=AccessTokenOrders.created_at(ascending=True),
         forward_condition_factory=AccessTokenConditions.by_cursor_forward,
         backward_condition_factory=AccessTokenConditions.by_cursor_backward,
+        tiebreaker_order=EndpointTokenRow.id.asc(),
     )
 
 

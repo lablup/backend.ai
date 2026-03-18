@@ -1,0 +1,178 @@
+"""User GraphQL payload types for mutations."""
+
+from __future__ import annotations
+
+from uuid import UUID
+
+import strawberry
+
+from .node import UserV2GQL
+
+# Create User Payloads
+
+
+@strawberry.type(
+    name="CreateUserV2Payload",
+    description="Added in 26.2.0. Payload for user creation mutation.",
+)
+class CreateUserPayloadGQL:
+    """Payload for single user creation."""
+
+    user: UserV2GQL = strawberry.field(description="The newly created user.")
+    # Note: keypair field can be added when KeyPairGQL is available
+    # keypair: KeyPairGQL = strawberry.field(
+    #     description="The automatically generated keypair for the user."
+    # )
+
+
+@strawberry.type(
+    name="BulkCreateUserV2Error",
+    description="Added in 26.2.0. Error information for a failed user in bulk creation.",
+)
+class BulkCreateUserV2ErrorGQL:
+    """Error information for a single user that failed during bulk creation."""
+
+    index: int = strawberry.field(description="Original position in the input list.")
+    username: str = strawberry.field(description="Username of the user that failed.")
+    email: str = strawberry.field(description="Email of the user that failed.")
+    message: str = strawberry.field(description="Error message describing the failure.")
+
+
+@strawberry.type(
+    name="BulkCreateUsersV2Payload",
+    description="Added in 26.2.0. Payload for bulk user creation mutation.",
+)
+class BulkCreateUsersV2PayloadGQL:
+    """Payload for bulk user creation."""
+
+    created_users: list[UserV2GQL] = strawberry.field(
+        description="List of successfully created users."
+    )
+    failed: list[BulkCreateUserV2ErrorGQL] = strawberry.field(
+        description="List of errors for users that failed to create."
+    )
+
+
+# Update User Payloads
+
+
+@strawberry.type(
+    name="UpdateUserV2Payload",
+    description="Added in 26.3.0. Payload for user update mutation.",
+)
+class UpdateUserPayloadGQL:
+    """Payload for user update."""
+
+    user: UserV2GQL = strawberry.field(description="The updated user.")
+
+
+@strawberry.type(
+    name="BulkUpdateUserV2Error",
+    description="Added in 26.3.0. Error information for a failed user in bulk update.",
+)
+class BulkUpdateUserV2ErrorGQL:
+    """Error information for a single user that failed during bulk update."""
+
+    user_id: UUID = strawberry.field(description="UUID of the user that failed to update.")
+    message: str = strawberry.field(description="Error message describing the failure.")
+
+
+@strawberry.type(
+    name="BulkUpdateUsersV2Payload",
+    description="Added in 26.3.0. Payload for bulk user update mutation.",
+)
+class BulkUpdateUsersV2PayloadGQL:
+    """Payload for bulk user update."""
+
+    updated_users: list[UserV2GQL] = strawberry.field(
+        description="List of successfully updated users."
+    )
+    failed: list[BulkUpdateUserV2ErrorGQL] = strawberry.field(
+        description="List of errors for users that failed to update."
+    )
+
+
+# Delete User Payloads
+
+
+@strawberry.type(
+    name="DeleteUserV2Payload",
+    description="Added in 26.2.0. Payload for single user soft-delete mutation.",
+)
+class DeleteUserPayloadGQL:
+    """Payload for single user soft-delete."""
+
+    success: bool = strawberry.field(description="Whether the deletion was successful.")
+
+
+@strawberry.type(
+    name="DeleteUsersV2Payload",
+    description="Added in 26.2.0. Payload for bulk user soft-delete mutation.",
+)
+class DeleteUsersPayloadGQL:
+    """Payload for bulk user soft-delete."""
+
+    deleted_count: int = strawberry.field(description="Number of users successfully soft-deleted.")
+
+
+# Purge User Payloads
+
+
+@strawberry.type(
+    name="PurgeUserV2Payload",
+    description="Added in 26.2.0. Payload for single user permanent deletion mutation.",
+)
+class PurgeUserPayloadGQL:
+    """Payload for single user permanent deletion."""
+
+    success: bool = strawberry.field(description="Whether the purge was successful.")
+
+
+@strawberry.type(
+    name="PurgeUsersV2Payload",
+    description="Added in 26.2.0. Payload for bulk user permanent deletion mutation.",
+)
+class PurgeUsersPayloadGQL:
+    """Payload for bulk user permanent deletion."""
+
+    purged_count: int = strawberry.field(description="Number of users successfully purged.")
+    failed_user_ids: list[UUID] = strawberry.field(
+        description="List of user UUIDs that failed to purge, if any."
+    )
+
+
+@strawberry.type(
+    name="BulkPurgeUserV2Error",
+    description="Added in 26.3.0. Error information for a failed user in bulk purge.",
+)
+class BulkPurgeUserV2ErrorGQL:
+    """Error information for a single user that failed during bulk purge."""
+
+    user_id: UUID = strawberry.field(description="UUID of the user that failed to purge.")
+    message: str = strawberry.field(description="Error message describing the failure.")
+
+
+@strawberry.type(
+    name="BulkPurgeUsersV2Payload",
+    description="Added in 26.3.0. Payload for bulk user permanent deletion mutation.",
+)
+class BulkPurgeUsersV2PayloadGQL:
+    """Payload for bulk user permanent deletion."""
+
+    purged_count: int = strawberry.field(description="Number of users successfully purged.")
+    failed: list[BulkPurgeUserV2ErrorGQL] = strawberry.field(
+        description="List of errors for users that failed to purge."
+    )
+
+
+# IP Allowlist Payloads
+
+
+@strawberry.type(
+    name="UpdateMyAllowedClientIPPayload",
+    description="Added in 26.4.0. Payload for updating the current user's allowed client IP list.",
+)
+class UpdateMyAllowedClientIPPayloadGQL:
+    """Payload for updating the current user's allowed client IP list."""
+
+    success: bool = strawberry.field(description="Whether the update was successful.")

@@ -5,6 +5,7 @@ from aiohttp import web
 
 from ai.backend.common.dto.manager.auth.types import AuthTokenType
 from ai.backend.manager.actions.action import BaseActionResult
+from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.auth.types import AuthorizationResult
 from ai.backend.manager.services.auth.actions.base import AuthAction
 
@@ -24,8 +25,8 @@ class AuthorizeAction(AuthAction):
 
     @override
     @classmethod
-    def operation_type(cls) -> str:
-        return "authorize"
+    def operation_type(cls) -> ActionOperationType:
+        return ActionOperationType.CREATE
 
     @property
     def hook_params(self) -> dict[str, str]:

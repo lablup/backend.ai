@@ -55,7 +55,7 @@ class UserResourcePolicyDBSource:
     @user_resource_policy_db_source_resilience.apply()
     async def get_by_name(self, name: str) -> UserResourcePolicyData:
         """Retrieves a user resource policy by name."""
-        async with self._db.begin_readonly_session() as db_sess:
+        async with self._db.begin_readonly_session_read_committed() as db_sess:
             query = sa.select(UserResourcePolicyRow).where(UserResourcePolicyRow.name == name)
             row = await db_sess.scalar(query)
             if row is None:

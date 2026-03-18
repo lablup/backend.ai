@@ -3,6 +3,7 @@ from dataclasses import dataclass
 from typing import override
 
 from ai.backend.manager.actions.action import BaseActionResult
+from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.artifact.types import ArtifactRevisionReadme
 from ai.backend.manager.services.artifact_revision.actions.base import ArtifactRevisionAction
 
@@ -17,8 +18,8 @@ class GetArtifactRevisionReadmeAction(ArtifactRevisionAction):
 
     @override
     @classmethod
-    def operation_type(cls) -> str:
-        return "get_readme"
+    def operation_type(cls) -> ActionOperationType:
+        return ActionOperationType.GET
 
 
 @dataclass

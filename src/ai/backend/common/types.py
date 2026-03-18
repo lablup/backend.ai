@@ -107,6 +107,8 @@ __all__ = (
     "MountPoint",
     "MountTypes",
     "MovingStatValue",
+    "PreemptionMode",
+    "PreemptionOrder",
     "PromMetric",
     "PromMetricGroup",
     "PromMetricPrimitive",
@@ -127,6 +129,7 @@ __all__ = (
     "SchedulerStatus",
     "SecretKey",
     "Sentinel",
+    "ServiceCatalogStatus",
     "ServicePort",
     "ServicePortProtocols",
     "SessionEnqueueingConfig",
@@ -1136,6 +1139,18 @@ class ResourceSlot(UserDict[str, Decimal]):
         return all(k in self.data.keys() for k in [name.value for name in IntrinsicSlotNames])
 
 
+@dataclass(frozen=True)
+class SlotQuantity:
+    """A single resource slot entry with slot name and quantity.
+
+    Represents one (slot_name, quantity) pair as a list-friendly alternative
+    to ResourceSlot (UserDict).
+    """
+
+    slot_name: str
+    quantity: Decimal
+
+
 class ResourceSlotState(enum.StrEnum):
     OCCUPIED = "occupied"
     AVAILABLE = "available"
@@ -1212,6 +1227,35 @@ class VFolderID:
         if second:
             return cls(QuotaScopeID.parse(first), UUID(hex=second))
         return cls(None, UUID(hex=first))
+
+    @classmethod
+    def __get_pydantic_core_schema__(
+        cls,
+        source_type: Any,
+        handler: Any,
+    ) -> Any:
+        """Provide Pydantic core schema for VFolderID serialization/deserialization."""
+        from pydantic_core import core_schema
+
+        def validate_vfolder_id(v: Any) -> VFolderID:
+            if isinstance(v, VFolderID):
+                return v
+            if isinstance(v, str):
+                return cls.from_str(v)
+            raise ValueError(f"Invalid VFolderID: {v}")
+
+        # Accept both VFolderID objects and strings
+        return core_schema.no_info_after_validator_function(
+            validate_vfolder_id,
+            core_schema.union_schema([
+                core_schema.is_instance_schema(cls),
+                core_schema.str_schema(),
+            ]),
+            serialization=core_schema.plain_serializer_function_ser_schema(
+                lambda v: str(v),
+                return_schema=core_schema.str_schema(),
+            ),
+        )
 
     def __init__(self, quota_scope_id: QuotaScopeID | str | None, folder_id: UUID) -> None:
         self.folder_id = folder_id
@@ -1604,7 +1648,10 @@ def _stringify_number(v: BinarySize | int | float | Decimal) -> str:
         elif math.isinf(v) and v < 0:
             result = "-Infinity"
         else:
-            result = f"{v:f}"
+            if isinstance(v, Decimal):
+                result = f"{v.quantize(Decimal('0.01')).normalize():f}"
+            else:
+                result = f"{v:.2f}".rstrip("0").rstrip(".")
     elif isinstance(v, BinarySize):
         result = f"{int(v):d}"
     else:
@@ -1849,6 +1896,16 @@ class AgentSelectionStrategy(enum.StrEnum):
     LEGACY = "legacy"
 
 
+class PreemptionMode(enum.StrEnum):
+    TERMINATE = "terminate"
+    RESCHEDULE = "reschedule"
+
+
+class PreemptionOrder(enum.StrEnum):
+    OLDEST = "oldest"
+    NEWEST = "newest"
+
+
 class SchedulerStatus(TypedDict):
     trigger_event: str
     execution_time: str
@@ -2021,6 +2078,12 @@ class PurgeImageResult(TypedDict):
 class ServiceDiscoveryType(enum.StrEnum):
     ETCD = "etcd"
     REDIS = "redis"
+
+
+class ServiceCatalogStatus(enum.StrEnum):
+    HEALTHY = "healthy"
+    UNHEALTHY = "unhealthy"
+    DEREGISTERED = "deregistered"
 
 
 class SessionExecutionStatus(enum.StrEnum):

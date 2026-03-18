@@ -3,6 +3,7 @@ from typing import override
 from ai.backend.manager.actions.monitors.monitor import ActionMonitor
 from ai.backend.manager.actions.processor import ActionProcessor
 from ai.backend.manager.actions.types import AbstractProcessorPackage, ActionSpec
+from ai.backend.manager.actions.validators import ActionValidators
 from ai.backend.manager.services.artifact_registry.actions.common.get_meta import (
     GetArtifactRegistryMetaAction,
     GetArtifactRegistryMetaActionResult,
@@ -129,7 +130,10 @@ class ArtifactRegistryProcessors(AbstractProcessorPackage):
     ]
 
     def __init__(
-        self, service: ArtifactRegistryService, action_monitors: list[ActionMonitor]
+        self,
+        service: ArtifactRegistryService,
+        action_monitors: list[ActionMonitor],
+        validators: ActionValidators,
     ) -> None:
         self.create_huggingface_registry = ActionProcessor(
             service.create_huggingface_registry, action_monitors

@@ -1,7 +1,8 @@
 from __future__ import annotations
 
 import logging
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
+from datetime import datetime
 from typing import cast
 from uuid import UUID
 
@@ -10,12 +11,14 @@ from sqlalchemy.exc import DBAPIError
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
 from sqlalchemy.orm import selectinload
 
+from ai.backend.common.bgtask.reporter import ProgressReporter
 from ai.backend.common.docker import ImageRef
 from ai.backend.common.exception import UnknownImageReference
 from ai.backend.common.types import ImageAlias, ImageID
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.data.image.types import (
     ImageAliasData,
+    ImageAliasListResult,
     ImageData,
     ImageDataWithDetails,
     ImageListResult,
@@ -37,8 +40,10 @@ from ai.backend.manager.models.image import (
     ImageAliasRow,
     ImageIdentifier,
     ImageRow,
+    rescan_images,
     scan_single_image,
 )
+from ai.backend.manager.models.kernel.row import KernelRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.base import BatchQuerier, Creator, execute_batch_querier
 from ai.backend.manager.repositories.base.creator import execute_creator
@@ -63,7 +68,7 @@ class ImageDBSource:
         Returns an ImageData object.
         Raises Exception if the image cannot be found.
         """
-        async with self._db.begin_session() as session:
+        async with self._db.begin_readonly_session_read_committed() as session:
             row = await self._resolve_image(session, identifiers)
             return row.to_dataclass()
 
@@ -75,7 +80,7 @@ class ImageDBSource:
         Returns a list of ImageData objects.
         More efficient than multiple individual fetch operations.
         """
-        async with self._db.begin_session() as session:
+        async with self._db.begin_readonly_session() as session:
             rows: list[ImageRow] = []
             for identifiers in identifier_lists:
                 row = await self._resolve_image(
@@ -136,7 +141,7 @@ class ImageDBSource:
         if status_filter:
             query = query.where(ImageRow.status.in_(status_filter))
 
-        async with self._db.begin_readonly_session() as session:
+        async with self._db.begin_readonly_session_read_committed() as session:
             result = await session.execute(query)
             image_rows = list(result.scalars().all())
             return {ImageID(row.id): row.to_detailed_dataclass() for row in image_rows}
@@ -150,7 +155,7 @@ class ImageDBSource:
         Deprecated. Use query_image_details_by_id instead.
         """
         try:
-            async with self._db.begin_readonly_session() as session:
+            async with self._db.begin_readonly_session_read_committed() as session:
                 image_row = await ImageRow.resolve(
                     session,
                     [
@@ -169,7 +174,7 @@ class ImageDBSource:
         load_aliases: bool = False,
         status_filter: list[ImageStatus] | None = None,
     ) -> ImageDataWithDetails:
-        async with self._db.begin_session() as session:
+        async with self._db.begin_readonly_session_read_committed() as session:
             try:
                 row: ImageRow = await self._get_image_by_id(
                     session, image_id, load_aliases, status_filter
@@ -181,7 +186,7 @@ class ImageDBSource:
     async def query_all_images(
         self, status_filter: list[ImageStatus] | None = None
     ) -> Mapping[ImageID, ImageDataWithDetails]:
-        async with self._db.begin_readonly_session() as session:
+        async with self._db.begin_readonly_session_read_committed() as session:
             rows = await ImageRow.list(session, load_aliases=True, filter_by_statuses=status_filter)
             return {ImageID(row.id): row.to_detailed_dataclass() for row in rows}
 
@@ -214,7 +219,7 @@ class ImageDBSource:
         Fetches an image from database by ID.
         Raises ImageNotFound if image doesn't exist.
         """
-        async with self._db.begin_session() as session:
+        async with self._db.begin_readonly_session_read_committed() as session:
             image_row = await self._get_image_by_id(session, image_id, load_aliases)
             return image_row.to_dataclass()
 
@@ -224,7 +229,7 @@ class ImageDBSource:
         Returns True if user owns the image, False otherwise.
         Raises ImageNotFound if image doesn't exist.
         """
-        async with self._db.begin_session() as session:
+        async with self._db.begin_readonly_session_read_committed() as session:
             image_row = await self._get_image_by_id(session, image_id)
             return image_row.is_owned_by(user_id)
 
@@ -250,7 +255,7 @@ class ImageDBSource:
             raise AliasImageActionDBError(str(e)) from e
 
     async def query_image_alias(self, alias: str) -> ImageAliasData:
-        async with self._db.begin_session() as session:
+        async with self._db.begin_readonly_session_read_committed() as session:
             row = await self._get_image_alias_by_name(session, alias)
             return ImageAliasData(id=row.id, alias=row.alias or "")
 
@@ -358,7 +363,7 @@ class ImageDBSource:
         if status_filter:
             query = query.where(ImageRow.status.in_(status_filter))
 
-        async with self._db.begin_readonly_session() as session:
+        async with self._db.begin_readonly_session_read_committed() as session:
             result = await session.execute(query)
             image_rows = list(result.scalars().all())
             return {ImageID(row.id): row.to_detailed_dataclass() for row in image_rows}
@@ -428,3 +433,70 @@ class ImageDBSource:
                 has_next_page=result.has_next_page,
                 has_previous_page=result.has_previous_page,
             )
+
+    async def search_aliases(self, querier: BatchQuerier) -> ImageAliasListResult:
+        """
+        Search image aliases using a batch querier with conditions, pagination, and ordering.
+        Returns ImageAliasListResult with items and pagination info.
+        """
+        async with self._db.begin_readonly_session() as db_sess:
+            query = sa.select(ImageAliasRow)
+            result = await execute_batch_querier(db_sess, query, querier)
+            items = [row.ImageAliasRow.to_dataclass() for row in result.rows]
+            image_ids = [ImageID(row.ImageAliasRow.image_id) for row in result.rows]
+            return ImageAliasListResult(
+                items=items,
+                image_ids=image_ids,
+                total_count=result.total_count,
+                has_next_page=result.has_next_page,
+                has_previous_page=result.has_previous_page,
+            )
+
+    async def rescan_images(
+        self,
+        registry_or_image: str | None = None,
+        project: str | None = None,
+        *,
+        reporter: ProgressReporter | None = None,
+    ) -> RescanImagesResult:
+        """
+        Rescan container registries and update images table.
+        Wraps the rescan_images function from models/image/row.py.
+        """
+        return await rescan_images(
+            self._db,
+            registry_or_image,
+            project,
+            reporter=reporter,
+        )
+
+    async def load_image_last_used(
+        self,
+        image_ids: Sequence[ImageID],
+    ) -> Mapping[ImageID, datetime]:
+        """Load the most recent session creation timestamp for each image.
+
+        Queries the kernels table to find the latest created_at for sessions
+        that used each image (matched by canonical name and architecture).
+
+        Returns a mapping of ImageID to the most recent session created_at.
+        Images that have never been used will not appear in the mapping.
+        """
+        async with self._db.begin_readonly_session_read_committed() as session:
+            stmt = (
+                sa.select(
+                    ImageRow.id,
+                    sa.func.max(KernelRow.created_at).label("last_used"),
+                )
+                .join(
+                    KernelRow,
+                    sa.and_(
+                        KernelRow.image == ImageRow.name,
+                        KernelRow.architecture == ImageRow.architecture,
+                    ),
+                )
+                .where(ImageRow.id.in_(image_ids))
+                .group_by(ImageRow.id)
+            )
+            result = await session.execute(stmt)
+            return {ImageID(row.id): row.last_used for row in result if row.last_used is not None}

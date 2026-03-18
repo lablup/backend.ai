@@ -1,10 +1,12 @@
 from __future__ import annotations
 
 import uuid
+from collections.abc import Collection
 
 import sqlalchemy as sa
 
-from ai.backend.manager.api.gql.base import StringMatchSpec
+from ai.backend.common.data.filter_specs import StringMatchSpec
+from ai.backend.manager.data.permission.id import ObjectId
 from ai.backend.manager.data.permission.status import RoleStatus
 from ai.backend.manager.data.permission.types import EntityType, RoleSource, ScopeType
 from ai.backend.manager.models.domain.row import DomainRow
@@ -15,9 +17,7 @@ from ai.backend.manager.models.rbac_models.association_scopes_entities import (
 from ai.backend.manager.models.rbac_models.permission.object_permission import (
     ObjectPermissionRow,
 )
-from ai.backend.manager.models.rbac_models.permission.permission_group import (
-    PermissionGroupRow,
-)
+from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
 from ai.backend.manager.models.rbac_models.role import RoleRow
 from ai.backend.manager.models.rbac_models.user_role import UserRoleRow
 from ai.backend.manager.models.user import UserRow
@@ -126,30 +126,6 @@ class RoleConditions:
         return inner
 
     @staticmethod
-    def by_scope_type(scope_type: ScopeType) -> QueryCondition:
-        """Filter roles by scope type.
-
-        Requires JOIN with PermissionGroupRow.
-        """
-
-        def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return PermissionGroupRow.scope_type == scope_type
-
-        return inner
-
-    @staticmethod
-    def by_scope_id(scope_id: str) -> QueryCondition:
-        """Filter roles by scope ID.
-
-        Requires JOIN with PermissionGroupRow.
-        """
-
-        def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return PermissionGroupRow.scope_id == scope_id
-
-        return inner
-
-    @staticmethod
     def by_has_permission_for(entity_type: EntityType) -> QueryCondition:
         """Filter roles having permission for entity type.
 
@@ -158,6 +134,13 @@ class RoleConditions:
 
         def inner() -> sa.sql.expression.ColumnElement[bool]:
             return ObjectPermissionRow.entity_type == entity_type
+
+        return inner
+
+    @staticmethod
+    def by_ids(role_ids: Collection[uuid.UUID]) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return RoleRow.id.in_(role_ids)
 
         return inner
 
@@ -188,9 +171,23 @@ class AssignedUserConditions:
     """Query conditions for assigned users."""
 
     @staticmethod
+    def by_user_id(user_id: uuid.UUID) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return UserRoleRow.user_id == user_id
+
+        return inner
+
+    @staticmethod
     def by_role_id(role_id: uuid.UUID) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
             return UserRoleRow.role_id == role_id
+
+        return inner
+
+    @staticmethod
+    def by_role_ids(role_ids: Collection[uuid.UUID]) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return UserRoleRow.role_id.in_(role_ids)
 
         return inner
 
@@ -302,6 +299,77 @@ class AssignedUserConditions:
     def by_granted_by_equals(granted_by: uuid.UUID) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
             return UserRoleRow.granted_by == granted_by
+
+        return inner
+
+    @staticmethod
+    def by_cursor_forward(cursor_id: str) -> QueryCondition:
+        """Cursor condition for forward pagination (after cursor)."""
+        cursor_uuid = uuid.UUID(cursor_id)
+
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return UserRoleRow.id > cursor_uuid
+
+        return inner
+
+    @staticmethod
+    def by_cursor_backward(cursor_id: str) -> QueryCondition:
+        """Cursor condition for backward pagination (before cursor)."""
+        cursor_uuid = uuid.UUID(cursor_id)
+
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return UserRoleRow.id < cursor_uuid
+
+        return inner
+
+    @staticmethod
+    def by_ids(assignment_ids: Collection[uuid.UUID]) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return UserRoleRow.id.in_(assignment_ids)
+
+        return inner
+
+    @staticmethod
+    def by_user_ids(user_ids: Collection[uuid.UUID]) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return UserRoleRow.user_id.in_(user_ids)
+
+        return inner
+
+    @staticmethod
+    def by_role_and_user_ids(
+        pairs: Collection[tuple[uuid.UUID, uuid.UUID]],
+    ) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return sa.tuple_(UserRoleRow.role_id, UserRoleRow.user_id).in_(pairs)
+
+        return inner
+
+    @staticmethod
+    def exists_role_combined(role_conditions: list[QueryCondition]) -> QueryCondition:
+        """Combine multiple role conditions into single EXISTS subquery."""
+
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            subq = sa.select(sa.literal(1)).where(RoleRow.id == UserRoleRow.role_id)
+            for cond in role_conditions:
+                subq = subq.where(cond())
+            return sa.exists(subq)
+
+        return inner
+
+    @staticmethod
+    def exists_user_combined(user_conditions: list[QueryCondition]) -> QueryCondition:
+        """Combine multiple user conditions into single EXISTS subquery."""
+
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            subq = (
+                sa.select(sa.literal(1))
+                .where(UserRow.uuid == UserRoleRow.user_id)
+                .correlate(UserRoleRow)
+            )
+            for cond in user_conditions:
+                subq = subq.where(cond())
+            return sa.exists(subq)
 
         return inner
 
@@ -588,3 +656,300 @@ class EntityScopeConditions:
             return AssociationScopesEntitiesRow.entity_type == entity_type
 
         return inner
+
+    @staticmethod
+    def by_object_ids(
+        object_ids: Collection[ObjectId],
+    ) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return sa.tuple_(
+                AssociationScopesEntitiesRow.entity_type,
+                AssociationScopesEntitiesRow.entity_id,
+            ).in_([(oid.entity_type, oid.entity_id) for oid in object_ids])
+
+        return inner
+
+    @staticmethod
+    def by_entity_id_contains(spec: StringMatchSpec) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            if spec.case_insensitive:
+                condition = AssociationScopesEntitiesRow.entity_id.ilike(f"%{spec.value}%")
+            else:
+                condition = AssociationScopesEntitiesRow.entity_id.like(f"%{spec.value}%")
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
+
+        return inner
+
+    @staticmethod
+    def by_entity_id_equals(spec: StringMatchSpec) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            if spec.case_insensitive:
+                condition = (
+                    sa.func.lower(AssociationScopesEntitiesRow.entity_id) == spec.value.lower()
+                )
+            else:
+                condition = AssociationScopesEntitiesRow.entity_id == spec.value
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
+
+        return inner
+
+    @staticmethod
+    def by_entity_id_starts_with(spec: StringMatchSpec) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            if spec.case_insensitive:
+                condition = AssociationScopesEntitiesRow.entity_id.ilike(f"{spec.value}%")
+            else:
+                condition = AssociationScopesEntitiesRow.entity_id.like(f"{spec.value}%")
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
+
+        return inner
+
+    @staticmethod
+    def by_entity_id_ends_with(spec: StringMatchSpec) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            if spec.case_insensitive:
+                condition = AssociationScopesEntitiesRow.entity_id.ilike(f"%{spec.value}")
+            else:
+                condition = AssociationScopesEntitiesRow.entity_id.like(f"%{spec.value}")
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
+
+        return inner
+
+    @staticmethod
+    def by_ids(ids: Collection[uuid.UUID]) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return AssociationScopesEntitiesRow.id.in_(ids)
+
+        return inner
+
+    @staticmethod
+    def by_cursor_forward(cursor_id: str) -> QueryCondition:
+        """Cursor condition for forward pagination (after cursor).
+
+        Uses subquery to get (registered_at, id) of the cursor row and compare.
+        """
+
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            cursor_subq = (
+                sa.select(
+                    AssociationScopesEntitiesRow.registered_at,
+                    AssociationScopesEntitiesRow.id,
+                )
+                .where(AssociationScopesEntitiesRow.id == uuid.UUID(cursor_id))
+                .scalar_subquery()
+            )
+            return (
+                sa.tuple_(
+                    AssociationScopesEntitiesRow.registered_at,
+                    AssociationScopesEntitiesRow.id,
+                )
+                < cursor_subq
+            )
+
+        return inner
+
+    @staticmethod
+    def by_cursor_backward(cursor_id: str) -> QueryCondition:
+        """Cursor condition for backward pagination (before cursor).
+
+        Uses subquery to get (registered_at, id) of the cursor row and compare.
+        """
+
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            cursor_subq = (
+                sa.select(
+                    AssociationScopesEntitiesRow.registered_at,
+                    AssociationScopesEntitiesRow.id,
+                )
+                .where(AssociationScopesEntitiesRow.id == uuid.UUID(cursor_id))
+                .scalar_subquery()
+            )
+            return (
+                sa.tuple_(
+                    AssociationScopesEntitiesRow.registered_at,
+                    AssociationScopesEntitiesRow.id,
+                )
+                > cursor_subq
+            )
+
+        return inner
+
+
+class EntityScopeOrders:
+    """Query orders for entity scope search."""
+
+    @staticmethod
+    def id(ascending: bool = True) -> QueryOrder:
+        if ascending:
+            return AssociationScopesEntitiesRow.id.asc()
+        return AssociationScopesEntitiesRow.id.desc()
+
+    @staticmethod
+    def entity_type(ascending: bool = True) -> QueryOrder:
+        if ascending:
+            return AssociationScopesEntitiesRow.entity_type.asc()
+        return AssociationScopesEntitiesRow.entity_type.desc()
+
+    @staticmethod
+    def registered_at(ascending: bool = True) -> QueryOrder:
+        if ascending:
+            return AssociationScopesEntitiesRow.registered_at.asc()
+        return AssociationScopesEntitiesRow.registered_at.desc()
+
+
+class ScopedPermissionConditions:
+    """Query conditions for scoped permissions."""
+
+    @staticmethod
+    def by_entity_type(entity_type: EntityType) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return PermissionRow.entity_type == entity_type
+
+        return inner
+
+    @staticmethod
+    def by_operation(operation: str) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return PermissionRow.operation == operation
+
+        return inner
+
+    @staticmethod
+    def by_cursor_forward(cursor_id: str) -> QueryCondition:
+        """Cursor condition for forward pagination (after cursor)."""
+        cursor_uuid = uuid.UUID(cursor_id)
+
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return PermissionRow.id > cursor_uuid
+
+        return inner
+
+    @staticmethod
+    def by_cursor_backward(cursor_id: str) -> QueryCondition:
+        """Cursor condition for backward pagination (before cursor)."""
+        cursor_uuid = uuid.UUID(cursor_id)
+
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return PermissionRow.id < cursor_uuid
+
+        return inner
+
+    @staticmethod
+    def by_role_id(role_id: uuid.UUID) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return PermissionRow.role_id == role_id
+
+        return inner
+
+    @staticmethod
+    def by_scope_type(scope_type: ScopeType) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return PermissionRow.scope_type == scope_type
+
+        return inner
+
+    @staticmethod
+    def by_ids(permission_ids: Collection[uuid.UUID]) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return PermissionRow.id.in_(permission_ids)
+
+        return inner
+
+    @staticmethod
+    def by_role_ids(role_ids: Collection[uuid.UUID]) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return PermissionRow.role_id.in_(role_ids)
+
+        return inner
+
+
+class ScopedPermissionOrders:
+    """Query orders for scoped permissions."""
+
+    @staticmethod
+    def id(ascending: bool = True) -> QueryOrder:
+        if ascending:
+            return PermissionRow.id.asc()
+        return PermissionRow.id.desc()
+
+    @staticmethod
+    def entity_type(ascending: bool = True) -> QueryOrder:
+        if ascending:
+            return PermissionRow.entity_type.asc()
+        return PermissionRow.entity_type.desc()
+
+
+class ObjectPermissionConditions:
+    """Query conditions for object permissions."""
+
+    @staticmethod
+    def by_role_id(role_id: uuid.UUID) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return ObjectPermissionRow.role_id == role_id
+
+        return inner
+
+    @staticmethod
+    def by_entity_type(entity_type: EntityType) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return ObjectPermissionRow.entity_type == entity_type
+
+        return inner
+
+    @staticmethod
+    def by_entity_id(entity_id: str) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return ObjectPermissionRow.entity_id == entity_id
+
+        return inner
+
+    @staticmethod
+    def by_operation(operation: str) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return ObjectPermissionRow.operation == operation
+
+        return inner
+
+    @staticmethod
+    def by_cursor_forward(cursor_id: str) -> QueryCondition:
+        """Cursor condition for forward pagination (after cursor)."""
+        cursor_uuid = uuid.UUID(cursor_id)
+
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return ObjectPermissionRow.id > cursor_uuid
+
+        return inner
+
+    @staticmethod
+    def by_cursor_backward(cursor_id: str) -> QueryCondition:
+        """Cursor condition for backward pagination (before cursor)."""
+        cursor_uuid = uuid.UUID(cursor_id)
+
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return ObjectPermissionRow.id < cursor_uuid
+
+        return inner
+
+
+class ObjectPermissionOrders:
+    """Query orders for object permissions."""
+
+    @staticmethod
+    def id(ascending: bool = True) -> QueryOrder:
+        if ascending:
+            return ObjectPermissionRow.id.asc()
+        return ObjectPermissionRow.id.desc()
+
+    @staticmethod
+    def entity_type(ascending: bool = True) -> QueryOrder:
+        if ascending:
+            return ObjectPermissionRow.entity_type.asc()
+        return ObjectPermissionRow.entity_type.desc()

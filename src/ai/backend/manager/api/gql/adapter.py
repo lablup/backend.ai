@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import final
 
 from ai.backend.manager.api.gql.base import decode_cursor
@@ -36,6 +36,16 @@ class PaginationOptions:
 
 
 @dataclass(frozen=True)
+class QuerierInput:
+    """Internal input for build_querier_from_input. Contains adapter-level types only."""
+
+    pagination: PaginationOptions = field(default_factory=PaginationOptions)
+    filter: GQLFilter | None = None
+    order_by: Sequence[GQLOrderBy] | None = None
+    base_conditions: Sequence[QueryCondition] | None = None
+
+
+@dataclass(frozen=True)
 class PaginationSpec:
     """Specification for pagination behavior.
 
@@ -60,6 +70,11 @@ class PaginationSpec:
 
     backward_condition_factory: CursorConditionFactory
     """Factory that creates cursor condition for backward pagination (e.g., created_at > cursor)."""
+
+    tiebreaker_order: QueryOrder
+    """Tiebreaker order for deterministic pagination (e.g., RowClass.id.asc()).
+    Applied as the last ORDER BY clause to ensure stable ordering
+    when the primary sort column has duplicate values."""
 
 
 class BaseGQLAdapter:
@@ -177,9 +192,27 @@ class BaseGQLAdapter:
             # Apply default order for offset pagination when order_by is not provided
             orders.append(pagination_spec.forward_order)
 
+        # Always append tiebreaker as the last ORDER BY for deterministic ordering
+        orders.append(pagination_spec.tiebreaker_order)
+
         pagination = self._build_pagination(
             options=pagination_options,
             spec=pagination_spec,
         )
 
         return BatchQuerier(conditions=conditions, orders=orders, pagination=pagination)
+
+    @final
+    def build_querier_from_input(
+        self,
+        input: QuerierInput,
+        pagination_spec: PaginationSpec,
+    ) -> BatchQuerier:
+        """Build BatchQuerier from a QuerierInput dataclass."""
+        return self.build_querier(
+            input.pagination,
+            pagination_spec,
+            filter=input.filter,
+            order_by=input.order_by,
+            base_conditions=input.base_conditions,
+        )

@@ -82,6 +82,28 @@ class TestEndpointType:
         result = await Endpoint.resolve_status(mock_endpoint, info=Mock())
         assert result == EndpointStatus.UNHEALTHY
 
+    async def test_status_healthy_when_terminated_routes_are_mixed_with_healthy(self) -> None:
+        """
+        Regression test: Terminated routes should be excluded from status calculation.
+
+        When all active routes are healthy but terminated routes also exist,
+        the endpoint status should be HEALTHY, not DEGRADED.
+        Previously, terminated routes were included in the total count, causing
+        the status to incorrectly report DEGRADED.
+        """
+        mock_endpoint = Mock(spec=Endpoint)
+        mock_endpoint.lifecycle_stage = EndpointLifecycle.READY.name
+
+        healthy_route = Mock()
+        healthy_route.status = RouteStatus.HEALTHY.name
+        terminated_route = Mock()
+        terminated_route.status = RouteStatus.TERMINATED.name
+
+        mock_endpoint.routings = [healthy_route, healthy_route, terminated_route]
+
+        result = await Endpoint.resolve_status(mock_endpoint, info=Mock())
+        assert result == EndpointStatus.HEALTHY
+
     async def test_status_unhealthy_when_no_routes(self) -> None:
         """
         When there are no routes at all, the endpoint status should be UNHEALTHY.

@@ -125,7 +125,6 @@ class KernelV2GQL(Node):
     id: NodeID[str]
 
     # Node references (deferred)
-    image_node: ImageNode | None
     session_node: SessionNode | None
     user_node: UserNode | None
     keypair_node: KeypairNode | None
@@ -136,7 +135,6 @@ class KernelV2GQL(Node):
     vfolder_nodes: VFolderConnection
 
     # Inlined fields (from single-element types)
-    image_id: uuid.UUID | None
     startup_command: str | None
 
     # Sub-info types

@@ -2,6 +2,7 @@ from dataclasses import dataclass
 from typing import override
 
 from ai.backend.manager.actions.action import BaseActionResult
+from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.resource.types import KeyPairResourcePolicyData
 from ai.backend.manager.models.resource_policy import KeyPairResourcePolicyRow
 from ai.backend.manager.repositories.base.creator import Creator
@@ -20,8 +21,8 @@ class CreateKeyPairResourcePolicyAction(KeypairResourcePolicyAction):
 
     @override
     @classmethod
-    def operation_type(cls) -> str:
-        return "create"
+    def operation_type(cls) -> ActionOperationType:
+        return ActionOperationType.CREATE
 
 
 @dataclass

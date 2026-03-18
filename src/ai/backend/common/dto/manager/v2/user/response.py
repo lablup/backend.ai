@@ -1,0 +1,203 @@
+"""
+Response DTOs for User v2 API.
+Shared between Client SDK and Manager API.
+"""
+
+from __future__ import annotations
+
+from datetime import datetime
+from uuid import UUID
+
+from pydantic import BaseModel, Field
+
+from ai.backend.common.api_handlers import BaseResponseModel
+from ai.backend.common.dto.manager.pagination import PaginationInfo
+from ai.backend.common.dto.manager.v2.user.types import UserRole, UserStatus
+
+__all__ = (
+    "DeleteUserPayload",
+    "EntityTimestamps",
+    "PurgeUserPayload",
+    "SearchUsersPayload",
+    "UserBasicInfo",
+    "UserContainerSettings",
+    "UserNode",
+    "UserOrganizationInfo",
+    "UserPayload",
+    "UserSecurityInfo",
+    "UserStatusInfo",
+)
+
+
+class UserBasicInfo(BaseModel):
+    """Basic user profile information."""
+
+    username: str | None = Field(
+        default=None,
+        description="Unique username for login. May be null if only email-based login is used.",
+    )
+    email: str = Field(
+        description="User's email address. Used for login and notifications.",
+    )
+    full_name: str | None = Field(
+        default=None,
+        description="User's full display name.",
+    )
+    description: str | None = Field(
+        default=None,
+        description="Optional description or notes about the user.",
+    )
+
+
+class UserStatusInfo(BaseModel):
+    """User account status information."""
+
+    status: UserStatus = Field(
+        description=(
+            "Current account status. See UserStatus enum for possible values. "
+            "Replaces the deprecated is_active field."
+        ),
+    )
+    status_info: str | None = Field(
+        default=None,
+        description="Additional information about the current status, such as reason for deactivation.",
+    )
+    need_password_change: bool | None = Field(
+        default=None,
+        description="If true, user must change password on next login.",
+    )
+
+
+class UserOrganizationInfo(BaseModel):
+    """User's organizational context and permissions."""
+
+    domain_name: str | None = Field(
+        default=None,
+        description="Name of the domain this user belongs to.",
+    )
+    role: UserRole | None = Field(
+        default=None,
+        description="User's role determining access permissions. See UserRole enum.",
+    )
+    resource_policy: str = Field(
+        description="Name of the user resource policy applied to this user.",
+    )
+    main_access_key: str | None = Field(
+        default=None,
+        description="Primary API access key for this user.",
+    )
+
+
+class UserSecurityInfo(BaseModel):
+    """User security settings and authentication configuration."""
+
+    allowed_client_ip: list[str] | None = Field(
+        default=None,
+        description=(
+            "List of allowed client IP addresses or CIDR ranges. "
+            "If set, login is restricted to these IP addresses. "
+            "Supports both IPv4 and IPv6 formats (e.g., '192.168.1.0/24', '::1')."
+        ),
+    )
+    totp_activated: bool | None = Field(
+        default=None,
+        description="Whether TOTP (Time-based One-Time Password) two-factor authentication is enabled.",
+    )
+    totp_activated_at: datetime | None = Field(
+        default=None,
+        description="Timestamp when TOTP was activated.",
+    )
+    sudo_session_enabled: bool = Field(
+        description="Whether this user can create sudo (privileged) sessions.",
+    )
+
+
+class UserContainerSettings(BaseModel):
+    """Container execution settings for the user."""
+
+    container_uid: int | None = Field(
+        default=None,
+        description="User ID (UID) to use inside containers. If null, system default is used.",
+    )
+    container_main_gid: int | None = Field(
+        default=None,
+        description="Primary group ID (GID) to use inside containers. If null, system default is used.",
+    )
+    container_gids: list[int] | None = Field(
+        default=None,
+        description="Additional supplementary group IDs for container processes.",
+    )
+
+
+class EntityTimestamps(BaseModel):
+    """Common timestamp fields for entity lifecycle tracking."""
+
+    created_at: datetime | None = Field(
+        default=None,
+        description="Timestamp when this entity was created.",
+    )
+    modified_at: datetime | None = Field(
+        default=None,
+        description="Timestamp when this entity was last modified.",
+    )
+
+
+class UserNode(BaseResponseModel):
+    """User entity with structured field groups."""
+
+    id: UUID = Field(
+        description="Unique identifier for the user (UUID).",
+    )
+    basic_info: UserBasicInfo = Field(
+        description="Basic profile information including username, email, and display name.",
+    )
+    status: UserStatusInfo = Field(
+        description="Account status and password-related flags.",
+    )
+    organization: UserOrganizationInfo = Field(
+        description="Organizational context including domain, role, and resource policy.",
+    )
+    security: UserSecurityInfo = Field(
+        description="Security settings including IP restrictions and TOTP configuration.",
+    )
+    container: UserContainerSettings = Field(
+        description="Container execution settings including UID/GID mappings.",
+    )
+    timestamps: EntityTimestamps = Field(
+        description="Creation and modification timestamps.",
+    )
+
+
+class UserPayload(BaseResponseModel):
+    """Payload for single user mutation responses."""
+
+    user: UserNode = Field(
+        description="The user entity.",
+    )
+
+
+class SearchUsersPayload(BaseResponseModel):
+    """Payload for user search responses."""
+
+    items: list[UserNode] = Field(
+        description="List of user entities matching the search criteria.",
+    )
+    pagination: PaginationInfo = Field(
+        description="Pagination information for the result set.",
+    )
+
+
+class DeleteUserPayload(BaseResponseModel):
+    """Payload for user deletion mutation."""
+
+    success: bool = Field(
+        description="Whether the deletion was successful.",
+    )
+
+
+class PurgeUserPayload(BaseResponseModel):
+    """Payload for user permanent deletion mutation."""
+
+    success: bool = Field(
+        description="Whether the purge was successful.",
+    )
