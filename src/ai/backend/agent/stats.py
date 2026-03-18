@@ -596,7 +596,10 @@ class StatContext:
         for computer in self.agent.computers.values():
             _tasks.append(
                 asyncio.create_task(
-                    computer.instance.gather_container_measures(self, container_ids),
+                    asyncio.wait_for(
+                        computer.instance.gather_container_measures(self, container_ids),
+                        timeout=_PLUGIN_TIMEOUT,
+                    ),
                 )
             )
         self._stage_observer.observe_stage(
