@@ -3,23 +3,25 @@
 from __future__ import annotations
 
 from datetime import datetime
-from uuid import UUID
 
 import strawberry
 from strawberry import UNSET
 
+from ai.backend.common.api_handlers import SENTINEL
 from ai.backend.common.dto.clients.prometheus.request import QueryTimeRange
+from ai.backend.common.dto.manager.v2.prometheus_query_preset.request import (
+    CreateQueryDefinitionInput as CreateQueryDefinitionInputDTO,
+)
+from ai.backend.common.dto.manager.v2.prometheus_query_preset.request import (
+    CreateQueryDefinitionOptionsInput as CreateQueryDefinitionOptionsInputDTO,
+)
+from ai.backend.common.dto.manager.v2.prometheus_query_preset.request import (
+    ModifyQueryDefinitionInput as ModifyQueryDefinitionInputDTO,
+)
+from ai.backend.common.dto.manager.v2.prometheus_query_preset.request import (
+    ModifyQueryDefinitionOptionsInput as ModifyQueryDefinitionOptionsInputDTO,
+)
 from ai.backend.manager.data.prometheus_query_preset import ExecutePresetOptions
-from ai.backend.manager.models.prometheus_query_preset import PrometheusQueryPresetRow
-from ai.backend.manager.repositories.base.creator import Creator
-from ai.backend.manager.repositories.base.updater import Updater
-from ai.backend.manager.repositories.prometheus_query_preset.creators import (
-    PrometheusQueryPresetCreatorSpec,
-)
-from ai.backend.manager.repositories.prometheus_query_preset.updaters import (
-    PrometheusQueryPresetUpdaterSpec,
-)
-from ai.backend.manager.types import OptionalState, TriState
 
 
 @strawberry.input(
@@ -31,7 +33,8 @@ class QueryDefinitionOptionsInput:
     group_labels: list[str] = strawberry.field(description="Allowed group-by label keys.")
 
 
-@strawberry.input(
+@strawberry.experimental.pydantic.input(
+    model=CreateQueryDefinitionInputDTO,
     name="CreateQueryDefinitionInput",
     description="Added in 26.3.0. Input for creating a new query definition.",
 )
@@ -46,20 +49,21 @@ class CreateQueryDefinitionInput:
         description="Query definition options including filter and group labels."
     )
 
-    def to_creator(self) -> Creator[PrometheusQueryPresetRow]:
-        return Creator(
-            spec=PrometheusQueryPresetCreatorSpec(
-                name=self.name,
-                metric_name=self.metric_name,
-                query_template=self.query_template,
-                time_window=self.time_window,
+    def to_pydantic(self) -> CreateQueryDefinitionInputDTO:
+        return CreateQueryDefinitionInputDTO(
+            name=self.name,
+            metric_name=self.metric_name,
+            query_template=self.query_template,
+            time_window=self.time_window,
+            options=CreateQueryDefinitionOptionsInputDTO(
                 filter_labels=self.options.filter_labels,
                 group_labels=self.options.group_labels,
-            )
+            ),
         )
 
 
-@strawberry.input(
+@strawberry.experimental.pydantic.input(
+    model=ModifyQueryDefinitionInputDTO,
     name="ModifyQueryDefinitionInput",
     description="Added in 26.3.0. Input for modifying an existing query definition.",
 )
@@ -74,19 +78,19 @@ class ModifyQueryDefinitionInput:
         default=UNSET, description="New query definition options."
     )
 
-    def to_updater(self, preset_id: UUID) -> Updater[PrometheusQueryPresetRow]:
-        spec = PrometheusQueryPresetUpdaterSpec(
-            name=OptionalState[str].from_graphql(self.name),
-            metric_name=OptionalState[str].from_graphql(self.metric_name),
-            query_template=OptionalState[str].from_graphql(self.query_template),
-            time_window=TriState[str].from_graphql(self.time_window),
+    def to_pydantic(self) -> ModifyQueryDefinitionInputDTO:
+        return ModifyQueryDefinitionInputDTO(
+            name=None if self.name is UNSET else self.name,
+            metric_name=None if self.metric_name is UNSET else self.metric_name,
+            query_template=None if self.query_template is UNSET else self.query_template,
+            time_window=SENTINEL if self.time_window is UNSET else self.time_window,
+            options=None
+            if (self.options is UNSET or self.options is None)
+            else ModifyQueryDefinitionOptionsInputDTO(
+                filter_labels=self.options.filter_labels,
+                group_labels=self.options.group_labels,
+            ),
         )
-
-        if self.options is not UNSET and self.options is not None:
-            spec.filter_labels = OptionalState.update(self.options.filter_labels)
-            spec.group_labels = OptionalState.update(self.options.group_labels)
-
-        return Updater(pk_value=preset_id, spec=spec)
 
 
 @strawberry.input(

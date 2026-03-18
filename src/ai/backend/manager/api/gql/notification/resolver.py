@@ -7,7 +7,7 @@ from functools import lru_cache
 from typing import Any
 
 import strawberry
-from strawberry import ID, UNSET, Info
+from strawberry import ID, Info
 from strawberry.relay import Connection, Edge
 
 from ai.backend.common.api_handlers import Sentinel
@@ -772,16 +772,17 @@ async def admin_validate_notification_channel(
 ) -> ValidateNotificationChannelPayload:
     check_admin_only()
     processors = info.context.processors
+    dto = input.to_pydantic()
 
     await processors.notification.validate_channel.wait_for_complete(
         ValidateChannelAction(
-            channel_id=uuid.UUID(input.id),
-            test_message=input.test_message,
+            channel_id=dto.id,
+            test_message=dto.test_message,
         )
     )
 
     return ValidateNotificationChannelPayload(
-        id=input.id,
+        id=ID(str(dto.id)),
     )
 
 
@@ -796,16 +797,17 @@ async def validate_notification_channel(
     input: ValidateNotificationChannelInput, info: Info[StrawberryGQLContext]
 ) -> ValidateNotificationChannelPayload:
     processors = info.context.processors
+    dto = input.to_pydantic()
 
     await processors.notification.validate_channel.wait_for_complete(
         ValidateChannelAction(
-            channel_id=uuid.UUID(input.id),
-            test_message=input.test_message,
+            channel_id=dto.id,
+            test_message=dto.test_message,
         )
     )
 
     return ValidateNotificationChannelPayload(
-        id=input.id,
+        id=ID(str(dto.id)),
     )
 
 
@@ -815,15 +817,12 @@ async def admin_validate_notification_rule(
 ) -> ValidateNotificationRulePayload:
     check_admin_only()
     processors = info.context.processors
-
-    notification_data = {}
-    if input.notification_data is not UNSET and input.notification_data is not None:
-        notification_data = dict(input.notification_data)
+    dto = input.to_pydantic()
 
     action_result = await processors.notification.validate_rule.wait_for_complete(
         ValidateRuleAction(
-            rule_id=uuid.UUID(input.id),
-            notification_data=notification_data,
+            rule_id=dto.id,
+            notification_data=dto.notification_data,
         )
     )
 
@@ -843,15 +842,12 @@ async def validate_notification_rule(
     input: ValidateNotificationRuleInput, info: Info[StrawberryGQLContext]
 ) -> ValidateNotificationRulePayload:
     processors = info.context.processors
-
-    notification_data = {}
-    if input.notification_data is not UNSET and input.notification_data is not None:
-        notification_data = dict(input.notification_data)
+    dto = input.to_pydantic()
 
     action_result = await processors.notification.validate_rule.wait_for_complete(
         ValidateRuleAction(
-            rule_id=uuid.UUID(input.id),
-            notification_data=notification_data,
+            rule_id=dto.id,
+            notification_data=dto.notification_data,
         )
     )
 

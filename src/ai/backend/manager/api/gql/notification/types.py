@@ -42,6 +42,12 @@ from ai.backend.common.dto.manager.v2.notification.request import (
 from ai.backend.common.dto.manager.v2.notification.request import (
     UpdateNotificationRuleInput as UpdateNotificationRuleInputDTO,
 )
+from ai.backend.common.dto.manager.v2.notification.request import (
+    ValidateNotificationChannelInput as ValidateNotificationChannelInputDTO,
+)
+from ai.backend.common.dto.manager.v2.notification.request import (
+    ValidateNotificationRuleInput as ValidateNotificationRuleInputDTO,
+)
 from ai.backend.common.exception import InvalidNotificationChannelSpec
 from ai.backend.manager.api.gql.base import OrderDirection, StringFilter
 from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin
@@ -779,10 +785,19 @@ class DeleteNotificationRulePayload:
 # Validate mutations
 
 
-@strawberry.input(description="Input for validate notification channel mutation")
+@strawberry.experimental.pydantic.input(
+    model=ValidateNotificationChannelInputDTO,
+    description="Input for validate notification channel mutation",
+)
 class ValidateNotificationChannelInput:
     id: ID
     test_message: str
+
+    def to_pydantic(self) -> ValidateNotificationChannelInputDTO:
+        return ValidateNotificationChannelInputDTO(
+            id=uuid.UUID(self.id),
+            test_message=self.test_message,
+        )
 
 
 @strawberry.type(description="Payload for validate notification channel mutation")
@@ -790,10 +805,21 @@ class ValidateNotificationChannelPayload:
     id: ID
 
 
-@strawberry.input(description="Input for validate notification rule mutation")
+@strawberry.experimental.pydantic.input(
+    model=ValidateNotificationRuleInputDTO,
+    description="Input for validate notification rule mutation",
+)
 class ValidateNotificationRuleInput:
     id: ID
     notification_data: strawberry.scalars.JSON | None = UNSET
+
+    def to_pydantic(self) -> ValidateNotificationRuleInputDTO:
+        return ValidateNotificationRuleInputDTO(
+            id=uuid.UUID(self.id),
+            notification_data={}
+            if (self.notification_data is UNSET or self.notification_data is None)
+            else dict(self.notification_data),
+        )
 
 
 @strawberry.type(description="Payload for validate notification rule mutation")

@@ -134,6 +134,7 @@ class DeleteNotificationRuleInput(BaseRequestModel):
 class ValidateNotificationChannelInput(BaseRequestModel):
     """Input for validating a notification channel by sending a test message."""
 
+    id: UUID = Field(description="Channel ID to validate")
     test_message: str = Field(
         max_length=5000,
         description="Test message to send through the channel (max 5KB)",
@@ -143,6 +144,7 @@ class ValidateNotificationChannelInput(BaseRequestModel):
 class ValidateNotificationRuleInput(BaseRequestModel):
     """Input for validating a notification rule by rendering its message template."""
 
+    id: UUID = Field(description="Rule ID to validate")
     notification_data: dict[str, Any] = Field(
         default_factory=dict,
         description="Test notification data to use in template rendering",
