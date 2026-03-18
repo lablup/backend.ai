@@ -130,16 +130,19 @@ async def reservoir_registries(
     )
 
 
-@strawberry.input(description="Added in 25.14.0")
+@strawberry.experimental.pydantic.input(
+    model=CreateReservoirRegistryInputDTO,
+    description="Added in 25.14.0",
+    all_fields=True,
+)
 class CreateReservoirRegistryInput:
-    name: str
-    endpoint: str
-    access_key: str
-    secret_key: str
-    api_version: str
+    pass
 
 
-@strawberry.input(description="Added in 25.14.0")
+@strawberry.experimental.pydantic.input(
+    model=UpdateReservoirRegistryInputDTO,
+    description="Added in 25.14.0",
+)
 class UpdateReservoirRegistryInput:
     id: ID
     name: str | None = UNSET
@@ -147,6 +150,16 @@ class UpdateReservoirRegistryInput:
     access_key: str | None = UNSET
     secret_key: str | None = UNSET
     api_version: str | None = UNSET
+
+    def to_pydantic(self) -> UpdateReservoirRegistryInputDTO:
+        return UpdateReservoirRegistryInputDTO(
+            id=uuid.UUID(self.id),
+            name=None if self.name is UNSET else self.name,
+            endpoint=None if self.endpoint is UNSET else self.endpoint,
+            access_key=None if self.access_key is UNSET else self.access_key,
+            secret_key=None if self.secret_key is UNSET else self.secret_key,
+            api_version=None if self.api_version is UNSET else self.api_version,
+        )
 
 
 @strawberry.experimental.pydantic.input(
@@ -176,15 +189,7 @@ class DeleteReservoirRegistryPayload:
 async def create_reservoir_registry(
     input: CreateReservoirRegistryInput, info: Info[StrawberryGQLContext]
 ) -> CreateReservoirRegistryPayload:
-    result = await info.context.adapters.reservoir_registry.create(
-        CreateReservoirRegistryInputDTO(
-            name=input.name,
-            endpoint=input.endpoint,
-            access_key=input.access_key,
-            secret_key=input.secret_key,
-            api_version=input.api_version,
-        )
-    )
+    result = await info.context.adapters.reservoir_registry.create(input.to_pydantic())
     return CreateReservoirRegistryPayload(
         reservoir=ReservoirRegistry.from_pydantic(result.registry)
     )
@@ -194,16 +199,7 @@ async def create_reservoir_registry(
 async def update_reservoir_registry(
     input: UpdateReservoirRegistryInput, info: Info[StrawberryGQLContext]
 ) -> UpdateReservoirRegistryPayload:
-    result = await info.context.adapters.reservoir_registry.update(
-        UpdateReservoirRegistryInputDTO(
-            id=uuid.UUID(input.id),
-            name=None if input.name is UNSET else input.name,
-            endpoint=None if input.endpoint is UNSET else input.endpoint,
-            access_key=None if input.access_key is UNSET else input.access_key,
-            secret_key=None if input.secret_key is UNSET else input.secret_key,
-            api_version=None if input.api_version is UNSET else input.api_version,
-        )
-    )
+    result = await info.context.adapters.reservoir_registry.update(input.to_pydantic())
     return UpdateReservoirRegistryPayload(
         reservoir=ReservoirRegistry.from_pydantic(result.registry)
     )

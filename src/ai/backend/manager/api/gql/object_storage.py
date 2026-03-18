@@ -20,6 +20,12 @@ from ai.backend.common.dto.manager.v2.object_storage.request import (
     DeleteObjectStorageInput as DeleteObjectStorageInputDTO,
 )
 from ai.backend.common.dto.manager.v2.object_storage.request import (
+    GetPresignedDownloadURLInput as GetPresignedDownloadURLInputDTO,
+)
+from ai.backend.common.dto.manager.v2.object_storage.request import (
+    GetPresignedUploadURLInput as GetPresignedUploadURLInputDTO,
+)
+from ai.backend.common.dto.manager.v2.object_storage.request import (
     UpdateObjectStorageInput as UpdateObjectStorageInputDTO,
 )
 from ai.backend.manager.api.gql.base import encode_cursor
@@ -152,17 +158,19 @@ async def object_storages(
     )
 
 
-@strawberry.input(description="Added in 25.14.0")
+@strawberry.experimental.pydantic.input(
+    model=CreateObjectStorageInputDTO,
+    description="Added in 25.14.0",
+    all_fields=True,
+)
 class CreateObjectStorageInput:
-    name: str
-    host: str
-    access_key: str
-    secret_key: str
-    endpoint: str
-    region: str
+    pass
 
 
-@strawberry.input(description="Added in 25.14.0")
+@strawberry.experimental.pydantic.input(
+    model=UpdateObjectStorageInputDTO,
+    description="Added in 25.14.0",
+)
 class UpdateObjectStorageInput:
     id: ID
     name: str | None = UNSET
@@ -171,6 +179,17 @@ class UpdateObjectStorageInput:
     secret_key: str | None = UNSET
     endpoint: str | None = UNSET
     region: str | None = UNSET
+
+    def to_pydantic(self) -> UpdateObjectStorageInputDTO:
+        return UpdateObjectStorageInputDTO(
+            id=uuid.UUID(self.id),
+            name=None if self.name is UNSET else self.name,
+            host=None if self.host is UNSET else self.host,
+            access_key=None if self.access_key is UNSET else self.access_key,
+            secret_key=None if self.secret_key is UNSET else self.secret_key,
+            endpoint=None if self.endpoint is UNSET else self.endpoint,
+            region=SENTINEL if self.region is UNSET else self.region,
+        )
 
 
 @strawberry.experimental.pydantic.input(
@@ -181,17 +200,36 @@ class DeleteObjectStorageInput:
     id: ID
 
 
-@strawberry.input(description="Added in 25.14.0")
+@strawberry.experimental.pydantic.input(
+    model=GetPresignedDownloadURLInputDTO,
+    description="Added in 25.14.0",
+)
 class GetPresignedDownloadURLInput:
     artifact_revision_id: ID
     key: str
     expiration: int | None = None
 
+    def to_pydantic(self) -> GetPresignedDownloadURLInputDTO:
+        return GetPresignedDownloadURLInputDTO(
+            artifact_revision_id=uuid.UUID(self.artifact_revision_id),
+            key=self.key,
+            expiration=self.expiration,
+        )
 
-@strawberry.input(description="Added in 25.14.0")
+
+@strawberry.experimental.pydantic.input(
+    model=GetPresignedUploadURLInputDTO,
+    description="Added in 25.14.0",
+)
 class GetPresignedUploadURLInput:
     artifact_revision_id: ID
     key: str
+
+    def to_pydantic(self) -> GetPresignedUploadURLInputDTO:
+        return GetPresignedUploadURLInputDTO(
+            artifact_revision_id=uuid.UUID(self.artifact_revision_id),
+            key=self.key,
+        )
 
 
 @strawberry.type(description="Added in 25.14.0")
@@ -224,16 +262,7 @@ class GetPresignedUploadURLPayload:
 async def create_object_storage(
     input: CreateObjectStorageInput, info: Info[StrawberryGQLContext]
 ) -> CreateObjectStoragePayload:
-    result = await info.context.adapters.object_storage.create(
-        CreateObjectStorageInputDTO(
-            name=input.name,
-            host=input.host,
-            access_key=input.access_key,
-            secret_key=input.secret_key,
-            endpoint=input.endpoint,
-            region=input.region,
-        )
-    )
+    result = await info.context.adapters.object_storage.create(input.to_pydantic())
     return CreateObjectStoragePayload(
         object_storage=ObjectStorage.from_pydantic(
             result.object_storage, extra={"region": result.object_storage.region or ""}
@@ -245,17 +274,7 @@ async def create_object_storage(
 async def update_object_storage(
     input: UpdateObjectStorageInput, info: Info[StrawberryGQLContext]
 ) -> UpdateObjectStoragePayload:
-    result = await info.context.adapters.object_storage.update(
-        UpdateObjectStorageInputDTO(
-            id=uuid.UUID(input.id),
-            name=None if input.name is UNSET else input.name,
-            host=None if input.host is UNSET else input.host,
-            access_key=None if input.access_key is UNSET else input.access_key,
-            secret_key=None if input.secret_key is UNSET else input.secret_key,
-            endpoint=None if input.endpoint is UNSET else input.endpoint,
-            region=SENTINEL if input.region is UNSET else input.region,
-        )
-    )
+    result = await info.context.adapters.object_storage.update(input.to_pydantic())
     return UpdateObjectStoragePayload(
         object_storage=ObjectStorage.from_pydantic(
             result.object_storage, extra={"region": result.object_storage.region or ""}
@@ -277,12 +296,12 @@ async def get_presigned_download_url(
     input: GetPresignedDownloadURLInput, info: Info[StrawberryGQLContext]
 ) -> GetPresignedDownloadURLPayload:
     processors = info.context.processors
-
+    dto = input.to_pydantic()
     action_result = await processors.object_storage.get_presigned_download_url.wait_for_complete(
         GetDownloadPresignedURLAction(
-            artifact_revision_id=uuid.UUID(input.artifact_revision_id),
-            key=input.key,
-            expiration=input.expiration,
+            artifact_revision_id=dto.artifact_revision_id,
+            key=dto.key,
+            expiration=dto.expiration,
         )
     )
 
@@ -294,11 +313,11 @@ async def get_presigned_upload_url(
     input: GetPresignedUploadURLInput, info: Info[StrawberryGQLContext]
 ) -> GetPresignedUploadURLPayload:
     processors = info.context.processors
-
+    dto = input.to_pydantic()
     action_result = await processors.object_storage.get_presigned_upload_url.wait_for_complete(
         GetUploadPresignedURLAction(
-            artifact_revision_id=uuid.UUID(input.artifact_revision_id),
-            key=input.key,
+            artifact_revision_id=dto.artifact_revision_id,
+            key=dto.key,
         )
     )
 

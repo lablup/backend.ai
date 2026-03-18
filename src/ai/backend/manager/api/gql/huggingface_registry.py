@@ -121,19 +121,32 @@ async def huggingface_registries(
     )
 
 
-@strawberry.input(description="Added in 25.14.0")
+@strawberry.experimental.pydantic.input(
+    model=CreateHuggingFaceRegistryInputDTO,
+    description="Added in 25.14.0",
+    all_fields=True,
+)
 class CreateHuggingFaceRegistryInput:
-    url: str
-    name: str
-    token: str | None = None
+    pass
 
 
-@strawberry.input(description="Added in 25.14.0")
+@strawberry.experimental.pydantic.input(
+    model=UpdateHuggingFaceRegistryInputDTO,
+    description="Added in 25.14.0",
+)
 class UpdateHuggingFaceRegistryInput:
     id: ID
     url: str | None = UNSET
     name: str | None = UNSET
     token: str | None = UNSET
+
+    def to_pydantic(self) -> UpdateHuggingFaceRegistryInputDTO:
+        return UpdateHuggingFaceRegistryInputDTO(
+            id=uuid.UUID(self.id),
+            name=None if self.name is UNSET else self.name,
+            url=None if self.url is UNSET else self.url,
+            token=None if self.token is UNSET else self.token,
+        )
 
 
 @strawberry.experimental.pydantic.input(
@@ -163,9 +176,7 @@ class DeleteHuggingFaceRegistryPayload:
 async def create_huggingface_registry(
     input: CreateHuggingFaceRegistryInput, info: Info[StrawberryGQLContext]
 ) -> CreateHuggingFaceRegistryPayload:
-    result = await info.context.adapters.huggingface_registry.create(
-        CreateHuggingFaceRegistryInputDTO(url=input.url, name=input.name, token=input.token)
-    )
+    result = await info.context.adapters.huggingface_registry.create(input.to_pydantic())
     return CreateHuggingFaceRegistryPayload(
         huggingface_registry=HuggingFaceRegistry.from_pydantic(result.registry)
     )
@@ -175,14 +186,7 @@ async def create_huggingface_registry(
 async def update_huggingface_registry(
     input: UpdateHuggingFaceRegistryInput, info: Info[StrawberryGQLContext]
 ) -> UpdateHuggingFaceRegistryPayload:
-    result = await info.context.adapters.huggingface_registry.update(
-        UpdateHuggingFaceRegistryInputDTO(
-            id=uuid.UUID(input.id),
-            name=None if input.name is UNSET else input.name,
-            url=None if input.url is UNSET else input.url,
-            token=None if input.token is UNSET else input.token,
-        )
-    )
+    result = await info.context.adapters.huggingface_registry.update(input.to_pydantic())
     return UpdateHuggingFaceRegistryPayload(
         huggingface_registry=HuggingFaceRegistry.from_pydantic(result.registry)
     )

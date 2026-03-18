@@ -76,16 +76,17 @@ class StorageNamespaceConnection(Connection[StorageNamespace]):
         return len(self.edges)
 
 
-@strawberry.input(
+@strawberry.experimental.pydantic.input(
+    model=RegisterStorageNamespaceInputDTO,
     description=dedent_strip("""
     Added in 25.15.0.
 
     Input type for registering a storage namespace.
-    """)
+    """),
+    all_fields=True,
 )
 class RegisterStorageNamespaceInput:
-    storage_id: uuid.UUID
-    namespace: str
+    pass
 
 
 @strawberry.experimental.pydantic.input(
@@ -133,12 +134,7 @@ class UnregisterStorageNamespacePayload:
 async def register_storage_namespace(
     input: RegisterStorageNamespaceInput, info: Info[StrawberryGQLContext]
 ) -> RegisterStorageNamespacePayload:
-    payload = await info.context.adapters.storage_namespace.register(
-        RegisterStorageNamespaceInputDTO(
-            storage_id=input.storage_id,
-            namespace=input.namespace,
-        )
-    )
+    payload = await info.context.adapters.storage_namespace.register(input.to_pydantic())
     return RegisterStorageNamespacePayload(id=payload.namespace.storage_id)
 
 
