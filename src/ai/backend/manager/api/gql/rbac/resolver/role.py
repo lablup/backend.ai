@@ -40,10 +40,17 @@ from ai.backend.manager.api.gql.rbac.types import (
 )
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.api.gql.utils import check_admin_only
+from ai.backend.manager.data.permission.role import (
+    BulkUserRoleRevocationInput,
+    UserRoleAssignmentInput,
+    UserRoleRevocationInput,
+)
 from ai.backend.manager.models.rbac_models.conditions import AssignedUserConditions
 from ai.backend.manager.models.rbac_models.role import RoleRow
+from ai.backend.manager.repositories.base.creator import BulkCreator
 from ai.backend.manager.repositories.base.purger import Purger
 from ai.backend.manager.repositories.base.updater import Updater
+from ai.backend.manager.repositories.permission_controller.creators import UserRoleCreatorSpec
 from ai.backend.manager.repositories.permission_controller.updaters import RoleUpdaterSpec
 from ai.backend.manager.services.permission_contoller.actions.assign_role import (
     AssignRoleAction,
@@ -227,9 +234,12 @@ async def admin_assign_role(
     input: AssignRoleInput,
 ) -> RoleAssignmentGQL:
     check_admin_only()
+    dto = input.to_pydantic()
     action_result = (
         await info.context.processors.permission_controller.assign_role.wait_for_complete(
-            AssignRoleAction(input=input.to_input())
+            AssignRoleAction(
+                input=UserRoleAssignmentInput(user_id=dto.user_id, role_id=dto.role_id)
+            )
         )
     )
     return RoleAssignmentGQL.from_assignment_data(action_result.data)
@@ -241,9 +251,12 @@ async def admin_revoke_role(
     input: RevokeRoleInput,
 ) -> RoleAssignmentGQL:
     check_admin_only()
+    dto = input.to_pydantic()
     action_result = (
         await info.context.processors.permission_controller.revoke_role.wait_for_complete(
-            RevokeRoleAction(input=input.to_input())
+            RevokeRoleAction(
+                input=UserRoleRevocationInput(user_id=dto.user_id, role_id=dto.role_id)
+            )
         )
     )
     return RoleAssignmentGQL.from_revocation_data(action_result.data)
@@ -257,9 +270,11 @@ async def admin_bulk_assign_role(
     input: BulkAssignRoleInputGQL,
 ) -> BulkAssignRolePayloadGQL:
     check_admin_only()
+    dto = input.to_pydantic()
+    specs = [UserRoleCreatorSpec(user_id=uid, role_id=dto.role_id) for uid in dto.user_ids]
     action_result = (
         await info.context.processors.permission_controller.bulk_assign_role.wait_for_complete(
-            BulkAssignRoleAction(bulk_creator=input.to_bulk_creator())
+            BulkAssignRoleAction(bulk_creator=BulkCreator(specs=specs))
         )
     )
     return BulkAssignRolePayloadGQL(
@@ -279,9 +294,12 @@ async def admin_bulk_revoke_role(
     input: BulkRevokeRoleInputGQL,
 ) -> BulkRevokeRolePayloadGQL:
     check_admin_only()
+    dto = input.to_pydantic()
     action_result = (
         await info.context.processors.permission_controller.bulk_revoke_role.wait_for_complete(
-            BulkRevokeRoleAction(input=input.to_input())
+            BulkRevokeRoleAction(
+                input=BulkUserRoleRevocationInput(role_id=dto.role_id, user_ids=dto.user_ids)
+            )
         )
     )
     return BulkRevokeRolePayloadGQL(

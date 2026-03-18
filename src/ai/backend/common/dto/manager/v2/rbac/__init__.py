@@ -3,9 +3,16 @@ RBAC DTOs v2 for Manager API.
 """
 
 from ai.backend.common.dto.manager.v2.rbac.request import (
+    AssignRoleInput,
+    BulkAssignRoleInput,
+    BulkRevokeRoleInput,
+    CreatePermissionInput,
     CreateRoleInput,
+    DeletePermissionInput,
     DeleteRoleInput,
     PurgeRoleInput,
+    RevokeRoleInput,
+    UpdatePermissionInput,
     UpdateRoleInput,
 )
 from ai.backend.common.dto.manager.v2.rbac.response import (
@@ -35,9 +42,16 @@ __all__ = (
     "RoleSource",
     "RoleStatus",
     # Input models (request)
+    "AssignRoleInput",
+    "BulkAssignRoleInput",
+    "BulkRevokeRoleInput",
+    "CreatePermissionInput",
     "CreateRoleInput",
+    "DeletePermissionInput",
     "DeleteRoleInput",
     "PurgeRoleInput",
+    "RevokeRoleInput",
+    "UpdatePermissionInput",
     "UpdateRoleInput",
     # Node and Payload models (response)
     "CreateRolePayload",

@@ -18,6 +18,15 @@ from ai.backend.common.data.permission.types import (
     RoleStatus,
 )
 from ai.backend.common.dto.manager.v2.rbac.request import (
+    AssignRoleInput as AssignRoleInputDTO,
+)
+from ai.backend.common.dto.manager.v2.rbac.request import (
+    BulkAssignRoleInput as BulkAssignRoleInputDTO,
+)
+from ai.backend.common.dto.manager.v2.rbac.request import (
+    BulkRevokeRoleInput as BulkRevokeRoleInputDTO,
+)
+from ai.backend.common.dto.manager.v2.rbac.request import (
     CreateRoleInput as CreateRoleInputDTO,
 )
 from ai.backend.common.dto.manager.v2.rbac.request import (
@@ -25,6 +34,9 @@ from ai.backend.common.dto.manager.v2.rbac.request import (
 )
 from ai.backend.common.dto.manager.v2.rbac.request import (
     PurgeRoleInput as PurgeRoleInputDTO,
+)
+from ai.backend.common.dto.manager.v2.rbac.request import (
+    RevokeRoleInput as RevokeRoleInputDTO,
 )
 from ai.backend.common.dto.manager.v2.rbac.request import (
     UpdateRoleInput as UpdateRoleInputDTO,
@@ -40,13 +52,10 @@ from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin
 from ai.backend.manager.api.gql.types import GQLFilter, GQLOrderBy, StrawberryGQLContext
 from ai.backend.manager.data.permission.role import (
     AssignedUserData,
-    BulkUserRoleRevocationInput,
     RoleData,
     RoleDetailData,
     UserRoleAssignmentData,
-    UserRoleAssignmentInput,
     UserRoleRevocationData,
-    UserRoleRevocationInput,
 )
 from ai.backend.manager.models.rbac_models.conditions import (
     AssignedUserConditions,
@@ -56,15 +65,12 @@ from ai.backend.manager.models.rbac_models.orders import (
     AssignedUserOrders,
     RoleOrders,
 )
-from ai.backend.manager.models.rbac_models.user_role import UserRoleRow
 from ai.backend.manager.repositories.base import (
     QueryCondition,
     QueryOrder,
     combine_conditions_or,
     negate_conditions,
 )
-from ai.backend.manager.repositories.base.creator import BulkCreator
-from ai.backend.manager.repositories.permission_controller.creators import UserRoleCreatorSpec
 
 if TYPE_CHECKING:
     from ai.backend.manager.api.gql.rbac.types.permission import (
@@ -684,56 +690,42 @@ class UpdateRoleInput:
         )
 
 
-@strawberry.input(description="Added in 26.3.0. Input for assigning a role to a user")
+@strawberry.experimental.pydantic.input(
+    model=AssignRoleInputDTO,
+    description="Added in 26.3.0. Input for assigning a role to a user",
+    all_fields=True,
+)
 class AssignRoleInput:
-    user_id: uuid.UUID
-    role_id: uuid.UUID
-
-    def to_input(self) -> UserRoleAssignmentInput:
-        return UserRoleAssignmentInput(
-            user_id=self.user_id,
-            role_id=self.role_id,
-        )
+    pass
 
 
-@strawberry.input(description="Added in 26.3.0. Input for revoking a role from a user")
+@strawberry.experimental.pydantic.input(
+    model=RevokeRoleInputDTO,
+    description="Added in 26.3.0. Input for revoking a role from a user",
+    all_fields=True,
+)
 class RevokeRoleInput:
-    user_id: uuid.UUID
-    role_id: uuid.UUID
-
-    def to_input(self) -> UserRoleRevocationInput:
-        return UserRoleRevocationInput(
-            user_id=self.user_id,
-            role_id=self.role_id,
-        )
+    pass
 
 
-@strawberry.input(
+@strawberry.experimental.pydantic.input(
+    model=BulkAssignRoleInputDTO,
     name="BulkAssignRoleInput",
     description="Added in 26.3.0. Input for bulk assigning a role to multiple users",
+    all_fields=True,
 )
 class BulkAssignRoleInputGQL:
-    role_id: uuid.UUID
-    user_ids: list[uuid.UUID]
-
-    def to_bulk_creator(self) -> BulkCreator[UserRoleRow]:
-        specs = [UserRoleCreatorSpec(user_id=uid, role_id=self.role_id) for uid in self.user_ids]
-        return BulkCreator(specs=specs)
+    pass
 
 
-@strawberry.input(
+@strawberry.experimental.pydantic.input(
+    model=BulkRevokeRoleInputDTO,
     name="BulkRevokeRoleInput",
     description="Added in 26.3.0. Input for bulk revoking a role from multiple users",
+    all_fields=True,
 )
 class BulkRevokeRoleInputGQL:
-    role_id: uuid.UUID
-    user_ids: list[uuid.UUID]
-
-    def to_input(self) -> BulkUserRoleRevocationInput:
-        return BulkUserRoleRevocationInput(
-            role_id=self.role_id,
-            user_ids=self.user_ids,
-        )
+    pass
 
 
 @strawberry.experimental.pydantic.input(

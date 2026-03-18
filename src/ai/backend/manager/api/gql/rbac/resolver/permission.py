@@ -8,6 +8,10 @@ from strawberry import ID, Info
 from ai.backend.common.data.permission.scope_entity_combinations import (
     VALID_SCOPE_ENTITY_COMBINATIONS,
 )
+from ai.backend.common.data.permission.types import (
+    OperationType,
+    RBACElementType,
+)
 from ai.backend.manager.api.gql.rbac.fetcher.permission import fetch_permissions
 from ai.backend.manager.api.gql.rbac.types import (
     CreatePermissionInput,
@@ -24,7 +28,11 @@ from ai.backend.manager.api.gql.rbac.types import (
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.api.gql.utils import check_admin_only
 from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
+from ai.backend.manager.repositories.base.creator import Creator
 from ai.backend.manager.repositories.base.purger import Purger
+from ai.backend.manager.repositories.base.updater import Updater
+from ai.backend.manager.repositories.permission_controller.creators import PermissionCreatorSpec
+from ai.backend.manager.repositories.permission_controller.updaters import PermissionUpdaterSpec
 from ai.backend.manager.services.permission_contoller.actions.permission import (
     CreatePermissionAction,
     DeletePermissionAction,
@@ -32,6 +40,7 @@ from ai.backend.manager.services.permission_contoller.actions.permission import 
 from ai.backend.manager.services.permission_contoller.actions.update_permission import (
     UpdatePermissionAction,
 )
+from ai.backend.manager.types import OptionalState
 
 # ==================== Query Resolvers ====================
 
@@ -89,9 +98,19 @@ async def admin_create_permission(
     input: CreatePermissionInput,
 ) -> PermissionGQL:
     check_admin_only()
+    dto = input.to_pydantic()
+    creator = Creator(
+        spec=PermissionCreatorSpec(
+            role_id=dto.role_id,
+            scope_type=RBACElementType(dto.scope_type).to_scope_type(),
+            scope_id=dto.scope_id,
+            entity_type=RBACElementType(dto.entity_type).to_entity_type(),
+            operation=OperationType(dto.operation),
+        )
+    )
     action_result = (
         await info.context.processors.permission_controller.create_permission.wait_for_complete(
-            CreatePermissionAction(creator=input.to_creator())
+            CreatePermissionAction(creator=creator)
         )
     )
     return PermissionGQL.from_dataclass(action_result.data)
@@ -103,9 +122,30 @@ async def admin_update_permission(
     input: UpdatePermissionInput,
 ) -> PermissionGQL:
     check_admin_only()
+    dto = input.to_pydantic()
+    spec = PermissionUpdaterSpec(
+        scope_type=(
+            OptionalState.update(RBACElementType(dto.scope_type).to_scope_type())
+            if dto.scope_type is not None
+            else OptionalState.nop()
+        ),
+        scope_id=(
+            OptionalState.update(dto.scope_id) if dto.scope_id is not None else OptionalState.nop()
+        ),
+        entity_type=(
+            OptionalState.update(RBACElementType(dto.entity_type).to_entity_type())
+            if dto.entity_type is not None
+            else OptionalState.nop()
+        ),
+        operation=(
+            OptionalState.update(OperationType(dto.operation))
+            if dto.operation is not None
+            else OptionalState.nop()
+        ),
+    )
     action_result = (
         await info.context.processors.permission_controller.update_permission.wait_for_complete(
-            UpdatePermissionAction(updater=input.to_updater())
+            UpdatePermissionAction(updater=Updater(spec=spec, pk_value=dto.id))
         )
     )
     return PermissionGQL.from_dataclass(action_result.data)
