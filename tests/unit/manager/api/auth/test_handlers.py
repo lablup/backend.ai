@@ -209,6 +209,7 @@ class TestAuthorize:
         assert action.email == email
         assert action.password == password
         assert action.stoken == stoken
+        assert action.otp is None
 
     async def test_stream_response_passthrough(
         self,
