@@ -10,7 +10,7 @@ from uuid import UUID
 
 from pydantic import Field
 
-from ai.backend.common.api_handlers import BaseResponseModel
+from ai.backend.common.api_handlers import BaseRequestModel, BaseResponseModel
 from ai.backend.common.data.artifact.types import (
     ArtifactRegistryType,
     CombinedDownloadProgress,
@@ -19,12 +19,14 @@ from ai.backend.common.data.artifact.types import (
 
 __all__ = (
     "ArtifactAvailability",
+    "ArtifactAvailabilityFilter",
     "ArtifactOrderField",
     "ArtifactRegistryType",
     "ArtifactRevisionInfo",
     "ArtifactRevisionOrderField",
     "ArtifactStatus",
     "ArtifactType",
+    "ArtifactTypeFilter",
     "CombinedDownloadProgress",
     "OrderDirection",
     "VerificationStepResult",
@@ -84,6 +86,36 @@ class OrderDirection(StrEnum):
 
     ASC = "asc"
     DESC = "desc"
+
+
+class ArtifactTypeFilter(BaseRequestModel):
+    """Filter for artifact type enum fields."""
+
+    equals: ArtifactType | None = Field(default=None, description="Exact match for artifact type.")
+    in_: list[ArtifactType] | None = Field(
+        default=None, alias="in", description="Match any of the provided types."
+    )
+    not_equals: ArtifactType | None = Field(default=None, description="Exclude exact type match.")
+    not_in: list[ArtifactType] | None = Field(
+        default=None, description="Exclude any of the provided types."
+    )
+
+
+class ArtifactAvailabilityFilter(BaseRequestModel):
+    """Filter for artifact availability enum fields."""
+
+    equals: ArtifactAvailability | None = Field(
+        default=None, description="Exact match for availability."
+    )
+    in_: list[ArtifactAvailability] | None = Field(
+        default=None, alias="in", description="Match any of the provided availability values."
+    )
+    not_equals: ArtifactAvailability | None = Field(
+        default=None, description="Exclude exact availability match."
+    )
+    not_in: list[ArtifactAvailability] | None = Field(
+        default=None, description="Exclude any of the provided availability values."
+    )
 
 
 class ArtifactRevisionInfo(BaseResponseModel):

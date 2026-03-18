@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from ai.backend.manager.api.adapters.agent import AgentAdapter
+from ai.backend.manager.api.adapters.artifact import ArtifactAdapter
 from ai.backend.manager.api.adapters.container_registry import ContainerRegistryAdapter
 from ai.backend.manager.api.adapters.domain import DomainAdapter
 from ai.backend.manager.api.adapters.image import ImageAdapter
@@ -35,6 +36,7 @@ class Adapters:
     def __init__(
         self,
         agent: AgentAdapter,
+        artifact: ArtifactAdapter,
         container_registry: ContainerRegistryAdapter,
         domain: DomainAdapter,
         image: ImageAdapter,
@@ -51,6 +53,7 @@ class Adapters:
         user: UserAdapter,
     ) -> None:
         self.agent = agent
+        self.artifact = artifact
         self.container_registry = container_registry
         self.domain = domain
         self.image = image
@@ -71,6 +74,7 @@ class Adapters:
         """Factory that wires up all adapters from the shared Processors."""
         return cls(
             agent=AgentAdapter(processors),
+            artifact=ArtifactAdapter(processors),
             container_registry=ContainerRegistryAdapter(processors),
             domain=DomainAdapter(processors),
             image=ImageAdapter(processors),

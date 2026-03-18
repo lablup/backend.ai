@@ -187,8 +187,50 @@ class ArtifactConditions:
         return inner
 
     @staticmethod
+    def by_types_not_in(types: list[ArtifactType]) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return ArtifactRow.type.not_in(types)
+
+        return inner
+
+    @staticmethod
+    def by_type_equals(type_: ArtifactType) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return ArtifactRow.type == type_
+
+        return inner
+
+    @staticmethod
+    def by_type_not_equals(type_: ArtifactType) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return ArtifactRow.type != type_
+
+        return inner
+
+    @staticmethod
     def by_availability(availability: list[ArtifactAvailability]) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
             return ArtifactRow.availability.in_([avail.value for avail in availability])
+
+        return inner
+
+    @staticmethod
+    def by_availability_not_in(availability: list[ArtifactAvailability]) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return ArtifactRow.availability.not_in([avail.value for avail in availability])
+
+        return inner
+
+    @staticmethod
+    def by_availability_equals(availability: ArtifactAvailability) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return ArtifactRow.availability == availability.value
+
+        return inner
+
+    @staticmethod
+    def by_availability_not_equals(availability: ArtifactAvailability) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return ArtifactRow.availability != availability.value
 
         return inner

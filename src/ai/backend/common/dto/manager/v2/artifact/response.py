@@ -22,12 +22,14 @@ from .types import (
 )
 
 __all__ = (
+    "AdminSearchArtifactsPayload",
     "ArtifactNode",
     "ArtifactRevisionImportTaskInfo",
     "ArtifactRevisionNode",
     "ApproveRevisionPayload",
     "CancelImportTaskPayload",
     "CleanupRevisionsPayload",
+    "DeleteArtifactsPayload",
     "GetRevisionDownloadProgressPayload",
     "GetRevisionReadmePayload",
     "GetRevisionVerificationResultPayload",
@@ -120,6 +122,21 @@ class CancelImportTaskPayload(BaseResponseModel):
     artifact_revision: ArtifactRevisionNode = Field(
         description="Artifact revision with cancelled import"
     )
+
+
+class AdminSearchArtifactsPayload(BaseResponseModel):
+    """Payload for admin artifact search result."""
+
+    items: list[ArtifactNode] = Field(description="List of matching artifact nodes.")
+    total_count: int = Field(description="Total number of matching artifacts.")
+    has_next_page: bool
+    has_previous_page: bool
+
+
+class DeleteArtifactsPayload(BaseResponseModel):
+    """Payload for artifact deletion result."""
+
+    artifacts: list[ArtifactNode] = Field(description="List of deleted artifact nodes.")
 
 
 class GetRevisionReadmePayload(BaseResponseModel):
