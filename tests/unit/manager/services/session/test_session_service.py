@@ -758,9 +758,7 @@ class TestGetSessionInfo:
         sample_access_key: AccessKey,
     ) -> None:
         """Test successfully getting session info"""
-        mock_session_repository.get_session_validated = AsyncMock(
-            return_value=mock_running_session
-        )
+        mock_session_repository.get_session_validated = AsyncMock(return_value=mock_running_session)
 
         action = GetSessionInfoAction(
             session_name="test-session",
@@ -788,9 +786,7 @@ class TestGetSessionInfo:
         """Test getting session info when container_id is None (pre-RUNNING state)"""
         mock_running_session.main_kernel.container_id = None
         mock_running_session.status = SessionStatus.PENDING
-        mock_session_repository.get_session_validated = AsyncMock(
-            return_value=mock_running_session
-        )
+        mock_session_repository.get_session_validated = AsyncMock(return_value=mock_running_session)
 
         action = GetSessionInfoAction(
             session_name="test-session",
