@@ -491,10 +491,11 @@ async def cleanup_artifact_revisions(
 ) -> CleanupArtifactRevisionsPayload:
     cleaned_artifact_revisions: list[ArtifactRevision] = []
     # TODO: Refactor with asyncio.gather()
-    for artifact_revision_id in input.artifact_revision_ids:
+    pydantic_input = input.to_pydantic()
+    for artifact_revision_id in pydantic_input.artifact_revision_ids:
         action_result = await info.context.processors.artifact_revision.cleanup.wait_for_complete(
             CleanupArtifactRevisionAction(
-                artifact_revision_id=UUID(artifact_revision_id),
+                artifact_revision_id=artifact_revision_id,
             )
         )
         cleaned_artifact_revisions.append(ArtifactRevision.from_dataclass(action_result.result))
@@ -597,9 +598,10 @@ async def cancel_import_artifact(
     input: CancelArtifactInput, info: Info[StrawberryGQLContext]
 ) -> CancelImportArtifactPayload:
     # TODO: Cancel actual import bgtask
+    pydantic_input = input.to_pydantic()
     action_result = await info.context.processors.artifact_revision.cancel_import.wait_for_complete(
         CancelImportAction(
-            artifact_revision_id=UUID(input.artifact_revision_id),
+            artifact_revision_id=pydantic_input.artifact_revision_id,
         )
     )
     return CancelImportArtifactPayload(

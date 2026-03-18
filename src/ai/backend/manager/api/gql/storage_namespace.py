@@ -8,6 +8,9 @@ import strawberry
 from strawberry import ID, Info
 from strawberry.relay import Connection, Edge, NodeID
 
+from ai.backend.common.dto.manager.v2.storage_namespace.request import (
+    UnregisterStorageNamespaceInput as UnregisterStorageNamespaceInputDTO,
+)
 from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin
 from ai.backend.manager.api.gql.utils import dedent_strip
 from ai.backend.manager.data.storage_namespace.types import StorageNamespaceData
@@ -99,12 +102,13 @@ class RegisterStorageNamespaceInput:
         )
 
 
-@strawberry.input(
+@strawberry.experimental.pydantic.input(
+    model=UnregisterStorageNamespaceInputDTO,
     description=dedent_strip("""
     Added in 25.15.0.
 
     Input type for unregistering a storage namespace.
-    """)
+    """),
 )
 class UnregisterStorageNamespaceInput:
     storage_id: uuid.UUID

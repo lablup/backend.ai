@@ -16,6 +16,12 @@ from ai.backend.common.data.artifact.types import (
 )
 from ai.backend.common.data.storage.registries.types import ModelTarget as ModelTargetData
 from ai.backend.common.dto.manager.v2.artifact.request import (
+    CancelImportTaskInput as CancelArtifactInputDTO,
+)
+from ai.backend.common.dto.manager.v2.artifact.request import (
+    CleanupRevisionsInput as CleanupArtifactRevisionsInputDTO,
+)
+from ai.backend.common.dto.manager.v2.artifact.request import (
     DeleteArtifactsInput as DeleteArtifactsInputDTO,
 )
 from ai.backend.manager.api.gql.base import (
@@ -616,20 +622,22 @@ class UpdateArtifactInput:
     description: str | None = UNSET
 
 
-@strawberry.input(
+@strawberry.experimental.pydantic.input(
+    model=CancelArtifactInputDTO,
     description=dedent_strip("""
     Added in 25.14.0.
 
     Input for canceling an in-progress artifact import operation.
 
     Stops the download process and reverts the artifact revision status back to SCANNED.
-    """)
+    """),
 )
 class CancelArtifactInput:
     artifact_revision_id: ID
 
 
-@strawberry.input(
+@strawberry.experimental.pydantic.input(
+    model=CleanupArtifactRevisionsInputDTO,
     description=dedent_strip("""
     Added in 25.14.0.
 
@@ -637,7 +645,7 @@ class CancelArtifactInput:
 
     Removes downloaded files from storage and transitions the artifact revision
     back to SCANNED status, freeing up storage space.
-    """)
+    """),
 )
 class CleanupArtifactRevisionsInput:
     artifact_revision_ids: list[ID]
