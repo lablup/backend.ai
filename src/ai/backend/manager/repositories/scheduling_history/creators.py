@@ -99,7 +99,6 @@ class DeploymentHistoryCreatorSpec(CreatorSpec[DeploymentHistoryRow]):
     to_status: EndpointLifecycle | None = None
     error_code: str | None = None
     sub_steps: list[SubStepResult] = field(default_factory=list)
-    allow_merge: bool = True
 
     @override
     def build_row(self) -> DeploymentHistoryRow:

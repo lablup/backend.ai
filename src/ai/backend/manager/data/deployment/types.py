@@ -195,21 +195,19 @@ class DeploymentStatusTransitions:
 
     Attributes:
         success: Target lifecycle when handler succeeds, None means no change
-        need_retry: Target lifecycle when handler fails but can retry
+        need_retry: Target lifecycle when handler fails but can retry, or when
+            route mutations were executed but the deployment stays in the same
+            sub-step (e.g. PROVISIONING → PROVISIONING after create/drain).
+            Items explicitly returned as need_retry by handlers are never
+            escalated to give_up — they represent normal progress.
         expired: Target lifecycle when time elapsed in current state
         give_up: Target lifecycle when retry count exceeded
-        rewind: Target lifecycle when route mutations were executed but
-            the deployment stays in the same sub-step (e.g. PROVISIONING
-            → PROVISIONING after create/drain).  Unlike need_retry, rewind
-            does NOT increment phase_attempts.  Each rewind creates a
-            separate history record (allow_merge=False) for progress tracking.
     """
 
     success: DeploymentLifecycleStatus | None = None
     need_retry: DeploymentLifecycleStatus | None = None
     expired: DeploymentLifecycleStatus | None = None
     give_up: DeploymentLifecycleStatus | None = None
-    rewind: DeploymentLifecycleStatus | None = None
 
 
 @dataclass(frozen=True)

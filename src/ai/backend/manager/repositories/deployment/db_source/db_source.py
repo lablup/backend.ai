@@ -148,7 +148,6 @@ from ai.backend.manager.repositories.scheduler.types.session_creation import (
     ImageContext,
     UserContext,
 )
-from ai.backend.manager.repositories.scheduling_history.creators import DeploymentHistoryCreatorSpec
 from ai.backend.manager.utils import query_userinfo_from_session
 
 
@@ -729,11 +728,10 @@ class DeploymentDBSource:
             merge_ids: list[uuid.UUID] = []
             create_rows: list[DeploymentHistoryRow] = []
 
-            for spec, new_row in zip(bulk_creator.specs, new_rows, strict=True):
-                allow_merge = cast(DeploymentHistoryCreatorSpec, spec).allow_merge
+            for new_row in new_rows:
                 last_row = last_records.get(new_row.deployment_id)
 
-                if allow_merge and last_row is not None and last_row.should_merge_with(new_row):
+                if last_row is not None and last_row.should_merge_with(new_row):
                     merge_ids.append(last_row.id)
                 else:
                     create_rows.append(new_row)

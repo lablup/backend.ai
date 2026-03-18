@@ -382,14 +382,14 @@ class TestProcessDeploymentLifecycle:
 
         mock_deployment_repository.update_endpoint_lifecycle_bulk_with_history.assert_not_called()
 
-    async def test_records_history_on_rewind(
+    async def test_records_history_on_need_retry(
         self,
         coordinator_with_pending_deployments: DeploymentCoordinator,
         mock_deployment_repository: AsyncMock,
         sample_deployment_with_history: DeploymentWithHistory,
     ) -> None:
-        """History is recorded when handler returns rewind result."""
-        rewind_status = DeploymentLifecycleStatus(lifecycle=EndpointLifecycle.DEPLOYING)
+        """History is recorded when handler returns need_retry result."""
+        need_retry_status = DeploymentLifecycleStatus(lifecycle=EndpointLifecycle.DEPLOYING)
         mock_handler = MagicMock(spec=DeploymentHandler)
         mock_handler.name = MagicMock(return_value="deploying_progressing")
         mock_handler.lock_id = None
@@ -399,14 +399,14 @@ class TestProcessDeploymentLifecycle:
         mock_handler.status_transitions = MagicMock(
             return_value=DeploymentStatusTransitions(
                 success=DeploymentLifecycleStatus(lifecycle=EndpointLifecycle.READY),
-                rewind=rewind_status,
+                need_retry=need_retry_status,
             )
         )
         mock_handler.execute = AsyncMock(
             return_value=DeploymentExecutionResult(
                 successes=[],
                 errors=[],
-                rewind=[sample_deployment_with_history],
+                need_retry=[sample_deployment_with_history],
             )
         )
         mock_handler.post_process = AsyncMock()
@@ -421,13 +421,13 @@ class TestProcessDeploymentLifecycle:
 
         mock_deployment_repository.update_endpoint_lifecycle_bulk_with_history.assert_called_once()
 
-    async def test_rewind_without_transition_does_not_record_history(
+    async def test_need_retry_without_transition_does_not_record_history(
         self,
         coordinator_with_pending_deployments: DeploymentCoordinator,
         mock_deployment_repository: AsyncMock,
         sample_deployment_with_history: DeploymentWithHistory,
     ) -> None:
-        """No history recorded when rewind result exists but transitions.rewind is None."""
+        """No history recorded when need_retry result exists but transitions.need_retry is None."""
         mock_handler = MagicMock(spec=DeploymentHandler)
         mock_handler.name = MagicMock(return_value="deploying_progressing")
         mock_handler.lock_id = None
@@ -437,14 +437,14 @@ class TestProcessDeploymentLifecycle:
         mock_handler.status_transitions = MagicMock(
             return_value=DeploymentStatusTransitions(
                 success=DeploymentLifecycleStatus(lifecycle=EndpointLifecycle.READY),
-                rewind=None,
+                need_retry=None,
             )
         )
         mock_handler.execute = AsyncMock(
             return_value=DeploymentExecutionResult(
                 successes=[],
                 errors=[],
-                rewind=[sample_deployment_with_history],
+                need_retry=[sample_deployment_with_history],
             )
         )
         mock_handler.post_process = AsyncMock()

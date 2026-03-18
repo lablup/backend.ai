@@ -9,7 +9,7 @@ Two DEPLOYING handlers are registered in the coordinator's HandlerRegistry:
 
 Sub-step flow::
 
-    PROVISIONING ──(rewind)──▸ PROVISIONING  (route mutations, logged)
+    PROVISIONING ──(need_retry)──▸ PROVISIONING  (route mutations, logged)
          │
          │ (success)
          ▼
@@ -19,7 +19,7 @@ Sub-step flow::
 
 The evaluator determines sub-step assignments and route mutations;
 the applier persists them to DB atomically.  Each handler classifies
-deployments into successes (transition forward), rewind (route mutations
+deployments into successes (transition forward), need_retry (route mutations
 with history logged), and skipped (no change — waiting).
 """
 
@@ -69,8 +69,9 @@ class DeployingProvisioningHandler(DeploymentHandler):
     Runs the strategy FSM each cycle to create/drain routes and check
     for completion.  Classification:
 
-    - **Route mutations executed** (create/drain): rewind — stays in
+    - **Route mutations executed** (create/drain): need_retry — stays in
       PROVISIONING with a new history record for progress tracking.
+      Never escalated to give_up (normal progress).
     - **No changes** (routes still warming up): skipped — no history.
     - **Completed** (all old routes replaced): success → READY.
     """
@@ -115,7 +116,7 @@ class DeployingProvisioningHandler(DeploymentHandler):
                 lifecycle=EndpointLifecycle.READY,
                 sub_status=None,
             ),
-            rewind=DeploymentLifecycleStatus(
+            need_retry=DeploymentLifecycleStatus(
                 lifecycle=EndpointLifecycle.DEPLOYING,
                 sub_status=DeploymentSubStep.PROVISIONING,
             ),
@@ -147,7 +148,7 @@ class DeployingProvisioningHandler(DeploymentHandler):
         successes: list[DeploymentWithHistory] = []
         errors: list[DeploymentExecutionError] = []
         skipped: list[DeploymentWithHistory] = []
-        rewind: list[DeploymentWithHistory] = []
+        need_retry: list[DeploymentWithHistory] = []
 
         # COMPLETED → success (coordinator transitions to READY)
         for endpoint_id in apply_result.completed_ids:
@@ -169,7 +170,7 @@ class DeployingProvisioningHandler(DeploymentHandler):
                     )
                 )
 
-        # Classify rest: route mutations happened → rewind (history logged),
+        # Classify rest: route mutations happened → need_retry (never give_up),
         # no changes → skipped (no history).
         completed_or_error_ids = apply_result.completed_ids | {
             e.deployment.id for e in summary.errors
@@ -180,12 +181,12 @@ class DeployingProvisioningHandler(DeploymentHandler):
             if endpoint_id in completed_or_error_ids or endpoint_id in destroying_ids:
                 continue
             if has_route_mutations:
-                rewind.append(deployment)
+                need_retry.append(deployment)
             else:
                 skipped.append(deployment)
 
         return DeploymentExecutionResult(
-            successes=successes, errors=errors, skipped=skipped, rewind=rewind
+            successes=successes, errors=errors, skipped=skipped, need_retry=need_retry
         )
 
     @override
