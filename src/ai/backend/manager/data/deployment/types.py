@@ -198,7 +198,7 @@ class DeploymentStatusTransitions:
         need_retry: Target lifecycle when handler fails but can retry
         expired: Target lifecycle when time elapsed in current state
         give_up: Target lifecycle when retry count exceeded
-            rewind: Target lifecycle when route mutations were executed but
+        rewind: Target lifecycle when route mutations were executed but
             the deployment stays in the same sub-step (e.g. PROVISIONING
             → PROVISIONING after create/drain).  Unlike need_retry, rewind
             does NOT increment phase_attempts.  Each rewind creates a
