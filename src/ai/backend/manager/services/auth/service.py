@@ -104,15 +104,21 @@ class AuthService:
     async def get_role(self, action: GetRoleAction) -> GetRoleActionResult:
         group_role = None
         if action.group_id is not None:
-            try:
-                # TODO: per-group role is not yet implemented.
-                await self._auth_repository.get_group_membership(action.group_id, action.user_id)
+            if action.is_superadmin:
+                # Superadmins have global access across all domains and groups.
                 group_role = "user"
-            except GroupMembershipNotFoundError as e:
-                raise ObjectNotFound(
-                    extra_msg="No such project or you are not the member of it.",
-                    object_name="project (user group)",
-                ) from e
+            else:
+                try:
+                    # TODO: per-group role is not yet implemented.
+                    await self._auth_repository.get_group_membership(
+                        action.group_id, action.user_id
+                    )
+                    group_role = "user"
+                except GroupMembershipNotFoundError as e:
+                    raise ObjectNotFound(
+                        extra_msg="No such project or you are not the member of it.",
+                        object_name="project (user group)",
+                    ) from e
 
         return GetRoleActionResult(
             global_role="superadmin" if action.is_superadmin else "user",
