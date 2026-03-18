@@ -12,6 +12,7 @@ import strawberry
 from strawberry import ID, UNSET, Info
 from strawberry.relay import NodeID
 
+from ai.backend.common.api_handlers import SENTINEL
 from ai.backend.common.data.notification import (
     NotificationChannelType,
     NotificationRuleType,
@@ -23,12 +24,23 @@ from ai.backend.common.data.notification.types import (
     SMTPAuth,
     SMTPConnection,
 )
-from ai.backend.common.data.permission.types import RBACElementType
+from ai.backend.common.dto.manager.v2.notification.request import (
+    CreateNotificationChannelInput as CreateNotificationChannelInputDTO,
+)
+from ai.backend.common.dto.manager.v2.notification.request import (
+    CreateNotificationRuleInput as CreateNotificationRuleInputDTO,
+)
 from ai.backend.common.dto.manager.v2.notification.request import (
     DeleteNotificationChannelInput as DeleteNotificationChannelInputDTO,
 )
 from ai.backend.common.dto.manager.v2.notification.request import (
     DeleteNotificationRuleInput as DeleteNotificationRuleInputDTO,
+)
+from ai.backend.common.dto.manager.v2.notification.request import (
+    UpdateNotificationChannelInput as UpdateNotificationChannelInputDTO,
+)
+from ai.backend.common.dto.manager.v2.notification.request import (
+    UpdateNotificationRuleInput as UpdateNotificationRuleInputDTO,
 )
 from ai.backend.common.exception import InvalidNotificationChannelSpec
 from ai.backend.manager.api.gql.base import OrderDirection, StringFilter
@@ -38,8 +50,6 @@ from ai.backend.manager.data.notification import (
     NotificationChannelData,
     NotificationRuleData,
 )
-from ai.backend.manager.data.permission.types import RBACElementRef
-from ai.backend.manager.models.notification import NotificationChannelRow, NotificationRuleRow
 from ai.backend.manager.models.notification.conditions import (
     NotificationChannelConditions,
     NotificationRuleConditions,
@@ -54,17 +64,6 @@ from ai.backend.manager.repositories.base import (
     combine_conditions_or,
     negate_conditions,
 )
-from ai.backend.manager.repositories.base.rbac.entity_creator import RBACEntityCreator
-from ai.backend.manager.repositories.base.updater import Updater
-from ai.backend.manager.repositories.notification.creators import (
-    NotificationChannelCreatorSpec,
-    NotificationRuleCreatorSpec,
-)
-from ai.backend.manager.repositories.notification.updaters import (
-    NotificationChannelUpdaterSpec,
-    NotificationRuleUpdaterSpec,
-)
-from ai.backend.manager.types import OptionalState, TriState
 
 # GraphQL enum types
 
@@ -304,10 +303,29 @@ class NotificationChannelOrderField(StrEnum):
     UPDATED_AT = "updated_at"
 
 
+@strawberry.input(
+    name="NotificationChannelTypeFilter",
+    description="Added in 26.3.0. Filter for notification channel type with equality and membership operators.",
+)
+class NotificationChannelTypeFilterGQL:
+    equals: NotificationChannelTypeGQL | None = strawberry.field(
+        default=None, description="Matches channels with this exact type."
+    )
+    in_: list[NotificationChannelTypeGQL] | None = strawberry.field(
+        name="in", default=None, description="Matches channels whose type is in this list."
+    )
+    not_equals: NotificationChannelTypeGQL | None = strawberry.field(
+        default=None, description="Excludes channels with this exact type."
+    )
+    not_in: list[NotificationChannelTypeGQL] | None = strawberry.field(
+        default=None, description="Excludes channels whose type is in this list."
+    )
+
+
 @strawberry.input(description="Filter for notification channels")
 class NotificationChannelFilter(GQLFilter):
     name: StringFilter | None = None
-    channel_type: list[NotificationChannelTypeGQL] | None = None
+    channel_type: NotificationChannelTypeFilterGQL | None = None
     enabled: bool | None = None
 
     AND: list[NotificationChannelFilter] | None = None
@@ -336,9 +354,30 @@ class NotificationChannelFilter(GQLFilter):
                 field_conditions.append(name_condition)
 
         # Apply channel_type filter
-        if self.channel_type:
-            internal_types = [ct.to_internal() for ct in self.channel_type]
-            field_conditions.append(NotificationChannelConditions.by_channel_types(internal_types))
+        if self.channel_type is not None:
+            ct = self.channel_type
+            if ct.equals is not None:
+                field_conditions.append(
+                    NotificationChannelConditions.by_channel_type_equals(ct.equals.to_internal())
+                )
+            if ct.in_ is not None:
+                field_conditions.append(
+                    NotificationChannelConditions.by_channel_types([
+                        t.to_internal() for t in ct.in_
+                    ])
+                )
+            if ct.not_equals is not None:
+                field_conditions.append(
+                    NotificationChannelConditions.by_channel_type_not_equals(
+                        ct.not_equals.to_internal()
+                    )
+                )
+            if ct.not_in is not None:
+                field_conditions.append(
+                    NotificationChannelConditions.by_channel_type_not_in([
+                        t.to_internal() for t in ct.not_in
+                    ])
+                )
 
         # Apply enabled filter
         if self.enabled is not None:
@@ -393,10 +432,29 @@ class NotificationRuleOrderField(StrEnum):
     UPDATED_AT = "updated_at"
 
 
+@strawberry.input(
+    name="NotificationRuleTypeFilter",
+    description="Added in 26.3.0. Filter for notification rule type with equality and membership operators.",
+)
+class NotificationRuleTypeFilterGQL:
+    equals: NotificationRuleTypeGQL | None = strawberry.field(
+        default=None, description="Matches rules with this exact type."
+    )
+    in_: list[NotificationRuleTypeGQL] | None = strawberry.field(
+        name="in", default=None, description="Matches rules whose type is in this list."
+    )
+    not_equals: NotificationRuleTypeGQL | None = strawberry.field(
+        default=None, description="Excludes rules with this exact type."
+    )
+    not_in: list[NotificationRuleTypeGQL] | None = strawberry.field(
+        default=None, description="Excludes rules whose type is in this list."
+    )
+
+
 @strawberry.input(description="Filter for notification rules")
 class NotificationRuleFilter(GQLFilter):
     name: StringFilter | None = None
-    rule_type: list[NotificationRuleTypeGQL] | None = None
+    rule_type: NotificationRuleTypeFilterGQL | None = None
     enabled: bool | None = None
 
     AND: list[NotificationRuleFilter] | None = None
@@ -425,9 +483,30 @@ class NotificationRuleFilter(GQLFilter):
                 field_conditions.append(name_condition)
 
         # Apply rule_type filter
-        if self.rule_type:
-            internal_types = [rt.to_internal() for rt in self.rule_type]
-            field_conditions.append(NotificationRuleConditions.by_rule_types(internal_types))
+        if self.rule_type is not None:
+            rt_filter = self.rule_type
+            if rt_filter.equals is not None:
+                field_conditions.append(
+                    NotificationRuleConditions.by_rule_type_equals(rt_filter.equals.to_internal())
+                )
+            if rt_filter.in_ is not None:
+                field_conditions.append(
+                    NotificationRuleConditions.by_rule_types([
+                        t.to_internal() for t in rt_filter.in_
+                    ])
+                )
+            if rt_filter.not_equals is not None:
+                field_conditions.append(
+                    NotificationRuleConditions.by_rule_type_not_equals(
+                        rt_filter.not_equals.to_internal()
+                    )
+                )
+            if rt_filter.not_in is not None:
+                field_conditions.append(
+                    NotificationRuleConditions.by_rule_type_not_in([
+                        t.to_internal() for t in rt_filter.not_in
+                    ])
+                )
 
         # Apply enabled filter
         if self.enabled is not None:
@@ -564,7 +643,10 @@ class NotificationChannelSpecInput:
         raise InvalidNotificationChannelSpec("Exactly one of webhook or email must be set")
 
 
-@strawberry.input(description="Input for creating a notification channel")
+@strawberry.experimental.pydantic.input(
+    model=CreateNotificationChannelInputDTO,
+    description="Input for creating a notification channel",
+)
 class CreateNotificationChannelInput:
     name: str
     description: str | None = None
@@ -572,22 +654,20 @@ class CreateNotificationChannelInput:
     spec: NotificationChannelSpecInput
     enabled: bool = True
 
-    def to_creator(self, created_by: uuid.UUID) -> RBACEntityCreator[NotificationChannelRow]:
-        return RBACEntityCreator(
-            spec=NotificationChannelCreatorSpec(
-                name=self.name,
-                description=self.description,
-                channel_type=self.channel_type.to_internal(),
-                spec=self.spec.to_dataclass(),
-                enabled=self.enabled,
-                created_by=created_by,
-            ),
-            element_type=RBACElementType.NOTIFICATION_CHANNEL,
-            scope_ref=RBACElementRef(RBACElementType.USER, str(created_by)),
+    def to_pydantic(self) -> CreateNotificationChannelInputDTO:
+        return CreateNotificationChannelInputDTO(
+            name=self.name,
+            description=self.description,
+            channel_type=self.channel_type.to_internal(),
+            spec=self.spec.to_dataclass(),
+            enabled=self.enabled,
         )
 
 
-@strawberry.input(description="Input for updating a notification channel")
+@strawberry.experimental.pydantic.input(
+    model=UpdateNotificationChannelInputDTO,
+    description="Input for updating a notification channel",
+)
 class UpdateNotificationChannelInput:
     id: ID
     name: str | None = UNSET
@@ -595,21 +675,13 @@ class UpdateNotificationChannelInput:
     spec: NotificationChannelSpecInput | None = UNSET
     enabled: bool | None = UNSET
 
-    def to_updater(self, channel_id: uuid.UUID) -> Updater[NotificationChannelRow]:
-        spec_state = OptionalState[WebhookSpec | EmailSpec].nop()
-        if self.spec is not UNSET:
-            if self.spec is None:
-                spec_state = OptionalState[WebhookSpec | EmailSpec].nop()
-            else:
-                spec_state = OptionalState[WebhookSpec | EmailSpec].update(self.spec.to_dataclass())
-
-        updater_spec = NotificationChannelUpdaterSpec(
-            name=OptionalState[str].from_graphql(self.name),
-            description=TriState[str].from_graphql(self.description),
-            spec=spec_state,
-            enabled=OptionalState[bool].from_graphql(self.enabled),
+    def to_pydantic(self) -> UpdateNotificationChannelInputDTO:
+        return UpdateNotificationChannelInputDTO(
+            name=None if self.name is UNSET else self.name,
+            description=SENTINEL if self.description is UNSET else self.description,
+            spec=(None if (self.spec is UNSET or self.spec is None) else self.spec.to_dataclass()),
+            enabled=None if self.enabled is UNSET else self.enabled,
         )
-        return Updater(spec=updater_spec, pk_value=channel_id)
 
 
 @strawberry.experimental.pydantic.input(
@@ -620,7 +692,10 @@ class DeleteNotificationChannelInput:
     id: ID
 
 
-@strawberry.input(description="Input for creating a notification rule")
+@strawberry.experimental.pydantic.input(
+    model=CreateNotificationRuleInputDTO,
+    description="Input for creating a notification rule",
+)
 class CreateNotificationRuleInput:
     name: str
     description: str | None = None
@@ -629,23 +704,21 @@ class CreateNotificationRuleInput:
     message_template: str
     enabled: bool = True
 
-    def to_creator(self, created_by: uuid.UUID) -> RBACEntityCreator[NotificationRuleRow]:
-        return RBACEntityCreator(
-            spec=NotificationRuleCreatorSpec(
-                name=self.name,
-                description=self.description,
-                rule_type=self.rule_type.to_internal(),
-                channel_id=uuid.UUID(self.channel_id),
-                message_template=self.message_template,
-                enabled=self.enabled,
-                created_by=created_by,
-            ),
-            element_type=RBACElementType.NOTIFICATION_RULE,
-            scope_ref=RBACElementRef(RBACElementType.NOTIFICATION_CHANNEL, str(self.channel_id)),
+    def to_pydantic(self) -> CreateNotificationRuleInputDTO:
+        return CreateNotificationRuleInputDTO(
+            name=self.name,
+            description=self.description,
+            rule_type=self.rule_type.to_internal(),
+            channel_id=uuid.UUID(self.channel_id),
+            message_template=self.message_template,
+            enabled=self.enabled,
         )
 
 
-@strawberry.input(description="Input for updating a notification rule")
+@strawberry.experimental.pydantic.input(
+    model=UpdateNotificationRuleInputDTO,
+    description="Input for updating a notification rule",
+)
 class UpdateNotificationRuleInput:
     id: ID
     name: str | None = UNSET
@@ -653,14 +726,13 @@ class UpdateNotificationRuleInput:
     message_template: str | None = UNSET
     enabled: bool | None = UNSET
 
-    def to_updater(self, rule_id: uuid.UUID) -> Updater[NotificationRuleRow]:
-        spec = NotificationRuleUpdaterSpec(
-            name=OptionalState[str].from_graphql(self.name),
-            description=TriState[str].from_graphql(self.description),
-            message_template=OptionalState[str].from_graphql(self.message_template),
-            enabled=OptionalState[bool].from_graphql(self.enabled),
+    def to_pydantic(self) -> UpdateNotificationRuleInputDTO:
+        return UpdateNotificationRuleInputDTO(
+            name=None if self.name is UNSET else self.name,
+            description=SENTINEL if self.description is UNSET else self.description,
+            message_template=None if self.message_template is UNSET else self.message_template,
+            enabled=None if self.enabled is UNSET else self.enabled,
         )
-        return Updater(spec=spec, pk_value=rule_id)
 
 
 @strawberry.experimental.pydantic.input(

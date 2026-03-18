@@ -10,11 +10,14 @@ import strawberry
 from strawberry import ID, UNSET, Info
 from strawberry.relay import Connection, Edge
 
+from ai.backend.common.api_handlers import Sentinel
 from ai.backend.common.contexts.user import current_user
+from ai.backend.common.data.permission.types import RBACElementType
 from ai.backend.manager.api.gql.adapter import PaginationOptions, PaginationSpec
 from ai.backend.manager.api.gql.base import encode_cursor
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.api.gql.utils import check_admin_only
+from ai.backend.manager.data.permission.types import RBACElementRef
 from ai.backend.manager.errors.auth import InvalidAuthParameters
 from ai.backend.manager.models.notification.conditions import (
     NotificationChannelConditions,
@@ -25,6 +28,16 @@ from ai.backend.manager.models.notification.orders import (
     NotificationRuleOrders,
 )
 from ai.backend.manager.models.notification.row import NotificationChannelRow, NotificationRuleRow
+from ai.backend.manager.repositories.base.rbac.entity_creator import RBACEntityCreator
+from ai.backend.manager.repositories.base.updater import Updater
+from ai.backend.manager.repositories.notification.creators import (
+    NotificationChannelCreatorSpec,
+    NotificationRuleCreatorSpec,
+)
+from ai.backend.manager.repositories.notification.updaters import (
+    NotificationChannelUpdaterSpec,
+    NotificationRuleUpdaterSpec,
+)
 from ai.backend.manager.services.notification.actions import (
     CreateChannelAction,
     CreateRuleAction,
@@ -39,6 +52,7 @@ from ai.backend.manager.services.notification.actions import (
     ValidateChannelAction,
     ValidateRuleAction,
 )
+from ai.backend.manager.types import OptionalState, TriState
 
 from .types import (
     CreateNotificationChannelInput,
@@ -89,6 +103,111 @@ def _get_rule_pagination_spec() -> PaginationSpec:
         backward_condition_factory=NotificationRuleConditions.by_cursor_backward,
         tiebreaker_order=NotificationRuleRow.id.asc(),
     )
+
+
+# Creator / updater helpers
+
+
+def _build_channel_creator(
+    dto: CreateNotificationChannelInput,
+    created_by: uuid.UUID,
+) -> RBACEntityCreator[NotificationChannelRow]:
+    pydantic_dto = dto.to_pydantic()
+    return RBACEntityCreator(
+        spec=NotificationChannelCreatorSpec(
+            name=pydantic_dto.name,
+            description=pydantic_dto.description,
+            channel_type=pydantic_dto.channel_type,
+            spec=pydantic_dto.spec,
+            enabled=pydantic_dto.enabled,
+            created_by=created_by,
+        ),
+        element_type=RBACElementType.NOTIFICATION_CHANNEL,
+        scope_ref=RBACElementRef(RBACElementType.USER, str(created_by)),
+    )
+
+
+def _build_channel_updater(
+    channel_id: uuid.UUID,
+    dto: UpdateNotificationChannelInput,
+) -> Updater[NotificationChannelRow]:
+    pydantic_dto = dto.to_pydantic()
+    spec_state = (
+        OptionalState.update(pydantic_dto.spec)
+        if pydantic_dto.spec is not None
+        else OptionalState.nop()
+    )
+    updater_spec = NotificationChannelUpdaterSpec(
+        name=(
+            OptionalState.update(pydantic_dto.name)
+            if pydantic_dto.name is not None
+            else OptionalState.nop()
+        ),
+        description=(
+            TriState[str].nop()
+            if isinstance(pydantic_dto.description, Sentinel)
+            else TriState[str].from_graphql(pydantic_dto.description)
+        ),
+        spec=spec_state,
+        enabled=(
+            OptionalState.update(pydantic_dto.enabled)
+            if pydantic_dto.enabled is not None
+            else OptionalState.nop()
+        ),
+    )
+    return Updater(spec=updater_spec, pk_value=channel_id)
+
+
+def _build_rule_creator(
+    dto: CreateNotificationRuleInput,
+    created_by: uuid.UUID,
+) -> RBACEntityCreator[NotificationRuleRow]:
+    pydantic_dto = dto.to_pydantic()
+    return RBACEntityCreator(
+        spec=NotificationRuleCreatorSpec(
+            name=pydantic_dto.name,
+            description=pydantic_dto.description,
+            rule_type=pydantic_dto.rule_type,
+            channel_id=pydantic_dto.channel_id,
+            message_template=pydantic_dto.message_template,
+            enabled=pydantic_dto.enabled,
+            created_by=created_by,
+        ),
+        element_type=RBACElementType.NOTIFICATION_RULE,
+        scope_ref=RBACElementRef(
+            RBACElementType.NOTIFICATION_CHANNEL, str(pydantic_dto.channel_id)
+        ),
+    )
+
+
+def _build_rule_updater(
+    rule_id: uuid.UUID,
+    dto: UpdateNotificationRuleInput,
+) -> Updater[NotificationRuleRow]:
+    pydantic_dto = dto.to_pydantic()
+    updater_spec = NotificationRuleUpdaterSpec(
+        name=(
+            OptionalState.update(pydantic_dto.name)
+            if pydantic_dto.name is not None
+            else OptionalState.nop()
+        ),
+        description=(
+            TriState[str].nop()
+            if isinstance(pydantic_dto.description, Sentinel)
+            else TriState[str].from_graphql(pydantic_dto.description)
+        ),
+        message_template=(
+            OptionalState.update(pydantic_dto.message_template)
+            if pydantic_dto.message_template is not None
+            else OptionalState.nop()
+        ),
+        enabled=(
+            OptionalState.update(pydantic_dto.enabled)
+            if pydantic_dto.enabled is not None
+            else OptionalState.nop()
+        ),
+    )
+    return Updater(spec=updater_spec, pk_value=rule_id)
 
 
 # Connection types
@@ -424,7 +543,7 @@ async def admin_create_notification_channel(
         raise InvalidAuthParameters("User authentication is required")
 
     action_result = await processors.notification.create_channel.wait_for_complete(
-        CreateChannelAction(creator=input.to_creator(me.user_id))
+        CreateChannelAction(creator=_build_channel_creator(input, me.user_id))
     )
 
     return CreateNotificationChannelPayload(
@@ -448,7 +567,7 @@ async def create_notification_channel(
         raise InvalidAuthParameters("User authentication is required")
 
     action_result = await processors.notification.create_channel.wait_for_complete(
-        CreateChannelAction(creator=input.to_creator(me.user_id))
+        CreateChannelAction(creator=_build_channel_creator(input, me.user_id))
     )
 
     return CreateNotificationChannelPayload(
@@ -465,7 +584,7 @@ async def admin_update_notification_channel(
 
     channel_id = uuid.UUID(input.id)
     action_result = await processors.notification.update_channel.wait_for_complete(
-        UpdateChannelAction(updater=input.to_updater(channel_id))
+        UpdateChannelAction(updater=_build_channel_updater(channel_id, input))
     )
 
     return UpdateNotificationChannelPayload(
@@ -487,7 +606,7 @@ async def update_notification_channel(
 
     channel_id = uuid.UUID(input.id)
     action_result = await processors.notification.update_channel.wait_for_complete(
-        UpdateChannelAction(updater=input.to_updater(channel_id))
+        UpdateChannelAction(updater=_build_channel_updater(channel_id, input))
     )
 
     return UpdateNotificationChannelPayload(
@@ -541,7 +660,7 @@ async def admin_create_notification_rule(
         raise InvalidAuthParameters("User authentication is required")
 
     action_result = await processors.notification.create_rule.wait_for_complete(
-        CreateRuleAction(creator=input.to_creator(me.user_id))
+        CreateRuleAction(creator=_build_rule_creator(input, me.user_id))
     )
 
     return CreateNotificationRulePayload(
@@ -565,7 +684,7 @@ async def create_notification_rule(
         raise InvalidAuthParameters("User authentication is required")
 
     action_result = await processors.notification.create_rule.wait_for_complete(
-        CreateRuleAction(creator=input.to_creator(me.user_id))
+        CreateRuleAction(creator=_build_rule_creator(input, me.user_id))
     )
 
     return CreateNotificationRulePayload(
@@ -582,7 +701,7 @@ async def admin_update_notification_rule(
 
     rule_id = uuid.UUID(input.id)
     action_result = await processors.notification.update_rule.wait_for_complete(
-        UpdateRuleAction(updater=input.to_updater(rule_id))
+        UpdateRuleAction(updater=_build_rule_updater(rule_id, input))
     )
 
     return UpdateNotificationRulePayload(
@@ -604,7 +723,7 @@ async def update_notification_rule(
 
     rule_id = uuid.UUID(input.id)
     action_result = await processors.notification.update_rule.wait_for_complete(
-        UpdateRuleAction(updater=input.to_updater(rule_id))
+        UpdateRuleAction(updater=_build_rule_updater(rule_id, input))
     )
 
     return UpdateNotificationRulePayload(
