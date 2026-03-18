@@ -2,10 +2,18 @@
 
 from __future__ import annotations
 
+import uuid
+
 import strawberry
 from strawberry import ID, Info
 
 from ai.backend.common.contexts.user import current_user
+from ai.backend.common.dto.manager.v2.app_config.request import (
+    DeleteDomainConfigInput as DeleteDomainConfigInputDTO,
+)
+from ai.backend.common.dto.manager.v2.app_config.request import (
+    DeleteUserConfigInput as DeleteUserConfigInputDTO,
+)
 from ai.backend.manager.api.gql.utils import check_admin_only, dedent_strip
 from ai.backend.manager.errors.auth import InsufficientPrivilege
 from ai.backend.manager.repositories.app_config.updaters import AppConfigUpdaterSpec
@@ -73,26 +81,35 @@ class UpsertUserConfigInput:
         return AppConfigUpdaterSpec(extra_config=OptionalState.update(self.extra_config))
 
 
-@strawberry.input(description="Added in 25.16.0. Input for deleting domain-level app configuration")
+@strawberry.experimental.pydantic.input(
+    model=DeleteDomainConfigInputDTO,
+    description="Added in 25.16.0. Input for deleting domain-level app configuration",
+)
 class DeleteDomainConfigInput:
     """Input type for deleting domain-level app configuration."""
 
     domain_name: str
 
 
-@strawberry.input(
+@strawberry.experimental.pydantic.input(
+    model=DeleteUserConfigInputDTO,
     description=dedent_strip(
         """\
         Added in 25.16.0.
         Input for deleting user-level app configuration.
         If user_id is not provided, the current user's configuration will be deleted.
         """
-    )
+    ),
 )
 class DeleteUserConfigInput:
     """Input type for deleting user-level app configuration."""
 
     user_id: ID | None = None
+
+    def to_pydantic(self) -> DeleteUserConfigInputDTO:
+        return DeleteUserConfigInputDTO(
+            user_id=uuid.UUID(self.user_id) if self.user_id is not None else None
+        )
 
 
 @strawberry.type(
