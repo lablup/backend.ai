@@ -211,24 +211,24 @@ async def admin_update_resource_group_fair_share_spec(
     check_admin_only()
 
     processors = info.context.processors
+    dto = input.to_pydantic()
 
-    # Convert GQL input to action
     resource_weights = None
-    if input.resource_weights is not None:
+    if dto.resource_weights is not None:
         resource_weights = [
             ResourceWeightInput(
                 resource_type=entry.resource_type,
                 weight=entry.weight,
             )
-            for entry in input.resource_weights
+            for entry in dto.resource_weights
         ]
 
     action = UpdateFairShareSpecAction(
-        resource_group=input.resource_group_name,
-        half_life_days=input.half_life_days,
-        lookback_days=input.lookback_days,
-        decay_unit_days=input.decay_unit_days,
-        default_weight=input.default_weight,
+        resource_group=dto.resource_group_name,
+        half_life_days=dto.half_life_days,
+        lookback_days=dto.lookback_days,
+        decay_unit_days=dto.decay_unit_days,
+        default_weight=dto.default_weight,
         resource_weights=resource_weights,
     )
 
@@ -257,24 +257,24 @@ async def update_resource_group_fair_share_spec(
 ) -> UpdateResourceGroupFairShareSpecPayload:
     """Update fair share spec with partial update and validation."""
     processors = info.context.processors
+    dto = input.to_pydantic()
 
-    # Convert GQL input to action
     resource_weights = None
-    if input.resource_weights is not None:
+    if dto.resource_weights is not None:
         resource_weights = [
             ResourceWeightInput(
                 resource_type=entry.resource_type,
                 weight=entry.weight,
             )
-            for entry in input.resource_weights
+            for entry in dto.resource_weights
         ]
 
     action = UpdateFairShareSpecAction(
-        resource_group=input.resource_group_name,
-        half_life_days=input.half_life_days,
-        lookback_days=input.lookback_days,
-        decay_unit_days=input.decay_unit_days,
-        default_weight=input.default_weight,
+        resource_group=dto.resource_group_name,
+        half_life_days=dto.half_life_days,
+        lookback_days=dto.lookback_days,
+        decay_unit_days=dto.decay_unit_days,
+        default_weight=dto.default_weight,
         resource_weights=resource_weights,
     )
 
@@ -300,58 +300,58 @@ async def admin_update_resource_group(
     check_admin_only()
 
     processors = info.context.processors
+    dto = input.to_pydantic()
 
-    # Build UpdaterSpec from input
     status_spec = ScalingGroupStatusUpdaterSpec(
         is_active=(
-            OptionalState.update(input.is_active)
-            if input.is_active is not None
+            OptionalState.update(dto.is_active)
+            if dto.is_active is not None
             else OptionalState.nop()
         ),
         is_public=(
-            OptionalState.update(input.is_public)
-            if input.is_public is not None
+            OptionalState.update(dto.is_public)
+            if dto.is_public is not None
             else OptionalState.nop()
         ),
     )
 
     metadata_spec = ScalingGroupMetadataUpdaterSpec(
         description=(
-            TriState.update(input.description) if input.description is not None else TriState.nop()
+            TriState.update(dto.description) if dto.description is not None else TriState.nop()
         ),
     )
 
     network_spec = ScalingGroupNetworkConfigUpdaterSpec(
         wsproxy_addr=(
-            TriState.update(input.app_proxy_addr)
-            if input.app_proxy_addr is not None
+            TriState.update(dto.app_proxy_addr)
+            if dto.app_proxy_addr is not None
             else TriState.nop()
         ),
         wsproxy_api_token=(
-            TriState.update(input.appproxy_api_token)
-            if input.appproxy_api_token is not None
+            TriState.update(dto.appproxy_api_token)
+            if dto.appproxy_api_token is not None
             else TriState.nop()
         ),
         use_host_network=(
-            OptionalState.update(input.use_host_network)
-            if input.use_host_network is not None
+            OptionalState.update(dto.use_host_network)
+            if dto.use_host_network is not None
             else OptionalState.nop()
         ),
     )
 
-    # Convert scheduler_type from GQL enum to internal type
+    # Convert scheduler_type from DTO str to internal type
     scheduler_value: str | None = None
-    if input.scheduler_type is not None:
-        scheduler_value = SchedulerType(input.scheduler_type.value).value
+    if dto.scheduler_type is not None:
+        scheduler_value = SchedulerType(dto.scheduler_type).value
 
     # Handle preemption config update
     preemption_config_state: OptionalState[DataPreemptionConfig] = OptionalState.nop()
-    if input.preemption is not None:
+    if dto.preemption is not None:
         preemption_config_state = OptionalState.update(
             DataPreemptionConfig(
-                preemptible_priority=input.preemption.preemptible_priority,
-                order=PreemptionOrder(input.preemption.order.value),
-                mode=PreemptionMode(input.preemption.mode.value),
+                preemptible_priority=dto.preemption.preemptible_priority,
+                order=PreemptionOrder(dto.preemption.order),
+                mode=PreemptionMode(dto.preemption.mode),
             )
         )
 
@@ -372,9 +372,8 @@ async def admin_update_resource_group(
         scheduler=scheduler_spec,
     )
 
-    updater = Updater(spec=updater_spec, pk_value=input.resource_group_name)
+    updater = Updater(spec=updater_spec, pk_value=dto.resource_group_name)
 
-    # Use existing ModifyScalingGroupAction
     action = ModifyScalingGroupAction(updater=updater)
 
     result = await processors.scaling_group.modify_scaling_group.wait_for_complete(action)

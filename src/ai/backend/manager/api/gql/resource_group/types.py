@@ -12,7 +12,19 @@ import strawberry
 from strawberry import Info
 from strawberry.relay import NodeID
 
-from ai.backend.common.types import PreemptionMode, PreemptionOrder, ResourceSlot
+from ai.backend.common.dto.manager.v2.resource_group.request import (
+    PreemptionConfigInputDTO,
+)
+from ai.backend.common.dto.manager.v2.resource_group.request import (
+    ResourceWeightEntryInput as ResourceWeightEntryInputDTO,
+)
+from ai.backend.common.dto.manager.v2.resource_group.request import (
+    UpdateResourceGroupConfigInput as UpdateResourceGroupConfigInputDTO,
+)
+from ai.backend.common.dto.manager.v2.resource_group.request import (
+    UpdateResourceGroupFairShareSpecInput as UpdateResourceGroupFairShareSpecInputDTO,
+)
+from ai.backend.common.types import PreemptionMode, PreemptionOrder
 from ai.backend.manager.api.gql.base import OrderDirection, StringFilter
 from ai.backend.manager.api.gql.fair_share.types.common import (
     ResourceSlotGQL,
@@ -611,7 +623,8 @@ class PreemptionConfigInput:
 # Mutation Input/Payload types
 
 
-@strawberry.input(
+@strawberry.experimental.pydantic.input(
+    model=UpdateResourceGroupFairShareSpecInputDTO,
     name="UpdateResourceGroupFairShareSpecInput",
     description=(
         "Added in 26.1.0. Input for updating resource group fair share configuration. "
@@ -649,36 +662,22 @@ class UpdateResourceGroupFairShareSpecInput:
         ),
     )
 
-    def merge_with(self, existing: FairShareScalingGroupSpec) -> FairShareScalingGroupSpec:
-        """Merge partial input with existing spec, returning a new complete spec."""
-        # Merge resource_weights: partial update with deletion support
-        merged_resource_weights = existing.resource_weights
-        if self.resource_weights is not None:
-            # Start with existing weights
-            merged_weights_dict = dict(existing.resource_weights)
-            for entry in self.resource_weights:
-                if entry.weight is None:
-                    # Remove the resource type (revert to default)
-                    merged_weights_dict.pop(entry.resource_type, None)
-                else:
-                    # Update or add the resource type
-                    merged_weights_dict[entry.resource_type] = entry.weight
-            merged_resource_weights = ResourceSlot(merged_weights_dict)
-
-        return FairShareScalingGroupSpec(
-            half_life_days=self.half_life_days
-            if self.half_life_days is not None
-            else existing.half_life_days,
-            lookback_days=self.lookback_days
-            if self.lookback_days is not None
-            else existing.lookback_days,
-            decay_unit_days=self.decay_unit_days
-            if self.decay_unit_days is not None
-            else existing.decay_unit_days,
-            default_weight=self.default_weight
-            if self.default_weight is not None
-            else existing.default_weight,
-            resource_weights=merged_resource_weights,
+    def to_pydantic(self) -> UpdateResourceGroupFairShareSpecInputDTO:
+        return UpdateResourceGroupFairShareSpecInputDTO(
+            resource_group_name=self.resource_group_name,
+            half_life_days=self.half_life_days,
+            lookback_days=self.lookback_days,
+            decay_unit_days=self.decay_unit_days,
+            default_weight=self.default_weight,
+            resource_weights=None
+            if self.resource_weights is None
+            else [
+                ResourceWeightEntryInputDTO(
+                    resource_type=entry.resource_type,
+                    weight=entry.weight,
+                )
+                for entry in self.resource_weights
+            ],
         )
 
 
@@ -694,7 +693,8 @@ class UpdateResourceGroupFairShareSpecPayload:
     )
 
 
-@strawberry.input(
+@strawberry.experimental.pydantic.input(
+    model=UpdateResourceGroupConfigInputDTO,
     name="UpdateResourceGroupInput",
     description=(
         "Added in 26.2.0. Resource group configuration update input. "
@@ -751,6 +751,25 @@ class UpdateResourceGroupInput:
             "preemption config. Leave null to keep existing value."
         ),
     )
+
+    def to_pydantic(self) -> UpdateResourceGroupConfigInputDTO:
+        return UpdateResourceGroupConfigInputDTO(
+            resource_group_name=self.resource_group_name,
+            is_active=self.is_active,
+            is_public=self.is_public,
+            description=self.description,
+            app_proxy_addr=self.app_proxy_addr,
+            appproxy_api_token=self.appproxy_api_token,
+            use_host_network=self.use_host_network,
+            scheduler_type=None if self.scheduler_type is None else self.scheduler_type.value,
+            preemption=None
+            if self.preemption is None
+            else PreemptionConfigInputDTO(
+                preemptible_priority=self.preemption.preemptible_priority,
+                order=self.preemption.order.value,
+                mode=self.preemption.mode.value,
+            ),
+        )
 
 
 @strawberry.type(

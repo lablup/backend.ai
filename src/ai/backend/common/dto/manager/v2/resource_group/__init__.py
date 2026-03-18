@@ -6,8 +6,12 @@ from ai.backend.common.dto.manager.v2.resource_group.request import (
     AdminSearchResourceGroupsInput,
     CreateResourceGroupInput,
     DeleteResourceGroupInput,
+    PreemptionConfigInputDTO,
     ResourceGroupFilter,
     ResourceGroupOrder,
+    ResourceWeightEntryInput,
+    UpdateResourceGroupConfigInput,
+    UpdateResourceGroupFairShareSpecInput,
     UpdateResourceGroupInput,
 )
 from ai.backend.common.dto.manager.v2.resource_group.response import (
@@ -32,8 +36,12 @@ __all__ = (
     "AdminSearchResourceGroupsInput",
     "CreateResourceGroupInput",
     "DeleteResourceGroupInput",
+    "PreemptionConfigInputDTO",
     "ResourceGroupFilter",
     "ResourceGroupOrder",
+    "ResourceWeightEntryInput",
+    "UpdateResourceGroupConfigInput",
+    "UpdateResourceGroupFairShareSpecInput",
     "UpdateResourceGroupInput",
     # Node and Payload models (response)
     "AdminSearchResourceGroupsPayload",
