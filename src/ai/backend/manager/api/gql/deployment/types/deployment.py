@@ -19,6 +19,9 @@ from ai.backend.common.data.model_deployment.types import (
 from ai.backend.common.dto.manager.v2.deployment.request import (
     DeleteDeploymentInput as DeleteDeploymentInputDTO,
 )
+from ai.backend.common.dto.manager.v2.deployment.request import (
+    SyncReplicaInput as SyncReplicaInputDTO,
+)
 from ai.backend.common.exception import (
     InvalidAPIParameters,
 )
@@ -765,9 +768,15 @@ class ModelDeploymentConnection(Connection[ModelDeployment]):
 
 
 # Sync replica types
-@strawberry.input(description="Added in 25.19.0")
+@strawberry.experimental.pydantic.input(
+    model=SyncReplicaInputDTO,
+    description="Added in 25.19.0",
+)
 class SyncReplicaInput:
     model_deployment_id: ID
+
+    def to_pydantic(self) -> SyncReplicaInputDTO:
+        return SyncReplicaInputDTO(model_deployment_id=UUID(self.model_deployment_id))
 
 
 @strawberry.type(description="Added in 25.19.0")

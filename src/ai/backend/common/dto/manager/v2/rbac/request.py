@@ -14,6 +14,7 @@ from .types import RoleSource, RoleStatus
 
 __all__ = (
     "CreateRoleInput",
+    "DeletePermissionInput",
     "DeleteRoleInput",
     "PurgeRoleInput",
     "UpdateRoleInput",
@@ -66,3 +67,9 @@ class PurgeRoleInput(BaseRequestModel):
     """Input for purging a role."""
 
     id: UUID = Field(description="Role ID to purge")
+
+
+class DeletePermissionInput(BaseRequestModel):
+    """Input for deleting a scoped permission."""
+
+    id: UUID = Field(description="Permission ID to delete")

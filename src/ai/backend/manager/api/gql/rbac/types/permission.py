@@ -15,6 +15,9 @@ from ai.backend.common.data.permission.types import (
     OperationType,
     RBACElementType,
 )
+from ai.backend.common.dto.manager.v2.rbac.request import (
+    DeletePermissionInput as DeletePermissionInputDTO,
+)
 from ai.backend.common.types import SessionId
 from ai.backend.manager.api.gql.base import OrderDirection
 from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin
@@ -424,7 +427,10 @@ class UpdatePermissionInput:
         return Updater(spec=spec, pk_value=self.id)
 
 
-@strawberry.input(description="Added in 26.3.0. Input for deleting a scoped permission")
+@strawberry.experimental.pydantic.input(
+    model=DeletePermissionInputDTO,
+    description="Added in 26.3.0. Input for deleting a scoped permission",
+)
 class DeletePermissionInput:
     id: uuid.UUID
 

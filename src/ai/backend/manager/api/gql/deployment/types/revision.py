@@ -13,6 +13,9 @@ from strawberry import ID, Info
 from strawberry.relay import Connection, Edge, NodeID, PageInfo
 from strawberry.scalars import JSON
 
+from ai.backend.common.dto.manager.v2.deployment.request import (
+    ActivateRevisionInput as ActivateRevisionInputDTO,
+)
 from ai.backend.common.types import ClusterMode as CommonClusterMode
 from ai.backend.common.types import MountPermission as CommonMountPermission
 from ai.backend.common.types import RuntimeVariant
@@ -371,13 +374,20 @@ class AddRevisionPayload:
     revision: ModelRevision
 
 
-@strawberry.input(
+@strawberry.experimental.pydantic.input(
+    model=ActivateRevisionInputDTO,
     name="ActivateRevisionInput",
     description="Added in 25.19.0. Input for activating a revision to be the current revision.",
 )
 class ActivateRevisionInputGQL:
     deployment_id: ID
     revision_id: ID
+
+    def to_pydantic(self) -> ActivateRevisionInputDTO:
+        return ActivateRevisionInputDTO(
+            deployment_id=UUID(self.deployment_id),
+            revision_id=UUID(self.revision_id),
+        )
 
 
 @strawberry.type(

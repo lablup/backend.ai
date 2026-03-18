@@ -14,6 +14,12 @@ from strawberry import ID, Info
 from strawberry.relay import Connection, Edge, NodeID
 from strawberry.scalars import JSON
 
+from ai.backend.common.data.model_deployment.types import (
+    RouteTrafficStatus as RouteTrafficStatusCommon,
+)
+from ai.backend.common.dto.manager.v2.deployment.request import (
+    UpdateRouteTrafficStatusInput as UpdateRouteTrafficStatusInputDTO,
+)
 from ai.backend.manager.api.gql.adapter import PaginationSpec
 from ai.backend.manager.api.gql.base import (
     OrderDirection,
@@ -333,7 +339,8 @@ def get_route_pagination_spec() -> PaginationSpec:
 # Input/Payload types for mutations
 
 
-@strawberry.input(
+@strawberry.experimental.pydantic.input(
+    model=UpdateRouteTrafficStatusInputDTO,
     name="UpdateRouteTrafficStatusInput",
     description="Added in 25.19.0. Input for updating route traffic status.",
 )
@@ -342,6 +349,12 @@ class UpdateRouteTrafficStatusInputGQL:
     traffic_status: RouteTrafficStatusGQL = strawberry.field(
         description="The new traffic status (ACTIVE/INACTIVE)."
     )
+
+    def to_pydantic(self) -> UpdateRouteTrafficStatusInputDTO:
+        return UpdateRouteTrafficStatusInputDTO(
+            route_id=UUID(self.route_id),
+            traffic_status=RouteTrafficStatusCommon(self.traffic_status.value),
+        )
 
 
 @strawberry.type(

@@ -33,6 +33,7 @@ __all__ = (
     "AccessTokenFilter",
     "AccessTokenOrder",
     "ActivateDeploymentInput",
+    "ActivateRevisionInput",
     "AddRevisionInput",
     "AdminSearchDeploymentsInput",
     "AdminSearchRevisionsInput",
@@ -62,8 +63,10 @@ __all__ = (
     "SearchAutoScalingRulesInput",
     "SearchDeploymentPoliciesInput",
     "SearchRoutesInput",
+    "SyncReplicaInput",
     "UpdateAutoScalingRuleInput",
     "UpdateDeploymentInput",
+    "UpdateRouteTrafficStatusInput",
     "UpsertDeploymentPolicyInput",
 )
 
@@ -455,3 +458,23 @@ class UpsertDeploymentPolicyInput(BaseRequestModel):
     blue_green: BlueGreenConfigInput | None = Field(
         default=None, description="Blue/green config (required for BLUE_GREEN strategy)"
     )
+
+
+class SyncReplicaInput(BaseRequestModel):
+    """Input for syncing replicas for a deployment."""
+
+    model_deployment_id: UUID = Field(description="Deployment ID to sync replicas for")
+
+
+class ActivateRevisionInput(BaseRequestModel):
+    """Input for activating a revision as the current revision."""
+
+    deployment_id: UUID = Field(description="Deployment ID")
+    revision_id: UUID = Field(description="Revision ID to activate")
+
+
+class UpdateRouteTrafficStatusInput(BaseRequestModel):
+    """Input for updating a route's traffic status."""
+
+    route_id: UUID = Field(description="Route ID to update")
+    traffic_status: RouteTrafficStatus = Field(description="New traffic status (ACTIVE/INACTIVE)")
