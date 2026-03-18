@@ -421,7 +421,7 @@ class RouteExecutor:
                         deployment_info=deployment,
                         context=deployment_context,
                         route_id=route.route_id,
-                        revision_id=route.revision_id,
+                        revision_id=target_revision_id,
                     )
                 )
 
