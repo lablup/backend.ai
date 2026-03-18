@@ -9,6 +9,7 @@ import strawberry
 from strawberry import ID, UNSET, Info
 from strawberry.relay import Connection, Edge, NodeID
 
+from ai.backend.common.api_handlers import SENTINEL
 from ai.backend.common.dto.manager.v2.object_storage.request import (
     AdminSearchObjectStoragesInput,
 )
@@ -252,7 +253,7 @@ async def update_object_storage(
             access_key=None if input.access_key is UNSET else input.access_key,
             secret_key=None if input.secret_key is UNSET else input.secret_key,
             endpoint=None if input.endpoint is UNSET else input.endpoint,
-            region=None if input.region is UNSET else input.region,
+            region=SENTINEL if input.region is UNSET else input.region,
         )
     )
     return UpdateObjectStoragePayload(

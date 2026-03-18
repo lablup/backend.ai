@@ -977,10 +977,10 @@ class ModifyUserInput(graphene.InputObjectType):  # type: ignore[misc]
             need_password_change=OptionalState[bool].from_graphql(
                 self.need_password_change,
             ),
-            full_name=OptionalState[str].from_graphql(
+            full_name=TriState[str].from_graphql(
                 self.full_name,
             ),
-            description=OptionalState[str].from_graphql(
+            description=TriState[str].from_graphql(
                 self.description,
             ),
             is_active=OptionalState[bool].from_graphql(

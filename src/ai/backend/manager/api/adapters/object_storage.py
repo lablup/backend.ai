@@ -39,7 +39,7 @@ from ai.backend.manager.services.object_storage.actions.delete import DeleteObje
 from ai.backend.manager.services.object_storage.actions.get import GetObjectStorageAction
 from ai.backend.manager.services.object_storage.actions.search import SearchObjectStoragesAction
 from ai.backend.manager.services.object_storage.actions.update import UpdateObjectStorageAction
-from ai.backend.manager.types import OptionalState
+from ai.backend.manager.types import OptionalState, TriState
 
 from .base import BaseAdapter
 
@@ -175,9 +175,11 @@ class ObjectStorageAdapter(BaseAdapter):
             if input.endpoint is not None
             else OptionalState.nop(),
             region=(
-                OptionalState.nop()
-                if isinstance(input.region, Sentinel) or input.region is None
-                else OptionalState.update(input.region)
+                TriState.nop()
+                if isinstance(input.region, Sentinel)
+                else TriState.nullify()
+                if input.region is None
+                else TriState.update(input.region)
             ),
         )
         action_result = await self._processors.object_storage.update.wait_for_complete(

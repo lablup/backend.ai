@@ -251,14 +251,18 @@ async def admin_bulk_update_users_v2(
                 else OptionalState.nop()
             ),
             full_name=(
-                OptionalState.nop()
-                if isinstance(dto.full_name, Sentinel) or dto.full_name is None
-                else OptionalState.update(dto.full_name)
+                TriState.nop()
+                if isinstance(dto.full_name, Sentinel)
+                else TriState.nullify()
+                if dto.full_name is None
+                else TriState.update(dto.full_name)
             ),
             description=(
-                OptionalState.nop()
-                if isinstance(dto.description, Sentinel) or dto.description is None
-                else OptionalState.update(dto.description)
+                TriState.nop()
+                if isinstance(dto.description, Sentinel)
+                else TriState.nullify()
+                if dto.description is None
+                else TriState.update(dto.description)
             ),
             status=(
                 OptionalState.update(UserStatus(dto.status))
