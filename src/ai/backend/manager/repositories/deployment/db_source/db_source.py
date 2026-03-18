@@ -1790,15 +1790,13 @@ class DeploymentDBSource:
     async def fetch_deployment_context(
         self,
         deployment_info: DeploymentInfo,
-        revision_id: uuid.UUID | None = None,
+        revision_id: uuid.UUID,
     ) -> DeploymentContext:
         """Fetch all context data needed for session creation from deployment info.
 
         Args:
             deployment_info: Deployment information
-            revision_id: Specific revision to use for image resolution.
-                If provided, the image is resolved from this revision's DB row.
-                Otherwise falls back to deploying_revision_id → current_revision_id.
+            revision_id: Revision to use for image resolution.
 
         Returns:
             DeploymentContext: Context data needed for session creation
@@ -1849,28 +1847,16 @@ class DeploymentDBSource:
                 else None,
             )
 
-            # Resolve image from the specified revision, or fall back to
-            # deploying → current revision from deployment_info.
-            target_revision_id = (
-                revision_id
-                or deployment_info.deploying_revision_id
-                or deployment_info.current_revision_id
-            )
-            if target_revision_id is None:
-                raise DeploymentHasNoTargetRevision(
-                    "Deployment has no revision for image resolution"
-                )
-
             revision_query = (
                 sa.select(DeploymentRevisionRow)
-                .where(DeploymentRevisionRow.id == target_revision_id)
+                .where(DeploymentRevisionRow.id == revision_id)
                 .options(selectinload(DeploymentRevisionRow.image_row))
             )
             revision_result = await db_sess.execute(revision_query)
             revision_row = revision_result.scalar_one_or_none()
             if revision_row is None or revision_row.image_row is None:
                 raise DeploymentHasNoTargetRevision(
-                    f"Revision {target_revision_id} not found or has no image"
+                    f"Revision {revision_id} not found or has no image"
                 )
             image_identifier = ImageIdentifier(
                 canonical=revision_row.image_row.name,

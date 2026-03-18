@@ -707,15 +707,13 @@ class DeploymentRepository:
     async def fetch_deployment_context(
         self,
         deployment_info: DeploymentInfo,
-        revision_id: UUID | None = None,
+        revision_id: UUID,
     ) -> DeploymentContext:
         """Fetch all context data needed for session creation from deployment info.
 
         Args:
             deployment_info: Deployment information
-            revision_id: Specific revision to use for image resolution.
-                If provided, the image is resolved from this revision's DB row.
-                Otherwise falls back to deploying_revision_id → current_revision_id.
+            revision_id: Revision to use for image resolution.
 
         Returns:
             DeploymentContext: Context data needed for session creation
