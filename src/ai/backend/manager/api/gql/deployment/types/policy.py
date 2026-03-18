@@ -147,7 +147,7 @@ class UpdateDeploymentPolicyInputGQL:
     rolling_update: RollingUpdateConfigInputGQL | None = None
     blue_green: BlueGreenConfigInputGQL | None = None
 
-    def to_upserter(self, deployment_uuid: UUID) -> DeploymentPolicyUpserter:
+    def to_upserter(self) -> DeploymentPolicyUpserter:
         """Convert to DeploymentPolicyUpserter for the service layer."""
         from ai.backend.manager.errors.api import InvalidAPIParameters
 
@@ -156,19 +156,19 @@ class UpdateDeploymentPolicyInputGQL:
         match strategy:
             case DeploymentStrategy.ROLLING:
                 if self.rolling_update is None:
-                    strategy_spec = RollingUpdateSpec(max_surge=1, max_unavailable=0)
-                else:
-                    strategy_spec = self.rolling_update.to_spec()
+                    raise InvalidAPIParameters(
+                        "rolling_update config required for ROLLING strategy"
+                    )
+                strategy_spec = self.rolling_update.to_spec()
             case DeploymentStrategy.BLUE_GREEN:
                 if self.blue_green is None:
-                    strategy_spec = BlueGreenSpec(auto_promote=False, promote_delay_seconds=0)
-                else:
-                    strategy_spec = self.blue_green.to_spec()
+                    raise InvalidAPIParameters("blue_green config required for BLUE_GREEN strategy")
+                strategy_spec = self.blue_green.to_spec()
             case _:
                 raise InvalidAPIParameters(f"Unsupported deployment strategy: {strategy}")
 
         return DeploymentPolicyUpserter(
-            deployment_id=deployment_uuid,
+            deployment_id=UUID(str(self.deployment_id)),
             strategy=strategy,
             strategy_spec=strategy_spec,
             rollback_on_failure=self.rollback_on_failure,

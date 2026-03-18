@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-from uuid import UUID
-
 import strawberry
 from strawberry import Info
 
@@ -26,8 +24,7 @@ async def admin_update_deployment_policy(
 ) -> UpdateDeploymentPolicyPayloadGQL:
     """Update (upsert) a deployment policy for a deployment."""
     check_admin_only()
-    deployment_uuid = UUID(str(input.deployment_id))
-    upserter = input.to_upserter(deployment_uuid)
+    upserter = input.to_upserter()
 
     processor = info.context.processors.deployment
     result = await processor.upsert_deployment_policy.wait_for_complete(
