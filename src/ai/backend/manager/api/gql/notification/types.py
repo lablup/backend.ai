@@ -24,6 +24,12 @@ from ai.backend.common.data.notification.types import (
     SMTPConnection,
 )
 from ai.backend.common.data.permission.types import RBACElementType
+from ai.backend.common.dto.manager.v2.notification.request import (
+    DeleteNotificationChannelInput as DeleteNotificationChannelInputDTO,
+)
+from ai.backend.common.dto.manager.v2.notification.request import (
+    DeleteNotificationRuleInput as DeleteNotificationRuleInputDTO,
+)
 from ai.backend.common.exception import InvalidNotificationChannelSpec
 from ai.backend.manager.api.gql.base import OrderDirection, StringFilter
 from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin
@@ -606,7 +612,10 @@ class UpdateNotificationChannelInput:
         return Updater(spec=updater_spec, pk_value=channel_id)
 
 
-@strawberry.input(description="Input for deleting a notification channel")
+@strawberry.experimental.pydantic.input(
+    model=DeleteNotificationChannelInputDTO,
+    description="Input for deleting a notification channel",
+)
 class DeleteNotificationChannelInput:
     id: ID
 
@@ -654,7 +663,10 @@ class UpdateNotificationRuleInput:
         return Updater(spec=spec, pk_value=rule_id)
 
 
-@strawberry.input(description="Input for deleting a notification rule")
+@strawberry.experimental.pydantic.input(
+    model=DeleteNotificationRuleInputDTO,
+    description="Input for deleting a notification rule",
+)
 class DeleteNotificationRuleInput:
     id: ID
 

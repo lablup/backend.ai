@@ -502,8 +502,9 @@ async def admin_delete_notification_channel(
     check_admin_only()
     processors = info.context.processors
 
+    pydantic_input = input.to_pydantic()
     await processors.notification.delete_channel.wait_for_complete(
-        DeleteChannelAction(channel_id=uuid.UUID(input.id))
+        DeleteChannelAction(channel_id=pydantic_input.id)
     )
 
     return DeleteNotificationChannelPayload(id=input.id)
@@ -521,8 +522,9 @@ async def delete_notification_channel(
 ) -> DeleteNotificationChannelPayload:
     processors = info.context.processors
 
+    pydantic_input = input.to_pydantic()
     await processors.notification.delete_channel.wait_for_complete(
-        DeleteChannelAction(channel_id=uuid.UUID(input.id))
+        DeleteChannelAction(channel_id=pydantic_input.id)
     )
 
     return DeleteNotificationChannelPayload(id=input.id)
@@ -617,8 +619,9 @@ async def admin_delete_notification_rule(
     check_admin_only()
     processors = info.context.processors
 
+    pydantic_input = input.to_pydantic()
     await processors.notification.delete_rule.wait_for_complete(
-        DeleteRuleAction(rule_id=uuid.UUID(input.id))
+        DeleteRuleAction(rule_id=pydantic_input.id)
     )
 
     return DeleteNotificationRulePayload(id=input.id)
@@ -636,8 +639,9 @@ async def delete_notification_rule(
 ) -> DeleteNotificationRulePayload:
     processors = info.context.processors
 
+    pydantic_input = input.to_pydantic()
     await processors.notification.delete_rule.wait_for_complete(
-        DeleteRuleAction(rule_id=uuid.UUID(input.id))
+        DeleteRuleAction(rule_id=pydantic_input.id)
     )
 
     return DeleteNotificationRulePayload(id=input.id)
