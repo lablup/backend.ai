@@ -76,6 +76,16 @@ class TestAuthorizeInput:
         })
         assert req.stoken == "tok2"
 
+    def test_stoken_alias_choices_otp(self) -> None:
+        req = AuthorizeInput.model_validate({
+            "type": "keypair",
+            "domain": "default",
+            "username": "user@example.com",
+            "password": "secret",
+            "otp": "123456",
+        })
+        assert req.stoken == "123456"
+
     def test_stoken_defaults_to_none(self) -> None:
         req = AuthorizeInput(
             type=AuthTokenType.KEYPAIR,
