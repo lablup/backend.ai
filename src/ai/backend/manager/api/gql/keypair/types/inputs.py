@@ -4,8 +4,16 @@ from __future__ import annotations
 
 import strawberry
 
+from ai.backend.common.dto.manager.v2.auth.request import (
+    RevokeMyKeypairInput as RevokeMyKeypairInputDTO,
+)
+from ai.backend.common.dto.manager.v2.auth.request import (
+    SwitchMyMainAccessKeyInput as SwitchMyMainAccessKeyInputDTO,
+)
 
-@strawberry.input(
+
+@strawberry.experimental.pydantic.input(
+    model=RevokeMyKeypairInputDTO,
     name="RevokeMyKeypairInput",
     description="Input for revoking a keypair owned by the current user.",
 )
@@ -15,7 +23,8 @@ class RevokeMyKeypairInputGQL:
     )
 
 
-@strawberry.input(
+@strawberry.experimental.pydantic.input(
+    model=SwitchMyMainAccessKeyInputDTO,
     name="SwitchMyMainAccessKeyInput",
     description="Input for switching the main access key of the current user.",
 )

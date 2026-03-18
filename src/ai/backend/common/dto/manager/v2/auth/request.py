@@ -14,8 +14,10 @@ from ai.backend.common.dto.manager.v2.auth.types import AuthTokenType
 __all__ = (
     "AuthorizeInput",
     "GetRoleInput",
+    "RevokeMyKeypairInput",
     "SignupInput",
     "SignoutInput",
+    "SwitchMyMainAccessKeyInput",
     "UpdateFullNameInput",
     "UpdatePasswordInput",
     "UpdatePasswordNoAuthInput",
@@ -222,6 +224,22 @@ class UpdatePasswordNoAuthInput(BaseRequestModel):
     new_password: str = Field(
         min_length=1,
         description="New password; must differ from current password",
+    )
+
+
+class RevokeMyKeypairInput(BaseRequestModel):
+    """Input for revoking a keypair owned by the current user."""
+
+    access_key: str = Field(
+        description="Access key of the keypair to revoke. Must not be the main access key."
+    )
+
+
+class SwitchMyMainAccessKeyInput(BaseRequestModel):
+    """Input for switching the main access key of the current user."""
+
+    access_key: str = Field(
+        description="Access key to set as the new main access key. Must be active and owned by the user."
     )
 
 

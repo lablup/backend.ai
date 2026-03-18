@@ -387,12 +387,6 @@ class ActivateRevisionInputGQL:
     deployment_id: ID
     revision_id: ID
 
-    def to_pydantic(self) -> ActivateRevisionInputDTO:
-        return ActivateRevisionInputDTO(
-            deployment_id=UUID(self.deployment_id),
-            revision_id=UUID(self.revision_id),
-        )
-
 
 @strawberry.type(
     name="ActivateRevisionPayload",

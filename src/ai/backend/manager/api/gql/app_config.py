@@ -12,6 +12,12 @@ from ai.backend.common.dto.manager.v2.app_config.request import (
 from ai.backend.common.dto.manager.v2.app_config.request import (
     DeleteUserConfigInput as DeleteUserConfigInputDTO,
 )
+from ai.backend.common.dto.manager.v2.app_config.request import (
+    UpsertDomainConfigInput as UpsertDomainConfigInputDTO,
+)
+from ai.backend.common.dto.manager.v2.app_config.request import (
+    UpsertUserConfigInput as UpsertUserConfigInputDTO,
+)
 from ai.backend.manager.api.gql.utils import check_admin_only, dedent_strip
 from ai.backend.manager.errors.auth import InsufficientPrivilege
 from ai.backend.manager.repositories.app_config.updaters import AppConfigUpdaterSpec
@@ -36,7 +42,8 @@ class AppConfig:
     extra_config: strawberry.scalars.JSON
 
 
-@strawberry.input(
+@strawberry.experimental.pydantic.input(
+    model=UpsertDomainConfigInputDTO,
     description=dedent_strip(
         """\
         Added in 25.16.0.
@@ -45,7 +52,7 @@ class AppConfig:
         existing keys not present in the new extra_config will be removed.
         All users in this domain will be affected by these settings when their configurations are merged.
         """
-    )
+    ),
 )
 class UpsertDomainConfigInput:
     """Input type for upserting domain-level app configuration."""
@@ -57,7 +64,8 @@ class UpsertDomainConfigInput:
         return AppConfigUpdaterSpec(extra_config=OptionalState.update(self.extra_config))
 
 
-@strawberry.input(
+@strawberry.experimental.pydantic.input(
+    model=UpsertUserConfigInputDTO,
     description=dedent_strip(
         """\
         Added in 25.16.0.
@@ -67,7 +75,7 @@ class UpsertDomainConfigInput:
         These settings will override domain-level settings when configurations are merged for this user.
         If user_id is not provided, the current user's configuration will be updated.
         """
-    )
+    ),
 )
 class UpsertUserConfigInput:
     """Input type for upserting user-level app configuration."""
