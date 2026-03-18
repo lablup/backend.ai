@@ -733,27 +733,51 @@ class DeploymentAdapter(BaseAdapter):
             if f.deployment_id is not None:
                 conditions.append(RouteConditions.by_endpoint_id(f.deployment_id))
             if f.status is not None:
-                if f.status.equals is not None:
+                st = f.status
+                if st.equals is not None:
                     conditions.append(
-                        RouteConditions.by_statuses([ManagerRouteStatus(f.status.equals.value)])
+                        RouteConditions.by_status_equals(ManagerRouteStatus(st.equals.value))
                     )
-                elif f.status.in_ is not None:
+                if st.in_ is not None:
                     conditions.append(
-                        RouteConditions.by_statuses([
-                            ManagerRouteStatus(s.value) for s in f.status.in_
+                        RouteConditions.by_statuses([ManagerRouteStatus(s.value) for s in st.in_])
+                    )
+                if st.not_equals is not None:
+                    conditions.append(
+                        RouteConditions.by_status_not_equals(
+                            ManagerRouteStatus(st.not_equals.value)
+                        )
+                    )
+                if st.not_in is not None:
+                    conditions.append(
+                        RouteConditions.by_status_not_in([
+                            ManagerRouteStatus(s.value) for s in st.not_in
                         ])
                     )
             if f.traffic_status is not None:
-                if f.traffic_status.equals is not None:
+                ts = f.traffic_status
+                if ts.equals is not None:
+                    conditions.append(
+                        RouteConditions.by_traffic_status_equals(
+                            ManagerRouteTrafficStatus(ts.equals.value)
+                        )
+                    )
+                if ts.in_ is not None:
                     conditions.append(
                         RouteConditions.by_traffic_statuses([
-                            ManagerRouteTrafficStatus(f.traffic_status.equals.value)
+                            ManagerRouteTrafficStatus(s.value) for s in ts.in_
                         ])
                     )
-                elif f.traffic_status.in_ is not None:
+                if ts.not_equals is not None:
                     conditions.append(
-                        RouteConditions.by_traffic_statuses([
-                            ManagerRouteTrafficStatus(s.value) for s in f.traffic_status.in_
+                        RouteConditions.by_traffic_status_not_equals(
+                            ManagerRouteTrafficStatus(ts.not_equals.value)
+                        )
+                    )
+                if ts.not_in is not None:
+                    conditions.append(
+                        RouteConditions.by_traffic_status_not_in([
+                            ManagerRouteTrafficStatus(s.value) for s in ts.not_in
                         ])
                     )
         orders: list[QueryOrder] = self._convert_route_orders(input.order) if input.order else []

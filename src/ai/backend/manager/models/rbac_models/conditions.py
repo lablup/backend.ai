@@ -89,9 +89,51 @@ class RoleConditions:
         return inner
 
     @staticmethod
+    def by_source_equals(source: RoleSource) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return RoleRow.source == source
+
+        return inner
+
+    @staticmethod
+    def by_source_not_equals(source: RoleSource) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return RoleRow.source != source
+
+        return inner
+
+    @staticmethod
+    def by_source_not_in(sources: Collection[RoleSource]) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return RoleRow.source.not_in(sources)
+
+        return inner
+
+    @staticmethod
     def by_statuses(statuses: list[RoleStatus]) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
             return RoleRow.status.in_(statuses)
+
+        return inner
+
+    @staticmethod
+    def by_status_equals(status: RoleStatus) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return RoleRow.status == status
+
+        return inner
+
+    @staticmethod
+    def by_status_not_equals(status: RoleStatus) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return RoleRow.status != status
+
+        return inner
+
+    @staticmethod
+    def by_status_not_in(statuses: Collection[RoleStatus]) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return RoleRow.status.not_in(statuses)
 
         return inner
 

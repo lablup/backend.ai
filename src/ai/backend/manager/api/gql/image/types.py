@@ -546,6 +546,25 @@ class ImageAliasNestedFilterGQL:
 
 
 @strawberry.input(
+    name="ImageV2StatusFilter",
+    description="Added in 26.3.0. Filter for image status with equality and membership operators.",
+)
+class ImageV2StatusFilterGQL:
+    equals: ImageV2StatusGQL | None = strawberry.field(
+        default=None, description="Matches images with this exact status."
+    )
+    in_: list[ImageV2StatusGQL] | None = strawberry.field(
+        name="in", default=None, description="Matches images whose status is in this list."
+    )
+    not_equals: ImageV2StatusGQL | None = strawberry.field(
+        default=None, description="Excludes images with this exact status."
+    )
+    not_in: list[ImageV2StatusGQL] | None = strawberry.field(
+        default=None, description="Excludes images whose status is in this list."
+    )
+
+
+@strawberry.input(
     description=dedent_strip("""
     Added in 26.2.0.
 
@@ -556,7 +575,7 @@ class ImageAliasNestedFilterGQL:
     """)
 )
 class ImageV2FilterGQL(GQLFilter):
-    status: list[ImageV2StatusGQL] | None = None
+    status: ImageV2StatusFilterGQL | None = None
     name: StringFilter | None = None
     architecture: StringFilter | None = None
     alias: ImageAliasNestedFilterGQL | None = strawberry.field(
@@ -581,9 +600,24 @@ class ImageV2FilterGQL(GQLFilter):
         field_conditions: list[QueryCondition] = []
 
         # Apply status filter
-        if self.status:
-            statuses = [ImageStatus(s.value) for s in self.status]
-            field_conditions.append(ImageConditions.by_statuses(statuses))
+        if self.status is not None:
+            st = self.status
+            if st.equals is not None:
+                field_conditions.append(
+                    ImageConditions.by_status_equals(ImageStatus(st.equals.value))
+                )
+            if st.in_ is not None:
+                field_conditions.append(
+                    ImageConditions.by_statuses([ImageStatus(s.value) for s in st.in_])
+                )
+            if st.not_equals is not None:
+                field_conditions.append(
+                    ImageConditions.by_status_not_equals(ImageStatus(st.not_equals.value))
+                )
+            if st.not_in is not None:
+                field_conditions.append(
+                    ImageConditions.by_status_not_in([ImageStatus(s.value) for s in st.not_in])
+                )
 
         # Apply name filter
         if self.name:

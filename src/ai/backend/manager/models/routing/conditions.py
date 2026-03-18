@@ -51,9 +51,51 @@ class RouteConditions:
         return inner
 
     @staticmethod
+    def by_status_equals(status: RouteStatus) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return RoutingRow.status == status
+
+        return inner
+
+    @staticmethod
+    def by_status_not_equals(status: RouteStatus) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return RoutingRow.status != status
+
+        return inner
+
+    @staticmethod
+    def by_status_not_in(statuses: Collection[RouteStatus]) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return RoutingRow.status.not_in(statuses)
+
+        return inner
+
+    @staticmethod
     def by_traffic_statuses(traffic_statuses: list[RouteTrafficStatus]) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
             return RoutingRow.traffic_status.in_(traffic_statuses)
+
+        return inner
+
+    @staticmethod
+    def by_traffic_status_equals(status: RouteTrafficStatus) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return RoutingRow.traffic_status == status
+
+        return inner
+
+    @staticmethod
+    def by_traffic_status_not_equals(status: RouteTrafficStatus) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return RoutingRow.traffic_status != status
+
+        return inner
+
+    @staticmethod
+    def by_traffic_status_not_in(statuses: Collection[RouteTrafficStatus]) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return RoutingRow.traffic_status.not_in(statuses)
 
         return inner
 

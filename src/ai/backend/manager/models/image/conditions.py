@@ -41,6 +41,27 @@ class ImageConditions:
         return inner
 
     @staticmethod
+    def by_status_equals(status: ImageStatus) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return ImageRow.status == status
+
+        return inner
+
+    @staticmethod
+    def by_status_not_equals(status: ImageStatus) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return ImageRow.status != status
+
+        return inner
+
+    @staticmethod
+    def by_status_not_in(statuses: Collection[ImageStatus]) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return ImageRow.status.not_in(statuses)
+
+        return inner
+
+    @staticmethod
     def by_architecture(architecture: str) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
             return ImageRow.architecture == architecture

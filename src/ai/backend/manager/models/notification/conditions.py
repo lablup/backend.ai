@@ -83,6 +83,29 @@ class NotificationChannelConditions:
         return inner
 
     @staticmethod
+    def by_channel_type_equals(channel_type: NotificationChannelType) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return NotificationChannelRow.channel_type == channel_type
+
+        return inner
+
+    @staticmethod
+    def by_channel_type_not_equals(channel_type: NotificationChannelType) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return NotificationChannelRow.channel_type != channel_type
+
+        return inner
+
+    @staticmethod
+    def by_channel_type_not_in(
+        channel_types: Collection[NotificationChannelType],
+    ) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return NotificationChannelRow.channel_type.not_in(channel_types)
+
+        return inner
+
+    @staticmethod
     def by_enabled(enabled: bool) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
             return NotificationChannelRow.enabled == enabled
@@ -192,6 +215,29 @@ class NotificationRuleConditions:
     def by_rule_types(rule_types: list[NotificationRuleType]) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
             return NotificationRuleRow.rule_type.in_(rule_types)
+
+        return inner
+
+    @staticmethod
+    def by_rule_type_equals(rule_type: NotificationRuleType) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return NotificationRuleRow.rule_type == rule_type
+
+        return inner
+
+    @staticmethod
+    def by_rule_type_not_equals(rule_type: NotificationRuleType) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return NotificationRuleRow.rule_type != rule_type
+
+        return inner
+
+    @staticmethod
+    def by_rule_type_not_in(
+        rule_types: Collection[NotificationRuleType],
+    ) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return NotificationRuleRow.rule_type.not_in(rule_types)
 
         return inner
 

@@ -77,6 +77,20 @@ class SessionSchedulingHistoryConditions:
         return inner
 
     @staticmethod
+    def by_result_not_equals(result: SchedulingResult) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return SessionSchedulingHistoryRow.result != str(result)
+
+        return inner
+
+    @staticmethod
+    def by_result_not_in(results: list[SchedulingResult]) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return SessionSchedulingHistoryRow.result.not_in([str(r) for r in results])
+
+        return inner
+
+    @staticmethod
     def by_from_status(status: SessionStatus) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
             return SessionSchedulingHistoryRow.from_status == str(status)
@@ -511,6 +525,20 @@ class DeploymentHistoryConditions:
         return inner
 
     @staticmethod
+    def by_result_not_equals(result: SchedulingResult) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return DeploymentHistoryRow.result != str(result)
+
+        return inner
+
+    @staticmethod
+    def by_result_not_in(results: list[SchedulingResult]) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return DeploymentHistoryRow.result.not_in([str(r) for r in results])
+
+        return inner
+
+    @staticmethod
     def by_error_code(error_code: str) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
             return DeploymentHistoryRow.error_code == error_code
@@ -853,6 +881,20 @@ class RouteHistoryConditions:
     def by_results(results: list[SchedulingResult]) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
             return RouteHistoryRow.result.in_([str(r) for r in results])
+
+        return inner
+
+    @staticmethod
+    def by_result_not_equals(result: SchedulingResult) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return RouteHistoryRow.result != str(result)
+
+        return inner
+
+    @staticmethod
+    def by_result_not_in(results: list[SchedulingResult]) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return RouteHistoryRow.result.not_in([str(r) for r in results])
 
         return inner
 

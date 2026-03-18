@@ -3,7 +3,11 @@
 from __future__ import annotations
 
 from ai.backend.manager.api.gql.base import StringFilter
-from ai.backend.manager.api.gql.rbac.types.role import RoleFilter, RoleSourceGQL
+from ai.backend.manager.api.gql.rbac.types.role import (
+    RoleFilter,
+    RoleSourceFilterGQL,
+    RoleSourceGQL,
+)
 
 # Row imports to trigger mapper initialization (FK dependency order).
 from ai.backend.manager.models.agent import AgentRow
@@ -167,7 +171,7 @@ class TestRoleFilterNOT:
             NOT=[
                 RoleFilter(
                     name=StringFilter(equals="banned"),
-                    source=[RoleSourceGQL.CUSTOM],
+                    source=RoleSourceFilterGQL(in_=[RoleSourceGQL.CUSTOM]),
                 )
             ],
         )

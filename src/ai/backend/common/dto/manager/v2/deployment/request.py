@@ -224,6 +224,8 @@ class RouteStatusFilter(BaseRequestModel):
 
     equals: RouteStatus | None = Field(default=None, description="Exact status match")
     in_: list[RouteStatus] | None = Field(default=None, alias="in", description="Status is in list")
+    not_equals: RouteStatus | None = Field(default=None, description="Excludes exact status match")
+    not_in: list[RouteStatus] | None = Field(default=None, description="Status is not in list")
 
 
 class RouteTrafficStatusFilter(BaseRequestModel):
@@ -232,6 +234,12 @@ class RouteTrafficStatusFilter(BaseRequestModel):
     equals: RouteTrafficStatus | None = Field(default=None, description="Exact status match")
     in_: list[RouteTrafficStatus] | None = Field(
         default=None, alias="in", description="Status is in list"
+    )
+    not_equals: RouteTrafficStatus | None = Field(
+        default=None, description="Excludes exact status match"
+    )
+    not_in: list[RouteTrafficStatus] | None = Field(
+        default=None, description="Status is not in list"
     )
 
 

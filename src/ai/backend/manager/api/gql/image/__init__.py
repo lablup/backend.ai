@@ -36,6 +36,7 @@ from .types import (
     ImageV2RequirementsInfoGQL,
     ImageV2ResourceLimitGQL,
     ImageV2ScopeGQL,
+    ImageV2StatusFilterGQL,
     ImageV2StatusGQL,
     ImageV2TagEntryGQL,
 )
@@ -43,6 +44,8 @@ from .types import (
 __all__ = [
     # Enums
     "ImageV2StatusGQL",
+    # Filter wrappers
+    "ImageV2StatusFilterGQL",
     "ImageV2PermissionGQL",
     "ImageV2OrderFieldGQL",
     "ImageV2AliasOrderFieldGQL",

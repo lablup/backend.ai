@@ -6,10 +6,12 @@ import uuid
 from datetime import UTC, datetime
 
 from ai.backend.common.types import ServiceCatalogStatus
+from ai.backend.manager.api.gql.base import StringFilter
 from ai.backend.manager.api.gql.service_catalog.types import (
     ServiceCatalogEndpointGQL,
     ServiceCatalogFilterGQL,
     ServiceCatalogGQL,
+    ServiceCatalogStatusFilterGQL,
     ServiceCatalogStatusGQL,
 )
 from ai.backend.manager.data.service_catalog.types import (
@@ -163,22 +165,24 @@ class TestServiceCatalogFilterGQL:
 
     def test_build_conditions_service_group(self) -> None:
         """Filter by service_group should produce one condition."""
-        f = ServiceCatalogFilterGQL(service_group="manager")
+        f = ServiceCatalogFilterGQL(service_group=StringFilter(equals="manager"))
         conditions = f.build_conditions()
         assert len(conditions) == 1
         assert str(conditions[0]().compile(compile_kwargs={"literal_binds": True}))
 
     def test_build_conditions_status(self) -> None:
         """Filter by status should produce one condition."""
-        f = ServiceCatalogFilterGQL(status=ServiceCatalogStatusGQL.HEALTHY)
+        f = ServiceCatalogFilterGQL(
+            status=ServiceCatalogStatusFilterGQL(equals=ServiceCatalogStatusGQL.HEALTHY)
+        )
         conditions = f.build_conditions()
         assert len(conditions) == 1
 
     def test_build_conditions_combined(self) -> None:
         """Filter with both fields should produce two conditions."""
         f = ServiceCatalogFilterGQL(
-            service_group="agent",
-            status=ServiceCatalogStatusGQL.DEREGISTERED,
+            service_group=StringFilter(equals="agent"),
+            status=ServiceCatalogStatusFilterGQL(equals=ServiceCatalogStatusGQL.DEREGISTERED),
         )
         conditions = f.build_conditions()
         assert len(conditions) == 2

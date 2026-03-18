@@ -46,6 +46,8 @@ from ai.backend.manager.repositories.base import (
 __all__ = (
     # Enums
     "SchedulingResultGQL",
+    # Filter wrappers
+    "SchedulingResultFilterGQL",
     "SessionSchedulingHistoryOrderField",
     "DeploymentHistoryOrderField",
     "RouteHistoryOrderField",
@@ -341,6 +343,25 @@ class RouteScope:
     route_id: UUID = strawberry.field(description="Route ID to get history for")
 
 
+@strawberry.input(
+    name="SchedulingResultFilter",
+    description="Added in 26.3.0. Filter for scheduling result with equality and membership operators.",
+)
+class SchedulingResultFilterGQL:
+    equals: SchedulingResultGQL | None = strawberry.field(
+        default=None, description="Matches records with this exact scheduling result."
+    )
+    in_: list[SchedulingResultGQL] | None = strawberry.field(
+        name="in", default=None, description="Matches records whose result is in this list."
+    )
+    not_equals: SchedulingResultGQL | None = strawberry.field(
+        default=None, description="Excludes records with this exact scheduling result."
+    )
+    not_in: list[SchedulingResultGQL] | None = strawberry.field(
+        default=None, description="Excludes records whose result is in this list."
+    )
+
+
 # Filters
 
 
@@ -351,7 +372,7 @@ class SessionSchedulingHistoryFilter(GQLFilter):
     phase: StringFilter | None = None
     from_status: list[str] | None = None
     to_status: list[str] | None = None
-    result: list[SchedulingResultGQL] | None = None
+    result: SchedulingResultFilterGQL | None = None
     error_code: StringFilter | None = None
     message: StringFilter | None = None
     created_at: DateTimeFilter | None = None
@@ -398,12 +419,30 @@ class SessionSchedulingHistoryFilter(GQLFilter):
         if self.to_status is not None and len(self.to_status) > 0:
             conditions.append(SessionSchedulingHistoryConditions.by_to_statuses(self.to_status))
 
-        if self.result is not None and len(self.result) > 0:
-            conditions.append(
-                SessionSchedulingHistoryConditions.by_results([
-                    r.to_internal() for r in self.result
-                ])
-            )
+        if self.result is not None:
+            r_filter = self.result
+            if r_filter.equals is not None:
+                conditions.append(
+                    SessionSchedulingHistoryConditions.by_result(r_filter.equals.to_internal())
+                )
+            if r_filter.in_ is not None and len(r_filter.in_) > 0:
+                conditions.append(
+                    SessionSchedulingHistoryConditions.by_results([
+                        r.to_internal() for r in r_filter.in_
+                    ])
+                )
+            if r_filter.not_equals is not None:
+                conditions.append(
+                    SessionSchedulingHistoryConditions.by_result_not_equals(
+                        r_filter.not_equals.to_internal()
+                    )
+                )
+            if r_filter.not_in is not None and len(r_filter.not_in) > 0:
+                conditions.append(
+                    SessionSchedulingHistoryConditions.by_result_not_in([
+                        r.to_internal() for r in r_filter.not_in
+                    ])
+                )
 
         if self.error_code is not None:
             condition = self.error_code.build_query_condition(
@@ -490,7 +529,7 @@ class DeploymentHistoryFilter(GQLFilter):
     phase: StringFilter | None = None
     from_status: list[str] | None = None
     to_status: list[str] | None = None
-    result: list[SchedulingResultGQL] | None = None
+    result: SchedulingResultFilterGQL | None = None
     error_code: StringFilter | None = None
     message: StringFilter | None = None
     created_at: DateTimeFilter | None = None
@@ -537,10 +576,28 @@ class DeploymentHistoryFilter(GQLFilter):
         if self.to_status is not None and len(self.to_status) > 0:
             conditions.append(DeploymentHistoryConditions.by_to_statuses(self.to_status))
 
-        if self.result is not None and len(self.result) > 0:
-            conditions.append(
-                DeploymentHistoryConditions.by_results([r.to_internal() for r in self.result])
-            )
+        if self.result is not None:
+            r_filter = self.result
+            if r_filter.equals is not None:
+                conditions.append(
+                    DeploymentHistoryConditions.by_result(r_filter.equals.to_internal())
+                )
+            if r_filter.in_ is not None and len(r_filter.in_) > 0:
+                conditions.append(
+                    DeploymentHistoryConditions.by_results([r.to_internal() for r in r_filter.in_])
+                )
+            if r_filter.not_equals is not None:
+                conditions.append(
+                    DeploymentHistoryConditions.by_result_not_equals(
+                        r_filter.not_equals.to_internal()
+                    )
+                )
+            if r_filter.not_in is not None and len(r_filter.not_in) > 0:
+                conditions.append(
+                    DeploymentHistoryConditions.by_result_not_in([
+                        r.to_internal() for r in r_filter.not_in
+                    ])
+                )
 
         if self.error_code is not None:
             condition = self.error_code.build_query_condition(
@@ -628,7 +685,7 @@ class RouteHistoryFilter(GQLFilter):
     phase: StringFilter | None = None
     from_status: list[str] | None = None
     to_status: list[str] | None = None
-    result: list[SchedulingResultGQL] | None = None
+    result: SchedulingResultFilterGQL | None = None
     error_code: StringFilter | None = None
     message: StringFilter | None = None
     created_at: DateTimeFilter | None = None
@@ -683,10 +740,24 @@ class RouteHistoryFilter(GQLFilter):
         if self.to_status is not None and len(self.to_status) > 0:
             conditions.append(RouteHistoryConditions.by_to_statuses(self.to_status))
 
-        if self.result is not None and len(self.result) > 0:
-            conditions.append(
-                RouteHistoryConditions.by_results([r.to_internal() for r in self.result])
-            )
+        if self.result is not None:
+            r_filter = self.result
+            if r_filter.equals is not None:
+                conditions.append(RouteHistoryConditions.by_result(r_filter.equals.to_internal()))
+            if r_filter.in_ is not None and len(r_filter.in_) > 0:
+                conditions.append(
+                    RouteHistoryConditions.by_results([r.to_internal() for r in r_filter.in_])
+                )
+            if r_filter.not_equals is not None:
+                conditions.append(
+                    RouteHistoryConditions.by_result_not_equals(r_filter.not_equals.to_internal())
+                )
+            if r_filter.not_in is not None and len(r_filter.not_in) > 0:
+                conditions.append(
+                    RouteHistoryConditions.by_result_not_in([
+                        r.to_internal() for r in r_filter.not_in
+                    ])
+                )
 
         if self.error_code is not None:
             condition = self.error_code.build_query_condition(

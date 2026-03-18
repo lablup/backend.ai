@@ -169,6 +169,44 @@ class RouteConnection(Connection[Route]):
 # Filter and OrderBy types
 
 
+@strawberry.input(
+    name="RouteStatusFilter",
+    description="Added in 26.3.0. Filter for route status with equality and membership operators.",
+)
+class RouteStatusFilterGQL:
+    equals: RouteStatusGQL | None = strawberry.field(
+        default=None, description="Matches routes with this exact status."
+    )
+    in_: list[RouteStatusGQL] | None = strawberry.field(
+        name="in", default=None, description="Matches routes whose status is in this list."
+    )
+    not_equals: RouteStatusGQL | None = strawberry.field(
+        default=None, description="Excludes routes with this exact status."
+    )
+    not_in: list[RouteStatusGQL] | None = strawberry.field(
+        default=None, description="Excludes routes whose status is in this list."
+    )
+
+
+@strawberry.input(
+    name="RouteTrafficStatusFilter",
+    description="Added in 26.3.0. Filter for route traffic status with equality and membership operators.",
+)
+class RouteTrafficStatusFilterGQL:
+    equals: RouteTrafficStatusGQL | None = strawberry.field(
+        default=None, description="Matches routes with this exact traffic status."
+    )
+    in_: list[RouteTrafficStatusGQL] | None = strawberry.field(
+        name="in", default=None, description="Matches routes whose traffic status is in this list."
+    )
+    not_equals: RouteTrafficStatusGQL | None = strawberry.field(
+        default=None, description="Excludes routes with this exact traffic status."
+    )
+    not_in: list[RouteTrafficStatusGQL] | None = strawberry.field(
+        default=None, description="Excludes routes whose traffic status is in this list."
+    )
+
+
 @strawberry.enum
 class RouteOrderField(StrEnum):
     CREATED_AT = "created_at"
@@ -178,8 +216,8 @@ class RouteOrderField(StrEnum):
 
 @strawberry.input(description="Added in 25.19.0. Filter for routes.")
 class RouteFilter(GQLFilter):
-    status: list[RouteStatusGQL] | None = None
-    traffic_status: list[RouteTrafficStatusGQL] | None = None
+    status: RouteStatusFilterGQL | None = None
+    traffic_status: RouteTrafficStatusFilterGQL | None = None
 
     AND: list[RouteFilter] | None = None
     OR: list[RouteFilter] | None = None
@@ -190,15 +228,51 @@ class RouteFilter(GQLFilter):
         """Build query conditions from this filter."""
         conditions: list[QueryCondition] = []
 
-        if self.status:
-            internal_statuses = [RouteStatusEnum(s.value) for s in self.status]
-            conditions.append(RouteConditions.by_statuses(internal_statuses))
+        if self.status is not None:
+            st = self.status
+            if st.equals is not None:
+                conditions.append(
+                    RouteConditions.by_status_equals(RouteStatusEnum(st.equals.value))
+                )
+            if st.in_ is not None:
+                conditions.append(
+                    RouteConditions.by_statuses([RouteStatusEnum(s.value) for s in st.in_])
+                )
+            if st.not_equals is not None:
+                conditions.append(
+                    RouteConditions.by_status_not_equals(RouteStatusEnum(st.not_equals.value))
+                )
+            if st.not_in is not None:
+                conditions.append(
+                    RouteConditions.by_status_not_in([RouteStatusEnum(s.value) for s in st.not_in])
+                )
 
-        if self.traffic_status:
-            internal_traffic_statuses = [
-                RouteTrafficStatusEnum(ts.value) for ts in self.traffic_status
-            ]
-            conditions.append(RouteConditions.by_traffic_statuses(internal_traffic_statuses))
+        if self.traffic_status is not None:
+            ts = self.traffic_status
+            if ts.equals is not None:
+                conditions.append(
+                    RouteConditions.by_traffic_status_equals(
+                        RouteTrafficStatusEnum(ts.equals.value)
+                    )
+                )
+            if ts.in_ is not None:
+                conditions.append(
+                    RouteConditions.by_traffic_statuses([
+                        RouteTrafficStatusEnum(s.value) for s in ts.in_
+                    ])
+                )
+            if ts.not_equals is not None:
+                conditions.append(
+                    RouteConditions.by_traffic_status_not_equals(
+                        RouteTrafficStatusEnum(ts.not_equals.value)
+                    )
+                )
+            if ts.not_in is not None:
+                conditions.append(
+                    RouteConditions.by_traffic_status_not_in([
+                        RouteTrafficStatusEnum(s.value) for s in ts.not_in
+                    ])
+                )
 
         # Handle AND logical operator
         if self.AND:
