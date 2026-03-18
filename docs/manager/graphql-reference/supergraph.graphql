@@ -12952,7 +12952,7 @@ type UpdateDeploymentPayload
 }
 
 """
-Added in 26.3.0. Input for updating a deployment policy. Internally upserts the policy.
+Added in 26.4.0. Input for updating a deployment policy. Internally upserts the policy.
 """
 input UpdateDeploymentPolicyInput
   @join__type(graph: STRAWBERRY)
@@ -12964,7 +12964,7 @@ input UpdateDeploymentPolicyInput
   blueGreen: BlueGreenConfigInput = null
 }
 
-"""Added in 26.3.0. Result of updating a deployment policy."""
+"""Added in 26.4.0. Result of updating a deployment policy."""
 type UpdateDeploymentPolicyPayload
   @join__type(graph: STRAWBERRY)
 {
