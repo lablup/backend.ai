@@ -710,16 +710,6 @@ class CreateNotificationRuleInput:
     message_template: str
     enabled: bool = True
 
-    def to_pydantic(self) -> CreateNotificationRuleInputDTO:
-        return CreateNotificationRuleInputDTO(
-            name=self.name,
-            description=self.description,
-            rule_type=self.rule_type.to_internal(),
-            channel_id=uuid.UUID(self.channel_id),
-            message_template=self.message_template,
-            enabled=self.enabled,
-        )
-
 
 @strawberry.experimental.pydantic.input(
     model=UpdateNotificationRuleInputDTO,

@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import uuid
-
 import strawberry
 from strawberry import ID, Info
 
@@ -105,11 +103,6 @@ class DeleteUserConfigInput:
     """Input type for deleting user-level app configuration."""
 
     user_id: ID | None = None
-
-    def to_pydantic(self) -> DeleteUserConfigInputDTO:
-        return DeleteUserConfigInputDTO(
-            user_id=uuid.UUID(self.user_id) if self.user_id is not None else None
-        )
 
 
 @strawberry.type(

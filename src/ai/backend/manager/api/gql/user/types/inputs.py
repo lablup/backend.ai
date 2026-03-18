@@ -91,27 +91,6 @@ class CreateUserInputGQL:
         description="Supplementary group IDs for container processes.",
     )
 
-    def to_pydantic(self) -> CreateUserInputDTO:
-        return CreateUserInputDTO(
-            email=self.email,
-            username=self.username,
-            password=self.password,
-            domain_name=self.domain_name,
-            need_password_change=self.need_password_change,
-            status=DtoUserStatus(self.status.value),
-            role=DtoUserRole(self.role.value),
-            full_name=self.full_name,
-            description=self.description,
-            group_ids=self.group_ids,
-            allowed_client_ip=self.allowed_client_ip,
-            totp_activated=self.totp_activated,
-            resource_policy=self.resource_policy,
-            sudo_session_enabled=self.sudo_session_enabled,
-            container_uid=self.container_uid,
-            container_main_gid=self.container_main_gid,
-            container_gids=self.container_gids,
-        )
-
 
 @strawberry.input(
     name="BulkCreateUserV2Input",

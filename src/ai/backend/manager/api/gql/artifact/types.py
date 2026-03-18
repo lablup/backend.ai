@@ -688,9 +688,6 @@ class DeleteArtifactsInput:
 class RestoreArtifactsInput:
     artifact_ids: list[ID]
 
-    def to_pydantic(self) -> RestoreArtifactsInputDTO:
-        return RestoreArtifactsInputDTO(artifact_ids=[uuid.UUID(i) for i in self.artifact_ids])
-
 
 @strawberry.experimental.pydantic.input(
     model=ApproveArtifactInputDTO,
@@ -705,9 +702,6 @@ class RestoreArtifactsInput:
 class ApproveArtifactInput:
     artifact_revision_id: ID
 
-    def to_pydantic(self) -> ApproveArtifactInputDTO:
-        return ApproveArtifactInputDTO(artifact_revision_id=uuid.UUID(self.artifact_revision_id))
-
 
 @strawberry.experimental.pydantic.input(
     model=RejectArtifactInputDTO,
@@ -721,9 +715,6 @@ class ApproveArtifactInput:
 )
 class RejectArtifactInput:
     artifact_revision_id: ID
-
-    def to_pydantic(self) -> RejectArtifactInputDTO:
-        return RejectArtifactInputDTO(artifact_revision_id=uuid.UUID(self.artifact_revision_id))
 
 
 @strawberry.input(

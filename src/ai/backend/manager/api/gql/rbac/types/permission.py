@@ -380,15 +380,6 @@ class CreatePermissionInput:
     entity_type: RBACElementTypeGQL
     operation: OperationTypeGQL
 
-    def to_pydantic(self) -> CreatePermissionInputDTO:
-        return CreatePermissionInputDTO(
-            role_id=self.role_id,
-            scope_type=self.scope_type.value,
-            scope_id=self.scope_id,
-            entity_type=self.entity_type.value,
-            operation=self.operation.value,
-        )
-
 
 @strawberry.experimental.pydantic.input(
     model=UpdatePermissionInputDTO,
