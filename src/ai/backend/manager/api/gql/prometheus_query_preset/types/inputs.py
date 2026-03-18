@@ -24,7 +24,8 @@ from ai.backend.common.dto.manager.v2.prometheus_query_preset.request import (
 from ai.backend.manager.data.prometheus_query_preset import ExecutePresetOptions
 
 
-@strawberry.input(
+@strawberry.experimental.pydantic.input(
+    model=CreateQueryDefinitionOptionsInputDTO,
     name="QueryDefinitionOptionsInput",
     description="Added in 26.3.0. Options for query definition labels.",
 )
@@ -48,18 +49,6 @@ class CreateQueryDefinitionInput:
     options: QueryDefinitionOptionsInput = strawberry.field(
         description="Query definition options including filter and group labels."
     )
-
-    def to_pydantic(self) -> CreateQueryDefinitionInputDTO:
-        return CreateQueryDefinitionInputDTO(
-            name=self.name,
-            metric_name=self.metric_name,
-            query_template=self.query_template,
-            time_window=self.time_window,
-            options=CreateQueryDefinitionOptionsInputDTO(
-                filter_labels=self.options.filter_labels,
-                group_labels=self.options.group_labels,
-            ),
-        )
 
 
 @strawberry.experimental.pydantic.input(

@@ -16,9 +16,6 @@ from ai.backend.common.dto.manager.v2.resource_group.request import (
     PreemptionConfigInputDTO,
 )
 from ai.backend.common.dto.manager.v2.resource_group.request import (
-    ResourceWeightEntryInput as ResourceWeightEntryInputDTO,
-)
-from ai.backend.common.dto.manager.v2.resource_group.request import (
     UpdateResourceGroupConfigInput as UpdateResourceGroupConfigInputDTO,
 )
 from ai.backend.common.dto.manager.v2.resource_group.request import (
@@ -597,7 +594,8 @@ class ResourceGroupOrderByGQL(GQLOrderBy):
                 return ScalingGroupOrders.is_active(ascending)
 
 
-@strawberry.input(
+@strawberry.experimental.pydantic.input(
+    model=PreemptionConfigInputDTO,
     name="PreemptionConfigInput",
     description="Added in 26.3.0. Input for preemption configuration.",
 )
@@ -671,13 +669,7 @@ class UpdateResourceGroupFairShareSpecInput:
             default_weight=self.default_weight,
             resource_weights=None
             if self.resource_weights is None
-            else [
-                ResourceWeightEntryInputDTO(
-                    resource_type=entry.resource_type,
-                    weight=entry.weight,
-                )
-                for entry in self.resource_weights
-            ],
+            else [entry.to_pydantic() for entry in self.resource_weights],
         )
 
 
@@ -761,14 +753,8 @@ class UpdateResourceGroupInput:
             app_proxy_addr=self.app_proxy_addr,
             appproxy_api_token=self.appproxy_api_token,
             use_host_network=self.use_host_network,
-            scheduler_type=None if self.scheduler_type is None else self.scheduler_type.value,
-            preemption=None
-            if self.preemption is None
-            else PreemptionConfigInputDTO(
-                preemptible_priority=self.preemption.preemptible_priority,
-                order=self.preemption.order.value,
-                mode=self.preemption.mode.value,
-            ),
+            scheduler_type=self.scheduler_type,
+            preemption=None if self.preemption is None else self.preemption.to_pydantic(),
         )
 
 

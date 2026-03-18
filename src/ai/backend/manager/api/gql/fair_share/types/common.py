@@ -9,6 +9,9 @@ from typing import Self
 
 import strawberry
 
+from ai.backend.common.dto.manager.v2.resource_group.request import (
+    ResourceWeightEntryInput as ResourceWeightEntryInputDTO,
+)
 from ai.backend.common.types import SlotQuantity
 from ai.backend.manager.data.fair_share.types import FairShareSpec
 from ai.backend.manager.errors.fair_share import FairShareError
@@ -65,7 +68,8 @@ class ResourceSlotEntryGQL:
     )
 
 
-@strawberry.input(
+@strawberry.experimental.pydantic.input(
+    model=ResourceWeightEntryInputDTO,
     name="ResourceWeightEntryInput",
     description=(
         "Added in 26.1.0. Input for a single resource weight entry. "
