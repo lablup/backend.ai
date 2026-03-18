@@ -2,36 +2,45 @@
 
 from __future__ import annotations
 
-from datetime import datetime
-
 import strawberry
+
+from ai.backend.common.dto.manager.v2.user.response import (
+    EntityTimestamps as EntityTimestampsDTO,
+)
+from ai.backend.common.dto.manager.v2.user.response import (
+    UserBasicInfo as UserBasicInfoDTO,
+)
+from ai.backend.common.dto.manager.v2.user.response import (
+    UserContainerSettings as UserContainerSettingsDTO,
+)
+from ai.backend.common.dto.manager.v2.user.response import (
+    UserOrganizationInfo as UserOrganizationInfoDTO,
+)
+from ai.backend.common.dto.manager.v2.user.response import (
+    UserSecurityInfo as UserSecurityInfoDTO,
+)
+from ai.backend.common.dto.manager.v2.user.response import (
+    UserStatusInfo as UserStatusInfoDTO,
+)
 
 from .enums import UserRoleEnumGQL, UserStatusEnumGQL
 
 
-@strawberry.type(
+@strawberry.experimental.pydantic.type(
+    model=UserBasicInfoDTO,
     name="UserV2BasicInfo",
     description=(
         "Added in 26.2.0. Basic user profile information. "
         "Contains identity and descriptive fields for the user account."
     ),
+    all_fields=True,
 )
 class UserBasicInfoGQL:
     """Basic user profile information."""
 
-    username: str | None = strawberry.field(
-        description="Unique username for login. May be null if only email-based login is used."
-    )
-    email: str = strawberry.field(
-        description="User's email address. Used for login and notifications."
-    )
-    full_name: str | None = strawberry.field(description="User's full display name.")
-    description: str | None = strawberry.field(
-        description="Optional description or notes about the user."
-    )
 
-
-@strawberry.type(
+@strawberry.experimental.pydantic.type(
+    model=UserStatusInfoDTO,
     name="UserV2StatusInfo",
     description=(
         "Added in 26.2.0. User account status information. "
@@ -55,7 +64,8 @@ class UserStatusInfoGQL:
     )
 
 
-@strawberry.type(
+@strawberry.experimental.pydantic.type(
+    model=UserOrganizationInfoDTO,
     name="UserV2OrganizationInfo",
     description=(
         "Added in 26.2.0. User's organizational context and permissions. "
@@ -79,68 +89,40 @@ class UserOrganizationInfoGQL:
     )
 
 
-@strawberry.type(
+@strawberry.experimental.pydantic.type(
+    model=UserSecurityInfoDTO,
     name="UserV2SecurityInfo",
     description=(
         "Added in 26.2.0. User security settings and authentication configuration. "
         "Contains IP restrictions, TOTP settings, and privilege flags."
     ),
+    all_fields=True,
 )
 class UserSecurityInfoGQL:
     """User security settings and authentication configuration."""
 
-    allowed_client_ip: list[str] | None = strawberry.field(
-        description=(
-            "List of allowed client IP addresses or CIDR ranges. "
-            "If set, login is restricted to these IP addresses. "
-            "Supports both IPv4 and IPv6 formats (e.g., '192.168.1.0/24', '::1')."
-        )
-    )
-    totp_activated: bool | None = strawberry.field(
-        description="Whether TOTP (Time-based One-Time Password) two-factor authentication is enabled."
-    )
-    totp_activated_at: datetime | None = strawberry.field(
-        description="Timestamp when TOTP was activated."
-    )
-    sudo_session_enabled: bool = strawberry.field(
-        description="Whether this user can create sudo (privileged) sessions."
-    )
 
-
-@strawberry.type(
+@strawberry.experimental.pydantic.type(
+    model=UserContainerSettingsDTO,
     name="UserV2ContainerSettings",
     description=(
         "Added in 26.2.0. Container execution settings for the user. "
         "Defines UID/GID mappings for containers created by this user."
     ),
+    all_fields=True,
 )
 class UserContainerSettingsGQL:
     """Container execution settings for the user."""
 
-    container_uid: int | None = strawberry.field(
-        description="User ID (UID) to use inside containers. If null, system default is used."
-    )
-    container_main_gid: int | None = strawberry.field(
-        description="Primary group ID (GID) to use inside containers. If null, system default is used."
-    )
-    container_gids: list[int] | None = strawberry.field(
-        description="Additional supplementary group IDs for container processes."
-    )
 
-
-@strawberry.type(
+@strawberry.experimental.pydantic.type(
+    model=EntityTimestampsDTO,
     name="EntityTimestamps",
     description=(
         "Added in 26.2.0. Common timestamp fields for entity lifecycle tracking. "
         "Reusable across different entity types."
     ),
+    all_fields=True,
 )
 class EntityTimestampsGQL:
     """Common timestamp fields for entity lifecycle tracking."""
-
-    created_at: datetime | None = strawberry.field(
-        description="Timestamp when this entity was created."
-    )
-    modified_at: datetime | None = strawberry.field(
-        description="Timestamp when this entity was last modified."
-    )
