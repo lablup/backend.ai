@@ -47,7 +47,7 @@ class AuthorizeInput(BaseRequestModel):
     stoken: str | None = Field(
         default=None,
         description="Secondary token forwarded to auth hook plugins (e.g., for 2FA)",
-        validation_alias=AliasChoices("stoken", "sToken"),
+        validation_alias=AliasChoices("stoken", "sToken", "otp"),
     )
 
 
