@@ -113,6 +113,9 @@ class RevisionInput(BaseRequestModel):
     runtime_variant: RuntimeVariant = Field(
         default=RuntimeVariant.CUSTOM, description="Runtime variant"
     )
+    inference_runtime_config: dict[str, Any] | None = Field(
+        default=None, description="Framework-specific inference runtime configuration"
+    )
     model_vfolder_id: UUID = Field(description="Model VFolder ID")
     model_mount_destination: str = Field(
         default="/models", description="Mount destination for model vfolder"

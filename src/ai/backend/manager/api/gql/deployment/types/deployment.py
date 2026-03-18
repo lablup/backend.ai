@@ -26,12 +26,6 @@ from ai.backend.common.dto.manager.v2.deployment.request import (
     DeleteDeploymentInput as DeleteDeploymentInputDTO,
 )
 from ai.backend.common.dto.manager.v2.deployment.request import (
-    ExtraVFolderMountInput as ExtraVFolderMountInputDTO,
-)
-from ai.backend.common.dto.manager.v2.deployment.request import (
-    RevisionInput as RevisionInputDTO,
-)
-from ai.backend.common.dto.manager.v2.deployment.request import (
     RollingUpdateConfigInput as RollingUpdateConfigInputDTO,
 )
 from ai.backend.common.dto.manager.v2.deployment.request import (
@@ -43,8 +37,6 @@ from ai.backend.common.dto.manager.v2.deployment.request import (
 from ai.backend.common.exception import (
     InvalidAPIParameters,
 )
-from ai.backend.common.types import ClusterMode as CommonClusterMode
-from ai.backend.common.types import RuntimeVariant
 from ai.backend.manager.api.gql.base import (
     OrderDirection,
     StringFilter,
@@ -670,46 +662,7 @@ class CreateDeploymentInput:
                 auto_promote=self.default_deployment_strategy.blue_green.auto_promote,
                 promote_delay_seconds=self.default_deployment_strategy.blue_green.promote_delay_seconds,
             )
-        extra_mounts_dto: list[ExtraVFolderMountInputDTO] | None = None
-        if self.initial_revision.extra_mounts is not None:
-            extra_mounts_dto = [
-                ExtraVFolderMountInputDTO(
-                    vfolder_id=UUID(str(m.vfolder_id)),
-                    mount_destination=m.mount_destination,
-                )
-                for m in self.initial_revision.extra_mounts
-            ]
-        environ_dto: dict[str, str] | None = None
-        if self.initial_revision.model_runtime_config.environ is not None:
-            environ_dto = {
-                e.name: e.value for e in self.initial_revision.model_runtime_config.environ.entries
-            }
-        resource_slots_dict = {
-            e.resource_type: e.quantity
-            for e in self.initial_revision.resource_config.resource_slots.entries
-        }
-        resource_opts_dict: dict[str, str] | None = None
-        if self.initial_revision.resource_config.resource_opts is not None:
-            resource_opts_dict = {
-                e.name: e.value for e in self.initial_revision.resource_config.resource_opts.entries
-            }
-        revision_dto = RevisionInputDTO(
-            name=self.initial_revision.name,
-            image_id=UUID(str(self.initial_revision.image.id)),
-            cluster_mode=CommonClusterMode(self.initial_revision.cluster_config.mode),
-            cluster_size=self.initial_revision.cluster_config.size,
-            resource_group=self.initial_revision.resource_config.resource_group.name,
-            resource_slots=resource_slots_dict,
-            resource_opts=resource_opts_dict,
-            runtime_variant=RuntimeVariant(
-                self.initial_revision.model_runtime_config.runtime_variant
-            ),
-            model_vfolder_id=UUID(str(self.initial_revision.model_mount_config.vfolder_id)),
-            model_mount_destination=self.initial_revision.model_mount_config.mount_destination,
-            model_definition_path=self.initial_revision.model_mount_config.definition_path,
-            extra_mounts=extra_mounts_dto,
-            environ=environ_dto,
-        )
+        revision_dto = self.initial_revision.to_pydantic()
         return CreateDeploymentInputDTO(
             project_id=UUID(str(self.metadata.project_id)),
             domain_name=self.metadata.domain_name,

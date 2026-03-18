@@ -2,10 +2,9 @@
 
 from __future__ import annotations
 
-from collections.abc import Iterable, Mapping, Sequence
+from collections.abc import Iterable, Sequence
 from datetime import datetime
-from pathlib import PurePosixPath
-from typing import TYPE_CHECKING, Annotated, Any, Self, cast, override
+from typing import TYPE_CHECKING, Annotated, Any, Self, override
 from uuid import UUID
 
 import strawberry
@@ -15,6 +14,15 @@ from strawberry.scalars import JSON
 
 from ai.backend.common.dto.manager.v2.deployment.request import (
     ActivateRevisionInput as ActivateRevisionInputDTO,
+)
+from ai.backend.common.dto.manager.v2.deployment.request import (
+    AddRevisionInput as AddRevisionInputDTO,
+)
+from ai.backend.common.dto.manager.v2.deployment.request import (
+    ExtraVFolderMountInput as ExtraVFolderMountInputDTO,
+)
+from ai.backend.common.dto.manager.v2.deployment.request import (
+    RevisionInput as RevisionInputDTO,
 )
 from ai.backend.common.types import ClusterMode as CommonClusterMode
 from ai.backend.common.types import MountPermission as CommonMountPermission
@@ -38,17 +46,13 @@ from ai.backend.manager.api.gql.vfolder import ExtraVFolderMountConnection, VFol
 from ai.backend.manager.api.gql_legacy.image import ImageNode
 from ai.backend.manager.api.gql_legacy.scaling_group import ScalingGroupNode
 from ai.backend.manager.api.gql_legacy.vfolder import VirtualFolderNode
-from ai.backend.manager.data.deployment.creator import ModelRevisionCreator, VFolderMountsCreator
 from ai.backend.manager.data.deployment.types import (
     ClusterConfigData,
-    ExecutionSpec,
     ModelMountConfigData,
     ModelRevisionData,
     ModelRevisionOrderField,
     ModelRuntimeConfigData,
-    MountInfo,
     ResourceConfigData,
-    ResourceSpec,
 )
 from ai.backend.manager.models.deployment_revision.conditions import RevisionConditions
 from ai.backend.manager.models.deployment_revision.orders import RevisionOrders
@@ -502,8 +506,9 @@ class ExtraVFolderMountInput:
     mount_destination: str | None
 
 
-@strawberry.input(
-    description="Added in 25.19.0. Input for specifying revision configuration within a deployment."
+@strawberry.experimental.pydantic.input(
+    model=RevisionInputDTO,
+    description="Added in 25.19.0. Input for specifying revision configuration within a deployment.",
 )
 class CreateRevisionInput:
     name: str | None = None
@@ -514,52 +519,50 @@ class CreateRevisionInput:
     model_mount_config: ModelMountConfigInput
     extra_mounts: list[ExtraVFolderMountInput] | None
 
-    def to_model_revision_creator(self) -> ModelRevisionCreator:
-        resource_spec = ResourceSpec(
+    def to_pydantic(self) -> RevisionInputDTO:
+        resource_slots_dict = {
+            e.resource_type: e.quantity for e in self.resource_config.resource_slots.entries
+        }
+        resource_opts_dict: dict[str, str] | None = None
+        if self.resource_config.resource_opts is not None:
+            resource_opts_dict = {
+                e.name: e.value for e in self.resource_config.resource_opts.entries
+            }
+        environ_dict: dict[str, str] | None = None
+        if self.model_runtime_config.environ is not None:
+            environ_dict = {e.name: e.value for e in self.model_runtime_config.environ.entries}
+        return RevisionInputDTO(
+            name=self.name,
+            image_id=UUID(str(self.image.id)),
             cluster_mode=CommonClusterMode(self.cluster_config.mode),
             cluster_size=self.cluster_config.size,
-            resource_slots=cast(Mapping[str, Any], self.resource_config.resource_slots),
-            resource_opts=cast(Mapping[str, Any] | None, self.resource_config.resource_opts),
-        )
-
-        extra_mounts = []
-        if self.extra_mounts is not None:
-            extra_mounts = [
-                MountInfo(
-                    vfolder_id=UUID(str(extra_mount.vfolder_id)),
-                    kernel_path=PurePosixPath(extra_mount.mount_destination)
-                    if extra_mount.mount_destination
-                    else None,
-                )
-                for extra_mount in self.extra_mounts
-            ]
-
-        mounts = VFolderMountsCreator(
-            model_vfolder_id=UUID(str(self.model_mount_config.vfolder_id)),
-            model_definition_path=self.model_mount_config.definition_path,
-            model_mount_destination=self.model_mount_config.mount_destination,
-            extra_mounts=extra_mounts,
-        )
-
-        execution_spec = ExecutionSpec(
-            environ={e.name: e.value for e in self.model_runtime_config.environ.entries}
-            if self.model_runtime_config.environ
-            else None,
+            resource_group=self.resource_config.resource_group.name,
+            resource_slots=resource_slots_dict,
+            resource_opts=resource_opts_dict,
             runtime_variant=RuntimeVariant(self.model_runtime_config.runtime_variant),
-            inference_runtime_config=cast(
-                dict[str, Any] | None, self.model_runtime_config.inference_runtime_config
-            ),
+            inference_runtime_config=dict(self.model_runtime_config.inference_runtime_config)
+            if self.model_runtime_config.inference_runtime_config is not None
+            else None,
+            model_vfolder_id=UUID(str(self.model_mount_config.vfolder_id)),
+            model_mount_destination=self.model_mount_config.mount_destination,
+            model_definition_path=self.model_mount_config.definition_path,
+            extra_mounts=[
+                ExtraVFolderMountInputDTO(
+                    vfolder_id=UUID(str(m.vfolder_id)),
+                    mount_destination=m.mount_destination,
+                )
+                for m in self.extra_mounts
+            ]
+            if self.extra_mounts is not None
+            else None,
+            environ=environ_dict,
         )
 
-        return ModelRevisionCreator(
-            image_id=UUID(str(self.image.id)),
-            resource_spec=resource_spec,
-            mounts=mounts,
-            execution=execution_spec,
-        )
 
-
-@strawberry.input(description="Added in 25.19.0")
+@strawberry.experimental.pydantic.input(
+    model=AddRevisionInputDTO,
+    description="Added in 25.19.0",
+)
 class AddRevisionInput:
     name: str | None = None
     deployment_id: ID
@@ -570,49 +573,46 @@ class AddRevisionInput:
     model_mount_config: ModelMountConfigInput
     extra_mounts: list[ExtraVFolderMountInput] | None
 
-    def to_model_revision_creator(self) -> ModelRevisionCreator:
-        """Build ModelRevisionCreator from input fields."""
-        resource_spec = ResourceSpec(
-            cluster_mode=CommonClusterMode(self.cluster_config.mode),
-            cluster_size=self.cluster_config.size,
-            resource_slots=cast(Mapping[str, Any], self.resource_config.resource_slots),
-            resource_opts=cast(Mapping[str, Any] | None, self.resource_config.resource_opts),
-        )
-
-        extra_mounts = []
-        if self.extra_mounts is not None:
-            extra_mounts = [
-                MountInfo(
-                    vfolder_id=UUID(str(extra_mount.vfolder_id)),
-                    kernel_path=PurePosixPath(extra_mount.mount_destination)
-                    if extra_mount.mount_destination
-                    else None,
-                )
-                for extra_mount in self.extra_mounts
-            ]
-
-        mounts = VFolderMountsCreator(
-            model_vfolder_id=UUID(str(self.model_mount_config.vfolder_id)),
-            model_definition_path=self.model_mount_config.definition_path,
-            model_mount_destination=self.model_mount_config.mount_destination,
-            extra_mounts=extra_mounts,
-        )
-
-        execution_spec = ExecutionSpec(
-            environ={e.name: e.value for e in self.model_runtime_config.environ.entries}
-            if self.model_runtime_config.environ
-            else None,
-            runtime_variant=RuntimeVariant(self.model_runtime_config.runtime_variant),
-            inference_runtime_config=cast(
-                dict[str, Any] | None, self.model_runtime_config.inference_runtime_config
+    def to_pydantic(self) -> AddRevisionInputDTO:
+        resource_slots_dict = {
+            e.resource_type: e.quantity for e in self.resource_config.resource_slots.entries
+        }
+        resource_opts_dict: dict[str, str] | None = None
+        if self.resource_config.resource_opts is not None:
+            resource_opts_dict = {
+                e.name: e.value for e in self.resource_config.resource_opts.entries
+            }
+        environ_dict: dict[str, str] | None = None
+        if self.model_runtime_config.environ is not None:
+            environ_dict = {e.name: e.value for e in self.model_runtime_config.environ.entries}
+        return AddRevisionInputDTO(
+            deployment_id=UUID(self.deployment_id),
+            revision=RevisionInputDTO(
+                name=self.name,
+                image_id=UUID(str(self.image.id)),
+                cluster_mode=CommonClusterMode(self.cluster_config.mode),
+                cluster_size=self.cluster_config.size,
+                resource_group=self.resource_config.resource_group.name,
+                resource_slots=resource_slots_dict,
+                resource_opts=resource_opts_dict,
+                runtime_variant=RuntimeVariant(self.model_runtime_config.runtime_variant),
+                inference_runtime_config=dict(self.model_runtime_config.inference_runtime_config)
+                if self.model_runtime_config.inference_runtime_config is not None
+                else None,
+                model_vfolder_id=UUID(str(self.model_mount_config.vfolder_id)),
+                model_mount_destination=self.model_mount_config.mount_destination,
+                model_definition_path=self.model_mount_config.definition_path,
+                extra_mounts=[
+                    ExtraVFolderMountInputDTO(
+                        vfolder_id=UUID(str(m.vfolder_id)),
+                        mount_destination=m.mount_destination,
+                    )
+                    for m in self.extra_mounts
+                ]
+                if self.extra_mounts is not None
+                else None,
+                environ=environ_dict,
             ),
-        )
-
-        return ModelRevisionCreator(
-            image_id=UUID(str(self.image.id)),
-            resource_spec=resource_spec,
-            mounts=mounts,
-            execution=execution_spec,
         )
 
 
