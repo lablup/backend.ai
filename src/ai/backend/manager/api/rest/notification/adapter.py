@@ -56,7 +56,7 @@ from ai.backend.manager.repositories.notification.updaters import (
     NotificationChannelUpdaterSpec,
     NotificationRuleUpdaterSpec,
 )
-from ai.backend.manager.types import OptionalState
+from ai.backend.manager.types import OptionalState, TriState
 
 __all__ = (
     "NotificationChannelAdapter",
@@ -107,14 +107,14 @@ class NotificationChannelAdapter(BaseFilterAdapter):
         """Convert update request to updater."""
 
         name = OptionalState[str].nop()
-        description = OptionalState[str | None].nop()
+        description = TriState[str].nop()
         spec = OptionalState[WebhookSpec | EmailSpec].nop()
         enabled = OptionalState[bool].nop()
 
         if request.name is not None:
             name = OptionalState.update(request.name)
         if request.description is not None:
-            description = OptionalState.update(request.description)
+            description = TriState.update(request.description)
         if request.spec is not None:
             # spec validator ensures this is WebhookSpec or EmailSpec
             if not isinstance(request.spec, WebhookSpec | EmailSpec):
@@ -218,14 +218,14 @@ class NotificationRuleAdapter(BaseFilterAdapter):
     ) -> Updater[NotificationRuleRow]:
         """Convert update request to updater."""
         name = OptionalState[str].nop()
-        description = OptionalState[str | None].nop()
+        description = TriState[str].nop()
         message_template = OptionalState[str].nop()
         enabled = OptionalState[bool].nop()
 
         if request.name is not None:
             name = OptionalState.update(request.name)
         if request.description is not None:
-            description = OptionalState.update(request.description)
+            description = TriState.update(request.description)
         if request.message_template is not None:
             message_template = OptionalState.update(request.message_template)
         if request.enabled is not None:

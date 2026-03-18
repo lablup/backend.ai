@@ -53,7 +53,7 @@ from ai.backend.manager.services.notification.actions import (
     UpdateChannelAction,
     UpdateRuleAction,
 )
-from ai.backend.manager.types import OptionalState
+from ai.backend.manager.types import OptionalState, TriState
 
 from .base import BaseAdapter
 
@@ -255,9 +255,9 @@ class NotificationAdapter(BaseAdapter):
                 OptionalState.update(input.name) if input.name is not None else OptionalState.nop()
             ),
             description=(
-                OptionalState[str | None].nop()
+                TriState[str].nop()
                 if isinstance(input.description, Sentinel)
-                else OptionalState[str | None].update(input.description)
+                else TriState[str].from_graphql(input.description)
             ),
             spec=(
                 OptionalState.update(input.spec) if input.spec is not None else OptionalState.nop()
@@ -278,9 +278,9 @@ class NotificationAdapter(BaseAdapter):
                 OptionalState.update(input.name) if input.name is not None else OptionalState.nop()
             ),
             description=(
-                OptionalState[str | None].nop()
+                TriState[str].nop()
                 if isinstance(input.description, Sentinel)
-                else OptionalState[str | None].update(input.description)
+                else TriState[str].from_graphql(input.description)
             ),
             message_template=(
                 OptionalState.update(input.message_template)

@@ -58,7 +58,7 @@ from ai.backend.manager.repositories.notification.updaters import (
     NotificationChannelUpdaterSpec,
     NotificationRuleUpdaterSpec,
 )
-from ai.backend.manager.types import OptionalState
+from ai.backend.manager.types import OptionalState, TriState
 
 # GraphQL enum types
 
@@ -599,7 +599,7 @@ class UpdateNotificationChannelInput:
 
         updater_spec = NotificationChannelUpdaterSpec(
             name=OptionalState[str].from_graphql(self.name),
-            description=OptionalState[str | None].from_graphql(self.description),
+            description=TriState[str].from_graphql(self.description),
             spec=spec_state,
             enabled=OptionalState[bool].from_graphql(self.enabled),
         )
@@ -647,7 +647,7 @@ class UpdateNotificationRuleInput:
     def to_updater(self, rule_id: uuid.UUID) -> Updater[NotificationRuleRow]:
         spec = NotificationRuleUpdaterSpec(
             name=OptionalState[str].from_graphql(self.name),
-            description=OptionalState[str | None].from_graphql(self.description),
+            description=TriState[str].from_graphql(self.description),
             message_template=OptionalState[str].from_graphql(self.message_template),
             enabled=OptionalState[bool].from_graphql(self.enabled),
         )
