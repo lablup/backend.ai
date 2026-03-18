@@ -39,6 +39,7 @@ from ai.backend.manager.models.artifact.orders import (
     TIEBREAKER_ORDER,
     resolve_order,
 )
+from ai.backend.manager.models.artifact.row import ArtifactRow
 from ai.backend.manager.repositories.artifact.updaters import ArtifactUpdaterSpec
 from ai.backend.manager.repositories.base import (
     BatchQuerier,
@@ -104,9 +105,9 @@ class ArtifactAdapter(BaseAdapter):
                 else TriState[str].from_graphql(input.description)
             ),
         )
-        updater: Updater[object] = Updater(spec=spec, pk_value=artifact_id)
+        updater: Updater[ArtifactRow] = Updater(spec=spec, pk_value=artifact_id)
         action_result = await self._processors.artifact.update.wait_for_complete(
-            UpdateArtifactAction(updater=updater)  # type: ignore[arg-type]
+            UpdateArtifactAction(updater=updater)
         )
         return UpdateArtifactPayload(artifact=self._data_to_dto(action_result.result))
 

@@ -8,6 +8,7 @@ from ai.backend.manager.api.adapters.agent import AgentAdapter
 from ai.backend.manager.api.adapters.artifact import ArtifactAdapter
 from ai.backend.manager.api.adapters.container_registry import ContainerRegistryAdapter
 from ai.backend.manager.api.adapters.domain import DomainAdapter
+from ai.backend.manager.api.adapters.fair_share import FairShareAdapter
 from ai.backend.manager.api.adapters.image import ImageAdapter
 from ai.backend.manager.api.adapters.notification import NotificationAdapter
 from ai.backend.manager.api.adapters.object_storage import ObjectStorageAdapter
@@ -39,6 +40,7 @@ class Adapters:
         artifact: ArtifactAdapter,
         container_registry: ContainerRegistryAdapter,
         domain: DomainAdapter,
+        fair_share: FairShareAdapter,
         image: ImageAdapter,
         notification: NotificationAdapter,
         object_storage: ObjectStorageAdapter,
@@ -56,6 +58,7 @@ class Adapters:
         self.artifact = artifact
         self.container_registry = container_registry
         self.domain = domain
+        self.fair_share = fair_share
         self.image = image
         self.notification = notification
         self.object_storage = object_storage
@@ -77,6 +80,7 @@ class Adapters:
             artifact=ArtifactAdapter(processors),
             container_registry=ContainerRegistryAdapter(processors),
             domain=DomainAdapter(processors),
+            fair_share=FairShareAdapter(processors),
             image=ImageAdapter(processors),
             notification=NotificationAdapter(processors),
             object_storage=ObjectStorageAdapter(processors),
