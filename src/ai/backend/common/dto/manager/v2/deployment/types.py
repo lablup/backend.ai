@@ -19,6 +19,8 @@ from ai.backend.common.data.model_deployment.types import (
 from ai.backend.common.types import ClusterMode, RuntimeVariant
 
 __all__ = (
+    "AccessTokenOrderField",
+    "AutoScalingRuleOrderField",
     "BlueGreenConfigInfo",
     "ClusterMode",
     "DeploymentBasicInfo",
@@ -131,3 +133,15 @@ class DeploymentPolicyInfo(BaseResponseModel):
     rollback_on_failure: bool
     rolling_update: RollingUpdateConfigInfo | None
     blue_green: BlueGreenConfigInfo | None
+
+
+class AccessTokenOrderField(StrEnum):
+    """Fields available for ordering access tokens."""
+
+    CREATED_AT = "created_at"
+
+
+class AutoScalingRuleOrderField(StrEnum):
+    """Fields available for ordering auto-scaling rules."""
+
+    CREATED_AT = "created_at"

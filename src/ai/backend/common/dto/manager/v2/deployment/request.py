@@ -5,26 +5,66 @@ Request DTOs for Deployment DTO v2.
 from __future__ import annotations
 
 from collections.abc import Mapping
+from datetime import datetime
+from decimal import Decimal
 from typing import Any
 from uuid import UUID
 
 from pydantic import Field, field_validator
 
 from ai.backend.common.api_handlers import SENTINEL, BaseRequestModel, Sentinel
-from ai.backend.common.data.model_deployment.types import DeploymentStrategy
-from ai.backend.common.types import ClusterMode, RuntimeVariant
+from ai.backend.common.data.model_deployment.types import (
+    DeploymentStrategy,
+    RouteStatus,
+    RouteTrafficStatus,
+)
+from ai.backend.common.dto.manager.query import StringFilter
+from ai.backend.common.dto.manager.v2.deployment.types import (
+    AccessTokenOrderField,
+    AutoScalingRuleOrderField,
+    DeploymentOrderField,
+    OrderDirection,
+    RevisionOrderField,
+    RouteOrderField,
+)
+from ai.backend.common.types import AutoScalingMetricSource, ClusterMode, RuntimeVariant
 
 __all__ = (
+    "AccessTokenFilter",
+    "AccessTokenOrder",
     "ActivateDeploymentInput",
     "AddRevisionInput",
+    "AdminSearchDeploymentsInput",
+    "AdminSearchRevisionsInput",
+    "AutoScalingRuleFilter",
+    "AutoScalingRuleOrder",
     "BlueGreenConfigInput",
+    "CreateAccessTokenInput",
+    "CreateAutoScalingRuleInput",
     "CreateDeploymentInput",
+    "DeleteAutoScalingRuleInput",
     "DeleteDeploymentInput",
+    "DeploymentFilter",
+    "DeploymentOrder",
+    "DeploymentPolicyFilter",
+    "DeploymentStatusFilter",
     "ExtraVFolderMountInput",
+    "RevisionFilter",
     "RevisionInput",
+    "RevisionOrder",
     "RollingUpdateConfigInput",
+    "RouteFilter",
+    "RouteOrder",
+    "RouteStatusFilter",
+    "RouteTrafficStatusFilter",
     "ScaleDeploymentInput",
+    "SearchAccessTokensInput",
+    "SearchAutoScalingRulesInput",
+    "SearchDeploymentPoliciesInput",
+    "SearchRoutesInput",
+    "UpdateAutoScalingRuleInput",
     "UpdateDeploymentInput",
+    "UpsertDeploymentPolicyInput",
 )
 
 
@@ -165,3 +205,245 @@ class AddRevisionInput(BaseRequestModel):
 
     deployment_id: UUID = Field(description="Deployment ID")
     revision: RevisionInput = Field(description="Revision configuration")
+
+
+# ---------------------------------------------------------------------------
+# Filter types
+# ---------------------------------------------------------------------------
+
+
+class DeploymentStatusFilter(BaseRequestModel):
+    """Filter for deployment status."""
+
+    equals: str | None = Field(default=None, description="Exact status match")
+    in_: list[str] | None = Field(default=None, alias="in", description="Status is in list")
+
+
+class RouteStatusFilter(BaseRequestModel):
+    """Filter for route status."""
+
+    equals: RouteStatus | None = Field(default=None, description="Exact status match")
+    in_: list[RouteStatus] | None = Field(default=None, alias="in", description="Status is in list")
+
+
+class RouteTrafficStatusFilter(BaseRequestModel):
+    """Filter for route traffic status."""
+
+    equals: RouteTrafficStatus | None = Field(default=None, description="Exact status match")
+    in_: list[RouteTrafficStatus] | None = Field(
+        default=None, alias="in", description="Status is in list"
+    )
+
+
+class DeploymentFilter(BaseRequestModel):
+    """Filter for deployments."""
+
+    name: StringFilter | None = Field(default=None, description="Name filter")
+    status: DeploymentStatusFilter | None = Field(default=None, description="Status filter")
+    open_to_public: bool | None = Field(default=None, description="Public access filter")
+
+
+class RevisionFilter(BaseRequestModel):
+    """Filter for deployment revisions."""
+
+    name: StringFilter | None = Field(default=None, description="Name filter")
+    deployment_id: UUID | None = Field(default=None, description="Filter by deployment ID")
+
+
+class RouteFilter(BaseRequestModel):
+    """Filter for deployment routes."""
+
+    deployment_id: UUID | None = Field(default=None, description="Filter by deployment ID")
+    status: RouteStatusFilter | None = Field(default=None, description="Route status filter")
+    traffic_status: RouteTrafficStatusFilter | None = Field(
+        default=None, description="Traffic status filter"
+    )
+
+
+class AccessTokenFilter(BaseRequestModel):
+    """Filter for access tokens."""
+
+    deployment_id: UUID | None = Field(default=None, description="Filter by deployment ID")
+
+
+class AutoScalingRuleFilter(BaseRequestModel):
+    """Filter for auto-scaling rules."""
+
+    deployment_id: UUID | None = Field(default=None, description="Filter by deployment ID")
+
+
+class DeploymentPolicyFilter(BaseRequestModel):
+    """Filter for deployment policies."""
+
+    deployment_id: UUID | None = Field(default=None, description="Filter by deployment ID")
+
+
+# ---------------------------------------------------------------------------
+# Order types
+# ---------------------------------------------------------------------------
+
+
+class DeploymentOrder(BaseRequestModel):
+    """Ordering specification for deployments."""
+
+    field: DeploymentOrderField
+    direction: OrderDirection = OrderDirection.DESC
+
+
+class RevisionOrder(BaseRequestModel):
+    """Ordering specification for revisions."""
+
+    field: RevisionOrderField
+    direction: OrderDirection = OrderDirection.DESC
+
+
+class RouteOrder(BaseRequestModel):
+    """Ordering specification for routes."""
+
+    field: RouteOrderField
+    direction: OrderDirection = OrderDirection.DESC
+
+
+class AccessTokenOrder(BaseRequestModel):
+    """Ordering specification for access tokens."""
+
+    field: AccessTokenOrderField
+    direction: OrderDirection = OrderDirection.DESC
+
+
+class AutoScalingRuleOrder(BaseRequestModel):
+    """Ordering specification for auto-scaling rules."""
+
+    field: AutoScalingRuleOrderField
+    direction: OrderDirection = OrderDirection.DESC
+
+
+# ---------------------------------------------------------------------------
+# Search input types
+# ---------------------------------------------------------------------------
+
+
+class AdminSearchDeploymentsInput(BaseRequestModel):
+    """Input for searching deployments (admin, no scope)."""
+
+    filter: DeploymentFilter | None = Field(default=None, description="Filter criteria")
+    order: list[DeploymentOrder] | None = Field(default=None, description="Sort order")
+    limit: int | None = Field(default=None, ge=1, description="Max results per page")
+    offset: int | None = Field(default=None, ge=0, description="Pagination offset")
+
+
+class AdminSearchRevisionsInput(BaseRequestModel):
+    """Input for searching deployment revisions (admin, no scope)."""
+
+    filter: RevisionFilter | None = Field(default=None, description="Filter criteria")
+    order: list[RevisionOrder] | None = Field(default=None, description="Sort order")
+    limit: int | None = Field(default=None, ge=1, description="Max results per page")
+    offset: int | None = Field(default=None, ge=0, description="Pagination offset")
+
+
+class SearchRoutesInput(BaseRequestModel):
+    """Input for searching deployment routes."""
+
+    filter: RouteFilter | None = Field(default=None, description="Filter criteria")
+    order: list[RouteOrder] | None = Field(default=None, description="Sort order")
+    limit: int | None = Field(default=None, ge=1, description="Max results per page")
+    offset: int | None = Field(default=None, ge=0, description="Pagination offset")
+
+
+class SearchAccessTokensInput(BaseRequestModel):
+    """Input for searching access tokens."""
+
+    filter: AccessTokenFilter | None = Field(default=None, description="Filter criteria")
+    order: list[AccessTokenOrder] | None = Field(default=None, description="Sort order")
+    limit: int | None = Field(default=None, ge=1, description="Max results per page")
+    offset: int | None = Field(default=None, ge=0, description="Pagination offset")
+
+
+class SearchAutoScalingRulesInput(BaseRequestModel):
+    """Input for searching auto-scaling rules."""
+
+    filter: AutoScalingRuleFilter | None = Field(default=None, description="Filter criteria")
+    order: list[AutoScalingRuleOrder] | None = Field(default=None, description="Sort order")
+    limit: int | None = Field(default=None, ge=1, description="Max results per page")
+    offset: int | None = Field(default=None, ge=0, description="Pagination offset")
+
+
+class SearchDeploymentPoliciesInput(BaseRequestModel):
+    """Input for searching deployment policies."""
+
+    filter: DeploymentPolicyFilter | None = Field(default=None, description="Filter criteria")
+    limit: int | None = Field(default=None, ge=1, description="Max results per page")
+    offset: int | None = Field(default=None, ge=0, description="Pagination offset")
+
+
+# ---------------------------------------------------------------------------
+# Sub-entity mutation inputs
+# ---------------------------------------------------------------------------
+
+
+class CreateAccessTokenInput(BaseRequestModel):
+    """Input for creating an access token."""
+
+    deployment_id: UUID = Field(description="Deployment ID")
+    valid_until: datetime = Field(description="Token expiration timestamp")
+
+
+class CreateAutoScalingRuleInput(BaseRequestModel):
+    """Input for creating an auto-scaling rule."""
+
+    deployment_id: UUID = Field(description="Deployment ID")
+    metric_source: AutoScalingMetricSource = Field(description="Metric source")
+    metric_name: str = Field(description="Metric name")
+    min_threshold: Decimal | None = Field(default=None, description="Minimum threshold")
+    max_threshold: Decimal | None = Field(default=None, description="Maximum threshold")
+    step_size: int = Field(ge=1, description="Scale step size")
+    time_window: int = Field(ge=1, description="Time window in seconds")
+    min_replicas: int | None = Field(default=None, ge=0, description="Minimum replicas")
+    max_replicas: int | None = Field(default=None, ge=1, description="Maximum replicas")
+
+
+class UpdateAutoScalingRuleInput(BaseRequestModel):
+    """Input for updating an auto-scaling rule (all fields are optional)."""
+
+    metric_source: AutoScalingMetricSource | None = Field(
+        default=None, description="Metric source (None = no change)"
+    )
+    metric_name: str | None = Field(default=None, description="Metric name (None = no change)")
+    min_threshold: Decimal | None = Field(
+        default=None, description="Minimum threshold (None = no change)"
+    )
+    max_threshold: Decimal | None = Field(
+        default=None, description="Maximum threshold (None = no change)"
+    )
+    step_size: int | None = Field(
+        default=None, ge=1, description="Scale step size (None = no change)"
+    )
+    time_window: int | None = Field(
+        default=None, ge=1, description="Time window in seconds (None = no change)"
+    )
+    min_replicas: int | None = Field(
+        default=None, ge=0, description="Minimum replicas (None = no change)"
+    )
+    max_replicas: int | None = Field(
+        default=None, ge=1, description="Maximum replicas (None = no change)"
+    )
+
+
+class DeleteAutoScalingRuleInput(BaseRequestModel):
+    """Input for deleting an auto-scaling rule."""
+
+    id: UUID = Field(description="Auto-scaling rule ID")
+
+
+class UpsertDeploymentPolicyInput(BaseRequestModel):
+    """Input for creating or updating a deployment policy."""
+
+    deployment_id: UUID = Field(description="Deployment ID")
+    strategy: DeploymentStrategy = Field(description="Deployment strategy")
+    rollback_on_failure: bool = Field(default=False, description="Roll back on failure")
+    rolling_update: RollingUpdateConfigInput | None = Field(
+        default=None, description="Rolling update config (required for ROLLING strategy)"
+    )
+    blue_green: BlueGreenConfigInput | None = Field(
+        default=None, description="Blue/green config (required for BLUE_GREEN strategy)"
+    )

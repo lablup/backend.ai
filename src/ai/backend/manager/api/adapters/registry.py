@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING
 from ai.backend.manager.api.adapters.agent import AgentAdapter
 from ai.backend.manager.api.adapters.artifact import ArtifactAdapter
 from ai.backend.manager.api.adapters.container_registry import ContainerRegistryAdapter
+from ai.backend.manager.api.adapters.deployment import DeploymentAdapter
 from ai.backend.manager.api.adapters.domain import DomainAdapter
 from ai.backend.manager.api.adapters.fair_share import FairShareAdapter
 from ai.backend.manager.api.adapters.image import ImageAdapter
@@ -39,6 +40,7 @@ class Adapters:
         agent: AgentAdapter,
         artifact: ArtifactAdapter,
         container_registry: ContainerRegistryAdapter,
+        deployment: DeploymentAdapter,
         domain: DomainAdapter,
         fair_share: FairShareAdapter,
         image: ImageAdapter,
@@ -57,6 +59,7 @@ class Adapters:
         self.agent = agent
         self.artifact = artifact
         self.container_registry = container_registry
+        self.deployment = deployment
         self.domain = domain
         self.fair_share = fair_share
         self.image = image
@@ -79,6 +82,7 @@ class Adapters:
             agent=AgentAdapter(processors),
             artifact=ArtifactAdapter(processors),
             container_registry=ContainerRegistryAdapter(processors),
+            deployment=DeploymentAdapter(processors),
             domain=DomainAdapter(processors),
             fair_share=FairShareAdapter(processors),
             image=ImageAdapter(processors),
