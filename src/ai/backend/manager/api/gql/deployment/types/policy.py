@@ -138,7 +138,7 @@ class BlueGreenConfigInputGQL:
 
 @strawberry.input(
     name="UpdateDeploymentPolicyInput",
-    description="Added in 26.3.0. Input for updating a deployment policy. Internally upserts the policy.",
+    description="Added in 26.4.0. Input for updating a deployment policy. Internally upserts the policy.",
 )
 class UpdateDeploymentPolicyInputGQL:
     deployment_id: ID
@@ -177,7 +177,7 @@ class UpdateDeploymentPolicyInputGQL:
 
 @strawberry.type(
     name="UpdateDeploymentPolicyPayload",
-    description="Added in 26.3.0. Result of updating a deployment policy.",
+    description="Added in 26.4.0. Result of updating a deployment policy.",
 )
 class UpdateDeploymentPolicyPayloadGQL:
     deployment_policy: DeploymentPolicyGQL

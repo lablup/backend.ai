@@ -22,7 +22,7 @@ from .deployment import (
     update_model_deployment,
 )
 from .policy import (
-    update_deployment_policy,
+    admin_update_deployment_policy,
 )
 from .replica import (
     replica,

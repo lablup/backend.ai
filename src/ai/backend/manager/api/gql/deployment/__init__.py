@@ -16,6 +16,8 @@ from .resolver import (
     # Revision
     activate_deployment_revision,
     add_model_revision,
+    # Policy
+    admin_update_deployment_policy,
     # Access Token
     create_access_token,
     # Auto Scaling
@@ -40,8 +42,6 @@ from .resolver import (
     routes,
     sync_replicas,
     update_auto_scaling_rule,
-    # Policy
-    update_deployment_policy,
     update_model_deployment,
     update_route_traffic_status,
 )
@@ -275,7 +275,7 @@ __all__ = [
     "sync_replicas",
     "update_model_deployment",
     # Resolvers - Policy
-    "update_deployment_policy",
+    "admin_update_deployment_policy",
     # Resolvers - Replica
     "replica",
     "replica_status_changed",

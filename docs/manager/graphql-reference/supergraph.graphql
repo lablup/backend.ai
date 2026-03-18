@@ -7718,6 +7718,9 @@ type Mutation
   """Added in 25.16.0"""
   addModelRevision(input: AddRevisionInput!): AddRevisionPayload! @join__field(graph: STRAWBERRY)
 
+  """Added in 26.4.0"""
+  adminUpdateDeploymentPolicy(input: UpdateDeploymentPolicyInput!): UpdateDeploymentPolicyPayload! @join__field(graph: STRAWBERRY)
+
   """Create a new notification channel (admin only)"""
   adminCreateNotificationChannel(input: CreateNotificationChannelInput!): CreateNotificationChannelPayload! @join__field(graph: STRAWBERRY)
 
@@ -12946,6 +12949,27 @@ type UpdateDeploymentPayload
   @join__type(graph: STRAWBERRY)
 {
   deployment: ModelDeployment!
+}
+
+"""
+Added in 26.3.0. Input for updating a deployment policy. Internally upserts the policy.
+"""
+input UpdateDeploymentPolicyInput
+  @join__type(graph: STRAWBERRY)
+{
+  deploymentId: ID!
+  strategy: DeploymentStrategyType!
+  rollbackOnFailure: Boolean! = false
+  rollingUpdate: RollingUpdateConfigInput = null
+  blueGreen: BlueGreenConfigInput = null
+}
+
+"""Added in 26.3.0. Result of updating a deployment policy."""
+type UpdateDeploymentPolicyPayload
+  @join__type(graph: STRAWBERRY)
+{
+  deploymentPolicy: DeploymentPolicy!
+  created: Boolean!
 }
 
 """Added in 25.14.0"""
