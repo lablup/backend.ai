@@ -16,6 +16,12 @@ from ai.backend.common.data.permission.types import (
     RoleSource,
     RoleStatus,
 )
+from ai.backend.common.dto.manager.v2.rbac.request import (
+    DeleteRoleInput as DeleteRoleInputDTO,
+)
+from ai.backend.common.dto.manager.v2.rbac.request import (
+    PurgeRoleInput as PurgeRoleInputDTO,
+)
 from ai.backend.manager.api.gql.base import OrderDirection, StringFilter
 from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin
 from ai.backend.manager.api.gql.types import GQLFilter, GQLOrderBy, StrawberryGQLContext
@@ -632,12 +638,18 @@ class BulkRevokeRoleInputGQL:
         )
 
 
-@strawberry.input(description="Added in 26.3.0. Input for soft-deleting a role")
+@strawberry.experimental.pydantic.input(
+    model=DeleteRoleInputDTO,
+    description="Added in 26.3.0. Input for soft-deleting a role",
+)
 class DeleteRoleInput:
     id: uuid.UUID
 
 
-@strawberry.input(description="Added in 26.3.0. Input for purging a role")
+@strawberry.experimental.pydantic.input(
+    model=PurgeRoleInputDTO,
+    description="Added in 26.3.0. Input for purging a role",
+)
 class PurgeRoleInput:
     id: uuid.UUID
 

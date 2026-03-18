@@ -531,9 +531,10 @@ async def cleanup_artifact_revisions(
 async def delete_artifacts(
     input: DeleteArtifactsInput, info: Info[StrawberryGQLContext]
 ) -> DeleteArtifactsPayload:
+    pydantic_input = input.to_pydantic()
     action_result = await info.context.processors.artifact.delete_artifacts.wait_for_complete(
         DeleteArtifactsAction(
-            artifact_ids=[UUID(id) for id in input.artifact_ids],
+            artifact_ids=pydantic_input.artifact_ids,
         )
     )
 

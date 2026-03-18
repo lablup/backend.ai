@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-from uuid import UUID
-
 import strawberry
 from strawberry import ID, Info
 
@@ -59,7 +57,8 @@ async def delete_auto_scaling_rule(
 ) -> DeleteAutoScalingRulePayload:
     """Delete an auto-scaling rule."""
     processor = info.context.processors.deployment
+    pydantic_input = input.to_pydantic()
     _ = await processor.delete_auto_scaling_rule.wait_for_complete(
-        DeleteAutoScalingRuleAction(auto_scaling_rule_id=UUID(input.id))
+        DeleteAutoScalingRuleAction(auto_scaling_rule_id=pydantic_input.id)
     )
-    return DeleteAutoScalingRulePayload(id=ID(input.id))
+    return DeleteAutoScalingRulePayload(id=ID(str(pydantic_input.id)))

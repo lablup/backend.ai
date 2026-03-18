@@ -15,6 +15,9 @@ from ai.backend.common.data.artifact.types import (
     VerifierResult,
 )
 from ai.backend.common.data.storage.registries.types import ModelTarget as ModelTargetData
+from ai.backend.common.dto.manager.v2.artifact.request import (
+    DeleteArtifactsInput as DeleteArtifactsInputDTO,
+)
 from ai.backend.manager.api.gql.base import (
     ByteSize,
     IntFilter,
@@ -640,7 +643,8 @@ class CleanupArtifactRevisionsInput:
     artifact_revision_ids: list[ID]
 
 
-@strawberry.input(
+@strawberry.experimental.pydantic.input(
+    model=DeleteArtifactsInputDTO,
     description=dedent_strip("""
     Added in 25.15.0.
 
@@ -648,7 +652,7 @@ class CleanupArtifactRevisionsInput:
 
     Marks artifacts as deleted without permanently removing them.
     Deleted artifacts can be restored using restore_artifacts.
-    """)
+    """),
 )
 class DeleteArtifactsInput:
     artifact_ids: list[ID]

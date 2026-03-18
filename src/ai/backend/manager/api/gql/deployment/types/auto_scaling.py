@@ -13,6 +13,9 @@ import strawberry
 from strawberry import ID, Info
 from strawberry.relay import Connection, Edge, NodeID
 
+from ai.backend.common.dto.manager.v2.auto_scaling_rule.request import (
+    DeleteAutoScalingRuleInput as DeleteAutoScalingRuleInputDTO,
+)
 from ai.backend.common.types import AutoScalingMetricSource as CommonAutoScalingMetricSource
 from ai.backend.manager.api.gql.base import DateTimeFilter, OrderDirection
 from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin
@@ -250,7 +253,10 @@ class UpdateAutoScalingRuleInput:
         )
 
 
-@strawberry.input
+@strawberry.experimental.pydantic.input(
+    model=DeleteAutoScalingRuleInputDTO,
+    description="Added in 25.16.0. Input for deleting an auto-scaling rule",
+)
 class DeleteAutoScalingRuleInput:
     id: ID
 

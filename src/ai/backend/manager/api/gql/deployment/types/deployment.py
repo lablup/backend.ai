@@ -16,6 +16,9 @@ from ai.backend.common.data.model_deployment.types import (
     DeploymentStrategy,
     ModelDeploymentStatus,
 )
+from ai.backend.common.dto.manager.v2.deployment.request import (
+    DeleteDeploymentInput as DeleteDeploymentInputDTO,
+)
 from ai.backend.common.exception import (
     InvalidAPIParameters,
 )
@@ -740,7 +743,10 @@ class UpdateDeploymentInput:
         )
 
 
-@strawberry.input(description="Added in 25.19.0")
+@strawberry.experimental.pydantic.input(
+    model=DeleteDeploymentInputDTO,
+    description="Added in 25.19.0",
+)
 class DeleteDeploymentInput:
     id: ID
 
