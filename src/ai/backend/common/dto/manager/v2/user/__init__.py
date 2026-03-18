@@ -3,10 +3,18 @@ User DTO v2 models for Manager API.
 """
 
 from ai.backend.common.dto.manager.v2.user.request import (
+    BulkCreateUsersInput,
+    BulkPurgeUsersInput,
+    BulkPurgeUsersOptions,
+    BulkUpdateUserItemInput,
+    BulkUpdateUsersInput,
     CreateUserInput,
     DeleteUserInput,
+    DeleteUsersInput,
     PurgeUserInput,
+    PurgeUserV2Input,
     SearchUsersRequest,
+    UpdateMyAllowedClientIPInput,
     UpdateUserInput,
     UserFilter,
     UserOrder,
@@ -33,10 +41,18 @@ from ai.backend.common.dto.manager.v2.user.types import (
 
 __all__ = (
     # Request DTOs
+    "BulkCreateUsersInput",
+    "BulkPurgeUsersInput",
+    "BulkPurgeUsersOptions",
+    "BulkUpdateUserItemInput",
+    "BulkUpdateUsersInput",
     "CreateUserInput",
     "UpdateUserInput",
     "DeleteUserInput",
+    "DeleteUsersInput",
     "PurgeUserInput",
+    "PurgeUserV2Input",
+    "UpdateMyAllowedClientIPInput",
     "UserFilter",
     "UserOrder",
     "SearchUsersRequest",

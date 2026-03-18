@@ -9,7 +9,31 @@ from strawberry import UNSET
 
 from ai.backend.common.api_handlers import SENTINEL
 from ai.backend.common.dto.manager.v2.user.request import (
+    BulkCreateUsersInput as BulkCreateUsersInputDTO,
+)
+from ai.backend.common.dto.manager.v2.user.request import (
+    BulkPurgeUsersInput as BulkPurgeUsersInputDTO,
+)
+from ai.backend.common.dto.manager.v2.user.request import (
+    BulkPurgeUsersOptions as BulkPurgeUsersOptionsDTO,
+)
+from ai.backend.common.dto.manager.v2.user.request import (
+    BulkUpdateUserItemInput as BulkUpdateUserItemInputDTO,
+)
+from ai.backend.common.dto.manager.v2.user.request import (
+    BulkUpdateUsersInput as BulkUpdateUsersInputDTO,
+)
+from ai.backend.common.dto.manager.v2.user.request import (
     CreateUserInput as CreateUserInputDTO,
+)
+from ai.backend.common.dto.manager.v2.user.request import (
+    DeleteUsersInput as DeleteUsersInputDTO,
+)
+from ai.backend.common.dto.manager.v2.user.request import (
+    PurgeUserV2Input as PurgeUserV2InputDTO,
+)
+from ai.backend.common.dto.manager.v2.user.request import (
+    UpdateMyAllowedClientIPInput as UpdateMyAllowedClientIPInputDTO,
 )
 from ai.backend.common.dto.manager.v2.user.request import (
     UpdateUserInput as UpdateUserInputDTO,
@@ -92,7 +116,8 @@ class CreateUserInputGQL:
     )
 
 
-@strawberry.input(
+@strawberry.experimental.pydantic.input(
+    model=BulkCreateUsersInputDTO,
     name="BulkCreateUserV2Input",
     description=(
         "Added in 26.2.0. Input for bulk creating multiple users. "
@@ -219,7 +244,8 @@ class UpdateUserV2InputGQL:
         )
 
 
-@strawberry.input(
+@strawberry.experimental.pydantic.input(
+    model=BulkUpdateUserItemInputDTO,
     name="BulkUpdateUserV2ItemInput",
     description=(
         "Added in 26.3.0. Input for a single user update within a bulk operation. "
@@ -233,7 +259,8 @@ class BulkUpdateUserV2ItemInputGQL:
     input: UpdateUserV2InputGQL = strawberry.field(description="Fields to update for this user.")
 
 
-@strawberry.input(
+@strawberry.experimental.pydantic.input(
+    model=BulkUpdateUsersInputDTO,
     name="BulkUpdateUserV2Input",
     description=(
         "Added in 26.3.0. Input for bulk updating multiple users. "
@@ -251,7 +278,8 @@ class BulkUpdateUserV2InputGQL:
 # Delete User Inputs
 
 
-@strawberry.input(
+@strawberry.experimental.pydantic.input(
+    model=DeleteUsersInputDTO,
     name="DeleteUsersV2Input",
     description=(
         "Added in 26.2.0. Input for soft-deleting multiple users. "
@@ -267,7 +295,8 @@ class DeleteUsersInputGQL:
 # Purge User Inputs
 
 
-@strawberry.input(
+@strawberry.experimental.pydantic.input(
+    model=PurgeUserV2InputDTO,
     name="PurgeUserV2Input",
     description=(
         "Added in 26.2.0. Input for permanently deleting a user and all associated data. "
@@ -280,7 +309,8 @@ class PurgeUserInputGQL:
     user_id: UUID = strawberry.field(description="UUID of the user to purge.")
 
 
-@strawberry.input(
+@strawberry.experimental.pydantic.input(
+    model=BulkPurgeUsersOptionsDTO,
     name="BulkPurgeUsersV2Options",
     description="Added in 26.3.0. Options for bulk user purge operation.",
 )
@@ -297,7 +327,8 @@ class BulkPurgeUsersV2OptionsGQL:
     )
 
 
-@strawberry.input(
+@strawberry.experimental.pydantic.input(
+    model=BulkPurgeUsersInputDTO,
     name="BulkPurgeUsersV2Input",
     description=(
         "Added in 26.3.0. Input for permanently deleting multiple users. "
@@ -317,7 +348,8 @@ class BulkPurgeUsersV2InputGQL:
 # IP Allowlist Inputs
 
 
-@strawberry.input(
+@strawberry.experimental.pydantic.input(
+    model=UpdateMyAllowedClientIPInputDTO,
     name="UpdateMyAllowedClientIPInput",
     description=(
         "Added in 26.4.0. Input for updating the current user's allowed client IP list. "

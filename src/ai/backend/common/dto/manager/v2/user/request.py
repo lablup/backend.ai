@@ -20,10 +20,18 @@ from ai.backend.common.dto.manager.v2.user.types import (
 )
 
 __all__ = (
+    "BulkCreateUsersInput",
+    "BulkPurgeUsersInput",
+    "BulkPurgeUsersOptions",
+    "BulkUpdateUserItemInput",
+    "BulkUpdateUsersInput",
     "CreateUserInput",
     "DeleteUserInput",
+    "DeleteUsersInput",
     "PurgeUserInput",
+    "PurgeUserV2Input",
     "SearchUsersRequest",
+    "UpdateMyAllowedClientIPInput",
     "UpdateUserInput",
     "UserFilter",
     "UserOrder",
@@ -171,6 +179,77 @@ class PurgeUserInput(BaseRequestModel):
     delegate_endpoint_ownership: bool = Field(
         default=False,
         description="If true, delegate endpoint ownership to the admin user before purging.",
+    )
+
+
+class BulkCreateUsersInput(BaseRequestModel):
+    """Input for creating multiple users in bulk."""
+
+    users: list[CreateUserInput] = Field(description="List of user creation inputs.")
+
+
+class BulkUpdateUserItemInput(BaseRequestModel):
+    """Input for a single user update within a bulk operation."""
+
+    user_id: UUID = Field(description="UUID of the user to update.")
+    input: UpdateUserInput = Field(description="Fields to update for this user.")
+
+
+class BulkUpdateUsersInput(BaseRequestModel):
+    """Input for bulk updating multiple users."""
+
+    users: list[BulkUpdateUserItemInput] = Field(description="List of user update inputs.")
+
+
+class DeleteUsersInput(BaseRequestModel):
+    """Input for soft-deleting multiple users."""
+
+    user_ids: list[UUID] = Field(description="List of user UUIDs to soft-delete.")
+
+
+class PurgeUserV2Input(BaseRequestModel):
+    """Input for permanently deleting a single user (GQL-aligned, user_id only)."""
+
+    user_id: UUID = Field(description="UUID of the user to purge.")
+
+
+class BulkPurgeUsersOptions(BaseRequestModel):
+    """Options for bulk user purge operation."""
+
+    purge_shared_vfolders: bool = Field(
+        default=False,
+        description="If true, migrate shared virtual folders to the admin user before purging.",
+    )
+    delegate_endpoint_ownership: bool = Field(
+        default=False,
+        description="If true, delegate endpoint ownership to the admin user before purging.",
+    )
+
+
+class BulkPurgeUsersInput(BaseRequestModel):
+    """Input for permanently deleting multiple users in bulk."""
+
+    user_ids: list[UUID] = Field(description="List of user UUIDs to purge.")
+    options: BulkPurgeUsersOptions | None = Field(
+        default=None, description="Options for the purge operation."
+    )
+
+
+class UpdateMyAllowedClientIPInput(BaseRequestModel):
+    """Input for updating the current user's allowed client IP list."""
+
+    allowed_client_ip: list[str] | None = Field(
+        description=(
+            "New allowed client IP addresses or CIDR ranges. "
+            "Set to null to remove all IP restrictions."
+        )
+    )
+    force: bool = Field(
+        default=False,
+        description=(
+            "If false (default), the operation will fail if the current request IP "
+            "is not included in the new allowlist."
+        ),
     )
 
 
