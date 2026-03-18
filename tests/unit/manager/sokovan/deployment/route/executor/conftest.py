@@ -110,7 +110,6 @@ def _create_deployment_info(
 ) -> DeploymentInfo:
     """Create DeploymentInfo for tests."""
     dep_id = deployment_id or uuid4()
-    revision = MagicMock()
 
     return DeploymentInfo(
         id=dep_id,
