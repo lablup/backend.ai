@@ -13,7 +13,7 @@ from strawberry.scalars import JSON
 
 from ai.backend.common.dto.manager.v2.service_catalog.types import EndpointInfo
 from ai.backend.common.types import ServiceCatalogStatus
-from ai.backend.manager.api.gql.base import OrderDirection
+from ai.backend.manager.api.gql.base import OrderDirection, StringFilter
 from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin
 from ai.backend.manager.api.gql.types import GQLFilter, GQLOrderBy
 from ai.backend.manager.api.gql.utils import dedent_strip
@@ -21,6 +21,7 @@ from ai.backend.manager.data.service_catalog.types import (
     ServiceCatalogData,
     ServiceCatalogEndpointData,
 )
+from ai.backend.manager.models.service_catalog.conditions import ServiceCatalogConditions
 from ai.backend.manager.models.service_catalog.row import ServiceCatalogRow
 from ai.backend.manager.repositories.base import (
     QueryCondition,
@@ -35,6 +36,7 @@ __all__ = (
     "ServiceCatalogGQL",
     "ServiceCatalogOrderByGQL",
     "ServiceCatalogOrderFieldGQL",
+    "ServiceCatalogStatusFilterGQL",
     "ServiceCatalogStatusGQL",
 )
 
@@ -179,17 +181,46 @@ class ServiceCatalogOrderByGQL(GQLOrderBy):
 
 
 @strawberry.input(
+    name="ServiceCatalogStatusFilter",
+    description=(
+        "Added in 26.3.0. Filter for ServiceCatalogStatus enum fields. "
+        "Supports equals, in, not_equals, and not_in operations."
+    ),
+)
+class ServiceCatalogStatusFilterGQL:
+    """Filter for service catalog status enum fields."""
+
+    equals: ServiceCatalogStatusGQL | None = strawberry.field(
+        default=None,
+        description="Exact match for service catalog status.",
+    )
+    in_: list[ServiceCatalogStatusGQL] | None = strawberry.field(
+        name="in",
+        default=None,
+        description="Match any of the provided statuses.",
+    )
+    not_equals: ServiceCatalogStatusGQL | None = strawberry.field(
+        default=None,
+        description="Exclude exact status match.",
+    )
+    not_in: list[ServiceCatalogStatusGQL] | None = strawberry.field(
+        default=None,
+        description="Exclude any of the provided statuses.",
+    )
+
+
+@strawberry.input(
     name="ServiceCatalogFilter",
     description="Added in 26.3.0. Filter for service catalog queries.",
 )
 class ServiceCatalogFilterGQL(GQLFilter):
-    service_group: str | None = strawberry.field(
+    service_group: StringFilter | None = strawberry.field(
         default=None,
-        description="Filter by service group name (exact match).",
+        description="Filter by service group name. Supports equals, contains, startsWith, and endsWith.",
     )
-    status: ServiceCatalogStatusGQL | None = strawberry.field(
+    status: ServiceCatalogStatusFilterGQL | None = strawberry.field(
         default=None,
-        description="Filter by health status.",
+        description="Filter by health status. Supports equals, in, not_equals, and not_in operations.",
     )
     AND: list[ServiceCatalogFilterGQL] | None = None
     OR: list[ServiceCatalogFilterGQL] | None = None
@@ -198,12 +229,48 @@ class ServiceCatalogFilterGQL(GQLFilter):
     def build_conditions(self) -> list[QueryCondition]:
         """Build query conditions from filter fields."""
         conditions: list[QueryCondition] = []
-        if self.service_group is not None:
-            group = self.service_group
-            conditions.append(lambda: ServiceCatalogRow.service_group == group)
-        if self.status is not None:
-            status_val = ServiceCatalogStatus(self.status.value)
-            conditions.append(lambda: ServiceCatalogRow.status == status_val)
+
+        if self.service_group:
+            condition = self.service_group.build_query_condition(
+                contains_factory=lambda spec: ServiceCatalogConditions.by_service_group_contains(
+                    spec
+                ),
+                equals_factory=lambda spec: ServiceCatalogConditions.by_service_group_equals(spec),
+                starts_with_factory=lambda spec: ServiceCatalogConditions.by_service_group_starts_with(
+                    spec
+                ),
+                ends_with_factory=lambda spec: ServiceCatalogConditions.by_service_group_ends_with(
+                    spec
+                ),
+            )
+            if condition:
+                conditions.append(condition)
+
+        if self.status:
+            if self.status.equals:
+                conditions.append(
+                    ServiceCatalogConditions.by_status_equals(
+                        ServiceCatalogStatus(self.status.equals.value)
+                    )
+                )
+            if self.status.in_:
+                conditions.append(
+                    ServiceCatalogConditions.by_status_in([
+                        ServiceCatalogStatus(s.value) for s in self.status.in_
+                    ])
+                )
+            if self.status.not_equals:
+                conditions.append(
+                    ServiceCatalogConditions.by_status_not_equals(
+                        ServiceCatalogStatus(self.status.not_equals.value)
+                    )
+                )
+            if self.status.not_in:
+                conditions.append(
+                    ServiceCatalogConditions.by_status_not_in([
+                        ServiceCatalogStatus(s.value) for s in self.status.not_in
+                    ])
+                )
 
         # Handle AND logical operator
         if self.AND:

@@ -5,7 +5,7 @@ from __future__ import annotations
 import strawberry
 from strawberry import Info
 
-from ai.backend.common.dto.manager.query import StringFilter
+from ai.backend.common.dto.manager.query import StringFilter as PydanticStringFilter
 from ai.backend.common.dto.manager.v2.service_catalog.request import (
     AdminSearchServiceCatalogsInput,
     ServiceCatalogFilter,
@@ -48,17 +48,41 @@ async def admin_service_catalogs(
     # Convert GQL filter to Pydantic DTO
     pydantic_filter: ServiceCatalogFilter | None = None
     if filter is not None:
+        pydantic_sg: PydanticStringFilter | None = None
+        if filter.service_group is not None:
+            sg = filter.service_group
+            pydantic_sg = PydanticStringFilter(
+                equals=sg.equals,
+                contains=sg.contains,
+                starts_with=sg.starts_with,
+                ends_with=sg.ends_with,
+                not_equals=sg.not_equals,
+                i_equals=sg.i_equals,
+                i_contains=sg.i_contains,
+                i_starts_with=sg.i_starts_with,
+                i_ends_with=sg.i_ends_with,
+                i_not_equals=sg.i_not_equals,
+            )
+        pydantic_status: ServiceCatalogStatusFilter | None = None
+        if filter.status is not None:
+            st = filter.status
+            pydantic_status = ServiceCatalogStatusFilter(
+                equals=ServiceCatalogStatus(st.equals.value) if st.equals is not None else None,
+                in_=(
+                    [ServiceCatalogStatus(s.value) for s in st.in_] if st.in_ is not None else None
+                ),
+                not_equals=(
+                    ServiceCatalogStatus(st.not_equals.value) if st.not_equals is not None else None
+                ),
+                not_in=(
+                    [ServiceCatalogStatus(s.value) for s in st.not_in]
+                    if st.not_in is not None
+                    else None
+                ),
+            )
         pydantic_filter = ServiceCatalogFilter(
-            service_group=(
-                StringFilter(equals=filter.service_group)
-                if filter.service_group is not None
-                else None
-            ),
-            status=(
-                ServiceCatalogStatusFilter(equals=ServiceCatalogStatus(filter.status.value))
-                if filter.status is not None
-                else None
-            ),
+            service_group=pydantic_sg,
+            status=pydantic_status,
         )
 
     # Convert GQL orders to Pydantic DTO
