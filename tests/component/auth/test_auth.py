@@ -435,6 +435,7 @@ class TestVerifyAuth:
         )
         assert isinstance(result, VerifyAuthResponse)
         assert result.authorized == "yes"
+        assert result.echo == "domain-admin-check"
 
 
 class TestRoleAndScopeAccess:
@@ -927,30 +928,23 @@ class TestCrossDomainAccess:
     """Cross-domain access control: non-superadmin cannot access other domains.
 
     Scenario: Verify cross-domain access control enforcement.
-    - A superadmin can authorize users from any domain
+    - A superadmin can query group roles for groups in another domain
     - A domain-admin's role is scoped to their own domain only
     - A domain-admin cannot query group roles for groups in another domain
     """
 
-    async def test_superadmin_can_authorize_cross_domain_user(
+    async def test_superadmin_can_query_role_for_other_domain_group(
         self,
         admin_registry: BackendAIClientRegistry,
         cross_domain_fixture: _CrossDomainFixtureData,
-        auth_user_fixture: AuthUserFixtureData,
     ) -> None:
-        """A superadmin must be able to authorize (issue credentials for) any user
-        regardless of domain.
-        This validates that superadmin's global privileges extend across domain boundaries."""
-        result = await admin_registry.auth.authorize(
-            AuthorizeRequest(
-                type=AuthTokenType.KEYPAIR,
-                domain=auth_user_fixture.domain_name,
-                username=auth_user_fixture.email,
-                password=auth_user_fixture.password,
-            ),
+        """A superadmin must be able to query group role for a group in another domain.
+        This validates that superadmin's global privileges extend across domain boundaries,
+        unlike domain-admins who are restricted to their own domain's groups."""
+        result = await admin_registry.auth.get_role(
+            GetRoleRequest(group=cross_domain_fixture.group_id),
         )
-        assert isinstance(result, AuthorizeResponse)
-        assert result.data.role == "user"
+        assert result.group_role is not None
 
     async def test_domain_admin_role_is_scoped_to_own_domain(
         self,
