@@ -224,7 +224,10 @@ class CreateAutoScalingRuleInput:
         )
 
 
-@strawberry.input
+@strawberry.experimental.pydantic.input(
+    model=UpdateAutoScalingRuleInputDTO,
+    description="Added in 25.19.0. Input for updating an auto-scaling rule.",
+)
 class UpdateAutoScalingRuleInput:
     id: ID
     metric_source: AutoScalingMetricSource | None

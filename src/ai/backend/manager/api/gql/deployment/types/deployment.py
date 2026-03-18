@@ -646,7 +646,10 @@ class DeploymentStrategyInputGQL:
                 )
 
 
-@strawberry.input(description="Added in 25.19.0")
+@strawberry.experimental.pydantic.input(
+    model=CreateDeploymentInputDTO,
+    description="Added in 25.19.0",
+)
 class CreateDeploymentInput:
     metadata: ModelDeploymentMetadataInput
     network_access: ModelDeploymentNetworkAccessInput
@@ -723,7 +726,10 @@ class CreateDeploymentInput:
         )
 
 
-@strawberry.input(description="Added in 25.19.0")
+@strawberry.experimental.pydantic.input(
+    model=UpdateDeploymentInputDTO,
+    description="Added in 25.19.0",
+)
 class UpdateDeploymentInput:
     id: ID
     open_to_public: bool | None = None

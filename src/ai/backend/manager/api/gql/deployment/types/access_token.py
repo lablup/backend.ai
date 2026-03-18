@@ -156,7 +156,10 @@ class AccessTokenConnection(Connection[AccessToken]):
         self.count = count
 
 
-@strawberry.input
+@strawberry.experimental.pydantic.input(
+    model=CreateAccessTokenInputDTO,
+    description="Added in 25.16.0. Input for creating an access token for a model deployment.",
+)
 class CreateAccessTokenInput:
     model_deployment_id: ID = strawberry.field(
         description="Added in 25.16.0: The ID of the model deployment for which the access token is created."
