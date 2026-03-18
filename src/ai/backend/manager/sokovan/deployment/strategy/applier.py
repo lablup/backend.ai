@@ -36,6 +36,14 @@ class StrategyApplyResult:
     routes_drained: int = 0
     """Number of routes marked for draining."""
 
+    def has_mutations(self) -> bool:
+        """Check if there are any route mutations to persist.
+
+        Returns True when at least one of the following is present:
+        new routes to roll out, routes to drain, or deployments completed.
+        """
+        return bool(self.completed_ids or self.routes_created or self.routes_drained)
+
 
 class StrategyResultApplier:
     """Applies a ``StrategyEvaluationSummary`` to the database.
@@ -79,7 +87,7 @@ class StrategyResultApplier:
 
         rollout = changes.rollout_specs
 
-        if not (rollout or drain or completed_ids):
+        if not result.has_mutations():
             return result
 
         swapped = await self._deployment_repo.apply_strategy_mutations(
