@@ -7,41 +7,25 @@ from strawberry import ID, UNSET, Info
 from strawberry.relay import Connection, Edge, NodeID
 
 from ai.backend.common.dto.manager.v2.reservoir_registry.request import (
+    AdminSearchReservoirRegistriesInput,
+)
+from ai.backend.common.dto.manager.v2.reservoir_registry.request import (
+    CreateReservoirRegistryInput as CreateReservoirRegistryInputDTO,
+)
+from ai.backend.common.dto.manager.v2.reservoir_registry.request import (
     DeleteReservoirRegistryInput as DeleteReservoirRegistryInputDTO,
+)
+from ai.backend.common.dto.manager.v2.reservoir_registry.request import (
+    UpdateReservoirRegistryInput as UpdateReservoirRegistryInputDTO,
 )
 from ai.backend.manager.api.gql.artifact_registry_meta import ArtifactRegistryMetaConnection
 from ai.backend.manager.api.gql.base import encode_cursor
 from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin
-from ai.backend.manager.data.artifact_registries.types import (
-    ArtifactRegistryCreatorMeta,
-    ArtifactRegistryModifierMeta,
-)
 from ai.backend.manager.data.reservoir_registry.types import ReservoirRegistryData
 from ai.backend.manager.errors.api import NotImplementedAPI
-from ai.backend.manager.models.reservoir_registry import ReservoirRegistryRow
-from ai.backend.manager.repositories.base.creator import Creator
-from ai.backend.manager.repositories.base.updater import Updater
-from ai.backend.manager.repositories.reservoir_registry import ReservoirRegistryCreatorSpec
-from ai.backend.manager.repositories.reservoir_registry.updaters import ReservoirRegistryUpdaterSpec
-from ai.backend.manager.services.artifact_registry.actions.reservoir.create import (
-    CreateReservoirRegistryAction,
-)
-from ai.backend.manager.services.artifact_registry.actions.reservoir.delete import (
-    DeleteReservoirRegistryAction,
-)
-from ai.backend.manager.services.artifact_registry.actions.reservoir.get import (
-    GetReservoirRegistryAction,
-)
 from ai.backend.manager.services.artifact_registry.actions.reservoir.get_multi import (
     GetReservoirRegistriesAction,
 )
-from ai.backend.manager.services.artifact_registry.actions.reservoir.list import (
-    ListReservoirRegistriesAction,
-)
-from ai.backend.manager.services.artifact_registry.actions.reservoir.update import (
-    UpdateReservoirRegistryAction,
-)
-from ai.backend.manager.types import OptionalState
 
 from .types import StrawberryGQLContext
 
@@ -115,11 +99,8 @@ class ReservoirRegistryConnection(Connection[ReservoirRegistry]):
 
 @strawberry.field(description="Added in 25.14.0")  # type: ignore[misc]
 async def reservoir_registry(id: ID, info: Info[StrawberryGQLContext]) -> ReservoirRegistry | None:
-    processors = info.context.processors
-    action_result = await processors.artifact_registry.get_reservoir_registry.wait_for_complete(
-        GetReservoirRegistryAction(reservoir_id=uuid.UUID(id))
-    )
-    return ReservoirRegistry.from_dataclass(action_result.result)
+    node = await info.context.adapters.reservoir_registry.get(uuid.UUID(id))
+    return ReservoirRegistry.from_pydantic(node)
 
 
 @strawberry.field(description="Added in 25.14.0")  # type: ignore[misc]
@@ -132,15 +113,10 @@ async def reservoir_registries(
     offset: int | None = None,
     limit: int | None = None,
 ) -> ReservoirRegistryConnection | None:
-    # TODO: Support pagination with before, after, first, last
-    # TODO: Does we need to support filtering, ordering here?
-    processors = info.context.processors
-
-    action_result = await processors.artifact_registry.list_reservoir_registries.wait_for_complete(
-        ListReservoirRegistriesAction()
+    payload = await info.context.adapters.reservoir_registry.search(
+        AdminSearchReservoirRegistriesInput(limit=limit, offset=offset)
     )
-
-    nodes = [ReservoirRegistry.from_dataclass(data) for data in action_result.data]
+    nodes = [ReservoirRegistry.from_pydantic(item) for item in payload.items]
     edges = [ReservoirRegistryEdge(node=node, cursor=encode_cursor(node.id)) for node in nodes]
 
     return ReservoirRegistryConnection(
@@ -162,19 +138,6 @@ class CreateReservoirRegistryInput:
     secret_key: str
     api_version: str
 
-    def to_creator(self) -> Creator[ReservoirRegistryRow]:
-        return Creator(
-            spec=ReservoirRegistryCreatorSpec(
-                endpoint=self.endpoint,
-                access_key=self.access_key,
-                secret_key=self.secret_key,
-                api_version=self.api_version,
-            )
-        )
-
-    def to_creator_meta(self) -> ArtifactRegistryCreatorMeta:
-        return ArtifactRegistryCreatorMeta(name=self.name)
-
 
 @strawberry.input(description="Added in 25.14.0")
 class UpdateReservoirRegistryInput:
@@ -184,20 +147,6 @@ class UpdateReservoirRegistryInput:
     access_key: str | None = UNSET
     secret_key: str | None = UNSET
     api_version: str | None = UNSET
-
-    def to_updater(self) -> Updater[ReservoirRegistryRow]:
-        spec = ReservoirRegistryUpdaterSpec(
-            endpoint=OptionalState[str].from_graphql(self.endpoint),
-            access_key=OptionalState[str].from_graphql(self.access_key),
-            secret_key=OptionalState[str].from_graphql(self.secret_key),
-            api_version=OptionalState[str].from_graphql(self.api_version),
-        )
-        return Updater(spec=spec, pk_value=uuid.UUID(self.id))
-
-    def to_modifier_meta(self) -> ArtifactRegistryModifierMeta:
-        return ArtifactRegistryModifierMeta(
-            name=OptionalState[str].from_graphql(self.name),
-        )
 
 
 @strawberry.experimental.pydantic.input(
@@ -227,17 +176,17 @@ class DeleteReservoirRegistryPayload:
 async def create_reservoir_registry(
     input: CreateReservoirRegistryInput, info: Info[StrawberryGQLContext]
 ) -> CreateReservoirRegistryPayload:
-    processors = info.context.processors
-
-    action_result = await processors.artifact_registry.create_reservoir_registry.wait_for_complete(
-        CreateReservoirRegistryAction(
-            input.to_creator(),
-            input.to_creator_meta(),
+    result = await info.context.adapters.reservoir_registry.create(
+        CreateReservoirRegistryInputDTO(
+            name=input.name,
+            endpoint=input.endpoint,
+            access_key=input.access_key,
+            secret_key=input.secret_key,
+            api_version=input.api_version,
         )
     )
-
     return CreateReservoirRegistryPayload(
-        reservoir=ReservoirRegistry.from_dataclass(action_result.result)
+        reservoir=ReservoirRegistry.from_pydantic(result.registry)
     )
 
 
@@ -245,14 +194,18 @@ async def create_reservoir_registry(
 async def update_reservoir_registry(
     input: UpdateReservoirRegistryInput, info: Info[StrawberryGQLContext]
 ) -> UpdateReservoirRegistryPayload:
-    processors = info.context.processors
-
-    action_result = await processors.artifact_registry.update_reservoir_registry.wait_for_complete(
-        UpdateReservoirRegistryAction(updater=input.to_updater(), meta=input.to_modifier_meta())
+    result = await info.context.adapters.reservoir_registry.update(
+        UpdateReservoirRegistryInputDTO(
+            id=uuid.UUID(input.id),
+            name=None if input.name is UNSET else input.name,
+            endpoint=None if input.endpoint is UNSET else input.endpoint,
+            access_key=None if input.access_key is UNSET else input.access_key,
+            secret_key=None if input.secret_key is UNSET else input.secret_key,
+            api_version=None if input.api_version is UNSET else input.api_version,
+        )
     )
-
     return UpdateReservoirRegistryPayload(
-        reservoir=ReservoirRegistry.from_dataclass(action_result.result)
+        reservoir=ReservoirRegistry.from_pydantic(result.registry)
     )
 
 
@@ -260,11 +213,6 @@ async def update_reservoir_registry(
 async def delete_reservoir_registry(
     input: DeleteReservoirRegistryInput, info: Info[StrawberryGQLContext]
 ) -> DeleteReservoirRegistryPayload:
-    processors = info.context.processors
-
     pydantic_input = input.to_pydantic()
-    await processors.artifact_registry.delete_reservoir_registry.wait_for_complete(
-        DeleteReservoirRegistryAction(reservoir_id=pydantic_input.id)
-    )
-
-    return DeleteReservoirRegistryPayload(id=input.id)
+    result = await info.context.adapters.reservoir_registry.delete(pydantic_input)
+    return DeleteReservoirRegistryPayload(id=ID(str(result.id)))

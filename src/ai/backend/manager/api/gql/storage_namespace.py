@@ -9,20 +9,14 @@ from strawberry import ID, Info
 from strawberry.relay import Connection, Edge, NodeID
 
 from ai.backend.common.dto.manager.v2.storage_namespace.request import (
+    RegisterStorageNamespaceInput as RegisterStorageNamespaceInputDTO,
+)
+from ai.backend.common.dto.manager.v2.storage_namespace.request import (
     UnregisterStorageNamespaceInput as UnregisterStorageNamespaceInputDTO,
 )
 from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin
 from ai.backend.manager.api.gql.utils import dedent_strip
 from ai.backend.manager.data.storage_namespace.types import StorageNamespaceData
-from ai.backend.manager.models.storage_namespace import StorageNamespaceRow
-from ai.backend.manager.repositories.base.creator import Creator
-from ai.backend.manager.repositories.storage_namespace import StorageNamespaceCreatorSpec
-from ai.backend.manager.services.storage_namespace.actions.register import (
-    RegisterNamespaceAction,
-)
-from ai.backend.manager.services.storage_namespace.actions.unregister import (
-    UnregisterNamespaceAction,
-)
 
 from .types import StrawberryGQLContext
 
@@ -93,14 +87,6 @@ class RegisterStorageNamespaceInput:
     storage_id: uuid.UUID
     namespace: str
 
-    def to_creator(self) -> Creator[StorageNamespaceRow]:
-        return Creator(
-            spec=StorageNamespaceCreatorSpec(
-                storage_id=self.storage_id,
-                bucket=self.namespace,
-            )
-        )
-
 
 @strawberry.experimental.pydantic.input(
     model=UnregisterStorageNamespaceInputDTO,
@@ -147,15 +133,13 @@ class UnregisterStorageNamespacePayload:
 async def register_storage_namespace(
     input: RegisterStorageNamespaceInput, info: Info[StrawberryGQLContext]
 ) -> RegisterStorageNamespacePayload:
-    processors = info.context.processors
-
-    action_result = await processors.storage_namespace.register.wait_for_complete(
-        RegisterNamespaceAction(
-            creator=input.to_creator(),
+    payload = await info.context.adapters.storage_namespace.register(
+        RegisterStorageNamespaceInputDTO(
+            storage_id=input.storage_id,
+            namespace=input.namespace,
         )
     )
-
-    return RegisterStorageNamespacePayload(id=action_result.storage_id)
+    return RegisterStorageNamespacePayload(id=payload.namespace.storage_id)
 
 
 @strawberry.mutation(  # type: ignore[misc]
@@ -168,13 +152,6 @@ async def register_storage_namespace(
 async def unregister_storage_namespace(
     input: UnregisterStorageNamespaceInput, info: Info[StrawberryGQLContext]
 ) -> UnregisterStorageNamespacePayload:
-    processors = info.context.processors
-
-    action_result = await processors.storage_namespace.unregister.wait_for_complete(
-        UnregisterNamespaceAction(
-            storage_id=input.storage_id,
-            namespace=input.namespace,
-        )
-    )
-
-    return UnregisterStorageNamespacePayload(id=action_result.storage_id)
+    pydantic_input = input.to_pydantic()
+    payload = await info.context.adapters.storage_namespace.unregister(pydantic_input)
+    return UnregisterStorageNamespacePayload(id=payload.id)

@@ -49,6 +49,7 @@ class CreateObjectStorageInput(BaseRequestModel):
 class UpdateObjectStorageInput(BaseRequestModel):
     """Input for updating an object storage."""
 
+    id: UUID = Field(description="Object storage ID to update")
     name: str | None = Field(default=None, description="Updated name of the object storage")
     host: str | None = Field(default=None, description="Updated host address")
     access_key: str | None = Field(default=None, description="Updated access key")
