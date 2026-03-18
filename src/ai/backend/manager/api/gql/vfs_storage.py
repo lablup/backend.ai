@@ -9,22 +9,20 @@ from strawberry import ID, UNSET, Info
 from strawberry.relay import Connection, Edge, NodeID
 
 from ai.backend.common.dto.manager.v2.vfs_storage.request import (
+    CreateVFSStorageInput as CreateVFSStorageInputDTO,
+)
+from ai.backend.common.dto.manager.v2.vfs_storage.request import (
     DeleteVFSStorageInput as DeleteVFSStorageInputDTO,
+)
+from ai.backend.common.dto.manager.v2.vfs_storage.request import (
+    UpdateVFSStorageInput as UpdateVFSStorageInputDTO,
 )
 from ai.backend.manager.api.gql.base import encode_cursor
 from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin
 from ai.backend.manager.data.vfs_storage.types import VFSStorageData
-from ai.backend.manager.models.vfs_storage import VFSStorageRow
-from ai.backend.manager.repositories.base.creator import Creator
-from ai.backend.manager.repositories.base.updater import Updater
-from ai.backend.manager.repositories.vfs_storage import VFSStorageCreatorSpec
-from ai.backend.manager.repositories.vfs_storage.updaters import VFSStorageUpdaterSpec
-from ai.backend.manager.services.vfs_storage.actions.create import CreateVFSStorageAction
 from ai.backend.manager.services.vfs_storage.actions.delete import DeleteVFSStorageAction
 from ai.backend.manager.services.vfs_storage.actions.get import GetVFSStorageAction
 from ai.backend.manager.services.vfs_storage.actions.list import ListVFSStorageAction
-from ai.backend.manager.services.vfs_storage.actions.update import UpdateVFSStorageAction
-from ai.backend.manager.types import OptionalState
 
 from .types import StrawberryGQLContext
 
@@ -108,36 +106,32 @@ async def vfs_storages(
     )
 
 
-@strawberry.input(description="Added in 25.16.0. Input for creating VFS storage")
+@strawberry.experimental.pydantic.input(
+    model=CreateVFSStorageInputDTO,
+    description="Added in 25.16.0. Input for creating VFS storage",
+    all_fields=True,
+)
 class CreateVFSStorageInput:
-    name: str
-    host: str
-    base_path: str
-
-    def to_creator(self) -> Creator[VFSStorageRow]:
-        return Creator(
-            spec=VFSStorageCreatorSpec(
-                name=self.name,
-                host=self.host,
-                base_path=self.base_path,
-            )
-        )
+    pass
 
 
-@strawberry.input(description="Added in 25.16.0. Input for updating VFS storage")
+@strawberry.experimental.pydantic.input(
+    model=UpdateVFSStorageInputDTO,
+    description="Added in 25.16.0. Input for updating VFS storage",
+)
 class UpdateVFSStorageInput:
     id: ID
     name: str | None = UNSET
     host: str | None = UNSET
     base_path: str | None = UNSET
 
-    def to_updater(self) -> Updater[VFSStorageRow]:
-        spec = VFSStorageUpdaterSpec(
-            name=OptionalState[str].from_graphql(self.name),
-            host=OptionalState[str].from_graphql(self.host),
-            base_path=OptionalState[str].from_graphql(self.base_path),
+    def to_pydantic(self) -> UpdateVFSStorageInputDTO:
+        return UpdateVFSStorageInputDTO(
+            id=uuid.UUID(self.id),
+            name=None if self.name is UNSET else self.name,
+            host=None if self.host is UNSET else self.host,
+            base_path=None if self.base_path is UNSET else self.base_path,
         )
-        return Updater(spec=spec, pk_value=uuid.UUID(self.id))
 
 
 @strawberry.experimental.pydantic.input(
@@ -169,15 +163,8 @@ class DeleteVFSStoragePayload:
 async def create_vfs_storage(
     input: CreateVFSStorageInput, info: Info[StrawberryGQLContext]
 ) -> CreateVFSStoragePayload:
-    processors = info.context.processors
-
-    action_result = await processors.vfs_storage.create.wait_for_complete(
-        CreateVFSStorageAction(
-            creator=input.to_creator(),
-        )
-    )
-
-    return CreateVFSStoragePayload(vfs_storage=VFSStorage.from_dataclass(action_result.result))
+    result = await info.context.adapters.vfs_storage.create(input.to_pydantic())
+    return CreateVFSStoragePayload(vfs_storage=VFSStorage.from_pydantic(result.vfs_storage))
 
 
 @strawberry.mutation(  # type: ignore[misc]
@@ -186,15 +173,8 @@ async def create_vfs_storage(
 async def update_vfs_storage(
     input: UpdateVFSStorageInput, info: Info[StrawberryGQLContext]
 ) -> UpdateVFSStoragePayload:
-    processors = info.context.processors
-
-    action_result = await processors.vfs_storage.update.wait_for_complete(
-        UpdateVFSStorageAction(
-            updater=input.to_updater(),
-        )
-    )
-
-    return UpdateVFSStoragePayload(vfs_storage=VFSStorage.from_dataclass(action_result.result))
+    result = await info.context.adapters.vfs_storage.update(input.to_pydantic())
+    return UpdateVFSStoragePayload(vfs_storage=VFSStorage.from_pydantic(result.vfs_storage))
 
 
 @strawberry.mutation(name="deleteVFSStorage", description="Added in 25.16.0. Delete a VFS storage")  # type: ignore[misc]
