@@ -8,6 +8,9 @@ import strawberry
 from strawberry import ID, UNSET, Info
 from strawberry.relay import Connection, Edge, NodeID
 
+from ai.backend.common.dto.manager.v2.huggingface_registry.request import (
+    DeleteHuggingFaceRegistryInput as DeleteHuggingFaceRegistryInputDTO,
+)
 from ai.backend.manager.api.gql.base import encode_cursor
 from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin
 from ai.backend.manager.data.artifact_registries.types import (
@@ -179,7 +182,10 @@ class UpdateHuggingFaceRegistryInput:
         )
 
 
-@strawberry.input(description="Added in 25.14.0")
+@strawberry.experimental.pydantic.input(
+    model=DeleteHuggingFaceRegistryInputDTO,
+    description="Added in 25.14.0",
+)
 class DeleteHuggingFaceRegistryInput:
     id: ID
 
@@ -244,8 +250,9 @@ async def delete_huggingface_registry(
 ) -> DeleteHuggingFaceRegistryPayload:
     processors = info.context.processors
 
+    pydantic_input = input.to_pydantic()
     await processors.artifact_registry.delete_huggingface_registry.wait_for_complete(
-        DeleteHuggingFaceRegistryAction(registry_id=uuid.UUID(input.id))
+        DeleteHuggingFaceRegistryAction(registry_id=pydantic_input.id)
     )
 
     return DeleteHuggingFaceRegistryPayload(id=input.id)

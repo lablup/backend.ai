@@ -6,6 +6,9 @@ import strawberry
 from strawberry import ID, UNSET, Info
 from strawberry.relay import Connection, Edge, NodeID
 
+from ai.backend.common.dto.manager.v2.reservoir_registry.request import (
+    DeleteReservoirRegistryInput as DeleteReservoirRegistryInputDTO,
+)
 from ai.backend.manager.api.gql.artifact_registry_meta import ArtifactRegistryMetaConnection
 from ai.backend.manager.api.gql.base import encode_cursor
 from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin
@@ -197,7 +200,10 @@ class UpdateReservoirRegistryInput:
         )
 
 
-@strawberry.input(description="Added in 25.14.0")
+@strawberry.experimental.pydantic.input(
+    model=DeleteReservoirRegistryInputDTO,
+    description="Added in 25.14.0",
+)
 class DeleteReservoirRegistryInput:
     id: ID
 
@@ -256,8 +262,9 @@ async def delete_reservoir_registry(
 ) -> DeleteReservoirRegistryPayload:
     processors = info.context.processors
 
+    pydantic_input = input.to_pydantic()
     await processors.artifact_registry.delete_reservoir_registry.wait_for_complete(
-        DeleteReservoirRegistryAction(reservoir_id=uuid.UUID(input.id))
+        DeleteReservoirRegistryAction(reservoir_id=pydantic_input.id)
     )
 
     return DeleteReservoirRegistryPayload(id=input.id)

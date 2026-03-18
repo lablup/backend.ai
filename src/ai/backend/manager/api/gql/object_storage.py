@@ -9,6 +9,9 @@ import strawberry
 from strawberry import ID, UNSET, Info
 from strawberry.relay import Connection, Edge, NodeID
 
+from ai.backend.common.dto.manager.v2.object_storage.request import (
+    DeleteObjectStorageInput as DeleteObjectStorageInputDTO,
+)
 from ai.backend.manager.api.gql.base import encode_cursor
 from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin
 from ai.backend.manager.data.object_storage.types import ObjectStorageData
@@ -198,7 +201,10 @@ class UpdateObjectStorageInput:
         return Updater(spec=spec, pk_value=uuid.UUID(self.id))
 
 
-@strawberry.input(description="Added in 25.14.0")
+@strawberry.experimental.pydantic.input(
+    model=DeleteObjectStorageInputDTO,
+    description="Added in 25.14.0",
+)
 class DeleteObjectStorageInput:
     id: ID
 
@@ -282,9 +288,10 @@ async def delete_object_storage(
 ) -> DeleteObjectStoragePayload:
     processors = info.context.processors
 
+    pydantic_input = input.to_pydantic()
     action_result = await processors.object_storage.delete.wait_for_complete(
         DeleteObjectStorageAction(
-            storage_id=uuid.UUID(input.id),
+            storage_id=pydantic_input.id,
         )
     )
 

@@ -8,6 +8,9 @@ import strawberry
 from strawberry import ID, UNSET, Info
 from strawberry.relay import Connection, Edge, NodeID
 
+from ai.backend.common.dto.manager.v2.vfs_storage.request import (
+    DeleteVFSStorageInput as DeleteVFSStorageInputDTO,
+)
 from ai.backend.manager.api.gql.base import encode_cursor
 from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin
 from ai.backend.manager.data.vfs_storage.types import VFSStorageData
@@ -137,7 +140,10 @@ class UpdateVFSStorageInput:
         return Updater(spec=spec, pk_value=uuid.UUID(self.id))
 
 
-@strawberry.input(description="Added in 25.16.0. Input for deleting VFS storage")
+@strawberry.experimental.pydantic.input(
+    model=DeleteVFSStorageInputDTO,
+    description="Added in 25.16.0. Input for deleting VFS storage",
+)
 class DeleteVFSStorageInput:
     id: ID
 
@@ -197,9 +203,10 @@ async def delete_vfs_storage(
 ) -> DeleteVFSStoragePayload:
     processors = info.context.processors
 
+    pydantic_input = input.to_pydantic()
     action_result = await processors.vfs_storage.delete.wait_for_complete(
         DeleteVFSStorageAction(
-            storage_id=uuid.UUID(input.id),
+            storage_id=pydantic_input.id,
         )
     )
 
