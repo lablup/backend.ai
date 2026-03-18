@@ -59,7 +59,7 @@ __all__ = [
     "sync_replicas",
     "deployment_status_changed",
     # Policy
-    "update_deployment_policy",
+    "admin_update_deployment_policy",
     # Replica
     "replicas",
     "replica",
