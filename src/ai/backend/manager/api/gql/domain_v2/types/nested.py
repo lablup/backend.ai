@@ -2,30 +2,34 @@
 
 from __future__ import annotations
 
-from datetime import datetime
-
 import strawberry
+
+from ai.backend.common.dto.manager.v2.domain.response import (
+    DomainBasicInfo as DomainBasicInfoDTO,
+)
+from ai.backend.common.dto.manager.v2.domain.response import (
+    DomainLifecycleInfo as DomainLifecycleInfoDTO,
+)
+from ai.backend.common.dto.manager.v2.domain.response import (
+    DomainRegistryInfo as DomainRegistryInfoDTO,
+)
 
 # ============================================================================
 # Basic Information
 # ============================================================================
 
 
-@strawberry.type(
+@strawberry.experimental.pydantic.type(
+    model=DomainBasicInfoDTO,
     name="DomainBasicInfo",
     description=(
         "Added in 26.2.0. Basic domain information. "
         "Contains identity and descriptive fields for the domain."
     ),
+    all_fields=True,
 )
 class DomainBasicInfoGQL:
     """Basic domain information."""
-
-    name: str = strawberry.field(description="Domain name (primary key).")
-    description: str | None = strawberry.field(description="Optional description of the domain.")
-    integration_id: str | None = strawberry.field(
-        description="External system integration identifier."
-    )
 
 
 # ============================================================================
@@ -33,22 +37,17 @@ class DomainBasicInfoGQL:
 # ============================================================================
 
 
-@strawberry.type(
+@strawberry.experimental.pydantic.type(
+    model=DomainRegistryInfoDTO,
     name="DomainRegistryInfo",
     description=(
         "Added in 26.2.0. Domain container registry configuration. "
         "Contains allowed container registry URLs for this domain."
     ),
+    all_fields=True,
 )
 class DomainRegistryInfoGQL:
     """Domain container registry configuration."""
-
-    allowed_docker_registries: list[str] = strawberry.field(
-        description=(
-            "List of allowed container registry URLs. "
-            "Empty list means no restrictions on registry access."
-        )
-    )
 
 
 # ============================================================================
@@ -56,23 +55,14 @@ class DomainRegistryInfoGQL:
 # ============================================================================
 
 
-@strawberry.type(
+@strawberry.experimental.pydantic.type(
+    model=DomainLifecycleInfoDTO,
     name="DomainLifecycleInfo",
     description=(
         "Added in 26.2.0. Domain lifecycle information. "
         "Contains activation status and timestamp tracking."
     ),
+    all_fields=True,
 )
 class DomainLifecycleInfoGQL:
     """Domain lifecycle information."""
-
-    is_active: bool = strawberry.field(
-        description=(
-            "Whether the domain is active. "
-            "Inactive domains cannot create new projects or perform operations."
-        )
-    )
-    created_at: datetime = strawberry.field(description="Timestamp when the domain was created.")
-    modified_at: datetime = strawberry.field(
-        description="Timestamp when the domain was last modified."
-    )
