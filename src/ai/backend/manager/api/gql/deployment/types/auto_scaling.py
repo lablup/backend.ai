@@ -13,15 +13,20 @@ import strawberry
 from strawberry import ID, Info
 from strawberry.relay import Connection, Edge, NodeID
 
+from ai.backend.common.api_handlers import SENTINEL
+from ai.backend.common.dto.manager.v2.auto_scaling_rule.request import (
+    CreateAutoScalingRuleInput as CreateAutoScalingRuleInputDTO,
+)
 from ai.backend.common.dto.manager.v2.auto_scaling_rule.request import (
     DeleteAutoScalingRuleInput as DeleteAutoScalingRuleInputDTO,
+)
+from ai.backend.common.dto.manager.v2.auto_scaling_rule.request import (
+    UpdateAutoScalingRuleInput as UpdateAutoScalingRuleInputDTO,
 )
 from ai.backend.common.types import AutoScalingMetricSource as CommonAutoScalingMetricSource
 from ai.backend.manager.api.gql.base import DateTimeFilter, OrderDirection
 from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin
 from ai.backend.manager.api.gql.types import GQLFilter, GQLOrderBy, StrawberryGQLContext
-from ai.backend.manager.data.deployment.scale import ModelDeploymentAutoScalingRuleCreator
-from ai.backend.manager.data.deployment.scale_modifier import ModelDeploymentAutoScalingRuleModifier
 from ai.backend.manager.data.deployment.types import (
     AutoScalingRuleOrderField,
     ModelDeploymentAutoScalingRuleData,
@@ -34,10 +39,6 @@ from ai.backend.manager.repositories.base import (
     combine_conditions_or,
     negate_conditions,
 )
-from ai.backend.manager.services.deployment.actions.auto_scaling_rule.update_auto_scaling_rule import (
-    UpdateAutoScalingRuleAction,
-)
-from ai.backend.manager.types import OptionalState
 
 
 @strawberry.enum(description="Added in 25.1.0")
@@ -194,7 +195,10 @@ class AutoScalingRuleConnection(Connection[AutoScalingRule]):
 
 
 # Input Types
-@strawberry.input
+@strawberry.experimental.pydantic.input(
+    model=CreateAutoScalingRuleInputDTO,
+    description="Added in 25.19.0. Input for creating an auto-scaling rule.",
+)
 class CreateAutoScalingRuleInput:
     model_deployment_id: ID
     metric_source: AutoScalingMetricSource
@@ -206,8 +210,8 @@ class CreateAutoScalingRuleInput:
     min_replicas: int | None
     max_replicas: int | None
 
-    def to_creator(self) -> ModelDeploymentAutoScalingRuleCreator:
-        return ModelDeploymentAutoScalingRuleCreator(
+    def to_pydantic(self) -> CreateAutoScalingRuleInputDTO:
+        return CreateAutoScalingRuleInputDTO(
             model_deployment_id=UUID(self.model_deployment_id),
             metric_source=CommonAutoScalingMetricSource(self.metric_source.lower()),
             metric_name=self.metric_name,
@@ -232,24 +236,18 @@ class UpdateAutoScalingRuleInput:
     min_replicas: int | None
     max_replicas: int | None
 
-    def to_action(self) -> UpdateAutoScalingRuleAction:
-        optional_state_metric_source = OptionalState[CommonAutoScalingMetricSource].nop()
-        if isinstance(self.metric_source, AutoScalingMetricSource):
-            optional_state_metric_source = OptionalState[CommonAutoScalingMetricSource].update(
-                CommonAutoScalingMetricSource(self.metric_source)
-            )
-        return UpdateAutoScalingRuleAction(
-            auto_scaling_rule_id=UUID(self.id),
-            modifier=ModelDeploymentAutoScalingRuleModifier(
-                metric_source=optional_state_metric_source,
-                metric_name=OptionalState[str].from_graphql(self.metric_name),
-                min_threshold=OptionalState[Decimal].from_graphql(self.min_threshold),
-                max_threshold=OptionalState[Decimal].from_graphql(self.max_threshold),
-                step_size=OptionalState[int].from_graphql(self.step_size),
-                time_window=OptionalState[int].from_graphql(self.time_window),
-                min_replicas=OptionalState[int].from_graphql(self.min_replicas),
-                max_replicas=OptionalState[int].from_graphql(self.max_replicas),
-            ),
+    def to_pydantic(self) -> UpdateAutoScalingRuleInputDTO:
+        return UpdateAutoScalingRuleInputDTO(
+            metric_source=None
+            if self.metric_source is None
+            else CommonAutoScalingMetricSource(self.metric_source.lower()),
+            metric_name=self.metric_name,
+            min_threshold=SENTINEL if self.min_threshold is None else self.min_threshold,
+            max_threshold=SENTINEL if self.max_threshold is None else self.max_threshold,
+            step_size=self.step_size,
+            time_window=self.time_window,
+            min_replicas=SENTINEL if self.min_replicas is None else self.min_replicas,
+            max_replicas=SENTINEL if self.max_replicas is None else self.max_replicas,
         )
 
 

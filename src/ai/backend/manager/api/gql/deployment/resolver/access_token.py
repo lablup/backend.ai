@@ -11,6 +11,7 @@ from ai.backend.manager.api.gql.deployment.types.access_token import (
     CreateAccessTokenPayload,
 )
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
+from ai.backend.manager.data.deployment.access_token import ModelDeploymentAccessTokenCreator
 from ai.backend.manager.services.deployment.actions.access_token.create_access_token import (
     CreateAccessTokenAction,
 )
@@ -24,7 +25,13 @@ async def create_access_token(
 ) -> CreateAccessTokenPayload:
     """Create a new access token for a deployment."""
     processor = info.context.processors.deployment
+    dto = input.to_pydantic()
     result = await processor.create_access_token.wait_for_complete(
-        action=CreateAccessTokenAction(input.to_creator())
+        action=CreateAccessTokenAction(
+            ModelDeploymentAccessTokenCreator(
+                model_deployment_id=dto.deployment_id,
+                valid_until=dto.valid_until,
+            )
+        )
     )
     return CreateAccessTokenPayload(access_token=AccessToken.from_dataclass(result.data))

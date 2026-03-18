@@ -11,10 +11,12 @@ import strawberry
 from strawberry import ID, Info
 from strawberry.relay import Connection, Edge, NodeID
 
+from ai.backend.common.dto.manager.v2.deployment.request import (
+    CreateAccessTokenInput as CreateAccessTokenInputDTO,
+)
 from ai.backend.manager.api.gql.base import DateTimeFilter, OrderDirection, StringFilter
 from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin
 from ai.backend.manager.api.gql.types import GQLFilter, GQLOrderBy, StrawberryGQLContext
-from ai.backend.manager.data.deployment.access_token import ModelDeploymentAccessTokenCreator
 from ai.backend.manager.data.deployment.types import (
     AccessTokenOrderField,
     ModelDeploymentAccessTokenData,
@@ -163,9 +165,9 @@ class CreateAccessTokenInput:
         description="Added in 25.16.0: The expiration timestamp of the access token."
     )
 
-    def to_creator(self) -> ModelDeploymentAccessTokenCreator:
-        return ModelDeploymentAccessTokenCreator(
-            model_deployment_id=UUID(self.model_deployment_id),
+    def to_pydantic(self) -> CreateAccessTokenInputDTO:
+        return CreateAccessTokenInputDTO(
+            deployment_id=UUID(self.model_deployment_id),
             valid_until=self.valid_until,
         )
 

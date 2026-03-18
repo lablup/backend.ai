@@ -5,26 +5,46 @@ from __future__ import annotations
 from collections.abc import Iterable, Sequence
 from datetime import datetime
 from typing import Any, Self, override
-from uuid import UUID, uuid4
+from uuid import UUID
 
 import strawberry
 from strawberry import ID, Info
 from strawberry.relay import Connection, Edge, NodeID
 
-from ai.backend.common.contexts.user import current_user
+from ai.backend.common.api_handlers import SENTINEL
 from ai.backend.common.data.model_deployment.types import (
     DeploymentStrategy,
     ModelDeploymentStatus,
 )
 from ai.backend.common.dto.manager.v2.deployment.request import (
+    BlueGreenConfigInput as BlueGreenConfigInputDTO,
+)
+from ai.backend.common.dto.manager.v2.deployment.request import (
+    CreateDeploymentInput as CreateDeploymentInputDTO,
+)
+from ai.backend.common.dto.manager.v2.deployment.request import (
     DeleteDeploymentInput as DeleteDeploymentInputDTO,
+)
+from ai.backend.common.dto.manager.v2.deployment.request import (
+    ExtraVFolderMountInput as ExtraVFolderMountInputDTO,
+)
+from ai.backend.common.dto.manager.v2.deployment.request import (
+    RevisionInput as RevisionInputDTO,
+)
+from ai.backend.common.dto.manager.v2.deployment.request import (
+    RollingUpdateConfigInput as RollingUpdateConfigInputDTO,
 )
 from ai.backend.common.dto.manager.v2.deployment.request import (
     SyncReplicaInput as SyncReplicaInputDTO,
 )
+from ai.backend.common.dto.manager.v2.deployment.request import (
+    UpdateDeploymentInput as UpdateDeploymentInputDTO,
+)
 from ai.backend.common.exception import (
     InvalidAPIParameters,
 )
+from ai.backend.common.types import ClusterMode as CommonClusterMode
+from ai.backend.common.types import RuntimeVariant
 from ai.backend.manager.api.gql.base import (
     OrderDirection,
     StringFilter,
@@ -66,18 +86,14 @@ from ai.backend.manager.api.gql.user_federation import User
 from ai.backend.manager.api.gql_legacy.domain import DomainNode
 from ai.backend.manager.api.gql_legacy.group import GroupNode
 from ai.backend.manager.api.gql_legacy.user import UserNode
-from ai.backend.manager.data.deployment.creator import DeploymentPolicyConfig, NewDeploymentCreator
+from ai.backend.manager.data.deployment.creator import DeploymentPolicyConfig
 from ai.backend.manager.data.deployment.types import (
-    DeploymentMetadata,
     DeploymentNetworkSpec,
     DeploymentOrderField,
     ModelDeploymentData,
     ModelDeploymentMetadataInfo,
-    ReplicaSpec,
 )
-from ai.backend.manager.errors.user import UserNotFound
 from ai.backend.manager.models.deployment_revision.conditions import RevisionConditions
-from ai.backend.manager.models.endpoint import EndpointRow
 from ai.backend.manager.models.endpoint.conditions import (
     AccessTokenConditions,
     AutoScalingRuleConditions,
@@ -88,19 +104,9 @@ from ai.backend.manager.models.routing.conditions import RouteConditions
 from ai.backend.manager.repositories.base import (
     QueryCondition,
     QueryOrder,
-    Updater,
     combine_conditions_or,
     negate_conditions,
 )
-from ai.backend.manager.repositories.deployment.updaters import (
-    DeploymentMetadataUpdaterSpec,
-    DeploymentNetworkSpecUpdaterSpec,
-    DeploymentPolicyUpdaterSpec,
-    DeploymentUpdaterSpec,
-    ReplicaSpecUpdaterSpec,
-    RevisionStateUpdaterSpec,
-)
-from ai.backend.manager.types import OptionalState, TriState
 
 DeploymentStatusGQL: type[ModelDeploymentStatus] = strawberry.enum(
     ModelDeploymentStatus,
@@ -648,29 +654,72 @@ class CreateDeploymentInput:
     desired_replica_count: int
     initial_revision: CreateRevisionInput
 
-    def to_creator(self) -> NewDeploymentCreator:
-        name = self.metadata.name or f"deployment-{uuid4().hex[:8]}"
-        tag = ",".join(self.metadata.tags) if self.metadata.tags else None
-        user_data = current_user()
-        if user_data is None:
-            raise UserNotFound("User not found in context")
-        metadata_for_creator = DeploymentMetadata(
-            name=name,
-            domain=self.metadata.domain_name,
-            project=UUID(str(self.metadata.project_id)),
+    def to_pydantic(self) -> CreateDeploymentInputDTO:
+        rolling_update_dto: RollingUpdateConfigInputDTO | None = None
+        if self.default_deployment_strategy.rolling_update is not None:
+            rolling_update_dto = RollingUpdateConfigInputDTO(
+                max_surge=self.default_deployment_strategy.rolling_update.max_surge,
+                max_unavailable=self.default_deployment_strategy.rolling_update.max_unavailable,
+            )
+        blue_green_dto: BlueGreenConfigInputDTO | None = None
+        if self.default_deployment_strategy.blue_green is not None:
+            blue_green_dto = BlueGreenConfigInputDTO(
+                auto_promote=self.default_deployment_strategy.blue_green.auto_promote,
+                promote_delay_seconds=self.default_deployment_strategy.blue_green.promote_delay_seconds,
+            )
+        extra_mounts_dto: list[ExtraVFolderMountInputDTO] | None = None
+        if self.initial_revision.extra_mounts is not None:
+            extra_mounts_dto = [
+                ExtraVFolderMountInputDTO(
+                    vfolder_id=UUID(str(m.vfolder_id)),
+                    mount_destination=m.mount_destination,
+                )
+                for m in self.initial_revision.extra_mounts
+            ]
+        environ_dto: dict[str, str] | None = None
+        if self.initial_revision.model_runtime_config.environ is not None:
+            environ_dto = {
+                e.name: e.value for e in self.initial_revision.model_runtime_config.environ.entries
+            }
+        resource_slots_dict = {
+            e.resource_type: e.quantity
+            for e in self.initial_revision.resource_config.resource_slots.entries
+        }
+        resource_opts_dict: dict[str, str] | None = None
+        if self.initial_revision.resource_config.resource_opts is not None:
+            resource_opts_dict = {
+                e.name: e.value for e in self.initial_revision.resource_config.resource_opts.entries
+            }
+        revision_dto = RevisionInputDTO(
+            name=self.initial_revision.name,
+            image_id=UUID(str(self.initial_revision.image.id)),
+            cluster_mode=CommonClusterMode(self.initial_revision.cluster_config.mode),
+            cluster_size=self.initial_revision.cluster_config.size,
             resource_group=self.initial_revision.resource_config.resource_group.name,
-            created_user=user_data.user_id,
-            session_owner=user_data.user_id,
-            created_at=None,
-            revision_history_limit=10,
-            tag=tag,
+            resource_slots=resource_slots_dict,
+            resource_opts=resource_opts_dict,
+            runtime_variant=RuntimeVariant(
+                self.initial_revision.model_runtime_config.runtime_variant
+            ),
+            model_vfolder_id=UUID(str(self.initial_revision.model_mount_config.vfolder_id)),
+            model_mount_destination=self.initial_revision.model_mount_config.mount_destination,
+            model_definition_path=self.initial_revision.model_mount_config.definition_path,
+            extra_mounts=extra_mounts_dto,
+            environ=environ_dto,
         )
-        return NewDeploymentCreator(
-            metadata=metadata_for_creator,
-            replica_spec=ReplicaSpec(replica_count=self.desired_replica_count),
-            network=self.network_access.to_network_spec(),
-            model_revision=self.initial_revision.to_model_revision_creator(),
-            policy=self.default_deployment_strategy.to_policy_config(),
+        return CreateDeploymentInputDTO(
+            project_id=UUID(str(self.metadata.project_id)),
+            domain_name=self.metadata.domain_name,
+            name=self.metadata.name,
+            tags=self.metadata.tags,
+            open_to_public=self.network_access.open_to_public,
+            preferred_domain_name=self.network_access.preferred_domain_name,
+            strategy=DeploymentStrategy(self.default_deployment_strategy.type.value),
+            rollback_on_failure=self.default_deployment_strategy.rollback_on_failure,
+            desired_replica_count=self.desired_replica_count,
+            initial_revision=revision_dto,
+            rolling_update=rolling_update_dto,
+            blue_green=blue_green_dto,
         )
 
 
@@ -685,64 +734,11 @@ class UpdateDeploymentInput:
     name: str | None = None
     preferred_domain_name: str | None = None
 
-    def to_updater(self, deployment_id: UUID) -> Updater[EndpointRow]:
-        """Convert input to deployment updater."""
-        # Build metadata sub-spec if any metadata fields are provided
-        metadata_spec: DeploymentMetadataUpdaterSpec | None = None
-        if self.name is not None or self.tags is not None:
-            # Convert tags list to comma-separated string for tag column
-            tag_str: str | None = None
-            if self.tags is not None:
-                tag_str = ",".join(self.tags)
-            metadata_spec = DeploymentMetadataUpdaterSpec(
-                name=OptionalState[str].from_graphql(self.name),
-                tag=TriState[str].from_graphql(tag_str),
-            )
-
-        # Build replica spec sub-spec if any replica fields are provided
-        replica_spec: ReplicaSpecUpdaterSpec | None = None
-        if self.desired_replica_count is not None:
-            replica_spec = ReplicaSpecUpdaterSpec(
-                desired_replica_count=OptionalState[int].from_graphql(self.desired_replica_count),
-            )
-
-        # Build network sub-spec if any network fields are provided
-        network_spec: DeploymentNetworkSpecUpdaterSpec | None = None
-        if self.open_to_public is not None:
-            network_spec = DeploymentNetworkSpecUpdaterSpec(
-                open_to_public=OptionalState[bool].from_graphql(self.open_to_public),
-            )
-
-        # Build revision state sub-spec if any revision fields are provided
-        revision_state_spec: RevisionStateUpdaterSpec | None = None
-        if self.active_revision_id is not None:
-            active_revision_uuid = UUID(self.active_revision_id)
-            revision_state_spec = RevisionStateUpdaterSpec(
-                current_revision=TriState[UUID].from_graphql(active_revision_uuid),
-            )
-
-        spec = DeploymentUpdaterSpec(
-            metadata=metadata_spec,
-            replica_spec=replica_spec,
-            network=network_spec,
-            revision_state=revision_state_spec,
-        )
-        return Updater(spec=spec, pk_value=deployment_id)
-
-    def to_policy_updater_spec(self) -> DeploymentPolicyUpdaterSpec | None:
-        """Convert deployment strategy input to policy updater spec.
-
-        Returns None if no deployment_strategy is provided (no policy update).
-        """
-        if self.default_deployment_strategy is None:
-            return None
-
-        # Validate and convert
-        creator = self.default_deployment_strategy.to_policy_config()
-        return DeploymentPolicyUpdaterSpec(
-            strategy=OptionalState.update(creator.strategy),
-            strategy_spec=OptionalState.update(creator.strategy_spec),
-            rollback_on_failure=OptionalState.update(creator.rollback_on_failure),
+    def to_pydantic(self) -> UpdateDeploymentInputDTO:
+        return UpdateDeploymentInputDTO(
+            name=self.name,
+            desired_replicas=self.desired_replica_count,
+            tags=SENTINEL if self.tags is None else self.tags,
         )
 
 
