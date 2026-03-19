@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Callable, Coroutine
 from typing import Any
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
@@ -18,17 +19,34 @@ from ai.backend.common.dto.manager.vfolder import (
     UpdateQuotaResponse,
 )
 from ai.backend.common.types import QuotaScopeID, QuotaScopeType
+from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
 
 VFolderFixtureData = dict[str, Any]
 VFolderFactory = Callable[..., Coroutine[Any, Any, VFolderFixtureData]]
 
 
+@pytest.fixture()
+def storage_manager() -> StorageSessionManager:
+    """Mock StorageSessionManager with configured storage proxy client methods.
+
+    Overrides the parent conftest mock so that quota and usage endpoints work
+    without a live storage-proxy connection.
+    """
+    mock = MagicMock(spec=StorageSessionManager)
+    mock_client = AsyncMock()
+    mock_client.get_volume_quota.return_value = {"used_bytes": 0, "limit_bytes": 0}
+    mock_client.update_volume_quota.return_value = None
+    mock_client.get_folder_usage.return_value = {"used_bytes": 0, "file_count": 0}
+    mock_client.get_used_bytes.return_value = {"used_bytes": 0}
+    mock.get_proxy_and_volume.return_value = ("local", "volume")
+    mock.get_manager_facing_client.return_value = mock_client
+    return mock
+
+
 class TestStorageQuotaScope:
     """Storage quota CRUD and access control via the quota scope API.
-    All tests are xfail because they require a live storage-proxy connection
-    that is not available in the CI environment."""
+    Storage-proxy calls are mocked via the storage_manager fixture in conftest."""
 
-    @pytest.mark.xfail(strict=False, reason="Requires live storage-proxy")
     async def test_get_quota(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -46,7 +64,6 @@ class TestStorageQuotaScope:
         assert isinstance(result, GetQuotaResponse)
         assert isinstance(result.data, dict)
 
-    @pytest.mark.xfail(strict=False, reason="Requires live storage-proxy")
     async def test_update_quota(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -64,7 +81,6 @@ class TestStorageQuotaScope:
         )
         assert isinstance(result, UpdateQuotaResponse)
 
-    @pytest.mark.xfail(strict=False, reason="Requires live storage-proxy")
     async def test_get_usage(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -82,7 +98,6 @@ class TestStorageQuotaScope:
         assert isinstance(result, GetUsageResponse)
         assert isinstance(result.data, dict)
 
-    @pytest.mark.xfail(strict=False, reason="Requires live storage-proxy")
     async def test_get_used_bytes(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -100,7 +115,6 @@ class TestStorageQuotaScope:
         assert isinstance(result, GetUsedBytesResponse)
         assert isinstance(result.data, dict)
 
-    @pytest.mark.xfail(strict=False, reason="Requires live storage-proxy")
     async def test_regular_user_can_get_own_quota(
         self,
         user_registry: BackendAIClientRegistry,
@@ -121,7 +135,6 @@ class TestStorageQuotaScope:
         )
         assert isinstance(result, GetQuotaResponse)
 
-    @pytest.mark.xfail(strict=False, reason="Requires live storage-proxy")
     async def test_regular_user_cannot_update_others_quota(
         self,
         user_registry: BackendAIClientRegistry,
