@@ -283,6 +283,13 @@ class UserRepository:
         await self._db_source.revoke_my_keypair(user_uuid, email, access_key)
 
     @user_repository_resilience.apply()
+    async def update_my_keypair(
+        self, user_uuid: UUID, email: str, access_key: str, is_active: bool
+    ) -> None:
+        """Update a keypair owned by the current user."""
+        await self._db_source.update_my_keypair(user_uuid, email, access_key, is_active)
+
+    @user_repository_resilience.apply()
     async def switch_my_main_access_key(self, user_uuid: UUID, email: str, access_key: str) -> None:
         """Switch the main access key for the current user."""
         await self._db_source.switch_my_main_access_key(user_uuid, email, access_key)
