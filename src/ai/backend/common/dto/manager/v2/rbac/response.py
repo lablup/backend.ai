@@ -15,6 +15,7 @@ from .types import PermissionSummary, RoleSource, RoleStatus
 
 __all__ = (
     "CreateRolePayload",
+    "DeletePermissionPayload",
     "DeleteRolePayload",
     "PurgeRolePayload",
     "RoleNode",
@@ -60,3 +61,9 @@ class PurgeRolePayload(BaseResponseModel):
     """Payload for role purge mutation result."""
 
     id: UUID = Field(description="ID of the purged role")
+
+
+class DeletePermissionPayload(BaseResponseModel):
+    """Payload for permission deletion mutation result."""
+
+    id: UUID = Field(description="ID of the deleted permission")

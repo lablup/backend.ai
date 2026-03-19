@@ -48,6 +48,15 @@ from ai.backend.common.dto.manager.v2.notification.request import (
 from ai.backend.common.dto.manager.v2.notification.request import (
     ValidateNotificationRuleInput as ValidateNotificationRuleInputDTO,
 )
+from ai.backend.common.dto.manager.v2.notification.response import (
+    DeleteNotificationChannelPayload as DeleteNotificationChannelPayloadDTO,
+)
+from ai.backend.common.dto.manager.v2.notification.response import (
+    DeleteNotificationRulePayload as DeleteNotificationRulePayloadDTO,
+)
+from ai.backend.common.dto.manager.v2.notification.response import (
+    ValidateNotificationRulePayload as ValidateNotificationRulePayloadDTO,
+)
 from ai.backend.common.exception import InvalidNotificationChannelSpec
 from ai.backend.manager.api.gql.base import OrderDirection, StringFilter
 from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin
@@ -752,9 +761,13 @@ class UpdateNotificationChannelPayload:
     channel: NotificationChannel
 
 
-@strawberry.type(description="Payload for delete notification channel mutation")
+@strawberry.experimental.pydantic.type(
+    model=DeleteNotificationChannelPayloadDTO,
+    description="Payload for delete notification channel mutation",
+    all_fields=True,
+)
 class DeleteNotificationChannelPayload:
-    id: ID
+    """Payload for notification channel deletion mutation."""
 
 
 @strawberry.type(description="Payload for create notification rule mutation")
@@ -767,9 +780,13 @@ class UpdateNotificationRulePayload:
     rule: NotificationRule
 
 
-@strawberry.type(description="Payload for delete notification rule mutation")
+@strawberry.experimental.pydantic.type(
+    model=DeleteNotificationRulePayloadDTO,
+    description="Payload for delete notification rule mutation",
+    all_fields=True,
+)
 class DeleteNotificationRulePayload:
-    id: ID
+    """Payload for notification rule deletion mutation."""
 
 
 # Validate mutations
@@ -812,6 +829,10 @@ class ValidateNotificationRuleInput:
         )
 
 
-@strawberry.type(description="Payload for validate notification rule mutation")
+@strawberry.experimental.pydantic.type(
+    model=ValidateNotificationRulePayloadDTO,
+    description="Payload for validate notification rule mutation",
+    all_fields=True,
+)
 class ValidateNotificationRulePayload:
-    message: str
+    """Payload for notification rule validation mutation."""

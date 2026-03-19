@@ -20,6 +20,9 @@ from ai.backend.common.dto.manager.v2.rbac.request import (
     DeletePermissionInput as DeletePermissionInputDTO,
     UpdatePermissionInput as UpdatePermissionInputDTO,
 )
+from ai.backend.common.dto.manager.v2.rbac.response import (
+    DeletePermissionPayload as DeletePermissionPayloadDTO,
+)
 from ai.backend.common.types import SessionId
 from ai.backend.manager.api.gql.base import OrderDirection
 from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin
@@ -413,9 +416,13 @@ class DeletePermissionInput:
 # ==================== Payload Types ====================
 
 
-@strawberry.type(description="Added in 26.3.0. Payload for delete permission mutation")
+@strawberry.experimental.pydantic.type(
+    model=DeletePermissionPayloadDTO,
+    description="Added in 26.3.0. Payload for delete permission mutation",
+    all_fields=True,
+)
 class DeletePermissionPayload:
-    id: ID
+    """Payload for permission deletion mutation."""
 
 
 # ==================== Connection Types ====================

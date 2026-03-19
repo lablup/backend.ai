@@ -18,6 +18,12 @@ from ai.backend.common.dto.manager.v2.app_config.request import (
 from ai.backend.common.dto.manager.v2.app_config.request import (
     UpsertUserConfigInput as UpsertUserConfigInputDTO,
 )
+from ai.backend.common.dto.manager.v2.app_config.response import (
+    DeleteDomainConfigPayload as DeleteDomainConfigPayloadDTO,
+)
+from ai.backend.common.dto.manager.v2.app_config.response import (
+    DeleteUserConfigPayload as DeleteUserConfigPayloadDTO,
+)
 from ai.backend.manager.api.gql.utils import check_admin_only, dedent_strip
 from ai.backend.manager.errors.auth import InsufficientPrivilege
 from ai.backend.manager.repositories.app_config.updaters import AppConfigUpdaterSpec
@@ -143,34 +149,34 @@ class UpsertUserConfigPayload:
     app_config: AppConfig
 
 
-@strawberry.type(
+@strawberry.experimental.pydantic.type(
+    model=DeleteDomainConfigPayloadDTO,
     description=dedent_strip(
         """\
         Added in 25.16.0.
         Payload returned after deleting domain-level app configuration.
         Indicates whether the deletion was successful.
         """
-    )
+    ),
+    all_fields=True,
 )
 class DeleteDomainConfigPayload:
     """Payload returned after deleting domain-level app configuration."""
 
-    deleted: bool
 
-
-@strawberry.type(
+@strawberry.experimental.pydantic.type(
+    model=DeleteUserConfigPayloadDTO,
     description=dedent_strip(
         """\
         Added in 25.16.0.
         Payload returned after deleting user-level app configuration.
         Indicates whether the deletion was successful.
         """
-    )
+    ),
+    all_fields=True,
 )
 class DeleteUserConfigPayload:
     """Payload returned after deleting user-level app configuration."""
-
-    deleted: bool
 
 
 @strawberry.field(  # type: ignore[misc]

@@ -8,10 +8,16 @@ from ai.backend.common.dto.manager.v2.app_config.request import (
     UpsertDomainConfigInput,
     UpsertUserConfigInput,
 )
+from ai.backend.common.dto.manager.v2.app_config.response import (
+    DeleteDomainConfigPayload,
+    DeleteUserConfigPayload,
+)
 
 __all__ = (
     "DeleteDomainConfigInput",
     "DeleteUserConfigInput",
     "UpsertDomainConfigInput",
     "UpsertUserConfigInput",
+    "DeleteDomainConfigPayload",
+    "DeleteUserConfigPayload",
 )

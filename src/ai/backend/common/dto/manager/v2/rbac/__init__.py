@@ -17,6 +17,7 @@ from ai.backend.common.dto.manager.v2.rbac.request import (
 )
 from ai.backend.common.dto.manager.v2.rbac.response import (
     CreateRolePayload,
+    DeletePermissionPayload,
     DeleteRolePayload,
     PurgeRolePayload,
     RoleNode,
@@ -55,6 +56,7 @@ __all__ = (
     "UpdateRoleInput",
     # Node and Payload models (response)
     "CreateRolePayload",
+    "DeletePermissionPayload",
     "DeleteRolePayload",
     "PurgeRolePayload",
     "RoleNode",
