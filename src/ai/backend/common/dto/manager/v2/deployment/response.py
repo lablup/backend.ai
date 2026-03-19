@@ -52,6 +52,7 @@ __all__ = (
     "SearchAutoScalingRulesPayload",
     "SearchDeploymentPoliciesPayload",
     "SearchRoutesPayload",
+    "SyncReplicaPayload",
     "UpdateAutoScalingRulePayload",
     "UpdateDeploymentPayload",
     "UpsertDeploymentPolicyPayload",
@@ -133,6 +134,12 @@ class ActivateDeploymentPayload(BaseResponseModel):
     """Payload for deployment activation mutation result."""
 
     success: bool = Field(description="Whether the activation succeeded")
+
+
+class SyncReplicaPayload(BaseResponseModel):
+    """Payload for replica sync mutation result."""
+
+    success: bool = Field(description="Whether the sync succeeded")
 
 
 class ScaleDeploymentPayload(BaseResponseModel):

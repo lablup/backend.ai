@@ -34,6 +34,9 @@ from ai.backend.common.dto.manager.v2.deployment.request import (
 from ai.backend.common.dto.manager.v2.deployment.request import (
     UpdateDeploymentInput as UpdateDeploymentInputDTO,
 )
+from ai.backend.common.dto.manager.v2.deployment.response import (
+    SyncReplicaPayload as SyncReplicaPayloadDTO,
+)
 from ai.backend.common.exception import (
     InvalidAPIParameters,
 )
@@ -734,6 +737,10 @@ class SyncReplicaInput:
         return SyncReplicaInputDTO(model_deployment_id=UUID(self.model_deployment_id))
 
 
-@strawberry.type(description="Added in 25.19.0")
+@strawberry.experimental.pydantic.type(
+    model=SyncReplicaPayloadDTO,
+    description="Added in 25.19.0",
+    all_fields=True,
+)
 class SyncReplicaPayload:
-    success: bool
+    """Payload for replica sync mutation result."""
