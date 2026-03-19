@@ -1201,7 +1201,7 @@ class UserDBSource:
                 has_previous_page=result.has_previous_page,
             )
 
-    async def issue_my_keypair(self, user_uuid: UUID, email: str) -> GeneratedKeyPairData:
+    async def issue_my_keypair(self, user_uuid: UUID) -> GeneratedKeyPairData:
         """Issue a new keypair for the current user, inheriting settings from main keypair."""
         async with self._db.begin_session() as session:
             user_row = (
@@ -1244,13 +1244,13 @@ class UserDBSource:
                 creator=keypair_creator,
                 generated_data=generated,
                 user_id=user_uuid,
-                email=email,
+                email=user_row.email,
             )
             kp_creator = Creator(spec=kp_spec)
             await execute_creator(session, kp_creator)
             return generated
 
-    async def revoke_my_keypair(self, user_uuid: UUID, email: str, access_key: str) -> None:
+    async def revoke_my_keypair(self, user_uuid: UUID, access_key: str) -> None:
         """Revoke a keypair owned by the current user."""
         async with self._db.begin_session() as session:
             kp_row = (
@@ -1279,7 +1279,7 @@ class UserDBSource:
 
             await session.execute(sa.delete(keypairs).where(keypairs.c.access_key == access_key))
 
-    async def switch_my_main_access_key(self, user_uuid: UUID, email: str, access_key: str) -> None:
+    async def switch_my_main_access_key(self, user_uuid: UUID, access_key: str) -> None:
         """Switch the main access key for the current user."""
         async with self._db.begin_session() as session:
             kp_row = (
@@ -1292,13 +1292,12 @@ class UserDBSource:
                             KeyPairRow.user,
                             KeyPairRow.is_active,
                         ),
-                        joinedload(KeyPairRow.user_row).options(load_only(UserRow.email)),
                     )
                 )
             ).first()
             if not kp_row:
                 raise KeyPairNotFound("Cannot set non-existing access key as the main access key.")
-            if kp_row.user_row.email != email:
+            if kp_row.user != user_uuid:
                 raise KeyPairForbidden(
                     "Cannot set another user's access key as the main access key."
                 )

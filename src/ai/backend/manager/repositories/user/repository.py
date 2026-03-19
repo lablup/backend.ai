@@ -273,14 +273,14 @@ class UserRepository:
         return await self._db_source.search_users_by_role(scope, querier)
 
     @user_repository_resilience.apply()
-    async def issue_my_keypair(self, user_uuid: UUID, email: str) -> GeneratedKeyPairData:
+    async def issue_my_keypair(self, user_uuid: UUID) -> GeneratedKeyPairData:
         """Issue a new keypair for the current user."""
-        return await self._db_source.issue_my_keypair(user_uuid, email)
+        return await self._db_source.issue_my_keypair(user_uuid)
 
     @user_repository_resilience.apply()
-    async def revoke_my_keypair(self, user_uuid: UUID, email: str, access_key: str) -> None:
+    async def revoke_my_keypair(self, user_uuid: UUID, access_key: str) -> None:
         """Revoke a keypair owned by the current user."""
-        await self._db_source.revoke_my_keypair(user_uuid, email, access_key)
+        await self._db_source.revoke_my_keypair(user_uuid, access_key)
 
     @user_repository_resilience.apply()
     async def update_my_keypair(self, user_uuid: UUID, access_key: str, is_active: bool) -> None:
@@ -288,9 +288,9 @@ class UserRepository:
         await self._db_source.update_my_keypair(user_uuid, access_key, is_active)
 
     @user_repository_resilience.apply()
-    async def switch_my_main_access_key(self, user_uuid: UUID, email: str, access_key: str) -> None:
+    async def switch_my_main_access_key(self, user_uuid: UUID, access_key: str) -> None:
         """Switch the main access key for the current user."""
-        await self._db_source.switch_my_main_access_key(user_uuid, email, access_key)
+        await self._db_source.switch_my_main_access_key(user_uuid, access_key)
 
     async def _get_time_binned_monthly_stats(
         self,

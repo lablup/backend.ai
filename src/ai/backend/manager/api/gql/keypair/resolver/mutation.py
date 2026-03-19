@@ -19,7 +19,6 @@ from ai.backend.manager.api.gql.keypair.types import (
     UpdateMyKeypairPayloadGQL,
 )
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
-from ai.backend.manager.services.user.actions.get_user import GetUserAction
 from ai.backend.manager.services.user.actions.keypair_ops import (
     IssueMyKeypairAction,
     RevokeMyKeypairAction,
@@ -28,15 +27,11 @@ from ai.backend.manager.services.user.actions.keypair_ops import (
 )
 
 
-async def _get_my_email(info: Info[StrawberryGQLContext]) -> tuple[UUID, str]:
-    """Get current user's UUID and email."""
+def _get_current_user_id() -> UUID:
     me = current_user()
     if me is None:
         raise UnreachableError("User context is not available")
-    user_result = await info.context.processors.user.get_user.wait_for_complete(
-        GetUserAction(user_uuid=me.user_id)
-    )
-    return me.user_id, user_result.user.email
+    return me.user_id
 
 
 @strawberry.mutation(
@@ -49,9 +44,9 @@ async def _get_my_email(info: Info[StrawberryGQLContext]) -> tuple[UUID, str]:
 async def issue_my_keypair(
     info: Info[StrawberryGQLContext],
 ) -> IssueMyKeypairPayloadGQL:
-    user_uuid, email = await _get_my_email(info)
+    user_uuid = _get_current_user_id()
     result = await info.context.processors.user.issue_my_keypair.wait_for_complete(
-        IssueMyKeypairAction(user_uuid=user_uuid, email=email)
+        IssueMyKeypairAction(user_uuid=user_uuid)
     )
     return IssueMyKeypairPayloadGQL(
         access_key=result.generated_data.access_key,
@@ -70,9 +65,9 @@ async def revoke_my_keypair(
     info: Info[StrawberryGQLContext],
     input: RevokeMyKeypairInputGQL,
 ) -> RevokeMyKeypairPayloadGQL:
-    user_uuid, email = await _get_my_email(info)
+    user_uuid = _get_current_user_id()
     result = await info.context.processors.user.revoke_my_keypair.wait_for_complete(
-        RevokeMyKeypairAction(user_uuid=user_uuid, email=email, access_key=input.access_key)
+        RevokeMyKeypairAction(user_uuid=user_uuid, access_key=input.access_key)
     )
     return RevokeMyKeypairPayloadGQL(success=result.success)
 
@@ -87,7 +82,7 @@ async def update_my_keypair(
     info: Info[StrawberryGQLContext],
     input: UpdateMyKeypairInputGQL,
 ) -> UpdateMyKeypairPayloadGQL:
-    user_uuid, _ = await _get_my_email(info)
+    user_uuid = _get_current_user_id()
     result = await info.context.processors.user.update_my_keypair.wait_for_complete(
         UpdateMyKeypairAction(
             user_uuid=user_uuid, access_key=input.access_key, is_active=input.is_active
@@ -106,8 +101,8 @@ async def switch_my_main_access_key(
     info: Info[StrawberryGQLContext],
     input: SwitchMyMainAccessKeyInputGQL,
 ) -> SwitchMyMainAccessKeyPayloadGQL:
-    user_uuid, email = await _get_my_email(info)
+    user_uuid = _get_current_user_id()
     result = await info.context.processors.user.switch_my_main_access_key.wait_for_complete(
-        SwitchMyMainAccessKeyAction(user_uuid=user_uuid, email=email, access_key=input.access_key)
+        SwitchMyMainAccessKeyAction(user_uuid=user_uuid, access_key=input.access_key)
     )
     return SwitchMyMainAccessKeyPayloadGQL(success=result.success)

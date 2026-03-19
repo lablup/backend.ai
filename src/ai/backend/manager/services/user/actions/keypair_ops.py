@@ -17,7 +17,6 @@ class IssueMyKeypairAction(UserAction):
     """Issue a new keypair for the current user."""
 
     user_uuid: UUID
-    email: str
 
     @override
     def entity_id(self) -> str | None:
@@ -43,7 +42,6 @@ class RevokeMyKeypairAction(UserAction):
     """Revoke a keypair owned by the current user."""
 
     user_uuid: UUID
-    email: str
     access_key: str
 
     @override
@@ -97,7 +95,6 @@ class SwitchMyMainAccessKeyAction(UserAction):
     """Switch the main access key for the current user."""
 
     user_uuid: UUID
-    email: str
     access_key: str
 
     @override
