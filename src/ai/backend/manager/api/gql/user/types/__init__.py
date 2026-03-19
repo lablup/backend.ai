@@ -5,11 +5,11 @@ from .enums import (
     UserStatusEnumGQL,
 )
 from .filters import (
-    UserDomainNestedFilter,
+    UserDomainNestedFilterGQL,
     UserFilterGQL,
     UserOrderByGQL,
     UserOrderFieldGQL,
-    UserProjectNestedFilter,
+    UserProjectNestedFilterGQL,
     UserRoleEnumFilterGQL,
     UserStatusEnumFilterGQL,
 )
@@ -74,8 +74,8 @@ __all__ = [
     "UserV2Edge",
     "UserV2Connection",
     # Filters
-    "UserDomainNestedFilter",
-    "UserProjectNestedFilter",
+    "UserDomainNestedFilterGQL",
+    "UserProjectNestedFilterGQL",
     "UserFilterGQL",
     "UserOrderFieldGQL",
     "UserOrderByGQL",

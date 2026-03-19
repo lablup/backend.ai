@@ -15,6 +15,7 @@ from ai.backend.common.dto.manager.pagination import PaginationInfo
 from ai.backend.common.dto.manager.v2.user.types import UserRole, UserStatus
 
 __all__ = (
+    "AdminSearchUsersPayload",
     "BulkCreateUserV2Error",
     "BulkPurgeUserV2Error",
     "BulkPurgeUsersPayload",
@@ -265,3 +266,12 @@ class UpdateMyAllowedClientIPPayload(BaseResponseModel):
     """Payload for updating the current user's allowed client IP list."""
 
     success: bool = Field(description="Whether the update was successful.")
+
+
+class AdminSearchUsersPayload(BaseResponseModel):
+    """Payload for searching users with cursor-based or offset pagination."""
+
+    items: list[UserNode] = Field(description="List of user nodes matching the query.")
+    total_count: int = Field(description="Total number of users matching the query criteria.")
+    has_next_page: bool = Field(description="Whether there are more items after this page.")
+    has_previous_page: bool = Field(description="Whether there are more items before this page.")

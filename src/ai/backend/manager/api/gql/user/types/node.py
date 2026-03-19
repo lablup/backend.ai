@@ -10,6 +10,8 @@ import strawberry
 from strawberry import ID, Info
 from strawberry.relay import Connection, Edge, NodeID
 
+from ai.backend.common.dto.manager.v2.user.response import UserNode
+from ai.backend.common.dto.manager.v2.user.types import UserFairShareScope, UserUsageScope
 from ai.backend.common.exception import InvalidAPIParameters
 from ai.backend.manager.api.gql.fair_share.types import UserFairShareGQL
 from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin
@@ -40,7 +42,11 @@ if TYPE_CHECKING:
     from ai.backend.manager.data.user.types import UserData
 
 
-@strawberry.input(name="UserFairShareScope")
+@strawberry.experimental.pydantic.input(
+    model=UserFairShareScope,
+    name="UserFairShareScope",
+    description="Scope parameters for filtering user fair shares.",
+)
 class UserFairShareScopeGQL:
     """Scope parameters for filtering user fair shares."""
 
@@ -51,8 +57,18 @@ class UserFairShareScopeGQL:
         description="Project ID that the user belongs to (required for user-level fair shares)."
     )
 
+    def to_pydantic(self) -> UserFairShareScope:
+        return UserFairShareScope(
+            resource_group_name=self.resource_group_name,
+            project_id=self.project_id,
+        )
 
-@strawberry.input(name="UserUsageScope")
+
+@strawberry.experimental.pydantic.input(
+    model=UserUsageScope,
+    name="UserUsageScope",
+    description="Scope parameters for filtering user usage buckets.",
+)
 class UserUsageScopeGQL:
     """Scope parameters for filtering user usage buckets."""
 
@@ -62,6 +78,12 @@ class UserUsageScopeGQL:
     project_id: UUID = strawberry.field(
         description="Project ID that the user belongs to (required for user-level usage)."
     )
+
+    def to_pydantic(self) -> UserUsageScope:
+        return UserUsageScope(
+            resource_group_name=self.resource_group_name,
+            project_id=self.project_id,
+        )
 
 
 @strawberry.federation.type(
@@ -277,6 +299,47 @@ class UserV2GQL(PydanticNodeMixin):
             UUID(nid) for nid in node_ids
         ])
         return [cls.from_data(data) if data is not None else None for data in results]
+
+    @classmethod
+    def from_node(cls, node: UserNode) -> Self:
+        """Convert UserNode DTO to GraphQL type."""
+        return cls(
+            id=ID(str(node.id)),
+            basic_info=UserBasicInfoGQL(
+                username=node.basic_info.username,
+                email=node.basic_info.email,
+                full_name=node.basic_info.full_name,
+                description=node.basic_info.description,
+            ),
+            status=UserStatusInfoGQL(
+                status=UserStatusEnumGQL(node.status.status.value),
+                status_info=node.status.status_info,
+                need_password_change=node.status.need_password_change,
+            ),
+            organization=UserOrganizationInfoGQL(
+                domain_name=node.organization.domain_name,
+                role=UserRoleEnumGQL(node.organization.role.value)
+                if node.organization.role
+                else None,
+                resource_policy=node.organization.resource_policy,
+                main_access_key=node.organization.main_access_key,
+            ),
+            security=UserSecurityInfoGQL(
+                allowed_client_ip=node.security.allowed_client_ip,
+                totp_activated=node.security.totp_activated,
+                totp_activated_at=node.security.totp_activated_at,
+                sudo_session_enabled=node.security.sudo_session_enabled,
+            ),
+            container=UserContainerSettingsGQL(
+                container_uid=node.container.container_uid,
+                container_main_gid=node.container.container_main_gid,
+                container_gids=node.container.container_gids,
+            ),
+            timestamps=EntityTimestampsGQL(
+                created_at=node.timestamps.created_at,
+                modified_at=node.timestamps.modified_at,
+            ),
+        )
 
     @classmethod
     def from_data(cls, data: UserData) -> Self:

@@ -6,8 +6,11 @@ from uuid import UUID
 
 import strawberry
 
+from ai.backend.common.dto.manager.v2.user.types import DomainUserScope, ProjectUserScope
 
-@strawberry.input(
+
+@strawberry.experimental.pydantic.input(
+    model=DomainUserScope,
     name="DomainUserV2Scope",
     description=(
         "Added in 26.2.0. Scope for querying users within a specific domain. "
@@ -21,8 +24,12 @@ class DomainUserScopeGQL:
         description="Domain name to scope the user query. Only users belonging to this domain will be returned."
     )
 
+    def to_pydantic(self) -> DomainUserScope:
+        return DomainUserScope(domain_name=self.domain_name)
 
-@strawberry.input(
+
+@strawberry.experimental.pydantic.input(
+    model=ProjectUserScope,
     name="ProjectUserV2Scope",
     description=(
         "Added in 26.2.0. Scope for querying users within a specific project. "
@@ -35,3 +42,6 @@ class ProjectUserScopeGQL:
     project_id: UUID = strawberry.field(
         description="Project UUID to scope the user query. Only users who are members of this project will be returned."
     )
+
+    def to_pydantic(self) -> ProjectUserScope:
+        return ProjectUserScope(project_id=self.project_id)

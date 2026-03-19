@@ -221,21 +221,42 @@ class ProjectV2GQL(PydanticNodeMixin):
         UserV2Connection,
         strawberry.lazy("ai.backend.manager.api.gql.user.types.node"),
     ]:
-        from ai.backend.manager.api.gql.user.fetcher.user import fetch_project_users
+        from strawberry.relay import PageInfo
+
+        from ai.backend.common.dto.manager.v2.user.request import AdminSearchUsersInput
+        from ai.backend.manager.api.gql.base import encode_cursor
+        from ai.backend.manager.api.gql.user.types.node import (
+            UserV2Connection,
+            UserV2Edge,
+            UserV2GQL,
+        )
         from ai.backend.manager.repositories.user.types import ProjectUserSearchScope
 
-        scope = ProjectUserSearchScope(project_id=UUID(str(self.id)))
-        return await fetch_project_users(
-            info=info,
-            scope=scope,
-            filter=filter,
-            order_by=order_by,
-            before=before,
-            after=after,
-            first=first,
-            last=last,
-            limit=limit,
-            offset=offset,
+        repo_scope = ProjectUserSearchScope(project_id=UUID(str(self.id)))
+        payload = await info.context.adapters.user.gql_search_by_project(
+            scope=repo_scope,
+            input=AdminSearchUsersInput(
+                filter=filter.to_pydantic() if filter else None,
+                order=[o.to_pydantic() for o in order_by] if order_by else None,
+                first=first,
+                after=after,
+                last=last,
+                before=before,
+                limit=limit,
+                offset=offset,
+            ),
+        )
+        nodes = [UserV2GQL.from_node(item) for item in payload.items]
+        edges = [UserV2Edge(node=node, cursor=encode_cursor(str(node.id))) for node in nodes]
+        return UserV2Connection(
+            edges=edges,
+            page_info=PageInfo(
+                has_next_page=payload.has_next_page,
+                has_previous_page=payload.has_previous_page,
+                start_cursor=edges[0].cursor if edges else None,
+                end_cursor=edges[-1].cursor if edges else None,
+            ),
+            count=payload.total_count,
         )
 
     @classmethod

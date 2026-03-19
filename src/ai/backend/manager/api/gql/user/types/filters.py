@@ -3,178 +3,128 @@
 from __future__ import annotations
 
 from enum import StrEnum
-from typing import override
 
 import strawberry
 
-from ai.backend.common.data.user.types import UserRole
+from ai.backend.common.dto.manager.v2.user.request import UserFilter, UserOrder
+from ai.backend.common.dto.manager.v2.user.types import (
+    OrderDirection as OrderDirectionDTO,
+)
+from ai.backend.common.dto.manager.v2.user.types import (
+    UserDomainFilter,
+    UserOrderField,
+    UserProjectFilter,
+    UserRoleFilter,
+    UserStatusFilter,
+)
 from ai.backend.manager.api.gql.base import (
     DateTimeFilter,
     OrderDirection,
     StringFilter,
     UUIDFilter,
 )
-from ai.backend.manager.api.gql.types import GQLFilter, GQLOrderBy
-from ai.backend.manager.data.user.types import UserStatus
-from ai.backend.manager.models.domain.conditions import DomainConditions
-from ai.backend.manager.models.group.conditions import GroupConditions
-from ai.backend.manager.models.user.conditions import UserConditions
-from ai.backend.manager.models.user.orders import UserOrders
-from ai.backend.manager.repositories.base import (
-    QueryCondition,
-    QueryOrder,
-    combine_conditions_or,
-    negate_conditions,
-)
 
 from .enums import UserRoleEnumGQL, UserStatusEnumGQL
 
 
-@strawberry.input(
-    name="UserDomainNestedFilter",
-    description=(
-        "Added in 26.2.0. Nested filter for the domain a user belongs to. "
-        "Filters users whose domain matches all specified conditions."
-    ),
-)
-class UserDomainNestedFilter:
-    """Nested filter for domain of a user."""
-
-    name: StringFilter | None = strawberry.field(
-        default=None,
-        description="Filter by domain name. Supports equals, contains, startsWith, and endsWith.",
-    )
-    is_active: bool | None = strawberry.field(
-        default=None,
-        description="Filter by domain active status.",
-    )
-
-    def build_conditions(self) -> list[QueryCondition]:
-        """Build query conditions for domain nested filter.
-
-        Returns:
-            List containing a single EXISTS condition wrapping all domain sub-conditions,
-            or empty list if no filters specified.
-        """
-        raw_conditions: list[QueryCondition] = []
-        if self.name:
-            condition = self.name.build_query_condition(
-                contains_factory=lambda spec: DomainConditions.by_name_contains(spec),
-                equals_factory=lambda spec: DomainConditions.by_name_equals(spec),
-                starts_with_factory=lambda spec: DomainConditions.by_name_starts_with(spec),
-                ends_with_factory=lambda spec: DomainConditions.by_name_ends_with(spec),
-            )
-            if condition:
-                raw_conditions.append(condition)
-        if self.is_active is not None:
-            raw_conditions.append(DomainConditions.by_is_active(self.is_active))
-        if not raw_conditions:
-            return []
-        return [UserConditions.exists_domain_combined(raw_conditions)]
-
-
-@strawberry.input(
-    name="UserProjectNestedFilter",
-    description=(
-        "Added in 26.2.0. Nested filter for projects a user belongs to. "
-        "Filters users that belong to at least one project matching all specified conditions."
-    ),
-)
-class UserProjectNestedFilter:
-    """Nested filter for projects of a user."""
-
-    name: StringFilter | None = strawberry.field(
-        default=None,
-        description="Filter by project name. Supports equals, contains, startsWith, and endsWith.",
-    )
-    is_active: bool | None = strawberry.field(
-        default=None,
-        description="Filter by project active status.",
-    )
-
-    def build_conditions(self) -> list[QueryCondition]:
-        """Build query conditions for project nested filter.
-
-        Returns:
-            List containing a single EXISTS condition wrapping all project sub-conditions,
-            or empty list if no filters specified.
-        """
-        raw_conditions: list[QueryCondition] = []
-        if self.name:
-            condition = self.name.build_query_condition(
-                contains_factory=lambda spec: GroupConditions.by_name_contains(spec),
-                equals_factory=lambda spec: GroupConditions.by_name_equals(spec),
-                starts_with_factory=lambda spec: GroupConditions.by_name_starts_with(spec),
-                ends_with_factory=lambda spec: GroupConditions.by_name_ends_with(spec),
-            )
-            if condition:
-                raw_conditions.append(condition)
-        if self.is_active is not None:
-            raw_conditions.append(GroupConditions.by_is_active(self.is_active))
-        if not raw_conditions:
-            return []
-        return [UserConditions.exists_project_combined(raw_conditions)]
-
-
-@strawberry.input(
+@strawberry.experimental.pydantic.input(
+    model=UserStatusFilter,
     name="UserStatusV2EnumFilter",
     description=(
-        "Added in 26.2.0. Filter for UserStatusV2 enum fields."
+        "Added in 26.2.0. Filter for UserStatusV2 enum fields. "
         "Supports equals, in, not_equals, and not_in operations."
     ),
 )
 class UserStatusEnumFilterGQL:
     """Filter for user status enum fields."""
 
-    equals: UserStatusEnumGQL | None = strawberry.field(
-        default=None,
-        description="Exact match for user status.",
-    )
-    in_: list[UserStatusEnumGQL] | None = strawberry.field(
-        name="in",
-        default=None,
-        description="Match any of the provided statuses.",
-    )
-    not_equals: UserStatusEnumGQL | None = strawberry.field(
-        default=None,
-        description="Exclude exact status match.",
-    )
-    not_in: list[UserStatusEnumGQL] | None = strawberry.field(
-        default=None,
-        description="Exclude any of the provided statuses.",
-    )
+    equals: UserStatusEnumGQL | None = None
+    in_: list[UserStatusEnumGQL] | None = strawberry.field(name="in", default=None)
+    not_equals: UserStatusEnumGQL | None = None
+    not_in: list[UserStatusEnumGQL] | None = None
+
+    def to_pydantic(self) -> UserStatusFilter:
+        from ai.backend.common.dto.manager.v2.user.types import UserStatus as UserStatusDTO
+
+        return UserStatusFilter(
+            equals=UserStatusDTO(self.equals.value) if self.equals else None,
+            in_=[UserStatusDTO(s.value) for s in self.in_] if self.in_ else None,
+            not_equals=UserStatusDTO(self.not_equals.value) if self.not_equals else None,
+            not_in=[UserStatusDTO(s.value) for s in self.not_in] if self.not_in else None,
+        )
 
 
-@strawberry.input(
+@strawberry.experimental.pydantic.input(
+    model=UserRoleFilter,
     name="UserRoleV2EnumFilter",
     description=(
-        "Added in 26.2.0. Filter for UserRoleV2 enum fields."
+        "Added in 26.2.0. Filter for UserRoleV2 enum fields. "
         "Supports equals, in, not_equals, and not_in operations."
     ),
 )
 class UserRoleEnumFilterGQL:
     """Filter for user role enum fields."""
 
-    equals: UserRoleEnumGQL | None = strawberry.field(
-        default=None,
-        description="Exact match for user role.",
-    )
-    in_: list[UserRoleEnumGQL] | None = strawberry.field(
-        name="in",
-        default=None,
-        description="Match any of the provided roles.",
-    )
-    not_equals: UserRoleEnumGQL | None = strawberry.field(
-        default=None,
-        description="Exclude exact role match.",
-    )
-    not_in: list[UserRoleEnumGQL] | None = strawberry.field(
-        default=None,
-        description="Exclude any of the provided roles.",
-    )
+    equals: UserRoleEnumGQL | None = None
+    in_: list[UserRoleEnumGQL] | None = strawberry.field(name="in", default=None)
+    not_equals: UserRoleEnumGQL | None = None
+    not_in: list[UserRoleEnumGQL] | None = None
+
+    def to_pydantic(self) -> UserRoleFilter:
+        from ai.backend.common.dto.manager.v2.user.types import UserRole as UserRoleDTO
+
+        return UserRoleFilter(
+            equals=UserRoleDTO(self.equals.value) if self.equals else None,
+            in_=[UserRoleDTO(r.value) for r in self.in_] if self.in_ else None,
+            not_equals=UserRoleDTO(self.not_equals.value) if self.not_equals else None,
+            not_in=[UserRoleDTO(r.value) for r in self.not_in] if self.not_in else None,
+        )
 
 
-@strawberry.input(
+@strawberry.experimental.pydantic.input(
+    model=UserDomainFilter,
+    name="UserDomainNestedFilter",
+    description=(
+        "Added in 26.2.0. Nested filter for the domain a user belongs to. "
+        "Filters users whose domain matches all specified conditions."
+    ),
+)
+class UserDomainNestedFilterGQL:
+    """Nested filter for domain of a user."""
+
+    name: StringFilter | None = None
+    is_active: bool | None = None
+
+    def to_pydantic(self) -> UserDomainFilter:
+        return UserDomainFilter(
+            name=self.name.to_pydantic() if self.name else None,
+            is_active=self.is_active,
+        )
+
+
+@strawberry.experimental.pydantic.input(
+    model=UserProjectFilter,
+    name="UserProjectNestedFilter",
+    description=(
+        "Added in 26.2.0. Nested filter for projects a user belongs to. "
+        "Filters users that belong to at least one project matching all specified conditions."
+    ),
+)
+class UserProjectNestedFilterGQL:
+    """Nested filter for projects of a user."""
+
+    name: StringFilter | None = None
+    is_active: bool | None = None
+
+    def to_pydantic(self) -> UserProjectFilter:
+        return UserProjectFilter(
+            name=self.name.to_pydantic() if self.name else None,
+            is_active=self.is_active,
+        )
+
+
+@strawberry.experimental.pydantic.input(
+    model=UserFilter,
     name="UserV2Filter",
     description=(
         "Added in 26.2.0. Filter input for querying users. "
@@ -183,166 +133,37 @@ class UserRoleEnumFilterGQL:
         "Multiple filters can be combined using AND, OR, and NOT logical operators."
     ),
 )
-class UserFilterGQL(GQLFilter):
+class UserFilterGQL:
     """Filter for user queries."""
 
-    uuid: UUIDFilter | None = strawberry.field(
-        default=None,
-        description="Filter by user UUID. Supports equals and 'in' operations.",
-    )
-    username: StringFilter | None = strawberry.field(
-        default=None,
-        description="Filter by username. Supports equals, contains, startsWith, and endsWith.",
-    )
-    email: StringFilter | None = strawberry.field(
-        default=None,
-        description="Filter by email address. Supports equals, contains, startsWith, and endsWith.",
-    )
-    status: UserStatusEnumFilterGQL | None = strawberry.field(
-        default=None,
-        description="Filter by account status. Supports equals, in, not_equals, and not_in operations.",
-    )
-    domain_name: StringFilter | None = strawberry.field(
-        default=None,
-        description="Filter by domain name. Supports equals, contains, startsWith, and endsWith.",
-    )
-    role: UserRoleEnumFilterGQL | None = strawberry.field(
-        default=None,
-        description="Filter by user role. Supports equals, in, not_equals, and not_in operations.",
-    )
-    created_at: DateTimeFilter | None = strawberry.field(
-        default=None,
-        description="Filter by creation timestamp. Supports before, after, and between operations.",
-    )
-    domain: UserDomainNestedFilter | None = strawberry.field(
-        default=None,
-        description=(
-            "Filter by nested domain conditions. "
-            "Returns users whose domain matches all specified conditions."
-        ),
-    )
-    project: UserProjectNestedFilter | None = strawberry.field(
-        default=None,
-        description=(
-            "Filter by nested project conditions. "
-            "Returns users that belong to at least one project matching all specified conditions."
-        ),
-    )
+    uuid: UUIDFilter | None = None
+    username: StringFilter | None = None
+    email: StringFilter | None = None
+    status: UserStatusEnumFilterGQL | None = None
+    domain_name: StringFilter | None = None
+    role: UserRoleEnumFilterGQL | None = None
+    created_at: DateTimeFilter | None = None
+    domain: UserDomainNestedFilterGQL | None = None
+    project: UserProjectNestedFilterGQL | None = None
+    AND: list[UserFilterGQL] | None = None
+    OR: list[UserFilterGQL] | None = None
+    NOT: list[UserFilterGQL] | None = None
 
-    AND: list[UserFilterGQL] | None = strawberry.field(
-        default=None,
-        description="Combine multiple filters with AND logic. All conditions must match.",
-    )
-    OR: list[UserFilterGQL] | None = strawberry.field(
-        default=None,
-        description="Combine multiple filters with OR logic. At least one condition must match.",
-    )
-    NOT: list[UserFilterGQL] | None = strawberry.field(
-        default=None,
-        description="Negate the specified filters. Records matching these conditions will be excluded.",
-    )
-
-    @override
-    def build_conditions(self) -> list[QueryCondition]:
-        """Build query conditions from filter fields.
-
-        Returns:
-            List of QueryCondition callables.
-        """
-        conditions: list[QueryCondition] = []
-
-        if self.uuid:
-            condition = self.uuid.build_query_condition(
-                equals_factory=lambda spec: UserConditions.by_uuid_equals(spec),
-                in_factory=lambda spec: UserConditions.by_uuid_in(spec),
-            )
-            if condition:
-                conditions.append(condition)
-
-        if self.username:
-            condition = self.username.build_query_condition(
-                contains_factory=lambda spec: UserConditions.by_username_contains(spec),
-                equals_factory=lambda spec: UserConditions.by_username_equals(spec),
-                starts_with_factory=lambda spec: UserConditions.by_username_starts_with(spec),
-                ends_with_factory=lambda spec: UserConditions.by_username_ends_with(spec),
-            )
-            if condition:
-                conditions.append(condition)
-
-        if self.email:
-            condition = self.email.build_query_condition(
-                contains_factory=lambda spec: UserConditions.by_email_contains(spec),
-                equals_factory=lambda spec: UserConditions.by_email_equals(spec),
-                starts_with_factory=lambda spec: UserConditions.by_email_starts_with(spec),
-                ends_with_factory=lambda spec: UserConditions.by_email_ends_with(spec),
-            )
-            if condition:
-                conditions.append(condition)
-
-        if self.status:
-            if self.status.equals:
-                conditions.append(
-                    UserConditions.by_status_equals(UserStatus[self.status.equals.name])
-                )
-            if self.status.in_:
-                conditions.append(
-                    UserConditions.by_status_in([
-                        UserStatus[status.name] for status in self.status.in_
-                    ])
-                )
-
-        if self.domain_name:
-            condition = self.domain_name.build_query_condition(
-                contains_factory=lambda spec: UserConditions.by_domain_name_contains(spec),
-                equals_factory=lambda spec: UserConditions.by_domain_name_equals(spec),
-                starts_with_factory=lambda spec: UserConditions.by_domain_name_starts_with(spec),
-                ends_with_factory=lambda spec: UserConditions.by_domain_name_ends_with(spec),
-            )
-            if condition:
-                conditions.append(condition)
-
-        if self.role:
-            if self.role.equals:
-                conditions.append(UserConditions.by_role_equals(UserRole[self.role.equals.name]))
-            if self.role.in_:
-                conditions.append(
-                    UserConditions.by_role_in([UserRole[role.name] for role in self.role.in_])
-                )
-
-        if self.created_at:
-            condition = self.created_at.build_query_condition(
-                before_factory=lambda dt: UserConditions.by_created_at_before(dt),
-                after_factory=lambda dt: UserConditions.by_created_at_after(dt),
-            )
-            if condition:
-                conditions.append(condition)
-
-        if self.domain:
-            conditions.extend(self.domain.build_conditions())
-
-        if self.project:
-            conditions.extend(self.project.build_conditions())
-
-        # Handle logical operators
-        if self.AND:
-            for sub_filter in self.AND:
-                conditions.extend(sub_filter.build_conditions())
-
-        if self.OR:
-            or_sub_conditions: list[QueryCondition] = []
-            for sub_filter in self.OR:
-                or_sub_conditions.extend(sub_filter.build_conditions())
-            if or_sub_conditions:
-                conditions.append(combine_conditions_or(or_sub_conditions))
-
-        if self.NOT:
-            not_sub_conditions: list[QueryCondition] = []
-            for sub_filter in self.NOT:
-                not_sub_conditions.extend(sub_filter.build_conditions())
-            if not_sub_conditions:
-                conditions.append(negate_conditions(not_sub_conditions))
-
-        return conditions
+    def to_pydantic(self) -> UserFilter:
+        return UserFilter(
+            uuid=self.uuid.to_pydantic() if self.uuid else None,
+            username=self.username.to_pydantic() if self.username else None,
+            email=self.email.to_pydantic() if self.email else None,
+            status=self.status.to_pydantic() if self.status else None,
+            domain_name=self.domain_name.to_pydantic() if self.domain_name else None,
+            role=self.role.to_pydantic() if self.role else None,
+            created_at=self.created_at.to_pydantic() if self.created_at else None,
+            domain=self.domain.to_pydantic() if self.domain else None,
+            project=self.project.to_pydantic() if self.project else None,
+            AND=[f.to_pydantic() for f in self.AND] if self.AND else None,
+            OR=[f.to_pydantic() for f in self.OR] if self.OR else None,
+            NOT=[f.to_pydantic() for f in self.NOT] if self.NOT else None,
+        )
 
 
 @strawberry.enum(
@@ -368,7 +189,8 @@ class UserOrderFieldGQL(StrEnum):
     PROJECT_NAME = "project_name"
 
 
-@strawberry.input(
+@strawberry.experimental.pydantic.input(
+    model=UserOrder,
     name="UserV2OrderBy",
     description=(
         "Added in 26.2.0. Specifies ordering for user query results. "
@@ -376,39 +198,30 @@ class UserOrderFieldGQL(StrEnum):
         "Default direction is DESC (descending)."
     ),
 )
-class UserOrderByGQL(GQLOrderBy):
+class UserOrderByGQL:
     """OrderBy for user queries."""
 
-    field: UserOrderFieldGQL = strawberry.field(
-        description="The field to order by. See UserOrderField for available options."
-    )
-    direction: OrderDirection = strawberry.field(
-        default=OrderDirection.DESC,
-        description="Sort direction. ASC for ascending, DESC for descending.",
-    )
+    field: UserOrderFieldGQL = UserOrderFieldGQL.CREATED_AT
+    direction: OrderDirection = OrderDirection.DESC
 
-    @override
-    def to_query_order(self) -> QueryOrder:
-        """Convert to repository QueryOrder.
-
-        Returns:
-            QueryOrder for the specified field and direction.
-        """
-        ascending = self.direction == OrderDirection.ASC
+    def to_pydantic(self) -> UserOrder:
+        direction = (
+            OrderDirectionDTO.ASC
+            if self.direction == OrderDirection.ASC
+            else OrderDirectionDTO.DESC
+        )
         match self.field:
             case UserOrderFieldGQL.CREATED_AT:
-                return UserOrders.created_at(ascending)
+                return UserOrder(field=UserOrderField.CREATED_AT, direction=direction)
             case UserOrderFieldGQL.MODIFIED_AT:
-                return UserOrders.modified_at(ascending)
+                return UserOrder(field=UserOrderField.MODIFIED_AT, direction=direction)
             case UserOrderFieldGQL.USERNAME:
-                return UserOrders.username(ascending)
+                return UserOrder(field=UserOrderField.USERNAME, direction=direction)
             case UserOrderFieldGQL.EMAIL:
-                return UserOrders.email(ascending)
+                return UserOrder(field=UserOrderField.EMAIL, direction=direction)
             case UserOrderFieldGQL.STATUS:
-                return UserOrders.status(ascending)
+                return UserOrder(field=UserOrderField.STATUS, direction=direction)
             case UserOrderFieldGQL.DOMAIN_NAME:
-                return UserOrders.by_domain_name(ascending)
+                return UserOrder(field=UserOrderField.DOMAIN_NAME, direction=direction)
             case UserOrderFieldGQL.PROJECT_NAME:
-                return UserOrders.by_project_name(ascending)
-            case _:
-                raise ValueError(f"Unknown order field: {self.field}")
+                return UserOrder(field=UserOrderField.PROJECT_NAME, direction=direction)
