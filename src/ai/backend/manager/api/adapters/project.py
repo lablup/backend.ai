@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
-from ai.backend.common.dto.manager.query import StringFilter
+from uuid import UUID
+
+from ai.backend.common.dto.manager.query import DateTimeFilter, StringFilter, UUIDFilter
 from ai.backend.common.dto.manager.v2.group.request import (
     AdminSearchGroupsInput,
     GroupFilter,
@@ -19,23 +21,45 @@ from ai.backend.common.dto.manager.v2.group.response import (
 )
 from ai.backend.common.dto.manager.v2.group.types import (
     GroupOrderField,
+    GroupUserFilter,
     OrderDirection,
     ProjectType,
+    ProjectTypeFilter,
 )
+from ai.backend.manager.api.adapters.pagination import PaginationSpec
 from ai.backend.manager.data.group.types import GroupData
+from ai.backend.manager.data.group.types import ProjectType as DataProjectType
+from ai.backend.manager.models.domain.conditions import DomainConditions
 from ai.backend.manager.models.group.conditions import GroupConditions
 from ai.backend.manager.models.group.orders import GroupOrders
+from ai.backend.manager.models.group.row import GroupRow
 from ai.backend.manager.repositories.base import (
-    BatchQuerier,
-    OffsetPagination,
     QueryCondition,
     QueryOrder,
+    combine_conditions_or,
+    negate_conditions,
 )
-from ai.backend.manager.services.group.actions.search_projects import SearchProjectsAction
+from ai.backend.manager.repositories.group.types import (
+    DomainProjectSearchScope,
+    UserProjectSearchScope,
+)
+from ai.backend.manager.services.group.actions.search_projects import (
+    SearchProjectsAction,
+    SearchProjectsByDomainAction,
+    SearchProjectsByUserAction,
+)
 
 from .base import BaseAdapter
 
-DEFAULT_PAGINATION_LIMIT = 10
+_PROJECT_PAGINATION_SPEC = PaginationSpec(
+    forward_order=GroupOrders.created_at(ascending=False),
+    backward_order=GroupOrders.created_at(ascending=True),
+    forward_condition_factory=lambda cursor_id: GroupConditions.by_cursor_forward(UUID(cursor_id)),
+    backward_condition_factory=lambda cursor_id: GroupConditions.by_cursor_backward(
+        UUID(cursor_id)
+    ),
+    tiebreaker_order=GroupRow.id.asc(),
+)
 
 
 class ProjectAdapter(BaseAdapter):
@@ -45,15 +69,20 @@ class ProjectAdapter(BaseAdapter):
         self,
         input: AdminSearchGroupsInput,
     ) -> AdminSearchGroupsPayload:
-        """Search projects (admin, no scope) with filters, orders, and pagination.
-
-        Args:
-            input: Pydantic DTO with filter, order, and pagination parameters.
-
-        Returns:
-            Pydantic payload with items and pagination info.
-        """
-        querier = self.build_querier(input)
+        """Search projects (admin, no scope) with filters, orders, and pagination."""
+        conditions = self._convert_group_filter(input.filter) if input.filter else []
+        orders = self._convert_orders(input.order) if input.order else []
+        querier = self._build_querier(
+            conditions=conditions,
+            orders=orders,
+            pagination_spec=_PROJECT_PAGINATION_SPEC,
+            first=input.first,
+            after=input.after,
+            last=input.last,
+            before=input.before,
+            limit=input.limit,
+            offset=input.offset,
+        )
 
         action_result = await self._processors.group.search_projects.wait_for_complete(
             SearchProjectsAction(querier=querier)
@@ -66,27 +95,140 @@ class ProjectAdapter(BaseAdapter):
             has_previous_page=action_result.has_previous_page,
         )
 
-    def build_querier(self, input: AdminSearchGroupsInput) -> BatchQuerier:
-        """Build a BatchQuerier from the search input DTO."""
-        conditions = self._convert_filter(input.filter) if input.filter else []
+    async def search_by_domain(
+        self,
+        scope: DomainProjectSearchScope,
+        input: AdminSearchGroupsInput,
+    ) -> AdminSearchGroupsPayload:
+        """Search projects within a domain."""
+        conditions = self._convert_group_filter(input.filter) if input.filter else []
         orders = self._convert_orders(input.order) if input.order else []
-        pagination = self._build_pagination(input)
+        base_conditions: list[QueryCondition] = [scope.to_condition()]
+        querier = self._build_querier(
+            conditions=conditions,
+            orders=orders,
+            pagination_spec=_PROJECT_PAGINATION_SPEC,
+            first=input.first,
+            after=input.after,
+            last=input.last,
+            before=input.before,
+            limit=input.limit,
+            offset=input.offset,
+            base_conditions=base_conditions,
+        )
 
-        return BatchQuerier(conditions=conditions, orders=orders, pagination=pagination)
+        action_result = await self._processors.group.search_projects_by_domain.wait_for_complete(
+            SearchProjectsByDomainAction(scope=scope, querier=querier)
+        )
 
-    def _convert_filter(self, filter: GroupFilter) -> list[QueryCondition]:
+        return AdminSearchGroupsPayload(
+            items=[self._group_data_to_node(item) for item in action_result.items],
+            total_count=action_result.total_count,
+            has_next_page=action_result.has_next_page,
+            has_previous_page=action_result.has_previous_page,
+        )
+
+    async def search_by_user(
+        self,
+        scope: UserProjectSearchScope,
+        input: AdminSearchGroupsInput,
+    ) -> AdminSearchGroupsPayload:
+        """Search projects a user is a member of."""
+        conditions = self._convert_group_filter(input.filter) if input.filter else []
+        orders = self._convert_orders(input.order) if input.order else []
+        base_conditions: list[QueryCondition] = [scope.to_condition()]
+        querier = self._build_querier(
+            conditions=conditions,
+            orders=orders,
+            pagination_spec=_PROJECT_PAGINATION_SPEC,
+            first=input.first,
+            after=input.after,
+            last=input.last,
+            before=input.before,
+            limit=input.limit,
+            offset=input.offset,
+            base_conditions=base_conditions,
+        )
+
+        action_result = await self._processors.group.search_projects_by_user.wait_for_complete(
+            SearchProjectsByUserAction(scope=scope, querier=querier)
+        )
+
+        return AdminSearchGroupsPayload(
+            items=[self._group_data_to_node(item) for item in action_result.items],
+            total_count=action_result.total_count,
+            has_next_page=action_result.has_next_page,
+            has_previous_page=action_result.has_previous_page,
+        )
+
+    def _convert_group_filter(self, filter: GroupFilter) -> list[QueryCondition]:
         conditions: list[QueryCondition] = []
+
+        if filter.id is not None:
+            condition = self._convert_id_filter(filter.id)
+            if condition is not None:
+                conditions.append(condition)
+
         if filter.name is not None:
             condition = self._convert_name_filter(filter.name)
             if condition is not None:
                 conditions.append(condition)
+
         if filter.domain_name is not None:
             condition = self._convert_domain_name_filter(filter.domain_name)
             if condition is not None:
                 conditions.append(condition)
+
+        if filter.type is not None:
+            conditions.extend(self._convert_type_filter(filter.type))
+
         if filter.is_active is not None:
             conditions.append(GroupConditions.by_is_active(filter.is_active))
+
+        if filter.created_at is not None:
+            condition = self._convert_created_at_filter(filter.created_at)
+            if condition is not None:
+                conditions.append(condition)
+
+        if filter.modified_at is not None:
+            condition = self._convert_modified_at_filter(filter.modified_at)
+            if condition is not None:
+                conditions.append(condition)
+
+        if filter.domain is not None:
+            conditions.extend(
+                self._convert_domain_nested_filter(filter.domain.name, filter.domain.is_active)
+            )
+
+        if filter.user is not None:
+            conditions.extend(self._convert_user_nested_filter(filter.user))
+
+        if filter.AND:
+            for sub_filter in filter.AND:
+                conditions.extend(self._convert_group_filter(sub_filter))
+
+        if filter.OR:
+            or_sub_conditions: list[QueryCondition] = []
+            for sub_filter in filter.OR:
+                or_sub_conditions.extend(self._convert_group_filter(sub_filter))
+            if or_sub_conditions:
+                conditions.append(combine_conditions_or(or_sub_conditions))
+
+        if filter.NOT:
+            not_sub_conditions: list[QueryCondition] = []
+            for sub_filter in filter.NOT:
+                not_sub_conditions.extend(self._convert_group_filter(sub_filter))
+            if not_sub_conditions:
+                conditions.append(negate_conditions(not_sub_conditions))
+
         return conditions
+
+    def _convert_id_filter(self, uuid_filter: UUIDFilter) -> QueryCondition | None:
+        return self.convert_uuid_filter(
+            uuid_filter,
+            equals_factory=GroupConditions.by_id_equals,
+            in_factory=GroupConditions.by_id_in,
+        )
 
     def _convert_name_filter(self, sf: StringFilter) -> QueryCondition | None:
         return self.convert_string_filter(
@@ -107,15 +249,97 @@ class ProjectAdapter(BaseAdapter):
         )
 
     @staticmethod
-    def _convert_orders(order: list[GroupOrder]) -> list[QueryOrder]:
-        return [_resolve_order(o.field, o.direction) for o in order]
+    def _convert_type_filter(type_filter: ProjectTypeFilter) -> list[QueryCondition]:
+        conditions: list[QueryCondition] = []
+        if type_filter.equals is not None:
+            conditions.append(
+                GroupConditions.by_type_equals(DataProjectType(type_filter.equals.value))
+            )
+        if type_filter.in_ is not None:
+            conditions.append(
+                GroupConditions.by_type_in([DataProjectType(t.value) for t in type_filter.in_])
+            )
+        if type_filter.not_equals is not None:
+            conditions.append(
+                negate_conditions([
+                    GroupConditions.by_type_equals(DataProjectType(type_filter.not_equals.value))
+                ])
+            )
+        if type_filter.not_in is not None:
+            conditions.append(
+                negate_conditions([
+                    GroupConditions.by_type_in([
+                        DataProjectType(t.value) for t in type_filter.not_in
+                    ])
+                ])
+            )
+        return conditions
 
     @staticmethod
-    def _build_pagination(input: AdminSearchGroupsInput) -> OffsetPagination:
-        return OffsetPagination(
-            limit=input.limit if input.limit is not None else DEFAULT_PAGINATION_LIMIT,
-            offset=input.offset if input.offset is not None else 0,
+    def _convert_created_at_filter(dt_filter: DateTimeFilter) -> QueryCondition | None:
+        return dt_filter.build_query_condition(
+            before_factory=GroupConditions.by_created_at_before,
+            after_factory=GroupConditions.by_created_at_after,
         )
+
+    @staticmethod
+    def _convert_modified_at_filter(dt_filter: DateTimeFilter) -> QueryCondition | None:
+        return dt_filter.build_query_condition(
+            before_factory=GroupConditions.by_modified_at_before,
+            after_factory=GroupConditions.by_modified_at_after,
+        )
+
+    @staticmethod
+    def _convert_domain_nested_filter(
+        name_filter: StringFilter | None,
+        is_active: bool | None,
+    ) -> list[QueryCondition]:
+        raw_conditions: list[QueryCondition] = []
+        if name_filter is not None:
+            condition = name_filter.build_query_condition(
+                contains_factory=DomainConditions.by_name_contains,
+                equals_factory=DomainConditions.by_name_equals,
+                starts_with_factory=DomainConditions.by_name_starts_with,
+                ends_with_factory=DomainConditions.by_name_ends_with,
+            )
+            if condition is not None:
+                raw_conditions.append(condition)
+        if is_active is not None:
+            raw_conditions.append(DomainConditions.by_is_active(is_active))
+        if not raw_conditions:
+            return []
+        return [GroupConditions.exists_domain_combined(raw_conditions)]
+
+    @staticmethod
+    def _convert_user_nested_filter(user_filter: GroupUserFilter) -> list[QueryCondition]:
+        raw_conditions: list[QueryCondition] = []
+        if user_filter.username is not None:
+            condition = user_filter.username.build_query_condition(
+                contains_factory=GroupConditions.by_user_username_contains,
+                equals_factory=GroupConditions.by_user_username_equals,
+                starts_with_factory=GroupConditions.by_user_username_starts_with,
+                ends_with_factory=GroupConditions.by_user_username_ends_with,
+            )
+            if condition is not None:
+                raw_conditions.append(condition)
+        if user_filter.email is not None:
+            condition = user_filter.email.build_query_condition(
+                contains_factory=GroupConditions.by_user_email_contains,
+                equals_factory=GroupConditions.by_user_email_equals,
+                starts_with_factory=GroupConditions.by_user_email_starts_with,
+                ends_with_factory=GroupConditions.by_user_email_ends_with,
+            )
+            if condition is not None:
+                raw_conditions.append(condition)
+        if user_filter.is_active is not None:
+            raw_conditions.append(GroupConditions.by_user_is_active(user_filter.is_active))
+        if not raw_conditions:
+            return []
+        return [GroupConditions.exists_user_combined(raw_conditions)]
+
+    @staticmethod
+    def _convert_orders(order: list[GroupOrder]) -> list[QueryOrder]:
+        return [_resolve_order(o.field, o.direction) for o in order]
 
     @staticmethod
     def _group_data_to_node(data: GroupData) -> ProjectNode:
@@ -161,3 +385,13 @@ def _resolve_order(field: GroupOrderField, direction: OrderDirection) -> QueryOr
             return GroupOrders.created_at(ascending)
         case GroupOrderField.MODIFIED_AT:
             return GroupOrders.modified_at(ascending)
+        case GroupOrderField.IS_ACTIVE:
+            return GroupOrders.is_active(ascending)
+        case GroupOrderField.TYPE:
+            return GroupOrders.type(ascending)
+        case GroupOrderField.DOMAIN_NAME:
+            return GroupOrders.by_domain_name(ascending)
+        case GroupOrderField.USER_USERNAME:
+            return GroupOrders.by_user_username(ascending)
+        case GroupOrderField.USER_EMAIL:
+            return GroupOrders.by_user_email(ascending)

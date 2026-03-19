@@ -11,8 +11,14 @@ from pydantic import Field
 
 from ai.backend.common.api_handlers import SENTINEL, BaseRequestModel, Sentinel
 from ai.backend.common.dto.manager.defs import DEFAULT_PAGE_LIMIT, MAX_PAGE_LIMIT
-from ai.backend.common.dto.manager.query import StringFilter
-from ai.backend.common.dto.manager.v2.group.types import GroupOrderField, OrderDirection
+from ai.backend.common.dto.manager.query import DateTimeFilter, StringFilter, UUIDFilter
+from ai.backend.common.dto.manager.v2.group.types import (
+    GroupDomainFilter,
+    GroupOrderField,
+    GroupUserFilter,
+    OrderDirection,
+    ProjectTypeFilter,
+)
 
 __all__ = (
     "AdminSearchGroupsInput",
@@ -91,9 +97,31 @@ class PurgeGroupInput(BaseRequestModel):
 class GroupFilter(BaseRequestModel):
     """Filter criteria for searching groups."""
 
+    id: UUIDFilter | None = Field(default=None, description="Filter by project ID (UUID).")
     name: StringFilter | None = Field(default=None, description="Filter by group name.")
     domain_name: StringFilter | None = Field(default=None, description="Filter by domain name.")
+    type: ProjectTypeFilter | None = Field(default=None, description="Filter by project type.")
     is_active: bool | None = Field(default=None, description="Filter by active status.")
+    created_at: DateTimeFilter | None = Field(
+        default=None, description="Filter by creation timestamp."
+    )
+    modified_at: DateTimeFilter | None = Field(
+        default=None, description="Filter by last modification timestamp."
+    )
+    domain: GroupDomainFilter | None = Field(
+        default=None, description="Nested filter for domain conditions."
+    )
+    user: GroupUserFilter | None = Field(
+        default=None, description="Nested filter for user conditions."
+    )
+    AND: list[GroupFilter] | None = Field(
+        default=None, description="Combine filters with AND logic."
+    )
+    OR: list[GroupFilter] | None = Field(default=None, description="Combine filters with OR logic.")
+    NOT: list[GroupFilter] | None = Field(default=None, description="Negate the specified filters.")
+
+
+GroupFilter.model_rebuild()
 
 
 class GroupOrder(BaseRequestModel):

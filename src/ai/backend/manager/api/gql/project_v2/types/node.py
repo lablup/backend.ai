@@ -30,6 +30,7 @@ from .nested import (
 )
 
 if TYPE_CHECKING:
+    from ai.backend.common.dto.manager.v2.group.response import ProjectNode
     from ai.backend.manager.api.gql.domain_v2.types.node import DomainV2GQL
     from ai.backend.manager.api.gql.user.types.filters import UserFilterGQL, UserOrderByGQL
     from ai.backend.manager.api.gql.user.types.node import UserV2Connection
@@ -249,6 +250,38 @@ class ProjectV2GQL(PydanticNodeMixin):
             UUID(nid) for nid in node_ids
         ])
         return [cls.from_data(data) if data is not None else None for data in results]
+
+    @classmethod
+    def from_node(cls, node: ProjectNode) -> Self:
+        """Create ProjectV2GQL from ProjectNode DTO (adapter search results)."""
+        vfolder_host_entries = [
+            VFolderHostPermissionEntryGQL(
+                host=entry.host,
+                permissions=[VFolderHostPermissionEnum(perm) for perm in entry.permissions],
+            )
+            for entry in node.storage.allowed_vfolder_hosts
+        ]
+        return cls(
+            id=ID(str(node.id)),
+            basic_info=ProjectBasicInfoGQL(
+                name=node.basic_info.name,
+                description=node.basic_info.description,
+                type=ProjectTypeEnum(node.basic_info.type.value),
+                integration_id=node.basic_info.integration_id,
+            ),
+            organization=ProjectOrganizationInfoGQL(
+                domain_name=node.organization.domain_name,
+                resource_policy=node.organization.resource_policy,
+            ),
+            storage=ProjectStorageInfoGQL(
+                allowed_vfolder_hosts=vfolder_host_entries,
+            ),
+            lifecycle=ProjectLifecycleInfoGQL(
+                is_active=node.lifecycle.is_active,
+                created_at=node.lifecycle.created_at,
+                modified_at=node.lifecycle.modified_at,
+            ),
+        )
 
     @classmethod
     def from_data(

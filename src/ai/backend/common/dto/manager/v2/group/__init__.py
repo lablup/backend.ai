@@ -26,9 +26,12 @@ from ai.backend.common.dto.manager.v2.group.response import (
     VFolderHostPermissionEntry,
 )
 from ai.backend.common.dto.manager.v2.group.types import (
+    GroupDomainFilter,
     GroupOrderField,
+    GroupUserFilter,
     OrderDirection,
     ProjectType,
+    ProjectTypeFilter,
 )
 
 __all__ = (
@@ -36,6 +39,9 @@ __all__ = (
     "ProjectType",
     "OrderDirection",
     "GroupOrderField",
+    "GroupDomainFilter",
+    "GroupUserFilter",
+    "ProjectTypeFilter",
     # Request DTOs
     "AdminSearchGroupsInput",
     "CreateGroupInput",
