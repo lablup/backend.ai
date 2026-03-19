@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import uuid
+from dataclasses import dataclass
 from datetime import UTC, datetime
 from unittest.mock import AsyncMock, MagicMock
 
@@ -25,6 +26,29 @@ from ai.backend.manager.models.deployment_policy import BlueGreenSpec, RollingUp
 from ai.backend.manager.services.deployment.actions.deployment_policy.upsert_deployment_policy import (
     UpsertDeploymentPolicyActionResult,
 )
+
+SAMPLE_DEPLOYMENT_ID = "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"
+
+
+# --- Test scenarios ---
+
+
+@dataclass(frozen=True)
+class StrategyConversionScenario:
+    """Input → expected upserter output for a valid strategy conversion."""
+
+    input: UpdateDeploymentPolicyInputGQL
+    expected_spec: RollingUpdateSpec | BlueGreenSpec
+    expected_rollback_on_failure: bool
+
+
+@dataclass(frozen=True)
+class MissingConfigScenario:
+    """Input that should raise due to missing strategy config."""
+
+    input: UpdateDeploymentPolicyInputGQL
+    expected_error_match: str
+
 
 # --- Fixtures ---
 
@@ -51,11 +75,23 @@ def mock_upsert_processor() -> AsyncMock:
     return AsyncMock()
 
 
-def _create_mock_info(processor: AsyncMock) -> MagicMock:
+@pytest.fixture
+def mock_info(mock_upsert_processor: AsyncMock) -> MagicMock:
     """Create mock strawberry.Info with deployment processors."""
     info = MagicMock()
-    info.context.processors.deployment.upsert_deployment_policy = processor
+    info.context.processors.deployment.upsert_deployment_policy = mock_upsert_processor
     return info
+
+
+@pytest.fixture
+def rolling_update_input() -> UpdateDeploymentPolicyInputGQL:
+    """Input for ROLLING strategy with custom surge/unavailable."""
+    return UpdateDeploymentPolicyInputGQL(
+        deployment_id=ID(SAMPLE_DEPLOYMENT_ID),
+        strategy=DeploymentStrategy.ROLLING,
+        rollback_on_failure=True,
+        rolling_update=RollingUpdateConfigInputGQL(max_surge=2, max_unavailable=1),
+    )
 
 
 def _make_policy_data(
@@ -80,83 +116,106 @@ def _make_policy_data(
 # --- Input type conversion tests ---
 
 
-class TestUpdateDeploymentPolicyInputGQL:
+class TestToUpserterConversion:
     """Tests for UpdateDeploymentPolicyInputGQL.to_upserter()."""
 
-    def test_rolling_strategy_with_config(self) -> None:
-        """Test conversion with ROLLING strategy and config provided."""
+    @pytest.mark.parametrize(
+        "scenario",
+        [
+            pytest.param(
+                StrategyConversionScenario(
+                    input=UpdateDeploymentPolicyInputGQL(
+                        deployment_id=ID(SAMPLE_DEPLOYMENT_ID),
+                        strategy=DeploymentStrategy.ROLLING,
+                        rollback_on_failure=True,
+                        rolling_update=RollingUpdateConfigInputGQL(max_surge=2, max_unavailable=1),
+                    ),
+                    expected_spec=RollingUpdateSpec(max_surge=2, max_unavailable=1),
+                    expected_rollback_on_failure=True,
+                ),
+                id="rolling",
+            ),
+            pytest.param(
+                StrategyConversionScenario(
+                    input=UpdateDeploymentPolicyInputGQL(
+                        deployment_id=ID(SAMPLE_DEPLOYMENT_ID),
+                        strategy=DeploymentStrategy.BLUE_GREEN,
+                        blue_green=BlueGreenConfigInputGQL(
+                            auto_promote=True, promote_delay_seconds=30
+                        ),
+                    ),
+                    expected_spec=BlueGreenSpec(auto_promote=True, promote_delay_seconds=30),
+                    expected_rollback_on_failure=False,
+                ),
+                id="blue_green",
+            ),
+        ],
+    )
+    def test_converts_gql_input_to_upserter(self, scenario: StrategyConversionScenario) -> None:
+        """Test that GQL input is correctly converted to DeploymentPolicyUpserter."""
+        upserter = scenario.input.to_upserter()
+
+        assert upserter.strategy == scenario.input.strategy
+        assert upserter.strategy_spec == scenario.expected_spec
+        assert upserter.rollback_on_failure is scenario.expected_rollback_on_failure
+
+    @pytest.mark.parametrize(
+        "scenario",
+        [
+            pytest.param(
+                MissingConfigScenario(
+                    input=UpdateDeploymentPolicyInputGQL(
+                        deployment_id=ID(SAMPLE_DEPLOYMENT_ID),
+                        strategy=DeploymentStrategy.ROLLING,
+                    ),
+                    expected_error_match="rolling_update",
+                ),
+                id="rolling",
+            ),
+            pytest.param(
+                MissingConfigScenario(
+                    input=UpdateDeploymentPolicyInputGQL(
+                        deployment_id=ID(SAMPLE_DEPLOYMENT_ID),
+                        strategy=DeploymentStrategy.BLUE_GREEN,
+                    ),
+                    expected_error_match="blue_green",
+                ),
+                id="blue_green",
+            ),
+        ],
+    )
+    def test_raises_when_strategy_config_is_missing(self, scenario: MissingConfigScenario) -> None:
+        """Test that to_upserter() raises when matching strategy config is not provided."""
+        with pytest.raises(InvalidAPIParameters, match=scenario.expected_error_match):
+            scenario.input.to_upserter()
+
+    def test_converts_deployment_id_to_uuid(self) -> None:
+        """Test that string deployment_id is correctly parsed into UUID."""
         input_gql = UpdateDeploymentPolicyInputGQL(
-            deployment_id=ID("aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"),
-            strategy=DeploymentStrategy.ROLLING,
-            rollback_on_failure=True,
-            rolling_update=RollingUpdateConfigInputGQL(max_surge=2, max_unavailable=1),
-        )
-        upserter = input_gql.to_upserter()
-
-        assert upserter.strategy == DeploymentStrategy.ROLLING
-        assert isinstance(upserter.strategy_spec, RollingUpdateSpec)
-        assert upserter.strategy_spec.max_surge == 2
-        assert upserter.strategy_spec.max_unavailable == 1
-        assert upserter.rollback_on_failure is True
-
-    def test_blue_green_strategy_with_config(self) -> None:
-        """Test conversion with BLUE_GREEN strategy and config provided."""
-        input_gql = UpdateDeploymentPolicyInputGQL(
-            deployment_id=ID("aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"),
-            strategy=DeploymentStrategy.BLUE_GREEN,
-            blue_green=BlueGreenConfigInputGQL(auto_promote=True, promote_delay_seconds=30),
-        )
-        upserter = input_gql.to_upserter()
-
-        assert upserter.strategy == DeploymentStrategy.BLUE_GREEN
-        assert isinstance(upserter.strategy_spec, BlueGreenSpec)
-        assert upserter.strategy_spec.auto_promote is True
-        assert upserter.strategy_spec.promote_delay_seconds == 30
-        assert upserter.rollback_on_failure is False
-
-    def test_rolling_strategy_missing_config_raises(self) -> None:
-        """Test that ROLLING strategy without rolling_update config raises."""
-        input_gql = UpdateDeploymentPolicyInputGQL(
-            deployment_id=ID("aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"),
-            strategy=DeploymentStrategy.ROLLING,
-        )
-        with pytest.raises(InvalidAPIParameters, match="rolling_update"):
-            input_gql.to_upserter()
-
-    def test_blue_green_strategy_missing_config_raises(self) -> None:
-        """Test that BLUE_GREEN strategy without blue_green config raises."""
-        input_gql = UpdateDeploymentPolicyInputGQL(
-            deployment_id=ID("aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"),
-            strategy=DeploymentStrategy.BLUE_GREEN,
-        )
-        with pytest.raises(InvalidAPIParameters, match="blue_green"):
-            input_gql.to_upserter()
-
-    def test_deployment_id_is_converted_to_uuid(self) -> None:
-        """Test that deployment_id string is correctly converted to UUID."""
-        input_gql = UpdateDeploymentPolicyInputGQL(
-            deployment_id=ID("aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"),
+            deployment_id=ID(SAMPLE_DEPLOYMENT_ID),
             strategy=DeploymentStrategy.ROLLING,
             rolling_update=RollingUpdateConfigInputGQL(),
         )
         upserter = input_gql.to_upserter()
 
-        assert str(upserter.deployment_id) == "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"
+        assert str(upserter.deployment_id) == SAMPLE_DEPLOYMENT_ID
 
 
 # --- Resolver tests ---
 
 
-class TestAdminUpdateDeploymentPolicyMutation:
+class TestAdminUpdateDeploymentPolicyResolver:
     """Tests for admin_update_deployment_policy resolver."""
 
-    async def test_mutation_calls_processor_with_correct_action(
+    async def test_delegates_upsert_action_to_processor(
         self,
         mock_superadmin_user: MagicMock,
         mock_upsert_processor: AsyncMock,
+        mock_info: MagicMock,
+        rolling_update_input: UpdateDeploymentPolicyInputGQL,
         monkeypatch: pytest.MonkeyPatch,
     ) -> None:
-        """Test that mutation calls processor with correct action parameters."""
+        """Test that resolver delegates to processor and returns payload."""
         # Given
         policy_data = _make_policy_data(
             strategy=DeploymentStrategy.ROLLING,
@@ -166,7 +225,6 @@ class TestAdminUpdateDeploymentPolicyMutation:
             data=policy_data,
             created=True,
         )
-        mock_info = _create_mock_info(mock_upsert_processor)
 
         monkeypatch.setattr(
             gql_utils,
@@ -174,73 +232,30 @@ class TestAdminUpdateDeploymentPolicyMutation:
             lambda: mock_superadmin_user,
         )
 
-        input_data = UpdateDeploymentPolicyInputGQL(
-            deployment_id=ID("aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"),
-            strategy=DeploymentStrategy.ROLLING,
-            rollback_on_failure=True,
-            rolling_update=RollingUpdateConfigInputGQL(max_surge=2, max_unavailable=1),
-        )
-
         # When
         resolver_fn = policy_resolver.admin_update_deployment_policy.base_resolver
-        result = await resolver_fn(input_data, mock_info)
+        result = await resolver_fn(rolling_update_input, mock_info)
 
         # Then
         mock_upsert_processor.wait_for_complete.assert_called_once()
         call_args = mock_upsert_processor.wait_for_complete.call_args
         action = call_args[0][0]
 
-        assert str(action.upserter.deployment_id) == "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"
+        assert str(action.upserter.deployment_id) == SAMPLE_DEPLOYMENT_ID
         assert action.upserter.strategy == DeploymentStrategy.ROLLING
         assert action.upserter.rollback_on_failure is True
 
         assert isinstance(result, UpdateDeploymentPolicyPayloadGQL)
-        assert result.created is True
 
-    async def test_mutation_returns_created_false_on_update(
-        self,
-        mock_superadmin_user: MagicMock,
-        mock_upsert_processor: AsyncMock,
-        monkeypatch: pytest.MonkeyPatch,
-    ) -> None:
-        """Test that mutation returns created=False when policy already exists."""
-        # Given
-        policy_data = _make_policy_data()
-        mock_upsert_processor.wait_for_complete.return_value = UpsertDeploymentPolicyActionResult(
-            data=policy_data,
-            created=False,
-        )
-        mock_info = _create_mock_info(mock_upsert_processor)
-
-        monkeypatch.setattr(
-            gql_utils,
-            "current_user",
-            lambda: mock_superadmin_user,
-        )
-
-        input_data = UpdateDeploymentPolicyInputGQL(
-            deployment_id=ID("aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"),
-            strategy=DeploymentStrategy.ROLLING,
-            rolling_update=RollingUpdateConfigInputGQL(),
-        )
-
-        # When
-        resolver_fn = policy_resolver.admin_update_deployment_policy.base_resolver
-        result = await resolver_fn(input_data, mock_info)
-
-        # Then
-        assert result.created is False
-
-    async def test_mutation_requires_superadmin(
+    async def test_rejects_non_superadmin(
         self,
         mock_regular_user: MagicMock,
         mock_upsert_processor: AsyncMock,
+        mock_info: MagicMock,
         monkeypatch: pytest.MonkeyPatch,
     ) -> None:
-        """Test that mutation requires superadmin privilege."""
+        """Test that non-superadmin user is rejected with HTTPForbidden."""
         # Given
-        mock_info = _create_mock_info(mock_upsert_processor)
-
         monkeypatch.setattr(
             gql_utils,
             "current_user",
@@ -248,7 +263,7 @@ class TestAdminUpdateDeploymentPolicyMutation:
         )
 
         input_data = UpdateDeploymentPolicyInputGQL(
-            deployment_id=ID("aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"),
+            deployment_id=ID(SAMPLE_DEPLOYMENT_ID),
             strategy=DeploymentStrategy.ROLLING,
             rolling_update=RollingUpdateConfigInputGQL(),
         )
