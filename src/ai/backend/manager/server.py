@@ -55,10 +55,13 @@ from ai.backend.logging.otel import (
 
 from . import __version__
 from .api import ManagerStatus
+from .api.rest.app import _mount_registry_tree
+from .api.rest.internal.tree import build_internal_api_routes
 from .api.rest.middleware import (
     build_auth_middleware,
     build_exception_middleware,
 )
+from .api.rest.routing import RouteRegistry
 from .config.bootstrap import BootstrapConfig
 from .config.unified import EventLoopType
 from .dependencies import DependencyInput, DependencyResources, ManagerDependencyComposer
@@ -198,6 +201,10 @@ def build_internal_app(dep_resources: DependencyResources) -> web.Application:
         r"/metrics/service_discovery",
         build_prometheus_service_discovery_handler(dep_resources.system.service_discovery),
     )
+    root_reg = RouteRegistry.create("", {})
+    for sub in build_internal_api_routes(health_probe=dep_resources.system.health_probe):
+        root_reg.add_subregistry(sub)
+    _mount_registry_tree(app, root_reg)
     return app
 
 
