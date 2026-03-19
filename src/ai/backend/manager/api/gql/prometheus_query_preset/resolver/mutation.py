@@ -8,6 +8,9 @@ import strawberry
 from strawberry import ID, Info
 
 from ai.backend.common.api_handlers import Sentinel
+from ai.backend.common.dto.manager.v2.prometheus_query_preset.request import (
+    DeleteQueryDefinitionInput as DeleteQueryDefinitionInputDTO,
+)
 from ai.backend.manager.api.gql.prometheus_query_preset.types import (
     CreateQueryDefinitionInput,
     CreateQueryDefinitionPayload,
@@ -29,7 +32,6 @@ from ai.backend.manager.repositories.prometheus_query_preset.updaters import (
 )
 from ai.backend.manager.services.prometheus_query_preset.actions import (
     CreatePresetAction,
-    DeletePresetAction,
     ModifyPresetAction,
 )
 from ai.backend.manager.types import OptionalState, TriState
@@ -105,10 +107,7 @@ async def admin_delete_prometheus_query_preset(
     id: ID,
 ) -> DeleteQueryDefinitionPayload:
     check_admin_only()
-    processors = info.context.processors
-
-    await processors.prometheus_query_preset.delete_preset.wait_for_complete(
-        DeletePresetAction(preset_id=UUID(id))
+    result = await info.context.adapters.prometheus_query_preset.delete(
+        DeleteQueryDefinitionInputDTO(id=UUID(id))
     )
-
-    return DeleteQueryDefinitionPayload(id=UUID(id))
+    return DeleteQueryDefinitionPayload.from_pydantic(result)

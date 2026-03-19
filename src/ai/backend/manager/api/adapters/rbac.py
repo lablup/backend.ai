@@ -29,6 +29,9 @@ from ai.backend.common.dto.manager.v2.rbac import (
     UpdateRoleInput,
     UpdateRolePayload,
 )
+from ai.backend.common.dto.manager.v2.rbac import (
+    DeletePermissionPayload as DeletePermissionPayloadDTO,
+)
 from ai.backend.common.dto.manager.v2.rbac.request import (
     AdminSearchEntitiesGQLInput,
     AdminSearchPermissionsGQLInput,
@@ -118,6 +121,9 @@ from ai.backend.manager.services.permission_contoller.actions.create_role import
 from ai.backend.manager.services.permission_contoller.actions.delete_role import DeleteRoleAction
 from ai.backend.manager.services.permission_contoller.actions.get_role_detail import (
     GetRoleDetailAction,
+)
+from ai.backend.manager.services.permission_contoller.actions.permission import (
+    DeletePermissionAction,
 )
 from ai.backend.manager.services.permission_contoller.actions.purge_role import PurgeRoleAction
 from ai.backend.manager.services.permission_contoller.actions.search_element_associations import (
@@ -370,6 +376,16 @@ class RBACAdapter(BaseAdapter):
             PurgeRoleAction(purger=purger)
         )
         return PurgeRolePayload(id=action_result.data.id)
+
+    # ------------------------------------------------------------------ delete_permission
+
+    async def delete_permission(self, permission_id: UUID) -> DeletePermissionPayloadDTO:
+        """Hard-delete a scoped permission."""
+        purger: Purger[PermissionRow] = Purger(row_class=PermissionRow, pk_value=permission_id)
+        await self._processors.permission_controller.delete_permission.wait_for_complete(
+            DeletePermissionAction(purger=purger)
+        )
+        return DeletePermissionPayloadDTO(id=permission_id)
 
     # ------------------------------------------------------------------ helpers (REST layer)
 

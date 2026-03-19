@@ -29,16 +29,13 @@ from ai.backend.manager.api.gql.rbac.types import (
 from ai.backend.manager.api.gql.rbac.types.permission import PermissionEdge
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.api.gql.utils import check_admin_only
-from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
 from ai.backend.manager.repositories.base import QueryCondition
 from ai.backend.manager.repositories.base.creator import Creator
-from ai.backend.manager.repositories.base.purger import Purger
 from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.repositories.permission_controller.creators import PermissionCreatorSpec
 from ai.backend.manager.repositories.permission_controller.updaters import PermissionUpdaterSpec
 from ai.backend.manager.services.permission_contoller.actions.permission import (
     CreatePermissionAction,
-    DeletePermissionAction,
 )
 from ai.backend.manager.services.permission_contoller.actions.update_permission import (
     UpdatePermissionAction,
@@ -210,8 +207,5 @@ async def admin_delete_permission(
     input: DeletePermissionInput,
 ) -> DeletePermissionPayload:
     check_admin_only()
-    purger = Purger(row_class=PermissionRow, pk_value=input.id)
-    await info.context.processors.permission_controller.delete_permission.wait_for_complete(
-        DeletePermissionAction(purger=purger)
-    )
-    return DeletePermissionPayload(id=input.id)
+    result = await info.context.adapters.rbac.delete_permission(input.id)
+    return DeletePermissionPayload.from_pydantic(result)

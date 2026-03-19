@@ -23,7 +23,6 @@ from ai.backend.common.dto.manager.v2.vfs_storage.response import (
 from ai.backend.manager.api.gql.base import encode_cursor
 from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin
 from ai.backend.manager.data.vfs_storage.types import VFSStorageData
-from ai.backend.manager.services.vfs_storage.actions.delete import DeleteVFSStorageAction
 from ai.backend.manager.services.vfs_storage.actions.get import GetVFSStorageAction
 from ai.backend.manager.services.vfs_storage.actions.list import ListVFSStorageAction
 
@@ -188,13 +187,5 @@ async def update_vfs_storage(
 async def delete_vfs_storage(
     input: DeleteVFSStorageInput, info: Info[StrawberryGQLContext]
 ) -> DeleteVFSStoragePayload:
-    processors = info.context.processors
-
-    pydantic_input = input.to_pydantic()
-    action_result = await processors.vfs_storage.delete.wait_for_complete(
-        DeleteVFSStorageAction(
-            storage_id=pydantic_input.id,
-        )
-    )
-
-    return DeleteVFSStoragePayload(id=action_result.deleted_storage_id)
+    result = await info.context.adapters.vfs_storage.delete(input.to_pydantic())
+    return DeleteVFSStoragePayload.from_pydantic(result)

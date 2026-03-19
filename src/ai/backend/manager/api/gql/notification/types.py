@@ -75,6 +75,12 @@ from ai.backend.common.dto.manager.v2.notification.request import (
     ValidateNotificationRuleInput as ValidateNotificationRuleInputDTO,
 )
 from ai.backend.common.dto.manager.v2.notification.response import (
+    CreateNotificationChannelPayload as CreateNotificationChannelPayloadDTO,
+)
+from ai.backend.common.dto.manager.v2.notification.response import (
+    CreateNotificationRulePayload as CreateNotificationRulePayloadDTO,
+)
+from ai.backend.common.dto.manager.v2.notification.response import (
     DeleteNotificationChannelPayload as DeleteNotificationChannelPayloadDTO,
 )
 from ai.backend.common.dto.manager.v2.notification.response import (
@@ -83,6 +89,12 @@ from ai.backend.common.dto.manager.v2.notification.response import (
 from ai.backend.common.dto.manager.v2.notification.response import (
     NotificationChannelNode,
     NotificationRuleNode,
+)
+from ai.backend.common.dto.manager.v2.notification.response import (
+    UpdateNotificationChannelPayload as UpdateNotificationChannelPayloadDTO,
+)
+from ai.backend.common.dto.manager.v2.notification.response import (
+    UpdateNotificationRulePayload as UpdateNotificationRulePayloadDTO,
 )
 from ai.backend.common.dto.manager.v2.notification.response import (
     ValidateNotificationRulePayload as ValidateNotificationRulePayloadDTO,
@@ -799,10 +811,18 @@ class DeleteNotificationRuleInput:
 class CreateNotificationChannelPayload:
     channel: NotificationChannel
 
+    @classmethod
+    def from_pydantic(cls, dto: CreateNotificationChannelPayloadDTO) -> Self:
+        return cls(channel=NotificationChannel.from_node(dto.channel))
+
 
 @strawberry.type(description="Payload for update notification channel mutation")
 class UpdateNotificationChannelPayload:
     channel: NotificationChannel
+
+    @classmethod
+    def from_pydantic(cls, dto: UpdateNotificationChannelPayloadDTO) -> Self:
+        return cls(channel=NotificationChannel.from_node(dto.channel))
 
 
 @strawberry.experimental.pydantic.type(
@@ -818,10 +838,18 @@ class DeleteNotificationChannelPayload:
 class CreateNotificationRulePayload:
     rule: NotificationRule
 
+    @classmethod
+    def from_pydantic(cls, dto: CreateNotificationRulePayloadDTO) -> Self:
+        return cls(rule=NotificationRule.from_node(dto.rule))
+
 
 @strawberry.type(description="Payload for update notification rule mutation")
 class UpdateNotificationRulePayload:
     rule: NotificationRule
+
+    @classmethod
+    def from_pydantic(cls, dto: UpdateNotificationRulePayloadDTO) -> Self:
+        return cls(rule=NotificationRule.from_node(dto.rule))
 
 
 @strawberry.experimental.pydantic.type(

@@ -8,7 +8,6 @@ import strawberry
 from strawberry import Info
 
 from ai.backend.common.contexts.user import current_user
-from ai.backend.common.data.permission.types import RoleStatus
 from ai.backend.common.dto.manager.v2.rbac.request import (
     AdminSearchRoleAssignmentsGQLInput,
     AdminSearchRolesGQLInput,
@@ -47,13 +46,9 @@ from ai.backend.manager.data.permission.role import (
     UserRoleRevocationInput,
 )
 from ai.backend.manager.models.rbac_models.conditions import AssignedUserConditions
-from ai.backend.manager.models.rbac_models.role import RoleRow
 from ai.backend.manager.repositories.base import QueryCondition
 from ai.backend.manager.repositories.base.creator import BulkCreator
-from ai.backend.manager.repositories.base.purger import Purger
-from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.repositories.permission_controller.creators import UserRoleCreatorSpec
-from ai.backend.manager.repositories.permission_controller.updaters import RoleUpdaterSpec
 from ai.backend.manager.services.permission_contoller.actions.assign_role import (
     AssignRoleAction,
 )
@@ -63,19 +58,12 @@ from ai.backend.manager.services.permission_contoller.actions.bulk_assign_role i
 from ai.backend.manager.services.permission_contoller.actions.bulk_revoke_role import (
     BulkRevokeRoleAction,
 )
-from ai.backend.manager.services.permission_contoller.actions.delete_role import (
-    DeleteRoleAction,
-)
 from ai.backend.manager.services.permission_contoller.actions.get_role_detail import (
     GetRoleDetailAction,
-)
-from ai.backend.manager.services.permission_contoller.actions.purge_role import (
-    PurgeRoleAction,
 )
 from ai.backend.manager.services.permission_contoller.actions.revoke_role import (
     RevokeRoleAction,
 )
-from ai.backend.manager.types import OptionalState
 
 
 async def _fetch_role(
@@ -316,16 +304,8 @@ async def admin_delete_role(
     input: DeleteRoleInput,
 ) -> DeleteRolePayload:
     check_admin_only()
-    updater = Updater(
-        spec=RoleUpdaterSpec(
-            status=OptionalState.update(RoleStatus.DELETED),
-        ),
-        pk_value=input.id,
-    )
-    await info.context.processors.permission_controller.delete_role.wait_for_complete(
-        DeleteRoleAction(updater=updater)
-    )
-    return DeleteRolePayload(id=input.id)
+    result = await info.context.adapters.rbac.delete(input.id)
+    return DeleteRolePayload.from_pydantic(result)
 
 
 @strawberry.mutation(description="Added in 26.3.0. Permanently remove a role (admin only).")  # type: ignore[misc]
@@ -334,11 +314,8 @@ async def admin_purge_role(
     input: PurgeRoleInput,
 ) -> PurgeRolePayload:
     check_admin_only()
-    purger = Purger(row_class=RoleRow, pk_value=input.id)
-    await info.context.processors.permission_controller.purge_role.wait_for_complete(
-        PurgeRoleAction(purger=purger)
-    )
-    return PurgeRolePayload(id=input.id)
+    result = await info.context.adapters.rbac.purge(input.id)
+    return PurgeRolePayload.from_pydantic(result)
 
 
 @strawberry.mutation(description="Added in 26.3.0. Assign a role to a user (admin only).")  # type: ignore[misc]

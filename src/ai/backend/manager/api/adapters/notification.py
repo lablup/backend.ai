@@ -21,6 +21,8 @@ from ai.backend.common.dto.manager.v2.notification.request import (
     SearchNotificationRulesInput,
     UpdateNotificationChannelInput,
     UpdateNotificationRuleInput,
+    ValidateNotificationChannelInput,
+    ValidateNotificationRuleInput,
 )
 from ai.backend.common.dto.manager.v2.notification.response import (
     CreateNotificationChannelPayload,
@@ -35,6 +37,8 @@ from ai.backend.common.dto.manager.v2.notification.response import (
     SearchNotificationRulesPayload,
     UpdateNotificationChannelPayload,
     UpdateNotificationRulePayload,
+    ValidateNotificationChannelPayload,
+    ValidateNotificationRulePayload,
 )
 from ai.backend.common.dto.manager.v2.notification.types import (
     EmailSpecInfo,
@@ -83,6 +87,8 @@ from ai.backend.manager.services.notification.actions import (
     SearchRulesAction,
     UpdateChannelAction,
     UpdateRuleAction,
+    ValidateChannelAction,
+    ValidateRuleAction,
 )
 from ai.backend.manager.types import OptionalState, TriState
 
@@ -242,6 +248,24 @@ class NotificationAdapter(BaseAdapter):
         )
 
         return DeleteNotificationRulePayload(id=input.id)
+
+    async def validate_channel(
+        self, input: ValidateNotificationChannelInput
+    ) -> ValidateNotificationChannelPayload:
+        """Validate a notification channel by sending a test message."""
+        await self._processors.notification.validate_channel.wait_for_complete(
+            ValidateChannelAction(channel_id=input.id, test_message=input.test_message)
+        )
+        return ValidateNotificationChannelPayload(channel_id=input.id)
+
+    async def validate_rule(
+        self, input: ValidateNotificationRuleInput
+    ) -> ValidateNotificationRulePayload:
+        """Validate a notification rule by rendering its template with test data."""
+        action_result = await self._processors.notification.validate_rule.wait_for_complete(
+            ValidateRuleAction(rule_id=input.id, notification_data=input.notification_data)
+        )
+        return ValidateNotificationRulePayload(message=action_result.message)
 
     async def search_channels(
         self, input: SearchNotificationChannelsInput
