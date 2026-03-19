@@ -14,7 +14,14 @@ from strawberry.relay import Connection, Edge, NodeID
 
 from ai.backend.common.contexts.user import current_user
 from ai.backend.common.dto.manager.v2.session.request import SessionFilter, SessionOrder
-from ai.backend.common.dto.manager.v2.session.response import SessionNode
+from ai.backend.common.dto.manager.v2.session.response import (
+    SessionLifecycleInfoGQLDTO,
+    SessionMetadataInfoGQLDTO,
+    SessionNetworkInfo,
+    SessionNode,
+    SessionResourceInfoGQLDTO,
+    SessionRuntimeInfoGQLDTO,
+)
 from ai.backend.common.dto.manager.v2.session.types import (
     OrderDirection as OrderDirectionDTO,
 )
@@ -223,7 +230,8 @@ class SessionV2OrderByGQL:
 # ========== Session Info Sub-Types ==========
 
 
-@strawberry.type(
+@strawberry.experimental.pydantic.type(
+    model=SessionMetadataInfoGQLDTO,
     name="SessionV2MetadataInfo",
     description="Added in 26.3.0. Metadata information for a session.",
 )
@@ -247,7 +255,8 @@ class SessionV2MetadataInfoGQL:
     tag: str | None = strawberry.field(description="Optional user-provided tag for the session.")
 
 
-@strawberry.type(
+@strawberry.experimental.pydantic.type(
+    model=SessionResourceInfoGQLDTO,
     name="SessionV2ResourceInfo",
     description="Added in 26.3.0. Resource allocation information for a session.",
 )
@@ -263,7 +272,8 @@ class SessionV2ResourceInfoGQL:
     )
 
 
-@strawberry.type(
+@strawberry.experimental.pydantic.type(
+    model=SessionLifecycleInfoGQLDTO,
     name="SessionV2LifecycleInfo",
     description="Added in 26.3.0. Lifecycle status and timestamps for a session.",
 )
@@ -286,7 +296,8 @@ class SessionV2LifecycleInfoGQL:
     )
 
 
-@strawberry.type(
+@strawberry.experimental.pydantic.type(
+    model=SessionRuntimeInfoGQLDTO,
     name="SessionV2RuntimeInfo",
     description="Added in 26.3.0. Runtime execution configuration for a session.",
 )
@@ -305,16 +316,14 @@ class SessionV2RuntimeInfoGQL:
     )
 
 
-@strawberry.type(
+@strawberry.experimental.pydantic.type(
+    model=SessionNetworkInfo,
     name="SessionV2NetworkInfo",
+    all_fields=True,
     description="Added in 26.3.0. Network configuration for a session.",
 )
 class SessionV2NetworkInfoGQL:
-    use_host_network: bool = strawberry.field(
-        description="Whether the session uses the host network directly."
-    )
-    network_type: str | None = strawberry.field(description="Type of network used by the session.")
-    network_id: str | None = strawberry.field(description="ID of the network if applicable.")
+    pass
 
 
 # ========== Main Session Type ==========
@@ -514,10 +523,12 @@ class SessionV2GQL(PydanticNodeMixin[SessionNode]):
                 startup_command=data.startup_command,
                 callback_url=data.callback_url,
             ),
-            network=SessionV2NetworkInfoGQL(
-                use_host_network=data.use_host_network,
-                network_type=str(data.network_type) if data.network_type else None,
-                network_id=data.network_id,
+            network=SessionV2NetworkInfoGQL.from_pydantic(
+                SessionNetworkInfo(
+                    use_host_network=data.use_host_network,
+                    network_type=str(data.network_type) if data.network_type else None,
+                    network_id=data.network_id,
+                )
             ),
         )
 
@@ -596,10 +607,12 @@ class SessionV2GQL(PydanticNodeMixin[SessionNode]):
                 startup_command=dto.runtime.startup_command,
                 callback_url=dto.runtime.callback_url,
             ),
-            network=SessionV2NetworkInfoGQL(
-                use_host_network=dto.network.use_host_network,
-                network_type=dto.network.network_type,
-                network_id=dto.network.network_id,
+            network=SessionV2NetworkInfoGQL.from_pydantic(
+                SessionNetworkInfo(
+                    use_host_network=dto.network.use_host_network,
+                    network_type=dto.network.network_type,
+                    network_id=dto.network.network_id,
+                )
             ),
         )
 

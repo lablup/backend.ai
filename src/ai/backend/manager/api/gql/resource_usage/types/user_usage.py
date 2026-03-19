@@ -16,6 +16,9 @@ from ai.backend.common.dto.manager.v2.resource_usage.request import (
     UserUsageBucketOrderBy as UserUsageBucketOrderByDTO,
 )
 from ai.backend.common.dto.manager.v2.resource_usage.response import (
+    UsageBucketMetadataNode as UsageBucketMetadataNodeDTO,
+)
+from ai.backend.common.dto.manager.v2.resource_usage.response import (
     UserUsageBucketNode,
 )
 from ai.backend.common.dto.manager.v2.resource_usage.types import (
@@ -116,12 +119,14 @@ class UserUsageBucketGQL(PydanticNodeMixin[UserUsageBucketNode]):
             project_id=data.project_id,
             domain_name=data.domain_name,
             resource_group_name=data.resource_group,
-            metadata=UsageBucketMetadataGQL(
-                period_start=data.period_start,
-                period_end=data.period_end,
-                decay_unit_days=data.decay_unit_days,
-                created_at=data.created_at,
-                updated_at=data.updated_at,
+            metadata=UsageBucketMetadataGQL.from_pydantic(
+                UsageBucketMetadataNodeDTO(
+                    period_start=data.period_start,
+                    period_end=data.period_end,
+                    decay_unit_days=data.decay_unit_days,
+                    created_at=data.created_at,
+                    updated_at=data.updated_at,
+                )
             ),
             resource_usage=ResourceSlotGQL.from_resource_slot(data.resource_usage),
             capacity_snapshot=ResourceSlotGQL.from_resource_slot(data.capacity_snapshot),
@@ -142,12 +147,14 @@ class UserUsageBucketGQL(PydanticNodeMixin[UserUsageBucketNode]):
             project_id=dto.project_id,
             domain_name=dto.domain_name,
             resource_group_name=dto.resource_group,
-            metadata=UsageBucketMetadataGQL(
-                period_start=dto.period_start,
-                period_end=dto.period_end,
-                decay_unit_days=dto.decay_unit_days,
-                created_at=dto.created_at,
-                updated_at=dto.updated_at,
+            metadata=UsageBucketMetadataGQL.from_pydantic(
+                UsageBucketMetadataNodeDTO(
+                    period_start=dto.period_start,
+                    period_end=dto.period_end,
+                    decay_unit_days=dto.decay_unit_days,
+                    created_at=dto.created_at,
+                    updated_at=dto.updated_at,
+                )
             ),
             resource_usage=ResourceSlotGQL.from_resource_slot(dto.resource_usage),
             capacity_snapshot=ResourceSlotGQL.from_resource_slot(dto.capacity_snapshot),

@@ -10,6 +10,12 @@ from strawberry import ID
 from strawberry.relay import Connection, Edge, NodeID
 
 from ai.backend.common.dto.manager.v2.prometheus_query_preset.response import (
+    CreateQueryDefinitionGQLPayload as CreateQueryDefinitionGQLPayloadDTO,
+)
+from ai.backend.common.dto.manager.v2.prometheus_query_preset.response import (
+    ModifyQueryDefinitionGQLPayload as ModifyQueryDefinitionGQLPayloadDTO,
+)
+from ai.backend.common.dto.manager.v2.prometheus_query_preset.response import (
     QueryDefinitionNode,
 )
 from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin
@@ -17,12 +23,6 @@ from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin
 from .payloads import QueryDefinitionOptionsGQL
 
 if TYPE_CHECKING:
-    from ai.backend.common.dto.manager.v2.prometheus_query_preset.response import (
-        CreateQueryDefinitionPayload as CreateQueryDefinitionPayloadDTO,
-    )
-    from ai.backend.common.dto.manager.v2.prometheus_query_preset.response import (
-        ModifyQueryDefinitionPayload as ModifyQueryDefinitionPayloadDTO,
-    )
     from ai.backend.manager.data.prometheus_query_preset import PrometheusQueryPresetData
 
 
@@ -46,15 +46,21 @@ class QueryDefinitionGQL(PydanticNodeMixin[QueryDefinitionNode]):
 
     @classmethod
     def from_data(cls, data: PrometheusQueryPresetData) -> Self:
+        from ai.backend.common.dto.manager.v2.prometheus_query_preset.types import (
+            QueryDefinitionOptionsInfo,
+        )
+
         return cls(
             id=ID(str(data.id)),
             name=data.name,
             metric_name=data.metric_name,
             query_template=data.query_template,
             time_window=data.time_window,
-            options=QueryDefinitionOptionsGQL(
-                filter_labels=data.filter_labels,
-                group_labels=data.group_labels,
+            options=QueryDefinitionOptionsGQL.from_pydantic(
+                QueryDefinitionOptionsInfo(
+                    filter_labels=data.filter_labels,
+                    group_labels=data.group_labels,
+                )
             ),
             created_at=data.created_at,
             updated_at=data.updated_at,
@@ -68,15 +74,21 @@ class QueryDefinitionGQL(PydanticNodeMixin[QueryDefinitionNode]):
         id_field: str = "id",
         extra: dict[str, Any] | None = None,
     ) -> Self:
+        from ai.backend.common.dto.manager.v2.prometheus_query_preset.types import (
+            QueryDefinitionOptionsInfo,
+        )
+
         return cls(
             id=ID(str(dto.id)),
             name=dto.name,
             metric_name=dto.metric_name,
             query_template=dto.query_template,
             time_window=dto.time_window,
-            options=QueryDefinitionOptionsGQL(
-                filter_labels=dto.options.filter_labels,
-                group_labels=dto.options.group_labels,
+            options=QueryDefinitionOptionsGQL.from_pydantic(
+                QueryDefinitionOptionsInfo(
+                    filter_labels=dto.options.filter_labels,
+                    group_labels=dto.options.group_labels,
+                )
             ),
             created_at=dto.created_at,
             updated_at=dto.updated_at,
@@ -99,25 +111,23 @@ class QueryDefinitionConnection(Connection[QueryDefinitionGQL]):
         self.count = count
 
 
-@strawberry.type(
+@strawberry.experimental.pydantic.type(
+    model=CreateQueryDefinitionGQLPayloadDTO,
     name="CreateQueryDefinitionPayload",
     description="Added in 26.3.0. Payload returned after creating a query definition.",
 )
 class CreateQueryDefinitionPayload:
+    """Payload for query definition creation mutation."""
+
     preset: QueryDefinitionGQL
 
-    @classmethod
-    def from_pydantic(cls, dto: CreateQueryDefinitionPayloadDTO) -> Self:
-        return cls(preset=QueryDefinitionGQL.from_pydantic(dto.item))
 
-
-@strawberry.type(
+@strawberry.experimental.pydantic.type(
+    model=ModifyQueryDefinitionGQLPayloadDTO,
     name="ModifyQueryDefinitionPayload",
     description="Added in 26.3.0. Payload returned after modifying a query definition.",
 )
 class ModifyQueryDefinitionPayload:
-    preset: QueryDefinitionGQL
+    """Payload for query definition modification mutation."""
 
-    @classmethod
-    def from_pydantic(cls, dto: ModifyQueryDefinitionPayloadDTO) -> Self:
-        return cls(preset=QueryDefinitionGQL.from_pydantic(dto.item))
+    preset: QueryDefinitionGQL

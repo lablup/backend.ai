@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from collections.abc import Iterable
-from datetime import datetime
 from decimal import Decimal
 from enum import StrEnum
 from typing import Any, Self, assert_never
@@ -26,6 +25,12 @@ from ai.backend.common.dto.manager.v2.resource_group.request import (
 )
 from ai.backend.common.dto.manager.v2.resource_group.request import (
     UpdateResourceGroupFairShareSpecInput as UpdateResourceGroupFairShareSpecInputDTO,
+)
+from ai.backend.common.dto.manager.v2.resource_group.response import (
+    PreemptionConfigInfo,
+    ResourceGroupMetadataInfo,
+    ResourceGroupNetworkConfigInfo,
+    ResourceGroupStatusInfo,
 )
 from ai.backend.common.dto.manager.v2.resource_group.types import (
     ResourceGroupOrderDirection as ResourceGroupOrderDirectionEnum,
@@ -149,32 +154,17 @@ class PreemptionOrderGQL(StrEnum):
                 assert_never(order)
 
 
-@strawberry.type(
+@strawberry.experimental.pydantic.type(
+    model=PreemptionConfigInfo,
     name="PreemptionConfig",
     description="Added in 26.3.0. Preemption configuration for a resource group.",
 )
 class PreemptionConfigGQL:
     """Preemption configuration for GraphQL."""
 
-    preemptible_priority: int = strawberry.field(
-        description=(
-            "Sessions with priority <= this value are eligible for preemption. Default is 5."
-        )
-    )
-    order: PreemptionOrderGQL = strawberry.field(
-        description=(
-            "Tie-breaking order for sessions with the same priority during preemption. "
-            "'oldest' preempts the oldest session first, 'newest' preempts the newest. "
-            "Default is 'oldest'."
-        )
-    )
-    mode: PreemptionModeGQL = strawberry.field(
-        description=(
-            "How to preempt a session when preemption is triggered. "
-            "'terminate' destroys the session, 'reschedule' queues it for rescheduling. "
-            "Default is 'terminate'."
-        )
-    )
+    preemptible_priority: strawberry.auto
+    order: PreemptionOrderGQL
+    mode: PreemptionModeGQL
 
     @classmethod
     def from_dataclass(cls, data: DataPreemptionConfig) -> Self:
@@ -186,49 +176,34 @@ class PreemptionConfigGQL:
         )
 
 
-@strawberry.type(
+@strawberry.experimental.pydantic.type(
+    model=ResourceGroupStatusInfo,
     name="ResourceGroupStatus",
     description="Added in 26.2.0. Status information for a resource group.",
+    all_fields=True,
 )
 class ResourceGroupStatusGQL:
     """Status information for a resource group."""
 
-    is_active: bool = strawberry.field(
-        description="Whether the resource group is active and can accept new sessions."
-    )
-    is_public: bool = strawberry.field(
-        description="Whether the resource group is publicly accessible to all users."
-    )
 
-
-@strawberry.type(
+@strawberry.experimental.pydantic.type(
+    model=ResourceGroupMetadataInfo,
     name="ResourceGroupMetadata",
     description="Added in 26.2.0. Metadata for a resource group.",
+    all_fields=True,
 )
 class ResourceGroupMetadataGQL:
     """Metadata for a resource group."""
 
-    description: str | None = strawberry.field(
-        description="Human-readable description of the resource group."
-    )
-    created_at: datetime = strawberry.field(
-        description="Timestamp when the resource group was created."
-    )
 
-
-@strawberry.type(
+@strawberry.experimental.pydantic.type(
+    model=ResourceGroupNetworkConfigInfo,
     name="ResourceGroupNetworkConfig",
     description="Added in 26.2.0. Network configuration for a resource group.",
+    all_fields=True,
 )
 class ResourceGroupNetworkConfigGQL:
     """Network configuration for a resource group."""
-
-    wsproxy_addr: str | None = strawberry.field(
-        description="WebSocket proxy address for this resource group."
-    )
-    use_host_network: bool = strawberry.field(
-        description="Whether to use host network mode for containers in this resource group."
-    )
 
 
 @strawberry.type(
@@ -409,17 +384,23 @@ class ResourceGroupGQL(PydanticNodeMixin[Any]):
         return cls(
             id=dto.name,
             name=dto.name,
-            status=ResourceGroupStatusGQL(
-                is_active=dto.status.is_active,
-                is_public=dto.status.is_public,
+            status=ResourceGroupStatusGQL.from_pydantic(
+                ResourceGroupStatusInfo(
+                    is_active=dto.status.is_active,
+                    is_public=dto.status.is_public,
+                )
             ),
-            metadata=ResourceGroupMetadataGQL(
-                description=dto.metadata.description if dto.metadata.description else None,
-                created_at=dto.metadata.created_at,
+            metadata=ResourceGroupMetadataGQL.from_pydantic(
+                ResourceGroupMetadataInfo(
+                    description=dto.metadata.description if dto.metadata.description else None,
+                    created_at=dto.metadata.created_at,
+                )
             ),
-            network=ResourceGroupNetworkConfigGQL(
-                wsproxy_addr=dto.network.wsproxy_addr if dto.network.wsproxy_addr else None,
-                use_host_network=dto.network.use_host_network,
+            network=ResourceGroupNetworkConfigGQL.from_pydantic(
+                ResourceGroupNetworkConfigInfo(
+                    wsproxy_addr=dto.network.wsproxy_addr if dto.network.wsproxy_addr else None,
+                    use_host_network=dto.network.use_host_network,
+                )
             ),
             scheduler=ResourceGroupSchedulerConfigGQL(
                 type=SchedulerTypeGQL.from_scheduler_type(dto.scheduler.name),

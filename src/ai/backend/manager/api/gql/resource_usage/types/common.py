@@ -7,30 +7,26 @@ from enum import StrEnum
 
 import strawberry
 
+from ai.backend.common.dto.manager.v2.resource_usage.response import (
+    UsageBucketMetadataNode as UsageBucketMetadataNodeDTO,
+)
 
-@strawberry.type(
+
+@strawberry.experimental.pydantic.type(
+    model=UsageBucketMetadataNodeDTO,
     name="UsageBucketMetadata",
     description=(
         "Added in 26.1.0. Common metadata for usage bucket records including "
         "the measurement period and timestamps."
     ),
+    all_fields=True,
 )
 class UsageBucketMetadataGQL:
-    """Common metadata for usage bucket records."""
-
-    period_start: date = strawberry.field(
-        description="Start date of the usage measurement period (inclusive)."
-    )
-    period_end: date = strawberry.field(
-        description="End date of the usage measurement period (exclusive)."
-    )
-    decay_unit_days: int = strawberry.field(
-        description="Number of days in each decay unit for this bucket."
-    )
-    created_at: datetime = strawberry.field(description="Timestamp when this record was created.")
-    updated_at: datetime = strawberry.field(
-        description="Timestamp when this record was last updated."
-    )
+    period_start: date
+    period_end: date
+    decay_unit_days: int
+    created_at: datetime
+    updated_at: datetime
 
 
 @strawberry.enum(

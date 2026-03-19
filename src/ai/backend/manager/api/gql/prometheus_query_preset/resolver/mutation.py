@@ -10,6 +10,12 @@ from strawberry import ID, Info
 from ai.backend.common.dto.manager.v2.prometheus_query_preset.request import (
     DeleteQueryDefinitionInput as DeleteQueryDefinitionInputDTO,
 )
+from ai.backend.common.dto.manager.v2.prometheus_query_preset.response import (
+    CreateQueryDefinitionGQLPayload as CreateQueryDefinitionGQLPayloadDTO,
+)
+from ai.backend.common.dto.manager.v2.prometheus_query_preset.response import (
+    ModifyQueryDefinitionGQLPayload as ModifyQueryDefinitionGQLPayloadDTO,
+)
 from ai.backend.manager.api.gql.prometheus_query_preset.types import (
     CreateQueryDefinitionInput,
     CreateQueryDefinitionPayload,
@@ -28,7 +34,9 @@ async def admin_create_prometheus_query_preset(
 ) -> CreateQueryDefinitionPayload:
     check_admin_only()
     result = await info.context.adapters.prometheus_query_preset.create(input.to_pydantic())
-    return CreateQueryDefinitionPayload.from_pydantic(result)
+    return CreateQueryDefinitionPayload.from_pydantic(
+        CreateQueryDefinitionGQLPayloadDTO(preset=result.item)
+    )
 
 
 @strawberry.mutation(
@@ -43,7 +51,9 @@ async def admin_modify_prometheus_query_preset(
     result = await info.context.adapters.prometheus_query_preset.update(
         UUID(id), input.to_pydantic()
     )
-    return ModifyQueryDefinitionPayload.from_pydantic(result)
+    return ModifyQueryDefinitionPayload.from_pydantic(
+        ModifyQueryDefinitionGQLPayloadDTO(preset=result.item)
+    )
 
 
 @strawberry.mutation(description="Added in 26.3.0. Delete a query definition (admin only).")  # type: ignore[misc]

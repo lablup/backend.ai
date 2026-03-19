@@ -34,6 +34,7 @@ from ai.backend.common.types import AutoScalingMetricSource
 __all__ = (
     "AccessTokenNode",
     "ActivateDeploymentPayload",
+    "ActivateRevisionPayload",
     "AddRevisionPayload",
     "AdminSearchDeploymentsPayload",
     "AdminSearchRevisionsPayload",
@@ -45,10 +46,12 @@ __all__ = (
     "DeleteDeploymentPayload",
     "DeploymentNode",
     "DeploymentPolicyNode",
+    "DeploymentStatusChangedPayload",
     "ExtraVFolderMountNode",
     "GetAutoScalingRulePayload",
     "GetDeploymentPolicyPayload",
     "ReplicaNode",
+    "ReplicaStatusChangedPayload",
     "RevisionNode",
     "RouteNode",
     "ScaleDeploymentPayload",
@@ -60,6 +63,7 @@ __all__ = (
     "SyncReplicaPayload",
     "UpdateAutoScalingRulePayload",
     "UpdateDeploymentPayload",
+    "UpdateRouteTrafficStatusPayload",
     "UpsertDeploymentPolicyPayload",
 )
 
@@ -328,3 +332,31 @@ class SearchReplicasPayload(BaseResponseModel):
     total_count: int = Field(description="Total count")
     has_next_page: bool = Field(description="Whether a next page exists")
     has_previous_page: bool = Field(description="Whether a previous page exists")
+
+
+class DeploymentStatusChangedPayload(BaseResponseModel):
+    """Payload for deployment status changed subscription event."""
+
+    deployment: DeploymentNode = Field(description="The deployment whose status changed")
+
+
+class ReplicaStatusChangedPayload(BaseResponseModel):
+    """Payload for replica status changed subscription event."""
+
+    replica: ReplicaNode = Field(description="The replica whose status changed")
+
+
+class ActivateRevisionPayload(BaseResponseModel):
+    """Payload for activate revision mutation result."""
+
+    deployment: DeploymentNode = Field(description="The deployment with the activated revision")
+    previous_revision_id: UUID | None = Field(
+        default=None, description="ID of the previously active revision"
+    )
+    activated_revision_id: UUID = Field(description="ID of the newly activated revision")
+
+
+class UpdateRouteTrafficStatusPayload(BaseResponseModel):
+    """Payload for update route traffic status mutation result."""
+
+    route: RouteNode = Field(description="The updated route")

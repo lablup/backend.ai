@@ -18,7 +18,13 @@ from ai.backend.common.dto.manager.v2.vfs_storage.request import (
     UpdateVFSStorageInput as UpdateVFSStorageInputDTO,
 )
 from ai.backend.common.dto.manager.v2.vfs_storage.response import (
+    CreateVFSStoragePayload as CreateVFSStoragePayloadDTO,
+)
+from ai.backend.common.dto.manager.v2.vfs_storage.response import (
     DeleteVFSStoragePayload as DeleteVFSStoragePayloadDTO,
+)
+from ai.backend.common.dto.manager.v2.vfs_storage.response import (
+    UpdateVFSStoragePayload as UpdateVFSStoragePayloadDTO,
 )
 from ai.backend.common.dto.manager.v2.vfs_storage.response import (
     VFSStorageNode,
@@ -147,12 +153,18 @@ class DeleteVFSStorageInput:
     id: ID
 
 
-@strawberry.type(description="Added in 25.16.0. Payload for creating VFS storage")
+@strawberry.experimental.pydantic.type(
+    model=CreateVFSStoragePayloadDTO,
+    description="Added in 25.16.0. Payload for creating VFS storage",
+)
 class CreateVFSStoragePayload:
     vfs_storage: VFSStorage
 
 
-@strawberry.type(description="Added in 25.16.0. Payload for updating VFS storage")
+@strawberry.experimental.pydantic.type(
+    model=UpdateVFSStoragePayloadDTO,
+    description="Added in 25.16.0. Payload for updating VFS storage",
+)
 class UpdateVFSStoragePayload:
     vfs_storage: VFSStorage
 
@@ -173,7 +185,10 @@ async def create_vfs_storage(
     input: CreateVFSStorageInput, info: Info[StrawberryGQLContext]
 ) -> CreateVFSStoragePayload:
     result = await info.context.adapters.vfs_storage.create(input.to_pydantic())
-    return CreateVFSStoragePayload(vfs_storage=VFSStorage.from_pydantic(result.vfs_storage))
+    return CreateVFSStoragePayload.from_pydantic(
+        result,
+        extra={"vfs_storage": VFSStorage.from_pydantic(result.vfs_storage)},
+    )
 
 
 @strawberry.mutation(  # type: ignore[misc]
@@ -183,7 +198,10 @@ async def update_vfs_storage(
     input: UpdateVFSStorageInput, info: Info[StrawberryGQLContext]
 ) -> UpdateVFSStoragePayload:
     result = await info.context.adapters.vfs_storage.update(input.to_pydantic())
-    return UpdateVFSStoragePayload(vfs_storage=VFSStorage.from_pydantic(result.vfs_storage))
+    return UpdateVFSStoragePayload.from_pydantic(
+        result,
+        extra={"vfs_storage": VFSStorage.from_pydantic(result.vfs_storage)},
+    )
 
 
 @strawberry.mutation(name="deleteVFSStorage", description="Added in 25.16.0. Delete a VFS storage")  # type: ignore[misc]

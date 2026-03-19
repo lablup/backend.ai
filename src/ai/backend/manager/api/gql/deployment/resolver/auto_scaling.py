@@ -56,9 +56,7 @@ async def create_auto_scaling_rule(
             )
         )
     )
-    return CreateAutoScalingRulePayload(
-        auto_scaling_rule=AutoScalingRule.from_dataclass(result.data)
-    )
+    return CreateAutoScalingRulePayload(rule=AutoScalingRule.from_dataclass(result.data))
 
 
 @strawberry.mutation(description="Added in 25.16.0")  # type: ignore[misc]
@@ -104,9 +102,7 @@ async def update_auto_scaling_rule(
             ),
         )
     )
-    return UpdateAutoScalingRulePayload(
-        auto_scaling_rule=AutoScalingRule.from_dataclass(action_result.data)
-    )
+    return UpdateAutoScalingRulePayload(rule=AutoScalingRule.from_dataclass(action_result.data))
 
 
 @strawberry.mutation(description="Added in 25.16.0")  # type: ignore[misc]

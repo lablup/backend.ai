@@ -27,7 +27,11 @@ __all__ = (
     "ForgetImagePayload",
     "GetImagePayload",
     "ImageAliasNode",
+    "ImageIdentityInfoDTO",
+    "ImageMetadataInfoDTO",
     "ImageNode",
+    "ImagePermissionInfoDTO",
+    "ImageRequirementsInfoDTO",
     "PurgeImagePayload",
     "RescanImagesPayload",
     "SearchImagesPayload",
@@ -124,3 +128,33 @@ class AdminSearchImageAliasesPayload(BaseResponseModel):
     total_count: int = Field(description="Total number of aliases matching the filter.")
     has_next_page: bool = Field(description="Whether there is a next page.")
     has_previous_page: bool = Field(description="Whether there is a previous page.")
+
+
+class ImageIdentityInfoDTO(BaseResponseModel):
+    """DTO for ImageV2IdentityInfoGQL: identity information for an image."""
+
+    canonical_name: str = Field(description="Full canonical name of the image.")
+    namespace: str = Field(description="Image namespace/path within the registry.")
+    architecture: str = Field(description="CPU architecture.")
+
+
+class ImageMetadataInfoDTO(BaseResponseModel):
+    """DTO for ImageV2MetadataInfoGQL: metadata information for an image."""
+
+    digest: str | None = Field(default=None, description="Config digest for verification.")
+    size_bytes: int = Field(description="Image size in bytes.")
+    created_at: datetime | None = Field(default=None, description="Image creation timestamp.")
+
+
+class ImageRequirementsInfoDTO(BaseResponseModel):
+    """DTO for ImageV2RequirementsInfoGQL: runtime requirements for an image."""
+
+    supported_accelerators: list[str] = Field(
+        default_factory=list, description="List of supported accelerator types."
+    )
+
+
+class ImagePermissionInfoDTO(BaseResponseModel):
+    """DTO for ImageV2PermissionInfoGQL: permission information for an image."""
+
+    pass

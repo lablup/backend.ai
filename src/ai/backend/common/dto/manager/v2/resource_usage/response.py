@@ -11,6 +11,7 @@ from pydantic import Field
 from ai.backend.common.api_handlers import BaseResponseModel
 
 __all__ = (
+    "UsageBucketMetadataNode",
     "DomainUsageBucketNode",
     "ProjectUsageBucketNode",
     "UserUsageBucketNode",
@@ -21,6 +22,18 @@ __all__ = (
     "DomainSearchProjectUsageBucketsPayload",
     "DomainSearchUserUsageBucketsPayload",
 )
+
+
+class UsageBucketMetadataNode(BaseResponseModel):
+    """Common metadata for usage bucket records."""
+
+    period_start: date = Field(
+        description="Start date of the usage measurement period (inclusive)."
+    )
+    period_end: date = Field(description="End date of the usage measurement period (exclusive).")
+    decay_unit_days: int = Field(description="Number of days in each decay unit for this bucket.")
+    created_at: datetime = Field(description="Timestamp when this record was created.")
+    updated_at: datetime = Field(description="Timestamp when this record was last updated.")
 
 
 class DomainUsageBucketNode(BaseResponseModel):

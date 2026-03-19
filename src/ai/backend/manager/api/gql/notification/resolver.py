@@ -496,7 +496,7 @@ async def admin_validate_notification_channel(
 ) -> ValidateNotificationChannelPayload:
     check_admin_only()
     result = await info.context.adapters.notification.validate_channel(input.to_pydantic())
-    return ValidateNotificationChannelPayload(id=ID(str(result.channel_id)))
+    return ValidateNotificationChannelPayload.from_pydantic(result)
 
 
 @strawberry.mutation(  # type: ignore[misc]
@@ -510,7 +510,7 @@ async def validate_notification_channel(
     input: ValidateNotificationChannelInput, info: Info[StrawberryGQLContext]
 ) -> ValidateNotificationChannelPayload:
     result = await info.context.adapters.notification.validate_channel(input.to_pydantic())
-    return ValidateNotificationChannelPayload(id=ID(str(result.channel_id)))
+    return ValidateNotificationChannelPayload.from_pydantic(result)
 
 
 @strawberry.mutation(description="Validate a notification rule (admin only)")  # type: ignore[misc]

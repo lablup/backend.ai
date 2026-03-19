@@ -18,7 +18,16 @@ from ai.backend.common.dto.manager.v2.reservoir_registry.request import (
 from ai.backend.common.dto.manager.v2.reservoir_registry.request import (
     UpdateReservoirRegistryInput as UpdateReservoirRegistryInputDTO,
 )
+from ai.backend.common.dto.manager.v2.reservoir_registry.response import (
+    CreateReservoirRegistryPayload as CreateReservoirRegistryPayloadDTO,
+)
+from ai.backend.common.dto.manager.v2.reservoir_registry.response import (
+    DeleteReservoirRegistryPayload as DeleteReservoirRegistryPayloadDTO,
+)
 from ai.backend.common.dto.manager.v2.reservoir_registry.response import ReservoirRegistryNode
+from ai.backend.common.dto.manager.v2.reservoir_registry.response import (
+    UpdateReservoirRegistryPayload as UpdateReservoirRegistryPayloadDTO,
+)
 from ai.backend.manager.api.gql.artifact_registry_meta import ArtifactRegistryMetaConnection
 from ai.backend.manager.api.gql.base import encode_cursor
 from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin
@@ -178,17 +187,26 @@ class DeleteReservoirRegistryInput:
     id: ID
 
 
-@strawberry.type(description="Added in 25.14.0")
+@strawberry.experimental.pydantic.type(
+    model=CreateReservoirRegistryPayloadDTO,
+    description="Added in 25.14.0",
+)
 class CreateReservoirRegistryPayload:
     reservoir: ReservoirRegistry
 
 
-@strawberry.type(description="Added in 25.14.0")
+@strawberry.experimental.pydantic.type(
+    model=UpdateReservoirRegistryPayloadDTO,
+    description="Added in 25.14.0",
+)
 class UpdateReservoirRegistryPayload:
     reservoir: ReservoirRegistry
 
 
-@strawberry.type(description="Added in 25.14.0")
+@strawberry.experimental.pydantic.type(
+    model=DeleteReservoirRegistryPayloadDTO,
+    description="Added in 25.14.0",
+)
 class DeleteReservoirRegistryPayload:
     id: ID
 
@@ -198,8 +216,9 @@ async def create_reservoir_registry(
     input: CreateReservoirRegistryInput, info: Info[StrawberryGQLContext]
 ) -> CreateReservoirRegistryPayload:
     result = await info.context.adapters.reservoir_registry.create(input.to_pydantic())
-    return CreateReservoirRegistryPayload(
-        reservoir=ReservoirRegistry.from_pydantic(result.registry)
+    return CreateReservoirRegistryPayload.from_pydantic(
+        result,
+        extra={"reservoir": ReservoirRegistry.from_pydantic(result.registry)},
     )
 
 
@@ -208,8 +227,9 @@ async def update_reservoir_registry(
     input: UpdateReservoirRegistryInput, info: Info[StrawberryGQLContext]
 ) -> UpdateReservoirRegistryPayload:
     result = await info.context.adapters.reservoir_registry.update(input.to_pydantic())
-    return UpdateReservoirRegistryPayload(
-        reservoir=ReservoirRegistry.from_pydantic(result.registry)
+    return UpdateReservoirRegistryPayload.from_pydantic(
+        result,
+        extra={"reservoir": ReservoirRegistry.from_pydantic(result.registry)},
     )
 
 
@@ -219,4 +239,7 @@ async def delete_reservoir_registry(
 ) -> DeleteReservoirRegistryPayload:
     pydantic_input = input.to_pydantic()
     result = await info.context.adapters.reservoir_registry.delete(pydantic_input)
-    return DeleteReservoirRegistryPayload(id=ID(str(result.id)))
+    return DeleteReservoirRegistryPayload.from_pydantic(
+        result,
+        extra={"id": ID(str(result.id))},
+    )

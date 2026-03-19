@@ -23,11 +23,15 @@ __all__ = (
     "RestartSessionPayload",
     "SearchSessionsPayload",
     "SessionLifecycleInfo",
+    "SessionLifecycleInfoGQLDTO",
     "SessionMetadataInfo",
+    "SessionMetadataInfoGQLDTO",
     "SessionNetworkInfo",
     "SessionNode",
     "SessionResourceInfo",
+    "SessionResourceInfoGQLDTO",
     "SessionRuntimeInfo",
+    "SessionRuntimeInfoGQLDTO",
     "StartServicePayload",
 )
 
@@ -215,3 +219,107 @@ class AdminSearchSessionsPayload(BaseResponseModel):
     total_count: int = Field(description="Total number of records matching the filter.")
     has_next_page: bool = Field(description="Whether there is a next page.")
     has_previous_page: bool = Field(description="Whether there is a previous page.")
+
+
+# ---------------------------------------------------------------------------
+# GQL-specific DTOs (for @strawberry.experimental.pydantic.type conversion)
+# These DTOs use Any for nested GQL type fields and str for enum fields
+# that are converted at the GQL layer.
+# ---------------------------------------------------------------------------
+
+
+class SessionMetadataInfoGQLDTO(BaseResponseModel):
+    """GQL-specific DTO for SessionV2MetadataInfoGQL.
+
+    session_type and cluster_mode are typed as str; enums are applied at GQL layer.
+    """
+
+    creation_id: str | None = Field(
+        default=None,
+        description="Server-generated unique token for tracking session creation.",
+    )
+    name: str | None = Field(default=None, description="Human-readable name of the session.")
+    session_type: str = Field(description="Type of the session (interactive, batch, inference).")
+    access_key: str | None = Field(
+        default=None, description="Access key used to create this session."
+    )
+    cluster_mode: str = Field(
+        description="Cluster mode for distributed sessions (single-node, multi-node)."
+    )
+    cluster_size: int = Field(description="Number of nodes in the cluster.")
+    priority: int = Field(description="Scheduling priority of the session.")
+    is_preemptible: bool = Field(
+        description="Whether this session is eligible for preemption by higher-priority sessions."
+    )
+    tag: str | None = Field(default=None, description="Optional user-provided tag for the session.")
+
+
+class SessionResourceInfoGQLDTO(BaseResponseModel):
+    """GQL-specific DTO for SessionV2ResourceInfoGQL.
+
+    allocation is typed as Any because it holds a nested GQL type (ResourceAllocationGQL).
+    """
+
+    allocation: Any = Field(
+        description=(
+            "Resource allocation with requested and occupied slots. "
+            "Typed as Any because this field holds a nested GQL type (ResourceAllocationGQL)."
+        )
+    )
+    resource_group_name: str | None = Field(
+        default=None,
+        description="The resource group (scaling group) this session is assigned to.",
+    )
+    target_resource_group_names: list[str] | None = Field(
+        default=None,
+        description="Candidate resource group names considered during scheduling.",
+    )
+
+
+class SessionLifecycleInfoGQLDTO(BaseResponseModel):
+    """GQL-specific DTO for SessionV2LifecycleInfoGQL.
+
+    status and result are typed as str; enum conversion is performed at the GQL layer.
+    """
+
+    status: str = Field(description="Current status of the session.")
+    result: str = Field(description="Result of the session execution (success, failure, etc.).")
+    created_at: datetime | None = Field(
+        default=None, description="Timestamp when the session was created."
+    )
+    terminated_at: datetime | None = Field(
+        default=None,
+        description="Timestamp when the session was terminated. Null if still active.",
+    )
+    starts_at: datetime | None = Field(
+        default=None, description="Scheduled start time for the session, if applicable."
+    )
+    batch_timeout: int | None = Field(
+        default=None,
+        description="Batch execution timeout in seconds. Applicable to batch sessions.",
+    )
+
+
+class SessionRuntimeInfoGQLDTO(BaseResponseModel):
+    """GQL-specific DTO for SessionV2RuntimeInfoGQL.
+
+    environ is typed as Any because it holds a nested GQL type (EnvironmentVariablesGQL).
+    """
+
+    environ: Any = Field(
+        default=None,
+        description=(
+            "Environment variables for the session. "
+            "Typed as Any because this field holds a nested GQL type (EnvironmentVariablesGQL)."
+        ),
+    )
+    bootstrap_script: str | None = Field(
+        default=None, description="Bootstrap script to run before the main process."
+    )
+    startup_command: str | None = Field(
+        default=None, description="Startup command to execute when the session starts."
+    )
+    callback_url: str | None = Field(
+        default=None,
+        description="URL to call back when the session completes (e.g., for batch sessions).",
+    )

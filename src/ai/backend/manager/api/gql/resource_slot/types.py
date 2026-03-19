@@ -40,6 +40,9 @@ from ai.backend.common.dto.manager.v2.resource_slot.types import (
     AgentResourceOrderField as AgentResourceOrderFieldDTO,
 )
 from ai.backend.common.dto.manager.v2.resource_slot.types import (
+    NumberFormatInfo as NumberFormatInfoDTO,
+)
+from ai.backend.common.dto.manager.v2.resource_slot.types import (
     OrderDirection as DtoOrderDirection,
 )
 from ai.backend.common.dto.manager.v2.resource_slot.types import (
@@ -54,7 +57,6 @@ from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.api.gql.utils import dedent_strip
 from ai.backend.manager.data.resource_slot.types import (
     AgentResourceData,
-    NumberFormatData,
     ResourceAllocationData,
     ResourceSlotTypeData,
 )
@@ -125,19 +127,14 @@ async def load_kernel_allocation_data(
 # ========== NumberFormat ==========
 
 
-@strawberry.type(
+@strawberry.experimental.pydantic.type(
+    model=NumberFormatInfoDTO,
     name="NumberFormat",
     description="Added in 26.3.0. Display number format configuration for a resource slot type.",
+    all_fields=True,
 )
 class NumberFormatGQL:
-    binary: bool = strawberry.field(
-        description="Whether to use binary (1024-based) prefix instead of decimal (1000-based)."
-    )
-    round_length: int = strawberry.field(description="Number of decimal places to display.")
-
-    @classmethod
-    def from_data(cls, data: NumberFormatData) -> Self:
-        return cls(binary=data.binary, round_length=data.round_length)
+    pass
 
 
 # ========== ResourceSlotTypeGQL (Node) ==========
@@ -205,7 +202,12 @@ class ResourceSlotTypeGQL(PydanticNodeMixin[Any]):
             description=data.description,
             display_unit=data.display_unit,
             display_icon=data.display_icon,
-            number_format=NumberFormatGQL.from_data(data.number_format),
+            number_format=NumberFormatGQL.from_pydantic(
+                NumberFormatInfoDTO(
+                    binary=data.number_format.binary,
+                    round_length=data.number_format.round_length,
+                )
+            ),
             rank=data.rank,
         )
 

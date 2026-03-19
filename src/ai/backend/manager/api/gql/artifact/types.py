@@ -71,7 +71,13 @@ from ai.backend.common.dto.manager.v2.artifact.request import (
 from ai.backend.common.dto.manager.v2.artifact.request import (
     UpdateArtifactGQLInput as UpdateArtifactGQLInputDTO,
 )
-from ai.backend.common.dto.manager.v2.artifact.response import ArtifactNode, ArtifactRevisionNode
+from ai.backend.common.dto.manager.v2.artifact.response import (
+    ArtifactImportProgressUpdatedGQLPayload,
+    ArtifactNode,
+    ArtifactRevisionNode,
+    ArtifactVerifierMetadataEntryDTO,
+    SourceInfoDTO,
+)
 from ai.backend.common.dto.manager.v2.artifact.types import (
     ArtifactAvailability as ArtifactAvailabilityDTO,
 )
@@ -143,7 +149,8 @@ async def get_registry_url(
     raise ArtifactRegistryNotFoundError(f"Unknown registry type: {registry_type}")
 
 
-@strawberry.type(
+@strawberry.experimental.pydantic.type(
+    model=ArtifactVerifierMetadataEntryDTO,
     name="ArtifactVerifierMetadataEntry",
     description=dedent_strip("""
     Added in 26.1.0.
@@ -151,12 +158,10 @@ async def get_registry_url(
     A single key-value entry representing metadata from an artifact verifier.
     Contains additional information about the verification process.
     """),
+    all_fields=True,
 )
 class ArtifactVerifierMetadataEntryGQL:
-    """Single metadata entry with key and value."""
-
-    key: str = strawberry.field(description="The key identifier for this metadata entry.")
-    value: str = strawberry.field(description="The value for this metadata entry.")
+    pass
 
 
 @strawberry.type(
@@ -178,7 +183,12 @@ class ArtifactVerifierMetadataGQL:
     @classmethod
     def from_mapping(cls, data: Mapping[str, str]) -> ArtifactVerifierMetadataGQL:
         """Convert a Mapping to GraphQL type."""
-        entries = [ArtifactVerifierMetadataEntryGQL(key=k, value=v) for k, v in data.items()]
+        entries = [
+            ArtifactVerifierMetadataEntryGQL.from_pydantic(
+                ArtifactVerifierMetadataEntryDTO(key=k, value=v)
+            )
+            for k, v in data.items()
+        ]
         return cls(entries=entries)
 
 
@@ -211,7 +221,7 @@ class ArtifactVerifierGQLResult:
     )
 
     @classmethod
-    def from_dataclass(cls, data: VerifierResult) -> Self:
+    def from_dataclass(cls, data: VerifierResult) -> ArtifactVerifierGQLResult:
         return cls(
             success=data.success,
             infected_count=data.infected_count,
@@ -240,7 +250,9 @@ class ArtifactVerifierGQLResultEntry:
     )
 
     @classmethod
-    def from_verifier_result(cls, name: str, result: VerifierResult) -> Self:
+    def from_verifier_result(
+        cls, name: str, result: VerifierResult
+    ) -> ArtifactVerifierGQLResultEntry:
         return cls(
             name=name,
             result=ArtifactVerifierGQLResult.from_dataclass(result),
@@ -264,7 +276,7 @@ class ArtifactVerificationGQLResult:
     )
 
     @classmethod
-    def from_dataclass(cls, data: VerificationStepResult) -> Self:
+    def from_dataclass(cls, data: VerificationStepResult) -> ArtifactVerificationGQLResult:
         verifier_entries = [
             ArtifactVerifierGQLResultEntry.from_verifier_result(verifier_name, verifier_result)
             for verifier_name, verifier_result in data.verifiers.items()
@@ -743,18 +755,19 @@ class ScanArtifactModelsInput:
 
 
 # Object Types
-@strawberry.type(
+@strawberry.experimental.pydantic.type(
+    model=SourceInfoDTO,
     description=dedent_strip("""
     Added in 25.14.0.
 
     Information about the source or registry of an artifact.
 
     Contains the name and URL of the registry where the artifact is stored or originates from.
-    """)
+    """),
+    all_fields=True,
 )
 class SourceInfo:
-    name: str | None
-    url: str | None
+    pass
 
 
 @strawberry.type(
@@ -795,8 +808,12 @@ class Artifact(PydanticNodeMixin[ArtifactNode]):
             name=data.name,
             type=ArtifactType(data.type),
             description=data.description,
-            registry=SourceInfo(name=data.registry_type.value, url=registry_url),
-            source=SourceInfo(name=data.source_registry_type.value, url=source_url),
+            registry=SourceInfo.from_pydantic(
+                SourceInfoDTO(name=data.registry_type.value, url=registry_url)
+            ),
+            source=SourceInfo.from_pydantic(
+                SourceInfoDTO(name=data.source_registry_type.value, url=source_url)
+            ),
             readonly=data.readonly,
             extra=data.extra,
             scanned_at=data.scanned_at,
@@ -812,8 +829,12 @@ class Artifact(PydanticNodeMixin[ArtifactNode]):
             name=node.name,
             type=ArtifactType(node.type.value),
             description=node.description,
-            registry=SourceInfo(name=node.registry_type.value, url=registry_url),
-            source=SourceInfo(name=node.source_registry_type.value, url=source_url),
+            registry=SourceInfo.from_pydantic(
+                SourceInfoDTO(name=node.registry_type.value, url=registry_url)
+            ),
+            source=SourceInfo.from_pydantic(
+                SourceInfoDTO(name=node.source_registry_type.value, url=source_url)
+            ),
             readonly=node.readonly,
             extra=node.extra,
             scanned_at=node.scanned_at,
@@ -987,8 +1008,12 @@ def make_artifact_from_node(node: ArtifactNode, registry_url: str, source_url: s
         name=node.name,
         type=ArtifactType(node.type.value),
         description=node.description,
-        registry=SourceInfo(name=node.registry_type.value, url=registry_url),
-        source=SourceInfo(name=node.source_registry_type.value, url=source_url),
+        registry=SourceInfo.from_pydantic(
+            SourceInfoDTO(name=node.registry_type.value, url=registry_url)
+        ),
+        source=SourceInfo.from_pydantic(
+            SourceInfoDTO(name=node.source_registry_type.value, url=source_url)
+        ),
         readonly=node.readonly,
         extra=node.extra,
         scanned_at=node.scanned_at,
@@ -1051,7 +1076,8 @@ class ArtifactRevisionConnection(Connection[ArtifactRevision]):
         self.count = count
 
 
-@strawberry.type(
+@strawberry.experimental.pydantic.type(
+    model=ArtifactImportProgressUpdatedGQLPayload,
     description=dedent_strip("""
     Added in 25.14.0.
 
@@ -1059,12 +1085,12 @@ class ArtifactRevisionConnection(Connection[ArtifactRevision]):
 
     Provides real-time updates during the artifact import process,
     including progress percentage and current status.
-    """)
+    """),
 )
 class ArtifactImportProgressUpdatedPayload:
-    artifact_id: ID
-    progress: float
-    status: ArtifactStatus
+    artifact_id: ID = strawberry.field(description="Artifact revision ID.")
+    progress: float = strawberry.field(description="Import progress as a percentage.")
+    status: ArtifactStatus = strawberry.field(description="Current import status.")
 
 
 @strawberry.type(

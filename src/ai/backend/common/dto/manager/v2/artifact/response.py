@@ -24,18 +24,38 @@ from .types import (
 __all__ = (
     "AdminSearchArtifactRevisionsPayload",
     "AdminSearchArtifactsPayload",
+    "ArtifactImportProgressUpdatedGQLPayload",
     "ArtifactNode",
     "ArtifactRevisionImportTaskInfo",
     "ArtifactRevisionNode",
+    "ArtifactStatusChangedGQLPayload",
+    "ArtifactVerificationGQLResultDTO",
+    "ArtifactVerifierGQLResultDTO",
+    "ArtifactVerifierGQLResultEntryDTO",
+    "ArtifactVerifierMetadataEntryDTO",
+    "ArtifactVerifierMetadataDTO",
+    "ApproveArtifactGQLPayload",
     "ApproveRevisionPayload",
+    "CancelImportArtifactGQLPayload",
     "CancelImportTaskPayload",
+    "CleanupArtifactRevisionsGQLPayload",
     "CleanupRevisionsPayload",
+    "DelegateImportArtifactsGQLPayload",
+    "DelegateScanArtifactsGQLPayload",
+    "DeleteArtifactsGQLPayload",
     "DeleteArtifactsPayload",
     "GetRevisionDownloadProgressPayload",
     "GetRevisionReadmePayload",
     "GetRevisionVerificationResultPayload",
+    "ImportArtifactsGQLPayload",
     "ImportArtifactsPayload",
+    "RejectArtifactGQLPayload",
     "RejectRevisionPayload",
+    "RestoreArtifactsGQLPayload",
+    "ScanArtifactsGQLPayload",
+    "ScanArtifactModelsGQLPayload",
+    "SourceInfoDTO",
+    "UpdateArtifactGQLPayload",
     "UpdateArtifactPayload",
 )
 
@@ -171,3 +191,139 @@ class GetRevisionDownloadProgressPayload(BaseResponseModel):
     download_progress: CombinedDownloadProgress = Field(
         description="Combined local and remote download progress"
     )
+
+
+# ---------------------------------------------------------------------------
+# GQL-level DTOs (for Strawberry pydantic type integration)
+# ---------------------------------------------------------------------------
+
+
+class SourceInfoDTO(BaseResponseModel):
+    """DTO for source/registry info used in GQL Artifact type."""
+
+    name: str | None = Field(default=None, description="Name of the registry or source.")
+    url: str | None = Field(default=None, description="URL of the registry or source.")
+
+
+class ArtifactVerifierMetadataEntryDTO(BaseResponseModel):
+    """DTO for a single key-value verifier metadata entry."""
+
+    key: str = Field(description="The key identifier for this metadata entry.")
+    value: str = Field(description="The value for this metadata entry.")
+
+
+class ArtifactVerifierMetadataDTO(BaseResponseModel):
+    """DTO for verifier metadata containing multiple key-value entries."""
+
+    entries: list[ArtifactVerifierMetadataEntryDTO] = Field(description="List of metadata entries.")
+
+
+class ArtifactVerifierGQLResultDTO(BaseResponseModel):
+    """DTO for a single verifier scan result."""
+
+    success: bool = Field(description="Whether the verification completed successfully.")
+    infected_count: int = Field(description="Number of infected or suspicious files detected.")
+    scanned_at: datetime = Field(description="Timestamp when verification started.")
+    scan_time: float = Field(description="Time taken to complete verification in seconds.")
+    scanned_count: int = Field(description="Total number of files scanned.")
+    error: str | None = Field(
+        default=None, description="Fatal error message if the verifier failed to complete."
+    )
+
+
+class ArtifactVerifierGQLResultEntryDTO(BaseResponseModel):
+    """DTO for associating a verifier name with its scan result."""
+
+    name: str = Field(description="Name of the verifier.")
+
+
+class ArtifactVerificationGQLResultDTO(BaseResponseModel):
+    """DTO for the complete verification result from all verifiers."""
+
+    pass
+
+
+class ArtifactImportProgressUpdatedGQLPayload(BaseResponseModel):
+    """GQL payload for artifact import progress subscription events."""
+
+    artifact_id: UUID = Field(description="Artifact revision ID.")
+    progress: float = Field(description="Import progress as a percentage.")
+    status: str = Field(description="Current import status.")
+
+
+class ArtifactStatusChangedGQLPayload(BaseResponseModel):
+    """GQL payload for artifact status change subscription events."""
+
+    pass
+
+
+class ScanArtifactsGQLPayload(BaseResponseModel):
+    """GQL payload for artifact scanning operations."""
+
+    pass
+
+
+class DelegateScanArtifactsGQLPayload(BaseResponseModel):
+    """GQL payload for delegated artifact scanning operations."""
+
+    pass
+
+
+class ImportArtifactsGQLPayload(BaseResponseModel):
+    """GQL payload for artifact import operations."""
+
+    pass
+
+
+class DelegateImportArtifactsGQLPayload(BaseResponseModel):
+    """GQL payload for delegated artifact import operations."""
+
+    pass
+
+
+class UpdateArtifactGQLPayload(BaseResponseModel):
+    """GQL payload for artifact update operations."""
+
+    pass
+
+
+class CleanupArtifactRevisionsGQLPayload(BaseResponseModel):
+    """GQL payload for artifact revision cleanup operations."""
+
+    pass
+
+
+class ApproveArtifactGQLPayload(BaseResponseModel):
+    """GQL payload for artifact revision approval operations."""
+
+    pass
+
+
+class RejectArtifactGQLPayload(BaseResponseModel):
+    """GQL payload for artifact revision rejection operations."""
+
+    pass
+
+
+class CancelImportArtifactGQLPayload(BaseResponseModel):
+    """GQL payload for canceling artifact import operations."""
+
+    pass
+
+
+class ScanArtifactModelsGQLPayload(BaseResponseModel):
+    """GQL payload for batch model scanning operations."""
+
+    pass
+
+
+class DeleteArtifactsGQLPayload(BaseResponseModel):
+    """GQL payload for artifact deletion operations."""
+
+    pass
+
+
+class RestoreArtifactsGQLPayload(BaseResponseModel):
+    """GQL payload for artifact restoration operations."""
+
+    pass

@@ -59,10 +59,22 @@ from ai.backend.common.dto.manager.v2.deployment.request import (
     UpdateDeploymentInput as UpdateDeploymentInputDTO,
 )
 from ai.backend.common.dto.manager.v2.deployment.response import (
+    CreateDeploymentPayload as CreateDeploymentPayloadDTO,
+)
+from ai.backend.common.dto.manager.v2.deployment.response import (
+    DeleteDeploymentPayload as DeleteDeploymentPayloadDTO,
+)
+from ai.backend.common.dto.manager.v2.deployment.response import (
     DeploymentNode as DeploymentNodeDTO,
 )
 from ai.backend.common.dto.manager.v2.deployment.response import (
+    DeploymentStatusChangedPayload as DeploymentStatusChangedPayloadDTO,
+)
+from ai.backend.common.dto.manager.v2.deployment.response import (
     SyncReplicaPayload as SyncReplicaPayloadDTO,
+)
+from ai.backend.common.dto.manager.v2.deployment.response import (
+    UpdateDeploymentPayload as UpdateDeploymentPayloadDTO,
 )
 from ai.backend.common.dto.manager.v2.deployment.types import (
     DeploymentOrderField as DTODeploymentOrderField,
@@ -617,22 +629,34 @@ class DeploymentOrderBy:
 
 
 # Payload Types
-@strawberry.type(description="Added in 25.19.0")
+@strawberry.experimental.pydantic.type(
+    model=CreateDeploymentPayloadDTO,
+    description="Added in 25.19.0",
+)
 class CreateDeploymentPayload:
     deployment: ModelDeployment
 
 
-@strawberry.type(description="Added in 25.19.0")
+@strawberry.experimental.pydantic.type(
+    model=UpdateDeploymentPayloadDTO,
+    description="Added in 25.19.0",
+)
 class UpdateDeploymentPayload:
     deployment: ModelDeployment
 
 
-@strawberry.type(description="Added in 25.19.0")
+@strawberry.experimental.pydantic.type(
+    model=DeleteDeploymentPayloadDTO,
+    description="Added in 25.19.0",
+)
 class DeleteDeploymentPayload:
     id: ID
 
 
-@strawberry.type(description="Added in 25.19.0")
+@strawberry.experimental.pydantic.type(
+    model=DeploymentStatusChangedPayloadDTO,
+    description="Added in 25.19.0",
+)
 class DeploymentStatusChangedPayload:
     deployment: ModelDeployment
 

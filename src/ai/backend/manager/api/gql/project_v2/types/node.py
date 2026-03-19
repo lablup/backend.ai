@@ -326,18 +326,11 @@ class ProjectV2GQL(PydanticNodeMixin[ProjectNode]):
                 type=ProjectTypeEnum(dto.basic_info.type.value),
                 integration_id=dto.basic_info.integration_id,
             ),
-            organization=ProjectOrganizationInfoGQL(
-                domain_name=dto.organization.domain_name,
-                resource_policy=dto.organization.resource_policy,
-            ),
+            organization=ProjectOrganizationInfoGQL.from_pydantic(dto.organization),
             storage=ProjectStorageInfoGQL(
                 allowed_vfolder_hosts=vfolder_host_entries,
             ),
-            lifecycle=ProjectLifecycleInfoGQL(
-                is_active=dto.lifecycle.is_active,
-                created_at=dto.lifecycle.created_at,
-                modified_at=dto.lifecycle.modified_at,
-            ),
+            lifecycle=ProjectLifecycleInfoGQL.from_pydantic(dto.lifecycle),
         )
 
     @classmethod
@@ -359,6 +352,13 @@ class ProjectV2GQL(PydanticNodeMixin[ProjectNode]):
             - No JSON scalars are used in the output
             - ResourceSlot and container_registry are excluded; use dedicated APIs
         """
+        from ai.backend.common.dto.manager.v2.group.response import (
+            ProjectLifecycleInfo as ProjectLifecycleInfoDTO,
+        )
+        from ai.backend.common.dto.manager.v2.group.response import (
+            ProjectOrganizationInfo as ProjectOrganizationInfoDTO,
+        )
+
         # Convert VFolderHostPermissionMap (dict[str, set[VFolderHostPermission]]) to list of entries
         vfolder_host_entries = [
             VFolderHostPermissionEntryGQL(
@@ -376,17 +376,21 @@ class ProjectV2GQL(PydanticNodeMixin[ProjectNode]):
                 type=ProjectTypeEnum(data.type.value),
                 integration_id=data.integration_id,
             ),
-            organization=ProjectOrganizationInfoGQL(
-                domain_name=data.domain_name,
-                resource_policy=data.resource_policy,
+            organization=ProjectOrganizationInfoGQL.from_pydantic(
+                ProjectOrganizationInfoDTO(
+                    domain_name=data.domain_name,
+                    resource_policy=data.resource_policy,
+                )
             ),
             storage=ProjectStorageInfoGQL(
                 allowed_vfolder_hosts=vfolder_host_entries,
             ),
-            lifecycle=ProjectLifecycleInfoGQL(
-                is_active=data.is_active,
-                created_at=data.created_at,
-                modified_at=data.modified_at,
+            lifecycle=ProjectLifecycleInfoGQL.from_pydantic(
+                ProjectLifecycleInfoDTO(
+                    is_active=data.is_active,
+                    created_at=data.created_at,
+                    modified_at=data.modified_at,
+                )
             ),
         )
 

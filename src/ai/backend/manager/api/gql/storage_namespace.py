@@ -15,6 +15,9 @@ from ai.backend.common.dto.manager.v2.storage_namespace.request import (
     UnregisterStorageNamespaceInput as UnregisterStorageNamespaceInputDTO,
 )
 from ai.backend.common.dto.manager.v2.storage_namespace.response import (
+    RegisterStorageNamespaceGQLPayload as RegisterStorageNamespaceGQLPayloadDTO,
+)
+from ai.backend.common.dto.manager.v2.storage_namespace.response import (
     UnregisterStorageNamespacePayload as UnregisterStorageNamespacePayloadDTO,
 )
 from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin
@@ -105,15 +108,17 @@ class UnregisterStorageNamespaceInput:
     namespace: str
 
 
-@strawberry.type(
+@strawberry.experimental.pydantic.type(
+    model=RegisterStorageNamespaceGQLPayloadDTO,
     description=dedent_strip("""
     Added in 25.15.0.
 
     Payload returned after storage namespace registration.
-    """)
+    """),
+    all_fields=True,
 )
 class RegisterStorageNamespacePayload:
-    id: uuid.UUID
+    pass
 
 
 @strawberry.experimental.pydantic.type(
@@ -140,7 +145,9 @@ async def register_storage_namespace(
     input: RegisterStorageNamespaceInput, info: Info[StrawberryGQLContext]
 ) -> RegisterStorageNamespacePayload:
     payload = await info.context.adapters.storage_namespace.register(input.to_pydantic())
-    return RegisterStorageNamespacePayload(id=payload.namespace.storage_id)
+    return RegisterStorageNamespacePayload.from_pydantic(
+        RegisterStorageNamespaceGQLPayloadDTO(id=payload.namespace.storage_id)
+    )
 
 
 @strawberry.mutation(  # type: ignore[misc]

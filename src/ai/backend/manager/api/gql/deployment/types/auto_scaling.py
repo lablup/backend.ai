@@ -32,6 +32,15 @@ from ai.backend.common.dto.manager.v2.deployment.request import (
 from ai.backend.common.dto.manager.v2.deployment.response import (
     AutoScalingRuleNode as AutoScalingRuleNodeDTO,
 )
+from ai.backend.common.dto.manager.v2.deployment.response import (
+    CreateAutoScalingRulePayload as CreateAutoScalingRulePayloadDTO,
+)
+from ai.backend.common.dto.manager.v2.deployment.response import (
+    DeleteAutoScalingRulePayload as DeleteAutoScalingRulePayloadDTO,
+)
+from ai.backend.common.dto.manager.v2.deployment.response import (
+    UpdateAutoScalingRulePayload as UpdateAutoScalingRulePayloadDTO,
+)
 from ai.backend.common.dto.manager.v2.deployment.types import (
     AutoScalingRuleOrderField as DTOAutoScalingRuleOrderField,
 )
@@ -261,16 +270,22 @@ class DeleteAutoScalingRuleInput:
 
 
 # Payload Types
-@strawberry.type
+@strawberry.experimental.pydantic.type(
+    model=CreateAutoScalingRulePayloadDTO,
+)
 class CreateAutoScalingRulePayload:
-    auto_scaling_rule: AutoScalingRule
+    rule: AutoScalingRule
 
 
-@strawberry.type
+@strawberry.experimental.pydantic.type(
+    model=UpdateAutoScalingRulePayloadDTO,
+)
 class UpdateAutoScalingRulePayload:
-    auto_scaling_rule: AutoScalingRule
+    rule: AutoScalingRule
 
 
-@strawberry.type
+@strawberry.experimental.pydantic.type(
+    model=DeleteAutoScalingRulePayloadDTO,
+)
 class DeleteAutoScalingRulePayload:
     id: ID

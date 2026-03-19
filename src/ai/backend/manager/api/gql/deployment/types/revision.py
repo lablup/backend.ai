@@ -61,6 +61,12 @@ from ai.backend.common.dto.manager.v2.deployment.request import (
     RevisionOrder as RevisionOrderDTO,
 )
 from ai.backend.common.dto.manager.v2.deployment.response import (
+    ActivateRevisionPayload as ActivateRevisionPayloadDTO,
+)
+from ai.backend.common.dto.manager.v2.deployment.response import (
+    AddRevisionPayload as AddRevisionPayloadDTO,
+)
+from ai.backend.common.dto.manager.v2.deployment.response import (
     RevisionNode as RevisionNodeDTO,
 )
 from ai.backend.common.dto.manager.v2.deployment.types import (
@@ -444,7 +450,10 @@ class ModelRevisionOrderBy:
 
 
 # Payload Types
-@strawberry.type(description="Added in 25.19.0")
+@strawberry.experimental.pydantic.type(
+    model=AddRevisionPayloadDTO,
+    description="Added in 25.19.0",
+)
 class AddRevisionPayload:
     revision: ModelRevision
 
@@ -459,7 +468,8 @@ class ActivateRevisionInputGQL:
     revision_id: ID
 
 
-@strawberry.type(
+@strawberry.experimental.pydantic.type(
+    model=ActivateRevisionPayloadDTO,
     name="ActivateRevisionPayload",
     description="Added in 25.19.0. Result of activating a revision.",
 )

@@ -13,7 +13,16 @@ from strawberry import ID, Info
 from strawberry.relay import Connection, Edge, NodeID
 
 from ai.backend.common.dto.manager.v2.kernel.request import KernelFilter, KernelOrder
-from ai.backend.common.dto.manager.v2.kernel.response import KernelNode
+from ai.backend.common.dto.manager.v2.kernel.response import (
+    KernelClusterInfoGQLDTO,
+    KernelLifecycleInfoGQLDTO,
+    KernelNetworkInfoGQLDTO,
+    KernelNode,
+    KernelResourceInfoGQLDTO,
+    KernelSessionInfoGQLDTO,
+    KernelUserInfoGQLDTO,
+    ResourceAllocationGQLDTO,
+)
 from ai.backend.common.dto.manager.v2.kernel.types import (
     KernelOrderField,
     KernelStatusEnum,
@@ -204,7 +213,8 @@ class KernelV2OrderByGQL:
 # ========== Kernel Sub-Info Types ==========
 
 
-@strawberry.type(
+@strawberry.experimental.pydantic.type(
+    model=KernelSessionInfoGQLDTO,
     name="KernelV2SessionInfo",
     description="Added in 26.2.0. Information about the session this kernel belongs to.",
 )
@@ -221,7 +231,8 @@ class KernelV2SessionInfoGQL:
     )
 
 
-@strawberry.type(
+@strawberry.experimental.pydantic.type(
+    model=KernelClusterInfoGQLDTO,
     name="KernelV2ClusterInfo",
     description="Added in 26.2.0. Cluster configuration for a kernel in distributed sessions.",
 )
@@ -240,7 +251,8 @@ class KernelV2ClusterInfoGQL:
     )
 
 
-@strawberry.type(
+@strawberry.experimental.pydantic.type(
+    model=KernelUserInfoGQLDTO,
     name="KernelV2UserInfo",
     description="Added in 26.2.0. User and ownership information for a kernel.",
 )
@@ -257,7 +269,8 @@ class KernelV2UserInfoGQL:
     )
 
 
-@strawberry.type(
+@strawberry.experimental.pydantic.type(
+    model=ResourceAllocationGQLDTO,
     name="ResourceAllocation",
     description="Added in 26.2.0. Resource allocation with requested and used slots.",
 )
@@ -270,7 +283,8 @@ class ResourceAllocationGQL:
     )
 
 
-@strawberry.type(
+@strawberry.experimental.pydantic.type(
+    model=KernelResourceInfoGQLDTO,
     name="KernelV2ResourceInfo",
     description="Added in 26.2.0. Resource allocation information for a kernel.",
 )
@@ -295,7 +309,8 @@ class KernelV2ResourceInfoGQL:
     )
 
 
-@strawberry.type(
+@strawberry.experimental.pydantic.type(
+    model=KernelNetworkInfoGQLDTO,
     name="KernelV2NetworkInfo",
     description="Added in 26.2.0. Network configuration for a kernel.",
 )
@@ -308,7 +323,8 @@ class KernelV2NetworkInfoGQL:
     )
 
 
-@strawberry.type(
+@strawberry.experimental.pydantic.type(
+    model=KernelLifecycleInfoGQLDTO,
     name="KernelV2LifecycleInfo",
     description="Added in 26.2.0. Lifecycle and status information for a kernel.",
 )
@@ -589,21 +605,25 @@ class KernelV2GQL(PydanticNodeMixin[KernelNode]):
                 name=dto.session.name,
                 session_type=SessionTypes(dto.session.session_type),
             ),
-            user_info=KernelV2UserInfoGQL(
-                user_id=dto.user.user_uuid,
-                access_key=dto.user.access_key,
-                domain_name=dto.user.domain_name,
-                group_id=dto.user.group_id,
+            user_info=KernelV2UserInfoGQL.from_pydantic(
+                KernelUserInfoGQLDTO(
+                    user_id=dto.user.user_uuid,
+                    access_key=dto.user.access_key,
+                    domain_name=dto.user.domain_name,
+                    group_id=dto.user.group_id,
+                )
             ),
             network=KernelV2NetworkInfoGQL(
                 service_ports=None,
                 preopen_ports=None,
             ),
-            cluster=KernelV2ClusterInfoGQL(
-                cluster_role=dto.cluster.cluster_role,
-                cluster_idx=dto.cluster.cluster_idx,
-                local_rank=dto.cluster.local_rank,
-                cluster_hostname=dto.cluster.cluster_hostname,
+            cluster=KernelV2ClusterInfoGQL.from_pydantic(
+                KernelClusterInfoGQLDTO(
+                    cluster_role=dto.cluster.cluster_role,
+                    cluster_idx=dto.cluster.cluster_idx,
+                    local_rank=dto.cluster.local_rank,
+                    cluster_hostname=dto.cluster.cluster_hostname,
+                )
             ),
             resource=KernelV2ResourceInfoGQL(
                 agent_id=dto.resource.agent,
@@ -661,21 +681,25 @@ class KernelV2GQL(PydanticNodeMixin[KernelNode]):
                 name=kernel_info.session.name,
                 session_type=SessionTypes(kernel_info.session.session_type),
             ),
-            user_info=KernelV2UserInfoGQL(
-                user_id=kernel_info.user_permission.user_uuid,
-                access_key=kernel_info.user_permission.access_key,
-                domain_name=kernel_info.user_permission.domain_name,
-                group_id=kernel_info.user_permission.group_id,
+            user_info=KernelV2UserInfoGQL.from_pydantic(
+                KernelUserInfoGQLDTO(
+                    user_id=kernel_info.user_permission.user_uuid,
+                    access_key=kernel_info.user_permission.access_key,
+                    domain_name=kernel_info.user_permission.domain_name,
+                    group_id=kernel_info.user_permission.group_id,
+                )
             ),
             network=KernelV2NetworkInfoGQL(
                 service_ports=service_ports,
                 preopen_ports=kernel_info.network.preopen_ports,
             ),
-            cluster=KernelV2ClusterInfoGQL(
-                cluster_role=kernel_info.cluster.cluster_role,
-                cluster_idx=kernel_info.cluster.cluster_idx,
-                local_rank=kernel_info.cluster.local_rank,
-                cluster_hostname=kernel_info.cluster.cluster_hostname,
+            cluster=KernelV2ClusterInfoGQL.from_pydantic(
+                KernelClusterInfoGQLDTO(
+                    cluster_role=kernel_info.cluster.cluster_role,
+                    cluster_idx=kernel_info.cluster.cluster_idx,
+                    local_rank=kernel_info.cluster.local_rank,
+                    cluster_hostname=kernel_info.cluster.cluster_hostname,
+                )
             ),
             resource=KernelV2ResourceInfoGQL(
                 agent_id=kernel_info.resource.agent if not hide_agents else None,

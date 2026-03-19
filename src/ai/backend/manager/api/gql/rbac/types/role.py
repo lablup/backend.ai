@@ -63,6 +63,9 @@ from ai.backend.common.dto.manager.v2.rbac.response import (
     BulkRevokeRoleResultPayload as BulkRevokeRoleResultPayloadDTO,
 )
 from ai.backend.common.dto.manager.v2.rbac.response import (
+    BulkRoleOperationFailureInfo as BulkRoleOperationFailureInfoDTO,
+)
+from ai.backend.common.dto.manager.v2.rbac.response import (
     DeleteRolePayload as DeleteRolePayloadDTO,
 )
 from ai.backend.common.dto.manager.v2.rbac.response import (
@@ -888,13 +891,14 @@ class PurgeRolePayload:
     """Payload for role purge mutation."""
 
 
-@strawberry.type(
+@strawberry.experimental.pydantic.type(
+    model=BulkRoleOperationFailureInfoDTO,
     name="BulkAssignRoleError",
     description="Added in 26.3.0. Error information for a failed user in bulk role assignment.",
+    all_fields=True,
 )
 class BulkAssignRoleErrorGQL:
-    user_id: uuid.UUID = strawberry.field(description="UUID of the user that failed.")
-    message: str = strawberry.field(description="Error message describing the failure.")
+    """Error information for a single user that failed during bulk role assignment."""
 
 
 @strawberry.type(
@@ -913,19 +917,18 @@ class BulkAssignRolePayloadGQL:
     def from_pydantic(cls, dto: BulkAssignRoleResultPayloadDTO) -> Self:
         return cls(
             assigned=[RoleAssignmentGQL.from_pydantic(s) for s in dto.successes],
-            failed=[
-                BulkAssignRoleErrorGQL(user_id=f.user_id, message=f.message) for f in dto.failures
-            ],
+            failed=[BulkAssignRoleErrorGQL.from_pydantic(f) for f in dto.failures],
         )
 
 
-@strawberry.type(
+@strawberry.experimental.pydantic.type(
+    model=BulkRoleOperationFailureInfoDTO,
     name="BulkRevokeRoleError",
     description="Added in 26.3.0. Error information for a failed user in bulk role revocation.",
+    all_fields=True,
 )
 class BulkRevokeRoleErrorGQL:
-    user_id: uuid.UUID = strawberry.field(description="UUID of the user that failed.")
-    message: str = strawberry.field(description="Error message describing the failure.")
+    """Error information for a single user that failed during bulk role revocation."""
 
 
 @strawberry.type(
@@ -944,9 +947,7 @@ class BulkRevokeRolePayloadGQL:
     def from_pydantic(cls, dto: BulkRevokeRoleResultPayloadDTO) -> Self:
         return cls(
             revoked=[RoleAssignmentGQL.from_pydantic(s) for s in dto.successes],
-            failed=[
-                BulkRevokeRoleErrorGQL(user_id=f.user_id, message=f.message) for f in dto.failures
-            ],
+            failed=[BulkRevokeRoleErrorGQL.from_pydantic(f) for f in dto.failures],
         )
 
 

@@ -38,6 +38,9 @@ from ai.backend.common.dto.manager.v2.deployment.request import (
 from ai.backend.common.dto.manager.v2.deployment.response import (
     RouteNode as RouteNodeDTO,
 )
+from ai.backend.common.dto.manager.v2.deployment.response import (
+    UpdateRouteTrafficStatusPayload as UpdateRouteTrafficStatusPayloadDTO,
+)
 from ai.backend.common.dto.manager.v2.deployment.types import (
     OrderDirection as DTOOrderDirection,
 )
@@ -378,9 +381,10 @@ class UpdateRouteTrafficStatusInputGQL:
         )
 
 
-@strawberry.type(
+@strawberry.experimental.pydantic.type(
+    model=UpdateRouteTrafficStatusPayloadDTO,
     name="UpdateRouteTrafficStatusPayload",
     description="Added in 25.19.0. Result of updating route traffic status.",
 )
 class UpdateRouteTrafficStatusPayloadGQL:
-    route: Route = strawberry.field(description="The updated route.")
+    route: Route

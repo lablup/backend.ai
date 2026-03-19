@@ -17,9 +17,12 @@ from ai.backend.common.dto.manager.v2.user.types import UserRole, UserStatus
 __all__ = (
     "AdminSearchUsersPayload",
     "BulkCreateUserV2Error",
+    "BulkCreateUsersPayload",
     "BulkPurgeUserV2Error",
     "BulkPurgeUsersPayload",
     "BulkUpdateUserV2Error",
+    "BulkUpdateUsersPayload",
+    "CreateUserPayload",
     "DeleteUserPayload",
     "DeleteUsersPayload",
     "EntityTimestamps",
@@ -27,6 +30,7 @@ __all__ = (
     "PurgeUsersPayload",
     "SearchUsersPayload",
     "UpdateMyAllowedClientIPPayload",
+    "UpdateUserPayload",
     "UserBasicInfo",
     "UserContainerSettings",
     "UserNode",
@@ -266,6 +270,36 @@ class UpdateMyAllowedClientIPPayload(BaseResponseModel):
     """Payload for updating the current user's allowed client IP list."""
 
     success: bool = Field(description="Whether the update was successful.")
+
+
+class CreateUserPayload(BaseResponseModel):
+    """Payload for single user creation mutation."""
+
+    user: UserNode = Field(description="The newly created user.")
+
+
+class UpdateUserPayload(BaseResponseModel):
+    """Payload for user update mutation."""
+
+    user: UserNode = Field(description="The updated user.")
+
+
+class BulkCreateUsersPayload(BaseResponseModel):
+    """Payload for bulk user creation mutation."""
+
+    created_users: list[UserNode] = Field(description="List of successfully created users.")
+    failed: list[BulkCreateUserV2Error] = Field(
+        description="List of errors for users that failed to create."
+    )
+
+
+class BulkUpdateUsersPayload(BaseResponseModel):
+    """Payload for bulk user update mutation."""
+
+    updated_users: list[UserNode] = Field(description="List of successfully updated users.")
+    failed: list[BulkUpdateUserV2Error] = Field(
+        description="List of errors for users that failed to update."
+    )
 
 
 class AdminSearchUsersPayload(BaseResponseModel):

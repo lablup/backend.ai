@@ -28,6 +28,10 @@ __all__ = (
     "QueryDefinitionMetricResultInfo",
     "QueryDefinitionExecuteDataInfo",
     "ExecuteQueryDefinitionPayload",
+    # GQL-layer sub-models
+    "QueryDefinitionResultInfo",
+    "CreateQueryDefinitionGQLPayload",
+    "ModifyQueryDefinitionGQLPayload",
 )
 
 
@@ -105,3 +109,23 @@ class ExecuteQueryDefinitionPayload(BaseResponseModel):
 
     status: str = Field(description="Prometheus query status (e.g. 'success')")
     data: QueryDefinitionExecuteDataInfo = Field(description="Query execution data")
+
+
+class QueryDefinitionResultInfo(BaseResponseModel):
+    """GQL-layer result DTO for executing a query definition."""
+
+    status: str = Field(description="Prometheus response status.")
+    result_type: str = Field(description="Result type (e.g., matrix).")
+    result: list[QueryDefinitionMetricResultInfo] = Field(description="Metric result entries.")
+
+
+class CreateQueryDefinitionGQLPayload(BaseResponseModel):
+    """GQL-layer payload returned after creating a query definition."""
+
+    preset: QueryDefinitionNode = Field(description="Created query definition.")
+
+
+class ModifyQueryDefinitionGQLPayload(BaseResponseModel):
+    """GQL-layer payload returned after modifying a query definition."""
+
+    preset: QueryDefinitionNode = Field(description="Updated query definition.")

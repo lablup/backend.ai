@@ -12,6 +12,8 @@ from ai.backend.common.api_handlers import BaseResponseModel
 __all__ = (
     "ImageLabelInfo",
     "ImageOrderField",
+    "ImagePermissionType",
+    "ImageResourceLimitGQLInfo",
     "ImageResourceLimitInfo",
     "ImageStatusType",
     "ImageTagInfo",
@@ -70,3 +72,17 @@ class ImageResourceLimitInfo(BaseResponseModel):
     key: str
     min: Decimal
     max: Decimal | None
+
+
+class ImageResourceLimitGQLInfo(BaseResponseModel):
+    """Resource limit definition for GQL type (min/max as str for display)."""
+
+    key: str
+    min: str
+    max: str
+
+
+class ImagePermissionType(BaseResponseModel):
+    """A single permission entry for an image."""
+
+    value: str

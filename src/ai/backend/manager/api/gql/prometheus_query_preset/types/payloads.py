@@ -9,40 +9,51 @@ import strawberry
 from ai.backend.common.dto.manager.v2.prometheus_query_preset.response import (
     DeleteQueryDefinitionPayload as DeleteQueryDefinitionPayloadDTO,
 )
+from ai.backend.common.dto.manager.v2.prometheus_query_preset.response import (
+    QueryDefinitionResultInfo as QueryDefinitionResultInfoDTO,
+)
+from ai.backend.common.dto.manager.v2.prometheus_query_preset.types import (
+    MetricLabelEntryInfo,
+    MetricValueInfo,
+    QueryDefinitionOptionsInfo,
+)
 
 if TYPE_CHECKING:
     from ai.backend.common.dto.clients.prometheus.response import MetricResponse
 
 
-@strawberry.type(
+@strawberry.experimental.pydantic.type(
+    model=QueryDefinitionOptionsInfo,
     name="QueryDefinitionOptions",
     description="Added in 26.3.0. Options for query definition label governance.",
+    all_fields=True,
 )
 class QueryDefinitionOptionsGQL:
-    filter_labels: list[str] = strawberry.field(description="Allowed filter label keys.")
-    group_labels: list[str] = strawberry.field(description="Allowed group-by label keys.")
+    pass
 
 
-@strawberry.type(
+@strawberry.experimental.pydantic.type(
+    model=MetricLabelEntryInfo,
     name="QueryDefinitionMetricLabelEntry",
     description="Added in 26.3.0. Key-value label entry from Prometheus result.",
+    all_fields=True,
 )
 class MetricLabelEntryGQL:
-    key: str
-    value: str
-
     @classmethod
-    def from_metric_dict(cls, metric: dict[str, Any]) -> list[Self]:
-        return [cls(key=k, value=str(v)) for k, v in metric.items()]
+    def from_metric_dict(cls, metric: dict[str, Any]) -> list[MetricLabelEntryGQL]:
+        return [
+            cls.from_pydantic(MetricLabelEntryInfo(key=k, value=str(v))) for k, v in metric.items()
+        ]
 
 
-@strawberry.type(
+@strawberry.experimental.pydantic.type(
+    model=MetricValueInfo,
     name="QueryDefinitionMetricResultValue",
     description="Added in 26.3.0. Single timestamp-value pair from Prometheus.",
+    all_fields=True,
 )
 class MetricResultValueGQL:
-    timestamp: float
-    value: str
+    pass
 
 
 @strawberry.type(
@@ -62,7 +73,8 @@ class MetricResultGQL:
                 metric_response.metric.model_dump(exclude_none=True)
             ),
             values=[
-                MetricResultValueGQL(timestamp=ts, value=val) for ts, val in metric_response.values
+                MetricResultValueGQL.from_pydantic(MetricValueInfo(timestamp=ts, value=val))
+                for ts, val in metric_response.values
             ],
         )
 
@@ -75,6 +87,20 @@ class QueryDefinitionResultGQL:
     status: str = strawberry.field(description="Prometheus response status.")
     result_type: str = strawberry.field(description="Result type (e.g., matrix).")
     result: list[MetricResultGQL] = strawberry.field(description="Metric result entries.")
+
+    @classmethod
+    def from_pydantic(cls, dto: QueryDefinitionResultInfoDTO) -> Self:
+        return cls(
+            status=dto.status,
+            result_type=dto.result_type,
+            result=[
+                MetricResultGQL(
+                    metric=[MetricLabelEntryGQL.from_pydantic(entry) for entry in item.metric],
+                    values=[MetricResultValueGQL.from_pydantic(v) for v in item.values],
+                )
+                for item in dto.result
+            ],
+        )
 
 
 @strawberry.experimental.pydantic.type(

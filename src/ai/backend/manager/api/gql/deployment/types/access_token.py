@@ -23,6 +23,9 @@ from ai.backend.common.dto.manager.v2.deployment.request import (
 from ai.backend.common.dto.manager.v2.deployment.response import (
     AccessTokenNode as AccessTokenNodeDTO,
 )
+from ai.backend.common.dto.manager.v2.deployment.response import (
+    CreateAccessTokenPayload as CreateAccessTokenPayloadDTO,
+)
 from ai.backend.common.dto.manager.v2.deployment.types import (
     AccessTokenOrderField as DTOAccessTokenOrderField,
 )
@@ -159,6 +162,9 @@ class CreateAccessTokenInput:
         )
 
 
-@strawberry.type
+@strawberry.experimental.pydantic.type(
+    model=CreateAccessTokenPayloadDTO,
+    description="Added in 25.16.0",
+)
 class CreateAccessTokenPayload:
     access_token: AccessToken

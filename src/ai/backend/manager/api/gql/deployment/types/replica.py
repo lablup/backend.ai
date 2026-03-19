@@ -33,6 +33,9 @@ from ai.backend.common.dto.manager.v2.deployment.request import (
 from ai.backend.common.dto.manager.v2.deployment.response import (
     ReplicaNode as ReplicaNodeDTO,
 )
+from ai.backend.common.dto.manager.v2.deployment.response import (
+    ReplicaStatusChangedPayload as ReplicaStatusChangedPayloadDTO,
+)
 from ai.backend.common.dto.manager.v2.deployment.types import (
     OrderDirection as DTOOrderDirection,
 )
@@ -309,6 +312,9 @@ class ModelReplicaConnection(Connection[ModelReplica]):
         return cls(count=len(nodes), edges=edges, page_info=page_info)
 
 
-@strawberry.type(description="Added in 25.19.0")
+@strawberry.experimental.pydantic.type(
+    model=ReplicaStatusChangedPayloadDTO,
+    description="Added in 25.19.0",
+)
 class ReplicaStatusChangedPayload:
     replica: ModelReplica

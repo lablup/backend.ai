@@ -97,6 +97,9 @@ from ai.backend.common.dto.manager.v2.notification.response import (
     UpdateNotificationRulePayload as UpdateNotificationRulePayloadDTO,
 )
 from ai.backend.common.dto.manager.v2.notification.response import (
+    ValidateNotificationChannelPayload as ValidateNotificationChannelPayloadDTO,
+)
+from ai.backend.common.dto.manager.v2.notification.response import (
     ValidateNotificationRulePayload as ValidateNotificationRulePayloadDTO,
 )
 from ai.backend.common.dto.manager.v2.notification.types import (
@@ -891,9 +894,13 @@ class ValidateNotificationChannelInput:
         )
 
 
-@strawberry.type(description="Payload for validate notification channel mutation")
+@strawberry.experimental.pydantic.type(
+    model=ValidateNotificationChannelPayloadDTO,
+    description="Payload for validate notification channel mutation",
+    all_fields=True,
+)
 class ValidateNotificationChannelPayload:
-    id: ID
+    """Payload for notification channel validation mutation."""
 
 
 @strawberry.experimental.pydantic.input(

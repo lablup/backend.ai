@@ -13,11 +13,18 @@ from ai.backend.common.api_handlers import BaseResponseModel
 __all__ = (
     "AdminSearchKernelsPayload",
     "KernelClusterInfo",
+    "KernelClusterInfoGQLDTO",
     "KernelLifecycleInfo",
+    "KernelLifecycleInfoGQLDTO",
+    "KernelNetworkInfoGQLDTO",
     "KernelNode",
     "KernelResourceInfo",
+    "KernelResourceInfoGQLDTO",
     "KernelSessionInfo",
+    "KernelSessionInfoGQLDTO",
     "KernelUserInfo",
+    "KernelUserInfoGQLDTO",
+    "ResourceAllocationGQLDTO",
 )
 
 
@@ -160,3 +167,156 @@ class AdminSearchKernelsPayload(BaseResponseModel):
     total_count: int = Field(description="Total number of records matching the filter.")
     has_next_page: bool = Field(description="Whether there is a next page.")
     has_previous_page: bool = Field(description="Whether there is a previous page.")
+
+
+# ---------------------------------------------------------------------------
+# GQL-specific DTOs (for @strawberry.experimental.pydantic.type conversion)
+# These DTOs use Any for nested GQL type fields and str for enum/internal-type
+# fields that are converted at the GQL layer.
+# ---------------------------------------------------------------------------
+
+
+class KernelSessionInfoGQLDTO(BaseResponseModel):
+    """GQL-specific DTO for KernelV2SessionInfoGQL.
+
+    session_type is typed as str; enum (SessionTypes) conversion is done at GQL layer.
+    """
+
+    session_id: UUID = Field(
+        description="The unique identifier of the session this kernel belongs to."
+    )
+    creation_id: str | None = Field(
+        default=None, description="The creation ID used when creating the session."
+    )
+    name: str | None = Field(default=None, description="The name of the session.")
+    session_type: str = Field(
+        description="The type of session (interactive, batch, inference, system)."
+    )
+
+
+class KernelClusterInfoGQLDTO(BaseResponseModel):
+    """GQL-specific DTO for KernelV2ClusterInfoGQL.
+
+    Contains only the fields exposed by KernelV2ClusterInfoGQL (no cluster_mode/cluster_size).
+    """
+
+    cluster_role: str = Field(
+        description="The role of this kernel in the cluster (e.g., main, sub)."
+    )
+    cluster_idx: int = Field(description="The index of this kernel within the cluster (0-based).")
+    local_rank: int = Field(description="The local rank of this kernel for distributed computing.")
+    cluster_hostname: str = Field(
+        description="The hostname assigned to this kernel within the cluster network."
+    )
+
+
+class KernelUserInfoGQLDTO(BaseResponseModel):
+    """GQL-specific DTO for KernelV2UserInfoGQL.
+
+    user_id maps to user_uuid in KernelUserInfo.
+    """
+
+    user_id: UUID | None = Field(
+        default=None, description="The UUID of the user who owns this kernel."
+    )
+    access_key: str | None = Field(
+        default=None, description="The access key used to create this kernel."
+    )
+    domain_name: str | None = Field(default=None, description="The domain this kernel belongs to.")
+    group_id: UUID | None = Field(
+        default=None, description="The group (project) ID this kernel belongs to."
+    )
+
+
+class ResourceAllocationGQLDTO(BaseResponseModel):
+    """GQL-specific DTO for ResourceAllocationGQL.
+
+    requested and used are typed as Any because they hold nested GQL types (ResourceSlotGQL).
+    """
+
+    requested: Any = Field(
+        description=(
+            "The resource slots originally requested. "
+            "Typed as Any because this field holds a nested GQL type (ResourceSlotGQL)."
+        )
+    )
+    used: Any = Field(
+        default=None,
+        description=(
+            "The resource slots currently used. "
+            "Typed as Any because this field holds a nested GQL type (ResourceSlotGQL)."
+        ),
+    )
+
+
+class KernelResourceInfoGQLDTO(BaseResponseModel):
+    """GQL-specific DTO for KernelV2ResourceInfoGQL.
+
+    allocation, shares, and resource_opts are typed as Any because they hold nested GQL types.
+    """
+
+    agent_id: str | None = Field(
+        default=None,
+        description="The ID of the agent running this kernel. Null if not yet assigned or hidden.",
+    )
+    resource_group_name: str | None = Field(
+        default=None,
+        description="The resource group (scaling group) this kernel is assigned to.",
+    )
+    container_id: str | None = Field(default=None, description="The container ID on the agent.")
+    allocation: Any = Field(
+        description=(
+            "Resource allocation with requested and used slots. "
+            "Typed as Any because this field holds a nested GQL type (ResourceAllocationGQL)."
+        )
+    )
+    shares: Any = Field(
+        description=(
+            "The fractional resource shares occupied by this kernel. "
+            "Typed as Any because this field holds a nested GQL type (ResourceSlotGQL)."
+        )
+    )
+    resource_opts: Any = Field(
+        default=None,
+        description=(
+            "Additional resource options and configurations. "
+            "Typed as Any because this field holds a nested GQL type (ResourceOptsGQL)."
+        ),
+    )
+
+
+class KernelNetworkInfoGQLDTO(BaseResponseModel):
+    """GQL-specific DTO for KernelV2NetworkInfoGQL.
+
+    service_ports is typed as Any because it holds a nested GQL type (ServicePortsGQL).
+    """
+
+    service_ports: Any = Field(
+        default=None,
+        description=(
+            "Collection of service ports exposed by this kernel. "
+            "Typed as Any because this field holds a nested GQL type (ServicePortsGQL)."
+        ),
+    )
+    preopen_ports: list[int] | None = Field(
+        default=None, description="List of ports that are pre-opened for this kernel."
+    )
+
+
+class KernelLifecycleInfoGQLDTO(BaseResponseModel):
+    """GQL-specific DTO for KernelV2LifecycleInfoGQL.
+
+    status and result are typed as str; enum conversion is done at the GQL layer.
+    """
+
+    status: str = Field(description="Current status of the kernel.")
+    result: str = Field(description="The result of the kernel execution.")
+    created_at: datetime | None = Field(
+        default=None, description="Timestamp when the kernel was created."
+    )
+    terminated_at: datetime | None = Field(
+        default=None, description="Timestamp when the kernel was terminated."
+    )
+    starts_at: datetime | None = Field(
+        default=None, description="Scheduled start time for the kernel, if applicable."
+    )

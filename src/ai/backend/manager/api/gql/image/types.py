@@ -27,12 +27,22 @@ from ai.backend.common.dto.manager.v2.image.request import (
     ImageScopeInputDTO,
     ImageStatusFilterInputDTO,
 )
-from ai.backend.common.dto.manager.v2.image.response import ImageAliasNode, ImageNode
-from ai.backend.common.dto.manager.v2.image.types import (
-    ImageOrderField as ImageOrderFieldDTO,
+from ai.backend.common.dto.manager.v2.image.response import (
+    ImageAliasNode,
+    ImageIdentityInfoDTO,
+    ImageMetadataInfoDTO,
+    ImageNode,
+    ImagePermissionInfoDTO,
+    ImageRequirementsInfoDTO,
 )
 from ai.backend.common.dto.manager.v2.image.types import (
+    ImageLabelInfo,
+    ImageResourceLimitGQLInfo,
     ImageStatusType,
+    ImageTagInfo,
+)
+from ai.backend.common.dto.manager.v2.image.types import (
+    ImageOrderField as ImageOrderFieldDTO,
 )
 from ai.backend.common.dto.manager.v2.image.types import (
     OrderDirection as OrderDirectionDTO,
@@ -53,7 +63,6 @@ from ai.backend.manager.data.image.types import (
     ImageData,
     ImageDataWithDetails,
     ImageStatus,
-    ResourceLimit,
 )
 from ai.backend.manager.models.image.conditions import ImageAliasConditions
 from ai.backend.manager.models.rbac.permission_defs import ImagePermission
@@ -104,7 +113,8 @@ class ImageV2PermissionGQL(enum.Enum):
 # =============================================================================
 
 
-@strawberry.type(
+@strawberry.experimental.pydantic.type(
+    model=ImageLabelInfo,
     name="ImageV2LabelEntry",
     description=dedent_strip("""
     Added in 26.2.0.
@@ -112,17 +122,14 @@ class ImageV2PermissionGQL(enum.Enum):
     A key-value pair representing a Docker label on the image.
     Labels contain metadata about the image such as maintainer, version, etc.
     """),
+    all_fields=True,
 )
 class ImageV2LabelEntryGQL:
-    key: str = strawberry.field(description="The label key (e.g., 'maintainer').")
-    value: str = strawberry.field(description="The label value.")
-
-    @classmethod
-    def from_dict_item(cls, key: str, value: str) -> Self:
-        return cls(key=key, value=value)
+    pass
 
 
-@strawberry.type(
+@strawberry.experimental.pydantic.type(
+    model=ImageResourceLimitGQLInfo,
     name="ImageV2ResourceLimit",
     description=dedent_strip("""
     Added in 26.2.0.
@@ -130,24 +137,14 @@ class ImageV2LabelEntryGQL:
     Resource limit specification for an image.
     Defines minimum and maximum values for a resource slot.
     """),
+    all_fields=True,
 )
 class ImageV2ResourceLimitGQL:
-    key: str = strawberry.field(
-        description="Resource slot name (e.g., 'cpu', 'mem', 'cuda.shares')."
-    )
-    min: str = strawberry.field(description="Minimum required amount.")
-    max: str = strawberry.field(description="Maximum allowed amount.")
-
-    @classmethod
-    def from_data(cls, data: ResourceLimit) -> Self:
-        return cls(
-            key=data.key,
-            min=str(data.min),
-            max=str(data.max),
-        )
+    pass
 
 
-@strawberry.type(
+@strawberry.experimental.pydantic.type(
+    model=ImageTagInfo,
     name="ImageV2TagEntry",
     description=dedent_strip("""
     Added in 26.2.0.
@@ -155,14 +152,10 @@ class ImageV2ResourceLimitGQL:
     A key-value pair representing a parsed tag component.
     Tags are extracted from the image reference (e.g., py311, cuda12.1).
     """),
+    all_fields=True,
 )
 class ImageV2TagEntryGQL:
-    key: str = strawberry.field(description="The tag key (e.g., 'python', 'cuda').")
-    value: str = strawberry.field(description="The tag value (e.g., '3.11', '12.1').")
-
-    @classmethod
-    def from_dict_item(cls, key: str, value: str) -> Self:
-        return cls(key=key, value=value)
+    pass
 
 
 @strawberry.type(
@@ -212,7 +205,8 @@ class ImageV2AliasGQL(PydanticNodeMixin[ImageAliasNode]):
 # =============================================================================
 
 
-@strawberry.type(
+@strawberry.experimental.pydantic.type(
+    model=ImageIdentityInfoDTO,
     name="ImageV2IdentityInfo",
     description=dedent_strip("""
     Added in 26.2.0.
@@ -220,36 +214,14 @@ class ImageV2AliasGQL(PydanticNodeMixin[ImageAliasNode]):
     Identity information for an image.
     Contains the canonical name, namespace, and architecture.
     """),
+    all_fields=True,
 )
 class ImageV2IdentityInfoGQL:
-    canonical_name: str = strawberry.field(
-        description="Full canonical name (e.g., 'cr.backend.ai/stable/python:3.9')."
-    )
-    namespace: str = strawberry.field(
-        description="Image namespace/path within the registry (e.g., 'stable/python')."
-    )
-    architecture: str = strawberry.field(
-        description="CPU architecture (e.g., 'x86_64', 'aarch64')."
-    )
-
-    @classmethod
-    def from_data(cls, data: ImageData) -> Self:
-        return cls(
-            canonical_name=str(data.name),
-            namespace=data.image,
-            architecture=data.architecture,
-        )
-
-    @classmethod
-    def from_detailed_data(cls, data: ImageDataWithDetails) -> Self:
-        return cls(
-            canonical_name=str(data.name),
-            namespace=data.namespace,
-            architecture=data.architecture,
-        )
+    pass
 
 
-@strawberry.type(
+@strawberry.experimental.pydantic.type(
+    model=ImageMetadataInfoDTO,
     name="ImageV2MetadataInfo",
     description=dedent_strip("""
     Added in 26.2.0.
@@ -259,45 +231,22 @@ class ImageV2IdentityInfoGQL:
     """),
 )
 class ImageV2MetadataInfoGQL:
-    tags: list[ImageV2TagEntryGQL] = strawberry.field(
-        description="Parsed tag components from the image reference (e.g., python=3.11, cuda=12.1)."
-    )
-    labels: list[ImageV2LabelEntryGQL] = strawberry.field(description="Docker labels.")
     digest: str | None = strawberry.field(
         description="Config digest (image hash) for verification."
     )
     size_bytes: int = strawberry.field(description="Image size in bytes.")
-    status: ImageV2StatusGQL = strawberry.field(description="Image status (ALIVE or DELETED).")
     created_at: datetime | None = strawberry.field(
         description="Timestamp when the image was created/registered."
     )
-
-    @classmethod
-    def from_data(cls, data: ImageData) -> Self:
-        return cls(
-            tags=[ImageV2TagEntryGQL.from_dict_item(entry.key, entry.value) for entry in data.tags],
-            labels=[
-                ImageV2LabelEntryGQL.from_dict_item(k, v) for k, v in data.labels.label_data.items()
-            ],
-            digest=data.config_digest,
-            size_bytes=data.size_bytes,
-            status=ImageV2StatusGQL.from_data(data.status),
-            created_at=data.created_at,
-        )
-
-    @classmethod
-    def from_detailed_data(cls, data: ImageDataWithDetails) -> Self:
-        return cls(
-            tags=[ImageV2TagEntryGQL.from_dict_item(kv.key, kv.value) for kv in data.tags],
-            labels=[ImageV2LabelEntryGQL.from_dict_item(kv.key, kv.value) for kv in data.labels],
-            digest=data.digest,
-            size_bytes=data.size_bytes,
-            status=ImageV2StatusGQL.from_data(data.status),
-            created_at=data.created_at,
-        )
+    tags: list[ImageV2TagEntryGQL] = strawberry.field(
+        description="Parsed tag components from the image reference (e.g., python=3.11, cuda=12.1)."
+    )
+    labels: list[ImageV2LabelEntryGQL] = strawberry.field(description="Docker labels.")
+    status: ImageV2StatusGQL = strawberry.field(description="Image status (ALIVE or DELETED).")
 
 
-@strawberry.type(
+@strawberry.experimental.pydantic.type(
+    model=ImageRequirementsInfoDTO,
     name="ImageV2RequirementsInfo",
     description=dedent_strip("""
     Added in 26.2.0.
@@ -307,30 +256,16 @@ class ImageV2MetadataInfoGQL:
     """),
 )
 class ImageV2RequirementsInfoGQL:
-    resource_limits: list[ImageV2ResourceLimitGQL] = strawberry.field(
-        description="Resource slot limits (cpu, memory, accelerators, etc.)."
-    )
     supported_accelerators: list[str] = strawberry.field(
         description="List of supported accelerator types (e.g., 'cuda', 'rocm')."
     )
-
-    @classmethod
-    def from_data(cls, data: ImageData) -> Self:
-        accelerators = data.accelerators.split(",") if data.accelerators else []
-        return cls(
-            resource_limits=[ImageV2ResourceLimitGQL.from_data(rl) for rl in data.resource_limits],
-            supported_accelerators=[a.strip() for a in accelerators if a.strip()],
-        )
-
-    @classmethod
-    def from_detailed_data(cls, data: ImageDataWithDetails) -> Self:
-        return cls(
-            resource_limits=[ImageV2ResourceLimitGQL.from_data(rl) for rl in data.resource_limits],
-            supported_accelerators=[a.strip() for a in data.supported_accelerators if a.strip()],
-        )
+    resource_limits: list[ImageV2ResourceLimitGQL] = strawberry.field(
+        description="Resource slot limits (cpu, memory, accelerators, etc.)."
+    )
 
 
-@strawberry.type(
+@strawberry.experimental.pydantic.type(
+    model=ImagePermissionInfoDTO,
     name="ImageV2PermissionInfo",
     description=dedent_strip("""
     Added in 26.2.0.
@@ -343,10 +278,6 @@ class ImageV2PermissionInfoGQL:
     permissions: list[ImageV2PermissionGQL] = strawberry.field(
         description="List of permissions the user has on this image."
     )
-
-    @classmethod
-    def from_permissions(cls, permissions: list[ImagePermission]) -> Self:
-        return cls(permissions=[ImageV2PermissionGQL.from_data(p) for p in permissions])
 
 
 # =============================================================================
@@ -477,29 +408,49 @@ class ImageV2GQL(PydanticNodeMixin[ImageNode]):
         return cls(
             id=dto.id,
             _image_id=image_id,
-            identity=ImageV2IdentityInfoGQL(
-                canonical_name=dto.name,
-                namespace=dto.image,
-                architecture=dto.architecture,
+            identity=ImageV2IdentityInfoGQL.from_pydantic(
+                ImageIdentityInfoDTO(
+                    canonical_name=dto.name,
+                    namespace=dto.image,
+                    architecture=dto.architecture,
+                )
             ),
-            metadata=ImageV2MetadataInfoGQL(
-                tags=[ImageV2TagEntryGQL(key=t.key, value=t.value) for t in dto.tags],
-                labels=[ImageV2LabelEntryGQL(key=lb.key, value=lb.value) for lb in dto.labels],
-                digest=dto.config_digest,
-                size_bytes=dto.size_bytes,
-                status=ImageV2StatusGQL(dto.status.value),
-                created_at=dto.created_at,
+            metadata=ImageV2MetadataInfoGQL.from_pydantic(
+                ImageMetadataInfoDTO(
+                    digest=dto.config_digest,
+                    size_bytes=dto.size_bytes,
+                    created_at=dto.created_at,
+                ),
+                extra={
+                    "tags": [
+                        ImageV2TagEntryGQL.from_pydantic(ImageTagInfo(key=t.key, value=t.value))
+                        for t in dto.tags
+                    ],
+                    "labels": [
+                        ImageV2LabelEntryGQL.from_pydantic(
+                            ImageLabelInfo(key=lb.key, value=lb.value)
+                        )
+                        for lb in dto.labels
+                    ],
+                    "status": ImageV2StatusGQL(dto.status.value),
+                },
             ),
-            requirements=ImageV2RequirementsInfoGQL(
-                resource_limits=[
-                    ImageV2ResourceLimitGQL(
-                        key=rl.key,
-                        min=str(rl.min),
-                        max=str(rl.max) if rl.max is not None else "Infinity",
-                    )
-                    for rl in dto.resource_limits
-                ],
-                supported_accelerators=[a.strip() for a in accelerators if a.strip()],
+            requirements=ImageV2RequirementsInfoGQL.from_pydantic(
+                ImageRequirementsInfoDTO(
+                    supported_accelerators=[a.strip() for a in accelerators if a.strip()],
+                ),
+                extra={
+                    "resource_limits": [
+                        ImageV2ResourceLimitGQL.from_pydantic(
+                            ImageResourceLimitGQLInfo(
+                                key=rl.key,
+                                min=str(rl.min),
+                                max=str(rl.max) if rl.max is not None else "Infinity",
+                            )
+                        )
+                        for rl in dto.resource_limits
+                    ],
+                },
             ),
             permission=None,
             registry_id=dto.registry_id,
@@ -520,13 +471,60 @@ class ImageV2GQL(PydanticNodeMixin[ImageNode]):
         Returns:
             ImageV2GQL instance.
         """
+        accelerators = data.accelerators.split(",") if data.accelerators else []
         return cls(
             id=data.id,
             _image_id=data.id,
-            identity=ImageV2IdentityInfoGQL.from_data(data),
-            metadata=ImageV2MetadataInfoGQL.from_data(data),
-            requirements=ImageV2RequirementsInfoGQL.from_data(data),
-            permission=ImageV2PermissionInfoGQL.from_permissions(permissions)
+            identity=ImageV2IdentityInfoGQL.from_pydantic(
+                ImageIdentityInfoDTO(
+                    canonical_name=str(data.name),
+                    namespace=data.image,
+                    architecture=data.architecture,
+                )
+            ),
+            metadata=ImageV2MetadataInfoGQL.from_pydantic(
+                ImageMetadataInfoDTO(
+                    digest=data.config_digest,
+                    size_bytes=data.size_bytes,
+                    created_at=data.created_at,
+                ),
+                extra={
+                    "tags": [
+                        ImageV2TagEntryGQL.from_pydantic(
+                            ImageTagInfo(key=entry.key, value=entry.value)
+                        )
+                        for entry in data.tags
+                    ],
+                    "labels": [
+                        ImageV2LabelEntryGQL.from_pydantic(ImageLabelInfo(key=k, value=v))
+                        for k, v in data.labels.label_data.items()
+                    ],
+                    "status": ImageV2StatusGQL.from_data(data.status),
+                },
+            ),
+            requirements=ImageV2RequirementsInfoGQL.from_pydantic(
+                ImageRequirementsInfoDTO(
+                    supported_accelerators=[a.strip() for a in accelerators if a.strip()],
+                ),
+                extra={
+                    "resource_limits": [
+                        ImageV2ResourceLimitGQL.from_pydantic(
+                            ImageResourceLimitGQLInfo(
+                                key=rl.key,
+                                min=str(rl.min),
+                                max=str(rl.max),
+                            )
+                        )
+                        for rl in data.resource_limits
+                    ],
+                },
+            ),
+            permission=ImageV2PermissionInfoGQL.from_pydantic(
+                ImagePermissionInfoDTO(),
+                extra={
+                    "permissions": [ImageV2PermissionGQL.from_data(p) for p in permissions],
+                },
+            )
             if permissions
             else None,
             registry_id=data.registry_id,
@@ -550,10 +548,58 @@ class ImageV2GQL(PydanticNodeMixin[ImageNode]):
         return cls(
             id=data.id,
             _image_id=data.id,
-            identity=ImageV2IdentityInfoGQL.from_detailed_data(data),
-            metadata=ImageV2MetadataInfoGQL.from_detailed_data(data),
-            requirements=ImageV2RequirementsInfoGQL.from_detailed_data(data),
-            permission=ImageV2PermissionInfoGQL.from_permissions(permissions)
+            identity=ImageV2IdentityInfoGQL.from_pydantic(
+                ImageIdentityInfoDTO(
+                    canonical_name=str(data.name),
+                    namespace=data.namespace,
+                    architecture=data.architecture,
+                )
+            ),
+            metadata=ImageV2MetadataInfoGQL.from_pydantic(
+                ImageMetadataInfoDTO(
+                    digest=data.digest,
+                    size_bytes=data.size_bytes,
+                    created_at=data.created_at,
+                ),
+                extra={
+                    "tags": [
+                        ImageV2TagEntryGQL.from_pydantic(ImageTagInfo(key=kv.key, value=kv.value))
+                        for kv in data.tags
+                    ],
+                    "labels": [
+                        ImageV2LabelEntryGQL.from_pydantic(
+                            ImageLabelInfo(key=kv.key, value=kv.value)
+                        )
+                        for kv in data.labels
+                    ],
+                    "status": ImageV2StatusGQL.from_data(data.status),
+                },
+            ),
+            requirements=ImageV2RequirementsInfoGQL.from_pydantic(
+                ImageRequirementsInfoDTO(
+                    supported_accelerators=[
+                        a.strip() for a in data.supported_accelerators if a.strip()
+                    ],
+                ),
+                extra={
+                    "resource_limits": [
+                        ImageV2ResourceLimitGQL.from_pydantic(
+                            ImageResourceLimitGQLInfo(
+                                key=rl.key,
+                                min=str(rl.min),
+                                max=str(rl.max),
+                            )
+                        )
+                        for rl in data.resource_limits
+                    ],
+                },
+            ),
+            permission=ImageV2PermissionInfoGQL.from_pydantic(
+                ImagePermissionInfoDTO(),
+                extra={
+                    "permissions": [ImageV2PermissionGQL.from_data(p) for p in permissions],
+                },
+            )
             if permissions
             else None,
             registry_id=data.registry_id,

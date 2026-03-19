@@ -29,6 +29,12 @@ from ai.backend.common.dto.manager.v2.object_storage.request import (
     UpdateObjectStorageInput as UpdateObjectStorageInputDTO,
 )
 from ai.backend.common.dto.manager.v2.object_storage.response import (
+    CreateObjectStoragePayload as CreateObjectStoragePayloadDTO,
+)
+from ai.backend.common.dto.manager.v2.object_storage.response import (
+    DeleteObjectStoragePayload as DeleteObjectStoragePayloadDTO,
+)
+from ai.backend.common.dto.manager.v2.object_storage.response import (
     ObjectStorageNode,
 )
 from ai.backend.common.dto.manager.v2.object_storage.response import (
@@ -36,6 +42,9 @@ from ai.backend.common.dto.manager.v2.object_storage.response import (
 )
 from ai.backend.common.dto.manager.v2.object_storage.response import (
     PresignedUploadURLPayload as PresignedUploadURLPayloadDTO,
+)
+from ai.backend.common.dto.manager.v2.object_storage.response import (
+    UpdateObjectStoragePayload as UpdateObjectStoragePayloadDTO,
 )
 from ai.backend.manager.api.gql.base import encode_cursor
 from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin
@@ -235,19 +244,29 @@ class GetPresignedUploadURLInput:
     key: str
 
 
-@strawberry.type(description="Added in 25.14.0")
+@strawberry.experimental.pydantic.type(
+    model=CreateObjectStoragePayloadDTO,
+    description="Added in 25.14.0",
+)
 class CreateObjectStoragePayload:
     object_storage: ObjectStorage
 
 
-@strawberry.type(description="Added in 25.14.0")
+@strawberry.experimental.pydantic.type(
+    model=UpdateObjectStoragePayloadDTO,
+    description="Added in 25.14.0",
+)
 class UpdateObjectStoragePayload:
     object_storage: ObjectStorage
 
 
-@strawberry.type(description="Added in 25.14.0")
+@strawberry.experimental.pydantic.type(
+    model=DeleteObjectStoragePayloadDTO,
+    description="Added in 25.14.0",
+    all_fields=True,
+)
 class DeleteObjectStoragePayload:
-    id: ID
+    pass
 
 
 @strawberry.experimental.pydantic.type(
@@ -275,10 +294,13 @@ async def create_object_storage(
     input: CreateObjectStorageInput, info: Info[StrawberryGQLContext]
 ) -> CreateObjectStoragePayload:
     result = await info.context.adapters.object_storage.create(input.to_pydantic())
-    return CreateObjectStoragePayload(
-        object_storage=ObjectStorage.from_pydantic(
-            result.object_storage, extra={"region": result.object_storage.region or ""}
-        )
+    return CreateObjectStoragePayload.from_pydantic(
+        result,
+        extra={
+            "object_storage": ObjectStorage.from_pydantic(
+                result.object_storage, extra={"region": result.object_storage.region or ""}
+            )
+        },
     )
 
 
@@ -287,10 +309,13 @@ async def update_object_storage(
     input: UpdateObjectStorageInput, info: Info[StrawberryGQLContext]
 ) -> UpdateObjectStoragePayload:
     result = await info.context.adapters.object_storage.update(input.to_pydantic())
-    return UpdateObjectStoragePayload(
-        object_storage=ObjectStorage.from_pydantic(
-            result.object_storage, extra={"region": result.object_storage.region or ""}
-        )
+    return UpdateObjectStoragePayload.from_pydantic(
+        result,
+        extra={
+            "object_storage": ObjectStorage.from_pydantic(
+                result.object_storage, extra={"region": result.object_storage.region or ""}
+            )
+        },
     )
 
 
@@ -300,7 +325,7 @@ async def delete_object_storage(
 ) -> DeleteObjectStoragePayload:
     pydantic_input = input.to_pydantic()
     result = await info.context.adapters.object_storage.delete(pydantic_input)
-    return DeleteObjectStoragePayload(id=ID(str(result.id)))
+    return DeleteObjectStoragePayload.from_pydantic(result)
 
 
 @strawberry.mutation(description="Added in 25.14.0")  # type: ignore[misc]

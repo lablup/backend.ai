@@ -11,6 +11,7 @@ from ai.backend.common.api_handlers import BaseResponseModel
 __all__ = (
     "AdminSearchStorageNamespacesPayload",
     "RegisterStorageNamespacePayload",
+    "RegisterStorageNamespaceGQLPayload",
     "StorageNamespaceNode",
     "UnregisterStorageNamespacePayload",
 )
@@ -28,6 +29,12 @@ class RegisterStorageNamespacePayload(BaseResponseModel):
     """Payload for storage namespace registration mutation result."""
 
     namespace: StorageNamespaceNode = Field(description="Registered storage namespace")
+
+
+class RegisterStorageNamespaceGQLPayload(BaseResponseModel):
+    """GQL payload for storage namespace registration: exposes only the namespace ID."""
+
+    id: UUID = Field(description="ID of the registered storage namespace")
 
 
 class UnregisterStorageNamespacePayload(BaseResponseModel):
