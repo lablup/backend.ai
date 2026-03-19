@@ -13,6 +13,16 @@ from strawberry import ID, Info
 from strawberry.relay import Connection, Edge, NodeID
 
 from ai.backend.common.contexts.user import current_user
+from ai.backend.common.dto.manager.v2.session.request import SessionFilter, SessionOrder
+from ai.backend.common.dto.manager.v2.session.response import SessionNode
+from ai.backend.common.dto.manager.v2.session.types import (
+    OrderDirection as OrderDirectionDTO,
+)
+from ai.backend.common.dto.manager.v2.session.types import (
+    SessionOrderField,
+    SessionStatusEnum,
+    SessionStatusFilter,
+)
 from ai.backend.common.types import SessionId
 from ai.backend.manager.api.gql.base import OrderDirection, StringFilter, UUIDFilter, encode_cursor
 from ai.backend.manager.api.gql.common.types import (
@@ -40,20 +50,14 @@ from ai.backend.manager.api.gql.resource_group.resolver import (
     ResourceGroupEdge,
 )
 from ai.backend.manager.api.gql.resource_group.types import ResourceGroupGQL
-from ai.backend.manager.api.gql.types import GQLFilter, GQLOrderBy, StrawberryGQLContext
+from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.api.gql.user.types.node import UserV2GQL
 from ai.backend.manager.data.session.types import SessionData, SessionStatus
 from ai.backend.manager.errors.user import UserNotFound
 from ai.backend.manager.models.kernel.conditions import KernelConditions
-from ai.backend.manager.models.session.conditions import SessionConditions
-from ai.backend.manager.models.session.orders import SessionOrders
 from ai.backend.manager.repositories.base import (
     BatchQuerier,
     NoPagination,
-    QueryCondition,
-    QueryOrder,
-    combine_conditions_or,
-    negate_conditions,
 )
 from ai.backend.manager.services.session.actions.search_kernel import SearchKernelsAction
 
@@ -144,25 +148,28 @@ class SessionV2OrderFieldGQL(StrEnum):
     NAME = "name"
 
 
-@strawberry.input(
-    name="SessionV2StatusFilter", description="Added in 26.3.0. Filter for session status."
+@strawberry.experimental.pydantic.input(
+    model=SessionStatusFilter,
+    name="SessionV2StatusFilter",
+    description="Added in 26.3.0. Filter for session status.",
 )
 class SessionV2StatusFilterGQL:
     in_: list[SessionV2StatusGQL] | None = strawberry.field(name="in", default=None)
     not_in: list[SessionV2StatusGQL] | None = None
 
-    def build_condition(self) -> QueryCondition | None:
-        if self.in_:
-            return SessionConditions.by_status_in([s.to_internal() for s in self.in_])
-        if self.not_in:
-            return SessionConditions.by_status_not_in([s.to_internal() for s in self.not_in])
-        return None
+    def to_pydantic(self) -> SessionStatusFilter:
+        return SessionStatusFilter(
+            in_=[SessionStatusEnum(s) for s in self.in_] if self.in_ else None,
+            not_in=[SessionStatusEnum(s) for s in self.not_in] if self.not_in else None,
+        )
 
 
-@strawberry.input(
-    name="SessionV2Filter", description="Added in 26.3.0. Filter criteria for querying sessions."
+@strawberry.experimental.pydantic.input(
+    model=SessionFilter,
+    name="SessionV2Filter",
+    description="Added in 26.3.0. Filter criteria for querying sessions.",
 )
-class SessionV2FilterGQL(GQLFilter):
+class SessionV2FilterGQL:
     id: UUIDFilter | None = None
     status: SessionV2StatusFilterGQL | None = None
     name: StringFilter | None = None
@@ -170,102 +177,47 @@ class SessionV2FilterGQL(GQLFilter):
     project_id: UUIDFilter | None = None
     user_uuid: UUIDFilter | None = None
 
-    AND: list[Self] | None = None
-    OR: list[Self] | None = None
-    NOT: list[Self] | None = None
+    AND: list[SessionV2FilterGQL] | None = None
+    OR: list[SessionV2FilterGQL] | None = None
+    NOT: list[SessionV2FilterGQL] | None = None
 
-    def build_conditions(self) -> list[QueryCondition]:
-        conditions: list[QueryCondition] = []
-        if self.id:
-            condition = self.id.build_query_condition(
-                SessionConditions.by_id_filter_equals,
-                SessionConditions.by_id_filter_in,
-            )
-            if condition:
-                conditions.append(condition)
-        if self.status:
-            condition = self.status.build_condition()
-            if condition:
-                conditions.append(condition)
-        if self.name:
-            name_condition = self.name.build_query_condition(
-                contains_factory=SessionConditions.by_name_contains,
-                equals_factory=SessionConditions.by_name_equals,
-                starts_with_factory=SessionConditions.by_name_starts_with,
-                ends_with_factory=SessionConditions.by_name_ends_with,
-            )
-            if name_condition:
-                conditions.append(name_condition)
-        if self.domain_name:
-            domain_condition = self.domain_name.build_query_condition(
-                contains_factory=SessionConditions.by_domain_name_contains,
-                equals_factory=SessionConditions.by_domain_name_equals,
-                starts_with_factory=SessionConditions.by_domain_name_starts_with,
-                ends_with_factory=SessionConditions.by_domain_name_ends_with,
-            )
-            if domain_condition:
-                conditions.append(domain_condition)
-        if self.project_id:
-            condition = self.project_id.build_query_condition(
-                SessionConditions.by_group_id_filter_equals,
-                SessionConditions.by_group_id_filter_in,
-            )
-            if condition:
-                conditions.append(condition)
-        if self.user_uuid:
-            condition = self.user_uuid.build_query_condition(
-                SessionConditions.by_user_uuid_filter_equals,
-                SessionConditions.by_user_uuid_filter_in,
-            )
-            if condition:
-                conditions.append(condition)
-
-        # Handle AND logical operator
-        if self.AND:
-            for sub_filter in self.AND:
-                conditions.extend(sub_filter.build_conditions())
-
-        # Handle OR logical operator
-        if self.OR:
-            or_sub_conditions: list[QueryCondition] = []
-            for sub_filter in self.OR:
-                or_sub_conditions.extend(sub_filter.build_conditions())
-            if or_sub_conditions:
-                conditions.append(combine_conditions_or(or_sub_conditions))
-
-        # Handle NOT logical operator
-        if self.NOT:
-            not_sub_conditions: list[QueryCondition] = []
-            for sub_filter in self.NOT:
-                not_sub_conditions.extend(sub_filter.build_conditions())
-            if not_sub_conditions:
-                conditions.append(negate_conditions(not_sub_conditions))
-
-        return conditions
+    def to_pydantic(self) -> SessionFilter:
+        return SessionFilter(
+            id=self.id.to_pydantic() if self.id else None,
+            status=self.status.to_pydantic() if self.status else None,
+            name=self.name.to_pydantic() if self.name else None,
+            domain_name=self.domain_name.to_pydantic() if self.domain_name else None,
+            project_id=self.project_id.to_pydantic() if self.project_id else None,
+            user_uuid=self.user_uuid.to_pydantic() if self.user_uuid else None,
+            AND=[f.to_pydantic() for f in self.AND] if self.AND else None,
+            OR=[f.to_pydantic() for f in self.OR] if self.OR else None,
+            NOT=[f.to_pydantic() for f in self.NOT] if self.NOT else None,
+        )
 
 
-@strawberry.input(
-    name="SessionV2OrderBy", description="Added in 26.3.0. Ordering specification for sessions."
+@strawberry.experimental.pydantic.input(
+    model=SessionOrder,
+    name="SessionV2OrderBy",
+    description="Added in 26.3.0. Ordering specification for sessions.",
 )
-class SessionV2OrderByGQL(GQLOrderBy):
+class SessionV2OrderByGQL:
     field: SessionV2OrderFieldGQL
     direction: OrderDirection = OrderDirection.DESC
 
-    def to_query_order(self) -> QueryOrder:
+    def to_pydantic(self) -> SessionOrder:
         ascending = self.direction == OrderDirection.ASC
+        direction = OrderDirectionDTO.ASC if ascending else OrderDirectionDTO.DESC
         match self.field:
             case SessionV2OrderFieldGQL.CREATED_AT:
-                return SessionOrders.created_at(ascending)
+                return SessionOrder(field=SessionOrderField.CREATED_AT, direction=direction)
             case SessionV2OrderFieldGQL.TERMINATED_AT:
-                return SessionOrders.terminated_at(ascending)
+                return SessionOrder(field=SessionOrderField.TERMINATED_AT, direction=direction)
             case SessionV2OrderFieldGQL.STATUS:
-                return SessionOrders.status(ascending)
+                return SessionOrder(field=SessionOrderField.STATUS, direction=direction)
             case SessionV2OrderFieldGQL.ID:
-                return SessionOrders.id(ascending)
+                return SessionOrder(field=SessionOrderField.ID, direction=direction)
             case SessionV2OrderFieldGQL.NAME:
-                return SessionOrders.name(ascending)
-            case _:
-                raise ValueError(f"Unhandled SessionV2OrderFieldGQL value: {self.field!r}")
+                return SessionOrder(field=SessionOrderField.NAME, direction=direction)
 
 
 # ========== Session Info Sub-Types ==========
@@ -566,6 +518,82 @@ class SessionV2GQL(PydanticNodeMixin):
                 use_host_network=data.use_host_network,
                 network_type=str(data.network_type) if data.network_type else None,
                 network_id=data.network_id,
+            ),
+        )
+
+    @classmethod
+    def from_node(cls, node: SessionNode) -> Self:
+        """Create SessionV2GQL from SessionNode DTO (adapter search results)."""
+        from ai.backend.common.types import ClusterMode, ResourceSlot, SessionResult, SessionTypes
+        from ai.backend.manager.data.session.types import SessionStatus as SessionStatusInternal
+
+        requested_slots = ResourceSlotGQL.from_resource_slot(
+            ResourceSlot.from_json(node.resource.requested_slots)
+            if node.resource.requested_slots
+            else {}
+        )
+        occupying_slots = ResourceSlotGQL.from_resource_slot(
+            ResourceSlot.from_json(node.resource.occupying_slots)
+            if node.resource.occupying_slots
+            else {}
+        )
+
+        status = SessionV2StatusGQL.from_internal(SessionStatusInternal(node.lifecycle.status))
+        result = SessionV2ResultGQL.from_internal(SessionResult(node.lifecycle.result))
+
+        environ_gql: EnvironmentVariablesGQL | None = None
+        if node.runtime.environ:
+            environ_gql = EnvironmentVariablesGQL(
+                entries=[
+                    EnvironmentVariableEntryGQL(name=k, value=v)
+                    for k, v in node.runtime.environ.items()
+                ]
+            )
+
+        return cls(
+            id=ID(str(node.id)),
+            _domain_name=node.domain_name,
+            _user_uuid=node.user_uuid,
+            _group_id=node.group_id,
+            metadata=SessionV2MetadataInfoGQL(
+                creation_id=node.metadata.creation_id or "",
+                name=node.metadata.name or "",
+                session_type=SessionV2TypeGQL.from_internal(
+                    SessionTypes(node.metadata.session_type)
+                ),
+                access_key=node.metadata.access_key or "",
+                cluster_mode=ClusterModeGQL.from_internal(ClusterMode(node.metadata.cluster_mode)),
+                cluster_size=node.metadata.cluster_size,
+                priority=node.metadata.priority,
+                is_preemptible=node.metadata.is_preemptible,
+                tag=node.metadata.tag,
+            ),
+            resource=SessionV2ResourceInfoGQL(
+                allocation=ResourceAllocationGQL(
+                    requested=requested_slots,
+                    used=occupying_slots,
+                ),
+                resource_group_name=node.resource.scaling_group_name,
+                target_resource_group_names=node.resource.target_sgroup_names,
+            ),
+            lifecycle=SessionV2LifecycleInfoGQL(
+                status=status,
+                result=result,
+                created_at=node.lifecycle.created_at,
+                terminated_at=node.lifecycle.terminated_at,
+                starts_at=node.lifecycle.starts_at,
+                batch_timeout=node.lifecycle.batch_timeout,
+            ),
+            runtime=SessionV2RuntimeInfoGQL(
+                environ=environ_gql,
+                bootstrap_script=node.runtime.bootstrap_script,
+                startup_command=node.runtime.startup_command,
+                callback_url=node.runtime.callback_url,
+            ),
+            network=SessionV2NetworkInfoGQL(
+                use_host_network=node.network.use_host_network,
+                network_type=node.network.network_type,
+                network_id=node.network.network_id,
             ),
         )
 

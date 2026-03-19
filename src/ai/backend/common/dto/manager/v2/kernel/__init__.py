@@ -18,12 +18,16 @@ from ai.backend.common.dto.manager.v2.kernel.response import (
 )
 from ai.backend.common.dto.manager.v2.kernel.types import (
     KernelOrderField,
+    KernelStatusEnum,
+    KernelStatusFilter,
     OrderDirection,
 )
 
 __all__ = (
     # Types
     "KernelOrderField",
+    "KernelStatusEnum",
+    "KernelStatusFilter",
     "OrderDirection",
     # Input models (request)
     "AdminSearchKernelsInput",

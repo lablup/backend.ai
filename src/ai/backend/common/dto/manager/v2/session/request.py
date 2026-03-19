@@ -66,6 +66,12 @@ class SessionFilter(BaseRequestModel):
     project_id: UUIDFilter | None = None
     user_uuid: UUIDFilter | None = None
     created_at: DateTimeRangeFilter | None = None
+    AND: list[SessionFilter] | None = None
+    OR: list[SessionFilter] | None = None
+    NOT: list[SessionFilter] | None = None
+
+
+SessionFilter.model_rebuild()
 
 
 class SessionOrder(BaseRequestModel):

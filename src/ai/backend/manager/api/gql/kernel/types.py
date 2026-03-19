@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Callable, Iterable
+from collections.abc import Iterable
 from datetime import datetime
 from enum import StrEnum
 from typing import TYPE_CHECKING, Annotated, Any, Self
@@ -12,6 +12,16 @@ import strawberry
 from strawberry import ID, Info
 from strawberry.relay import Connection, Edge, NodeID
 
+from ai.backend.common.dto.manager.v2.kernel.request import KernelFilter, KernelOrder
+from ai.backend.common.dto.manager.v2.kernel.response import KernelNode
+from ai.backend.common.dto.manager.v2.kernel.types import (
+    KernelOrderField,
+    KernelStatusEnum,
+    KernelStatusFilter,
+)
+from ai.backend.common.dto.manager.v2.kernel.types import (
+    OrderDirection as OrderDirectionDTO,
+)
 from ai.backend.common.types import AgentId, KernelId, SessionTypes
 from ai.backend.manager.api.gql.base import OrderDirection, UUIDFilter
 
@@ -35,18 +45,10 @@ from ai.backend.manager.api.gql.fair_share.types.common import ResourceSlotGQL
 from ai.backend.manager.api.gql.project_v2.types.node import ProjectV2GQL
 from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin
 from ai.backend.manager.api.gql.resource_group.types import ResourceGroupGQL
-from ai.backend.manager.api.gql.types import GQLFilter, GQLOrderBy, StrawberryGQLContext
+from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.api.gql.user.types.node import UserV2GQL
 from ai.backend.manager.api.gql.utils import dedent_strip
-from ai.backend.manager.data.kernel.types import KernelInfo, KernelStatus, KernelStatusInMatchSpec
-from ai.backend.manager.models.kernel.conditions import KernelConditions
-from ai.backend.manager.models.kernel.orders import KernelOrders
-from ai.backend.manager.repositories.base import (
-    QueryCondition,
-    QueryOrder,
-    combine_conditions_or,
-    negate_conditions,
-)
+from ai.backend.manager.data.kernel.types import KernelInfo, KernelStatus
 
 
 @strawberry.enum(
@@ -131,125 +133,72 @@ class KernelV2OrderFieldGQL(StrEnum):
     CLUSTER_IDX = "cluster_idx"
 
 
-@strawberry.input(
-    name="KernelV2StatusFilter", description="Added in 26.2.0. Filter for kernel status."
+@strawberry.experimental.pydantic.input(
+    model=KernelStatusFilter,
+    name="KernelV2StatusFilter",
+    description="Added in 26.2.0. Filter for kernel status.",
 )
 class KernelV2StatusFilterGQL:
     in_: list[KernelV2StatusGQL] | None = strawberry.field(name="in", default=None)
     not_in: list[KernelV2StatusGQL] | None = None
 
-    def build_query_condition(
-        self,
-        in_factory: Callable[[KernelStatusInMatchSpec], QueryCondition],
-    ) -> QueryCondition | None:
-        """Build a query condition from this filter using the provided factory callable.
-
-        Args:
-            in_factory: Factory function for IN operations (IN, NOT IN)
-
-        Returns:
-            QueryCondition if any filter field is set, None otherwise
-        """
-        if self.in_:
-            return in_factory(
-                KernelStatusInMatchSpec(
-                    values=[s.to_internal() for s in self.in_],
-                    negated=False,
-                )
-            )
-        if self.not_in:
-            return in_factory(
-                KernelStatusInMatchSpec(
-                    values=[s.to_internal() for s in self.not_in],
-                    negated=True,
-                )
-            )
-        return None
+    def to_pydantic(self) -> KernelStatusFilter:
+        return KernelStatusFilter(
+            in_=[KernelStatusEnum(s) for s in self.in_] if self.in_ else None,
+            not_in=[KernelStatusEnum(s) for s in self.not_in] if self.not_in else None,
+        )
 
 
-@strawberry.input(
-    name="KernelV2Filter", description="Added in 26.2.0. Filter criteria for querying kernels."
+@strawberry.experimental.pydantic.input(
+    model=KernelFilter,
+    name="KernelV2Filter",
+    description="Added in 26.2.0. Filter criteria for querying kernels.",
 )
-class KernelV2FilterGQL(GQLFilter):
+class KernelV2FilterGQL:
     id: UUIDFilter | None = None
     status: KernelV2StatusFilterGQL | None = None
     session_id: UUIDFilter | None = None
 
-    AND: list[Self] | None = None
-    OR: list[Self] | None = None
-    NOT: list[Self] | None = None
+    AND: list[KernelV2FilterGQL] | None = None
+    OR: list[KernelV2FilterGQL] | None = None
+    NOT: list[KernelV2FilterGQL] | None = None
 
-    def build_conditions(self) -> list[QueryCondition]:
-        conditions: list[QueryCondition] = []
-        if self.id:
-            condition = self.id.build_query_condition(
-                KernelConditions.by_id_filter_equals,
-                KernelConditions.by_id_filter_in,
-            )
-            if condition:
-                conditions.append(condition)
-        if self.status:
-            condition = self.status.build_query_condition(
-                KernelConditions.by_status_filter_in,
-            )
-            if condition:
-                conditions.append(condition)
-        if self.session_id:
-            condition = self.session_id.build_query_condition(
-                KernelConditions.by_session_id_filter_equals,
-                KernelConditions.by_session_id_filter_in,
-            )
-            if condition:
-                conditions.append(condition)
-
-        # Handle AND logical operator
-        if self.AND:
-            for sub_filter in self.AND:
-                conditions.extend(sub_filter.build_conditions())
-
-        # Handle OR logical operator
-        if self.OR:
-            or_sub_conditions: list[QueryCondition] = []
-            for sub_filter in self.OR:
-                or_sub_conditions.extend(sub_filter.build_conditions())
-            if or_sub_conditions:
-                conditions.append(combine_conditions_or(or_sub_conditions))
-
-        # Handle NOT logical operator
-        if self.NOT:
-            not_sub_conditions: list[QueryCondition] = []
-            for sub_filter in self.NOT:
-                not_sub_conditions.extend(sub_filter.build_conditions())
-            if not_sub_conditions:
-                conditions.append(negate_conditions(not_sub_conditions))
-
-        return conditions
+    def to_pydantic(self) -> KernelFilter:
+        return KernelFilter(
+            id=self.id.to_pydantic() if self.id else None,
+            status=self.status.to_pydantic() if self.status else None,
+            session_id=self.session_id.to_pydantic() if self.session_id else None,
+            AND=[f.to_pydantic() for f in self.AND] if self.AND else None,
+            OR=[f.to_pydantic() for f in self.OR] if self.OR else None,
+            NOT=[f.to_pydantic() for f in self.NOT] if self.NOT else None,
+        )
 
 
-@strawberry.input(
-    name="KernelV2OrderBy", description="Added in 26.2.0. Ordering specification for kernels."
+@strawberry.experimental.pydantic.input(
+    model=KernelOrder,
+    name="KernelV2OrderBy",
+    description="Added in 26.2.0. Ordering specification for kernels.",
 )
-class KernelV2OrderByGQL(GQLOrderBy):
+class KernelV2OrderByGQL:
     field: KernelV2OrderFieldGQL
     direction: OrderDirection = OrderDirection.DESC
 
-    def to_query_order(self) -> QueryOrder:
+    def to_pydantic(self) -> KernelOrder:
         ascending = self.direction == OrderDirection.ASC
+        direction = OrderDirectionDTO.ASC if ascending else OrderDirectionDTO.DESC
         match self.field:
             case KernelV2OrderFieldGQL.CREATED_AT:
-                return KernelOrders.created_at(ascending)
+                return KernelOrder(field=KernelOrderField.CREATED_AT, direction=direction)
             case KernelV2OrderFieldGQL.TERMINATED_AT:
-                return KernelOrders.terminated_at(ascending)
+                return KernelOrder(field=KernelOrderField.TERMINATED_AT, direction=direction)
             case KernelV2OrderFieldGQL.STATUS:
-                return KernelOrders.status(ascending)
+                return KernelOrder(field=KernelOrderField.STATUS, direction=direction)
             case KernelV2OrderFieldGQL.CLUSTER_MODE:
-                return KernelOrders.cluster_mode(ascending)
+                return KernelOrder(field=KernelOrderField.CLUSTER_MODE, direction=direction)
             case KernelV2OrderFieldGQL.CLUSTER_HOSTNAME:
-                return KernelOrders.cluster_hostname(ascending)
+                return KernelOrder(field=KernelOrderField.CLUSTER_HOSTNAME, direction=direction)
             case KernelV2OrderFieldGQL.CLUSTER_IDX:
-                return KernelOrders.cluster_idx(ascending)
-            case _:
-                raise ValueError(f"Unhandled KernelV2OrderFieldGQL value: {self.field!r}")
+                return KernelOrder(field=KernelOrderField.CLUSTER_IDX, direction=direction)
 
 
 # ========== Kernel Sub-Info Types ==========
@@ -548,6 +497,64 @@ class KernelV2GQL(PydanticNodeMixin):
             KernelId(UUID(nid)) for nid in node_ids
         ])
         return [cls.from_kernel_info(data) if data is not None else None for data in results]
+
+    @classmethod
+    def from_node(cls, node: KernelNode) -> Self:
+        """Create KernelV2GQL from KernelNode DTO (adapter search results)."""
+        from ai.backend.common.types import SessionResult
+        from ai.backend.manager.data.kernel.types import KernelStatus as KernelStatusInternal
+
+        occupied_slots = ResourceSlotGQL.from_resource_slot(node.resource.occupied_slots or {})
+        requested_slots = ResourceSlotGQL.from_resource_slot(node.resource.requested_slots or {})
+        shares = ResourceSlotGQL.from_resource_slot(node.resource.occupied_shares or {})
+
+        status = KernelV2StatusGQL.from_internal(KernelStatusInternal(node.lifecycle.status))
+        result = SessionV2ResultGQL.from_internal(SessionResult(node.lifecycle.result))
+
+        return cls(
+            id=ID(str(node.id)),
+            startup_command=node.startup_command,
+            session_info=KernelV2SessionInfoGQL(
+                session_id=node.session.session_id,
+                creation_id=node.session.creation_id,
+                name=node.session.name,
+                session_type=SessionTypes(node.session.session_type),
+            ),
+            user_info=KernelV2UserInfoGQL(
+                user_id=node.user.user_uuid,
+                access_key=node.user.access_key,
+                domain_name=node.user.domain_name,
+                group_id=node.user.group_id,
+            ),
+            network=KernelV2NetworkInfoGQL(
+                service_ports=None,
+                preopen_ports=None,
+            ),
+            cluster=KernelV2ClusterInfoGQL(
+                cluster_role=node.cluster.cluster_role,
+                cluster_idx=node.cluster.cluster_idx,
+                local_rank=node.cluster.local_rank,
+                cluster_hostname=node.cluster.cluster_hostname,
+            ),
+            resource=KernelV2ResourceInfoGQL(
+                agent_id=node.resource.agent,
+                resource_group_name=node.resource.scaling_group,
+                container_id=node.resource.container_id,
+                allocation=ResourceAllocationGQL(
+                    requested=requested_slots,
+                    used=occupied_slots,
+                ),
+                shares=shares,
+                resource_opts=ResourceOptsGQL.from_mapping(node.resource.resource_opts or {}),
+            ),
+            lifecycle=KernelV2LifecycleInfoGQL(
+                status=status,
+                result=result,
+                created_at=node.lifecycle.created_at,
+                terminated_at=node.lifecycle.terminated_at,
+                starts_at=node.lifecycle.starts_at,
+            ),
+        )
 
     @classmethod
     def from_kernel_info(cls, kernel_info: KernelInfo, hide_agents: bool = False) -> Self:

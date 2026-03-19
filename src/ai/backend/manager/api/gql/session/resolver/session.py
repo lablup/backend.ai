@@ -3,10 +3,13 @@ from __future__ import annotations
 import strawberry
 from strawberry import Info
 
-from ai.backend.manager.api.gql.session.fetcher import fetch_sessions
+from ai.backend.common.dto.manager.v2.session.request import AdminSearchSessionsInput
+from ai.backend.manager.api.gql.base import encode_cursor
 from ai.backend.manager.api.gql.session.types import (
     SessionV2ConnectionGQL,
+    SessionV2EdgeGQL,
     SessionV2FilterGQL,
+    SessionV2GQL,
     SessionV2OrderByGQL,
 )
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
@@ -28,14 +31,27 @@ async def admin_sessions_v2(
     offset: int | None = None,
 ) -> SessionV2ConnectionGQL:
     check_admin_only()
-    return await fetch_sessions(
-        info,
-        filter=filter,
-        order_by=order_by,
-        before=before,
-        after=after,
-        first=first,
-        last=last,
-        limit=limit,
-        offset=offset,
+    payload = await info.context.adapters.session.admin_search(
+        AdminSearchSessionsInput(
+            filter=filter.to_pydantic() if filter else None,
+            order=[o.to_pydantic() for o in order_by] if order_by else None,
+            first=first,
+            after=after,
+            last=last,
+            before=before,
+            limit=limit,
+            offset=offset,
+        )
+    )
+    nodes = [SessionV2GQL.from_node(node) for node in payload.items]
+    edges = [SessionV2EdgeGQL(node=node, cursor=encode_cursor(node.id)) for node in nodes]
+    return SessionV2ConnectionGQL(
+        edges=edges,
+        page_info=strawberry.relay.PageInfo(
+            has_next_page=payload.has_next_page,
+            has_previous_page=payload.has_previous_page,
+            start_cursor=edges[0].cursor if edges else None,
+            end_cursor=edges[-1].cursor if edges else None,
+        ),
+        count=payload.total_count,
     )

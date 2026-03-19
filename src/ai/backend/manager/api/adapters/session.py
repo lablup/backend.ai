@@ -4,7 +4,11 @@ from __future__ import annotations
 
 from uuid import UUID
 
-from ai.backend.common.dto.manager.v2.kernel.request import AdminSearchKernelsInput, KernelOrder
+from ai.backend.common.dto.manager.v2.kernel.request import (
+    AdminSearchKernelsInput,
+    KernelFilter,
+    KernelOrder,
+)
 from ai.backend.common.dto.manager.v2.kernel.response import (
     AdminSearchKernelsPayload,
     KernelClusterInfo,
@@ -14,8 +18,10 @@ from ai.backend.common.dto.manager.v2.kernel.response import (
     KernelSessionInfo,
     KernelUserInfo,
 )
+from ai.backend.common.dto.manager.v2.kernel.types import KernelStatusFilter
 from ai.backend.common.dto.manager.v2.session.request import (
     AdminSearchSessionsInput,
+    SessionFilter,
     SessionOrder,
 )
 from ai.backend.common.dto.manager.v2.session.response import (
@@ -27,9 +33,14 @@ from ai.backend.common.dto.manager.v2.session.response import (
     SessionResourceInfo,
     SessionRuntimeInfo,
 )
-from ai.backend.manager.data.kernel.types import KernelInfo
+from ai.backend.common.types import AgentId, SessionId
+from ai.backend.manager.api.adapters.pagination import PaginationSpec
+from ai.backend.manager.data.kernel.types import KernelInfo, KernelStatus, KernelStatusInMatchSpec
 from ai.backend.manager.data.session.types import SessionData
 from ai.backend.manager.models.kernel.conditions import KernelConditions
+from ai.backend.manager.models.kernel.orders import (
+    DEFAULT_BACKWARD_ORDER as KERNEL_DEFAULT_BACKWARD_ORDER,
+)
 from ai.backend.manager.models.kernel.orders import (
     DEFAULT_FORWARD_ORDER as KERNEL_DEFAULT_FORWARD_ORDER,
 )
@@ -41,6 +52,9 @@ from ai.backend.manager.models.kernel.orders import (
 )
 from ai.backend.manager.models.session.conditions import SessionConditions
 from ai.backend.manager.models.session.orders import (
+    DEFAULT_BACKWARD_ORDER as SESSION_DEFAULT_BACKWARD_ORDER,
+)
+from ai.backend.manager.models.session.orders import (
     DEFAULT_FORWARD_ORDER as SESSION_DEFAULT_FORWARD_ORDER,
 )
 from ai.backend.manager.models.session.orders import (
@@ -50,17 +64,31 @@ from ai.backend.manager.models.session.orders import (
     resolve_order as resolve_session_order,
 )
 from ai.backend.manager.repositories.base import (
-    BatchQuerier,
-    OffsetPagination,
     QueryCondition,
     QueryOrder,
+    combine_conditions_or,
+    negate_conditions,
 )
 from ai.backend.manager.services.session.actions.search import SearchSessionsAction
 from ai.backend.manager.services.session.actions.search_kernel import SearchKernelsAction
 
 from .base import BaseAdapter
 
-DEFAULT_PAGINATION_LIMIT = 10
+_SESSION_PAGINATION_SPEC = PaginationSpec(
+    forward_order=SESSION_DEFAULT_FORWARD_ORDER,
+    backward_order=SESSION_DEFAULT_BACKWARD_ORDER,
+    forward_condition_factory=SessionConditions.by_cursor_forward,
+    backward_condition_factory=SessionConditions.by_cursor_backward,
+    tiebreaker_order=SESSION_TIEBREAKER_ORDER,
+)
+
+_KERNEL_PAGINATION_SPEC = PaginationSpec(
+    forward_order=KERNEL_DEFAULT_FORWARD_ORDER,
+    backward_order=KERNEL_DEFAULT_BACKWARD_ORDER,
+    forward_condition_factory=KernelConditions.by_cursor_forward,
+    backward_condition_factory=KernelConditions.by_cursor_backward,
+    tiebreaker_order=KERNEL_TIEBREAKER_ORDER,
+)
 
 
 class SessionAdapter(BaseAdapter):
@@ -75,7 +103,19 @@ class SessionAdapter(BaseAdapter):
         input: AdminSearchSessionsInput,
     ) -> AdminSearchSessionsPayload:
         """Search sessions (admin, no scope) with filters, orders, and pagination."""
-        querier = self._build_session_querier(input)
+        conditions = self._convert_session_filter(input.filter) if input.filter else []
+        orders = self._convert_session_orders(input.order) if input.order else []
+        querier = self._build_querier(
+            conditions=conditions,
+            orders=orders,
+            pagination_spec=_SESSION_PAGINATION_SPEC,
+            first=input.first,
+            after=input.after,
+            last=input.last,
+            before=input.before,
+            limit=input.limit,
+            offset=input.offset,
+        )
 
         action_result = await self._processors.session.search_sessions.wait_for_complete(
             SearchSessionsAction(querier=querier)
@@ -88,22 +128,41 @@ class SessionAdapter(BaseAdapter):
             has_previous_page=action_result.has_previous_page,
         )
 
-    def _build_session_querier(self, input: AdminSearchSessionsInput) -> BatchQuerier:
-        conditions = self._convert_session_filter(input) if input.filter else []
-        orders = (
-            self._convert_session_orders(input.order)
-            if input.order
-            else [SESSION_DEFAULT_FORWARD_ORDER]
+    async def search_sessions_by_agent(
+        self,
+        agent_id: AgentId,
+        input: AdminSearchSessionsInput,
+    ) -> AdminSearchSessionsPayload:
+        """Search sessions scoped to a specific agent."""
+        conditions = self._convert_session_filter(input.filter) if input.filter else []
+        orders = self._convert_session_orders(input.order) if input.order else []
+        scope_condition = SessionConditions.by_agent_id(agent_id)
+        querier = self._build_querier(
+            conditions=conditions,
+            orders=orders,
+            pagination_spec=_SESSION_PAGINATION_SPEC,
+            first=input.first,
+            after=input.after,
+            last=input.last,
+            before=input.before,
+            limit=input.limit,
+            offset=input.offset,
+            base_conditions=[scope_condition],
         )
-        orders.append(SESSION_TIEBREAKER_ORDER)
-        pagination = self._build_session_pagination(input)
-        return BatchQuerier(conditions=conditions, orders=orders, pagination=pagination)
 
-    def _convert_session_filter(self, input: AdminSearchSessionsInput) -> list[QueryCondition]:
+        action_result = await self._processors.session.search_sessions.wait_for_complete(
+            SearchSessionsAction(querier=querier)
+        )
+
+        return AdminSearchSessionsPayload(
+            items=[self._session_data_to_node(item) for item in action_result.data],
+            total_count=action_result.total_count,
+            has_next_page=action_result.has_next_page,
+            has_previous_page=action_result.has_previous_page,
+        )
+
+    def _convert_session_filter(self, f: SessionFilter) -> list[QueryCondition]:
         conditions: list[QueryCondition] = []
-        if input.filter is None:
-            return conditions
-        f = input.filter
         if f.id is not None:
             c = self.convert_uuid_filter(
                 f.id,
@@ -148,18 +207,26 @@ class SessionAdapter(BaseAdapter):
             )
             if c is not None:
                 conditions.append(c)
+        if f.AND:
+            for sub in f.AND:
+                conditions.extend(self._convert_session_filter(sub))
+        if f.OR:
+            or_conditions: list[QueryCondition] = []
+            for sub in f.OR:
+                or_conditions.extend(self._convert_session_filter(sub))
+            if or_conditions:
+                conditions.append(combine_conditions_or(or_conditions))
+        if f.NOT:
+            not_conditions: list[QueryCondition] = []
+            for sub in f.NOT:
+                not_conditions.extend(self._convert_session_filter(sub))
+            if not_conditions:
+                conditions.append(negate_conditions(not_conditions))
         return conditions
 
     @staticmethod
     def _convert_session_orders(orders: list[SessionOrder]) -> list[QueryOrder]:
         return [resolve_session_order(o.field, o.direction) for o in orders]
-
-    @staticmethod
-    def _build_session_pagination(input: AdminSearchSessionsInput) -> OffsetPagination:
-        return OffsetPagination(
-            limit=input.limit if input.limit is not None else DEFAULT_PAGINATION_LIMIT,
-            offset=input.offset if input.offset is not None else 0,
-        )
 
     # -------------------------------------------------------------------------
     # Kernel search
@@ -170,7 +237,19 @@ class SessionAdapter(BaseAdapter):
         input: AdminSearchKernelsInput,
     ) -> AdminSearchKernelsPayload:
         """Search kernels (admin, no scope) with filters, orders, and pagination."""
-        querier = self._build_kernel_querier(input)
+        conditions = self._convert_kernel_filter(input.filter) if input.filter else []
+        orders = self._convert_kernel_orders(input.order) if input.order else []
+        querier = self._build_querier(
+            conditions=conditions,
+            orders=orders,
+            pagination_spec=_KERNEL_PAGINATION_SPEC,
+            first=input.first,
+            after=input.after,
+            last=input.last,
+            before=input.before,
+            limit=input.limit,
+            offset=input.offset,
+        )
 
         action_result = await self._processors.session.search_kernels.wait_for_complete(
             SearchKernelsAction(querier=querier)
@@ -183,22 +262,74 @@ class SessionAdapter(BaseAdapter):
             has_previous_page=action_result.has_previous_page,
         )
 
-    def _build_kernel_querier(self, input: AdminSearchKernelsInput) -> BatchQuerier:
-        conditions = self._convert_kernel_filter(input) if input.filter else []
-        orders = (
-            self._convert_kernel_orders(input.order)
-            if input.order
-            else [KERNEL_DEFAULT_FORWARD_ORDER]
+    async def search_kernels_by_agent(
+        self,
+        agent_id: AgentId,
+        input: AdminSearchKernelsInput,
+    ) -> AdminSearchKernelsPayload:
+        """Search kernels scoped to a specific agent."""
+        conditions = self._convert_kernel_filter(input.filter) if input.filter else []
+        orders = self._convert_kernel_orders(input.order) if input.order else []
+        scope_condition = KernelConditions.by_agent_id(agent_id)
+        querier = self._build_querier(
+            conditions=conditions,
+            orders=orders,
+            pagination_spec=_KERNEL_PAGINATION_SPEC,
+            first=input.first,
+            after=input.after,
+            last=input.last,
+            before=input.before,
+            limit=input.limit,
+            offset=input.offset,
+            base_conditions=[scope_condition],
         )
-        orders.append(KERNEL_TIEBREAKER_ORDER)
-        pagination = self._build_kernel_pagination(input)
-        return BatchQuerier(conditions=conditions, orders=orders, pagination=pagination)
 
-    def _convert_kernel_filter(self, input: AdminSearchKernelsInput) -> list[QueryCondition]:
+        action_result = await self._processors.session.search_kernels.wait_for_complete(
+            SearchKernelsAction(querier=querier)
+        )
+
+        return AdminSearchKernelsPayload(
+            items=[self._kernel_info_to_node(item) for item in action_result.data],
+            total_count=action_result.total_count,
+            has_next_page=action_result.has_next_page,
+            has_previous_page=action_result.has_previous_page,
+        )
+
+    async def search_kernels_by_session(
+        self,
+        session_id: SessionId,
+        input: AdminSearchKernelsInput,
+    ) -> AdminSearchKernelsPayload:
+        """Search kernels scoped to a specific session."""
+        conditions = self._convert_kernel_filter(input.filter) if input.filter else []
+        orders = self._convert_kernel_orders(input.order) if input.order else []
+        scope_condition = KernelConditions.by_session_ids([session_id])
+        querier = self._build_querier(
+            conditions=conditions,
+            orders=orders,
+            pagination_spec=_KERNEL_PAGINATION_SPEC,
+            first=input.first,
+            after=input.after,
+            last=input.last,
+            before=input.before,
+            limit=input.limit,
+            offset=input.offset,
+            base_conditions=[scope_condition],
+        )
+
+        action_result = await self._processors.session.search_kernels.wait_for_complete(
+            SearchKernelsAction(querier=querier)
+        )
+
+        return AdminSearchKernelsPayload(
+            items=[self._kernel_info_to_node(item) for item in action_result.data],
+            total_count=action_result.total_count,
+            has_next_page=action_result.has_next_page,
+            has_previous_page=action_result.has_previous_page,
+        )
+
+    def _convert_kernel_filter(self, f: KernelFilter) -> list[QueryCondition]:
         conditions: list[QueryCondition] = []
-        if input.filter is None:
-            return conditions
-        f = input.filter
         if f.id is not None:
             c = self.convert_uuid_filter(
                 f.id,
@@ -215,18 +346,48 @@ class SessionAdapter(BaseAdapter):
             )
             if c is not None:
                 conditions.append(c)
+        if f.status is not None:
+            c = self._convert_kernel_status_filter(f.status)
+            if c is not None:
+                conditions.append(c)
+        if f.AND:
+            for sub in f.AND:
+                conditions.extend(self._convert_kernel_filter(sub))
+        if f.OR:
+            or_conditions: list[QueryCondition] = []
+            for sub in f.OR:
+                or_conditions.extend(self._convert_kernel_filter(sub))
+            if or_conditions:
+                conditions.append(combine_conditions_or(or_conditions))
+        if f.NOT:
+            not_conditions: list[QueryCondition] = []
+            for sub in f.NOT:
+                not_conditions.extend(self._convert_kernel_filter(sub))
+            if not_conditions:
+                conditions.append(negate_conditions(not_conditions))
         return conditions
+
+    @staticmethod
+    def _convert_kernel_status_filter(f: KernelStatusFilter) -> QueryCondition | None:
+        if f.in_:
+            return KernelConditions.by_status_filter_in(
+                KernelStatusInMatchSpec(
+                    values=[KernelStatus(s) for s in f.in_],
+                    negated=False,
+                )
+            )
+        if f.not_in:
+            return KernelConditions.by_status_filter_in(
+                KernelStatusInMatchSpec(
+                    values=[KernelStatus(s) for s in f.not_in],
+                    negated=True,
+                )
+            )
+        return None
 
     @staticmethod
     def _convert_kernel_orders(orders: list[KernelOrder]) -> list[QueryOrder]:
         return [resolve_kernel_order(o.field, o.direction) for o in orders]
-
-    @staticmethod
-    def _build_kernel_pagination(input: AdminSearchKernelsInput) -> OffsetPagination:
-        return OffsetPagination(
-            limit=input.limit if input.limit is not None else DEFAULT_PAGINATION_LIMIT,
-            offset=input.offset if input.offset is not None else 0,
-        )
 
     # -------------------------------------------------------------------------
     # Data → DTO conversion
@@ -236,6 +397,9 @@ class SessionAdapter(BaseAdapter):
     def _session_data_to_node(data: SessionData) -> SessionNode:
         return SessionNode(
             id=data.id,
+            domain_name=data.domain_name,
+            user_uuid=data.user_uuid,
+            group_id=data.group_id,
             metadata=SessionMetadataInfo(
                 creation_id=data.creation_id,
                 name=data.name,

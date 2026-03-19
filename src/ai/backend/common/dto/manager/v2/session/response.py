@@ -148,6 +148,9 @@ class SessionNode(BaseResponseModel):
     """Node model representing a session entity with nested info sub-models."""
 
     id: UUID = Field(description="Session ID.")
+    domain_name: str = Field(description="Domain name the session belongs to.")
+    user_uuid: UUID = Field(description="UUID of the user who owns this session.")
+    group_id: UUID = Field(description="Group (project) ID the session belongs to.")
     metadata: SessionMetadataInfo = Field(
         description="Metadata including name, type, and cluster information."
     )

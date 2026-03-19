@@ -25,9 +25,7 @@ from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.api.gql.utils import dedent_strip
 from ai.backend.manager.data.agent.types import AgentDetailData, AgentStatus
-from ai.backend.manager.models.kernel.conditions import KernelConditions
 from ai.backend.manager.models.rbac.permission_defs import AgentPermission
-from ai.backend.manager.models.session.conditions import SessionConditions
 
 if TYPE_CHECKING:
     from ai.backend.common.dto.manager.v2.agent.response import AgentNode
@@ -415,19 +413,36 @@ class AgentV2GQL(PydanticNodeMixin):
         KernelV2ConnectionGQL, strawberry.lazy("ai.backend.manager.api.gql.kernel.types")
     ]:
         """Fetch kernels associated with this agent."""
-        from ai.backend.manager.api.gql.kernel.fetcher import fetch_kernels
+        from ai.backend.common.dto.manager.v2.kernel.request import AdminSearchKernelsInput
+        from ai.backend.manager.api.gql.base import encode_cursor
+        from ai.backend.manager.api.gql.kernel.types import KernelV2ConnectionGQL, KernelV2EdgeGQL
 
-        return await fetch_kernels(
-            info=info,
-            filter=filter,
-            order_by=order_by,
-            before=before,
-            after=after,
-            first=first,
-            last=last,
-            limit=limit,
-            offset=offset,
-            base_conditions=[KernelConditions.by_agent_id(self._agent_id)],
+        payload = await info.context.adapters.session.search_kernels_by_agent(
+            self._agent_id,
+            AdminSearchKernelsInput(
+                filter=filter.to_pydantic() if filter else None,
+                order=[o.to_pydantic() for o in order_by] if order_by else None,
+                first=first,
+                after=after,
+                last=last,
+                before=before,
+                limit=limit,
+                offset=offset,
+            ),
+        )
+        from ai.backend.manager.api.gql.kernel.types import KernelV2GQL
+
+        nodes = [KernelV2GQL.from_node(node) for node in payload.items]
+        edges = [KernelV2EdgeGQL(node=node, cursor=encode_cursor(node.id)) for node in nodes]
+        return KernelV2ConnectionGQL(
+            edges=edges,
+            page_info=strawberry.relay.PageInfo(
+                has_next_page=payload.has_next_page,
+                has_previous_page=payload.has_previous_page,
+                start_cursor=edges[0].cursor if edges else None,
+                end_cursor=edges[-1].cursor if edges else None,
+            ),
+            count=payload.total_count,
         )
 
     @strawberry.field(  # type: ignore[misc]
@@ -456,19 +471,38 @@ class AgentV2GQL(PydanticNodeMixin):
         SessionV2ConnectionGQL, strawberry.lazy("ai.backend.manager.api.gql.session.types")
     ]:
         """Fetch sessions associated with this agent."""
-        from ai.backend.manager.api.gql.session.fetcher.session import fetch_sessions
+        from ai.backend.common.dto.manager.v2.session.request import AdminSearchSessionsInput
+        from ai.backend.manager.api.gql.base import encode_cursor
+        from ai.backend.manager.api.gql.session.types import (
+            SessionV2ConnectionGQL,
+            SessionV2EdgeGQL,
+            SessionV2GQL,
+        )
 
-        return await fetch_sessions(
-            info=info,
-            filter=filter,
-            order_by=order_by,
-            before=before,
-            after=after,
-            first=first,
-            last=last,
-            limit=limit,
-            offset=offset,
-            base_conditions=[SessionConditions.by_agent_id(self._agent_id)],
+        payload = await info.context.adapters.session.search_sessions_by_agent(
+            self._agent_id,
+            AdminSearchSessionsInput(
+                filter=filter.to_pydantic() if filter else None,
+                order=[o.to_pydantic() for o in order_by] if order_by else None,
+                first=first,
+                after=after,
+                last=last,
+                before=before,
+                limit=limit,
+                offset=offset,
+            ),
+        )
+        nodes = [SessionV2GQL.from_node(node) for node in payload.items]
+        edges = [SessionV2EdgeGQL(node=node, cursor=encode_cursor(node.id)) for node in nodes]
+        return SessionV2ConnectionGQL(
+            edges=edges,
+            page_info=strawberry.relay.PageInfo(
+                has_next_page=payload.has_next_page,
+                has_previous_page=payload.has_previous_page,
+                start_cursor=edges[0].cursor if edges else None,
+                end_cursor=edges[-1].cursor if edges else None,
+            ),
+            count=payload.total_count,
         )
 
     @strawberry.field(  # type: ignore[misc]
