@@ -6,10 +6,14 @@ from enum import StrEnum
 
 import strawberry
 
+from ai.backend.common.dto.manager.v2.audit_log.request import AuditLogOrder
+from ai.backend.common.dto.manager.v2.audit_log.types import (
+    AuditLogOrderField,
+)
+from ai.backend.common.dto.manager.v2.audit_log.types import (
+    OrderDirection as OrderDirectionDTO,
+)
 from ai.backend.manager.api.gql.base import OrderDirection
-from ai.backend.manager.api.gql.types import GQLOrderBy
-from ai.backend.manager.repositories.audit_log.options import AuditLogOrders
-from ai.backend.manager.repositories.base import QueryOrder
 
 
 @strawberry.enum(
@@ -23,24 +27,18 @@ class AuditLogOrderFieldGQL(StrEnum):
     STATUS = "status"
 
 
-@strawberry.input(
+@strawberry.experimental.pydantic.input(
+    model=AuditLogOrder,
     name="AuditLogOrderBy",
     description="Ordering specification for audit logs.",
 )
-class AuditLogOrderByGQL(GQLOrderBy):
+class AuditLogOrderByGQL:
     field: AuditLogOrderFieldGQL
     direction: OrderDirection = OrderDirection.DESC
 
-    def to_query_order(self) -> QueryOrder:
+    def to_pydantic(self) -> AuditLogOrder:
         ascending = self.direction == OrderDirection.ASC
-        match self.field:
-            case AuditLogOrderFieldGQL.CREATED_AT:
-                return AuditLogOrders.created_at(ascending)
-            case AuditLogOrderFieldGQL.ENTITY_TYPE:
-                return AuditLogOrders.entity_type(ascending)
-            case AuditLogOrderFieldGQL.OPERATION:
-                return AuditLogOrders.operation(ascending)
-            case AuditLogOrderFieldGQL.STATUS:
-                return AuditLogOrders.status(ascending)
-            case _:
-                raise ValueError(f"Unhandled AuditLogOrderFieldGQL value: {self.field!r}")
+        return AuditLogOrder(
+            field=AuditLogOrderField(self.field),
+            direction=OrderDirectionDTO.ASC if ascending else OrderDirectionDTO.DESC,
+        )

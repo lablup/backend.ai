@@ -4,7 +4,9 @@ from __future__ import annotations
 
 from ai.backend.common.dto.manager.v2.audit_log.request import (
     AdminSearchAuditLogsInput,
+    AuditLogFilter,
     AuditLogOrder,
+    AuditLogStatusFilter,
 )
 from ai.backend.common.dto.manager.v2.audit_log.response import (
     AdminSearchAuditLogsPayload,
@@ -16,18 +18,26 @@ from ai.backend.common.dto.manager.v2.audit_log.types import (
     OrderDirection,
 )
 from ai.backend.manager.data.audit_log.types import AuditLogData
+from ai.backend.manager.models.audit_log import AuditLogRow
 from ai.backend.manager.repositories.audit_log.options import AuditLogConditions, AuditLogOrders
 from ai.backend.manager.repositories.base import (
-    BatchQuerier,
-    OffsetPagination,
     QueryCondition,
     QueryOrder,
+    combine_conditions_or,
+    negate_conditions,
 )
 from ai.backend.manager.services.audit_log.actions.search import SearchAuditLogsAction
 
 from .base import BaseAdapter
+from .pagination import PaginationSpec
 
-DEFAULT_PAGINATION_LIMIT = 20
+_AUDIT_LOG_PAGINATION_SPEC = PaginationSpec(
+    forward_order=AuditLogOrders.created_at(ascending=False),
+    backward_order=AuditLogOrders.created_at(ascending=True),
+    forward_condition_factory=AuditLogConditions.by_cursor_forward,
+    backward_condition_factory=AuditLogConditions.by_cursor_backward,
+    tiebreaker_order=AuditLogRow.id.asc(),
+)
 
 
 class AuditLogAdapter(BaseAdapter):
@@ -35,78 +45,98 @@ class AuditLogAdapter(BaseAdapter):
 
     async def admin_search(self, input: AdminSearchAuditLogsInput) -> AdminSearchAuditLogsPayload:
         """Search audit logs with filters, ordering, and pagination."""
-        querier = self._build_audit_log_querier(input)
+        conditions = self._convert_filter(input.filter) if input.filter else []
+        orders = self._convert_orders(input.order) if input.order else []
+        querier = self._build_querier(
+            conditions=conditions,
+            orders=orders,
+            pagination_spec=_AUDIT_LOG_PAGINATION_SPEC,
+            first=input.first,
+            after=input.after,
+            last=input.last,
+            before=input.before,
+            limit=input.limit,
+            offset=input.offset,
+        )
         action_result = await self._processors.audit_log.search.wait_for_complete(
             SearchAuditLogsAction(querier=querier)
         )
         return AdminSearchAuditLogsPayload(
-            items=[self._audit_log_data_to_dto(item) for item in action_result.data],
+            items=[self._data_to_node(item) for item in action_result.data],
             total_count=action_result.total_count,
             has_next_page=action_result.has_next_page,
             has_previous_page=action_result.has_previous_page,
         )
 
-    def _build_audit_log_querier(self, input: AdminSearchAuditLogsInput) -> BatchQuerier:
+    def _convert_filter(self, f: AuditLogFilter) -> list[QueryCondition]:
         conditions: list[QueryCondition] = []
-        if input.filter:
-            f = input.filter
-            if f.entity_type is not None:
-                condition = self.convert_string_filter(
-                    f.entity_type,
-                    contains_factory=AuditLogConditions.by_entity_type_contains,
-                    equals_factory=AuditLogConditions.by_entity_type_equals,
-                    starts_with_factory=AuditLogConditions.by_entity_type_starts_with,
-                    ends_with_factory=AuditLogConditions.by_entity_type_ends_with,
-                )
-                if condition is not None:
-                    conditions.append(condition)
-            if f.operation is not None:
-                condition = self.convert_string_filter(
-                    f.operation,
-                    contains_factory=AuditLogConditions.by_operation_contains,
-                    equals_factory=AuditLogConditions.by_operation_equals,
-                    starts_with_factory=AuditLogConditions.by_operation_starts_with,
-                    ends_with_factory=AuditLogConditions.by_operation_ends_with,
-                )
-                if condition is not None:
-                    conditions.append(condition)
-            if f.triggered_by is not None:
-                condition = self.convert_string_filter(
-                    f.triggered_by,
-                    contains_factory=AuditLogConditions.by_triggered_by_contains,
-                    equals_factory=AuditLogConditions.by_triggered_by_equals,
-                    starts_with_factory=AuditLogConditions.by_triggered_by_starts_with,
-                    ends_with_factory=AuditLogConditions.by_triggered_by_ends_with,
-                )
-                if condition is not None:
-                    conditions.append(condition)
-            if f.status is not None:
-                if f.status.equals is not None:
-                    conditions.append(AuditLogConditions.by_status_in([f.status.equals.value]))
-                elif f.status.in_ is not None:
-                    conditions.append(
-                        AuditLogConditions.by_status_in([s.value for s in f.status.in_])
-                    )
-                elif f.status.not_in is not None:
-                    conditions.append(
-                        AuditLogConditions.by_status_not_in([s.value for s in f.status.not_in])
-                    )
-            if f.created_at_before is not None:
-                conditions.append(AuditLogConditions.by_created_at_before(f.created_at_before))
-            if f.created_at_after is not None:
-                conditions.append(AuditLogConditions.by_created_at_after(f.created_at_after))
-        orders: list[QueryOrder] = (
-            self._convert_audit_log_orders(input.order) if input.order else []
-        )
-        orders.append(AuditLogOrders.created_at(ascending=False))
-        pagination = OffsetPagination(
-            limit=input.limit if input.limit is not None else DEFAULT_PAGINATION_LIMIT,
-            offset=input.offset if input.offset is not None else 0,
-        )
-        return BatchQuerier(conditions=conditions, orders=orders, pagination=pagination)
+        if f.entity_type is not None:
+            condition = self.convert_string_filter(
+                f.entity_type,
+                contains_factory=AuditLogConditions.by_entity_type_contains,
+                equals_factory=AuditLogConditions.by_entity_type_equals,
+                starts_with_factory=AuditLogConditions.by_entity_type_starts_with,
+                ends_with_factory=AuditLogConditions.by_entity_type_ends_with,
+            )
+            if condition is not None:
+                conditions.append(condition)
+        if f.operation is not None:
+            condition = self.convert_string_filter(
+                f.operation,
+                contains_factory=AuditLogConditions.by_operation_contains,
+                equals_factory=AuditLogConditions.by_operation_equals,
+                starts_with_factory=AuditLogConditions.by_operation_starts_with,
+                ends_with_factory=AuditLogConditions.by_operation_ends_with,
+            )
+            if condition is not None:
+                conditions.append(condition)
+        if f.triggered_by is not None:
+            condition = self.convert_string_filter(
+                f.triggered_by,
+                contains_factory=AuditLogConditions.by_triggered_by_contains,
+                equals_factory=AuditLogConditions.by_triggered_by_equals,
+                starts_with_factory=AuditLogConditions.by_triggered_by_starts_with,
+                ends_with_factory=AuditLogConditions.by_triggered_by_ends_with,
+            )
+            if condition is not None:
+                conditions.append(condition)
+        if f.status is not None:
+            self._apply_status_filter(f.status, conditions)
+        if f.created_at is not None:
+            condition = f.created_at.build_query_condition(
+                before_factory=AuditLogConditions.by_created_at_before,
+                after_factory=AuditLogConditions.by_created_at_after,
+            )
+            if condition is not None:
+                conditions.append(condition)
+        if f.AND:
+            for sub_filter in f.AND:
+                conditions.extend(self._convert_filter(sub_filter))
+        if f.OR:
+            or_conditions: list[QueryCondition] = []
+            for sub_filter in f.OR:
+                or_conditions.extend(self._convert_filter(sub_filter))
+            if or_conditions:
+                conditions.append(combine_conditions_or(or_conditions))
+        if f.NOT:
+            not_conditions: list[QueryCondition] = []
+            for sub_filter in f.NOT:
+                not_conditions.extend(self._convert_filter(sub_filter))
+            if not_conditions:
+                conditions.append(negate_conditions(not_conditions))
+        return conditions
 
     @staticmethod
-    def _convert_audit_log_orders(orders: list[AuditLogOrder]) -> list[QueryOrder]:
+    def _apply_status_filter(s: AuditLogStatusFilter, conditions: list[QueryCondition]) -> None:
+        if s.equals is not None:
+            conditions.append(AuditLogConditions.by_status_in([s.equals.value]))
+        elif s.in_ is not None:
+            conditions.append(AuditLogConditions.by_status_in([v.value for v in s.in_]))
+        elif s.not_in is not None:
+            conditions.append(AuditLogConditions.by_status_not_in([v.value for v in s.not_in]))
+
+    @staticmethod
+    def _convert_orders(orders: list[AuditLogOrder]) -> list[QueryOrder]:
         result: list[QueryOrder] = []
         for o in orders:
             ascending = o.direction == OrderDirection.ASC
@@ -122,7 +152,7 @@ class AuditLogAdapter(BaseAdapter):
         return result
 
     @staticmethod
-    def _audit_log_data_to_dto(data: AuditLogData) -> AuditLogNode:
+    def _data_to_node(data: AuditLogData) -> AuditLogNode:
         return AuditLogNode(
             id=data.id,
             action_id=data.action_id,

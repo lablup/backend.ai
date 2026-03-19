@@ -12,6 +12,8 @@ import strawberry
 from strawberry import ID, Info
 from strawberry.relay import Connection, Edge, NodeID
 
+from ai.backend.common.dto.manager.v2.audit_log.response import AuditLogNode
+from ai.backend.common.dto.manager.v2.audit_log.types import AuditLogStatus as AuditLogStatusDTO
 from ai.backend.manager.actions.types import OperationStatus
 from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
@@ -132,6 +134,23 @@ class AuditLogV2GQL(PydanticNodeMixin):
             description=data.description,
             duration=str(data.duration) if data.duration is not None else None,
             status=AuditLogStatusGQL.from_internal(data.status),
+        )
+
+    @classmethod
+    def from_node(cls, node: AuditLogNode) -> Self:
+        return cls(
+            id=ID(str(node.id)),
+            _triggered_by=node.triggered_by,
+            action_id=node.action_id,
+            entity_type=node.entity_type,
+            operation=node.operation,
+            entity_id=node.entity_id,
+            created_at=node.created_at,
+            request_id=node.request_id,
+            triggered_by=node.triggered_by,
+            description=node.description,
+            duration=node.duration,
+            status=AuditLogStatusGQL(AuditLogStatusDTO(node.status).value),
         )
 
 

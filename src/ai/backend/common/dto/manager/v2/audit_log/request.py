@@ -2,12 +2,10 @@
 
 from __future__ import annotations
 
-from datetime import datetime
-
 from pydantic import Field
 
 from ai.backend.common.api_handlers import BaseRequestModel
-from ai.backend.common.dto.manager.query import StringFilter
+from ai.backend.common.dto.manager.query import DateTimeFilter, StringFilter
 
 from .types import AuditLogOrderField, AuditLogStatus, OrderDirection
 
@@ -36,12 +34,19 @@ class AuditLogFilter(BaseRequestModel):
     operation: StringFilter | None = Field(default=None, description="Operation filter")
     status: AuditLogStatusFilter | None = Field(default=None, description="Status filter")
     triggered_by: StringFilter | None = Field(default=None, description="Triggered-by filter")
-    created_at_before: datetime | None = Field(
-        default=None, description="Filter logs created before this timestamp"
+    created_at: DateTimeFilter | None = Field(
+        default=None, description="Filter logs by created_at datetime"
     )
-    created_at_after: datetime | None = Field(
-        default=None, description="Filter logs created after this timestamp"
+    AND: list[AuditLogFilter] | None = Field(default=None, description="All conditions must match")
+    OR: list[AuditLogFilter] | None = Field(
+        default=None, description="At least one condition must match"
     )
+    NOT: list[AuditLogFilter] | None = Field(
+        default=None, description="None of the conditions must match"
+    )
+
+
+AuditLogFilter.model_rebuild()
 
 
 class AuditLogOrder(BaseRequestModel):
@@ -56,5 +61,9 @@ class AdminSearchAuditLogsInput(BaseRequestModel):
 
     filter: AuditLogFilter | None = Field(default=None, description="Filter criteria")
     order: list[AuditLogOrder] | None = Field(default=None, description="Sort order")
-    limit: int | None = Field(default=None, ge=1, description="Max results per page")
-    offset: int | None = Field(default=None, ge=0, description="Pagination offset")
+    first: int | None = Field(default=None, ge=1, description="Cursor-forward page size")
+    after: str | None = Field(default=None, description="Cursor-forward start cursor")
+    last: int | None = Field(default=None, ge=1, description="Cursor-backward page size")
+    before: str | None = Field(default=None, description="Cursor-backward end cursor")
+    limit: int | None = Field(default=None, ge=1, description="Offset-based page size")
+    offset: int | None = Field(default=None, ge=0, description="Offset-based page offset")
