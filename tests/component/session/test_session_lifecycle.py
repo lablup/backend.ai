@@ -37,6 +37,202 @@ from .conftest import SessionSeedData
 
 
 @pytest.fixture()
+async def degraded_session_seed(
+    db_engine: SAEngine,
+    domain_fixture: str,
+    group_fixture: uuid.UUID,
+    admin_user_fixture: Any,
+    scaling_group_fixture: str,
+) -> AsyncIterator[SessionSeedData]:
+    """Seed a RUNNING_DEGRADED session with two kernels (one RUNNING, one ERROR)."""
+    unique = secrets.token_hex(4)
+    session_id = SessionId(uuid.uuid4())
+    session_name = f"test-degraded-{unique}"
+    kernel_id_main = uuid.uuid4()
+    kernel_id_sub = uuid.uuid4()
+    now = datetime.now(tzutc())
+
+    status_history: dict[str, Any] = {
+        SessionStatus.PENDING.name: now.isoformat(),
+        SessionStatus.RUNNING.name: now.isoformat(),
+        SessionStatus.RUNNING_DEGRADED.name: now.isoformat(),
+    }
+
+    common_kernel_values = dict(
+        session_id=session_id,
+        session_creation_id=f"cid-{unique}",
+        session_name=session_name,
+        session_type=SessionTypes.INTERACTIVE,
+        cluster_mode="single-node",
+        cluster_size=2,
+        domain_name=domain_fixture,
+        group_id=group_fixture,
+        user_uuid=admin_user_fixture.user_uuid,
+        access_key=admin_user_fixture.keypair.access_key,
+        scaling_group=scaling_group_fixture,
+        status_info="",
+        occupied_slots=ResourceSlot(),
+        requested_slots=ResourceSlot(),
+        repl_in_port=0,
+        repl_out_port=0,
+        stdin_port=0,
+        stdout_port=0,
+        created_at=now,
+    )
+
+    async with db_engine.begin() as conn:
+        await conn.execute(
+            sa.insert(SessionRow.__table__).values(
+                id=session_id,
+                creation_id=f"cid-{unique}",
+                name=session_name,
+                session_type=SessionTypes.INTERACTIVE,
+                cluster_size=2,
+                cluster_mode="single-node",
+                domain_name=domain_fixture,
+                group_id=group_fixture,
+                user_uuid=admin_user_fixture.user_uuid,
+                access_key=admin_user_fixture.keypair.access_key,
+                scaling_group_name=scaling_group_fixture,
+                status=SessionStatus.RUNNING_DEGRADED,
+                status_info="",
+                status_history=status_history,
+                occupying_slots=ResourceSlot(),
+                requested_slots=ResourceSlot(),
+                created_at=now,
+            )
+        )
+        await conn.execute(
+            sa.insert(kernels).values(
+                id=kernel_id_main,
+                cluster_role="main",
+                cluster_idx=0,
+                cluster_hostname="main0",
+                status=KernelStatus.RUNNING,
+                **common_kernel_values,
+            )
+        )
+        await conn.execute(
+            sa.insert(kernels).values(
+                id=kernel_id_sub,
+                cluster_role="sub",
+                cluster_idx=1,
+                cluster_hostname="sub1",
+                status=KernelStatus.ERROR,
+                **common_kernel_values,
+            )
+        )
+
+    yield SessionSeedData(
+        session_id=session_id,
+        session_name=session_name,
+        kernel_id=kernel_id_main,
+        access_key=admin_user_fixture.keypair.access_key,
+        domain_name=domain_fixture,
+        user_uuid=admin_user_fixture.user_uuid,
+    )
+
+    async with db_engine.begin() as conn:
+        await conn.execute(kernels.delete().where(kernels.c.session_id == session_id))
+        await conn.execute(
+            SessionRow.__table__.delete().where(SessionRow.__table__.c.id == session_id)
+        )
+
+
+@pytest.fixture()
+async def full_lifecycle_session_seed(
+    db_engine: SAEngine,
+    domain_fixture: str,
+    group_fixture: uuid.UUID,
+    admin_user_fixture: Any,
+    scaling_group_fixture: str,
+) -> AsyncIterator[SessionSeedData]:
+    """Seed a RUNNING session with a full lifecycle status_history
+    (PENDING → SCHEDULED → PREPARING → PULLING → CREATING → RUNNING).
+    """
+    unique = secrets.token_hex(4)
+    session_id = SessionId(uuid.uuid4())
+    session_name = f"test-full-lifecycle-{unique}"
+    kernel_id = uuid.uuid4()
+    now = datetime.now(tzutc())
+
+    status_history: dict[str, Any] = {
+        SessionStatus.PENDING.name: now.isoformat(),
+        SessionStatus.SCHEDULED.name: now.isoformat(),
+        SessionStatus.PREPARING.name: now.isoformat(),
+        SessionStatus.PULLING.name: now.isoformat(),
+        SessionStatus.CREATING.name: now.isoformat(),
+        SessionStatus.RUNNING.name: now.isoformat(),
+    }
+
+    async with db_engine.begin() as conn:
+        await conn.execute(
+            sa.insert(SessionRow.__table__).values(
+                id=session_id,
+                creation_id=f"cid-{unique}",
+                name=session_name,
+                session_type=SessionTypes.INTERACTIVE,
+                cluster_size=1,
+                cluster_mode="single-node",
+                domain_name=domain_fixture,
+                group_id=group_fixture,
+                user_uuid=admin_user_fixture.user_uuid,
+                access_key=admin_user_fixture.keypair.access_key,
+                scaling_group_name=scaling_group_fixture,
+                status=SessionStatus.RUNNING,
+                status_info="",
+                status_history=status_history,
+                occupying_slots=ResourceSlot(),
+                requested_slots=ResourceSlot(),
+                created_at=now,
+            )
+        )
+        await conn.execute(
+            sa.insert(kernels).values(
+                id=kernel_id,
+                session_id=session_id,
+                session_creation_id=f"cid-{unique}",
+                session_name=session_name,
+                session_type=SessionTypes.INTERACTIVE,
+                cluster_role="main",
+                cluster_idx=0,
+                cluster_hostname="main0",
+                cluster_mode="single-node",
+                cluster_size=1,
+                domain_name=domain_fixture,
+                group_id=group_fixture,
+                user_uuid=admin_user_fixture.user_uuid,
+                access_key=admin_user_fixture.keypair.access_key,
+                scaling_group=scaling_group_fixture,
+                status=KernelStatus.RUNNING,
+                status_info="",
+                occupied_slots=ResourceSlot(),
+                requested_slots=ResourceSlot(),
+                repl_in_port=0,
+                repl_out_port=0,
+                stdin_port=0,
+                stdout_port=0,
+                created_at=now,
+            )
+        )
+
+    yield SessionSeedData(
+        session_id=session_id,
+        session_name=session_name,
+        kernel_id=kernel_id,
+        access_key=admin_user_fixture.keypair.access_key,
+        domain_name=domain_fixture,
+        user_uuid=admin_user_fixture.user_uuid,
+    )
+
+    async with db_engine.begin() as conn:
+        await conn.execute(kernels.delete().where(kernels.c.id == kernel_id))
+        await conn.execute(
+            SessionRow.__table__.delete().where(SessionRow.__table__.c.id == session_id)
+        )
+
+
+@pytest.fixture()
 async def user_session_seed(
     db_engine: SAEngine,
     domain_fixture: str,
@@ -251,6 +447,92 @@ class TestSessionStatusTransition:
         assert session_seed.session_id in result.session_status_map
         assert terminated_session_seed.session_id in result.session_status_map
 
+    async def test_transit_reflects_new_status_after_transition(
+        self,
+        admin_registry: BackendAIClientRegistry,
+        session_seed: SessionSeedData,
+        session_lifecycle_manager_mock: AsyncMock,
+    ) -> None:
+        """Scenario: Lifecycle manager actually transitions a session (is_transited=True).
+
+        When a kernel status change triggers a valid session transition
+        (e.g., RUNNING → TERMINATING), the response status map must reflect
+        the NEW status, not the original one.
+        """
+        mock_row = AsyncMock()
+        mock_row.id = session_seed.session_id
+        mock_row.status = SessionStatus.TERMINATING
+        session_lifecycle_manager_mock.transit_session_status.return_value = [
+            (mock_row, True),
+        ]
+        result = await admin_registry.session.transit_session_status(
+            TransitSessionStatusRequest(ids=[session_seed.session_id]),
+        )
+        assert result.session_status_map[session_seed.session_id] == SessionStatus.TERMINATING.name
+
+    async def test_transit_terminal_session_returns_unchanged_status(
+        self,
+        admin_registry: BackendAIClientRegistry,
+        terminated_session_seed: SessionSeedData,
+        session_lifecycle_manager_mock: AsyncMock,
+    ) -> None:
+        """Scenario: Transit is requested for a TERMINATED session.
+
+        TERMINATED is a terminal state with no valid outgoing transitions.
+        The lifecycle manager returns is_transited=False and the response
+        status map should still contain the session with TERMINATED status.
+        """
+        mock_row = AsyncMock()
+        mock_row.id = terminated_session_seed.session_id
+        mock_row.status = SessionStatus.TERMINATED
+        session_lifecycle_manager_mock.transit_session_status.return_value = [
+            (mock_row, False),
+        ]
+        result = await admin_registry.session.transit_session_status(
+            TransitSessionStatusRequest(ids=[terminated_session_seed.session_id]),
+        )
+        assert (
+            result.session_status_map[terminated_session_seed.session_id]
+            == SessionStatus.TERMINATED.name
+        )
+
+    async def test_deregister_called_only_for_transited_sessions(
+        self,
+        admin_registry: BackendAIClientRegistry,
+        session_seed: SessionSeedData,
+        terminated_session_seed: SessionSeedData,
+        session_lifecycle_manager_mock: AsyncMock,
+    ) -> None:
+        """Scenario: Batch transit where only some sessions actually transition.
+
+        When one session transitions (RUNNING → TERMINATING) and another
+        does not (TERMINATED stays), deregister_status_updatable_session
+        must be called only with the transited session's ID.
+        """
+        transited_row = AsyncMock()
+        transited_row.id = session_seed.session_id
+        transited_row.status = SessionStatus.TERMINATING
+
+        unchanged_row = AsyncMock()
+        unchanged_row.id = terminated_session_seed.session_id
+        unchanged_row.status = SessionStatus.TERMINATED
+
+        session_lifecycle_manager_mock.transit_session_status.side_effect = [
+            [(transited_row, True)],
+            [(unchanged_row, False)],
+        ]
+        await admin_registry.session.transit_session_status(
+            TransitSessionStatusRequest(
+                ids=[session_seed.session_id, terminated_session_seed.session_id],
+            ),
+        )
+        deregister_calls = (
+            session_lifecycle_manager_mock.deregister_status_updatable_session.call_args_list
+        )
+        deregistered_ids = [session_id for call in deregister_calls for session_id in call.args[0]]
+        assert session_seed.session_id in deregistered_ids
+        assert terminated_session_seed.session_id not in deregistered_ids
+
     async def test_user_cannot_transit_others_session(
         self,
         user_registry: BackendAIClientRegistry,
@@ -267,6 +549,58 @@ class TestSessionStatusTransition:
         )
         assert isinstance(result, TransitSessionStatusResponse)
         assert session_seed.session_id not in result.session_status_map
+
+    async def test_transit_degraded_session_recovers_to_running(
+        self,
+        admin_registry: BackendAIClientRegistry,
+        degraded_session_seed: SessionSeedData,
+        session_lifecycle_manager_mock: AsyncMock,
+    ) -> None:
+        """Scenario: A RUNNING_DEGRADED session recovers to RUNNING.
+
+        When all kernels return to healthy status, the lifecycle manager
+        transitions the session from RUNNING_DEGRADED back to RUNNING.
+        Verifies that the recovery transition is reflected in the response.
+        """
+        mock_row = AsyncMock()
+        mock_row.id = degraded_session_seed.session_id
+        mock_row.status = SessionStatus.RUNNING
+        session_lifecycle_manager_mock.transit_session_status.return_value = [
+            (mock_row, True),
+        ]
+        result = await admin_registry.session.transit_session_status(
+            TransitSessionStatusRequest(ids=[degraded_session_seed.session_id]),
+        )
+        assert (
+            result.session_status_map[degraded_session_seed.session_id]
+            == SessionStatus.RUNNING.name
+        )
+
+    async def test_transit_degraded_session_to_terminating(
+        self,
+        admin_registry: BackendAIClientRegistry,
+        degraded_session_seed: SessionSeedData,
+        session_lifecycle_manager_mock: AsyncMock,
+    ) -> None:
+        """Scenario: A RUNNING_DEGRADED session transitions to TERMINATING.
+
+        RUNNING_DEGRADED → TERMINATING is a valid transition in the
+        SESSION_STATUS_TRANSITION_MAP. Verifies the endpoint returns the
+        new TERMINATING status.
+        """
+        mock_row = AsyncMock()
+        mock_row.id = degraded_session_seed.session_id
+        mock_row.status = SessionStatus.TERMINATING
+        session_lifecycle_manager_mock.transit_session_status.return_value = [
+            (mock_row, True),
+        ]
+        result = await admin_registry.session.transit_session_status(
+            TransitSessionStatusRequest(ids=[degraded_session_seed.session_id]),
+        )
+        assert (
+            result.session_status_map[degraded_session_seed.session_id]
+            == SessionStatus.TERMINATING.name
+        )
 
 
 class TestSessionRenameLifecycle:
@@ -491,6 +825,55 @@ class TestSessionStatusHistory:
             await user_registry.session.get_status_history(
                 session_seed.session_name,
             )
+
+    async def test_full_lifecycle_status_history(
+        self,
+        admin_registry: BackendAIClientRegistry,
+        full_lifecycle_session_seed: SessionSeedData,
+    ) -> None:
+        """Scenario: Admin queries status history of a session that went through
+        the full scheduling lifecycle (PENDING → SCHEDULED → PREPARING →
+        PULLING → CREATING → RUNNING).
+
+        Verifies that every intermediate status is recorded in the history
+        with a timestamp, confirming that the status_history column
+        accumulates entries across all transitions.
+        """
+        result = await admin_registry.session.get_status_history(
+            full_lifecycle_session_seed.session_name,
+        )
+        assert isinstance(result, GetStatusHistoryResponse)
+        history = result.root
+        assert isinstance(history, dict)
+        expected_statuses = [
+            SessionStatus.PENDING,
+            SessionStatus.SCHEDULED,
+            SessionStatus.PREPARING,
+            SessionStatus.PULLING,
+            SessionStatus.CREATING,
+            SessionStatus.RUNNING,
+        ]
+        for status in expected_statuses:
+            assert status.name in history, f"{status.name} missing from status history"
+
+    async def test_degraded_session_status_history_includes_degraded(
+        self,
+        admin_registry: BackendAIClientRegistry,
+        degraded_session_seed: SessionSeedData,
+    ) -> None:
+        """Scenario: Admin queries status history of a RUNNING_DEGRADED session.
+
+        Verifies that the RUNNING_DEGRADED status is recorded in the history,
+        confirming that the transition from RUNNING to RUNNING_DEGRADED was tracked.
+        """
+        result = await admin_registry.session.get_status_history(
+            degraded_session_seed.session_name,
+        )
+        assert isinstance(result, GetStatusHistoryResponse)
+        history = result.root
+        assert isinstance(history, dict)
+        assert SessionStatus.RUNNING.name in history
+        assert SessionStatus.RUNNING_DEGRADED.name in history
 
 
 class TestSessionDestroyLifecycle:
