@@ -93,6 +93,7 @@ async def test_authorize_success(
         password="correct_password",
         request=MagicMock(),
         stoken=None,
+        otp=None,
     )
 
     result = await auth_service.authorize(action)
@@ -117,6 +118,7 @@ async def test_authorize_invalid_token_type(
         password="password",
         request=MagicMock(),
         stoken=None,
+        otp=None,
     )
 
     with pytest.raises(InvalidAPIParameters):
@@ -143,6 +145,7 @@ async def test_authorize_invalid_credentials(
         password="wrong_password",
         request=MagicMock(),
         stoken=None,
+        otp=None,
     )
 
     with pytest.raises(AuthorizationFailed):
@@ -163,6 +166,7 @@ async def test_authorize_with_hook_authorization(
         password="any_password",
         request=MagicMock(),
         stoken=None,
+        otp=None,
     )
 
     # Hook returns user data as MagicMock for attribute access
@@ -213,6 +217,7 @@ async def test_authorize_with_password_expiry(
         password="old_password",
         request=MagicMock(),
         stoken=None,
+        otp=None,
     )
 
     # Setup expired password
@@ -251,6 +256,7 @@ async def test_authorize_with_post_hook_response(
         password="password",
         request=MagicMock(),
         stoken=None,
+        otp=None,
     )
 
     # Setup successful credential check
