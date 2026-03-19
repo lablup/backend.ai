@@ -92,6 +92,8 @@ async def webapp_plugin_ctx(
     cors_options = r.system.cors_options
     root_app["_db"] = r.infrastructure.db
     root_app["_config_provider"] = r.bootstrap.config_provider
+    root_app["_etcd"] = r.bootstrap.etcd
+    root_app["_valkey_stat"] = r.infrastructure.valkey.stat
     for plugin_name, plugin_instance in plugin_ctx.plugins.items():
         if pidx == 0:
             log.info("Loading webapp plugin: {0}", plugin_name)
