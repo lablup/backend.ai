@@ -395,15 +395,6 @@ class UpdatePermissionInput:
     entity_type: RBACElementTypeGQL | None = None
     operation: OperationTypeGQL | None = None
 
-    def to_pydantic(self) -> UpdatePermissionInputDTO:
-        return UpdatePermissionInputDTO(
-            id=self.id,
-            scope_type=None if self.scope_type is None else self.scope_type.value,
-            scope_id=self.scope_id,
-            entity_type=None if self.entity_type is None else self.entity_type.value,
-            operation=None if self.operation is None else self.operation.value,
-        )
-
 
 @strawberry.experimental.pydantic.input(
     model=DeletePermissionInputDTO,
