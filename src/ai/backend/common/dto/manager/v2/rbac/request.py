@@ -9,8 +9,9 @@ from uuid import UUID
 from pydantic import Field, field_validator
 
 from ai.backend.common.api_handlers import SENTINEL, BaseRequestModel, Sentinel
+from ai.backend.common.dto.manager.query import StringFilter
 
-from .types import RoleSource, RoleStatus
+from .types import RoleSource, RoleSourceFilter, RoleStatus, RoleStatusFilter
 
 __all__ = (
     "AssignRoleInput",
@@ -20,8 +21,17 @@ __all__ = (
     "CreateRoleInput",
     "DeletePermissionInput",
     "DeleteRoleInput",
+    "EntityFilter",
+    "EntityOrderBy",
+    "PermissionFilter",
+    "PermissionOrderBy",
     "PurgeRoleInput",
     "RevokeRoleInput",
+    "RoleAssignmentFilter",
+    "RoleAssignmentOrderBy",
+    "RoleFilter",
+    "RoleNestedFilter",
+    "RoleOrderBy",
     "UpdatePermissionInput",
     "UpdateRoleInput",
 )
@@ -127,3 +137,101 @@ class BulkRevokeRoleInput(BaseRequestModel):
 
     role_id: UUID = Field(description="Role ID to revoke")
     user_ids: list[UUID] = Field(description="List of user IDs to revoke the role from")
+
+
+class RoleFilter(BaseRequestModel):
+    """Filter for roles."""
+
+    name: StringFilter | None = None
+    source: RoleSourceFilter | None = None
+    status: RoleStatusFilter | None = None
+    AND: list[RoleFilter] | None = None
+    OR: list[RoleFilter] | None = None
+    NOT: list[RoleFilter] | None = None
+
+
+RoleFilter.model_rebuild()
+
+
+class RoleNestedFilter(BaseRequestModel):
+    """Nested filter for roles within a role assignment."""
+
+    name: StringFilter | None = None
+    source: RoleSourceFilter | None = None
+    status: RoleStatusFilter | None = None
+    AND: list[RoleNestedFilter] | None = None
+    OR: list[RoleNestedFilter] | None = None
+    NOT: list[RoleNestedFilter] | None = None
+
+
+RoleNestedFilter.model_rebuild()
+
+
+class RoleAssignmentFilter(BaseRequestModel):
+    """Filter for role assignments."""
+
+    role_id: UUID | None = None
+    role: RoleNestedFilter | None = None
+    username: StringFilter | None = None
+    email: StringFilter | None = None
+    AND: list[RoleAssignmentFilter] | None = None
+    OR: list[RoleAssignmentFilter] | None = None
+    NOT: list[RoleAssignmentFilter] | None = None
+
+
+RoleAssignmentFilter.model_rebuild()
+
+
+class EntityFilter(BaseRequestModel):
+    """Filter for entity associations."""
+
+    entity_type: str | None = None
+    entity_id: StringFilter | None = None
+    AND: list[EntityFilter] | None = None
+    OR: list[EntityFilter] | None = None
+    NOT: list[EntityFilter] | None = None
+
+
+EntityFilter.model_rebuild()
+
+
+class PermissionFilter(BaseRequestModel):
+    """Filter for scoped permissions."""
+
+    role_id: UUID | None = None
+    scope_type: str | None = None
+    entity_type: str | None = None
+    AND: list[PermissionFilter] | None = None
+    OR: list[PermissionFilter] | None = None
+    NOT: list[PermissionFilter] | None = None
+
+
+PermissionFilter.model_rebuild()
+
+
+class RoleOrderBy(BaseRequestModel):
+    """Order by specification for roles."""
+
+    field: str
+    direction: str = "desc"
+
+
+class RoleAssignmentOrderBy(BaseRequestModel):
+    """Order by specification for role assignments."""
+
+    field: str
+    direction: str = "desc"
+
+
+class EntityOrderBy(BaseRequestModel):
+    """Order by specification for entity associations."""
+
+    field: str
+    direction: str = "desc"
+
+
+class PermissionOrderBy(BaseRequestModel):
+    """Order by specification for permissions."""
+
+    field: str
+    direction: str = "desc"

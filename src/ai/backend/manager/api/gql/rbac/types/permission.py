@@ -18,10 +18,16 @@ from ai.backend.common.data.permission.types import (
 from ai.backend.common.dto.manager.v2.rbac.request import (
     CreatePermissionInput as CreatePermissionInputDTO,
     DeletePermissionInput as DeletePermissionInputDTO,
+    PermissionFilter as PermissionFilterDTO,
+    PermissionOrderBy as PermissionOrderByDTO,
     UpdatePermissionInput as UpdatePermissionInputDTO,
 )
 from ai.backend.common.dto.manager.v2.rbac.response import (
     DeletePermissionPayload as DeletePermissionPayloadDTO,
+)
+from ai.backend.common.dto.manager.v2.rbac.types import (
+    OrderDirection as OrderDirectionDTO,
+    PermissionOrderField as PermissionOrderFieldDTO,
 )
 from ai.backend.common.types import SessionId
 from ai.backend.manager.api.gql.base import OrderDirection
@@ -297,14 +303,28 @@ class PermissionGQL(PydanticNodeMixin):
 # ==================== Filter Types ====================
 
 
-@strawberry.input(description="Added in 26.3.0. Filter for scoped permissions")
+@strawberry.experimental.pydantic.input(
+    model=PermissionFilterDTO,
+    name="PermissionFilter",
+    description="Added in 26.3.0. Filter for scoped permissions",
+)
 class PermissionFilter(GQLFilter):
     role_id: uuid.UUID | None = None
     scope_type: RBACElementTypeGQL | None = None
     entity_type: RBACElementTypeGQL | None = None
-    AND: list[Self] | None = None
-    OR: list[Self] | None = None
-    NOT: list[Self] | None = None
+    AND: list[PermissionFilter] | None = None
+    OR: list[PermissionFilter] | None = None
+    NOT: list[PermissionFilter] | None = None
+
+    def to_pydantic(self) -> PermissionFilterDTO:
+        return PermissionFilterDTO(
+            role_id=self.role_id,
+            scope_type=self.scope_type.value if self.scope_type is not None else None,
+            entity_type=self.entity_type.value if self.entity_type is not None else None,
+            AND=[f.to_pydantic() for f in self.AND] if self.AND else None,
+            OR=[f.to_pydantic() for f in self.OR] if self.OR else None,
+            NOT=[f.to_pydantic() for f in self.NOT] if self.NOT else None,
+        )
 
     @override
     def build_conditions(self) -> list[QueryCondition]:
@@ -354,10 +374,20 @@ class PermissionFilter(GQLFilter):
 # ==================== OrderBy Types ====================
 
 
-@strawberry.input(description="Added in 26.3.0. Order by specification for permissions")
+@strawberry.experimental.pydantic.input(
+    model=PermissionOrderByDTO,
+    name="PermissionOrderBy",
+    description="Added in 26.3.0. Order by specification for permissions",
+)
 class PermissionOrderBy(GQLOrderBy):
     field: PermissionOrderField
     direction: OrderDirection = OrderDirection.DESC
+
+    def to_pydantic(self) -> PermissionOrderByDTO:
+        return PermissionOrderByDTO(
+            field=PermissionOrderFieldDTO(self.field.value),
+            direction=OrderDirectionDTO(self.direction.value),
+        )
 
     @override
     def to_query_order(self) -> QueryOrder:

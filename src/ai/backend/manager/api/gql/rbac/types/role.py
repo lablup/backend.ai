@@ -39,13 +39,43 @@ from ai.backend.common.dto.manager.v2.rbac.request import (
     RevokeRoleInput as RevokeRoleInputDTO,
 )
 from ai.backend.common.dto.manager.v2.rbac.request import (
+    RoleAssignmentFilter as RoleAssignmentFilterDTO,
+)
+from ai.backend.common.dto.manager.v2.rbac.request import (
+    RoleAssignmentOrderBy as RoleAssignmentOrderByDTO,
+)
+from ai.backend.common.dto.manager.v2.rbac.request import (
+    RoleFilter as RoleFilterDTO,
+)
+from ai.backend.common.dto.manager.v2.rbac.request import (
+    RoleNestedFilter as RoleNestedFilterDTO,
+)
+from ai.backend.common.dto.manager.v2.rbac.request import (
+    RoleOrderBy as RoleOrderByDTO,
+)
+from ai.backend.common.dto.manager.v2.rbac.request import (
     UpdateRoleInput as UpdateRoleInputDTO,
+)
+from ai.backend.common.dto.manager.v2.rbac.types import (
+    OrderDirection as OrderDirectionDTO,
+)
+from ai.backend.common.dto.manager.v2.rbac.types import (
+    RoleAssignmentOrderField as RoleAssignmentOrderFieldDTO,
+)
+from ai.backend.common.dto.manager.v2.rbac.types import (
+    RoleOrderField as RoleOrderFieldDTO,
 )
 from ai.backend.common.dto.manager.v2.rbac.types import (
     RoleSource as RoleSourceV2,
 )
 from ai.backend.common.dto.manager.v2.rbac.types import (
+    RoleSourceFilter as RoleSourceFilterDTO,
+)
+from ai.backend.common.dto.manager.v2.rbac.types import (
     RoleStatus as RoleStatusV2,
+)
+from ai.backend.common.dto.manager.v2.rbac.types import (
+    RoleStatusFilter as RoleStatusFilterDTO,
 )
 from ai.backend.manager.api.gql.base import OrderDirection, StringFilter
 from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin
@@ -343,7 +373,8 @@ class RoleAssignmentGQL(PydanticNodeMixin):
 # ==================== Filter Types ====================
 
 
-@strawberry.input(
+@strawberry.experimental.pydantic.input(
+    model=RoleSourceFilterDTO,
     name="RoleSourceFilter",
     description="Added in 26.3.0. Filter for role source with equality and membership operators.",
 )
@@ -361,8 +392,17 @@ class RoleSourceFilterGQL:
         default=None, description="Excludes roles whose source is in this list."
     )
 
+    def to_pydantic(self) -> RoleSourceFilterDTO:
+        return RoleSourceFilterDTO(
+            equals=self.equals.value if self.equals is not None else None,
+            in_=[v.value for v in self.in_] if self.in_ is not None else None,
+            not_equals=self.not_equals.value if self.not_equals is not None else None,
+            not_in=[v.value for v in self.not_in] if self.not_in is not None else None,
+        )
 
-@strawberry.input(
+
+@strawberry.experimental.pydantic.input(
+    model=RoleStatusFilterDTO,
     name="RoleStatusFilter",
     description="Added in 26.3.0. Filter for role status with equality and membership operators.",
 )
@@ -380,8 +420,20 @@ class RoleStatusFilterGQL:
         default=None, description="Excludes roles whose status is in this list."
     )
 
+    def to_pydantic(self) -> RoleStatusFilterDTO:
+        return RoleStatusFilterDTO(
+            equals=self.equals.value if self.equals is not None else None,
+            in_=[v.value for v in self.in_] if self.in_ is not None else None,
+            not_equals=self.not_equals.value if self.not_equals is not None else None,
+            not_in=[v.value for v in self.not_in] if self.not_in is not None else None,
+        )
 
-@strawberry.input(description="Added in 26.3.0. Filter for roles")
+
+@strawberry.experimental.pydantic.input(
+    model=RoleFilterDTO,
+    name="RoleFilter",
+    description="Added in 26.3.0. Filter for roles",
+)
 class RoleFilter(GQLFilter):
     name: StringFilter | None = None
     source: RoleSourceFilterGQL | None = None
@@ -390,6 +442,16 @@ class RoleFilter(GQLFilter):
     AND: list[RoleFilter] | None = None
     OR: list[RoleFilter] | None = None
     NOT: list[RoleFilter] | None = None
+
+    def to_pydantic(self) -> RoleFilterDTO:
+        return RoleFilterDTO(
+            name=self.name.to_pydantic() if self.name is not None else None,
+            source=self.source.to_pydantic() if self.source is not None else None,
+            status=self.status.to_pydantic() if self.status is not None else None,
+            AND=[f.to_pydantic() for f in self.AND] if self.AND else None,
+            OR=[f.to_pydantic() for f in self.OR] if self.OR else None,
+            NOT=[f.to_pydantic() for f in self.NOT] if self.NOT else None,
+        )
 
     @override
     def build_conditions(self) -> list[QueryCondition]:
@@ -458,7 +520,8 @@ class RoleFilter(GQLFilter):
 # TODO: Add user_id filter (requires AssignedUserConditions.by_user_id)
 
 
-@strawberry.input(
+@strawberry.experimental.pydantic.input(
+    model=RoleNestedFilterDTO,
     name="RoleAssignmentRoleNestedFilter",
     description=(
         "Added in 26.3.0. Nested filter for roles within a role assignment. "
@@ -473,6 +536,16 @@ class RoleAssignmentRoleNestedFilterGQL:
     AND: list[RoleAssignmentRoleNestedFilterGQL] | None = None
     OR: list[RoleAssignmentRoleNestedFilterGQL] | None = None
     NOT: list[RoleAssignmentRoleNestedFilterGQL] | None = None
+
+    def to_pydantic(self) -> RoleNestedFilterDTO:
+        return RoleNestedFilterDTO(
+            name=self.name.to_pydantic() if self.name is not None else None,
+            source=self.source.to_pydantic() if self.source is not None else None,
+            status=self.status.to_pydantic() if self.status is not None else None,
+            AND=[f.to_pydantic() for f in self.AND] if self.AND else None,
+            OR=[f.to_pydantic() for f in self.OR] if self.OR else None,
+            NOT=[f.to_pydantic() for f in self.NOT] if self.NOT else None,
+        )
 
     def build_conditions(self) -> list[QueryCondition]:
         raw_conditions: list[QueryCondition] = []
@@ -541,7 +614,11 @@ class RoleAssignmentRoleNestedFilterGQL:
         return conditions
 
 
-@strawberry.input(description="Added in 26.3.0. Filter for role assignments")
+@strawberry.experimental.pydantic.input(
+    model=RoleAssignmentFilterDTO,
+    name="RoleAssignmentFilter",
+    description="Added in 26.3.0. Filter for role assignments",
+)
 class RoleAssignmentFilter(GQLFilter):
     role_id: uuid.UUID | None = None
     role: RoleAssignmentRoleNestedFilterGQL | None = None
@@ -551,6 +628,17 @@ class RoleAssignmentFilter(GQLFilter):
     AND: list[RoleAssignmentFilter] | None = None
     OR: list[RoleAssignmentFilter] | None = None
     NOT: list[RoleAssignmentFilter] | None = None
+
+    def to_pydantic(self) -> RoleAssignmentFilterDTO:
+        return RoleAssignmentFilterDTO(
+            role_id=self.role_id,
+            role=self.role.to_pydantic() if self.role is not None else None,
+            username=self.username.to_pydantic() if self.username is not None else None,
+            email=self.email.to_pydantic() if self.email is not None else None,
+            AND=[f.to_pydantic() for f in self.AND] if self.AND else None,
+            OR=[f.to_pydantic() for f in self.OR] if self.OR else None,
+            NOT=[f.to_pydantic() for f in self.NOT] if self.NOT else None,
+        )
 
     @override
     def build_conditions(self) -> list[QueryCondition]:
@@ -609,10 +697,20 @@ class RoleAssignmentFilter(GQLFilter):
 # ==================== OrderBy Types ====================
 
 
-@strawberry.input(description="Added in 26.3.0. Order by specification for roles")
+@strawberry.experimental.pydantic.input(
+    model=RoleOrderByDTO,
+    name="RoleOrderBy",
+    description="Added in 26.3.0. Order by specification for roles",
+)
 class RoleOrderBy(GQLOrderBy):
     field: RoleOrderField
     direction: OrderDirection = OrderDirection.DESC
+
+    def to_pydantic(self) -> RoleOrderByDTO:
+        return RoleOrderByDTO(
+            field=RoleOrderFieldDTO(self.field.value),
+            direction=OrderDirectionDTO(self.direction.value),
+        )
 
     @override
     def to_query_order(self) -> QueryOrder:
@@ -633,10 +731,20 @@ class RoleAssignmentOrderField(StrEnum):
     GRANTED_AT = "granted_at"
 
 
-@strawberry.input(description="Added in 26.3.0. Order by specification for role assignments")
+@strawberry.experimental.pydantic.input(
+    model=RoleAssignmentOrderByDTO,
+    name="RoleAssignmentOrderBy",
+    description="Added in 26.3.0. Order by specification for role assignments",
+)
 class RoleAssignmentOrderBy(GQLOrderBy):
     field: RoleAssignmentOrderField
     direction: OrderDirection = OrderDirection.DESC
+
+    def to_pydantic(self) -> RoleAssignmentOrderByDTO:
+        return RoleAssignmentOrderByDTO(
+            field=RoleAssignmentOrderFieldDTO(self.field.value),
+            direction=OrderDirectionDTO(self.direction.value),
+        )
 
     @override
     def to_query_order(self) -> QueryOrder:

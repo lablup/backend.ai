@@ -13,6 +13,18 @@ from strawberry import ID, Info
 from strawberry.relay import NodeID
 
 from ai.backend.common.data.permission.types import RBACElementType
+from ai.backend.common.dto.manager.v2.rbac.request import (
+    EntityFilter as EntityFilterDTO,
+)
+from ai.backend.common.dto.manager.v2.rbac.request import (
+    EntityOrderBy as EntityOrderByDTO,
+)
+from ai.backend.common.dto.manager.v2.rbac.types import (
+    EntityOrderField as EntityOrderFieldDTO,
+)
+from ai.backend.common.dto.manager.v2.rbac.types import (
+    OrderDirection as OrderDirectionDTO,
+)
 from ai.backend.manager.api.gql.base import OrderDirection, StringFilter
 from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin
 from ai.backend.manager.api.gql.rbac.types.entity_node import EntityNode
@@ -206,13 +218,26 @@ class EntityRefGQL(PydanticNodeMixin):
 # ==================== Filter Types ====================
 
 
-@strawberry.input(description="Added in 26.3.0. Filter for entity associations")
+@strawberry.experimental.pydantic.input(
+    model=EntityFilterDTO,
+    name="EntityFilter",
+    description="Added in 26.3.0. Filter for entity associations",
+)
 class EntityFilter(GQLFilter):
     entity_type: RBACElementTypeGQL | None = None
     entity_id: StringFilter | None = None
-    AND: list[Self] | None = None
-    OR: list[Self] | None = None
-    NOT: list[Self] | None = None
+    AND: list[EntityFilter] | None = None
+    OR: list[EntityFilter] | None = None
+    NOT: list[EntityFilter] | None = None
+
+    def to_pydantic(self) -> EntityFilterDTO:
+        return EntityFilterDTO(
+            entity_type=self.entity_type.value if self.entity_type is not None else None,
+            entity_id=self.entity_id.to_pydantic() if self.entity_id is not None else None,
+            AND=[f.to_pydantic() for f in self.AND] if self.AND else None,
+            OR=[f.to_pydantic() for f in self.OR] if self.OR else None,
+            NOT=[f.to_pydantic() for f in self.NOT] if self.NOT else None,
+        )
 
     @override
     def build_conditions(self) -> list[QueryCondition]:
@@ -260,10 +285,20 @@ class EntityFilter(GQLFilter):
 # ==================== OrderBy Types ====================
 
 
-@strawberry.input(description="Added in 26.3.0. Order by specification for entity associations")
+@strawberry.experimental.pydantic.input(
+    model=EntityOrderByDTO,
+    name="EntityOrderBy",
+    description="Added in 26.3.0. Order by specification for entity associations",
+)
 class EntityOrderBy(GQLOrderBy):
     field: EntityOrderField
     direction: OrderDirection = OrderDirection.DESC
+
+    def to_pydantic(self) -> EntityOrderByDTO:
+        return EntityOrderByDTO(
+            field=EntityOrderFieldDTO(self.field.value),
+            direction=OrderDirectionDTO(self.direction.value),
+        )
 
     @override
     def to_query_order(self) -> QueryOrder:
