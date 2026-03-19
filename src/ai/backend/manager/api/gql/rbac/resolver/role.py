@@ -5,7 +5,7 @@ from __future__ import annotations
 import uuid
 
 import strawberry
-from strawberry import ID, Info
+from strawberry import Info
 
 from ai.backend.common.contexts.user import current_user
 from ai.backend.common.data.permission.types import RoleStatus
@@ -325,7 +325,7 @@ async def admin_delete_role(
     await info.context.processors.permission_controller.delete_role.wait_for_complete(
         DeleteRoleAction(updater=updater)
     )
-    return DeleteRolePayload(id=ID(str(input.id)))
+    return DeleteRolePayload(id=input.id)
 
 
 @strawberry.mutation(description="Added in 26.3.0. Permanently remove a role (admin only).")  # type: ignore[misc]
@@ -338,7 +338,7 @@ async def admin_purge_role(
     await info.context.processors.permission_controller.purge_role.wait_for_complete(
         PurgeRoleAction(purger=purger)
     )
-    return PurgeRolePayload(id=ID(str(input.id)))
+    return PurgeRolePayload(id=input.id)
 
 
 @strawberry.mutation(description="Added in 26.3.0. Assign a role to a user (admin only).")  # type: ignore[misc]

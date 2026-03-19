@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import strawberry
-from strawberry import ID, Info
+from strawberry import Info
 
 from ai.backend.common.data.permission.scope_entity_combinations import (
     VALID_SCOPE_ENTITY_COMBINATIONS,
@@ -214,4 +214,4 @@ async def admin_delete_permission(
     await info.context.processors.permission_controller.delete_permission.wait_for_complete(
         DeletePermissionAction(purger=purger)
     )
-    return DeletePermissionPayload(id=ID(str(input.id)))
+    return DeletePermissionPayload(id=input.id)

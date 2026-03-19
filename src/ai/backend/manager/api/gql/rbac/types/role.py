@@ -56,6 +56,12 @@ from ai.backend.common.dto.manager.v2.rbac.request import (
 from ai.backend.common.dto.manager.v2.rbac.request import (
     UpdateRoleInput as UpdateRoleInputDTO,
 )
+from ai.backend.common.dto.manager.v2.rbac.response import (
+    DeleteRolePayload as DeleteRolePayloadDTO,
+)
+from ai.backend.common.dto.manager.v2.rbac.response import (
+    PurgeRolePayload as PurgeRolePayloadDTO,
+)
 from ai.backend.common.dto.manager.v2.rbac.types import (
     OrderDirection as OrderDirectionDTO,
 )
@@ -855,14 +861,22 @@ class PurgeRoleInput:
 # ==================== Payload Types ====================
 
 
-@strawberry.type(description="Added in 26.3.0. Payload for delete role mutation")
+@strawberry.experimental.pydantic.type(
+    model=DeleteRolePayloadDTO,
+    description="Added in 26.3.0. Payload for delete role mutation",
+    all_fields=True,
+)
 class DeleteRolePayload:
-    id: ID
+    """Payload for role soft-deletion mutation."""
 
 
-@strawberry.type(description="Added in 26.3.0. Payload for purge role mutation")
+@strawberry.experimental.pydantic.type(
+    model=PurgeRolePayloadDTO,
+    description="Added in 26.3.0. Payload for purge role mutation",
+    all_fields=True,
+)
 class PurgeRolePayload:
-    id: ID
+    """Payload for role purge mutation."""
 
 
 @strawberry.type(
