@@ -111,4 +111,4 @@ async def admin_delete_prometheus_query_preset(
         DeletePresetAction(preset_id=UUID(id))
     )
 
-    return DeleteQueryDefinitionPayload(id=id)
+    return DeleteQueryDefinitionPayload(id=UUID(id))

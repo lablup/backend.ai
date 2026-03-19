@@ -5,7 +5,10 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any, Self
 
 import strawberry
-from strawberry import ID
+
+from ai.backend.common.dto.manager.v2.prometheus_query_preset.response import (
+    DeleteQueryDefinitionPayload as DeleteQueryDefinitionPayloadDTO,
+)
 
 if TYPE_CHECKING:
     from ai.backend.common.dto.clients.prometheus.response import MetricResponse
@@ -74,9 +77,11 @@ class QueryDefinitionResultGQL:
     result: list[MetricResultGQL] = strawberry.field(description="Metric result entries.")
 
 
-@strawberry.type(
+@strawberry.experimental.pydantic.type(
+    model=DeleteQueryDefinitionPayloadDTO,
     name="DeleteQueryDefinitionPayload",
     description="Added in 26.3.0. Payload returned after deleting a query definition.",
+    all_fields=True,
 )
 class DeleteQueryDefinitionPayload:
-    id: ID = strawberry.field(description="ID of the deleted query definition.")
+    """Payload for query definition deletion mutation."""

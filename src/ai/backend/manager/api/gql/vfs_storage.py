@@ -17,6 +17,9 @@ from ai.backend.common.dto.manager.v2.vfs_storage.request import (
 from ai.backend.common.dto.manager.v2.vfs_storage.request import (
     UpdateVFSStorageInput as UpdateVFSStorageInputDTO,
 )
+from ai.backend.common.dto.manager.v2.vfs_storage.response import (
+    DeleteVFSStoragePayload as DeleteVFSStoragePayloadDTO,
+)
 from ai.backend.manager.api.gql.base import encode_cursor
 from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin
 from ai.backend.manager.data.vfs_storage.types import VFSStorageData
@@ -152,9 +155,13 @@ class UpdateVFSStoragePayload:
     vfs_storage: VFSStorage
 
 
-@strawberry.type(description="Added in 25.16.0. Payload for deleting VFS storage")
+@strawberry.experimental.pydantic.type(
+    model=DeleteVFSStoragePayloadDTO,
+    description="Added in 25.16.0. Payload for deleting VFS storage",
+    all_fields=True,
+)
 class DeleteVFSStoragePayload:
-    id: ID
+    """Payload for VFS storage deletion mutation."""
 
 
 @strawberry.mutation(  # type: ignore[misc]
@@ -190,4 +197,4 @@ async def delete_vfs_storage(
         )
     )
 
-    return DeleteVFSStoragePayload(id=ID(str(action_result.deleted_storage_id)))
+    return DeleteVFSStoragePayload(id=action_result.deleted_storage_id)
