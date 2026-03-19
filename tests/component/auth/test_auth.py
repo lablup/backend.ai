@@ -491,16 +491,28 @@ class TestRoleAndScopeAccess:
         )
         assert result.group_role is not None
 
-    async def test_get_role_with_nonexistent_group_fails(
+    async def test_superadmin_get_role_with_nonexistent_group_succeeds(
         self,
         admin_registry: BackendAIClientRegistry,
     ) -> None:
-        """Calling get_role with a nonexistent group UUID must raise NotFoundError (404).
-        Since no group membership exists in the database, the server responds
-        with ObjectNotFound."""
+        """Superadmin calling get_role with a nonexistent group UUID must succeed
+        because superadmins have global access across all domains and groups."""
+        fake_group = uuid.uuid4()
+        result = await admin_registry.auth.get_role(
+            GetRoleRequest(group=fake_group),
+        )
+        assert result.group_role is not None
+
+    async def test_regular_user_get_role_with_nonexistent_group_fails(
+        self,
+        user_registry: BackendAIClientRegistry,
+    ) -> None:
+        """A regular user calling get_role with a nonexistent group UUID must raise
+        NotFoundError (404). Since no group membership exists in the database,
+        the server responds with ObjectNotFound."""
         fake_group = uuid.uuid4()
         with pytest.raises(NotFoundError):
-            await admin_registry.auth.get_role(
+            await user_registry.auth.get_role(
                 GetRoleRequest(group=fake_group),
             )
 
