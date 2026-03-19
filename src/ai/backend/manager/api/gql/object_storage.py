@@ -215,13 +215,6 @@ class GetPresignedDownloadURLInput:
     key: str
     expiration: int | None = None
 
-    def to_pydantic(self) -> GetPresignedDownloadURLInputDTO:
-        return GetPresignedDownloadURLInputDTO(
-            artifact_revision_id=uuid.UUID(self.artifact_revision_id),
-            key=self.key,
-            expiration=self.expiration,
-        )
-
 
 @strawberry.experimental.pydantic.input(
     model=GetPresignedUploadURLInputDTO,
@@ -230,12 +223,6 @@ class GetPresignedDownloadURLInput:
 class GetPresignedUploadURLInput:
     artifact_revision_id: ID
     key: str
-
-    def to_pydantic(self) -> GetPresignedUploadURLInputDTO:
-        return GetPresignedUploadURLInputDTO(
-            artifact_revision_id=uuid.UUID(self.artifact_revision_id),
-            key=self.key,
-        )
 
 
 @strawberry.type(description="Added in 25.14.0")
