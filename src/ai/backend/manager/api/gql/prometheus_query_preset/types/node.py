@@ -15,6 +15,12 @@ from .payloads import QueryDefinitionOptionsGQL
 
 if TYPE_CHECKING:
     from ai.backend.common.dto.manager.v2.prometheus_query_preset.response import (
+        CreateQueryDefinitionPayload as CreateQueryDefinitionPayloadDTO,
+    )
+    from ai.backend.common.dto.manager.v2.prometheus_query_preset.response import (
+        ModifyQueryDefinitionPayload as ModifyQueryDefinitionPayloadDTO,
+    )
+    from ai.backend.common.dto.manager.v2.prometheus_query_preset.response import (
         QueryDefinitionNode,
     )
     from ai.backend.manager.data.prometheus_query_preset import PrometheusQueryPresetData
@@ -94,6 +100,10 @@ class QueryDefinitionConnection(Connection[QueryDefinitionGQL]):
 class CreateQueryDefinitionPayload:
     preset: QueryDefinitionGQL
 
+    @classmethod
+    def from_pydantic(cls, dto: CreateQueryDefinitionPayloadDTO) -> Self:
+        return cls(preset=QueryDefinitionGQL.from_node(dto.item))
+
 
 @strawberry.type(
     name="ModifyQueryDefinitionPayload",
@@ -101,3 +111,7 @@ class CreateQueryDefinitionPayload:
 )
 class ModifyQueryDefinitionPayload:
     preset: QueryDefinitionGQL
+
+    @classmethod
+    def from_pydantic(cls, dto: ModifyQueryDefinitionPayloadDTO) -> Self:
+        return cls(preset=QueryDefinitionGQL.from_node(dto.item))
