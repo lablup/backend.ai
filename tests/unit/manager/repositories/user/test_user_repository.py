@@ -52,7 +52,7 @@ from ai.backend.manager.repositories.user.creators import UserCreatorSpec
 from ai.backend.manager.repositories.user.repository import UserRepository
 from ai.backend.manager.repositories.user.updaters import UserUpdaterSpec
 from ai.backend.manager.services.user.types import UserCreateSpec, UserUpdateSpec
-from ai.backend.manager.types import OptionalState
+from ai.backend.manager.types import OptionalState, TriState
 from ai.backend.testutils.db import with_tables
 
 
@@ -650,8 +650,8 @@ class TestUserRepository:
     ) -> None:
         """Test successful user update"""
         updater_spec = UserUpdaterSpec(
-            full_name=OptionalState.update("Updated Name"),
-            description=OptionalState.update("Updated Description"),
+            full_name=TriState.update("Updated Name"),
+            description=TriState.update("Updated Description"),
         )
         updater = Updater(spec=updater_spec, pk_value=sample_user_email)
 
@@ -736,7 +736,7 @@ class TestUserRepository:
     ) -> None:
         """Test user update when user not found"""
         updater_spec = UserUpdaterSpec(
-            full_name=OptionalState.update("Updated Name"),
+            full_name=TriState.update("Updated Name"),
         )
         updater = Updater(spec=updater_spec, pk_value="nonexistent@example.com")
 
@@ -899,8 +899,8 @@ class TestUserRepository:
         update_items: list[UserUpdateSpec] = []
         for i, user_data in enumerate(create_result.successes):
             updater_spec = UserUpdaterSpec(
-                full_name=OptionalState.update(f"Updated Name {i}"),
-                description=OptionalState.update(f"Updated Description {i}"),
+                full_name=TriState.update(f"Updated Name {i}"),
+                description=TriState.update(f"Updated Description {i}"),
             )
             update_items.append(UserUpdateSpec(user_id=user_data.uuid, updater_spec=updater_spec))
 
@@ -956,13 +956,13 @@ class TestUserRepository:
             UserUpdateSpec(
                 user_id=real_user.uuid,
                 updater_spec=UserUpdaterSpec(
-                    full_name=OptionalState.update("Updated Name"),
+                    full_name=TriState.update("Updated Name"),
                 ),
             ),
             UserUpdateSpec(
                 user_id=non_existent_user_id,
                 updater_spec=UserUpdaterSpec(
-                    full_name=OptionalState.update("Should Fail"),
+                    full_name=TriState.update("Should Fail"),
                 ),
             ),
         ]

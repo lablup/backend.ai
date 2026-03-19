@@ -68,7 +68,7 @@ class TestGroupOrderField:
         assert GroupOrderField.MODIFIED_AT.value == "modified_at"
 
     def test_enum_members_count(self) -> None:
-        assert len(list(GroupOrderField)) == 3
+        assert len(list(GroupOrderField)) == 8
 
     def test_all_values_are_strings(self) -> None:
         for member in GroupOrderField:

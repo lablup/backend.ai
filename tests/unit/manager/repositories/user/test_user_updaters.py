@@ -125,8 +125,8 @@ class TestUserUpdaterSpecBuildValues:
         """Test multiple fields are correctly included."""
         spec = UserUpdaterSpec(
             username=OptionalState.update("updated_user"),
-            full_name=OptionalState.update("Updated Name"),
-            description=OptionalState.update("Updated description"),
+            full_name=TriState.update("Updated Name"),
+            description=TriState.update("Updated description"),
             role=OptionalState.update(UserRole.USER),
             status=OptionalState.update(UserStatus.ACTIVE),
             totp_activated=OptionalState.update(True),

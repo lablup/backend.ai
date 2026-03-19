@@ -77,7 +77,7 @@ class SubInfoGQL:
 
 
 @strawberry.type(name="ItemV2")
-class ItemGQL(PydanticNodeMixin):
+class ItemGQL(PydanticNodeMixin[Any]):
     id: NodeID[str] = strawberry.field(description="Relay ID")
     name: str = strawberry.field(description="Item name")
     type: ItemTypeGQL = strawberry.field(description="Item type")
@@ -162,7 +162,7 @@ class TestPydanticNodeMixin:
             value: int = Field(description="Some value")
 
         @strawberry.type(name="NameKeyV2")
-        class NameKeyGQL(PydanticNodeMixin):
+        class NameKeyGQL(PydanticNodeMixin[Any]):
             id: NodeID[str] = strawberry.field(description="Relay ID")
             value: int = strawberry.field(description="Some value")
 

@@ -49,7 +49,7 @@ class TestAgentOrderField:
         assert AgentOrderField.RESOURCE_GROUP.value == "resource_group"
 
     def test_all_members_count(self) -> None:
-        assert len(list(AgentOrderField)) == 3
+        assert len(list(AgentOrderField)) == 5
 
     def test_from_string_id(self) -> None:
         assert AgentOrderField("id") is AgentOrderField.ID

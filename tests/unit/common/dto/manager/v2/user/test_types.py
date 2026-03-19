@@ -121,7 +121,7 @@ class TestUserOrderField:
         assert UserOrderField.DOMAIN_NAME.value == "domain_name"
 
     def test_enum_members_count(self) -> None:
-        assert len(list(UserOrderField)) == 6
+        assert len(list(UserOrderField)) == 7
 
     def test_all_values_are_strings(self) -> None:
         for member in UserOrderField:

@@ -45,6 +45,7 @@ def _make_agent_node(agent_id: str = "agent-001") -> AgentNode:
         status_info=_make_status_info(),
         system_info=_make_system_info(),
         network_info=_make_network_info(),
+        scaling_group="default",
     )
 
 

@@ -44,7 +44,7 @@ class TestDomainOrderField:
         assert DomainOrderField.MODIFIED_AT.value == "modified_at"
 
     def test_enum_members_count(self) -> None:
-        assert len(list(DomainOrderField)) == 3
+        assert len(list(DomainOrderField)) == 7
 
     def test_all_values_are_strings(self) -> None:
         for member in DomainOrderField:

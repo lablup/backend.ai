@@ -58,7 +58,7 @@ class TestDomainFairShareOrderField:
         assert DomainFairShareOrderField.CREATED_AT.value == "created_at"
 
     def test_member_count(self) -> None:
-        assert len(DomainFairShareOrderField) == 3
+        assert len(DomainFairShareOrderField) == 4
 
     def test_from_string(self) -> None:
         assert (
@@ -77,7 +77,7 @@ class TestProjectFairShareOrderField:
         assert ProjectFairShareOrderField.CREATED_AT.value == "created_at"
 
     def test_member_count(self) -> None:
-        assert len(ProjectFairShareOrderField) == 2
+        assert len(ProjectFairShareOrderField) == 4
 
 
 class TestUserFairShareOrderField:
@@ -90,7 +90,7 @@ class TestUserFairShareOrderField:
         assert UserFairShareOrderField.CREATED_AT.value == "created_at"
 
     def test_member_count(self) -> None:
-        assert len(UserFairShareOrderField) == 2
+        assert len(UserFairShareOrderField) == 4
 
 
 class TestDomainUsageBucketOrderField:
@@ -196,27 +196,30 @@ class TestFairShareSpecInfo:
         assert spec.lookback_days == 90
         assert spec.decay_unit_days == 1
 
-    def test_weight_none_is_valid(self) -> None:
+    def test_uses_default_weight_false_by_default(self) -> None:
         spec = FairShareSpecInfo(
-            weight=None,
+            weight=Decimal("1.0"),
             half_life_days=30,
             lookback_days=90,
             decay_unit_days=1,
             resource_weights=self._make_resource_slot(),
         )
-        assert spec.weight is None
+        assert spec.uses_default_weight is False
 
-    def test_default_weight_is_none(self) -> None:
+    def test_uses_default_weight_true(self) -> None:
         spec = FairShareSpecInfo(
+            weight=Decimal("1.0"),
             half_life_days=30,
             lookback_days=90,
             decay_unit_days=1,
             resource_weights=self._make_resource_slot(),
+            uses_default_weight=True,
         )
-        assert spec.weight is None
+        assert spec.uses_default_weight is True
 
     def test_nested_resource_weights(self) -> None:
         spec = FairShareSpecInfo(
+            weight=Decimal("1.0"),
             half_life_days=30,
             lookback_days=90,
             decay_unit_days=1,
