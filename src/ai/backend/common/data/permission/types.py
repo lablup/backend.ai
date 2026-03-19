@@ -89,6 +89,8 @@ class EntityType(enum.StrEnum):
     # === Standalone entity types ===
     AGENT = "agent"
     AUTH = "auth"
+    PROJECT_ADMIN_PAGE = "project_admin_page"
+    DOMAIN_ADMIN_PAGE = "domain_admin_page"
     SERVICE_CATALOG = "service_catalog"
     AUDIT_LOG = "audit_log"
     CONTAINER_METRIC = "container_metric"
@@ -384,6 +386,10 @@ class RBACElementType(enum.StrEnum):
     ROLE = "role"
     AUDIT_LOG = "audit_log"
     EVENT_LOG = "event_log"
+
+    # === Admin page access control ===
+    PROJECT_ADMIN_PAGE = "project_admin_page"
+    DOMAIN_ADMIN_PAGE = "domain_admin_page"
 
     # === Auto-only entities used in permissions ===
     NOTIFICATION_RULE = "notification_rule"
