@@ -16,8 +16,35 @@ import strawberry
 from strawberry import Info
 from strawberry.relay import Connection, Edge, NodeID
 
+from ai.backend.common.dto.manager.v2.image.request import (
+    AdminSearchImageAliasesInput,
+    ContainerRegistryScopeInputDTO,
+    ImageAliasFilterInputDTO,
+    ImageAliasNestedFilterInputDTO,
+    ImageAliasOrderByInputDTO,
+    ImageFilterInputDTO,
+    ImageOrderByInputDTO,
+    ImageScopeInputDTO,
+    ImageStatusFilterInputDTO,
+)
+from ai.backend.common.dto.manager.v2.image.response import ImageAliasNode, ImageNode
+from ai.backend.common.dto.manager.v2.image.types import (
+    ImageOrderField as ImageOrderFieldDTO,
+)
+from ai.backend.common.dto.manager.v2.image.types import (
+    ImageStatusType,
+)
+from ai.backend.common.dto.manager.v2.image.types import (
+    OrderDirection as OrderDirectionDTO,
+)
 from ai.backend.common.types import ImageID
-from ai.backend.manager.api.gql.base import DateTimeFilter, OrderDirection, StringFilter
+from ai.backend.manager.api.gql.base import (
+    DateTimeFilter,
+    OrderDirection,
+    StringFilter,
+    UUIDFilter,
+    encode_cursor,
+)
 from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin
 from ai.backend.manager.api.gql.types import GQLFilter, GQLOrderBy, StrawberryGQLContext
 from ai.backend.manager.api.gql.utils import dedent_strip
@@ -28,15 +55,8 @@ from ai.backend.manager.data.image.types import (
     ImageStatus,
     ResourceLimit,
 )
-from ai.backend.manager.models.image.conditions import ImageAliasConditions, ImageConditions
-from ai.backend.manager.models.image.orders import ImageAliasOrders, ImageOrders
+from ai.backend.manager.models.image.conditions import ImageAliasConditions
 from ai.backend.manager.models.rbac.permission_defs import ImagePermission
-from ai.backend.manager.repositories.base import (
-    QueryCondition,
-    QueryOrder,
-    combine_conditions_or,
-    negate_conditions,
-)
 
 # =============================================================================
 # Enums
@@ -174,6 +194,11 @@ class ImageV2AliasGQL(PydanticNodeMixin):
     @classmethod
     def from_data(cls, data: ImageAliasData) -> Self:
         return cls(id=data.id, alias=data.alias)
+
+    @classmethod
+    def from_node(cls, node: ImageAliasNode) -> Self:
+        """Create ImageV2AliasGQL from ImageAliasNode DTO."""
+        return cls(id=node.id, alias=node.alias)
 
 
 # =============================================================================
@@ -381,18 +406,35 @@ class ImageV2GQL(PydanticNodeMixin):
         last: int | None = None,
     ) -> ImageV2AliasConnectionGQL:
         """Get the aliases for this image with pagination, filtering, and ordering."""
-        from .fetcher import fetch_image_aliases
-
+        pydantic_filter = filter.to_pydantic() if filter else None
+        pydantic_orders = [o.to_pydantic() for o in order_by] if order_by else None
         base_conditions = [ImageAliasConditions.by_image_ids([self._image_id])]
-        return await fetch_image_aliases(
-            info,
-            filter=filter,
-            order_by=order_by,
-            before=before,
-            after=after,
-            first=first,
-            last=last,
+        payload = await info.context.adapters.image.admin_search_image_aliases(
+            AdminSearchImageAliasesInput(
+                filter=pydantic_filter,
+                order=pydantic_orders,
+                first=first,
+                after=after,
+                last=last,
+                before=before,
+            ),
             base_conditions=base_conditions,
+        )
+        edges = [
+            ImageV2AliasEdgeGQL(
+                node=ImageV2AliasGQL.from_node(node),
+                cursor=encode_cursor(node.id),
+            )
+            for node in payload.items
+        ]
+        page_info = strawberry.relay.PageInfo(
+            has_next_page=payload.has_next_page,
+            has_previous_page=payload.has_previous_page,
+            start_cursor=edges[0].cursor if edges else None,
+            end_cursor=edges[-1].cursor if edges else None,
+        )
+        return ImageV2AliasConnectionGQL(
+            count=payload.total_count, edges=edges, page_info=page_info
         )
 
     @classmethod
@@ -407,6 +449,49 @@ class ImageV2GQL(PydanticNodeMixin):
             ImageID(uuid.UUID(nid)) for nid in node_ids
         ])
         return [cls.from_data(data) if data is not None else None for data in results]
+
+    @classmethod
+    def from_node(cls, node: ImageNode) -> Self:
+        """Create ImageV2GQL from ImageNode DTO.
+
+        Args:
+            node: The image node DTO from the adapter layer.
+
+        Returns:
+            ImageV2GQL instance.
+        """
+        accelerators = node.accelerators.split(",") if node.accelerators else []
+        image_id = ImageID(node.id)
+        return cls(
+            id=node.id,
+            _image_id=image_id,
+            identity=ImageV2IdentityInfoGQL(
+                canonical_name=node.name,
+                namespace=node.image,
+                architecture=node.architecture,
+            ),
+            metadata=ImageV2MetadataInfoGQL(
+                tags=[ImageV2TagEntryGQL(key=t.key, value=t.value) for t in node.tags],
+                labels=[ImageV2LabelEntryGQL(key=lb.key, value=lb.value) for lb in node.labels],
+                digest=node.config_digest,
+                size_bytes=node.size_bytes,
+                status=ImageV2StatusGQL(node.status.value),
+                created_at=node.created_at,
+            ),
+            requirements=ImageV2RequirementsInfoGQL(
+                resource_limits=[
+                    ImageV2ResourceLimitGQL(
+                        key=rl.key,
+                        min=str(rl.min),
+                        max=str(rl.max) if rl.max is not None else "Infinity",
+                    )
+                    for rl in node.resource_limits
+                ],
+                supported_accelerators=[a.strip() for a in accelerators if a.strip()],
+            ),
+            permission=None,
+            registry_id=node.registry_id,
+        )
 
     @classmethod
     def from_data(
@@ -489,7 +574,8 @@ class ImageV2ConnectionGQL(Connection[ImageV2GQL]):
 # =============================================================================
 
 
-@strawberry.input(
+@strawberry.experimental.pydantic.input(
+    model=ContainerRegistryScopeInputDTO,
     name="ContainerRegistryScope",
     description=dedent_strip("""
     Added in 26.2.0.
@@ -502,8 +588,13 @@ class ContainerRegistryScopeGQL:
         description="UUID of the container registry to scope the query to."
     )
 
+    def to_pydantic(self) -> ContainerRegistryScopeInputDTO:
+        """Convert to pydantic DTO for adapter layer processing."""
+        return ContainerRegistryScopeInputDTO(registry_id=self.registry_id)
 
-@strawberry.input(
+
+@strawberry.experimental.pydantic.input(
+    model=ImageScopeInputDTO,
     name="ImageV2Scope",
     description=dedent_strip("""
     Added in 26.2.0.
@@ -514,8 +605,13 @@ class ContainerRegistryScopeGQL:
 class ImageV2ScopeGQL:
     image_id: uuid.UUID = strawberry.field(description="UUID of the image to scope the query to.")
 
+    def to_pydantic(self) -> ImageScopeInputDTO:
+        """Convert to pydantic DTO for adapter layer processing."""
+        return ImageScopeInputDTO(image_id=self.image_id)
 
-@strawberry.input(
+
+@strawberry.experimental.pydantic.input(
+    model=ImageAliasNestedFilterInputDTO,
     name="ImageAliasNestedFilter",
     description=(
         "Added in 26.3.0. Nested filter for aliases belonging to an image. "
@@ -530,22 +626,15 @@ class ImageAliasNestedFilterGQL:
         description="Filter by alias string. Supports equals, contains, startsWith, and endsWith.",
     )
 
-    def build_conditions(self) -> list[QueryCondition]:
-        """Build query conditions for alias nested filter."""
-        raw_conditions: list[QueryCondition] = []
-        if self.alias:
-            condition = self.alias.build_query_condition(
-                contains_factory=ImageAliasConditions.by_alias_contains,
-                equals_factory=ImageAliasConditions.by_alias_equals,
-                starts_with_factory=ImageAliasConditions.by_alias_starts_with,
-                ends_with_factory=ImageAliasConditions.by_alias_ends_with,
-            )
-            if condition:
-                raw_conditions.append(condition)
-        return raw_conditions
+    def to_pydantic(self) -> ImageAliasNestedFilterInputDTO:
+        """Convert to pydantic DTO for adapter layer processing."""
+        return ImageAliasNestedFilterInputDTO(
+            alias=self.alias.to_pydantic() if self.alias else None,
+        )
 
 
-@strawberry.input(
+@strawberry.experimental.pydantic.input(
+    model=ImageStatusFilterInputDTO,
     name="ImageV2StatusFilter",
     description="Added in 26.3.0. Filter for image status with equality and membership operators.",
 )
@@ -563,8 +652,18 @@ class ImageV2StatusFilterGQL:
         default=None, description="Excludes images whose status is in this list."
     )
 
+    def to_pydantic(self) -> ImageStatusFilterInputDTO:
+        """Convert to pydantic DTO for adapter layer processing."""
+        return ImageStatusFilterInputDTO(
+            equals=ImageStatusType(self.equals.value) if self.equals else None,
+            in_=[ImageStatusType(s.value) for s in self.in_] if self.in_ else None,
+            not_equals=ImageStatusType(self.not_equals.value) if self.not_equals else None,
+            not_in=[ImageStatusType(s.value) for s in self.not_in] if self.not_in else None,
+        )
 
-@strawberry.input(
+
+@strawberry.experimental.pydantic.input(
+    model=ImageFilterInputDTO,
     description=dedent_strip("""
     Added in 26.2.0.
 
@@ -572,12 +671,16 @@ class ImageV2StatusFilterGQL:
     name, and architecture.
 
     Supports logical operations (AND, OR, NOT) for complex filtering scenarios.
-    """)
+    """),
 )
 class ImageV2FilterGQL(GQLFilter):
     status: ImageV2StatusFilterGQL | None = None
     name: StringFilter | None = None
     architecture: StringFilter | None = None
+    registry_id: UUIDFilter | None = strawberry.field(
+        default=None,
+        description="Added in 26.4.0. Filter by container registry ID.",
+    )
     alias: ImageAliasNestedFilterGQL | None = strawberry.field(
         default=None,
         description="Added in 26.3.0. Filter by nested alias conditions.",
@@ -590,92 +693,19 @@ class ImageV2FilterGQL(GQLFilter):
     OR: list[ImageV2FilterGQL] | None = None
     NOT: list[ImageV2FilterGQL] | None = None
 
-    def build_conditions(self) -> list[QueryCondition]:
-        """Build query conditions from this filter.
-
-        Returns a list containing QueryConditions that represent
-        all filters with proper logical operators applied.
-        """
-
-        field_conditions: list[QueryCondition] = []
-
-        # Apply status filter
-        if self.status is not None:
-            st = self.status
-            if st.equals is not None:
-                field_conditions.append(
-                    ImageConditions.by_status_equals(ImageStatus(st.equals.value))
-                )
-            if st.in_ is not None:
-                field_conditions.append(
-                    ImageConditions.by_statuses([ImageStatus(s.value) for s in st.in_])
-                )
-            if st.not_equals is not None:
-                field_conditions.append(
-                    ImageConditions.by_status_not_equals(ImageStatus(st.not_equals.value))
-                )
-            if st.not_in is not None:
-                field_conditions.append(
-                    ImageConditions.by_status_not_in([ImageStatus(s.value) for s in st.not_in])
-                )
-
-        # Apply name filter
-        if self.name:
-            name_condition = self.name.build_query_condition(
-                contains_factory=ImageConditions.by_name_contains,
-                equals_factory=ImageConditions.by_name_equals,
-                starts_with_factory=ImageConditions.by_name_starts_with,
-                ends_with_factory=ImageConditions.by_name_ends_with,
-            )
-            if name_condition:
-                field_conditions.append(name_condition)
-
-        # Apply architecture filter
-        if self.architecture:
-            arch_condition = self.architecture.build_query_condition(
-                contains_factory=ImageConditions.by_architecture_contains,
-                equals_factory=ImageConditions.by_architecture_equals,
-                starts_with_factory=ImageConditions.by_architecture_starts_with,
-                ends_with_factory=ImageConditions.by_architecture_ends_with,
-            )
-            if arch_condition:
-                field_conditions.append(arch_condition)
-
-        # Apply alias filter
-        if self.alias:
-            field_conditions.extend(self.alias.build_conditions())
-
-        # Apply last_used filter
-        if self.last_used:
-            last_used_condition = self.last_used.build_query_condition(
-                before_factory=ImageConditions.by_last_used_before,
-                after_factory=ImageConditions.by_last_used_after,
-            )
-            if last_used_condition:
-                field_conditions.append(last_used_condition)
-
-        # Handle AND logical operator
-        if self.AND:
-            for sub_filter in self.AND:
-                field_conditions.extend(sub_filter.build_conditions())
-
-        # Handle OR logical operator
-        if self.OR:
-            or_sub_conditions: list[QueryCondition] = []
-            for sub_filter in self.OR:
-                or_sub_conditions.extend(sub_filter.build_conditions())
-            if or_sub_conditions:
-                field_conditions.append(combine_conditions_or(or_sub_conditions))
-
-        # Handle NOT logical operator
-        if self.NOT:
-            not_sub_conditions: list[QueryCondition] = []
-            for sub_filter in self.NOT:
-                not_sub_conditions.extend(sub_filter.build_conditions())
-            if not_sub_conditions:
-                field_conditions.append(negate_conditions(not_sub_conditions))
-
-        return field_conditions
+    def to_pydantic(self) -> ImageFilterInputDTO:
+        """Convert to pydantic DTO for adapter layer processing."""
+        return ImageFilterInputDTO(
+            status=self.status.to_pydantic() if self.status else None,
+            name=self.name.to_pydantic() if self.name else None,
+            architecture=self.architecture.to_pydantic() if self.architecture else None,
+            registry_id=self.registry_id.to_pydantic() if self.registry_id else None,
+            alias=self.alias.to_pydantic() if self.alias else None,
+            last_used=self.last_used.to_pydantic() if self.last_used else None,
+            AND=[f.to_pydantic() for f in self.AND] if self.AND else None,
+            OR=[f.to_pydantic() for f in self.OR] if self.OR else None,
+            NOT=[f.to_pydantic() for f in self.NOT] if self.NOT else None,
+        )
 
 
 @strawberry.enum(
@@ -692,27 +722,24 @@ class ImageV2OrderFieldGQL(enum.Enum):
     LAST_USED = "LAST_USED"
 
 
-@strawberry.input(
+@strawberry.experimental.pydantic.input(
+    model=ImageOrderByInputDTO,
     description=dedent_strip("""
     Added in 26.2.0.
 
     Specifies the field and direction for ordering images in queries.
-    """)
+    """),
 )
 class ImageV2OrderByGQL(GQLOrderBy):
     field: ImageV2OrderFieldGQL
     direction: OrderDirection = OrderDirection.ASC
 
-    def to_query_order(self) -> QueryOrder:
-        """Convert to repository QueryOrder."""
-        ascending = self.direction == OrderDirection.ASC
-        match self.field:
-            case ImageV2OrderFieldGQL.NAME:
-                return ImageOrders.name(ascending)
-            case ImageV2OrderFieldGQL.CREATED_AT:
-                return ImageOrders.created_at(ascending)
-            case ImageV2OrderFieldGQL.LAST_USED:
-                return ImageOrders.last_used(ascending)
+    def to_pydantic(self) -> ImageOrderByInputDTO:
+        """Convert to pydantic DTO for adapter layer processing."""
+        return ImageOrderByInputDTO(
+            field=ImageOrderFieldDTO(self.field.value.lower()),
+            direction=OrderDirectionDTO(self.direction.value.lower()),
+        )
 
 
 # =============================================================================
@@ -740,57 +767,35 @@ class ImageV2AliasConnectionGQL(Connection[ImageV2AliasGQL]):
         self.count = count
 
 
-@strawberry.input(
+@strawberry.experimental.pydantic.input(
+    model=ImageAliasFilterInputDTO,
     description=dedent_strip("""
     Added in 26.2.0.
 
     Filter options for image aliases.
-    Supports filtering by alias string.
-    """)
+    Supports filtering by alias string and image ID.
+    """),
 )
 class ImageV2AliasFilterGQL(GQLFilter):
     alias: StringFilter | None = None
+    image_id: UUIDFilter | None = strawberry.field(
+        default=None,
+        description="Added in 26.4.0. Filter by image ID.",
+    )
 
     AND: list[ImageV2AliasFilterGQL] | None = None
     OR: list[ImageV2AliasFilterGQL] | None = None
     NOT: list[ImageV2AliasFilterGQL] | None = None
 
-    def build_conditions(self) -> list[QueryCondition]:
-        """Build query conditions from this filter."""
-        field_conditions: list[QueryCondition] = []
-
-        if self.alias:
-            alias_condition = self.alias.build_query_condition(
-                contains_factory=ImageAliasConditions.by_alias_contains,
-                equals_factory=ImageAliasConditions.by_alias_equals,
-                starts_with_factory=ImageAliasConditions.by_alias_starts_with,
-                ends_with_factory=ImageAliasConditions.by_alias_ends_with,
-            )
-            if alias_condition:
-                field_conditions.append(alias_condition)
-
-        # Handle AND logical operator
-        if self.AND:
-            for sub_filter in self.AND:
-                field_conditions.extend(sub_filter.build_conditions())
-
-        # Handle OR logical operator
-        if self.OR:
-            or_sub_conditions: list[QueryCondition] = []
-            for sub_filter in self.OR:
-                or_sub_conditions.extend(sub_filter.build_conditions())
-            if or_sub_conditions:
-                field_conditions.append(combine_conditions_or(or_sub_conditions))
-
-        # Handle NOT logical operator
-        if self.NOT:
-            not_sub_conditions: list[QueryCondition] = []
-            for sub_filter in self.NOT:
-                not_sub_conditions.extend(sub_filter.build_conditions())
-            if not_sub_conditions:
-                field_conditions.append(negate_conditions(not_sub_conditions))
-
-        return field_conditions
+    def to_pydantic(self) -> ImageAliasFilterInputDTO:
+        """Convert to pydantic DTO for adapter layer processing."""
+        return ImageAliasFilterInputDTO(
+            alias=self.alias.to_pydantic() if self.alias else None,
+            image_id=self.image_id.to_pydantic() if self.image_id else None,
+            AND=[f.to_pydantic() for f in self.AND] if self.AND else None,
+            OR=[f.to_pydantic() for f in self.OR] if self.OR else None,
+            NOT=[f.to_pydantic() for f in self.NOT] if self.NOT else None,
+        )
 
 
 @strawberry.enum(
@@ -805,20 +810,21 @@ class ImageV2AliasOrderFieldGQL(enum.Enum):
     ALIAS = "ALIAS"
 
 
-@strawberry.input(
+@strawberry.experimental.pydantic.input(
+    model=ImageAliasOrderByInputDTO,
     description=dedent_strip("""
     Added in 26.2.0.
 
     Specifies the field and direction for ordering image aliases in queries.
-    """)
+    """),
 )
 class ImageV2AliasOrderByGQL(GQLOrderBy):
     field: ImageV2AliasOrderFieldGQL
     direction: OrderDirection = OrderDirection.ASC
 
-    def to_query_order(self) -> QueryOrder:
-        """Convert to repository QueryOrder."""
-        ascending = self.direction == OrderDirection.ASC
-        match self.field:
-            case ImageV2AliasOrderFieldGQL.ALIAS:
-                return ImageAliasOrders.alias(ascending)
+    def to_pydantic(self) -> ImageAliasOrderByInputDTO:
+        """Convert to pydantic DTO for adapter layer processing."""
+        return ImageAliasOrderByInputDTO(
+            field=self.field.value.lower(),
+            direction=OrderDirectionDTO(self.direction.value.lower()),
+        )

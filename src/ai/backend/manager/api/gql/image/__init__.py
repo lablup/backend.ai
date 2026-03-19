@@ -5,7 +5,6 @@ This module provides ImageV2 types as part of the Strawberry GraphQL migration (
 See BEP-1038 for detailed specifications.
 """
 
-from .fetcher import fetch_image, fetch_image_alias, fetch_image_aliases, fetch_images
 from .resolver import (
     admin_image_aliases,
     admin_images_v2,
@@ -72,11 +71,6 @@ __all__ = [
     "ImageV2AliasOrderByGQL",
     "ContainerRegistryScopeGQL",
     "ImageV2ScopeGQL",
-    # Fetcher functions
-    "fetch_images",
-    "fetch_image",
-    "fetch_image_alias",
-    "fetch_image_aliases",
     # Resolver fields
     "admin_images_v2",
     "image_v2",

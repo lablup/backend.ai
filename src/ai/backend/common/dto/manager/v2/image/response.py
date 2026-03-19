@@ -21,10 +21,12 @@ from .types import (
 )
 
 __all__ = (
+    "AdminSearchImageAliasesPayload",
     "AdminSearchImagesPayload",
     "AliasImagePayload",
     "ForgetImagePayload",
     "GetImagePayload",
+    "ImageAliasNode",
     "ImageNode",
     "PurgeImagePayload",
     "RescanImagesPayload",
@@ -37,6 +39,9 @@ class ImageNode(BaseResponseModel):
 
     id: UUID = Field(description="Image ID")
     name: str = Field(description="Image canonical name")
+    image: str = Field(
+        description="Image namespace/path within the registry (e.g. 'stable/python')"
+    )
     registry: str = Field(description="Registry hostname")
     registry_id: UUID = Field(description="Registry ID")
     project: str | None = Field(default=None, description="Project (namespace) within registry")
@@ -101,5 +106,21 @@ class AdminSearchImagesPayload(BaseResponseModel):
 
     items: list[ImageNode] = Field(description="List of image nodes.")
     total_count: int = Field(description="Total number of images matching the filter.")
+    has_next_page: bool = Field(description="Whether there is a next page.")
+    has_previous_page: bool = Field(description="Whether there is a previous page.")
+
+
+class ImageAliasNode(BaseResponseModel):
+    """Node representing a single image alias."""
+
+    id: UUID = Field(description="Alias ID.")
+    alias: str = Field(description="Alias string.")
+
+
+class AdminSearchImageAliasesPayload(BaseResponseModel):
+    """Payload for admin-scoped paginated image alias search results."""
+
+    items: list[ImageAliasNode] = Field(description="List of image alias nodes.")
+    total_count: int = Field(description="Total number of aliases matching the filter.")
     has_next_page: bool = Field(description="Whether there is a next page.")
     has_previous_page: bool = Field(description="Whether there is a previous page.")
