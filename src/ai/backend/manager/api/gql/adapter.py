@@ -6,33 +6,22 @@ from collections.abc import Sequence
 from dataclasses import dataclass, field
 from typing import final
 
-from ai.backend.manager.api.gql.base import decode_cursor
+from ai.backend.manager.api.adapters.pagination import (
+    PaginationOptions as PaginationOptions,
+)
+from ai.backend.manager.api.adapters.pagination import (
+    PaginationSpec as PaginationSpec,
+)
+from ai.backend.manager.api.adapters.pagination import (
+    build_pagination,
+)
 from ai.backend.manager.api.gql.types import GQLFilter, GQLOrderBy
 from ai.backend.manager.errors.api import InvalidGraphQLParameters
 from ai.backend.manager.repositories.base import (
     BatchQuerier,
-    CursorBackwardPagination,
-    CursorConditionFactory,
-    CursorForwardPagination,
-    OffsetPagination,
     QueryCondition,
     QueryOrder,
-    QueryPagination,
 )
-
-DEFAULT_PAGINATION_LIMIT = 10
-
-
-@dataclass(frozen=True)
-class PaginationOptions:
-    """GraphQL pagination arguments."""
-
-    first: int | None = None
-    after: str | None = None
-    last: int | None = None
-    before: str | None = None
-    limit: int | None = None
-    offset: int | None = None
 
 
 @dataclass(frozen=True)
@@ -45,102 +34,8 @@ class QuerierInput:
     base_conditions: Sequence[QueryCondition] | None = None
 
 
-@dataclass(frozen=True)
-class PaginationSpec:
-    """Specification for pagination behavior.
-
-    Contains domain-specific configuration for pagination:
-    - Forward/backward orders and condition factories for cursor-based pagination
-    - forward_order is also used as default order for offset pagination when order_by is not provided
-
-    For typical "newest first" lists:
-    - Forward (first/after): DESC order, shows newer items first, next page shows older items
-    - Backward (last/before): ASC order, fetches older items first (reversed for display)
-    """
-
-    forward_order: QueryOrder
-    """Order for forward pagination (e.g., created_at DESC for newest first).
-    Also used as default order for offset pagination when order_by is not provided."""
-
-    backward_order: QueryOrder
-    """Order for backward pagination (e.g., created_at ASC, results reversed for display)."""
-
-    forward_condition_factory: CursorConditionFactory
-    """Factory that creates cursor condition for forward pagination (e.g., created_at < cursor)."""
-
-    backward_condition_factory: CursorConditionFactory
-    """Factory that creates cursor condition for backward pagination (e.g., created_at > cursor)."""
-
-    tiebreaker_order: QueryOrder
-    """Tiebreaker order for deterministic pagination (e.g., RowClass.id.asc()).
-    Applied as the last ORDER BY clause to ensure stable ordering
-    when the primary sort column has duplicate values."""
-
-
 class BaseGQLAdapter:
     """Base adapter providing common GraphQL query building utilities."""
-
-    def _build_pagination(
-        self,
-        options: PaginationOptions,
-        spec: PaginationSpec,
-    ) -> QueryPagination:
-        """Build pagination from GraphQL pagination arguments.
-
-        For cursor-based pagination (first/after or last/before), condition factories
-        and orders are used from the spec. The factories create cursor conditions from
-        decoded cursor values.
-
-        If no pagination parameters are provided, returns a default OffsetPagination
-        with limit=DEFAULT_PAGINATION_LIMIT.
-        """
-        # Validate and build pagination
-        # Count how many pagination modes are being used
-        pagination_modes = sum([
-            options.first is not None,
-            options.last is not None,
-            options.limit is not None,
-        ])
-
-        if pagination_modes > 1:
-            raise InvalidGraphQLParameters(
-                "Only one pagination mode allowed: (first/after) OR (last/before) OR (limit/offset)"
-            )
-
-        # Build appropriate pagination based on parameters
-        if options.first is not None:
-            if options.first <= 0:
-                raise InvalidGraphQLParameters(f"first must be positive, got {options.first}")
-            cursor_condition = None
-            if options.after is not None:
-                cursor_value = decode_cursor(options.after)
-                cursor_condition = spec.forward_condition_factory(cursor_value)
-            return CursorForwardPagination(
-                first=options.first,
-                cursor_order=spec.forward_order,
-                cursor_condition=cursor_condition,
-            )
-        if options.last is not None:
-            if options.last <= 0:
-                raise InvalidGraphQLParameters(f"last must be positive, got {options.last}")
-            cursor_condition = None
-            if options.before is not None:
-                cursor_value = decode_cursor(options.before)
-                cursor_condition = spec.backward_condition_factory(cursor_value)
-            return CursorBackwardPagination(
-                last=options.last,
-                cursor_order=spec.backward_order,
-                cursor_condition=cursor_condition,
-            )
-        if options.limit is not None:
-            if options.limit <= 0:
-                raise InvalidGraphQLParameters(f"limit must be positive, got {options.limit}")
-            if options.offset is not None and options.offset < 0:
-                raise InvalidGraphQLParameters(f"offset must be non-negative, got {options.offset}")
-            return OffsetPagination(limit=options.limit, offset=options.offset or 0)
-
-        # Default pagination when no parameters provided
-        return OffsetPagination(limit=DEFAULT_PAGINATION_LIMIT, offset=0)
 
     @final
     def build_querier(
@@ -195,10 +90,7 @@ class BaseGQLAdapter:
         # Always append tiebreaker as the last ORDER BY for deterministic ordering
         orders.append(pagination_spec.tiebreaker_order)
 
-        pagination = self._build_pagination(
-            options=pagination_options,
-            spec=pagination_spec,
-        )
+        pagination = build_pagination(options=pagination_options, spec=pagination_spec)
 
         return BatchQuerier(conditions=conditions, orders=orders, pagination=pagination)
 

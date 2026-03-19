@@ -7,7 +7,11 @@ from functools import lru_cache
 from strawberry import Info
 from strawberry.relay import PageInfo
 
-from ai.backend.manager.api.gql.adapter import PaginationOptions, PaginationSpec
+from ai.backend.manager.api.adapters.pagination import (
+    PaginationOptions,
+    PaginationSpec,
+    build_pagination,
+)
 from ai.backend.manager.api.gql.base import encode_cursor
 from ai.backend.manager.api.gql.fair_share.types import (
     DomainFairShareConnection,
@@ -21,7 +25,7 @@ from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.models.fair_share.conditions import DomainFairShareConditions
 from ai.backend.manager.models.fair_share.orders import DomainFairShareOrders
 from ai.backend.manager.models.fair_share.row import DomainFairShareRow
-from ai.backend.manager.repositories.base import QueryCondition
+from ai.backend.manager.repositories.base import BatchQuerier, QueryCondition, QueryOrder
 from ai.backend.manager.repositories.fair_share.types import DomainFairShareSearchScope
 from ai.backend.manager.services.fair_share.actions import (
     GetDomainFairShareAction,
@@ -39,6 +43,35 @@ def get_domain_fair_share_pagination_spec() -> PaginationSpec:
         backward_condition_factory=DomainFairShareConditions.by_cursor_backward,
         tiebreaker_order=DomainFairShareRow.id.asc(),
     )
+
+
+def _build_domain_querier(
+    spec: PaginationSpec,
+    filter: DomainFairShareFilter | RGDomainFairShareFilter | None,
+    order_by: list[DomainFairShareOrderBy] | None,
+    first: int | None,
+    after: str | None,
+    last: int | None,
+    before: str | None,
+    limit: int | None,
+    offset: int | None,
+    base_conditions: list[QueryCondition] | None,
+) -> BatchQuerier:
+    is_cursor = first is not None or last is not None
+    all_conditions: list[QueryCondition] = list(base_conditions or [])
+    if filter is not None:
+        all_conditions.extend(filter.build_conditions())
+    all_orders: list[QueryOrder] = [o.to_query_order() for o in order_by] if order_by else []
+    if not all_orders and not is_cursor:
+        all_orders.append(spec.forward_order)
+    all_orders.append(spec.tiebreaker_order)
+    pagination = build_pagination(
+        PaginationOptions(
+            first=first, after=after, last=last, before=before, limit=limit, offset=offset
+        ),
+        spec,
+    )
+    return BatchQuerier(conditions=all_conditions, orders=all_orders, pagination=pagination)
 
 
 async def fetch_domain_fair_shares(
@@ -64,20 +97,17 @@ async def fetch_domain_fair_shares(
         base_conditions: Additional conditions to prepend (e.g., resource_group filter)
     """
     processors = info.context.processors
-
-    querier = info.context.gql_adapter.build_querier(
-        PaginationOptions(
-            first=first,
-            after=after,
-            last=last,
-            before=before,
-            limit=limit,
-            offset=offset,
-        ),
+    querier = _build_domain_querier(
         get_domain_fair_share_pagination_spec(),
-        filter=filter,
-        order_by=order_by,
-        base_conditions=base_conditions,
+        filter,
+        order_by,
+        first,
+        after,
+        last,
+        before,
+        limit,
+        offset,
+        base_conditions,
     )
 
     action_result = await processors.fair_share.search_domain_fair_shares.wait_for_complete(
@@ -123,20 +153,17 @@ async def fetch_rg_domain_fair_shares(
     columns to avoid NULL exclusion.
     """
     processors = info.context.processors
-
-    querier = info.context.gql_adapter.build_querier(
-        PaginationOptions(
-            first=first,
-            after=after,
-            last=last,
-            before=before,
-            limit=limit,
-            offset=offset,
-        ),
+    querier = _build_domain_querier(
         get_domain_fair_share_pagination_spec(),
-        filter=filter,
-        order_by=order_by,
-        base_conditions=base_conditions,
+        filter,
+        order_by,
+        first,
+        after,
+        last,
+        before,
+        limit,
+        offset,
+        base_conditions,
     )
 
     action_result = await processors.fair_share.search_rg_domain_fair_shares.wait_for_complete(

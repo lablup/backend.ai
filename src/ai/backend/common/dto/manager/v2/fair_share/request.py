@@ -215,10 +215,12 @@ class SearchDomainFairSharesInput(BaseRequestModel):
     order: list[DomainFairShareOrder] | None = Field(
         default=None, description="Order specifications"
     )
-    limit: int = Field(
-        default=_DEFAULT_PAGE_LIMIT, ge=1, le=1000, description="Maximum items to return"
-    )
-    offset: int = Field(default=0, ge=0, description="Number of items to skip")
+    first: int | None = Field(default=None, ge=1, description="Cursor-based: items after cursor")
+    after: str | None = Field(default=None, description="Cursor-based: start cursor (exclusive)")
+    last: int | None = Field(default=None, ge=1, description="Cursor-based: items before cursor")
+    before: str | None = Field(default=None, description="Cursor-based: end cursor (exclusive)")
+    limit: int | None = Field(default=None, ge=1, le=1000, description="Offset-based: max results")
+    offset: int | None = Field(default=None, ge=0, description="Offset-based: pagination offset")
 
 
 class SearchProjectFairSharesInput(BaseRequestModel):
@@ -228,10 +230,12 @@ class SearchProjectFairSharesInput(BaseRequestModel):
     order: list[ProjectFairShareOrder] | None = Field(
         default=None, description="Order specifications"
     )
-    limit: int = Field(
-        default=_DEFAULT_PAGE_LIMIT, ge=1, le=1000, description="Maximum items to return"
-    )
-    offset: int = Field(default=0, ge=0, description="Number of items to skip")
+    first: int | None = Field(default=None, ge=1, description="Cursor-based: items after cursor")
+    after: str | None = Field(default=None, description="Cursor-based: start cursor (exclusive)")
+    last: int | None = Field(default=None, ge=1, description="Cursor-based: items before cursor")
+    before: str | None = Field(default=None, description="Cursor-based: end cursor (exclusive)")
+    limit: int | None = Field(default=None, ge=1, le=1000, description="Offset-based: max results")
+    offset: int | None = Field(default=None, ge=0, description="Offset-based: pagination offset")
 
 
 class SearchUserFairSharesInput(BaseRequestModel):
@@ -239,10 +243,12 @@ class SearchUserFairSharesInput(BaseRequestModel):
 
     filter: UserFairShareFilter | None = Field(default=None, description="Filter conditions")
     order: list[UserFairShareOrder] | None = Field(default=None, description="Order specifications")
-    limit: int = Field(
-        default=_DEFAULT_PAGE_LIMIT, ge=1, le=1000, description="Maximum items to return"
-    )
-    offset: int = Field(default=0, ge=0, description="Number of items to skip")
+    first: int | None = Field(default=None, ge=1, description="Cursor-based: items after cursor")
+    after: str | None = Field(default=None, description="Cursor-based: start cursor (exclusive)")
+    last: int | None = Field(default=None, ge=1, description="Cursor-based: items before cursor")
+    before: str | None = Field(default=None, description="Cursor-based: end cursor (exclusive)")
+    limit: int | None = Field(default=None, ge=1, le=1000, description="Offset-based: max results")
+    offset: int | None = Field(default=None, ge=0, description="Offset-based: pagination offset")
 
 
 class SearchDomainUsageBucketsInput(BaseRequestModel):

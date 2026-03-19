@@ -54,6 +54,7 @@ from ai.backend.common.dto.manager.v2.fair_share.types import (
     UserFairShareOrderField,
 )
 from ai.backend.common.types import ResourceSlot, SlotQuantity
+from ai.backend.manager.api.adapters.pagination import PaginationSpec
 from ai.backend.manager.data.fair_share.types import (
     DomainFairShareData,
     FairShareCalculationSnapshot,
@@ -77,9 +78,12 @@ from ai.backend.manager.models.fair_share.orders import (
     RGUserFairShareOrders,
     UserFairShareOrders,
 )
+from ai.backend.manager.models.fair_share.row import (
+    DomainFairShareRow,
+    ProjectFairShareRow,
+    UserFairShareRow,
+)
 from ai.backend.manager.repositories.base import (
-    BatchQuerier,
-    OffsetPagination,
     QueryCondition,
     QueryOrder,
 )
@@ -112,6 +116,36 @@ from ai.backend.manager.services.fair_share.actions import (
 from .base import BaseAdapter
 
 
+def _domain_fair_share_pagination_spec() -> PaginationSpec:
+    return PaginationSpec(
+        forward_order=DomainFairShareOrders.by_created_at(ascending=False),
+        backward_order=DomainFairShareOrders.by_created_at(ascending=True),
+        forward_condition_factory=DomainFairShareConditions.by_cursor_forward,
+        backward_condition_factory=DomainFairShareConditions.by_cursor_backward,
+        tiebreaker_order=DomainFairShareRow.id.asc(),
+    )
+
+
+def _project_fair_share_pagination_spec() -> PaginationSpec:
+    return PaginationSpec(
+        forward_order=ProjectFairShareOrders.by_created_at(ascending=False),
+        backward_order=ProjectFairShareOrders.by_created_at(ascending=True),
+        forward_condition_factory=ProjectFairShareConditions.by_cursor_forward,
+        backward_condition_factory=ProjectFairShareConditions.by_cursor_backward,
+        tiebreaker_order=ProjectFairShareRow.id.asc(),
+    )
+
+
+def _user_fair_share_pagination_spec() -> PaginationSpec:
+    return PaginationSpec(
+        forward_order=UserFairShareOrders.by_created_at(ascending=False),
+        backward_order=UserFairShareOrders.by_created_at(ascending=True),
+        forward_condition_factory=UserFairShareConditions.by_cursor_forward,
+        backward_condition_factory=UserFairShareConditions.by_cursor_backward,
+        tiebreaker_order=UserFairShareRow.id.asc(),
+    )
+
+
 class FairShareAdapter(BaseAdapter):
     """Adapter for fair share domain operations (domain / project / user)."""
 
@@ -132,16 +166,26 @@ class FairShareAdapter(BaseAdapter):
     async def search_domain(
         self, input: SearchDomainFairSharesInput
     ) -> SearchDomainFairSharesPayload:
-        """Search domain fair shares with filters and pagination."""
+        """Search domain fair shares with filters and pagination (cursor/offset)."""
         conditions = self._convert_domain_filter(input.filter) if input.filter else []
         orders = self._convert_domain_orders(input.order) if input.order else []
-        pagination = OffsetPagination(limit=input.limit, offset=input.offset)
+        querier = self._build_querier(
+            conditions=conditions,
+            orders=orders,
+            pagination_spec=_domain_fair_share_pagination_spec(),
+            first=input.first,
+            after=input.after,
+            last=input.last,
+            before=input.before,
+            limit=input.limit,
+            offset=input.offset,
+        )
 
         result = await self._processors.fair_share.search_domain_fair_shares.wait_for_complete(
             SearchDomainFairSharesAction(
-                pagination=pagination,
-                conditions=conditions,
-                orders=orders,
+                pagination=querier.pagination,
+                conditions=querier.conditions,
+                orders=querier.orders,
             )
         )
         return SearchDomainFairSharesPayload(
@@ -154,19 +198,25 @@ class FairShareAdapter(BaseAdapter):
         input: SearchDomainFairSharesInput,
         resource_group: str,
     ) -> SearchDomainFairSharesPayload:
-        """Search domain fair shares within a resource group (entity-based)."""
+        """Search domain fair shares within a resource group (entity-based, cursor/offset)."""
         conditions = self._convert_domain_filter_rg(input.filter) if input.filter else []
         orders = self._convert_domain_orders_rg(input.order) if input.order else []
-        pagination = OffsetPagination(limit=input.limit, offset=input.offset)
+        querier = self._build_querier(
+            conditions=conditions,
+            orders=orders,
+            pagination_spec=_domain_fair_share_pagination_spec(),
+            first=input.first,
+            after=input.after,
+            last=input.last,
+            before=input.before,
+            limit=input.limit,
+            offset=input.offset,
+        )
 
         result = await self._processors.fair_share.search_rg_domain_fair_shares.wait_for_complete(
             SearchRGDomainFairSharesAction(
                 scope=DomainFairShareSearchScope(resource_group=resource_group),
-                querier=BatchQuerier(
-                    conditions=conditions,
-                    orders=orders,
-                    pagination=pagination,
-                ),
+                querier=querier,
             )
         )
         return SearchDomainFairSharesPayload(
@@ -221,16 +271,26 @@ class FairShareAdapter(BaseAdapter):
     async def search_project(
         self, input: SearchProjectFairSharesInput
     ) -> SearchProjectFairSharesPayload:
-        """Search project fair shares with filters and pagination."""
+        """Search project fair shares with filters and pagination (cursor/offset)."""
         conditions = self._convert_project_filter(input.filter) if input.filter else []
         orders = self._convert_project_orders(input.order) if input.order else []
-        pagination = OffsetPagination(limit=input.limit, offset=input.offset)
+        querier = self._build_querier(
+            conditions=conditions,
+            orders=orders,
+            pagination_spec=_project_fair_share_pagination_spec(),
+            first=input.first,
+            after=input.after,
+            last=input.last,
+            before=input.before,
+            limit=input.limit,
+            offset=input.offset,
+        )
 
         result = await self._processors.fair_share.search_project_fair_shares.wait_for_complete(
             SearchProjectFairSharesAction(
-                pagination=pagination,
-                conditions=conditions,
-                orders=orders,
+                pagination=querier.pagination,
+                conditions=querier.conditions,
+                orders=querier.orders,
             )
         )
         return SearchProjectFairSharesPayload(
@@ -244,10 +304,20 @@ class FairShareAdapter(BaseAdapter):
         resource_group: str,
         domain_name: str,
     ) -> SearchProjectFairSharesPayload:
-        """Search project fair shares within a resource group scope (entity-based)."""
+        """Search project fair shares within a resource group scope (entity-based, cursor/offset)."""
         conditions = self._convert_project_filter_rg(input.filter) if input.filter else []
         orders = self._convert_project_orders_rg(input.order) if input.order else []
-        pagination = OffsetPagination(limit=input.limit, offset=input.offset)
+        querier = self._build_querier(
+            conditions=conditions,
+            orders=orders,
+            pagination_spec=_project_fair_share_pagination_spec(),
+            first=input.first,
+            after=input.after,
+            last=input.last,
+            before=input.before,
+            limit=input.limit,
+            offset=input.offset,
+        )
 
         result = await self._processors.fair_share.search_rg_project_fair_shares.wait_for_complete(
             SearchRGProjectFairSharesAction(
@@ -255,11 +325,7 @@ class FairShareAdapter(BaseAdapter):
                     resource_group=resource_group,
                     domain_name=domain_name,
                 ),
-                querier=BatchQuerier(
-                    conditions=conditions,
-                    orders=orders,
-                    pagination=pagination,
-                ),
+                querier=querier,
             )
         )
         return SearchProjectFairSharesPayload(
@@ -318,16 +384,26 @@ class FairShareAdapter(BaseAdapter):
         return GetUserFairSharePayload(item=self._user_data_to_dto(result.data))
 
     async def search_user(self, input: SearchUserFairSharesInput) -> SearchUserFairSharesPayload:
-        """Search user fair shares with filters and pagination."""
+        """Search user fair shares with filters and pagination (cursor/offset)."""
         conditions = self._convert_user_filter(input.filter) if input.filter else []
         orders = self._convert_user_orders(input.order) if input.order else []
-        pagination = OffsetPagination(limit=input.limit, offset=input.offset)
+        querier = self._build_querier(
+            conditions=conditions,
+            orders=orders,
+            pagination_spec=_user_fair_share_pagination_spec(),
+            first=input.first,
+            after=input.after,
+            last=input.last,
+            before=input.before,
+            limit=input.limit,
+            offset=input.offset,
+        )
 
         result = await self._processors.fair_share.search_user_fair_shares.wait_for_complete(
             SearchUserFairSharesAction(
-                pagination=pagination,
-                conditions=conditions,
-                orders=orders,
+                pagination=querier.pagination,
+                conditions=querier.conditions,
+                orders=querier.orders,
             )
         )
         return SearchUserFairSharesPayload(
@@ -342,10 +418,20 @@ class FairShareAdapter(BaseAdapter):
         domain_name: str,
         project_id: UUID,
     ) -> SearchUserFairSharesPayload:
-        """Search user fair shares within a resource group scope (entity-based)."""
+        """Search user fair shares within a resource group scope (entity-based, cursor/offset)."""
         conditions = self._convert_user_filter_rg(input.filter) if input.filter else []
         orders = self._convert_user_orders_rg(input.order) if input.order else []
-        pagination = OffsetPagination(limit=input.limit, offset=input.offset)
+        querier = self._build_querier(
+            conditions=conditions,
+            orders=orders,
+            pagination_spec=_user_fair_share_pagination_spec(),
+            first=input.first,
+            after=input.after,
+            last=input.last,
+            before=input.before,
+            limit=input.limit,
+            offset=input.offset,
+        )
 
         result = await self._processors.fair_share.search_rg_user_fair_shares.wait_for_complete(
             SearchRGUserFairSharesAction(
@@ -354,11 +440,7 @@ class FairShareAdapter(BaseAdapter):
                     domain_name=domain_name,
                     project_id=project_id,
                 ),
-                querier=BatchQuerier(
-                    conditions=conditions,
-                    orders=orders,
-                    pagination=pagination,
-                ),
+                querier=querier,
             )
         )
         return SearchUserFairSharesPayload(
