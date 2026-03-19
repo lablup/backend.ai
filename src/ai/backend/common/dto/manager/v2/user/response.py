@@ -15,10 +15,17 @@ from ai.backend.common.dto.manager.pagination import PaginationInfo
 from ai.backend.common.dto.manager.v2.user.types import UserRole, UserStatus
 
 __all__ = (
+    "BulkCreateUserV2Error",
+    "BulkPurgeUserV2Error",
+    "BulkPurgeUsersPayload",
+    "BulkUpdateUserV2Error",
     "DeleteUserPayload",
+    "DeleteUsersPayload",
     "EntityTimestamps",
     "PurgeUserPayload",
+    "PurgeUsersPayload",
     "SearchUsersPayload",
+    "UpdateMyAllowedClientIPPayload",
     "UserBasicInfo",
     "UserContainerSettings",
     "UserNode",
@@ -195,9 +202,66 @@ class DeleteUserPayload(BaseResponseModel):
     )
 
 
+class DeleteUsersPayload(BaseResponseModel):
+    """Payload for bulk user soft-delete mutation."""
+
+    deleted_count: int = Field(
+        description="Number of users successfully soft-deleted.",
+    )
+
+
 class PurgeUserPayload(BaseResponseModel):
     """Payload for user permanent deletion mutation."""
 
     success: bool = Field(
         description="Whether the purge was successful.",
     )
+
+
+class PurgeUsersPayload(BaseResponseModel):
+    """Payload for bulk user permanent deletion mutation."""
+
+    purged_count: int = Field(
+        description="Number of users successfully purged.",
+    )
+    failed_user_ids: list[UUID] = Field(
+        description="List of user UUIDs that failed to purge, if any.",
+    )
+
+
+class BulkCreateUserV2Error(BaseResponseModel):
+    """Error information for a single user that failed during bulk creation."""
+
+    index: int = Field(description="Original position in the input list.")
+    username: str = Field(description="Username of the user that failed.")
+    email: str = Field(description="Email of the user that failed.")
+    message: str = Field(description="Error message describing the failure.")
+
+
+class BulkUpdateUserV2Error(BaseResponseModel):
+    """Error information for a single user that failed during bulk update."""
+
+    user_id: UUID = Field(description="UUID of the user that failed to update.")
+    message: str = Field(description="Error message describing the failure.")
+
+
+class BulkPurgeUserV2Error(BaseResponseModel):
+    """Error information for a single user that failed during bulk purge."""
+
+    user_id: UUID = Field(description="UUID of the user that failed to purge.")
+    message: str = Field(description="Error message describing the failure.")
+
+
+class BulkPurgeUsersPayload(BaseResponseModel):
+    """Payload for bulk user permanent deletion mutation."""
+
+    purged_count: int = Field(description="Number of users successfully purged.")
+    failed: list[BulkPurgeUserV2Error] = Field(
+        description="List of errors for users that failed to purge.",
+    )
+
+
+class UpdateMyAllowedClientIPPayload(BaseResponseModel):
+    """Payload for updating the current user's allowed client IP list."""
+
+    success: bool = Field(description="Whether the update was successful.")
