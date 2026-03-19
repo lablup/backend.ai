@@ -1626,13 +1626,7 @@ to support integers outside the range of a signed 32-bit integer.
 scalar BigInt
   @join__type(graph: GRAPHENE)
 
-"""
-Added in 25.19.0.
-Input parameters for configuring a blue-green deployment strategy.
-When auto_promote is true, traffic is automatically switched from the blue (old)
-replica set to the green (new) set after promote_delay_seconds elapse.
-When auto_promote is false (default), an explicit promotion action is required.
-"""
+"""Added in 25.19.0. Configuration for blue-green deployment strategy."""
 input BlueGreenConfigInput
   @join__type(graph: STRAWBERRY)
 {
@@ -3652,14 +3646,7 @@ enum DeploymentOrderField
   NAME @join__enumValue(graph: STRAWBERRY)
 }
 
-"""
-Added in 25.19.0.
-Defines the deployment policy attached to a model deployment,
-including the rollout strategy (rolling update or blue-green),
-strategy-specific parameters, and whether to automatically roll back on failure.
-Each deployment has at most one policy; creating a new policy for the same deployment
-replaces the existing one (upsert semantics).
-"""
+"""Added in 25.19.0. Deployment policy configuration."""
 type DeploymentPolicy implements Node
   @join__implements(graph: STRAWBERRY, interface: "Node")
   @join__type(graph: STRAWBERRY)
@@ -3730,10 +3717,7 @@ input DeploymentStrategyInput
 }
 
 """
-Added in 25.19.0.
-Base interface for all deployment strategy specifications.
-Each concrete implementation (RollingUpdateStrategySpec, BlueGreenStrategySpec)
-carries strategy-specific parameters that control how replica transitions are performed.
+Added in 25.19.0. Base interface for deployment strategy specifications.
 """
 interface DeploymentStrategySpec
   @join__type(graph: STRAWBERRY)
@@ -3742,10 +3726,7 @@ interface DeploymentStrategySpec
 }
 
 """
-Added in 25.19.0.
-Determines how new revisions of a model deployment are rolled out to replace old ones.
-ROLLING performs incremental replica replacement controlled by max_surge and max_unavailable,
-while BLUE_GREEN provisions a complete new replica set before switching traffic.
+Added in 25.19.0. This enum represents the deployment strategy type of a model deployment, indicating the strategy used for deployment.
 """
 enum DeploymentStrategyType
   @join__type(graph: STRAWBERRY)
@@ -11534,14 +11515,7 @@ enum RoleStatus
   DELETED @join__enumValue(graph: STRAWBERRY)
 }
 
-"""
-Added in 25.19.0.
-Input parameters for configuring a rolling update strategy.
-max_surge sets the maximum number of additional replicas that can be created
-beyond the desired count during an update (default: 1).
-max_unavailable sets the maximum number of replicas that can be unavailable
-during the update (default: 0). At least one of these must be positive.
-"""
+"""Added in 25.19.0. Configuration for rolling update strategy."""
 input RollingUpdateConfigInput
   @join__type(graph: STRAWBERRY)
 {
