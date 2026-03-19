@@ -5,15 +5,44 @@ from __future__ import annotations
 import strawberry
 from strawberry import Info
 
+from ai.backend.common.dto.manager.v2.resource_slot.request import (
+    AdminSearchResourceSlotTypesInput,
+)
+from ai.backend.common.dto.manager.v2.resource_slot.response import ResourceSlotTypeNode
+from ai.backend.manager.api.gql.base import encode_cursor
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
+from ai.backend.manager.services.resource_slot.actions.get_resource_slot_type import (
+    GetResourceSlotTypeAction,
+)
 
-from .fetcher import fetch_resource_slot_type, fetch_resource_slot_types
 from .types import (
+    NumberFormatGQL,
     ResourceSlotTypeConnectionGQL,
+    ResourceSlotTypeEdgeGQL,
     ResourceSlotTypeFilterGQL,
     ResourceSlotTypeGQL,
     ResourceSlotTypeOrderByGQL,
 )
+
+
+def _slot_type_node_to_gql(node: ResourceSlotTypeNode) -> ResourceSlotTypeGQL:
+    """Convert ResourceSlotTypeNode DTO to ResourceSlotTypeGQL."""
+    from strawberry import ID
+
+    return ResourceSlotTypeGQL(
+        id=ID(node.slot_name),
+        slot_name=node.slot_name,
+        slot_type=node.slot_type,
+        display_name=node.display_name,
+        description=node.description,
+        display_unit=node.display_unit,
+        display_icon=node.display_icon,
+        number_format=NumberFormatGQL(
+            binary=node.number_format.binary,
+            round_length=node.number_format.round_length,
+        ),
+        rank=node.rank,
+    )
 
 
 @strawberry.field(
@@ -23,7 +52,12 @@ async def resource_slot_type(
     info: Info[StrawberryGQLContext],
     slot_name: str,
 ) -> ResourceSlotTypeGQL | None:
-    return await fetch_resource_slot_type(info, slot_name)
+    action_result = (
+        await info.context.processors.resource_slot.get_resource_slot_type.wait_for_complete(
+            GetResourceSlotTypeAction(slot_name=slot_name)
+        )
+    )
+    return ResourceSlotTypeGQL.from_data(action_result.item)
 
 
 @strawberry.field(
@@ -40,14 +74,28 @@ async def resource_slot_types(
     limit: int | None = None,
     offset: int | None = None,
 ) -> ResourceSlotTypeConnectionGQL:
-    return await fetch_resource_slot_types(
-        info,
-        filter=filter,
-        order_by=order_by,
-        before=before,
-        after=after,
+    search_input = AdminSearchResourceSlotTypesInput(
+        filter=filter.to_pydantic() if filter is not None else None,
+        order=[o.to_pydantic() for o in order_by] if order_by is not None else None,
         first=first,
+        after=after,
         last=last,
+        before=before,
         limit=limit,
         offset=offset,
+    )
+    payload = await info.context.adapters.resource_slot.search_slot_types(search_input)
+
+    nodes = [_slot_type_node_to_gql(item) for item in payload.items]
+    edges = [ResourceSlotTypeEdgeGQL(node=node, cursor=encode_cursor(node.id)) for node in nodes]
+
+    return ResourceSlotTypeConnectionGQL(
+        edges=edges,
+        page_info=strawberry.relay.PageInfo(
+            has_next_page=payload.has_next_page,
+            has_previous_page=payload.has_previous_page,
+            start_cursor=edges[0].cursor if edges else None,
+            end_cursor=edges[-1].cursor if edges else None,
+        ),
+        count=payload.total_count,
     )
