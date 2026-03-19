@@ -132,19 +132,20 @@ class UserV2GQL(PydanticNodeMixin):
         info: Info,
         scope: UserFairShareScopeGQL,
     ) -> UserFairShareGQL:
-        from ai.backend.manager.api.gql.fair_share.fetcher.user import (
-            fetch_single_user_fair_share,
-        )
+        from ai.backend.common.dto.manager.v2.fair_share.request import GetUserFairShareInput
 
         if self.organization.domain_name is None:
             raise InvalidAPIParameters("User must belong to a domain to query fair share")
 
-        return await fetch_single_user_fair_share(
-            info=info,
-            resource_group_name=scope.resource_group_name,
-            project_id=scope.project_id,
-            user_uuid=UUID(str(self.id)),
+        payload = await info.context.adapters.fair_share.get_user(
+            GetUserFairShareInput(
+                resource_group=scope.resource_group_name,
+                project_id=scope.project_id,
+                user_uuid=UUID(str(self.id)),
+            )
         )
+
+        return UserFairShareGQL.from_node(payload.item)
 
     @strawberry.field(  # type: ignore[misc]
         description=(
@@ -165,14 +166,17 @@ class UserV2GQL(PydanticNodeMixin):
         limit: int | None = None,
         offset: int | None = None,
     ) -> UserUsageBucketConnection:
-        from ai.backend.manager.api.gql.resource_usage.fetcher.user_usage import (
-            fetch_rg_user_usage_buckets,
+        from strawberry.relay import PageInfo
+
+        from ai.backend.manager.api.gql.base import encode_cursor
+        from ai.backend.manager.api.gql.resource_usage.types import (
+            UserUsageBucketEdge,
+            UserUsageBucketGQL,
         )
         from ai.backend.manager.repositories.resource_usage_history.types import (
             UserUsageBucketSearchScope,
         )
 
-        # Create repository scope with context information
         if self.organization.domain_name is None:
             raise InvalidAPIParameters("User must belong to a domain to query usage buckets")
         repository_scope = UserUsageBucketSearchScope(
@@ -181,22 +185,30 @@ class UserV2GQL(PydanticNodeMixin):
             project_id=scope.project_id,
             user_uuid=UUID(str(self.id)),
         )
-
-        # No additional filters needed (scope includes all entity info)
-        base_conditions = None
-
-        return await fetch_rg_user_usage_buckets(
-            info=info,
+        payload = await info.context.adapters.resource_usage.gql_search_user_scoped(
             scope=repository_scope,
-            filter=filter,
-            order_by=order_by,
-            before=before,
-            after=after,
+            filter=filter.to_pydantic() if filter else None,
+            order=[o.to_pydantic() for o in order_by] if order_by else None,
             first=first,
+            after=after,
             last=last,
+            before=before,
             limit=limit,
             offset=offset,
-            base_conditions=base_conditions,
+        )
+        nodes = [UserUsageBucketGQL.from_node(item) for item in payload.items]
+        edges = [
+            UserUsageBucketEdge(node=node, cursor=encode_cursor(str(node.id))) for node in nodes
+        ]
+        return UserUsageBucketConnection(
+            edges=edges,
+            page_info=PageInfo(
+                has_next_page=payload.has_next_page,
+                has_previous_page=payload.has_previous_page,
+                start_cursor=edges[0].cursor if edges else None,
+                end_cursor=edges[-1].cursor if edges else None,
+            ),
+            count=payload.total_count,
         )
 
     @strawberry.field(  # type: ignore[misc]

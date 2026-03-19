@@ -534,19 +534,81 @@ class AgentV2GQL(PydanticNodeMixin):
         strawberry.lazy("ai.backend.manager.api.gql.resource_slot.types"),
     ]:
         """Fetch per-slot resource capacity and usage for this agent."""
-        from ai.backend.manager.api.gql.resource_slot.fetcher import fetch_agent_resources
+        from decimal import Decimal
 
-        return await fetch_agent_resources(
-            info=info,
-            agent_id=str(self._agent_id),
-            filter=filter,
-            order_by=order_by,
+        import strawberry as _strawberry
+
+        from ai.backend.common.dto.manager.query import StringFilter as StringFilterDTO
+        from ai.backend.common.dto.manager.v2.resource_slot.request import (
+            AdminSearchAgentResourcesInput,
+        )
+        from ai.backend.common.dto.manager.v2.resource_slot.request import (
+            AgentResourceFilter as AgentResourceFilterDTO,
+        )
+        from ai.backend.common.dto.manager.v2.resource_slot.request import (
+            AgentResourceOrder as AgentResourceOrderDTO,
+        )
+        from ai.backend.manager.api.gql.base import encode_cursor
+        from ai.backend.manager.api.gql.resource_slot.types import (
+            AgentResourceConnectionGQL,
+            AgentResourceSlotEdgeGQL,
+            AgentResourceSlotGQL,
+        )
+
+        agent_id = str(self._agent_id)
+        pydantic_filter: AgentResourceFilterDTO | None = None
+        if filter is not None:
+            pydantic_filter = filter.to_pydantic()
+            if pydantic_filter.agent_id is None:
+                pydantic_filter = AgentResourceFilterDTO(
+                    slot_name=pydantic_filter.slot_name,
+                    agent_id=StringFilterDTO(equals=agent_id),
+                    AND=pydantic_filter.AND,
+                    OR=pydantic_filter.OR,
+                    NOT=pydantic_filter.NOT,
+                )
+        else:
+            pydantic_filter = AgentResourceFilterDTO(
+                agent_id=StringFilterDTO(equals=agent_id),
+            )
+
+        pydantic_order: list[AgentResourceOrderDTO] | None = (
+            [o.to_pydantic() for o in order_by] if order_by is not None else None
+        )
+
+        search_input = AdminSearchAgentResourcesInput(
+            filter=pydantic_filter,
+            order=pydantic_order,
             first=first,
             after=after,
             last=last,
             before=before,
             limit=limit,
             offset=offset,
+        )
+        payload = await info.context.adapters.resource_slot.search_agent_resources(search_input)
+
+        edges = []
+        for item in payload.items:
+            slot_name = item.slot_name
+            node = AgentResourceSlotGQL(
+                id=_strawberry.ID(item.id),
+                slot_name=slot_name,
+                capacity=Decimal(item.capacity),
+                used=Decimal(item.occupied),
+            )
+            cursor = encode_cursor(slot_name)
+            edges.append(AgentResourceSlotEdgeGQL(node=node, cursor=cursor))
+
+        return AgentResourceConnectionGQL(
+            count=payload.total_count,
+            edges=edges,
+            page_info=_strawberry.relay.PageInfo(
+                has_next_page=payload.has_next_page,
+                has_previous_page=payload.has_previous_page,
+                start_cursor=edges[0].cursor if edges else None,
+                end_cursor=edges[-1].cursor if edges else None,
+            ),
         )
 
     @classmethod

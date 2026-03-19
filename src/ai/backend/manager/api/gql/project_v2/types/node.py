@@ -115,15 +115,16 @@ class ProjectV2GQL(PydanticNodeMixin):
         info: Info,
         scope: ProjectFairShareScopeGQL,
     ) -> ProjectFairShareGQL:
-        from ai.backend.manager.api.gql.fair_share.fetcher.project import (
-            fetch_single_project_fair_share,
+        from ai.backend.common.dto.manager.v2.fair_share.request import GetProjectFairShareInput
+
+        payload = await info.context.adapters.fair_share.get_project(
+            GetProjectFairShareInput(
+                resource_group=scope.resource_group_name,
+                project_id=UUID(str(self.id)),
+            )
         )
 
-        return await fetch_single_project_fair_share(
-            info=info,
-            resource_group_name=scope.resource_group_name,
-            project_id=UUID(str(self.id)),
-        )
+        return ProjectFairShareGQL.from_node(payload.item)
 
     @strawberry.field(  # type: ignore[misc]
         description=(
@@ -163,35 +164,46 @@ class ProjectV2GQL(PydanticNodeMixin):
         limit: int | None = None,
         offset: int | None = None,
     ) -> ProjectUsageBucketConnection:
-        from ai.backend.manager.api.gql.resource_usage.fetcher.project_usage import (
-            fetch_rg_project_usage_buckets,
+        from strawberry.relay import PageInfo
+
+        from ai.backend.manager.api.gql.base import encode_cursor
+        from ai.backend.manager.api.gql.resource_usage.types import (
+            ProjectUsageBucketEdge,
+            ProjectUsageBucketGQL,
         )
         from ai.backend.manager.repositories.resource_usage_history.types import (
             ProjectUsageBucketSearchScope,
         )
 
-        # Create repository scope with context information
         repository_scope = ProjectUsageBucketSearchScope(
             resource_group=scope.resource_group_name,
             domain_name=self.organization.domain_name,
             project_id=UUID(str(self.id)),
         )
-
-        # No additional filters needed (scope includes all entity info)
-        base_conditions = None
-
-        return await fetch_rg_project_usage_buckets(
-            info=info,
+        payload = await info.context.adapters.resource_usage.gql_search_project_scoped(
             scope=repository_scope,
-            filter=filter,
-            order_by=order_by,
-            before=before,
-            after=after,
+            filter=filter.to_pydantic() if filter else None,
+            order=[o.to_pydantic() for o in order_by] if order_by else None,
             first=first,
+            after=after,
             last=last,
+            before=before,
             limit=limit,
             offset=offset,
-            base_conditions=base_conditions,
+        )
+        nodes = [ProjectUsageBucketGQL.from_node(item) for item in payload.items]
+        edges = [
+            ProjectUsageBucketEdge(node=node, cursor=encode_cursor(str(node.id))) for node in nodes
+        ]
+        return ProjectUsageBucketConnection(
+            edges=edges,
+            page_info=PageInfo(
+                has_next_page=payload.has_next_page,
+                has_previous_page=payload.has_previous_page,
+                start_cursor=edges[0].cursor if edges else None,
+                end_cursor=edges[-1].cursor if edges else None,
+            ),
+            count=payload.total_count,
         )
 
     @strawberry.field(  # type: ignore[misc]

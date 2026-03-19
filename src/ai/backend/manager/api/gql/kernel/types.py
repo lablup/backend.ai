@@ -470,19 +470,82 @@ class KernelV2GQL(PydanticNodeMixin):
         strawberry.lazy("ai.backend.manager.api.gql.resource_slot.types"),
     ]:
         """Fetch per-slot resource allocation for this kernel."""
-        from ai.backend.manager.api.gql.resource_slot.fetcher import fetch_kernel_allocations
+        import uuid as _uuid
+        from decimal import Decimal
 
-        return await fetch_kernel_allocations(
-            info=info,
-            kernel_id=str(self.id),
-            filter=filter,
-            order_by=order_by,
+        import strawberry as _strawberry
+
+        from ai.backend.common.dto.manager.query import UUIDFilter as UUIDFilterDTO
+        from ai.backend.common.dto.manager.v2.resource_slot.request import (
+            AdminSearchResourceAllocationsInput,
+        )
+        from ai.backend.common.dto.manager.v2.resource_slot.request import (
+            ResourceAllocationFilter as ResourceAllocationFilterDTO,
+        )
+        from ai.backend.common.dto.manager.v2.resource_slot.request import (
+            ResourceAllocationOrder as ResourceAllocationOrderDTO,
+        )
+        from ai.backend.manager.api.gql.base import encode_cursor
+        from ai.backend.manager.api.gql.resource_slot.types import (
+            KernelResourceAllocationEdgeGQL,
+            KernelResourceAllocationGQL,
+            ResourceAllocationConnectionGQL,
+        )
+
+        kernel_id = str(self.id)
+        pydantic_filter: ResourceAllocationFilterDTO | None = None
+        if filter is not None:
+            pydantic_filter = filter.to_pydantic()
+            if pydantic_filter.kernel_id is None:
+                pydantic_filter = ResourceAllocationFilterDTO(
+                    slot_name=pydantic_filter.slot_name,
+                    kernel_id=UUIDFilterDTO(equals=_uuid.UUID(kernel_id)),
+                    AND=pydantic_filter.AND,
+                    OR=pydantic_filter.OR,
+                    NOT=pydantic_filter.NOT,
+                )
+        else:
+            pydantic_filter = ResourceAllocationFilterDTO(
+                kernel_id=UUIDFilterDTO(equals=_uuid.UUID(kernel_id)),
+            )
+
+        pydantic_order: list[ResourceAllocationOrderDTO] | None = (
+            [o.to_pydantic() for o in order_by] if order_by is not None else None
+        )
+
+        search_input = AdminSearchResourceAllocationsInput(
+            filter=pydantic_filter,
+            order=pydantic_order,
             first=first,
             after=after,
             last=last,
             before=before,
             limit=limit,
             offset=offset,
+        )
+        payload = await info.context.adapters.resource_slot.search_allocations(search_input)
+
+        edges = []
+        for item in payload.items:
+            slot_name = item.slot_name
+            node = KernelResourceAllocationGQL(
+                id=_strawberry.ID(item.id),
+                slot_name=slot_name,
+                requested=Decimal(item.requested),
+                used=Decimal(item.used) if item.used is not None else None,
+            )
+            cursor = encode_cursor(slot_name)
+            edges.append(KernelResourceAllocationEdgeGQL(node=node, cursor=cursor))
+
+        return ResourceAllocationConnectionGQL(
+            count=payload.total_count,
+            edges=edges,
+            page_info=_strawberry.relay.PageInfo(
+                has_next_page=payload.has_next_page,
+                has_previous_page=payload.has_previous_page,
+                start_cursor=edges[0].cursor if edges else None,
+                end_cursor=edges[-1].cursor if edges else None,
+            ),
         )
 
     @classmethod

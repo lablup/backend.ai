@@ -110,15 +110,16 @@ class DomainV2GQL(PydanticNodeMixin):
         info: Info,
         scope: DomainFairShareScopeGQL,
     ) -> DomainFairShareGQL:
-        from ai.backend.manager.api.gql.fair_share.fetcher.domain import (
-            fetch_single_domain_fair_share,
+        from ai.backend.common.dto.manager.v2.fair_share.request import GetDomainFairShareInput
+
+        payload = await info.context.adapters.fair_share.get_domain(
+            GetDomainFairShareInput(
+                resource_group=scope.resource_group_name,
+                domain_name=str(self.id),
+            )
         )
 
-        return await fetch_single_domain_fair_share(
-            info=info,
-            resource_group_name=scope.resource_group_name,
-            domain_name=str(self.id),
-        )
+        return DomainFairShareGQL.from_node(payload.item)
 
     @strawberry.field(  # type: ignore[misc]
         description=(
@@ -158,34 +159,48 @@ class DomainV2GQL(PydanticNodeMixin):
         limit: int | None = None,
         offset: int | None = None,
     ) -> DomainUsageBucketConnection:
-        from ai.backend.manager.api.gql.resource_usage.fetcher.domain_usage import (
-            fetch_rg_domain_usage_buckets,
+        from strawberry.relay import PageInfo
+
+        from ai.backend.manager.api.gql.base import encode_cursor
+        from ai.backend.manager.api.gql.resource_usage.types import (
+            DomainUsageBucketEdge,
+            DomainUsageBucketGQL,
         )
         from ai.backend.manager.repositories.resource_usage_history.types import (
             DomainUsageBucketSearchScope,
         )
 
-        # Create repository scope with context information
         repository_scope = DomainUsageBucketSearchScope(
             resource_group=scope.resource_group_name,
             domain_name=str(self.id),
         )
 
-        # No additional filters needed (scope includes all entity info)
-        base_conditions = None
-
-        return await fetch_rg_domain_usage_buckets(
-            info=info,
+        payload = await info.context.adapters.resource_usage.gql_search_domain_scoped(
             scope=repository_scope,
-            filter=filter,
-            order_by=order_by,
-            before=before,
-            after=after,
+            filter=filter.to_pydantic() if filter else None,
+            order=[o.to_pydantic() for o in order_by] if order_by else None,
             first=first,
+            after=after,
             last=last,
+            before=before,
             limit=limit,
             offset=offset,
-            base_conditions=base_conditions,
+        )
+
+        nodes = [DomainUsageBucketGQL.from_node(item) for item in payload.items]
+        edges = [
+            DomainUsageBucketEdge(node=node, cursor=encode_cursor(str(node.id))) for node in nodes
+        ]
+
+        return DomainUsageBucketConnection(
+            edges=edges,
+            page_info=PageInfo(
+                has_next_page=payload.has_next_page,
+                has_previous_page=payload.has_previous_page,
+                start_cursor=edges[0].cursor if edges else None,
+                end_cursor=edges[-1].cursor if edges else None,
+            ),
+            count=payload.total_count,
         )
 
     @strawberry.field(  # type: ignore[misc]
