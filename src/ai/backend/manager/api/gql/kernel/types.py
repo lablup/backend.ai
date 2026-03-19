@@ -37,6 +37,7 @@ from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     gql_connection_type,
     gql_node_type,
+    gql_pydantic_input,
     gql_pydantic_type,
 )
 
@@ -148,10 +149,10 @@ class KernelV2OrderFieldGQL(StrEnum):
     CLUSTER_IDX = "cluster_idx"
 
 
-@strawberry.experimental.pydantic.input(
+@gql_pydantic_input(
+    BackendAIGQLMeta(description="Filter for kernel status.", added_version="26.2.0"),
     model=KernelStatusFilter,
     name="KernelV2StatusFilter",
-    description="Added in 26.2.0. Filter for kernel status.",
 )
 class KernelV2StatusFilterGQL:
     in_: list[KernelV2StatusGQL] | None = strawberry.field(name="in", default=None)
@@ -164,10 +165,10 @@ class KernelV2StatusFilterGQL:
         )
 
 
-@strawberry.experimental.pydantic.input(
+@gql_pydantic_input(
+    BackendAIGQLMeta(description="Filter criteria for querying kernels.", added_version="26.2.0"),
     model=KernelFilter,
     name="KernelV2Filter",
-    description="Added in 26.2.0. Filter criteria for querying kernels.",
 )
 class KernelV2FilterGQL:
     id: UUIDFilter | None = None
@@ -189,10 +190,10 @@ class KernelV2FilterGQL:
         )
 
 
-@strawberry.experimental.pydantic.input(
+@gql_pydantic_input(
+    BackendAIGQLMeta(description="Ordering specification for kernels.", added_version="26.2.0"),
     model=KernelOrder,
     name="KernelV2OrderBy",
-    description="Added in 26.2.0. Ordering specification for kernels.",
 )
 class KernelV2OrderByGQL:
     field: KernelV2OrderFieldGQL

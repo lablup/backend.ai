@@ -37,6 +37,7 @@ from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     gql_connection_type,
     gql_node_type,
+    gql_pydantic_input,
     gql_pydantic_type,
 )
 from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin
@@ -156,18 +157,18 @@ async def huggingface_registries(
     )
 
 
-@strawberry.experimental.pydantic.input(
+@gql_pydantic_input(
+    BackendAIGQLMeta(description="", added_version="25.14.0"),
     model=CreateHuggingFaceRegistryInputDTO,
-    description="Added in 25.14.0",
     all_fields=True,
 )
 class CreateHuggingFaceRegistryInput:
     pass
 
 
-@strawberry.experimental.pydantic.input(
+@gql_pydantic_input(
+    BackendAIGQLMeta(description="", added_version="25.14.0"),
     model=UpdateHuggingFaceRegistryInputDTO,
-    description="Added in 25.14.0",
 )
 class UpdateHuggingFaceRegistryInput:
     id: ID
@@ -184,9 +185,9 @@ class UpdateHuggingFaceRegistryInput:
         )
 
 
-@strawberry.experimental.pydantic.input(
+@gql_pydantic_input(
+    BackendAIGQLMeta(description="", added_version="25.14.0"),
     model=DeleteHuggingFaceRegistryInputDTO,
-    description="Added in 25.14.0",
 )
 class DeleteHuggingFaceRegistryInput:
     id: ID

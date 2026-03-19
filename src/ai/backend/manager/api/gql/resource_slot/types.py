@@ -56,6 +56,7 @@ from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     gql_connection_type,
     gql_node_type,
+    gql_pydantic_input,
     gql_pydantic_type,
 )
 from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin
@@ -257,10 +258,12 @@ class ResourceSlotTypeOrderFieldGQL(StrEnum):
     DISPLAY_NAME = "display_name"
 
 
-@strawberry.experimental.pydantic.input(
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description="Filter criteria for querying resource slot types.", added_version="26.3.0"
+    ),
     model=ResourceSlotTypeFilterDTO,
     name="ResourceSlotTypeFilter",
-    description="Added in 26.3.0. Filter criteria for querying resource slot types.",
 )
 class ResourceSlotTypeFilterGQL:
     slot_name: StringFilter | None = None
@@ -282,10 +285,12 @@ class ResourceSlotTypeFilterGQL:
         )
 
 
-@strawberry.experimental.pydantic.input(
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description="Ordering specification for resource slot types.", added_version="26.3.0"
+    ),
     model=ResourceSlotTypeOrderDTO,
     name="ResourceSlotTypeOrderBy",
-    description="Added in 26.3.0. Ordering specification for resource slot types.",
 )
 class ResourceSlotTypeOrderByGQL:
     field: ResourceSlotTypeOrderFieldGQL
@@ -391,10 +396,12 @@ class AgentResourceSlotOrderFieldGQL(StrEnum):
     USED = "used"
 
 
-@strawberry.experimental.pydantic.input(
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description="Filter criteria for querying agent resource slots.", added_version="26.3.0"
+    ),
     model=AgentResourceFilterDTO,
     name="AgentResourceSlotFilter",
-    description="Added in 26.3.0. Filter criteria for querying agent resource slots.",
 )
 class AgentResourceSlotFilterGQL:
     slot_name: StringFilter | None = None
@@ -414,10 +421,12 @@ class AgentResourceSlotFilterGQL:
         )
 
 
-@strawberry.experimental.pydantic.input(
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description="Ordering specification for agent resource slots.", added_version="26.3.0"
+    ),
     model=AgentResourceOrderDTO,
     name="AgentResourceSlotOrderBy",
-    description="Added in 26.3.0. Ordering specification for agent resource slots.",
 )
 class AgentResourceSlotOrderByGQL:
     field: AgentResourceSlotOrderFieldGQL
@@ -505,10 +514,13 @@ class KernelResourceAllocationOrderFieldGQL(StrEnum):
     USED = "used"
 
 
-@strawberry.experimental.pydantic.input(
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description="Filter criteria for querying kernel resource allocations.",
+        added_version="26.3.0",
+    ),
     model=ResourceAllocationFilterDTO,
     name="KernelResourceAllocationFilter",
-    description="Added in 26.3.0. Filter criteria for querying kernel resource allocations.",
 )
 class KernelResourceAllocationFilterGQL:
     slot_name: StringFilter | None = None
@@ -526,10 +538,13 @@ class KernelResourceAllocationFilterGQL:
         )
 
 
-@strawberry.experimental.pydantic.input(
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description="Ordering specification for kernel resource allocations.",
+        added_version="26.3.0",
+    ),
     model=ResourceAllocationOrderDTO,
     name="KernelResourceAllocationOrderBy",
-    description="Added in 26.3.0. Ordering specification for kernel resource allocations.",
 )
 class KernelResourceAllocationOrderByGQL:
     field: KernelResourceAllocationOrderFieldGQL

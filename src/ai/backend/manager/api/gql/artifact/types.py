@@ -112,6 +112,7 @@ from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     gql_connection_type,
     gql_node_type,
+    gql_pydantic_input,
     gql_pydantic_type,
 )
 from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin
@@ -270,7 +271,8 @@ class ArtifactVerificationGQLResult:
         return cls(verifiers=verifier_entries)
 
 
-@strawberry.experimental.pydantic.input(
+@gql_pydantic_input(
+    BackendAIGQLMeta(description="", added_version="24.09.0"),
     model=ArtifactGQLFilterInputDTO,
     description=dedent_strip("""
     Added in 25.14.0.
@@ -310,7 +312,8 @@ class ArtifactFilter(GQLFilter):
         )
 
 
-@strawberry.experimental.pydantic.input(
+@gql_pydantic_input(
+    BackendAIGQLMeta(description="", added_version="24.09.0"),
     model=ArtifactGQLOrderByInputDTO,
     description=dedent_strip("""
     Added in 25.14.0.
@@ -330,7 +333,8 @@ class ArtifactOrderBy(GQLOrderBy):
         )
 
 
-@strawberry.experimental.pydantic.input(
+@gql_pydantic_input(
+    BackendAIGQLMeta(description="", added_version="24.09.0"),
     model=ArtifactRevisionStatusFilterDTO,
     description=dedent_strip("""
     Added in 25.14.0.
@@ -350,9 +354,9 @@ class ArtifactRevisionStatusFilter:
         )
 
 
-@strawberry.experimental.pydantic.input(
+@gql_pydantic_input(
+    BackendAIGQLMeta(description="", added_version="25.16.0"),
     model=ArtifactRevisionRemoteStatusFilterDTO,
-    description="Added in 25.16.0",
 )
 class ArtifactRevisionRemoteStatusFilter:
     in_: list[ArtifactRemoteStatus] | None = strawberry.field(name="in", default=None)
@@ -366,7 +370,8 @@ class ArtifactRevisionRemoteStatusFilter:
         )
 
 
-@strawberry.experimental.pydantic.input(
+@gql_pydantic_input(
+    BackendAIGQLMeta(description="", added_version="24.09.0"),
     model=ArtifactRevisionGQLFilterInputDTO,
     description=dedent_strip("""
     Added in 25.14.0.
@@ -425,7 +430,8 @@ class ArtifactRevisionFilter(GQLFilter):
         )
 
 
-@strawberry.experimental.pydantic.input(
+@gql_pydantic_input(
+    BackendAIGQLMeta(description="", added_version="24.09.0"),
     model=ArtifactRevisionGQLOrderByInputDTO,
     description=dedent_strip("""
     Added in 25.14.0.
@@ -445,7 +451,8 @@ class ArtifactRevisionOrderBy(GQLOrderBy):
         )
 
 
-@strawberry.experimental.pydantic.input(
+@gql_pydantic_input(
+    BackendAIGQLMeta(description="", added_version="24.09.0"),
     model=ScanArtifactsInputDTO,
     description=dedent_strip("""
     Added in 25.14.0.
@@ -465,7 +472,8 @@ class ScanArtifactsInput:
     search: str | None = None
 
 
-@strawberry.experimental.pydantic.input(
+@gql_pydantic_input(
+    BackendAIGQLMeta(description="", added_version="24.09.0"),
     model=ImportArtifactsOptionsInputDTO,
     description=dedent_strip("""
     Added in 26.1.0.
@@ -482,7 +490,8 @@ class ImportArtifactsOptionsGQL:
     )
 
 
-@strawberry.experimental.pydantic.input(
+@gql_pydantic_input(
+    BackendAIGQLMeta(description="", added_version="24.09.0"),
     model=ImportArtifactsInputDTO,
     description=dedent_strip("""
     Added in 25.14.0.
@@ -505,9 +514,9 @@ class ImportArtifactsInput:
     )
 
 
-@strawberry.experimental.pydantic.input(
+@gql_pydantic_input(
+    BackendAIGQLMeta(description="", added_version="25.15.0"),
     model=DelegateeTargetInputDTO,
-    description="Added in 25.15.0",
 )
 class DelegateeTarget:
     delegatee_reservoir_id: ID
@@ -520,7 +529,8 @@ class DelegateeTarget:
         )
 
 
-@strawberry.experimental.pydantic.input(
+@gql_pydantic_input(
+    BackendAIGQLMeta(description="", added_version="24.09.0"),
     model=DelegateScanArtifactsInputDTO,
     description=dedent_strip("""
     Added in 25.15.0.
@@ -547,7 +557,8 @@ class DelegateScanArtifactsInput:
     )
 
 
-@strawberry.experimental.pydantic.input(
+@gql_pydantic_input(
+    BackendAIGQLMeta(description="", added_version="24.09.0"),
     model=DelegateImportArtifactsInputDTO,
     description=dedent_strip("""
     Added in 25.15.0.
@@ -572,7 +583,8 @@ class DelegateImportArtifactsInput:
     )
 
 
-@strawberry.experimental.pydantic.input(
+@gql_pydantic_input(
+    BackendAIGQLMeta(description="", added_version="24.09.0"),
     model=UpdateArtifactGQLInputDTO,
     description=dedent_strip("""
     Added in 25.14.0.
@@ -597,7 +609,8 @@ class UpdateArtifactInput:
         )
 
 
-@strawberry.experimental.pydantic.input(
+@gql_pydantic_input(
+    BackendAIGQLMeta(description="", added_version="24.09.0"),
     model=CancelArtifactInputDTO,
     description=dedent_strip("""
     Added in 25.14.0.
@@ -611,7 +624,8 @@ class CancelArtifactInput:
     artifact_revision_id: ID
 
 
-@strawberry.experimental.pydantic.input(
+@gql_pydantic_input(
+    BackendAIGQLMeta(description="", added_version="24.09.0"),
     model=CleanupArtifactRevisionsInputDTO,
     description=dedent_strip("""
     Added in 25.14.0.
@@ -626,7 +640,8 @@ class CleanupArtifactRevisionsInput:
     artifact_revision_ids: list[ID]
 
 
-@strawberry.experimental.pydantic.input(
+@gql_pydantic_input(
+    BackendAIGQLMeta(description="", added_version="24.09.0"),
     model=DeleteArtifactsInputDTO,
     description=dedent_strip("""
     Added in 25.15.0.
@@ -641,7 +656,8 @@ class DeleteArtifactsInput:
     artifact_ids: list[ID]
 
 
-@strawberry.experimental.pydantic.input(
+@gql_pydantic_input(
+    BackendAIGQLMeta(description="", added_version="24.09.0"),
     model=RestoreArtifactsInputDTO,
     description=dedent_strip("""
     Added in 25.15.0.
@@ -655,7 +671,8 @@ class RestoreArtifactsInput:
     artifact_ids: list[ID]
 
 
-@strawberry.experimental.pydantic.input(
+@gql_pydantic_input(
+    BackendAIGQLMeta(description="", added_version="24.09.0"),
     model=ApproveArtifactInputDTO,
     description=dedent_strip("""
     Added in 25.14.0.
@@ -669,7 +686,8 @@ class ApproveArtifactInput:
     artifact_revision_id: ID
 
 
-@strawberry.experimental.pydantic.input(
+@gql_pydantic_input(
+    BackendAIGQLMeta(description="", added_version="24.09.0"),
     model=RejectArtifactInputDTO,
     description=dedent_strip("""
     Added in 25.14.0.
@@ -683,7 +701,8 @@ class RejectArtifactInput:
     artifact_revision_id: ID
 
 
-@strawberry.experimental.pydantic.input(
+@gql_pydantic_input(
+    BackendAIGQLMeta(description="", added_version="24.09.0"),
     model=ArtifactStatusChangedInputDTO,
     description=dedent_strip("""
     Added in 25.14.0.
@@ -704,7 +723,8 @@ class ArtifactStatusChangedInput:
         )
 
 
-@strawberry.experimental.pydantic.input(
+@gql_pydantic_input(
+    BackendAIGQLMeta(description="", added_version="24.09.0"),
     model=ModelTargetInputDTO,
     description=dedent_strip("""
     Added in 25.14.0.
@@ -723,7 +743,8 @@ class ModelTarget:
         return ModelTargetData(model_id=self.model_id, revision=self.revision)
 
 
-@strawberry.experimental.pydantic.input(
+@gql_pydantic_input(
+    BackendAIGQLMeta(description="", added_version="24.09.0"),
     model=ScanArtifactModelsInputDTO,
     description=dedent_strip("""
     Added in 25.14.0.

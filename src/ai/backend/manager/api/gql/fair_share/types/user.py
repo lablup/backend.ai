@@ -47,6 +47,7 @@ from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     gql_connection_type,
     gql_node_type,
+    gql_pydantic_input,
     gql_pydantic_type,
 )
 from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin
@@ -291,13 +292,13 @@ class UserFairShareConnection(Connection[UserFairShareGQL]):
         self.count = count
 
 
-@strawberry.experimental.pydantic.input(
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description="Nested filter for user entity fields in user fair share queries. Allows filtering by user properties such as username, email, and active status.",
+        added_version="26.2.0",
+    ),
     model=UserFairShareUserNestedFilterDTO,
     name="UserFairShareUserNestedFilter",
-    description=(
-        "Added in 26.2.0. Nested filter for user entity fields in user fair share queries. "
-        "Allows filtering by user properties such as username, email, and active status."
-    ),
 )
 class UserFairShareUserNestedFilter:
     """Nested filter for user entity within user fair share."""
@@ -319,15 +320,13 @@ class UserFairShareUserNestedFilter:
         return UserFairShareUserNestedFilterDTO(is_active=self.is_active)
 
 
-@strawberry.experimental.pydantic.input(
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description="Filter input for querying user fair shares. Supports filtering by scaling group, user UUID, project ID, and domain name. This is the most granular level of fair share filtering. Multiple filters can be combined using AND, OR, and NOT logical operators.",
+        added_version="26.1.0",
+    ),
     model=UserFairShareFilterDTO,
     name="UserFairShareFilter",
-    description=(
-        "Added in 26.1.0. Filter input for querying user fair shares. "
-        "Supports filtering by scaling group, user UUID, project ID, and domain name. "
-        "This is the most granular level of fair share filtering. "
-        "Multiple filters can be combined using AND, OR, and NOT logical operators."
-    ),
 )
 class UserFairShareFilter:
     """Filter for user fair shares."""
@@ -395,13 +394,13 @@ class UserFairShareFilter:
         )
 
 
-@strawberry.experimental.pydantic.input(
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description="Filter for user fair shares within a resource group scope. References resource group membership columns to avoid excluding users without fair share records.",
+        added_version="26.2.0",
+    ),
     model=UserFairShareFilterDTO,
     name="RGUserFairShareFilter",
-    description=(
-        "Added in 26.2.0. Filter for user fair shares within a resource group scope. "
-        "References resource group membership columns to avoid excluding users without fair share records."
-    ),
 )
 class RGUserFairShareFilter:
     """Filter for user fair shares in RG context (uses INNER JOIN'd columns)."""
@@ -462,14 +461,13 @@ class UserFairShareOrderField(StrEnum):
     USER_EMAIL = "user_email"
 
 
-@strawberry.experimental.pydantic.input(
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description="Specifies ordering for user fair share query results. Combine field selection with direction to sort results. Default direction is DESC (descending).",
+        added_version="26.1.0",
+    ),
     model=UserFairShareOrderDTO,
     name="UserFairShareOrderBy",
-    description=(
-        "Added in 26.1.0. Specifies ordering for user fair share query results. "
-        "Combine field selection with direction to sort results. "
-        "Default direction is DESC (descending)."
-    ),
 )
 class UserFairShareOrderBy:
     """OrderBy for user fair shares."""
@@ -496,14 +494,13 @@ class UserFairShareOrderBy:
 # Mutation Input/Payload Types
 
 
-@strawberry.experimental.pydantic.input(
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description="Input for upserting user fair share weight. The weight parameter affects scheduling priority - higher weight = higher priority. Set weight to null to use resource group's default_weight.",
+        added_version="26.1.0",
+    ),
     model=UpsertUserFairShareWeightInputDTO,
     name="UpsertUserFairShareWeightInput",
-    description=(
-        "Added in 26.1.0. Input for upserting user fair share weight. "
-        "The weight parameter affects scheduling priority - higher weight = higher priority. "
-        "Set weight to null to use resource group's default_weight."
-    ),
 )
 class UpsertUserFairShareWeightInput:
     """Input for upserting user fair share weight."""
@@ -541,13 +538,13 @@ class UpsertUserFairShareWeightPayload:
 # Bulk Upsert Mutation Input/Payload Types
 
 
-@strawberry.experimental.pydantic.input(
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description="Input item for a single user weight in bulk upsert. Represents one user's weight configuration within a project.",
+        added_version="26.1.0",
+    ),
     model=UserWeightEntryInputDTO,
     name="UserWeightInputItem",
-    description=(
-        "Added in 26.1.0. Input item for a single user weight in bulk upsert. "
-        "Represents one user's weight configuration within a project."
-    ),
 )
 class UserWeightInputItem:
     """Input item for a single user weight in bulk upsert."""
@@ -566,13 +563,13 @@ class UserWeightInputItem:
     )
 
 
-@strawberry.experimental.pydantic.input(
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description="Input for bulk upserting user fair share weights. Allows updating multiple users in a single transaction.",
+        added_version="26.1.0",
+    ),
     model=BulkUpsertUserFairShareWeightInputDTO,
     name="BulkUpsertUserFairShareWeightInput",
-    description=(
-        "Added in 26.1.0. Input for bulk upserting user fair share weights. "
-        "Allows updating multiple users in a single transaction."
-    ),
 )
 class BulkUpsertUserFairShareWeightInput:
     """Input for bulk upserting user fair share weights."""

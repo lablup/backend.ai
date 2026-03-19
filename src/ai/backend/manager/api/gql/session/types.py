@@ -41,6 +41,7 @@ from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     gql_connection_type,
     gql_node_type,
+    gql_pydantic_input,
     gql_pydantic_type,
 )
 from ai.backend.manager.api.gql.deployment.types.revision import (
@@ -161,10 +162,10 @@ class SessionV2OrderFieldGQL(StrEnum):
     NAME = "name"
 
 
-@strawberry.experimental.pydantic.input(
+@gql_pydantic_input(
+    BackendAIGQLMeta(description="Filter for session status.", added_version="26.3.0"),
     model=SessionStatusFilter,
     name="SessionV2StatusFilter",
-    description="Added in 26.3.0. Filter for session status.",
 )
 class SessionV2StatusFilterGQL:
     in_: list[SessionV2StatusGQL] | None = strawberry.field(name="in", default=None)
@@ -177,10 +178,10 @@ class SessionV2StatusFilterGQL:
         )
 
 
-@strawberry.experimental.pydantic.input(
+@gql_pydantic_input(
+    BackendAIGQLMeta(description="Filter criteria for querying sessions.", added_version="26.3.0"),
     model=SessionFilter,
     name="SessionV2Filter",
-    description="Added in 26.3.0. Filter criteria for querying sessions.",
 )
 class SessionV2FilterGQL:
     id: UUIDFilter | None = None
@@ -208,10 +209,10 @@ class SessionV2FilterGQL:
         )
 
 
-@strawberry.experimental.pydantic.input(
+@gql_pydantic_input(
+    BackendAIGQLMeta(description="Ordering specification for sessions.", added_version="26.3.0"),
     model=SessionOrder,
     name="SessionV2OrderBy",
-    description="Added in 26.3.0. Ordering specification for sessions.",
 )
 class SessionV2OrderByGQL:
     field: SessionV2OrderFieldGQL

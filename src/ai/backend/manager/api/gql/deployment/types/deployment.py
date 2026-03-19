@@ -95,6 +95,7 @@ from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     gql_connection_type,
     gql_node_type,
+    gql_pydantic_input,
     gql_pydantic_type,
 )
 from ai.backend.manager.api.gql.deployment.types.access_token import (
@@ -553,9 +554,9 @@ class ModelDeployment(PydanticNodeMixin[DeploymentNodeDTO]):
 
 
 # Filter Types
-@strawberry.experimental.pydantic.input(
+@gql_pydantic_input(
+    BackendAIGQLMeta(description="", added_version="25.19.0"),
     model=DeploymentStatusFilterDTO,
-    description="Added in 25.19.0",
 )
 class DeploymentStatusFilter:
     in_: list[DeploymentStatusGQL] | None = strawberry.field(name="in", default=None)
@@ -568,9 +569,9 @@ class DeploymentStatusFilter:
         )
 
 
-@strawberry.experimental.pydantic.input(
+@gql_pydantic_input(
+    BackendAIGQLMeta(description="", added_version="25.19.0"),
     model=DeploymentFilterDTO,
-    description="Added in 25.19.0",
 )
 class DeploymentFilter:
     name: StringFilter | None = None
@@ -601,9 +602,9 @@ class DeploymentFilter:
         )
 
 
-@strawberry.experimental.pydantic.input(
+@gql_pydantic_input(
+    BackendAIGQLMeta(description="", added_version="25.19.0"),
     model=DeploymentOrderDTO,
-    description="Added in 25.19.0",
 )
 class DeploymentOrderBy:
     field: DeploymentOrderField
@@ -658,9 +659,9 @@ class DeploymentStatusChangedPayload:
 
 
 # Input Types
-@strawberry.experimental.pydantic.input(
+@gql_pydantic_input(
+    BackendAIGQLMeta(description="", added_version="25.19.0"),
     model=ModelDeploymentMetadataInputDTO,
-    description="Added in 25.19.0",
 )
 class ModelDeploymentMetadataInput:
     project_id: ID
@@ -677,9 +678,9 @@ class ModelDeploymentMetadataInput:
         )
 
 
-@strawberry.experimental.pydantic.input(
+@gql_pydantic_input(
+    BackendAIGQLMeta(description="", added_version="25.19.0"),
     model=ModelDeploymentNetworkAccessInputDTO,
-    description="Added in 25.19.0",
 )
 class ModelDeploymentNetworkAccessInput:
     preferred_domain_name: str | None = None
@@ -698,10 +699,13 @@ class ModelDeploymentNetworkAccessInput:
         )
 
 
-@strawberry.experimental.pydantic.input(
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description="Deployment strategy configuration with discriminator pattern.",
+        added_version="25.19.0",
+    ),
     model=DeploymentStrategyInputDTO,
     name="DeploymentStrategyInput",
-    description="Added in 25.19.0. Deployment strategy configuration with discriminator pattern.",
 )
 class DeploymentStrategyInputGQL:
     """Deployment strategy input with type discriminator and optional config fields.
@@ -754,9 +758,9 @@ class DeploymentStrategyInputGQL:
         )
 
 
-@strawberry.experimental.pydantic.input(
+@gql_pydantic_input(
+    BackendAIGQLMeta(description="", added_version="25.19.0"),
     model=CreateDeploymentInputDTO,
-    description="Added in 25.19.0",
 )
 class CreateDeploymentInput:
     metadata: ModelDeploymentMetadataInput
@@ -795,9 +799,9 @@ class CreateDeploymentInput:
         )
 
 
-@strawberry.experimental.pydantic.input(
+@gql_pydantic_input(
+    BackendAIGQLMeta(description="", added_version="25.19.0"),
     model=UpdateDeploymentInputDTO,
-    description="Added in 25.19.0",
 )
 class UpdateDeploymentInput:
     id: ID
@@ -817,9 +821,9 @@ class UpdateDeploymentInput:
         )
 
 
-@strawberry.experimental.pydantic.input(
+@gql_pydantic_input(
+    BackendAIGQLMeta(description="", added_version="25.19.0"),
     model=DeleteDeploymentInputDTO,
-    description="Added in 25.19.0",
 )
 class DeleteDeploymentInput:
     id: ID
@@ -841,9 +845,9 @@ class ModelDeploymentConnection(Connection[ModelDeployment]):
 
 
 # Sync replica types
-@strawberry.experimental.pydantic.input(
+@gql_pydantic_input(
+    BackendAIGQLMeta(description="", added_version="25.19.0"),
     model=SyncReplicaInputDTO,
-    description="Added in 25.19.0",
 )
 class SyncReplicaInput:
     model_deployment_id: ID

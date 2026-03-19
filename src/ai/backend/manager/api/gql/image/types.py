@@ -59,6 +59,7 @@ from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     gql_connection_type,
     gql_node_type,
+    gql_pydantic_input,
     gql_pydantic_type,
 )
 from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin
@@ -550,7 +551,8 @@ class ImageV2ConnectionGQL(Connection[ImageV2GQL]):
 # =============================================================================
 
 
-@strawberry.experimental.pydantic.input(
+@gql_pydantic_input(
+    BackendAIGQLMeta(description="", added_version="24.09.0"),
     model=ContainerRegistryScopeInputDTO,
     name="ContainerRegistryScope",
     description=dedent_strip("""
@@ -569,7 +571,8 @@ class ContainerRegistryScopeGQL:
         return ContainerRegistryScopeInputDTO(registry_id=self.registry_id)
 
 
-@strawberry.experimental.pydantic.input(
+@gql_pydantic_input(
+    BackendAIGQLMeta(description="", added_version="24.09.0"),
     model=ImageScopeInputDTO,
     name="ImageV2Scope",
     description=dedent_strip("""
@@ -586,13 +589,13 @@ class ImageV2ScopeGQL:
         return ImageScopeInputDTO(image_id=self.image_id)
 
 
-@strawberry.experimental.pydantic.input(
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description="Nested filter for aliases belonging to an image. Filters images that have at least one alias matching all specified conditions.",
+        added_version="26.3.0",
+    ),
     model=ImageAliasNestedFilterInputDTO,
     name="ImageAliasNestedFilter",
-    description=(
-        "Added in 26.3.0. Nested filter for aliases belonging to an image. "
-        "Filters images that have at least one alias matching all specified conditions."
-    ),
 )
 class ImageAliasNestedFilterGQL:
     """Nested filter for image aliases within an image."""
@@ -609,10 +612,13 @@ class ImageAliasNestedFilterGQL:
         )
 
 
-@strawberry.experimental.pydantic.input(
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description="Filter for image status with equality and membership operators.",
+        added_version="26.3.0",
+    ),
     model=ImageStatusFilterInputDTO,
     name="ImageV2StatusFilter",
-    description="Added in 26.3.0. Filter for image status with equality and membership operators.",
 )
 class ImageV2StatusFilterGQL:
     equals: ImageV2StatusGQL | None = strawberry.field(
@@ -638,7 +644,8 @@ class ImageV2StatusFilterGQL:
         )
 
 
-@strawberry.experimental.pydantic.input(
+@gql_pydantic_input(
+    BackendAIGQLMeta(description="", added_version="24.09.0"),
     model=ImageFilterInputDTO,
     description=dedent_strip("""
     Added in 26.2.0.
@@ -698,7 +705,8 @@ class ImageV2OrderFieldGQL(enum.Enum):
     LAST_USED = "LAST_USED"
 
 
-@strawberry.experimental.pydantic.input(
+@gql_pydantic_input(
+    BackendAIGQLMeta(description="", added_version="24.09.0"),
     model=ImageOrderByInputDTO,
     description=dedent_strip("""
     Added in 26.2.0.
@@ -741,7 +749,8 @@ class ImageV2AliasConnectionGQL(Connection[ImageV2AliasGQL]):
         self.count = count
 
 
-@strawberry.experimental.pydantic.input(
+@gql_pydantic_input(
+    BackendAIGQLMeta(description="", added_version="24.09.0"),
     model=ImageAliasFilterInputDTO,
     description=dedent_strip("""
     Added in 26.2.0.
@@ -784,7 +793,8 @@ class ImageV2AliasOrderFieldGQL(enum.Enum):
     ALIAS = "ALIAS"
 
 
-@strawberry.experimental.pydantic.input(
+@gql_pydantic_input(
+    BackendAIGQLMeta(description="", added_version="24.09.0"),
     model=ImageAliasOrderByInputDTO,
     description=dedent_strip("""
     Added in 26.2.0.

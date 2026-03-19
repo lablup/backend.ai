@@ -51,6 +51,7 @@ from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     gql_connection_type,
     gql_node_type,
+    gql_pydantic_input,
     gql_pydantic_type,
 )
 from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin
@@ -199,18 +200,18 @@ async def object_storages(
     )
 
 
-@strawberry.experimental.pydantic.input(
+@gql_pydantic_input(
+    BackendAIGQLMeta(description="", added_version="25.14.0"),
     model=CreateObjectStorageInputDTO,
-    description="Added in 25.14.0",
     all_fields=True,
 )
 class CreateObjectStorageInput:
     pass
 
 
-@strawberry.experimental.pydantic.input(
+@gql_pydantic_input(
+    BackendAIGQLMeta(description="", added_version="25.14.0"),
     model=UpdateObjectStorageInputDTO,
-    description="Added in 25.14.0",
 )
 class UpdateObjectStorageInput:
     id: ID
@@ -233,17 +234,17 @@ class UpdateObjectStorageInput:
         )
 
 
-@strawberry.experimental.pydantic.input(
+@gql_pydantic_input(
+    BackendAIGQLMeta(description="", added_version="25.14.0"),
     model=DeleteObjectStorageInputDTO,
-    description="Added in 25.14.0",
 )
 class DeleteObjectStorageInput:
     id: ID
 
 
-@strawberry.experimental.pydantic.input(
+@gql_pydantic_input(
+    BackendAIGQLMeta(description="", added_version="25.14.0"),
     model=GetPresignedDownloadURLInputDTO,
-    description="Added in 25.14.0",
 )
 class GetPresignedDownloadURLInput:
     artifact_revision_id: ID
@@ -251,9 +252,9 @@ class GetPresignedDownloadURLInput:
     expiration: int | None = None
 
 
-@strawberry.experimental.pydantic.input(
+@gql_pydantic_input(
+    BackendAIGQLMeta(description="", added_version="25.14.0"),
     model=GetPresignedUploadURLInputDTO,
-    description="Added in 25.14.0",
 )
 class GetPresignedUploadURLInput:
     artifact_revision_id: ID

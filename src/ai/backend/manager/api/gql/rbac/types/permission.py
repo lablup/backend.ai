@@ -38,6 +38,7 @@ from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     gql_connection_type,
     gql_node_type,
+    gql_pydantic_input,
 )
 from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin
 from ai.backend.manager.api.gql.rbac.types.entity_node import EntityNode
@@ -331,10 +332,10 @@ class PermissionGQL(PydanticNodeMixin[PermissionNodeDTO]):
 # ==================== Filter Types ====================
 
 
-@strawberry.experimental.pydantic.input(
+@gql_pydantic_input(
+    BackendAIGQLMeta(description="Filter for scoped permissions", added_version="26.3.0"),
     model=PermissionFilterDTO,
     name="PermissionFilter",
-    description="Added in 26.3.0. Filter for scoped permissions",
 )
 class PermissionFilter(GQLFilter):
     role_id: uuid.UUID | None = None
@@ -402,10 +403,10 @@ class PermissionFilter(GQLFilter):
 # ==================== OrderBy Types ====================
 
 
-@strawberry.experimental.pydantic.input(
+@gql_pydantic_input(
+    BackendAIGQLMeta(description="Order by specification for permissions", added_version="26.3.0"),
     model=PermissionOrderByDTO,
     name="PermissionOrderBy",
-    description="Added in 26.3.0. Order by specification for permissions",
 )
 class PermissionOrderBy(GQLOrderBy):
     field: PermissionOrderField
@@ -430,9 +431,9 @@ class PermissionOrderBy(GQLOrderBy):
 # ==================== Input Types ====================
 
 
-@strawberry.experimental.pydantic.input(
+@gql_pydantic_input(
+    BackendAIGQLMeta(description="Input for creating a scoped permission", added_version="26.3.0"),
     model=CreatePermissionInputDTO,
-    description="Added in 26.3.0. Input for creating a scoped permission",
 )
 class CreatePermissionInput:
     role_id: uuid.UUID
@@ -442,9 +443,9 @@ class CreatePermissionInput:
     operation: OperationTypeGQL
 
 
-@strawberry.experimental.pydantic.input(
+@gql_pydantic_input(
+    BackendAIGQLMeta(description="Input for updating a scoped permission", added_version="26.3.0"),
     model=UpdatePermissionInputDTO,
-    description="Added in 26.3.0. Input for updating a scoped permission",
 )
 class UpdatePermissionInput:
     id: uuid.UUID
@@ -454,9 +455,9 @@ class UpdatePermissionInput:
     operation: OperationTypeGQL | None = None
 
 
-@strawberry.experimental.pydantic.input(
+@gql_pydantic_input(
+    BackendAIGQLMeta(description="Input for deleting a scoped permission", added_version="26.3.0"),
     model=DeletePermissionInputDTO,
-    description="Added in 26.3.0. Input for deleting a scoped permission",
 )
 class DeletePermissionInput:
     id: uuid.UUID

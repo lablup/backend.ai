@@ -35,6 +35,7 @@ from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     gql_connection_type,
     gql_node_type,
+    gql_pydantic_input,
     gql_pydantic_type,
 )
 from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin
@@ -96,7 +97,8 @@ class AgentOrderFieldGQL(StrEnum):
     SCHEDULABLE = "schedulable"
 
 
-@strawberry.experimental.pydantic.input(
+@gql_pydantic_input(
+    BackendAIGQLMeta(description="", added_version="24.09.0"),
     model=AgentStatusFilter,
     name="AgentStatusFilter",
     description=dedent_strip("""
@@ -115,10 +117,10 @@ class AgentStatusFilterGQL:
         )
 
 
-@strawberry.experimental.pydantic.input(
+@gql_pydantic_input(
+    BackendAIGQLMeta(description="Filter options for querying agents", added_version="26.1.0"),
     model=AgentFilter,
     name="AgentFilter",
-    description="Added in 26.1.0. Filter options for querying agents",
 )
 class AgentFilterGQL:
     id: StringFilter | None = None
@@ -142,10 +144,10 @@ class AgentFilterGQL:
         )
 
 
-@strawberry.experimental.pydantic.input(
+@gql_pydantic_input(
+    BackendAIGQLMeta(description="Options for ordering agents", added_version="26.1.0"),
     model=AgentOrder,
     name="AgentOrderBy",
-    description="Added in 26.1.0. Options for ordering agents",
 )
 class AgentOrderByGQL:
     field: AgentOrderFieldGQL

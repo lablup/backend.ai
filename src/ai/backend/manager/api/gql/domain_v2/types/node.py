@@ -14,7 +14,11 @@ from ai.backend.common.dto.manager.v2.domain.types import (
     DomainFairShareScopeDTO,
     DomainUsageScopeDTO,
 )
-from ai.backend.manager.api.gql.decorators import BackendAIGQLMeta, gql_connection_type
+from ai.backend.manager.api.gql.decorators import (
+    BackendAIGQLMeta,
+    gql_connection_type,
+    gql_pydantic_input,
+)
 from ai.backend.manager.api.gql.fair_share.types import DomainFairShareGQL
 from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin
 from ai.backend.manager.api.gql.resource_slot.overview_types import ActiveResourceOverviewGQL
@@ -42,7 +46,8 @@ if TYPE_CHECKING:
     from ai.backend.manager.data.domain.types import DomainData
 
 
-@strawberry.experimental.pydantic.input(
+@gql_pydantic_input(
+    BackendAIGQLMeta(description="", added_version="24.09.0"),
     model=DomainFairShareScopeDTO,
     name="DomainFairShareScope",
 )
@@ -57,7 +62,8 @@ class DomainFairShareScopeGQL:
         return DomainFairShareScopeDTO(resource_group_name=self.resource_group_name)
 
 
-@strawberry.experimental.pydantic.input(
+@gql_pydantic_input(
+    BackendAIGQLMeta(description="", added_version="24.09.0"),
     model=DomainUsageScopeDTO,
     name="DomainUsageScope",
 )

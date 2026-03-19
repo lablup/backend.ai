@@ -15,7 +15,11 @@ from ai.backend.common.dto.manager.v2.fair_share.types import (
     ProjectUsageScopeDTO,
 )
 from ai.backend.common.dto.manager.v2.group.response import ProjectNode
-from ai.backend.manager.api.gql.decorators import BackendAIGQLMeta, gql_connection_type
+from ai.backend.manager.api.gql.decorators import (
+    BackendAIGQLMeta,
+    gql_connection_type,
+    gql_pydantic_input,
+)
 from ai.backend.manager.api.gql.fair_share.types import ProjectFairShareGQL
 from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin
 from ai.backend.manager.api.gql.resource_slot.overview_types import ActiveResourceOverviewGQL
@@ -42,10 +46,12 @@ if TYPE_CHECKING:
     from ai.backend.manager.data.group.types import GroupData
 
 
-@strawberry.experimental.pydantic.input(
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description="Scope parameters for filtering project fair shares.", added_version="24.09.0"
+    ),
     model=ProjectFairShareScopeDTO,
     name="ProjectFairShareScope",
-    description="Scope parameters for filtering project fair shares.",
 )
 class ProjectFairShareScopeGQL:
     """Scope parameters for filtering project fair shares."""
@@ -58,10 +64,12 @@ class ProjectFairShareScopeGQL:
         return ProjectFairShareScopeDTO(resource_group_name=self.resource_group_name)
 
 
-@strawberry.experimental.pydantic.input(
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description="Scope parameters for filtering project usage buckets.", added_version="24.09.0"
+    ),
     model=ProjectUsageScopeDTO,
     name="ProjectUsageScope",
-    description="Scope parameters for filtering project usage buckets.",
 )
 class ProjectUsageScopeGQL:
     """Scope parameters for filtering project usage buckets."""

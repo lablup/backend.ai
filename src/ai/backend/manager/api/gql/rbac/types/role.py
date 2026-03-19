@@ -100,6 +100,7 @@ from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     gql_connection_type,
     gql_node_type,
+    gql_pydantic_input,
 )
 from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin
 from ai.backend.manager.api.gql.types import GQLFilter, GQLOrderBy, StrawberryGQLContext
@@ -398,10 +399,13 @@ class RoleAssignmentGQL(PydanticNodeMixin[RoleAssignmentNode]):
 # ==================== Filter Types ====================
 
 
-@strawberry.experimental.pydantic.input(
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description="Filter for role source with equality and membership operators.",
+        added_version="26.3.0",
+    ),
     model=RoleSourceFilterDTO,
     name="RoleSourceFilter",
-    description="Added in 26.3.0. Filter for role source with equality and membership operators.",
 )
 class RoleSourceFilterGQL:
     equals: RoleSourceGQL | None = strawberry.field(
@@ -426,10 +430,13 @@ class RoleSourceFilterGQL:
         )
 
 
-@strawberry.experimental.pydantic.input(
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description="Filter for role status with equality and membership operators.",
+        added_version="26.3.0",
+    ),
     model=RoleStatusFilterDTO,
     name="RoleStatusFilter",
-    description="Added in 26.3.0. Filter for role status with equality and membership operators.",
 )
 class RoleStatusFilterGQL:
     equals: RoleStatusGQL | None = strawberry.field(
@@ -454,10 +461,10 @@ class RoleStatusFilterGQL:
         )
 
 
-@strawberry.experimental.pydantic.input(
+@gql_pydantic_input(
+    BackendAIGQLMeta(description="Filter for roles", added_version="26.3.0"),
     model=RoleFilterDTO,
     name="RoleFilter",
-    description="Added in 26.3.0. Filter for roles",
 )
 class RoleFilter(GQLFilter):
     name: StringFilter | None = None
@@ -545,13 +552,13 @@ class RoleFilter(GQLFilter):
 # TODO: Add user_id filter (requires AssignedUserConditions.by_user_id)
 
 
-@strawberry.experimental.pydantic.input(
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description="Nested filter for roles within a role assignment. Filters assignments that have a role matching all specified conditions.",
+        added_version="26.3.0",
+    ),
     model=RoleNestedFilterDTO,
     name="RoleAssignmentRoleNestedFilter",
-    description=(
-        "Added in 26.3.0. Nested filter for roles within a role assignment. "
-        "Filters assignments that have a role matching all specified conditions."
-    ),
 )
 class RoleAssignmentRoleNestedFilterGQL:
     name: StringFilter | None = None
@@ -639,10 +646,10 @@ class RoleAssignmentRoleNestedFilterGQL:
         return conditions
 
 
-@strawberry.experimental.pydantic.input(
+@gql_pydantic_input(
+    BackendAIGQLMeta(description="Filter for role assignments", added_version="26.3.0"),
     model=RoleAssignmentFilterDTO,
     name="RoleAssignmentFilter",
-    description="Added in 26.3.0. Filter for role assignments",
 )
 class RoleAssignmentFilter(GQLFilter):
     role_id: uuid.UUID | None = None
@@ -722,10 +729,10 @@ class RoleAssignmentFilter(GQLFilter):
 # ==================== OrderBy Types ====================
 
 
-@strawberry.experimental.pydantic.input(
+@gql_pydantic_input(
+    BackendAIGQLMeta(description="Order by specification for roles", added_version="26.3.0"),
     model=RoleOrderByDTO,
     name="RoleOrderBy",
-    description="Added in 26.3.0. Order by specification for roles",
 )
 class RoleOrderBy(GQLOrderBy):
     field: RoleOrderField
@@ -756,10 +763,12 @@ class RoleAssignmentOrderField(StrEnum):
     GRANTED_AT = "granted_at"
 
 
-@strawberry.experimental.pydantic.input(
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description="Order by specification for role assignments", added_version="26.3.0"
+    ),
     model=RoleAssignmentOrderByDTO,
     name="RoleAssignmentOrderBy",
-    description="Added in 26.3.0. Order by specification for role assignments",
 )
 class RoleAssignmentOrderBy(GQLOrderBy):
     field: RoleAssignmentOrderField
@@ -786,9 +795,9 @@ class RoleAssignmentOrderBy(GQLOrderBy):
 # ==================== Input Types ====================
 
 
-@strawberry.experimental.pydantic.input(
+@gql_pydantic_input(
+    BackendAIGQLMeta(description="Input for creating a role", added_version="26.3.0"),
     model=CreateRoleInputDTO,
-    description="Added in 26.3.0. Input for creating a role",
 )
 class CreateRoleInput:
     name: str
@@ -805,9 +814,9 @@ class CreateRoleInput:
         )
 
 
-@strawberry.experimental.pydantic.input(
+@gql_pydantic_input(
+    BackendAIGQLMeta(description="Input for updating a role", added_version="26.3.0"),
     model=UpdateRoleInputDTO,
-    description="Added in 26.3.0. Input for updating a role",
 )
 class UpdateRoleInput:
     id: uuid.UUID
@@ -823,55 +832,59 @@ class UpdateRoleInput:
         )
 
 
-@strawberry.experimental.pydantic.input(
+@gql_pydantic_input(
+    BackendAIGQLMeta(description="Input for assigning a role to a user", added_version="26.3.0"),
     model=AssignRoleInputDTO,
-    description="Added in 26.3.0. Input for assigning a role to a user",
     all_fields=True,
 )
 class AssignRoleInput:
     pass
 
 
-@strawberry.experimental.pydantic.input(
+@gql_pydantic_input(
+    BackendAIGQLMeta(description="Input for revoking a role from a user", added_version="26.3.0"),
     model=RevokeRoleInputDTO,
-    description="Added in 26.3.0. Input for revoking a role from a user",
     all_fields=True,
 )
 class RevokeRoleInput:
     pass
 
 
-@strawberry.experimental.pydantic.input(
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description="Input for bulk assigning a role to multiple users", added_version="26.3.0"
+    ),
     model=BulkAssignRoleInputDTO,
     name="BulkAssignRoleInput",
-    description="Added in 26.3.0. Input for bulk assigning a role to multiple users",
     all_fields=True,
 )
 class BulkAssignRoleInputGQL:
     pass
 
 
-@strawberry.experimental.pydantic.input(
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description="Input for bulk revoking a role from multiple users", added_version="26.3.0"
+    ),
     model=BulkRevokeRoleInputDTO,
     name="BulkRevokeRoleInput",
-    description="Added in 26.3.0. Input for bulk revoking a role from multiple users",
     all_fields=True,
 )
 class BulkRevokeRoleInputGQL:
     pass
 
 
-@strawberry.experimental.pydantic.input(
+@gql_pydantic_input(
+    BackendAIGQLMeta(description="Input for soft-deleting a role", added_version="26.3.0"),
     model=DeleteRoleInputDTO,
-    description="Added in 26.3.0. Input for soft-deleting a role",
 )
 class DeleteRoleInput:
     id: uuid.UUID
 
 
-@strawberry.experimental.pydantic.input(
+@gql_pydantic_input(
+    BackendAIGQLMeta(description="Input for purging a role", added_version="26.3.0"),
     model=PurgeRoleInputDTO,
-    description="Added in 26.3.0. Input for purging a role",
 )
 class PurgeRoleInput:
     id: uuid.UUID

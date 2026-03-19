@@ -13,7 +13,11 @@ from strawberry.relay import Connection, Edge, NodeID
 from ai.backend.common.dto.manager.v2.user.response import UserNode
 from ai.backend.common.dto.manager.v2.user.types import UserFairShareScope, UserUsageScope
 from ai.backend.common.exception import InvalidAPIParameters
-from ai.backend.manager.api.gql.decorators import BackendAIGQLMeta, gql_connection_type
+from ai.backend.manager.api.gql.decorators import (
+    BackendAIGQLMeta,
+    gql_connection_type,
+    gql_pydantic_input,
+)
 from ai.backend.manager.api.gql.fair_share.types import UserFairShareGQL
 from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin
 from ai.backend.manager.api.gql.resource_usage.types import (
@@ -43,10 +47,12 @@ if TYPE_CHECKING:
     from ai.backend.manager.data.user.types import UserData
 
 
-@strawberry.experimental.pydantic.input(
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description="Scope parameters for filtering user fair shares.", added_version="24.09.0"
+    ),
     model=UserFairShareScope,
     name="UserFairShareScope",
-    description="Scope parameters for filtering user fair shares.",
 )
 class UserFairShareScopeGQL:
     """Scope parameters for filtering user fair shares."""
@@ -65,10 +71,12 @@ class UserFairShareScopeGQL:
         )
 
 
-@strawberry.experimental.pydantic.input(
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description="Scope parameters for filtering user usage buckets.", added_version="24.09.0"
+    ),
     model=UserUsageScope,
     name="UserUsageScope",
-    description="Scope parameters for filtering user usage buckets.",
 )
 class UserUsageScopeGQL:
     """Scope parameters for filtering user usage buckets."""

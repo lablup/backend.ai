@@ -17,7 +17,11 @@ from ai.backend.common.dto.manager.v2.deployment.request import (
 from ai.backend.common.dto.manager.v2.deployment.request import (
     RollingUpdateConfigInput as RollingUpdateConfigInputDTO,
 )
-from ai.backend.manager.api.gql.decorators import BackendAIGQLMeta, gql_node_type
+from ai.backend.manager.api.gql.decorators import (
+    BackendAIGQLMeta,
+    gql_node_type,
+    gql_pydantic_input,
+)
 from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin
 from ai.backend.manager.api.gql.utils import dedent_strip
 from ai.backend.manager.data.deployment.types import DeploymentPolicyData
@@ -115,10 +119,12 @@ class DeploymentPolicyGQL(PydanticNodeMixin[Any]):
 # ========== Input Types ==========
 
 
-@strawberry.experimental.pydantic.input(
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description="Configuration for rolling update strategy.", added_version="25.19.0"
+    ),
     model=RollingUpdateConfigInputDTO,
     name="RollingUpdateConfigInput",
-    description="Added in 25.19.0. Configuration for rolling update strategy.",
 )
 class RollingUpdateConfigInputGQL:
     max_surge: int = 1
@@ -137,10 +143,12 @@ class RollingUpdateConfigInputGQL:
         )
 
 
-@strawberry.experimental.pydantic.input(
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description="Configuration for blue-green deployment strategy.", added_version="25.19.0"
+    ),
     model=BlueGreenConfigInputDTO,
     name="BlueGreenConfigInput",
-    description="Added in 25.19.0. Configuration for blue-green deployment strategy.",
 )
 class BlueGreenConfigInputGQL:
     auto_promote: bool = False

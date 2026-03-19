@@ -34,6 +34,7 @@ from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     gql_connection_type,
     gql_node_type,
+    gql_pydantic_input,
     gql_pydantic_type,
 )
 from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin
@@ -133,18 +134,18 @@ async def vfs_storages(
     )
 
 
-@strawberry.experimental.pydantic.input(
+@gql_pydantic_input(
+    BackendAIGQLMeta(description="Input for creating VFS storage", added_version="25.16.0"),
     model=CreateVFSStorageInputDTO,
-    description="Added in 25.16.0. Input for creating VFS storage",
     all_fields=True,
 )
 class CreateVFSStorageInput:
     pass
 
 
-@strawberry.experimental.pydantic.input(
+@gql_pydantic_input(
+    BackendAIGQLMeta(description="Input for updating VFS storage", added_version="25.16.0"),
     model=UpdateVFSStorageInputDTO,
-    description="Added in 25.16.0. Input for updating VFS storage",
 )
 class UpdateVFSStorageInput:
     id: ID
@@ -161,9 +162,9 @@ class UpdateVFSStorageInput:
         )
 
 
-@strawberry.experimental.pydantic.input(
+@gql_pydantic_input(
+    BackendAIGQLMeta(description="Input for deleting VFS storage", added_version="25.16.0"),
     model=DeleteVFSStorageInputDTO,
-    description="Added in 25.16.0. Input for deleting VFS storage",
 )
 class DeleteVFSStorageInput:
     id: ID

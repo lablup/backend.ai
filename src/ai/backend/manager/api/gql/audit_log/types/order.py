@@ -14,6 +14,10 @@ from ai.backend.common.dto.manager.v2.audit_log.types import (
     OrderDirection as OrderDirectionDTO,
 )
 from ai.backend.manager.api.gql.base import OrderDirection
+from ai.backend.manager.api.gql.decorators import (
+    BackendAIGQLMeta,
+    gql_pydantic_input,
+)
 
 
 @strawberry.enum(
@@ -27,10 +31,10 @@ class AuditLogOrderFieldGQL(StrEnum):
     STATUS = "status"
 
 
-@strawberry.experimental.pydantic.input(
+@gql_pydantic_input(
+    BackendAIGQLMeta(description="Ordering specification for audit logs.", added_version="24.09.0"),
     model=AuditLogOrder,
     name="AuditLogOrderBy",
-    description="Ordering specification for audit logs.",
 )
 class AuditLogOrderByGQL:
     field: AuditLogOrderFieldGQL

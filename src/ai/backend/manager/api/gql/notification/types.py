@@ -117,7 +117,11 @@ from ai.backend.common.dto.manager.v2.notification.types import (
 )
 from ai.backend.common.exception import InvalidNotificationChannelSpec
 from ai.backend.manager.api.gql.base import OrderDirection, StringFilter
-from ai.backend.manager.api.gql.decorators import BackendAIGQLMeta, gql_node_type
+from ai.backend.manager.api.gql.decorators import (
+    BackendAIGQLMeta,
+    gql_node_type,
+    gql_pydantic_input,
+)
 from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.data.notification import (
@@ -439,10 +443,13 @@ class NotificationChannelOrderField(StrEnum):
     UPDATED_AT = "updated_at"
 
 
-@strawberry.experimental.pydantic.input(
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description="Filter for notification channel type with equality and membership operators.",
+        added_version="26.3.0",
+    ),
     model=NotificationChannelTypeFilterDTO,
     name="NotificationChannelTypeFilter",
-    description="Added in 26.3.0. Filter for notification channel type with equality and membership operators.",
 )
 class NotificationChannelTypeFilterGQL:
     equals: NotificationChannelTypeGQL | None = strawberry.field(
@@ -467,10 +474,10 @@ class NotificationChannelTypeFilterGQL:
         )
 
 
-@strawberry.experimental.pydantic.input(
+@gql_pydantic_input(
+    BackendAIGQLMeta(description="Filter for notification channels", added_version="24.09.0"),
     model=NotificationChannelFilterDTO,
     name="NotificationChannelFilter",
-    description="Filter for notification channels",
 )
 class NotificationChannelFilter:
     name: StringFilter | None = None
@@ -494,10 +501,12 @@ class NotificationChannelFilter:
         )
 
 
-@strawberry.experimental.pydantic.input(
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description="Order by specification for notification channels", added_version="24.09.0"
+    ),
     model=NotificationChannelOrderDTO,
     name="NotificationChannelOrderBy",
-    description="Order by specification for notification channels",
 )
 class NotificationChannelOrderBy:
     field: NotificationChannelOrderField
@@ -517,10 +526,13 @@ class NotificationRuleOrderField(StrEnum):
     UPDATED_AT = "updated_at"
 
 
-@strawberry.experimental.pydantic.input(
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description="Filter for notification rule type with equality and membership operators.",
+        added_version="26.3.0",
+    ),
     model=NotificationRuleTypeFilterDTO,
     name="NotificationRuleTypeFilter",
-    description="Added in 26.3.0. Filter for notification rule type with equality and membership operators.",
 )
 class NotificationRuleTypeFilterGQL:
     equals: NotificationRuleTypeGQL | None = strawberry.field(
@@ -545,10 +557,10 @@ class NotificationRuleTypeFilterGQL:
         )
 
 
-@strawberry.experimental.pydantic.input(
+@gql_pydantic_input(
+    BackendAIGQLMeta(description="Filter for notification rules", added_version="24.09.0"),
     model=NotificationRuleFilterDTO,
     name="NotificationRuleFilter",
-    description="Filter for notification rules",
 )
 class NotificationRuleFilter:
     name: StringFilter | None = None
@@ -570,10 +582,12 @@ class NotificationRuleFilter:
         )
 
 
-@strawberry.experimental.pydantic.input(
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description="Order by specification for notification rules", added_version="24.09.0"
+    ),
     model=NotificationRuleOrderDTO,
     name="NotificationRuleOrderBy",
-    description="Order by specification for notification rules",
 )
 class NotificationRuleOrderBy:
     field: NotificationRuleOrderField
@@ -589,10 +603,10 @@ class NotificationRuleOrderBy:
 # Input types for mutations
 
 
-@strawberry.experimental.pydantic.input(
+@gql_pydantic_input(
+    BackendAIGQLMeta(description="Input for webhook configuration", added_version="24.09.0"),
     model=WebhookSpecInputDTO,
     name="WebhookSpecInput",
-    description="Input for webhook configuration",
 )
 class WebhookSpecInput:
     url: str
@@ -604,10 +618,12 @@ class WebhookSpecInput:
         return WebhookSpecInputDTO(url=self.url)
 
 
-@strawberry.experimental.pydantic.input(
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description="Input for SMTP authentication credentials", added_version="24.09.0"
+    ),
     model=SMTPAuthInputDTO,
     name="SMTPAuthInput",
-    description="Input for SMTP authentication credentials",
 )
 class SMTPAuthInput:
     username: str | None = None
@@ -620,10 +636,12 @@ class SMTPAuthInput:
         return SMTPAuthInputDTO(username=self.username, password=self.password)
 
 
-@strawberry.experimental.pydantic.input(
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description="Input for SMTP server connection settings", added_version="24.09.0"
+    ),
     model=SMTPConnectionInputDTO,
     name="SMTPConnectionInput",
-    description="Input for SMTP server connection settings",
 )
 class SMTPConnectionInput:
     host: str
@@ -648,10 +666,10 @@ class SMTPConnectionInput:
         )
 
 
-@strawberry.experimental.pydantic.input(
+@gql_pydantic_input(
+    BackendAIGQLMeta(description="Input for email message settings", added_version="24.09.0"),
     model=EmailMessageInputDTO,
     name="EmailMessageInput",
-    description="Input for email message settings",
 )
 class EmailMessageInput:
     from_email: str
@@ -673,10 +691,12 @@ class EmailMessageInput:
         )
 
 
-@strawberry.experimental.pydantic.input(
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description="Input for email notification channel configuration", added_version="24.09.0"
+    ),
     model=EmailSpecInputDTO,
     name="EmailSpecInput",
-    description="Input for email notification channel configuration",
 )
 class EmailSpecInput:
     smtp: SMTPConnectionInput
@@ -698,10 +718,13 @@ class EmailSpecInput:
         )
 
 
-@strawberry.experimental.pydantic.input(
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description="Input for notification channel configuration. Exactly one of webhook or email must be set.",
+        added_version="24.09.0",
+    ),
     model=NotificationChannelSpecInputDTO,
     name="NotificationChannelSpecInput",
-    description="Input for notification channel configuration. Exactly one of webhook or email must be set.",
 )
 class NotificationChannelSpecInput:
     webhook: WebhookSpecInput | None = UNSET
@@ -734,9 +757,11 @@ class NotificationChannelSpecInput:
         )
 
 
-@strawberry.experimental.pydantic.input(
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description="Input for creating a notification channel", added_version="24.09.0"
+    ),
     model=CreateNotificationChannelInputDTO,
-    description="Input for creating a notification channel",
 )
 class CreateNotificationChannelInput:
     name: str
@@ -755,9 +780,11 @@ class CreateNotificationChannelInput:
         )
 
 
-@strawberry.experimental.pydantic.input(
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description="Input for updating a notification channel", added_version="24.09.0"
+    ),
     model=UpdateNotificationChannelInputDTO,
-    description="Input for updating a notification channel",
 )
 class UpdateNotificationChannelInput:
     id: ID
@@ -775,17 +802,19 @@ class UpdateNotificationChannelInput:
         )
 
 
-@strawberry.experimental.pydantic.input(
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description="Input for deleting a notification channel", added_version="24.09.0"
+    ),
     model=DeleteNotificationChannelInputDTO,
-    description="Input for deleting a notification channel",
 )
 class DeleteNotificationChannelInput:
     id: ID
 
 
-@strawberry.experimental.pydantic.input(
+@gql_pydantic_input(
+    BackendAIGQLMeta(description="Input for creating a notification rule", added_version="24.09.0"),
     model=CreateNotificationRuleInputDTO,
-    description="Input for creating a notification rule",
 )
 class CreateNotificationRuleInput:
     name: str
@@ -796,9 +825,9 @@ class CreateNotificationRuleInput:
     enabled: bool = True
 
 
-@strawberry.experimental.pydantic.input(
+@gql_pydantic_input(
+    BackendAIGQLMeta(description="Input for updating a notification rule", added_version="24.09.0"),
     model=UpdateNotificationRuleInputDTO,
-    description="Input for updating a notification rule",
 )
 class UpdateNotificationRuleInput:
     id: ID
@@ -816,9 +845,9 @@ class UpdateNotificationRuleInput:
         )
 
 
-@strawberry.experimental.pydantic.input(
+@gql_pydantic_input(
+    BackendAIGQLMeta(description="Input for deleting a notification rule", added_version="24.09.0"),
     model=DeleteNotificationRuleInputDTO,
-    description="Input for deleting a notification rule",
 )
 class DeleteNotificationRuleInput:
     id: ID
@@ -914,9 +943,11 @@ class DeleteNotificationRulePayload:
 # Validate mutations
 
 
-@strawberry.experimental.pydantic.input(
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description="Input for validate notification channel mutation", added_version="24.09.0"
+    ),
     model=ValidateNotificationChannelInputDTO,
-    description="Input for validate notification channel mutation",
 )
 class ValidateNotificationChannelInput:
     id: ID
@@ -947,9 +978,11 @@ class ValidateNotificationChannelPayload:
         return cls(channel_id=instance.channel_id)
 
 
-@strawberry.experimental.pydantic.input(
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description="Input for validate notification rule mutation", added_version="24.09.0"
+    ),
     model=ValidateNotificationRuleInputDTO,
-    description="Input for validate notification rule mutation",
 )
 class ValidateNotificationRuleInput:
     id: ID

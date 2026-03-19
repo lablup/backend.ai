@@ -48,6 +48,7 @@ from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     gql_connection_type,
     gql_node_type,
+    gql_pydantic_input,
     gql_pydantic_type,
 )
 from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin
@@ -279,13 +280,13 @@ class ProjectFairShareTypeEnum(StrEnum):
     MODEL_STORE = "model-store"
 
 
-@strawberry.experimental.pydantic.input(
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description="Filter for project type enum in fair share queries. Supports equals, in, not_equals, and not_in operations.",
+        added_version="26.2.0",
+    ),
     model=ProjectTypeFilter,
     name="ProjectFairShareTypeEnumFilter",
-    description=(
-        "Added in 26.2.0. Filter for project type enum in fair share queries. "
-        "Supports equals, in, not_equals, and not_in operations."
-    ),
 )
 class ProjectFairShareTypeEnumFilter:
     """Filter for project type enum fields in fair share context."""
@@ -317,13 +318,13 @@ class ProjectFairShareTypeEnumFilter:
         )
 
 
-@strawberry.experimental.pydantic.input(
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description="Nested filter for project entity fields in project fair share queries. Allows filtering by project properties such as name, active status, and type.",
+        added_version="26.2.0",
+    ),
     model=ProjectFairShareProjectNestedFilterDTO,
     name="ProjectFairShareProjectNestedFilter",
-    description=(
-        "Added in 26.2.0. Nested filter for project entity fields in project fair share queries. "
-        "Allows filtering by project properties such as name, active status, and type."
-    ),
 )
 class ProjectFairShareProjectNestedFilter:
     """Nested filter for project entity within project fair share."""
@@ -345,14 +346,13 @@ class ProjectFairShareProjectNestedFilter:
         return ProjectFairShareProjectNestedFilterDTO(is_active=self.is_active)
 
 
-@strawberry.experimental.pydantic.input(
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description="Filter input for querying project fair shares. Supports filtering by scaling group, project ID, and domain name. Multiple filters can be combined using AND, OR, and NOT logical operators.",
+        added_version="26.1.0",
+    ),
     model=ProjectFairShareFilterDTO,
     name="ProjectFairShareFilter",
-    description=(
-        "Added in 26.1.0. Filter input for querying project fair shares. "
-        "Supports filtering by scaling group, project ID, and domain name. "
-        "Multiple filters can be combined using AND, OR, and NOT logical operators."
-    ),
 )
 class ProjectFairShareFilter:
     """Filter for project fair shares."""
@@ -412,13 +412,13 @@ class ProjectFairShareFilter:
         )
 
 
-@strawberry.experimental.pydantic.input(
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description="Filter for project fair shares within a resource group scope. References resource group membership columns to avoid excluding projects without fair share records.",
+        added_version="26.2.0",
+    ),
     model=ProjectFairShareFilterDTO,
     name="RGProjectFairShareFilter",
-    description=(
-        "Added in 26.2.0. Filter for project fair shares within a resource group scope. "
-        "References resource group membership columns to avoid excluding projects without fair share records."
-    ),
 )
 class RGProjectFairShareFilter:
     """Filter for project fair shares in RG context (uses INNER JOIN'd columns)."""
@@ -475,14 +475,13 @@ class ProjectFairShareOrderField(StrEnum):
     PROJECT_IS_ACTIVE = "project_is_active"
 
 
-@strawberry.experimental.pydantic.input(
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description="Specifies ordering for project fair share query results. Combine field selection with direction to sort results. Default direction is DESC (descending).",
+        added_version="26.1.0",
+    ),
     model=ProjectFairShareOrderDTO,
     name="ProjectFairShareOrderBy",
-    description=(
-        "Added in 26.1.0. Specifies ordering for project fair share query results. "
-        "Combine field selection with direction to sort results. "
-        "Default direction is DESC (descending)."
-    ),
 )
 class ProjectFairShareOrderBy:
     """OrderBy for project fair shares."""
@@ -509,14 +508,13 @@ class ProjectFairShareOrderBy:
 # Mutation Input/Payload Types
 
 
-@strawberry.experimental.pydantic.input(
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description="Input for upserting project fair share weight. The weight parameter affects scheduling priority - higher weight = higher priority. Set weight to null to use resource group's default_weight.",
+        added_version="26.1.0",
+    ),
     model=UpsertProjectFairShareWeightInputDTO,
     name="UpsertProjectFairShareWeightInput",
-    description=(
-        "Added in 26.1.0. Input for upserting project fair share weight. "
-        "The weight parameter affects scheduling priority - higher weight = higher priority. "
-        "Set weight to null to use resource group's default_weight."
-    ),
 )
 class UpsertProjectFairShareWeightInput:
     """Input for upserting project fair share weight."""
@@ -553,13 +551,13 @@ class UpsertProjectFairShareWeightPayload:
 # Bulk Upsert Mutation Input/Payload Types
 
 
-@strawberry.experimental.pydantic.input(
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description="Input item for a single project weight in bulk upsert. Represents one project's weight configuration.",
+        added_version="26.1.0",
+    ),
     model=ProjectWeightEntryInputDTO,
     name="ProjectWeightInputItem",
-    description=(
-        "Added in 26.1.0. Input item for a single project weight in bulk upsert. "
-        "Represents one project's weight configuration."
-    ),
 )
 class ProjectWeightInputItem:
     """Input item for a single project weight in bulk upsert."""
@@ -575,13 +573,13 @@ class ProjectWeightInputItem:
     )
 
 
-@strawberry.experimental.pydantic.input(
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description="Input for bulk upserting project fair share weights. Allows updating multiple projects in a single transaction.",
+        added_version="26.1.0",
+    ),
     model=BulkUpsertProjectFairShareWeightInputDTO,
     name="BulkUpsertProjectFairShareWeightInput",
-    description=(
-        "Added in 26.1.0. Input for bulk upserting project fair share weights. "
-        "Allows updating multiple projects in a single transaction."
-    ),
 )
 class BulkUpsertProjectFairShareWeightInput:
     """Input for bulk upserting project fair share weights."""

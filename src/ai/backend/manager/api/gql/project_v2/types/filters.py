@@ -22,17 +22,21 @@ from ai.backend.manager.api.gql.base import (
     StringFilter,
     UUIDFilter,
 )
+from ai.backend.manager.api.gql.decorators import (
+    BackendAIGQLMeta,
+    gql_pydantic_input,
+)
 
 from .enums import ProjectTypeEnum
 
 
-@strawberry.experimental.pydantic.input(
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description="Nested filter for the domain a project belongs to. Filters projects whose domain matches all specified conditions.",
+        added_version="26.2.0",
+    ),
     model=GroupDomainFilter,
     name="ProjectDomainNestedFilter",
-    description=(
-        "Added in 26.2.0. Nested filter for the domain a project belongs to. "
-        "Filters projects whose domain matches all specified conditions."
-    ),
 )
 class ProjectDomainNestedFilter:
     """Nested filter for domain of a project."""
@@ -47,13 +51,13 @@ class ProjectDomainNestedFilter:
         )
 
 
-@strawberry.experimental.pydantic.input(
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description="Nested filter for users belonging to a project. Filters projects that have at least one user matching all specified conditions.",
+        added_version="26.2.0",
+    ),
     model=GroupUserFilter,
     name="ProjectUserNestedFilter",
-    description=(
-        "Added in 26.2.0. Nested filter for users belonging to a project. "
-        "Filters projects that have at least one user matching all specified conditions."
-    ),
 )
 class ProjectUserNestedFilter:
     """Nested filter for users within a project."""
@@ -70,13 +74,13 @@ class ProjectUserNestedFilter:
         )
 
 
-@strawberry.experimental.pydantic.input(
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description="Filter for ProjectTypeEnum fields. Supports equals, in, not_equals, and not_in operations.",
+        added_version="26.2.0",
+    ),
     model=ProjectTypeFilter,
     name="ProjectTypeV2EnumFilter",
-    description=(
-        "Added in 26.2.0. Filter for ProjectTypeEnum fields. "
-        "Supports equals, in, not_equals, and not_in operations."
-    ),
 )
 class ProjectTypeEnumFilter:
     """Filter for project type enum fields."""
@@ -97,14 +101,13 @@ class ProjectTypeEnumFilter:
         )
 
 
-@strawberry.experimental.pydantic.input(
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description="Filter input for querying projects. Supports filtering by ID, name, domain, type, active status, and timestamps. Multiple filters can be combined using AND, OR, and NOT logical operators.",
+        added_version="26.2.0",
+    ),
     model=GroupFilter,
     name="ProjectV2Filter",
-    description=(
-        "Added in 26.2.0. Filter input for querying projects. "
-        "Supports filtering by ID, name, domain, type, active status, and timestamps. "
-        "Multiple filters can be combined using AND, OR, and NOT logical operators."
-    ),
 )
 class ProjectV2Filter:
     """Filter for project queries."""
@@ -164,14 +167,13 @@ class ProjectV2OrderField(StrEnum):
     USER_EMAIL = "user_email"
 
 
-@strawberry.experimental.pydantic.input(
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description="Specifies ordering for project query results. Combine field selection with direction to sort results. Default direction is DESC (descending).",
+        added_version="26.2.0",
+    ),
     model=GroupOrder,
     name="ProjectV2OrderBy",
-    description=(
-        "Added in 26.2.0. Specifies ordering for project query results. "
-        "Combine field selection with direction to sort results. "
-        "Default direction is DESC (descending)."
-    ),
 )
 class ProjectV2OrderBy:
     """OrderBy for project queries."""

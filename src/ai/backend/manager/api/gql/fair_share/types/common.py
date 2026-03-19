@@ -13,7 +13,11 @@ from ai.backend.common.dto.manager.v2.resource_group.request import (
     ResourceWeightEntryInput as ResourceWeightEntryInputDTO,
 )
 from ai.backend.common.types import SlotQuantity
-from ai.backend.manager.api.gql.decorators import BackendAIGQLMeta, gql_node_type
+from ai.backend.manager.api.gql.decorators import (
+    BackendAIGQLMeta,
+    gql_node_type,
+    gql_pydantic_input,
+)
 from ai.backend.manager.data.fair_share.types import FairShareSpec
 from ai.backend.manager.errors.fair_share import FairShareError
 
@@ -72,13 +76,13 @@ class ResourceSlotEntryGQL:
     )
 
 
-@strawberry.experimental.pydantic.input(
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description="Input for a single resource weight entry. Specifies how much a resource type contributes to fair share calculations.",
+        added_version="26.1.0",
+    ),
     model=ResourceWeightEntryInputDTO,
     name="ResourceWeightEntryInput",
-    description=(
-        "Added in 26.1.0. Input for a single resource weight entry. "
-        "Specifies how much a resource type contributes to fair share calculations."
-    ),
 )
 class ResourceWeightEntryInputGQL:
     """Input for single resource weight entry."""

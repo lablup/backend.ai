@@ -92,6 +92,7 @@ from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     gql_connection_type,
     gql_node_type,
+    gql_pydantic_input,
     gql_pydantic_type,
 )
 from ai.backend.manager.api.gql.fair_share.types.common import ResourceSlotGQL
@@ -409,9 +410,9 @@ class ModelRevision(PydanticNodeMixin[RevisionNodeDTO]):
 
 
 # Filter and Order Types
-@strawberry.experimental.pydantic.input(
+@gql_pydantic_input(
+    BackendAIGQLMeta(description="", added_version="25.19.0"),
     model=RevisionFilterDTO,
-    description="Added in 25.19.0",
 )
 class ModelRevisionFilter:
     name: StringFilter | None = None
@@ -431,9 +432,9 @@ class ModelRevisionFilter:
         )
 
 
-@strawberry.experimental.pydantic.input(
+@gql_pydantic_input(
+    BackendAIGQLMeta(description="", added_version="25.19.0"),
     model=RevisionOrderDTO,
-    description="Added in 25.19.0",
 )
 class ModelRevisionOrderBy:
     field: ModelRevisionOrderField
@@ -455,10 +456,13 @@ class AddRevisionPayload:
     revision: ModelRevision
 
 
-@strawberry.experimental.pydantic.input(
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description="Input for activating a revision to be the current revision.",
+        added_version="25.19.0",
+    ),
     model=ActivateRevisionInputDTO,
     name="ActivateRevisionInput",
-    description="Added in 25.19.0. Input for activating a revision to be the current revision.",
 )
 class ActivateRevisionInputGQL:
     deployment_id: ID
@@ -477,9 +481,9 @@ class ActivateRevisionPayloadGQL:
 
 
 # Input Types
-@strawberry.experimental.pydantic.input(
+@gql_pydantic_input(
+    BackendAIGQLMeta(description="", added_version="25.19.0"),
     model=ClusterConfigInputDTO,
-    description="Added in 25.19.0",
 )
 class ClusterConfigInput:
     mode: ClusterModeGQL
@@ -492,9 +496,9 @@ class ClusterConfigInput:
         )
 
 
-@strawberry.experimental.pydantic.input(
+@gql_pydantic_input(
+    BackendAIGQLMeta(description="", added_version="25.19.0"),
     model=ResourceGroupInputDTO,
-    description="Added in 25.19.0",
 )
 class ResourceGroupInput:
     name: str
@@ -503,11 +507,12 @@ class ResourceGroupInput:
         return ResourceGroupInputDTO(name=self.name)
 
 
-@strawberry.experimental.pydantic.input(
-    model=ResourceSlotEntryInputDTO,
-    description=(
-        "Added in 26.1.0. A single entry representing one resource type and its allocated quantity."
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description="A single entry representing one resource type and its allocated quantity.",
+        added_version="26.1.0",
     ),
+    model=ResourceSlotEntryInputDTO,
 )
 class ResourceSlotEntryInput:
     """Single resource slot entry input with resource type and quantity."""
@@ -524,9 +529,12 @@ class ResourceSlotEntryInput:
         )
 
 
-@strawberry.experimental.pydantic.input(
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description="A collection of compute resource allocations for input.",
+        added_version="26.1.0",
+    ),
     model=ResourceSlotInputDTO,
-    description="Added in 26.1.0. A collection of compute resource allocations for input.",
 )
 class ResourceSlotInput:
     """Resource slot input containing multiple resource type entries."""
@@ -541,9 +549,9 @@ class ResourceSlotInput:
         )
 
 
-@strawberry.experimental.pydantic.input(
+@gql_pydantic_input(
+    BackendAIGQLMeta(description="", added_version="25.19.0"),
     model=ResourceConfigInputDTO,
-    description="Added in 25.19.0",
 )
 class ResourceConfigInput:
     resource_group: ResourceGroupInput
@@ -566,9 +574,9 @@ class ResourceConfigInput:
         )
 
 
-@strawberry.experimental.pydantic.input(
+@gql_pydantic_input(
+    BackendAIGQLMeta(description="", added_version="25.19.0"),
     model=ImageInputDTO,
-    description="Added in 25.19.0",
 )
 class ImageInput:
     id: ID
@@ -577,10 +585,13 @@ class ImageInput:
         return ImageInputDTO(id=UUID(str(self.id)))
 
 
-@strawberry.experimental.pydantic.input(
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description="A single environment variable entry with name and value.",
+        added_version="26.1.0",
+    ),
     model=EnvironmentVariableEntryInputDTO,
     name="EnvironmentVariableEntryInput",
-    description="Added in 26.1.0. A single environment variable entry with name and value.",
 )
 class EnvironmentVariableEntryInputGQL:
     """A single environment variable entry with name and value."""
@@ -594,10 +605,12 @@ class EnvironmentVariableEntryInputGQL:
         return EnvironmentVariableEntryInputDTO(name=self.name, value=self.value)
 
 
-@strawberry.experimental.pydantic.input(
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description="A collection of environment variable entries.", added_version="26.1.0"
+    ),
     model=EnvironmentVariablesInputDTO,
     name="EnvironmentVariablesInput",
-    description="Added in 26.1.0. A collection of environment variable entries.",
 )
 class EnvironmentVariablesInputGQL:
     """A collection of environment variable entries."""
@@ -612,9 +625,9 @@ class EnvironmentVariablesInputGQL:
         )
 
 
-@strawberry.experimental.pydantic.input(
+@gql_pydantic_input(
+    BackendAIGQLMeta(description="", added_version="25.19.0"),
     model=ModelRuntimeConfigInputDTO,
-    description="Added in 25.19.0",
 )
 class ModelRuntimeConfigInput:
     runtime_variant: str
@@ -634,9 +647,9 @@ class ModelRuntimeConfigInput:
         )
 
 
-@strawberry.experimental.pydantic.input(
+@gql_pydantic_input(
+    BackendAIGQLMeta(description="", added_version="25.19.0"),
     model=ModelMountConfigInputDTO,
-    description="Added in 25.19.0",
 )
 class ModelMountConfigInput:
     vfolder_id: ID
@@ -651,9 +664,9 @@ class ModelMountConfigInput:
         )
 
 
-@strawberry.experimental.pydantic.input(
+@gql_pydantic_input(
+    BackendAIGQLMeta(description="", added_version="25.19.0"),
     model=ExtraVFolderMountInputDTO,
-    description="Added in 25.19.0",
 )
 class ExtraVFolderMountInput:
     vfolder_id: ID
@@ -666,9 +679,12 @@ class ExtraVFolderMountInput:
         )
 
 
-@strawberry.experimental.pydantic.input(
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description="Input for specifying revision configuration within a deployment.",
+        added_version="25.19.0",
+    ),
     model=RevisionInputDTO,
-    description="Added in 25.19.0. Input for specifying revision configuration within a deployment.",
 )
 class CreateRevisionInput:
     name: str | None = None
@@ -719,9 +735,9 @@ class CreateRevisionInput:
         )
 
 
-@strawberry.experimental.pydantic.input(
+@gql_pydantic_input(
+    BackendAIGQLMeta(description="", added_version="25.19.0"),
     model=AddRevisionInputDTO,
-    description="Added in 25.19.0",
 )
 class AddRevisionInput:
     name: str | None = None

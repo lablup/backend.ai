@@ -56,6 +56,7 @@ from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     gql_connection_type,
     gql_node_type,
+    gql_pydantic_input,
     gql_pydantic_type,
 )
 from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin
@@ -228,10 +229,13 @@ class RouteConnection(Connection[Route]):
 # Filter and OrderBy types
 
 
-@strawberry.experimental.pydantic.input(
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description="Filter for route status with equality and membership operators.",
+        added_version="26.3.0",
+    ),
     model=RouteStatusFilterDTO,
     name="RouteStatusFilter",
-    description="Added in 26.3.0. Filter for route status with equality and membership operators.",
 )
 class RouteStatusFilterGQL:
     equals: RouteStatusGQL | None = strawberry.field(
@@ -256,10 +260,13 @@ class RouteStatusFilterGQL:
         )
 
 
-@strawberry.experimental.pydantic.input(
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description="Filter for route traffic status with equality and membership operators.",
+        added_version="26.3.0",
+    ),
     model=RouteTrafficStatusFilterDTO,
     name="RouteTrafficStatusFilter",
-    description="Added in 26.3.0. Filter for route traffic status with equality and membership operators.",
 )
 class RouteTrafficStatusFilterGQL:
     equals: RouteTrafficStatusGQL | None = strawberry.field(
@@ -293,9 +300,9 @@ class RouteOrderField(StrEnum):
     TRAFFIC_RATIO = "traffic_ratio"
 
 
-@strawberry.experimental.pydantic.input(
+@gql_pydantic_input(
+    BackendAIGQLMeta(description="Filter for routes.", added_version="25.19.0"),
     model=RouteFilterDTO,
-    description="Added in 25.19.0. Filter for routes.",
 )
 class RouteFilter:
     status: RouteStatusFilterGQL | None = None
@@ -343,9 +350,9 @@ class RouteFilter:
         )
 
 
-@strawberry.experimental.pydantic.input(
+@gql_pydantic_input(
+    BackendAIGQLMeta(description="Order by specification for routes.", added_version="25.19.0"),
     model=RouteOrderDTO,
-    description="Added in 25.19.0. Order by specification for routes.",
 )
 class RouteOrderBy:
     field: RouteOrderField
@@ -375,10 +382,12 @@ def get_route_pagination_spec() -> PaginationSpec:
 # Input/Payload types for mutations
 
 
-@strawberry.experimental.pydantic.input(
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description="Input for updating route traffic status.", added_version="25.19.0"
+    ),
     model=UpdateRouteTrafficStatusInputDTO,
     name="UpdateRouteTrafficStatusInput",
-    description="Added in 25.19.0. Input for updating route traffic status.",
 )
 class UpdateRouteTrafficStatusInputGQL:
     route_id: ID = strawberry.field(description="The ID of the route to update.")

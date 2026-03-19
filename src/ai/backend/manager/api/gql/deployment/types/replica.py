@@ -50,6 +50,7 @@ from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     gql_connection_type,
     gql_node_type,
+    gql_pydantic_input,
     gql_pydantic_type,
 )
 from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin
@@ -104,9 +105,9 @@ TrafficStatus: type[RouteTrafficStatus] = strawberry.enum(
 # ========== Status Filters ==========
 
 
-@strawberry.experimental.pydantic.input(
+@gql_pydantic_input(
+    BackendAIGQLMeta(description="", added_version="25.19.0"),
     model=ReplicaStatusFilterDTO,
-    description="Added in 25.19.0",
 )
 class ReplicaStatusFilter:
     in_: list[ReplicaStatus] | None = strawberry.field(name="in", default=None)
@@ -119,9 +120,9 @@ class ReplicaStatusFilter:
         )
 
 
-@strawberry.experimental.pydantic.input(
+@gql_pydantic_input(
+    BackendAIGQLMeta(description="", added_version="25.19.0"),
     model=ReplicaTrafficStatusFilterDTO,
-    description="Added in 25.19.0",
 )
 class TrafficStatusFilter:
     in_: list[TrafficStatus] | None = strawberry.field(name="in", default=None)
@@ -137,9 +138,9 @@ class TrafficStatusFilter:
 # ========== ModelReplica Types ==========
 
 
-@strawberry.experimental.pydantic.input(
+@gql_pydantic_input(
+    BackendAIGQLMeta(description="", added_version="25.19.0"),
     model=ReplicaFilterDTO,
-    description="Added in 25.19.0",
 )
 class ReplicaFilter:
     status: ReplicaStatusFilter | None = None
@@ -177,9 +178,9 @@ class ReplicaFilter:
         )
 
 
-@strawberry.experimental.pydantic.input(
+@gql_pydantic_input(
+    BackendAIGQLMeta(description="", added_version="25.19.0"),
     model=ReplicaOrderDTO,
-    description="Added in 25.19.0",
 )
 class ReplicaOrderBy:
     field: ReplicaOrderField

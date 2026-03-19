@@ -30,6 +30,7 @@ from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     gql_connection_type,
     gql_node_type,
+    gql_pydantic_input,
 )
 from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin
 from ai.backend.manager.api.gql.rbac.types.entity_node import EntityNode
@@ -226,10 +227,10 @@ class EntityRefGQL(PydanticNodeMixin[Any]):
 # ==================== Filter Types ====================
 
 
-@strawberry.experimental.pydantic.input(
+@gql_pydantic_input(
+    BackendAIGQLMeta(description="Filter for entity associations", added_version="26.3.0"),
     model=EntityFilterDTO,
     name="EntityFilter",
-    description="Added in 26.3.0. Filter for entity associations",
 )
 class EntityFilter(GQLFilter):
     entity_type: RBACElementTypeGQL | None = None
@@ -293,10 +294,12 @@ class EntityFilter(GQLFilter):
 # ==================== OrderBy Types ====================
 
 
-@strawberry.experimental.pydantic.input(
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description="Order by specification for entity associations", added_version="26.3.0"
+    ),
     model=EntityOrderByDTO,
     name="EntityOrderBy",
-    description="Added in 26.3.0. Order by specification for entity associations",
 )
 class EntityOrderBy(GQLOrderBy):
     field: EntityOrderField

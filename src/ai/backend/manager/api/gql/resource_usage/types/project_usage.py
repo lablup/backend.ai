@@ -38,6 +38,7 @@ from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     gql_connection_type,
     gql_node_type,
+    gql_pydantic_input,
 )
 from ai.backend.manager.api.gql.fair_share.types import ResourceSlotGQL
 from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin
@@ -258,14 +259,13 @@ class ProjectUsageBucketConnection(Connection[ProjectUsageBucketGQL]):
         self.count = count
 
 
-@strawberry.experimental.pydantic.input(
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description="Filter input for querying project usage bucket records. Usage buckets contain historical resource consumption data aggregated by time period for projects. Multiple filters can be combined using AND, OR, and NOT logical operators.",
+        added_version="26.1.0",
+    ),
     model=ProjectUsageBucketFilterDTO,
     name="ProjectUsageBucketFilter",
-    description=(
-        "Added in 26.1.0. Filter input for querying project usage bucket records. "
-        "Usage buckets contain historical resource consumption data aggregated by time period for projects. "
-        "Multiple filters can be combined using AND, OR, and NOT logical operators."
-    ),
 )
 class ProjectUsageBucketFilter(GQLFilter):
     """Filter for project usage buckets."""
@@ -324,14 +324,13 @@ class ProjectUsageBucketFilter(GQLFilter):
         )
 
 
-@strawberry.experimental.pydantic.input(
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description="Specifies ordering for project usage bucket query results. Combine field selection with direction to sort results. Default direction is DESC (most recent first).",
+        added_version="26.1.0",
+    ),
     model=ProjectUsageBucketOrderByDTO,
     name="ProjectUsageBucketOrderBy",
-    description=(
-        "Added in 26.1.0. Specifies ordering for project usage bucket query results. "
-        "Combine field selection with direction to sort results. "
-        "Default direction is DESC (most recent first)."
-    ),
 )
 class ProjectUsageBucketOrderBy(GQLOrderBy):
     """OrderBy for project usage buckets."""

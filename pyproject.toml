@@ -187,6 +187,7 @@ ignore = [
 "pytest.mark.asyncio" = {msg = "asyncio_mode = 'auto' is set; @pytest.mark.asyncio is unnecessary."}
 "strawberry.type" = {msg = "Use gql_node_type or gql_connection_type from ai.backend.manager.api.gql.decorators instead of @strawberry.type."}
 "strawberry.experimental.pydantic.type" = {msg = "Use gql_pydantic_type from ai.backend.manager.api.gql.decorators instead of @strawberry.experimental.pydantic.type."}
+"strawberry.experimental.pydantic.input" = {msg = "Use gql_pydantic_input from ai.backend.manager.api.gql.decorators instead of @strawberry.experimental.pydantic.input."}
 
 [tool.ruff.lint.isort]
 known-first-party = ["ai.backend"]

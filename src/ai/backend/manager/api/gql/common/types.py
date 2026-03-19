@@ -18,7 +18,11 @@ from ai.backend.common.types import (
     SessionResult,
     SessionTypes,
 )
-from ai.backend.manager.api.gql.decorators import BackendAIGQLMeta, gql_node_type
+from ai.backend.manager.api.gql.decorators import (
+    BackendAIGQLMeta,
+    gql_node_type,
+    gql_pydantic_input,
+)
 
 # ========== Common Enums ==========
 
@@ -226,10 +230,13 @@ class ResourceOptsGQL:
         return cls(entries=entries)
 
 
-@strawberry.experimental.pydantic.input(
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description="A single key-value entry representing a resource option.",
+        added_version="26.1.0",
+    ),
     model=ResourceOptsEntryDTO,
     name="ResourceOptsEntryInput",
-    description="Added in 26.1.0. A single key-value entry representing a resource option.",
 )
 class ResourceOptsEntryInput:
     """Single resource option entry input with name and value."""
@@ -241,10 +248,12 @@ class ResourceOptsEntryInput:
         return ResourceOptsEntryDTO(name=self.name, value=self.value)
 
 
-@strawberry.experimental.pydantic.input(
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description="A collection of additional resource options for input.", added_version="26.1.0"
+    ),
     model=ResourceOptsDTOInput,
     name="ResourceOptsInput",
-    description="Added in 26.1.0. A collection of additional resource options for input.",
 )
 class ResourceOptsInput:
     """Resource options input containing multiple key-value entries."""

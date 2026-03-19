@@ -20,15 +20,19 @@ from ai.backend.manager.api.gql.base import (
     OrderDirection,
     StringFilter,
 )
+from ai.backend.manager.api.gql.decorators import (
+    BackendAIGQLMeta,
+    gql_pydantic_input,
+)
 
 
-@strawberry.experimental.pydantic.input(
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description="Nested filter for projects belonging to a domain. Filters domains that have at least one project matching all specified conditions.",
+        added_version="26.2.0",
+    ),
     model=DomainProjectFilter,
     name="DomainProjectNestedFilter",
-    description=(
-        "Added in 26.2.0. Nested filter for projects belonging to a domain. "
-        "Filters domains that have at least one project matching all specified conditions."
-    ),
 )
 class DomainProjectNestedFilter:
     """Nested filter for projects within a domain."""
@@ -43,13 +47,13 @@ class DomainProjectNestedFilter:
         )
 
 
-@strawberry.experimental.pydantic.input(
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description="Nested filter for users belonging to a domain. Filters domains that have at least one user matching all specified conditions.",
+        added_version="26.2.0",
+    ),
     model=DomainUserFilter,
     name="DomainUserNestedFilter",
-    description=(
-        "Added in 26.2.0. Nested filter for users belonging to a domain. "
-        "Filters domains that have at least one user matching all specified conditions."
-    ),
 )
 class DomainUserNestedFilter:
     """Nested filter for users within a domain."""
@@ -66,15 +70,13 @@ class DomainUserNestedFilter:
         )
 
 
-@strawberry.experimental.pydantic.input(
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description="Filter input for querying domains. Supports filtering by name, description, active status, timestamps, and nested project/user filters. Multiple filters can be combined using AND, OR, and NOT logical operators.",
+        added_version="26.2.0",
+    ),
     model=DomainFilter,
     name="DomainV2Filter",
-    description=(
-        "Added in 26.2.0. Filter input for querying domains. "
-        "Supports filtering by name, description, active status, timestamps, "
-        "and nested project/user filters. "
-        "Multiple filters can be combined using AND, OR, and NOT logical operators."
-    ),
 )
 class DomainV2Filter:
     """Filter for domain queries."""
@@ -128,14 +130,13 @@ class DomainV2OrderField(StrEnum):
     USER_EMAIL = "user_email"
 
 
-@strawberry.experimental.pydantic.input(
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description="Specifies ordering for domain query results. Combine field selection with direction to sort results. Default direction is DESC (descending).",
+        added_version="26.2.0",
+    ),
     model=DomainOrder,
     name="DomainV2OrderBy",
-    description=(
-        "Added in 26.2.0. Specifies ordering for domain query results. "
-        "Combine field selection with direction to sort results. "
-        "Default direction is DESC (descending)."
-    ),
 )
 class DomainV2OrderBy:
     """OrderBy for domain queries."""

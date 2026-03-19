@@ -1,6 +1,6 @@
 """Custom Strawberry GQL type decorators with enforced BackendAI metadata.
 
-Use these instead of @strawberry.type and @strawberry.experimental.pydantic.type
+Use these instead of @strawberry.type and @strawberry.experimental.pydantic.type/input
 so that every GQL type carries consistent version and description metadata.
 
 Decorator roles:
@@ -9,7 +9,9 @@ Decorator roles:
                            (e.g. types with strawberry.Private fields or interface
                            implementations).
     gql_connection_type  — Connection[T] and Edge[T] subclasses.
-    gql_pydantic_type    — Types backed by a v2 Pydantic DTO; Strawberry
+    gql_pydantic_type    — Output types backed by a v2 Pydantic DTO; Strawberry
+                           auto-generates from_pydantic() / to_pydantic().
+    gql_pydantic_input   — Input types backed by a v2 Pydantic DTO; Strawberry
                            auto-generates from_pydantic() / to_pydantic().
 """
 
@@ -31,6 +33,7 @@ __all__ = (
     "BackendAIGQLMeta",
     "gql_connection_type",
     "gql_node_type",
+    "gql_pydantic_input",
     "gql_pydantic_type",
 )
 
@@ -90,6 +93,42 @@ def gql_connection_type(
         description=description,
         directives=directives,
         extend=extend,
+    )
+
+
+@dataclass_transform(
+    order_default=True,
+    kw_only_default=True,
+    field_specifiers=(strawberry_field, StrawberryField),
+)
+def gql_pydantic_input[PydanticModel: BaseModel](
+    meta: BackendAIGQLMeta,
+    *,
+    model: type[PydanticModel],
+    fields: list[str] | None = None,
+    name: str | None = None,
+    all_fields: bool = False,
+    directives: Sequence[object] = (),
+    use_pydantic_alias: bool = True,
+) -> Callable[..., type[StrawberryTypeFromPydantic[PydanticModel]]]:
+    """Decorator for GQL input types backed by a v2 Pydantic DTO.
+
+    Strawberry auto-generates from_pydantic() and to_pydantic() methods.
+    Use all_fields=True for scalar-only types, or declare fields explicitly
+    for types with nested GQL input fields.
+    """
+    description = f"Added in {meta.added_version}. {meta.description}"
+    if meta.deprecated_version is not None:
+        hint = f" Use {meta.deprecation_hint}." if meta.deprecation_hint else ""
+        description += f" Deprecated since {meta.deprecated_version}.{hint}"
+    return strawberry.experimental.pydantic.input(
+        model=model,
+        fields=fields,
+        name=name,
+        description=description,
+        directives=directives,
+        all_fields=all_fields,
+        use_pydantic_alias=use_pydantic_alias,
     )
 
 

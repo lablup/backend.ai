@@ -37,6 +37,7 @@ from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     gql_connection_type,
     gql_node_type,
+    gql_pydantic_input,
     gql_pydantic_type,
 )
 from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin
@@ -47,9 +48,9 @@ from ai.backend.manager.data.deployment.types import (
 )
 
 
-@strawberry.experimental.pydantic.input(
+@gql_pydantic_input(
+    BackendAIGQLMeta(description="", added_version="25.16.0"),
     model=AccessTokenFilterDTO,
-    description="Added in 25.16.0",
 )
 class AccessTokenFilter:
     """Filter for access tokens."""
@@ -73,9 +74,9 @@ class AccessTokenFilter:
         )
 
 
-@strawberry.experimental.pydantic.input(
+@gql_pydantic_input(
+    BackendAIGQLMeta(description="", added_version="25.16.0"),
     model=AccessTokenOrderDTO,
-    description="Added in 25.16.0",
 )
 class AccessTokenOrderBy:
     field: AccessTokenOrderField
@@ -153,9 +154,12 @@ class AccessTokenConnection(Connection[AccessToken]):
         self.count = count
 
 
-@strawberry.experimental.pydantic.input(
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description="Input for creating an access token for a model deployment.",
+        added_version="25.16.0",
+    ),
     model=CreateAccessTokenInputDTO,
-    description="Added in 25.16.0. Input for creating an access token for a model deployment.",
 )
 class CreateAccessTokenInput:
     model_deployment_id: ID = strawberry.field(

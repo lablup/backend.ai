@@ -23,17 +23,21 @@ from ai.backend.manager.api.gql.base import (
     StringFilter,
     UUIDFilter,
 )
+from ai.backend.manager.api.gql.decorators import (
+    BackendAIGQLMeta,
+    gql_pydantic_input,
+)
 
 from .enums import UserRoleEnumGQL, UserStatusEnumGQL
 
 
-@strawberry.experimental.pydantic.input(
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description="Filter for UserStatusV2 enum fields. Supports equals, in, not_equals, and not_in operations.",
+        added_version="26.2.0",
+    ),
     model=UserStatusFilter,
     name="UserStatusV2EnumFilter",
-    description=(
-        "Added in 26.2.0. Filter for UserStatusV2 enum fields. "
-        "Supports equals, in, not_equals, and not_in operations."
-    ),
 )
 class UserStatusEnumFilterGQL:
     """Filter for user status enum fields."""
@@ -54,13 +58,13 @@ class UserStatusEnumFilterGQL:
         )
 
 
-@strawberry.experimental.pydantic.input(
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description="Filter for UserRoleV2 enum fields. Supports equals, in, not_equals, and not_in operations.",
+        added_version="26.2.0",
+    ),
     model=UserRoleFilter,
     name="UserRoleV2EnumFilter",
-    description=(
-        "Added in 26.2.0. Filter for UserRoleV2 enum fields. "
-        "Supports equals, in, not_equals, and not_in operations."
-    ),
 )
 class UserRoleEnumFilterGQL:
     """Filter for user role enum fields."""
@@ -81,13 +85,13 @@ class UserRoleEnumFilterGQL:
         )
 
 
-@strawberry.experimental.pydantic.input(
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description="Nested filter for the domain a user belongs to. Filters users whose domain matches all specified conditions.",
+        added_version="26.2.0",
+    ),
     model=UserDomainFilter,
     name="UserDomainNestedFilter",
-    description=(
-        "Added in 26.2.0. Nested filter for the domain a user belongs to. "
-        "Filters users whose domain matches all specified conditions."
-    ),
 )
 class UserDomainNestedFilterGQL:
     """Nested filter for domain of a user."""
@@ -102,13 +106,13 @@ class UserDomainNestedFilterGQL:
         )
 
 
-@strawberry.experimental.pydantic.input(
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description="Nested filter for projects a user belongs to. Filters users that belong to at least one project matching all specified conditions.",
+        added_version="26.2.0",
+    ),
     model=UserProjectFilter,
     name="UserProjectNestedFilter",
-    description=(
-        "Added in 26.2.0. Nested filter for projects a user belongs to. "
-        "Filters users that belong to at least one project matching all specified conditions."
-    ),
 )
 class UserProjectNestedFilterGQL:
     """Nested filter for projects of a user."""
@@ -123,15 +127,13 @@ class UserProjectNestedFilterGQL:
         )
 
 
-@strawberry.experimental.pydantic.input(
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description="Filter input for querying users. Supports filtering by UUID, username, email, status, domain, role, creation time, and nested domain/project filters. Multiple filters can be combined using AND, OR, and NOT logical operators.",
+        added_version="26.2.0",
+    ),
     model=UserFilter,
     name="UserV2Filter",
-    description=(
-        "Added in 26.2.0. Filter input for querying users. "
-        "Supports filtering by UUID, username, email, status, domain, role, creation time, "
-        "and nested domain/project filters. "
-        "Multiple filters can be combined using AND, OR, and NOT logical operators."
-    ),
 )
 class UserFilterGQL:
     """Filter for user queries."""
@@ -189,14 +191,13 @@ class UserOrderFieldGQL(StrEnum):
     PROJECT_NAME = "project_name"
 
 
-@strawberry.experimental.pydantic.input(
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description="Specifies ordering for user query results. Combine field selection with direction to sort results. Default direction is DESC (descending).",
+        added_version="26.2.0",
+    ),
     model=UserOrder,
     name="UserV2OrderBy",
-    description=(
-        "Added in 26.2.0. Specifies ordering for user query results. "
-        "Combine field selection with direction to sort results. "
-        "Default direction is DESC (descending)."
-    ),
 )
 class UserOrderByGQL:
     """OrderBy for user queries."""

@@ -10,14 +10,18 @@ from ai.backend.common.dto.manager.v2.audit_log.request import (
 )
 from ai.backend.common.dto.manager.v2.audit_log.types import AuditLogStatus
 from ai.backend.manager.api.gql.base import DateTimeFilter, StringFilter
+from ai.backend.manager.api.gql.decorators import (
+    BackendAIGQLMeta,
+    gql_pydantic_input,
+)
 
 from .node import AuditLogStatusGQL
 
 
-@strawberry.experimental.pydantic.input(
+@gql_pydantic_input(
+    BackendAIGQLMeta(description="Filter for audit log status field.", added_version="24.09.0"),
     model=AuditLogStatusFilter,
     name="AuditLogStatusFilter",
-    description="Filter for audit log status field.",
 )
 class AuditLogStatusFilterGQL:
     in_: list[AuditLogStatusGQL] | None = strawberry.field(name="in", default=None)
@@ -30,10 +34,12 @@ class AuditLogStatusFilterGQL:
         )
 
 
-@strawberry.experimental.pydantic.input(
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description="Filter criteria for querying audit logs.", added_version="24.09.0"
+    ),
     model=AuditLogFilter,
     name="AuditLogFilter",
-    description="Filter criteria for querying audit logs.",
 )
 class AuditLogFilterGQL:
     entity_type: StringFilter | None = None

@@ -31,7 +31,11 @@ from ai.backend.common.dto.manager.v2.service_catalog.types import (
 )
 from ai.backend.common.types import ServiceCatalogStatus
 from ai.backend.manager.api.gql.base import OrderDirection, StringFilter
-from ai.backend.manager.api.gql.decorators import BackendAIGQLMeta, gql_node_type
+from ai.backend.manager.api.gql.decorators import (
+    BackendAIGQLMeta,
+    gql_node_type,
+    gql_pydantic_input,
+)
 from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin
 from ai.backend.manager.api.gql.utils import dedent_strip
 from ai.backend.manager.data.service_catalog.types import (
@@ -169,10 +173,13 @@ class ServiceCatalogOrderFieldGQL(enum.Enum):
     REGISTERED_AT = "REGISTERED_AT"
 
 
-@strawberry.experimental.pydantic.input(
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description="Specifies the field and direction for ordering service catalog queries.",
+        added_version="26.3.0",
+    ),
     model=ServiceCatalogOrderDTO,
     name="ServiceCatalogOrderBy",
-    description="Added in 26.3.0. Specifies the field and direction for ordering service catalog queries.",
 )
 class ServiceCatalogOrderByGQL:
     field: ServiceCatalogOrderFieldGQL
@@ -185,13 +192,13 @@ class ServiceCatalogOrderByGQL:
         )
 
 
-@strawberry.experimental.pydantic.input(
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description="Filter for ServiceCatalogStatus enum fields. Supports equals, in, not_equals, and not_in operations.",
+        added_version="26.3.0",
+    ),
     model=ServiceCatalogStatusFilterDTO,
     name="ServiceCatalogStatusFilter",
-    description=(
-        "Added in 26.3.0. Filter for ServiceCatalogStatus enum fields. "
-        "Supports equals, in, not_equals, and not_in operations."
-    ),
 )
 class ServiceCatalogStatusFilterGQL:
     """Filter for service catalog status enum fields."""
@@ -231,10 +238,10 @@ class ServiceCatalogStatusFilterGQL:
         )
 
 
-@strawberry.experimental.pydantic.input(
+@gql_pydantic_input(
+    BackendAIGQLMeta(description="Filter for service catalog queries.", added_version="26.3.0"),
     model=ServiceCatalogFilterDTO,
     name="ServiceCatalogFilter",
-    description="Added in 26.3.0. Filter for service catalog queries.",
 )
 class ServiceCatalogFilterGQL:
     service_group: StringFilter | None = strawberry.field(

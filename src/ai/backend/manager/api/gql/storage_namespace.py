@@ -24,6 +24,7 @@ from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     gql_connection_type,
     gql_node_type,
+    gql_pydantic_input,
     gql_pydantic_type,
 )
 from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin
@@ -88,7 +89,8 @@ class StorageNamespaceConnection(Connection[StorageNamespace]):
         return len(self.edges)
 
 
-@strawberry.experimental.pydantic.input(
+@gql_pydantic_input(
+    BackendAIGQLMeta(description="", added_version="24.09.0"),
     model=RegisterStorageNamespaceInputDTO,
     description=dedent_strip("""
     Added in 25.15.0.
@@ -101,7 +103,8 @@ class RegisterStorageNamespaceInput:
     pass
 
 
-@strawberry.experimental.pydantic.input(
+@gql_pydantic_input(
+    BackendAIGQLMeta(description="", added_version="24.09.0"),
     model=UnregisterStorageNamespaceInputDTO,
     description=dedent_strip("""
     Added in 25.15.0.

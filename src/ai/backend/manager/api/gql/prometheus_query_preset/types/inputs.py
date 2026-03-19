@@ -30,23 +30,29 @@ from ai.backend.common.dto.manager.v2.prometheus_query_preset.request import (
 from ai.backend.common.dto.manager.v2.prometheus_query_preset.request import (
     QueryTimeRangeInputDTO,
 )
+from ai.backend.manager.api.gql.decorators import (
+    BackendAIGQLMeta,
+    gql_pydantic_input,
+)
 from ai.backend.manager.data.prometheus_query_preset import ExecutePresetOptions
 
 
-@strawberry.experimental.pydantic.input(
+@gql_pydantic_input(
+    BackendAIGQLMeta(description="Options for query definition labels.", added_version="26.3.0"),
     model=CreateQueryDefinitionOptionsInputDTO,
     name="QueryDefinitionOptionsInput",
-    description="Added in 26.3.0. Options for query definition labels.",
 )
 class QueryDefinitionOptionsInput:
     filter_labels: list[str] = strawberry.field(description="Allowed filter label keys.")
     group_labels: list[str] = strawberry.field(description="Allowed group-by label keys.")
 
 
-@strawberry.experimental.pydantic.input(
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description="Input for creating a new query definition.", added_version="26.3.0"
+    ),
     model=CreateQueryDefinitionInputDTO,
     name="CreateQueryDefinitionInput",
-    description="Added in 26.3.0. Input for creating a new query definition.",
 )
 class CreateQueryDefinitionInput:
     name: str = strawberry.field(description="Human-readable identifier (must be unique).")
@@ -60,10 +66,12 @@ class CreateQueryDefinitionInput:
     )
 
 
-@strawberry.experimental.pydantic.input(
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description="Input for modifying an existing query definition.", added_version="26.3.0"
+    ),
     model=ModifyQueryDefinitionInputDTO,
     name="ModifyQueryDefinitionInput",
-    description="Added in 26.3.0. Input for modifying an existing query definition.",
 )
 class ModifyQueryDefinitionInput:
     name: str | None = strawberry.field(default=UNSET, description="New name.")
@@ -91,10 +99,10 @@ class ModifyQueryDefinitionInput:
         )
 
 
-@strawberry.experimental.pydantic.input(
+@gql_pydantic_input(
+    BackendAIGQLMeta(description="Time range for Prometheus query.", added_version="26.3.0"),
     model=QueryTimeRangeInputDTO,
     name="QueryTimeRangeInput",
-    description="Added in 26.3.0. Time range for Prometheus query.",
 )
 class QueryTimeRangeInput:
     start: datetime = strawberry.field(description="Start of the time range.")
@@ -116,20 +124,22 @@ class QueryTimeRangeInput:
         )
 
 
-@strawberry.experimental.pydantic.input(
+@gql_pydantic_input(
+    BackendAIGQLMeta(description="Key-value label entry for queries.", added_version="26.3.0"),
     model=MetricLabelEntryDTO,
     name="MetricLabelEntryInput",
-    description="Added in 26.3.0. Key-value label entry for queries.",
 )
 class MetricLabelEntryInput:
     key: str = strawberry.field(description="Label key.")
     value: str = strawberry.field(description="Label value.")
 
 
-@strawberry.experimental.pydantic.input(
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description="Options for executing a query definition.", added_version="26.3.0"
+    ),
     model=ExecuteQueryDefinitionOptionsInputDTO,
     name="ExecuteQueryDefinitionOptionsInput",
-    description="Added in 26.3.0. Options for executing a query definition.",
 )
 class ExecuteQueryDefinitionOptionsInput:
     filter_labels: list[MetricLabelEntryInput] | None = strawberry.field(

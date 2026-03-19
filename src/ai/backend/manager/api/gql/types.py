@@ -15,6 +15,10 @@ from ai.backend.common.dto.manager.v2.fair_share.types import (
     UserUsageBucketScopeDTO,
 )
 from ai.backend.manager.api.gql.data_loader.data_loaders import DataLoaders
+from ai.backend.manager.api.gql.decorators import (
+    BackendAIGQLMeta,
+    gql_pydantic_input,
+)
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.repositories.base import QueryCondition, QueryOrder
 
@@ -74,10 +78,12 @@ class StrawberryGQLContext:
 # Scope input types for BEP-1041 Resource Group scoped APIs
 
 
-@strawberry.experimental.pydantic.input(
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description="Resource group scope for domain-level operations", added_version="24.09.0"
+    ),
     model=ResourceGroupDomainScopeDTO,
     name="ResourceGroupDomainScope",
-    description="Resource group scope for domain-level operations",
 )
 class ResourceGroupDomainScope:
     """Scope for domain-level APIs within a resource group context."""
@@ -90,10 +96,13 @@ class ResourceGroupDomainScope:
         return ResourceGroupDomainScopeDTO(resource_group_name=self.resource_group_name)
 
 
-@strawberry.experimental.pydantic.input(
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description="Resource group + domain scope for project-level operations",
+        added_version="24.09.0",
+    ),
     model=ResourceGroupProjectScopeDTO,
     name="ResourceGroupProjectScope",
-    description="Resource group + domain scope for project-level operations",
 )
 class ResourceGroupProjectScope:
     """Scope for project-level APIs within a resource group and domain context."""
@@ -110,10 +119,13 @@ class ResourceGroupProjectScope:
         )
 
 
-@strawberry.experimental.pydantic.input(
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description="Resource group + domain + project scope for user-level operations",
+        added_version="24.09.0",
+    ),
     model=ResourceGroupUserScopeDTO,
     name="ResourceGroupUserScope",
-    description="Resource group + domain + project scope for user-level operations",
 )
 class ResourceGroupUserScope:
     """Scope for user-level APIs within a resource group, domain, and project context."""
@@ -135,10 +147,10 @@ class ResourceGroupUserScope:
 # Scope input types for Usage Bucket scoped APIs
 
 
-@strawberry.experimental.pydantic.input(
+@gql_pydantic_input(
+    BackendAIGQLMeta(description="Domain scope for usage bucket queries", added_version="24.09.0"),
     model=DomainUsageBucketScopeDTO,
     name="DomainUsageBucketScope",
-    description="Domain scope for usage bucket queries",
 )
 class DomainUsageBucketScope:
     """Scope for domain-level usage bucket APIs."""
@@ -153,10 +165,10 @@ class DomainUsageBucketScope:
         )
 
 
-@strawberry.experimental.pydantic.input(
+@gql_pydantic_input(
+    BackendAIGQLMeta(description="Project scope for usage bucket queries", added_version="24.09.0"),
     model=ProjectUsageBucketScopeDTO,
     name="ProjectUsageBucketScope",
-    description="Project scope for usage bucket queries",
 )
 class ProjectUsageBucketScope:
     """Scope for project-level usage bucket APIs."""
@@ -173,10 +185,10 @@ class ProjectUsageBucketScope:
         )
 
 
-@strawberry.experimental.pydantic.input(
+@gql_pydantic_input(
+    BackendAIGQLMeta(description="User scope for usage bucket queries", added_version="24.09.0"),
     model=UserUsageBucketScopeDTO,
     name="UserUsageBucketScope",
-    description="User scope for usage bucket queries",
 )
 class UserUsageBucketScope:
     """Scope for user-level usage bucket APIs."""

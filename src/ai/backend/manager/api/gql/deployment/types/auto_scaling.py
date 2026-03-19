@@ -53,6 +53,7 @@ from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     gql_connection_type,
     gql_node_type,
+    gql_pydantic_input,
     gql_pydantic_type,
 )
 from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin
@@ -69,9 +70,9 @@ class AutoScalingMetricSource(StrEnum):
     INFERENCE_FRAMEWORK = "INFERENCE_FRAMEWORK"
 
 
-@strawberry.experimental.pydantic.input(
+@gql_pydantic_input(
+    BackendAIGQLMeta(description="", added_version="25.19.0"),
     model=AutoScalingRuleFilterDTO,
-    description="Added in 25.19.0",
 )
 class AutoScalingRuleFilter:
     """Filter for auto-scaling rules."""
@@ -95,9 +96,9 @@ class AutoScalingRuleFilter:
         )
 
 
-@strawberry.experimental.pydantic.input(
+@gql_pydantic_input(
+    BackendAIGQLMeta(description="", added_version="25.19.0"),
     model=AutoScalingRuleOrderDTO,
-    description="Added in 25.19.0",
 )
 class AutoScalingRuleOrderBy:
     field: AutoScalingRuleOrderField
@@ -214,9 +215,11 @@ class AutoScalingRuleConnection(Connection[AutoScalingRule]):
 
 
 # Input Types
-@strawberry.experimental.pydantic.input(
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description="Input for creating an auto-scaling rule.", added_version="25.19.0"
+    ),
     model=CreateAutoScalingRuleInputDTO,
-    description="Added in 25.19.0. Input for creating an auto-scaling rule.",
 )
 class CreateAutoScalingRuleInput:
     model_deployment_id: ID
@@ -243,9 +246,11 @@ class CreateAutoScalingRuleInput:
         )
 
 
-@strawberry.experimental.pydantic.input(
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description="Input for updating an auto-scaling rule.", added_version="25.19.0"
+    ),
     model=UpdateAutoScalingRuleInputDTO,
-    description="Added in 25.19.0. Input for updating an auto-scaling rule.",
 )
 class UpdateAutoScalingRuleInput:
     id: ID
@@ -273,9 +278,11 @@ class UpdateAutoScalingRuleInput:
         )
 
 
-@strawberry.experimental.pydantic.input(
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description="Input for deleting an auto-scaling rule", added_version="25.16.0"
+    ),
     model=DeleteAutoScalingRuleInputDTO,
-    description="Added in 25.16.0. Input for deleting an auto-scaling rule",
 )
 class DeleteAutoScalingRuleInput:
     id: ID

@@ -22,12 +22,18 @@ from ai.backend.manager.api.gql.base import (
     OrderDirection,
     StringFilter,
 )
+from ai.backend.manager.api.gql.decorators import (
+    BackendAIGQLMeta,
+    gql_pydantic_input,
+)
 
 
-@strawberry.experimental.pydantic.input(
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description="Filter input for querying query definitions.", added_version="26.3.0"
+    ),
     model=QueryDefinitionFilterDTO,
     name="QueryDefinitionFilter",
-    description="Added in 26.3.0. Filter input for querying query definitions.",
 )
 class QueryDefinitionFilter:
     name: StringFilter | None = strawberry.field(
@@ -51,10 +57,12 @@ class QueryDefinitionOrderField(StrEnum):
     NAME = "name"
 
 
-@strawberry.experimental.pydantic.input(
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description="Specifies ordering for query definition results.", added_version="26.3.0"
+    ),
     model=QueryDefinitionOrderDTO,
     name="QueryDefinitionOrderBy",
-    description="Added in 26.3.0. Specifies ordering for query definition results.",
 )
 class QueryDefinitionOrderBy:
     field: QueryDefinitionOrderField = strawberry.field(description="The field to order by.")

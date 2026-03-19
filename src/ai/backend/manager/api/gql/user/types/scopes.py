@@ -7,15 +7,19 @@ from uuid import UUID
 import strawberry
 
 from ai.backend.common.dto.manager.v2.user.types import DomainUserScope, ProjectUserScope
+from ai.backend.manager.api.gql.decorators import (
+    BackendAIGQLMeta,
+    gql_pydantic_input,
+)
 
 
-@strawberry.experimental.pydantic.input(
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description="Scope for querying users within a specific domain. Used to restrict user queries to a particular domain context.",
+        added_version="26.2.0",
+    ),
     model=DomainUserScope,
     name="DomainUserV2Scope",
-    description=(
-        "Added in 26.2.0. Scope for querying users within a specific domain. "
-        "Used to restrict user queries to a particular domain context."
-    ),
 )
 class DomainUserScopeGQL:
     """Scope for domain-level user queries."""
@@ -28,13 +32,13 @@ class DomainUserScopeGQL:
         return DomainUserScope(domain_name=self.domain_name)
 
 
-@strawberry.experimental.pydantic.input(
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description="Scope for querying users within a specific project. Used to restrict user queries to members of a particular project.",
+        added_version="26.2.0",
+    ),
     model=ProjectUserScope,
     name="ProjectUserV2Scope",
-    description=(
-        "Added in 26.2.0. Scope for querying users within a specific project. "
-        "Used to restrict user queries to members of a particular project."
-    ),
 )
 class ProjectUserScopeGQL:
     """Scope for project-level user queries."""

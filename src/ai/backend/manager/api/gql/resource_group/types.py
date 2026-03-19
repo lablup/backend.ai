@@ -41,6 +41,7 @@ from ai.backend.manager.api.gql.base import OrderDirection, StringFilter
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     gql_node_type,
+    gql_pydantic_input,
     gql_pydantic_type,
 )
 from ai.backend.manager.api.gql.fair_share.types.common import (
@@ -526,10 +527,10 @@ class ResourceGroupOrderFieldGQL(StrEnum):
     IS_ACTIVE = "is_active"
 
 
-@strawberry.experimental.pydantic.input(
+@gql_pydantic_input(
+    BackendAIGQLMeta(description="Filter for resource groups", added_version="26.1.0"),
     model=ResourceGroupFilterDTO,
     name="ResourceGroupFilter",
-    description="Added in 26.1.0. Filter for resource groups",
 )
 class ResourceGroupFilterGQL:
     name: StringFilter | None = None
@@ -553,10 +554,12 @@ class ResourceGroupFilterGQL:
         )
 
 
-@strawberry.experimental.pydantic.input(
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description="Order by specification for resource groups", added_version="26.1.0"
+    ),
     model=ResourceGroupOrderDTO,
     name="ResourceGroupOrderBy",
-    description="Added in 26.1.0. Order by specification for resource groups",
 )
 class ResourceGroupOrderByGQL:
     field: ResourceGroupOrderFieldGQL
@@ -569,10 +572,10 @@ class ResourceGroupOrderByGQL:
         )
 
 
-@strawberry.experimental.pydantic.input(
+@gql_pydantic_input(
+    BackendAIGQLMeta(description="Input for preemption configuration.", added_version="26.3.0"),
     model=PreemptionConfigInputDTO,
     name="PreemptionConfigInput",
-    description="Added in 26.3.0. Input for preemption configuration.",
 )
 class PreemptionConfigInput:
     """Input for preemption configuration. Replaces entire preemption config when provided."""
@@ -596,13 +599,13 @@ class PreemptionConfigInput:
 # Mutation Input/Payload types
 
 
-@strawberry.experimental.pydantic.input(
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description="Input for updating resource group fair share configuration. All fields are optional - only provided fields will be updated, others retain existing values.",
+        added_version="26.1.0",
+    ),
     model=UpdateResourceGroupFairShareSpecInputDTO,
     name="UpdateResourceGroupFairShareSpecInput",
-    description=(
-        "Added in 26.1.0. Input for updating resource group fair share configuration. "
-        "All fields are optional - only provided fields will be updated, others retain existing values."
-    ),
 )
 class UpdateResourceGroupFairShareSpecInput:
     """Partial update input for fair share spec. All fields optional for partial update."""
@@ -663,14 +666,13 @@ class UpdateResourceGroupFairShareSpecPayload:
     )
 
 
-@strawberry.experimental.pydantic.input(
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description="Resource group configuration update input. All fields are optional - only provided fields will be updated. Supports all ScalingGroupUpdaterSpec fields (except fair_share, use separate mutation).",
+        added_version="26.2.0",
+    ),
     model=UpdateResourceGroupConfigInputDTO,
     name="UpdateResourceGroupInput",
-    description=(
-        "Added in 26.2.0. Resource group configuration update input. "
-        "All fields are optional - only provided fields will be updated. "
-        "Supports all ScalingGroupUpdaterSpec fields (except fair_share, use separate mutation)."
-    ),
 )
 class UpdateResourceGroupInput:
     """Input for updating resource group configuration. All fields optional for partial update."""

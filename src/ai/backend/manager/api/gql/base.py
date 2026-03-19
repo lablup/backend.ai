@@ -23,6 +23,10 @@ from ai.backend.common.dto.manager.query import StringFilter as StringFilterDTO
 from ai.backend.common.dto.manager.query import UUIDFilter as UUIDFilterDTO
 from ai.backend.manager.api.adapters.cursor import decode_cursor as decode_cursor
 from ai.backend.manager.api.adapters.cursor import encode_cursor as encode_cursor
+from ai.backend.manager.api.gql.decorators import (
+    BackendAIGQLMeta,
+    gql_pydantic_input,
+)
 from ai.backend.manager.data.common.types import IntFilterData, SearchResult, StringFilterData
 
 if TYPE_CHECKING:
@@ -49,10 +53,13 @@ class ByteSize(str):
         return ast.value
 
 
-@strawberry.experimental.pydantic.input(
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description="Filter for string fields supporting equality, containment, prefix/suffix, and case-insensitive variants.",
+        added_version="24.09.0",
+    ),
     model=StringFilterDTO,
     name="StringFilter",
-    description="Filter for string fields supporting equality, containment, prefix/suffix, and case-insensitive variants.",
 )
 class StringFilter:
     # Basic operations
@@ -206,10 +213,13 @@ class StringFilter:
         return None
 
 
-@strawberry.experimental.pydantic.input(
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description="Filter for integer fields supporting equality and comparison operations.",
+        added_version="24.09.0",
+    ),
     model=IntFilterDTO,
     name="IntFilter",
-    description="Filter for integer fields supporting equality and comparison operations.",
 )
 class IntFilter:
     equals: int | None = None
@@ -240,10 +250,10 @@ class IntFilter:
         )
 
 
-@strawberry.experimental.pydantic.input(
+@gql_pydantic_input(
+    BackendAIGQLMeta(description="Filter for UUID fields.", added_version="26.1.0"),
     model=UUIDFilterDTO,
     name="UUIDFilter",
-    description="Added in 26.1.0. Filter for UUID fields.",
 )
 class UUIDFilter:
     # Basic operations
@@ -311,10 +321,13 @@ class UUIDFilter:
         )
 
 
-@strawberry.experimental.pydantic.input(
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description="Filter for datetime fields supporting range and equality operations.",
+        added_version="24.09.0",
+    ),
     model=DateTimeFilterDTO,
     name="DateTimeFilter",
-    description="Filter for datetime fields supporting range and equality operations.",
 )
 class DateTimeFilter:
     before: datetime | None = None
@@ -355,10 +368,13 @@ class DateTimeFilter:
         return None
 
 
-@strawberry.experimental.pydantic.input(
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description="Filter for date fields (not datetime) supporting range and equality operations.",
+        added_version="24.09.0",
+    ),
     model=DateFilterDTO,
     name="DateFilter",
-    description="Filter for date fields (not datetime) supporting range and equality operations.",
 )
 class DateFilter:
     before: date | None = None

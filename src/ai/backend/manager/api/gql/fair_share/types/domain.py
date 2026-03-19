@@ -46,6 +46,7 @@ from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     gql_connection_type,
     gql_node_type,
+    gql_pydantic_input,
     gql_pydantic_type,
 )
 from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin
@@ -242,13 +243,13 @@ class DomainFairShareConnection(Connection[DomainFairShareGQL]):
         self.count = count
 
 
-@strawberry.experimental.pydantic.input(
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description="Nested filter for domain entity fields in domain fair share queries. Allows filtering by domain properties such as active status.",
+        added_version="26.2.0",
+    ),
     model=DomainFairShareDomainNestedFilterDTO,
     name="DomainFairShareDomainNestedFilter",
-    description=(
-        "Added in 26.2.0. Nested filter for domain entity fields in domain fair share queries. "
-        "Allows filtering by domain properties such as active status."
-    ),
 )
 class DomainFairShareDomainNestedFilter:
     """Nested filter for domain entity within domain fair share."""
@@ -262,14 +263,13 @@ class DomainFairShareDomainNestedFilter:
         return DomainFairShareDomainNestedFilterDTO(is_active=self.is_active)
 
 
-@strawberry.experimental.pydantic.input(
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description="Filter input for querying domain fair shares. Supports filtering by scaling group and domain name with various string matching operations. Multiple filters can be combined using AND, OR, and NOT logical operators.",
+        added_version="26.1.0",
+    ),
     model=DomainFairShareFilterDTO,
     name="DomainFairShareFilter",
-    description=(
-        "Added in 26.1.0. Filter input for querying domain fair shares. "
-        "Supports filtering by scaling group and domain name with various string matching operations. "
-        "Multiple filters can be combined using AND, OR, and NOT logical operators."
-    ),
 )
 class DomainFairShareFilter:
     """Filter for domain fair shares."""
@@ -320,13 +320,13 @@ class DomainFairShareFilter:
         )
 
 
-@strawberry.experimental.pydantic.input(
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description="Filter for domain fair shares within a resource group scope. References resource group membership columns to avoid excluding domains without fair share records.",
+        added_version="26.2.0",
+    ),
     model=DomainFairShareFilterDTO,
     name="RGDomainFairShareFilter",
-    description=(
-        "Added in 26.2.0. Filter for domain fair shares within a resource group scope. "
-        "References resource group membership columns to avoid excluding domains without fair share records."
-    ),
 )
 class RGDomainFairShareFilter:
     """Filter for domain fair shares in RG context (uses INNER JOIN'd columns)."""
@@ -379,14 +379,13 @@ class DomainFairShareOrderField(StrEnum):
     DOMAIN_IS_ACTIVE = "domain_is_active"
 
 
-@strawberry.experimental.pydantic.input(
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description="Specifies ordering for domain fair share query results. Combine field selection with direction to sort results. Default direction is DESC (descending).",
+        added_version="26.1.0",
+    ),
     model=DomainFairShareOrderDTO,
     name="DomainFairShareOrderBy",
-    description=(
-        "Added in 26.1.0. Specifies ordering for domain fair share query results. "
-        "Combine field selection with direction to sort results. "
-        "Default direction is DESC (descending)."
-    ),
 )
 class DomainFairShareOrderBy:
     """OrderBy for domain fair shares."""
@@ -413,14 +412,13 @@ class DomainFairShareOrderBy:
 # Mutation Input/Payload Types
 
 
-@strawberry.experimental.pydantic.input(
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description="Input for upserting domain fair share weight. The weight parameter affects scheduling priority - higher weight = higher priority. Set weight to null to use resource group's default_weight.",
+        added_version="26.1.0",
+    ),
     model=UpsertDomainFairShareWeightInputDTO,
     name="UpsertDomainFairShareWeightInput",
-    description=(
-        "Added in 26.1.0. Input for upserting domain fair share weight. "
-        "The weight parameter affects scheduling priority - higher weight = higher priority. "
-        "Set weight to null to use resource group's default_weight."
-    ),
 )
 class UpsertDomainFairShareWeightInput:
     """Input for upserting domain fair share weight."""
@@ -456,13 +454,13 @@ class UpsertDomainFairShareWeightPayload:
 # Bulk Upsert Mutation Input/Payload Types
 
 
-@strawberry.experimental.pydantic.input(
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description="Input item for a single domain weight in bulk upsert. Represents one domain's weight configuration.",
+        added_version="26.1.0",
+    ),
     model=DomainWeightEntryInputDTO,
     name="DomainWeightInputItem",
-    description=(
-        "Added in 26.1.0. Input item for a single domain weight in bulk upsert. "
-        "Represents one domain's weight configuration."
-    ),
 )
 class DomainWeightInputItem:
     """Input item for a single domain weight in bulk upsert."""
@@ -477,13 +475,13 @@ class DomainWeightInputItem:
     )
 
 
-@strawberry.experimental.pydantic.input(
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description="Input for bulk upserting domain fair share weights. Allows updating multiple domains in a single transaction.",
+        added_version="26.1.0",
+    ),
     model=BulkUpsertDomainFairShareWeightInputDTO,
     name="BulkUpsertDomainFairShareWeightInput",
-    description=(
-        "Added in 26.1.0. Input for bulk upserting domain fair share weights. "
-        "Allows updating multiple domains in a single transaction."
-    ),
 )
 class BulkUpsertDomainFairShareWeightInput:
     """Input for bulk upserting domain fair share weights."""

@@ -64,7 +64,11 @@ from ai.backend.manager.api.gql.base import (
     StringFilter,
     UUIDFilter,
 )
-from ai.backend.manager.api.gql.decorators import BackendAIGQLMeta, gql_node_type
+from ai.backend.manager.api.gql.decorators import (
+    BackendAIGQLMeta,
+    gql_node_type,
+    gql_pydantic_input,
+)
 from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.data.deployment.types import DeploymentHistoryData, RouteHistoryData
@@ -457,10 +461,12 @@ class RouteHistory(PydanticNodeMixin[RouteHistoryNode]):
 # Scope input types (added in 26.2.0)
 
 
-@strawberry.experimental.pydantic.input(
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description="Scope for session scheduling history query", added_version="24.09.0"
+    ),
     model=SessionHistoryScopeDTO,
     name="SessionScope",
-    description="Scope for session scheduling history query",
 )
 class SessionScope:
     """Scope for session-level scheduling history queries."""
@@ -471,10 +477,12 @@ class SessionScope:
         return SessionHistoryScopeDTO(session_id=self.session_id)
 
 
-@strawberry.experimental.pydantic.input(
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description="Scope for deployment scheduling history query", added_version="24.09.0"
+    ),
     model=DeploymentHistoryScopeDTO,
     name="DeploymentScope",
-    description="Scope for deployment scheduling history query",
 )
 class DeploymentScope:
     """Scope for deployment-level scheduling history queries."""
@@ -485,10 +493,12 @@ class DeploymentScope:
         return DeploymentHistoryScopeDTO(deployment_id=self.deployment_id)
 
 
-@strawberry.experimental.pydantic.input(
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description="Scope for route scheduling history query", added_version="24.09.0"
+    ),
     model=RouteHistoryScopeDTO,
     name="RouteScope",
-    description="Scope for route scheduling history query",
 )
 class RouteScope:
     """Scope for route-level scheduling history queries."""
@@ -502,10 +512,13 @@ class RouteScope:
 # Filters and orders (pydantic-backed inputs)
 
 
-@strawberry.experimental.pydantic.input(
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description="Filter for scheduling result with equality and membership operators.",
+        added_version="26.3.0",
+    ),
     model=SchedulingResultFilterDTO,
     name="SchedulingResultFilter",
-    description="Added in 26.3.0. Filter for scheduling result with equality and membership operators.",
 )
 class SchedulingResultFilterGQL:
     equals: SchedulingResultGQL | None = None
@@ -524,10 +537,10 @@ class SchedulingResultFilterGQL:
         )
 
 
-@strawberry.experimental.pydantic.input(
+@gql_pydantic_input(
+    BackendAIGQLMeta(description="Filter for session scheduling history", added_version="24.09.0"),
     model=SessionHistoryFilterDTO,
     name="SessionSchedulingHistoryFilter",
-    description="Filter for session scheduling history",
 )
 class SessionSchedulingHistoryFilter:
     id: UUIDFilter | None = None
@@ -562,10 +575,12 @@ class SessionSchedulingHistoryFilter:
         )
 
 
-@strawberry.experimental.pydantic.input(
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description="Order by specification for session scheduling history", added_version="24.09.0"
+    ),
     model=SessionHistoryOrderDTO,
     name="SessionSchedulingHistoryOrderBy",
-    description="Order by specification for session scheduling history",
 )
 class SessionSchedulingHistoryOrderBy:
     field: SessionSchedulingHistoryOrderField
@@ -578,10 +593,10 @@ class SessionSchedulingHistoryOrderBy:
         )
 
 
-@strawberry.experimental.pydantic.input(
+@gql_pydantic_input(
+    BackendAIGQLMeta(description="Filter for deployment history", added_version="24.09.0"),
     model=DeploymentHistoryFilterDTO,
     name="DeploymentHistoryFilter",
-    description="Filter for deployment history",
 )
 class DeploymentHistoryFilter:
     id: UUIDFilter | None = None
@@ -616,10 +631,12 @@ class DeploymentHistoryFilter:
         )
 
 
-@strawberry.experimental.pydantic.input(
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description="Order by specification for deployment history", added_version="24.09.0"
+    ),
     model=DeploymentHistoryOrderDTO,
     name="DeploymentHistoryOrderBy",
-    description="Order by specification for deployment history",
 )
 class DeploymentHistoryOrderBy:
     field: DeploymentHistoryOrderField
@@ -632,10 +649,10 @@ class DeploymentHistoryOrderBy:
         )
 
 
-@strawberry.experimental.pydantic.input(
+@gql_pydantic_input(
+    BackendAIGQLMeta(description="Filter for route history", added_version="24.09.0"),
     model=RouteHistoryFilterDTO,
     name="RouteHistoryFilter",
-    description="Filter for route history",
 )
 class RouteHistoryFilter:
     id: UUIDFilter | None = None
@@ -672,10 +689,12 @@ class RouteHistoryFilter:
         )
 
 
-@strawberry.experimental.pydantic.input(
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description="Order by specification for route history", added_version="24.09.0"
+    ),
     model=RouteHistoryOrderDTO,
     name="RouteHistoryOrderBy",
-    description="Order by specification for route history",
 )
 class RouteHistoryOrderBy:
     field: RouteHistoryOrderField

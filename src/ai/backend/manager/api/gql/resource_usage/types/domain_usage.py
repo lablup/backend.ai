@@ -35,6 +35,7 @@ from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     gql_connection_type,
     gql_node_type,
+    gql_pydantic_input,
 )
 from ai.backend.manager.api.gql.fair_share.types import ResourceSlotGQL
 from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin
@@ -250,14 +251,13 @@ class DomainUsageBucketConnection(Connection[DomainUsageBucketGQL]):
         self.count = count
 
 
-@strawberry.experimental.pydantic.input(
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description="Filter input for querying domain usage bucket records. Usage buckets contain historical resource consumption data aggregated by time period. Multiple filters can be combined using AND, OR, and NOT logical operators.",
+        added_version="26.1.0",
+    ),
     model=DomainUsageBucketFilterDTO,
     name="DomainUsageBucketFilter",
-    description=(
-        "Added in 26.1.0. Filter input for querying domain usage bucket records. "
-        "Usage buckets contain historical resource consumption data aggregated by time period. "
-        "Multiple filters can be combined using AND, OR, and NOT logical operators."
-    ),
 )
 class DomainUsageBucketFilter(GQLFilter):
     """Filter for domain usage buckets."""
@@ -308,14 +308,13 @@ class DomainUsageBucketFilter(GQLFilter):
         )
 
 
-@strawberry.experimental.pydantic.input(
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description="Specifies ordering for domain usage bucket query results. Combine field selection with direction to sort results. Default direction is DESC (most recent first).",
+        added_version="26.1.0",
+    ),
     model=DomainUsageBucketOrderByDTO,
     name="DomainUsageBucketOrderBy",
-    description=(
-        "Added in 26.1.0. Specifies ordering for domain usage bucket query results. "
-        "Combine field selection with direction to sort results. "
-        "Default direction is DESC (most recent first)."
-    ),
 )
 class DomainUsageBucketOrderBy(GQLOrderBy):
     """OrderBy for domain usage buckets."""

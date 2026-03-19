@@ -27,6 +27,7 @@ from ai.backend.common.dto.manager.v2.app_config.response import (
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     gql_node_type,
+    gql_pydantic_input,
     gql_pydantic_type,
 )
 from ai.backend.manager.api.gql.utils import check_admin_only, dedent_strip
@@ -58,7 +59,8 @@ class AppConfig:
     extra_config: strawberry.scalars.JSON
 
 
-@strawberry.experimental.pydantic.input(
+@gql_pydantic_input(
+    BackendAIGQLMeta(description="", added_version="24.09.0"),
     model=UpsertDomainConfigInputDTO,
     description=dedent_strip(
         """\
@@ -80,7 +82,8 @@ class UpsertDomainConfigInput:
         return AppConfigUpdaterSpec(extra_config=OptionalState.update(self.extra_config))
 
 
-@strawberry.experimental.pydantic.input(
+@gql_pydantic_input(
+    BackendAIGQLMeta(description="", added_version="24.09.0"),
     model=UpsertUserConfigInputDTO,
     description=dedent_strip(
         """\
@@ -103,9 +106,11 @@ class UpsertUserConfigInput:
         return AppConfigUpdaterSpec(extra_config=OptionalState.update(self.extra_config))
 
 
-@strawberry.experimental.pydantic.input(
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description="Input for deleting domain-level app configuration", added_version="25.16.0"
+    ),
     model=DeleteDomainConfigInputDTO,
-    description="Added in 25.16.0. Input for deleting domain-level app configuration",
 )
 class DeleteDomainConfigInput:
     """Input type for deleting domain-level app configuration."""
@@ -113,7 +118,8 @@ class DeleteDomainConfigInput:
     domain_name: str
 
 
-@strawberry.experimental.pydantic.input(
+@gql_pydantic_input(
+    BackendAIGQLMeta(description="", added_version="24.09.0"),
     model=DeleteUserConfigInputDTO,
     description=dedent_strip(
         """\

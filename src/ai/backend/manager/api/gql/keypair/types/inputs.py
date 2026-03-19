@@ -10,12 +10,19 @@ from ai.backend.common.dto.manager.v2.auth.request import (
 from ai.backend.common.dto.manager.v2.auth.request import (
     SwitchMyMainAccessKeyInput as SwitchMyMainAccessKeyInputDTO,
 )
+from ai.backend.manager.api.gql.decorators import (
+    BackendAIGQLMeta,
+    gql_pydantic_input,
+)
 
 
-@strawberry.experimental.pydantic.input(
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description="Input for revoking a keypair owned by the current user.",
+        added_version="24.09.0",
+    ),
     model=RevokeMyKeypairInputDTO,
     name="RevokeMyKeypairInput",
-    description="Input for revoking a keypair owned by the current user.",
 )
 class RevokeMyKeypairInputGQL:
     access_key: str = strawberry.field(
@@ -23,10 +30,13 @@ class RevokeMyKeypairInputGQL:
     )
 
 
-@strawberry.experimental.pydantic.input(
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description="Input for switching the main access key of the current user.",
+        added_version="24.09.0",
+    ),
     model=SwitchMyMainAccessKeyInputDTO,
     name="SwitchMyMainAccessKeyInput",
-    description="Input for switching the main access key of the current user.",
 )
 class SwitchMyMainAccessKeyInputGQL:
     access_key: str = strawberry.field(
