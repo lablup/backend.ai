@@ -15,6 +15,8 @@ from ai.backend.manager.api.gql.keypair.types import (
     RevokeMyKeypairPayloadGQL,
     SwitchMyMainAccessKeyInputGQL,
     SwitchMyMainAccessKeyPayloadGQL,
+    UpdateMyKeypairInputGQL,
+    UpdateMyKeypairPayloadGQL,
 )
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.services.user.actions.get_user import GetUserAction
@@ -22,6 +24,7 @@ from ai.backend.manager.services.user.actions.keypair_ops import (
     IssueMyKeypairAction,
     RevokeMyKeypairAction,
     SwitchMyMainAccessKeyAction,
+    UpdateMyKeypairAction,
 )
 
 
@@ -72,6 +75,25 @@ async def revoke_my_keypair(
         RevokeMyKeypairAction(user_uuid=user_uuid, email=email, access_key=input.access_key)
     )
     return RevokeMyKeypairPayloadGQL(success=result.success)
+
+
+@strawberry.mutation(
+    description=(
+        "Update a keypair owned by the current user (e.g. toggle active state). "
+        "The keypair must be owned by the current user."
+    )
+)  # type: ignore[misc]
+async def update_my_keypair(
+    info: Info[StrawberryGQLContext],
+    input: UpdateMyKeypairInputGQL,
+) -> UpdateMyKeypairPayloadGQL:
+    user_uuid, email = await _get_my_email(info)
+    result = await info.context.processors.user.update_my_keypair.wait_for_complete(
+        UpdateMyKeypairAction(
+            user_uuid=user_uuid, email=email, access_key=input.access_key, is_active=input.is_active
+        )
+    )
+    return UpdateMyKeypairPayloadGQL(success=result.success)
 
 
 @strawberry.mutation(
