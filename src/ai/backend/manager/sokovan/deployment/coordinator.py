@@ -149,6 +149,7 @@ class HandlerRegistry:
     handlers: dict[HandlerKey, DeploymentHandler]
 
 
+
 @dataclass
 class DeploymentTaskSpec:
     """Specification for a deployment lifecycle periodic task."""
