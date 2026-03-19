@@ -542,7 +542,7 @@ class ResourceGroupOrderByGQL:
     def to_pydantic(self) -> ResourceGroupOrderDTO:
         return ResourceGroupOrderDTO(
             field=ResourceGroupOrderFieldEnum(self.field.value),
-            direction=ResourceGroupOrderDirectionEnum(self.direction.value),
+            direction=ResourceGroupOrderDirectionEnum(self.direction.value.lower()),
         )
 
 
