@@ -16,7 +16,9 @@ from strawberry.relay import Edge, Node
 from strawberry.types import get_object_definition, has_object_definition
 
 from ai.backend.common.data.filter_specs import StringMatchSpec, UUIDEqualMatchSpec, UUIDInMatchSpec
+from ai.backend.common.dto.manager.query import DateFilter as DateFilterDTO
 from ai.backend.common.dto.manager.query import DateTimeFilter as DateTimeFilterDTO
+from ai.backend.common.dto.manager.query import IntFilter as IntFilterDTO
 from ai.backend.common.dto.manager.query import StringFilter as StringFilterDTO
 from ai.backend.common.dto.manager.query import UUIDFilter as UUIDFilterDTO
 from ai.backend.manager.api.adapters.cursor import decode_cursor as decode_cursor
@@ -47,7 +49,11 @@ class ByteSize(str):
         return ast.value
 
 
-@strawberry.input
+@strawberry.experimental.pydantic.input(
+    model=StringFilterDTO,
+    name="StringFilter",
+    description="Filter for string fields supporting equality, containment, prefix/suffix, and case-insensitive variants.",
+)
 class StringFilter:
     # Basic operations
     contains: str | None = None
@@ -200,7 +206,11 @@ class StringFilter:
         return None
 
 
-@strawberry.input
+@strawberry.experimental.pydantic.input(
+    model=IntFilterDTO,
+    name="IntFilter",
+    description="Filter for integer fields supporting equality and comparison operations.",
+)
 class IntFilter:
     equals: int | None = None
     not_equals: int | None = None
@@ -219,8 +229,22 @@ class IntFilter:
             less_than_or_equal=self.less_than_or_equal,
         )
 
+    def to_pydantic(self) -> IntFilterDTO:
+        return IntFilterDTO(
+            equals=self.equals,
+            not_equals=self.not_equals,
+            greater_than=self.greater_than,
+            greater_than_or_equal=self.greater_than_or_equal,
+            less_than=self.less_than,
+            less_than_or_equal=self.less_than_or_equal,
+        )
 
-@strawberry.input(description="Added in 26.1.0. Filter for UUID fields.")
+
+@strawberry.experimental.pydantic.input(
+    model=UUIDFilterDTO,
+    name="UUIDFilter",
+    description="Added in 26.1.0. Filter for UUID fields.",
+)
 class UUIDFilter:
     # Basic operations
     equals: uuid.UUID | None = None
@@ -287,10 +311,12 @@ class UUIDFilter:
         )
 
 
-@strawberry.input
+@strawberry.experimental.pydantic.input(
+    model=DateTimeFilterDTO,
+    name="DateTimeFilter",
+    description="Filter for datetime fields supporting range and equality operations.",
+)
 class DateTimeFilter:
-    """Filter for datetime fields."""
-
     before: datetime | None = None
     after: datetime | None = None
     equals: datetime | None = None
@@ -301,6 +327,7 @@ class DateTimeFilter:
             before=self.before,
             after=self.after,
             equals=self.equals,
+            not_equals=self.not_equals,
         )
 
     def build_query_condition(
@@ -328,14 +355,24 @@ class DateTimeFilter:
         return None
 
 
-@strawberry.input
+@strawberry.experimental.pydantic.input(
+    model=DateFilterDTO,
+    name="DateFilter",
+    description="Filter for date fields (not datetime) supporting range and equality operations.",
+)
 class DateFilter:
-    """Filter for date fields (not datetime)."""
-
     before: date | None = None
     after: date | None = None
     equals: date | None = None
     not_equals: date | None = None
+
+    def to_pydantic(self) -> DateFilterDTO:
+        return DateFilterDTO(
+            before=self.before,
+            after=self.after,
+            equals=self.equals,
+            not_equals=self.not_equals,
+        )
 
     def build_query_condition(
         self,
