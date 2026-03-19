@@ -15,6 +15,7 @@ from ai.backend.common.data.permission.types import (
     OperationType,
     RBACElementType,
 )
+from ai.backend.common.types import SessionId
 from ai.backend.manager.api.gql.base import OrderDirection
 from ai.backend.manager.api.gql.rbac.types.entity_node import EntityNode
 from ai.backend.manager.api.gql.types import GQLFilter, GQLOrderBy, StrawberryGQLContext
@@ -194,6 +195,7 @@ class PermissionGQL(Node):
         from ai.backend.manager.api.gql.project_v2.types.node import ProjectV2GQL
         from ai.backend.manager.api.gql.rbac.types.role import RoleGQL
         from ai.backend.manager.api.gql.resource_group.types import ResourceGroupGQL
+        from ai.backend.manager.api.gql.session.types import SessionV2GQL
         from ai.backend.manager.api.gql.user.types.node import UserV2GQL
 
         element_type = self.scope_type.to_element()
@@ -243,9 +245,15 @@ class PermissionGQL(Node):
                 if cr_data is None:
                     return None
                 return ContainerRegistryGQL.from_data(cr_data)
+            case RBACElementType.SESSION:
+                session_data = await data_loaders.session_loader.load(
+                    SessionId(uuid.UUID(self.scope_id))
+                )
+                if session_data is None:
+                    return None
+                return SessionV2GQL.from_data(session_data)
             case (
-                RBACElementType.SESSION
-                | RBACElementType.VFOLDER
+                RBACElementType.VFOLDER
                 | RBACElementType.KEYPAIR
                 | RBACElementType.NOTIFICATION_CHANNEL
                 | RBACElementType.NETWORK
