@@ -16,12 +16,23 @@ from ai.backend.common.data.notification.types import (
     NotificationRuleType,
     WebhookSpec,
 )
+from ai.backend.common.dto.manager.query import StringFilter
+
+from .types import NotificationChannelOrderField, NotificationRuleOrderField, OrderDirection
 
 __all__ = (
     "CreateNotificationChannelInput",
     "CreateNotificationRuleInput",
     "DeleteNotificationChannelInput",
     "DeleteNotificationRuleInput",
+    "NotificationChannelFilter",
+    "NotificationChannelOrder",
+    "NotificationChannelTypeFilter",
+    "NotificationRuleFilter",
+    "NotificationRuleOrder",
+    "NotificationRuleTypeFilter",
+    "SearchNotificationChannelsInput",
+    "SearchNotificationRulesInput",
     "UpdateNotificationChannelInput",
     "UpdateNotificationRuleInput",
     "ValidateNotificationChannelInput",
@@ -149,3 +160,120 @@ class ValidateNotificationRuleInput(BaseRequestModel):
         default_factory=dict,
         description="Test notification data to use in template rendering",
     )
+
+
+# Search filter / order / input DTOs
+
+
+class NotificationChannelTypeFilter(BaseRequestModel):
+    """Filter for notification channel type field."""
+
+    equals: NotificationChannelType | None = Field(
+        default=None, description="Matches channels with this exact type"
+    )
+    in_: list[NotificationChannelType] | None = Field(
+        default=None, description="Matches channels whose type is in this list"
+    )
+    not_equals: NotificationChannelType | None = Field(
+        default=None, description="Excludes channels with this exact type"
+    )
+    not_in: list[NotificationChannelType] | None = Field(
+        default=None, description="Excludes channels whose type is in this list"
+    )
+
+
+class NotificationChannelFilter(BaseRequestModel):
+    """Filter for notification channel search queries."""
+
+    name: StringFilter | None = Field(default=None, description="Filter by channel name")
+    channel_type: NotificationChannelTypeFilter | None = Field(
+        default=None, description="Filter by channel type"
+    )
+    enabled: bool | None = Field(default=None, description="Filter by enabled status")
+    AND: list[NotificationChannelFilter] | None = Field(
+        default=None, description="Combine with AND logic"
+    )
+    OR: list[NotificationChannelFilter] | None = Field(
+        default=None, description="Combine with OR logic"
+    )
+    NOT: list[NotificationChannelFilter] | None = Field(default=None, description="Negate filters")
+
+
+NotificationChannelFilter.model_rebuild()
+
+
+class NotificationChannelOrder(BaseRequestModel):
+    """Order specification for notification channel queries."""
+
+    field: NotificationChannelOrderField = Field(description="Field to order by")
+    direction: OrderDirection = Field(default=OrderDirection.DESC, description="Order direction")
+
+
+class SearchNotificationChannelsInput(BaseRequestModel):
+    """Input for searching notification channels with filter, order, and pagination."""
+
+    filter: NotificationChannelFilter | None = None
+    order: list[NotificationChannelOrder] | None = None
+    first: int | None = None
+    after: str | None = None
+    last: int | None = None
+    before: str | None = None
+    limit: int | None = None
+    offset: int | None = None
+
+
+class NotificationRuleTypeFilter(BaseRequestModel):
+    """Filter for notification rule type field."""
+
+    equals: NotificationRuleType | None = Field(
+        default=None, description="Matches rules with this exact type"
+    )
+    in_: list[NotificationRuleType] | None = Field(
+        default=None, description="Matches rules whose type is in this list"
+    )
+    not_equals: NotificationRuleType | None = Field(
+        default=None, description="Excludes rules with this exact type"
+    )
+    not_in: list[NotificationRuleType] | None = Field(
+        default=None, description="Excludes rules whose type is in this list"
+    )
+
+
+class NotificationRuleFilter(BaseRequestModel):
+    """Filter for notification rule search queries."""
+
+    name: StringFilter | None = Field(default=None, description="Filter by rule name")
+    rule_type: NotificationRuleTypeFilter | None = Field(
+        default=None, description="Filter by rule type"
+    )
+    enabled: bool | None = Field(default=None, description="Filter by enabled status")
+    AND: list[NotificationRuleFilter] | None = Field(
+        default=None, description="Combine with AND logic"
+    )
+    OR: list[NotificationRuleFilter] | None = Field(
+        default=None, description="Combine with OR logic"
+    )
+    NOT: list[NotificationRuleFilter] | None = Field(default=None, description="Negate filters")
+
+
+NotificationRuleFilter.model_rebuild()
+
+
+class NotificationRuleOrder(BaseRequestModel):
+    """Order specification for notification rule queries."""
+
+    field: NotificationRuleOrderField = Field(description="Field to order by")
+    direction: OrderDirection = Field(default=OrderDirection.DESC, description="Order direction")
+
+
+class SearchNotificationRulesInput(BaseRequestModel):
+    """Input for searching notification rules with filter, order, and pagination."""
+
+    filter: NotificationRuleFilter | None = None
+    order: list[NotificationRuleOrder] | None = None
+    first: int | None = None
+    after: str | None = None
+    last: int | None = None
+    before: str | None = None
+    limit: int | None = None
+    offset: int | None = None

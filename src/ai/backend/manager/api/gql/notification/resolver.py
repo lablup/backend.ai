@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import uuid
-from functools import lru_cache
 from typing import Any
 
 import strawberry
@@ -13,20 +12,15 @@ from strawberry.relay import Connection, Edge
 from ai.backend.common.api_handlers import Sentinel
 from ai.backend.common.contexts.user import current_user
 from ai.backend.common.data.permission.types import RBACElementType
-from ai.backend.manager.api.gql.adapter import PaginationOptions, PaginationSpec
+from ai.backend.common.dto.manager.v2.notification.request import (
+    SearchNotificationChannelsInput,
+    SearchNotificationRulesInput,
+)
 from ai.backend.manager.api.gql.base import encode_cursor
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.api.gql.utils import check_admin_only
 from ai.backend.manager.data.permission.types import RBACElementRef
 from ai.backend.manager.errors.auth import InvalidAuthParameters
-from ai.backend.manager.models.notification.conditions import (
-    NotificationChannelConditions,
-    NotificationRuleConditions,
-)
-from ai.backend.manager.models.notification.orders import (
-    NotificationChannelOrders,
-    NotificationRuleOrders,
-)
 from ai.backend.manager.models.notification.row import NotificationChannelRow, NotificationRuleRow
 from ai.backend.manager.repositories.base.rbac.entity_creator import RBACEntityCreator
 from ai.backend.manager.repositories.base.updater import Updater
@@ -45,8 +39,6 @@ from ai.backend.manager.services.notification.actions import (
     DeleteRuleAction,
     GetChannelAction,
     GetRuleAction,
-    SearchChannelsAction,
-    SearchRulesAction,
     UpdateChannelAction,
     UpdateRuleAction,
     ValidateChannelAction,
@@ -79,31 +71,6 @@ from .types import (
     ValidateNotificationRuleInput,
     ValidateNotificationRulePayload,
 )
-
-# Pagination specs
-
-
-@lru_cache(maxsize=1)
-def _get_channel_pagination_spec() -> PaginationSpec:
-    return PaginationSpec(
-        forward_order=NotificationChannelOrders.created_at(ascending=False),
-        backward_order=NotificationChannelOrders.created_at(ascending=True),
-        forward_condition_factory=NotificationChannelConditions.by_cursor_forward,
-        backward_condition_factory=NotificationChannelConditions.by_cursor_backward,
-        tiebreaker_order=NotificationChannelRow.id.asc(),
-    )
-
-
-@lru_cache(maxsize=1)
-def _get_rule_pagination_spec() -> PaginationSpec:
-    return PaginationSpec(
-        forward_order=NotificationRuleOrders.created_at(ascending=False),
-        backward_order=NotificationRuleOrders.created_at(ascending=True),
-        forward_condition_factory=NotificationRuleConditions.by_cursor_forward,
-        backward_condition_factory=NotificationRuleConditions.by_cursor_backward,
-        tiebreaker_order=NotificationRuleRow.id.asc(),
-    )
-
 
 # Creator / updater helpers
 
@@ -281,29 +248,23 @@ async def admin_notification_channels(
     offset: int | None = None,
 ) -> NotificationChannelConnection | None:
     check_admin_only()
-    processors = info.context.processors
 
-    # Build querier from filter, order_by, and pagination using adapter
-    querier = info.context.gql_adapter.build_querier(
-        PaginationOptions(
+    pydantic_filter = filter.to_pydantic() if filter is not None else None
+    pydantic_orders = [o.to_pydantic() for o in order_by] if order_by is not None else None
+    payload = await info.context.adapters.notification.search_channels(
+        SearchNotificationChannelsInput(
+            filter=pydantic_filter,
+            order=pydantic_orders,
             first=first,
             after=after,
             last=last,
             before=before,
             limit=limit,
             offset=offset,
-        ),
-        _get_channel_pagination_spec(),
-        filter=filter,
-        order_by=order_by,
+        )
     )
 
-    action_result = await processors.notification.search_channels.wait_for_complete(
-        SearchChannelsAction(querier=querier)
-    )
-
-    nodes = [NotificationChannel.from_dataclass(data) for data in action_result.channels]
-
+    nodes = [NotificationChannel.from_node(item) for item in payload.items]
     edges = [
         NotificationChannelEdge(node=node, cursor=encode_cursor(str(node.id))) for node in nodes
     ]
@@ -311,12 +272,12 @@ async def admin_notification_channels(
     return NotificationChannelConnection(
         edges=edges,
         page_info=strawberry.relay.PageInfo(
-            has_next_page=action_result.has_next_page,
-            has_previous_page=action_result.has_previous_page,
+            has_next_page=payload.has_next_page,
+            has_previous_page=payload.has_previous_page,
             start_cursor=edges[0].cursor if edges else None,
             end_cursor=edges[-1].cursor if edges else None,
         ),
-        count=action_result.total_count,
+        count=payload.total_count,
     )
 
 
@@ -338,29 +299,22 @@ async def notification_channels(
     limit: int | None = None,
     offset: int | None = None,
 ) -> NotificationChannelConnection | None:
-    processors = info.context.processors
-
-    # Build querier from filter, order_by, and pagination using adapter
-    querier = info.context.gql_adapter.build_querier(
-        PaginationOptions(
+    pydantic_filter = filter.to_pydantic() if filter is not None else None
+    pydantic_orders = [o.to_pydantic() for o in order_by] if order_by is not None else None
+    payload = await info.context.adapters.notification.search_channels(
+        SearchNotificationChannelsInput(
+            filter=pydantic_filter,
+            order=pydantic_orders,
             first=first,
             after=after,
             last=last,
             before=before,
             limit=limit,
             offset=offset,
-        ),
-        _get_channel_pagination_spec(),
-        filter=filter,
-        order_by=order_by,
+        )
     )
 
-    action_result = await processors.notification.search_channels.wait_for_complete(
-        SearchChannelsAction(querier=querier)
-    )
-
-    nodes = [NotificationChannel.from_dataclass(data) for data in action_result.channels]
-
+    nodes = [NotificationChannel.from_node(item) for item in payload.items]
     edges = [
         NotificationChannelEdge(node=node, cursor=encode_cursor(str(node.id))) for node in nodes
     ]
@@ -368,12 +322,12 @@ async def notification_channels(
     return NotificationChannelConnection(
         edges=edges,
         page_info=strawberry.relay.PageInfo(
-            has_next_page=action_result.has_next_page,
-            has_previous_page=action_result.has_previous_page,
+            has_next_page=payload.has_next_page,
+            has_previous_page=payload.has_previous_page,
             start_cursor=edges[0].cursor if edges else None,
             end_cursor=edges[-1].cursor if edges else None,
         ),
-        count=action_result.total_count,
+        count=payload.total_count,
     )
 
 
@@ -417,40 +371,34 @@ async def admin_notification_rules(
     offset: int | None = None,
 ) -> NotificationRuleConnection | None:
     check_admin_only()
-    processors = info.context.processors
 
-    # Build querier from filter, order_by, and pagination using adapter
-    querier = info.context.gql_adapter.build_querier(
-        PaginationOptions(
+    pydantic_filter = filter.to_pydantic() if filter is not None else None
+    pydantic_orders = [o.to_pydantic() for o in order_by] if order_by is not None else None
+    payload = await info.context.adapters.notification.search_rules(
+        SearchNotificationRulesInput(
+            filter=pydantic_filter,
+            order=pydantic_orders,
             first=first,
             after=after,
             last=last,
             before=before,
             limit=limit,
             offset=offset,
-        ),
-        _get_rule_pagination_spec(),
-        filter=filter,
-        order_by=order_by,
+        )
     )
 
-    action_result = await processors.notification.search_rules.wait_for_complete(
-        SearchRulesAction(querier=querier)
-    )
-
-    nodes = [NotificationRule.from_dataclass(data) for data in action_result.rules]
-
+    nodes = [NotificationRule.from_node(item) for item in payload.items]
     edges = [NotificationRuleEdge(node=node, cursor=encode_cursor(str(node.id))) for node in nodes]
 
     return NotificationRuleConnection(
         edges=edges,
         page_info=strawberry.relay.PageInfo(
-            has_next_page=action_result.has_next_page,
-            has_previous_page=action_result.has_previous_page,
+            has_next_page=payload.has_next_page,
+            has_previous_page=payload.has_previous_page,
             start_cursor=edges[0].cursor if edges else None,
             end_cursor=edges[-1].cursor if edges else None,
         ),
-        count=action_result.total_count,
+        count=payload.total_count,
     )
 
 
@@ -472,40 +420,33 @@ async def notification_rules(
     limit: int | None = None,
     offset: int | None = None,
 ) -> NotificationRuleConnection | None:
-    processors = info.context.processors
-
-    # Build querier from filter, order_by, and pagination using adapter
-    querier = info.context.gql_adapter.build_querier(
-        PaginationOptions(
+    pydantic_filter = filter.to_pydantic() if filter is not None else None
+    pydantic_orders = [o.to_pydantic() for o in order_by] if order_by is not None else None
+    payload = await info.context.adapters.notification.search_rules(
+        SearchNotificationRulesInput(
+            filter=pydantic_filter,
+            order=pydantic_orders,
             first=first,
             after=after,
             last=last,
             before=before,
             limit=limit,
             offset=offset,
-        ),
-        _get_rule_pagination_spec(),
-        filter=filter,
-        order_by=order_by,
+        )
     )
 
-    action_result = await processors.notification.search_rules.wait_for_complete(
-        SearchRulesAction(querier=querier)
-    )
-
-    nodes = [NotificationRule.from_dataclass(data) for data in action_result.rules]
-
+    nodes = [NotificationRule.from_node(item) for item in payload.items]
     edges = [NotificationRuleEdge(node=node, cursor=encode_cursor(str(node.id))) for node in nodes]
 
     return NotificationRuleConnection(
         edges=edges,
         page_info=strawberry.relay.PageInfo(
-            has_next_page=action_result.has_next_page,
-            has_previous_page=action_result.has_previous_page,
+            has_next_page=payload.has_next_page,
+            has_previous_page=payload.has_previous_page,
             start_cursor=edges[0].cursor if edges else None,
             end_cursor=edges[-1].cursor if edges else None,
         ),
-        count=action_result.total_count,
+        count=payload.total_count,
     )
 
 

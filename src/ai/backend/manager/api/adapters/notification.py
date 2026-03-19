@@ -13,6 +13,12 @@ from ai.backend.common.dto.manager.v2.notification.request import (
     CreateNotificationRuleInput,
     DeleteNotificationChannelInput,
     DeleteNotificationRuleInput,
+    NotificationChannelFilter,
+    NotificationChannelOrder,
+    NotificationRuleFilter,
+    NotificationRuleOrder,
+    SearchNotificationChannelsInput,
+    SearchNotificationRulesInput,
     UpdateNotificationChannelInput,
     UpdateNotificationRuleInput,
 )
@@ -25,15 +31,38 @@ from ai.backend.common.dto.manager.v2.notification.response import (
     GetNotificationRulePayload,
     NotificationChannelNode,
     NotificationRuleNode,
+    SearchNotificationChannelsPayload,
+    SearchNotificationRulesPayload,
     UpdateNotificationChannelPayload,
     UpdateNotificationRulePayload,
 )
-from ai.backend.common.dto.manager.v2.notification.types import EmailSpecInfo, WebhookSpecInfo
+from ai.backend.common.dto.manager.v2.notification.types import (
+    EmailSpecInfo,
+    NotificationChannelOrderField,
+    NotificationRuleOrderField,
+    OrderDirection,
+    WebhookSpecInfo,
+)
+from ai.backend.manager.api.adapters.pagination import PaginationSpec
 from ai.backend.manager.data.notification import NotificationChannelData, NotificationRuleData
 from ai.backend.manager.data.permission.types import RBACElementRef
 from ai.backend.manager.errors.notification import InvalidNotificationSpec
 from ai.backend.manager.models.notification import NotificationChannelRow, NotificationRuleRow
-from ai.backend.manager.repositories.base import Updater
+from ai.backend.manager.models.notification.conditions import (
+    NotificationChannelConditions,
+    NotificationRuleConditions,
+)
+from ai.backend.manager.models.notification.orders import (
+    NotificationChannelOrders,
+    NotificationRuleOrders,
+)
+from ai.backend.manager.repositories.base import (
+    QueryCondition,
+    QueryOrder,
+    Updater,
+    combine_conditions_or,
+    negate_conditions,
+)
 from ai.backend.manager.repositories.base.rbac.entity_creator import RBACEntityCreator
 from ai.backend.manager.repositories.notification.creators import (
     NotificationChannelCreatorSpec,
@@ -50,12 +79,34 @@ from ai.backend.manager.services.notification.actions import (
     DeleteRuleAction,
     GetChannelAction,
     GetRuleAction,
+    SearchChannelsAction,
+    SearchRulesAction,
     UpdateChannelAction,
     UpdateRuleAction,
 )
 from ai.backend.manager.types import OptionalState, TriState
 
 from .base import BaseAdapter
+
+
+def _channel_pagination_spec() -> PaginationSpec:
+    return PaginationSpec(
+        forward_order=NotificationChannelOrders.created_at(ascending=False),
+        backward_order=NotificationChannelOrders.created_at(ascending=True),
+        forward_condition_factory=NotificationChannelConditions.by_cursor_forward,
+        backward_condition_factory=NotificationChannelConditions.by_cursor_backward,
+        tiebreaker_order=NotificationChannelRow.id.asc(),
+    )
+
+
+def _rule_pagination_spec() -> PaginationSpec:
+    return PaginationSpec(
+        forward_order=NotificationRuleOrders.created_at(ascending=False),
+        backward_order=NotificationRuleOrders.created_at(ascending=True),
+        forward_condition_factory=NotificationRuleConditions.by_cursor_forward,
+        backward_condition_factory=NotificationRuleConditions.by_cursor_backward,
+        tiebreaker_order=NotificationRuleRow.id.asc(),
+    )
 
 
 class NotificationAdapter(BaseAdapter):
@@ -192,6 +243,64 @@ class NotificationAdapter(BaseAdapter):
 
         return DeleteNotificationRulePayload(id=input.id)
 
+    async def search_channels(
+        self, input: SearchNotificationChannelsInput
+    ) -> SearchNotificationChannelsPayload:
+        """Search notification channels with filter, order, and pagination."""
+        conditions = self._convert_channel_filter(input.filter) if input.filter else []
+        orders = self._convert_channel_orders(input.order) if input.order else []
+        querier = self._build_querier(
+            conditions=conditions,
+            orders=orders,
+            pagination_spec=_channel_pagination_spec(),
+            first=input.first,
+            after=input.after,
+            last=input.last,
+            before=input.before,
+            limit=input.limit,
+            offset=input.offset,
+        )
+
+        action_result = await self._processors.notification.search_channels.wait_for_complete(
+            SearchChannelsAction(querier=querier)
+        )
+
+        return SearchNotificationChannelsPayload(
+            items=[self._channel_data_to_dto(d) for d in action_result.channels],
+            total_count=action_result.total_count,
+            has_next_page=action_result.has_next_page,
+            has_previous_page=action_result.has_previous_page,
+        )
+
+    async def search_rules(
+        self, input: SearchNotificationRulesInput
+    ) -> SearchNotificationRulesPayload:
+        """Search notification rules with filter, order, and pagination."""
+        conditions = self._convert_rule_filter(input.filter) if input.filter else []
+        orders = self._convert_rule_orders(input.order) if input.order else []
+        querier = self._build_querier(
+            conditions=conditions,
+            orders=orders,
+            pagination_spec=_rule_pagination_spec(),
+            first=input.first,
+            after=input.after,
+            last=input.last,
+            before=input.before,
+            limit=input.limit,
+            offset=input.offset,
+        )
+
+        action_result = await self._processors.notification.search_rules.wait_for_complete(
+            SearchRulesAction(querier=querier)
+        )
+
+        return SearchNotificationRulesPayload(
+            items=[self._rule_data_to_dto(d) for d in action_result.rules],
+            total_count=action_result.total_count,
+            has_next_page=action_result.has_next_page,
+            has_previous_page=action_result.has_previous_page,
+        )
+
     # ------------------------------------------------------------------ helpers
 
     @staticmethod
@@ -213,8 +322,12 @@ class NotificationAdapter(BaseAdapter):
                 spec_info = EmailSpecInfo(
                     smtp_host=data.spec.smtp.host,
                     smtp_port=data.spec.smtp.port,
+                    smtp_use_tls=data.spec.smtp.use_tls,
+                    smtp_timeout=data.spec.smtp.timeout,
                     from_email=data.spec.message.from_email,
                     to_emails=data.spec.message.to_emails,
+                    subject_template=data.spec.message.subject_template,
+                    auth_username=data.spec.auth.username if data.spec.auth is not None else None,
                 )
             case _:
                 raise InvalidNotificationSpec(f"Unsupported channel type: {data.channel_type}")
@@ -293,3 +406,133 @@ class NotificationAdapter(BaseAdapter):
                 else OptionalState.nop()
             ),
         )
+
+    @staticmethod
+    def _convert_channel_filter(f: NotificationChannelFilter) -> list[QueryCondition]:
+        """Convert NotificationChannelFilter DTO to QueryCondition list."""
+        conditions: list[QueryCondition] = []
+
+        if f.name:
+            cond = f.name.build_query_condition(
+                contains_factory=NotificationChannelConditions.by_name_contains,
+                equals_factory=NotificationChannelConditions.by_name_equals,
+                starts_with_factory=NotificationChannelConditions.by_name_starts_with,
+                ends_with_factory=NotificationChannelConditions.by_name_ends_with,
+            )
+            if cond:
+                conditions.append(cond)
+
+        if f.channel_type is not None:
+            ct = f.channel_type
+            if ct.equals is not None:
+                conditions.append(NotificationChannelConditions.by_channel_type_equals(ct.equals))
+            if ct.in_ is not None:
+                conditions.append(NotificationChannelConditions.by_channel_types(list(ct.in_)))
+            if ct.not_equals is not None:
+                conditions.append(
+                    NotificationChannelConditions.by_channel_type_not_equals(ct.not_equals)
+                )
+            if ct.not_in is not None:
+                conditions.append(NotificationChannelConditions.by_channel_type_not_in(ct.not_in))
+
+        if f.enabled is not None:
+            conditions.append(NotificationChannelConditions.by_enabled(f.enabled))
+
+        if f.AND:
+            for sub in f.AND:
+                conditions.extend(NotificationAdapter._convert_channel_filter(sub))
+
+        if f.OR:
+            or_conditions: list[QueryCondition] = []
+            for sub in f.OR:
+                or_conditions.extend(NotificationAdapter._convert_channel_filter(sub))
+            if or_conditions:
+                conditions.append(combine_conditions_or(or_conditions))
+
+        if f.NOT:
+            not_conditions: list[QueryCondition] = []
+            for sub in f.NOT:
+                not_conditions.extend(NotificationAdapter._convert_channel_filter(sub))
+            if not_conditions:
+                conditions.append(negate_conditions(not_conditions))
+
+        return conditions
+
+    @staticmethod
+    def _convert_channel_orders(orders: list[NotificationChannelOrder]) -> list[QueryOrder]:
+        """Convert NotificationChannelOrder DTO list to QueryOrder list."""
+        result: list[QueryOrder] = []
+        for o in orders:
+            ascending = o.direction == OrderDirection.ASC
+            match o.field:
+                case NotificationChannelOrderField.NAME:
+                    result.append(NotificationChannelOrders.name(ascending))
+                case NotificationChannelOrderField.CREATED_AT:
+                    result.append(NotificationChannelOrders.created_at(ascending))
+                case NotificationChannelOrderField.UPDATED_AT:
+                    result.append(NotificationChannelOrders.updated_at(ascending))
+        return result
+
+    @staticmethod
+    def _convert_rule_filter(f: NotificationRuleFilter) -> list[QueryCondition]:
+        """Convert NotificationRuleFilter DTO to QueryCondition list."""
+        conditions: list[QueryCondition] = []
+
+        if f.name:
+            cond = f.name.build_query_condition(
+                contains_factory=NotificationRuleConditions.by_name_contains,
+                equals_factory=NotificationRuleConditions.by_name_equals,
+                starts_with_factory=NotificationRuleConditions.by_name_starts_with,
+                ends_with_factory=NotificationRuleConditions.by_name_ends_with,
+            )
+            if cond:
+                conditions.append(cond)
+
+        if f.rule_type is not None:
+            rt = f.rule_type
+            if rt.equals is not None:
+                conditions.append(NotificationRuleConditions.by_rule_type_equals(rt.equals))
+            if rt.in_ is not None:
+                conditions.append(NotificationRuleConditions.by_rule_types(list(rt.in_)))
+            if rt.not_equals is not None:
+                conditions.append(NotificationRuleConditions.by_rule_type_not_equals(rt.not_equals))
+            if rt.not_in is not None:
+                conditions.append(NotificationRuleConditions.by_rule_type_not_in(rt.not_in))
+
+        if f.enabled is not None:
+            conditions.append(NotificationRuleConditions.by_enabled(f.enabled))
+
+        if f.AND:
+            for sub in f.AND:
+                conditions.extend(NotificationAdapter._convert_rule_filter(sub))
+
+        if f.OR:
+            or_conditions: list[QueryCondition] = []
+            for sub in f.OR:
+                or_conditions.extend(NotificationAdapter._convert_rule_filter(sub))
+            if or_conditions:
+                conditions.append(combine_conditions_or(or_conditions))
+
+        if f.NOT:
+            not_conditions: list[QueryCondition] = []
+            for sub in f.NOT:
+                not_conditions.extend(NotificationAdapter._convert_rule_filter(sub))
+            if not_conditions:
+                conditions.append(negate_conditions(not_conditions))
+
+        return conditions
+
+    @staticmethod
+    def _convert_rule_orders(orders: list[NotificationRuleOrder]) -> list[QueryOrder]:
+        """Convert NotificationRuleOrder DTO list to QueryOrder list."""
+        result: list[QueryOrder] = []
+        for o in orders:
+            ascending = o.direction == OrderDirection.ASC
+            match o.field:
+                case NotificationRuleOrderField.NAME:
+                    result.append(NotificationRuleOrders.name(ascending))
+                case NotificationRuleOrderField.CREATED_AT:
+                    result.append(NotificationRuleOrders.created_at(ascending))
+                case NotificationRuleOrderField.UPDATED_AT:
+                    result.append(NotificationRuleOrders.updated_at(ascending))
+        return result

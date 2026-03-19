@@ -37,6 +37,24 @@ from ai.backend.common.dto.manager.v2.notification.request import (
     DeleteNotificationRuleInput as DeleteNotificationRuleInputDTO,
 )
 from ai.backend.common.dto.manager.v2.notification.request import (
+    NotificationChannelFilter as NotificationChannelFilterDTO,
+)
+from ai.backend.common.dto.manager.v2.notification.request import (
+    NotificationChannelOrder as NotificationChannelOrderDTO,
+)
+from ai.backend.common.dto.manager.v2.notification.request import (
+    NotificationChannelTypeFilter as NotificationChannelTypeFilterDTO,
+)
+from ai.backend.common.dto.manager.v2.notification.request import (
+    NotificationRuleFilter as NotificationRuleFilterDTO,
+)
+from ai.backend.common.dto.manager.v2.notification.request import (
+    NotificationRuleOrder as NotificationRuleOrderDTO,
+)
+from ai.backend.common.dto.manager.v2.notification.request import (
+    NotificationRuleTypeFilter as NotificationRuleTypeFilterDTO,
+)
+from ai.backend.common.dto.manager.v2.notification.request import (
     UpdateNotificationChannelInput as UpdateNotificationChannelInputDTO,
 )
 from ai.backend.common.dto.manager.v2.notification.request import (
@@ -55,7 +73,24 @@ from ai.backend.common.dto.manager.v2.notification.response import (
     DeleteNotificationRulePayload as DeleteNotificationRulePayloadDTO,
 )
 from ai.backend.common.dto.manager.v2.notification.response import (
+    NotificationChannelNode,
+    NotificationRuleNode,
+)
+from ai.backend.common.dto.manager.v2.notification.response import (
     ValidateNotificationRulePayload as ValidateNotificationRulePayloadDTO,
+)
+from ai.backend.common.dto.manager.v2.notification.types import (
+    EmailSpecInfo,
+    WebhookSpecInfo,
+)
+from ai.backend.common.dto.manager.v2.notification.types import (
+    NotificationChannelOrderField as NotificationChannelOrderFieldDTO,
+)
+from ai.backend.common.dto.manager.v2.notification.types import (
+    NotificationRuleOrderField as NotificationRuleOrderFieldDTO,
+)
+from ai.backend.common.dto.manager.v2.notification.types import (
+    OrderDirection as OrderDirectionDTO,
 )
 from ai.backend.common.exception import InvalidNotificationChannelSpec
 from ai.backend.manager.api.gql.base import OrderDirection, StringFilter
@@ -269,6 +304,53 @@ class NotificationChannel(PydanticNodeMixin):
             created_at=data.created_at,
         )
 
+    @classmethod
+    def from_node(cls, node: NotificationChannelNode) -> Self:
+        final_spec: NotificationChannelSpecGQL
+        match node.channel_type:
+            case NotificationChannelType.WEBHOOK:
+                if not isinstance(node.spec, WebhookSpecInfo):
+                    raise InvalidNotificationChannelSpec(
+                        f"Expected WebhookSpecInfo for WEBHOOK channel, got {type(node.spec).__name__}"
+                    )
+                final_spec = WebhookSpecGQL(
+                    channel_type=NotificationChannelTypeGQL.WEBHOOK,
+                    url=node.spec.url,
+                )
+            case NotificationChannelType.EMAIL:
+                if not isinstance(node.spec, EmailSpecInfo):
+                    raise InvalidNotificationChannelSpec(
+                        f"Expected EmailSpecInfo for EMAIL channel, got {type(node.spec).__name__}"
+                    )
+                final_spec = EmailSpecGQL(
+                    channel_type=NotificationChannelTypeGQL.EMAIL,
+                    smtp=SMTPConnectionGQL(
+                        host=node.spec.smtp_host,
+                        port=node.spec.smtp_port,
+                        use_tls=node.spec.smtp_use_tls,
+                        timeout=node.spec.smtp_timeout,
+                    ),
+                    message=EmailMessageGQL(
+                        from_email=node.spec.from_email,
+                        to_emails=node.spec.to_emails,
+                        subject_template=node.spec.subject_template,
+                    ),
+                    auth=(
+                        SMTPAuthGQL(username=node.spec.auth_username)
+                        if node.spec.auth_username is not None
+                        else None
+                    ),
+                )
+        return cls(
+            id=ID(str(node.id)),
+            name=node.name,
+            description=node.description,
+            channel_type=NotificationChannelTypeGQL.from_internal(node.channel_type),
+            spec=final_spec,
+            enabled=node.enabled,
+            created_at=node.created_at,
+        )
+
 
 @strawberry.type(description="Notification rule")
 class NotificationRule(PydanticNodeMixin):
@@ -307,6 +389,19 @@ class NotificationRule(PydanticNodeMixin):
             created_at=data.created_at,
         )
 
+    @classmethod
+    def from_node(cls, node: NotificationRuleNode) -> Self:
+        return cls(
+            id=ID(str(node.id)),
+            name=node.name,
+            description=node.description,
+            rule_type=NotificationRuleTypeGQL.from_internal(node.rule_type),
+            channel=NotificationChannel.from_node(node.channel),
+            message_template=node.message_template,
+            enabled=node.enabled,
+            created_at=node.created_at,
+        )
+
 
 # Filter and OrderBy types
 
@@ -335,6 +430,14 @@ class NotificationChannelTypeFilterGQL:
     not_in: list[NotificationChannelTypeGQL] | None = strawberry.field(
         default=None, description="Excludes channels whose type is in this list."
     )
+
+    def to_pydantic(self) -> NotificationChannelTypeFilterDTO:
+        return NotificationChannelTypeFilterDTO(
+            equals=self.equals.to_internal() if self.equals is not None else None,
+            in_=[t.to_internal() for t in self.in_] if self.in_ is not None else None,
+            not_equals=self.not_equals.to_internal() if self.not_equals is not None else None,
+            not_in=[t.to_internal() for t in self.not_in] if self.not_in is not None else None,
+        )
 
 
 @strawberry.input(description="Filter for notification channels")
@@ -421,6 +524,18 @@ class NotificationChannelFilter(GQLFilter):
 
         return field_conditions
 
+    def to_pydantic(self) -> NotificationChannelFilterDTO:
+        return NotificationChannelFilterDTO(
+            name=self.name.to_pydantic() if self.name is not None else None,
+            channel_type=(
+                self.channel_type.to_pydantic() if self.channel_type is not None else None
+            ),
+            enabled=self.enabled,
+            AND=[f.to_pydantic() for f in self.AND] if self.AND is not None else None,
+            OR=[f.to_pydantic() for f in self.OR] if self.OR is not None else None,
+            NOT=[f.to_pydantic() for f in self.NOT] if self.NOT is not None else None,
+        )
+
 
 @strawberry.input(description="Order by specification for notification channels")
 class NotificationChannelOrderBy(GQLOrderBy):
@@ -438,6 +553,12 @@ class NotificationChannelOrderBy(GQLOrderBy):
                 return NotificationChannelOrders.created_at(ascending)
             case NotificationChannelOrderField.UPDATED_AT:
                 return NotificationChannelOrders.updated_at(ascending)
+
+    def to_pydantic(self) -> NotificationChannelOrderDTO:
+        return NotificationChannelOrderDTO(
+            field=NotificationChannelOrderFieldDTO(self.field.value),
+            direction=OrderDirectionDTO(self.direction.value),
+        )
 
 
 @strawberry.enum
@@ -464,6 +585,14 @@ class NotificationRuleTypeFilterGQL:
     not_in: list[NotificationRuleTypeGQL] | None = strawberry.field(
         default=None, description="Excludes rules whose type is in this list."
     )
+
+    def to_pydantic(self) -> NotificationRuleTypeFilterDTO:
+        return NotificationRuleTypeFilterDTO(
+            equals=self.equals.to_internal() if self.equals is not None else None,
+            in_=[t.to_internal() for t in self.in_] if self.in_ is not None else None,
+            not_equals=self.not_equals.to_internal() if self.not_equals is not None else None,
+            not_in=[t.to_internal() for t in self.not_in] if self.not_in is not None else None,
+        )
 
 
 @strawberry.input(description="Filter for notification rules")
@@ -550,6 +679,16 @@ class NotificationRuleFilter(GQLFilter):
 
         return field_conditions
 
+    def to_pydantic(self) -> NotificationRuleFilterDTO:
+        return NotificationRuleFilterDTO(
+            name=self.name.to_pydantic() if self.name is not None else None,
+            rule_type=self.rule_type.to_pydantic() if self.rule_type is not None else None,
+            enabled=self.enabled,
+            AND=[f.to_pydantic() for f in self.AND] if self.AND is not None else None,
+            OR=[f.to_pydantic() for f in self.OR] if self.OR is not None else None,
+            NOT=[f.to_pydantic() for f in self.NOT] if self.NOT is not None else None,
+        )
+
 
 @strawberry.input(description="Order by specification for notification rules")
 class NotificationRuleOrderBy(GQLOrderBy):
@@ -567,6 +706,12 @@ class NotificationRuleOrderBy(GQLOrderBy):
                 return NotificationRuleOrders.created_at(ascending)
             case NotificationRuleOrderField.UPDATED_AT:
                 return NotificationRuleOrders.updated_at(ascending)
+
+    def to_pydantic(self) -> NotificationRuleOrderDTO:
+        return NotificationRuleOrderDTO(
+            field=NotificationRuleOrderFieldDTO(self.field.value),
+            direction=OrderDirectionDTO(self.direction.value),
+        )
 
 
 # Input types for mutations

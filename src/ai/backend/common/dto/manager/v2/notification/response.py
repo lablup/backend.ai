@@ -26,6 +26,8 @@ __all__ = (
     "GetNotificationRulePayload",
     "NotificationChannelNode",
     "NotificationRuleNode",
+    "SearchNotificationChannelsPayload",
+    "SearchNotificationRulesPayload",
     "UpdateNotificationChannelPayload",
     "UpdateNotificationRulePayload",
     "ValidateNotificationChannelPayload",
@@ -120,3 +122,21 @@ class ValidateNotificationRulePayload(BaseResponseModel):
     """Payload for notification rule validation result."""
 
     message: str = Field(description="The rendered message from the template")
+
+
+class SearchNotificationChannelsPayload(BaseResponseModel):
+    """Payload for notification channel search result."""
+
+    items: list[NotificationChannelNode] = Field(description="List of matching channels")
+    total_count: int = Field(description="Total number of matching channels")
+    has_next_page: bool = Field(description="Whether there is a next page")
+    has_previous_page: bool = Field(description="Whether there is a previous page")
+
+
+class SearchNotificationRulesPayload(BaseResponseModel):
+    """Payload for notification rule search result."""
+
+    items: list[NotificationRuleNode] = Field(description="List of matching rules")
+    total_count: int = Field(description="Total number of matching rules")
+    has_next_page: bool = Field(description="Whether there is a next page")
+    has_previous_page: bool = Field(description="Whether there is a previous page")
