@@ -103,6 +103,12 @@ class ResourceWeightEntryInputGQL:
         ),
     )
 
+    def to_pydantic(self) -> ResourceWeightEntryInputDTO:
+        return ResourceWeightEntryInputDTO(
+            resource_type=self.resource_type,
+            weight=self.weight,
+        )
+
 
 @gql_node_type(
     BackendAIGQLMeta(

@@ -332,18 +332,17 @@ class PermissionGQL(PydanticNodeMixin[PermissionNodeDTO]):
 # ==================== Filter Types ====================
 
 
-@gql_pydantic_input(
-    BackendAIGQLMeta(description="Filter for scoped permissions", added_version="26.3.0"),
-    model=PermissionFilterDTO,
+@strawberry.input(
     name="PermissionFilter",
+    description="Added in 26.3.0. Filter for scoped permissions",
 )
 class PermissionFilter(GQLFilter):
     role_id: uuid.UUID | None = None
     scope_type: RBACElementTypeGQL | None = None
     entity_type: RBACElementTypeGQL | None = None
-    AND: list[PermissionFilter] | None = None
-    OR: list[PermissionFilter] | None = None
-    NOT: list[PermissionFilter] | None = None
+    AND: list[Self] | None = None
+    OR: list[Self] | None = None
+    NOT: list[Self] | None = None
 
     def to_pydantic(self) -> PermissionFilterDTO:
         return PermissionFilterDTO(
@@ -442,6 +441,15 @@ class CreatePermissionInput:
     entity_type: RBACElementTypeGQL
     operation: OperationTypeGQL
 
+    def to_pydantic(self) -> CreatePermissionInputDTO:
+        return CreatePermissionInputDTO(
+            role_id=self.role_id,
+            scope_type=self.scope_type.value,
+            scope_id=self.scope_id,
+            entity_type=self.entity_type.value,
+            operation=self.operation.value,
+        )
+
 
 @gql_pydantic_input(
     BackendAIGQLMeta(description="Input for updating a scoped permission", added_version="26.3.0"),
@@ -453,6 +461,15 @@ class UpdatePermissionInput:
     scope_id: str | None = None
     entity_type: RBACElementTypeGQL | None = None
     operation: OperationTypeGQL | None = None
+
+    def to_pydantic(self) -> UpdatePermissionInputDTO:
+        return UpdatePermissionInputDTO(
+            id=self.id,
+            scope_type=None if self.scope_type is None else self.scope_type.value,
+            scope_id=self.scope_id,
+            entity_type=None if self.entity_type is None else self.entity_type.value,
+            operation=None if self.operation is None else self.operation.value,
+        )
 
 
 @gql_pydantic_input(

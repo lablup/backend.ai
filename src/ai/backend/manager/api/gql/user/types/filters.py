@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from enum import StrEnum
+from typing import Self
 
 import strawberry
 
@@ -127,13 +128,9 @@ class UserProjectNestedFilterGQL:
         )
 
 
-@gql_pydantic_input(
-    BackendAIGQLMeta(
-        description="Filter input for querying users. Supports filtering by UUID, username, email, status, domain, role, creation time, and nested domain/project filters. Multiple filters can be combined using AND, OR, and NOT logical operators.",
-        added_version="26.2.0",
-    ),
-    model=UserFilter,
+@strawberry.input(
     name="UserV2Filter",
+    description="Added in 26.2.0. Filter input for querying users. Supports filtering by UUID, username, email, status, domain, role, creation time, and nested domain/project filters. Multiple filters can be combined using AND, OR, and NOT logical operators.",
 )
 class UserFilterGQL:
     """Filter for user queries."""
@@ -147,9 +144,9 @@ class UserFilterGQL:
     created_at: DateTimeFilter | None = None
     domain: UserDomainNestedFilterGQL | None = None
     project: UserProjectNestedFilterGQL | None = None
-    AND: list[UserFilterGQL] | None = None
-    OR: list[UserFilterGQL] | None = None
-    NOT: list[UserFilterGQL] | None = None
+    AND: list[Self] | None = None
+    OR: list[Self] | None = None
+    NOT: list[Self] | None = None
 
     def to_pydantic(self) -> UserFilter:
         return UserFilter(

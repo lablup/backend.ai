@@ -96,9 +96,21 @@ class PydanticNodeMixin[T_DTO: BaseModel](Node):
         # into actual types. include_extras preserves Annotated wrappers.
         resolved_hints = get_type_hints(cls, include_extras=True)
 
+        # Always set the relay ``id`` first.  Strawberry's Node interface may
+        # remove NodeID[str] from dataclasses.fields(), so we cannot rely on
+        # the field loop below to encounter it.
         kwargs: dict[str, Any] = {}
+        if "id" in extra:
+            kwargs["id"] = extra["id"]
+        else:
+            kwargs["id"] = str(getattr(dto, id_field))
+
         for field in dataclasses.fields(cls):
             field_name = field.name
+            if field_name == "id":
+                # Already handled above
+                continue
+
             # Extra overrides take priority
             if field_name in extra:
                 kwargs[field_name] = extra[field_name]
@@ -107,11 +119,6 @@ class PydanticNodeMixin[T_DTO: BaseModel](Node):
             # Skip strawberry.Private fields — they cannot be sourced from the DTO
             # and must be set via extra or a custom from_pydantic override
             if any(isinstance(a, StrawberryPrivate) for a in get_args(field.type)):
-                continue
-
-            # The ``id`` field is always sourced from id_field
-            if field_name == "id":
-                kwargs["id"] = str(getattr(dto, id_field))
                 continue
 
             # Skip fields that don't exist on the DTO

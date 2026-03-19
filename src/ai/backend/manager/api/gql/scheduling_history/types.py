@@ -537,10 +537,9 @@ class SchedulingResultFilterGQL:
         )
 
 
-@gql_pydantic_input(
-    BackendAIGQLMeta(description="Filter for session scheduling history", added_version="24.09.0"),
-    model=SessionHistoryFilterDTO,
+@strawberry.input(
     name="SessionSchedulingHistoryFilter",
+    description="Added in 24.09.0. Filter for session scheduling history",
 )
 class SessionSchedulingHistoryFilter:
     id: UUIDFilter | None = None
@@ -553,9 +552,9 @@ class SessionSchedulingHistoryFilter:
     message: StringFilter | None = None
     created_at: DateTimeFilter | None = None
     updated_at: DateTimeFilter | None = None
-    AND: list[SessionSchedulingHistoryFilter] | None = None
-    OR: list[SessionSchedulingHistoryFilter] | None = None
-    NOT: list[SessionSchedulingHistoryFilter] | None = None
+    AND: list[Self] | None = None
+    OR: list[Self] | None = None
+    NOT: list[Self] | None = None
 
     def to_pydantic(self) -> SessionHistoryFilterDTO:
         return SessionHistoryFilterDTO(
@@ -593,10 +592,9 @@ class SessionSchedulingHistoryOrderBy:
         )
 
 
-@gql_pydantic_input(
-    BackendAIGQLMeta(description="Filter for deployment history", added_version="24.09.0"),
-    model=DeploymentHistoryFilterDTO,
+@strawberry.input(
     name="DeploymentHistoryFilter",
+    description="Added in 24.09.0. Filter for deployment history",
 )
 class DeploymentHistoryFilter:
     id: UUIDFilter | None = None
@@ -609,9 +607,9 @@ class DeploymentHistoryFilter:
     message: StringFilter | None = None
     created_at: DateTimeFilter | None = None
     updated_at: DateTimeFilter | None = None
-    AND: list[DeploymentHistoryFilter] | None = None
-    OR: list[DeploymentHistoryFilter] | None = None
-    NOT: list[DeploymentHistoryFilter] | None = None
+    AND: list[Self] | None = None
+    OR: list[Self] | None = None
+    NOT: list[Self] | None = None
 
     def to_pydantic(self) -> DeploymentHistoryFilterDTO:
         return DeploymentHistoryFilterDTO(
@@ -649,10 +647,9 @@ class DeploymentHistoryOrderBy:
         )
 
 
-@gql_pydantic_input(
-    BackendAIGQLMeta(description="Filter for route history", added_version="24.09.0"),
-    model=RouteHistoryFilterDTO,
+@strawberry.input(
     name="RouteHistoryFilter",
+    description="Added in 24.09.0. Filter for route history",
 )
 class RouteHistoryFilter:
     id: UUIDFilter | None = None
@@ -666,9 +663,9 @@ class RouteHistoryFilter:
     message: StringFilter | None = None
     created_at: DateTimeFilter | None = None
     updated_at: DateTimeFilter | None = None
-    AND: list[RouteHistoryFilter] | None = None
-    OR: list[RouteHistoryFilter] | None = None
-    NOT: list[RouteHistoryFilter] | None = None
+    AND: list[Self] | None = None
+    OR: list[Self] | None = None
+    NOT: list[Self] | None = None
 
     def to_pydantic(self) -> RouteHistoryFilterDTO:
         return RouteHistoryFilterDTO(

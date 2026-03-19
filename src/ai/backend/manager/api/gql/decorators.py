@@ -110,22 +110,26 @@ def gql_pydantic_input[PydanticModel: BaseModel](
     all_fields: bool = False,
     directives: Sequence[object] = (),
     use_pydantic_alias: bool = True,
+    description: str | None = None,
 ) -> Callable[..., type[StrawberryTypeFromPydantic[PydanticModel]]]:
     """Decorator for GQL input types backed by a v2 Pydantic DTO.
 
     Strawberry auto-generates from_pydantic() and to_pydantic() methods.
     Use all_fields=True for scalar-only types, or declare fields explicitly
     for types with nested GQL input fields.
+
+    The description param is accepted for backward compatibility but the
+    canonical description is always built from BackendAIGQLMeta.
     """
-    description = f"Added in {meta.added_version}. {meta.description}"
+    desc = f"Added in {meta.added_version}. {meta.description or (description or '')}"
     if meta.deprecated_version is not None:
         hint = f" Use {meta.deprecation_hint}." if meta.deprecation_hint else ""
-        description += f" Deprecated since {meta.deprecated_version}.{hint}"
+        desc += f" Deprecated since {meta.deprecated_version}.{hint}"
     return strawberry.experimental.pydantic.input(
         model=model,
         fields=fields,
         name=name,
-        description=description,
+        description=desc,
         directives=directives,
         all_fields=all_fields,
         use_pydantic_alias=use_pydantic_alias,

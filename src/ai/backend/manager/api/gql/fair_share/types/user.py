@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import datetime
 from decimal import Decimal
 from enum import StrEnum
-from typing import TYPE_CHECKING, Annotated, Any
+from typing import TYPE_CHECKING, Annotated, Any, Self
 from uuid import UUID
 
 import strawberry
@@ -320,13 +320,9 @@ class UserFairShareUserNestedFilter:
         return UserFairShareUserNestedFilterDTO(is_active=self.is_active)
 
 
-@gql_pydantic_input(
-    BackendAIGQLMeta(
-        description="Filter input for querying user fair shares. Supports filtering by scaling group, user UUID, project ID, and domain name. This is the most granular level of fair share filtering. Multiple filters can be combined using AND, OR, and NOT logical operators.",
-        added_version="26.1.0",
-    ),
-    model=UserFairShareFilterDTO,
+@strawberry.input(
     name="UserFairShareFilter",
+    description="Added in 26.1.0. Filter input for querying user fair shares. Supports filtering by scaling group, user UUID, project ID, and domain name. This is the most granular level of fair share filtering. Multiple filters can be combined using AND, OR, and NOT logical operators.",
 )
 class UserFairShareFilter:
     """Filter for user fair shares."""
@@ -368,15 +364,15 @@ class UserFairShareFilter:
         ),
     )
 
-    AND: list[UserFairShareFilter] | None = strawberry.field(
+    AND: list[Self] | None = strawberry.field(
         default=None,
         description="Combine multiple filters with AND logic. All conditions must match.",
     )
-    OR: list[UserFairShareFilter] | None = strawberry.field(
+    OR: list[Self] | None = strawberry.field(
         default=None,
         description="Combine multiple filters with OR logic. At least one condition must match.",
     )
-    NOT: list[UserFairShareFilter] | None = strawberry.field(
+    NOT: list[Self] | None = strawberry.field(
         default=None,
         description="Negate the specified filters. Records matching these conditions will be excluded.",
     )
@@ -394,13 +390,9 @@ class UserFairShareFilter:
         )
 
 
-@gql_pydantic_input(
-    BackendAIGQLMeta(
-        description="Filter for user fair shares within a resource group scope. References resource group membership columns to avoid excluding users without fair share records.",
-        added_version="26.2.0",
-    ),
-    model=UserFairShareFilterDTO,
+@strawberry.input(
     name="RGUserFairShareFilter",
+    description="Added in 26.2.0. Filter for user fair shares within a resource group scope. References resource group membership columns to avoid excluding users without fair share records.",
 )
 class RGUserFairShareFilter:
     """Filter for user fair shares in RG context (uses INNER JOIN'd columns)."""
@@ -421,15 +413,9 @@ class RGUserFairShareFilter:
         default=None, description="Filter by user properties."
     )
 
-    AND: list[RGUserFairShareFilter] | None = strawberry.field(
-        default=None, description="Combine with AND logic."
-    )
-    OR: list[RGUserFairShareFilter] | None = strawberry.field(
-        default=None, description="Combine with OR logic."
-    )
-    NOT: list[RGUserFairShareFilter] | None = strawberry.field(
-        default=None, description="Negate filters."
-    )
+    AND: list[Self] | None = strawberry.field(default=None, description="Combine with AND logic.")
+    OR: list[Self] | None = strawberry.field(default=None, description="Combine with OR logic.")
+    NOT: list[Self] | None = strawberry.field(default=None, description="Negate filters.")
 
     def to_pydantic(self) -> UserFairShareFilterDTO:
         return UserFairShareFilterDTO(

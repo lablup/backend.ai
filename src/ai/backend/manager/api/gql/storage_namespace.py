@@ -90,31 +90,41 @@ class StorageNamespaceConnection(Connection[StorageNamespace]):
 
 
 @gql_pydantic_input(
-    BackendAIGQLMeta(description="", added_version="24.09.0"),
+    BackendAIGQLMeta(
+        description="Input type for registering a storage namespace.",
+        added_version="25.15.0",
+    ),
     model=RegisterStorageNamespaceInputDTO,
-    description=dedent_strip("""
-    Added in 25.15.0.
-
-    Input type for registering a storage namespace.
-    """),
-    all_fields=True,
 )
 class RegisterStorageNamespaceInput:
-    pass
+    storage_id: uuid.UUID
+    namespace: str
+
+    def to_pydantic(self) -> RegisterStorageNamespaceInputDTO:
+        """Convert to pydantic DTO for adapter layer processing."""
+        return RegisterStorageNamespaceInputDTO(
+            storage_id=self.storage_id,
+            namespace=self.namespace,
+        )
 
 
 @gql_pydantic_input(
-    BackendAIGQLMeta(description="", added_version="24.09.0"),
+    BackendAIGQLMeta(
+        description="Input type for unregistering a storage namespace.",
+        added_version="25.15.0",
+    ),
     model=UnregisterStorageNamespaceInputDTO,
-    description=dedent_strip("""
-    Added in 25.15.0.
-
-    Input type for unregistering a storage namespace.
-    """),
 )
 class UnregisterStorageNamespaceInput:
     storage_id: uuid.UUID
     namespace: str
+
+    def to_pydantic(self) -> UnregisterStorageNamespaceInputDTO:
+        """Convert to pydantic DTO for adapter layer processing."""
+        return UnregisterStorageNamespaceInputDTO(
+            storage_id=self.storage_id,
+            namespace=self.namespace,
+        )
 
 
 @gql_pydantic_type(

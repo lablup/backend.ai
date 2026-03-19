@@ -165,19 +165,18 @@ class KernelV2StatusFilterGQL:
         )
 
 
-@gql_pydantic_input(
-    BackendAIGQLMeta(description="Filter criteria for querying kernels.", added_version="26.2.0"),
-    model=KernelFilter,
+@strawberry.input(
     name="KernelV2Filter",
+    description="Added in 26.2.0. Filter criteria for querying kernels.",
 )
 class KernelV2FilterGQL:
     id: UUIDFilter | None = None
     status: KernelV2StatusFilterGQL | None = None
     session_id: UUIDFilter | None = None
 
-    AND: list[KernelV2FilterGQL] | None = None
-    OR: list[KernelV2FilterGQL] | None = None
-    NOT: list[KernelV2FilterGQL] | None = None
+    AND: list[Self] | None = None
+    OR: list[Self] | None = None
+    NOT: list[Self] | None = None
 
     def to_pydantic(self) -> KernelFilter:
         return KernelFilter(

@@ -178,10 +178,9 @@ class SessionV2StatusFilterGQL:
         )
 
 
-@gql_pydantic_input(
-    BackendAIGQLMeta(description="Filter criteria for querying sessions.", added_version="26.3.0"),
-    model=SessionFilter,
+@strawberry.input(
     name="SessionV2Filter",
+    description="Added in 26.3.0. Filter criteria for querying sessions.",
 )
 class SessionV2FilterGQL:
     id: UUIDFilter | None = None
@@ -191,9 +190,9 @@ class SessionV2FilterGQL:
     project_id: UUIDFilter | None = None
     user_uuid: UUIDFilter | None = None
 
-    AND: list[SessionV2FilterGQL] | None = None
-    OR: list[SessionV2FilterGQL] | None = None
-    NOT: list[SessionV2FilterGQL] | None = None
+    AND: list[Self] | None = None
+    OR: list[Self] | None = None
+    NOT: list[Self] | None = None
 
     def to_pydantic(self) -> SessionFilter:
         return SessionFilter(

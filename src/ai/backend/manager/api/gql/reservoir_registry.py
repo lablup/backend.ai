@@ -18,16 +18,7 @@ from ai.backend.common.dto.manager.v2.reservoir_registry.request import (
 from ai.backend.common.dto.manager.v2.reservoir_registry.request import (
     UpdateReservoirRegistryInput as UpdateReservoirRegistryInputDTO,
 )
-from ai.backend.common.dto.manager.v2.reservoir_registry.response import (
-    CreateReservoirRegistryPayload as CreateReservoirRegistryPayloadDTO,
-)
-from ai.backend.common.dto.manager.v2.reservoir_registry.response import (
-    DeleteReservoirRegistryPayload as DeleteReservoirRegistryPayloadDTO,
-)
 from ai.backend.common.dto.manager.v2.reservoir_registry.response import ReservoirRegistryNode
-from ai.backend.common.dto.manager.v2.reservoir_registry.response import (
-    UpdateReservoirRegistryPayload as UpdateReservoirRegistryPayloadDTO,
-)
 from ai.backend.manager.api.gql.artifact_registry_meta import ArtifactRegistryMetaConnection
 from ai.backend.manager.api.gql.base import encode_cursor
 from ai.backend.manager.api.gql.decorators import (
@@ -35,7 +26,6 @@ from ai.backend.manager.api.gql.decorators import (
     gql_connection_type,
     gql_node_type,
     gql_pydantic_input,
-    gql_pydantic_type,
 )
 from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin
 from ai.backend.manager.data.reservoir_registry.types import ReservoirRegistryData
@@ -170,7 +160,20 @@ async def reservoir_registries(
     all_fields=True,
 )
 class CreateReservoirRegistryInput:
-    pass
+    name: str
+    endpoint: str
+    access_key: str
+    secret_key: str
+    api_version: str
+
+    def to_pydantic(self) -> CreateReservoirRegistryInputDTO:
+        return CreateReservoirRegistryInputDTO(
+            name=self.name,
+            endpoint=self.endpoint,
+            access_key=self.access_key,
+            secret_key=self.secret_key,
+            api_version=self.api_version,
+        )
 
 
 @gql_pydantic_input(
@@ -203,35 +206,37 @@ class UpdateReservoirRegistryInput:
 class DeleteReservoirRegistryInput:
     id: ID
 
+    def to_pydantic(self) -> DeleteReservoirRegistryInputDTO:
+        return DeleteReservoirRegistryInputDTO(
+            id=uuid.UUID(str(self.id)),
+        )
 
-@gql_pydantic_type(
+
+@gql_node_type(
     BackendAIGQLMeta(
         added_version="25.14.0",
         description="Payload for creating a reservoir registry.",
     ),
-    model=CreateReservoirRegistryPayloadDTO,
 )
 class CreateReservoirRegistryPayload:
     reservoir: ReservoirRegistry
 
 
-@gql_pydantic_type(
+@gql_node_type(
     BackendAIGQLMeta(
         added_version="25.14.0",
         description="Payload for updating a reservoir registry.",
     ),
-    model=UpdateReservoirRegistryPayloadDTO,
 )
 class UpdateReservoirRegistryPayload:
     reservoir: ReservoirRegistry
 
 
-@gql_pydantic_type(
+@gql_node_type(
     BackendAIGQLMeta(
         added_version="25.14.0",
         description="Payload for deleting a reservoir registry.",
     ),
-    model=DeleteReservoirRegistryPayloadDTO,
 )
 class DeleteReservoirRegistryPayload:
     id: ID

@@ -227,17 +227,16 @@ class EntityRefGQL(PydanticNodeMixin[Any]):
 # ==================== Filter Types ====================
 
 
-@gql_pydantic_input(
-    BackendAIGQLMeta(description="Filter for entity associations", added_version="26.3.0"),
-    model=EntityFilterDTO,
+@strawberry.input(
     name="EntityFilter",
+    description="Added in 26.3.0. Filter for entity associations",
 )
 class EntityFilter(GQLFilter):
     entity_type: RBACElementTypeGQL | None = None
     entity_id: StringFilter | None = None
-    AND: list[EntityFilter] | None = None
-    OR: list[EntityFilter] | None = None
-    NOT: list[EntityFilter] | None = None
+    AND: list[Self] | None = None
+    OR: list[Self] | None = None
+    NOT: list[Self] | None = None
 
     def to_pydantic(self) -> EntityFilterDTO:
         return EntityFilterDTO(

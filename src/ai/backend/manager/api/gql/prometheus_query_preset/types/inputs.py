@@ -65,6 +65,19 @@ class CreateQueryDefinitionInput:
         description="Query definition options including filter and group labels."
     )
 
+    def to_pydantic(self) -> CreateQueryDefinitionInputDTO:
+        """Convert to pydantic DTO for adapter layer processing."""
+        return CreateQueryDefinitionInputDTO(
+            name=self.name,
+            metric_name=self.metric_name,
+            query_template=self.query_template,
+            time_window=self.time_window,
+            options=CreateQueryDefinitionOptionsInputDTO(
+                filter_labels=self.options.filter_labels,
+                group_labels=self.options.group_labels,
+            ),
+        )
+
 
 @gql_pydantic_input(
     BackendAIGQLMeta(

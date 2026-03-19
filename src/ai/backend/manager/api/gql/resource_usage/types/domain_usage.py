@@ -251,13 +251,9 @@ class DomainUsageBucketConnection(Connection[DomainUsageBucketGQL]):
         self.count = count
 
 
-@gql_pydantic_input(
-    BackendAIGQLMeta(
-        description="Filter input for querying domain usage bucket records. Usage buckets contain historical resource consumption data aggregated by time period. Multiple filters can be combined using AND, OR, and NOT logical operators.",
-        added_version="26.1.0",
-    ),
-    model=DomainUsageBucketFilterDTO,
+@strawberry.input(
     name="DomainUsageBucketFilter",
+    description="Added in 26.1.0. Filter input for querying domain usage bucket records. Usage buckets contain historical resource consumption data aggregated by time period. Multiple filters can be combined using AND, OR, and NOT logical operators.",
 )
 class DomainUsageBucketFilter(GQLFilter):
     """Filter for domain usage buckets."""
@@ -283,15 +279,15 @@ class DomainUsageBucketFilter(GQLFilter):
         default=None, description="Filter by usage measurement period end date."
     )
 
-    AND: list[DomainUsageBucketFilter] | None = strawberry.field(
+    AND: list[Self] | None = strawberry.field(
         default=None,
         description="Combine multiple filters with AND logic. All conditions must match.",
     )
-    OR: list[DomainUsageBucketFilter] | None = strawberry.field(
+    OR: list[Self] | None = strawberry.field(
         default=None,
         description="Combine multiple filters with OR logic. At least one condition must match.",
     )
-    NOT: list[DomainUsageBucketFilter] | None = strawberry.field(
+    NOT: list[Self] | None = strawberry.field(
         default=None,
         description="Negate the specified filters. Records matching these conditions will be excluded.",
     )

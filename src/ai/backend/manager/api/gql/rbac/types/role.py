@@ -461,19 +461,18 @@ class RoleStatusFilterGQL:
         )
 
 
-@gql_pydantic_input(
-    BackendAIGQLMeta(description="Filter for roles", added_version="26.3.0"),
-    model=RoleFilterDTO,
+@strawberry.input(
     name="RoleFilter",
+    description="Added in 26.3.0. Filter for roles",
 )
 class RoleFilter(GQLFilter):
     name: StringFilter | None = None
     source: RoleSourceFilterGQL | None = None
     status: RoleStatusFilterGQL | None = None
 
-    AND: list[RoleFilter] | None = None
-    OR: list[RoleFilter] | None = None
-    NOT: list[RoleFilter] | None = None
+    AND: list[Self] | None = None
+    OR: list[Self] | None = None
+    NOT: list[Self] | None = None
 
     def to_pydantic(self) -> RoleFilterDTO:
         return RoleFilterDTO(
@@ -552,22 +551,18 @@ class RoleFilter(GQLFilter):
 # TODO: Add user_id filter (requires AssignedUserConditions.by_user_id)
 
 
-@gql_pydantic_input(
-    BackendAIGQLMeta(
-        description="Nested filter for roles within a role assignment. Filters assignments that have a role matching all specified conditions.",
-        added_version="26.3.0",
-    ),
-    model=RoleNestedFilterDTO,
+@strawberry.input(
     name="RoleAssignmentRoleNestedFilter",
+    description="Added in 26.3.0. Nested filter for roles within a role assignment. Filters assignments that have a role matching all specified conditions.",
 )
 class RoleAssignmentRoleNestedFilterGQL:
     name: StringFilter | None = None
     source: RoleSourceFilterGQL | None = None
     status: RoleStatusFilterGQL | None = None
 
-    AND: list[RoleAssignmentRoleNestedFilterGQL] | None = None
-    OR: list[RoleAssignmentRoleNestedFilterGQL] | None = None
-    NOT: list[RoleAssignmentRoleNestedFilterGQL] | None = None
+    AND: list[Self] | None = None
+    OR: list[Self] | None = None
+    NOT: list[Self] | None = None
 
     def to_pydantic(self) -> RoleNestedFilterDTO:
         return RoleNestedFilterDTO(
@@ -646,10 +641,9 @@ class RoleAssignmentRoleNestedFilterGQL:
         return conditions
 
 
-@gql_pydantic_input(
-    BackendAIGQLMeta(description="Filter for role assignments", added_version="26.3.0"),
-    model=RoleAssignmentFilterDTO,
+@strawberry.input(
     name="RoleAssignmentFilter",
+    description="Added in 26.3.0. Filter for role assignments",
 )
 class RoleAssignmentFilter(GQLFilter):
     role_id: uuid.UUID | None = None
@@ -657,9 +651,9 @@ class RoleAssignmentFilter(GQLFilter):
     username: StringFilter | None = None
     email: StringFilter | None = None
 
-    AND: list[RoleAssignmentFilter] | None = None
-    OR: list[RoleAssignmentFilter] | None = None
-    NOT: list[RoleAssignmentFilter] | None = None
+    AND: list[Self] | None = None
+    OR: list[Self] | None = None
+    NOT: list[Self] | None = None
 
     def to_pydantic(self) -> RoleAssignmentFilterDTO:
         return RoleAssignmentFilterDTO(
@@ -838,7 +832,14 @@ class UpdateRoleInput:
     all_fields=True,
 )
 class AssignRoleInput:
-    pass
+    user_id: uuid.UUID
+    role_id: uuid.UUID
+
+    def to_pydantic(self) -> AssignRoleInputDTO:
+        return AssignRoleInputDTO(
+            user_id=self.user_id,
+            role_id=self.role_id,
+        )
 
 
 @gql_pydantic_input(
@@ -847,7 +848,14 @@ class AssignRoleInput:
     all_fields=True,
 )
 class RevokeRoleInput:
-    pass
+    user_id: uuid.UUID
+    role_id: uuid.UUID
+
+    def to_pydantic(self) -> RevokeRoleInputDTO:
+        return RevokeRoleInputDTO(
+            user_id=self.user_id,
+            role_id=self.role_id,
+        )
 
 
 @gql_pydantic_input(
@@ -859,7 +867,14 @@ class RevokeRoleInput:
     all_fields=True,
 )
 class BulkAssignRoleInputGQL:
-    pass
+    role_id: uuid.UUID
+    user_ids: list[uuid.UUID]
+
+    def to_pydantic(self) -> BulkAssignRoleInputDTO:
+        return BulkAssignRoleInputDTO(
+            role_id=self.role_id,
+            user_ids=self.user_ids,
+        )
 
 
 @gql_pydantic_input(
@@ -871,7 +886,14 @@ class BulkAssignRoleInputGQL:
     all_fields=True,
 )
 class BulkRevokeRoleInputGQL:
-    pass
+    role_id: uuid.UUID
+    user_ids: list[uuid.UUID]
+
+    def to_pydantic(self) -> BulkRevokeRoleInputDTO:
+        return BulkRevokeRoleInputDTO(
+            role_id=self.role_id,
+            user_ids=self.user_ids,
+        )
 
 
 @gql_pydantic_input(

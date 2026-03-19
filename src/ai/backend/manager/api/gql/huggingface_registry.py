@@ -21,16 +21,7 @@ from ai.backend.common.dto.manager.v2.huggingface_registry.request import (
     UpdateHuggingFaceRegistryInput as UpdateHuggingFaceRegistryInputDTO,
 )
 from ai.backend.common.dto.manager.v2.huggingface_registry.response import (
-    CreateHuggingFaceRegistryPayload as CreateHuggingFaceRegistryPayloadDTO,
-)
-from ai.backend.common.dto.manager.v2.huggingface_registry.response import (
-    DeleteHuggingFaceRegistryPayload as DeleteHuggingFaceRegistryPayloadDTO,
-)
-from ai.backend.common.dto.manager.v2.huggingface_registry.response import (
     HuggingFaceRegistryNode,
-)
-from ai.backend.common.dto.manager.v2.huggingface_registry.response import (
-    UpdateHuggingFaceRegistryPayload as UpdateHuggingFaceRegistryPayloadDTO,
 )
 from ai.backend.manager.api.gql.base import encode_cursor
 from ai.backend.manager.api.gql.decorators import (
@@ -38,7 +29,6 @@ from ai.backend.manager.api.gql.decorators import (
     gql_connection_type,
     gql_node_type,
     gql_pydantic_input,
-    gql_pydantic_type,
 )
 from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin
 from ai.backend.manager.data.huggingface_registry.types import HuggingFaceRegistryData
@@ -163,7 +153,16 @@ async def huggingface_registries(
     all_fields=True,
 )
 class CreateHuggingFaceRegistryInput:
-    pass
+    name: str
+    url: str
+    token: str | None = None
+
+    def to_pydantic(self) -> CreateHuggingFaceRegistryInputDTO:
+        return CreateHuggingFaceRegistryInputDTO(
+            name=self.name,
+            url=self.url,
+            token=self.token,
+        )
 
 
 @gql_pydantic_input(
@@ -192,35 +191,37 @@ class UpdateHuggingFaceRegistryInput:
 class DeleteHuggingFaceRegistryInput:
     id: ID
 
+    def to_pydantic(self) -> DeleteHuggingFaceRegistryInputDTO:
+        return DeleteHuggingFaceRegistryInputDTO(
+            id=uuid.UUID(str(self.id)),
+        )
 
-@gql_pydantic_type(
+
+@gql_node_type(
     BackendAIGQLMeta(
         added_version="25.14.0",
         description="Payload for creating a HuggingFace registry.",
     ),
-    model=CreateHuggingFaceRegistryPayloadDTO,
 )
 class CreateHuggingFaceRegistryPayload:
     huggingface_registry: HuggingFaceRegistry
 
 
-@gql_pydantic_type(
+@gql_node_type(
     BackendAIGQLMeta(
         added_version="25.14.0",
         description="Payload for updating a HuggingFace registry.",
     ),
-    model=UpdateHuggingFaceRegistryPayloadDTO,
 )
 class UpdateHuggingFaceRegistryPayload:
     huggingface_registry: HuggingFaceRegistry
 
 
-@gql_pydantic_type(
+@gql_node_type(
     BackendAIGQLMeta(
         added_version="25.14.0",
         description="Payload for deleting a HuggingFace registry.",
     ),
-    model=DeleteHuggingFaceRegistryPayloadDTO,
 )
 class DeleteHuggingFaceRegistryPayload:
     id: ID

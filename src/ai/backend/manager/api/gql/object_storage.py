@@ -206,7 +206,22 @@ async def object_storages(
     all_fields=True,
 )
 class CreateObjectStorageInput:
-    pass
+    name: str
+    host: str
+    access_key: str
+    secret_key: str
+    endpoint: str
+    region: str
+
+    def to_pydantic(self) -> CreateObjectStorageInputDTO:
+        return CreateObjectStorageInputDTO(
+            name=self.name,
+            host=self.host,
+            access_key=self.access_key,
+            secret_key=self.secret_key,
+            endpoint=self.endpoint,
+            region=self.region,
+        )
 
 
 @gql_pydantic_input(
@@ -241,6 +256,11 @@ class UpdateObjectStorageInput:
 class DeleteObjectStorageInput:
     id: ID
 
+    def to_pydantic(self) -> DeleteObjectStorageInputDTO:
+        return DeleteObjectStorageInputDTO(
+            id=uuid.UUID(str(self.id)),
+        )
+
 
 @gql_pydantic_input(
     BackendAIGQLMeta(description="", added_version="25.14.0"),
@@ -251,6 +271,13 @@ class GetPresignedDownloadURLInput:
     key: str
     expiration: int | None = None
 
+    def to_pydantic(self) -> GetPresignedDownloadURLInputDTO:
+        return GetPresignedDownloadURLInputDTO(
+            artifact_revision_id=uuid.UUID(str(self.artifact_revision_id)),
+            key=self.key,
+            expiration=self.expiration,
+        )
+
 
 @gql_pydantic_input(
     BackendAIGQLMeta(description="", added_version="25.14.0"),
@@ -259,6 +286,12 @@ class GetPresignedDownloadURLInput:
 class GetPresignedUploadURLInput:
     artifact_revision_id: ID
     key: str
+
+    def to_pydantic(self) -> GetPresignedUploadURLInputDTO:
+        return GetPresignedUploadURLInputDTO(
+            artifact_revision_id=uuid.UUID(str(self.artifact_revision_id)),
+            key=self.key,
+        )
 
 
 @gql_pydantic_type(

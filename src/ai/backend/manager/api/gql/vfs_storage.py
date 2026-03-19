@@ -137,10 +137,19 @@ async def vfs_storages(
 @gql_pydantic_input(
     BackendAIGQLMeta(description="Input for creating VFS storage", added_version="25.16.0"),
     model=CreateVFSStorageInputDTO,
-    all_fields=True,
 )
 class CreateVFSStorageInput:
-    pass
+    name: str
+    host: str
+    base_path: str
+
+    def to_pydantic(self) -> CreateVFSStorageInputDTO:
+        """Convert to pydantic DTO for adapter layer processing."""
+        return CreateVFSStorageInputDTO(
+            name=self.name,
+            host=self.host,
+            base_path=self.base_path,
+        )
 
 
 @gql_pydantic_input(
@@ -168,6 +177,10 @@ class UpdateVFSStorageInput:
 )
 class DeleteVFSStorageInput:
     id: ID
+
+    def to_pydantic(self) -> DeleteVFSStorageInputDTO:
+        """Convert to pydantic DTO for adapter layer processing."""
+        return DeleteVFSStorageInputDTO(id=uuid.UUID(self.id))
 
 
 @gql_pydantic_type(

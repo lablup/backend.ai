@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import datetime
 from decimal import Decimal
 from enum import StrEnum
-from typing import TYPE_CHECKING, Annotated, Any
+from typing import TYPE_CHECKING, Annotated, Any, Self
 from uuid import UUID
 
 import strawberry
@@ -346,13 +346,9 @@ class ProjectFairShareProjectNestedFilter:
         return ProjectFairShareProjectNestedFilterDTO(is_active=self.is_active)
 
 
-@gql_pydantic_input(
-    BackendAIGQLMeta(
-        description="Filter input for querying project fair shares. Supports filtering by scaling group, project ID, and domain name. Multiple filters can be combined using AND, OR, and NOT logical operators.",
-        added_version="26.1.0",
-    ),
-    model=ProjectFairShareFilterDTO,
+@strawberry.input(
     name="ProjectFairShareFilter",
+    description="Added in 26.1.0. Filter input for querying project fair shares. Supports filtering by scaling group, project ID, and domain name. Multiple filters can be combined using AND, OR, and NOT logical operators.",
 )
 class ProjectFairShareFilter:
     """Filter for project fair shares."""
@@ -387,15 +383,15 @@ class ProjectFairShareFilter:
         ),
     )
 
-    AND: list[ProjectFairShareFilter] | None = strawberry.field(
+    AND: list[Self] | None = strawberry.field(
         default=None,
         description="Combine multiple filters with AND logic. All conditions must match.",
     )
-    OR: list[ProjectFairShareFilter] | None = strawberry.field(
+    OR: list[Self] | None = strawberry.field(
         default=None,
         description="Combine multiple filters with OR logic. At least one condition must match.",
     )
-    NOT: list[ProjectFairShareFilter] | None = strawberry.field(
+    NOT: list[Self] | None = strawberry.field(
         default=None,
         description="Negate the specified filters. Records matching these conditions will be excluded.",
     )
@@ -412,13 +408,9 @@ class ProjectFairShareFilter:
         )
 
 
-@gql_pydantic_input(
-    BackendAIGQLMeta(
-        description="Filter for project fair shares within a resource group scope. References resource group membership columns to avoid excluding projects without fair share records.",
-        added_version="26.2.0",
-    ),
-    model=ProjectFairShareFilterDTO,
+@strawberry.input(
     name="RGProjectFairShareFilter",
+    description="Added in 26.2.0. Filter for project fair shares within a resource group scope. References resource group membership columns to avoid excluding projects without fair share records.",
 )
 class RGProjectFairShareFilter:
     """Filter for project fair shares in RG context (uses INNER JOIN'd columns)."""
@@ -436,15 +428,9 @@ class RGProjectFairShareFilter:
         default=None, description="Filter by project properties."
     )
 
-    AND: list[RGProjectFairShareFilter] | None = strawberry.field(
-        default=None, description="Combine with AND logic."
-    )
-    OR: list[RGProjectFairShareFilter] | None = strawberry.field(
-        default=None, description="Combine with OR logic."
-    )
-    NOT: list[RGProjectFairShareFilter] | None = strawberry.field(
-        default=None, description="Negate filters."
-    )
+    AND: list[Self] | None = strawberry.field(default=None, description="Combine with AND logic.")
+    OR: list[Self] | None = strawberry.field(default=None, description="Combine with OR logic.")
+    NOT: list[Self] | None = strawberry.field(default=None, description="Negate filters.")
 
     def to_pydantic(self) -> ProjectFairShareFilterDTO:
         return ProjectFairShareFilterDTO(

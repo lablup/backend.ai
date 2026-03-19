@@ -474,19 +474,18 @@ class NotificationChannelTypeFilterGQL:
         )
 
 
-@gql_pydantic_input(
-    BackendAIGQLMeta(description="Filter for notification channels", added_version="24.09.0"),
-    model=NotificationChannelFilterDTO,
+@strawberry.input(
     name="NotificationChannelFilter",
+    description="Added in 24.09.0. Filter for notification channels",
 )
 class NotificationChannelFilter:
     name: StringFilter | None = None
     channel_type: NotificationChannelTypeFilterGQL | None = None
     enabled: bool | None = None
 
-    AND: list[NotificationChannelFilter] | None = None
-    OR: list[NotificationChannelFilter] | None = None
-    NOT: list[NotificationChannelFilter] | None = None
+    AND: list[Self] | None = None
+    OR: list[Self] | None = None
+    NOT: list[Self] | None = None
 
     def to_pydantic(self) -> NotificationChannelFilterDTO:
         return NotificationChannelFilterDTO(
@@ -557,19 +556,18 @@ class NotificationRuleTypeFilterGQL:
         )
 
 
-@gql_pydantic_input(
-    BackendAIGQLMeta(description="Filter for notification rules", added_version="24.09.0"),
-    model=NotificationRuleFilterDTO,
+@strawberry.input(
     name="NotificationRuleFilter",
+    description="Added in 24.09.0. Filter for notification rules",
 )
 class NotificationRuleFilter:
     name: StringFilter | None = None
     rule_type: NotificationRuleTypeFilterGQL | None = None
     enabled: bool | None = None
 
-    AND: list[NotificationRuleFilter] | None = None
-    OR: list[NotificationRuleFilter] | None = None
-    NOT: list[NotificationRuleFilter] | None = None
+    AND: list[Self] | None = None
+    OR: list[Self] | None = None
+    NOT: list[Self] | None = None
 
     def to_pydantic(self) -> NotificationRuleFilterDTO:
         return NotificationRuleFilterDTO(
@@ -811,6 +809,11 @@ class UpdateNotificationChannelInput:
 class DeleteNotificationChannelInput:
     id: ID
 
+    def to_pydantic(self) -> DeleteNotificationChannelInputDTO:
+        return DeleteNotificationChannelInputDTO(
+            id=uuid.UUID(str(self.id)),
+        )
+
 
 @gql_pydantic_input(
     BackendAIGQLMeta(description="Input for creating a notification rule", added_version="24.09.0"),
@@ -823,6 +826,16 @@ class CreateNotificationRuleInput:
     channel_id: ID
     message_template: str
     enabled: bool = True
+
+    def to_pydantic(self) -> CreateNotificationRuleInputDTO:
+        return CreateNotificationRuleInputDTO(
+            name=self.name,
+            description=self.description,
+            rule_type=self.rule_type.to_internal(),
+            channel_id=uuid.UUID(str(self.channel_id)),
+            message_template=self.message_template,
+            enabled=self.enabled,
+        )
 
 
 @gql_pydantic_input(
@@ -851,6 +864,11 @@ class UpdateNotificationRuleInput:
 )
 class DeleteNotificationRuleInput:
     id: ID
+
+    def to_pydantic(self) -> DeleteNotificationRuleInputDTO:
+        return DeleteNotificationRuleInputDTO(
+            id=uuid.UUID(str(self.id)),
+        )
 
 
 # Payload types for mutations

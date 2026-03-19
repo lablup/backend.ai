@@ -32,7 +32,6 @@ from ai.backend.common.dto.manager.v2.image.response import (
     ImageIdentityInfoDTO,
     ImageMetadataInfoDTO,
     ImageNode,
-    ImagePermissionInfoDTO,
     ImageRequirementsInfoDTO,
 )
 from ai.backend.common.dto.manager.v2.image.types import (
@@ -259,12 +258,11 @@ class ImageV2RequirementsInfoGQL:
     )
 
 
-@gql_pydantic_type(
+@gql_node_type(
     BackendAIGQLMeta(
         added_version="26.2.0",
         description="Permission information for an image. Contains the list of permissions the current user has on this image.",
     ),
-    model=ImagePermissionInfoDTO,
     name="ImageV2PermissionInfo",
 )
 class ImageV2PermissionInfoGQL:
@@ -552,14 +550,12 @@ class ImageV2ConnectionGQL(Connection[ImageV2GQL]):
 
 
 @gql_pydantic_input(
-    BackendAIGQLMeta(description="", added_version="24.09.0"),
+    BackendAIGQLMeta(
+        description="Scope for querying images within a specific container registry.",
+        added_version="26.2.0",
+    ),
     model=ContainerRegistryScopeInputDTO,
     name="ContainerRegistryScope",
-    description=dedent_strip("""
-    Added in 26.2.0.
-
-    Scope for querying images within a specific container registry.
-    """),
 )
 class ContainerRegistryScopeGQL:
     registry_id: uuid.UUID = strawberry.field(
@@ -572,14 +568,12 @@ class ContainerRegistryScopeGQL:
 
 
 @gql_pydantic_input(
-    BackendAIGQLMeta(description="", added_version="24.09.0"),
+    BackendAIGQLMeta(
+        description="Scope for querying aliases within a specific image.",
+        added_version="26.2.0",
+    ),
     model=ImageScopeInputDTO,
     name="ImageV2Scope",
-    description=dedent_strip("""
-    Added in 26.2.0.
-
-    Scope for querying aliases within a specific image.
-    """),
 )
 class ImageV2ScopeGQL:
     image_id: uuid.UUID = strawberry.field(description="UUID of the image to scope the query to.")
@@ -644,17 +638,9 @@ class ImageV2StatusFilterGQL:
         )
 
 
-@gql_pydantic_input(
-    BackendAIGQLMeta(description="", added_version="24.09.0"),
-    model=ImageFilterInputDTO,
-    description=dedent_strip("""
-    Added in 26.2.0.
-
-    Filter options for images based on various criteria such as status,
-    name, and architecture.
-
-    Supports logical operations (AND, OR, NOT) for complex filtering scenarios.
-    """),
+@strawberry.input(
+    name="ImageV2Filter",
+    description="Added in 26.2.0. Filter options for images based on various criteria such as status, name, and architecture. Supports logical operations (AND, OR, NOT) for complex filtering scenarios.",
 )
 class ImageV2FilterGQL(GQLFilter):
     status: ImageV2StatusFilterGQL | None = None
@@ -672,9 +658,9 @@ class ImageV2FilterGQL(GQLFilter):
         default=None,
         description="Added in 26.3.0. Filter by last used datetime (before/after).",
     )
-    AND: list[ImageV2FilterGQL] | None = None
-    OR: list[ImageV2FilterGQL] | None = None
-    NOT: list[ImageV2FilterGQL] | None = None
+    AND: list[Self] | None = None
+    OR: list[Self] | None = None
+    NOT: list[Self] | None = None
 
     def to_pydantic(self) -> ImageFilterInputDTO:
         """Convert to pydantic DTO for adapter layer processing."""
@@ -706,13 +692,11 @@ class ImageV2OrderFieldGQL(enum.Enum):
 
 
 @gql_pydantic_input(
-    BackendAIGQLMeta(description="", added_version="24.09.0"),
+    BackendAIGQLMeta(
+        description="Specifies the field and direction for ordering images in queries.",
+        added_version="26.2.0",
+    ),
     model=ImageOrderByInputDTO,
-    description=dedent_strip("""
-    Added in 26.2.0.
-
-    Specifies the field and direction for ordering images in queries.
-    """),
 )
 class ImageV2OrderByGQL(GQLOrderBy):
     field: ImageV2OrderFieldGQL
@@ -749,15 +733,9 @@ class ImageV2AliasConnectionGQL(Connection[ImageV2AliasGQL]):
         self.count = count
 
 
-@gql_pydantic_input(
-    BackendAIGQLMeta(description="", added_version="24.09.0"),
-    model=ImageAliasFilterInputDTO,
-    description=dedent_strip("""
-    Added in 26.2.0.
-
-    Filter options for image aliases.
-    Supports filtering by alias string and image ID.
-    """),
+@strawberry.input(
+    name="ImageV2AliasFilter",
+    description="Added in 26.2.0. Filter options for image aliases. Supports filtering by alias string and image ID.",
 )
 class ImageV2AliasFilterGQL(GQLFilter):
     alias: StringFilter | None = None
@@ -766,9 +744,9 @@ class ImageV2AliasFilterGQL(GQLFilter):
         description="Added in 26.4.0. Filter by image ID.",
     )
 
-    AND: list[ImageV2AliasFilterGQL] | None = None
-    OR: list[ImageV2AliasFilterGQL] | None = None
-    NOT: list[ImageV2AliasFilterGQL] | None = None
+    AND: list[Self] | None = None
+    OR: list[Self] | None = None
+    NOT: list[Self] | None = None
 
     def to_pydantic(self) -> ImageAliasFilterInputDTO:
         """Convert to pydantic DTO for adapter layer processing."""
@@ -794,13 +772,11 @@ class ImageV2AliasOrderFieldGQL(enum.Enum):
 
 
 @gql_pydantic_input(
-    BackendAIGQLMeta(description="", added_version="24.09.0"),
+    BackendAIGQLMeta(
+        description="Specifies the field and direction for ordering image aliases in queries.",
+        added_version="26.2.0",
+    ),
     model=ImageAliasOrderByInputDTO,
-    description=dedent_strip("""
-    Added in 26.2.0.
-
-    Specifies the field and direction for ordering image aliases in queries.
-    """),
 )
 class ImageV2AliasOrderByGQL(GQLOrderBy):
     field: ImageV2AliasOrderFieldGQL

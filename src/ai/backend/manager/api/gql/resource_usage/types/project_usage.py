@@ -259,13 +259,9 @@ class ProjectUsageBucketConnection(Connection[ProjectUsageBucketGQL]):
         self.count = count
 
 
-@gql_pydantic_input(
-    BackendAIGQLMeta(
-        description="Filter input for querying project usage bucket records. Usage buckets contain historical resource consumption data aggregated by time period for projects. Multiple filters can be combined using AND, OR, and NOT logical operators.",
-        added_version="26.1.0",
-    ),
-    model=ProjectUsageBucketFilterDTO,
+@strawberry.input(
     name="ProjectUsageBucketFilter",
+    description="Added in 26.1.0. Filter input for querying project usage bucket records. Usage buckets contain historical resource consumption data aggregated by time period for projects. Multiple filters can be combined using AND, OR, and NOT logical operators.",
 )
 class ProjectUsageBucketFilter(GQLFilter):
     """Filter for project usage buckets."""
@@ -298,15 +294,15 @@ class ProjectUsageBucketFilter(GQLFilter):
         default=None, description="Filter by usage measurement period end date."
     )
 
-    AND: list[ProjectUsageBucketFilter] | None = strawberry.field(
+    AND: list[Self] | None = strawberry.field(
         default=None,
         description="Combine multiple filters with AND logic. All conditions must match.",
     )
-    OR: list[ProjectUsageBucketFilter] | None = strawberry.field(
+    OR: list[Self] | None = strawberry.field(
         default=None,
         description="Combine multiple filters with OR logic. At least one condition must match.",
     )
-    NOT: list[ProjectUsageBucketFilter] | None = strawberry.field(
+    NOT: list[Self] | None = strawberry.field(
         default=None,
         description="Negate the specified filters. Records matching these conditions will be excluded.",
     )

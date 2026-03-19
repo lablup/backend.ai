@@ -432,11 +432,11 @@ class ResourceGroupGQL(PydanticNodeMixin[Any]):
                 is_public=dto.status.is_public,
             ),
             metadata=ResourceGroupMetadataGQL(
-                description=dto.metadata.description if dto.metadata.description else None,
+                description=dto.metadata.description or None,
                 created_at=dto.metadata.created_at,
             ),
             network=ResourceGroupNetworkConfigGQL(
-                wsproxy_addr=dto.network.wsproxy_addr if dto.network.wsproxy_addr else None,
+                wsproxy_addr=dto.network.wsproxy_addr or None,
                 use_host_network=dto.network.use_host_network,
             ),
             scheduler=ResourceGroupSchedulerConfigGQL(
@@ -527,10 +527,9 @@ class ResourceGroupOrderFieldGQL(StrEnum):
     IS_ACTIVE = "is_active"
 
 
-@gql_pydantic_input(
-    BackendAIGQLMeta(description="Filter for resource groups", added_version="26.1.0"),
-    model=ResourceGroupFilterDTO,
+@strawberry.input(
     name="ResourceGroupFilter",
+    description="Added in 26.1.0. Filter for resource groups",
 )
 class ResourceGroupFilterGQL:
     name: StringFilter | None = None
@@ -538,9 +537,9 @@ class ResourceGroupFilterGQL:
     is_active: bool | None = None
     is_public: bool | None = None
 
-    AND: list[ResourceGroupFilterGQL] | None = None
-    OR: list[ResourceGroupFilterGQL] | None = None
-    NOT: list[ResourceGroupFilterGQL] | None = None
+    AND: list[Self] | None = None
+    OR: list[Self] | None = None
+    NOT: list[Self] | None = None
 
     def to_pydantic(self) -> ResourceGroupFilterDTO:
         return ResourceGroupFilterDTO(
@@ -594,6 +593,13 @@ class PreemptionConfigInput:
         default=PreemptionModeGQL.TERMINATE,
         description=("How to preempt sessions (TERMINATE, RESCHEDULE). Default is TERMINATE."),
     )
+
+    def to_pydantic(self) -> PreemptionConfigInputDTO:
+        return PreemptionConfigInputDTO(
+            preemptible_priority=self.preemptible_priority,
+            order=self.order.value,
+            mode=self.mode.value,
+        )
 
 
 # Mutation Input/Payload types

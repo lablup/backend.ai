@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from enum import StrEnum
+from typing import Self
 
 import strawberry
 
@@ -101,13 +102,9 @@ class ProjectTypeEnumFilter:
         )
 
 
-@gql_pydantic_input(
-    BackendAIGQLMeta(
-        description="Filter input for querying projects. Supports filtering by ID, name, domain, type, active status, and timestamps. Multiple filters can be combined using AND, OR, and NOT logical operators.",
-        added_version="26.2.0",
-    ),
-    model=GroupFilter,
+@strawberry.input(
     name="ProjectV2Filter",
+    description="Added in 26.2.0. Filter input for querying projects. Supports filtering by ID, name, domain, type, active status, and timestamps. Multiple filters can be combined using AND, OR, and NOT logical operators.",
 )
 class ProjectV2Filter:
     """Filter for project queries."""
@@ -121,9 +118,9 @@ class ProjectV2Filter:
     modified_at: DateTimeFilter | None = None
     domain: ProjectDomainNestedFilter | None = None
     user: ProjectUserNestedFilter | None = None
-    AND: list[ProjectV2Filter] | None = None
-    OR: list[ProjectV2Filter] | None = None
-    NOT: list[ProjectV2Filter] | None = None
+    AND: list[Self] | None = None
+    OR: list[Self] | None = None
+    NOT: list[Self] | None = None
 
     def to_pydantic(self) -> GroupFilter:
         return GroupFilter(

@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import Self
+
 import strawberry
 
 from ai.backend.common.dto.manager.v2.audit_log.request import (
@@ -34,12 +36,9 @@ class AuditLogStatusFilterGQL:
         )
 
 
-@gql_pydantic_input(
-    BackendAIGQLMeta(
-        description="Filter criteria for querying audit logs.", added_version="24.09.0"
-    ),
-    model=AuditLogFilter,
+@strawberry.input(
     name="AuditLogFilter",
+    description="Added in 24.09.0. Filter criteria for querying audit logs.",
 )
 class AuditLogFilterGQL:
     entity_type: StringFilter | None = None
@@ -48,9 +47,9 @@ class AuditLogFilterGQL:
     created_at: DateTimeFilter | None = None
     triggered_by: StringFilter | None = None
 
-    AND: list[AuditLogFilterGQL] | None = None
-    OR: list[AuditLogFilterGQL] | None = None
-    NOT: list[AuditLogFilterGQL] | None = None
+    AND: list[Self] | None = None
+    OR: list[Self] | None = None
+    NOT: list[Self] | None = None
 
     def to_pydantic(self) -> AuditLogFilter:
         return AuditLogFilter(

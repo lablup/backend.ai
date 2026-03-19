@@ -117,10 +117,9 @@ class AgentStatusFilterGQL:
         )
 
 
-@gql_pydantic_input(
-    BackendAIGQLMeta(description="Filter options for querying agents", added_version="26.1.0"),
-    model=AgentFilter,
+@strawberry.input(
     name="AgentFilter",
+    description="Added in 26.1.0. Filter options for querying agents",
 )
 class AgentFilterGQL:
     id: StringFilter | None = None
@@ -128,9 +127,9 @@ class AgentFilterGQL:
     schedulable: bool | None = None
     scaling_group: StringFilter | None = None
 
-    AND: list[AgentFilterGQL] | None = None
-    OR: list[AgentFilterGQL] | None = None
-    NOT: list[AgentFilterGQL] | None = None
+    AND: list[Self] | None = None
+    OR: list[Self] | None = None
+    NOT: list[Self] | None = None
 
     def to_pydantic(self) -> AgentFilter:
         return AgentFilter(

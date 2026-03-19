@@ -130,18 +130,6 @@ class RollingUpdateConfigInputGQL:
     max_surge: int = 1
     max_unavailable: int = 0
 
-    def to_spec(self) -> RollingUpdateSpec:
-        return RollingUpdateSpec(
-            max_surge=self.max_surge,
-            max_unavailable=self.max_unavailable,
-        )
-
-    def to_pydantic(self) -> RollingUpdateConfigInputDTO:
-        return RollingUpdateConfigInputDTO(
-            max_surge=self.max_surge,
-            max_unavailable=self.max_unavailable,
-        )
-
 
 @gql_pydantic_input(
     BackendAIGQLMeta(
@@ -153,18 +141,6 @@ class RollingUpdateConfigInputGQL:
 class BlueGreenConfigInputGQL:
     auto_promote: bool = False
     promote_delay_seconds: int = 0
-
-    def to_spec(self) -> BlueGreenSpec:
-        return BlueGreenSpec(
-            auto_promote=self.auto_promote,
-            promote_delay_seconds=self.promote_delay_seconds,
-        )
-
-    def to_pydantic(self) -> BlueGreenConfigInputDTO:
-        return BlueGreenConfigInputDTO(
-            auto_promote=self.auto_promote,
-            promote_delay_seconds=self.promote_delay_seconds,
-        )
 
 
 # ========== Mutation Input/Payload Types ==========
@@ -199,11 +175,17 @@ class UpdateDeploymentPolicyInputGQL:
                     raise InvalidAPIParameters(
                         "rolling_update config required for ROLLING strategy"
                     )
-                strategy_spec = self.rolling_update.to_spec()
+                strategy_spec = RollingUpdateSpec(
+                    max_surge=self.rolling_update.max_surge,
+                    max_unavailable=self.rolling_update.max_unavailable,
+                )
             case DeploymentStrategy.BLUE_GREEN:
                 if self.blue_green is None:
                     raise InvalidAPIParameters("blue_green config required for BLUE_GREEN strategy")
-                strategy_spec = self.blue_green.to_spec()
+                strategy_spec = BlueGreenSpec(
+                    auto_promote=self.blue_green.auto_promote,
+                    promote_delay_seconds=self.blue_green.promote_delay_seconds,
+                )
             case _:
                 raise InvalidAPIParameters(f"Unsupported deployment strategy: {strategy}")
 
