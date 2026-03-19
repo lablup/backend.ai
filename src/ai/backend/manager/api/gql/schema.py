@@ -136,6 +136,7 @@ from .keypair import (
     issue_my_keypair,
     revoke_my_keypair,
     switch_my_main_access_key,
+    update_my_keypair,
 )
 from .notification import (
     admin_create_notification_channel,
@@ -510,6 +511,7 @@ class Mutation:
     issue_my_keypair = issue_my_keypair
     revoke_my_keypair = revoke_my_keypair
     switch_my_main_access_key = switch_my_main_access_key
+    update_my_keypair = update_my_keypair
     # IP allowlist self-service mutation
     update_my_allowed_client_ip = update_my_allowed_client_ip
     # Prometheus Query Preset - Admin APIs
