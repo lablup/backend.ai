@@ -288,11 +288,10 @@ class SearchUserUsageBucketsInput(BaseRequestModel):
 
 
 class UpsertDomainFairShareWeightInput(BaseRequestModel):
-    """Input for upserting domain fair share weight.
+    """Input for upserting domain fair share weight."""
 
-    Set weight to null to use the resource group's default_weight.
-    """
-
+    resource_group_name: str = Field(description="Scaling group name.")
+    domain_name: str = Field(description="Name of the domain to update weight for.")
     weight: Decimal | None = Field(
         default=None,
         description=(
@@ -303,12 +302,11 @@ class UpsertDomainFairShareWeightInput(BaseRequestModel):
 
 
 class UpsertProjectFairShareWeightInput(BaseRequestModel):
-    """Input for upserting project fair share weight.
+    """Input for upserting project fair share weight."""
 
-    Set weight to null to use the resource group's default_weight.
-    """
-
-    domain_name: str = Field(description="Domain name the project belongs to")
+    resource_group_name: str = Field(description="Scaling group name.")
+    project_id: UUID = Field(description="UUID of the project to update weight for.")
+    domain_name: str = Field(description="Name of the domain the project belongs to.")
     weight: Decimal | None = Field(
         default=None,
         description=(
@@ -319,12 +317,12 @@ class UpsertProjectFairShareWeightInput(BaseRequestModel):
 
 
 class UpsertUserFairShareWeightInput(BaseRequestModel):
-    """Input for upserting user fair share weight.
+    """Input for upserting user fair share weight."""
 
-    Set weight to null to use the resource group's default_weight.
-    """
-
-    domain_name: str = Field(description="Domain name the user belongs to")
+    resource_group_name: str = Field(description="Scaling group name.")
+    user_uuid: UUID = Field(description="User UUID.")
+    project_id: UUID = Field(description="Project ID.")
+    domain_name: str = Field(description="Name of the domain the user belongs to.")
     weight: Decimal | None = Field(
         default=None,
         description=(
@@ -347,8 +345,8 @@ class DomainWeightEntryInput(BaseRequestModel):
 class BulkUpsertDomainFairShareWeightInput(BaseRequestModel):
     """Input for bulk upserting domain fair share weights."""
 
-    resource_group: str = Field(description="Scaling group name")
-    inputs: list[DomainWeightEntryInput] = Field(description="List of domain weights to upsert")
+    resource_group_name: str = Field(description="Scaling group name.")
+    inputs: list[DomainWeightEntryInput] = Field(description="List of domain weights to upsert.")
 
 
 class ProjectWeightEntryInput(BaseRequestModel):
@@ -362,8 +360,8 @@ class ProjectWeightEntryInput(BaseRequestModel):
 class BulkUpsertProjectFairShareWeightInput(BaseRequestModel):
     """Input for bulk upserting project fair share weights."""
 
-    resource_group: str = Field(description="Scaling group name")
-    inputs: list[ProjectWeightEntryInput] = Field(description="List of project weights to upsert")
+    resource_group_name: str = Field(description="Scaling group name.")
+    inputs: list[ProjectWeightEntryInput] = Field(description="List of project weights to upsert.")
 
 
 class UserWeightEntryInput(BaseRequestModel):
@@ -378,8 +376,8 @@ class UserWeightEntryInput(BaseRequestModel):
 class BulkUpsertUserFairShareWeightInput(BaseRequestModel):
     """Input for bulk upserting user fair share weights."""
 
-    resource_group: str = Field(description="Scaling group name")
-    inputs: list[UserWeightEntryInput] = Field(description="List of user weights to upsert")
+    resource_group_name: str = Field(description="Scaling group name.")
+    inputs: list[UserWeightEntryInput] = Field(description="List of user weights to upsert.")
 
 
 # Update spec input

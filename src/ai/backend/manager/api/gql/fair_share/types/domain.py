@@ -11,6 +11,15 @@ import strawberry
 from strawberry import ID, Info
 from strawberry.relay import Connection, Edge, NodeID
 
+from ai.backend.common.dto.manager.v2.fair_share.request import (
+    BulkUpsertDomainFairShareWeightInput as BulkUpsertDomainFairShareWeightInputDTO,
+)
+from ai.backend.common.dto.manager.v2.fair_share.request import (
+    DomainWeightEntryInput as DomainWeightEntryInputDTO,
+)
+from ai.backend.common.dto.manager.v2.fair_share.request import (
+    UpsertDomainFairShareWeightInput as UpsertDomainFairShareWeightInputDTO,
+)
 from ai.backend.manager.api.gql.base import OrderDirection, StringFilter
 from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin
 from ai.backend.manager.api.gql.types import GQLFilter, GQLOrderBy, StrawberryGQLContext
@@ -414,7 +423,8 @@ class DomainFairShareOrderBy(GQLOrderBy):
 # Mutation Input/Payload Types
 
 
-@strawberry.input(
+@strawberry.experimental.pydantic.input(
+    model=UpsertDomainFairShareWeightInputDTO,
     name="UpsertDomainFairShareWeightInput",
     description=(
         "Added in 26.1.0. Input for upserting domain fair share weight. "
@@ -453,7 +463,8 @@ class UpsertDomainFairShareWeightPayload:
 # Bulk Upsert Mutation Input/Payload Types
 
 
-@strawberry.input(
+@strawberry.experimental.pydantic.input(
+    model=DomainWeightEntryInputDTO,
     name="DomainWeightInputItem",
     description=(
         "Added in 26.1.0. Input item for a single domain weight in bulk upsert. "
@@ -473,7 +484,8 @@ class DomainWeightInputItem:
     )
 
 
-@strawberry.input(
+@strawberry.experimental.pydantic.input(
+    model=BulkUpsertDomainFairShareWeightInputDTO,
     name="BulkUpsertDomainFairShareWeightInput",
     description=(
         "Added in 26.1.0. Input for bulk upserting domain fair share weights. "

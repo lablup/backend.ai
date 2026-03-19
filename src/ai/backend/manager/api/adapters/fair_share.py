@@ -177,15 +177,13 @@ class FairShareAdapter(BaseAdapter):
     async def upsert_domain(
         self,
         input: UpsertDomainFairShareWeightInput,
-        resource_group: str,
-        domain_name: str,
     ) -> UpsertDomainFairShareWeightPayload:
         """Upsert domain fair share weight."""
         result = (
             await self._processors.fair_share.upsert_domain_fair_share_weight.wait_for_complete(
                 UpsertDomainFairShareWeightAction(
-                    resource_group=resource_group,
-                    domain_name=domain_name,
+                    resource_group=input.resource_group_name,
+                    domain_name=input.domain_name,
                     weight=input.weight,
                 )
             )
@@ -199,7 +197,7 @@ class FairShareAdapter(BaseAdapter):
         """Bulk upsert domain fair share weights."""
         result = await self._processors.fair_share.bulk_upsert_domain_fair_share_weight.wait_for_complete(
             BulkUpsertDomainFairShareWeightAction(
-                resource_group=input.resource_group,
+                resource_group=input.resource_group_name,
                 inputs=[
                     DomainWeightInput(domain_name=e.domain_name, weight=e.weight)
                     for e in input.inputs
@@ -272,15 +270,13 @@ class FairShareAdapter(BaseAdapter):
     async def upsert_project(
         self,
         input: UpsertProjectFairShareWeightInput,
-        resource_group: str,
-        project_id: UUID,
     ) -> UpsertProjectFairShareWeightPayload:
         """Upsert project fair share weight."""
         result = (
             await self._processors.fair_share.upsert_project_fair_share_weight.wait_for_complete(
                 UpsertProjectFairShareWeightAction(
-                    resource_group=resource_group,
-                    project_id=project_id,
+                    resource_group=input.resource_group_name,
+                    project_id=input.project_id,
                     domain_name=input.domain_name,
                     weight=input.weight,
                 )
@@ -295,7 +291,7 @@ class FairShareAdapter(BaseAdapter):
         """Bulk upsert project fair share weights."""
         result = await self._processors.fair_share.bulk_upsert_project_fair_share_weight.wait_for_complete(
             BulkUpsertProjectFairShareWeightAction(
-                resource_group=input.resource_group,
+                resource_group=input.resource_group_name,
                 inputs=[
                     ProjectWeightInput(
                         project_id=e.project_id,
@@ -373,16 +369,13 @@ class FairShareAdapter(BaseAdapter):
     async def upsert_user(
         self,
         input: UpsertUserFairShareWeightInput,
-        resource_group: str,
-        project_id: UUID,
-        user_uuid: UUID,
     ) -> UpsertUserFairShareWeightPayload:
         """Upsert user fair share weight."""
         result = await self._processors.fair_share.upsert_user_fair_share_weight.wait_for_complete(
             UpsertUserFairShareWeightAction(
-                resource_group=resource_group,
-                project_id=project_id,
-                user_uuid=user_uuid,
+                resource_group=input.resource_group_name,
+                project_id=input.project_id,
+                user_uuid=input.user_uuid,
                 domain_name=input.domain_name,
                 weight=input.weight,
             )
@@ -397,7 +390,7 @@ class FairShareAdapter(BaseAdapter):
         result = (
             await self._processors.fair_share.bulk_upsert_user_fair_share_weight.wait_for_complete(
                 BulkUpsertUserFairShareWeightAction(
-                    resource_group=input.resource_group,
+                    resource_group=input.resource_group_name,
                     inputs=[
                         UserWeightInput(
                             user_uuid=e.user_uuid,

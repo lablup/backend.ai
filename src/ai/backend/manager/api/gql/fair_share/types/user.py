@@ -12,6 +12,15 @@ import strawberry
 from strawberry import ID, Info
 from strawberry.relay import Connection, Edge, NodeID
 
+from ai.backend.common.dto.manager.v2.fair_share.request import (
+    BulkUpsertUserFairShareWeightInput as BulkUpsertUserFairShareWeightInputDTO,
+)
+from ai.backend.common.dto.manager.v2.fair_share.request import (
+    UpsertUserFairShareWeightInput as UpsertUserFairShareWeightInputDTO,
+)
+from ai.backend.common.dto.manager.v2.fair_share.request import (
+    UserWeightEntryInput as UserWeightEntryInputDTO,
+)
 from ai.backend.manager.api.gql.base import OrderDirection, StringFilter, UUIDFilter
 from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin
 from ai.backend.manager.api.gql.types import GQLFilter, GQLOrderBy, StrawberryGQLContext
@@ -541,7 +550,8 @@ class UserFairShareOrderBy(GQLOrderBy):
 # Mutation Input/Payload Types
 
 
-@strawberry.input(
+@strawberry.experimental.pydantic.input(
+    model=UpsertUserFairShareWeightInputDTO,
     name="UpsertUserFairShareWeightInput",
     description=(
         "Added in 26.1.0. Input for upserting user fair share weight. "
@@ -582,7 +592,8 @@ class UpsertUserFairShareWeightPayload:
 # Bulk Upsert Mutation Input/Payload Types
 
 
-@strawberry.input(
+@strawberry.experimental.pydantic.input(
+    model=UserWeightEntryInputDTO,
     name="UserWeightInputItem",
     description=(
         "Added in 26.1.0. Input item for a single user weight in bulk upsert. "
@@ -606,7 +617,8 @@ class UserWeightInputItem:
     )
 
 
-@strawberry.input(
+@strawberry.experimental.pydantic.input(
+    model=BulkUpsertUserFairShareWeightInputDTO,
     name="BulkUpsertUserFairShareWeightInput",
     description=(
         "Added in 26.1.0. Input for bulk upserting user fair share weights. "
