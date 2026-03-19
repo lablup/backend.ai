@@ -43,6 +43,7 @@ class DomainFairShareOrderField(StrEnum):
     FAIR_SHARE_FACTOR = "fair_share_factor"
     DOMAIN_NAME = "domain_name"
     CREATED_AT = "created_at"
+    DOMAIN_IS_ACTIVE = "domain_is_active"
 
 
 class ProjectFairShareOrderField(StrEnum):
@@ -93,16 +94,27 @@ class ResourceSlotInfo(BaseResponseModel):
 class FairShareSpecInfo(BaseResponseModel):
     """Fair share specification parameters."""
 
-    weight: Decimal | None = Field(
-        default=None,
+    weight: Decimal = Field(
         description=(
-            "Base weight for this entity. None means use resource group's default_weight."
+            "Effective weight for this entity. Always the resolved value "
+            "(either the explicitly set weight or the resource group's default_weight)."
+        ),
+    )
+    uses_default_weight: bool = Field(
+        default=False,
+        description=(
+            "Whether this entity uses the resource group's default_weight. "
+            "True means no explicit weight was set."
         ),
     )
     half_life_days: int = Field(description="Half-life for exponential decay in days")
     lookback_days: int = Field(description="Total lookback period in days")
     decay_unit_days: int = Field(description="Granularity of decay buckets in days")
     resource_weights: ResourceSlotInfo = Field(description="Weights for each resource type")
+    uses_default_resource_types: list[str] = Field(
+        default_factory=list,
+        description="Resource types using the resource group's default weight",
+    )
 
 
 class FairShareCalculationSnapshotInfo(BaseResponseModel):

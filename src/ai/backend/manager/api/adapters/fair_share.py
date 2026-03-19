@@ -86,6 +86,8 @@ from ai.backend.manager.models.fair_share.row import (
 from ai.backend.manager.repositories.base import (
     QueryCondition,
     QueryOrder,
+    combine_conditions_or,
+    negate_conditions,
 )
 from ai.backend.manager.repositories.fair_share.types import (
     DomainFairShareSearchScope,
@@ -510,6 +512,25 @@ class FairShareAdapter(BaseAdapter):
             )
             if cond is not None:
                 conditions.append(cond)
+        if filter.domain is not None and filter.domain.is_active is not None:
+            conditions.append(
+                DomainFairShareConditions.by_domain_is_active(filter.domain.is_active)
+            )
+        if filter.AND:
+            for sub_filter in filter.AND:
+                conditions.extend(FairShareAdapter._convert_domain_filter(sub_filter))
+        if filter.OR:
+            or_conditions: list[QueryCondition] = []
+            for sub_filter in filter.OR:
+                or_conditions.extend(FairShareAdapter._convert_domain_filter(sub_filter))
+            if or_conditions:
+                conditions.append(combine_conditions_or(or_conditions))
+        if filter.NOT:
+            not_conditions: list[QueryCondition] = []
+            for sub_filter in filter.NOT:
+                not_conditions.extend(FairShareAdapter._convert_domain_filter(sub_filter))
+            if not_conditions:
+                conditions.append(negate_conditions(not_conditions))
         return conditions
 
     @staticmethod
@@ -533,6 +554,25 @@ class FairShareAdapter(BaseAdapter):
             )
             if cond is not None:
                 conditions.append(cond)
+        if filter.domain is not None and filter.domain.is_active is not None:
+            conditions.append(
+                DomainFairShareConditions.by_domain_is_active(filter.domain.is_active)
+            )
+        if filter.AND:
+            for sub_filter in filter.AND:
+                conditions.extend(FairShareAdapter._convert_domain_filter_rg(sub_filter))
+        if filter.OR:
+            or_conditions: list[QueryCondition] = []
+            for sub_filter in filter.OR:
+                or_conditions.extend(FairShareAdapter._convert_domain_filter_rg(sub_filter))
+            if or_conditions:
+                conditions.append(combine_conditions_or(or_conditions))
+        if filter.NOT:
+            not_conditions: list[QueryCondition] = []
+            for sub_filter in filter.NOT:
+                not_conditions.extend(FairShareAdapter._convert_domain_filter_rg(sub_filter))
+            if not_conditions:
+                conditions.append(negate_conditions(not_conditions))
         return conditions
 
     @staticmethod
@@ -547,6 +587,8 @@ class FairShareAdapter(BaseAdapter):
                     result.append(DomainFairShareOrders.by_domain_name(ascending=ascending))
                 case DomainFairShareOrderField.CREATED_AT:
                     result.append(DomainFairShareOrders.by_created_at(ascending=ascending))
+                case DomainFairShareOrderField.DOMAIN_IS_ACTIVE:
+                    result.append(DomainFairShareOrders.by_domain_is_active(ascending=ascending))
         return result
 
     @staticmethod
@@ -561,6 +603,8 @@ class FairShareAdapter(BaseAdapter):
                     result.append(RGDomainFairShareOrders.by_domain_name(ascending=ascending))
                 case DomainFairShareOrderField.CREATED_AT:
                     result.append(RGDomainFairShareOrders.by_created_at(ascending=ascending))
+                case DomainFairShareOrderField.DOMAIN_IS_ACTIVE:
+                    result.append(DomainFairShareOrders.by_domain_is_active(ascending=ascending))
         return result
 
     # ------------------------------------------------------------------ filter helpers (project)
@@ -593,6 +637,25 @@ class FairShareAdapter(BaseAdapter):
             )
             if cond is not None:
                 conditions.append(cond)
+        if filter.project is not None and filter.project.is_active is not None:
+            conditions.append(
+                ProjectFairShareConditions.by_project_is_active(filter.project.is_active)
+            )
+        if filter.AND:
+            for sub_filter in filter.AND:
+                conditions.extend(FairShareAdapter._convert_project_filter(sub_filter))
+        if filter.OR:
+            or_conditions: list[QueryCondition] = []
+            for sub_filter in filter.OR:
+                or_conditions.extend(FairShareAdapter._convert_project_filter(sub_filter))
+            if or_conditions:
+                conditions.append(combine_conditions_or(or_conditions))
+        if filter.NOT:
+            not_conditions: list[QueryCondition] = []
+            for sub_filter in filter.NOT:
+                not_conditions.extend(FairShareAdapter._convert_project_filter(sub_filter))
+            if not_conditions:
+                conditions.append(negate_conditions(not_conditions))
         return conditions
 
     @staticmethod
@@ -623,6 +686,25 @@ class FairShareAdapter(BaseAdapter):
             )
             if cond is not None:
                 conditions.append(cond)
+        if filter.project is not None and filter.project.is_active is not None:
+            conditions.append(
+                ProjectFairShareConditions.by_project_is_active(filter.project.is_active)
+            )
+        if filter.AND:
+            for sub_filter in filter.AND:
+                conditions.extend(FairShareAdapter._convert_project_filter_rg(sub_filter))
+        if filter.OR:
+            or_conditions: list[QueryCondition] = []
+            for sub_filter in filter.OR:
+                or_conditions.extend(FairShareAdapter._convert_project_filter_rg(sub_filter))
+            if or_conditions:
+                conditions.append(combine_conditions_or(or_conditions))
+        if filter.NOT:
+            not_conditions: list[QueryCondition] = []
+            for sub_filter in filter.NOT:
+                not_conditions.extend(FairShareAdapter._convert_project_filter_rg(sub_filter))
+            if not_conditions:
+                conditions.append(negate_conditions(not_conditions))
         return conditions
 
     @staticmethod
@@ -688,6 +770,23 @@ class FairShareAdapter(BaseAdapter):
             )
             if cond is not None:
                 conditions.append(cond)
+        if filter.user is not None and filter.user.is_active is not None:
+            conditions.append(UserFairShareConditions.by_user_is_active(filter.user.is_active))
+        if filter.AND:
+            for sub_filter in filter.AND:
+                conditions.extend(FairShareAdapter._convert_user_filter(sub_filter))
+        if filter.OR:
+            or_conditions: list[QueryCondition] = []
+            for sub_filter in filter.OR:
+                or_conditions.extend(FairShareAdapter._convert_user_filter(sub_filter))
+            if or_conditions:
+                conditions.append(combine_conditions_or(or_conditions))
+        if filter.NOT:
+            not_conditions: list[QueryCondition] = []
+            for sub_filter in filter.NOT:
+                not_conditions.extend(FairShareAdapter._convert_user_filter(sub_filter))
+            if not_conditions:
+                conditions.append(negate_conditions(not_conditions))
         return conditions
 
     @staticmethod
@@ -725,6 +824,23 @@ class FairShareAdapter(BaseAdapter):
             )
             if cond is not None:
                 conditions.append(cond)
+        if filter.user is not None and filter.user.is_active is not None:
+            conditions.append(UserFairShareConditions.by_user_is_active(filter.user.is_active))
+        if filter.AND:
+            for sub_filter in filter.AND:
+                conditions.extend(FairShareAdapter._convert_user_filter_rg(sub_filter))
+        if filter.OR:
+            or_conditions: list[QueryCondition] = []
+            for sub_filter in filter.OR:
+                or_conditions.extend(FairShareAdapter._convert_user_filter_rg(sub_filter))
+            if or_conditions:
+                conditions.append(combine_conditions_or(or_conditions))
+        if filter.NOT:
+            not_conditions: list[QueryCondition] = []
+            for sub_filter in filter.NOT:
+                not_conditions.extend(FairShareAdapter._convert_user_filter_rg(sub_filter))
+            if not_conditions:
+                conditions.append(negate_conditions(not_conditions))
         return conditions
 
     @staticmethod
@@ -760,7 +876,9 @@ class FairShareAdapter(BaseAdapter):
             id=uuid.uuid5(uuid.NAMESPACE_DNS, id_str),
             resource_group=data.resource_group,
             domain_name=data.domain_name,
-            spec=FairShareAdapter._convert_spec(data.data.spec, data.data.use_default),
+            spec=FairShareAdapter._convert_spec(
+                data.data.spec, data.data.use_default, data.data.uses_default_resources
+            ),
             calculation_snapshot=FairShareAdapter._convert_snapshot(data.data.calculation_snapshot),
             created_at=(
                 data.data.metadata.created_at
@@ -782,7 +900,9 @@ class FairShareAdapter(BaseAdapter):
             resource_group=data.resource_group,
             project_id=data.project_id,
             domain_name=data.domain_name,
-            spec=FairShareAdapter._convert_spec(data.data.spec, data.data.use_default),
+            spec=FairShareAdapter._convert_spec(
+                data.data.spec, data.data.use_default, data.data.uses_default_resources
+            ),
             calculation_snapshot=FairShareAdapter._convert_snapshot(data.data.calculation_snapshot),
             created_at=(
                 data.data.metadata.created_at
@@ -805,7 +925,9 @@ class FairShareAdapter(BaseAdapter):
             user_uuid=data.user_uuid,
             project_id=data.project_id,
             domain_name=data.domain_name,
-            spec=FairShareAdapter._convert_spec(data.data.spec, data.data.use_default),
+            spec=FairShareAdapter._convert_spec(
+                data.data.spec, data.data.use_default, data.data.uses_default_resources
+            ),
             calculation_snapshot=FairShareAdapter._convert_snapshot(data.data.calculation_snapshot),
             created_at=(
                 data.data.metadata.created_at
@@ -820,13 +942,19 @@ class FairShareAdapter(BaseAdapter):
         )
 
     @staticmethod
-    def _convert_spec(spec: FairShareSpec, use_default: bool) -> FairShareSpecInfo:
+    def _convert_spec(
+        spec: FairShareSpec,
+        use_default: bool,
+        uses_default_resources: frozenset[str] = frozenset(),
+    ) -> FairShareSpecInfo:
         return FairShareSpecInfo(
-            weight=None if use_default else spec.weight,
+            weight=spec.weight,
+            uses_default_weight=use_default,
             half_life_days=spec.half_life_days,
             lookback_days=spec.lookback_days,
             decay_unit_days=spec.decay_unit_days,
             resource_weights=FairShareAdapter._convert_resource_slot(spec.resource_weights),
+            uses_default_resource_types=sorted(uses_default_resources),
         )
 
     @staticmethod

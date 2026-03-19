@@ -16,6 +16,15 @@ from ai.backend.common.dto.manager.v2.fair_share.request import (
     BulkUpsertProjectFairShareWeightInput as BulkUpsertProjectFairShareWeightInputDTO,
 )
 from ai.backend.common.dto.manager.v2.fair_share.request import (
+    ProjectFairShareFilter as ProjectFairShareFilterDTO,
+)
+from ai.backend.common.dto.manager.v2.fair_share.request import (
+    ProjectFairShareOrder as ProjectFairShareOrderDTO,
+)
+from ai.backend.common.dto.manager.v2.fair_share.request import (
+    ProjectFairShareProjectNestedFilter as ProjectFairShareProjectNestedFilterDTO,
+)
+from ai.backend.common.dto.manager.v2.fair_share.request import (
     ProjectWeightEntryInput as ProjectWeightEntryInputDTO,
 )
 from ai.backend.common.dto.manager.v2.fair_share.request import (
@@ -23,6 +32,15 @@ from ai.backend.common.dto.manager.v2.fair_share.request import (
 )
 from ai.backend.common.dto.manager.v2.fair_share.response import (
     BulkUpsertProjectFairShareWeightPayload as BulkUpsertProjectFairShareWeightPayloadDTO,
+)
+from ai.backend.common.dto.manager.v2.fair_share.response import (
+    ProjectFairShareNode,
+)
+from ai.backend.common.dto.manager.v2.fair_share.types import (
+    OrderDirection as OrderDirectionDTO,
+)
+from ai.backend.common.dto.manager.v2.fair_share.types import (
+    ProjectFairShareOrderField as ProjectFairShareOrderFieldDTO,
 )
 from ai.backend.manager.api.gql.base import OrderDirection, StringFilter, UUIDFilter
 from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin
@@ -45,6 +63,7 @@ from .common import (
     FairShareCalculationSnapshotGQL,
     FairShareSpecGQL,
     ResourceSlotGQL,
+    ResourceWeightEntryGQL,
 )
 
 if TYPE_CHECKING:
@@ -180,6 +199,47 @@ class ProjectFairShareGQL(PydanticNodeMixin):
             ),
         )
 
+    @classmethod
+    def from_node(cls, node: ProjectFairShareNode) -> ProjectFairShareGQL:
+        """Convert ProjectFairShareNode pydantic DTO to GraphQL type."""
+        resource_weights = [
+            ResourceWeightEntryGQL(
+                resource_type=entry.resource_type,
+                weight=Decimal(entry.quantity),
+                uses_default=entry.resource_type in node.spec.uses_default_resource_types,
+            )
+            for entry in node.spec.resource_weights.entries
+        ]
+        spec = FairShareSpecGQL(
+            weight=node.spec.weight,
+            uses_default=node.spec.uses_default_weight,
+            half_life_days=node.spec.half_life_days,
+            lookback_days=node.spec.lookback_days,
+            decay_unit_days=node.spec.decay_unit_days,
+            resource_weights=resource_weights,
+        )
+        snapshot = FairShareCalculationSnapshotGQL(
+            fair_share_factor=node.calculation_snapshot.fair_share_factor,
+            total_decayed_usage=ResourceSlotGQL.from_resource_slot({
+                e.resource_type: e.quantity
+                for e in node.calculation_snapshot.total_decayed_usage.entries
+            }),
+            normalized_usage=node.calculation_snapshot.normalized_usage,
+            lookback_start=node.calculation_snapshot.lookback_start,
+            lookback_end=node.calculation_snapshot.lookback_end,
+            last_calculated_at=node.calculation_snapshot.last_calculated_at,
+        )
+        return cls(
+            id=ID(f"{node.resource_group}:{node.project_id}"),
+            resource_group_name=node.resource_group,
+            project_id=node.project_id,
+            domain_name=node.domain_name,
+            spec=spec,
+            calculation_snapshot=snapshot,
+            created_at=node.created_at,
+            updated_at=node.updated_at,
+        )
+
 
 ProjectFairShareEdge = Edge[ProjectFairShareGQL]
 
@@ -263,6 +323,9 @@ class ProjectFairShareProjectNestedFilter:
         default=None,
         description="Filter by project type (GENERAL, MODEL_STORE).",
     )
+
+    def to_pydantic(self) -> ProjectFairShareProjectNestedFilterDTO:
+        return ProjectFairShareProjectNestedFilterDTO(is_active=self.is_active)
 
     def build_conditions(self) -> list[QueryCondition]:
         conditions: list[QueryCondition] = []
@@ -363,6 +426,17 @@ class ProjectFairShareFilter(GQLFilter):
         description="Negate the specified filters. Records matching these conditions will be excluded.",
     )
 
+    def to_pydantic(self) -> ProjectFairShareFilterDTO:
+        return ProjectFairShareFilterDTO(
+            resource_group=self.resource_group.to_pydantic() if self.resource_group else None,
+            project_id=self.project_id.to_pydantic() if self.project_id else None,
+            domain_name=self.domain_name.to_pydantic() if self.domain_name else None,
+            project=self.project.to_pydantic() if self.project else None,
+            AND=[f.to_pydantic() for f in self.AND] if self.AND else None,
+            OR=[f.to_pydantic() for f in self.OR] if self.OR else None,
+            NOT=[f.to_pydantic() for f in self.NOT] if self.NOT else None,
+        )
+
     @override
     def build_conditions(self) -> list[QueryCondition]:
         conditions: list[QueryCondition] = []
@@ -451,6 +525,17 @@ class RGProjectFairShareFilter(GQLFilter):
     NOT: list[RGProjectFairShareFilter] | None = strawberry.field(
         default=None, description="Negate filters."
     )
+
+    def to_pydantic(self) -> ProjectFairShareFilterDTO:
+        return ProjectFairShareFilterDTO(
+            resource_group=self.resource_group.to_pydantic() if self.resource_group else None,
+            project_id=self.project_id.to_pydantic() if self.project_id else None,
+            domain_name=self.domain_name.to_pydantic() if self.domain_name else None,
+            project=self.project.to_pydantic() if self.project else None,
+            AND=[f.to_pydantic() for f in self.AND] if self.AND else None,
+            OR=[f.to_pydantic() for f in self.OR] if self.OR else None,
+            NOT=[f.to_pydantic() for f in self.NOT] if self.NOT else None,
+        )
 
     @override
     def build_conditions(self) -> list[QueryCondition]:
@@ -546,6 +631,14 @@ class ProjectFairShareOrderBy(GQLOrderBy):
             "For fair_share_factor, ASC shows highest priority projects first."
         ),
     )
+
+    def to_pydantic(self) -> ProjectFairShareOrderDTO:
+        return ProjectFairShareOrderDTO(
+            field=ProjectFairShareOrderFieldDTO(self.field.value),
+            direction=OrderDirectionDTO.ASC
+            if self.direction == OrderDirection.ASC
+            else OrderDirectionDTO.DESC,
+        )
 
     @override
     def to_query_order(self) -> QueryOrder:

@@ -16,6 +16,8 @@ from strawberry.relay import Edge, Node
 from strawberry.types import get_object_definition, has_object_definition
 
 from ai.backend.common.data.filter_specs import StringMatchSpec, UUIDEqualMatchSpec, UUIDInMatchSpec
+from ai.backend.common.dto.manager.query import StringFilter as StringFilterDTO
+from ai.backend.common.dto.manager.query import UUIDFilter as UUIDFilterDTO
 from ai.backend.manager.api.adapters.cursor import decode_cursor as decode_cursor
 from ai.backend.manager.api.adapters.cursor import encode_cursor as encode_cursor
 from ai.backend.manager.data.common.types import IntFilterData, SearchResult, StringFilterData
@@ -82,6 +84,26 @@ class StringFilter:
             i_ends_with=self.i_ends_with,
             i_equals=self.i_equals,
             i_not_equals=self.i_not_equals,
+        )
+
+    def to_pydantic(self) -> StringFilterDTO:
+        return StringFilterDTO(
+            equals=self.equals,
+            contains=self.contains,
+            starts_with=self.starts_with,
+            ends_with=self.ends_with,
+            not_equals=self.not_equals,
+            not_contains=self.not_contains,
+            not_starts_with=self.not_starts_with,
+            not_ends_with=self.not_ends_with,
+            i_equals=self.i_equals,
+            i_contains=self.i_contains,
+            i_starts_with=self.i_starts_with,
+            i_ends_with=self.i_ends_with,
+            i_not_equals=self.i_not_equals,
+            i_not_contains=self.i_not_contains,
+            i_not_starts_with=self.i_not_starts_with,
+            i_not_ends_with=self.i_not_ends_with,
         )
 
     def build_query_condition(
@@ -254,6 +276,14 @@ class UUIDFilter:
             )
 
         return None
+
+    def to_pydantic(self) -> UUIDFilterDTO:
+        return UUIDFilterDTO(
+            equals=self.equals,
+            not_equals=self.not_equals,
+            in_=self.in_,
+            not_in=self.not_in,
+        )
 
 
 @strawberry.input

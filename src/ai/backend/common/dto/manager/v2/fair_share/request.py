@@ -23,6 +23,10 @@ from .types import (
 )
 
 __all__ = (
+    # Filter sub-models
+    "DomainFairShareDomainNestedFilter",
+    "ProjectFairShareProjectNestedFilter",
+    "UserFairShareUserNestedFilter",
     # Filter models
     "DomainFairShareFilter",
     "ProjectFairShareFilter",
@@ -69,6 +73,27 @@ __all__ = (
 _DEFAULT_PAGE_LIMIT = 50
 
 
+# Filter nested sub-models
+
+
+class DomainFairShareDomainNestedFilter(BaseRequestModel):
+    """Nested filter for domain entity within domain fair share."""
+
+    is_active: bool | None = Field(default=None, description="Filter by domain active status")
+
+
+class ProjectFairShareProjectNestedFilter(BaseRequestModel):
+    """Nested filter for project entity within project fair share."""
+
+    is_active: bool | None = Field(default=None, description="Filter by project active status")
+
+
+class UserFairShareUserNestedFilter(BaseRequestModel):
+    """Nested filter for user entity within user fair share."""
+
+    is_active: bool | None = Field(default=None, description="Filter by user active status")
+
+
 # Filter models
 
 
@@ -77,6 +102,16 @@ class DomainFairShareFilter(BaseRequestModel):
 
     resource_group: StringFilter | None = Field(default=None, description="Filter by scaling group")
     domain_name: StringFilter | None = Field(default=None, description="Filter by domain name")
+    domain: DomainFairShareDomainNestedFilter | None = Field(
+        default=None, description="Filter by domain entity properties"
+    )
+    AND: list[DomainFairShareFilter] | None = Field(
+        default=None, description="Combine with AND logic"
+    )
+    OR: list[DomainFairShareFilter] | None = Field(
+        default=None, description="Combine with OR logic"
+    )
+    NOT: list[DomainFairShareFilter] | None = Field(default=None, description="Negate filters")
 
 
 class ProjectFairShareFilter(BaseRequestModel):
@@ -85,6 +120,16 @@ class ProjectFairShareFilter(BaseRequestModel):
     resource_group: StringFilter | None = Field(default=None, description="Filter by scaling group")
     project_id: UUIDFilter | None = Field(default=None, description="Filter by project ID")
     domain_name: StringFilter | None = Field(default=None, description="Filter by domain name")
+    project: ProjectFairShareProjectNestedFilter | None = Field(
+        default=None, description="Filter by project entity properties"
+    )
+    AND: list[ProjectFairShareFilter] | None = Field(
+        default=None, description="Combine with AND logic"
+    )
+    OR: list[ProjectFairShareFilter] | None = Field(
+        default=None, description="Combine with OR logic"
+    )
+    NOT: list[ProjectFairShareFilter] | None = Field(default=None, description="Negate filters")
 
 
 class UserFairShareFilter(BaseRequestModel):
@@ -94,6 +139,20 @@ class UserFairShareFilter(BaseRequestModel):
     user_uuid: UUIDFilter | None = Field(default=None, description="Filter by user UUID")
     project_id: UUIDFilter | None = Field(default=None, description="Filter by project ID")
     domain_name: StringFilter | None = Field(default=None, description="Filter by domain name")
+    user: UserFairShareUserNestedFilter | None = Field(
+        default=None, description="Filter by user entity properties"
+    )
+    AND: list[UserFairShareFilter] | None = Field(
+        default=None, description="Combine with AND logic"
+    )
+    OR: list[UserFairShareFilter] | None = Field(default=None, description="Combine with OR logic")
+    NOT: list[UserFairShareFilter] | None = Field(default=None, description="Negate filters")
+
+
+# model_rebuild() required for self-referential fields
+DomainFairShareFilter.model_rebuild()
+ProjectFairShareFilter.model_rebuild()
+UserFairShareFilter.model_rebuild()
 
 
 class DomainUsageBucketFilter(BaseRequestModel):
