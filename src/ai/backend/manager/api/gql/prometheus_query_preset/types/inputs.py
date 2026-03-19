@@ -27,6 +27,9 @@ from ai.backend.common.dto.manager.v2.prometheus_query_preset.request import (
 from ai.backend.common.dto.manager.v2.prometheus_query_preset.request import (
     ModifyQueryDefinitionOptionsInput as ModifyQueryDefinitionOptionsInputDTO,
 )
+from ai.backend.common.dto.manager.v2.prometheus_query_preset.request import (
+    QueryTimeRangeInputDTO,
+)
 from ai.backend.manager.data.prometheus_query_preset import ExecutePresetOptions
 
 
@@ -88,7 +91,8 @@ class ModifyQueryDefinitionInput:
         )
 
 
-@strawberry.input(
+@strawberry.experimental.pydantic.input(
+    model=QueryTimeRangeInputDTO,
     name="QueryTimeRangeInput",
     description="Added in 26.3.0. Time range for Prometheus query.",
 )
@@ -101,6 +105,13 @@ class QueryTimeRangeInput:
         return QueryTimeRange(
             start=self.start.isoformat(),
             end=self.end.isoformat(),
+            step=self.step,
+        )
+
+    def to_pydantic(self) -> QueryTimeRangeInputDTO:
+        return QueryTimeRangeInputDTO(
+            start=self.start,
+            end=self.end,
             step=self.step,
         )
 

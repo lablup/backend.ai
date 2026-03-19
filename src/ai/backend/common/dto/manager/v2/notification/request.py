@@ -25,19 +25,70 @@ __all__ = (
     "CreateNotificationRuleInput",
     "DeleteNotificationChannelInput",
     "DeleteNotificationRuleInput",
+    "EmailMessageInputDTO",
+    "EmailSpecInputDTO",
     "NotificationChannelFilter",
     "NotificationChannelOrder",
+    "NotificationChannelSpecInputDTO",
     "NotificationChannelTypeFilter",
     "NotificationRuleFilter",
     "NotificationRuleOrder",
     "NotificationRuleTypeFilter",
     "SearchNotificationChannelsInput",
     "SearchNotificationRulesInput",
+    "SMTPAuthInputDTO",
+    "SMTPConnectionInputDTO",
     "UpdateNotificationChannelInput",
     "UpdateNotificationRuleInput",
     "ValidateNotificationChannelInput",
     "ValidateNotificationRuleInput",
+    "WebhookSpecInputDTO",
 )
+
+
+class WebhookSpecInputDTO(BaseRequestModel):
+    """Input for webhook channel specification."""
+
+    url: str = Field(description="Webhook URL.")
+
+
+class SMTPAuthInputDTO(BaseRequestModel):
+    """Input for SMTP authentication credentials."""
+
+    username: str | None = Field(default=None, description="SMTP username.")
+    password: str | None = Field(default=None, description="SMTP password.")
+
+
+class SMTPConnectionInputDTO(BaseRequestModel):
+    """Input for SMTP server connection settings."""
+
+    host: str = Field(description="SMTP host.")
+    port: int = Field(description="SMTP port.")
+    use_tls: bool = Field(default=True, description="Use TLS.")
+    timeout: int = Field(default=30, description="Connection timeout in seconds.")
+
+
+class EmailMessageInputDTO(BaseRequestModel):
+    """Input for email message settings."""
+
+    from_email: str = Field(description="Sender email address.")
+    to_emails: list[str] = Field(description="Recipient email addresses.")
+    subject_template: str | None = Field(default=None, description="Email subject template.")
+
+
+class EmailSpecInputDTO(BaseRequestModel):
+    """Input for email channel specification."""
+
+    smtp: SMTPConnectionInputDTO = Field(description="SMTP connection settings.")
+    message: EmailMessageInputDTO = Field(description="Email message settings.")
+    auth: SMTPAuthInputDTO | None = Field(default=None, description="SMTP authentication.")
+
+
+class NotificationChannelSpecInputDTO(BaseRequestModel):
+    """Input for notification channel specification. Exactly one of webhook or email must be set."""
+
+    webhook: WebhookSpecInputDTO | None = Field(default=None, description="Webhook specification.")
+    email: EmailSpecInputDTO | None = Field(default=None, description="Email specification.")
 
 
 class CreateNotificationChannelInput(BaseRequestModel):

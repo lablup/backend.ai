@@ -37,6 +37,14 @@ from ai.backend.common.dto.manager.v2.notification.request import (
     DeleteNotificationRuleInput as DeleteNotificationRuleInputDTO,
 )
 from ai.backend.common.dto.manager.v2.notification.request import (
+    EmailMessageInputDTO,
+    EmailSpecInputDTO,
+    NotificationChannelSpecInputDTO,
+    SMTPAuthInputDTO,
+    SMTPConnectionInputDTO,
+    WebhookSpecInputDTO,
+)
+from ai.backend.common.dto.manager.v2.notification.request import (
     NotificationChannelFilter as NotificationChannelFilterDTO,
 )
 from ai.backend.common.dto.manager.v2.notification.request import (
@@ -549,15 +557,26 @@ class NotificationRuleOrderBy:
 # Input types for mutations
 
 
-@strawberry.input(description="Input for webhook configuration")
+@strawberry.experimental.pydantic.input(
+    model=WebhookSpecInputDTO,
+    name="WebhookSpecInput",
+    description="Input for webhook configuration",
+)
 class WebhookSpecInput:
     url: str
 
     def to_dataclass(self) -> WebhookSpec:
         return WebhookSpec(url=self.url)
 
+    def to_pydantic(self) -> WebhookSpecInputDTO:
+        return WebhookSpecInputDTO(url=self.url)
 
-@strawberry.input(description="Input for SMTP authentication credentials")
+
+@strawberry.experimental.pydantic.input(
+    model=SMTPAuthInputDTO,
+    name="SMTPAuthInput",
+    description="Input for SMTP authentication credentials",
+)
 class SMTPAuthInput:
     username: str | None = None
     password: str | None = None
@@ -565,8 +584,15 @@ class SMTPAuthInput:
     def to_dataclass(self) -> SMTPAuth:
         return SMTPAuth(username=self.username, password=self.password)
 
+    def to_pydantic(self) -> SMTPAuthInputDTO:
+        return SMTPAuthInputDTO(username=self.username, password=self.password)
 
-@strawberry.input(description="Input for SMTP server connection settings")
+
+@strawberry.experimental.pydantic.input(
+    model=SMTPConnectionInputDTO,
+    name="SMTPConnectionInput",
+    description="Input for SMTP server connection settings",
+)
 class SMTPConnectionInput:
     host: str
     port: int
@@ -581,8 +607,20 @@ class SMTPConnectionInput:
             timeout=self.timeout,
         )
 
+    def to_pydantic(self) -> SMTPConnectionInputDTO:
+        return SMTPConnectionInputDTO(
+            host=self.host,
+            port=self.port,
+            use_tls=self.use_tls,
+            timeout=self.timeout,
+        )
 
-@strawberry.input(description="Input for email message settings")
+
+@strawberry.experimental.pydantic.input(
+    model=EmailMessageInputDTO,
+    name="EmailMessageInput",
+    description="Input for email message settings",
+)
 class EmailMessageInput:
     from_email: str
     to_emails: list[str]
@@ -595,8 +633,19 @@ class EmailMessageInput:
             subject_template=self.subject_template,
         )
 
+    def to_pydantic(self) -> EmailMessageInputDTO:
+        return EmailMessageInputDTO(
+            from_email=self.from_email,
+            to_emails=self.to_emails,
+            subject_template=self.subject_template,
+        )
 
-@strawberry.input(description="Input for email notification channel configuration")
+
+@strawberry.experimental.pydantic.input(
+    model=EmailSpecInputDTO,
+    name="EmailSpecInput",
+    description="Input for email notification channel configuration",
+)
 class EmailSpecInput:
     smtp: SMTPConnectionInput
     message: EmailMessageInput
@@ -609,10 +658,18 @@ class EmailSpecInput:
             auth=self.auth.to_dataclass() if self.auth else None,
         )
 
+    def to_pydantic(self) -> EmailSpecInputDTO:
+        return EmailSpecInputDTO(
+            smtp=self.smtp.to_pydantic(),
+            message=self.message.to_pydantic(),
+            auth=self.auth.to_pydantic() if self.auth else None,
+        )
 
-@strawberry.input(
+
+@strawberry.experimental.pydantic.input(
+    model=NotificationChannelSpecInputDTO,
+    name="NotificationChannelSpecInput",
     description="Input for notification channel configuration. Exactly one of webhook or email must be set.",
-    one_of=True,
 )
 class NotificationChannelSpecInput:
     webhook: WebhookSpecInput | None = UNSET
@@ -633,6 +690,16 @@ class NotificationChannelSpecInput:
         if self.email is not None and self.email is not UNSET:
             return NotificationChannelType.EMAIL
         raise InvalidNotificationChannelSpec("Exactly one of webhook or email must be set")
+
+    def to_pydantic(self) -> NotificationChannelSpecInputDTO:
+        return NotificationChannelSpecInputDTO(
+            webhook=self.webhook.to_pydantic()
+            if (self.webhook is not None and self.webhook is not UNSET)
+            else None,
+            email=self.email.to_pydantic()
+            if (self.email is not None and self.email is not UNSET)
+            else None,
+        )
 
 
 @strawberry.experimental.pydantic.input(

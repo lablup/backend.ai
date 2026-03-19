@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from abc import ABC, abstractmethod
+from abc import ABC
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
@@ -28,13 +28,12 @@ if TYPE_CHECKING:
 
 
 class GQLFilter(ABC):
-    """Abstract base class for GraphQL filter types.
+    """Base class for GraphQL filter types.
 
-    All GraphQL filter input types should inherit from this ABC
-    to ensure they implement the build_conditions method.
+    All GraphQL filter input types should inherit from this class.
+    Subclasses may implement build_conditions() for legacy adapter usage.
     """
 
-    @abstractmethod
     def build_conditions(self) -> list[QueryCondition]:
         """Build query conditions from this filter.
 
@@ -45,13 +44,12 @@ class GQLFilter(ABC):
 
 
 class GQLOrderBy(ABC):
-    """Abstract base class for GraphQL order by types.
+    """Base class for GraphQL order by types.
 
-    All GraphQL order by input types should inherit from this ABC
-    to ensure they implement the to_query_order method.
+    All GraphQL order by input types should inherit from this class.
+    Subclasses may implement to_query_order() for legacy adapter usage.
     """
 
-    @abstractmethod
     def to_query_order(self) -> QueryOrder:
         """Convert to repository QueryOrder.
 
