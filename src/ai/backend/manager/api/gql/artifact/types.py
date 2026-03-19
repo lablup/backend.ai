@@ -775,7 +775,7 @@ class SourceInfo:
     - Source: Original external registry where it was discovered
     """)
 )
-class Artifact(PydanticNodeMixin):
+class Artifact(PydanticNodeMixin[ArtifactNode]):
     id: NodeID[str]
     name: str
     type: ArtifactType
@@ -903,7 +903,7 @@ class Artifact(PydanticNodeMixin):
     Most HuggingFace models only have a 'main' revision.
     """)
 )
-class ArtifactRevision(PydanticNodeMixin):
+class ArtifactRevision(PydanticNodeMixin[ArtifactRevisionNode]):
     id: NodeID[str]
     status: ArtifactStatus
     remote_status: ArtifactRemoteStatus | None = strawberry.field(description="Added in 25.15.0")

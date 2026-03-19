@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Self
+from typing import Any, Self
 from uuid import UUID
 
 import strawberry
@@ -65,7 +65,7 @@ class BlueGreenStrategySpecGQL(DeploymentStrategySpecGQL):
     name="DeploymentPolicy",
     description="Added in 25.19.0. Deployment policy configuration.",
 )
-class DeploymentPolicyGQL(PydanticNodeMixin):
+class DeploymentPolicyGQL(PydanticNodeMixin[Any]):
     id: NodeID[str]
     strategy_spec: DeploymentStrategySpecGQL
     rollback_on_failure: bool

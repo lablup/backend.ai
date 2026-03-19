@@ -340,7 +340,7 @@ class KernelV2LifecycleInfoGQL:
     name="KernelV2",
     description="Added in 26.2.0. Represents a kernel (compute container) in Backend.AI.",
 )
-class KernelV2GQL(PydanticNodeMixin):
+class KernelV2GQL(PydanticNodeMixin[KernelNode]):
     """Kernel type representing a compute container."""
 
     id: NodeID[str]
@@ -562,60 +562,66 @@ class KernelV2GQL(PydanticNodeMixin):
         return [cls.from_kernel_info(data) if data is not None else None for data in results]
 
     @classmethod
-    def from_node(cls, node: KernelNode) -> Self:
+    def from_pydantic(
+        cls,
+        dto: KernelNode,
+        *,
+        id_field: str = "id",
+        extra: dict[str, Any] | None = None,
+    ) -> Self:
         """Create KernelV2GQL from KernelNode DTO (adapter search results)."""
         from ai.backend.common.types import SessionResult
         from ai.backend.manager.data.kernel.types import KernelStatus as KernelStatusInternal
 
-        occupied_slots = ResourceSlotGQL.from_resource_slot(node.resource.occupied_slots or {})
-        requested_slots = ResourceSlotGQL.from_resource_slot(node.resource.requested_slots or {})
-        shares = ResourceSlotGQL.from_resource_slot(node.resource.occupied_shares or {})
+        occupied_slots = ResourceSlotGQL.from_resource_slot(dto.resource.occupied_slots or {})
+        requested_slots = ResourceSlotGQL.from_resource_slot(dto.resource.requested_slots or {})
+        shares = ResourceSlotGQL.from_resource_slot(dto.resource.occupied_shares or {})
 
-        status = KernelV2StatusGQL.from_internal(KernelStatusInternal(node.lifecycle.status))
-        result = SessionV2ResultGQL.from_internal(SessionResult(node.lifecycle.result))
+        status = KernelV2StatusGQL.from_internal(KernelStatusInternal(dto.lifecycle.status))
+        result = SessionV2ResultGQL.from_internal(SessionResult(dto.lifecycle.result))
 
         return cls(
-            id=ID(str(node.id)),
-            startup_command=node.startup_command,
+            id=ID(str(dto.id)),
+            startup_command=dto.startup_command,
             session_info=KernelV2SessionInfoGQL(
-                session_id=node.session.session_id,
-                creation_id=node.session.creation_id,
-                name=node.session.name,
-                session_type=SessionTypes(node.session.session_type),
+                session_id=dto.session.session_id,
+                creation_id=dto.session.creation_id,
+                name=dto.session.name,
+                session_type=SessionTypes(dto.session.session_type),
             ),
             user_info=KernelV2UserInfoGQL(
-                user_id=node.user.user_uuid,
-                access_key=node.user.access_key,
-                domain_name=node.user.domain_name,
-                group_id=node.user.group_id,
+                user_id=dto.user.user_uuid,
+                access_key=dto.user.access_key,
+                domain_name=dto.user.domain_name,
+                group_id=dto.user.group_id,
             ),
             network=KernelV2NetworkInfoGQL(
                 service_ports=None,
                 preopen_ports=None,
             ),
             cluster=KernelV2ClusterInfoGQL(
-                cluster_role=node.cluster.cluster_role,
-                cluster_idx=node.cluster.cluster_idx,
-                local_rank=node.cluster.local_rank,
-                cluster_hostname=node.cluster.cluster_hostname,
+                cluster_role=dto.cluster.cluster_role,
+                cluster_idx=dto.cluster.cluster_idx,
+                local_rank=dto.cluster.local_rank,
+                cluster_hostname=dto.cluster.cluster_hostname,
             ),
             resource=KernelV2ResourceInfoGQL(
-                agent_id=node.resource.agent,
-                resource_group_name=node.resource.scaling_group,
-                container_id=node.resource.container_id,
+                agent_id=dto.resource.agent,
+                resource_group_name=dto.resource.scaling_group,
+                container_id=dto.resource.container_id,
                 allocation=ResourceAllocationGQL(
                     requested=requested_slots,
                     used=occupied_slots,
                 ),
                 shares=shares,
-                resource_opts=ResourceOptsGQL.from_mapping(node.resource.resource_opts or {}),
+                resource_opts=ResourceOptsGQL.from_mapping(dto.resource.resource_opts or {}),
             ),
             lifecycle=KernelV2LifecycleInfoGQL(
                 status=status,
                 result=result,
-                created_at=node.lifecycle.created_at,
-                terminated_at=node.lifecycle.terminated_at,
-                starts_at=node.lifecycle.starts_at,
+                created_at=dto.lifecycle.created_at,
+                terminated_at=dto.lifecycle.terminated_at,
+                starts_at=dto.lifecycle.starts_at,
             ),
         )
 

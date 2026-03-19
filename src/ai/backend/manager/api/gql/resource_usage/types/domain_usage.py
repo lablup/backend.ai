@@ -60,7 +60,7 @@ from .project_usage import (
         "used to calculate fair share factors."
     ),
 )
-class DomainUsageBucketGQL(PydanticNodeMixin):
+class DomainUsageBucketGQL(PydanticNodeMixin[DomainUsageBucketNode]):
     """Domain-level usage bucket containing aggregated resource usage for a period."""
 
     id: NodeID[str]
@@ -135,21 +135,27 @@ class DomainUsageBucketGQL(PydanticNodeMixin):
         )
 
     @classmethod
-    def from_node(cls, node: DomainUsageBucketNode) -> Self:
+    def from_pydantic(
+        cls,
+        dto: DomainUsageBucketNode,
+        *,
+        id_field: str = "id",
+        extra: dict[str, Any] | None = None,
+    ) -> Self:
         """Create DomainUsageBucketGQL from DomainUsageBucketNode DTO (adapter search results)."""
         return cls(
-            id=ID(str(node.id)),
-            domain_name=node.domain_name,
-            resource_group_name=node.resource_group,
+            id=ID(str(dto.id)),
+            domain_name=dto.domain_name,
+            resource_group_name=dto.resource_group,
             metadata=UsageBucketMetadataGQL(
-                period_start=node.period_start,
-                period_end=node.period_end,
-                decay_unit_days=node.decay_unit_days,
-                created_at=node.created_at,
-                updated_at=node.updated_at,
+                period_start=dto.period_start,
+                period_end=dto.period_end,
+                decay_unit_days=dto.decay_unit_days,
+                created_at=dto.created_at,
+                updated_at=dto.updated_at,
             ),
-            resource_usage=ResourceSlotGQL.from_resource_slot(node.resource_usage),
-            capacity_snapshot=ResourceSlotGQL.from_resource_slot(node.capacity_snapshot),
+            resource_usage=ResourceSlotGQL.from_resource_slot(dto.resource_usage),
+            capacity_snapshot=ResourceSlotGQL.from_resource_slot(dto.capacity_snapshot),
         )
 
     @strawberry.field(  # type: ignore[misc]
@@ -190,7 +196,7 @@ class DomainUsageBucketGQL(PydanticNodeMixin):
             limit=limit,
             offset=offset,
         )
-        nodes = [ProjectUsageBucketGQL.from_node(item) for item in payload.items]
+        nodes = [ProjectUsageBucketGQL.from_pydantic(item) for item in payload.items]
         edges = [
             ProjectUsageBucketEdge(node=node, cursor=encode_cursor(str(node.id))) for node in nodes
         ]

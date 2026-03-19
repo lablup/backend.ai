@@ -20,6 +20,9 @@ from ai.backend.common.dto.manager.v2.vfs_storage.request import (
 from ai.backend.common.dto.manager.v2.vfs_storage.response import (
     DeleteVFSStoragePayload as DeleteVFSStoragePayloadDTO,
 )
+from ai.backend.common.dto.manager.v2.vfs_storage.response import (
+    VFSStorageNode,
+)
 from ai.backend.manager.api.gql.base import encode_cursor
 from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin
 from ai.backend.manager.data.vfs_storage.types import VFSStorageData
@@ -30,7 +33,7 @@ from .types import StrawberryGQLContext
 
 
 @strawberry.type(description="Added in 25.16.0. VFS Storage configuration")
-class VFSStorage(PydanticNodeMixin):
+class VFSStorage(PydanticNodeMixin[VFSStorageNode]):
     id: NodeID[str]
     name: str
     host: str

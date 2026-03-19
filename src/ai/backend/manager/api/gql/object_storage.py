@@ -29,6 +29,9 @@ from ai.backend.common.dto.manager.v2.object_storage.request import (
     UpdateObjectStorageInput as UpdateObjectStorageInputDTO,
 )
 from ai.backend.common.dto.manager.v2.object_storage.response import (
+    ObjectStorageNode,
+)
+from ai.backend.common.dto.manager.v2.object_storage.response import (
     PresignedDownloadURLPayload as PresignedDownloadURLPayloadDTO,
 )
 from ai.backend.common.dto.manager.v2.object_storage.response import (
@@ -52,7 +55,7 @@ from .types import StrawberryGQLContext
 
 
 @strawberry.type(description="Added in 25.14.0")
-class ObjectStorage(PydanticNodeMixin):
+class ObjectStorage(PydanticNodeMixin[ObjectStorageNode]):
     id: NodeID[str]
     name: str
     host: str

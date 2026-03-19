@@ -58,7 +58,7 @@ async def admin_kernels_v2(
             offset=offset,
         )
     )
-    nodes = [KernelV2GQL.from_node(node) for node in payload.items]
+    nodes = [KernelV2GQL.from_pydantic(node) for node in payload.items]
     edges = [KernelV2EdgeGQL(node=node, cursor=encode_cursor(node.id)) for node in nodes]
     return KernelV2ConnectionGQL(
         edges=edges,
@@ -101,7 +101,7 @@ async def session_kernels_v2(
             offset=offset,
         ),
     )
-    nodes = [KernelV2GQL.from_node(node) for node in payload.items]
+    nodes = [KernelV2GQL.from_pydantic(node) for node in payload.items]
     edges = [KernelV2EdgeGQL(node=node, cursor=encode_cursor(node.id)) for node in nodes]
     return KernelV2ConnectionGQL(
         edges=edges,

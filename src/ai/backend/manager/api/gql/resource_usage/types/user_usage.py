@@ -51,7 +51,7 @@ from .common_calculations import (
         "consumption for a specific time period. This is the most granular level of usage tracking."
     ),
 )
-class UserUsageBucketGQL(PydanticNodeMixin):
+class UserUsageBucketGQL(PydanticNodeMixin[UserUsageBucketNode]):
     """User-level usage bucket containing aggregated resource usage for a period."""
 
     id: NodeID[str]
@@ -128,23 +128,29 @@ class UserUsageBucketGQL(PydanticNodeMixin):
         )
 
     @classmethod
-    def from_node(cls, node: UserUsageBucketNode) -> Self:
+    def from_pydantic(
+        cls,
+        dto: UserUsageBucketNode,
+        *,
+        id_field: str = "id",
+        extra: dict[str, Any] | None = None,
+    ) -> Self:
         """Create UserUsageBucketGQL from UserUsageBucketNode DTO (adapter search results)."""
         return cls(
-            id=ID(str(node.id)),
-            user_uuid=node.user_uuid,
-            project_id=node.project_id,
-            domain_name=node.domain_name,
-            resource_group_name=node.resource_group,
+            id=ID(str(dto.id)),
+            user_uuid=dto.user_uuid,
+            project_id=dto.project_id,
+            domain_name=dto.domain_name,
+            resource_group_name=dto.resource_group,
             metadata=UsageBucketMetadataGQL(
-                period_start=node.period_start,
-                period_end=node.period_end,
-                decay_unit_days=node.decay_unit_days,
-                created_at=node.created_at,
-                updated_at=node.updated_at,
+                period_start=dto.period_start,
+                period_end=dto.period_end,
+                decay_unit_days=dto.decay_unit_days,
+                created_at=dto.created_at,
+                updated_at=dto.updated_at,
             ),
-            resource_usage=ResourceSlotGQL.from_resource_slot(node.resource_usage),
-            capacity_snapshot=ResourceSlotGQL.from_resource_slot(node.capacity_snapshot),
+            resource_usage=ResourceSlotGQL.from_resource_slot(dto.resource_usage),
+            capacity_snapshot=ResourceSlotGQL.from_resource_slot(dto.capacity_snapshot),
         )
 
 

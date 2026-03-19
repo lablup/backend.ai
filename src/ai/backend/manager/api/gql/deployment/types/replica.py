@@ -184,7 +184,7 @@ class ReplicaOrderBy:
 
 
 @strawberry.type
-class ModelReplica(PydanticNodeMixin):
+class ModelReplica(PydanticNodeMixin[ReplicaNodeDTO]):
     """
     Added in 25.19.0.
 
@@ -257,16 +257,22 @@ class ModelReplica(PydanticNodeMixin):
         )
 
     @classmethod
-    def from_node(cls, node: ReplicaNodeDTO) -> Self:
+    def from_pydantic(
+        cls,
+        dto: ReplicaNodeDTO,
+        *,
+        id_field: str = "id",
+        extra: dict[str, Any] | None = None,
+    ) -> Self:
         return cls(
-            id=ID(str(node.id)),
-            _revision_id=node.revision_id,
-            _session_id=node.session_id,
-            readiness_status=ReadinessStatus(node.readiness_status),
-            liveness_status=LivenessStatus(node.liveness_status),
-            activeness_status=ActivenessStatus(node.activeness_status),
-            weight=node.weight,
-            created_at=node.created_at,
+            id=ID(str(dto.id)),
+            _revision_id=dto.revision_id,
+            _session_id=dto.session_id,
+            readiness_status=ReadinessStatus(dto.readiness_status),
+            liveness_status=LivenessStatus(dto.liveness_status),
+            activeness_status=ActivenessStatus(dto.activeness_status),
+            weight=dto.weight,
+            created_at=dto.created_at,
         )
 
 

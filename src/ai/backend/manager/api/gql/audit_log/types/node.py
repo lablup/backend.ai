@@ -52,7 +52,7 @@ class AuditLogStatusGQL(StrEnum):
     name="AuditLogV2",
     description="Represents an audit log entry tracking system operations.",
 )
-class AuditLogV2GQL(PydanticNodeMixin):
+class AuditLogV2GQL(PydanticNodeMixin[AuditLogNode]):
     id: NodeID[str] = strawberry.field(
         description="Unique identifier of the audit log entry (UUID)."
     )
@@ -137,20 +137,26 @@ class AuditLogV2GQL(PydanticNodeMixin):
         )
 
     @classmethod
-    def from_node(cls, node: AuditLogNode) -> Self:
+    def from_pydantic(
+        cls,
+        dto: AuditLogNode,
+        *,
+        id_field: str = "id",
+        extra: dict[str, Any] | None = None,
+    ) -> Self:
         return cls(
-            id=ID(str(node.id)),
-            _triggered_by=node.triggered_by,
-            action_id=node.action_id,
-            entity_type=node.entity_type,
-            operation=node.operation,
-            entity_id=node.entity_id,
-            created_at=node.created_at,
-            request_id=node.request_id,
-            triggered_by=node.triggered_by,
-            description=node.description,
-            duration=node.duration,
-            status=AuditLogStatusGQL(AuditLogStatusDTO(node.status).value),
+            id=ID(str(dto.id)),
+            _triggered_by=dto.triggered_by,
+            action_id=dto.action_id,
+            entity_type=dto.entity_type,
+            operation=dto.operation,
+            entity_id=dto.entity_id,
+            created_at=dto.created_at,
+            request_id=dto.request_id,
+            triggered_by=dto.triggered_by,
+            description=dto.description,
+            duration=dto.duration,
+            status=AuditLogStatusGQL(AuditLogStatusDTO(dto.status).value),
         )
 
 

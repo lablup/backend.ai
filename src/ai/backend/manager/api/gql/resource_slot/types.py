@@ -150,7 +150,7 @@ class NumberFormatGQL:
         and formatting rules for a specific resource (e.g., cpu, mem, cuda.device).
     """),
 )
-class ResourceSlotTypeGQL(PydanticNodeMixin):
+class ResourceSlotTypeGQL(PydanticNodeMixin[Any]):
     id: NodeID[str]
     slot_name: str = strawberry.field(
         description="Unique identifier for the resource slot (e.g., 'cpu', 'mem', 'cuda.device')."
@@ -289,7 +289,7 @@ class ResourceSlotTypeOrderByGQL:
         Represents one row from the agent_resources table.
     """),
 )
-class AgentResourceSlotGQL(PydanticNodeMixin):
+class AgentResourceSlotGQL(PydanticNodeMixin[Any]):
     """Per-agent, per-slot resource capacity and usage."""
 
     id: NodeID[str]
@@ -415,7 +415,7 @@ class AgentResourceSlotOrderByGQL:
         Represents one row from the resource_allocations table.
     """),
 )
-class KernelResourceAllocationGQL(PydanticNodeMixin):
+class KernelResourceAllocationGQL(PydanticNodeMixin[Any]):
     """Per-kernel, per-slot resource allocation."""
 
     id: NodeID[str]

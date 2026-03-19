@@ -11,6 +11,7 @@ from strawberry.relay import Connection, Edge, NodeID
 from strawberry.scalars import JSON
 
 from ai.backend.common.dto.manager.v2.agent.request import AgentFilter, AgentOrder
+from ai.backend.common.dto.manager.v2.agent.response import AgentNode
 from ai.backend.common.dto.manager.v2.agent.types import (
     AgentOrderField,
     AgentStatusEnum,
@@ -28,7 +29,6 @@ from ai.backend.manager.data.agent.types import AgentDetailData, AgentStatus
 from ai.backend.manager.models.rbac.permission_defs import AgentPermission
 
 if TYPE_CHECKING:
-    from ai.backend.common.dto.manager.v2.agent.response import AgentNode
     from ai.backend.manager.api.gql.kernel.types import (
         KernelV2ConnectionGQL,
         KernelV2FilterGQL,
@@ -332,7 +332,7 @@ class AgentNetworkInfoGQL:
 @strawberry.type(
     name="AgentV2", description="Added in 26.1.0. Strawberry-based Agent type replacing AgentNode."
 )
-class AgentV2GQL(PydanticNodeMixin):
+class AgentV2GQL(PydanticNodeMixin[AgentNode]):
     _agent_id: strawberry.Private[AgentId]
     id: NodeID[str]
     resource_info: AgentResourceGQL = strawberry.field(
@@ -432,7 +432,7 @@ class AgentV2GQL(PydanticNodeMixin):
         )
         from ai.backend.manager.api.gql.kernel.types import KernelV2GQL
 
-        nodes = [KernelV2GQL.from_node(node) for node in payload.items]
+        nodes = [KernelV2GQL.from_pydantic(node) for node in payload.items]
         edges = [KernelV2EdgeGQL(node=node, cursor=encode_cursor(node.id)) for node in nodes]
         return KernelV2ConnectionGQL(
             edges=edges,
@@ -492,7 +492,7 @@ class AgentV2GQL(PydanticNodeMixin):
                 offset=offset,
             ),
         )
-        nodes = [SessionV2GQL.from_node(node) for node in payload.items]
+        nodes = [SessionV2GQL.from_pydantic(node) for node in payload.items]
         edges = [SessionV2EdgeGQL(node=node, cursor=encode_cursor(node.id)) for node in nodes]
         return SessionV2ConnectionGQL(
             edges=edges,
@@ -660,38 +660,44 @@ class AgentV2GQL(PydanticNodeMixin):
         )
 
     @classmethod
-    def from_node(cls, node: AgentNode) -> Self:
+    def from_pydantic(
+        cls,
+        dto: AgentNode,
+        *,
+        id_field: str = "id",
+        extra: dict[str, Any] | None = None,
+    ) -> Self:
         return cls(
-            _agent_id=AgentId(node.id),
-            id=ID(node.id),
+            _agent_id=AgentId(dto.id),
+            id=ID(dto.id),
             resource_info=AgentResourceGQL(
-                capacity=node.resource_info.capacity,
-                used=node.resource_info.used,
-                free=node.resource_info.free,
+                capacity=dto.resource_info.capacity,
+                used=dto.resource_info.used,
+                free=dto.resource_info.free,
             ),
             status_info=AgentStatusInfoGQL(
-                status=AgentStatus(node.status_info.status),
-                status_changed=node.status_info.status_changed,
-                first_contact=node.status_info.first_contact,
-                lost_at=node.status_info.lost_at,
-                schedulable=node.status_info.schedulable,
+                status=AgentStatus(dto.status_info.status),
+                status_changed=dto.status_info.status_changed,
+                first_contact=dto.status_info.first_contact,
+                lost_at=dto.status_info.lost_at,
+                schedulable=dto.status_info.schedulable,
             ),
             system_info=AgentSystemInfoGQL(
-                architecture=node.system_info.architecture,
-                version=node.system_info.version,
+                architecture=dto.system_info.architecture,
+                version=dto.system_info.version,
                 auto_terminate_abusing_kernel=False,
                 compute_plugins=(
-                    ComputePluginsGQL.from_mapping(node.system_info.compute_plugins)
-                    if node.system_info.compute_plugins is not None
+                    ComputePluginsGQL.from_mapping(dto.system_info.compute_plugins)
+                    if dto.system_info.compute_plugins is not None
                     else ComputePluginsGQL(entries=[])
                 ),
             ),
             network_info=AgentNetworkInfoGQL(
-                region=node.network_info.region,
-                addr=node.network_info.addr,
+                region=dto.network_info.region,
+                addr=dto.network_info.addr,
             ),
-            permissions=[AgentPermissionGQL(p) for p in node.permissions],
-            scaling_group=node.scaling_group,
+            permissions=[AgentPermissionGQL(p) for p in dto.permissions],
+            scaling_group=dto.scaling_group,
         )
 
 

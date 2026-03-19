@@ -7,7 +7,7 @@ it carries the Node interface through to the subclass.
 Usage::
 
     @strawberry.type(name="FooV2")
-    class FooGQL(PydanticNodeMixin):
+    class FooGQL(PydanticNodeMixin[FooDTONode]):
         id: NodeID[str]
         name: str = strawberry.field(description="...")
 
@@ -27,12 +27,12 @@ from strawberry.relay import Node
 from strawberry.types.base import StrawberryObjectDefinition
 
 
-class PydanticNodeMixin(Node):
+class PydanticNodeMixin[T_DTO: BaseModel](Node):
     """Relay Node mixin with ``from_pydantic()`` conversion.
 
     Inherits ``Node`` so that concrete types only need::
 
-        class FooGQL(PydanticNodeMixin): ...
+        class FooGQL(PydanticNodeMixin[FooDTONode]): ...
 
     Strawberry's ``_get_interfaces()`` walks the MRO and appends every class
     whose ``__strawberry_definition__.is_interface`` is ``True``.  Without the
@@ -62,7 +62,7 @@ class PydanticNodeMixin(Node):
     @classmethod
     def from_pydantic(
         cls,
-        dto: BaseModel,
+        dto: T_DTO,
         *,
         id_field: str = "id",
         extra: dict[str, Any] | None = None,

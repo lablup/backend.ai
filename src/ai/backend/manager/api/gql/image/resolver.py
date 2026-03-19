@@ -80,7 +80,7 @@ async def admin_images_v2(
     )
     edges = [
         ImageV2EdgeGQL(
-            node=ImageV2GQL.from_node(node),
+            node=ImageV2GQL.from_pydantic(node),
             cursor=encode_cursor(node.id),
         )
         for node in payload.items
@@ -153,7 +153,7 @@ async def container_registry_images_v2(
     )
     edges = [
         ImageV2EdgeGQL(
-            node=ImageV2GQL.from_node(node),
+            node=ImageV2GQL.from_pydantic(node),
             cursor=encode_cursor(node.id),
         )
         for node in payload.items
@@ -207,7 +207,7 @@ async def admin_image_aliases(
     )
     edges = [
         ImageV2AliasEdgeGQL(
-            node=ImageV2AliasGQL.from_node(node),
+            node=ImageV2AliasGQL.from_pydantic(node),
             cursor=encode_cursor(node.id),
         )
         for node in payload.items
@@ -278,7 +278,7 @@ async def image_scoped_aliases(
     )
     edges = [
         ImageV2AliasEdgeGQL(
-            node=ImageV2AliasGQL.from_node(node),
+            node=ImageV2AliasGQL.from_pydantic(node),
             cursor=encode_cursor(node.id),
         )
         for node in payload.items

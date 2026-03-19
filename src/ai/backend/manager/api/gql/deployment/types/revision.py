@@ -272,7 +272,7 @@ class ClusterConfig:
 
 
 @strawberry.type
-class ModelRevision(PydanticNodeMixin):
+class ModelRevision(PydanticNodeMixin[RevisionNodeDTO]):
     """
     Added in 25.19.0.
 
@@ -336,8 +336,14 @@ class ModelRevision(PydanticNodeMixin):
         )
 
     @classmethod
-    def from_node(cls, node: RevisionNodeDTO) -> Self:
-        info = node.revision_info
+    def from_pydantic(
+        cls,
+        dto: RevisionNodeDTO,
+        *,
+        id_field: str = "id",
+        extra: dict[str, Any] | None = None,
+    ) -> Self:
+        info = dto.revision_info
         environ_gql: EnvironmentVariablesGQL | None = None
         if info.environ:
             environ_gql = EnvironmentVariablesGQL(
@@ -358,7 +364,7 @@ class ModelRevision(PydanticNodeMixin):
                 mount_destination=m.mount_destination or "",
                 _vfolder_id=m.vfolder_id,
             )
-            for m in node.extra_mounts
+            for m in dto.extra_mounts
         ]
         extra_mount_edges = [
             ExtraVFolderMountEdge(node=n, cursor=str(n.id)) for n in extra_mount_nodes
@@ -376,8 +382,8 @@ class ModelRevision(PydanticNodeMixin):
             ),
         )
         return cls(
-            id=ID(str(node.id)),
-            name=node.name,
+            id=ID(str(dto.id)),
+            name=dto.name,
             cluster_config=ClusterConfig(
                 mode=ClusterModeGQL(info.cluster_mode.name),
                 size=info.cluster_size,
@@ -395,7 +401,7 @@ class ModelRevision(PydanticNodeMixin):
             model_mount_config=model_mount_config,
             extra_mounts=extra_mounts,
             _image_id=info.image_id,
-            created_at=node.created_at,
+            created_at=dto.created_at,
         )
 
 

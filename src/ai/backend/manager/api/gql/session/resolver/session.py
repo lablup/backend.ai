@@ -43,7 +43,7 @@ async def admin_sessions_v2(
             offset=offset,
         )
     )
-    nodes = [SessionV2GQL.from_node(node) for node in payload.items]
+    nodes = [SessionV2GQL.from_pydantic(node) for node in payload.items]
     edges = [SessionV2EdgeGQL(node=node, cursor=encode_cursor(node.id)) for node in nodes]
     return SessionV2ConnectionGQL(
         edges=edges,

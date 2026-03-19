@@ -250,7 +250,7 @@ async def deployments(
             offset=offset,
         )
     )
-    nodes = [ModelDeployment.from_node(item) for item in payload.items]
+    nodes = [ModelDeployment.from_pydantic(item) for item in payload.items]
     edges = [ModelDeploymentEdge(node=node, cursor=encode_cursor(str(node.id))) for node in nodes]
     return ModelDeploymentConnection(
         count=payload.total_count,

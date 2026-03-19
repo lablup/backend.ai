@@ -6,7 +6,7 @@ from collections.abc import Iterable
 from datetime import datetime
 from decimal import Decimal
 from enum import StrEnum
-from typing import Self, assert_never
+from typing import Any, Self, assert_never
 
 import strawberry
 from strawberry import Info
@@ -358,7 +358,7 @@ class ResourceInfoGQL:
     name="ResourceGroup",
     description="Added in 26.1.0. Resource group with structured configuration",
 )
-class ResourceGroupGQL(PydanticNodeMixin):
+class ResourceGroupGQL(PydanticNodeMixin[Any]):
     id: NodeID[str] = strawberry.field(
         description="Relay-style global node identifier for the resource group"
     )
@@ -399,32 +399,38 @@ class ResourceGroupGQL(PydanticNodeMixin):
         return [cls.from_dataclass(data) if data is not None else None for data in results]
 
     @classmethod
-    def from_node(cls, data: ScalingGroupData) -> Self:
+    def from_pydantic(
+        cls,
+        dto: ScalingGroupData,
+        *,
+        id_field: str = "id",
+        extra: dict[str, Any] | None = None,
+    ) -> Self:
         return cls(
-            id=data.name,
-            name=data.name,
+            id=dto.name,
+            name=dto.name,
             status=ResourceGroupStatusGQL(
-                is_active=data.status.is_active,
-                is_public=data.status.is_public,
+                is_active=dto.status.is_active,
+                is_public=dto.status.is_public,
             ),
             metadata=ResourceGroupMetadataGQL(
-                description=data.metadata.description if data.metadata.description else None,
-                created_at=data.metadata.created_at,
+                description=dto.metadata.description if dto.metadata.description else None,
+                created_at=dto.metadata.created_at,
             ),
             network=ResourceGroupNetworkConfigGQL(
-                wsproxy_addr=data.network.wsproxy_addr if data.network.wsproxy_addr else None,
-                use_host_network=data.network.use_host_network,
+                wsproxy_addr=dto.network.wsproxy_addr if dto.network.wsproxy_addr else None,
+                use_host_network=dto.network.use_host_network,
             ),
             scheduler=ResourceGroupSchedulerConfigGQL(
-                type=SchedulerTypeGQL.from_scheduler_type(data.scheduler.name),
-                preemption=PreemptionConfigGQL.from_dataclass(data.scheduler.options.preemption),
+                type=SchedulerTypeGQL.from_scheduler_type(dto.scheduler.name),
+                preemption=PreemptionConfigGQL.from_dataclass(dto.scheduler.options.preemption),
             ),
-            _fair_share_spec_data=data.fair_share_spec,
+            _fair_share_spec_data=dto.fair_share_spec,
         )
 
     @classmethod
     def from_dataclass(cls, data: ScalingGroupData) -> Self:
-        return cls.from_node(data)
+        return cls.from_pydantic(data)
 
     @strawberry.field(  # type: ignore[misc]
         description=(

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import uuid
 from collections.abc import Iterable
-from typing import Self
+from typing import Any, Self
 
 import strawberry
 from strawberry import ID, Info
@@ -36,7 +36,7 @@ from .types import StrawberryGQLContext
     - File System (VFS): Uses directory path prefix for namespace distinction
     """)
 )
-class StorageNamespace(PydanticNodeMixin):
+class StorageNamespace(PydanticNodeMixin[Any]):
     id: NodeID[str]
     storage_id: ID
     namespace: str

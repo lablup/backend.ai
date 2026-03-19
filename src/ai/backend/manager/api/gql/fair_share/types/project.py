@@ -65,7 +65,7 @@ if TYPE_CHECKING:
     name="ProjectFairShare",
     description="Added in 26.1.0. Project-level fair share data representing scheduling priority for a specific project. The fair share factor determines resource allocation relative to other projects in the same domain.",
 )
-class ProjectFairShareGQL(PydanticNodeMixin):
+class ProjectFairShareGQL(PydanticNodeMixin[ProjectFairShareNode]):
     """Project-level fair share data with calculated fair share factor."""
 
     id: NodeID[str]
@@ -189,44 +189,50 @@ class ProjectFairShareGQL(PydanticNodeMixin):
         )
 
     @classmethod
-    def from_node(cls, node: ProjectFairShareNode) -> ProjectFairShareGQL:
+    def from_pydantic(
+        cls,
+        dto: ProjectFairShareNode,
+        *,
+        id_field: str = "id",
+        extra: dict[str, Any] | None = None,
+    ) -> ProjectFairShareGQL:
         """Convert ProjectFairShareNode pydantic DTO to GraphQL type."""
         resource_weights = [
             ResourceWeightEntryGQL(
                 resource_type=entry.resource_type,
                 weight=Decimal(entry.quantity),
-                uses_default=entry.resource_type in node.spec.uses_default_resource_types,
+                uses_default=entry.resource_type in dto.spec.uses_default_resource_types,
             )
-            for entry in node.spec.resource_weights.entries
+            for entry in dto.spec.resource_weights.entries
         ]
         spec = FairShareSpecGQL(
-            weight=node.spec.weight,
-            uses_default=node.spec.uses_default_weight,
-            half_life_days=node.spec.half_life_days,
-            lookback_days=node.spec.lookback_days,
-            decay_unit_days=node.spec.decay_unit_days,
+            weight=dto.spec.weight,
+            uses_default=dto.spec.uses_default_weight,
+            half_life_days=dto.spec.half_life_days,
+            lookback_days=dto.spec.lookback_days,
+            decay_unit_days=dto.spec.decay_unit_days,
             resource_weights=resource_weights,
         )
         snapshot = FairShareCalculationSnapshotGQL(
-            fair_share_factor=node.calculation_snapshot.fair_share_factor,
+            fair_share_factor=dto.calculation_snapshot.fair_share_factor,
             total_decayed_usage=ResourceSlotGQL.from_resource_slot({
                 e.resource_type: e.quantity
-                for e in node.calculation_snapshot.total_decayed_usage.entries
+                for e in dto.calculation_snapshot.total_decayed_usage.entries
             }),
-            normalized_usage=node.calculation_snapshot.normalized_usage,
-            lookback_start=node.calculation_snapshot.lookback_start,
-            lookback_end=node.calculation_snapshot.lookback_end,
-            last_calculated_at=node.calculation_snapshot.last_calculated_at,
+            normalized_usage=dto.calculation_snapshot.normalized_usage,
+            lookback_start=dto.calculation_snapshot.lookback_start,
+            lookback_end=dto.calculation_snapshot.lookback_end,
+            last_calculated_at=dto.calculation_snapshot.last_calculated_at,
         )
         return cls(
-            id=ID(f"{node.resource_group}:{node.project_id}"),
-            resource_group_name=node.resource_group,
-            project_id=node.project_id,
-            domain_name=node.domain_name,
+            id=ID(f"{dto.resource_group}:{dto.project_id}"),
+            resource_group_name=dto.resource_group,
+            project_id=dto.project_id,
+            domain_name=dto.domain_name,
             spec=spec,
             calculation_snapshot=snapshot,
-            created_at=node.created_at,
-            updated_at=node.updated_at,
+            created_at=dto.created_at,
+            updated_at=dto.updated_at,
         )
 
 

@@ -54,7 +54,7 @@ async def replicas(
             offset=offset,
         )
     )
-    nodes = [ModelReplica.from_node(item) for item in payload.items]
+    nodes = [ModelReplica.from_pydantic(item) for item in payload.items]
     edges = [ModelReplicaEdge(node=node, cursor=str(node.id)) for node in nodes]
     return ModelReplicaConnection(
         count=payload.total_count,

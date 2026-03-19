@@ -41,7 +41,7 @@ async def admin_audit_logs_v2(
             offset=offset,
         )
     )
-    nodes = [AuditLogV2GQL.from_node(item) for item in result.items]
+    nodes = [AuditLogV2GQL.from_pydantic(item) for item in result.items]
     edges = [AuditLogV2EdgeGQL(node=node, cursor=encode_cursor(node.id)) for node in nodes]
     return AuditLogV2ConnectionGQL(
         edges=edges,

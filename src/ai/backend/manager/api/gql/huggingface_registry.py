@@ -20,6 +20,9 @@ from ai.backend.common.dto.manager.v2.huggingface_registry.request import (
 from ai.backend.common.dto.manager.v2.huggingface_registry.request import (
     UpdateHuggingFaceRegistryInput as UpdateHuggingFaceRegistryInputDTO,
 )
+from ai.backend.common.dto.manager.v2.huggingface_registry.response import (
+    HuggingFaceRegistryNode,
+)
 from ai.backend.manager.api.gql.base import encode_cursor
 from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin
 from ai.backend.manager.data.huggingface_registry.types import HuggingFaceRegistryData
@@ -31,7 +34,7 @@ from .types import StrawberryGQLContext
 
 
 @strawberry.type(description="Added in 25.14.0")
-class HuggingFaceRegistry(PydanticNodeMixin):
+class HuggingFaceRegistry(PydanticNodeMixin[HuggingFaceRegistryNode]):
     id: NodeID[str]
     url: str
     name: str

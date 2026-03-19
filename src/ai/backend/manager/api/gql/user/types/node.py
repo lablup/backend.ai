@@ -96,7 +96,7 @@ class UserUsageScopeGQL:
         "security (auth settings), container (execution settings), and timestamps."
     ),
 )
-class UserV2GQL(PydanticNodeMixin):
+class UserV2GQL(PydanticNodeMixin[UserNode]):
     """User entity with structured field groups."""
 
     id: NodeID[str] = strawberry.field(description="Unique identifier for the user (UUID).")
@@ -145,7 +145,7 @@ class UserV2GQL(PydanticNodeMixin):
             )
         )
 
-        return UserFairShareGQL.from_node(payload.item)
+        return UserFairShareGQL.from_pydantic(payload.item)
 
     @strawberry.field(  # type: ignore[misc]
         description=(
@@ -196,7 +196,7 @@ class UserV2GQL(PydanticNodeMixin):
             limit=limit,
             offset=offset,
         )
-        nodes = [UserUsageBucketGQL.from_node(item) for item in payload.items]
+        nodes = [UserUsageBucketGQL.from_pydantic(item) for item in payload.items]
         edges = [
             UserUsageBucketEdge(node=node, cursor=encode_cursor(str(node.id))) for node in nodes
         ]
@@ -286,7 +286,7 @@ class UserV2GQL(PydanticNodeMixin):
                 offset=offset,
             ),
         )
-        nodes = [ProjectV2GQL.from_node(node) for node in payload.items]
+        nodes = [ProjectV2GQL.from_pydantic(node) for node in payload.items]
         edges = [ProjectV2Edge(node=node, cursor=encode_cursor(str(node.id))) for node in nodes]
         return ProjectV2Connection(
             edges=edges,
@@ -313,43 +313,49 @@ class UserV2GQL(PydanticNodeMixin):
         return [cls.from_data(data) if data is not None else None for data in results]
 
     @classmethod
-    def from_node(cls, node: UserNode) -> Self:
+    def from_pydantic(
+        cls,
+        dto: UserNode,
+        *,
+        id_field: str = "id",
+        extra: dict[str, Any] | None = None,
+    ) -> Self:
         """Convert UserNode DTO to GraphQL type."""
         return cls(
-            id=ID(str(node.id)),
+            id=ID(str(dto.id)),
             basic_info=UserBasicInfoGQL(
-                username=node.basic_info.username,
-                email=node.basic_info.email,
-                full_name=node.basic_info.full_name,
-                description=node.basic_info.description,
+                username=dto.basic_info.username,
+                email=dto.basic_info.email,
+                full_name=dto.basic_info.full_name,
+                description=dto.basic_info.description,
             ),
             status=UserStatusInfoGQL(
-                status=UserStatusEnumGQL(node.status.status.value),
-                status_info=node.status.status_info,
-                need_password_change=node.status.need_password_change,
+                status=UserStatusEnumGQL(dto.status.status.value),
+                status_info=dto.status.status_info,
+                need_password_change=dto.status.need_password_change,
             ),
             organization=UserOrganizationInfoGQL(
-                domain_name=node.organization.domain_name,
-                role=UserRoleEnumGQL(node.organization.role.value)
-                if node.organization.role
+                domain_name=dto.organization.domain_name,
+                role=UserRoleEnumGQL(dto.organization.role.value)
+                if dto.organization.role
                 else None,
-                resource_policy=node.organization.resource_policy,
-                main_access_key=node.organization.main_access_key,
+                resource_policy=dto.organization.resource_policy,
+                main_access_key=dto.organization.main_access_key,
             ),
             security=UserSecurityInfoGQL(
-                allowed_client_ip=node.security.allowed_client_ip,
-                totp_activated=node.security.totp_activated,
-                totp_activated_at=node.security.totp_activated_at,
-                sudo_session_enabled=node.security.sudo_session_enabled,
+                allowed_client_ip=dto.security.allowed_client_ip,
+                totp_activated=dto.security.totp_activated,
+                totp_activated_at=dto.security.totp_activated_at,
+                sudo_session_enabled=dto.security.sudo_session_enabled,
             ),
             container=UserContainerSettingsGQL(
-                container_uid=node.container.container_uid,
-                container_main_gid=node.container.container_main_gid,
-                container_gids=node.container.container_gids,
+                container_uid=dto.container.container_uid,
+                container_main_gid=dto.container.container_main_gid,
+                container_gids=dto.container.container_gids,
             ),
             timestamps=EntityTimestampsGQL(
-                created_at=node.timestamps.created_at,
-                modified_at=node.timestamps.modified_at,
+                created_at=dto.timestamps.created_at,
+                modified_at=dto.timestamps.modified_at,
             ),
         )
 

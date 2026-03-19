@@ -174,7 +174,7 @@ class ImageV2TagEntryGQL:
     Aliases provide alternative names for images.
     """),
 )
-class ImageV2AliasGQL(PydanticNodeMixin):
+class ImageV2AliasGQL(PydanticNodeMixin[ImageAliasNode]):
     id: NodeID[uuid.UUID]
     alias: str = strawberry.field(description="The alias string for the image.")
 
@@ -196,9 +196,15 @@ class ImageV2AliasGQL(PydanticNodeMixin):
         return cls(id=data.id, alias=data.alias)
 
     @classmethod
-    def from_node(cls, node: ImageAliasNode) -> Self:
+    def from_pydantic(
+        cls,
+        dto: ImageAliasNode,
+        *,
+        id_field: str = "id",
+        extra: dict[str, Any] | None = None,
+    ) -> Self:
         """Create ImageV2AliasGQL from ImageAliasNode DTO."""
-        return cls(id=node.id, alias=node.alias)
+        return cls(id=dto.id, alias=dto.alias)
 
 
 # =============================================================================
@@ -363,7 +369,7 @@ class ImageV2PermissionInfoGQL:
     connections as part of BEP-1010 migration.
     """),
 )
-class ImageV2GQL(PydanticNodeMixin):
+class ImageV2GQL(PydanticNodeMixin[ImageNode]):
     _image_id: strawberry.Private[ImageID]
 
     id: NodeID[uuid.UUID]
@@ -422,7 +428,7 @@ class ImageV2GQL(PydanticNodeMixin):
         )
         edges = [
             ImageV2AliasEdgeGQL(
-                node=ImageV2AliasGQL.from_node(node),
+                node=ImageV2AliasGQL.from_pydantic(node),
                 cursor=encode_cursor(node.id),
             )
             for node in payload.items
@@ -451,32 +457,38 @@ class ImageV2GQL(PydanticNodeMixin):
         return [cls.from_data(data) if data is not None else None for data in results]
 
     @classmethod
-    def from_node(cls, node: ImageNode) -> Self:
+    def from_pydantic(
+        cls,
+        dto: ImageNode,
+        *,
+        id_field: str = "id",
+        extra: dict[str, Any] | None = None,
+    ) -> Self:
         """Create ImageV2GQL from ImageNode DTO.
 
         Args:
-            node: The image node DTO from the adapter layer.
+            dto: The image node DTO from the adapter layer.
 
         Returns:
             ImageV2GQL instance.
         """
-        accelerators = node.accelerators.split(",") if node.accelerators else []
-        image_id = ImageID(node.id)
+        accelerators = dto.accelerators.split(",") if dto.accelerators else []
+        image_id = ImageID(dto.id)
         return cls(
-            id=node.id,
+            id=dto.id,
             _image_id=image_id,
             identity=ImageV2IdentityInfoGQL(
-                canonical_name=node.name,
-                namespace=node.image,
-                architecture=node.architecture,
+                canonical_name=dto.name,
+                namespace=dto.image,
+                architecture=dto.architecture,
             ),
             metadata=ImageV2MetadataInfoGQL(
-                tags=[ImageV2TagEntryGQL(key=t.key, value=t.value) for t in node.tags],
-                labels=[ImageV2LabelEntryGQL(key=lb.key, value=lb.value) for lb in node.labels],
-                digest=node.config_digest,
-                size_bytes=node.size_bytes,
-                status=ImageV2StatusGQL(node.status.value),
-                created_at=node.created_at,
+                tags=[ImageV2TagEntryGQL(key=t.key, value=t.value) for t in dto.tags],
+                labels=[ImageV2LabelEntryGQL(key=lb.key, value=lb.value) for lb in dto.labels],
+                digest=dto.config_digest,
+                size_bytes=dto.size_bytes,
+                status=ImageV2StatusGQL(dto.status.value),
+                created_at=dto.created_at,
             ),
             requirements=ImageV2RequirementsInfoGQL(
                 resource_limits=[
@@ -485,12 +497,12 @@ class ImageV2GQL(PydanticNodeMixin):
                         min=str(rl.min),
                         max=str(rl.max) if rl.max is not None else "Infinity",
                     )
-                    for rl in node.resource_limits
+                    for rl in dto.resource_limits
                 ],
                 supported_accelerators=[a.strip() for a in accelerators if a.strip()],
             ),
             permission=None,
-            registry_id=node.registry_id,
+            registry_id=dto.registry_id,
         )
 
     @classmethod

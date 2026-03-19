@@ -30,7 +30,7 @@ from .types import StrawberryGQLContext
     All artifact registry nodes expose that information regardless of type.
 """)
 )
-class ArtifactRegistryMeta(PydanticNodeMixin):
+class ArtifactRegistryMeta(PydanticNodeMixin[Any]):
     id: NodeID[str]
     name: str
     registry_id: ID

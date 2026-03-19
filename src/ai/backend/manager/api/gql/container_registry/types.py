@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Iterable
 from enum import StrEnum
-from typing import Self
+from typing import Any, Self
 from uuid import UUID
 
 import strawberry
@@ -42,7 +42,7 @@ class ContainerRegistryTypeGQL(StrEnum):
     name="ContainerRegistryV2",
     description="Added in 26.4.0. Container registry node.",
 )
-class ContainerRegistryGQL(PydanticNodeMixin):
+class ContainerRegistryGQL(PydanticNodeMixin[Any]):
     id: NodeID[str] = strawberry.field(
         description="Relay-style global node identifier for the container registry"
     )

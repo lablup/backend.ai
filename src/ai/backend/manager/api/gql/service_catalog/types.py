@@ -5,7 +5,7 @@ from __future__ import annotations
 import enum
 from datetime import datetime
 from enum import StrEnum
-from typing import Self
+from typing import Any, Self
 
 import strawberry
 from strawberry.relay import NodeID
@@ -115,7 +115,7 @@ class ServiceCatalogEndpointGQL:
     name="ServiceCatalog",
     description="Added in 26.3.0. A registered service instance in the catalog.",
 )
-class ServiceCatalogGQL(PydanticNodeMixin):
+class ServiceCatalogGQL(PydanticNodeMixin[Any]):
     id: NodeID[str] = strawberry.field(description="Relay-style global node ID.")
     service_group: str = strawberry.field(
         description=dedent_strip("""

@@ -47,7 +47,7 @@ async def admin_domain_usage_buckets(
         limit=limit,
         offset=offset,
     )
-    nodes = [DomainUsageBucketGQL.from_node(item) for item in payload.items]
+    nodes = [DomainUsageBucketGQL.from_pydantic(item) for item in payload.items]
     edges = [DomainUsageBucketEdge(node=node, cursor=encode_cursor(str(node.id))) for node in nodes]
     return DomainUsageBucketConnection(
         edges=edges,
@@ -122,7 +122,7 @@ async def domain_usage_buckets(
         limit=limit,
         offset=offset,
     )
-    nodes = [DomainUsageBucketGQL.from_node(item) for item in payload.items]
+    nodes = [DomainUsageBucketGQL.from_pydantic(item) for item in payload.items]
     edges = [DomainUsageBucketEdge(node=node, cursor=encode_cursor(str(node.id))) for node in nodes]
     return DomainUsageBucketConnection(
         edges=edges,

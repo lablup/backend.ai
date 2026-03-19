@@ -87,7 +87,7 @@ RouteTrafficStatusGQL = strawberry.enum(
     name="Route",
     description="Added in 25.19.0. Represents a route for a model deployment.",
 )
-class Route(PydanticNodeMixin):
+class Route(PydanticNodeMixin[RouteNodeDTO]):
     id: NodeID[str]
     _deployment_id: strawberry.Private[UUID]
     _session_id: strawberry.Private[UUID | None]
@@ -176,17 +176,23 @@ class Route(PydanticNodeMixin):
         )
 
     @classmethod
-    def from_node(cls, node: RouteNodeDTO) -> Self:
+    def from_pydantic(
+        cls,
+        dto: RouteNodeDTO,
+        *,
+        id_field: str = "id",
+        extra: dict[str, Any] | None = None,
+    ) -> Self:
         return cls(
-            id=ID(str(node.id)),
-            _deployment_id=node.endpoint_id,
-            _session_id=UUID(node.session_id) if node.session_id else None,
-            _revision_id=node.revision_id,
-            status=RouteStatusGQL(RouteStatusEnum(node.status.value)),
-            traffic_status=RouteTrafficStatusGQL(RouteTrafficStatusEnum(node.traffic_status.value)),
-            traffic_ratio=node.traffic_ratio,
-            created_at=node.created_at,
-            error_data=node.error_data,
+            id=ID(str(dto.id)),
+            _deployment_id=dto.endpoint_id,
+            _session_id=UUID(dto.session_id) if dto.session_id else None,
+            _revision_id=dto.revision_id,
+            status=RouteStatusGQL(RouteStatusEnum(dto.status.value)),
+            traffic_status=RouteTrafficStatusGQL(RouteTrafficStatusEnum(dto.traffic_status.value)),
+            traffic_ratio=dto.traffic_ratio,
+            created_at=dto.created_at,
+            error_data=dto.error_data,
         )
 
 

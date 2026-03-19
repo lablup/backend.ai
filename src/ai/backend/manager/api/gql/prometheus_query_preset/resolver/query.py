@@ -69,7 +69,7 @@ async def admin_prometheus_query_presets(
         )
     )
 
-    nodes = [QueryDefinitionGQL.from_node(node) for node in payload.items]
+    nodes = [QueryDefinitionGQL.from_pydantic(node) for node in payload.items]
     edges = [QueryDefinitionEdge(node=node, cursor=encode_cursor(str(node.id))) for node in nodes]
 
     return QueryDefinitionConnection(

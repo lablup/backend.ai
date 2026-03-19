@@ -80,7 +80,7 @@ async def admin_notification_channel(
 ) -> NotificationChannel | None:
     check_admin_only()
     result = await info.context.adapters.notification.get_channel(uuid.UUID(id))
-    return NotificationChannel.from_node(result.item)
+    return NotificationChannel.from_pydantic(result.item)
 
 
 @strawberry.field(  # type: ignore[misc]
@@ -94,7 +94,7 @@ async def notification_channel(
     id: ID, info: Info[StrawberryGQLContext]
 ) -> NotificationChannel | None:
     result = await info.context.adapters.notification.get_channel(uuid.UUID(id))
-    return NotificationChannel.from_node(result.item)
+    return NotificationChannel.from_pydantic(result.item)
 
 
 @strawberry.field(description="List notification channels (admin only)")  # type: ignore[misc]
@@ -126,7 +126,7 @@ async def admin_notification_channels(
         )
     )
 
-    nodes = [NotificationChannel.from_node(item) for item in payload.items]
+    nodes = [NotificationChannel.from_pydantic(item) for item in payload.items]
     edges = [
         NotificationChannelEdge(node=node, cursor=encode_cursor(str(node.id))) for node in nodes
     ]
@@ -176,7 +176,7 @@ async def notification_channels(
         )
     )
 
-    nodes = [NotificationChannel.from_node(item) for item in payload.items]
+    nodes = [NotificationChannel.from_pydantic(item) for item in payload.items]
     edges = [
         NotificationChannelEdge(node=node, cursor=encode_cursor(str(node.id))) for node in nodes
     ]
@@ -199,7 +199,7 @@ async def admin_notification_rule(
 ) -> NotificationRule | None:
     check_admin_only()
     result = await info.context.adapters.notification.get_rule(uuid.UUID(id))
-    return NotificationRule.from_node(result.item)
+    return NotificationRule.from_pydantic(result.item)
 
 
 @strawberry.field(  # type: ignore[misc]
@@ -211,7 +211,7 @@ async def admin_notification_rule(
 )
 async def notification_rule(id: ID, info: Info[StrawberryGQLContext]) -> NotificationRule | None:
     result = await info.context.adapters.notification.get_rule(uuid.UUID(id))
-    return NotificationRule.from_node(result.item)
+    return NotificationRule.from_pydantic(result.item)
 
 
 @strawberry.field(description="List notification rules (admin only)")  # type: ignore[misc]
@@ -243,7 +243,7 @@ async def admin_notification_rules(
         )
     )
 
-    nodes = [NotificationRule.from_node(item) for item in payload.items]
+    nodes = [NotificationRule.from_pydantic(item) for item in payload.items]
     edges = [NotificationRuleEdge(node=node, cursor=encode_cursor(str(node.id))) for node in nodes]
 
     return NotificationRuleConnection(
@@ -291,7 +291,7 @@ async def notification_rules(
         )
     )
 
-    nodes = [NotificationRule.from_node(item) for item in payload.items]
+    nodes = [NotificationRule.from_pydantic(item) for item in payload.items]
     edges = [NotificationRuleEdge(node=node, cursor=encode_cursor(str(node.id))) for node in nodes]
 
     return NotificationRuleConnection(

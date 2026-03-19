@@ -9,6 +9,7 @@ import strawberry
 from strawberry import ID, Info
 from strawberry.relay import Connection, Edge, NodeID
 
+from ai.backend.common.dto.manager.v2.domain.response import DomainNode
 from ai.backend.common.dto.manager.v2.domain.types import (
     DomainFairShareScopeDTO,
     DomainUsageScopeDTO,
@@ -30,7 +31,6 @@ from .nested import (
 )
 
 if TYPE_CHECKING:
-    from ai.backend.common.dto.manager.v2.domain.response import DomainNode
     from ai.backend.manager.api.gql.project_v2.types.filters import (
         ProjectV2Filter,
         ProjectV2OrderBy,
@@ -83,7 +83,7 @@ class DomainUsageScopeGQL:
         "Resource allocation and storage permissions are provided through separate dedicated APIs."
     ),
 )
-class DomainV2GQL(PydanticNodeMixin):
+class DomainV2GQL(PydanticNodeMixin[DomainNode]):
     """Domain entity with structured field groups."""
 
     id: NodeID[str] = strawberry.field(description="Domain name (primary key).")
@@ -119,7 +119,7 @@ class DomainV2GQL(PydanticNodeMixin):
             )
         )
 
-        return DomainFairShareGQL.from_node(payload.item)
+        return DomainFairShareGQL.from_pydantic(payload.item)
 
     @strawberry.field(  # type: ignore[misc]
         description=(
@@ -187,7 +187,7 @@ class DomainV2GQL(PydanticNodeMixin):
             offset=offset,
         )
 
-        nodes = [DomainUsageBucketGQL.from_node(item) for item in payload.items]
+        nodes = [DomainUsageBucketGQL.from_pydantic(item) for item in payload.items]
         edges = [
             DomainUsageBucketEdge(node=node, cursor=encode_cursor(str(node.id))) for node in nodes
         ]
@@ -255,7 +255,7 @@ class DomainV2GQL(PydanticNodeMixin):
                 offset=offset,
             ),
         )
-        nodes = [ProjectV2GQL.from_node(node) for node in payload.items]
+        nodes = [ProjectV2GQL.from_pydantic(node) for node in payload.items]
         edges = [ProjectV2Edge(node=node, cursor=encode_cursor(str(node.id))) for node in nodes]
         return ProjectV2Connection(
             edges=edges,
@@ -320,7 +320,7 @@ class DomainV2GQL(PydanticNodeMixin):
                 offset=offset,
             ),
         )
-        nodes = [UserV2GQL.from_node(item) for item in payload.items]
+        nodes = [UserV2GQL.from_pydantic(item) for item in payload.items]
         edges = [UserV2Edge(node=node, cursor=encode_cursor(str(node.id))) for node in nodes]
         return UserV2Connection(
             edges=edges,
@@ -345,22 +345,28 @@ class DomainV2GQL(PydanticNodeMixin):
         return [cls.from_data(data) if data is not None else None for data in results]
 
     @classmethod
-    def from_node(cls, node: DomainNode) -> Self:
+    def from_pydantic(
+        cls,
+        dto: DomainNode,
+        *,
+        id_field: str = "id",
+        extra: dict[str, Any] | None = None,
+    ) -> Self:
         """Create DomainV2GQL from DomainNode DTO (adapter search results)."""
         return cls(
-            id=ID(node.id),
+            id=ID(dto.id),
             basic_info=DomainBasicInfoGQL(
-                name=node.basic_info.name,
-                description=node.basic_info.description,
-                integration_id=node.basic_info.integration_id,
+                name=dto.basic_info.name,
+                description=dto.basic_info.description,
+                integration_id=dto.basic_info.integration_id,
             ),
             registry=DomainRegistryInfoGQL(
-                allowed_docker_registries=node.registry.allowed_docker_registries,
+                allowed_docker_registries=dto.registry.allowed_docker_registries,
             ),
             lifecycle=DomainLifecycleInfoGQL(
-                is_active=node.lifecycle.is_active,
-                created_at=node.lifecycle.created_at,
-                modified_at=node.lifecycle.modified_at,
+                is_active=dto.lifecycle.is_active,
+                created_at=dto.lifecycle.created_at,
+                modified_at=dto.lifecycle.modified_at,
             ),
         )
 

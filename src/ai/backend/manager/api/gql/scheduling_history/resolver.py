@@ -102,7 +102,7 @@ async def fetch_session_scoped_scheduling_histories(
             offset=offset,
         ),
     )
-    nodes = [SessionSchedulingHistory.from_node(item) for item in result.items]
+    nodes = [SessionSchedulingHistory.from_pydantic(item) for item in result.items]
     edges = [
         SessionSchedulingHistoryEdge(node=node, cursor=encode_cursor(str(node.id)))
         for node in nodes
@@ -145,7 +145,7 @@ async def fetch_deployment_scoped_scheduling_histories(
             offset=offset,
         ),
     )
-    nodes = [DeploymentHistory.from_node(item) for item in result.items]
+    nodes = [DeploymentHistory.from_pydantic(item) for item in result.items]
     edges = [DeploymentHistoryEdge(node=node, cursor=encode_cursor(str(node.id))) for node in nodes]
     return DeploymentHistoryConnection(
         edges=edges,
@@ -185,7 +185,7 @@ async def fetch_route_scoped_scheduling_histories(
             offset=offset,
         ),
     )
-    nodes = [RouteHistory.from_node(item) for item in result.items]
+    nodes = [RouteHistory.from_pydantic(item) for item in result.items]
     edges = [RouteHistoryEdge(node=node, cursor=encode_cursor(str(node.id))) for node in nodes]
     return RouteHistoryConnection(
         edges=edges,
@@ -227,7 +227,7 @@ async def admin_session_scheduling_histories(
             offset=offset,
         )
     )
-    nodes = [SessionSchedulingHistory.from_node(item) for item in result.items]
+    nodes = [SessionSchedulingHistory.from_pydantic(item) for item in result.items]
     edges = [
         SessionSchedulingHistoryEdge(node=node, cursor=encode_cursor(str(node.id)))
         for node in nodes
@@ -277,7 +277,7 @@ async def session_scheduling_histories(
             offset=offset,
         )
     )
-    nodes = [SessionSchedulingHistory.from_node(item) for item in result.items]
+    nodes = [SessionSchedulingHistory.from_pydantic(item) for item in result.items]
     edges = [
         SessionSchedulingHistoryEdge(node=node, cursor=encode_cursor(str(node.id)))
         for node in nodes
@@ -319,7 +319,7 @@ async def admin_deployment_histories(
             offset=offset,
         )
     )
-    nodes = [DeploymentHistory.from_node(item) for item in result.items]
+    nodes = [DeploymentHistory.from_pydantic(item) for item in result.items]
     edges = [DeploymentHistoryEdge(node=node, cursor=encode_cursor(str(node.id))) for node in nodes]
     return DeploymentHistoryConnection(
         edges=edges,
@@ -366,7 +366,7 @@ async def deployment_histories(
             offset=offset,
         )
     )
-    nodes = [DeploymentHistory.from_node(item) for item in result.items]
+    nodes = [DeploymentHistory.from_pydantic(item) for item in result.items]
     edges = [DeploymentHistoryEdge(node=node, cursor=encode_cursor(str(node.id))) for node in nodes]
     return DeploymentHistoryConnection(
         edges=edges,
@@ -405,7 +405,7 @@ async def admin_route_histories(
             offset=offset,
         )
     )
-    nodes = [RouteHistory.from_node(item) for item in result.items]
+    nodes = [RouteHistory.from_pydantic(item) for item in result.items]
     edges = [RouteHistoryEdge(node=node, cursor=encode_cursor(str(node.id))) for node in nodes]
     return RouteHistoryConnection(
         edges=edges,
@@ -452,7 +452,7 @@ async def route_histories(
             offset=offset,
         )
     )
-    nodes = [RouteHistory.from_node(item) for item in result.items]
+    nodes = [RouteHistory.from_pydantic(item) for item in result.items]
     edges = [RouteHistoryEdge(node=node, cursor=encode_cursor(str(node.id))) for node in nodes]
     return RouteHistoryConnection(
         edges=edges,

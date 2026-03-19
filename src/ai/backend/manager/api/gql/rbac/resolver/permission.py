@@ -134,7 +134,7 @@ async def admin_create_permission(
 ) -> PermissionGQL:
     check_admin_only()
     result = await info.context.adapters.rbac.create_permission(input.to_pydantic())
-    return PermissionGQL.from_node(result)
+    return PermissionGQL.from_pydantic(result)
 
 
 @strawberry.mutation(description="Added in 26.3.0. Update a scoped permission (admin only).")  # type: ignore[misc]
@@ -144,7 +144,7 @@ async def admin_update_permission(
 ) -> PermissionGQL:
     check_admin_only()
     result = await info.context.adapters.rbac.update_permission(input.to_pydantic())
-    return PermissionGQL.from_node(result)
+    return PermissionGQL.from_pydantic(result)
 
 
 @strawberry.mutation(description="Added in 26.3.0. Delete a scoped permission (admin only).")  # type: ignore[misc]

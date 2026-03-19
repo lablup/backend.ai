@@ -80,7 +80,7 @@ class AccessTokenOrderBy:
 
 
 @strawberry.type
-class AccessToken(PydanticNodeMixin):
+class AccessToken(PydanticNodeMixin[AccessTokenNodeDTO]):
     id: NodeID[str]
     token: str = strawberry.field(description="Added in 25.16.0: The access token.")
     created_at: datetime = strawberry.field(
@@ -113,12 +113,18 @@ class AccessToken(PydanticNodeMixin):
         )
 
     @classmethod
-    def from_node(cls, node: AccessTokenNodeDTO) -> Self:
+    def from_pydantic(
+        cls,
+        dto: AccessTokenNodeDTO,
+        *,
+        id_field: str = "id",
+        extra: dict[str, Any] | None = None,
+    ) -> Self:
         return cls(
-            id=ID(str(node.id)),
-            token=node.token,
-            created_at=node.created_at,
-            valid_until=node.valid_until,
+            id=ID(str(dto.id)),
+            token=dto.token,
+            created_at=dto.created_at,
+            valid_until=dto.valid_until,
         )
 
 

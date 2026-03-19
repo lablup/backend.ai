@@ -153,7 +153,7 @@ class PermissionOrderField(StrEnum):
 
 
 @strawberry.type(name="Permission", description="Added in 26.3.0. RBAC scoped permission")
-class PermissionGQL(PydanticNodeMixin):
+class PermissionGQL(PydanticNodeMixin[PermissionNodeDTO]):
     id: NodeID[str]
     role_id: uuid.UUID
     scope_type: RBACElementTypeGQL
@@ -303,7 +303,13 @@ class PermissionGQL(PydanticNodeMixin):
         )
 
     @classmethod
-    def from_node(cls, dto: PermissionNodeDTO) -> Self:
+    def from_pydantic(
+        cls,
+        dto: PermissionNodeDTO,
+        *,
+        id_field: str = "id",
+        extra: dict[str, Any] | None = None,
+    ) -> Self:
         return cls(
             id=ID(str(dto.id)),
             role_id=dto.role_id,

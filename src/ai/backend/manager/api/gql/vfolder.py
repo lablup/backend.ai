@@ -21,7 +21,7 @@ class VFolder:
 
 
 @strawberry.type
-class ExtraVFolderMount(PydanticNodeMixin):
+class ExtraVFolderMount(PydanticNodeMixin[Any]):
     id: NodeID[str]
     mount_destination: str
     _vfolder_id: strawberry.Private[UUID]

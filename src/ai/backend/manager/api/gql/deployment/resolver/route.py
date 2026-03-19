@@ -65,7 +65,7 @@ async def routes(
             offset=offset,
         ),
     )
-    nodes = [Route.from_node(item) for item in payload.items]
+    nodes = [Route.from_pydantic(item) for item in payload.items]
     edges = [RouteEdge(node=node, cursor=encode_cursor(str(node.id))) for node in nodes]
     return RouteConnection(
         count=payload.total_count,

@@ -6,7 +6,7 @@ import uuid
 from collections.abc import Iterable
 from datetime import datetime
 from enum import StrEnum
-from typing import Self
+from typing import Any, Self
 
 import strawberry
 from strawberry import ID, UNSET, Info
@@ -262,7 +262,7 @@ class EmailSpecGQL(NotificationChannelSpecGQL):
 
 
 @strawberry.type(description="Notification channel")
-class NotificationChannel(PydanticNodeMixin):
+class NotificationChannel(PydanticNodeMixin[NotificationChannelNode]):
     id: NodeID[str]
     name: str
     description: str | None
@@ -311,55 +311,61 @@ class NotificationChannel(PydanticNodeMixin):
         )
 
     @classmethod
-    def from_node(cls, node: NotificationChannelNode) -> Self:
+    def from_pydantic(
+        cls,
+        dto: NotificationChannelNode,
+        *,
+        id_field: str = "id",
+        extra: dict[str, Any] | None = None,
+    ) -> Self:
         final_spec: NotificationChannelSpecGQL
-        match node.channel_type:
+        match dto.channel_type:
             case NotificationChannelType.WEBHOOK:
-                if not isinstance(node.spec, WebhookSpecInfo):
+                if not isinstance(dto.spec, WebhookSpecInfo):
                     raise InvalidNotificationChannelSpec(
-                        f"Expected WebhookSpecInfo for WEBHOOK channel, got {type(node.spec).__name__}"
+                        f"Expected WebhookSpecInfo for WEBHOOK channel, got {type(dto.spec).__name__}"
                     )
                 final_spec = WebhookSpecGQL(
                     channel_type=NotificationChannelTypeGQL.WEBHOOK,
-                    url=node.spec.url,
+                    url=dto.spec.url,
                 )
             case NotificationChannelType.EMAIL:
-                if not isinstance(node.spec, EmailSpecInfo):
+                if not isinstance(dto.spec, EmailSpecInfo):
                     raise InvalidNotificationChannelSpec(
-                        f"Expected EmailSpecInfo for EMAIL channel, got {type(node.spec).__name__}"
+                        f"Expected EmailSpecInfo for EMAIL channel, got {type(dto.spec).__name__}"
                     )
                 final_spec = EmailSpecGQL(
                     channel_type=NotificationChannelTypeGQL.EMAIL,
                     smtp=SMTPConnectionGQL(
-                        host=node.spec.smtp_host,
-                        port=node.spec.smtp_port,
-                        use_tls=node.spec.smtp_use_tls,
-                        timeout=node.spec.smtp_timeout,
+                        host=dto.spec.smtp_host,
+                        port=dto.spec.smtp_port,
+                        use_tls=dto.spec.smtp_use_tls,
+                        timeout=dto.spec.smtp_timeout,
                     ),
                     message=EmailMessageGQL(
-                        from_email=node.spec.from_email,
-                        to_emails=node.spec.to_emails,
-                        subject_template=node.spec.subject_template,
+                        from_email=dto.spec.from_email,
+                        to_emails=dto.spec.to_emails,
+                        subject_template=dto.spec.subject_template,
                     ),
                     auth=(
-                        SMTPAuthGQL(username=node.spec.auth_username)
-                        if node.spec.auth_username is not None
+                        SMTPAuthGQL(username=dto.spec.auth_username)
+                        if dto.spec.auth_username is not None
                         else None
                     ),
                 )
         return cls(
-            id=ID(str(node.id)),
-            name=node.name,
-            description=node.description,
-            channel_type=NotificationChannelTypeGQL.from_internal(node.channel_type),
+            id=ID(str(dto.id)),
+            name=dto.name,
+            description=dto.description,
+            channel_type=NotificationChannelTypeGQL.from_internal(dto.channel_type),
             spec=final_spec,
-            enabled=node.enabled,
-            created_at=node.created_at,
+            enabled=dto.enabled,
+            created_at=dto.created_at,
         )
 
 
 @strawberry.type(description="Notification rule")
-class NotificationRule(PydanticNodeMixin):
+class NotificationRule(PydanticNodeMixin[NotificationRuleNode]):
     id: NodeID[str]
     name: str
     description: str | None
@@ -396,16 +402,22 @@ class NotificationRule(PydanticNodeMixin):
         )
 
     @classmethod
-    def from_node(cls, node: NotificationRuleNode) -> Self:
+    def from_pydantic(
+        cls,
+        dto: NotificationRuleNode,
+        *,
+        id_field: str = "id",
+        extra: dict[str, Any] | None = None,
+    ) -> Self:
         return cls(
-            id=ID(str(node.id)),
-            name=node.name,
-            description=node.description,
-            rule_type=NotificationRuleTypeGQL.from_internal(node.rule_type),
-            channel=NotificationChannel.from_node(node.channel),
-            message_template=node.message_template,
-            enabled=node.enabled,
-            created_at=node.created_at,
+            id=ID(str(dto.id)),
+            name=dto.name,
+            description=dto.description,
+            rule_type=NotificationRuleTypeGQL.from_internal(dto.rule_type),
+            channel=NotificationChannel.from_pydantic(dto.channel),
+            message_template=dto.message_template,
+            enabled=dto.enabled,
+            created_at=dto.created_at,
         )
 
 
@@ -813,7 +825,7 @@ class CreateNotificationChannelPayload:
 
     @classmethod
     def from_pydantic(cls, dto: CreateNotificationChannelPayloadDTO) -> Self:
-        return cls(channel=NotificationChannel.from_node(dto.channel))
+        return cls(channel=NotificationChannel.from_pydantic(dto.channel))
 
 
 @strawberry.type(description="Payload for update notification channel mutation")
@@ -822,7 +834,7 @@ class UpdateNotificationChannelPayload:
 
     @classmethod
     def from_pydantic(cls, dto: UpdateNotificationChannelPayloadDTO) -> Self:
-        return cls(channel=NotificationChannel.from_node(dto.channel))
+        return cls(channel=NotificationChannel.from_pydantic(dto.channel))
 
 
 @strawberry.experimental.pydantic.type(
@@ -840,7 +852,7 @@ class CreateNotificationRulePayload:
 
     @classmethod
     def from_pydantic(cls, dto: CreateNotificationRulePayloadDTO) -> Self:
-        return cls(rule=NotificationRule.from_node(dto.rule))
+        return cls(rule=NotificationRule.from_pydantic(dto.rule))
 
 
 @strawberry.type(description="Payload for update notification rule mutation")
@@ -849,7 +861,7 @@ class UpdateNotificationRulePayload:
 
     @classmethod
     def from_pydantic(cls, dto: UpdateNotificationRulePayloadDTO) -> Self:
-        return cls(rule=NotificationRule.from_node(dto.rule))
+        return cls(rule=NotificationRule.from_pydantic(dto.rule))
 
 
 @strawberry.experimental.pydantic.type(

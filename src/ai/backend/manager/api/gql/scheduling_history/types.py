@@ -5,7 +5,7 @@ from __future__ import annotations
 from collections.abc import Iterable
 from datetime import datetime
 from enum import StrEnum
-from typing import Self
+from typing import Any, Self
 from uuid import UUID
 
 import strawberry
@@ -194,7 +194,7 @@ class SubStepResultGQL:
 
 
 @strawberry.type(description="Session scheduling history record")
-class SessionSchedulingHistory(PydanticNodeMixin):
+class SessionSchedulingHistory(PydanticNodeMixin[SessionHistoryNode]):
     id: NodeID[str]
     _session_id: strawberry.Private[UUID]
     phase: str
@@ -226,16 +226,22 @@ class SessionSchedulingHistory(PydanticNodeMixin):
         return [cls.from_dataclass(data) if data is not None else None for data in results]
 
     @classmethod
-    def from_node(cls, node: SessionHistoryNode) -> Self:
+    def from_pydantic(
+        cls,
+        dto: SessionHistoryNode,
+        *,
+        id_field: str = "id",
+        extra: dict[str, Any] | None = None,
+    ) -> Self:
         return cls(
-            id=ID(str(node.id)),
-            _session_id=node.session_id,
-            phase=node.phase,
-            from_status=node.from_status,
-            to_status=node.to_status,
-            result=SchedulingResultGQL(node.result),
-            error_code=node.error_code,
-            message=node.message,
+            id=ID(str(dto.id)),
+            _session_id=dto.session_id,
+            phase=dto.phase,
+            from_status=dto.from_status,
+            to_status=dto.to_status,
+            result=SchedulingResultGQL(dto.result),
+            error_code=dto.error_code,
+            message=dto.message,
             sub_steps=[
                 SubStepResultGQL(
                     step=s.step,
@@ -245,11 +251,11 @@ class SessionSchedulingHistory(PydanticNodeMixin):
                     started_at=s.started_at,
                     ended_at=s.ended_at,
                 )
-                for s in node.sub_steps
+                for s in dto.sub_steps
             ],
-            attempts=node.attempts,
-            created_at=node.created_at,
-            updated_at=node.updated_at,
+            attempts=dto.attempts,
+            created_at=dto.created_at,
+            updated_at=dto.updated_at,
         )
 
     @classmethod
@@ -271,7 +277,7 @@ class SessionSchedulingHistory(PydanticNodeMixin):
 
 
 @strawberry.type(description="Deployment history record")
-class DeploymentHistory(PydanticNodeMixin):
+class DeploymentHistory(PydanticNodeMixin[DeploymentHistoryNode]):
     id: NodeID[str]
     _deployment_id: strawberry.Private[UUID]
     phase: str
@@ -303,16 +309,22 @@ class DeploymentHistory(PydanticNodeMixin):
         return [cls.from_dataclass(data) if data is not None else None for data in results]
 
     @classmethod
-    def from_node(cls, node: DeploymentHistoryNode) -> Self:
+    def from_pydantic(
+        cls,
+        dto: DeploymentHistoryNode,
+        *,
+        id_field: str = "id",
+        extra: dict[str, Any] | None = None,
+    ) -> Self:
         return cls(
-            id=ID(str(node.id)),
-            _deployment_id=node.deployment_id,
-            phase=node.phase,
-            from_status=node.from_status,
-            to_status=node.to_status,
-            result=SchedulingResultGQL(node.result),
-            error_code=node.error_code,
-            message=node.message,
+            id=ID(str(dto.id)),
+            _deployment_id=dto.deployment_id,
+            phase=dto.phase,
+            from_status=dto.from_status,
+            to_status=dto.to_status,
+            result=SchedulingResultGQL(dto.result),
+            error_code=dto.error_code,
+            message=dto.message,
             sub_steps=[
                 SubStepResultGQL(
                     step=s.step,
@@ -322,11 +334,11 @@ class DeploymentHistory(PydanticNodeMixin):
                     started_at=s.started_at,
                     ended_at=s.ended_at,
                 )
-                for s in node.sub_steps
+                for s in dto.sub_steps
             ],
-            attempts=node.attempts,
-            created_at=node.created_at,
-            updated_at=node.updated_at,
+            attempts=dto.attempts,
+            created_at=dto.created_at,
+            updated_at=dto.updated_at,
         )
 
     @classmethod
@@ -348,7 +360,7 @@ class DeploymentHistory(PydanticNodeMixin):
 
 
 @strawberry.type(description="Route history record")
-class RouteHistory(PydanticNodeMixin):
+class RouteHistory(PydanticNodeMixin[RouteHistoryNode]):
     id: NodeID[str]
     _route_id: strawberry.Private[UUID]
     _deployment_id: strawberry.Private[UUID]
@@ -385,17 +397,23 @@ class RouteHistory(PydanticNodeMixin):
         return [cls.from_dataclass(data) if data is not None else None for data in results]
 
     @classmethod
-    def from_node(cls, node: RouteHistoryNode) -> Self:
+    def from_pydantic(
+        cls,
+        dto: RouteHistoryNode,
+        *,
+        id_field: str = "id",
+        extra: dict[str, Any] | None = None,
+    ) -> Self:
         return cls(
-            id=ID(str(node.id)),
-            _route_id=node.route_id,
-            _deployment_id=node.deployment_id,
-            phase=node.phase,
-            from_status=node.from_status,
-            to_status=node.to_status,
-            result=SchedulingResultGQL(node.result),
-            error_code=node.error_code,
-            message=node.message,
+            id=ID(str(dto.id)),
+            _route_id=dto.route_id,
+            _deployment_id=dto.deployment_id,
+            phase=dto.phase,
+            from_status=dto.from_status,
+            to_status=dto.to_status,
+            result=SchedulingResultGQL(dto.result),
+            error_code=dto.error_code,
+            message=dto.message,
             sub_steps=[
                 SubStepResultGQL(
                     step=s.step,
@@ -405,11 +423,11 @@ class RouteHistory(PydanticNodeMixin):
                     started_at=s.started_at,
                     ended_at=s.ended_at,
                 )
-                for s in node.sub_steps
+                for s in dto.sub_steps
             ],
-            attempts=node.attempts,
-            created_at=node.created_at,
-            updated_at=node.updated_at,
+            attempts=dto.attempts,
+            created_at=dto.created_at,
+            updated_at=dto.updated_at,
         )
 
     @classmethod

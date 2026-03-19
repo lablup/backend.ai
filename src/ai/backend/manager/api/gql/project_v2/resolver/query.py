@@ -71,7 +71,7 @@ async def admin_projects_v2(
             offset=offset,
         )
     )
-    nodes = [ProjectV2GQL.from_node(node) for node in payload.items]
+    nodes = [ProjectV2GQL.from_pydantic(node) for node in payload.items]
     edges = [ProjectV2Edge(node=node, cursor=encode_cursor(str(node.id))) for node in nodes]
     return ProjectV2Connection(
         edges=edges,
@@ -120,7 +120,7 @@ async def domain_projects_v2(
             offset=offset,
         ),
     )
-    nodes = [ProjectV2GQL.from_node(node) for node in payload.items]
+    nodes = [ProjectV2GQL.from_pydantic(node) for node in payload.items]
     edges = [ProjectV2Edge(node=node, cursor=encode_cursor(str(node.id))) for node in nodes]
     return ProjectV2Connection(
         edges=edges,

@@ -6,7 +6,7 @@ import uuid
 from collections.abc import Iterable
 from datetime import datetime
 from enum import StrEnum
-from typing import Self, override
+from typing import Any, Self, override
 
 import strawberry
 from strawberry import ID, Info
@@ -58,7 +58,7 @@ class EntityOrderField(StrEnum):
     name="EntityRef",
     description="Added in 26.3.0. Entity reference from the association_scopes_entities table",
 )
-class EntityRefGQL(PydanticNodeMixin):
+class EntityRefGQL(PydanticNodeMixin[Any]):
     id: NodeID[str]
     scope_type: RBACElementTypeGQL
     scope_id: str

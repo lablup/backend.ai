@@ -66,7 +66,7 @@ async def _fetch_project_fair_shares(
         )
     )
 
-    nodes = [ProjectFairShareGQL.from_node(item) for item in payload.items]
+    nodes = [ProjectFairShareGQL.from_pydantic(item) for item in payload.items]
     edges = [ProjectFairShareEdge(node=node, cursor=encode_cursor(str(node.id))) for node in nodes]
 
     return ProjectFairShareConnection(
@@ -111,7 +111,7 @@ async def _fetch_rg_project_fair_shares(
         domain_name=scope.domain_name,
     )
 
-    nodes = [ProjectFairShareGQL.from_node(item) for item in payload.items]
+    nodes = [ProjectFairShareGQL.from_pydantic(item) for item in payload.items]
     edges = [ProjectFairShareEdge(node=node, cursor=encode_cursor(str(node.id))) for node in nodes]
 
     return ProjectFairShareConnection(

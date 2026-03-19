@@ -66,7 +66,7 @@ async def admin_domains_v2(
             offset=offset,
         )
     )
-    nodes = [DomainV2GQL.from_node(node) for node in payload.items]
+    nodes = [DomainV2GQL.from_pydantic(node) for node in payload.items]
     edges = [strawberry.relay.Edge(node=node, cursor=encode_cursor(str(node.id))) for node in nodes]
     return DomainV2Connection(
         edges=edges,
@@ -107,7 +107,7 @@ async def rg_domains_v2(
             offset=offset,
         ),
     )
-    nodes = [DomainV2GQL.from_node(node) for node in payload.items]
+    nodes = [DomainV2GQL.from_pydantic(node) for node in payload.items]
     edges = [strawberry.relay.Edge(node=node, cursor=encode_cursor(str(node.id))) for node in nodes]
     return DomainV2Connection(
         edges=edges,

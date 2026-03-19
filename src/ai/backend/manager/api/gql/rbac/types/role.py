@@ -68,6 +68,9 @@ from ai.backend.common.dto.manager.v2.rbac.response import (
 from ai.backend.common.dto.manager.v2.rbac.response import (
     PurgeRolePayload as PurgeRolePayloadDTO,
 )
+from ai.backend.common.dto.manager.v2.rbac.response import (
+    RoleAssignmentNode,
+)
 from ai.backend.common.dto.manager.v2.rbac.types import (
     OrderDirection as OrderDirectionDTO,
 )
@@ -171,7 +174,7 @@ class RoleOrderField(StrEnum):
 
 
 @strawberry.type(name="Role", description="Added in 26.3.0. RBAC role")
-class RoleGQL(PydanticNodeMixin):
+class RoleGQL(PydanticNodeMixin[Any]):
     id: NodeID[str]
     name: str
     description: str | None
@@ -305,7 +308,7 @@ class RoleGQL(PydanticNodeMixin):
     name="RoleAssignment",
     description="Added in 26.3.0. RBAC role assignment (user-role association)",
 )
-class RoleAssignmentGQL(PydanticNodeMixin):
+class RoleAssignmentGQL(PydanticNodeMixin[RoleAssignmentNode]):
     id: NodeID[str]
     user_id: uuid.UUID = strawberry.field(description="The assigned user ID.")
     role_id: uuid.UUID = strawberry.field(description="The assigned role ID.")

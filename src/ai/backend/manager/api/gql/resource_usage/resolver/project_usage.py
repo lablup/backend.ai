@@ -47,7 +47,7 @@ async def admin_project_usage_buckets(
         limit=limit,
         offset=offset,
     )
-    nodes = [ProjectUsageBucketGQL.from_node(item) for item in payload.items]
+    nodes = [ProjectUsageBucketGQL.from_pydantic(item) for item in payload.items]
     edges = [
         ProjectUsageBucketEdge(node=node, cursor=encode_cursor(str(node.id))) for node in nodes
     ]
@@ -124,7 +124,7 @@ async def project_usage_buckets(
         limit=limit,
         offset=offset,
     )
-    nodes = [ProjectUsageBucketGQL.from_node(item) for item in payload.items]
+    nodes = [ProjectUsageBucketGQL.from_pydantic(item) for item in payload.items]
     edges = [
         ProjectUsageBucketEdge(node=node, cursor=encode_cursor(str(node.id))) for node in nodes
     ]

@@ -14,6 +14,7 @@ from ai.backend.common.dto.manager.v2.fair_share.types import (
     ProjectFairShareScopeDTO,
     ProjectUsageScopeDTO,
 )
+from ai.backend.common.dto.manager.v2.group.response import ProjectNode
 from ai.backend.manager.api.gql.fair_share.types import ProjectFairShareGQL
 from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin
 from ai.backend.manager.api.gql.resource_slot.overview_types import ActiveResourceOverviewGQL
@@ -34,7 +35,6 @@ from .nested import (
 )
 
 if TYPE_CHECKING:
-    from ai.backend.common.dto.manager.v2.group.response import ProjectNode
     from ai.backend.manager.api.gql.domain_v2.types.node import DomainV2GQL
     from ai.backend.manager.api.gql.user.types.filters import UserFilterGQL, UserOrderByGQL
     from ai.backend.manager.api.gql.user.types.node import UserV2Connection
@@ -85,7 +85,7 @@ class ProjectUsageScopeGQL:
         "Resource allocation and container registry are provided through separate dedicated APIs."
     ),
 )
-class ProjectV2GQL(PydanticNodeMixin):
+class ProjectV2GQL(PydanticNodeMixin[ProjectNode]):
     """Project entity with structured field groups."""
 
     id: NodeID[str] = strawberry.field(description="Unique identifier for the project (UUID).")
@@ -124,7 +124,7 @@ class ProjectV2GQL(PydanticNodeMixin):
             )
         )
 
-        return ProjectFairShareGQL.from_node(payload.item)
+        return ProjectFairShareGQL.from_pydantic(payload.item)
 
     @strawberry.field(  # type: ignore[misc]
         description=(
@@ -191,7 +191,7 @@ class ProjectV2GQL(PydanticNodeMixin):
             limit=limit,
             offset=offset,
         )
-        nodes = [ProjectUsageBucketGQL.from_node(item) for item in payload.items]
+        nodes = [ProjectUsageBucketGQL.from_pydantic(item) for item in payload.items]
         edges = [
             ProjectUsageBucketEdge(node=node, cursor=encode_cursor(str(node.id))) for node in nodes
         ]
@@ -276,7 +276,7 @@ class ProjectV2GQL(PydanticNodeMixin):
                 offset=offset,
             ),
         )
-        nodes = [UserV2GQL.from_node(item) for item in payload.items]
+        nodes = [UserV2GQL.from_pydantic(item) for item in payload.items]
         edges = [UserV2Edge(node=node, cursor=encode_cursor(str(node.id))) for node in nodes]
         return UserV2Connection(
             edges=edges,
@@ -303,34 +303,40 @@ class ProjectV2GQL(PydanticNodeMixin):
         return [cls.from_data(data) if data is not None else None for data in results]
 
     @classmethod
-    def from_node(cls, node: ProjectNode) -> Self:
+    def from_pydantic(
+        cls,
+        dto: ProjectNode,
+        *,
+        id_field: str = "id",
+        extra: dict[str, Any] | None = None,
+    ) -> Self:
         """Create ProjectV2GQL from ProjectNode DTO (adapter search results)."""
         vfolder_host_entries = [
             VFolderHostPermissionEntryGQL(
                 host=entry.host,
                 permissions=[VFolderHostPermissionEnum(perm) for perm in entry.permissions],
             )
-            for entry in node.storage.allowed_vfolder_hosts
+            for entry in dto.storage.allowed_vfolder_hosts
         ]
         return cls(
-            id=ID(str(node.id)),
+            id=ID(str(dto.id)),
             basic_info=ProjectBasicInfoGQL(
-                name=node.basic_info.name,
-                description=node.basic_info.description,
-                type=ProjectTypeEnum(node.basic_info.type.value),
-                integration_id=node.basic_info.integration_id,
+                name=dto.basic_info.name,
+                description=dto.basic_info.description,
+                type=ProjectTypeEnum(dto.basic_info.type.value),
+                integration_id=dto.basic_info.integration_id,
             ),
             organization=ProjectOrganizationInfoGQL(
-                domain_name=node.organization.domain_name,
-                resource_policy=node.organization.resource_policy,
+                domain_name=dto.organization.domain_name,
+                resource_policy=dto.organization.resource_policy,
             ),
             storage=ProjectStorageInfoGQL(
                 allowed_vfolder_hosts=vfolder_host_entries,
             ),
             lifecycle=ProjectLifecycleInfoGQL(
-                is_active=node.lifecycle.is_active,
-                created_at=node.lifecycle.created_at,
-                modified_at=node.lifecycle.modified_at,
+                is_active=dto.lifecycle.is_active,
+                created_at=dto.lifecycle.created_at,
+                modified_at=dto.lifecycle.modified_at,
             ),
         )
 

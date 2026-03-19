@@ -78,7 +78,7 @@ async def revisions(
             offset=offset,
         )
     )
-    nodes = [ModelRevision.from_node(item) for item in payload.items]
+    nodes = [ModelRevision.from_pydantic(item) for item in payload.items]
     edges = [ModelRevisionEdge(node=node, cursor=encode_cursor(str(node.id))) for node in nodes]
     return ModelRevisionConnection(
         count=payload.total_count,

@@ -193,7 +193,7 @@ class ReplicaState:
                 offset=offset,
             ),
         )
-        nodes = [ModelReplica.from_node(item) for item in payload.items]
+        nodes = [ModelReplica.from_pydantic(item) for item in payload.items]
         edges = [ModelReplicaEdge(node=node, cursor=str(node.id)) for node in nodes]
         return ModelReplicaConnection(
             count=payload.total_count,
@@ -247,7 +247,7 @@ class ScalingRule:
                 offset=offset,
             ),
         )
-        nodes = [AutoScalingRule.from_node(item) for item in payload.items]
+        nodes = [AutoScalingRule.from_pydantic(item) for item in payload.items]
         edges = [
             AutoScalingRuleEdge(node=node, cursor=encode_cursor(str(node.id))) for node in nodes
         ]
@@ -352,7 +352,7 @@ class ModelDeploymentNetworkAccess:
                 offset=offset,
             ),
         )
-        nodes = [AccessToken.from_node(item) for item in payload.items]
+        nodes = [AccessToken.from_pydantic(item) for item in payload.items]
         edges = [AccessTokenEdge(node=node, cursor=encode_cursor(str(node.id))) for node in nodes]
         return AccessTokenConnection(
             count=payload.total_count,
@@ -379,7 +379,7 @@ class ModelDeploymentNetworkAccess:
 
 # Main ModelDeployment Type
 @strawberry.type
-class ModelDeployment(PydanticNodeMixin):
+class ModelDeployment(PydanticNodeMixin[DeploymentNodeDTO]):
     """
     Added in 25.19.0.
 
@@ -452,7 +452,7 @@ class ModelDeployment(PydanticNodeMixin):
                 offset=offset,
             ),
         )
-        nodes = [ModelRevision.from_node(item) for item in payload.items]
+        nodes = [ModelRevision.from_pydantic(item) for item in payload.items]
         edges = [ModelRevisionEdge(node=node, cursor=encode_cursor(str(node.id))) for node in nodes]
         return ModelRevisionConnection(
             count=payload.total_count,
@@ -512,37 +512,43 @@ class ModelDeployment(PydanticNodeMixin):
         )
 
     @classmethod
-    def from_node(cls, node: DeploymentNodeDTO) -> Self:
+    def from_pydantic(
+        cls,
+        dto: DeploymentNodeDTO,
+        *,
+        id_field: str = "id",
+        extra: dict[str, Any] | None = None,
+    ) -> Self:
         metadata = ModelDeploymentMetadata(
-            name=node.basic.name,
-            status=DeploymentStatusGQL(node.basic.status),
-            tags=node.basic.tags,
-            _project_id=node.basic.project_id,
-            _domain_name=node.basic.domain_name,
-            created_at=node.created_at,
-            updated_at=node.updated_at,
+            name=dto.basic.name,
+            status=DeploymentStatusGQL(dto.basic.status),
+            tags=dto.basic.tags,
+            _project_id=dto.basic.project_id,
+            _domain_name=dto.basic.domain_name,
+            created_at=dto.created_at,
+            updated_at=dto.updated_at,
         )
         return cls(
-            id=ID(str(node.id)),
+            id=ID(str(dto.id)),
             metadata=metadata,
             network_access=ModelDeploymentNetworkAccess(
-                _deployment_id=node.id,
-                endpoint_url=node.network.url,
-                preferred_domain_name=node.network.preferred_domain_name,
-                open_to_public=node.network.open_to_public,
+                _deployment_id=dto.id,
+                endpoint_url=dto.network.url,
+                preferred_domain_name=dto.network.preferred_domain_name,
+                open_to_public=dto.network.open_to_public,
             ),
-            revision=ModelRevision.from_node(node.current_revision)
-            if node.current_revision
+            revision=ModelRevision.from_pydantic(dto.current_revision)
+            if dto.current_revision
             else None,
             default_deployment_strategy=DeploymentStrategyGQL(
-                type=DeploymentStrategyTypeGQL(node.default_deployment_strategy)
+                type=DeploymentStrategyTypeGQL(dto.default_deployment_strategy)
             ),
             replica_state=ReplicaState(
-                desired_replica_count=node.replica_state.desired_replica_count,
-                _deployment_id=node.id,
+                desired_replica_count=dto.replica_state.desired_replica_count,
+                _deployment_id=dto.id,
             ),
-            _created_user_id=node.basic.created_user_id,
-            _deployment_id=node.id,
+            _created_user_id=dto.basic.created_user_id,
+            _deployment_id=dto.id,
         )
 
 

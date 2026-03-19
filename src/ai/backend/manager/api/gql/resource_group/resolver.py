@@ -95,7 +95,7 @@ async def admin_resource_groups(
         )
     )
 
-    nodes = [ResourceGroupGQL.from_node(data) for data in payload.items]
+    nodes = [ResourceGroupGQL.from_pydantic(data) for data in payload.items]
     edges = [ResourceGroupEdge(node=node, cursor=encode_cursor(node.id)) for node in nodes]
 
     return ResourceGroupConnection(
@@ -144,7 +144,7 @@ async def resource_groups(
         )
     )
 
-    nodes = [ResourceGroupGQL.from_node(data) for data in payload.items]
+    nodes = [ResourceGroupGQL.from_pydantic(data) for data in payload.items]
     edges = [ResourceGroupEdge(node=node, cursor=encode_cursor(node.id)) for node in nodes]
 
     return ResourceGroupConnection(
@@ -202,7 +202,7 @@ async def admin_update_resource_group_fair_share_spec(
     result = await processors.scaling_group.update_fair_share_spec.wait_for_complete(action)
 
     return UpdateResourceGroupFairShareSpecPayload(
-        resource_group=ResourceGroupGQL.from_node(result.scaling_group),
+        resource_group=ResourceGroupGQL.from_pydantic(result.scaling_group),
     )
 
 
@@ -248,7 +248,7 @@ async def update_resource_group_fair_share_spec(
     result = await processors.scaling_group.update_fair_share_spec.wait_for_complete(action)
 
     return UpdateResourceGroupFairShareSpecPayload(
-        resource_group=ResourceGroupGQL.from_node(result.scaling_group),
+        resource_group=ResourceGroupGQL.from_pydantic(result.scaling_group),
     )
 
 
@@ -346,5 +346,5 @@ async def admin_update_resource_group(
     result = await processors.scaling_group.modify_scaling_group.wait_for_complete(action)
 
     return UpdateResourceGroupPayload(
-        resource_group=ResourceGroupGQL.from_node(result.scaling_group),
+        resource_group=ResourceGroupGQL.from_pydantic(result.scaling_group),
     )

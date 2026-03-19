@@ -18,6 +18,7 @@ from ai.backend.common.dto.manager.v2.reservoir_registry.request import (
 from ai.backend.common.dto.manager.v2.reservoir_registry.request import (
     UpdateReservoirRegistryInput as UpdateReservoirRegistryInputDTO,
 )
+from ai.backend.common.dto.manager.v2.reservoir_registry.response import ReservoirRegistryNode
 from ai.backend.manager.api.gql.artifact_registry_meta import ArtifactRegistryMetaConnection
 from ai.backend.manager.api.gql.base import encode_cursor
 from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin
@@ -31,7 +32,7 @@ from .types import StrawberryGQLContext
 
 
 @strawberry.type(description="Added in 25.14.0")
-class ReservoirRegistry(PydanticNodeMixin):
+class ReservoirRegistry(PydanticNodeMixin[ReservoirRegistryNode]):
     id: NodeID[str]
     name: str
     endpoint: str

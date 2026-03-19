@@ -79,7 +79,7 @@ async def admin_users_v2(
             offset=offset,
         )
     )
-    nodes = [UserV2GQL.from_node(item) for item in payload.items]
+    nodes = [UserV2GQL.from_pydantic(item) for item in payload.items]
     edges = [UserV2Edge(node=node, cursor=encode_cursor(str(node.id))) for node in nodes]
     return UserV2Connection(
         edges=edges,
@@ -124,7 +124,7 @@ async def domain_users_v2(
             offset=offset,
         ),
     )
-    nodes = [UserV2GQL.from_node(item) for item in payload.items]
+    nodes = [UserV2GQL.from_pydantic(item) for item in payload.items]
     edges = [UserV2Edge(node=node, cursor=encode_cursor(str(node.id))) for node in nodes]
     return UserV2Connection(
         edges=edges,
@@ -169,7 +169,7 @@ async def project_users_v2(
             offset=offset,
         ),
     )
-    nodes = [UserV2GQL.from_node(item) for item in payload.items]
+    nodes = [UserV2GQL.from_pydantic(item) for item in payload.items]
     edges = [UserV2Edge(node=node, cursor=encode_cursor(str(node.id))) for node in nodes]
     return UserV2Connection(
         edges=edges,

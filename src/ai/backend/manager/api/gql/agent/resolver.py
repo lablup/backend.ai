@@ -57,7 +57,7 @@ async def agents_v2(
             offset=offset,
         )
     )
-    nodes = [AgentV2GQL.from_node(item) for item in result.items]
+    nodes = [AgentV2GQL.from_pydantic(item) for item in result.items]
     edges = [AgentV2Edge(node=node, cursor=to_global_id(AgentV2GQL, node.id)) for node in nodes]
     return AgentV2Connection(
         edges=edges,

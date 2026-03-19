@@ -324,7 +324,7 @@ class SessionV2NetworkInfoGQL:
     name="SessionV2",
     description="Added in 26.3.0. Represents a compute session in Backend.AI.",
 )
-class SessionV2GQL(PydanticNodeMixin):
+class SessionV2GQL(PydanticNodeMixin[SessionNode]):
     """Session type representing a compute session."""
 
     id: NodeID[str]
@@ -522,78 +522,84 @@ class SessionV2GQL(PydanticNodeMixin):
         )
 
     @classmethod
-    def from_node(cls, node: SessionNode) -> Self:
+    def from_pydantic(
+        cls,
+        dto: SessionNode,
+        *,
+        id_field: str = "id",
+        extra: dict[str, Any] | None = None,
+    ) -> Self:
         """Create SessionV2GQL from SessionNode DTO (adapter search results)."""
         from ai.backend.common.types import ClusterMode, ResourceSlot, SessionResult, SessionTypes
         from ai.backend.manager.data.session.types import SessionStatus as SessionStatusInternal
 
         requested_slots = ResourceSlotGQL.from_resource_slot(
-            ResourceSlot.from_json(node.resource.requested_slots)
-            if node.resource.requested_slots
+            ResourceSlot.from_json(dto.resource.requested_slots)
+            if dto.resource.requested_slots
             else {}
         )
         occupying_slots = ResourceSlotGQL.from_resource_slot(
-            ResourceSlot.from_json(node.resource.occupying_slots)
-            if node.resource.occupying_slots
+            ResourceSlot.from_json(dto.resource.occupying_slots)
+            if dto.resource.occupying_slots
             else {}
         )
 
-        status = SessionV2StatusGQL.from_internal(SessionStatusInternal(node.lifecycle.status))
-        result = SessionV2ResultGQL.from_internal(SessionResult(node.lifecycle.result))
+        status = SessionV2StatusGQL.from_internal(SessionStatusInternal(dto.lifecycle.status))
+        result = SessionV2ResultGQL.from_internal(SessionResult(dto.lifecycle.result))
 
         environ_gql: EnvironmentVariablesGQL | None = None
-        if node.runtime.environ:
+        if dto.runtime.environ:
             environ_gql = EnvironmentVariablesGQL(
                 entries=[
                     EnvironmentVariableEntryGQL(name=k, value=v)
-                    for k, v in node.runtime.environ.items()
+                    for k, v in dto.runtime.environ.items()
                 ]
             )
 
         return cls(
-            id=ID(str(node.id)),
-            _domain_name=node.domain_name,
-            _user_uuid=node.user_uuid,
-            _group_id=node.group_id,
+            id=ID(str(dto.id)),
+            _domain_name=dto.domain_name,
+            _user_uuid=dto.user_uuid,
+            _group_id=dto.group_id,
             metadata=SessionV2MetadataInfoGQL(
-                creation_id=node.metadata.creation_id or "",
-                name=node.metadata.name or "",
+                creation_id=dto.metadata.creation_id or "",
+                name=dto.metadata.name or "",
                 session_type=SessionV2TypeGQL.from_internal(
-                    SessionTypes(node.metadata.session_type)
+                    SessionTypes(dto.metadata.session_type)
                 ),
-                access_key=node.metadata.access_key or "",
-                cluster_mode=ClusterModeGQL.from_internal(ClusterMode(node.metadata.cluster_mode)),
-                cluster_size=node.metadata.cluster_size,
-                priority=node.metadata.priority,
-                is_preemptible=node.metadata.is_preemptible,
-                tag=node.metadata.tag,
+                access_key=dto.metadata.access_key or "",
+                cluster_mode=ClusterModeGQL.from_internal(ClusterMode(dto.metadata.cluster_mode)),
+                cluster_size=dto.metadata.cluster_size,
+                priority=dto.metadata.priority,
+                is_preemptible=dto.metadata.is_preemptible,
+                tag=dto.metadata.tag,
             ),
             resource=SessionV2ResourceInfoGQL(
                 allocation=ResourceAllocationGQL(
                     requested=requested_slots,
                     used=occupying_slots,
                 ),
-                resource_group_name=node.resource.scaling_group_name,
-                target_resource_group_names=node.resource.target_sgroup_names,
+                resource_group_name=dto.resource.scaling_group_name,
+                target_resource_group_names=dto.resource.target_sgroup_names,
             ),
             lifecycle=SessionV2LifecycleInfoGQL(
                 status=status,
                 result=result,
-                created_at=node.lifecycle.created_at,
-                terminated_at=node.lifecycle.terminated_at,
-                starts_at=node.lifecycle.starts_at,
-                batch_timeout=node.lifecycle.batch_timeout,
+                created_at=dto.lifecycle.created_at,
+                terminated_at=dto.lifecycle.terminated_at,
+                starts_at=dto.lifecycle.starts_at,
+                batch_timeout=dto.lifecycle.batch_timeout,
             ),
             runtime=SessionV2RuntimeInfoGQL(
                 environ=environ_gql,
-                bootstrap_script=node.runtime.bootstrap_script,
-                startup_command=node.runtime.startup_command,
-                callback_url=node.runtime.callback_url,
+                bootstrap_script=dto.runtime.bootstrap_script,
+                startup_command=dto.runtime.startup_command,
+                callback_url=dto.runtime.callback_url,
             ),
             network=SessionV2NetworkInfoGQL(
-                use_host_network=node.network.use_host_network,
-                network_type=node.network.network_type,
-                network_id=node.network.network_id,
+                use_host_network=dto.network.use_host_network,
+                network_type=dto.network.network_type,
+                network_id=dto.network.network_id,
             ),
         )
 

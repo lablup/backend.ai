@@ -96,7 +96,7 @@ class AutoScalingRuleOrderBy:
 
 
 @strawberry.type
-class AutoScalingRule(PydanticNodeMixin):
+class AutoScalingRule(PydanticNodeMixin[AutoScalingRuleNodeDTO]):
     id: NodeID[str]
 
     metric_source: AutoScalingMetricSource = strawberry.field(
@@ -158,19 +158,25 @@ class AutoScalingRule(PydanticNodeMixin):
         )
 
     @classmethod
-    def from_node(cls, node: AutoScalingRuleNodeDTO) -> Self:
+    def from_pydantic(
+        cls,
+        dto: AutoScalingRuleNodeDTO,
+        *,
+        id_field: str = "id",
+        extra: dict[str, Any] | None = None,
+    ) -> Self:
         return cls(
-            id=ID(str(node.id)),
-            metric_source=AutoScalingMetricSource(node.metric_source.name),
-            metric_name=node.metric_name,
-            min_threshold=node.min_threshold,
-            max_threshold=node.max_threshold,
-            step_size=node.step_size,
-            time_window=node.time_window,
-            min_replicas=node.min_replicas,
-            max_replicas=node.max_replicas,
-            created_at=node.created_at,
-            last_triggered_at=node.last_triggered_at,
+            id=ID(str(dto.id)),
+            metric_source=AutoScalingMetricSource(dto.metric_source.name),
+            metric_name=dto.metric_name,
+            min_threshold=dto.min_threshold,
+            max_threshold=dto.max_threshold,
+            step_size=dto.step_size,
+            time_window=dto.time_window,
+            min_replicas=dto.min_replicas,
+            max_replicas=dto.max_replicas,
+            created_at=dto.created_at,
+            last_triggered_at=dto.last_triggered_at,
         )
 
 
