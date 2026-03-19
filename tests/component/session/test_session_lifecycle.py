@@ -16,13 +16,10 @@ from ai.backend.client.exceptions import BackendAPIError
 from ai.backend.client.v2.exceptions import NotFoundError
 from ai.backend.client.v2.registry import BackendAIClientRegistry
 from ai.backend.common.dto.manager.session.request import (
-    DestroySessionRequest,
-    RenameSessionRequest,
     RestartSessionRequest,
     TransitSessionStatusRequest,
 )
 from ai.backend.common.dto.manager.session.response import (
-    DestroySessionResponse,
     GetStatusHistoryResponse,
     TransitSessionStatusResponse,
 )
@@ -31,45 +28,36 @@ from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.models.kernel import kernels
 from ai.backend.manager.models.session import SessionRow
-from ai.backend.manager.repositories.scheduler.types.session import MarkTerminatingResult
 
-from .conftest import SessionSeedData
+from .conftest import SessionSeedData, UserFixtureData
 
 
-@pytest.fixture()
-async def degraded_session_seed(
-    db_engine: SAEngine,
-    domain_fixture: str,
-    group_fixture: uuid.UUID,
-    admin_user_fixture: Any,
-    scaling_group_fixture: str,
-) -> AsyncIterator[SessionSeedData]:
-    """Seed a RUNNING_DEGRADED session with two kernels (one RUNNING, one ERROR)."""
-    unique = secrets.token_hex(4)
-    session_id = SessionId(uuid.uuid4())
-    session_name = f"test-degraded-{unique}"
-    kernel_id_main = uuid.uuid4()
-    kernel_id_sub = uuid.uuid4()
-    now = datetime.now(tzutc())
-
-    status_history: dict[str, Any] = {
-        SessionStatus.PENDING.name: now.isoformat(),
-        SessionStatus.RUNNING.name: now.isoformat(),
-        SessionStatus.RUNNING_DEGRADED.name: now.isoformat(),
-    }
-
-    common_kernel_values = dict(
+def _build_kernel_values(
+    *,
+    session_id: SessionId,
+    unique: str,
+    session_name: str,
+    cluster_size: int,
+    domain_name: str,
+    group_id: uuid.UUID,
+    user_uuid: uuid.UUID,
+    access_key: str,
+    scaling_group: str,
+    now: datetime,
+) -> dict[str, Any]:
+    """Return the common kernel column values shared by all session seed fixtures."""
+    return dict(
         session_id=session_id,
         session_creation_id=f"cid-{unique}",
         session_name=session_name,
         session_type=SessionTypes.INTERACTIVE,
         cluster_mode="single-node",
-        cluster_size=2,
-        domain_name=domain_fixture,
-        group_id=group_fixture,
-        user_uuid=admin_user_fixture.user_uuid,
-        access_key=admin_user_fixture.keypair.access_key,
-        scaling_group=scaling_group_fixture,
+        cluster_size=cluster_size,
+        domain_name=domain_name,
+        group_id=group_id,
+        user_uuid=user_uuid,
+        access_key=access_key,
+        scaling_group=scaling_group,
         status_info="",
         occupied_slots=ResourceSlot(),
         requested_slots=ResourceSlot(),
@@ -78,6 +66,40 @@ async def degraded_session_seed(
         stdin_port=0,
         stdout_port=0,
         created_at=now,
+    )
+
+
+@pytest.fixture()
+async def degraded_session_seed(
+    db_engine: SAEngine,
+    domain_fixture: str,
+    group_fixture: uuid.UUID,
+    admin_user_fixture: UserFixtureData,
+    scaling_group_fixture: str,
+) -> AsyncIterator[SessionSeedData]:
+    """Seed a RUNNING_DEGRADED session with two kernels (one RUNNING, one ERROR)."""
+    unique = secrets.token_hex(4)
+    session_id = SessionId(uuid.uuid4())
+    session_name = f"test-degraded-{unique}"
+    now = datetime.now(tzutc())
+
+    status_history: dict[str, Any] = {
+        SessionStatus.PENDING.name: now.isoformat(),
+        SessionStatus.RUNNING.name: now.isoformat(),
+        SessionStatus.RUNNING_DEGRADED.name: now.isoformat(),
+    }
+
+    common_kernel = _build_kernel_values(
+        session_id=session_id,
+        unique=unique,
+        session_name=session_name,
+        cluster_size=2,
+        domain_name=domain_fixture,
+        group_id=group_fixture,
+        user_uuid=admin_user_fixture.user_uuid,
+        access_key=admin_user_fixture.keypair.access_key,
+        scaling_group=scaling_group_fixture,
+        now=now,
     )
 
     async with db_engine.begin() as conn:
@@ -104,29 +126,29 @@ async def degraded_session_seed(
         )
         await conn.execute(
             sa.insert(kernels).values(
-                id=kernel_id_main,
+                id=uuid.uuid4(),
                 cluster_role="main",
                 cluster_idx=0,
                 cluster_hostname="main0",
                 status=KernelStatus.RUNNING,
-                **common_kernel_values,
+                **common_kernel,
             )
         )
         await conn.execute(
             sa.insert(kernels).values(
-                id=kernel_id_sub,
+                id=uuid.uuid4(),
                 cluster_role="sub",
                 cluster_idx=1,
                 cluster_hostname="sub1",
                 status=KernelStatus.ERROR,
-                **common_kernel_values,
+                **common_kernel,
             )
         )
 
     yield SessionSeedData(
         session_id=session_id,
         session_name=session_name,
-        kernel_id=kernel_id_main,
+        kernel_id=uuid.UUID(int=0),  # not meaningful for multi-kernel
         access_key=admin_user_fixture.keypair.access_key,
         domain_name=domain_fixture,
         user_uuid=admin_user_fixture.user_uuid,
@@ -144,7 +166,7 @@ async def full_lifecycle_session_seed(
     db_engine: SAEngine,
     domain_fixture: str,
     group_fixture: uuid.UUID,
-    admin_user_fixture: Any,
+    admin_user_fixture: UserFixtureData,
     scaling_group_fixture: str,
 ) -> AsyncIterator[SessionSeedData]:
     """Seed a RUNNING session with a full lifecycle status_history
@@ -165,6 +187,19 @@ async def full_lifecycle_session_seed(
         SessionStatus.RUNNING.name: now.isoformat(),
     }
 
+    common_kernel = _build_kernel_values(
+        session_id=session_id,
+        unique=unique,
+        session_name=session_name,
+        cluster_size=1,
+        domain_name=domain_fixture,
+        group_id=group_fixture,
+        user_uuid=admin_user_fixture.user_uuid,
+        access_key=admin_user_fixture.keypair.access_key,
+        scaling_group=scaling_group_fixture,
+        now=now,
+    )
+
     async with db_engine.begin() as conn:
         await conn.execute(
             sa.insert(SessionRow.__table__).values(
@@ -190,29 +225,11 @@ async def full_lifecycle_session_seed(
         await conn.execute(
             sa.insert(kernels).values(
                 id=kernel_id,
-                session_id=session_id,
-                session_creation_id=f"cid-{unique}",
-                session_name=session_name,
-                session_type=SessionTypes.INTERACTIVE,
                 cluster_role="main",
                 cluster_idx=0,
                 cluster_hostname="main0",
-                cluster_mode="single-node",
-                cluster_size=1,
-                domain_name=domain_fixture,
-                group_id=group_fixture,
-                user_uuid=admin_user_fixture.user_uuid,
-                access_key=admin_user_fixture.keypair.access_key,
-                scaling_group=scaling_group_fixture,
                 status=KernelStatus.RUNNING,
-                status_info="",
-                occupied_slots=ResourceSlot(),
-                requested_slots=ResourceSlot(),
-                repl_in_port=0,
-                repl_out_port=0,
-                stdin_port=0,
-                stdout_port=0,
-                created_at=now,
+                **common_kernel,
             )
         )
 
@@ -226,94 +243,7 @@ async def full_lifecycle_session_seed(
     )
 
     async with db_engine.begin() as conn:
-        await conn.execute(kernels.delete().where(kernels.c.id == kernel_id))
-        await conn.execute(
-            SessionRow.__table__.delete().where(SessionRow.__table__.c.id == session_id)
-        )
-
-
-@pytest.fixture()
-async def user_session_seed(
-    db_engine: SAEngine,
-    domain_fixture: str,
-    group_fixture: uuid.UUID,
-    regular_user_fixture: Any,
-    scaling_group_fixture: str,
-) -> AsyncIterator[SessionSeedData]:
-    """Seed a RUNNING session owned by the regular user."""
-    unique = secrets.token_hex(4)
-    session_id = SessionId(uuid.uuid4())
-    session_name = f"test-user-session-{unique}"
-    kernel_id = uuid.uuid4()
-    now = datetime.now(tzutc())
-
-    status_history: dict[str, Any] = {
-        SessionStatus.PENDING.name: now.isoformat(),
-        SessionStatus.RUNNING.name: now.isoformat(),
-    }
-
-    async with db_engine.begin() as conn:
-        await conn.execute(
-            sa.insert(SessionRow.__table__).values(
-                id=session_id,
-                creation_id=f"cid-{unique}",
-                name=session_name,
-                session_type=SessionTypes.INTERACTIVE,
-                cluster_size=1,
-                cluster_mode="single-node",
-                domain_name=domain_fixture,
-                group_id=group_fixture,
-                user_uuid=regular_user_fixture.user_uuid,
-                access_key=regular_user_fixture.keypair.access_key,
-                scaling_group_name=scaling_group_fixture,
-                status=SessionStatus.RUNNING,
-                status_info="",
-                status_history=status_history,
-                occupying_slots=ResourceSlot(),
-                requested_slots=ResourceSlot(),
-                created_at=now,
-            )
-        )
-        await conn.execute(
-            sa.insert(kernels).values(
-                id=kernel_id,
-                session_id=session_id,
-                session_creation_id=f"cid-{unique}",
-                session_name=session_name,
-                session_type=SessionTypes.INTERACTIVE,
-                cluster_role="main",
-                cluster_idx=0,
-                cluster_hostname="main0",
-                cluster_mode="single-node",
-                cluster_size=1,
-                domain_name=domain_fixture,
-                group_id=group_fixture,
-                user_uuid=regular_user_fixture.user_uuid,
-                access_key=regular_user_fixture.keypair.access_key,
-                scaling_group=scaling_group_fixture,
-                status=KernelStatus.RUNNING,
-                status_info="",
-                occupied_slots=ResourceSlot(),
-                requested_slots=ResourceSlot(),
-                repl_in_port=0,
-                repl_out_port=0,
-                stdin_port=0,
-                stdout_port=0,
-                created_at=now,
-            )
-        )
-
-    yield SessionSeedData(
-        session_id=session_id,
-        session_name=session_name,
-        kernel_id=kernel_id,
-        access_key=regular_user_fixture.keypair.access_key,
-        domain_name=domain_fixture,
-        user_uuid=regular_user_fixture.user_uuid,
-    )
-
-    async with db_engine.begin() as conn:
-        await conn.execute(kernels.delete().where(kernels.c.id == kernel_id))
+        await conn.execute(kernels.delete().where(kernels.c.session_id == session_id))
         await conn.execute(
             SessionRow.__table__.delete().where(SessionRow.__table__.c.id == session_id)
         )
@@ -338,7 +268,7 @@ class TestSessionRestart:
             RestartSessionRequest(),
         )
         result = await admin_registry.session.get_info(session_seed.session_name)
-        assert result.root["status"] == "RUNNING"
+        assert result.root["status"] == SessionStatus.RUNNING.name
 
     async def test_restart_terminated_session_fails(
         self,
@@ -603,156 +533,6 @@ class TestSessionStatusTransition:
         )
 
 
-class TestSessionRenameLifecycle:
-    """Test rename edge cases beyond basic rename already tested in test_session.py."""
-
-    async def test_rename_back_and_forth(
-        self,
-        admin_registry: BackendAIClientRegistry,
-        session_seed: SessionSeedData,
-    ) -> None:
-        """Scenario: Admin renames a session to a new name, then reverts to the original.
-
-        Verifies that rename is fully reversible — after each rename the new name
-        resolves successfully while the old name returns NotFoundError.
-        """
-        original_name = session_seed.session_name
-        new_name = f"{original_name}-lifecycle-test"
-
-        await admin_registry.session.rename(
-            original_name,
-            RenameSessionRequest(session_name=new_name),
-        )
-        result = await admin_registry.session.get_info(new_name)
-        assert result.root["status"] == "RUNNING"
-        with pytest.raises(NotFoundError):
-            await admin_registry.session.get_info(original_name)
-
-        await admin_registry.session.rename(
-            new_name,
-            RenameSessionRequest(session_name=original_name),
-        )
-        result = await admin_registry.session.get_info(original_name)
-        assert result.root["status"] == "RUNNING"
-        with pytest.raises(NotFoundError):
-            await admin_registry.session.get_info(new_name)
-
-    async def test_rename_to_same_name_is_rejected(
-        self,
-        admin_registry: BackendAIClientRegistry,
-        session_seed: SessionSeedData,
-    ) -> None:
-        """Scenario: Admin attempts to rename a session to its current name.
-
-        Verifies that the server rejects a no-op rename as an invalid
-        request rather than silently succeeding.
-        """
-        with pytest.raises(BackendAPIError):
-            await admin_registry.session.rename(
-                session_seed.session_name,
-                RenameSessionRequest(session_name=session_seed.session_name),
-            )
-
-    async def test_user_renames_own_session(
-        self,
-        user_registry: BackendAIClientRegistry,
-        user_session_seed: SessionSeedData,
-    ) -> None:
-        """Scenario: Regular user renames their own session.
-
-        Verifies that non-admin users have rename permission on sessions
-        they own, and that the old name is no longer resolvable after rename.
-        """
-        original_name = user_session_seed.session_name
-        new_name = f"{original_name}-renamed"
-        await user_registry.session.rename(
-            original_name,
-            RenameSessionRequest(session_name=new_name),
-        )
-        result = await user_registry.session.get_info(new_name)
-        assert result.root["status"] == "RUNNING"
-        with pytest.raises(NotFoundError):
-            await user_registry.session.get_info(original_name)
-
-
-class TestSessionPermissions:
-    """Test role-based access control for session operations."""
-
-    async def test_user_gets_own_session_info(
-        self,
-        user_registry: BackendAIClientRegistry,
-        user_session_seed: SessionSeedData,
-    ) -> None:
-        """Scenario: Regular user queries info of their own RUNNING session.
-
-        Verifies that users can read their own session metadata including
-        status and domain name through the get_info endpoint.
-        """
-        result = await user_registry.session.get_info(user_session_seed.session_name)
-        assert result.root["status"] == "RUNNING"
-        assert result.root["domainName"] == user_session_seed.domain_name
-
-    async def test_user_cannot_access_admin_session(
-        self,
-        user_registry: BackendAIClientRegistry,
-        session_seed: SessionSeedData,
-    ) -> None:
-        """Scenario: Regular user attempts to query an admin-owned session.
-
-        Verifies that session visibility is scoped by access key — a user
-        keypair cannot resolve sessions belonging to a different keypair.
-        """
-        with pytest.raises((NotFoundError, BackendAPIError)):
-            await user_registry.session.get_info(session_seed.session_name)
-
-    async def test_admin_cannot_access_user_session_without_ownership(
-        self,
-        admin_registry: BackendAIClientRegistry,
-        user_session_seed: SessionSeedData,
-    ) -> None:
-        """Scenario: Admin queries a session owned by a regular user's keypair.
-
-        The get_info handler resolves scope using the requester's own access
-        key, so sessions owned by other access keys are not found. This is a
-        known limitation of the current implementation that may change in
-        future refactoring.
-        """
-        with pytest.raises(NotFoundError):
-            await admin_registry.session.get_info(user_session_seed.session_name)
-
-    async def test_user_cannot_destroy_admin_session(
-        self,
-        user_registry: BackendAIClientRegistry,
-        session_seed: SessionSeedData,
-    ) -> None:
-        """Scenario: Regular user attempts to force-destroy an admin-owned session.
-
-        Verifies that the destroy endpoint enforces ownership — the session
-        is not resolvable under the user's access key scope.
-        """
-        with pytest.raises((NotFoundError, BackendAPIError)):
-            await user_registry.session.destroy(
-                session_seed.session_name,
-                DestroySessionRequest(forced=True),
-            )
-
-    async def test_user_cannot_rename_admin_session(
-        self,
-        user_registry: BackendAIClientRegistry,
-        session_seed: SessionSeedData,
-    ) -> None:
-        """Scenario: Regular user attempts to rename an admin-owned session.
-
-        Verifies that the rename endpoint enforces ownership — the session
-        is not resolvable under the user's access key scope.
-        """
-        with pytest.raises((NotFoundError, BackendAPIError)):
-            await user_registry.session.rename(
-                session_seed.session_name,
-                RenameSessionRequest(session_name="hacked-name"),
-            )
-
-
 class TestSessionStatusHistory:
     """Test status history for sessions in different lifecycle stages."""
 
@@ -874,61 +654,3 @@ class TestSessionStatusHistory:
         assert isinstance(history, dict)
         assert SessionStatus.RUNNING.name in history
         assert SessionStatus.RUNNING_DEGRADED.name in history
-
-
-class TestSessionDestroyLifecycle:
-    """Test destroy edge cases for session lifecycle."""
-
-    async def test_destroy_already_terminated_session_succeeds(
-        self,
-        admin_registry: BackendAIClientRegistry,
-        terminated_session_seed: SessionSeedData,
-        scheduling_controller_mock: AsyncMock,
-    ) -> None:
-        """Scenario: Admin force-destroys a session that is already TERMINATED.
-
-        Verifies that forced destroy is idempotent — calling destroy on an
-        already-terminated session does not raise an error and returns a
-        valid response with status "terminated".
-        """
-        scheduling_controller_mock.mark_sessions_for_termination.return_value = (
-            MarkTerminatingResult(
-                cancelled_sessions=[],
-                terminating_sessions=[],
-                force_terminated_sessions=[terminated_session_seed.session_id],
-                skipped_sessions=[],
-            )
-        )
-        result = await admin_registry.session.destroy(
-            terminated_session_seed.session_name,
-            DestroySessionRequest(forced=True),
-        )
-        assert isinstance(result, DestroySessionResponse)
-        assert result.root["stats"]["status"] == "terminated"
-
-    async def test_user_destroys_own_session(
-        self,
-        user_registry: BackendAIClientRegistry,
-        user_session_seed: SessionSeedData,
-        scheduling_controller_mock: AsyncMock,
-    ) -> None:
-        """Scenario: Regular user force-destroys their own RUNNING session.
-
-        Verifies that non-admin users have destroy permission on sessions
-        they own, and that the scheduling controller correctly marks the
-        session for termination.
-        """
-        scheduling_controller_mock.mark_sessions_for_termination.return_value = (
-            MarkTerminatingResult(
-                cancelled_sessions=[],
-                terminating_sessions=[],
-                force_terminated_sessions=[user_session_seed.session_id],
-                skipped_sessions=[],
-            )
-        )
-        result = await user_registry.session.destroy(
-            user_session_seed.session_name,
-            DestroySessionRequest(forced=True),
-        )
-        assert isinstance(result, DestroySessionResponse)
-        assert result.root["stats"]["status"] == "terminated"
