@@ -4,6 +4,9 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 
+from ai.backend.common.dto.manager.v2.deployment.request import (
+    AccessTokenFilter as AccessTokenFilterDTO,
+)
 from ai.backend.manager.api.gql.base import DateTimeFilter, StringFilter
 from ai.backend.manager.api.gql.deployment.types.access_token import AccessTokenFilter
 
@@ -32,7 +35,6 @@ from ai.backend.manager.models.scaling_group import ScalingGroupRow
 from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.models.vfolder import VFolderRow
-from ai.backend.manager.repositories.base import QueryCondition
 
 # Reference Row models to prevent unused-import removal.
 _MAPPER_ROWS = [
@@ -60,22 +62,19 @@ _MAPPER_ROWS = [
 ]
 
 
-def _compile(condition_callable: QueryCondition) -> str:
-    """Compile a QueryCondition callable to SQL string."""
-    return str(condition_callable().compile(compile_kwargs={"literal_binds": True}))
-
-
 class TestAccessTokenFilterAND:
-    """Tests for AND logical operator on AccessTokenFilter."""
+    """Tests for AND logical operator on AccessTokenFilter.to_pydantic()."""
 
     def test_and_extends_conditions_from_sub_filter(self) -> None:
         f = AccessTokenFilter(
             AND=[AccessTokenFilter(token=StringFilter(equals="tok-abc"))],
         )
-        conditions = f.build_conditions()
-        assert len(conditions) == 1
-        sql = _compile(conditions[0])
-        assert "endpoint_tokens" in sql
+        dto = f.to_pydantic()
+        assert isinstance(dto, AccessTokenFilterDTO)
+        assert dto.AND is not None
+        assert len(dto.AND) == 1
+        assert dto.AND[0].token is not None
+        assert dto.AND[0].token.equals == "tok-abc"
 
     def test_and_combines_multiple_sub_filters(self) -> None:
         f = AccessTokenFilter(
@@ -84,42 +83,52 @@ class TestAccessTokenFilterAND:
                 AccessTokenFilter(token=StringFilter(equals="tok-xyz")),
             ],
         )
-        conditions = f.build_conditions()
-        assert len(conditions) == 2
+        dto = f.to_pydantic()
+        assert isinstance(dto, AccessTokenFilterDTO)
+        assert dto.AND is not None
+        assert len(dto.AND) == 2
 
-    def test_and_with_empty_list_produces_no_extra_conditions(self) -> None:
+    def test_and_with_empty_list_produces_none_or_empty(self) -> None:
         f = AccessTokenFilter(AND=[])
-        conditions = f.build_conditions()
-        assert conditions == []
+        dto = f.to_pydantic()
+        assert isinstance(dto, AccessTokenFilterDTO)
+        assert dto.AND is None or dto.AND == []
 
     def test_and_combined_with_field_filter(self) -> None:
         f = AccessTokenFilter(
             token=StringFilter(equals="tok-abc"),
             AND=[AccessTokenFilter(token=StringFilter(equals="tok-xyz"))],
         )
-        conditions = f.build_conditions()
-        assert len(conditions) == 2
+        dto = f.to_pydantic()
+        assert isinstance(dto, AccessTokenFilterDTO)
+        assert dto.token is not None
+        assert dto.token.equals == "tok-abc"
+        assert dto.AND is not None
+        assert len(dto.AND) == 1
 
 
 class TestAccessTokenFilterOR:
-    """Tests for OR logical operator on AccessTokenFilter."""
+    """Tests for OR logical operator on AccessTokenFilter.to_pydantic()."""
 
-    def test_or_wraps_sub_filters_in_single_condition(self) -> None:
+    def test_or_produces_sub_filter_dtos(self) -> None:
         f = AccessTokenFilter(
             OR=[
                 AccessTokenFilter(token=StringFilter(equals="tok-abc")),
                 AccessTokenFilter(token=StringFilter(equals="tok-xyz")),
             ],
         )
-        conditions = f.build_conditions()
-        assert len(conditions) == 1
-        sql = _compile(conditions[0])
-        assert "OR" in sql
+        dto = f.to_pydantic()
+        assert isinstance(dto, AccessTokenFilterDTO)
+        assert dto.OR is not None
+        assert len(dto.OR) == 2
+        assert dto.OR[0].token is not None
+        assert dto.OR[0].token.equals == "tok-abc"
 
-    def test_or_with_empty_list_produces_no_extra_conditions(self) -> None:
+    def test_or_with_empty_list_produces_none_or_empty(self) -> None:
         f = AccessTokenFilter(OR=[])
-        conditions = f.build_conditions()
-        assert conditions == []
+        dto = f.to_pydantic()
+        assert isinstance(dto, AccessTokenFilterDTO)
+        assert dto.OR is None or dto.OR == []
 
     def test_or_combined_with_field_filter(self) -> None:
         f = AccessTokenFilter(
@@ -129,20 +138,24 @@ class TestAccessTokenFilterOR:
                 AccessTokenFilter(token=StringFilter(equals="tok-def")),
             ],
         )
-        conditions = f.build_conditions()
-        assert len(conditions) == 2
+        dto = f.to_pydantic()
+        assert isinstance(dto, AccessTokenFilterDTO)
+        assert dto.token is not None
+        assert dto.OR is not None
+        assert len(dto.OR) == 2
 
-    def test_or_sub_filter_with_no_conditions_skipped(self) -> None:
+    def test_or_sub_filter_with_no_field_produces_none_token(self) -> None:
         f = AccessTokenFilter(OR=[AccessTokenFilter()])
-        conditions = f.build_conditions()
-        assert conditions == []
+        dto = f.to_pydantic()
+        assert isinstance(dto, AccessTokenFilterDTO)
+        assert dto.OR is not None
+        assert dto.OR[0].token is None
 
 
 class TestAccessTokenFilterNOT:
-    """Tests for NOT logical operator on AccessTokenFilter."""
+    """Tests for NOT logical operator on AccessTokenFilter.to_pydantic()."""
 
-    def test_not_wraps_sub_filter_in_negated_condition(self) -> None:
-        # Use two sub-conditions so SQLAlchemy emits NOT (cond1 AND cond2) rather than !=
+    def test_not_produces_sub_filter_dto(self) -> None:
         f = AccessTokenFilter(
             NOT=[
                 AccessTokenFilter(
@@ -153,25 +166,33 @@ class TestAccessTokenFilterNOT:
                 )
             ],
         )
-        conditions = f.build_conditions()
-        assert len(conditions) == 1
-        sql = _compile(conditions[0])
-        assert "NOT" in sql
+        dto = f.to_pydantic()
+        assert isinstance(dto, AccessTokenFilterDTO)
+        assert dto.NOT is not None
+        assert len(dto.NOT) == 1
+        assert dto.NOT[0].token is not None
+        assert dto.NOT[0].token.equals == "tok-revoked"
 
-    def test_not_with_empty_list_produces_no_extra_conditions(self) -> None:
+    def test_not_with_empty_list_produces_none_or_empty(self) -> None:
         f = AccessTokenFilter(NOT=[])
-        conditions = f.build_conditions()
-        assert conditions == []
+        dto = f.to_pydantic()
+        assert isinstance(dto, AccessTokenFilterDTO)
+        assert dto.NOT is None or dto.NOT == []
 
     def test_not_combined_with_field_filter(self) -> None:
         f = AccessTokenFilter(
             token=StringFilter(equals="tok-abc"),
             NOT=[AccessTokenFilter(token=StringFilter(equals="tok-revoked"))],
         )
-        conditions = f.build_conditions()
-        assert len(conditions) == 2
+        dto = f.to_pydantic()
+        assert isinstance(dto, AccessTokenFilterDTO)
+        assert dto.token is not None
+        assert dto.NOT is not None
+        assert len(dto.NOT) == 1
 
-    def test_not_sub_filter_with_no_conditions_skipped(self) -> None:
+    def test_not_sub_filter_with_no_field_produces_none_token(self) -> None:
         f = AccessTokenFilter(NOT=[AccessTokenFilter()])
-        conditions = f.build_conditions()
-        assert conditions == []
+        dto = f.to_pydantic()
+        assert isinstance(dto, AccessTokenFilterDTO)
+        assert dto.NOT is not None
+        assert dto.NOT[0].token is None
