@@ -733,9 +733,6 @@ class ModelDeploymentConnection(Connection[ModelDeployment]):
 class SyncReplicaInput:
     model_deployment_id: ID
 
-    def to_pydantic(self) -> SyncReplicaInputDTO:
-        return SyncReplicaInputDTO(model_deployment_id=UUID(self.model_deployment_id))
-
 
 @strawberry.experimental.pydantic.type(
     model=SyncReplicaPayloadDTO,
