@@ -9,6 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession as SASession
 from sqlalchemy.orm import contains_eager, selectinload
 
 from ai.backend.common.data.permission.types import (
+    RBACElementType,
     RelationType,
 )
 from ai.backend.logging.utils import BraceStyleAdapter
@@ -338,9 +339,9 @@ class PermissionDBSource:
                 perm_creator = Creator(
                     spec=PermissionCreatorSpec(
                         role_id=input_data.role_id,
-                        scope_type=scoped_perm_input.scope_type,
+                        scope_type=RBACElementType(scoped_perm_input.scope_type.value),
                         scope_id=scoped_perm_input.scope_id,
-                        entity_type=scoped_perm_input.entity_type,
+                        entity_type=RBACElementType(scoped_perm_input.entity_type.value),
                         operation=scoped_perm_input.operation,
                     )
                 )
@@ -356,7 +357,7 @@ class PermissionDBSource:
                 obj_perm_creator = Creator(
                     spec=ObjectPermissionCreatorSpec(
                         role_id=input_data.role_id,
-                        entity_type=obj_perm_input.entity_type,
+                        entity_type=RBACElementType(obj_perm_input.entity_type.value),
                         entity_id=obj_perm_input.entity_id,
                         operation=obj_perm_input.operation,
                         status=obj_perm_input.status,

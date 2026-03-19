@@ -11,6 +11,11 @@ from __future__ import annotations
 from http import HTTPStatus
 
 from ai.backend.common.api_handlers import APIResponse, BodyParam, PathParam
+from ai.backend.common.data.permission.types import (
+    GLOBAL_SCOPE_ID,
+    EntityType,
+    ScopeType,
+)
 from ai.backend.common.dto.manager.rbac import (
     AssignRoleRequest,
     AssignRoleResponse,
@@ -44,7 +49,9 @@ from ai.backend.common.dto.manager.rbac.response import (
     SearchEntitiesResponse,
     SearchScopesResponse,
 )
+from ai.backend.manager.data.permission.id import ScopeId
 from ai.backend.manager.data.permission.role import UserRoleAssignmentInput, UserRoleRevocationInput
+from ai.backend.manager.data.permission.types import ScopeData
 from ai.backend.manager.dto.context import UserContext
 from ai.backend.manager.errors.permission import NotEnoughPermission
 from ai.backend.manager.models.rbac_models.role import RoleRow
@@ -298,7 +305,13 @@ class RBACHandler:
         action_result = await self._permission_controller.get_scope_types.wait_for_complete(
             GetScopeTypesAction()
         )
-        resp = GetScopeTypesResponse(items=action_result.scope_types)
+        scope_types: list[ScopeType] = []
+        for et in action_result.element_types:
+            try:
+                scope_types.append(et.to_scope_type())
+            except Exception:
+                pass
+        resp = GetScopeTypesResponse(items=scope_types)
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=resp)
 
     async def search_scopes(
@@ -312,8 +325,24 @@ class RBACHandler:
             raise NotEnoughPermission("Only superadmin can search scopes.")
 
         scope_type = path.parsed.scope_type
+        # Handle GLOBAL scope as a static early-return (GLOBAL is not in RBACElementType)
+        if scope_type.value == GLOBAL_SCOPE_ID:
+            global_result = SearchScopesResponse(
+                items=[
+                    self._scope_adapter.convert_to_dto(
+                        ScopeData(
+                            id=ScopeId(scope_type=ScopeType.GLOBAL, scope_id=GLOBAL_SCOPE_ID),
+                            name=GLOBAL_SCOPE_ID,
+                        )
+                    )
+                ],
+                pagination=PaginationInfo(total=1, offset=0, limit=1),
+            )
+            return APIResponse.build(status_code=HTTPStatus.OK, response_model=global_result)
+
+        element_type = scope_type.to_element()
         querier = self._scope_adapter.build_querier(scope_type, body.parsed)
-        action = SearchScopesAction(scope_type=scope_type, querier=querier)
+        action = SearchScopesAction(element_type=element_type, querier=querier)
         action_result = await self._permission_controller.search_scopes.wait_for_complete(action)
         resp = SearchScopesResponse(
             items=[self._scope_adapter.convert_to_dto(item) for item in action_result.result.items],
@@ -338,7 +367,13 @@ class RBACHandler:
         action_result = await self._permission_controller.get_entity_types.wait_for_complete(
             GetEntityTypesAction()
         )
-        resp = GetEntityTypesResponse(items=action_result.entity_types)
+        entity_types: list[EntityType] = []
+        for et in action_result.element_types:
+            try:
+                entity_types.append(et.to_entity_type())
+            except Exception:
+                pass
+        resp = GetEntityTypesResponse(items=entity_types)
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=resp)
 
     async def search_entities(
@@ -352,9 +387,9 @@ class RBACHandler:
             raise NotEnoughPermission("Only superadmin can search entities.")
 
         querier = self._entity_adapter.build_querier(
-            scope_type=path.parsed.scope_type,
+            scope_type=path.parsed.scope_type.to_element(),
             scope_id=path.parsed.scope_id,
-            entity_type=path.parsed.entity_type,
+            entity_type=path.parsed.entity_type.to_element(),
             request=body.parsed,
         )
         action = SearchEntitiesAction(querier=querier)

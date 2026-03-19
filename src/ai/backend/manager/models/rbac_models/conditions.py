@@ -8,6 +8,7 @@ from collections.abc import Collection
 import sqlalchemy as sa
 
 from ai.backend.common.data.filter_specs import StringMatchSpec
+from ai.backend.common.data.permission.types import RBACElementType
 from ai.backend.manager.data.permission.id import ObjectId
 from ai.backend.manager.data.permission.status import RoleStatus
 from ai.backend.manager.data.permission.types import (
@@ -175,14 +176,14 @@ class RoleConditions:
         return inner
 
     @staticmethod
-    def by_has_permission_for(entity_type: EntityType) -> QueryCondition:
+    def by_has_permission_for(element_type: RBACElementType) -> QueryCondition:
         """Filter roles having permission for entity type.
 
         Requires JOIN with ObjectPermissionRow.
         """
 
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return ObjectPermissionRow.entity_type == entity_type
+            return ObjectPermissionRow.entity_type == element_type.to_entity_type()
 
         return inner
 
@@ -641,9 +642,9 @@ class EntityScopeConditions:
     """Query conditions for entity scope search."""
 
     @staticmethod
-    def by_scope_type(scope_type: ScopeType) -> QueryCondition:
+    def by_scope_type(element_type: RBACElementType) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return AssociationScopesEntitiesRow.scope_type == scope_type
+            return AssociationScopesEntitiesRow.scope_type == element_type.to_scope_type()
 
         return inner
 
@@ -655,9 +656,9 @@ class EntityScopeConditions:
         return inner
 
     @staticmethod
-    def by_entity_type(entity_type: EntityType) -> QueryCondition:
+    def by_entity_type(element_type: RBACElementType) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return AssociationScopesEntitiesRow.entity_type == entity_type
+            return AssociationScopesEntitiesRow.entity_type == element_type.to_entity_type()
 
         return inner
 
@@ -791,9 +792,9 @@ class ScopedPermissionConditions:
     """Query conditions for scoped permissions."""
 
     @staticmethod
-    def by_entity_type(entity_type: EntityType) -> QueryCondition:
+    def by_entity_type(element_type: RBACElementType) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return PermissionRow.entity_type == entity_type
+            return PermissionRow.entity_type == element_type.to_entity_type()
 
         return inner
 
@@ -832,9 +833,9 @@ class ScopedPermissionConditions:
         return inner
 
     @staticmethod
-    def by_scope_type(scope_type: ScopeType) -> QueryCondition:
+    def by_scope_type(element_type: RBACElementType) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return PermissionRow.scope_type == scope_type
+            return PermissionRow.scope_type == element_type.to_scope_type()
 
         return inner
 
@@ -864,9 +865,9 @@ class ObjectPermissionConditions:
         return inner
 
     @staticmethod
-    def by_entity_type(entity_type: EntityType) -> QueryCondition:
+    def by_entity_type(element_type: RBACElementType) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return ObjectPermissionRow.entity_type == entity_type
+            return ObjectPermissionRow.entity_type == element_type.to_entity_type()
 
         return inner
 

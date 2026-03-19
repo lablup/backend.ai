@@ -147,7 +147,7 @@ class RoleManager:
             Creator(
                 spec=ObjectPermissionCreatorSpec(
                     role_id=role_id,
-                    entity_type=entity_id.entity_type,
+                    entity_type=entity_id.entity_type.to_element(),
                     entity_id=entity_id.entity_id,
                     operation=operation,
                 )

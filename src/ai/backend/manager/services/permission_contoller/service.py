@@ -1,11 +1,7 @@
 import logging
 from collections.abc import Sequence
 
-from ai.backend.common.data.permission.types import (
-    EntityType,
-    RBACElementType,
-    ScopeType,
-)
+from ai.backend.common.data.permission.types import RBACElementType
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.actions.action.rbac import (
     BaseRBACAction,
@@ -276,17 +272,17 @@ class PermissionControllerService:
         return UpdateRolePermissionsActionResult(role=result)
 
     async def search_scopes(self, action: SearchScopesAction) -> SearchScopesActionResult:
-        """Search scopes based on scope type."""
-        result = await self._repository.search_scopes(action.scope_type, action.querier)
+        """Search scopes based on element type."""
+        result = await self._repository.search_scopes(action.element_type, action.querier)
         return SearchScopesActionResult(result=result)
 
     async def get_scope_types(self, _action: GetScopeTypesAction) -> GetScopeTypesActionResult:
         """Get all available scope types."""
-        return GetScopeTypesActionResult(scope_types=list(ScopeType))
+        return GetScopeTypesActionResult(element_types=list(RBACElementType))
 
     async def get_entity_types(self, _action: GetEntityTypesAction) -> GetEntityTypesActionResult:
         """Get all available entity types."""
-        return GetEntityTypesActionResult(entity_types=list(EntityType))
+        return GetEntityTypesActionResult(element_types=list(RBACElementType))
 
     async def search_entities(self, action: SearchEntitiesAction) -> SearchEntitiesActionResult:
         """Search entities within a scope."""
