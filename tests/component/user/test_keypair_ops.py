@@ -175,35 +175,45 @@ class TestUpdateMyKeypair:
     async def test_activate_own_keypair(
         self,
         user_registry: BackendAIClientRegistry,
-        regular_user_fixture: Any,
         db_engine: SAEngine,
     ) -> None:
-        """S-2: updateMyKeypair(isActive=false) then (isActive=true) → is_active=True in DB."""
-        access_key: str = regular_user_fixture.keypair.access_key
+        """S-2: updateMyKeypair(isActive=false) then (isActive=true) → is_active=True in DB.
 
-        # Deactivate first
-        deact = await _call_gql(
-            user_registry,
-            _UPDATE_MY_KEYPAIR,
-            {"accessKey": access_key, "isActive": False},
-        )
-        _assert_gql_success(deact, "updateMyKeypair")
+        Uses a secondary keypair so that the primary keypair (used for auth) stays active.
+        """
+        # Issue a secondary keypair — the primary keypair used by user_registry remains active.
+        issue_resp = await _call_gql(user_registry, _ISSUE_MY_KEYPAIR)
+        issue_payload = _assert_gql_success(issue_resp, "issueMyKeypair")
+        secondary_ak: str = issue_payload["accessKey"]
 
-        # Reactivate
-        response = await _call_gql(
-            user_registry,
-            _UPDATE_MY_KEYPAIR,
-            {"accessKey": access_key, "isActive": True},
-        )
-        payload = _assert_gql_success(response, "updateMyKeypair")
-        assert payload["success"] is True
-
-        async with db_engine.begin() as conn:
-            row = await conn.execute(
-                sa.select(keypairs.c.is_active).where(keypairs.c.access_key == access_key)
+        try:
+            # Deactivate the secondary keypair (primary keypair still active → auth works).
+            deact = await _call_gql(
+                user_registry,
+                _UPDATE_MY_KEYPAIR,
+                {"accessKey": secondary_ak, "isActive": False},
             )
-            is_active = row.scalar()
-        assert is_active is True, "Keypair should be reactivated in DB"
+            _assert_gql_success(deact, "updateMyKeypair")
+
+            # Reactivate the secondary keypair — still authenticated via primary.
+            response = await _call_gql(
+                user_registry,
+                _UPDATE_MY_KEYPAIR,
+                {"accessKey": secondary_ak, "isActive": True},
+            )
+            payload = _assert_gql_success(response, "updateMyKeypair")
+            assert payload["success"] is True
+
+            async with db_engine.begin() as conn:
+                row = await conn.execute(
+                    sa.select(keypairs.c.is_active).where(keypairs.c.access_key == secondary_ak)
+                )
+                is_active = row.scalar()
+            assert is_active is True, "Secondary keypair should be reactivated in DB"
+        finally:
+            # Clean up: remove the extra keypair to keep DB consistent.
+            async with db_engine.begin() as conn:
+                await conn.execute(keypairs.delete().where(keypairs.c.access_key == secondary_ak))
 
     async def test_update_another_users_keypair_raises_forbidden(
         self,
