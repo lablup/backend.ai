@@ -609,44 +609,90 @@ class ComputeSessionNode(graphene.ObjectType):  # type: ignore[misc]
     async def batch_load_by_dependee_id(
         cls, ctx: GraphQueryContext, session_ids: Sequence[SessionId]
     ) -> Sequence[Sequence[Self]]:
+        """Load dependent sessions for the given dependee session IDs.
+
+        Used by resolve_dependents(): given dependee IDs (sessions being depended on),
+        return the dependent sessions (sessions that depend on them).
+        """
         from ai.backend.manager.models.session import SessionDependencyRow, SessionRow
 
         async with ctx.db.begin_readonly_session() as db_sess:
-            j = sa.join(
-                SessionRow, SessionDependencyRow, SessionRow.id == SessionDependencyRow.depends_on
-            )
-            query = (
-                sa.select(SessionRow)
-                .select_from(j)
-                .where(SessionDependencyRow.session_id.in_(session_ids))
-            )
-            rows = (await db_sess.execute(query)).scalars().all()
-            await batch_populate_session_occupied_slots(db_sess, list(rows))
+            # Step 1: Find dependency rows where depends_on matches the input IDs
+            dep_query = sa.select(
+                SessionDependencyRow.depends_on, SessionDependencyRow.session_id
+            ).where(SessionDependencyRow.depends_on.in_(session_ids))
+            dep_rows = (await db_sess.execute(dep_query)).all()
+
             objs_per_key: dict[SessionId, list[Self]] = {sid: [] for sid in session_ids}
+            if not dep_rows:
+                return [*objs_per_key.values()]
+
+            # Build map: dependent_id → list of dependee session_ids (input keys)
+            dependent_ids = list({row.session_id for row in dep_rows})
+            dep_map: dict[SessionId, list[SessionId]] = {}
+            for dependee_id, dependent_id in dep_rows:
+                dep_map.setdefault(dependent_id, []).append(dependee_id)
+
+            # Step 2: Fetch dependent SessionRows with eager loading
+            sess_query = (
+                sa.select(SessionRow)
+                .where(SessionRow.id.in_(dependent_ids))
+                .options(
+                    selectinload(SessionRow.kernels.and_(KernelRow.cluster_role == DEFAULT_ROLE)),
+                    joinedload(SessionRow.user),
+                )
+            )
+            rows = list((await db_sess.execute(sess_query)).unique().scalars().all())
+            await batch_populate_session_occupied_slots(db_sess, rows)
+
             for row in rows:
-                objs_per_key[row.id].append(cls.from_row(ctx, row))
+                for dependee_id in dep_map.get(row.id, []):
+                    objs_per_key[dependee_id].append(cls.from_row(ctx, row))
             return [*objs_per_key.values()]
 
     @classmethod
     async def batch_load_by_dependent_id(
         cls, ctx: GraphQueryContext, session_ids: Sequence[SessionId]
     ) -> Sequence[Sequence[Self]]:
+        """Load dependee sessions for the given dependent session IDs.
+
+        Used by resolve_dependees(): given dependent IDs (sessions that depend on others),
+        return the dependee sessions (sessions they depend on).
+        """
         from ai.backend.manager.models.session import SessionDependencyRow, SessionRow
 
         async with ctx.db.begin_readonly_session() as db_sess:
-            j = sa.join(
-                SessionRow, SessionDependencyRow, SessionRow.id == SessionDependencyRow.session_id
-            )
-            query = (
-                sa.select(SessionRow)
-                .select_from(j)
-                .where(SessionDependencyRow.depends_on.in_(session_ids))
-            )
-            rows = (await db_sess.execute(query)).scalars().all()
-            await batch_populate_session_occupied_slots(db_sess, list(rows))
+            # Step 1: Find dependency rows where session_id matches the input IDs
+            dep_query = sa.select(
+                SessionDependencyRow.session_id, SessionDependencyRow.depends_on
+            ).where(SessionDependencyRow.session_id.in_(session_ids))
+            dep_rows = (await db_sess.execute(dep_query)).all()
+
             objs_per_key: dict[SessionId, list[Self]] = {sid: [] for sid in session_ids}
+            if not dep_rows:
+                return [*objs_per_key.values()]
+
+            # Build map: dependee_id → list of dependent session_ids (input keys)
+            dependee_ids = list({row.depends_on for row in dep_rows})
+            dep_map: dict[SessionId, list[SessionId]] = {}
+            for dependent_id, dependee_id in dep_rows:
+                dep_map.setdefault(dependee_id, []).append(dependent_id)
+
+            # Step 2: Fetch dependee SessionRows with eager loading
+            sess_query = (
+                sa.select(SessionRow)
+                .where(SessionRow.id.in_(dependee_ids))
+                .options(
+                    selectinload(SessionRow.kernels.and_(KernelRow.cluster_role == DEFAULT_ROLE)),
+                    joinedload(SessionRow.user),
+                )
+            )
+            rows = list((await db_sess.execute(sess_query)).unique().scalars().all())
+            await batch_populate_session_occupied_slots(db_sess, rows)
+
             for row in rows:
-                objs_per_key[row.id].append(cls.from_row(ctx, row))
+                for dependent_id in dep_map.get(row.id, []):
+                    objs_per_key[dependent_id].append(cls.from_row(ctx, row))
             return [*objs_per_key.values()]
 
     @classmethod
