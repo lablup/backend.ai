@@ -45,9 +45,17 @@ class AgentPathParam(BaseRequestModel):
 class AgentFilter(BaseRequestModel):
     """Filter conditions for agent search."""
 
+    id: StringFilter | None = Field(
+        default=None,
+        description="Filter by agent ID. Supports string match operations.",
+    )
     status: AgentStatusFilter | None = Field(
         default=None,
         description="Filter by agent status. Supports equals, in, not_equals, and not_in operations.",
+    )
+    schedulable: bool | None = Field(
+        default=None,
+        description="Filter by schedulable flag.",
     )
     resource_group: StringFilter | None = Field(
         default=None,
@@ -57,6 +65,18 @@ class AgentFilter(BaseRequestModel):
             "and their case-insensitive and negated variants."
         ),
     )
+    AND: list[AgentFilter] | None = Field(
+        default=None, description="All sub-conditions must match."
+    )
+    OR: list[AgentFilter] | None = Field(
+        default=None, description="At least one sub-condition must match."
+    )
+    NOT: list[AgentFilter] | None = Field(
+        default=None, description="None of the sub-conditions must match."
+    )
+
+
+AgentFilter.model_rebuild()
 
 
 class AgentOrder(BaseRequestModel):

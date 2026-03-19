@@ -20,21 +20,29 @@ from ai.backend.common.dto.manager.v2.agent.types import AgentStatusFilter
 from ai.backend.manager.data.agent.types import AgentDetailData, AgentStatus
 from ai.backend.manager.models.agent.conditions import AgentConditions
 from ai.backend.manager.models.agent.orders import (
+    DEFAULT_BACKWARD_ORDER,
     DEFAULT_FORWARD_ORDER,
     TIEBREAKER_ORDER,
     resolve_order,
 )
 from ai.backend.manager.repositories.base import (
-    BatchQuerier,
-    OffsetPagination,
     QueryCondition,
     QueryOrder,
+    combine_conditions_or,
+    negate_conditions,
 )
 from ai.backend.manager.services.agent.actions.search_agents import SearchAgentsAction
 
 from .base import BaseAdapter
+from .pagination import PaginationSpec
 
-DEFAULT_PAGINATION_LIMIT = 10
+_AGENT_PAGINATION_SPEC = PaginationSpec(
+    forward_order=DEFAULT_FORWARD_ORDER,
+    backward_order=DEFAULT_BACKWARD_ORDER,
+    forward_condition_factory=AgentConditions.by_cursor_forward,
+    backward_condition_factory=AgentConditions.by_cursor_backward,
+    tiebreaker_order=TIEBREAKER_ORDER,
+)
 
 
 class AgentAdapter(BaseAdapter):
@@ -44,20 +52,23 @@ class AgentAdapter(BaseAdapter):
         self,
         input: AdminSearchAgentsInput,
     ) -> AdminSearchAgentsPayload:
-        """Search agents (admin, no scope) with filters, orders, and pagination.
-
-        Args:
-            input: Pydantic DTO with filter, order, and pagination parameters.
-
-        Returns:
-            Pydantic payload with items and pagination info.
-        """
-        querier = self.build_querier(input)
-
+        """Search agents (admin, no scope) with filters, orders, and pagination."""
+        conditions = self._convert_filter(input.filter) if input.filter else []
+        orders = self._convert_orders(input.order) if input.order else []
+        querier = self._build_querier(
+            conditions=conditions,
+            orders=orders,
+            pagination_spec=_AGENT_PAGINATION_SPEC,
+            first=input.first,
+            after=input.after,
+            last=input.last,
+            before=input.before,
+            limit=input.limit,
+            offset=input.offset,
+        )
         action_result = await self._processors.agent.search_agents.wait_for_complete(
             SearchAgentsAction(querier=querier)
         )
-
         return AdminSearchAgentsPayload(
             items=[self._data_to_dto(item) for item in action_result.agents],
             total_count=action_result.total_count,
@@ -65,26 +76,47 @@ class AgentAdapter(BaseAdapter):
             has_previous_page=action_result.has_previous_page,
         )
 
-    def build_querier(self, input: AdminSearchAgentsInput) -> BatchQuerier:
-        """Build a BatchQuerier from the search input DTO."""
-        conditions = self._convert_filter(input.filter) if input.filter else []
-        orders = self._convert_orders(input.order) if input.order else [DEFAULT_FORWARD_ORDER]
-        orders.append(TIEBREAKER_ORDER)
-        pagination = self._build_pagination(input)
-
-        return BatchQuerier(conditions=conditions, orders=orders, pagination=pagination)
-
-    def _convert_filter(self, filter: AgentFilter) -> list[QueryCondition]:
+    def _convert_filter(self, f: AgentFilter) -> list[QueryCondition]:
         conditions: list[QueryCondition] = []
-        if filter.status is not None:
-            conditions.extend(self._convert_status_filter(filter.status))
-        if filter.resource_group is not None:
-            condition = self._convert_resource_group_filter(filter.resource_group)
+        if f.id is not None:
+            condition = self._convert_id_filter(f.id)
             if condition is not None:
                 conditions.append(condition)
+        if f.status is not None:
+            conditions.extend(self._convert_status_filter(f.status))
+        if f.schedulable is not None:
+            conditions.append(AgentConditions.by_schedulable(f.schedulable))
+        if f.resource_group is not None:
+            condition = self._convert_scaling_group_filter(f.resource_group)
+            if condition is not None:
+                conditions.append(condition)
+        if f.AND:
+            for sub_filter in f.AND:
+                conditions.extend(self._convert_filter(sub_filter))
+        if f.OR:
+            or_conditions: list[QueryCondition] = []
+            for sub_filter in f.OR:
+                or_conditions.extend(self._convert_filter(sub_filter))
+            if or_conditions:
+                conditions.append(combine_conditions_or(or_conditions))
+        if f.NOT:
+            not_conditions: list[QueryCondition] = []
+            for sub_filter in f.NOT:
+                not_conditions.extend(self._convert_filter(sub_filter))
+            if not_conditions:
+                conditions.append(negate_conditions(not_conditions))
         return conditions
 
-    def _convert_resource_group_filter(self, sf: StringFilter) -> QueryCondition | None:
+    def _convert_id_filter(self, sf: StringFilter) -> QueryCondition | None:
+        return self.convert_string_filter(
+            sf,
+            contains_factory=AgentConditions.by_id_contains,
+            equals_factory=AgentConditions.by_id_equals,
+            starts_with_factory=AgentConditions.by_id_starts_with,
+            ends_with_factory=AgentConditions.by_id_ends_with,
+        )
+
+    def _convert_scaling_group_filter(self, sf: StringFilter) -> QueryCondition | None:
         return self.convert_string_filter(
             sf,
             contains_factory=AgentConditions.by_scaling_group_contains,
@@ -117,13 +149,6 @@ class AgentAdapter(BaseAdapter):
         return [resolve_order(o.field, o.direction) for o in order]
 
     @staticmethod
-    def _build_pagination(input: AdminSearchAgentsInput) -> OffsetPagination:
-        return OffsetPagination(
-            limit=input.limit if input.limit is not None else DEFAULT_PAGINATION_LIMIT,
-            offset=input.offset if input.offset is not None else 0,
-        )
-
-    @staticmethod
     def _data_to_dto(detail: AgentDetailData) -> AgentNode:
         """Convert data layer type to Pydantic DTO."""
         data = detail.agent
@@ -150,4 +175,6 @@ class AgentAdapter(BaseAdapter):
                 region=data.region,
                 addr=data.addr,
             ),
+            scaling_group=data.scaling_group,
+            permissions=[p.value for p in detail.permissions],
         )

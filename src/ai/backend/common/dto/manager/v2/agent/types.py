@@ -33,6 +33,8 @@ class AgentOrderField(StrEnum):
     ID = "id"
     STATUS = "status"
     RESOURCE_GROUP = "resource_group"
+    FIRST_CONTACT = "first_contact"
+    SCHEDULABLE = "schedulable"
 
 
 class OrderDirection(StrEnum):

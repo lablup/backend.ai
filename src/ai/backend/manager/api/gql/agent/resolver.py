@@ -3,14 +3,17 @@ from __future__ import annotations
 import strawberry
 from strawberry import Info
 
-from ai.backend.manager.api.gql.agent.fetcher import fetch_agents
+from ai.backend.common.dto.manager.v2.agent.request import AdminSearchAgentsInput
 from ai.backend.manager.api.gql.agent.types import (
     AgentFilterGQL,
     AgentOrderByGQL,
     AgentResourceGQL,
     AgentStatsGQL,
     AgentV2Connection,
+    AgentV2Edge,
+    AgentV2GQL,
 )
+from ai.backend.manager.api.gql.base import to_global_id
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.services.agent.actions.get_total_resources import GetTotalResourcesAction
 
@@ -42,14 +45,27 @@ async def agents_v2(
     limit: int | None = None,
     offset: int | None = None,
 ) -> AgentV2Connection | None:
-    return await fetch_agents(
-        info,
-        filter=filter,
-        order_by=order_by,
-        before=before,
-        after=after,
-        first=first,
-        last=last,
-        limit=limit,
-        offset=offset,
+    result = await info.context.adapters.agent.admin_search(
+        AdminSearchAgentsInput(
+            filter=filter.to_pydantic() if filter else None,
+            order=[o.to_pydantic() for o in order_by] if order_by else None,
+            first=first,
+            after=after,
+            last=last,
+            before=before,
+            limit=limit,
+            offset=offset,
+        )
+    )
+    nodes = [AgentV2GQL.from_node(item) for item in result.items]
+    edges = [AgentV2Edge(node=node, cursor=to_global_id(AgentV2GQL, node.id)) for node in nodes]
+    return AgentV2Connection(
+        edges=edges,
+        page_info=strawberry.relay.PageInfo(
+            has_next_page=result.has_next_page,
+            has_previous_page=result.has_previous_page,
+            start_cursor=edges[0].cursor if edges else None,
+            end_cursor=edges[-1].cursor if edges else None,
+        ),
+        count=result.total_count,
     )

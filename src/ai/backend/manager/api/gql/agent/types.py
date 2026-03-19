@@ -10,11 +10,27 @@ from strawberry import ID, Info
 from strawberry.relay import Connection, Edge, NodeID
 from strawberry.scalars import JSON
 
+from ai.backend.common.dto.manager.v2.agent.request import AgentFilter, AgentOrder
+from ai.backend.common.dto.manager.v2.agent.types import (
+    AgentOrderField,
+    AgentStatusEnum,
+    AgentStatusFilter,
+)
+from ai.backend.common.dto.manager.v2.agent.types import (
+    OrderDirection as OrderDirectionDTO,
+)
 from ai.backend.common.types import AgentId
 from ai.backend.manager.api.gql.base import OrderDirection, StringFilter
-from ai.backend.manager.api.gql.types import GQLFilter, GQLOrderBy, StrawberryGQLContext
+from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin
+from ai.backend.manager.api.gql.types import StrawberryGQLContext
+from ai.backend.manager.api.gql.utils import dedent_strip
+from ai.backend.manager.data.agent.types import AgentDetailData, AgentStatus
+from ai.backend.manager.models.kernel.conditions import KernelConditions
+from ai.backend.manager.models.rbac.permission_defs import AgentPermission
+from ai.backend.manager.models.session.conditions import SessionConditions
 
 if TYPE_CHECKING:
+    from ai.backend.common.dto.manager.v2.agent.response import AgentNode
     from ai.backend.manager.api.gql.kernel.types import (
         KernelV2ConnectionGQL,
         KernelV2FilterGQL,
@@ -30,20 +46,6 @@ if TYPE_CHECKING:
         SessionV2FilterGQL,
         SessionV2OrderByGQL,
     )
-from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin
-from ai.backend.manager.api.gql.utils import dedent_strip
-from ai.backend.manager.data.agent.types import AgentDetailData, AgentStatus
-from ai.backend.manager.models.agent.conditions import AgentConditions
-from ai.backend.manager.models.agent.orders import AgentOrders
-from ai.backend.manager.models.kernel.conditions import KernelConditions
-from ai.backend.manager.models.rbac.permission_defs import AgentPermission
-from ai.backend.manager.models.session.conditions import SessionConditions
-from ai.backend.manager.repositories.base import (
-    QueryCondition,
-    QueryOrder,
-    combine_conditions_or,
-    negate_conditions,
-)
 
 
 @strawberry.enum(
@@ -81,7 +83,8 @@ class AgentOrderFieldGQL(StrEnum):
     SCHEDULABLE = "schedulable"
 
 
-@strawberry.input(
+@strawberry.experimental.pydantic.input(
+    model=AgentStatusFilter,
     name="AgentStatusFilter",
     description=dedent_strip("""
         Added in 26.1.0. Filter options for agent status within AgentFilter.
@@ -92,11 +95,19 @@ class AgentStatusFilterGQL:
     in_: list[AgentStatus] | None = strawberry.field(name="in", default=None)
     equals: AgentStatus | None = None
 
+    def to_pydantic(self) -> AgentStatusFilter:
+        return AgentStatusFilter(
+            in_=[AgentStatusEnum(s.name) for s in self.in_] if self.in_ else None,
+            equals=AgentStatusEnum(self.equals.name) if self.equals else None,
+        )
 
-@strawberry.input(
-    name="AgentFilter", description="Added in 26.1.0. Filter options for querying agents"
+
+@strawberry.experimental.pydantic.input(
+    model=AgentFilter,
+    name="AgentFilter",
+    description="Added in 26.1.0. Filter options for querying agents",
 )
-class AgentFilterGQL(GQLFilter):
+class AgentFilterGQL:
     id: StringFilter | None = None
     status: AgentStatusFilterGQL | None = None
     schedulable: bool | None = None
@@ -106,75 +117,41 @@ class AgentFilterGQL(GQLFilter):
     OR: list[AgentFilterGQL] | None = None
     NOT: list[AgentFilterGQL] | None = None
 
-    def build_conditions(self) -> list[QueryCondition]:
-        field_conditions: list[QueryCondition] = []
-        if self.id is not None:
-            name_condition = self.id.build_query_condition(
-                contains_factory=AgentConditions.by_id_contains,
-                equals_factory=AgentConditions.by_id_equals,
-                starts_with_factory=AgentConditions.by_id_starts_with,
-                ends_with_factory=AgentConditions.by_id_ends_with,
-            )
-            if name_condition is not None:
-                field_conditions.append(name_condition)
-        if self.status is not None:
-            if self.status.in_ is not None:
-                field_conditions.append(AgentConditions.by_status_contains(self.status.in_))
-            if self.status.equals is not None:
-                field_conditions.append(AgentConditions.by_status_equals(self.status.equals))
-        if self.schedulable is not None:
-            field_conditions.append(AgentConditions.by_schedulable(self.schedulable))
-        if self.scaling_group is not None:
-            scaling_group_condition = self.scaling_group.build_query_condition(
-                contains_factory=AgentConditions.by_scaling_group_contains,
-                equals_factory=AgentConditions.by_scaling_group_equals,
-                starts_with_factory=AgentConditions.by_scaling_group_starts_with,
-                ends_with_factory=AgentConditions.by_scaling_group_ends_with,
-            )
-            if scaling_group_condition is not None:
-                field_conditions.append(scaling_group_condition)
-
-        if self.AND:
-            for sub_filter in self.AND:
-                field_conditions.extend(sub_filter.build_conditions())
-
-        # Handle OR logical operator
-        if self.OR:
-            or_sub_conditions: list[QueryCondition] = []
-            for sub_filter in self.OR:
-                or_sub_conditions.extend(sub_filter.build_conditions())
-            if or_sub_conditions:
-                field_conditions.append(combine_conditions_or(or_sub_conditions))
-
-        # Handle NOT logical operator
-        if self.NOT:
-            not_sub_conditions: list[QueryCondition] = []
-            for sub_filter in self.NOT:
-                not_sub_conditions.extend(sub_filter.build_conditions())
-            if not_sub_conditions:
-                field_conditions.append(negate_conditions(not_sub_conditions))
-
-        return field_conditions
+    def to_pydantic(self) -> AgentFilter:
+        return AgentFilter(
+            id=self.id.to_pydantic() if self.id else None,
+            status=self.status.to_pydantic() if self.status else None,
+            schedulable=self.schedulable,
+            resource_group=self.scaling_group.to_pydantic() if self.scaling_group else None,
+            AND=[f.to_pydantic() for f in self.AND] if self.AND else None,
+            OR=[f.to_pydantic() for f in self.OR] if self.OR else None,
+            NOT=[f.to_pydantic() for f in self.NOT] if self.NOT else None,
+        )
 
 
-@strawberry.input(name="AgentOrderBy", description="Added in 26.1.0. Options for ordering agents")
-class AgentOrderByGQL(GQLOrderBy):
+@strawberry.experimental.pydantic.input(
+    model=AgentOrder,
+    name="AgentOrderBy",
+    description="Added in 26.1.0. Options for ordering agents",
+)
+class AgentOrderByGQL:
     field: AgentOrderFieldGQL
     direction: OrderDirection = OrderDirection.ASC
 
-    def to_query_order(self) -> QueryOrder:
+    def to_pydantic(self) -> AgentOrder:
         ascending = self.direction == OrderDirection.ASC
+        dto_direction = OrderDirectionDTO.ASC if ascending else OrderDirectionDTO.DESC
         match self.field:
             case AgentOrderFieldGQL.ID:
-                return AgentOrders.id(ascending)
+                return AgentOrder(field=AgentOrderField.ID, direction=dto_direction)
             case AgentOrderFieldGQL.STATUS:
-                return AgentOrders.status(ascending)
+                return AgentOrder(field=AgentOrderField.STATUS, direction=dto_direction)
             case AgentOrderFieldGQL.FIRST_CONTACT:
-                return AgentOrders.first_contact(ascending)
+                return AgentOrder(field=AgentOrderField.FIRST_CONTACT, direction=dto_direction)
             case AgentOrderFieldGQL.SCALING_GROUP:
-                return AgentOrders.scaling_group(ascending)
+                return AgentOrder(field=AgentOrderField.RESOURCE_GROUP, direction=dto_direction)
             case AgentOrderFieldGQL.SCHEDULABLE:
-                return AgentOrders.schedulable(ascending)
+                return AgentOrder(field=AgentOrderField.SCHEDULABLE, direction=dto_direction)
 
 
 @strawberry.type(name="AgentResource", description="Added in 25.15.0")
@@ -584,6 +561,41 @@ class AgentV2GQL(PydanticNodeMixin):
                 AgentPermissionGQL.from_agent_permission(p) for p in detail_data.permissions
             ],
             scaling_group=data.scaling_group,
+        )
+
+    @classmethod
+    def from_node(cls, node: AgentNode) -> Self:
+        return cls(
+            _agent_id=AgentId(node.id),
+            id=ID(node.id),
+            resource_info=AgentResourceGQL(
+                capacity=node.resource_info.capacity,
+                used=node.resource_info.used,
+                free=node.resource_info.free,
+            ),
+            status_info=AgentStatusInfoGQL(
+                status=AgentStatus(node.status_info.status),
+                status_changed=node.status_info.status_changed,
+                first_contact=node.status_info.first_contact,
+                lost_at=node.status_info.lost_at,
+                schedulable=node.status_info.schedulable,
+            ),
+            system_info=AgentSystemInfoGQL(
+                architecture=node.system_info.architecture,
+                version=node.system_info.version,
+                auto_terminate_abusing_kernel=False,
+                compute_plugins=(
+                    ComputePluginsGQL.from_mapping(node.system_info.compute_plugins)
+                    if node.system_info.compute_plugins is not None
+                    else ComputePluginsGQL(entries=[])
+                ),
+            ),
+            network_info=AgentNetworkInfoGQL(
+                region=node.network_info.region,
+                addr=node.network_info.addr,
+            ),
+            permissions=[AgentPermissionGQL(p) for p in node.permissions],
+            scaling_group=node.scaling_group,
         )
 
 

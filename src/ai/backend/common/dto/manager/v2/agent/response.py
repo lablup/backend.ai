@@ -146,6 +146,10 @@ class AgentNode(BaseResponseModel):
     network_info: AgentNetworkInfo = Field(
         description="Network location and connectivity information."
     )
+    scaling_group: str = Field(description="Scaling group this agent belongs to.")
+    permissions: list[str] = Field(
+        default_factory=list, description="Permission strings the caller has on this agent."
+    )
 
 
 # ---------------------------------------------------------------------------
