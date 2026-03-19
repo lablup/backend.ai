@@ -215,13 +215,12 @@ class UpdateDeploymentPolicyInputGQL:
         )
 
 
-@strawberry.type(
+@gql_node_type(
+    BackendAIGQLMeta(
+        added_version="26.4.0",
+        description="Result payload returned after creating or updating a deployment policy. Contains the full deployment_policy object reflecting the applied configuration.",
+    ),
     name="UpdateDeploymentPolicyPayload",
-    description=dedent_strip("""
-        Added in 26.4.0.
-        Result payload returned after creating or updating a deployment policy.
-        Contains the full deployment_policy object reflecting the applied configuration.
-    """),
 )
 class UpdateDeploymentPolicyPayloadGQL:
     deployment_policy: DeploymentPolicyGQL

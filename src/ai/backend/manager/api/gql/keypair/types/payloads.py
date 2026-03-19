@@ -75,9 +75,12 @@ class SwitchMyMainAccessKeyPayloadGQL:
         return cls(success=dto.success)
 
 
-@strawberry.type(
+@gql_node_type(
+    BackendAIGQLMeta(
+        added_version="26.2.0",
+        description="Payload returned after updating a keypair.",
+    ),
     name="UpdateMyKeypairPayload",
-    description="Payload returned after updating a keypair.",
 )
 class UpdateMyKeypairPayloadGQL:
     success: bool = strawberry.field(description="Whether the update was successful.")

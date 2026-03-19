@@ -14,7 +14,6 @@ from ai.backend.manager.data.deployment.types import (
 )
 from ai.backend.manager.models.routing import RoutingRow
 from ai.backend.manager.models.routing.conditions import RouteConditions
-from ai.backend.manager.repositories.base.creator import BulkCreator
 from ai.backend.manager.repositories.base.updater import BatchUpdater
 from ai.backend.manager.repositories.deployment.creators import RouteBatchUpdaterSpec
 from ai.backend.manager.repositories.deployment.repository import DeploymentRepository
