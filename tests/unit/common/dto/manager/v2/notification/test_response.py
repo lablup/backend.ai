@@ -36,6 +36,8 @@ def _make_email_spec_info() -> EmailSpecInfo:
     return EmailSpecInfo(
         smtp_host="smtp.example.com",
         smtp_port=587,
+        smtp_use_tls=True,
+        smtp_timeout=30,
         from_email="noreply@example.com",
         to_emails=["admin@example.com"],
     )
