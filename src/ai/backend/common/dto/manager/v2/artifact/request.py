@@ -14,6 +14,7 @@ from ai.backend.common.dto.manager.query import StringFilter
 from .types import (
     ArtifactAvailabilityFilter,
     ArtifactOrderField,
+    ArtifactType,
     ArtifactTypeFilter,
     OrderDirection,
 )
@@ -26,9 +27,16 @@ __all__ = (
     "CancelImportTaskInput",
     "CleanupRevisionsInput",
     "DeleteArtifactsInput",
+    "DelegateeTargetInput",
+    "DelegateImportArtifactsInput",
+    "DelegateScanArtifactsInput",
     "ImportArtifactsInput",
+    "ImportArtifactsOptionsInput",
+    "ModelTargetInput",
     "RejectArtifactInput",
     "RestoreArtifactsInput",
+    "ScanArtifactModelsInput",
+    "ScanArtifactsInput",
     "UpdateArtifactInput",
 )
 
@@ -54,6 +62,15 @@ class UpdateArtifactInput(BaseRequestModel):
         return v
 
 
+class ImportArtifactsOptionsInput(BaseRequestModel):
+    """Options for importing artifact revisions."""
+
+    force: bool = Field(
+        default=False,
+        description="Force re-download regardless of digest freshness check.",
+    )
+
+
 class ImportArtifactsInput(BaseRequestModel):
     """Input for importing scanned artifact revisions from external registries."""
 
@@ -64,9 +81,9 @@ class ImportArtifactsInput(BaseRequestModel):
         default=None,
         description="Optional vfolder ID to import artifacts directly into.",
     )
-    force: bool = Field(
-        default=False,
-        description="Force re-download regardless of digest freshness check.",
+    options: ImportArtifactsOptionsInput | None = Field(
+        default=None,
+        description="Options controlling import behavior such as forcing re-download.",
     )
 
 
@@ -148,4 +165,107 @@ class RejectArtifactInput(BaseRequestModel):
 
     artifact_revision_id: UUID = Field(
         description="The artifact revision ID to reject.",
+    )
+
+
+class ScanArtifactsInput(BaseRequestModel):
+    """Input for scanning artifacts from external registries."""
+
+    registry_id: UUID | None = Field(
+        default=None,
+        description="Optional registry ID to scan artifacts from.",
+    )
+    limit: int = Field(
+        description="Maximum number of artifacts to scan.",
+    )
+    artifact_type: ArtifactType | None = Field(
+        default=None,
+        description="Filter artifacts by type.",
+    )
+    search: str | None = Field(
+        default=None,
+        description="Search term to filter artifacts by name or description.",
+    )
+
+
+class DelegateeTargetInput(BaseRequestModel):
+    """Target delegatee for delegated scan/import operations."""
+
+    delegatee_reservoir_id: UUID = Field(
+        description="ID of the delegatee reservoir registry.",
+    )
+    target_registry_id: UUID = Field(
+        description="ID of the target registry within the delegatee reservoir.",
+    )
+
+
+class DelegateScanArtifactsInput(BaseRequestModel):
+    """Input for delegated scanning of artifacts from a reservoir registry."""
+
+    delegator_reservoir_id: UUID | None = Field(
+        default=None,
+        description="ID of the reservoir registry to delegate the scan request to.",
+    )
+    delegatee_target: DelegateeTargetInput | None = Field(
+        default=None,
+        description="Target delegatee reservoir registry and its remote registry to scan.",
+    )
+    limit: int = Field(
+        description="Maximum number of artifacts to scan.",
+    )
+    artifact_type: ArtifactType | None = Field(
+        default=None,
+        description="Filter artifacts by type.",
+    )
+    search: str | None = Field(
+        default=None,
+        description="Search term to filter artifacts by name or description.",
+    )
+
+
+class DelegateImportArtifactsInput(BaseRequestModel):
+    """Input for delegated import of artifact revisions from a reservoir registry."""
+
+    artifact_revision_ids: list[UUID] = Field(
+        description="List of artifact revision IDs of delegatee artifact registry.",
+    )
+    delegator_reservoir_id: UUID | None = Field(
+        default=None,
+        description="ID of the reservoir registry to delegate the import request to.",
+    )
+    artifact_type: ArtifactType | None = Field(
+        default=None,
+        description="Filter artifacts by type.",
+    )
+    delegatee_target: DelegateeTargetInput | None = Field(
+        default=None,
+        description="Target delegatee reservoir registry.",
+    )
+    options: ImportArtifactsOptionsInput | None = Field(
+        default=None,
+        description="Options controlling import behavior.",
+    )
+
+
+class ModelTargetInput(BaseRequestModel):
+    """Specifies a target model for scanning operations."""
+
+    model_id: str = Field(
+        description="Model ID in the external registry.",
+    )
+    revision: str | None = Field(
+        default=None,
+        description="Specific revision (branch or tag). Defaults to 'main' if not specified.",
+    )
+
+
+class ScanArtifactModelsInput(BaseRequestModel):
+    """Input for batch scanning of specific models from external registries."""
+
+    models: list[ModelTargetInput] = Field(
+        description="List of model targets to scan.",
+    )
+    registry_id: UUID | None = Field(
+        default=None,
+        description="Optional registry ID to scan models from.",
     )

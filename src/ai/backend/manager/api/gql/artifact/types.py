@@ -25,13 +25,37 @@ from ai.backend.common.dto.manager.v2.artifact.request import (
     CleanupRevisionsInput as CleanupArtifactRevisionsInputDTO,
 )
 from ai.backend.common.dto.manager.v2.artifact.request import (
+    DelegateeTargetInput as DelegateeTargetInputDTO,
+)
+from ai.backend.common.dto.manager.v2.artifact.request import (
+    DelegateImportArtifactsInput as DelegateImportArtifactsInputDTO,
+)
+from ai.backend.common.dto.manager.v2.artifact.request import (
+    DelegateScanArtifactsInput as DelegateScanArtifactsInputDTO,
+)
+from ai.backend.common.dto.manager.v2.artifact.request import (
     DeleteArtifactsInput as DeleteArtifactsInputDTO,
+)
+from ai.backend.common.dto.manager.v2.artifact.request import (
+    ImportArtifactsInput as ImportArtifactsInputDTO,
+)
+from ai.backend.common.dto.manager.v2.artifact.request import (
+    ImportArtifactsOptionsInput as ImportArtifactsOptionsInputDTO,
+)
+from ai.backend.common.dto.manager.v2.artifact.request import (
+    ModelTargetInput as ModelTargetInputDTO,
 )
 from ai.backend.common.dto.manager.v2.artifact.request import (
     RejectArtifactInput as RejectArtifactInputDTO,
 )
 from ai.backend.common.dto.manager.v2.artifact.request import (
     RestoreArtifactsInput as RestoreArtifactsInputDTO,
+)
+from ai.backend.common.dto.manager.v2.artifact.request import (
+    ScanArtifactModelsInput as ScanArtifactModelsInputDTO,
+)
+from ai.backend.common.dto.manager.v2.artifact.request import (
+    ScanArtifactsInput as ScanArtifactsInputDTO,
 )
 from ai.backend.manager.api.gql.base import (
     ByteSize,
@@ -496,7 +520,8 @@ class ArtifactRevisionOrderBy(GQLOrderBy):
                 return ArtifactRevisionOrders.updated_at(ascending)
 
 
-@strawberry.input(
+@strawberry.experimental.pydantic.input(
+    model=ScanArtifactsInputDTO,
     description=dedent_strip("""
     Added in 25.14.0.
 
@@ -504,7 +529,7 @@ class ArtifactRevisionOrderBy(GQLOrderBy):
 
     Discovers available artifacts and registers their metadata in the system.
     Artifacts remain in SCANNED status until explicitly imported via import_artifacts.
-    """)
+    """),
 )
 class ScanArtifactsInput:
     registry_id: ID | None = None
@@ -515,14 +540,15 @@ class ScanArtifactsInput:
     search: str | None = None
 
 
-@strawberry.input(
+@strawberry.experimental.pydantic.input(
+    model=ImportArtifactsOptionsInputDTO,
     description=dedent_strip("""
     Added in 26.1.0.
 
     Options for importing artifact revisions.
 
     Controls import behavior such as forcing re-download regardless of digest freshness.
-    """)
+    """),
 )
 class ImportArtifactsOptionsGQL:
     force: bool = strawberry.field(
@@ -531,7 +557,8 @@ class ImportArtifactsOptionsGQL:
     )
 
 
-@strawberry.input(
+@strawberry.experimental.pydantic.input(
+    model=ImportArtifactsInputDTO,
     description=dedent_strip("""
     Added in 25.14.0.
 
@@ -539,7 +566,7 @@ class ImportArtifactsOptionsGQL:
 
     Downloads artifact files from the external source and transitions them through:
     SCANNED → PULLING → PULLED → AVAILABLE status progression.
-    """)
+    """),
 )
 class ImportArtifactsInput:
     artifact_revision_ids: list[ID]
@@ -553,7 +580,10 @@ class ImportArtifactsInput:
     )
 
 
-@strawberry.input(description="Added in 25.15.0")
+@strawberry.experimental.pydantic.input(
+    model=DelegateeTargetInputDTO,
+    description="Added in 25.15.0",
+)
 class DelegateeTarget:
     delegatee_reservoir_id: ID
     target_registry_id: ID
@@ -565,12 +595,13 @@ class DelegateeTarget:
         )
 
 
-@strawberry.input(
+@strawberry.experimental.pydantic.input(
+    model=DelegateScanArtifactsInputDTO,
     description=dedent_strip("""
     Added in 25.15.0.
 
     Input type for delegated scanning of artifacts from a delegatee reservoir registry's remote registry.
-""")
+"""),
 )
 class DelegateScanArtifactsInput:
     delegator_reservoir_id: ID | None = strawberry.field(
@@ -591,14 +622,15 @@ class DelegateScanArtifactsInput:
     )
 
 
-@strawberry.input(
+@strawberry.experimental.pydantic.input(
+    model=DelegateImportArtifactsInputDTO,
     description=dedent_strip("""
     Added in 25.15.0.
 
     Input type for delegated import of artifact revisions from a reservoir registry's remote registry.
     Used to specify which artifact revisions should be imported from the remote registry source
     into the local reservoir registry storage.
-""")
+"""),
 )
 class DelegateImportArtifactsInput:
     artifact_revision_ids: list[ID] = strawberry.field(
@@ -731,7 +763,8 @@ class ArtifactStatusChangedInput:
     artifact_revision_ids: list[ID]
 
 
-@strawberry.input(
+@strawberry.experimental.pydantic.input(
+    model=ModelTargetInputDTO,
     description=dedent_strip("""
     Added in 25.14.0.
 
@@ -739,7 +772,7 @@ class ArtifactStatusChangedInput:
 
     Used to identify specific models in external registries for detailed scanning.
     If revision is not specified, defaults to 'main' revision.
-    """)
+    """),
 )
 class ModelTarget:
     model_id: str
@@ -749,7 +782,8 @@ class ModelTarget:
         return ModelTargetData(model_id=self.model_id, revision=self.revision)
 
 
-@strawberry.input(
+@strawberry.experimental.pydantic.input(
+    model=ScanArtifactModelsInputDTO,
     description=dedent_strip("""
     Added in 25.14.0.
 
@@ -758,7 +792,7 @@ class ModelTarget:
     Scans multiple specified models and retrieves detailed information including
     README content and file sizes. This operation performs immediate detailed scanning
     unlike the general scan_artifacts which only retrieves basic metadata.
-    """)
+    """),
 )
 class ScanArtifactModelsInput:
     models: list[ModelTarget]

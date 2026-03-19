@@ -60,10 +60,14 @@ class ProjectBasicInfoGQL:
         "Added in 26.2.0. Project's organizational context. "
         "Contains domain membership and resource policy information."
     ),
-    all_fields=True,
 )
 class ProjectOrganizationInfoGQL:
     """Project's organizational context."""
+
+    domain_name: str = strawberry.field(description="Name of the domain this project belongs to.")
+    resource_policy: str = strawberry.field(
+        description="Name of the project resource policy applied to this project."
+    )
 
 
 # ============================================================================
