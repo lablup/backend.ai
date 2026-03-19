@@ -172,11 +172,15 @@ class TestEmailSpecInfo:
         info = EmailSpecInfo(
             smtp_host="smtp.example.com",
             smtp_port=587,
+            smtp_use_tls=True,
+            smtp_timeout=30,
             from_email="noreply@example.com",
             to_emails=["admin@example.com", "ops@example.com"],
         )
         assert info.smtp_host == "smtp.example.com"
         assert info.smtp_port == 587
+        assert info.smtp_use_tls is True
+        assert info.smtp_timeout == 30
         assert info.from_email == "noreply@example.com"
         assert info.to_emails == ["admin@example.com", "ops@example.com"]
 
@@ -184,6 +188,8 @@ class TestEmailSpecInfo:
         info = EmailSpecInfo.model_validate({
             "smtp_host": "mail.example.com",
             "smtp_port": 465,
+            "smtp_use_tls": False,
+            "smtp_timeout": 60,
             "from_email": "sender@example.com",
             "to_emails": ["recipient@example.com"],
         })
@@ -194,6 +200,8 @@ class TestEmailSpecInfo:
         info = EmailSpecInfo(
             smtp_host="smtp.example.com",
             smtp_port=587,
+            smtp_use_tls=True,
+            smtp_timeout=30,
             from_email="noreply@example.com",
             to_emails=["admin@example.com"],
         )
@@ -208,6 +216,8 @@ class TestEmailSpecInfo:
         info = EmailSpecInfo(
             smtp_host="smtp.example.com",
             smtp_port=25,
+            smtp_use_tls=False,
+            smtp_timeout=30,
             from_email="from@example.com",
             to_emails=["a@example.com", "b@example.com"],
         )

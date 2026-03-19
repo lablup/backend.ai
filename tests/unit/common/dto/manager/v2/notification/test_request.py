@@ -422,20 +422,22 @@ class TestValidateNotificationChannelInput:
     """Tests for ValidateNotificationChannelInput model."""
 
     def test_valid_creation(self) -> None:
-        inp = ValidateNotificationChannelInput(test_message="Hello, World!")
+        channel_id = uuid.uuid4()
+        inp = ValidateNotificationChannelInput(id=channel_id, test_message="Hello, World!")
         assert inp.test_message == "Hello, World!"
+        assert inp.id == channel_id
 
     def test_empty_test_message_is_valid(self) -> None:
-        inp = ValidateNotificationChannelInput(test_message="")
+        inp = ValidateNotificationChannelInput(id=uuid.uuid4(), test_message="")
         assert inp.test_message == ""
 
     def test_test_message_at_max_length_is_valid(self) -> None:
-        inp = ValidateNotificationChannelInput(test_message="x" * 5000)
+        inp = ValidateNotificationChannelInput(id=uuid.uuid4(), test_message="x" * 5000)
         assert len(inp.test_message) == 5000
 
     def test_test_message_exceeding_max_length_raises_error(self) -> None:
         with pytest.raises(ValidationError):
-            ValidateNotificationChannelInput(test_message="x" * 5001)
+            ValidateNotificationChannelInput(id=uuid.uuid4(), test_message="x" * 5001)
 
     def test_missing_test_message_raises_validation_error(self) -> None:
         with pytest.raises(ValidationError):
@@ -446,23 +448,30 @@ class TestValidateNotificationRuleInput:
     """Tests for ValidateNotificationRuleInput model."""
 
     def test_default_notification_data_is_empty_dict(self) -> None:
-        inp = ValidateNotificationRuleInput()
+        rule_id = uuid.uuid4()
+        inp = ValidateNotificationRuleInput(id=rule_id)
         assert inp.notification_data == {}
 
     def test_notification_data_can_be_set(self) -> None:
         inp = ValidateNotificationRuleInput(
-            notification_data={"session_id": "abc123", "user": "admin"}
+            id=uuid.uuid4(),
+            notification_data={"session_id": "abc123", "user": "admin"},
         )
         assert inp.notification_data["session_id"] == "abc123"
         assert inp.notification_data["user"] == "admin"
 
     def test_notification_data_from_dict(self) -> None:
-        inp = ValidateNotificationRuleInput.model_validate({"notification_data": {"key": "value"}})
+        rule_id = uuid.uuid4()
+        inp = ValidateNotificationRuleInput.model_validate({
+            "id": str(rule_id),
+            "notification_data": {"key": "value"},
+        })
         assert inp.notification_data["key"] == "value"
 
     def test_round_trip_serialization(self) -> None:
         inp = ValidateNotificationRuleInput(
-            notification_data={"event": "session.started", "count": 5}
+            id=uuid.uuid4(),
+            notification_data={"event": "session.started", "count": 5},
         )
         json_str = inp.model_dump_json()
         restored = ValidateNotificationRuleInput.model_validate_json(json_str)
