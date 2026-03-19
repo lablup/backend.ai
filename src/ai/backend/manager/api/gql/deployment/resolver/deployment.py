@@ -8,8 +8,10 @@ from uuid import UUID, uuid4
 
 import strawberry
 from strawberry import ID, Info
+from strawberry.relay import PageInfo
 
 from ai.backend.common.contexts.user import current_user
+from ai.backend.common.dto.manager.v2.deployment.request import AdminSearchDeploymentsInput
 from ai.backend.common.dto.manager.v2.deployment.request import (
     CreateDeploymentInput as CreateDeploymentInputDTO,
 )
@@ -20,8 +22,7 @@ from ai.backend.common.dto.manager.v2.deployment.response import (
     SyncReplicaPayload as SyncReplicaPayloadDTO,
 )
 from ai.backend.common.types import RuntimeVariant
-from ai.backend.manager.api.gql.base import resolve_global_id
-from ai.backend.manager.api.gql.deployment.fetcher.deployment import fetch_deployments
+from ai.backend.manager.api.gql.base import encode_cursor, resolve_global_id
 from ai.backend.manager.api.gql.deployment.types.deployment import (
     CreateDeploymentInput,
     CreateDeploymentPayload,
@@ -32,6 +33,7 @@ from ai.backend.manager.api.gql.deployment.types.deployment import (
     DeploymentStatusChangedPayload,
     ModelDeployment,
     ModelDeploymentConnection,
+    ModelDeploymentEdge,
     SyncReplicaInput,
     SyncReplicaPayload,
     UpdateDeploymentInput,
@@ -233,17 +235,32 @@ async def deployments(
     limit: int | None = None,
     offset: int | None = None,
 ) -> ModelDeploymentConnection | None:
-    """List deployments with optional filtering and pagination."""
-    return await fetch_deployments(
-        info=info,
-        filter=filter,
-        order_by=order_by,
-        before=before,
-        after=after,
-        first=first,
-        last=last,
-        limit=limit,
-        offset=offset,
+    """List deployments with optional filtering and pagination (admin, all deployments)."""
+    pydantic_filter = filter.to_pydantic() if filter else None
+    pydantic_order = [o.to_pydantic() for o in order_by] if order_by else None
+    payload = await info.context.adapters.deployment.admin_search(
+        AdminSearchDeploymentsInput(
+            filter=pydantic_filter,
+            order=pydantic_order,
+            first=first,
+            after=after,
+            last=last,
+            before=before,
+            limit=limit,
+            offset=offset,
+        )
+    )
+    nodes = [ModelDeployment.from_node(item) for item in payload.items]
+    edges = [ModelDeploymentEdge(node=node, cursor=encode_cursor(str(node.id))) for node in nodes]
+    return ModelDeploymentConnection(
+        count=payload.total_count,
+        edges=edges,
+        page_info=PageInfo(
+            has_next_page=payload.has_next_page,
+            has_previous_page=payload.has_previous_page,
+            start_cursor=edges[0].cursor if edges else None,
+            end_cursor=edges[-1].cursor if edges else None,
+        ),
     )
 
 

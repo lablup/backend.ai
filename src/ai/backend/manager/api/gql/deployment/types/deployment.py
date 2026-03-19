@@ -2,19 +2,25 @@
 
 from __future__ import annotations
 
-from collections.abc import Iterable, Sequence
+from collections.abc import Iterable
 from datetime import datetime
-from typing import Any, Self, override
+from typing import Any, Self
 from uuid import UUID
 
 import strawberry
 from strawberry import ID, Info
-from strawberry.relay import Connection, Edge, NodeID
+from strawberry.relay import Connection, Edge, NodeID, PageInfo
 
 from ai.backend.common.api_handlers import SENTINEL
 from ai.backend.common.data.model_deployment.types import (
     DeploymentStrategy,
     ModelDeploymentStatus,
+)
+from ai.backend.common.dto.manager.v2.deployment.request import (
+    AdminSearchRevisionsInput,
+    SearchAccessTokensInput,
+    SearchAutoScalingRulesInput,
+    SearchReplicasInput,
 )
 from ai.backend.common.dto.manager.v2.deployment.request import (
     BlueGreenConfigInput as BlueGreenConfigInputDTO,
@@ -26,6 +32,15 @@ from ai.backend.common.dto.manager.v2.deployment.request import (
     DeleteDeploymentInput as DeleteDeploymentInputDTO,
 )
 from ai.backend.common.dto.manager.v2.deployment.request import (
+    DeploymentFilter as DeploymentFilterDTO,
+)
+from ai.backend.common.dto.manager.v2.deployment.request import (
+    DeploymentOrder as DeploymentOrderDTO,
+)
+from ai.backend.common.dto.manager.v2.deployment.request import (
+    DeploymentStatusFilter as DeploymentStatusFilterDTO,
+)
+from ai.backend.common.dto.manager.v2.deployment.request import (
     RollingUpdateConfigInput as RollingUpdateConfigInputDTO,
 )
 from ai.backend.common.dto.manager.v2.deployment.request import (
@@ -35,7 +50,16 @@ from ai.backend.common.dto.manager.v2.deployment.request import (
     UpdateDeploymentInput as UpdateDeploymentInputDTO,
 )
 from ai.backend.common.dto.manager.v2.deployment.response import (
+    DeploymentNode as DeploymentNodeDTO,
+)
+from ai.backend.common.dto.manager.v2.deployment.response import (
     SyncReplicaPayload as SyncReplicaPayloadDTO,
+)
+from ai.backend.common.dto.manager.v2.deployment.types import (
+    DeploymentOrderField as DTODeploymentOrderField,
+)
+from ai.backend.common.dto.manager.v2.deployment.types import (
+    OrderDirection as DTOOrderDirection,
 )
 from ai.backend.common.exception import (
     InvalidAPIParameters,
@@ -43,15 +67,20 @@ from ai.backend.common.exception import (
 from ai.backend.manager.api.gql.base import (
     OrderDirection,
     StringFilter,
+    encode_cursor,
     to_global_id,
 )
 from ai.backend.manager.api.gql.deployment.types.access_token import (
+    AccessToken,
     AccessTokenConnection,
+    AccessTokenEdge,
     AccessTokenFilter,
     AccessTokenOrderBy,
 )
 from ai.backend.manager.api.gql.deployment.types.auto_scaling import (
+    AutoScalingRule,
     AutoScalingRuleConnection,
+    AutoScalingRuleEdge,
     AutoScalingRuleFilter,
     AutoScalingRuleOrderBy,
 )
@@ -62,7 +91,9 @@ from ai.backend.manager.api.gql.deployment.types.policy import (
     RollingUpdateConfigInputGQL,
 )
 from ai.backend.manager.api.gql.deployment.types.replica import (
+    ModelReplica,
     ModelReplicaConnection,
+    ModelReplicaEdge,
     ReplicaFilter,
     ReplicaOrderBy,
 )
@@ -70,37 +101,28 @@ from ai.backend.manager.api.gql.deployment.types.revision import (
     CreateRevisionInput,
     ModelRevision,
     ModelRevisionConnection,
+    ModelRevisionEdge,
     ModelRevisionFilter,
     ModelRevisionOrderBy,
 )
 from ai.backend.manager.api.gql.domain import Domain
 from ai.backend.manager.api.gql.project import Project
 from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin
-from ai.backend.manager.api.gql.types import GQLFilter, GQLOrderBy, StrawberryGQLContext
+from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.api.gql.user_federation import User
 from ai.backend.manager.api.gql_legacy.domain import DomainNode
 from ai.backend.manager.api.gql_legacy.group import GroupNode
 from ai.backend.manager.api.gql_legacy.user import UserNode
 from ai.backend.manager.data.deployment.creator import DeploymentPolicyConfig
 from ai.backend.manager.data.deployment.types import (
+    AccessTokenSearchScope,
+    AutoScalingRuleSearchScope,
     DeploymentNetworkSpec,
     DeploymentOrderField,
     ModelDeploymentData,
     ModelDeploymentMetadataInfo,
-)
-from ai.backend.manager.models.deployment_revision.conditions import RevisionConditions
-from ai.backend.manager.models.endpoint.conditions import (
-    AccessTokenConditions,
-    AutoScalingRuleConditions,
-    DeploymentConditions,
-)
-from ai.backend.manager.models.endpoint.orders import DeploymentOrders
-from ai.backend.manager.models.routing.conditions import RouteConditions
-from ai.backend.manager.repositories.base import (
-    QueryCondition,
-    QueryOrder,
-    combine_conditions_or,
-    negate_conditions,
+    ReplicaSearchScope,
+    RevisionSearchScope,
 )
 
 DeploymentStatusGQL: type[ModelDeploymentStatus] = strawberry.enum(
@@ -147,19 +169,32 @@ class ReplicaState:
         limit: int | None = None,
         offset: int | None = None,
     ) -> ModelReplicaConnection:
-        from ai.backend.manager.api.gql.deployment.fetcher.replica import fetch_replicas
-
-        return await fetch_replicas(
-            info=info,
-            filter=filter,
-            order_by=order_by,
-            before=before,
-            after=after,
-            first=first,
-            last=last,
-            limit=limit,
-            offset=offset,
-            base_conditions=[RouteConditions.by_endpoint_id(self._deployment_id)],
+        pydantic_filter = filter.to_pydantic() if filter else None
+        pydantic_order = [o.to_pydantic() for o in order_by] if order_by else None
+        payload = await info.context.adapters.deployment.search_replicas(
+            scope=ReplicaSearchScope(deployment_id=self._deployment_id),
+            input=SearchReplicasInput(
+                filter=pydantic_filter,
+                order=pydantic_order,
+                first=first,
+                after=after,
+                last=last,
+                before=before,
+                limit=limit,
+                offset=offset,
+            ),
+        )
+        nodes = [ModelReplica.from_node(item) for item in payload.items]
+        edges = [ModelReplicaEdge(node=node, cursor=str(node.id)) for node in nodes]
+        return ModelReplicaConnection(
+            count=payload.total_count,
+            edges=edges,
+            page_info=PageInfo(
+                has_next_page=payload.has_next_page,
+                has_previous_page=payload.has_previous_page,
+                start_cursor=edges[0].cursor if edges else None,
+                end_cursor=edges[-1].cursor if edges else None,
+            ),
         )
 
 
@@ -188,21 +223,34 @@ class ScalingRule:
         limit: int | None = None,
         offset: int | None = None,
     ) -> AutoScalingRuleConnection:
-        from ai.backend.manager.api.gql.deployment.fetcher.auto_scaling import (
-            fetch_auto_scaling_rules,
+        pydantic_filter = filter.to_pydantic() if filter else None
+        pydantic_order = [o.to_pydantic() for o in order_by] if order_by else None
+        payload = await info.context.adapters.deployment.search_rules(
+            scope=AutoScalingRuleSearchScope(deployment_id=self._deployment_id),
+            input=SearchAutoScalingRulesInput(
+                filter=pydantic_filter,
+                order=pydantic_order,
+                first=first,
+                after=after,
+                last=last,
+                before=before,
+                limit=limit,
+                offset=offset,
+            ),
         )
-
-        return await fetch_auto_scaling_rules(
-            info=info,
-            filter=filter,
-            order_by=order_by,
-            before=before,
-            after=after,
-            first=first,
-            last=last,
-            limit=limit,
-            offset=offset,
-            base_conditions=[AutoScalingRuleConditions.by_deployment_id(self._deployment_id)],
+        nodes = [AutoScalingRule.from_node(item) for item in payload.items]
+        edges = [
+            AutoScalingRuleEdge(node=node, cursor=encode_cursor(str(node.id))) for node in nodes
+        ]
+        return AutoScalingRuleConnection(
+            count=payload.total_count,
+            edges=edges,
+            page_info=PageInfo(
+                has_next_page=payload.has_next_page,
+                has_previous_page=payload.has_previous_page,
+                start_cursor=edges[0].cursor if edges else None,
+                end_cursor=edges[-1].cursor if edges else None,
+            ),
         )
 
 
@@ -280,21 +328,32 @@ class ModelDeploymentNetworkAccess:
         offset: int | None = None,
     ) -> AccessTokenConnection:
         """Resolve access tokens for this deployment."""
-        from ai.backend.manager.api.gql.deployment.fetcher.access_token import (
-            fetch_access_tokens,
+        pydantic_filter = filter.to_pydantic() if filter else None
+        pydantic_order = [o.to_pydantic() for o in order_by] if order_by else None
+        payload = await info.context.adapters.deployment.search_access_tokens(
+            scope=AccessTokenSearchScope(deployment_id=self._deployment_id),
+            input=SearchAccessTokensInput(
+                filter=pydantic_filter,
+                order=pydantic_order,
+                first=first,
+                after=after,
+                last=last,
+                before=before,
+                limit=limit,
+                offset=offset,
+            ),
         )
-
-        return await fetch_access_tokens(
-            info=info,
-            filter=filter,
-            order_by=order_by,
-            before=before,
-            after=after,
-            first=first,
-            last=last,
-            limit=limit,
-            offset=offset,
-            base_conditions=[AccessTokenConditions.by_endpoint_id(self._deployment_id)],
+        nodes = [AccessToken.from_node(item) for item in payload.items]
+        edges = [AccessTokenEdge(node=node, cursor=encode_cursor(str(node.id))) for node in nodes]
+        return AccessTokenConnection(
+            count=payload.total_count,
+            edges=edges,
+            page_info=PageInfo(
+                has_next_page=payload.has_next_page,
+                has_previous_page=payload.has_previous_page,
+                start_cursor=edges[0].cursor if edges else None,
+                end_cursor=edges[-1].cursor if edges else None,
+            ),
         )
 
     @classmethod
@@ -369,19 +428,32 @@ class ModelDeployment(PydanticNodeMixin):
         limit: int | None = None,
         offset: int | None = None,
     ) -> ModelRevisionConnection:
-        from ai.backend.manager.api.gql.deployment.fetcher.revision import fetch_revisions
-
-        return await fetch_revisions(
-            info=info,
-            filter=filter,
-            order_by=order_by,
-            before=before,
-            after=after,
-            first=first,
-            last=last,
-            limit=limit,
-            offset=offset,
-            base_conditions=[RevisionConditions.by_deployment_id(self._deployment_id)],
+        pydantic_filter = filter.to_pydantic() if filter else None
+        pydantic_order = [o.to_pydantic() for o in order_by] if order_by else None
+        payload = await info.context.adapters.deployment.search_revisions(
+            scope=RevisionSearchScope(deployment_id=self._deployment_id),
+            input=AdminSearchRevisionsInput(
+                filter=pydantic_filter,
+                order=pydantic_order,
+                first=first,
+                after=after,
+                last=last,
+                before=before,
+                limit=limit,
+                offset=offset,
+            ),
+        )
+        nodes = [ModelRevision.from_node(item) for item in payload.items]
+        edges = [ModelRevisionEdge(node=node, cursor=encode_cursor(str(node.id))) for node in nodes]
+        return ModelRevisionConnection(
+            count=payload.total_count,
+            edges=edges,
+            page_info=PageInfo(
+                has_next_page=payload.has_next_page,
+                has_previous_page=payload.has_previous_page,
+                start_cursor=edges[0].cursor if edges else None,
+                end_cursor=edges[-1].cursor if edges else None,
+            ),
         )
 
     @classmethod
@@ -430,6 +502,40 @@ class ModelDeployment(PydanticNodeMixin):
             _deployment_id=data.id,
         )
 
+    @classmethod
+    def from_node(cls, node: DeploymentNodeDTO) -> Self:
+        metadata = ModelDeploymentMetadata(
+            name=node.basic.name,
+            status=DeploymentStatusGQL(node.basic.status),
+            tags=node.basic.tags,
+            _project_id=node.basic.project_id,
+            _domain_name=node.basic.domain_name,
+            created_at=node.created_at,
+            updated_at=node.updated_at,
+        )
+        return cls(
+            id=ID(str(node.id)),
+            metadata=metadata,
+            network_access=ModelDeploymentNetworkAccess(
+                _deployment_id=node.id,
+                endpoint_url=node.network.url,
+                preferred_domain_name=node.network.preferred_domain_name,
+                open_to_public=node.network.open_to_public,
+            ),
+            revision=ModelRevision.from_node(node.current_revision)
+            if node.current_revision
+            else None,
+            default_deployment_strategy=DeploymentStrategyGQL(
+                type=DeploymentStrategyTypeGQL(node.default_deployment_strategy)
+            ),
+            replica_state=ReplicaState(
+                desired_replica_count=node.replica_state.desired_replica_count,
+                _deployment_id=node.id,
+            ),
+            _created_user_id=node.basic.created_user_id,
+            _deployment_id=node.id,
+        )
+
 
 # Filter Types
 @strawberry.input(description="Added in 25.19.0")
@@ -438,118 +544,52 @@ class DeploymentStatusFilter:
     equals: DeploymentStatusGQL | None = None
 
 
-@strawberry.input(description="Added in 25.19.0")
-class DeploymentFilter(GQLFilter):
+@strawberry.experimental.pydantic.input(
+    model=DeploymentFilterDTO,
+    description="Added in 25.19.0",
+)
+class DeploymentFilter:
     name: StringFilter | None = None
     status: DeploymentStatusFilter | None = None
     open_to_public: bool | None = None
     tags: StringFilter | None = None
     endpoint_url: StringFilter | None = None
-    ids_in: strawberry.Private[Sequence[UUID] | None] = None
 
     AND: list[DeploymentFilter] | None = None
     OR: list[DeploymentFilter] | None = None
     NOT: list[DeploymentFilter] | None = None
 
-    @override
-    def build_conditions(self) -> list[QueryCondition]:
-        """Build query conditions from this filter.
-
-        Returns a list of QueryCondition callables that can be applied to SQLAlchemy queries.
-        """
-        field_conditions: list[QueryCondition] = []
-
-        # Apply name filter
-        if self.name:
-            name_condition = self.name.build_query_condition(
-                contains_factory=DeploymentConditions.by_name_contains,
-                equals_factory=DeploymentConditions.by_name_equals,
-                starts_with_factory=DeploymentConditions.by_name_starts_with,
-                ends_with_factory=DeploymentConditions.by_name_ends_with,
+    def to_pydantic(self) -> DeploymentFilterDTO:
+        return DeploymentFilterDTO(
+            name=self.name.to_pydantic() if self.name else None,
+            status=DeploymentStatusFilterDTO(
+                equals=self.status.equals.value if self.status.equals else None,
+                in_=[s.value for s in self.status.in_] if self.status.in_ else None,
             )
-            if name_condition:
-                field_conditions.append(name_condition)
-
-        # Apply status filter
-        if self.status:
-            if self.status.in_ is not None:
-                statuses = [ModelDeploymentStatus(s) for s in self.status.in_]
-                field_conditions.append(DeploymentConditions.by_status_in(statuses))
-            elif self.status.equals is not None:
-                field_conditions.append(
-                    DeploymentConditions.by_status_equals(ModelDeploymentStatus(self.status.equals))
-                )
-
-        # Apply open_to_public filter
-        if self.open_to_public is not None:
-            field_conditions.append(DeploymentConditions.by_open_to_public(self.open_to_public))
-
-        # Apply tags filter
-        if self.tags:
-            tags_condition = self.tags.build_query_condition(
-                contains_factory=DeploymentConditions.by_tag_contains,
-                equals_factory=DeploymentConditions.by_tag_equals,
-                starts_with_factory=DeploymentConditions.by_tag_starts_with,
-                ends_with_factory=DeploymentConditions.by_tag_ends_with,
-            )
-            if tags_condition:
-                field_conditions.append(tags_condition)
-
-        # Apply endpoint_url filter
-        if self.endpoint_url:
-            url_condition = self.endpoint_url.build_query_condition(
-                contains_factory=DeploymentConditions.by_url_contains,
-                equals_factory=DeploymentConditions.by_url_equals,
-                starts_with_factory=DeploymentConditions.by_url_starts_with,
-                ends_with_factory=DeploymentConditions.by_url_ends_with,
-            )
-            if url_condition:
-                field_conditions.append(url_condition)
-
-        # Apply ids_in filter (internal use)
-        if self.ids_in:
-            field_conditions.append(DeploymentConditions.by_ids(self.ids_in))
-
-        # Handle AND logical operator - these are implicitly ANDed with field conditions
-        if self.AND:
-            for sub_filter in self.AND:
-                field_conditions.extend(sub_filter.build_conditions())
-
-        # Handle OR logical operator
-        if self.OR:
-            or_sub_conditions: list[QueryCondition] = []
-            for sub_filter in self.OR:
-                or_sub_conditions.extend(sub_filter.build_conditions())
-            if or_sub_conditions:
-                field_conditions.append(combine_conditions_or(or_sub_conditions))
-
-        # Handle NOT logical operator
-        if self.NOT:
-            not_sub_conditions: list[QueryCondition] = []
-            for sub_filter in self.NOT:
-                not_sub_conditions.extend(sub_filter.build_conditions())
-            if not_sub_conditions:
-                field_conditions.append(negate_conditions(not_sub_conditions))
-
-        return field_conditions
+            if self.status
+            else None,
+            open_to_public=self.open_to_public,
+            tags=self.tags.to_pydantic() if self.tags else None,
+            endpoint_url=self.endpoint_url.to_pydantic() if self.endpoint_url else None,
+            AND=[f.to_pydantic() for f in self.AND] if self.AND else None,
+            OR=[f.to_pydantic() for f in self.OR] if self.OR else None,
+            NOT=[f.to_pydantic() for f in self.NOT] if self.NOT else None,
+        )
 
 
-@strawberry.input(description="Added in 25.19.0")
-class DeploymentOrderBy(GQLOrderBy):
+@strawberry.experimental.pydantic.input(
+    model=DeploymentOrderDTO,
+    description="Added in 25.19.0",
+)
+class DeploymentOrderBy:
     field: DeploymentOrderField
     direction: OrderDirection = OrderDirection.DESC
 
-    @override
-    def to_query_order(self) -> QueryOrder:
-        """Convert to repository QueryOrder."""
-        ascending = self.direction == OrderDirection.ASC
-        match self.field:
-            case DeploymentOrderField.NAME:
-                return DeploymentOrders.name(ascending)
-            case DeploymentOrderField.CREATED_AT:
-                return DeploymentOrders.created_at(ascending)
-            case DeploymentOrderField.UPDATED_AT:
-                return DeploymentOrders.updated_at(ascending)
+    def to_pydantic(self) -> DeploymentOrderDTO:
+        return DeploymentOrderDTO(
+            field=DTODeploymentOrderField(self.field.value.lower()),
+            direction=DTOOrderDirection(self.direction.value.lower()),
+        )
 
 
 # Payload Types

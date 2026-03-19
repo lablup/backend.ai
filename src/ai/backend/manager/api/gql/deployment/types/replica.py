@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Iterable
 from datetime import datetime
-from typing import Any, Self, override
+from typing import Any, Self
 from uuid import UUID
 
 import strawberry
@@ -14,13 +14,38 @@ from strawberry.relay import Connection, Edge, NodeID, PageInfo
 from ai.backend.common.data.model_deployment.types import ActivenessStatus as CommonActivenessStatus
 from ai.backend.common.data.model_deployment.types import LivenessStatus as CommonLivenessStatus
 from ai.backend.common.data.model_deployment.types import ReadinessStatus as CommonReadinessStatus
+from ai.backend.common.data.model_deployment.types import RouteStatus as CommonRouteStatus
+from ai.backend.common.data.model_deployment.types import (
+    RouteTrafficStatus as CommonRouteTrafficStatus,
+)
+from ai.backend.common.dto.manager.v2.deployment.request import (
+    ReplicaFilter as ReplicaFilterDTO,
+)
+from ai.backend.common.dto.manager.v2.deployment.request import (
+    ReplicaOrder as ReplicaOrderDTO,
+)
+from ai.backend.common.dto.manager.v2.deployment.request import (
+    ReplicaStatusFilter as ReplicaStatusFilterDTO,
+)
+from ai.backend.common.dto.manager.v2.deployment.request import (
+    ReplicaTrafficStatusFilter as ReplicaTrafficStatusFilterDTO,
+)
+from ai.backend.common.dto.manager.v2.deployment.response import (
+    ReplicaNode as ReplicaNodeDTO,
+)
+from ai.backend.common.dto.manager.v2.deployment.types import (
+    OrderDirection as DTOOrderDirection,
+)
+from ai.backend.common.dto.manager.v2.deployment.types import (
+    ReplicaOrderField as DTOReplicaOrderField,
+)
 from ai.backend.manager.api.gql.base import (
     OrderDirection,
     to_global_id,
 )
 from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin
 from ai.backend.manager.api.gql.session_federation import Session
-from ai.backend.manager.api.gql.types import GQLFilter, GQLOrderBy, StrawberryGQLContext
+from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.api.gql_legacy.session import ComputeSessionNode
 from ai.backend.manager.data.deployment.types import (
     ModelReplicaData,
@@ -28,9 +53,6 @@ from ai.backend.manager.data.deployment.types import (
     RouteStatus,
     RouteTrafficStatus,
 )
-from ai.backend.manager.models.routing.conditions import RouteConditions
-from ai.backend.manager.models.routing.orders import RouteOrders
-from ai.backend.manager.repositories.base import QueryCondition, QueryOrder
 from ai.backend.manager.services.deployment.actions.model_revision.get_revision_by_id import (
     GetRevisionByIdAction,
 )
@@ -88,8 +110,11 @@ class TrafficStatusFilter:
 # ========== ModelReplica Types ==========
 
 
-@strawberry.input(description="Added in 25.19.0")
-class ReplicaFilter(GQLFilter):
+@strawberry.experimental.pydantic.input(
+    model=ReplicaFilterDTO,
+    description="Added in 25.19.0",
+)
+class ReplicaFilter:
     status: ReplicaStatusFilter | None = None
     traffic_status: TrafficStatusFilter | None = None
 
@@ -97,46 +122,47 @@ class ReplicaFilter(GQLFilter):
     OR: list[ReplicaFilter] | None = None
     NOT: list[ReplicaFilter] | None = None
 
-    @override
-    def build_conditions(self) -> list[QueryCondition]:
-        """Build query conditions from this filter."""
-        conditions: list[QueryCondition] = []
+    def to_pydantic(self) -> ReplicaFilterDTO:
+        return ReplicaFilterDTO(
+            status=ReplicaStatusFilterDTO(
+                equals=CommonRouteStatus(self.status.equals.value)
+                if self.status and self.status.equals
+                else None,
+                in_=[CommonRouteStatus(s.value) for s in self.status.in_]
+                if self.status and self.status.in_
+                else None,
+            )
+            if self.status
+            else None,
+            traffic_status=ReplicaTrafficStatusFilterDTO(
+                equals=CommonRouteTrafficStatus(self.traffic_status.equals.value)
+                if self.traffic_status and self.traffic_status.equals
+                else None,
+                in_=[CommonRouteTrafficStatus(s.value) for s in self.traffic_status.in_]
+                if self.traffic_status and self.traffic_status.in_
+                else None,
+            )
+            if self.traffic_status
+            else None,
+            AND=[f.to_pydantic() for f in self.AND] if self.AND else None,
+            OR=[f.to_pydantic() for f in self.OR] if self.OR else None,
+            NOT=[f.to_pydantic() for f in self.NOT] if self.NOT else None,
+        )
 
-        if self.status:
-            if self.status.in_ is not None:
-                statuses = [RouteStatus(s) for s in self.status.in_]
-                conditions.append(RouteConditions.by_statuses(statuses))
-            elif self.status.equals is not None:
-                conditions.append(RouteConditions.by_statuses([RouteStatus(self.status.equals)]))
 
-        if self.traffic_status:
-            if self.traffic_status.in_ is not None:
-                traffic_statuses = [RouteTrafficStatus(s) for s in self.traffic_status.in_]
-                conditions.append(RouteConditions.by_traffic_statuses(traffic_statuses))
-            elif self.traffic_status.equals is not None:
-                conditions.append(
-                    RouteConditions.by_traffic_statuses([
-                        RouteTrafficStatus(self.traffic_status.equals)
-                    ])
-                )
-
-        return conditions
-
-
-@strawberry.input(description="Added in 25.19.0")
-class ReplicaOrderBy(GQLOrderBy):
+@strawberry.experimental.pydantic.input(
+    model=ReplicaOrderDTO,
+    description="Added in 25.19.0",
+)
+class ReplicaOrderBy:
     field: ReplicaOrderField
     direction: OrderDirection = OrderDirection.DESC
 
-    @override
-    def to_query_order(self) -> QueryOrder:
-        """Convert to repository QueryOrder."""
-        ascending = self.direction == OrderDirection.ASC
-        match self.field:
-            case ReplicaOrderField.CREATED_AT:
-                return RouteOrders.created_at(ascending)
-            case ReplicaOrderField.ID:
-                return RouteOrders.id(ascending)
+    def to_pydantic(self) -> ReplicaOrderDTO:
+        return ReplicaOrderDTO(
+            field=DTOReplicaOrderField(self.field.value.lower()),
+            direction=DTOOrderDirection(self.direction.value.lower()),
+        )
 
 
 @strawberry.type
@@ -210,6 +236,19 @@ class ModelReplica(PydanticNodeMixin):
             activeness_status=ActivenessStatus(data.activeness_status),
             weight=data.weight,
             created_at=data.created_at,
+        )
+
+    @classmethod
+    def from_node(cls, node: ReplicaNodeDTO) -> Self:
+        return cls(
+            id=ID(str(node.id)),
+            _revision_id=node.revision_id,
+            _session_id=node.session_id,
+            readiness_status=ReadinessStatus(node.readiness_status),
+            liveness_status=LivenessStatus(node.liveness_status),
+            activeness_status=ActivenessStatus(node.activeness_status),
+            weight=node.weight,
+            created_at=node.created_at,
         )
 
 

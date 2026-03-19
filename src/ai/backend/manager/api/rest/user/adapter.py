@@ -77,8 +77,8 @@ class UserAdapter(BaseFilterAdapter):
         username = OptionalState[str].nop()
         password = OptionalState[PasswordInfo].nop()
         need_password_change = OptionalState[bool].nop()
-        full_name = OptionalState[str].nop()
-        description = OptionalState[str].nop()
+        full_name = TriState[str].nop()
+        description = TriState[str].nop()
         status = OptionalState[UserStatus].nop()
         domain_name = OptionalState[str].nop()
         role: OptionalState[UserRole] = OptionalState.nop()
@@ -99,9 +99,9 @@ class UserAdapter(BaseFilterAdapter):
         if request.need_password_change is not None:
             need_password_change = OptionalState.update(request.need_password_change)
         if request.full_name is not None:
-            full_name = OptionalState.update(request.full_name)
+            full_name = TriState.update(request.full_name)
         if request.description is not None:
-            description = OptionalState.update(request.description)
+            description = TriState.update(request.description)
         if request.status is not None:
             status = OptionalState.update(UserStatus(request.status.value))
         if request.domain_name is not None:

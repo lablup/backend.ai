@@ -7,12 +7,14 @@ from uuid import UUID
 
 import strawberry
 from strawberry import ID, Info
+from strawberry.relay import PageInfo
 
+from ai.backend.common.dto.manager.v2.deployment.request import SearchReplicasInput
 from ai.backend.manager.api.gql.base import resolve_global_id
-from ai.backend.manager.api.gql.deployment.fetcher.replica import fetch_replicas
 from ai.backend.manager.api.gql.deployment.types.replica import (
     ModelReplica,
     ModelReplicaConnection,
+    ModelReplicaEdge,
     ReplicaFilter,
     ReplicaOrderBy,
     ReplicaStatusChangedPayload,
@@ -37,17 +39,32 @@ async def replicas(
     limit: int | None = None,
     offset: int | None = None,
 ) -> ModelReplicaConnection | None:
-    """List replicas with optional filtering and pagination."""
-    return await fetch_replicas(
-        info=info,
-        filter=filter,
-        order_by=order_by,
-        before=before,
-        after=after,
-        first=first,
-        last=last,
-        limit=limit,
-        offset=offset,
+    """List replicas with optional filtering and pagination (admin, all deployments)."""
+    pydantic_filter = filter.to_pydantic() if filter else None
+    pydantic_order = [o.to_pydantic() for o in order_by] if order_by else None
+    payload = await info.context.adapters.deployment.admin_search_replicas(
+        SearchReplicasInput(
+            filter=pydantic_filter,
+            order=pydantic_order,
+            first=first,
+            after=after,
+            last=last,
+            before=before,
+            limit=limit,
+            offset=offset,
+        )
+    )
+    nodes = [ModelReplica.from_node(item) for item in payload.items]
+    edges = [ModelReplicaEdge(node=node, cursor=str(node.id)) for node in nodes]
+    return ModelReplicaConnection(
+        count=payload.total_count,
+        edges=edges,
+        page_info=PageInfo(
+            has_next_page=payload.has_next_page,
+            has_previous_page=payload.has_previous_page,
+            start_cursor=edges[0].cursor if edges else None,
+            end_cursor=edges[-1].cursor if edges else None,
+        ),
     )
 
 

@@ -32,6 +32,7 @@ __all__ = (
     "ModelDeploymentStatus",
     "NetworkConfigInfo",
     "OrderDirection",
+    "ReplicaOrderField",
     "ReplicaStateInfo",
     "RevisionOrderField",
     "RollingUpdateConfigInfo",
@@ -90,8 +91,11 @@ class DeploymentRevisionInfo(BaseResponseModel):
     cluster_size: int
     resource_group: str
     resource_slots: dict[str, Any]
+    resource_opts: dict[str, Any] | None = None
     image_id: UUID
     runtime_variant: RuntimeVariant
+    inference_runtime_config: dict[str, Any] | None = None
+    environ: dict[str, str] | None = None
     model_vfolder_id: UUID | None
     model_mount_destination: str | None
     model_definition_path: str | None
@@ -145,3 +149,10 @@ class AutoScalingRuleOrderField(StrEnum):
     """Fields available for ordering auto-scaling rules."""
 
     CREATED_AT = "created_at"
+
+
+class ReplicaOrderField(StrEnum):
+    """Fields available for ordering deployment replicas."""
+
+    CREATED_AT = "created_at"
+    ID = "id"

@@ -13,6 +13,38 @@ from ai.backend.common.data.filter_specs import StringMatchSpec, UUIDEqualMatchS
 _QC = TypeVar("_QC")
 
 
+class DateTimeFilter(BaseRequestModel):
+    """Filter for datetime fields supporting range and equality operations."""
+
+    before: datetime | None = Field(default=None, description="Before this datetime (inclusive)")
+    after: datetime | None = Field(default=None, description="After this datetime (inclusive)")
+    equals: datetime | None = Field(default=None, description="Exact datetime match")
+
+    def build_query_condition(
+        self,
+        before_factory: Callable[[datetime], _QC],
+        after_factory: Callable[[datetime], _QC],
+        equals_factory: Callable[[datetime], _QC] | None = None,
+    ) -> _QC | None:
+        """Build a query condition from this filter using the provided factory callables.
+
+        Args:
+            before_factory: Factory function that takes datetime and returns a condition for <= comparison
+            after_factory: Factory function that takes datetime and returns a condition for >= comparison
+            equals_factory: Optional factory function for = comparison
+
+        Returns:
+            A query condition if any filter field is set, None otherwise
+        """
+        if self.equals is not None and equals_factory is not None:
+            return equals_factory(self.equals)
+        if self.before is not None:
+            return before_factory(self.before)
+        if self.after is not None:
+            return after_factory(self.after)
+        return None
+
+
 class DateTimeRangeFilter(BaseRequestModel):
     """
     Filters records by a datetime range.

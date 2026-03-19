@@ -13,7 +13,10 @@ from pydantic import Field
 
 from ai.backend.common.api_handlers import BaseResponseModel
 from ai.backend.common.data.model_deployment.types import (
+    ActivenessStatus,
     DeploymentStrategy,
+    LivenessStatus,
+    ReadinessStatus,
     RouteStatus,
     RouteTrafficStatus,
 )
@@ -45,12 +48,14 @@ __all__ = (
     "ExtraVFolderMountNode",
     "GetAutoScalingRulePayload",
     "GetDeploymentPolicyPayload",
+    "ReplicaNode",
     "RevisionNode",
     "RouteNode",
     "ScaleDeploymentPayload",
     "SearchAccessTokensPayload",
     "SearchAutoScalingRulesPayload",
     "SearchDeploymentPoliciesPayload",
+    "SearchReplicasPayload",
     "SearchRoutesPayload",
     "SyncReplicaPayload",
     "UpdateAutoScalingRulePayload",
@@ -298,6 +303,28 @@ class SearchDeploymentPoliciesPayload(BaseResponseModel):
     """Payload for deployment policy search result."""
 
     items: list[DeploymentPolicyNode] = Field(description="Deployment policy list")
+    total_count: int = Field(description="Total count")
+    has_next_page: bool = Field(description="Whether a next page exists")
+    has_previous_page: bool = Field(description="Whether a previous page exists")
+
+
+class ReplicaNode(BaseResponseModel):
+    """Node model representing a deployment replica (user-facing view of routing row)."""
+
+    id: UUID = Field(description="Replica ID")
+    revision_id: UUID = Field(description="Associated revision ID")
+    session_id: UUID = Field(description="Associated session ID")
+    readiness_status: ReadinessStatus = Field(description="Readiness status")
+    liveness_status: LivenessStatus = Field(description="Liveness status")
+    activeness_status: ActivenessStatus = Field(description="Activeness status")
+    weight: int = Field(description="Traffic weight for load balancing")
+    created_at: datetime = Field(description="Creation timestamp")
+
+
+class SearchReplicasPayload(BaseResponseModel):
+    """Payload for replica search result."""
+
+    items: list[ReplicaNode] = Field(description="Replica list")
     total_count: int = Field(description="Total count")
     has_next_page: bool = Field(description="Whether a next page exists")
     has_previous_page: bool = Field(description="Whether a previous page exists")

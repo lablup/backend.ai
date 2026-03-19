@@ -18,12 +18,13 @@ from ai.backend.common.data.model_deployment.types import (
     RouteStatus,
     RouteTrafficStatus,
 )
-from ai.backend.common.dto.manager.query import StringFilter
+from ai.backend.common.dto.manager.query import DateTimeFilter, StringFilter
 from ai.backend.common.dto.manager.v2.deployment.types import (
     AccessTokenOrderField,
     AutoScalingRuleOrderField,
     DeploymentOrderField,
     OrderDirection,
+    ReplicaOrderField,
     RevisionOrderField,
     RouteOrderField,
 )
@@ -50,6 +51,10 @@ __all__ = (
     "DeploymentPolicyFilter",
     "DeploymentStatusFilter",
     "ExtraVFolderMountInput",
+    "ReplicaFilter",
+    "ReplicaOrder",
+    "ReplicaStatusFilter",
+    "ReplicaTrafficStatusFilter",
     "RevisionFilter",
     "RevisionInput",
     "RevisionOrder",
@@ -62,6 +67,7 @@ __all__ = (
     "SearchAccessTokensInput",
     "SearchAutoScalingRulesInput",
     "SearchDeploymentPoliciesInput",
+    "SearchReplicasInput",
     "SearchRoutesInput",
     "SyncReplicaInput",
     "UpdateAutoScalingRuleInput",
@@ -249,12 +255,38 @@ class RouteTrafficStatusFilter(BaseRequestModel):
     )
 
 
+class ReplicaStatusFilter(BaseRequestModel):
+    """Filter for replica (route) status."""
+
+    equals: RouteStatus | None = Field(default=None, description="Exact status match")
+    in_: list[RouteStatus] | None = Field(default=None, alias="in", description="Status is in list")
+
+
+class ReplicaTrafficStatusFilter(BaseRequestModel):
+    """Filter for replica traffic status."""
+
+    equals: RouteTrafficStatus | None = Field(
+        default=None, description="Exact traffic status match"
+    )
+    in_: list[RouteTrafficStatus] | None = Field(
+        default=None, alias="in", description="Traffic status is in list"
+    )
+
+
 class DeploymentFilter(BaseRequestModel):
     """Filter for deployments."""
 
     name: StringFilter | None = Field(default=None, description="Name filter")
     status: DeploymentStatusFilter | None = Field(default=None, description="Status filter")
     open_to_public: bool | None = Field(default=None, description="Public access filter")
+    tags: StringFilter | None = Field(default=None, description="Tags filter")
+    endpoint_url: StringFilter | None = Field(default=None, description="Endpoint URL filter")
+    AND: list[DeploymentFilter] | None = Field(default=None, description="AND conjunction")
+    OR: list[DeploymentFilter] | None = Field(default=None, description="OR conjunction")
+    NOT: list[DeploymentFilter] | None = Field(default=None, description="NOT negation")
+
+
+DeploymentFilter.model_rebuild()
 
 
 class RevisionFilter(BaseRequestModel):
@@ -262,6 +294,12 @@ class RevisionFilter(BaseRequestModel):
 
     name: StringFilter | None = Field(default=None, description="Name filter")
     deployment_id: UUID | None = Field(default=None, description="Filter by deployment ID")
+    AND: list[RevisionFilter] | None = Field(default=None, description="AND conjunction")
+    OR: list[RevisionFilter] | None = Field(default=None, description="OR conjunction")
+    NOT: list[RevisionFilter] | None = Field(default=None, description="NOT negation")
+
+
+RevisionFilter.model_rebuild()
 
 
 class RouteFilter(BaseRequestModel):
@@ -272,18 +310,61 @@ class RouteFilter(BaseRequestModel):
     traffic_status: RouteTrafficStatusFilter | None = Field(
         default=None, description="Traffic status filter"
     )
+    AND: list[RouteFilter] | None = Field(default=None, description="AND conjunction")
+    OR: list[RouteFilter] | None = Field(default=None, description="OR conjunction")
+    NOT: list[RouteFilter] | None = Field(default=None, description="NOT negation")
+
+
+RouteFilter.model_rebuild()
 
 
 class AccessTokenFilter(BaseRequestModel):
     """Filter for access tokens."""
 
     deployment_id: UUID | None = Field(default=None, description="Filter by deployment ID")
+    token: StringFilter | None = Field(default=None, description="Token value filter")
+    valid_until: DateTimeFilter | None = Field(
+        default=None, description="Expiration datetime filter"
+    )
+    created_at: DateTimeFilter | None = Field(default=None, description="Creation datetime filter")
+    AND: list[AccessTokenFilter] | None = Field(default=None, description="AND conjunction")
+    OR: list[AccessTokenFilter] | None = Field(default=None, description="OR conjunction")
+    NOT: list[AccessTokenFilter] | None = Field(default=None, description="NOT negation")
+
+
+AccessTokenFilter.model_rebuild()
 
 
 class AutoScalingRuleFilter(BaseRequestModel):
     """Filter for auto-scaling rules."""
 
     deployment_id: UUID | None = Field(default=None, description="Filter by deployment ID")
+    created_at: DateTimeFilter | None = Field(default=None, description="Creation datetime filter")
+    last_triggered_at: DateTimeFilter | None = Field(
+        default=None, description="Last triggered datetime filter"
+    )
+    AND: list[AutoScalingRuleFilter] | None = Field(default=None, description="AND conjunction")
+    OR: list[AutoScalingRuleFilter] | None = Field(default=None, description="OR conjunction")
+    NOT: list[AutoScalingRuleFilter] | None = Field(default=None, description="NOT negation")
+
+
+AutoScalingRuleFilter.model_rebuild()
+
+
+class ReplicaFilter(BaseRequestModel):
+    """Filter for deployment replicas."""
+
+    deployment_id: UUID | None = Field(default=None, description="Filter by deployment ID")
+    status: ReplicaStatusFilter | None = Field(default=None, description="Replica status filter")
+    traffic_status: ReplicaTrafficStatusFilter | None = Field(
+        default=None, description="Replica traffic status filter"
+    )
+    AND: list[ReplicaFilter] | None = Field(default=None, description="AND conjunction")
+    OR: list[ReplicaFilter] | None = Field(default=None, description="OR conjunction")
+    NOT: list[ReplicaFilter] | None = Field(default=None, description="NOT negation")
+
+
+ReplicaFilter.model_rebuild()
 
 
 class DeploymentPolicyFilter(BaseRequestModel):
@@ -332,6 +413,13 @@ class AutoScalingRuleOrder(BaseRequestModel):
     direction: OrderDirection = OrderDirection.DESC
 
 
+class ReplicaOrder(BaseRequestModel):
+    """Ordering specification for deployment replicas."""
+
+    field: ReplicaOrderField
+    direction: OrderDirection = OrderDirection.DESC
+
+
 # ---------------------------------------------------------------------------
 # Search input types
 # ---------------------------------------------------------------------------
@@ -342,7 +430,11 @@ class AdminSearchDeploymentsInput(BaseRequestModel):
 
     filter: DeploymentFilter | None = Field(default=None, description="Filter criteria")
     order: list[DeploymentOrder] | None = Field(default=None, description="Sort order")
-    limit: int | None = Field(default=None, ge=1, description="Max results per page")
+    first: int | None = Field(default=None, ge=1, description="Cursor-forward page size")
+    after: str | None = Field(default=None, description="Cursor-forward start cursor")
+    last: int | None = Field(default=None, ge=1, description="Cursor-backward page size")
+    before: str | None = Field(default=None, description="Cursor-backward end cursor")
+    limit: int | None = Field(default=None, ge=1, description="Max results per page (offset)")
     offset: int | None = Field(default=None, ge=0, description="Pagination offset")
 
 
@@ -351,7 +443,11 @@ class AdminSearchRevisionsInput(BaseRequestModel):
 
     filter: RevisionFilter | None = Field(default=None, description="Filter criteria")
     order: list[RevisionOrder] | None = Field(default=None, description="Sort order")
-    limit: int | None = Field(default=None, ge=1, description="Max results per page")
+    first: int | None = Field(default=None, ge=1, description="Cursor-forward page size")
+    after: str | None = Field(default=None, description="Cursor-forward start cursor")
+    last: int | None = Field(default=None, ge=1, description="Cursor-backward page size")
+    before: str | None = Field(default=None, description="Cursor-backward end cursor")
+    limit: int | None = Field(default=None, ge=1, description="Max results per page (offset)")
     offset: int | None = Field(default=None, ge=0, description="Pagination offset")
 
 
@@ -360,7 +456,11 @@ class SearchRoutesInput(BaseRequestModel):
 
     filter: RouteFilter | None = Field(default=None, description="Filter criteria")
     order: list[RouteOrder] | None = Field(default=None, description="Sort order")
-    limit: int | None = Field(default=None, ge=1, description="Max results per page")
+    first: int | None = Field(default=None, ge=1, description="Cursor-forward page size")
+    after: str | None = Field(default=None, description="Cursor-forward start cursor")
+    last: int | None = Field(default=None, ge=1, description="Cursor-backward page size")
+    before: str | None = Field(default=None, description="Cursor-backward end cursor")
+    limit: int | None = Field(default=None, ge=1, description="Max results per page (offset)")
     offset: int | None = Field(default=None, ge=0, description="Pagination offset")
 
 
@@ -369,7 +469,11 @@ class SearchAccessTokensInput(BaseRequestModel):
 
     filter: AccessTokenFilter | None = Field(default=None, description="Filter criteria")
     order: list[AccessTokenOrder] | None = Field(default=None, description="Sort order")
-    limit: int | None = Field(default=None, ge=1, description="Max results per page")
+    first: int | None = Field(default=None, ge=1, description="Cursor-forward page size")
+    after: str | None = Field(default=None, description="Cursor-forward start cursor")
+    last: int | None = Field(default=None, ge=1, description="Cursor-backward page size")
+    before: str | None = Field(default=None, description="Cursor-backward end cursor")
+    limit: int | None = Field(default=None, ge=1, description="Max results per page (offset)")
     offset: int | None = Field(default=None, ge=0, description="Pagination offset")
 
 
@@ -378,7 +482,24 @@ class SearchAutoScalingRulesInput(BaseRequestModel):
 
     filter: AutoScalingRuleFilter | None = Field(default=None, description="Filter criteria")
     order: list[AutoScalingRuleOrder] | None = Field(default=None, description="Sort order")
-    limit: int | None = Field(default=None, ge=1, description="Max results per page")
+    first: int | None = Field(default=None, ge=1, description="Cursor-forward page size")
+    after: str | None = Field(default=None, description="Cursor-forward start cursor")
+    last: int | None = Field(default=None, ge=1, description="Cursor-backward page size")
+    before: str | None = Field(default=None, description="Cursor-backward end cursor")
+    limit: int | None = Field(default=None, ge=1, description="Max results per page (offset)")
+    offset: int | None = Field(default=None, ge=0, description="Pagination offset")
+
+
+class SearchReplicasInput(BaseRequestModel):
+    """Input for searching deployment replicas."""
+
+    filter: ReplicaFilter | None = Field(default=None, description="Filter criteria")
+    order: list[ReplicaOrder] | None = Field(default=None, description="Sort order")
+    first: int | None = Field(default=None, ge=1, description="Cursor-forward page size")
+    after: str | None = Field(default=None, description="Cursor-forward start cursor")
+    last: int | None = Field(default=None, ge=1, description="Cursor-backward page size")
+    before: str | None = Field(default=None, description="Cursor-backward end cursor")
+    limit: int | None = Field(default=None, ge=1, description="Max results per page (offset)")
     offset: int | None = Field(default=None, ge=0, description="Pagination offset")
 
 

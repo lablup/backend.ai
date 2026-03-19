@@ -16,6 +16,7 @@ from strawberry.relay import Edge, Node
 from strawberry.types import get_object_definition, has_object_definition
 
 from ai.backend.common.data.filter_specs import StringMatchSpec, UUIDEqualMatchSpec, UUIDInMatchSpec
+from ai.backend.common.dto.manager.query import DateTimeFilter as DateTimeFilterDTO
 from ai.backend.common.dto.manager.query import StringFilter as StringFilterDTO
 from ai.backend.common.dto.manager.query import UUIDFilter as UUIDFilterDTO
 from ai.backend.manager.api.adapters.cursor import decode_cursor as decode_cursor
@@ -294,6 +295,13 @@ class DateTimeFilter:
     after: datetime | None = None
     equals: datetime | None = None
     not_equals: datetime | None = None
+
+    def to_pydantic(self) -> DateTimeFilterDTO:
+        return DateTimeFilterDTO(
+            before=self.before,
+            after=self.after,
+            equals=self.equals,
+        )
 
     def build_query_condition(
         self,

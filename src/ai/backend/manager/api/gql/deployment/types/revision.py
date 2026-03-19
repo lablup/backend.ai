@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
-from collections.abc import Iterable, Sequence
+from collections.abc import Iterable
 from datetime import datetime
-from typing import TYPE_CHECKING, Annotated, Any, Self, override
+from typing import TYPE_CHECKING, Annotated, Any, Self
 from uuid import UUID
 
 import strawberry
@@ -22,7 +22,22 @@ from ai.backend.common.dto.manager.v2.deployment.request import (
     ExtraVFolderMountInput as ExtraVFolderMountInputDTO,
 )
 from ai.backend.common.dto.manager.v2.deployment.request import (
+    RevisionFilter as RevisionFilterDTO,
+)
+from ai.backend.common.dto.manager.v2.deployment.request import (
     RevisionInput as RevisionInputDTO,
+)
+from ai.backend.common.dto.manager.v2.deployment.request import (
+    RevisionOrder as RevisionOrderDTO,
+)
+from ai.backend.common.dto.manager.v2.deployment.response import (
+    RevisionNode as RevisionNodeDTO,
+)
+from ai.backend.common.dto.manager.v2.deployment.types import (
+    OrderDirection as DTOOrderDirection,
+)
+from ai.backend.common.dto.manager.v2.deployment.types import (
+    RevisionOrderField as DTORevisionOrderField,
 )
 from ai.backend.common.types import ClusterMode as CommonClusterMode
 from ai.backend.common.types import MountPermission as CommonMountPermission
@@ -41,8 +56,13 @@ from ai.backend.manager.api.gql.fair_share.types.common import ResourceSlotGQL
 from ai.backend.manager.api.gql.image_federation import Image
 from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin
 from ai.backend.manager.api.gql.resource_group.federation import ResourceGroup
-from ai.backend.manager.api.gql.types import GQLFilter, GQLOrderBy, StrawberryGQLContext
-from ai.backend.manager.api.gql.vfolder import ExtraVFolderMountConnection, VFolder
+from ai.backend.manager.api.gql.types import StrawberryGQLContext
+from ai.backend.manager.api.gql.vfolder import (
+    ExtraVFolderMount,
+    ExtraVFolderMountConnection,
+    ExtraVFolderMountEdge,
+    VFolder,
+)
 from ai.backend.manager.api.gql_legacy.image import ImageNode
 from ai.backend.manager.api.gql_legacy.scaling_group import ScalingGroupNode
 from ai.backend.manager.api.gql_legacy.vfolder import VirtualFolderNode
@@ -53,14 +73,6 @@ from ai.backend.manager.data.deployment.types import (
     ModelRevisionOrderField,
     ModelRuntimeConfigData,
     ResourceConfigData,
-)
-from ai.backend.manager.models.deployment_revision.conditions import RevisionConditions
-from ai.backend.manager.models.deployment_revision.orders import RevisionOrders
-from ai.backend.manager.repositories.base import (
-    QueryCondition,
-    QueryOrder,
-    combine_conditions_or,
-    negate_conditions,
 )
 
 if TYPE_CHECKING:
@@ -293,83 +305,106 @@ class ModelRevision(PydanticNodeMixin):
             created_at=data.created_at,
         )
 
+    @classmethod
+    def from_node(cls, node: RevisionNodeDTO) -> Self:
+        info = node.revision_info
+        environ_gql: EnvironmentVariablesGQL | None = None
+        if info.environ:
+            environ_gql = EnvironmentVariablesGQL(
+                entries=[
+                    EnvironmentVariableEntryGQL(name=k, value=v) for k, v in info.environ.items()
+                ]
+            )
+        model_mount_config: ModelMountConfig | None = None
+        if info.model_vfolder_id and info.model_mount_destination:
+            model_mount_config = ModelMountConfig(
+                _vfolder_id=info.model_vfolder_id,
+                mount_destination=info.model_mount_destination,
+                definition_path=info.model_definition_path or "",
+            )
+        extra_mount_nodes = [
+            ExtraVFolderMount(
+                id=ID(f"{m.vfolder_id}:{m.mount_destination}"),
+                mount_destination=m.mount_destination or "",
+                _vfolder_id=m.vfolder_id,
+            )
+            for m in node.extra_mounts
+        ]
+        extra_mount_edges = [
+            ExtraVFolderMountEdge(node=n, cursor=str(n.id)) for n in extra_mount_nodes
+        ]
+        from strawberry.relay import PageInfo
+
+        extra_mounts = ExtraVFolderMountConnection(
+            count=len(extra_mount_nodes),
+            edges=extra_mount_edges,
+            page_info=PageInfo(
+                has_next_page=False,
+                has_previous_page=False,
+                start_cursor=extra_mount_edges[0].cursor if extra_mount_edges else None,
+                end_cursor=extra_mount_edges[-1].cursor if extra_mount_edges else None,
+            ),
+        )
+        return cls(
+            id=ID(str(node.id)),
+            name=node.name,
+            cluster_config=ClusterConfig(
+                mode=ClusterModeGQL(info.cluster_mode.name),
+                size=info.cluster_size,
+            ),
+            resource_config=ResourceConfig(
+                _resource_group_name=info.resource_group,
+                resource_slots=ResourceSlotGQL.from_resource_slot(info.resource_slots),
+                resource_opts=ResourceOptsGQL.from_mapping(info.resource_opts),
+            ),
+            model_runtime_config=ModelRuntimeConfig(
+                runtime_variant=info.runtime_variant,
+                inference_runtime_config=info.inference_runtime_config,
+                environ=environ_gql,
+            ),
+            model_mount_config=model_mount_config,
+            extra_mounts=extra_mounts,
+            _image_id=info.image_id,
+            created_at=node.created_at,
+        )
+
 
 # Filter and Order Types
-@strawberry.input(description="Added in 25.19.0")
-class ModelRevisionFilter(GQLFilter):
+@strawberry.experimental.pydantic.input(
+    model=RevisionFilterDTO,
+    description="Added in 25.19.0",
+)
+class ModelRevisionFilter:
     name: StringFilter | None = None
     deployment_id: ID | None = None
-    ids_in: strawberry.Private[Sequence[UUID] | None] = None
 
     AND: list[ModelRevisionFilter] | None = None
     OR: list[ModelRevisionFilter] | None = None
     NOT: list[ModelRevisionFilter] | None = None
 
-    @override
-    def build_conditions(self) -> list[QueryCondition]:
-        """Build query conditions from this filter.
-
-        Returns a list of QueryCondition callables that can be applied to SQLAlchemy queries.
-        """
-        field_conditions: list[QueryCondition] = []
-
-        # Apply name filter
-        if self.name:
-            name_condition = self.name.build_query_condition(
-                contains_factory=RevisionConditions.by_name_contains,
-                equals_factory=RevisionConditions.by_name_equals,
-                starts_with_factory=RevisionConditions.by_name_starts_with,
-                ends_with_factory=RevisionConditions.by_name_ends_with,
-            )
-            if name_condition:
-                field_conditions.append(name_condition)
-
-        # Apply deployment_id filter
-        if self.deployment_id:
-            field_conditions.append(RevisionConditions.by_deployment_id(UUID(self.deployment_id)))
-
-        # Apply ids_in filter
-        if self.ids_in:
-            field_conditions.append(RevisionConditions.by_ids(self.ids_in))
-
-        # Handle AND logical operator - these are implicitly ANDed with field conditions
-        if self.AND:
-            for sub_filter in self.AND:
-                field_conditions.extend(sub_filter.build_conditions())
-
-        # Handle OR logical operator
-        if self.OR:
-            or_sub_conditions: list[QueryCondition] = []
-            for sub_filter in self.OR:
-                or_sub_conditions.extend(sub_filter.build_conditions())
-            if or_sub_conditions:
-                field_conditions.append(combine_conditions_or(or_sub_conditions))
-
-        # Handle NOT logical operator
-        if self.NOT:
-            not_sub_conditions: list[QueryCondition] = []
-            for sub_filter in self.NOT:
-                not_sub_conditions.extend(sub_filter.build_conditions())
-            if not_sub_conditions:
-                field_conditions.append(negate_conditions(not_sub_conditions))
-
-        return field_conditions
+    def to_pydantic(self) -> RevisionFilterDTO:
+        return RevisionFilterDTO(
+            name=self.name.to_pydantic() if self.name else None,
+            deployment_id=UUID(self.deployment_id) if self.deployment_id else None,
+            AND=[f.to_pydantic() for f in self.AND] if self.AND else None,
+            OR=[f.to_pydantic() for f in self.OR] if self.OR else None,
+            NOT=[f.to_pydantic() for f in self.NOT] if self.NOT else None,
+        )
 
 
-@strawberry.input(description="Added in 25.19.0")
-class ModelRevisionOrderBy(GQLOrderBy):
+@strawberry.experimental.pydantic.input(
+    model=RevisionOrderDTO,
+    description="Added in 25.19.0",
+)
+class ModelRevisionOrderBy:
     field: ModelRevisionOrderField
     direction: OrderDirection = OrderDirection.DESC
 
-    @override
-    def to_query_order(self) -> QueryOrder:
-        """Convert to repository QueryOrder."""
-        ascending = self.direction == OrderDirection.ASC
-        match self.field:
-            case ModelRevisionOrderField.NAME:
-                return RevisionOrders.name(ascending)
-            case ModelRevisionOrderField.CREATED_AT:
-                return RevisionOrders.created_at(ascending)
+    def to_pydantic(self) -> RevisionOrderDTO:
+        return RevisionOrderDTO(
+            field=DTORevisionOrderField(self.field.value.lower()),
+            direction=DTOOrderDirection(self.direction.value.lower()),
+        )
 
 
 # Payload Types

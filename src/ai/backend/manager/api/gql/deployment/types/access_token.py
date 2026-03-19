@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Iterable
 from datetime import datetime
-from typing import Any, Self, override
+from typing import Any, Self
 from uuid import UUID
 
 import strawberry
@@ -12,27 +12,37 @@ from strawberry import ID, Info
 from strawberry.relay import Connection, Edge, NodeID
 
 from ai.backend.common.dto.manager.v2.deployment.request import (
+    AccessTokenFilter as AccessTokenFilterDTO,
+)
+from ai.backend.common.dto.manager.v2.deployment.request import (
+    AccessTokenOrder as AccessTokenOrderDTO,
+)
+from ai.backend.common.dto.manager.v2.deployment.request import (
     CreateAccessTokenInput as CreateAccessTokenInputDTO,
+)
+from ai.backend.common.dto.manager.v2.deployment.response import (
+    AccessTokenNode as AccessTokenNodeDTO,
+)
+from ai.backend.common.dto.manager.v2.deployment.types import (
+    AccessTokenOrderField as DTOAccessTokenOrderField,
+)
+from ai.backend.common.dto.manager.v2.deployment.types import (
+    OrderDirection as DTOOrderDirection,
 )
 from ai.backend.manager.api.gql.base import DateTimeFilter, OrderDirection, StringFilter
 from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin
-from ai.backend.manager.api.gql.types import GQLFilter, GQLOrderBy, StrawberryGQLContext
+from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.data.deployment.types import (
     AccessTokenOrderField,
     ModelDeploymentAccessTokenData,
 )
-from ai.backend.manager.models.endpoint.conditions import AccessTokenConditions
-from ai.backend.manager.models.endpoint.orders import AccessTokenOrders
-from ai.backend.manager.repositories.base import (
-    QueryCondition,
-    QueryOrder,
-    combine_conditions_or,
-    negate_conditions,
+
+
+@strawberry.experimental.pydantic.input(
+    model=AccessTokenFilterDTO,
+    description="Added in 25.16.0",
 )
-
-
-@strawberry.input(description="Added in 25.16.0")
-class AccessTokenFilter(GQLFilter):
+class AccessTokenFilter:
     """Filter for access tokens."""
 
     token: StringFilter | None = None
@@ -43,71 +53,30 @@ class AccessTokenFilter(GQLFilter):
     OR: list[AccessTokenFilter] | None = None
     NOT: list[AccessTokenFilter] | None = None
 
-    @override
-    def build_conditions(self) -> list[QueryCondition]:
-        """Build query conditions from this filter."""
-        conditions: list[QueryCondition] = []
-
-        if self.token:
-            if self.token.equals:
-                conditions.append(AccessTokenConditions.by_token_equals(self.token.equals))
-            elif self.token.contains:
-                conditions.append(AccessTokenConditions.by_token_contains(self.token.contains))
-
-        if self.valid_until:
-            condition = self.valid_until.build_query_condition(
-                before_factory=AccessTokenConditions.by_valid_until_before,
-                after_factory=AccessTokenConditions.by_valid_until_after,
-                equals_factory=AccessTokenConditions.by_valid_until_equals,
-            )
-            if condition:
-                conditions.append(condition)
-
-        if self.created_at:
-            condition = self.created_at.build_query_condition(
-                before_factory=AccessTokenConditions.by_created_at_before,
-                after_factory=AccessTokenConditions.by_created_at_after,
-                equals_factory=AccessTokenConditions.by_created_at_equals,
-            )
-            if condition:
-                conditions.append(condition)
-
-        # Handle AND logical operator
-        if self.AND:
-            for sub_filter in self.AND:
-                conditions.extend(sub_filter.build_conditions())
-
-        # Handle OR logical operator
-        if self.OR:
-            or_sub_conditions: list[QueryCondition] = []
-            for sub_filter in self.OR:
-                or_sub_conditions.extend(sub_filter.build_conditions())
-            if or_sub_conditions:
-                conditions.append(combine_conditions_or(or_sub_conditions))
-
-        # Handle NOT logical operator
-        if self.NOT:
-            not_sub_conditions: list[QueryCondition] = []
-            for sub_filter in self.NOT:
-                not_sub_conditions.extend(sub_filter.build_conditions())
-            if not_sub_conditions:
-                conditions.append(negate_conditions(not_sub_conditions))
-
-        return conditions
+    def to_pydantic(self) -> AccessTokenFilterDTO:
+        return AccessTokenFilterDTO(
+            token=self.token.to_pydantic() if self.token else None,
+            valid_until=self.valid_until.to_pydantic() if self.valid_until else None,
+            created_at=self.created_at.to_pydantic() if self.created_at else None,
+            AND=[f.to_pydantic() for f in self.AND] if self.AND else None,
+            OR=[f.to_pydantic() for f in self.OR] if self.OR else None,
+            NOT=[f.to_pydantic() for f in self.NOT] if self.NOT else None,
+        )
 
 
-@strawberry.input(description="Added in 25.16.0")
-class AccessTokenOrderBy(GQLOrderBy):
+@strawberry.experimental.pydantic.input(
+    model=AccessTokenOrderDTO,
+    description="Added in 25.16.0",
+)
+class AccessTokenOrderBy:
     field: AccessTokenOrderField
     direction: OrderDirection = OrderDirection.DESC
 
-    @override
-    def to_query_order(self) -> QueryOrder:
-        """Convert to repository QueryOrder."""
-        ascending = self.direction == OrderDirection.ASC
-        match self.field:
-            case AccessTokenOrderField.CREATED_AT:
-                return AccessTokenOrders.created_at(ascending)
+    def to_pydantic(self) -> AccessTokenOrderDTO:
+        return AccessTokenOrderDTO(
+            field=DTOAccessTokenOrderField(self.field.value.lower()),
+            direction=DTOOrderDirection(self.direction.value.lower()),
+        )
 
 
 @strawberry.type
@@ -141,6 +110,15 @@ class AccessToken(PydanticNodeMixin):
             token=data.token,
             created_at=data.created_at,
             valid_until=data.valid_until,
+        )
+
+    @classmethod
+    def from_node(cls, node: AccessTokenNodeDTO) -> Self:
+        return cls(
+            id=ID(str(node.id)),
+            token=node.token,
+            created_at=node.created_at,
+            valid_until=node.valid_until,
         )
 
 

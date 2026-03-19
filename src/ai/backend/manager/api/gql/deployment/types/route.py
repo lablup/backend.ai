@@ -6,7 +6,7 @@ from collections.abc import Iterable
 from datetime import datetime
 from enum import StrEnum
 from functools import lru_cache
-from typing import TYPE_CHECKING, Annotated, Any, Self, override
+from typing import TYPE_CHECKING, Annotated, Any, Self
 from uuid import UUID
 
 import strawberry
@@ -15,10 +15,34 @@ from strawberry.relay import Connection, Edge, NodeID
 from strawberry.scalars import JSON
 
 from ai.backend.common.data.model_deployment.types import (
+    RouteStatus as RouteStatusCommon,
+)
+from ai.backend.common.data.model_deployment.types import (
     RouteTrafficStatus as RouteTrafficStatusCommon,
 )
 from ai.backend.common.dto.manager.v2.deployment.request import (
+    RouteFilter as RouteFilterDTO,
+)
+from ai.backend.common.dto.manager.v2.deployment.request import (
+    RouteOrder as RouteOrderDTO,
+)
+from ai.backend.common.dto.manager.v2.deployment.request import (
+    RouteStatusFilter as RouteStatusFilterDTO,
+)
+from ai.backend.common.dto.manager.v2.deployment.request import (
+    RouteTrafficStatusFilter as RouteTrafficStatusFilterDTO,
+)
+from ai.backend.common.dto.manager.v2.deployment.request import (
     UpdateRouteTrafficStatusInput as UpdateRouteTrafficStatusInputDTO,
+)
+from ai.backend.common.dto.manager.v2.deployment.response import (
+    RouteNode as RouteNodeDTO,
+)
+from ai.backend.common.dto.manager.v2.deployment.types import (
+    OrderDirection as DTOOrderDirection,
+)
+from ai.backend.common.dto.manager.v2.deployment.types import (
+    RouteOrderField as DTORouteOrderField,
 )
 from ai.backend.manager.api.gql.adapter import PaginationSpec
 from ai.backend.manager.api.gql.base import (
@@ -26,7 +50,7 @@ from ai.backend.manager.api.gql.base import (
     to_global_id,
 )
 from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin
-from ai.backend.manager.api.gql.types import GQLFilter, GQLOrderBy, StrawberryGQLContext
+from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.api.gql_legacy.session import ComputeSessionNode
 from ai.backend.manager.data.deployment.types import (
     RouteInfo,
@@ -41,12 +65,6 @@ from ai.backend.manager.errors.deployment import EndpointNotFound
 from ai.backend.manager.models.routing.conditions import RouteConditions
 from ai.backend.manager.models.routing.orders import RouteOrders
 from ai.backend.manager.models.routing.row import RoutingRow
-from ai.backend.manager.repositories.base import (
-    QueryCondition,
-    QueryOrder,
-    combine_conditions_or,
-    negate_conditions,
-)
 
 if TYPE_CHECKING:
     from ai.backend.manager.api.gql.deployment.types.deployment import ModelDeployment
@@ -157,6 +175,20 @@ class Route(PydanticNodeMixin):
             error_data=data.error_data,
         )
 
+    @classmethod
+    def from_node(cls, node: RouteNodeDTO) -> Self:
+        return cls(
+            id=ID(str(node.id)),
+            _deployment_id=node.endpoint_id,
+            _session_id=UUID(node.session_id) if node.session_id else None,
+            _revision_id=node.revision_id,
+            status=RouteStatusGQL(RouteStatusEnum(node.status.value)),
+            traffic_status=RouteTrafficStatusGQL(RouteTrafficStatusEnum(node.traffic_status.value)),
+            traffic_ratio=node.traffic_ratio,
+            created_at=node.created_at,
+            error_data=node.error_data,
+        )
+
 
 RouteEdge = Edge[Route]
 
@@ -220,8 +252,11 @@ class RouteOrderField(StrEnum):
     TRAFFIC_RATIO = "traffic_ratio"
 
 
-@strawberry.input(description="Added in 25.19.0. Filter for routes.")
-class RouteFilter(GQLFilter):
+@strawberry.experimental.pydantic.input(
+    model=RouteFilterDTO,
+    description="Added in 25.19.0. Filter for routes.",
+)
+class RouteFilter:
     status: RouteStatusFilterGQL | None = None
     traffic_status: RouteTrafficStatusFilterGQL | None = None
 
@@ -229,97 +264,57 @@ class RouteFilter(GQLFilter):
     OR: list[RouteFilter] | None = None
     NOT: list[RouteFilter] | None = None
 
-    @override
-    def build_conditions(self) -> list[QueryCondition]:
-        """Build query conditions from this filter."""
-        conditions: list[QueryCondition] = []
-
-        if self.status is not None:
-            st = self.status
-            if st.equals is not None:
-                conditions.append(
-                    RouteConditions.by_status_equals(RouteStatusEnum(st.equals.value))
-                )
-            if st.in_ is not None:
-                conditions.append(
-                    RouteConditions.by_statuses([RouteStatusEnum(s.value) for s in st.in_])
-                )
-            if st.not_equals is not None:
-                conditions.append(
-                    RouteConditions.by_status_not_equals(RouteStatusEnum(st.not_equals.value))
-                )
-            if st.not_in is not None:
-                conditions.append(
-                    RouteConditions.by_status_not_in([RouteStatusEnum(s.value) for s in st.not_in])
-                )
-
-        if self.traffic_status is not None:
-            ts = self.traffic_status
-            if ts.equals is not None:
-                conditions.append(
-                    RouteConditions.by_traffic_status_equals(
-                        RouteTrafficStatusEnum(ts.equals.value)
-                    )
-                )
-            if ts.in_ is not None:
-                conditions.append(
-                    RouteConditions.by_traffic_statuses([
-                        RouteTrafficStatusEnum(s.value) for s in ts.in_
-                    ])
-                )
-            if ts.not_equals is not None:
-                conditions.append(
-                    RouteConditions.by_traffic_status_not_equals(
-                        RouteTrafficStatusEnum(ts.not_equals.value)
-                    )
-                )
-            if ts.not_in is not None:
-                conditions.append(
-                    RouteConditions.by_traffic_status_not_in([
-                        RouteTrafficStatusEnum(s.value) for s in ts.not_in
-                    ])
-                )
-
-        # Handle AND logical operator
-        if self.AND:
-            for sub_filter in self.AND:
-                conditions.extend(sub_filter.build_conditions())
-
-        # Handle OR logical operator
-        if self.OR:
-            or_sub_conditions: list[QueryCondition] = []
-            for sub_filter in self.OR:
-                or_sub_conditions.extend(sub_filter.build_conditions())
-            if or_sub_conditions:
-                conditions.append(combine_conditions_or(or_sub_conditions))
-
-        # Handle NOT logical operator
-        if self.NOT:
-            not_sub_conditions: list[QueryCondition] = []
-            for sub_filter in self.NOT:
-                not_sub_conditions.extend(sub_filter.build_conditions())
-            if not_sub_conditions:
-                conditions.append(negate_conditions(not_sub_conditions))
-
-        return conditions
+    def to_pydantic(self) -> RouteFilterDTO:
+        return RouteFilterDTO(
+            status=RouteStatusFilterDTO(
+                equals=RouteStatusCommon(self.status.equals.value) if self.status.equals else None,
+                in_=[RouteStatusCommon(s.value) for s in self.status.in_]
+                if self.status.in_
+                else None,
+                not_equals=RouteStatusCommon(self.status.not_equals.value)
+                if self.status.not_equals
+                else None,
+                not_in=[RouteStatusCommon(s.value) for s in self.status.not_in]
+                if self.status.not_in
+                else None,
+            )
+            if self.status
+            else None,
+            traffic_status=RouteTrafficStatusFilterDTO(
+                equals=RouteTrafficStatusCommon(self.traffic_status.equals.value)
+                if self.traffic_status.equals
+                else None,
+                in_=[RouteTrafficStatusCommon(s.value) for s in self.traffic_status.in_]
+                if self.traffic_status.in_
+                else None,
+                not_equals=RouteTrafficStatusCommon(self.traffic_status.not_equals.value)
+                if self.traffic_status.not_equals
+                else None,
+                not_in=[RouteTrafficStatusCommon(s.value) for s in self.traffic_status.not_in]
+                if self.traffic_status.not_in
+                else None,
+            )
+            if self.traffic_status
+            else None,
+            AND=[f.to_pydantic() for f in self.AND] if self.AND else None,
+            OR=[f.to_pydantic() for f in self.OR] if self.OR else None,
+            NOT=[f.to_pydantic() for f in self.NOT] if self.NOT else None,
+        )
 
 
-@strawberry.input(description="Added in 25.19.0. Order by specification for routes.")
-class RouteOrderBy(GQLOrderBy):
+@strawberry.experimental.pydantic.input(
+    model=RouteOrderDTO,
+    description="Added in 25.19.0. Order by specification for routes.",
+)
+class RouteOrderBy:
     field: RouteOrderField
     direction: OrderDirection = OrderDirection.ASC
 
-    @override
-    def to_query_order(self) -> QueryOrder:
-        """Convert to repository QueryOrder."""
-        ascending = self.direction == OrderDirection.ASC
-        match self.field:
-            case RouteOrderField.CREATED_AT:
-                return RouteOrders.created_at(ascending)
-            case RouteOrderField.STATUS:
-                return RouteOrders.status(ascending)
-            case RouteOrderField.TRAFFIC_RATIO:
-                return RouteOrders.traffic_ratio(ascending)
+    def to_pydantic(self) -> RouteOrderDTO:
+        return RouteOrderDTO(
+            field=DTORouteOrderField(self.field.value),
+            direction=DTOOrderDirection(self.direction.value.lower()),
+        )
 
 
 # Pagination spec

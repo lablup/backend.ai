@@ -6,7 +6,7 @@ from collections.abc import Iterable
 from datetime import datetime
 from decimal import Decimal
 from enum import StrEnum
-from typing import Any, Self, override
+from typing import Any, Self
 from uuid import UUID
 
 import strawberry
@@ -23,21 +23,28 @@ from ai.backend.common.dto.manager.v2.auto_scaling_rule.request import (
 from ai.backend.common.dto.manager.v2.auto_scaling_rule.request import (
     UpdateAutoScalingRuleInput as UpdateAutoScalingRuleInputDTO,
 )
+from ai.backend.common.dto.manager.v2.deployment.request import (
+    AutoScalingRuleFilter as AutoScalingRuleFilterDTO,
+)
+from ai.backend.common.dto.manager.v2.deployment.request import (
+    AutoScalingRuleOrder as AutoScalingRuleOrderDTO,
+)
+from ai.backend.common.dto.manager.v2.deployment.response import (
+    AutoScalingRuleNode as AutoScalingRuleNodeDTO,
+)
+from ai.backend.common.dto.manager.v2.deployment.types import (
+    AutoScalingRuleOrderField as DTOAutoScalingRuleOrderField,
+)
+from ai.backend.common.dto.manager.v2.deployment.types import (
+    OrderDirection as DTOOrderDirection,
+)
 from ai.backend.common.types import AutoScalingMetricSource as CommonAutoScalingMetricSource
 from ai.backend.manager.api.gql.base import DateTimeFilter, OrderDirection
 from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin
-from ai.backend.manager.api.gql.types import GQLFilter, GQLOrderBy, StrawberryGQLContext
+from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.data.deployment.types import (
     AutoScalingRuleOrderField,
     ModelDeploymentAutoScalingRuleData,
-)
-from ai.backend.manager.models.endpoint.conditions import AutoScalingRuleConditions
-from ai.backend.manager.models.endpoint.orders import AutoScalingRuleOrders
-from ai.backend.manager.repositories.base import (
-    QueryCondition,
-    QueryOrder,
-    combine_conditions_or,
-    negate_conditions,
 )
 
 
@@ -47,8 +54,11 @@ class AutoScalingMetricSource(StrEnum):
     INFERENCE_FRAMEWORK = "INFERENCE_FRAMEWORK"
 
 
-@strawberry.input(description="Added in 25.19.0")
-class AutoScalingRuleFilter(GQLFilter):
+@strawberry.experimental.pydantic.input(
+    model=AutoScalingRuleFilterDTO,
+    description="Added in 25.19.0",
+)
+class AutoScalingRuleFilter:
     """Filter for auto-scaling rules."""
 
     created_at: DateTimeFilter | None = None
@@ -58,65 +68,31 @@ class AutoScalingRuleFilter(GQLFilter):
     OR: list[AutoScalingRuleFilter] | None = None
     NOT: list[AutoScalingRuleFilter] | None = None
 
-    @override
-    def build_conditions(self) -> list[QueryCondition]:
-        """Build query conditions from this filter."""
-        conditions: list[QueryCondition] = []
-
-        if self.created_at:
-            condition = self.created_at.build_query_condition(
-                before_factory=AutoScalingRuleConditions.by_created_at_before,
-                after_factory=AutoScalingRuleConditions.by_created_at_after,
-                equals_factory=AutoScalingRuleConditions.by_created_at_equals,
-            )
-            if condition:
-                conditions.append(condition)
-
-        if self.last_triggered_at:
-            condition = self.last_triggered_at.build_query_condition(
-                before_factory=AutoScalingRuleConditions.by_last_triggered_at_before,
-                after_factory=AutoScalingRuleConditions.by_last_triggered_at_after,
-                equals_factory=AutoScalingRuleConditions.by_last_triggered_at_equals,
-            )
-            if condition:
-                conditions.append(condition)
-
-        # Handle AND logical operator
-        if self.AND:
-            for sub_filter in self.AND:
-                conditions.extend(sub_filter.build_conditions())
-
-        # Handle OR logical operator
-        if self.OR:
-            or_sub_conditions: list[QueryCondition] = []
-            for sub_filter in self.OR:
-                or_sub_conditions.extend(sub_filter.build_conditions())
-            if or_sub_conditions:
-                conditions.append(combine_conditions_or(or_sub_conditions))
-
-        # Handle NOT logical operator
-        if self.NOT:
-            not_sub_conditions: list[QueryCondition] = []
-            for sub_filter in self.NOT:
-                not_sub_conditions.extend(sub_filter.build_conditions())
-            if not_sub_conditions:
-                conditions.append(negate_conditions(not_sub_conditions))
-
-        return conditions
+    def to_pydantic(self) -> AutoScalingRuleFilterDTO:
+        return AutoScalingRuleFilterDTO(
+            created_at=self.created_at.to_pydantic() if self.created_at else None,
+            last_triggered_at=self.last_triggered_at.to_pydantic()
+            if self.last_triggered_at
+            else None,
+            AND=[f.to_pydantic() for f in self.AND] if self.AND else None,
+            OR=[f.to_pydantic() for f in self.OR] if self.OR else None,
+            NOT=[f.to_pydantic() for f in self.NOT] if self.NOT else None,
+        )
 
 
-@strawberry.input(description="Added in 25.19.0")
-class AutoScalingRuleOrderBy(GQLOrderBy):
+@strawberry.experimental.pydantic.input(
+    model=AutoScalingRuleOrderDTO,
+    description="Added in 25.19.0",
+)
+class AutoScalingRuleOrderBy:
     field: AutoScalingRuleOrderField
     direction: OrderDirection = OrderDirection.DESC
 
-    @override
-    def to_query_order(self) -> QueryOrder:
-        """Convert to repository QueryOrder."""
-        ascending = self.direction == OrderDirection.ASC
-        match self.field:
-            case AutoScalingRuleOrderField.CREATED_AT:
-                return AutoScalingRuleOrders.created_at(ascending)
+    def to_pydantic(self) -> AutoScalingRuleOrderDTO:
+        return AutoScalingRuleOrderDTO(
+            field=DTOAutoScalingRuleOrderField(self.field.value.lower()),
+            direction=DTOOrderDirection(self.direction.value.lower()),
+        )
 
 
 @strawberry.type
@@ -179,6 +155,22 @@ class AutoScalingRule(PydanticNodeMixin):
             max_replicas=data.max_replicas,
             created_at=data.created_at,
             last_triggered_at=data.last_triggered_at,
+        )
+
+    @classmethod
+    def from_node(cls, node: AutoScalingRuleNodeDTO) -> Self:
+        return cls(
+            id=ID(str(node.id)),
+            metric_source=AutoScalingMetricSource(node.metric_source.name),
+            metric_name=node.metric_name,
+            min_threshold=node.min_threshold,
+            max_threshold=node.max_threshold,
+            step_size=node.step_size,
+            time_window=node.time_window,
+            min_replicas=node.min_replicas,
+            max_replicas=node.max_replicas,
+            created_at=node.created_at,
+            last_triggered_at=node.last_triggered_at,
         )
 
 

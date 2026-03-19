@@ -6,20 +6,26 @@ from uuid import UUID
 
 import strawberry
 from strawberry import ID, Info
+from strawberry.relay import PageInfo
 
-from ai.backend.manager.api.gql.base import resolve_global_id
-from ai.backend.manager.api.gql.deployment.fetcher.route import fetch_routes
+from ai.backend.common.dto.manager.v2.deployment.request import SearchRoutesInput
+from ai.backend.manager.api.gql.base import encode_cursor, resolve_global_id
 from ai.backend.manager.api.gql.deployment.types.route import (
     Route,
     RouteConnection,
+    RouteEdge,
     RouteFilter,
     RouteOrderBy,
     UpdateRouteTrafficStatusInputGQL,
     UpdateRouteTrafficStatusPayloadGQL,
 )
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
-from ai.backend.manager.data.deployment.types import RouteTrafficStatus as RouteTrafficStatusEnum
-from ai.backend.manager.models.routing.conditions import RouteConditions
+from ai.backend.manager.data.deployment.types import (
+    RouteSearchScope,
+)
+from ai.backend.manager.data.deployment.types import (
+    RouteTrafficStatus as RouteTrafficStatusEnum,
+)
 from ai.backend.manager.services.deployment.actions.route import (
     UpdateRouteTrafficStatusAction,
 )
@@ -44,17 +50,32 @@ async def routes(
 ) -> RouteConnection | None:
     """List routes for a deployment with optional filters."""
     _, endpoint_id = resolve_global_id(deployment_id)
-    return await fetch_routes(
-        info=info,
-        filter=filter,
-        order_by=order_by,
-        before=before,
-        after=after,
-        first=first,
-        last=last,
-        limit=limit,
-        offset=offset,
-        base_conditions=[RouteConditions.by_endpoint_id(UUID(endpoint_id))],
+    pydantic_filter = filter.to_pydantic() if filter else None
+    pydantic_order = [o.to_pydantic() for o in order_by] if order_by else None
+    payload = await info.context.adapters.deployment.search_routes(
+        scope=RouteSearchScope(deployment_id=UUID(endpoint_id)),
+        input=SearchRoutesInput(
+            filter=pydantic_filter,
+            order=pydantic_order,
+            first=first,
+            after=after,
+            last=last,
+            before=before,
+            limit=limit,
+            offset=offset,
+        ),
+    )
+    nodes = [Route.from_node(item) for item in payload.items]
+    edges = [RouteEdge(node=node, cursor=encode_cursor(str(node.id))) for node in nodes]
+    return RouteConnection(
+        count=payload.total_count,
+        edges=edges,
+        page_info=PageInfo(
+            has_next_page=payload.has_next_page,
+            has_previous_page=payload.has_previous_page,
+            start_cursor=edges[0].cursor if edges else None,
+            end_cursor=edges[-1].cursor if edges else None,
+        ),
     )
 
 

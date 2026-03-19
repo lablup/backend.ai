@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from functools import lru_cache
 from uuid import UUID
 
 from ai.backend.common.api_handlers import Sentinel
@@ -20,11 +21,13 @@ from ai.backend.common.dto.manager.v2.deployment.request import (
     DeleteAutoScalingRuleInput,
     DeleteDeploymentInput,
     DeploymentOrder,
+    ReplicaOrder,
     RevisionOrder,
     RouteOrder,
     SearchAccessTokensInput,
     SearchAutoScalingRulesInput,
     SearchDeploymentPoliciesInput,
+    SearchReplicasInput,
     SearchRoutesInput,
     UpdateAutoScalingRuleInput,
     UpdateDeploymentInput,
@@ -46,11 +49,13 @@ from ai.backend.common.dto.manager.v2.deployment.response import (
     ExtraVFolderMountNode,
     GetAutoScalingRulePayload,
     GetDeploymentPolicyPayload,
+    ReplicaNode,
     RevisionNode,
     RouteNode,
     SearchAccessTokensPayload,
     SearchAutoScalingRulesPayload,
     SearchDeploymentPoliciesPayload,
+    SearchReplicasPayload,
     SearchRoutesPayload,
     UpdateAutoScalingRulePayload,
     UpdateDeploymentPayload,
@@ -64,6 +69,7 @@ from ai.backend.common.dto.manager.v2.deployment.types import (
     DeploymentRevisionInfo,
     NetworkConfigInfo,
     OrderDirection,
+    ReplicaOrderField,
     ReplicaStateInfo,
     RevisionOrderField,
     RollingUpdateConfigInfo,
@@ -81,6 +87,8 @@ from ai.backend.manager.data.deployment.scale_modifier import (
     ModelDeploymentAutoScalingRuleModifier,
 )
 from ai.backend.manager.data.deployment.types import (
+    AccessTokenSearchScope,
+    AutoScalingRuleSearchScope,
     DeploymentMetadata,
     DeploymentNetworkSpec,
     DeploymentPolicyData,
@@ -88,11 +96,15 @@ from ai.backend.manager.data.deployment.types import (
     ModelDeploymentAccessTokenData,
     ModelDeploymentAutoScalingRuleData,
     ModelDeploymentData,
+    ModelReplicaData,
     ModelRevisionData,
     MountInfo,
+    ReplicaSearchScope,
     ReplicaSpec,
     ResourceSpec,
+    RevisionSearchScope,
     RouteInfo,
+    RouteSearchScope,
 )
 from ai.backend.manager.data.deployment.types import (
     RouteStatus as ManagerRouteStatus,
@@ -103,9 +115,14 @@ from ai.backend.manager.data.deployment.types import (
 from ai.backend.manager.data.deployment.upserter import DeploymentPolicyUpserter
 from ai.backend.manager.models.deployment_policy import BlueGreenSpec, RollingUpdateSpec
 from ai.backend.manager.models.deployment_policy.conditions import DeploymentPolicyConditions
+from ai.backend.manager.models.deployment_revision import DeploymentRevisionRow
 from ai.backend.manager.models.deployment_revision.conditions import RevisionConditions
 from ai.backend.manager.models.deployment_revision.orders import RevisionOrders
-from ai.backend.manager.models.endpoint import EndpointRow
+from ai.backend.manager.models.endpoint import (
+    EndpointAutoScalingRuleRow,
+    EndpointRow,
+    EndpointTokenRow,
+)
 from ai.backend.manager.models.endpoint.conditions import (
     AccessTokenConditions,
     AutoScalingRuleConditions,
@@ -116,11 +133,11 @@ from ai.backend.manager.models.endpoint.orders import (
     AutoScalingRuleOrders,
     DeploymentOrders,
 )
+from ai.backend.manager.models.routing import RoutingRow
 from ai.backend.manager.models.routing.conditions import RouteConditions
 from ai.backend.manager.models.routing.orders import RouteOrders
 from ai.backend.manager.repositories.base import (
     BatchQuerier,
-    OffsetPagination,
     QueryCondition,
     QueryOrder,
     Updater,
@@ -183,12 +200,80 @@ from ai.backend.manager.services.deployment.actions.route.update_route_traffic_s
 from ai.backend.manager.services.deployment.actions.search_deployments import (
     SearchDeploymentsAction,
 )
+from ai.backend.manager.services.deployment.actions.search_replicas import SearchReplicasAction
 from ai.backend.manager.services.deployment.actions.update_deployment import UpdateDeploymentAction
 from ai.backend.manager.types import OptionalState, TriState
 
 from .base import BaseAdapter
+from .pagination import PaginationSpec
 
 DEFAULT_PAGINATION_LIMIT = 10
+
+
+@lru_cache(maxsize=1)
+def _get_deployment_pagination_spec() -> PaginationSpec:
+    return PaginationSpec(
+        forward_order=DeploymentOrders.created_at(ascending=False),
+        backward_order=DeploymentOrders.created_at(ascending=True),
+        forward_condition_factory=DeploymentConditions.by_cursor_forward,
+        backward_condition_factory=DeploymentConditions.by_cursor_backward,
+        tiebreaker_order=EndpointRow.name.asc(),
+    )
+
+
+@lru_cache(maxsize=1)
+def _get_revision_pagination_spec() -> PaginationSpec:
+    return PaginationSpec(
+        forward_order=RevisionOrders.created_at(ascending=False),
+        backward_order=RevisionOrders.created_at(ascending=True),
+        forward_condition_factory=RevisionConditions.by_cursor_forward,
+        backward_condition_factory=RevisionConditions.by_cursor_backward,
+        tiebreaker_order=DeploymentRevisionRow.id.asc(),
+    )
+
+
+@lru_cache(maxsize=1)
+def _get_route_pagination_spec() -> PaginationSpec:
+    return PaginationSpec(
+        forward_order=RouteOrders.created_at(ascending=False),
+        backward_order=RouteOrders.created_at(ascending=True),
+        forward_condition_factory=RouteConditions.by_cursor_forward,
+        backward_condition_factory=RouteConditions.by_cursor_backward,
+        tiebreaker_order=RoutingRow.id.asc(),
+    )
+
+
+@lru_cache(maxsize=1)
+def _get_access_token_pagination_spec() -> PaginationSpec:
+    return PaginationSpec(
+        forward_order=AccessTokenOrders.created_at(ascending=False),
+        backward_order=AccessTokenOrders.created_at(ascending=True),
+        forward_condition_factory=AccessTokenConditions.by_cursor_forward,
+        backward_condition_factory=AccessTokenConditions.by_cursor_backward,
+        tiebreaker_order=EndpointTokenRow.id.asc(),
+    )
+
+
+@lru_cache(maxsize=1)
+def _get_auto_scaling_rule_pagination_spec() -> PaginationSpec:
+    return PaginationSpec(
+        forward_order=AutoScalingRuleOrders.created_at(ascending=False),
+        backward_order=AutoScalingRuleOrders.created_at(ascending=True),
+        forward_condition_factory=AutoScalingRuleConditions.by_cursor_forward,
+        backward_condition_factory=AutoScalingRuleConditions.by_cursor_backward,
+        tiebreaker_order=EndpointAutoScalingRuleRow.id.asc(),
+    )
+
+
+@lru_cache(maxsize=1)
+def _get_replica_pagination_spec() -> PaginationSpec:
+    return PaginationSpec(
+        forward_order=RouteOrders.created_at(ascending=False),
+        backward_order=RouteOrders.created_at(ascending=True),
+        forward_condition_factory=RouteConditions.by_cursor_forward,
+        backward_condition_factory=RouteConditions.by_cursor_backward,
+        tiebreaker_order=RoutingRow.id.asc(),
+    )
 
 
 class DeploymentAdapter(BaseAdapter):
@@ -377,10 +462,11 @@ class DeploymentAdapter(BaseAdapter):
 
     async def search_access_tokens(
         self,
+        scope: AccessTokenSearchScope,
         input: SearchAccessTokensInput,
     ) -> SearchAccessTokensPayload:
-        """Search access tokens with filters and pagination."""
-        querier = self._build_access_token_querier(input)
+        """Search access tokens scoped to a specific deployment."""
+        querier = self._build_access_token_querier(input, scope=scope)
         action_result = await self._processors.deployment.search_access_tokens.wait_for_complete(
             SearchAccessTokensAction(querier=querier)
         )
@@ -422,10 +508,11 @@ class DeploymentAdapter(BaseAdapter):
 
     async def search_rules(
         self,
+        scope: AutoScalingRuleSearchScope,
         input: SearchAutoScalingRulesInput,
     ) -> SearchAutoScalingRulesPayload:
-        """Search auto-scaling rules with filters and pagination."""
-        querier = self._build_auto_scaling_rule_querier(input)
+        """Search auto-scaling rules scoped to a specific deployment."""
+        querier = self._build_auto_scaling_rule_querier(input, scope=scope)
         action_result = (
             await self._processors.deployment.search_auto_scaling_rules.wait_for_complete(
                 SearchAutoScalingRulesAction(querier=querier)
@@ -621,9 +708,26 @@ class DeploymentAdapter(BaseAdapter):
 
     async def search_revisions(
         self,
+        scope: RevisionSearchScope,
         input: AdminSearchRevisionsInput,
     ) -> AdminSearchRevisionsPayload:
-        """Search model revisions with filters and pagination."""
+        """Search model revisions scoped to a specific deployment."""
+        querier = self._build_revision_querier(input, scope=scope)
+        action_result = await self._processors.deployment.search_revisions.wait_for_complete(
+            SearchRevisionsAction(querier=querier)
+        )
+        return AdminSearchRevisionsPayload(
+            items=[self._revision_data_to_dto(item) for item in action_result.data],
+            total_count=action_result.total_count,
+            has_next_page=action_result.has_next_page,
+            has_previous_page=action_result.has_previous_page,
+        )
+
+    async def admin_search_revisions(
+        self,
+        input: AdminSearchRevisionsInput,
+    ) -> AdminSearchRevisionsPayload:
+        """Search model revisions without scope (admin, all deployments)."""
         querier = self._build_revision_querier(input)
         action_result = await self._processors.deployment.search_revisions.wait_for_complete(
             SearchRevisionsAction(querier=querier)
@@ -641,15 +745,53 @@ class DeploymentAdapter(BaseAdapter):
 
     async def search_routes(
         self,
+        scope: RouteSearchScope,
         input: SearchRoutesInput,
     ) -> SearchRoutesPayload:
-        """Search routes with filters and pagination."""
-        querier = self._build_route_querier(input)
+        """Search routes scoped to a specific deployment."""
+        querier = self._build_route_querier(input, scope=scope)
         action_result = await self._processors.deployment.search_routes.wait_for_complete(
             SearchRoutesAction(querier=querier)
         )
         return SearchRoutesPayload(
             items=[self._route_info_to_dto(item) for item in action_result.routes],
+            total_count=action_result.total_count,
+            has_next_page=action_result.has_next_page,
+            has_previous_page=action_result.has_previous_page,
+        )
+
+    # ------------------------------------------------------------------
+    # Replica operations
+    # ------------------------------------------------------------------
+
+    async def search_replicas(
+        self,
+        scope: ReplicaSearchScope,
+        input: SearchReplicasInput,
+    ) -> SearchReplicasPayload:
+        """Search replicas scoped to a specific deployment."""
+        querier = self._build_replica_querier(input, scope=scope)
+        action_result = await self._processors.deployment.search_replicas.wait_for_complete(
+            SearchReplicasAction(querier=querier)
+        )
+        return SearchReplicasPayload(
+            items=[self._replica_data_to_dto(item) for item in action_result.data],
+            total_count=action_result.total_count,
+            has_next_page=action_result.has_next_page,
+            has_previous_page=action_result.has_previous_page,
+        )
+
+    async def admin_search_replicas(
+        self,
+        input: SearchReplicasInput,
+    ) -> SearchReplicasPayload:
+        """Search replicas without scope (admin, all deployments)."""
+        querier = self._build_replica_querier(input)
+        action_result = await self._processors.deployment.search_replicas.wait_for_complete(
+            SearchReplicasAction(querier=querier)
+        )
+        return SearchReplicasPayload(
+            items=[self._replica_data_to_dto(item) for item in action_result.data],
             total_count=action_result.total_count,
             has_next_page=action_result.has_next_page,
             has_previous_page=action_result.has_previous_page,
@@ -694,19 +836,29 @@ class DeploymentAdapter(BaseAdapter):
         orders: list[QueryOrder] = (
             self._convert_deployment_orders(input.order) if input.order else []
         )
-        orders.append(DeploymentOrders.created_at(ascending=False))
-        orders.append(DeploymentOrders.name(ascending=True))
-        pagination = OffsetPagination(
-            limit=input.limit if input.limit is not None else DEFAULT_PAGINATION_LIMIT,
-            offset=input.offset if input.offset is not None else 0,
+        return self._build_querier(
+            conditions=conditions,
+            orders=orders,
+            pagination_spec=_get_deployment_pagination_spec(),
+            first=input.first,
+            after=input.after,
+            last=input.last,
+            before=input.before,
+            limit=input.limit,
+            offset=input.offset,
         )
-        return BatchQuerier(conditions=conditions, orders=orders, pagination=pagination)
 
-    def _build_revision_querier(self, input: AdminSearchRevisionsInput) -> BatchQuerier:
+    def _build_revision_querier(
+        self,
+        input: AdminSearchRevisionsInput,
+        scope: RevisionSearchScope | None = None,
+    ) -> BatchQuerier:
         conditions: list[QueryCondition] = []
+        if scope is not None:
+            conditions.append(RevisionConditions.by_deployment_id(scope.deployment_id))
         if input.filter:
             f = input.filter
-            if f.deployment_id is not None:
+            if scope is None and f.deployment_id is not None:
                 conditions.append(RevisionConditions.by_deployment_id(f.deployment_id))
             if f.name is not None:
                 condition = self.convert_string_filter(
@@ -719,18 +871,29 @@ class DeploymentAdapter(BaseAdapter):
                 if condition is not None:
                     conditions.append(condition)
         orders: list[QueryOrder] = self._convert_revision_orders(input.order) if input.order else []
-        orders.append(RevisionOrders.created_at(ascending=False))
-        pagination = OffsetPagination(
-            limit=input.limit if input.limit is not None else DEFAULT_PAGINATION_LIMIT,
-            offset=input.offset if input.offset is not None else 0,
+        return self._build_querier(
+            conditions=conditions,
+            orders=orders,
+            pagination_spec=_get_revision_pagination_spec(),
+            first=input.first,
+            after=input.after,
+            last=input.last,
+            before=input.before,
+            limit=input.limit,
+            offset=input.offset,
         )
-        return BatchQuerier(conditions=conditions, orders=orders, pagination=pagination)
 
-    def _build_route_querier(self, input: SearchRoutesInput) -> BatchQuerier:
+    def _build_route_querier(
+        self,
+        input: SearchRoutesInput,
+        scope: RouteSearchScope | None = None,
+    ) -> BatchQuerier:
         conditions: list[QueryCondition] = []
+        if scope is not None:
+            conditions.append(RouteConditions.by_endpoint_id(scope.deployment_id))
         if input.filter:
             f = input.filter
-            if f.deployment_id is not None:
+            if scope is None and f.deployment_id is not None:
                 conditions.append(RouteConditions.by_endpoint_id(f.deployment_id))
             if f.status is not None:
                 st = f.status
@@ -781,16 +944,27 @@ class DeploymentAdapter(BaseAdapter):
                         ])
                     )
         orders: list[QueryOrder] = self._convert_route_orders(input.order) if input.order else []
-        orders.append(RouteOrders.created_at(ascending=False))
-        pagination = OffsetPagination(
-            limit=input.limit if input.limit is not None else DEFAULT_PAGINATION_LIMIT,
-            offset=input.offset if input.offset is not None else 0,
+        return self._build_querier(
+            conditions=conditions,
+            orders=orders,
+            pagination_spec=_get_route_pagination_spec(),
+            first=input.first,
+            after=input.after,
+            last=input.last,
+            before=input.before,
+            limit=input.limit,
+            offset=input.offset,
         )
-        return BatchQuerier(conditions=conditions, orders=orders, pagination=pagination)
 
-    def _build_access_token_querier(self, input: SearchAccessTokensInput) -> BatchQuerier:
+    def _build_access_token_querier(
+        self,
+        input: SearchAccessTokensInput,
+        scope: AccessTokenSearchScope | None = None,
+    ) -> BatchQuerier:
         conditions: list[QueryCondition] = []
-        if input.filter and input.filter.deployment_id is not None:
+        if scope is not None:
+            conditions.append(AccessTokenConditions.by_endpoint_id(scope.deployment_id))
+        elif input.filter and input.filter.deployment_id is not None:
             conditions.append(AccessTokenConditions.by_endpoint_id(input.filter.deployment_id))
         orders: list[QueryOrder] = (
             [
@@ -800,16 +974,27 @@ class DeploymentAdapter(BaseAdapter):
             if input.order
             else []
         )
-        orders.append(AccessTokenOrders.created_at(ascending=False))
-        pagination = OffsetPagination(
-            limit=input.limit if input.limit is not None else DEFAULT_PAGINATION_LIMIT,
-            offset=input.offset if input.offset is not None else 0,
+        return self._build_querier(
+            conditions=conditions,
+            orders=orders,
+            pagination_spec=_get_access_token_pagination_spec(),
+            first=input.first,
+            after=input.after,
+            last=input.last,
+            before=input.before,
+            limit=input.limit,
+            offset=input.offset,
         )
-        return BatchQuerier(conditions=conditions, orders=orders, pagination=pagination)
 
-    def _build_auto_scaling_rule_querier(self, input: SearchAutoScalingRulesInput) -> BatchQuerier:
+    def _build_auto_scaling_rule_querier(
+        self,
+        input: SearchAutoScalingRulesInput,
+        scope: AutoScalingRuleSearchScope | None = None,
+    ) -> BatchQuerier:
         conditions: list[QueryCondition] = []
-        if input.filter and input.filter.deployment_id is not None:
+        if scope is not None:
+            conditions.append(AutoScalingRuleConditions.by_deployment_id(scope.deployment_id))
+        elif input.filter and input.filter.deployment_id is not None:
             conditions.append(
                 AutoScalingRuleConditions.by_deployment_id(input.filter.deployment_id)
             )
@@ -821,12 +1006,17 @@ class DeploymentAdapter(BaseAdapter):
             if input.order
             else []
         )
-        orders.append(AutoScalingRuleOrders.created_at(ascending=False))
-        pagination = OffsetPagination(
-            limit=input.limit if input.limit is not None else DEFAULT_PAGINATION_LIMIT,
-            offset=input.offset if input.offset is not None else 0,
+        return self._build_querier(
+            conditions=conditions,
+            orders=orders,
+            pagination_spec=_get_auto_scaling_rule_pagination_spec(),
+            first=input.first,
+            after=input.after,
+            last=input.last,
+            before=input.before,
+            limit=input.limit,
+            offset=input.offset,
         )
-        return BatchQuerier(conditions=conditions, orders=orders, pagination=pagination)
 
     def _build_policy_querier(self, input: SearchDeploymentPoliciesInput) -> BatchQuerier:
         conditions: list[QueryCondition] = []
@@ -834,11 +1024,62 @@ class DeploymentAdapter(BaseAdapter):
             conditions.append(
                 DeploymentPolicyConditions.by_endpoint_ids([input.filter.deployment_id])
             )
-        pagination = OffsetPagination(
-            limit=input.limit if input.limit is not None else DEFAULT_PAGINATION_LIMIT,
-            offset=input.offset if input.offset is not None else 0,
+        return self._build_querier(
+            conditions=conditions,
+            orders=[],
+            pagination_spec=_get_deployment_pagination_spec(),
+            limit=input.limit,
+            offset=input.offset,
         )
-        return BatchQuerier(conditions=conditions, orders=[], pagination=pagination)
+
+    def _build_replica_querier(
+        self,
+        input: SearchReplicasInput,
+        scope: ReplicaSearchScope | None = None,
+    ) -> BatchQuerier:
+        conditions: list[QueryCondition] = []
+        if scope is not None:
+            conditions.append(RouteConditions.by_endpoint_id(scope.deployment_id))
+        if input.filter:
+            f = input.filter
+            if scope is None and f.deployment_id is not None:
+                conditions.append(RouteConditions.by_endpoint_id(f.deployment_id))
+            if f.status is not None:
+                st = f.status
+                if st.equals is not None:
+                    conditions.append(
+                        RouteConditions.by_status_equals(ManagerRouteStatus(st.equals.value))
+                    )
+                if st.in_ is not None:
+                    conditions.append(
+                        RouteConditions.by_statuses([ManagerRouteStatus(s.value) for s in st.in_])
+                    )
+            if f.traffic_status is not None:
+                ts = f.traffic_status
+                if ts.equals is not None:
+                    conditions.append(
+                        RouteConditions.by_traffic_status_equals(
+                            ManagerRouteTrafficStatus(ts.equals.value)
+                        )
+                    )
+                if ts.in_ is not None:
+                    conditions.append(
+                        RouteConditions.by_traffic_statuses([
+                            ManagerRouteTrafficStatus(s.value) for s in ts.in_
+                        ])
+                    )
+        orders: list[QueryOrder] = self._convert_replica_orders(input.order) if input.order else []
+        return self._build_querier(
+            conditions=conditions,
+            orders=orders,
+            pagination_spec=_get_replica_pagination_spec(),
+            first=input.first,
+            after=input.after,
+            last=input.last,
+            before=input.before,
+            limit=input.limit,
+            offset=input.offset,
+        )
 
     # ------------------------------------------------------------------
     # Order converters
@@ -882,6 +1123,18 @@ class DeploymentAdapter(BaseAdapter):
                     result.append(RouteOrders.status(ascending))
                 case RouteOrderField.TRAFFIC_RATIO:
                     result.append(RouteOrders.traffic_ratio(ascending))
+        return result
+
+    @staticmethod
+    def _convert_replica_orders(orders: list[ReplicaOrder]) -> list[QueryOrder]:
+        result: list[QueryOrder] = []
+        for o in orders:
+            ascending = o.direction == OrderDirection.ASC
+            match o.field:
+                case ReplicaOrderField.CREATED_AT:
+                    result.append(RouteOrders.created_at(ascending))
+                case ReplicaOrderField.ID:
+                    result.append(RouteOrders.id(ascending))
         return result
 
     # ------------------------------------------------------------------
@@ -951,8 +1204,23 @@ class DeploymentAdapter(BaseAdapter):
                 cluster_size=data.cluster_config.size,
                 resource_group=data.resource_config.resource_group_name,
                 resource_slots=dict(data.resource_config.resource_slot),
+                resource_opts=(
+                    dict(data.resource_config.resource_opts)
+                    if data.resource_config.resource_opts
+                    else None
+                ),
                 image_id=data.image_id,
                 runtime_variant=data.model_runtime_config.runtime_variant,
+                inference_runtime_config=(
+                    dict(data.model_runtime_config.inference_runtime_config)
+                    if data.model_runtime_config.inference_runtime_config
+                    else None
+                ),
+                environ=(
+                    dict(data.model_runtime_config.environ)
+                    if data.model_runtime_config.environ
+                    else None
+                ),
                 model_vfolder_id=data.model_mount_config.vfolder_id,
                 model_mount_destination=data.model_mount_config.mount_destination,
                 model_definition_path=data.model_mount_config.definition_path,
@@ -1032,4 +1300,17 @@ class DeploymentAdapter(BaseAdapter):
             blue_green=blue_green,
             created_at=data.created_at,
             updated_at=data.updated_at,
+        )
+
+    @staticmethod
+    def _replica_data_to_dto(data: ModelReplicaData) -> ReplicaNode:
+        return ReplicaNode(
+            id=data.id,
+            revision_id=data.revision_id,
+            session_id=data.session_id,
+            readiness_status=data.readiness_status,
+            liveness_status=data.liveness_status,
+            activeness_status=data.activeness_status,
+            weight=data.weight,
+            created_at=data.created_at,
         )
