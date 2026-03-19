@@ -8038,6 +8038,11 @@ type Mutation
   switchMyMainAccessKey(input: SwitchMyMainAccessKeyInput!): SwitchMyMainAccessKeyPayload! @join__field(graph: STRAWBERRY)
 
   """
+  Update a keypair owned by the current user (e.g. toggle active state). The keypair must be owned by the current user.
+  """
+  updateMyKeypair(input: UpdateMyKeypairInput!): UpdateMyKeypairPayload! @join__field(graph: STRAWBERRY)
+
+  """
   Added in 26.4.0. Update the current user's allowed client IP list. Set allowed_client_ip to null to remove all IP restrictions. When force is false, the operation fails if the current request IP would be excluded by the new allowlist (lockout prevention).
   """
   updateMyAllowedClientIp(input: UpdateMyAllowedClientIPInput!): UpdateMyAllowedClientIPPayload! @join__field(graph: STRAWBERRY)
@@ -12980,6 +12985,27 @@ input UpdateMyAllowedClientIPInput
 Added in 26.4.0. Payload for updating the current user's allowed client IP list.
 """
 type UpdateMyAllowedClientIPPayload
+  @join__type(graph: STRAWBERRY)
+{
+  """Whether the update was successful."""
+  success: Boolean!
+}
+
+"""Input for updating a keypair owned by the current user."""
+input UpdateMyKeypairInput
+  @join__type(graph: STRAWBERRY)
+{
+  """
+  Access key of the keypair to update. Must be owned by the current user.
+  """
+  accessKey: String!
+
+  """Target active state for the keypair."""
+  isActive: Boolean!
+}
+
+"""Payload returned after updating a keypair."""
+type UpdateMyKeypairPayload
   @join__type(graph: STRAWBERRY)
 {
   """Whether the update was successful."""
