@@ -26,6 +26,7 @@ from .nested import (
 )
 
 if TYPE_CHECKING:
+    from ai.backend.common.dto.manager.v2.domain.response import DomainNode
     from ai.backend.manager.api.gql.project_v2.types.filters import (
         ProjectV2Filter,
         ProjectV2OrderBy,
@@ -271,6 +272,26 @@ class DomainV2GQL(PydanticNodeMixin):
     ) -> Iterable[Self | None]:
         results = await info.context.data_loaders.domain_loader.load_many(node_ids)
         return [cls.from_data(data) if data is not None else None for data in results]
+
+    @classmethod
+    def from_node(cls, node: DomainNode) -> Self:
+        """Create DomainV2GQL from DomainNode DTO (adapter search results)."""
+        return cls(
+            id=ID(node.id),
+            basic_info=DomainBasicInfoGQL(
+                name=node.basic_info.name,
+                description=node.basic_info.description,
+                integration_id=node.basic_info.integration_id,
+            ),
+            registry=DomainRegistryInfoGQL(
+                allowed_docker_registries=node.registry.allowed_docker_registries,
+            ),
+            lifecycle=DomainLifecycleInfoGQL(
+                is_active=node.lifecycle.is_active,
+                created_at=node.lifecycle.created_at,
+                modified_at=node.lifecycle.modified_at,
+            ),
+        )
 
     @classmethod
     def from_data(

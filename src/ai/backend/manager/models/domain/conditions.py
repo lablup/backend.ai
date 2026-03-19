@@ -295,6 +295,32 @@ class DomainConditions:
         return inner
 
     @staticmethod
+    def by_project_name_starts_with(spec: StringMatchSpec) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            if spec.case_insensitive:
+                cond = GroupRow.name.ilike(f"{spec.value}%")
+            else:
+                cond = GroupRow.name.like(f"{spec.value}%")
+            if spec.negated:
+                cond = sa.not_(cond)
+            return DomainConditions._exists_project(cond)
+
+        return inner
+
+    @staticmethod
+    def by_project_name_ends_with(spec: StringMatchSpec) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            if spec.case_insensitive:
+                cond = GroupRow.name.ilike(f"%{spec.value}")
+            else:
+                cond = GroupRow.name.like(f"%{spec.value}")
+            if spec.negated:
+                cond = sa.not_(cond)
+            return DomainConditions._exists_project(cond)
+
+        return inner
+
+    @staticmethod
     def by_project_is_active(is_active: bool) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
             return DomainConditions._exists_project(GroupRow.is_active == is_active)
@@ -371,6 +397,58 @@ class DomainConditions:
                 cond = sa.func.lower(UserRow.email) == spec.value.lower()
             else:
                 cond = UserRow.email == spec.value
+            if spec.negated:
+                cond = sa.not_(cond)
+            return DomainConditions._exists_user(cond)
+
+        return inner
+
+    @staticmethod
+    def by_user_username_starts_with(spec: StringMatchSpec) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            if spec.case_insensitive:
+                cond = UserRow.username.ilike(f"{spec.value}%")
+            else:
+                cond = UserRow.username.like(f"{spec.value}%")
+            if spec.negated:
+                cond = sa.not_(cond)
+            return DomainConditions._exists_user(cond)
+
+        return inner
+
+    @staticmethod
+    def by_user_username_ends_with(spec: StringMatchSpec) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            if spec.case_insensitive:
+                cond = UserRow.username.ilike(f"%{spec.value}")
+            else:
+                cond = UserRow.username.like(f"%{spec.value}")
+            if spec.negated:
+                cond = sa.not_(cond)
+            return DomainConditions._exists_user(cond)
+
+        return inner
+
+    @staticmethod
+    def by_user_email_starts_with(spec: StringMatchSpec) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            if spec.case_insensitive:
+                cond = UserRow.email.ilike(f"{spec.value}%")
+            else:
+                cond = UserRow.email.like(f"{spec.value}%")
+            if spec.negated:
+                cond = sa.not_(cond)
+            return DomainConditions._exists_user(cond)
+
+        return inner
+
+    @staticmethod
+    def by_user_email_ends_with(spec: StringMatchSpec) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            if spec.case_insensitive:
+                cond = UserRow.email.ilike(f"%{spec.value}")
+            else:
+                cond = UserRow.email.like(f"%{spec.value}")
             if spec.negated:
                 cond = sa.not_(cond)
             return DomainConditions._exists_user(cond)

@@ -25,6 +25,8 @@ from ai.backend.common.dto.manager.v2.domain.response import (
 )
 from ai.backend.common.dto.manager.v2.domain.types import (
     DomainOrderField,
+    DomainProjectFilter,
+    DomainUserFilter,
     OrderDirection,
 )
 
@@ -50,5 +52,7 @@ __all__ = (
     "PurgeDomainPayload",
     # Types
     "DomainOrderField",
+    "DomainProjectFilter",
+    "DomainUserFilter",
     "OrderDirection",
 )

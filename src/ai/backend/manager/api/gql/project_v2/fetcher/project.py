@@ -10,7 +10,6 @@ from strawberry.relay import PageInfo
 
 from ai.backend.manager.api.gql.adapter import PaginationOptions, PaginationSpec
 from ai.backend.manager.api.gql.base import encode_cursor
-from ai.backend.manager.api.gql.domain_v2.fetcher import fetch_domain
 from ai.backend.manager.api.gql.domain_v2.types import DomainV2GQL
 from ai.backend.manager.api.gql.project_v2.types import (
     ProjectV2Connection,
@@ -311,4 +310,9 @@ async def fetch_project_domain(
     )
 
     # Fetch domain by name
-    return await fetch_domain(info, domain_name=action_result.data.domain_name)
+    from ai.backend.manager.services.domain.actions.get_domain import GetDomainAction
+
+    domain_result = await info.context.processors.domain.get_domain.wait_for_complete(
+        GetDomainAction(domain_name=action_result.data.domain_name)
+    )
+    return DomainV2GQL.from_data(domain_result.data)
