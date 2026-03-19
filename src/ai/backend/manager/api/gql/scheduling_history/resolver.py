@@ -16,6 +16,7 @@ from ai.backend.common.dto.manager.v2.scheduling_history.request import (
     AdminSearchSessionHistoriesInput,
 )
 from ai.backend.manager.api.gql.base import encode_cursor
+from ai.backend.manager.api.gql.decorators import BackendAIGQLMeta, gql_connection_type
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.api.gql.utils import check_admin_only
 
@@ -40,7 +41,9 @@ from .types import (
 SessionSchedulingHistoryEdge = Edge[SessionSchedulingHistory]
 
 
-@strawberry.type(description="Session scheduling history connection")
+@gql_connection_type(
+    BackendAIGQLMeta(added_version="26.3.0", description="Session scheduling history connection.")
+)
 class SessionSchedulingHistoryConnection(Connection[SessionSchedulingHistory]):
     count: int
 
@@ -52,7 +55,9 @@ class SessionSchedulingHistoryConnection(Connection[SessionSchedulingHistory]):
 DeploymentHistoryEdge = Edge[DeploymentHistory]
 
 
-@strawberry.type(description="Deployment history connection")
+@gql_connection_type(
+    BackendAIGQLMeta(added_version="26.3.0", description="Deployment history connection.")
+)
 class DeploymentHistoryConnection(Connection[DeploymentHistory]):
     count: int
 
@@ -64,7 +69,9 @@ class DeploymentHistoryConnection(Connection[DeploymentHistory]):
 RouteHistoryEdge = Edge[RouteHistory]
 
 
-@strawberry.type(description="Route history connection")
+@gql_connection_type(
+    BackendAIGQLMeta(added_version="26.3.0", description="Route history connection.")
+)
 class RouteHistoryConnection(Connection[RouteHistory]):
     count: int
 

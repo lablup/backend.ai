@@ -33,6 +33,11 @@ from ai.backend.manager.api.gql.base import (
     StringFilter,
     UUIDFilter,
 )
+from ai.backend.manager.api.gql.decorators import (
+    BackendAIGQLMeta,
+    gql_connection_type,
+    gql_node_type,
+)
 from ai.backend.manager.api.gql.fair_share.types import ResourceSlotGQL
 from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin
 from ai.backend.manager.api.gql.types import GQLFilter, GQLOrderBy
@@ -47,12 +52,15 @@ from .common_calculations import (
 )
 
 
-@strawberry.type(
-    name="UserUsageBucket",
-    description=(
-        "Added in 26.1.0. User-level usage bucket representing aggregated resource "
-        "consumption for a specific time period. This is the most granular level of usage tracking."
+@gql_node_type(
+    BackendAIGQLMeta(
+        added_version="26.1.0",
+        description=(
+            "User-level usage bucket representing aggregated resource "
+            "consumption for a specific time period. This is the most granular level of usage tracking."
+        ),
     ),
+    name="UserUsageBucket",
 )
 class UserUsageBucketGQL(PydanticNodeMixin[UserUsageBucketNode]):
     """User-level usage bucket containing aggregated resource usage for a period."""
@@ -136,9 +144,9 @@ class UserUsageBucketGQL(PydanticNodeMixin[UserUsageBucketNode]):
     def from_pydantic(
         cls,
         dto: UserUsageBucketNode,
+        extra: dict[str, Any] | None = None,
         *,
         id_field: str = "id",
-        extra: dict[str, Any] | None = None,
     ) -> Self:
         """Create UserUsageBucketGQL from UserUsageBucketNode DTO (adapter search results)."""
         return cls(
@@ -164,12 +172,15 @@ class UserUsageBucketGQL(PydanticNodeMixin[UserUsageBucketNode]):
 UserUsageBucketEdge = Edge[UserUsageBucketGQL]
 
 
-@strawberry.type(
-    description=(
-        "Added in 26.1.0. Paginated connection for user usage bucket records. "
-        "Provides relay-style cursor-based pagination for browsing historical usage data by time period. "
-        "Use 'edges' to access individual records with cursor information, or 'nodes' for direct data access."
-    )
+@gql_connection_type(
+    BackendAIGQLMeta(
+        added_version="26.1.0",
+        description=(
+            "Paginated connection for user usage bucket records. "
+            "Provides relay-style cursor-based pagination for browsing historical usage data by time period. "
+            "Use 'edges' to access individual records with cursor information, or 'nodes' for direct data access."
+        ),
+    ),
 )
 class UserUsageBucketConnection(Connection[UserUsageBucketGQL]):
     count: int = strawberry.field(

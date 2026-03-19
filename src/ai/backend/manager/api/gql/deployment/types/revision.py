@@ -88,6 +88,12 @@ from ai.backend.manager.api.gql.common.types import (
     ResourceOptsGQL,
     ResourceOptsInput,
 )
+from ai.backend.manager.api.gql.decorators import (
+    BackendAIGQLMeta,
+    gql_connection_type,
+    gql_node_type,
+    gql_pydantic_type,
+)
 from ai.backend.manager.api.gql.fair_share.types.common import ResourceSlotGQL
 from ai.backend.manager.api.gql.image_federation import Image
 from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin
@@ -121,9 +127,12 @@ MountPermission: type[CommonMountPermission] = strawberry.enum(
 )
 
 
-@strawberry.type(
+@gql_node_type(
+    BackendAIGQLMeta(
+        added_version="26.1.0",
+        description="A single environment variable entry with name and value.",
+    ),
     name="EnvironmentVariableEntry",
-    description="Added in 26.1.0. A single environment variable entry with name and value.",
 )
 class EnvironmentVariableEntryGQL:
     """A single environment variable entry with name and value."""
@@ -134,9 +143,11 @@ class EnvironmentVariableEntryGQL:
     value: str = strawberry.field(description="Environment variable value.")
 
 
-@strawberry.type(
+@gql_node_type(
+    BackendAIGQLMeta(
+        added_version="26.1.0", description="A collection of environment variable entries."
+    ),
     name="EnvironmentVariables",
-    description="Added in 26.1.0. A collection of environment variable entries.",
 )
 class EnvironmentVariablesGQL:
     """A collection of environment variable entries."""
@@ -146,15 +157,13 @@ class EnvironmentVariablesGQL:
     )
 
 
-@strawberry.type
+@gql_node_type(
+    BackendAIGQLMeta(
+        added_version="25.19.0",
+        description="Configuration for mounting the model data into the inference container. Specifies the virtual folder, mount destination, and model definition path.",
+    )
+)
 class ModelMountConfig:
-    """
-    Added in 25.19.0.
-
-    Configuration for mounting the model data into the inference container.
-    Specifies the virtual folder, mount destination, and model definition path.
-    """
-
     _vfolder_id: strawberry.Private[UUID]
     mount_destination: str = strawberry.field(
         description="Path inside the container where the model is mounted."
@@ -181,16 +190,13 @@ class ModelMountConfig:
         )
 
 
-@strawberry.type
+@gql_node_type(
+    BackendAIGQLMeta(
+        added_version="25.19.0",
+        description="Runtime configuration for the inference framework. Includes the runtime variant, framework-specific configuration, and environment variables.",
+    )
+)
 class ModelRuntimeConfig:
-    """
-    Added in 25.19.0.
-
-    Runtime configuration for the inference framework.
-    Includes the runtime variant, framework-specific configuration,
-    and environment variables.
-    """
-
     runtime_variant: str = strawberry.field(
         description="The inference runtime variant (e.g., vllm, triton)."
     )
@@ -220,15 +226,13 @@ class ModelRuntimeConfig:
         )
 
 
-@strawberry.type
+@gql_node_type(
+    BackendAIGQLMeta(
+        added_version="25.19.0",
+        description="Compute resource configuration for the deployment. Specifies CPU, memory, GPU allocations and additional resource options.",
+    )
+)
 class ResourceConfig:
-    """
-    Added in 25.19.0.
-
-    Compute resource configuration for the deployment.
-    Specifies CPU, memory, GPU allocations and additional resource options.
-    """
-
     _resource_group_name: strawberry.Private[str]
     resource_slots: ResourceSlotGQL = strawberry.field(
         description="Added in 26.1.0. Allocated compute resources including CPU, memory, and accelerators."
@@ -257,15 +261,13 @@ class ResourceConfig:
         )
 
 
-@strawberry.type
+@gql_node_type(
+    BackendAIGQLMeta(
+        added_version="25.19.0",
+        description="Cluster configuration for model deployment replicas. Defines the clustering mode and number of replicas.",
+    )
+)
 class ClusterConfig:
-    """
-    Added in 25.19.0.
-
-    Cluster configuration for model deployment replicas.
-    Defines the clustering mode and number of replicas.
-    """
-
     mode: ClusterModeGQL = strawberry.field(description="The clustering mode (e.g., SINGLE_NODE).")
     size: int = strawberry.field(description="Number of replicas in the cluster.")
 
@@ -277,18 +279,13 @@ class ClusterConfig:
         )
 
 
-@strawberry.type
+@gql_node_type(
+    BackendAIGQLMeta(
+        added_version="25.19.0",
+        description="Represents a versioned configuration snapshot of a model deployment. Each revision captures the complete configuration including cluster settings, resource allocations, runtime configuration, and model mount settings. Revisions enable version control and rollback capabilities for deployments.",
+    )
+)
 class ModelRevision(PydanticNodeMixin[RevisionNodeDTO]):
-    """
-    Added in 25.19.0.
-
-    Represents a versioned configuration snapshot of a model deployment.
-    Each revision captures the complete configuration including cluster settings,
-    resource allocations, runtime configuration, and model mount settings.
-
-    Revisions enable version control and rollback capabilities for deployments.
-    """
-
     _image_id: strawberry.Private[UUID]
     id: NodeID[str]
     name: str = strawberry.field(description="The name identifier for this revision.")
@@ -345,9 +342,9 @@ class ModelRevision(PydanticNodeMixin[RevisionNodeDTO]):
     def from_pydantic(
         cls,
         dto: RevisionNodeDTO,
+        extra: dict[str, Any] | None = None,
         *,
         id_field: str = "id",
-        extra: dict[str, Any] | None = None,
     ) -> Self:
         info = dto.revision_info
         environ_gql: EnvironmentVariablesGQL | None = None
@@ -450,9 +447,9 @@ class ModelRevisionOrderBy:
 
 
 # Payload Types
-@strawberry.experimental.pydantic.type(
+@gql_pydantic_type(
+    BackendAIGQLMeta(added_version="25.19.0", description="Payload for adding a revision."),
     model=AddRevisionPayloadDTO,
-    description="Added in 25.19.0",
 )
 class AddRevisionPayload:
     revision: ModelRevision
@@ -468,10 +465,10 @@ class ActivateRevisionInputGQL:
     revision_id: ID
 
 
-@strawberry.experimental.pydantic.type(
+@gql_pydantic_type(
+    BackendAIGQLMeta(added_version="25.19.0", description="Result of activating a revision."),
     model=ActivateRevisionPayloadDTO,
     name="ActivateRevisionPayload",
-    description="Added in 25.19.0. Result of activating a revision.",
 )
 class ActivateRevisionPayloadGQL:
     deployment: Annotated[ModelDeployment, strawberry.lazy(".deployment")]
@@ -782,7 +779,9 @@ class AddRevisionInput:
 ModelRevisionEdge = Edge[ModelRevision]
 
 
-@strawberry.type(description="Added in 25.19.0")
+@gql_connection_type(
+    BackendAIGQLMeta(added_version="25.19.0", description="Connection for model revisions.")
+)
 class ModelRevisionConnection(Connection[ModelRevision]):
     count: int
 

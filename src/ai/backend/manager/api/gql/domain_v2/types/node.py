@@ -14,6 +14,7 @@ from ai.backend.common.dto.manager.v2.domain.types import (
     DomainFairShareScopeDTO,
     DomainUsageScopeDTO,
 )
+from ai.backend.manager.api.gql.decorators import BackendAIGQLMeta, gql_connection_type
 from ai.backend.manager.api.gql.fair_share.types import DomainFairShareGQL
 from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin
 from ai.backend.manager.api.gql.resource_slot.overview_types import ActiveResourceOverviewGQL
@@ -348,16 +349,26 @@ class DomainV2GQL(PydanticNodeMixin[DomainNode]):
     def from_pydantic(
         cls,
         dto: DomainNode,
+        extra: dict[str, Any] | None = None,
         *,
         id_field: str = "id",
-        extra: dict[str, Any] | None = None,
     ) -> Self:
         """Create DomainV2GQL from DomainNode DTO (adapter search results)."""
         return cls(
             id=ID(dto.id),
-            basic_info=DomainBasicInfoGQL.from_pydantic(dto.basic_info),
-            registry=DomainRegistryInfoGQL.from_pydantic(dto.registry),
-            lifecycle=DomainLifecycleInfoGQL.from_pydantic(dto.lifecycle),
+            basic_info=DomainBasicInfoGQL(
+                name=dto.basic_info.name,
+                description=dto.basic_info.description,
+                integration_id=dto.basic_info.integration_id,
+            ),
+            registry=DomainRegistryInfoGQL(
+                allowed_docker_registries=dto.registry.allowed_docker_registries,
+            ),
+            lifecycle=DomainLifecycleInfoGQL(
+                is_active=dto.lifecycle.is_active,
+                created_at=dto.lifecycle.created_at,
+                modified_at=dto.lifecycle.modified_at,
+            ),
         )
 
     @classmethod
@@ -380,36 +391,20 @@ class DomainV2GQL(PydanticNodeMixin[DomainNode]):
             - ResourceSlot and storage permissions are excluded; use dedicated APIs
             - Dotfiles (binary data) is excluded; use query_domain_dotfiles()
         """
-        from ai.backend.common.dto.manager.v2.domain.response import (
-            DomainBasicInfo as DomainBasicInfoDTO,
-        )
-        from ai.backend.common.dto.manager.v2.domain.response import (
-            DomainLifecycleInfo as DomainLifecycleInfoDTO,
-        )
-        from ai.backend.common.dto.manager.v2.domain.response import (
-            DomainRegistryInfo as DomainRegistryInfoDTO,
-        )
-
         return cls(
             id=ID(data.name),  # name is the primary key
-            basic_info=DomainBasicInfoGQL.from_pydantic(
-                DomainBasicInfoDTO(
-                    name=data.name,
-                    description=data.description,
-                    integration_id=data.integration_id,
-                )
+            basic_info=DomainBasicInfoGQL(
+                name=data.name,
+                description=data.description,
+                integration_id=data.integration_id,
             ),
-            registry=DomainRegistryInfoGQL.from_pydantic(
-                DomainRegistryInfoDTO(
-                    allowed_docker_registries=data.allowed_docker_registries,
-                )
+            registry=DomainRegistryInfoGQL(
+                allowed_docker_registries=data.allowed_docker_registries,
             ),
-            lifecycle=DomainLifecycleInfoGQL.from_pydantic(
-                DomainLifecycleInfoDTO(
-                    is_active=data.is_active,
-                    created_at=data.created_at,
-                    modified_at=data.modified_at,
-                )
+            lifecycle=DomainLifecycleInfoGQL(
+                is_active=data.is_active,
+                created_at=data.created_at,
+                modified_at=data.modified_at,
             ),
         )
 
@@ -417,12 +412,15 @@ class DomainV2GQL(PydanticNodeMixin[DomainNode]):
 DomainV2Edge = Edge[DomainV2GQL]
 
 
-@strawberry.type(
-    description=(
-        "Added in 26.2.0. Paginated connection for domain records. "
-        "Provides relay-style cursor-based pagination for efficient traversal of domain data. "
-        "Use 'edges' to access individual records with cursor information, "
-        "or 'nodes' for direct data access."
+@gql_connection_type(
+    BackendAIGQLMeta(
+        added_version="26.2.0",
+        description=(
+            "Paginated connection for domain records. "
+            "Provides relay-style cursor-based pagination for efficient traversal of domain data. "
+            "Use 'edges' to access individual records with cursor information, "
+            "or 'nodes' for direct data access."
+        ),
     )
 )
 class DomainV2Connection(Connection[DomainV2GQL]):

@@ -20,6 +20,12 @@ from ai.backend.common.dto.manager.v2.storage_namespace.response import (
 from ai.backend.common.dto.manager.v2.storage_namespace.response import (
     UnregisterStorageNamespacePayload as UnregisterStorageNamespacePayloadDTO,
 )
+from ai.backend.manager.api.gql.decorators import (
+    BackendAIGQLMeta,
+    gql_connection_type,
+    gql_node_type,
+    gql_pydantic_type,
+)
 from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin
 from ai.backend.manager.api.gql.utils import dedent_strip
 from ai.backend.manager.data.storage_namespace.types import StorageNamespaceData
@@ -27,17 +33,18 @@ from ai.backend.manager.data.storage_namespace.types import StorageNamespaceData
 from .types import StrawberryGQLContext
 
 
-@strawberry.type(
-    description=dedent_strip("""
-    Added in 25.15.0.
+@gql_node_type(
+    BackendAIGQLMeta(
+        added_version="25.15.0",
+        description=dedent_strip("""
+            Storage namespace provides logical separation of data within a single storage system
+            to organize and isolate domain-specific concerns.
 
-    Storage namespace provides logical separation of data within a single storage system
-    to organize and isolate domain-specific concerns.
-
-    Implementation varies by storage type:
-    - Object Storage (S3, MinIO): Uses bucket-based namespace separation
-    - File System (VFS): Uses directory path prefix for namespace distinction
-    """)
+            Implementation varies by storage type:
+            - Object Storage (S3, MinIO): Uses bucket-based namespace separation
+            - File System (VFS): Uses directory path prefix for namespace distinction
+        """),
+    ),
 )
 class StorageNamespace(PydanticNodeMixin[Any]):
     id: NodeID[str]
@@ -69,12 +76,11 @@ class StorageNamespace(PydanticNodeMixin[Any]):
 StorageNamespaceEdge = Edge[StorageNamespace]
 
 
-@strawberry.type(
-    description=dedent_strip("""
-    Added in 25.15.0.
-
-    Storage namespace connection for pagination.
-    """)
+@gql_connection_type(
+    BackendAIGQLMeta(
+        added_version="25.15.0",
+        description="Storage namespace connection for pagination.",
+    ),
 )
 class StorageNamespaceConnection(Connection[StorageNamespace]):
     @strawberry.field
@@ -108,30 +114,28 @@ class UnregisterStorageNamespaceInput:
     namespace: str
 
 
-@strawberry.experimental.pydantic.type(
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version="25.15.0",
+        description="Payload returned after storage namespace registration.",
+    ),
     model=RegisterStorageNamespaceGQLPayloadDTO,
-    description=dedent_strip("""
-    Added in 25.15.0.
-
-    Payload returned after storage namespace registration.
-    """),
-    all_fields=True,
 )
 class RegisterStorageNamespacePayload:
-    pass
+    id: strawberry.auto
 
 
-@strawberry.experimental.pydantic.type(
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version="25.15.0",
+        description="Payload returned after storage namespace unregistration.",
+    ),
     model=UnregisterStorageNamespacePayloadDTO,
-    description=dedent_strip("""
-    Added in 25.15.0.
-
-    Payload returned after storage namespace unregistration.
-    """),
-    all_fields=True,
 )
 class UnregisterStorageNamespacePayload:
     """Payload returned after storage namespace unregistration."""
+
+    id: strawberry.auto
 
 
 @strawberry.mutation(  # type: ignore[misc]
@@ -145,9 +149,7 @@ async def register_storage_namespace(
     input: RegisterStorageNamespaceInput, info: Info[StrawberryGQLContext]
 ) -> RegisterStorageNamespacePayload:
     payload = await info.context.adapters.storage_namespace.register(input.to_pydantic())
-    return RegisterStorageNamespacePayload.from_pydantic(
-        RegisterStorageNamespaceGQLPayloadDTO(id=payload.namespace.storage_id)
-    )
+    return RegisterStorageNamespacePayload(id=payload.namespace.storage_id)
 
 
 @strawberry.mutation(  # type: ignore[misc]
@@ -162,4 +164,4 @@ async def unregister_storage_namespace(
 ) -> UnregisterStorageNamespacePayload:
     pydantic_input = input.to_pydantic()
     payload = await info.context.adapters.storage_namespace.unregister(pydantic_input)
-    return UnregisterStorageNamespacePayload.from_pydantic(payload)
+    return UnregisterStorageNamespacePayload(id=payload.id)

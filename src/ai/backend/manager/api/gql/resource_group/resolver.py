@@ -11,6 +11,7 @@ from strawberry.relay import Connection, Edge, PageInfo
 from ai.backend.common.dto.manager.v2.resource_group.request import AdminSearchResourceGroupsInput
 from ai.backend.common.types import PreemptionMode, PreemptionOrder
 from ai.backend.manager.api.gql.base import encode_cursor
+from ai.backend.manager.api.gql.decorators import BackendAIGQLMeta, gql_connection_type
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.api.gql.utils import check_admin_only
 from ai.backend.manager.data.scaling_group.types import (
@@ -51,7 +52,12 @@ from .types import (
 ResourceGroupEdge = Edge[ResourceGroupGQL]
 
 
-@strawberry.type(description="Added in 26.2.0. Resource group connection")
+@gql_connection_type(
+    BackendAIGQLMeta(
+        added_version="26.2.0",
+        description="Resource group connection",
+    )
+)
 class ResourceGroupConnection(Connection[ResourceGroupGQL]):
     count: int
 

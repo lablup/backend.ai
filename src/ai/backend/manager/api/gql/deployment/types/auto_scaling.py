@@ -49,6 +49,12 @@ from ai.backend.common.dto.manager.v2.deployment.types import (
 )
 from ai.backend.common.types import AutoScalingMetricSource as CommonAutoScalingMetricSource
 from ai.backend.manager.api.gql.base import DateTimeFilter, OrderDirection
+from ai.backend.manager.api.gql.decorators import (
+    BackendAIGQLMeta,
+    gql_connection_type,
+    gql_node_type,
+    gql_pydantic_type,
+)
 from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.data.deployment.types import (
@@ -104,7 +110,11 @@ class AutoScalingRuleOrderBy:
         )
 
 
-@strawberry.type
+@gql_node_type(
+    BackendAIGQLMeta(
+        added_version="25.19.0", description="An auto-scaling rule for a model deployment."
+    )
+)
 class AutoScalingRule(PydanticNodeMixin[AutoScalingRuleNodeDTO]):
     id: NodeID[str]
 
@@ -170,9 +180,9 @@ class AutoScalingRule(PydanticNodeMixin[AutoScalingRuleNodeDTO]):
     def from_pydantic(
         cls,
         dto: AutoScalingRuleNodeDTO,
+        extra: dict[str, Any] | None = None,
         *,
         id_field: str = "id",
-        extra: dict[str, Any] | None = None,
     ) -> Self:
         return cls(
             id=ID(str(dto.id)),
@@ -192,7 +202,9 @@ class AutoScalingRule(PydanticNodeMixin[AutoScalingRuleNodeDTO]):
 AutoScalingRuleEdge = Edge[AutoScalingRule]
 
 
-@strawberry.type(description="Added in 25.19.0")
+@gql_connection_type(
+    BackendAIGQLMeta(added_version="25.19.0", description="Connection for auto-scaling rules.")
+)
 class AutoScalingRuleConnection(Connection[AutoScalingRule]):
     count: int
 
@@ -270,21 +282,30 @@ class DeleteAutoScalingRuleInput:
 
 
 # Payload Types
-@strawberry.experimental.pydantic.type(
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version="25.19.0", description="Payload for creating an auto-scaling rule."
+    ),
     model=CreateAutoScalingRulePayloadDTO,
 )
 class CreateAutoScalingRulePayload:
     rule: AutoScalingRule
 
 
-@strawberry.experimental.pydantic.type(
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version="25.19.0", description="Payload for updating an auto-scaling rule."
+    ),
     model=UpdateAutoScalingRulePayloadDTO,
 )
 class UpdateAutoScalingRulePayload:
     rule: AutoScalingRule
 
 
-@strawberry.experimental.pydantic.type(
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version="25.19.0", description="Payload for deleting an auto-scaling rule."
+    ),
     model=DeleteAutoScalingRulePayloadDTO,
 )
 class DeleteAutoScalingRulePayload:

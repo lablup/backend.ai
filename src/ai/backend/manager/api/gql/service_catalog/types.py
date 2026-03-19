@@ -31,6 +31,7 @@ from ai.backend.common.dto.manager.v2.service_catalog.types import (
 )
 from ai.backend.common.types import ServiceCatalogStatus
 from ai.backend.manager.api.gql.base import OrderDirection, StringFilter
+from ai.backend.manager.api.gql.decorators import BackendAIGQLMeta, gql_node_type
 from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin
 from ai.backend.manager.api.gql.utils import dedent_strip
 from ai.backend.manager.data.service_catalog.types import (
@@ -73,9 +74,12 @@ class ServiceCatalogStatusGQL(StrEnum):
         return cls.from_status(value)
 
 
-@strawberry.type(
+@gql_node_type(
+    BackendAIGQLMeta(
+        added_version="26.3.0",
+        description="An endpoint exposed by a service instance.",
+    ),
     name="ServiceCatalogEndpoint",
-    description="Added in 26.3.0. An endpoint exposed by a service instance.",
 )
 class ServiceCatalogEndpointGQL:
     role: str = strawberry.field(description="Role of this endpoint (e.g., 'main', 'health').")
@@ -111,9 +115,12 @@ class ServiceCatalogEndpointGQL:
         )
 
 
-@strawberry.type(
+@gql_node_type(
+    BackendAIGQLMeta(
+        added_version="26.3.0",
+        description="A registered service instance in the catalog.",
+    ),
     name="ServiceCatalog",
-    description="Added in 26.3.0. A registered service instance in the catalog.",
 )
 class ServiceCatalogGQL(PydanticNodeMixin[Any]):
     id: NodeID[str] = strawberry.field(description="Relay-style global node ID.")

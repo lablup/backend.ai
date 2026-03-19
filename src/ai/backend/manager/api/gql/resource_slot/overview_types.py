@@ -6,16 +6,20 @@ from typing import Self
 
 import strawberry
 
+from ai.backend.manager.api.gql.decorators import BackendAIGQLMeta, gql_node_type
 from ai.backend.manager.api.gql.fair_share.types.common import ResourceSlotGQL
 from ai.backend.manager.data.resource_slot.types import ResourceOccupancy
 
 
-@strawberry.type(
-    name="ActiveResourceOverview",
-    description=(
-        "Added in 26.4.0. Active resource usage overview for a domain or project. "
-        "Shows the currently occupied resource slots and the number of active sessions."
+@gql_node_type(
+    BackendAIGQLMeta(
+        added_version="26.4.0",
+        description=(
+            "Active resource usage overview for a domain or project. "
+            "Shows the currently occupied resource slots and the number of active sessions."
+        ),
     ),
+    name="ActiveResourceOverview",
 )
 class ActiveResourceOverviewGQL:
     """Active resource occupancy for a domain or project."""

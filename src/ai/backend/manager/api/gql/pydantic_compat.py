@@ -25,6 +25,7 @@ from typing import Any, Self, Union, get_args, get_origin, get_type_hints
 from pydantic import BaseModel
 from strawberry.relay import Node
 from strawberry.types.base import StrawberryObjectDefinition
+from strawberry.types.private import StrawberryPrivate
 
 
 class PydanticNodeMixin[T_DTO: BaseModel](Node):
@@ -63,9 +64,9 @@ class PydanticNodeMixin[T_DTO: BaseModel](Node):
     def from_pydantic(
         cls,
         dto: T_DTO,
+        extra: dict[str, Any] | None = None,
         *,
         id_field: str = "id",
-        extra: dict[str, Any] | None = None,
     ) -> Self:
         """Convert a Pydantic DTO instance to this Strawberry Node type.
 
@@ -101,6 +102,11 @@ class PydanticNodeMixin[T_DTO: BaseModel](Node):
             # Extra overrides take priority
             if field_name in extra:
                 kwargs[field_name] = extra[field_name]
+                continue
+
+            # Skip strawberry.Private fields — they cannot be sourced from the DTO
+            # and must be set via extra or a custom from_pydantic override
+            if any(isinstance(a, StrawberryPrivate) for a in get_args(field.type)):
                 continue
 
             # The ``id`` field is always sourced from id_field

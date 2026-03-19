@@ -185,6 +185,8 @@ ignore = [
 
 [tool.ruff.lint.flake8-tidy-imports.banned-api]
 "pytest.mark.asyncio" = {msg = "asyncio_mode = 'auto' is set; @pytest.mark.asyncio is unnecessary."}
+"strawberry.type" = {msg = "Use gql_node_type or gql_connection_type from ai.backend.manager.api.gql.decorators instead of @strawberry.type."}
+"strawberry.experimental.pydantic.type" = {msg = "Use gql_pydantic_type from ai.backend.manager.api.gql.decorators instead of @strawberry.experimental.pydantic.type."}
 
 [tool.ruff.lint.isort]
 known-first-party = ["ai.backend"]
@@ -193,6 +195,10 @@ known-third-party = ["alembic", "redis", "kubernetes"]
 split-on-trailing-comma = true
 
 [tool.ruff.lint.per-file-ignores]
+# decorators.py wraps strawberry.type and strawberry.experimental.pydantic.type directly
+"src/ai/backend/manager/api/gql/decorators.py" = ["TID251"]
+# schema.py defines GQL schema roots (Query, Mutation, Subscription) using @strawberry.type
+"src/ai/backend/manager/api/gql/schema.py" = ["TID251"]
 "src/ai/backend/manager/config.py" = ["E402"]
 "src/ai/backend/manager/models/alembic/env.py" = ["E402"]
 "src/ai/backend/logging/otel.py" = ["LOG015"]  # root logger usage is intentional for OTEL initialization

@@ -13,6 +13,7 @@ from strawberry.relay import NodeID
 from strawberry.scalars import JSON
 
 from ai.backend.common.container_registry import ContainerRegistryType
+from ai.backend.manager.api.gql.decorators import BackendAIGQLMeta, gql_node_type
 from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.data.container_registry.types import ContainerRegistryData
@@ -38,9 +39,12 @@ class ContainerRegistryTypeGQL(StrEnum):
         return cls(value.value)
 
 
-@strawberry.type(
+@gql_node_type(
+    BackendAIGQLMeta(
+        added_version="26.4.0",
+        description="Container registry node.",
+    ),
     name="ContainerRegistryV2",
-    description="Added in 26.4.0. Container registry node.",
 )
 class ContainerRegistryGQL(PydanticNodeMixin[Any]):
     id: NodeID[str] = strawberry.field(

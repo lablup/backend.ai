@@ -5,6 +5,11 @@ import strawberry
 from strawberry import ID, Info
 from strawberry.relay import Connection, Edge, NodeID, PageInfo
 
+from ai.backend.manager.api.gql.decorators import (
+    BackendAIGQLMeta,
+    gql_connection_type,
+    gql_node_type,
+)
 from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.api.gql_legacy.gql_relay import AsyncNode
@@ -20,7 +25,12 @@ class VFolder:
         return cls(id=id)
 
 
-@strawberry.type
+@gql_node_type(
+    BackendAIGQLMeta(
+        added_version="24.3.0",
+        description="Represents a virtual folder mount in a deployment.",
+    ),
+)
 class ExtraVFolderMount(PydanticNodeMixin[Any]):
     id: NodeID[str]
     mount_destination: str
@@ -44,7 +54,12 @@ class ExtraVFolderMount(PydanticNodeMixin[Any]):
 ExtraVFolderMountEdge = Edge[ExtraVFolderMount]
 
 
-@strawberry.type(description="Added in 25.16.0")
+@gql_connection_type(
+    BackendAIGQLMeta(
+        added_version="25.16.0",
+        description="Connection type for paginated virtual folder mount results.",
+    ),
+)
 class ExtraVFolderMountConnection(Connection[ExtraVFolderMount]):
     count: int
 

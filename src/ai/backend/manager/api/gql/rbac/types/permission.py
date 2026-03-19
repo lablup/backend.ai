@@ -34,6 +34,11 @@ from ai.backend.common.dto.manager.v2.rbac.types import (
 )
 from ai.backend.common.types import SessionId
 from ai.backend.manager.api.gql.base import OrderDirection
+from ai.backend.manager.api.gql.decorators import (
+    BackendAIGQLMeta,
+    gql_connection_type,
+    gql_node_type,
+)
 from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin
 from ai.backend.manager.api.gql.rbac.types.entity_node import EntityNode
 from ai.backend.manager.api.gql.types import GQLFilter, GQLOrderBy, StrawberryGQLContext
@@ -152,7 +157,10 @@ class PermissionOrderField(StrEnum):
 # ==================== Node Types ====================
 
 
-@strawberry.type(name="Permission", description="Added in 26.3.0. RBAC scoped permission")
+@gql_node_type(
+    BackendAIGQLMeta(added_version="26.3.0", description="RBAC scoped permission."),
+    name="Permission",
+)
 class PermissionGQL(PydanticNodeMixin[PermissionNodeDTO]):
     id: NodeID[str]
     role_id: uuid.UUID
@@ -306,9 +314,9 @@ class PermissionGQL(PydanticNodeMixin[PermissionNodeDTO]):
     def from_pydantic(
         cls,
         dto: PermissionNodeDTO,
+        extra: dict[str, Any] | None = None,
         *,
         id_field: str = "id",
-        extra: dict[str, Any] | None = None,
     ) -> Self:
         return cls(
             id=ID(str(dto.id)),
@@ -457,21 +465,29 @@ class DeletePermissionInput:
 # ==================== Payload Types ====================
 
 
-@strawberry.experimental.pydantic.type(
-    model=DeletePermissionPayloadDTO,
-    description="Added in 26.3.0. Payload for delete permission mutation",
-    all_fields=True,
+@gql_node_type(
+    BackendAIGQLMeta(added_version="26.3.0", description="Payload for delete permission mutation."),
+    name="DeletePermissionPayload",
 )
 class DeletePermissionPayload:
     """Payload for permission deletion mutation."""
+
+    id: uuid.UUID = strawberry.field(description="ID of the deleted permission.")
+
+    @classmethod
+    def from_pydantic(cls, instance: DeletePermissionPayloadDTO) -> Self:
+        return cls(id=instance.id)
 
 
 # ==================== Connection Types ====================
 
 
-@strawberry.type(
+@gql_node_type(
+    BackendAIGQLMeta(
+        added_version="26.3.0",
+        description="Valid scope-entity type combination for RBAC permissions.",
+    ),
     name="ScopeEntityCombination",
-    description="Added in 26.3.0. Valid scope-entity type combination for RBAC permissions.",
 )
 class ScopeEntityCombinationGQL:
     scope_type: RBACElementTypeGQL
@@ -481,7 +497,7 @@ class ScopeEntityCombinationGQL:
 PermissionEdge = Edge[PermissionGQL]
 
 
-@strawberry.type(description="Added in 26.3.0. Permission connection")
+@gql_connection_type(BackendAIGQLMeta(added_version="26.3.0", description="Permission connection."))
 class PermissionConnection(Connection[PermissionGQL]):
     count: int
 

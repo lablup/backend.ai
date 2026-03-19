@@ -30,6 +30,12 @@ from ai.backend.common.dto.manager.v2.reservoir_registry.response import (
 )
 from ai.backend.manager.api.gql.artifact_registry_meta import ArtifactRegistryMetaConnection
 from ai.backend.manager.api.gql.base import encode_cursor
+from ai.backend.manager.api.gql.decorators import (
+    BackendAIGQLMeta,
+    gql_connection_type,
+    gql_node_type,
+    gql_pydantic_type,
+)
 from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin
 from ai.backend.manager.data.reservoir_registry.types import ReservoirRegistryData
 from ai.backend.manager.errors.api import NotImplementedAPI
@@ -40,7 +46,12 @@ from ai.backend.manager.services.artifact_registry.actions.reservoir.get_multi i
 from .types import StrawberryGQLContext
 
 
-@strawberry.type(description="Added in 25.14.0")
+@gql_node_type(
+    BackendAIGQLMeta(
+        added_version="25.14.0",
+        description="Reservoir registry node.",
+    ),
+)
 class ReservoirRegistry(PydanticNodeMixin[ReservoirRegistryNode]):
     id: NodeID[str]
     name: str
@@ -100,7 +111,12 @@ class ReservoirRegistry(PydanticNodeMixin[ReservoirRegistryNode]):
 ReservoirRegistryEdge = Edge[ReservoirRegistry]
 
 
-@strawberry.type(description="Added in 25.14.0")
+@gql_connection_type(
+    BackendAIGQLMeta(
+        added_version="25.14.0",
+        description="Relay-style connection for paginated reservoir registry queries.",
+    ),
+)
 class ReservoirRegistryConnection(Connection[ReservoirRegistry]):
     @strawberry.field
     def count(self) -> int:
@@ -187,25 +203,34 @@ class DeleteReservoirRegistryInput:
     id: ID
 
 
-@strawberry.experimental.pydantic.type(
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version="25.14.0",
+        description="Payload for creating a reservoir registry.",
+    ),
     model=CreateReservoirRegistryPayloadDTO,
-    description="Added in 25.14.0",
 )
 class CreateReservoirRegistryPayload:
     reservoir: ReservoirRegistry
 
 
-@strawberry.experimental.pydantic.type(
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version="25.14.0",
+        description="Payload for updating a reservoir registry.",
+    ),
     model=UpdateReservoirRegistryPayloadDTO,
-    description="Added in 25.14.0",
 )
 class UpdateReservoirRegistryPayload:
     reservoir: ReservoirRegistry
 
 
-@strawberry.experimental.pydantic.type(
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version="25.14.0",
+        description="Payload for deleting a reservoir registry.",
+    ),
     model=DeleteReservoirRegistryPayloadDTO,
-    description="Added in 25.14.0",
 )
 class DeleteReservoirRegistryPayload:
     id: ID
@@ -216,9 +241,8 @@ async def create_reservoir_registry(
     input: CreateReservoirRegistryInput, info: Info[StrawberryGQLContext]
 ) -> CreateReservoirRegistryPayload:
     result = await info.context.adapters.reservoir_registry.create(input.to_pydantic())
-    return CreateReservoirRegistryPayload.from_pydantic(
-        result,
-        extra={"reservoir": ReservoirRegistry.from_pydantic(result.registry)},
+    return CreateReservoirRegistryPayload(
+        reservoir=ReservoirRegistry.from_pydantic(result.registry)
     )
 
 
@@ -227,9 +251,8 @@ async def update_reservoir_registry(
     input: UpdateReservoirRegistryInput, info: Info[StrawberryGQLContext]
 ) -> UpdateReservoirRegistryPayload:
     result = await info.context.adapters.reservoir_registry.update(input.to_pydantic())
-    return UpdateReservoirRegistryPayload.from_pydantic(
-        result,
-        extra={"reservoir": ReservoirRegistry.from_pydantic(result.registry)},
+    return UpdateReservoirRegistryPayload(
+        reservoir=ReservoirRegistry.from_pydantic(result.registry)
     )
 
 
@@ -239,7 +262,4 @@ async def delete_reservoir_registry(
 ) -> DeleteReservoirRegistryPayload:
     pydantic_input = input.to_pydantic()
     result = await info.context.adapters.reservoir_registry.delete(pydantic_input)
-    return DeleteReservoirRegistryPayload.from_pydantic(
-        result,
-        extra={"id": ID(str(result.id))},
-    )
+    return DeleteReservoirRegistryPayload(id=ID(str(result.id)))

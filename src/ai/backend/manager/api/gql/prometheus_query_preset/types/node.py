@@ -18,6 +18,11 @@ from ai.backend.common.dto.manager.v2.prometheus_query_preset.response import (
 from ai.backend.common.dto.manager.v2.prometheus_query_preset.response import (
     QueryDefinitionNode,
 )
+from ai.backend.manager.api.gql.decorators import (
+    BackendAIGQLMeta,
+    gql_connection_type,
+    gql_node_type,
+)
 from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin
 
 from .payloads import QueryDefinitionOptionsGQL
@@ -26,9 +31,12 @@ if TYPE_CHECKING:
     from ai.backend.manager.data.prometheus_query_preset import PrometheusQueryPresetData
 
 
-@strawberry.type(
+@gql_node_type(
+    BackendAIGQLMeta(
+        added_version="26.3.0",
+        description="Prometheus query definition entity implementing Relay Node pattern.",
+    ),
     name="QueryDefinition",
-    description="Added in 26.3.0. Prometheus query definition entity implementing Relay Node pattern.",
 )
 class QueryDefinitionGQL(PydanticNodeMixin[QueryDefinitionNode]):
     id: NodeID[str] = strawberry.field(description="Query definition UUID (primary key).")
@@ -70,9 +78,9 @@ class QueryDefinitionGQL(PydanticNodeMixin[QueryDefinitionNode]):
     def from_pydantic(
         cls,
         dto: QueryDefinitionNode,
+        extra: dict[str, Any] | None = None,
         *,
         id_field: str = "id",
-        extra: dict[str, Any] | None = None,
     ) -> Self:
         from ai.backend.common.dto.manager.v2.prometheus_query_preset.types import (
             QueryDefinitionOptionsInfo,
@@ -98,8 +106,11 @@ class QueryDefinitionGQL(PydanticNodeMixin[QueryDefinitionNode]):
 QueryDefinitionEdge = Edge[QueryDefinitionGQL]
 
 
-@strawberry.type(
-    description="Added in 26.3.0. Paginated connection for query definition records.",
+@gql_connection_type(
+    BackendAIGQLMeta(
+        added_version="26.3.0",
+        description="Paginated connection for query definition records.",
+    ),
 )
 class QueryDefinitionConnection(Connection[QueryDefinitionGQL]):
     count: int = strawberry.field(
@@ -111,23 +122,35 @@ class QueryDefinitionConnection(Connection[QueryDefinitionGQL]):
         self.count = count
 
 
-@strawberry.experimental.pydantic.type(
-    model=CreateQueryDefinitionGQLPayloadDTO,
+@gql_node_type(
+    BackendAIGQLMeta(
+        added_version="26.3.0",
+        description="Payload returned after creating a query definition.",
+    ),
     name="CreateQueryDefinitionPayload",
-    description="Added in 26.3.0. Payload returned after creating a query definition.",
 )
 class CreateQueryDefinitionPayload:
     """Payload for query definition creation mutation."""
 
-    preset: QueryDefinitionGQL
+    preset: QueryDefinitionGQL = strawberry.field(description="Created query definition.")
+
+    @classmethod
+    def from_pydantic(cls, dto: CreateQueryDefinitionGQLPayloadDTO) -> Self:
+        return cls(preset=QueryDefinitionGQL.from_pydantic(dto.preset))
 
 
-@strawberry.experimental.pydantic.type(
-    model=ModifyQueryDefinitionGQLPayloadDTO,
+@gql_node_type(
+    BackendAIGQLMeta(
+        added_version="26.3.0",
+        description="Payload returned after modifying a query definition.",
+    ),
     name="ModifyQueryDefinitionPayload",
-    description="Added in 26.3.0. Payload returned after modifying a query definition.",
 )
 class ModifyQueryDefinitionPayload:
     """Payload for query definition modification mutation."""
 
-    preset: QueryDefinitionGQL
+    preset: QueryDefinitionGQL = strawberry.field(description="Updated query definition.")
+
+    @classmethod
+    def from_pydantic(cls, dto: ModifyQueryDefinitionGQLPayloadDTO) -> Self:
+        return cls(preset=QueryDefinitionGQL.from_pydantic(dto.preset))

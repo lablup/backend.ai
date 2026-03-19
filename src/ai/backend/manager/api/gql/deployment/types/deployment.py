@@ -91,6 +91,12 @@ from ai.backend.manager.api.gql.base import (
     encode_cursor,
     to_global_id,
 )
+from ai.backend.manager.api.gql.decorators import (
+    BackendAIGQLMeta,
+    gql_connection_type,
+    gql_node_type,
+    gql_pydantic_type,
+)
 from ai.backend.manager.api.gql.deployment.types.access_token import (
     AccessToken,
     AccessTokenConnection,
@@ -153,27 +159,23 @@ DeploymentStatusGQL: type[ModelDeploymentStatus] = strawberry.enum(
 )
 
 
-@strawberry.type
+@gql_node_type(
+    BackendAIGQLMeta(
+        added_version="25.19.0",
+        description="Represents the deployment strategy configuration that determines how updates are rolled out to replicas (e.g., rolling update, blue-green).",
+    )
+)
 class DeploymentStrategyGQL:
-    """
-    Added in 25.19.0.
-
-    Represents the deployment strategy configuration that determines how
-    updates are rolled out to replicas (e.g., rolling update, blue-green).
-    """
-
     type: DeploymentStrategyTypeGQL
 
 
-@strawberry.type
+@gql_node_type(
+    BackendAIGQLMeta(
+        added_version="25.19.0",
+        description="Represents the current replica state of a deployment, including the desired replica count and access to the list of active replicas.",
+    )
+)
 class ReplicaState:
-    """
-    Added in 25.19.0.
-
-    Represents the current replica state of a deployment, including the desired
-    replica count and access to the list of active replicas.
-    """
-
     _deployment_id: strawberry.Private[UUID]
     desired_replica_count: int
 
@@ -219,16 +221,13 @@ class ReplicaState:
         )
 
 
-@strawberry.type
+@gql_node_type(
+    BackendAIGQLMeta(
+        added_version="25.19.0",
+        description="Provides access to auto-scaling rules configured for a deployment. Auto-scaling rules define conditions for automatically adjusting the number of replicas based on metrics.",
+    )
+)
 class ScalingRule:
-    """
-    Added in 25.19.0.
-
-    Provides access to auto-scaling rules configured for a deployment.
-    Auto-scaling rules define conditions for automatically adjusting
-    the number of replicas based on metrics.
-    """
-
     _deployment_id: strawberry.Private[UUID]
 
     @strawberry.field
@@ -275,16 +274,13 @@ class ScalingRule:
         )
 
 
-@strawberry.type
+@gql_node_type(
+    BackendAIGQLMeta(
+        added_version="25.19.0",
+        description="Contains metadata information for a model deployment including its name, status, tags, and timestamps. Also provides access to the associated project and domain.",
+    )
+)
 class ModelDeploymentMetadata:
-    """
-    Added in 25.19.0.
-
-    Contains metadata information for a model deployment including its name,
-    status, tags, and timestamps. Also provides access to the associated
-    project and domain.
-    """
-
     _project_id: strawberry.Private[UUID]
     _domain_name: strawberry.Private[str]
     name: str
@@ -320,16 +316,13 @@ class ModelDeploymentMetadata:
         )
 
 
-@strawberry.type
+@gql_node_type(
+    BackendAIGQLMeta(
+        added_version="25.19.0",
+        description="Provides network access configuration for a model deployment, including the endpoint URL, preferred domain name, and public access settings. Also manages access tokens for authentication.",
+    )
+)
 class ModelDeploymentNetworkAccess:
-    """
-    Added in 25.19.0.
-
-    Provides network access configuration for a model deployment, including
-    the endpoint URL, preferred domain name, and public access settings.
-    Also manages access tokens for authentication.
-    """
-
     _deployment_id: strawberry.Private[UUID]
     endpoint_url: str | None = None
     preferred_domain_name: str | None = None
@@ -390,18 +383,13 @@ class ModelDeploymentNetworkAccess:
 
 
 # Main ModelDeployment Type
-@strawberry.type
+@gql_node_type(
+    BackendAIGQLMeta(
+        added_version="25.19.0",
+        description="Represents a model deployment in Backend.AI. A deployment is a long-running inference service that exposes a trained model via HTTP endpoints. Deployments manage the lifecycle of model replicas, handle traffic routing, and provide auto-scaling capabilities based on configured rules.",
+    )
+)
 class ModelDeployment(PydanticNodeMixin[DeploymentNodeDTO]):
-    """
-    Added in 25.19.0.
-
-    Represents a model deployment in Backend.AI. A deployment is a long-running
-    inference service that exposes a trained model via HTTP endpoints.
-
-    Deployments manage the lifecycle of model replicas, handle traffic routing,
-    and provide auto-scaling capabilities based on configured rules.
-    """
-
     id: NodeID[str]
     metadata: ModelDeploymentMetadata
     network_access: ModelDeploymentNetworkAccess
@@ -527,9 +515,9 @@ class ModelDeployment(PydanticNodeMixin[DeploymentNodeDTO]):
     def from_pydantic(
         cls,
         dto: DeploymentNodeDTO,
+        extra: dict[str, Any] | None = None,
         *,
         id_field: str = "id",
-        extra: dict[str, Any] | None = None,
     ) -> Self:
         metadata = ModelDeploymentMetadata(
             name=dto.basic.name,
@@ -629,33 +617,41 @@ class DeploymentOrderBy:
 
 
 # Payload Types
-@strawberry.experimental.pydantic.type(
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version="25.19.0", description="Payload for creating a model deployment."
+    ),
     model=CreateDeploymentPayloadDTO,
-    description="Added in 25.19.0",
 )
 class CreateDeploymentPayload:
     deployment: ModelDeployment
 
 
-@strawberry.experimental.pydantic.type(
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version="25.19.0", description="Payload for updating a model deployment."
+    ),
     model=UpdateDeploymentPayloadDTO,
-    description="Added in 25.19.0",
 )
 class UpdateDeploymentPayload:
     deployment: ModelDeployment
 
 
-@strawberry.experimental.pydantic.type(
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version="25.19.0", description="Payload for deleting a model deployment."
+    ),
     model=DeleteDeploymentPayloadDTO,
-    description="Added in 25.19.0",
 )
 class DeleteDeploymentPayload:
     id: ID
 
 
-@strawberry.experimental.pydantic.type(
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version="25.19.0", description="Payload for deployment status changed event."
+    ),
     model=DeploymentStatusChangedPayloadDTO,
-    description="Added in 25.19.0",
 )
 class DeploymentStatusChangedPayload:
     deployment: ModelDeployment
@@ -833,7 +829,9 @@ ModelDeploymentEdge = Edge[ModelDeployment]
 
 
 # Connection types for Relay support
-@strawberry.type(description="Added in 25.19.0")
+@gql_connection_type(
+    BackendAIGQLMeta(added_version="25.19.0", description="Connection for model deployments.")
+)
 class ModelDeploymentConnection(Connection[ModelDeployment]):
     count: int
 
@@ -851,10 +849,13 @@ class SyncReplicaInput:
     model_deployment_id: ID
 
 
-@strawberry.experimental.pydantic.type(
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version="25.19.0", description="Payload for replica sync mutation result."
+    ),
     model=SyncReplicaPayloadDTO,
-    description="Added in 25.19.0",
-    all_fields=True,
 )
 class SyncReplicaPayload:
     """Payload for replica sync mutation result."""
+
+    success: strawberry.auto

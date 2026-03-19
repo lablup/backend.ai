@@ -46,6 +46,12 @@ from ai.backend.manager.api.gql.base import (
     OrderDirection,
     to_global_id,
 )
+from ai.backend.manager.api.gql.decorators import (
+    BackendAIGQLMeta,
+    gql_connection_type,
+    gql_node_type,
+    gql_pydantic_type,
+)
 from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin
 from ai.backend.manager.api.gql.session_federation import Session
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
@@ -186,18 +192,13 @@ class ReplicaOrderBy:
         )
 
 
-@strawberry.type
+@gql_node_type(
+    BackendAIGQLMeta(
+        added_version="25.19.0",
+        description="A single replica instance of a model deployment. Each replica runs in a separate compute session and serves inference requests. Replicas have health status indicators (readiness, liveness, activeness) and traffic weight for load balancing.",
+    )
+)
 class ModelReplica(PydanticNodeMixin[ReplicaNodeDTO]):
-    """
-    Added in 25.19.0.
-
-    Represents a single replica instance of a model deployment. Each replica
-    runs in a separate compute session and serves inference requests.
-
-    Replicas have health status indicators (readiness, liveness, activeness)
-    and traffic weight for load balancing.
-    """
-
     id: NodeID[str]
     _session_id: strawberry.Private[UUID]
     _revision_id: strawberry.Private[UUID]
@@ -263,9 +264,9 @@ class ModelReplica(PydanticNodeMixin[ReplicaNodeDTO]):
     def from_pydantic(
         cls,
         dto: ReplicaNodeDTO,
+        extra: dict[str, Any] | None = None,
         *,
         id_field: str = "id",
-        extra: dict[str, Any] | None = None,
     ) -> Self:
         return cls(
             id=ID(str(dto.id)),
@@ -282,15 +283,13 @@ class ModelReplica(PydanticNodeMixin[ReplicaNodeDTO]):
 ModelReplicaEdge = Edge[ModelReplica]
 
 
-@strawberry.type
+@gql_connection_type(
+    BackendAIGQLMeta(
+        added_version="25.19.0",
+        description="A Relay-style connection for paginated access to model replicas. Includes total count for UI pagination display.",
+    )
+)
 class ModelReplicaConnection(Connection[ModelReplica]):
-    """
-    Added in 25.19.0.
-
-    A Relay-style connection for paginated access to model replicas.
-    Includes total count for UI pagination display.
-    """
-
     count: int
 
     def __init__(self, *args: Any, count: int, **kwargs: Any) -> None:
@@ -312,9 +311,11 @@ class ModelReplicaConnection(Connection[ModelReplica]):
         return cls(count=len(nodes), edges=edges, page_info=page_info)
 
 
-@strawberry.experimental.pydantic.type(
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version="25.19.0", description="Payload for replica status changed event."
+    ),
     model=ReplicaStatusChangedPayloadDTO,
-    description="Added in 25.19.0",
 )
 class ReplicaStatusChangedPayload:
     replica: ModelReplica

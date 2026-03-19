@@ -33,6 +33,12 @@ from ai.backend.common.dto.manager.v2.kernel.types import (
 )
 from ai.backend.common.types import AgentId, KernelId, SessionTypes
 from ai.backend.manager.api.gql.base import OrderDirection, UUIDFilter
+from ai.backend.manager.api.gql.decorators import (
+    BackendAIGQLMeta,
+    gql_connection_type,
+    gql_node_type,
+    gql_pydantic_type,
+)
 
 if TYPE_CHECKING:
     from ai.backend.manager.api.gql.resource_slot.types import (
@@ -213,10 +219,13 @@ class KernelV2OrderByGQL:
 # ========== Kernel Sub-Info Types ==========
 
 
-@strawberry.experimental.pydantic.type(
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version="26.2.0",
+        description="Information about the session this kernel belongs to.",
+    ),
     model=KernelSessionInfoGQLDTO,
     name="KernelV2SessionInfo",
-    description="Added in 26.2.0. Information about the session this kernel belongs to.",
 )
 class KernelV2SessionInfoGQL:
     session_id: UUID = strawberry.field(
@@ -231,10 +240,13 @@ class KernelV2SessionInfoGQL:
     )
 
 
-@strawberry.experimental.pydantic.type(
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version="26.2.0",
+        description="Cluster configuration for a kernel in distributed sessions.",
+    ),
     model=KernelClusterInfoGQLDTO,
     name="KernelV2ClusterInfo",
-    description="Added in 26.2.0. Cluster configuration for a kernel in distributed sessions.",
 )
 class KernelV2ClusterInfoGQL:
     cluster_role: str = strawberry.field(
@@ -251,10 +263,13 @@ class KernelV2ClusterInfoGQL:
     )
 
 
-@strawberry.experimental.pydantic.type(
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version="26.2.0",
+        description="User and ownership information for a kernel.",
+    ),
     model=KernelUserInfoGQLDTO,
     name="KernelV2UserInfo",
-    description="Added in 26.2.0. User and ownership information for a kernel.",
 )
 class KernelV2UserInfoGQL:
     user_id: UUID | None = strawberry.field(
@@ -269,10 +284,13 @@ class KernelV2UserInfoGQL:
     )
 
 
-@strawberry.experimental.pydantic.type(
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version="26.2.0",
+        description="Resource allocation with requested and used slots.",
+    ),
     model=ResourceAllocationGQLDTO,
     name="ResourceAllocation",
-    description="Added in 26.2.0. Resource allocation with requested and used slots.",
 )
 class ResourceAllocationGQL:
     requested: ResourceSlotGQL = strawberry.field(
@@ -283,10 +301,13 @@ class ResourceAllocationGQL:
     )
 
 
-@strawberry.experimental.pydantic.type(
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version="26.2.0",
+        description="Resource allocation information for a kernel.",
+    ),
     model=KernelResourceInfoGQLDTO,
     name="KernelV2ResourceInfo",
-    description="Added in 26.2.0. Resource allocation information for a kernel.",
 )
 class KernelV2ResourceInfoGQL:
     agent_id: str | None = strawberry.field(
@@ -309,10 +330,13 @@ class KernelV2ResourceInfoGQL:
     )
 
 
-@strawberry.experimental.pydantic.type(
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version="26.2.0",
+        description="Network configuration for a kernel.",
+    ),
     model=KernelNetworkInfoGQLDTO,
     name="KernelV2NetworkInfo",
-    description="Added in 26.2.0. Network configuration for a kernel.",
 )
 class KernelV2NetworkInfoGQL:
     service_ports: ServicePortsGQL | None = strawberry.field(
@@ -323,10 +347,13 @@ class KernelV2NetworkInfoGQL:
     )
 
 
-@strawberry.experimental.pydantic.type(
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version="26.2.0",
+        description="Lifecycle and status information for a kernel.",
+    ),
     model=KernelLifecycleInfoGQLDTO,
     name="KernelV2LifecycleInfo",
-    description="Added in 26.2.0. Lifecycle and status information for a kernel.",
 )
 class KernelV2LifecycleInfoGQL:
     status: KernelV2StatusGQL = strawberry.field(
@@ -352,9 +379,12 @@ class KernelV2LifecycleInfoGQL:
 # ========== Main Kernel Type ==========
 
 
-@strawberry.type(
+@gql_node_type(
+    BackendAIGQLMeta(
+        added_version="26.2.0",
+        description="Represents a kernel (compute container) in Backend.AI.",
+    ),
     name="KernelV2",
-    description="Added in 26.2.0. Represents a kernel (compute container) in Backend.AI.",
 )
 class KernelV2GQL(PydanticNodeMixin[KernelNode]):
     """Kernel type representing a compute container."""
@@ -581,9 +611,9 @@ class KernelV2GQL(PydanticNodeMixin[KernelNode]):
     def from_pydantic(
         cls,
         dto: KernelNode,
+        extra: dict[str, Any] | None = None,
         *,
         id_field: str = "id",
-        extra: dict[str, Any] | None = None,
     ) -> Self:
         """Create KernelV2GQL from KernelNode DTO (adapter search results)."""
         from ai.backend.common.types import SessionResult
@@ -605,25 +635,21 @@ class KernelV2GQL(PydanticNodeMixin[KernelNode]):
                 name=dto.session.name,
                 session_type=SessionTypes(dto.session.session_type),
             ),
-            user_info=KernelV2UserInfoGQL.from_pydantic(
-                KernelUserInfoGQLDTO(
-                    user_id=dto.user.user_uuid,
-                    access_key=dto.user.access_key,
-                    domain_name=dto.user.domain_name,
-                    group_id=dto.user.group_id,
-                )
+            user_info=KernelV2UserInfoGQL(
+                user_id=dto.user.user_uuid,
+                access_key=dto.user.access_key,
+                domain_name=dto.user.domain_name,
+                group_id=dto.user.group_id,
             ),
             network=KernelV2NetworkInfoGQL(
                 service_ports=None,
                 preopen_ports=None,
             ),
-            cluster=KernelV2ClusterInfoGQL.from_pydantic(
-                KernelClusterInfoGQLDTO(
-                    cluster_role=dto.cluster.cluster_role,
-                    cluster_idx=dto.cluster.cluster_idx,
-                    local_rank=dto.cluster.local_rank,
-                    cluster_hostname=dto.cluster.cluster_hostname,
-                )
+            cluster=KernelV2ClusterInfoGQL(
+                cluster_role=dto.cluster.cluster_role,
+                cluster_idx=dto.cluster.cluster_idx,
+                local_rank=dto.cluster.local_rank,
+                cluster_hostname=dto.cluster.cluster_hostname,
             ),
             resource=KernelV2ResourceInfoGQL(
                 agent_id=dto.resource.agent,
@@ -681,25 +707,21 @@ class KernelV2GQL(PydanticNodeMixin[KernelNode]):
                 name=kernel_info.session.name,
                 session_type=SessionTypes(kernel_info.session.session_type),
             ),
-            user_info=KernelV2UserInfoGQL.from_pydantic(
-                KernelUserInfoGQLDTO(
-                    user_id=kernel_info.user_permission.user_uuid,
-                    access_key=kernel_info.user_permission.access_key,
-                    domain_name=kernel_info.user_permission.domain_name,
-                    group_id=kernel_info.user_permission.group_id,
-                )
+            user_info=KernelV2UserInfoGQL(
+                user_id=kernel_info.user_permission.user_uuid,
+                access_key=kernel_info.user_permission.access_key,
+                domain_name=kernel_info.user_permission.domain_name,
+                group_id=kernel_info.user_permission.group_id,
             ),
             network=KernelV2NetworkInfoGQL(
                 service_ports=service_ports,
                 preopen_ports=kernel_info.network.preopen_ports,
             ),
-            cluster=KernelV2ClusterInfoGQL.from_pydantic(
-                KernelClusterInfoGQLDTO(
-                    cluster_role=kernel_info.cluster.cluster_role,
-                    cluster_idx=kernel_info.cluster.cluster_idx,
-                    local_rank=kernel_info.cluster.local_rank,
-                    cluster_hostname=kernel_info.cluster.cluster_hostname,
-                )
+            cluster=KernelV2ClusterInfoGQL(
+                cluster_role=kernel_info.cluster.cluster_role,
+                cluster_idx=kernel_info.cluster.cluster_idx,
+                local_rank=kernel_info.cluster.local_rank,
+                cluster_hostname=kernel_info.cluster.cluster_hostname,
             ),
             resource=KernelV2ResourceInfoGQL(
                 agent_id=kernel_info.resource.agent if not hide_agents else None,
@@ -725,9 +747,12 @@ class KernelV2GQL(PydanticNodeMixin[KernelNode]):
 KernelV2EdgeGQL = Edge[KernelV2GQL]
 
 
-@strawberry.type(
+@gql_connection_type(
+    BackendAIGQLMeta(
+        added_version="26.2.0",
+        description="Connection type for paginated kernel results.",
+    ),
     name="KernelV2Connection",
-    description="Added in 26.2.0. Connection type for paginated kernel results.",
 )
 class KernelV2ConnectionGQL(Connection[KernelV2GQL]):
     count: int

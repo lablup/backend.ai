@@ -31,6 +31,11 @@ from ai.backend.manager.api.gql.base import (
     OrderDirection,
     StringFilter,
 )
+from ai.backend.manager.api.gql.decorators import (
+    BackendAIGQLMeta,
+    gql_connection_type,
+    gql_node_type,
+)
 from ai.backend.manager.api.gql.fair_share.types import ResourceSlotGQL
 from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin
 from ai.backend.manager.api.gql.types import GQLFilter, GQLOrderBy, StrawberryGQLContext
@@ -55,13 +60,16 @@ from .project_usage import (
 )
 
 
-@strawberry.type(
-    name="DomainUsageBucket",
-    description=(
-        "Added in 26.1.0. Domain-level usage bucket representing aggregated resource "
-        "consumption for a specific time period. Usage buckets store historical data "
-        "used to calculate fair share factors."
+@gql_node_type(
+    BackendAIGQLMeta(
+        added_version="26.1.0",
+        description=(
+            "Domain-level usage bucket representing aggregated resource "
+            "consumption for a specific time period. Usage buckets store historical data "
+            "used to calculate fair share factors."
+        ),
     ),
+    name="DomainUsageBucket",
 )
 class DomainUsageBucketGQL(PydanticNodeMixin[DomainUsageBucketNode]):
     """Domain-level usage bucket containing aggregated resource usage for a period."""
@@ -143,9 +151,9 @@ class DomainUsageBucketGQL(PydanticNodeMixin[DomainUsageBucketNode]):
     def from_pydantic(
         cls,
         dto: DomainUsageBucketNode,
+        extra: dict[str, Any] | None = None,
         *,
         id_field: str = "id",
-        extra: dict[str, Any] | None = None,
     ) -> Self:
         """Create DomainUsageBucketGQL from DomainUsageBucketNode DTO (adapter search results)."""
         return cls(
@@ -222,12 +230,15 @@ class DomainUsageBucketGQL(PydanticNodeMixin[DomainUsageBucketNode]):
 DomainUsageBucketEdge = Edge[DomainUsageBucketGQL]
 
 
-@strawberry.type(
-    description=(
-        "Added in 26.1.0. Paginated connection for domain usage bucket records. "
-        "Provides relay-style cursor-based pagination for browsing historical usage data by time period. "
-        "Use 'edges' to access individual records with cursor information, or 'nodes' for direct data access."
-    )
+@gql_connection_type(
+    BackendAIGQLMeta(
+        added_version="26.1.0",
+        description=(
+            "Paginated connection for domain usage bucket records. "
+            "Provides relay-style cursor-based pagination for browsing historical usage data by time period. "
+            "Use 'edges' to access individual records with cursor information, or 'nodes' for direct data access."
+        ),
+    ),
 )
 class DomainUsageBucketConnection(Connection[DomainUsageBucketGQL]):
     count: int = strawberry.field(

@@ -31,6 +31,12 @@ from ai.backend.common.dto.manager.v2.agent.types import (
 )
 from ai.backend.common.types import AgentId
 from ai.backend.manager.api.gql.base import OrderDirection, StringFilter
+from ai.backend.manager.api.gql.decorators import (
+    BackendAIGQLMeta,
+    gql_connection_type,
+    gql_node_type,
+    gql_pydantic_type,
+)
 from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.api.gql.utils import dedent_strip
@@ -161,10 +167,13 @@ class AgentOrderByGQL:
                 return AgentOrder(field=AgentOrderField.SCHEDULABLE, direction=dto_direction)
 
 
-@strawberry.experimental.pydantic.type(
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version="25.15.0",
+        description="Hardware resource capacity, usage, and availability of an agent.",
+    ),
     model=AgentResourceGQLDTO,
     name="AgentResource",
-    description="Added in 25.15.0",
 )
 class AgentResourceGQL:
     capacity: JSON = strawberry.field(
@@ -193,19 +202,25 @@ class AgentResourceGQL:
     )
 
 
-@strawberry.experimental.pydantic.type(
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version="25.15.0",
+        description="Aggregated resource statistics for an agent.",
+    ),
     model=AgentStatsGQLDTO,
     name="AgentStats",
-    description="Added in 25.15.0",
 )
 class AgentStatsGQL:
     total_resource: AgentResourceGQL = strawberry.field(description="Added in 25.15.0")
 
 
-@strawberry.experimental.pydantic.type(
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version="26.1.0",
+        description="Status and lifecycle information for an agent.",
+    ),
     model=AgentStatusInfoGQLDTO,
     name="AgentStatusInfo",
-    description="Added in 26.1.0. Status and lifecycle information for an agent",
 )
 class AgentStatusInfoGQL:
     status: AgentStatus = strawberry.field(
@@ -246,27 +261,31 @@ class AgentStatusInfoGQL:
     )
 
 
-@strawberry.experimental.pydantic.type(
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version="26.1.0",
+        description="A single compute plugin entry representing one plugin and its metadata.",
+    ),
     model=ComputePluginEntryDTO,
     name="ComputePluginEntry",
-    all_fields=True,
-    description=(
-        "Added in 26.1.0. A single compute plugin entry representing one plugin and its metadata."
-    ),
 )
 class ComputePluginEntryGQL:
     """Single compute plugin entry with plugin name and metadata."""
 
-    pass
+    plugin_name: strawberry.auto
+    value: strawberry.auto
 
 
-@strawberry.experimental.pydantic.type(
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version="26.1.0",
+        description=(
+            "A collection of compute plugins available on an agent. "
+            "Each entry specifies a plugin name and its associated metadata."
+        ),
+    ),
     model=ComputePluginsGQLDTO,
     name="ComputePlugins",
-    description=(
-        "Added in 26.1.0. A collection of compute plugins available on an agent. "
-        "Each entry specifies a plugin name and its associated metadata."
-    ),
 )
 class ComputePluginsGQL:
     """Compute plugins container with multiple plugin entries."""
@@ -282,18 +301,18 @@ class ComputePluginsGQL:
     def from_mapping(cls, plugins: Mapping[str, str]) -> ComputePluginsGQL:
         """Convert a mapping of plugin name to value to GraphQL type."""
         entries = [
-            ComputePluginEntryGQL.from_pydantic(
-                ComputePluginEntryDTO(plugin_name=name, value=value)
-            )
-            for name, value in plugins.items()
+            ComputePluginEntryGQL(plugin_name=name, value=value) for name, value in plugins.items()
         ]
         return cls(entries=entries)
 
 
-@strawberry.experimental.pydantic.type(
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version="26.1.0",
+        description="System and configuration information for an agent.",
+    ),
     model=AgentSystemInfoGQLDTO,
     name="AgentSystemInfo",
-    description="Added in 26.1.0. System and configuration information for an agent",
 )
 class AgentSystemInfoGQL:
     architecture: str = strawberry.field(
@@ -328,18 +347,25 @@ class AgentSystemInfoGQL:
     )
 
 
-@strawberry.experimental.pydantic.type(
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version="26.1.0",
+        description="Network-related information for an agent.",
+    ),
     model=AgentNetworkInfoGQLDTO,
     name="AgentNetworkInfo",
-    all_fields=True,
-    description="Added in 26.1.0. Network-related information for an agent",
 )
 class AgentNetworkInfoGQL:
-    pass
+    region: strawberry.auto
+    addr: strawberry.auto
 
 
-@strawberry.type(
-    name="AgentV2", description="Added in 26.1.0. Strawberry-based Agent type replacing AgentNode."
+@gql_node_type(
+    BackendAIGQLMeta(
+        added_version="26.1.0",
+        description="Strawberry-based Agent type replacing AgentNode.",
+    ),
+    name="AgentV2",
 )
 class AgentV2GQL(PydanticNodeMixin[AgentNode]):
     _agent_id: strawberry.Private[AgentId]
@@ -640,12 +666,10 @@ class AgentV2GQL(PydanticNodeMixin[AgentNode]):
         return cls(
             _agent_id=data.id,
             id=ID(data.id),
-            resource_info=AgentResourceGQL.from_pydantic(
-                AgentResourceGQLDTO(
-                    capacity=data.available_slots.to_json(),
-                    used=data.actual_occupied_slots.to_json(),
-                    free=(data.available_slots - data.actual_occupied_slots).to_json(),
-                )
+            resource_info=AgentResourceGQL(
+                capacity=data.available_slots.to_json(),
+                used=data.actual_occupied_slots.to_json(),
+                free=(data.available_slots - data.actual_occupied_slots).to_json(),
             ),
             status_info=AgentStatusInfoGQL(
                 status=data.status,
@@ -654,19 +678,15 @@ class AgentV2GQL(PydanticNodeMixin[AgentNode]):
                 lost_at=data.lost_at,
                 schedulable=data.schedulable,
             ),
-            system_info=AgentSystemInfoGQL.from_pydantic(
-                AgentSystemInfoGQLDTO(
-                    architecture=data.architecture,
-                    version=data.version,
-                    auto_terminate_abusing_kernel=data.auto_terminate_abusing_kernel,
-                    compute_plugins=ComputePluginsGQL.from_mapping(data.compute_plugins),
-                )
+            system_info=AgentSystemInfoGQL(
+                architecture=data.architecture,
+                version=data.version,
+                auto_terminate_abusing_kernel=data.auto_terminate_abusing_kernel,
+                compute_plugins=ComputePluginsGQL.from_mapping(data.compute_plugins),
             ),
-            network_info=AgentNetworkInfoGQL.from_pydantic(
-                AgentNetworkInfoGQLDTO(
-                    region=data.region,
-                    addr=data.addr,
-                )
+            network_info=AgentNetworkInfoGQL(
+                region=data.region,
+                addr=data.addr,
             ),
             permissions=[
                 AgentPermissionGQL.from_agent_permission(p) for p in detail_data.permissions
@@ -678,19 +698,17 @@ class AgentV2GQL(PydanticNodeMixin[AgentNode]):
     def from_pydantic(
         cls,
         dto: AgentNode,
+        extra: dict[str, Any] | None = None,
         *,
         id_field: str = "id",
-        extra: dict[str, Any] | None = None,
     ) -> Self:
         return cls(
             _agent_id=AgentId(dto.id),
             id=ID(dto.id),
-            resource_info=AgentResourceGQL.from_pydantic(
-                AgentResourceGQLDTO(
-                    capacity=dto.resource_info.capacity,
-                    used=dto.resource_info.used,
-                    free=dto.resource_info.free,
-                )
+            resource_info=AgentResourceGQL(
+                capacity=dto.resource_info.capacity,
+                used=dto.resource_info.used,
+                free=dto.resource_info.free,
             ),
             status_info=AgentStatusInfoGQL(
                 status=AgentStatus(dto.status_info.status),
@@ -699,23 +717,19 @@ class AgentV2GQL(PydanticNodeMixin[AgentNode]):
                 lost_at=dto.status_info.lost_at,
                 schedulable=dto.status_info.schedulable,
             ),
-            system_info=AgentSystemInfoGQL.from_pydantic(
-                AgentSystemInfoGQLDTO(
-                    architecture=dto.system_info.architecture,
-                    version=dto.system_info.version,
-                    auto_terminate_abusing_kernel=False,
-                    compute_plugins=(
-                        ComputePluginsGQL.from_mapping(dto.system_info.compute_plugins)
-                        if dto.system_info.compute_plugins is not None
-                        else ComputePluginsGQL(entries=[])
-                    ),
-                )
+            system_info=AgentSystemInfoGQL(
+                architecture=dto.system_info.architecture,
+                version=dto.system_info.version,
+                auto_terminate_abusing_kernel=False,
+                compute_plugins=(
+                    ComputePluginsGQL.from_mapping(dto.system_info.compute_plugins)
+                    if dto.system_info.compute_plugins is not None
+                    else ComputePluginsGQL(entries=[])
+                ),
             ),
-            network_info=AgentNetworkInfoGQL.from_pydantic(
-                AgentNetworkInfoGQLDTO(
-                    region=dto.network_info.region,
-                    addr=dto.network_info.addr,
-                )
+            network_info=AgentNetworkInfoGQL(
+                region=dto.network_info.region,
+                addr=dto.network_info.addr,
             ),
             permissions=[AgentPermissionGQL(p) for p in dto.permissions],
             scaling_group=dto.scaling_group,
@@ -725,8 +739,11 @@ class AgentV2GQL(PydanticNodeMixin[AgentNode]):
 AgentV2Edge = Edge[AgentV2GQL]
 
 
-@strawberry.type(
-    description="Added in 26.1.0. Relay-style connection type for paginated lists of agents"
+@gql_connection_type(
+    BackendAIGQLMeta(
+        added_version="26.1.0",
+        description="Relay-style connection type for paginated lists of agents.",
+    ),
 )
 class AgentV2Connection(Connection[AgentV2GQL]):
     count: int

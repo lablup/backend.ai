@@ -33,6 +33,12 @@ from ai.backend.common.dto.manager.v2.huggingface_registry.response import (
     UpdateHuggingFaceRegistryPayload as UpdateHuggingFaceRegistryPayloadDTO,
 )
 from ai.backend.manager.api.gql.base import encode_cursor
+from ai.backend.manager.api.gql.decorators import (
+    BackendAIGQLMeta,
+    gql_connection_type,
+    gql_node_type,
+    gql_pydantic_type,
+)
 from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin
 from ai.backend.manager.data.huggingface_registry.types import HuggingFaceRegistryData
 from ai.backend.manager.services.artifact_registry.actions.huggingface.get_multi import (
@@ -42,7 +48,12 @@ from ai.backend.manager.services.artifact_registry.actions.huggingface.get_multi
 from .types import StrawberryGQLContext
 
 
-@strawberry.type(description="Added in 25.14.0")
+@gql_node_type(
+    BackendAIGQLMeta(
+        added_version="25.14.0",
+        description="HuggingFace registry node.",
+    ),
+)
 class HuggingFaceRegistry(PydanticNodeMixin[HuggingFaceRegistryNode]):
     id: NodeID[str]
     url: str
@@ -91,7 +102,12 @@ class HuggingFaceRegistry(PydanticNodeMixin[HuggingFaceRegistryNode]):
 HuggingFaceRegistryEdge = Edge[HuggingFaceRegistry]
 
 
-@strawberry.type(description="Added in 25.14.0")
+@gql_connection_type(
+    BackendAIGQLMeta(
+        added_version="25.14.0",
+        description="Relay-style connection for paginated HuggingFace registry queries.",
+    ),
+)
 class HuggingFaceRegistryConnection(Connection[HuggingFaceRegistry]):
     @strawberry.field
     def count(self) -> int:
@@ -176,25 +192,34 @@ class DeleteHuggingFaceRegistryInput:
     id: ID
 
 
-@strawberry.experimental.pydantic.type(
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version="25.14.0",
+        description="Payload for creating a HuggingFace registry.",
+    ),
     model=CreateHuggingFaceRegistryPayloadDTO,
-    description="Added in 25.14.0",
 )
 class CreateHuggingFaceRegistryPayload:
     huggingface_registry: HuggingFaceRegistry
 
 
-@strawberry.experimental.pydantic.type(
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version="25.14.0",
+        description="Payload for updating a HuggingFace registry.",
+    ),
     model=UpdateHuggingFaceRegistryPayloadDTO,
-    description="Added in 25.14.0",
 )
 class UpdateHuggingFaceRegistryPayload:
     huggingface_registry: HuggingFaceRegistry
 
 
-@strawberry.experimental.pydantic.type(
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version="25.14.0",
+        description="Payload for deleting a HuggingFace registry.",
+    ),
     model=DeleteHuggingFaceRegistryPayloadDTO,
-    description="Added in 25.14.0",
 )
 class DeleteHuggingFaceRegistryPayload:
     id: ID
@@ -205,9 +230,8 @@ async def create_huggingface_registry(
     input: CreateHuggingFaceRegistryInput, info: Info[StrawberryGQLContext]
 ) -> CreateHuggingFaceRegistryPayload:
     result = await info.context.adapters.huggingface_registry.create(input.to_pydantic())
-    return CreateHuggingFaceRegistryPayload.from_pydantic(
-        result,
-        extra={"huggingface_registry": HuggingFaceRegistry.from_pydantic(result.registry)},
+    return CreateHuggingFaceRegistryPayload(
+        huggingface_registry=HuggingFaceRegistry.from_pydantic(result.registry)
     )
 
 
@@ -216,9 +240,8 @@ async def update_huggingface_registry(
     input: UpdateHuggingFaceRegistryInput, info: Info[StrawberryGQLContext]
 ) -> UpdateHuggingFaceRegistryPayload:
     result = await info.context.adapters.huggingface_registry.update(input.to_pydantic())
-    return UpdateHuggingFaceRegistryPayload.from_pydantic(
-        result,
-        extra={"huggingface_registry": HuggingFaceRegistry.from_pydantic(result.registry)},
+    return UpdateHuggingFaceRegistryPayload(
+        huggingface_registry=HuggingFaceRegistry.from_pydantic(result.registry)
     )
 
 
@@ -228,7 +251,4 @@ async def delete_huggingface_registry(
 ) -> DeleteHuggingFaceRegistryPayload:
     pydantic_input = input.to_pydantic()
     result = await info.context.adapters.huggingface_registry.delete(pydantic_input)
-    return DeleteHuggingFaceRegistryPayload.from_pydantic(
-        result,
-        extra={"id": ID(str(result.id))},
-    )
+    return DeleteHuggingFaceRegistryPayload(id=ID(str(result.id)))

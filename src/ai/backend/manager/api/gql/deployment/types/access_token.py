@@ -33,6 +33,12 @@ from ai.backend.common.dto.manager.v2.deployment.types import (
     OrderDirection as DTOOrderDirection,
 )
 from ai.backend.manager.api.gql.base import DateTimeFilter, OrderDirection, StringFilter
+from ai.backend.manager.api.gql.decorators import (
+    BackendAIGQLMeta,
+    gql_connection_type,
+    gql_node_type,
+    gql_pydantic_type,
+)
 from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.data.deployment.types import (
@@ -82,7 +88,9 @@ class AccessTokenOrderBy:
         )
 
 
-@strawberry.type
+@gql_node_type(
+    BackendAIGQLMeta(added_version="25.16.0", description="An access token for model deployment.")
+)
 class AccessToken(PydanticNodeMixin[AccessTokenNodeDTO]):
     id: NodeID[str]
     token: str = strawberry.field(description="Added in 25.16.0: The access token.")
@@ -119,9 +127,9 @@ class AccessToken(PydanticNodeMixin[AccessTokenNodeDTO]):
     def from_pydantic(
         cls,
         dto: AccessTokenNodeDTO,
+        extra: dict[str, Any] | None = None,
         *,
         id_field: str = "id",
-        extra: dict[str, Any] | None = None,
     ) -> Self:
         return cls(
             id=ID(str(dto.id)),
@@ -134,7 +142,9 @@ class AccessToken(PydanticNodeMixin[AccessTokenNodeDTO]):
 AccessTokenEdge = Edge[AccessToken]
 
 
-@strawberry.type(description="Added in 25.16.0")
+@gql_connection_type(
+    BackendAIGQLMeta(added_version="25.16.0", description="Connection for access tokens.")
+)
 class AccessTokenConnection(Connection[AccessToken]):
     count: int
 
@@ -162,9 +172,9 @@ class CreateAccessTokenInput:
         )
 
 
-@strawberry.experimental.pydantic.type(
+@gql_pydantic_type(
+    BackendAIGQLMeta(added_version="25.16.0", description="Payload for creating an access token."),
     model=CreateAccessTokenPayloadDTO,
-    description="Added in 25.16.0",
 )
 class CreateAccessTokenPayload:
     access_token: AccessToken

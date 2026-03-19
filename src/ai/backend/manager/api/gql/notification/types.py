@@ -117,6 +117,7 @@ from ai.backend.common.dto.manager.v2.notification.types import (
 )
 from ai.backend.common.exception import InvalidNotificationChannelSpec
 from ai.backend.manager.api.gql.base import OrderDirection, StringFilter
+from ai.backend.manager.api.gql.decorators import BackendAIGQLMeta, gql_node_type
 from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.data.notification import (
@@ -192,9 +193,11 @@ class NotificationChannelSpecGQL:
     channel_type: NotificationChannelTypeGQL
 
 
-@strawberry.type(
+@gql_node_type(
+    BackendAIGQLMeta(
+        added_version="26.3.0", description="Specification for webhook notification channel."
+    ),
     name="WebhookSpec",
-    description="Specification for webhook notification channel",
 )
 class WebhookSpecGQL(NotificationChannelSpecGQL):
     url: str
@@ -207,17 +210,17 @@ class WebhookSpecGQL(NotificationChannelSpecGQL):
         )
 
 
-@strawberry.type(
+@gql_node_type(
+    BackendAIGQLMeta(added_version="26.3.0", description="SMTP authentication credentials."),
     name="SMTPAuth",
-    description="SMTP authentication credentials",
 )
 class SMTPAuthGQL:
     username: str | None
 
 
-@strawberry.type(
+@gql_node_type(
+    BackendAIGQLMeta(added_version="26.3.0", description="SMTP server connection settings."),
     name="SMTPConnection",
-    description="SMTP server connection settings",
 )
 class SMTPConnectionGQL:
     host: str
@@ -226,9 +229,9 @@ class SMTPConnectionGQL:
     timeout: int
 
 
-@strawberry.type(
+@gql_node_type(
+    BackendAIGQLMeta(added_version="26.3.0", description="Email message settings."),
     name="EmailMessage",
-    description="Email message settings",
 )
 class EmailMessageGQL:
     from_email: str
@@ -236,9 +239,11 @@ class EmailMessageGQL:
     subject_template: str | None
 
 
-@strawberry.type(
+@gql_node_type(
+    BackendAIGQLMeta(
+        added_version="26.3.0", description="Specification for email notification channel."
+    ),
     name="EmailSpec",
-    description="Specification for email notification channel",
 )
 class EmailSpecGQL(NotificationChannelSpecGQL):
     smtp: SMTPConnectionGQL
@@ -264,7 +269,7 @@ class EmailSpecGQL(NotificationChannelSpecGQL):
         )
 
 
-@strawberry.type(description="Notification channel")
+@gql_node_type(BackendAIGQLMeta(added_version="26.3.0", description="Notification channel."))
 class NotificationChannel(PydanticNodeMixin[NotificationChannelNode]):
     id: NodeID[str]
     name: str
@@ -317,9 +322,9 @@ class NotificationChannel(PydanticNodeMixin[NotificationChannelNode]):
     def from_pydantic(
         cls,
         dto: NotificationChannelNode,
+        extra: dict[str, Any] | None = None,
         *,
         id_field: str = "id",
-        extra: dict[str, Any] | None = None,
     ) -> Self:
         final_spec: NotificationChannelSpecGQL
         match dto.channel_type:
@@ -367,7 +372,7 @@ class NotificationChannel(PydanticNodeMixin[NotificationChannelNode]):
         )
 
 
-@strawberry.type(description="Notification rule")
+@gql_node_type(BackendAIGQLMeta(added_version="26.3.0", description="Notification rule."))
 class NotificationRule(PydanticNodeMixin[NotificationRuleNode]):
     id: NodeID[str]
     name: str
@@ -408,9 +413,9 @@ class NotificationRule(PydanticNodeMixin[NotificationRuleNode]):
     def from_pydantic(
         cls,
         dto: NotificationRuleNode,
+        extra: dict[str, Any] | None = None,
         *,
         id_field: str = "id",
-        extra: dict[str, Any] | None = None,
     ) -> Self:
         return cls(
             id=ID(str(dto.id)),
@@ -822,7 +827,11 @@ class DeleteNotificationRuleInput:
 # Payload types for mutations
 
 
-@strawberry.type(description="Payload for create notification channel mutation")
+@gql_node_type(
+    BackendAIGQLMeta(
+        added_version="26.3.0", description="Payload for create notification channel mutation."
+    )
+)
 class CreateNotificationChannelPayload:
     channel: NotificationChannel
 
@@ -831,7 +840,11 @@ class CreateNotificationChannelPayload:
         return cls(channel=NotificationChannel.from_pydantic(dto.channel))
 
 
-@strawberry.type(description="Payload for update notification channel mutation")
+@gql_node_type(
+    BackendAIGQLMeta(
+        added_version="26.3.0", description="Payload for update notification channel mutation."
+    )
+)
 class UpdateNotificationChannelPayload:
     channel: NotificationChannel
 
@@ -840,16 +853,27 @@ class UpdateNotificationChannelPayload:
         return cls(channel=NotificationChannel.from_pydantic(dto.channel))
 
 
-@strawberry.experimental.pydantic.type(
-    model=DeleteNotificationChannelPayloadDTO,
-    description="Payload for delete notification channel mutation",
-    all_fields=True,
+@gql_node_type(
+    BackendAIGQLMeta(
+        added_version="26.3.0", description="Payload for delete notification channel mutation."
+    ),
+    name="DeleteNotificationChannelPayload",
 )
 class DeleteNotificationChannelPayload:
     """Payload for notification channel deletion mutation."""
 
+    id: uuid.UUID = strawberry.field(description="ID of the deleted notification channel.")
 
-@strawberry.type(description="Payload for create notification rule mutation")
+    @classmethod
+    def from_pydantic(cls, instance: DeleteNotificationChannelPayloadDTO) -> Self:
+        return cls(id=instance.id)
+
+
+@gql_node_type(
+    BackendAIGQLMeta(
+        added_version="26.3.0", description="Payload for create notification rule mutation."
+    )
+)
 class CreateNotificationRulePayload:
     rule: NotificationRule
 
@@ -858,7 +882,11 @@ class CreateNotificationRulePayload:
         return cls(rule=NotificationRule.from_pydantic(dto.rule))
 
 
-@strawberry.type(description="Payload for update notification rule mutation")
+@gql_node_type(
+    BackendAIGQLMeta(
+        added_version="26.3.0", description="Payload for update notification rule mutation."
+    )
+)
 class UpdateNotificationRulePayload:
     rule: NotificationRule
 
@@ -867,13 +895,20 @@ class UpdateNotificationRulePayload:
         return cls(rule=NotificationRule.from_pydantic(dto.rule))
 
 
-@strawberry.experimental.pydantic.type(
-    model=DeleteNotificationRulePayloadDTO,
-    description="Payload for delete notification rule mutation",
-    all_fields=True,
+@gql_node_type(
+    BackendAIGQLMeta(
+        added_version="26.3.0", description="Payload for delete notification rule mutation."
+    ),
+    name="DeleteNotificationRulePayload",
 )
 class DeleteNotificationRulePayload:
     """Payload for notification rule deletion mutation."""
+
+    id: uuid.UUID = strawberry.field(description="ID of the deleted notification rule.")
+
+    @classmethod
+    def from_pydantic(cls, instance: DeleteNotificationRulePayloadDTO) -> Self:
+        return cls(id=instance.id)
 
 
 # Validate mutations
@@ -894,13 +929,22 @@ class ValidateNotificationChannelInput:
         )
 
 
-@strawberry.experimental.pydantic.type(
-    model=ValidateNotificationChannelPayloadDTO,
-    description="Payload for validate notification channel mutation",
-    all_fields=True,
+@gql_node_type(
+    BackendAIGQLMeta(
+        added_version="26.3.0", description="Payload for validate notification channel mutation."
+    ),
+    name="ValidateNotificationChannelPayload",
 )
 class ValidateNotificationChannelPayload:
     """Payload for notification channel validation mutation."""
+
+    channel_id: uuid.UUID = strawberry.field(
+        description="ID of the validated notification channel."
+    )
+
+    @classmethod
+    def from_pydantic(cls, instance: ValidateNotificationChannelPayloadDTO) -> Self:
+        return cls(channel_id=instance.channel_id)
 
 
 @strawberry.experimental.pydantic.input(
@@ -920,10 +964,17 @@ class ValidateNotificationRuleInput:
         )
 
 
-@strawberry.experimental.pydantic.type(
-    model=ValidateNotificationRulePayloadDTO,
-    description="Payload for validate notification rule mutation",
-    all_fields=True,
+@gql_node_type(
+    BackendAIGQLMeta(
+        added_version="26.3.0", description="Payload for validate notification rule mutation."
+    ),
+    name="ValidateNotificationRulePayload",
 )
 class ValidateNotificationRulePayload:
     """Payload for notification rule validation mutation."""
+
+    message: str = strawberry.field(description="The rendered message from the template.")
+
+    @classmethod
+    def from_pydantic(cls, instance: ValidateNotificationRulePayloadDTO) -> Self:
+        return cls(message=instance.message)

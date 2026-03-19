@@ -43,6 +43,12 @@ from ai.backend.common.dto.manager.v2.fair_share.types import (
     UserFairShareOrderField as UserFairShareOrderFieldDTO,
 )
 from ai.backend.manager.api.gql.base import OrderDirection, StringFilter, UUIDFilter
+from ai.backend.manager.api.gql.decorators import (
+    BackendAIGQLMeta,
+    gql_connection_type,
+    gql_node_type,
+    gql_pydantic_type,
+)
 from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.data.fair_share.types import UserFairShareData
@@ -61,9 +67,12 @@ if TYPE_CHECKING:
     from ai.backend.manager.api.gql.user.types.node import UserV2GQL
 
 
-@strawberry.type(
+@gql_node_type(
+    BackendAIGQLMeta(
+        added_version="26.1.0",
+        description="User-level fair share data representing scheduling priority for an individual user. This is the most granular level of fair share calculation.",
+    ),
     name="UserFairShare",
-    description="Added in 26.1.0. User-level fair share data representing scheduling priority for an individual user. This is the most granular level of fair share calculation.",
 )
 class UserFairShareGQL(PydanticNodeMixin[UserFairShareNode]):
     """User-level fair share data with calculated fair share factor."""
@@ -214,9 +223,9 @@ class UserFairShareGQL(PydanticNodeMixin[UserFairShareNode]):
     def from_pydantic(
         cls,
         dto: UserFairShareNode,
+        extra: dict[str, Any] | None = None,
         *,
         id_field: str = "id",
-        extra: dict[str, Any] | None = None,
     ) -> UserFairShareGQL:
         """Convert UserFairShareNode pydantic DTO to GraphQL type."""
         resource_weights = [
@@ -262,11 +271,14 @@ class UserFairShareGQL(PydanticNodeMixin[UserFairShareNode]):
 UserFairShareEdge = Edge[UserFairShareGQL]
 
 
-@strawberry.type(
-    description=(
-        "Added in 26.1.0. Paginated connection for user fair share records. "
-        "Provides relay-style cursor-based pagination for efficient traversal of user fair share data. "
-        "Use 'edges' to access individual records with cursor information, or 'nodes' for direct data access."
+@gql_connection_type(
+    BackendAIGQLMeta(
+        added_version="26.1.0",
+        description=(
+            "Paginated connection for user fair share records. "
+            "Provides relay-style cursor-based pagination for efficient traversal of user fair share data. "
+            "Use 'edges' to access individual records with cursor information, or 'nodes' for direct data access."
+        ),
     )
 )
 class UserFairShareConnection(Connection[UserFairShareGQL]):
@@ -511,9 +523,12 @@ class UpsertUserFairShareWeightInput:
     )
 
 
-@strawberry.type(
+@gql_node_type(
+    BackendAIGQLMeta(
+        added_version="26.1.0",
+        description="Payload for user fair share weight upsert mutation.",
+    ),
     name="UpsertUserFairShareWeightPayload",
-    description="Added in 26.1.0. Payload for user fair share weight upsert mutation.",
 )
 class UpsertUserFairShareWeightPayload:
     """Payload for user fair share weight upsert mutation."""
@@ -570,11 +585,15 @@ class BulkUpsertUserFairShareWeightInput:
     )
 
 
-@strawberry.experimental.pydantic.type(
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version="26.1.0",
+        description="Payload for bulk user fair share weight upsert mutation.",
+    ),
     model=BulkUpsertUserFairShareWeightPayloadDTO,
     name="BulkUpsertUserFairShareWeightPayload",
-    description="Added in 26.1.0. Payload for bulk user fair share weight upsert mutation.",
-    all_fields=True,
 )
 class BulkUpsertUserFairShareWeightPayload:
     """Payload for bulk user fair share weight upsert mutation."""
+
+    upserted_count: int = strawberry.field(description="Number of records upserted")

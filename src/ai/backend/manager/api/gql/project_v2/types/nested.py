@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from datetime import datetime
+
 import strawberry
 
 from ai.backend.common.dto.manager.v2.group.response import (
@@ -19,6 +21,7 @@ from ai.backend.common.dto.manager.v2.group.response import (
 from ai.backend.common.dto.manager.v2.group.response import (
     VFolderHostPermissionEntry as VFolderHostPermissionEntryDTO,
 )
+from ai.backend.manager.api.gql.decorators import BackendAIGQLMeta, gql_pydantic_type
 
 from .enums import ProjectTypeEnum, VFolderHostPermissionEnum
 
@@ -27,13 +30,15 @@ from .enums import ProjectTypeEnum, VFolderHostPermissionEnum
 # ============================================================================
 
 
-@strawberry.experimental.pydantic.type(
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version="26.2.0",
+        description=(
+            "Basic project information. Contains identity and descriptive fields for the project."
+        ),
+    ),
     model=ProjectBasicInfoDTO,
     name="ProjectBasicInfo",
-    description=(
-        "Added in 26.2.0. Basic project information. "
-        "Contains identity and descriptive fields for the project."
-    ),
 )
 class ProjectBasicInfoGQL:
     """Basic project information."""
@@ -53,13 +58,16 @@ class ProjectBasicInfoGQL:
 # ============================================================================
 
 
-@strawberry.experimental.pydantic.type(
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version="26.2.0",
+        description=(
+            "Project's organizational context. "
+            "Contains domain membership and resource policy information."
+        ),
+    ),
     model=ProjectOrganizationInfoDTO,
     name="ProjectOrganizationInfo",
-    description=(
-        "Added in 26.2.0. Project's organizational context. "
-        "Contains domain membership and resource policy information."
-    ),
 )
 class ProjectOrganizationInfoGQL:
     """Project's organizational context."""
@@ -75,13 +83,16 @@ class ProjectOrganizationInfoGQL:
 # ============================================================================
 
 
-@strawberry.experimental.pydantic.type(
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version="26.2.0",
+        description=(
+            "Storage host permission configuration. "
+            "Defines what operations are allowed for a specific storage host."
+        ),
+    ),
     model=VFolderHostPermissionEntryDTO,
     name="VFolderHostPermissionEntry",
-    description=(
-        "Added in 26.2.0. Storage host permission configuration. "
-        "Defines what operations are allowed for a specific storage host."
-    ),
 )
 class VFolderHostPermissionEntryGQL:
     """Storage host permission entry."""
@@ -97,13 +108,16 @@ class VFolderHostPermissionEntryGQL:
     )
 
 
-@strawberry.experimental.pydantic.type(
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version="26.2.0",
+        description=(
+            "Project storage configuration. "
+            "Contains allowed virtual folder hosts and their permissions."
+        ),
+    ),
     model=ProjectStorageInfoDTO,
     name="ProjectStorageInfo",
-    description=(
-        "Added in 26.2.0. Project storage configuration. "
-        "Contains allowed virtual folder hosts and their permissions."
-    ),
 )
 class ProjectStorageInfoGQL:
     """Project storage configuration."""
@@ -122,14 +136,28 @@ class ProjectStorageInfoGQL:
 # ============================================================================
 
 
-@strawberry.experimental.pydantic.type(
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version="26.2.0",
+        description=(
+            "Project lifecycle information. Contains activation status and timestamp tracking."
+        ),
+    ),
     model=ProjectLifecycleInfoDTO,
     name="ProjectLifecycleInfo",
-    description=(
-        "Added in 26.2.0. Project lifecycle information. "
-        "Contains activation status and timestamp tracking."
-    ),
-    all_fields=True,
 )
 class ProjectLifecycleInfoGQL:
     """Project lifecycle information."""
+
+    is_active: bool | None = strawberry.field(
+        description=(
+            "Whether the project is active. "
+            "Inactive projects cannot create new sessions or perform operations."
+        )
+    )
+    created_at: datetime | None = strawberry.field(
+        description="Timestamp when the project was created."
+    )
+    modified_at: datetime | None = strawberry.field(
+        description="Timestamp when the project was last modified."
+    )

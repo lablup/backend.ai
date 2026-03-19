@@ -26,6 +26,11 @@ from ai.backend.common.dto.manager.v2.rbac.types import (
     OrderDirection as OrderDirectionDTO,
 )
 from ai.backend.manager.api.gql.base import OrderDirection, StringFilter
+from ai.backend.manager.api.gql.decorators import (
+    BackendAIGQLMeta,
+    gql_connection_type,
+    gql_node_type,
+)
 from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin
 from ai.backend.manager.api.gql.rbac.types.entity_node import EntityNode
 from ai.backend.manager.api.gql.rbac.types.permission import RBACElementTypeGQL
@@ -54,9 +59,12 @@ class EntityOrderField(StrEnum):
 # ==================== Node Types ====================
 
 
-@strawberry.type(
+@gql_node_type(
+    BackendAIGQLMeta(
+        added_version="26.3.0",
+        description="Entity reference from the association_scopes_entities table.",
+    ),
     name="EntityRef",
-    description="Added in 26.3.0. Entity reference from the association_scopes_entities table",
 )
 class EntityRefGQL(PydanticNodeMixin[Any]):
     id: NodeID[str]
@@ -313,13 +321,13 @@ class EntityOrderBy(GQLOrderBy):
 # ==================== Connection Types ====================
 
 
-@strawberry.type(description="Added in 26.3.0. Entity edge")
+@gql_connection_type(BackendAIGQLMeta(added_version="26.3.0", description="Entity edge."))
 class EntityEdge:
     node: EntityRefGQL
     cursor: str
 
 
-@strawberry.type(description="Added in 26.3.0. Entity connection")
+@gql_connection_type(BackendAIGQLMeta(added_version="26.3.0", description="Entity connection."))
 class EntityConnection:
     edges: list[EntityEdge]
     page_info: strawberry.relay.PageInfo

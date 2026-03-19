@@ -64,6 +64,7 @@ from ai.backend.manager.api.gql.base import (
     StringFilter,
     UUIDFilter,
 )
+from ai.backend.manager.api.gql.decorators import BackendAIGQLMeta, gql_node_type
 from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.data.deployment.types import DeploymentHistoryData, RouteHistoryData
@@ -172,7 +173,9 @@ class RouteHistoryOrderField(StrEnum):
 # Types
 
 
-@strawberry.type(description="Sub-step result in scheduling history")
+@gql_node_type(
+    BackendAIGQLMeta(added_version="26.3.0", description="Sub-step result in scheduling history.")
+)
 class SubStepResultGQL:
     step: str
     result: SchedulingResultGQL
@@ -193,7 +196,9 @@ class SubStepResultGQL:
         )
 
 
-@strawberry.type(description="Session scheduling history record")
+@gql_node_type(
+    BackendAIGQLMeta(added_version="26.3.0", description="Session scheduling history record.")
+)
 class SessionSchedulingHistory(PydanticNodeMixin[SessionHistoryNode]):
     id: NodeID[str]
     _session_id: strawberry.Private[UUID]
@@ -229,9 +234,9 @@ class SessionSchedulingHistory(PydanticNodeMixin[SessionHistoryNode]):
     def from_pydantic(
         cls,
         dto: SessionHistoryNode,
+        extra: dict[str, Any] | None = None,
         *,
         id_field: str = "id",
-        extra: dict[str, Any] | None = None,
     ) -> Self:
         return cls(
             id=ID(str(dto.id)),
@@ -276,7 +281,7 @@ class SessionSchedulingHistory(PydanticNodeMixin[SessionHistoryNode]):
         )
 
 
-@strawberry.type(description="Deployment history record")
+@gql_node_type(BackendAIGQLMeta(added_version="26.3.0", description="Deployment history record."))
 class DeploymentHistory(PydanticNodeMixin[DeploymentHistoryNode]):
     id: NodeID[str]
     _deployment_id: strawberry.Private[UUID]
@@ -312,9 +317,9 @@ class DeploymentHistory(PydanticNodeMixin[DeploymentHistoryNode]):
     def from_pydantic(
         cls,
         dto: DeploymentHistoryNode,
+        extra: dict[str, Any] | None = None,
         *,
         id_field: str = "id",
-        extra: dict[str, Any] | None = None,
     ) -> Self:
         return cls(
             id=ID(str(dto.id)),
@@ -359,7 +364,7 @@ class DeploymentHistory(PydanticNodeMixin[DeploymentHistoryNode]):
         )
 
 
-@strawberry.type(description="Route history record")
+@gql_node_type(BackendAIGQLMeta(added_version="26.3.0", description="Route history record."))
 class RouteHistory(PydanticNodeMixin[RouteHistoryNode]):
     id: NodeID[str]
     _route_id: strawberry.Private[UUID]
@@ -400,9 +405,9 @@ class RouteHistory(PydanticNodeMixin[RouteHistoryNode]):
     def from_pydantic(
         cls,
         dto: RouteHistoryNode,
+        extra: dict[str, Any] | None = None,
         *,
         id_field: str = "id",
-        extra: dict[str, Any] | None = None,
     ) -> Self:
         return cls(
             id=ID(str(dto.id)),

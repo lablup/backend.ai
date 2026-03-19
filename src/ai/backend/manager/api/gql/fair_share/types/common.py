@@ -13,6 +13,7 @@ from ai.backend.common.dto.manager.v2.resource_group.request import (
     ResourceWeightEntryInput as ResourceWeightEntryInputDTO,
 )
 from ai.backend.common.types import SlotQuantity
+from ai.backend.manager.api.gql.decorators import BackendAIGQLMeta, gql_node_type
 from ai.backend.manager.data.fair_share.types import FairShareSpec
 from ai.backend.manager.errors.fair_share import FairShareError
 
@@ -39,13 +40,16 @@ def _normalize_quantity(value: Decimal) -> Decimal:
     return normalized
 
 
-@strawberry.type(
-    name="ResourceSlotEntry",
-    description=(
-        "Added in 26.1.0. A single entry representing one resource type and its allocated quantity. "
-        "Resource types include compute resources (cpu, mem), accelerators (cuda.shares, cuda.device, "
-        "rocm.device), and custom resources defined by plugins."
+@gql_node_type(
+    BackendAIGQLMeta(
+        added_version="26.1.0",
+        description=(
+            "A single entry representing one resource type and its allocated quantity. "
+            "Resource types include compute resources (cpu, mem), accelerators (cuda.shares, cuda.device, "
+            "rocm.device), and custom resources defined by plugins."
+        ),
     ),
+    name="ResourceSlotEntry",
 )
 class ResourceSlotEntryGQL:
     """Single resource slot entry with resource type and quantity."""
@@ -96,13 +100,16 @@ class ResourceWeightEntryInputGQL:
     )
 
 
-@strawberry.type(
-    name="ResourceSlot",
-    description=(
-        "Added in 26.1.0. A collection of compute resource allocations. "
-        "Represents the resources consumed, allocated, or available for a workload. "
-        "Each entry specifies a resource type and its quantity."
+@gql_node_type(
+    BackendAIGQLMeta(
+        added_version="26.1.0",
+        description=(
+            "A collection of compute resource allocations. "
+            "Represents the resources consumed, allocated, or available for a workload. "
+            "Each entry specifies a resource type and its quantity."
+        ),
     ),
+    name="ResourceSlot",
 )
 class ResourceSlotGQL:
     """Resource slot containing multiple resource type entries."""
@@ -138,12 +145,15 @@ class ResourceSlotGQL:
         return cls(entries=entries)
 
 
-@strawberry.type(
-    name="ResourceWeightEntry",
-    description=(
-        "Added in 26.2.0. Resource weight with default indicator. "
-        "Shows whether this resource type's weight was explicitly set or uses default."
+@gql_node_type(
+    BackendAIGQLMeta(
+        added_version="26.2.0",
+        description=(
+            "Resource weight with default indicator. "
+            "Shows whether this resource type's weight was explicitly set or uses default."
+        ),
     ),
+    name="ResourceWeightEntry",
 )
 class ResourceWeightEntryGQL:
     """Individual resource type weight with default usage flag."""
@@ -170,12 +180,15 @@ class ResourceWeightEntryGQL:
     )
 
 
-@strawberry.type(
-    name="FairShareSpec",
-    description=(
-        "Added in 26.1.0. Configuration parameters that control how fair share factors are calculated. "
-        "These parameters determine the decay rate, lookback period, and resource weighting for usage aggregation."
+@gql_node_type(
+    BackendAIGQLMeta(
+        added_version="26.1.0",
+        description=(
+            "Configuration parameters that control how fair share factors are calculated. "
+            "These parameters determine the decay rate, lookback period, and resource weighting for usage aggregation."
+        ),
     ),
+    name="FairShareSpec",
 )
 class FairShareSpecGQL:
     """Specification parameters for fair share calculation."""
@@ -264,12 +277,15 @@ class FairShareSpecGQL:
         )
 
 
-@strawberry.type(
-    name="FairShareCalculationSnapshot",
-    description=(
-        "Added in 26.1.0. Snapshot of the most recent fair share calculation results. "
-        "Contains the computed fair share factor and the intermediate values used in the calculation."
+@gql_node_type(
+    BackendAIGQLMeta(
+        added_version="26.1.0",
+        description=(
+            "Snapshot of the most recent fair share calculation results. "
+            "Contains the computed fair share factor and the intermediate values used in the calculation."
+        ),
     ),
+    name="FairShareCalculationSnapshot",
 )
 class FairShareCalculationSnapshotGQL:
     """Contains the computed values and the time window used for calculation."""

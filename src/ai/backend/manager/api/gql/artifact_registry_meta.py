@@ -4,13 +4,16 @@ import uuid
 from collections.abc import Sequence
 from typing import Any, Self
 
-import strawberry
 from strawberry import ID
 from strawberry.relay import Connection, Edge, NodeID
 
 from ai.backend.common.data.artifact.types import ArtifactRegistryType
+from ai.backend.manager.api.gql.decorators import (
+    BackendAIGQLMeta,
+    gql_connection_type,
+    gql_node_type,
+)
 from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin
-from ai.backend.manager.api.gql.utils import dedent_strip
 from ai.backend.manager.data.artifact_registries.types import (
     ArtifactRegistryData,
 )
@@ -22,13 +25,11 @@ from ai.backend.manager.services.artifact_registry.actions.common.get_multi impo
 from .types import StrawberryGQLContext
 
 
-@strawberry.type(
-    description=dedent_strip("""
-    Added in 25.15.0.
-
-    Represents common metadata for an artifact registry.
-    All artifact registry nodes expose that information regardless of type.
-""")
+@gql_node_type(
+    BackendAIGQLMeta(
+        added_version="25.15.0",
+        description="Represents common metadata for an artifact registry. All artifact registry nodes expose that information regardless of type.",
+    ),
 )
 class ArtifactRegistryMeta(PydanticNodeMixin[Any]):
     id: NodeID[str]
@@ -93,7 +94,12 @@ class ArtifactRegistryMeta(PydanticNodeMixin[Any]):
 ArtifactRegistryMetaEdge = Edge[ArtifactRegistryMeta]
 
 
-@strawberry.type(description="Added in 25.15.0")
+@gql_connection_type(
+    BackendAIGQLMeta(
+        added_version="25.15.0",
+        description="Relay-style connection for paginated artifact registry meta queries.",
+    ),
+)
 class ArtifactRegistryMetaConnection(Connection[ArtifactRegistryMeta]):
     count: int
 

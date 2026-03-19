@@ -44,6 +44,12 @@ from ai.backend.common.dto.manager.v2.fair_share.types import (
 )
 from ai.backend.common.dto.manager.v2.group.types import ProjectType, ProjectTypeFilter
 from ai.backend.manager.api.gql.base import OrderDirection, StringFilter, UUIDFilter
+from ai.backend.manager.api.gql.decorators import (
+    BackendAIGQLMeta,
+    gql_connection_type,
+    gql_node_type,
+    gql_pydantic_type,
+)
 from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.data.fair_share.types import ProjectFairShareData
@@ -61,9 +67,12 @@ if TYPE_CHECKING:
     from ai.backend.manager.api.gql.resource_group.types import ResourceGroupGQL
 
 
-@strawberry.type(
+@gql_node_type(
+    BackendAIGQLMeta(
+        added_version="26.1.0",
+        description="Project-level fair share data representing scheduling priority for a specific project. The fair share factor determines resource allocation relative to other projects in the same domain.",
+    ),
     name="ProjectFairShare",
-    description="Added in 26.1.0. Project-level fair share data representing scheduling priority for a specific project. The fair share factor determines resource allocation relative to other projects in the same domain.",
 )
 class ProjectFairShareGQL(PydanticNodeMixin[ProjectFairShareNode]):
     """Project-level fair share data with calculated fair share factor."""
@@ -192,9 +201,9 @@ class ProjectFairShareGQL(PydanticNodeMixin[ProjectFairShareNode]):
     def from_pydantic(
         cls,
         dto: ProjectFairShareNode,
+        extra: dict[str, Any] | None = None,
         *,
         id_field: str = "id",
-        extra: dict[str, Any] | None = None,
     ) -> ProjectFairShareGQL:
         """Convert ProjectFairShareNode pydantic DTO to GraphQL type."""
         resource_weights = [
@@ -239,11 +248,14 @@ class ProjectFairShareGQL(PydanticNodeMixin[ProjectFairShareNode]):
 ProjectFairShareEdge = Edge[ProjectFairShareGQL]
 
 
-@strawberry.type(
-    description=(
-        "Added in 26.1.0. Paginated connection for project fair share records. "
-        "Provides relay-style cursor-based pagination for efficient traversal of project fair share data. "
-        "Use 'edges' to access individual records with cursor information, or 'nodes' for direct data access."
+@gql_connection_type(
+    BackendAIGQLMeta(
+        added_version="26.1.0",
+        description=(
+            "Paginated connection for project fair share records. "
+            "Provides relay-style cursor-based pagination for efficient traversal of project fair share data. "
+            "Use 'edges' to access individual records with cursor information, or 'nodes' for direct data access."
+        ),
     )
 )
 class ProjectFairShareConnection(Connection[ProjectFairShareGQL]):
@@ -523,9 +535,12 @@ class UpsertProjectFairShareWeightInput:
     )
 
 
-@strawberry.type(
+@gql_node_type(
+    BackendAIGQLMeta(
+        added_version="26.1.0",
+        description="Payload for project fair share weight upsert mutation.",
+    ),
     name="UpsertProjectFairShareWeightPayload",
-    description="Added in 26.1.0. Payload for project fair share weight upsert mutation.",
 )
 class UpsertProjectFairShareWeightPayload:
     """Payload for project fair share weight upsert mutation."""
@@ -579,11 +594,15 @@ class BulkUpsertProjectFairShareWeightInput:
     )
 
 
-@strawberry.experimental.pydantic.type(
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version="26.1.0",
+        description="Payload for bulk project fair share weight upsert mutation.",
+    ),
     model=BulkUpsertProjectFairShareWeightPayloadDTO,
     name="BulkUpsertProjectFairShareWeightPayload",
-    description="Added in 26.1.0. Payload for bulk project fair share weight upsert mutation.",
-    all_fields=True,
 )
 class BulkUpsertProjectFairShareWeightPayload:
     """Payload for bulk project fair share weight upsert mutation."""
+
+    upserted_count: int = strawberry.field(description="Number of records upserted")

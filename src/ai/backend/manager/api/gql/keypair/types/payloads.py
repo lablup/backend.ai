@@ -13,36 +13,66 @@ from ai.backend.common.dto.manager.v2.keypair.response import (
 from ai.backend.common.dto.manager.v2.keypair.response import (
     SwitchMyMainAccessKeyPayload as SwitchMyMainAccessKeyPayloadDTO,
 )
+from ai.backend.manager.api.gql.decorators import BackendAIGQLMeta, gql_node_type
 
 
-@strawberry.experimental.pydantic.type(
-    model=IssueMyKeypairPayloadDTO,
+@gql_node_type(
+    BackendAIGQLMeta(
+        added_version="26.2.0",
+        description="Payload returned after issuing a new keypair. The secret_key is only shown once.",
+    ),
     name="IssueMyKeypairPayload",
-    description="Payload returned after issuing a new keypair. The secret_key is only shown once.",
-    all_fields=True,
 )
 class IssueMyKeypairPayloadGQL:
     """Payload returned after issuing a new keypair."""
 
+    access_key: str = strawberry.field(description="The newly generated access key.")
+    secret_key: str = strawberry.field(
+        description="The newly generated secret key. This value is only returned at creation time."
+    )
+    ssh_public_key: str = strawberry.field(description="The generated SSH public key.")
 
-@strawberry.experimental.pydantic.type(
-    model=RevokeMyKeypairPayloadDTO,
+    @classmethod
+    def from_pydantic(cls, dto: IssueMyKeypairPayloadDTO) -> IssueMyKeypairPayloadGQL:
+        return cls(
+            access_key=dto.access_key,
+            secret_key=dto.secret_key,
+            ssh_public_key=dto.ssh_public_key,
+        )
+
+
+@gql_node_type(
+    BackendAIGQLMeta(
+        added_version="26.2.0",
+        description="Payload returned after revoking a keypair.",
+    ),
     name="RevokeMyKeypairPayload",
-    description="Payload returned after revoking a keypair.",
-    all_fields=True,
 )
 class RevokeMyKeypairPayloadGQL:
     """Payload returned after revoking a keypair."""
 
+    success: bool = strawberry.field(description="Whether the revocation was successful.")
 
-@strawberry.experimental.pydantic.type(
-    model=SwitchMyMainAccessKeyPayloadDTO,
+    @classmethod
+    def from_pydantic(cls, dto: RevokeMyKeypairPayloadDTO) -> RevokeMyKeypairPayloadGQL:
+        return cls(success=dto.success)
+
+
+@gql_node_type(
+    BackendAIGQLMeta(
+        added_version="26.2.0",
+        description="Payload returned after switching the main access key.",
+    ),
     name="SwitchMyMainAccessKeyPayload",
-    description="Payload returned after switching the main access key.",
-    all_fields=True,
 )
 class SwitchMyMainAccessKeyPayloadGQL:
     """Payload returned after switching the main access key."""
+
+    success: bool = strawberry.field(description="Whether the switch was successful.")
+
+    @classmethod
+    def from_pydantic(cls, dto: SwitchMyMainAccessKeyPayloadDTO) -> SwitchMyMainAccessKeyPayloadGQL:
+        return cls(success=dto.success)
 
 
 @strawberry.type(

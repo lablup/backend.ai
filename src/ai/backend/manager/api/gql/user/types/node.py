@@ -13,6 +13,7 @@ from strawberry.relay import Connection, Edge, NodeID
 from ai.backend.common.dto.manager.v2.user.response import UserNode
 from ai.backend.common.dto.manager.v2.user.types import UserFairShareScope, UserUsageScope
 from ai.backend.common.exception import InvalidAPIParameters
+from ai.backend.manager.api.gql.decorators import BackendAIGQLMeta, gql_connection_type
 from ai.backend.manager.api.gql.fair_share.types import UserFairShareGQL
 from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin
 from ai.backend.manager.api.gql.resource_usage.types import (
@@ -316,9 +317,9 @@ class UserV2GQL(PydanticNodeMixin[UserNode]):
     def from_pydantic(
         cls,
         dto: UserNode,
+        extra: dict[str, Any] | None = None,
         *,
         id_field: str = "id",
-        extra: dict[str, Any] | None = None,
     ) -> Self:
         """Convert UserNode DTO to GraphQL type."""
         return cls(
@@ -409,12 +410,15 @@ class UserV2GQL(PydanticNodeMixin[UserNode]):
 UserV2Edge = Edge[UserV2GQL]
 
 
-@strawberry.type(
-    description=(
-        "Added in 26.2.0. Paginated connection for user records. "
-        "Provides relay-style cursor-based pagination for efficient traversal of user data. "
-        "Use 'edges' to access individual records with cursor information, "
-        "or 'nodes' for direct data access."
+@gql_connection_type(
+    BackendAIGQLMeta(
+        added_version="26.2.0",
+        description=(
+            "Paginated connection for user records. "
+            "Provides relay-style cursor-based pagination for efficient traversal of user data. "
+            "Use 'edges' to access individual records with cursor information, "
+            "or 'nodes' for direct data access."
+        ),
     )
 )
 class UserV2Connection(Connection[UserV2GQL]):

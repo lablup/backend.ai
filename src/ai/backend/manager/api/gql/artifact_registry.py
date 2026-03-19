@@ -7,6 +7,7 @@ from ai.backend.common.data.artifact.types import ArtifactRegistryType
 from ai.backend.common.dto.manager.v2.artifact_registry.response import (
     ArtifactRegistryGQLNode,
 )
+from ai.backend.manager.api.gql.decorators import BackendAIGQLMeta, gql_pydantic_type
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.data.artifact.types import (
     ArtifactType,
@@ -18,9 +19,12 @@ from ai.backend.manager.services.artifact_registry.actions.common.get_meta impor
 )
 
 
-@strawberry.experimental.pydantic.type(
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version="25.14.0",
+        description="Artifact registry node.",
+    ),
     model=ArtifactRegistryGQLNode,
-    description="Added in 25.14.0",
 )
 class ArtifactRegistry:
     id: ID = strawberry.field(
@@ -71,15 +75,9 @@ async def default_artifact_registry(
 
     registry_data = artifact_registry_meta.result
 
-    return ArtifactRegistry.from_pydantic(
-        ArtifactRegistryGQLNode(
-            id=registry_data.id,
-            registry_id=registry_data.registry_id,
-            name=registry_name,
-            type=registry_data.type,
-        ),
-        extra={
-            "id": ID(str(registry_data.id)),
-            "registry_id": ID(str(registry_data.registry_id)),
-        },
+    return ArtifactRegistry(
+        id=ID(str(registry_data.id)),
+        registry_id=ID(str(registry_data.registry_id)),
+        name=registry_name,
+        type=registry_data.type,
     )

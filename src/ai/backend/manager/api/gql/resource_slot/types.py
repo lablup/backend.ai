@@ -52,6 +52,12 @@ from ai.backend.common.dto.manager.v2.resource_slot.types import (
     ResourceSlotTypeOrderField as ResourceSlotTypeOrderFieldDTO,
 )
 from ai.backend.manager.api.gql.base import OrderDirection, StringFilter
+from ai.backend.manager.api.gql.decorators import (
+    BackendAIGQLMeta,
+    gql_connection_type,
+    gql_node_type,
+    gql_pydantic_type,
+)
 from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.api.gql.utils import dedent_strip
@@ -127,25 +133,35 @@ async def load_kernel_allocation_data(
 # ========== NumberFormat ==========
 
 
-@strawberry.experimental.pydantic.type(
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version="26.3.0",
+        description="Display number format configuration for a resource slot type.",
+    ),
     model=NumberFormatInfoDTO,
     name="NumberFormat",
-    description="Added in 26.3.0. Display number format configuration for a resource slot type.",
-    all_fields=True,
 )
 class NumberFormatGQL:
-    pass
+    binary: bool = strawberry.field(
+        description="Whether to use binary (1024-based) or decimal (1000-based) prefixes."
+    )
+    round_length: int = strawberry.field(
+        description="Number of decimal places to round to when displaying values."
+    )
 
 
 # ========== ResourceSlotTypeGQL (Node) ==========
 
 
-@strawberry.type(
+@gql_node_type(
+    BackendAIGQLMeta(
+        added_version="26.3.0",
+        description=dedent_strip("""
+            A registered resource slot type describing display metadata
+            and formatting rules for a specific resource (e.g., cpu, mem, cuda.device).
+        """),
+    ),
     name="ResourceSlotType",
-    description=dedent_strip("""
-        Added in 26.3.0. A registered resource slot type describing display metadata
-        and formatting rules for a specific resource (e.g., cpu, mem, cuda.device).
-    """),
 )
 class ResourceSlotTypeGQL(PydanticNodeMixin[Any]):
     id: NodeID[str]
@@ -202,11 +218,9 @@ class ResourceSlotTypeGQL(PydanticNodeMixin[Any]):
             description=data.description,
             display_unit=data.display_unit,
             display_icon=data.display_icon,
-            number_format=NumberFormatGQL.from_pydantic(
-                NumberFormatInfoDTO(
-                    binary=data.number_format.binary,
-                    round_length=data.number_format.round_length,
-                )
+            number_format=NumberFormatGQL(
+                binary=data.number_format.binary,
+                round_length=data.number_format.round_length,
             ),
             rank=data.rank,
         )
@@ -215,9 +229,12 @@ class ResourceSlotTypeGQL(PydanticNodeMixin[Any]):
 ResourceSlotTypeEdgeGQL = Edge[ResourceSlotTypeGQL]
 
 
-@strawberry.type(
+@gql_connection_type(
+    BackendAIGQLMeta(
+        added_version="26.3.0",
+        description="Relay-style connection for paginated resource slot types.",
+    ),
     name="ResourceSlotTypeConnection",
-    description="Added in 26.3.0. Relay-style connection for paginated resource slot types.",
 )
 class ResourceSlotTypeConnectionGQL(Connection[ResourceSlotTypeGQL]):
     count: int
@@ -284,12 +301,15 @@ class ResourceSlotTypeOrderByGQL:
 # ========== AgentResourceSlotGQL (Node) ==========
 
 
-@strawberry.type(
+@gql_node_type(
+    BackendAIGQLMeta(
+        added_version="26.3.0",
+        description=dedent_strip("""
+            Per-slot resource capacity and usage entry for an agent.
+            Represents one row from the agent_resources table.
+        """),
+    ),
     name="AgentResourceSlot",
-    description=dedent_strip("""
-        Added in 26.3.0. Per-slot resource capacity and usage entry for an agent.
-        Represents one row from the agent_resources table.
-    """),
 )
 class AgentResourceSlotGQL(PydanticNodeMixin[Any]):
     """Per-agent, per-slot resource capacity and usage."""
@@ -343,9 +363,12 @@ class AgentResourceSlotGQL(PydanticNodeMixin[Any]):
 AgentResourceSlotEdgeGQL = Edge[AgentResourceSlotGQL]
 
 
-@strawberry.type(
+@gql_connection_type(
+    BackendAIGQLMeta(
+        added_version="26.3.0",
+        description="Relay-style connection for per-slot agent resources.",
+    ),
     name="AgentResourceConnection",
-    description="Added in 26.3.0. Relay-style connection for per-slot agent resources.",
 )
 class AgentResourceConnectionGQL(Connection[AgentResourceSlotGQL]):
     count: int
@@ -410,12 +433,15 @@ class AgentResourceSlotOrderByGQL:
 # ========== KernelResourceAllocationGQL (Node) ==========
 
 
-@strawberry.type(
+@gql_node_type(
+    BackendAIGQLMeta(
+        added_version="26.3.0",
+        description=dedent_strip("""
+            Per-slot resource allocation entry for a kernel.
+            Represents one row from the resource_allocations table.
+        """),
+    ),
     name="KernelResourceAllocation",
-    description=dedent_strip("""
-        Added in 26.3.0. Per-slot resource allocation entry for a kernel.
-        Represents one row from the resource_allocations table.
-    """),
 )
 class KernelResourceAllocationGQL(PydanticNodeMixin[Any]):
     """Per-kernel, per-slot resource allocation."""
@@ -519,9 +545,12 @@ class KernelResourceAllocationOrderByGQL:
 KernelResourceAllocationEdgeGQL = Edge[KernelResourceAllocationGQL]
 
 
-@strawberry.type(
+@gql_connection_type(
+    BackendAIGQLMeta(
+        added_version="26.3.0",
+        description="Relay-style connection for per-slot kernel resource allocations.",
+    ),
     name="ResourceAllocationConnection",
-    description="Added in 26.3.0. Relay-style connection for per-slot kernel resource allocations.",
 )
 class ResourceAllocationConnectionGQL(Connection[KernelResourceAllocationGQL]):
     count: int

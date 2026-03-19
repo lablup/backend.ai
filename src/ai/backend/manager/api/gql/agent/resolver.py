@@ -4,7 +4,6 @@ import strawberry
 from strawberry import Info
 
 from ai.backend.common.dto.manager.v2.agent.request import AdminSearchAgentsInput
-from ai.backend.common.dto.manager.v2.agent.response import AgentResourceGQLDTO, AgentStatsGQLDTO
 from ai.backend.manager.api.gql.agent.types import (
     AgentFilterGQL,
     AgentOrderByGQL,
@@ -25,14 +24,12 @@ async def agent_stats(info: Info[StrawberryGQLContext]) -> AgentStatsGQL | None:
         GetTotalResourcesAction()
     )
 
-    resource = AgentResourceGQL.from_pydantic(
-        AgentResourceGQLDTO(
-            free=result.total_resources.total_free_slots.to_json(),
-            used=result.total_resources.total_used_slots.to_json(),
-            capacity=result.total_resources.total_capacity_slots.to_json(),
-        )
+    resource = AgentResourceGQL(
+        free=result.total_resources.total_free_slots.to_json(),
+        used=result.total_resources.total_used_slots.to_json(),
+        capacity=result.total_resources.total_capacity_slots.to_json(),
     )
-    return AgentStatsGQL.from_pydantic(AgentStatsGQLDTO(total_resource=resource))
+    return AgentStatsGQL(total_resource=resource)
 
 
 @strawberry.field(description="Added in 26.1.0")  # type: ignore[misc]

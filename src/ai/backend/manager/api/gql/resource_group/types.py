@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Iterable
+from datetime import datetime
 from decimal import Decimal
 from enum import StrEnum
 from typing import Any, Self, assert_never
@@ -28,9 +29,6 @@ from ai.backend.common.dto.manager.v2.resource_group.request import (
 )
 from ai.backend.common.dto.manager.v2.resource_group.response import (
     PreemptionConfigInfo,
-    ResourceGroupMetadataInfo,
-    ResourceGroupNetworkConfigInfo,
-    ResourceGroupStatusInfo,
 )
 from ai.backend.common.dto.manager.v2.resource_group.types import (
     ResourceGroupOrderDirection as ResourceGroupOrderDirectionEnum,
@@ -40,6 +38,11 @@ from ai.backend.common.dto.manager.v2.resource_group.types import (
 )
 from ai.backend.common.types import PreemptionMode, PreemptionOrder
 from ai.backend.manager.api.gql.base import OrderDirection, StringFilter
+from ai.backend.manager.api.gql.decorators import (
+    BackendAIGQLMeta,
+    gql_node_type,
+    gql_pydantic_type,
+)
 from ai.backend.manager.api.gql.fair_share.types.common import (
     ResourceSlotGQL,
     ResourceWeightEntryGQL,
@@ -154,10 +157,13 @@ class PreemptionOrderGQL(StrEnum):
                 assert_never(order)
 
 
-@strawberry.experimental.pydantic.type(
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version="26.3.0",
+        description="Preemption configuration for a resource group.",
+    ),
     model=PreemptionConfigInfo,
     name="PreemptionConfig",
-    description="Added in 26.3.0. Preemption configuration for a resource group.",
 )
 class PreemptionConfigGQL:
     """Preemption configuration for GraphQL."""
@@ -176,39 +182,66 @@ class PreemptionConfigGQL:
         )
 
 
-@strawberry.experimental.pydantic.type(
-    model=ResourceGroupStatusInfo,
+@gql_node_type(
+    BackendAIGQLMeta(
+        added_version="26.2.0",
+        description="Status information for a resource group.",
+    ),
     name="ResourceGroupStatus",
-    description="Added in 26.2.0. Status information for a resource group.",
-    all_fields=True,
 )
 class ResourceGroupStatusGQL:
     """Status information for a resource group."""
 
+    is_active: bool = strawberry.field(
+        description="Whether the resource group is active and can accept new sessions."
+    )
+    is_public: bool = strawberry.field(
+        description="Whether the resource group is publicly accessible to all users."
+    )
 
-@strawberry.experimental.pydantic.type(
-    model=ResourceGroupMetadataInfo,
+
+@gql_node_type(
+    BackendAIGQLMeta(
+        added_version="26.2.0",
+        description="Metadata for a resource group.",
+    ),
     name="ResourceGroupMetadata",
-    description="Added in 26.2.0. Metadata for a resource group.",
-    all_fields=True,
 )
 class ResourceGroupMetadataGQL:
     """Metadata for a resource group."""
 
+    description: str | None = strawberry.field(
+        description="Human-readable description of the resource group."
+    )
+    created_at: datetime = strawberry.field(
+        description="Timestamp when the resource group was created."
+    )
 
-@strawberry.experimental.pydantic.type(
-    model=ResourceGroupNetworkConfigInfo,
+
+@gql_node_type(
+    BackendAIGQLMeta(
+        added_version="26.2.0",
+        description="Network configuration for a resource group.",
+    ),
     name="ResourceGroupNetworkConfig",
-    description="Added in 26.2.0. Network configuration for a resource group.",
-    all_fields=True,
 )
 class ResourceGroupNetworkConfigGQL:
     """Network configuration for a resource group."""
 
+    wsproxy_addr: str | None = strawberry.field(
+        description="WebSocket proxy address for this resource group."
+    )
+    use_host_network: bool = strawberry.field(
+        description="Whether to use host network mode for containers in this resource group."
+    )
 
-@strawberry.type(
+
+@gql_node_type(
+    BackendAIGQLMeta(
+        added_version="26.2.0",
+        description="Scheduler configuration for a resource group.",
+    ),
     name="ResourceGroupSchedulerConfig",
-    description="Added in 26.2.0. Scheduler configuration for a resource group.",
 )
 class ResourceGroupSchedulerConfigGQL:
     """Scheduler configuration for a resource group."""
@@ -221,12 +254,15 @@ class ResourceGroupSchedulerConfigGQL:
     )
 
 
-@strawberry.type(
-    name="FairShareScalingGroupSpec",
-    description=(
-        "Added in 26.1.0. Fair share calculation configuration for a resource group. "
-        "Defines parameters for computing fair share factors across domains, projects, and users."
+@gql_node_type(
+    BackendAIGQLMeta(
+        added_version="26.1.0",
+        description=(
+            "Fair share calculation configuration for a resource group. "
+            "Defines parameters for computing fair share factors across domains, projects, and users."
+        ),
     ),
+    name="FairShareScalingGroupSpec",
 )
 class FairShareScalingGroupSpecGQL:
     """Fair share configuration for a resource group."""
@@ -297,12 +333,15 @@ class FairShareScalingGroupSpecGQL:
         )
 
 
-@strawberry.type(
-    name="ResourceInfo",
-    description=(
-        "Added in 26.1.0. Resource information for a resource group. "
-        "Provides aggregated resource metrics including capacity, used, and free resources."
+@gql_node_type(
+    BackendAIGQLMeta(
+        added_version="26.1.0",
+        description=(
+            "Resource information for a resource group. "
+            "Provides aggregated resource metrics including capacity, used, and free resources."
+        ),
     ),
+    name="ResourceInfo",
 )
 class ResourceInfoGQL:
     """Resource information containing capacity, used, and free resource metrics."""
@@ -329,9 +368,12 @@ class ResourceInfoGQL:
         )
 
 
-@strawberry.type(
+@gql_node_type(
+    BackendAIGQLMeta(
+        added_version="26.1.0",
+        description="Resource group with structured configuration",
+    ),
     name="ResourceGroup",
-    description="Added in 26.1.0. Resource group with structured configuration",
 )
 class ResourceGroupGQL(PydanticNodeMixin[Any]):
     id: NodeID[str] = strawberry.field(
@@ -377,30 +419,24 @@ class ResourceGroupGQL(PydanticNodeMixin[Any]):
     def from_pydantic(
         cls,
         dto: ScalingGroupData,
+        extra: dict[str, Any] | None = None,
         *,
         id_field: str = "id",
-        extra: dict[str, Any] | None = None,
     ) -> Self:
         return cls(
             id=dto.name,
             name=dto.name,
-            status=ResourceGroupStatusGQL.from_pydantic(
-                ResourceGroupStatusInfo(
-                    is_active=dto.status.is_active,
-                    is_public=dto.status.is_public,
-                )
+            status=ResourceGroupStatusGQL(
+                is_active=dto.status.is_active,
+                is_public=dto.status.is_public,
             ),
-            metadata=ResourceGroupMetadataGQL.from_pydantic(
-                ResourceGroupMetadataInfo(
-                    description=dto.metadata.description if dto.metadata.description else None,
-                    created_at=dto.metadata.created_at,
-                )
+            metadata=ResourceGroupMetadataGQL(
+                description=dto.metadata.description if dto.metadata.description else None,
+                created_at=dto.metadata.created_at,
             ),
-            network=ResourceGroupNetworkConfigGQL.from_pydantic(
-                ResourceGroupNetworkConfigInfo(
-                    wsproxy_addr=dto.network.wsproxy_addr if dto.network.wsproxy_addr else None,
-                    use_host_network=dto.network.use_host_network,
-                )
+            network=ResourceGroupNetworkConfigGQL(
+                wsproxy_addr=dto.network.wsproxy_addr if dto.network.wsproxy_addr else None,
+                use_host_network=dto.network.use_host_network,
             ),
             scheduler=ResourceGroupSchedulerConfigGQL(
                 type=SchedulerTypeGQL.from_scheduler_type(dto.scheduler.name),
@@ -612,9 +648,12 @@ class UpdateResourceGroupFairShareSpecInput:
         )
 
 
-@strawberry.type(
+@gql_node_type(
+    BackendAIGQLMeta(
+        added_version="26.1.0",
+        description="Payload for resource group fair share spec update mutation.",
+    ),
     name="UpdateResourceGroupFairShareSpecPayload",
-    description="Added in 26.1.0. Payload for resource group fair share spec update mutation.",
 )
 class UpdateResourceGroupFairShareSpecPayload:
     """Payload for fair share spec update mutation."""
@@ -697,9 +736,12 @@ class UpdateResourceGroupInput:
         )
 
 
-@strawberry.type(
+@gql_node_type(
+    BackendAIGQLMeta(
+        added_version="26.2.0",
+        description="Payload for resource group update mutation.",
+    ),
     name="UpdateResourceGroupPayload",
-    description="Added in 26.2.0. Payload for resource group update mutation.",
 )
 class UpdateResourceGroupPayload:
     """Payload for resource group update mutation."""

@@ -15,6 +15,11 @@ from strawberry.relay import Connection, Edge, NodeID
 from ai.backend.common.dto.manager.v2.audit_log.response import AuditLogNode
 from ai.backend.common.dto.manager.v2.audit_log.types import AuditLogStatus as AuditLogStatusDTO
 from ai.backend.manager.actions.types import OperationStatus
+from ai.backend.manager.api.gql.decorators import (
+    BackendAIGQLMeta,
+    gql_connection_type,
+    gql_node_type,
+)
 from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.data.audit_log.types import AuditLogData
@@ -48,9 +53,12 @@ class AuditLogStatusGQL(StrEnum):
                 raise ValueError(f"Unhandled OperationStatus: {status!r}")
 
 
-@strawberry.type(
+@gql_node_type(
+    BackendAIGQLMeta(
+        added_version="26.3.0",
+        description="Represents an audit log entry tracking system operations.",
+    ),
     name="AuditLogV2",
-    description="Represents an audit log entry tracking system operations.",
 )
 class AuditLogV2GQL(PydanticNodeMixin[AuditLogNode]):
     id: NodeID[str] = strawberry.field(
@@ -140,9 +148,9 @@ class AuditLogV2GQL(PydanticNodeMixin[AuditLogNode]):
     def from_pydantic(
         cls,
         dto: AuditLogNode,
+        extra: dict[str, Any] | None = None,
         *,
         id_field: str = "id",
-        extra: dict[str, Any] | None = None,
     ) -> Self:
         return cls(
             id=ID(str(dto.id)),
@@ -163,9 +171,12 @@ class AuditLogV2GQL(PydanticNodeMixin[AuditLogNode]):
 AuditLogV2EdgeGQL = Edge[AuditLogV2GQL]
 
 
-@strawberry.type(
+@gql_connection_type(
+    BackendAIGQLMeta(
+        added_version="26.3.0",
+        description="Connection type for paginated audit log results.",
+    ),
     name="AuditLogV2Connection",
-    description="Connection type for paginated audit log results.",
 )
 class AuditLogV2ConnectionGQL(Connection[AuditLogV2GQL]):
     count: int = strawberry.field(

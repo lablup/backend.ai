@@ -15,6 +15,7 @@ from ai.backend.common.events.types import EventDomain
 from ai.backend.common.types import SessionId
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.api.gql.base import to_global_id
+from ai.backend.manager.api.gql.decorators import BackendAIGQLMeta, gql_node_type
 from ai.backend.manager.api.gql_legacy.session import ComputeSessionNode
 from ai.backend.manager.errors.kernel import InvalidSessionId
 
@@ -46,7 +47,12 @@ class SchedulingStatus(StrEnum):
     ERROR = "ERROR"
 
 
-@strawberry.type(description="Added in 25.15.0. Scheduling event broadcast payload")
+@gql_node_type(
+    BackendAIGQLMeta(
+        added_version="25.15.0",
+        description="Scheduling event broadcast payload.",
+    ),
+)
 class SchedulingBroadcastEventPayload:
     """
     Payload for scheduling broadcast events.

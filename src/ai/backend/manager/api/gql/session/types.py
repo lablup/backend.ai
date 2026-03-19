@@ -37,6 +37,12 @@ from ai.backend.manager.api.gql.common.types import (
     SessionV2ResultGQL,
     SessionV2TypeGQL,
 )
+from ai.backend.manager.api.gql.decorators import (
+    BackendAIGQLMeta,
+    gql_connection_type,
+    gql_node_type,
+    gql_pydantic_type,
+)
 from ai.backend.manager.api.gql.deployment.types.revision import (
     EnvironmentVariableEntryGQL,
     EnvironmentVariablesGQL,
@@ -230,10 +236,13 @@ class SessionV2OrderByGQL:
 # ========== Session Info Sub-Types ==========
 
 
-@strawberry.experimental.pydantic.type(
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version="26.3.0",
+        description="Metadata information for a session.",
+    ),
     model=SessionMetadataInfoGQLDTO,
     name="SessionV2MetadataInfo",
-    description="Added in 26.3.0. Metadata information for a session.",
 )
 class SessionV2MetadataInfoGQL:
     creation_id: str = strawberry.field(
@@ -255,10 +264,13 @@ class SessionV2MetadataInfoGQL:
     tag: str | None = strawberry.field(description="Optional user-provided tag for the session.")
 
 
-@strawberry.experimental.pydantic.type(
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version="26.3.0",
+        description="Resource allocation information for a session.",
+    ),
     model=SessionResourceInfoGQLDTO,
     name="SessionV2ResourceInfo",
-    description="Added in 26.3.0. Resource allocation information for a session.",
 )
 class SessionV2ResourceInfoGQL:
     allocation: ResourceAllocationGQL = strawberry.field(
@@ -272,10 +284,13 @@ class SessionV2ResourceInfoGQL:
     )
 
 
-@strawberry.experimental.pydantic.type(
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version="26.3.0",
+        description="Lifecycle status and timestamps for a session.",
+    ),
     model=SessionLifecycleInfoGQLDTO,
     name="SessionV2LifecycleInfo",
-    description="Added in 26.3.0. Lifecycle status and timestamps for a session.",
 )
 class SessionV2LifecycleInfoGQL:
     status: SessionV2StatusGQL = strawberry.field(description="Current status of the session.")
@@ -296,10 +311,13 @@ class SessionV2LifecycleInfoGQL:
     )
 
 
-@strawberry.experimental.pydantic.type(
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version="26.3.0",
+        description="Runtime execution configuration for a session.",
+    ),
     model=SessionRuntimeInfoGQLDTO,
     name="SessionV2RuntimeInfo",
-    description="Added in 26.3.0. Runtime execution configuration for a session.",
 )
 class SessionV2RuntimeInfoGQL:
     environ: EnvironmentVariablesGQL | None = strawberry.field(
@@ -316,22 +334,29 @@ class SessionV2RuntimeInfoGQL:
     )
 
 
-@strawberry.experimental.pydantic.type(
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version="26.3.0",
+        description="Network configuration for a session.",
+    ),
     model=SessionNetworkInfo,
     name="SessionV2NetworkInfo",
-    all_fields=True,
-    description="Added in 26.3.0. Network configuration for a session.",
 )
 class SessionV2NetworkInfoGQL:
-    pass
+    use_host_network: strawberry.auto
+    network_type: strawberry.auto
+    network_id: strawberry.auto
 
 
 # ========== Main Session Type ==========
 
 
-@strawberry.type(
+@gql_node_type(
+    BackendAIGQLMeta(
+        added_version="26.3.0",
+        description="Represents a compute session in Backend.AI.",
+    ),
     name="SessionV2",
-    description="Added in 26.3.0. Represents a compute session in Backend.AI.",
 )
 class SessionV2GQL(PydanticNodeMixin[SessionNode]):
     """Session type representing a compute session."""
@@ -523,12 +548,10 @@ class SessionV2GQL(PydanticNodeMixin[SessionNode]):
                 startup_command=data.startup_command,
                 callback_url=data.callback_url,
             ),
-            network=SessionV2NetworkInfoGQL.from_pydantic(
-                SessionNetworkInfo(
-                    use_host_network=data.use_host_network,
-                    network_type=str(data.network_type) if data.network_type else None,
-                    network_id=data.network_id,
-                )
+            network=SessionV2NetworkInfoGQL(
+                use_host_network=data.use_host_network,
+                network_type=str(data.network_type) if data.network_type else None,
+                network_id=data.network_id,
             ),
         )
 
@@ -536,9 +559,9 @@ class SessionV2GQL(PydanticNodeMixin[SessionNode]):
     def from_pydantic(
         cls,
         dto: SessionNode,
+        extra: dict[str, Any] | None = None,
         *,
         id_field: str = "id",
-        extra: dict[str, Any] | None = None,
     ) -> Self:
         """Create SessionV2GQL from SessionNode DTO (adapter search results)."""
         from ai.backend.common.types import ClusterMode, ResourceSlot, SessionResult, SessionTypes
@@ -607,12 +630,10 @@ class SessionV2GQL(PydanticNodeMixin[SessionNode]):
                 startup_command=dto.runtime.startup_command,
                 callback_url=dto.runtime.callback_url,
             ),
-            network=SessionV2NetworkInfoGQL.from_pydantic(
-                SessionNetworkInfo(
-                    use_host_network=dto.network.use_host_network,
-                    network_type=dto.network.network_type,
-                    network_id=dto.network.network_id,
-                )
+            network=SessionV2NetworkInfoGQL(
+                use_host_network=dto.network.use_host_network,
+                network_type=dto.network.network_type,
+                network_id=dto.network.network_id,
             ),
         )
 
@@ -623,9 +644,12 @@ class SessionV2GQL(PydanticNodeMixin[SessionNode]):
 SessionV2EdgeGQL = Edge[SessionV2GQL]
 
 
-@strawberry.type(
+@gql_connection_type(
+    BackendAIGQLMeta(
+        added_version="26.3.0",
+        description="Connection type for paginated session results.",
+    ),
     name="SessionV2Connection",
-    description="Added in 26.3.0. Connection type for paginated session results.",
 )
 class SessionV2ConnectionGQL(Connection[SessionV2GQL]):
     count: int

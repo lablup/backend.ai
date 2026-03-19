@@ -15,6 +15,7 @@ from ai.backend.common.dto.manager.v2.notification.request import (
     SearchNotificationRulesInput,
 )
 from ai.backend.manager.api.gql.base import encode_cursor
+from ai.backend.manager.api.gql.decorators import BackendAIGQLMeta, gql_connection_type
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.api.gql.utils import check_admin_only
 from ai.backend.manager.errors.auth import InvalidAuthParameters
@@ -50,7 +51,9 @@ from .types import (
 NotificationChannelEdge = Edge[NotificationChannel]
 
 
-@strawberry.type(description="Notification channel connection")
+@gql_connection_type(
+    BackendAIGQLMeta(added_version="26.3.0", description="Notification channel connection.")
+)
 class NotificationChannelConnection(Connection[NotificationChannel]):
     count: int
 
@@ -62,7 +65,9 @@ class NotificationChannelConnection(Connection[NotificationChannel]):
 NotificationRuleEdge = Edge[NotificationRule]
 
 
-@strawberry.type(description="Notification rule connection")
+@gql_connection_type(
+    BackendAIGQLMeta(added_version="26.3.0", description="Notification rule connection.")
+)
 class NotificationRuleConnection(Connection[NotificationRule]):
     count: int
 

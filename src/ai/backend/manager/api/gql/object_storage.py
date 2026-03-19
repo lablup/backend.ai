@@ -47,6 +47,12 @@ from ai.backend.common.dto.manager.v2.object_storage.response import (
     UpdateObjectStoragePayload as UpdateObjectStoragePayloadDTO,
 )
 from ai.backend.manager.api.gql.base import encode_cursor
+from ai.backend.manager.api.gql.decorators import (
+    BackendAIGQLMeta,
+    gql_connection_type,
+    gql_node_type,
+    gql_pydantic_type,
+)
 from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin
 from ai.backend.manager.data.object_storage.types import ObjectStorageData
 from ai.backend.manager.services.object_storage.actions.get_download_presigned_url import (
@@ -63,7 +69,12 @@ from .storage_namespace import StorageNamespace, StorageNamespaceConnection, Sto
 from .types import StrawberryGQLContext
 
 
-@strawberry.type(description="Added in 25.14.0")
+@gql_node_type(
+    BackendAIGQLMeta(
+        added_version="25.14.0",
+        description="Object storage node.",
+    ),
+)
 class ObjectStorage(PydanticNodeMixin[ObjectStorageNode]):
     id: NodeID[str]
     name: str
@@ -133,7 +144,12 @@ class ObjectStorage(PydanticNodeMixin[ObjectStorageNode]):
 ObjectStorageEdge = Edge[ObjectStorage]
 
 
-@strawberry.type(description="Added in 25.14.0")
+@gql_connection_type(
+    BackendAIGQLMeta(
+        added_version="25.14.0",
+        description="Relay-style connection for paginated object storage queries.",
+    ),
+)
 class ObjectStorageConnection(Connection[ObjectStorage]):
     @strawberry.field
     def count(self) -> int:
@@ -244,49 +260,66 @@ class GetPresignedUploadURLInput:
     key: str
 
 
-@strawberry.experimental.pydantic.type(
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version="25.14.0",
+        description="Payload for creating an object storage.",
+    ),
     model=CreateObjectStoragePayloadDTO,
-    description="Added in 25.14.0",
 )
 class CreateObjectStoragePayload:
     object_storage: ObjectStorage
 
 
-@strawberry.experimental.pydantic.type(
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version="25.14.0",
+        description="Payload for updating an object storage.",
+    ),
     model=UpdateObjectStoragePayloadDTO,
-    description="Added in 25.14.0",
 )
 class UpdateObjectStoragePayload:
     object_storage: ObjectStorage
 
 
-@strawberry.experimental.pydantic.type(
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version="25.14.0",
+        description="Payload for deleting an object storage.",
+    ),
     model=DeleteObjectStoragePayloadDTO,
-    description="Added in 25.14.0",
-    all_fields=True,
 )
 class DeleteObjectStoragePayload:
-    pass
+    id: strawberry.auto
 
 
-@strawberry.experimental.pydantic.type(
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version="25.14.0",
+        description="Payload for presigned download URL generation result.",
+    ),
     model=PresignedDownloadURLPayloadDTO,
     name="GetPresignedDownloadURLPayload",
-    description="Added in 25.14.0",
-    all_fields=True,
 )
 class GetPresignedDownloadURLPayload:
     """Payload for presigned download URL generation result."""
 
+    presigned_url: strawberry.auto
 
-@strawberry.experimental.pydantic.type(
+
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version="25.14.0",
+        description="Payload for presigned upload URL generation result.",
+    ),
     model=PresignedUploadURLPayloadDTO,
     name="GetPresignedUploadURLPayload",
-    description="Added in 25.14.0",
-    all_fields=True,
 )
 class GetPresignedUploadURLPayload:
     """Payload for presigned upload URL generation result."""
+
+    presigned_url: strawberry.auto
+    fields: strawberry.auto
 
 
 @strawberry.mutation(description="Added in 25.14.0")  # type: ignore[misc]
@@ -294,13 +327,10 @@ async def create_object_storage(
     input: CreateObjectStorageInput, info: Info[StrawberryGQLContext]
 ) -> CreateObjectStoragePayload:
     result = await info.context.adapters.object_storage.create(input.to_pydantic())
-    return CreateObjectStoragePayload.from_pydantic(
-        result,
-        extra={
-            "object_storage": ObjectStorage.from_pydantic(
-                result.object_storage, extra={"region": result.object_storage.region or ""}
-            )
-        },
+    return CreateObjectStoragePayload(
+        object_storage=ObjectStorage.from_pydantic(
+            result.object_storage, extra={"region": result.object_storage.region or ""}
+        )
     )
 
 
@@ -309,13 +339,10 @@ async def update_object_storage(
     input: UpdateObjectStorageInput, info: Info[StrawberryGQLContext]
 ) -> UpdateObjectStoragePayload:
     result = await info.context.adapters.object_storage.update(input.to_pydantic())
-    return UpdateObjectStoragePayload.from_pydantic(
-        result,
-        extra={
-            "object_storage": ObjectStorage.from_pydantic(
-                result.object_storage, extra={"region": result.object_storage.region or ""}
-            )
-        },
+    return UpdateObjectStoragePayload(
+        object_storage=ObjectStorage.from_pydantic(
+            result.object_storage, extra={"region": result.object_storage.region or ""}
+        )
     )
 
 
@@ -325,7 +352,7 @@ async def delete_object_storage(
 ) -> DeleteObjectStoragePayload:
     pydantic_input = input.to_pydantic()
     result = await info.context.adapters.object_storage.delete(pydantic_input)
-    return DeleteObjectStoragePayload.from_pydantic(result)
+    return DeleteObjectStoragePayload(id=result.id)
 
 
 @strawberry.mutation(description="Added in 25.14.0")  # type: ignore[misc]
@@ -342,9 +369,7 @@ async def get_presigned_download_url(
         )
     )
 
-    return GetPresignedDownloadURLPayload.from_pydantic(
-        PresignedDownloadURLPayloadDTO(presigned_url=action_result.presigned_url)
-    )
+    return GetPresignedDownloadURLPayload(presigned_url=action_result.presigned_url)
 
 
 @strawberry.mutation(description="Added in 25.14.0")  # type: ignore[misc]
@@ -360,9 +385,7 @@ async def get_presigned_upload_url(
         )
     )
 
-    return GetPresignedUploadURLPayload.from_pydantic(
-        PresignedUploadURLPayloadDTO(
-            presigned_url=action_result.presigned_url,
-            fields=json.dumps(action_result.fields),
-        )
+    return GetPresignedUploadURLPayload(
+        presigned_url=action_result.presigned_url,
+        fields=json.dumps(action_result.fields),
     )

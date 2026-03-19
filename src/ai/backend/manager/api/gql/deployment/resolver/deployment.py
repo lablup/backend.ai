@@ -18,9 +18,6 @@ from ai.backend.common.dto.manager.v2.deployment.request import (
 from ai.backend.common.dto.manager.v2.deployment.request import (
     RevisionInput as RevisionInputDTO,
 )
-from ai.backend.common.dto.manager.v2.deployment.response import (
-    SyncReplicaPayload as SyncReplicaPayloadDTO,
-)
 from ai.backend.common.types import RuntimeVariant
 from ai.backend.manager.api.gql.base import encode_cursor, resolve_global_id
 from ai.backend.manager.api.gql.deployment.types.deployment import (
@@ -328,7 +325,7 @@ async def sync_replicas(
     await deployment_processor.sync_replicas.wait_for_complete(
         SyncReplicaAction(deployment_id=UUID(deployment_id))
     )
-    return SyncReplicaPayload.from_pydantic(SyncReplicaPayloadDTO(success=True))
+    return SyncReplicaPayload(success=True)
 
 
 # Subscription resolvers

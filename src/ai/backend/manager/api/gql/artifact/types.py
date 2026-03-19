@@ -108,6 +108,12 @@ from ai.backend.manager.api.gql.base import (
     encode_cursor,
 )
 from ai.backend.manager.api.gql.data_loader.data_loaders import DataLoaders
+from ai.backend.manager.api.gql.decorators import (
+    BackendAIGQLMeta,
+    gql_connection_type,
+    gql_node_type,
+    gql_pydantic_type,
+)
 from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin
 from ai.backend.manager.api.gql.types import GQLFilter, GQLOrderBy, StrawberryGQLContext
 from ai.backend.manager.api.gql.utils import dedent_strip
@@ -149,29 +155,25 @@ async def get_registry_url(
     raise ArtifactRegistryNotFoundError(f"Unknown registry type: {registry_type}")
 
 
-@strawberry.experimental.pydantic.type(
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version="26.1.0",
+        description="A single key-value entry representing metadata from an artifact verifier. Contains additional information about the verification process.",
+    ),
     model=ArtifactVerifierMetadataEntryDTO,
     name="ArtifactVerifierMetadataEntry",
-    description=dedent_strip("""
-    Added in 26.1.0.
-
-    A single key-value entry representing metadata from an artifact verifier.
-    Contains additional information about the verification process.
-    """),
-    all_fields=True,
 )
 class ArtifactVerifierMetadataEntryGQL:
-    pass
+    key: strawberry.auto
+    value: strawberry.auto
 
 
-@strawberry.type(
+@gql_node_type(
+    BackendAIGQLMeta(
+        added_version="26.1.0",
+        description="A collection of metadata from an artifact verifier. Contains key-value pairs providing additional information about the verification.",
+    ),
     name="ArtifactVerifierMetadata",
-    description=dedent_strip("""
-    Added in 26.1.0.
-
-    A collection of metadata from an artifact verifier.
-    Contains key-value pairs providing additional information about the verification.
-    """),
 )
 class ArtifactVerifierMetadataGQL:
     """Metadata containing multiple key-value entries."""
@@ -183,25 +185,16 @@ class ArtifactVerifierMetadataGQL:
     @classmethod
     def from_mapping(cls, data: Mapping[str, str]) -> ArtifactVerifierMetadataGQL:
         """Convert a Mapping to GraphQL type."""
-        entries = [
-            ArtifactVerifierMetadataEntryGQL.from_pydantic(
-                ArtifactVerifierMetadataEntryDTO(key=k, value=v)
-            )
-            for k, v in data.items()
-        ]
+        entries = [ArtifactVerifierMetadataEntryGQL(key=k, value=v) for k, v in data.items()]
         return cls(entries=entries)
 
 
-@strawberry.type(
+@gql_node_type(
+    BackendAIGQLMeta(
+        added_version="25.17.0",
+        description="Result from a single malware verifier containing scan results and metadata. Each verifier scans the artifact for potential security issues and reports findings including infected file count, scan time, and any errors encountered.",
+    ),
     name="ArtifactVerifierResult",
-    description=dedent_strip("""
-    Added in 25.17.0.
-
-    Result from a single malware verifier containing scan results and metadata.
-
-    Each verifier scans the artifact for potential security issues and reports
-    findings including infected file count, scan time, and any errors encountered.
-    """),
 )
 class ArtifactVerifierGQLResult:
     success: bool = strawberry.field(description="Whether the verification completed successfully")
@@ -233,15 +226,12 @@ class ArtifactVerifierGQLResult:
         )
 
 
-@strawberry.type(
+@gql_node_type(
+    BackendAIGQLMeta(
+        added_version="25.17.0",
+        description="Entry for a single verifier's result in the verification results. Associates a verifier name with its scan results.",
+    ),
     name="ArtifactVerifierResultEntry",
-    description=dedent_strip("""
-    Added in 25.17.0.
-
-    Entry for a single verifier's result in the verification results.
-
-    Associates a verifier name with its scan results.
-    """),
 )
 class ArtifactVerifierGQLResultEntry:
     name: str = strawberry.field(description="Name of the verifier (e.g., 'clamav', 'custom')")
@@ -259,16 +249,12 @@ class ArtifactVerifierGQLResultEntry:
         )
 
 
-@strawberry.type(
+@gql_node_type(
+    BackendAIGQLMeta(
+        added_version="25.17.0",
+        description="Complete verification result containing results from all configured verifiers. Artifacts undergo malware scanning through multiple verifiers after being imported. This type aggregates results from all verifiers that were run on the artifact.",
+    ),
     name="ArtifactVerificationResult",
-    description=dedent_strip("""
-    Added in 25.17.0.
-
-    Complete verification result containing results from all configured verifiers.
-
-    Artifacts undergo malware scanning through multiple verifiers after being imported.
-    This type aggregates results from all verifiers that were run on the artifact.
-    """),
 )
 class ArtifactVerificationGQLResult:
     verifiers: list[ArtifactVerifierGQLResultEntry] = strawberry.field(
@@ -755,38 +741,23 @@ class ScanArtifactModelsInput:
 
 
 # Object Types
-@strawberry.experimental.pydantic.type(
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version="25.14.0",
+        description="Information about the source or registry of an artifact. Contains the name and URL of the registry where the artifact is stored or originates from.",
+    ),
     model=SourceInfoDTO,
-    description=dedent_strip("""
-    Added in 25.14.0.
-
-    Information about the source or registry of an artifact.
-
-    Contains the name and URL of the registry where the artifact is stored or originates from.
-    """),
-    all_fields=True,
 )
 class SourceInfo:
-    pass
+    name: strawberry.auto
+    url: strawberry.auto
 
 
-@strawberry.type(
-    description=dedent_strip("""
-    Added in 25.14.0.
-
-    An artifact represents AI models, packages, images, or other resources that can be
-    stored, managed, and used within Backend.AI.
-
-    Artifacts are discovered through scanning external registries and,
-    can have multiple revisions.
-
-    Each artifact contains metadata and references to its source registry.
-
-    Key concepts:
-    - Type: MODEL, PACKAGE, or IMAGE
-    - Availability: ALIVE (available), DELETED (soft-deleted)
-    - Source: Original external registry where it was discovered
-    """)
+@gql_node_type(
+    BackendAIGQLMeta(
+        added_version="25.14.0",
+        description="An artifact represents AI models, packages, images, or other resources that can be stored, managed, and used within Backend.AI. Artifacts are discovered through scanning external registries and can have multiple revisions. Each artifact contains metadata and references to its source registry. Key concepts: Type (MODEL, PACKAGE, or IMAGE), Availability (ALIVE or DELETED), Source (original external registry where it was discovered).",
+    ),
 )
 class Artifact(PydanticNodeMixin[ArtifactNode]):
     id: NodeID[str]
@@ -808,12 +779,8 @@ class Artifact(PydanticNodeMixin[ArtifactNode]):
             name=data.name,
             type=ArtifactType(data.type),
             description=data.description,
-            registry=SourceInfo.from_pydantic(
-                SourceInfoDTO(name=data.registry_type.value, url=registry_url)
-            ),
-            source=SourceInfo.from_pydantic(
-                SourceInfoDTO(name=data.source_registry_type.value, url=source_url)
-            ),
+            registry=SourceInfo(name=data.registry_type.value, url=registry_url),
+            source=SourceInfo(name=data.source_registry_type.value, url=source_url),
             readonly=data.readonly,
             extra=data.extra,
             scanned_at=data.scanned_at,
@@ -829,12 +796,8 @@ class Artifact(PydanticNodeMixin[ArtifactNode]):
             name=node.name,
             type=ArtifactType(node.type.value),
             description=node.description,
-            registry=SourceInfo.from_pydantic(
-                SourceInfoDTO(name=node.registry_type.value, url=registry_url)
-            ),
-            source=SourceInfo.from_pydantic(
-                SourceInfoDTO(name=node.source_registry_type.value, url=source_url)
-            ),
+            registry=SourceInfo(name=node.registry_type.value, url=registry_url),
+            source=SourceInfo(name=node.source_registry_type.value, url=source_url),
             readonly=node.readonly,
             extra=node.extra,
             scanned_at=node.scanned_at,
@@ -908,21 +871,11 @@ class Artifact(PydanticNodeMixin[ArtifactNode]):
         )
 
 
-@strawberry.type(
-    description=dedent_strip("""
-    Added in 25.14.0.
-
-    A specific version/revision of an artifact containing the actual file data.
-
-    Artifact revisions progress through different statuses:
-    - SCANNED: Discovered in external registry, metadata only
-    - PULLING: Currently downloading from external source
-    - PULLED: Downloaded to temporary storage
-    - AVAILABLE: Ready for use by users
-
-    Contains version information, file size, README content, and timestamps.
-    Most HuggingFace models only have a 'main' revision.
-    """)
+@gql_node_type(
+    BackendAIGQLMeta(
+        added_version="25.14.0",
+        description="A specific version/revision of an artifact containing the actual file data. Artifact revisions progress through different statuses: SCANNED (discovered in external registry, metadata only), PULLING (currently downloading from external source), PULLED (downloaded to temporary storage), AVAILABLE (ready for use by users). Contains version information, file size, README content, and timestamps. Most HuggingFace models only have a 'main' revision.",
+    ),
 )
 class ArtifactRevision(PydanticNodeMixin[ArtifactRevisionNode]):
     id: NodeID[str]
@@ -1008,12 +961,8 @@ def make_artifact_from_node(node: ArtifactNode, registry_url: str, source_url: s
         name=node.name,
         type=ArtifactType(node.type.value),
         description=node.description,
-        registry=SourceInfo.from_pydantic(
-            SourceInfoDTO(name=node.registry_type.value, url=registry_url)
-        ),
-        source=SourceInfo.from_pydantic(
-            SourceInfoDTO(name=node.source_registry_type.value, url=source_url)
-        ),
+        registry=SourceInfo(name=node.registry_type.value, url=registry_url),
+        source=SourceInfo(name=node.source_registry_type.value, url=source_url),
         readonly=node.readonly,
         extra=node.extra,
         scanned_at=node.scanned_at,
@@ -1042,14 +991,11 @@ ArtifactEdge = Edge[Artifact]
 ArtifactRevisionEdge = Edge[ArtifactRevision]
 
 
-@strawberry.type(
-    description=dedent_strip("""
-    Added in 25.14.0.
-
-    Paginated connection for artifacts with total count information.
-
-    Used for relay-style pagination with cursor-based navigation.
-    """)
+@gql_connection_type(
+    BackendAIGQLMeta(
+        added_version="25.14.0",
+        description="Paginated connection for artifacts with total count information. Used for relay-style pagination with cursor-based navigation.",
+    ),
 )
 class ArtifactConnection(Connection[Artifact]):
     count: int
@@ -1059,14 +1005,11 @@ class ArtifactConnection(Connection[Artifact]):
         self.count = count
 
 
-@strawberry.type(
-    description=dedent_strip("""
-    Added in 25.14.0.
-
-    Paginated connection for artifact revisions with total count information.
-
-    Used for relay-style pagination with cursor-based navigation.
-    """)
+@gql_connection_type(
+    BackendAIGQLMeta(
+        added_version="25.14.0",
+        description="Paginated connection for artifact revisions with total count information. Used for relay-style pagination with cursor-based navigation.",
+    ),
 )
 class ArtifactRevisionConnection(Connection[ArtifactRevision]):
     count: int
@@ -1076,16 +1019,12 @@ class ArtifactRevisionConnection(Connection[ArtifactRevision]):
         self.count = count
 
 
-@strawberry.experimental.pydantic.type(
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version="25.14.0",
+        description="Payload for artifact import progress subscription events. Provides real-time updates during the artifact import process, including progress percentage and current status.",
+    ),
     model=ArtifactImportProgressUpdatedGQLPayload,
-    description=dedent_strip("""
-    Added in 25.14.0.
-
-    Payload for artifact import progress subscription events.
-
-    Provides real-time updates during the artifact import process,
-    including progress percentage and current status.
-    """),
 )
 class ArtifactImportProgressUpdatedPayload:
     artifact_id: ID = strawberry.field(description="Artifact revision ID.")
@@ -1093,28 +1032,21 @@ class ArtifactImportProgressUpdatedPayload:
     status: ArtifactStatus = strawberry.field(description="Current import status.")
 
 
-@strawberry.type(
-    description=dedent_strip("""
-    Added in 25.14.0.
-
-    Response payload for artifact scanning operations.
-
-    Contains the list of artifacts discovered during scanning of external registries.
-    These artifacts are registered with SCANNED status and can be imported for actual use.
-    """)
+@gql_node_type(
+    BackendAIGQLMeta(
+        added_version="25.14.0",
+        description="Response payload for artifact scanning operations. Contains the list of artifacts discovered during scanning of external registries. These artifacts are registered with SCANNED status and can be imported for actual use.",
+    ),
 )
 class ScanArtifactsPayload:
     artifacts: list[Artifact]
 
 
-@strawberry.type(
-    description=dedent_strip("""
-    Added in 25.15.0.
-
-    Response payload for delegated artifact scanning operation.
-    Contains the list of artifacts discovered during the scan of a reservoir registry's remote registry.
-    These artifacts are now available for import or direct use.
-""")
+@gql_node_type(
+    BackendAIGQLMeta(
+        added_version="25.15.0",
+        description="Response payload for delegated artifact scanning operation. Contains the list of artifacts discovered during the scan of a reservoir registry's remote registry. These artifacts are now available for import or direct use.",
+    ),
 )
 class DelegateScanArtifactsPayload:
     artifacts: list[Artifact] = strawberry.field(
@@ -1122,15 +1054,11 @@ class DelegateScanArtifactsPayload:
     )
 
 
-@strawberry.type(
-    description=dedent_strip("""
-    Added in 25.14.0.
-
-    Represents a background task for importing an artifact revision.
-
-    Contains the task ID for monitoring progress and the associated artifact revision
-    being imported from external registries.
-    """)
+@gql_node_type(
+    BackendAIGQLMeta(
+        added_version="25.14.0",
+        description="Represents a background task for importing an artifact revision. Contains the task ID for monitoring progress and the associated artifact revision being imported from external registries.",
+    ),
 )
 class ArtifactRevisionImportTask:
     task_id: ID | None
@@ -1138,29 +1066,22 @@ class ArtifactRevisionImportTask:
 
 
 # Mutation Payloads
-@strawberry.type(
-    description=dedent_strip("""
-    Added in 25.14.0.
-
-    Response payload for artifact import operations.
-
-    Contains the imported artifact revisions and their associated background tasks.
-    Tasks can be monitored to track the import progress from SCANNED to AVAILABLE status.
-    """)
+@gql_node_type(
+    BackendAIGQLMeta(
+        added_version="25.14.0",
+        description="Response payload for artifact import operations. Contains the imported artifact revisions and their associated background tasks. Tasks can be monitored to track the import progress from SCANNED to AVAILABLE status.",
+    ),
 )
 class ImportArtifactsPayload:
     artifact_revisions: ArtifactRevisionConnection
     tasks: list[ArtifactRevisionImportTask]
 
 
-@strawberry.type(
-    description=dedent_strip("""
-    Added in 25.15.0.
-
-    Response payload for delegated artifact import operation.
-    Contains the imported artifact revisions and associated background tasks.
-    The tasks can be monitored to track the progress of the import operation.
-""")
+@gql_node_type(
+    BackendAIGQLMeta(
+        added_version="25.15.0",
+        description="Response payload for delegated artifact import operation. Contains the imported artifact revisions and associated background tasks. The tasks can be monitored to track the progress of the import operation.",
+    ),
 )
 class DelegateImportArtifactsPayload:
     artifact_revisions: ArtifactRevisionConnection = strawberry.field(
@@ -1171,122 +1092,91 @@ class DelegateImportArtifactsPayload:
     )
 
 
-@strawberry.type(
-    description=dedent_strip("""
-    Added in 25.14.0.
-
-    Response payload for artifact update operations.
-
-    Returns the updated artifact with modified metadata properties.
-    """)
+@gql_node_type(
+    BackendAIGQLMeta(
+        added_version="25.14.0",
+        description="Response payload for artifact update operations. Returns the updated artifact with modified metadata properties.",
+    ),
 )
 class UpdateArtifactPayload:
     artifact: Artifact
 
 
-@strawberry.type(
-    description=dedent_strip("""
-    Added in 25.14.0.
-
-    Response payload for artifact revision cleanup operations.
-
-    Contains the cleaned artifact revisions that have had their stored data removed,
-    transitioning them back to SCANNED status to free storage space.
-    """)
+@gql_node_type(
+    BackendAIGQLMeta(
+        added_version="25.14.0",
+        description="Response payload for artifact revision cleanup operations. Contains the cleaned artifact revisions that have had their stored data removed, transitioning them back to SCANNED status to free storage space.",
+    ),
 )
 class CleanupArtifactRevisionsPayload:
     artifact_revisions: ArtifactRevisionConnection
 
 
-@strawberry.type(
-    description=dedent_strip("""
-    Added in 25.14.0.
-
-    Response payload for artifact revision approval operations.
-
-    Contains the approved artifact revision. Admin-only operation.
-    """)
+@gql_node_type(
+    BackendAIGQLMeta(
+        added_version="25.14.0",
+        description="Response payload for artifact revision approval operations. Contains the approved artifact revision. Admin-only operation.",
+    ),
 )
 class ApproveArtifactPayload:
     artifact_revision: ArtifactRevision
 
 
-@strawberry.type(
-    description=dedent_strip("""
-    Added in 25.14.0.
-
-    Response payload for artifact revision rejection operations.
-
-    Contains the rejected artifact revision. Admin-only operation.
-    """)
+@gql_node_type(
+    BackendAIGQLMeta(
+        added_version="25.14.0",
+        description="Response payload for artifact revision rejection operations. Contains the rejected artifact revision. Admin-only operation.",
+    ),
 )
 class RejectArtifactPayload:
     artifact_revision: ArtifactRevision
 
 
-@strawberry.type(
-    description=dedent_strip("""
-    Added in 25.14.0.
-
-    Response payload for canceling artifact import operations.
-
-    Contains the artifact revision whose import was canceled,
-    reverting its status back to SCANNED.
-    """)
+@gql_node_type(
+    BackendAIGQLMeta(
+        added_version="25.14.0",
+        description="Response payload for canceling artifact import operations. Contains the artifact revision whose import was canceled, reverting its status back to SCANNED.",
+    ),
 )
 class CancelImportArtifactPayload:
     artifact_revision: ArtifactRevision
 
 
-@strawberry.type(
-    description=dedent_strip("""
-    Added in 25.14.0.
-
-    Payload for artifact status change subscription events.
-
-    Provides real-time notifications when artifact revision statuses change
-    during import, cleanup, or other operations.
-    """)
+@gql_node_type(
+    BackendAIGQLMeta(
+        added_version="25.14.0",
+        description="Payload for artifact status change subscription events. Provides real-time notifications when artifact revision statuses change during import, cleanup, or other operations.",
+    ),
 )
 class ArtifactStatusChangedPayload:
     artifact_revision: ArtifactRevision
 
 
-@strawberry.type(
-    description=dedent_strip("""
-    Added in 25.14.0.
-
-    Response payload for batch model scanning operations.
-
-    Contains the artifact revisions discovered during detailed scanning of specific models,
-    including README content and file size information.
-    """)
+@gql_node_type(
+    BackendAIGQLMeta(
+        added_version="25.14.0",
+        description="Response payload for batch model scanning operations. Contains the artifact revisions discovered during detailed scanning of specific models, including README content and file size information.",
+    ),
 )
 class ScanArtifactModelsPayload:
     artifact_revision: ArtifactRevisionConnection
 
 
-@strawberry.type(
-    description=dedent_strip("""
-    Added in 25.15.0.
-
-    Response payload for artifact deletion operations.
-
-    Contains the artifacts that were soft-deleted. These can be restored later.
-    """)
+@gql_node_type(
+    BackendAIGQLMeta(
+        added_version="25.15.0",
+        description="Response payload for artifact deletion operations. Contains the artifacts that were soft-deleted. These can be restored later.",
+    ),
 )
 class DeleteArtifactsPayload:
     artifacts: list[Artifact]
 
 
-@strawberry.type(
-    description=dedent_strip("""
-    Added in 25.15.0.
-
-    Response payload for artifact restoration operations.
-
-    Contains the artifacts that were restored from soft-deleted state.
-    """)
+@gql_node_type(
+    BackendAIGQLMeta(
+        added_version="25.15.0",
+        description="Response payload for artifact restoration operations. Contains the artifacts that were restored from soft-deleted state.",
+    ),
 )
 class RestoreArtifactsPayload:
     artifacts: list[Artifact]

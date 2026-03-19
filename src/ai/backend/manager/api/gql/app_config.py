@@ -24,6 +24,11 @@ from ai.backend.common.dto.manager.v2.app_config.response import (
 from ai.backend.common.dto.manager.v2.app_config.response import (
     DeleteUserConfigPayload as DeleteUserConfigPayloadDTO,
 )
+from ai.backend.manager.api.gql.decorators import (
+    BackendAIGQLMeta,
+    gql_node_type,
+    gql_pydantic_type,
+)
 from ai.backend.manager.api.gql.utils import check_admin_only, dedent_strip
 from ai.backend.manager.errors.auth import InsufficientPrivilege
 from ai.backend.manager.repositories.app_config.updaters import AppConfigUpdaterSpec
@@ -41,7 +46,12 @@ from ai.backend.manager.types import OptionalState
 from .types import StrawberryGQLContext
 
 
-@strawberry.type(description="Added in 25.16.0. App configuration data")
+@gql_node_type(
+    BackendAIGQLMeta(
+        added_version="25.16.0",
+        description="App configuration data.",
+    ),
+)
 class AppConfig:
     """GraphQL type for app configuration."""
 
@@ -119,14 +129,11 @@ class DeleteUserConfigInput:
     user_id: ID | None = None
 
 
-@strawberry.type(
-    description=dedent_strip(
-        """\
-        Added in 25.16.0.
-        Payload returned after upserting domain-level app configuration.
-        Contains the resulting configuration that was stored.
-        """
-    )
+@gql_node_type(
+    BackendAIGQLMeta(
+        added_version="25.16.0",
+        description="Payload returned after upserting domain-level app configuration. Contains the resulting configuration that was stored.",
+    ),
 )
 class UpsertDomainConfigPayload:
     """Payload returned after upserting domain-level app configuration."""
@@ -134,14 +141,11 @@ class UpsertDomainConfigPayload:
     app_config: AppConfig
 
 
-@strawberry.type(
-    description=dedent_strip(
-        """\
-        Added in 25.16.0.
-        Payload returned after upserting user-level app configuration.
-        Contains the resulting configuration that was stored.
-        """
-    )
+@gql_node_type(
+    BackendAIGQLMeta(
+        added_version="25.16.0",
+        description="Payload returned after upserting user-level app configuration. Contains the resulting configuration that was stored.",
+    ),
 )
 class UpsertUserConfigPayload:
     """Payload returned after upserting user-level app configuration."""
@@ -149,34 +153,30 @@ class UpsertUserConfigPayload:
     app_config: AppConfig
 
 
-@strawberry.experimental.pydantic.type(
-    model=DeleteDomainConfigPayloadDTO,
-    description=dedent_strip(
-        """\
-        Added in 25.16.0.
-        Payload returned after deleting domain-level app configuration.
-        Indicates whether the deletion was successful.
-        """
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version="25.16.0",
+        description="Payload returned after deleting domain-level app configuration. Indicates whether the deletion was successful.",
     ),
-    all_fields=True,
+    model=DeleteDomainConfigPayloadDTO,
 )
 class DeleteDomainConfigPayload:
     """Payload returned after deleting domain-level app configuration."""
 
+    deleted: strawberry.auto
 
-@strawberry.experimental.pydantic.type(
-    model=DeleteUserConfigPayloadDTO,
-    description=dedent_strip(
-        """\
-        Added in 25.16.0.
-        Payload returned after deleting user-level app configuration.
-        Indicates whether the deletion was successful.
-        """
+
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version="25.16.0",
+        description="Payload returned after deleting user-level app configuration. Indicates whether the deletion was successful.",
     ),
-    all_fields=True,
+    model=DeleteUserConfigPayloadDTO,
 )
 class DeleteUserConfigPayload:
     """Payload returned after deleting user-level app configuration."""
+
+    deleted: strawberry.auto
 
 
 @strawberry.field(  # type: ignore[misc]

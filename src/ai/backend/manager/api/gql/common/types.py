@@ -18,6 +18,7 @@ from ai.backend.common.types import (
     SessionResult,
     SessionTypes,
 )
+from ai.backend.manager.api.gql.decorators import BackendAIGQLMeta, gql_node_type
 
 # ========== Common Enums ==========
 
@@ -182,12 +183,15 @@ class ServicePortProtocolGQL(StrEnum):
 # ========== Resource Options Types ==========
 
 
-@strawberry.type(
-    name="ResourceOptsEntry",
-    description=(
-        "Added in 26.1.0. A single key-value entry representing a resource option. "
-        "Contains additional resource configuration such as shared memory settings."
+@gql_node_type(
+    BackendAIGQLMeta(
+        added_version="26.1.0",
+        description=(
+            "A single key-value entry representing a resource option. "
+            "Contains additional resource configuration such as shared memory settings."
+        ),
     ),
+    name="ResourceOptsEntry",
 )
 class ResourceOptsEntryGQL:
     """Single resource option entry with name and value."""
@@ -196,12 +200,15 @@ class ResourceOptsEntryGQL:
     value: str = strawberry.field(description="The value for this resource option. Example: '64m'.")
 
 
-@strawberry.type(
-    name="ResourceOpts",
-    description=(
-        "Added in 26.1.0. A collection of additional resource options for a deployment. "
-        "Contains key-value pairs for resource configuration like shared memory."
+@gql_node_type(
+    BackendAIGQLMeta(
+        added_version="26.1.0",
+        description=(
+            "A collection of additional resource options for a deployment. "
+            "Contains key-value pairs for resource configuration like shared memory."
+        ),
     ),
+    name="ResourceOpts",
 )
 class ResourceOptsGQL:
     """Resource options containing multiple key-value entries."""
@@ -255,12 +262,15 @@ class ResourceOptsInput:
 # ========== Service Port Types ==========
 
 
-@strawberry.type(
-    name="ServicePortEntry",
-    description=(
-        "Added in 26.2.0. A single service port entry representing an exposed service. "
-        "Contains port mapping and protocol information for accessing services."
+@gql_node_type(
+    BackendAIGQLMeta(
+        added_version="26.2.0",
+        description=(
+            "A single service port entry representing an exposed service. "
+            "Contains port mapping and protocol information for accessing services."
+        ),
     ),
+    name="ServicePortEntry",
 )
 class ServicePortEntryGQL:
     """Single service port entry with name, protocol, and port mappings."""
@@ -291,12 +301,15 @@ class ServicePortEntryGQL:
         )
 
 
-@strawberry.type(
-    name="ServicePorts",
-    description=(
-        "Added in 26.2.0. A collection of exposed service ports. "
-        "Each entry defines a service accessible through the compute session."
+@gql_node_type(
+    BackendAIGQLMeta(
+        added_version="26.2.0",
+        description=(
+            "A collection of exposed service ports. "
+            "Each entry defines a service accessible through the compute session."
+        ),
     ),
+    name="ServicePorts",
 )
 class ServicePortsGQL:
     """Service ports containing multiple port entries."""

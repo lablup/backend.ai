@@ -52,6 +52,12 @@ from ai.backend.manager.api.gql.base import (
     OrderDirection,
     to_global_id,
 )
+from ai.backend.manager.api.gql.decorators import (
+    BackendAIGQLMeta,
+    gql_connection_type,
+    gql_node_type,
+    gql_pydantic_type,
+)
 from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.api.gql_legacy.session import ComputeSessionNode
@@ -86,9 +92,11 @@ RouteTrafficStatusGQL = strawberry.enum(
 )
 
 
-@strawberry.type(
+@gql_node_type(
+    BackendAIGQLMeta(
+        added_version="25.19.0", description="Represents a route for a model deployment."
+    ),
     name="Route",
-    description="Added in 25.19.0. Represents a route for a model deployment.",
 )
 class Route(PydanticNodeMixin[RouteNodeDTO]):
     id: NodeID[str]
@@ -182,9 +190,9 @@ class Route(PydanticNodeMixin[RouteNodeDTO]):
     def from_pydantic(
         cls,
         dto: RouteNodeDTO,
+        extra: dict[str, Any] | None = None,
         *,
         id_field: str = "id",
-        extra: dict[str, Any] | None = None,
     ) -> Self:
         return cls(
             id=ID(str(dto.id)),
@@ -202,7 +210,11 @@ class Route(PydanticNodeMixin[RouteNodeDTO]):
 RouteEdge = Edge[Route]
 
 
-@strawberry.type(description="Added in 25.19.0. Connection type for paginated route results.")
+@gql_connection_type(
+    BackendAIGQLMeta(
+        added_version="25.19.0", description="Connection type for paginated route results."
+    )
+)
 class RouteConnection(Connection[Route]):
     count: int = strawberry.field(
         description="Total number of routes matching the filter criteria."
@@ -381,10 +393,12 @@ class UpdateRouteTrafficStatusInputGQL:
         )
 
 
-@strawberry.experimental.pydantic.type(
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version="25.19.0", description="Result of updating route traffic status."
+    ),
     model=UpdateRouteTrafficStatusPayloadDTO,
     name="UpdateRouteTrafficStatusPayload",
-    description="Added in 25.19.0. Result of updating route traffic status.",
 )
 class UpdateRouteTrafficStatusPayloadGQL:
     route: Route

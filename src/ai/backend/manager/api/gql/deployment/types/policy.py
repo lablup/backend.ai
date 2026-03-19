@@ -17,6 +17,7 @@ from ai.backend.common.dto.manager.v2.deployment.request import (
 from ai.backend.common.dto.manager.v2.deployment.request import (
     RollingUpdateConfigInput as RollingUpdateConfigInputDTO,
 )
+from ai.backend.manager.api.gql.decorators import BackendAIGQLMeta, gql_node_type
 from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin
 from ai.backend.manager.api.gql.utils import dedent_strip
 from ai.backend.manager.data.deployment.types import DeploymentPolicyData
@@ -43,27 +44,29 @@ class DeploymentStrategySpecGQL:
     strategy: DeploymentStrategyTypeGQL
 
 
-@strawberry.type(
+@gql_node_type(
+    BackendAIGQLMeta(added_version="25.19.0", description="Rolling update strategy specification."),
     name="RollingUpdateStrategySpec",
-    description="Added in 25.19.0. Rolling update strategy specification.",
 )
 class RollingUpdateStrategySpecGQL(DeploymentStrategySpecGQL):
     max_surge: int
     max_unavailable: int
 
 
-@strawberry.type(
+@gql_node_type(
+    BackendAIGQLMeta(
+        added_version="25.19.0", description="Blue-green deployment strategy specification."
+    ),
     name="BlueGreenStrategySpec",
-    description="Added in 25.19.0. Blue-green deployment strategy specification.",
 )
 class BlueGreenStrategySpecGQL(DeploymentStrategySpecGQL):
     auto_promote: bool
     promote_delay_seconds: int
 
 
-@strawberry.type(
+@gql_node_type(
+    BackendAIGQLMeta(added_version="25.19.0", description="Deployment policy configuration."),
     name="DeploymentPolicy",
-    description="Added in 25.19.0. Deployment policy configuration.",
 )
 class DeploymentPolicyGQL(PydanticNodeMixin[Any]):
     id: NodeID[str]
