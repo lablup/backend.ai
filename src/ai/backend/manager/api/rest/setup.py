@@ -57,7 +57,6 @@ def setup_api(
         error_monitor=r.monitoring.error_monitor,
         gql_context_deps=gql_context_deps,
         valkey_rate_limit=r.infrastructure.valkey.rate_limit,
-        health_probe=r.system.health_probe,
         root_app=root_app,
         stream_cleanup_handler=r.processing.stream_cleanup_handler,
         pidx=pidx,
