@@ -22,7 +22,7 @@ from .deployment import (
     update_model_deployment,
 )
 from .policy import (
-    admin_update_deployment_policy,
+    update_deployment_policy,
 )
 from .replica import (
     replica,
@@ -59,7 +59,7 @@ __all__ = [
     "sync_replicas",
     "deployment_status_changed",
     # Policy
-    "admin_update_deployment_policy",
+    "update_deployment_policy",
     # Replica
     "replicas",
     "replica",

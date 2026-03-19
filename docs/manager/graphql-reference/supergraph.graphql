@@ -7740,10 +7740,9 @@ type Mutation
   """
   Added in 26.4.0.
   Create or update the deployment policy for a given deployment (upsert semantics).
-  Requires superadmin privileges.
   If the deployment already has a policy, it is replaced entirely with the new configuration.
   """
-  adminUpdateDeploymentPolicy(input: UpdateDeploymentPolicyInput!): UpdateDeploymentPolicyPayload! @join__field(graph: STRAWBERRY)
+  updateDeploymentPolicy(input: UpdateDeploymentPolicyInput!): UpdateDeploymentPolicyPayload! @join__field(graph: STRAWBERRY)
 
   """Create a new notification channel (admin only)"""
   adminCreateNotificationChannel(input: CreateNotificationChannelInput!): CreateNotificationChannelPayload! @join__field(graph: STRAWBERRY)

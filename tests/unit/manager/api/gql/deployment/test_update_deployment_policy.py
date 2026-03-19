@@ -1,4 +1,4 @@
-"""Tests for admin_update_deployment_policy GQL mutation."""
+"""Tests for update_deployment_policy GQL mutation."""
 
 from __future__ import annotations
 
@@ -205,7 +205,7 @@ class TestToUpserterConversion:
 
 
 class TestAdminUpdateDeploymentPolicyResolver:
-    """Tests for admin_update_deployment_policy resolver."""
+    """Tests for update_deployment_policy resolver."""
 
     async def test_delegates_upsert_action_to_processor(
         self,
@@ -233,7 +233,7 @@ class TestAdminUpdateDeploymentPolicyResolver:
         )
 
         # When
-        resolver_fn = policy_resolver.admin_update_deployment_policy.base_resolver
+        resolver_fn = policy_resolver.update_deployment_policy.base_resolver
         result = await resolver_fn(rolling_update_input, mock_info)
 
         # Then
@@ -269,7 +269,7 @@ class TestAdminUpdateDeploymentPolicyResolver:
         )
 
         # When / Then
-        resolver_fn = policy_resolver.admin_update_deployment_policy.base_resolver
+        resolver_fn = policy_resolver.update_deployment_policy.base_resolver
         with pytest.raises(web.HTTPForbidden):
             await resolver_fn(input_data, mock_info)
 

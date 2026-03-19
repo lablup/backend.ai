@@ -21,11 +21,10 @@ from ai.backend.manager.services.deployment.actions.deployment_policy.upsert_dep
     description=dedent_strip("""
         Added in 26.4.0.
         Create or update the deployment policy for a given deployment (upsert semantics).
-        Requires superadmin privileges.
         If the deployment already has a policy, it is replaced entirely with the new configuration.
     """),
 )
-async def admin_update_deployment_policy(
+async def update_deployment_policy(
     input: UpdateDeploymentPolicyInputGQL,
     info: Info[StrawberryGQLContext],
 ) -> UpdateDeploymentPolicyPayloadGQL:
