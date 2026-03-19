@@ -1256,7 +1256,7 @@ class UtilizationIdleChecker(BaseIdleChecker):
                     utilization_sums["mem"] = (
                         utilization_sums["mem"] + mem_current / mem_slots * 100
                     )
-                    utilization_counts["mem"] = utilization_counts.get("mem", 0) + 1
+                    utilization_counts["mem"] += 1
 
                 kernel_counter += 1
             if kernel_counter == 0:
