@@ -2,12 +2,17 @@
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from datetime import UTC, datetime
+from typing import Any
 from uuid import UUID
 
 from ai.backend.common.api_handlers import SENTINEL
 from ai.backend.common.dto.manager.v2.resource_group.request import (
+    AdminSearchResourceGroupsInput,
     CreateResourceGroupInput,
+    ResourceGroupFilter,
+    ResourceGroupOrder,
     UpdateResourceGroupInput,
 )
 from ai.backend.common.dto.manager.v2.resource_group.response import (
@@ -15,8 +20,19 @@ from ai.backend.common.dto.manager.v2.resource_group.response import (
     ResourceGroupNode,
     UpdateResourceGroupPayload,
 )
+from ai.backend.common.dto.manager.v2.resource_group.types import (
+    ResourceGroupOrderDirection,
+    ResourceGroupOrderField,
+)
 from ai.backend.manager.data.scaling_group.types import ScalingGroupData
 from ai.backend.manager.models.scaling_group import ScalingGroupRow
+from ai.backend.manager.models.scaling_group.conditions import ScalingGroupConditions
+from ai.backend.manager.models.scaling_group.orders import ScalingGroupOrders
+from ai.backend.manager.repositories.base import (
+    QueryCondition,
+    combine_conditions_or,
+    negate_conditions,
+)
 from ai.backend.manager.repositories.base.creator import Creator
 from ai.backend.manager.repositories.base.purger import Purger
 from ai.backend.manager.repositories.base.updater import Updater
@@ -27,6 +43,9 @@ from ai.backend.manager.repositories.scaling_group.updaters import (
     ScalingGroupUpdaterSpec,
 )
 from ai.backend.manager.services.scaling_group.actions.create import CreateScalingGroupAction
+from ai.backend.manager.services.scaling_group.actions.list_scaling_groups import (
+    SearchScalingGroupsAction,
+)
 from ai.backend.manager.services.scaling_group.actions.modify import ModifyScalingGroupAction
 from ai.backend.manager.services.scaling_group.actions.purge_scaling_group import (
     PurgeScalingGroupAction,
@@ -34,6 +53,28 @@ from ai.backend.manager.services.scaling_group.actions.purge_scaling_group impor
 from ai.backend.manager.types import OptionalState, TriState
 
 from .base import BaseAdapter
+from .pagination import PaginationSpec
+
+
+def _resource_group_pagination_spec() -> PaginationSpec:
+    return PaginationSpec(
+        forward_order=ScalingGroupOrders.created_at(ascending=False),
+        backward_order=ScalingGroupOrders.created_at(ascending=True),
+        forward_condition_factory=ScalingGroupConditions.by_cursor_forward,
+        backward_condition_factory=ScalingGroupConditions.by_cursor_backward,
+        tiebreaker_order=ScalingGroupRow.name.asc(),
+    )
+
+
+@dataclass
+class ResourceGroupSearchPayload:
+    """Result of a resource group search containing paginated ScalingGroupData items."""
+
+    items: list[ScalingGroupData]
+    total_count: int
+    has_next_page: bool
+    has_previous_page: bool
+
 
 # Sentinel UUID used when converting ScalingGroupData to ResourceGroupNode.
 # ScalingGroupData does not have a UUID field (name is the primary key),
@@ -54,6 +95,92 @@ class ResourceGroupAdapter(BaseAdapter):
         zero-UUID because no UUID is available in the data model.  Callers that
         need an opaque identifier should use the ``name`` field instead.
     """
+
+    async def search(self, input: AdminSearchResourceGroupsInput) -> ResourceGroupSearchPayload:
+        """Search resource groups with filters, ordering, and pagination."""
+        conditions = self._convert_filter(input.filter) if input.filter else []
+        orders = self._convert_orders(input.order) if input.order else []
+        pagination_spec = _resource_group_pagination_spec()
+        querier = self._build_querier(
+            conditions=conditions,
+            orders=orders,
+            pagination_spec=pagination_spec,
+            first=input.first,
+            after=input.after,
+            last=input.last,
+            before=input.before,
+            limit=input.limit,
+            offset=input.offset,
+        )
+        action_result = (
+            await self._processors.scaling_group.search_scaling_groups.wait_for_complete(
+                SearchScalingGroupsAction(querier=querier)
+            )
+        )
+        return ResourceGroupSearchPayload(
+            items=action_result.scaling_groups,
+            total_count=action_result.total_count,
+            has_next_page=action_result.has_next_page,
+            has_previous_page=action_result.has_previous_page,
+        )
+
+    def _convert_filter(self, filter_: ResourceGroupFilter) -> list[QueryCondition]:
+        """Convert ResourceGroupFilter DTO to QueryConditions."""
+        conditions: list[QueryCondition] = []
+        if filter_.name:
+            cond = self.convert_string_filter(
+                filter_.name,
+                contains_factory=ScalingGroupConditions.by_name_contains,
+                equals_factory=ScalingGroupConditions.by_name_equals,
+                starts_with_factory=ScalingGroupConditions.by_name_starts_with,
+                ends_with_factory=ScalingGroupConditions.by_name_ends_with,
+            )
+            if cond:
+                conditions.append(cond)
+        if filter_.description:
+            cond = self.convert_string_filter(
+                filter_.description,
+                contains_factory=ScalingGroupConditions.by_description_contains,
+                equals_factory=ScalingGroupConditions.by_description_equals,
+                starts_with_factory=ScalingGroupConditions.by_description_starts_with,
+                ends_with_factory=ScalingGroupConditions.by_description_ends_with,
+            )
+            if cond:
+                conditions.append(cond)
+        if filter_.is_active is not None:
+            conditions.append(ScalingGroupConditions.by_is_active(filter_.is_active))
+        if filter_.is_public is not None:
+            conditions.append(ScalingGroupConditions.by_is_public(filter_.is_public))
+        if filter_.AND:
+            for sub in filter_.AND:
+                conditions.extend(self._convert_filter(sub))
+        if filter_.OR:
+            or_conds: list[QueryCondition] = []
+            for sub in filter_.OR:
+                or_conds.extend(self._convert_filter(sub))
+            if or_conds:
+                conditions.append(combine_conditions_or(or_conds))
+        if filter_.NOT:
+            not_conds: list[QueryCondition] = []
+            for sub in filter_.NOT:
+                not_conds.extend(self._convert_filter(sub))
+            if not_conds:
+                conditions.append(negate_conditions(not_conds))
+        return conditions
+
+    def _convert_orders(self, orders: list[ResourceGroupOrder]) -> list[Any]:
+        """Convert ResourceGroupOrder DTOs to QueryOrders."""
+        result = []
+        for order in orders:
+            ascending = order.direction == ResourceGroupOrderDirection.ASC
+            match order.field:
+                case ResourceGroupOrderField.NAME:
+                    result.append(ScalingGroupOrders.name(ascending))
+                case ResourceGroupOrderField.CREATED_AT:
+                    result.append(ScalingGroupOrders.created_at(ascending))
+                case ResourceGroupOrderField.IS_ACTIVE:
+                    result.append(ScalingGroupOrders.is_active(ascending))
+        return result
 
     async def create(
         self,

@@ -6,7 +6,7 @@ from collections.abc import Iterable
 from datetime import datetime
 from decimal import Decimal
 from enum import StrEnum
-from typing import Self, assert_never, override
+from typing import Self, assert_never
 
 import strawberry
 from strawberry import Info
@@ -16,10 +16,22 @@ from ai.backend.common.dto.manager.v2.resource_group.request import (
     PreemptionConfigInputDTO,
 )
 from ai.backend.common.dto.manager.v2.resource_group.request import (
+    ResourceGroupFilter as ResourceGroupFilterDTO,
+)
+from ai.backend.common.dto.manager.v2.resource_group.request import (
+    ResourceGroupOrder as ResourceGroupOrderDTO,
+)
+from ai.backend.common.dto.manager.v2.resource_group.request import (
     UpdateResourceGroupConfigInput as UpdateResourceGroupConfigInputDTO,
 )
 from ai.backend.common.dto.manager.v2.resource_group.request import (
     UpdateResourceGroupFairShareSpecInput as UpdateResourceGroupFairShareSpecInputDTO,
+)
+from ai.backend.common.dto.manager.v2.resource_group.types import (
+    ResourceGroupOrderDirection as ResourceGroupOrderDirectionEnum,
+)
+from ai.backend.common.dto.manager.v2.resource_group.types import (
+    ResourceGroupOrderField as ResourceGroupOrderFieldEnum,
 )
 from ai.backend.common.types import PreemptionMode, PreemptionOrder
 from ai.backend.manager.api.gql.base import OrderDirection, StringFilter
@@ -29,7 +41,7 @@ from ai.backend.manager.api.gql.fair_share.types.common import (
     ResourceWeightEntryInputGQL,
 )
 from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin
-from ai.backend.manager.api.gql.types import GQLFilter, GQLOrderBy, StrawberryGQLContext
+from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.api.gql.utils import dedent_strip
 from ai.backend.manager.data.scaling_group.types import (
     PreemptionConfig as DataPreemptionConfig,
@@ -39,15 +51,7 @@ from ai.backend.manager.data.scaling_group.types import (
     ScalingGroupData,
     SchedulerType,
 )
-from ai.backend.manager.models.scaling_group.conditions import ScalingGroupConditions
-from ai.backend.manager.models.scaling_group.orders import ScalingGroupOrders
 from ai.backend.manager.models.scaling_group.types import FairShareScalingGroupSpec
-from ai.backend.manager.repositories.base import (
-    QueryCondition,
-    QueryOrder,
-    combine_conditions_or,
-    negate_conditions,
-)
 from ai.backend.manager.services.scaling_group.actions.get_resource_info import (
     GetResourceInfoAction,
 )
@@ -395,7 +399,7 @@ class ResourceGroupGQL(PydanticNodeMixin):
         return [cls.from_dataclass(data) if data is not None else None for data in results]
 
     @classmethod
-    def from_dataclass(cls, data: ScalingGroupData) -> Self:
+    def from_node(cls, data: ScalingGroupData) -> Self:
         return cls(
             id=data.name,
             name=data.name,
@@ -417,6 +421,10 @@ class ResourceGroupGQL(PydanticNodeMixin):
             ),
             _fair_share_spec_data=data.fair_share_spec,
         )
+
+    @classmethod
+    def from_dataclass(cls, data: ScalingGroupData) -> Self:
+        return cls.from_node(data)
 
     @strawberry.field(  # type: ignore[misc]
         description=(
@@ -495,11 +503,12 @@ class ResourceGroupOrderFieldGQL(StrEnum):
     IS_ACTIVE = "is_active"
 
 
-@strawberry.input(
+@strawberry.experimental.pydantic.input(
+    model=ResourceGroupFilterDTO,
     name="ResourceGroupFilter",
     description="Added in 26.1.0. Filter for resource groups",
 )
-class ResourceGroupFilterGQL(GQLFilter):
+class ResourceGroupFilterGQL:
     name: StringFilter | None = None
     description: StringFilter | None = None
     is_active: bool | None = None
@@ -509,89 +518,32 @@ class ResourceGroupFilterGQL(GQLFilter):
     OR: list[ResourceGroupFilterGQL] | None = None
     NOT: list[ResourceGroupFilterGQL] | None = None
 
-    @override
-    def build_conditions(self) -> list[QueryCondition]:
-        """Build query conditions from this filter.
-
-        Returns a list containing a single combined QueryCondition that represents
-        all filters with proper logical operators applied.
-        """
-        # Collect direct field conditions (these will be combined with AND)
-        field_conditions: list[QueryCondition] = []
-
-        # Apply name filter
-        if self.name:
-            name_condition = self.name.build_query_condition(
-                contains_factory=ScalingGroupConditions.by_name_contains,
-                equals_factory=ScalingGroupConditions.by_name_equals,
-                starts_with_factory=ScalingGroupConditions.by_name_starts_with,
-                ends_with_factory=ScalingGroupConditions.by_name_ends_with,
-            )
-            if name_condition:
-                field_conditions.append(name_condition)
-
-        # Apply description filter
-        if self.description:
-            description_condition = self.description.build_query_condition(
-                contains_factory=ScalingGroupConditions.by_description_contains,
-                equals_factory=ScalingGroupConditions.by_description_equals,
-                starts_with_factory=ScalingGroupConditions.by_description_starts_with,
-                ends_with_factory=ScalingGroupConditions.by_description_ends_with,
-            )
-            if description_condition:
-                field_conditions.append(description_condition)
-
-        # Apply is_active filter
-        if self.is_active is not None:
-            field_conditions.append(ScalingGroupConditions.by_is_active(self.is_active))
-
-        # Apply is_public filter
-        if self.is_public is not None:
-            field_conditions.append(ScalingGroupConditions.by_is_public(self.is_public))
-
-        # Handle AND logical operator - these are implicitly ANDed with field conditions
-        if self.AND:
-            for sub_filter in self.AND:
-                field_conditions.extend(sub_filter.build_conditions())
-
-        # Handle OR logical operator
-        if self.OR:
-            or_sub_conditions: list[QueryCondition] = []
-            for sub_filter in self.OR:
-                or_sub_conditions.extend(sub_filter.build_conditions())
-            if or_sub_conditions:
-                field_conditions.append(combine_conditions_or(or_sub_conditions))
-
-        # Handle NOT logical operator
-        if self.NOT:
-            not_sub_conditions: list[QueryCondition] = []
-            for sub_filter in self.NOT:
-                not_sub_conditions.extend(sub_filter.build_conditions())
-            if not_sub_conditions:
-                field_conditions.append(negate_conditions(not_sub_conditions))
-
-        return field_conditions
+    def to_pydantic(self) -> ResourceGroupFilterDTO:
+        return ResourceGroupFilterDTO(
+            name=self.name.to_pydantic() if self.name else None,
+            description=self.description.to_pydantic() if self.description else None,
+            is_active=self.is_active,
+            is_public=self.is_public,
+            AND=[f.to_pydantic() for f in self.AND] if self.AND else None,
+            OR=[f.to_pydantic() for f in self.OR] if self.OR else None,
+            NOT=[f.to_pydantic() for f in self.NOT] if self.NOT else None,
+        )
 
 
-@strawberry.input(
+@strawberry.experimental.pydantic.input(
+    model=ResourceGroupOrderDTO,
     name="ResourceGroupOrderBy",
     description="Added in 26.1.0. Order by specification for resource groups",
 )
-class ResourceGroupOrderByGQL(GQLOrderBy):
+class ResourceGroupOrderByGQL:
     field: ResourceGroupOrderFieldGQL
     direction: OrderDirection = OrderDirection.ASC
 
-    @override
-    def to_query_order(self) -> QueryOrder:
-        """Convert to repository QueryOrder."""
-        ascending = self.direction == OrderDirection.ASC
-        match self.field:
-            case ResourceGroupOrderFieldGQL.NAME:
-                return ScalingGroupOrders.name(ascending)
-            case ResourceGroupOrderFieldGQL.CREATED_AT:
-                return ScalingGroupOrders.created_at(ascending)
-            case ResourceGroupOrderFieldGQL.IS_ACTIVE:
-                return ScalingGroupOrders.is_active(ascending)
+    def to_pydantic(self) -> ResourceGroupOrderDTO:
+        return ResourceGroupOrderDTO(
+            field=ResourceGroupOrderFieldEnum(self.field.value),
+            direction=ResourceGroupOrderDirectionEnum(self.direction.value),
+        )
 
 
 @strawberry.experimental.pydantic.input(

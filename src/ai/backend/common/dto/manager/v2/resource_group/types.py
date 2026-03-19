@@ -32,4 +32,4 @@ class ResourceGroupOrderField(StrEnum):
 
     NAME = "name"
     CREATED_AT = "created_at"
-    MODIFIED_AT = "modified_at"
+    IS_ACTIVE = "is_active"

@@ -2,15 +2,14 @@
 
 from __future__ import annotations
 
-from functools import lru_cache
 from typing import Any
 
 import strawberry
 from strawberry import Info
-from strawberry.relay import Connection, Edge
+from strawberry.relay import Connection, Edge, PageInfo
 
+from ai.backend.common.dto.manager.v2.resource_group.request import AdminSearchResourceGroupsInput
 from ai.backend.common.types import PreemptionMode, PreemptionOrder
-from ai.backend.manager.api.gql.adapter import PaginationOptions, PaginationSpec
 from ai.backend.manager.api.gql.base import encode_cursor
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.api.gql.utils import check_admin_only
@@ -20,9 +19,6 @@ from ai.backend.manager.data.scaling_group.types import (
 from ai.backend.manager.data.scaling_group.types import (
     SchedulerType,
 )
-from ai.backend.manager.models.scaling_group.conditions import ScalingGroupConditions
-from ai.backend.manager.models.scaling_group.orders import ScalingGroupOrders
-from ai.backend.manager.models.scaling_group.row import ScalingGroupRow
 from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.repositories.scaling_group.updaters import (
     ScalingGroupMetadataUpdaterSpec,
@@ -30,9 +26,6 @@ from ai.backend.manager.repositories.scaling_group.updaters import (
     ScalingGroupSchedulerConfigUpdaterSpec,
     ScalingGroupStatusUpdaterSpec,
     ScalingGroupUpdaterSpec,
-)
-from ai.backend.manager.services.scaling_group.actions.list_scaling_groups import (
-    SearchScalingGroupsAction,
 )
 from ai.backend.manager.services.scaling_group.actions.modify import (
     ModifyScalingGroupAction,
@@ -52,20 +45,6 @@ from .types import (
     UpdateResourceGroupInput,
     UpdateResourceGroupPayload,
 )
-
-# Pagination specs
-
-
-@lru_cache(maxsize=1)
-def _get_resource_group_pagination_spec() -> PaginationSpec:
-    return PaginationSpec(
-        forward_order=ScalingGroupOrders.created_at(ascending=False),
-        backward_order=ScalingGroupOrders.created_at(ascending=True),
-        forward_condition_factory=ScalingGroupConditions.by_cursor_forward,
-        backward_condition_factory=ScalingGroupConditions.by_cursor_backward,
-        tiebreaker_order=ScalingGroupRow.name.asc(),
-    )
-
 
 # Connection types
 
@@ -100,40 +79,34 @@ async def admin_resource_groups(
 ) -> ResourceGroupConnection | None:
     check_admin_only()
 
-    processors = info.context.processors
+    pydantic_filter = filter.to_pydantic() if filter else None
+    pydantic_order = [o.to_pydantic() for o in order_by] if order_by else None
 
-    # Build querier from filter, order_by, and pagination using adapter
-    querier = info.context.gql_adapter.build_querier(
-        PaginationOptions(
+    payload = await info.context.adapters.resource_group.search(
+        AdminSearchResourceGroupsInput(
+            filter=pydantic_filter,
+            order=pydantic_order,
             first=first,
             after=after,
             last=last,
             before=before,
             limit=limit,
             offset=offset,
-        ),
-        _get_resource_group_pagination_spec(),
-        filter=filter,
-        order_by=order_by,
+        )
     )
 
-    action_result = await processors.scaling_group.search_scaling_groups.wait_for_complete(
-        SearchScalingGroupsAction(querier=querier)
-    )
-
-    nodes = [ResourceGroupGQL.from_dataclass(data) for data in action_result.scaling_groups]
-
+    nodes = [ResourceGroupGQL.from_node(data) for data in payload.items]
     edges = [ResourceGroupEdge(node=node, cursor=encode_cursor(node.id)) for node in nodes]
 
     return ResourceGroupConnection(
         edges=edges,
-        page_info=strawberry.relay.PageInfo(
-            has_next_page=action_result.has_next_page,
-            has_previous_page=action_result.has_previous_page,
+        page_info=PageInfo(
+            has_next_page=payload.has_next_page,
+            has_previous_page=payload.has_previous_page,
             start_cursor=edges[0].cursor if edges else None,
             end_cursor=edges[-1].cursor if edges else None,
         ),
-        count=action_result.total_count,
+        count=payload.total_count,
     )
 
 
@@ -155,40 +128,34 @@ async def resource_groups(
     limit: int | None = None,
     offset: int | None = None,
 ) -> ResourceGroupConnection | None:
-    processors = info.context.processors
+    pydantic_filter = filter.to_pydantic() if filter else None
+    pydantic_order = [o.to_pydantic() for o in order_by] if order_by else None
 
-    # Build querier from filter, order_by, and pagination using adapter
-    querier = info.context.gql_adapter.build_querier(
-        PaginationOptions(
+    payload = await info.context.adapters.resource_group.search(
+        AdminSearchResourceGroupsInput(
+            filter=pydantic_filter,
+            order=pydantic_order,
             first=first,
             after=after,
             last=last,
             before=before,
             limit=limit,
             offset=offset,
-        ),
-        _get_resource_group_pagination_spec(),
-        filter=filter,
-        order_by=order_by,
+        )
     )
 
-    action_result = await processors.scaling_group.search_scaling_groups.wait_for_complete(
-        SearchScalingGroupsAction(querier=querier)
-    )
-
-    nodes = [ResourceGroupGQL.from_dataclass(data) for data in action_result.scaling_groups]
-
+    nodes = [ResourceGroupGQL.from_node(data) for data in payload.items]
     edges = [ResourceGroupEdge(node=node, cursor=encode_cursor(node.id)) for node in nodes]
 
     return ResourceGroupConnection(
         edges=edges,
-        page_info=strawberry.relay.PageInfo(
-            has_next_page=action_result.has_next_page,
-            has_previous_page=action_result.has_previous_page,
+        page_info=PageInfo(
+            has_next_page=payload.has_next_page,
+            has_previous_page=payload.has_previous_page,
             start_cursor=edges[0].cursor if edges else None,
             end_cursor=edges[-1].cursor if edges else None,
         ),
-        count=action_result.total_count,
+        count=payload.total_count,
     )
 
 
@@ -235,7 +202,7 @@ async def admin_update_resource_group_fair_share_spec(
     result = await processors.scaling_group.update_fair_share_spec.wait_for_complete(action)
 
     return UpdateResourceGroupFairShareSpecPayload(
-        resource_group=ResourceGroupGQL.from_dataclass(result.scaling_group),
+        resource_group=ResourceGroupGQL.from_node(result.scaling_group),
     )
 
 
@@ -281,7 +248,7 @@ async def update_resource_group_fair_share_spec(
     result = await processors.scaling_group.update_fair_share_spec.wait_for_complete(action)
 
     return UpdateResourceGroupFairShareSpecPayload(
-        resource_group=ResourceGroupGQL.from_dataclass(result.scaling_group),
+        resource_group=ResourceGroupGQL.from_node(result.scaling_group),
     )
 
 
@@ -379,5 +346,5 @@ async def admin_update_resource_group(
     result = await processors.scaling_group.modify_scaling_group.wait_for_complete(action)
 
     return UpdateResourceGroupPayload(
-        resource_group=ResourceGroupGQL.from_dataclass(result.scaling_group),
+        resource_group=ResourceGroupGQL.from_node(result.scaling_group),
     )

@@ -127,7 +127,15 @@ class ResourceGroupFilter(BaseRequestModel):
     """Filter criteria for searching resource groups."""
 
     name: StringFilter | None = Field(default=None, description="Filter by name.")
+    description: StringFilter | None = Field(default=None, description="Filter by description.")
     is_active: bool | None = Field(default=None, description="Filter by active status.")
+    is_public: bool | None = Field(default=None, description="Filter by public status.")
+    AND: list[ResourceGroupFilter] | None = Field(default=None, description="AND conjunction.")
+    OR: list[ResourceGroupFilter] | None = Field(default=None, description="OR conjunction.")
+    NOT: list[ResourceGroupFilter] | None = Field(default=None, description="NOT negation.")
+
+
+ResourceGroupFilter.model_rebuild()
 
 
 class ResourceGroupOrder(BaseRequestModel):
