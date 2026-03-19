@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Any, override
+from typing import Any, Self
 from uuid import UUID
 
 import strawberry
@@ -14,6 +14,9 @@ from ai.backend.common.dto.manager.v2.resource_usage.request import (
 )
 from ai.backend.common.dto.manager.v2.resource_usage.request import (
     UserUsageBucketOrderBy as UserUsageBucketOrderByDTO,
+)
+from ai.backend.common.dto.manager.v2.resource_usage.response import (
+    UserUsageBucketNode,
 )
 from ai.backend.common.dto.manager.v2.resource_usage.types import (
     OrderDirection as OrderDirectionDTO,
@@ -30,16 +33,6 @@ from ai.backend.manager.api.gql.base import (
 from ai.backend.manager.api.gql.fair_share.types import ResourceSlotGQL
 from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin
 from ai.backend.manager.api.gql.types import GQLFilter, GQLOrderBy
-from ai.backend.manager.repositories.base import (
-    QueryCondition,
-    QueryOrder,
-    combine_conditions_or,
-    negate_conditions,
-)
-from ai.backend.manager.repositories.resource_usage_history.options import (
-    UserUsageBucketConditions,
-    UserUsageBucketOrders,
-)
 from ai.backend.manager.repositories.resource_usage_history.types import (
     UserUsageBucketData,
 )
@@ -132,6 +125,26 @@ class UserUsageBucketGQL(PydanticNodeMixin):
             ),
             resource_usage=ResourceSlotGQL.from_resource_slot(data.resource_usage),
             capacity_snapshot=ResourceSlotGQL.from_resource_slot(data.capacity_snapshot),
+        )
+
+    @classmethod
+    def from_node(cls, node: UserUsageBucketNode) -> Self:
+        """Create UserUsageBucketGQL from UserUsageBucketNode DTO (adapter search results)."""
+        return cls(
+            id=ID(str(node.id)),
+            user_uuid=node.user_uuid,
+            project_id=node.project_id,
+            domain_name=node.domain_name,
+            resource_group_name=node.resource_group,
+            metadata=UsageBucketMetadataGQL(
+                period_start=node.period_start,
+                period_end=node.period_end,
+                decay_unit_days=node.decay_unit_days,
+                created_at=node.created_at,
+                updated_at=node.updated_at,
+            ),
+            resource_usage=ResourceSlotGQL.from_resource_slot(node.resource_usage),
+            capacity_snapshot=ResourceSlotGQL.from_resource_slot(node.capacity_snapshot),
         )
 
 
@@ -229,86 +242,6 @@ class UserUsageBucketFilter(GQLFilter):
             NOT=[f.to_pydantic() for f in self.NOT] if self.NOT else None,
         )
 
-    @override
-    def build_conditions(self) -> list[QueryCondition]:
-        conditions: list[QueryCondition] = []
-
-        if self.resource_group:
-            sg_condition = self.resource_group.build_query_condition(
-                contains_factory=UserUsageBucketConditions.by_resource_group_contains,
-                equals_factory=UserUsageBucketConditions.by_resource_group_equals,
-                starts_with_factory=UserUsageBucketConditions.by_resource_group_starts_with,
-                ends_with_factory=UserUsageBucketConditions.by_resource_group_ends_with,
-            )
-            if sg_condition:
-                conditions.append(sg_condition)
-
-        if self.user_uuid:
-            uuid_condition = self.user_uuid.build_query_condition(
-                equals_factory=UserUsageBucketConditions.by_user_uuid,
-                in_factory=UserUsageBucketConditions.by_user_uuids,
-            )
-            if uuid_condition:
-                conditions.append(uuid_condition)
-
-        if self.project_id:
-            pid_condition = self.project_id.build_query_condition(
-                equals_factory=UserUsageBucketConditions.by_project_id,
-                in_factory=UserUsageBucketConditions.by_project_ids,
-            )
-            if pid_condition:
-                conditions.append(pid_condition)
-
-        if self.domain_name:
-            dn_condition = self.domain_name.build_query_condition(
-                contains_factory=UserUsageBucketConditions.by_domain_name_contains,
-                equals_factory=UserUsageBucketConditions.by_domain_name_equals,
-                starts_with_factory=UserUsageBucketConditions.by_domain_name_starts_with,
-                ends_with_factory=UserUsageBucketConditions.by_domain_name_ends_with,
-            )
-            if dn_condition:
-                conditions.append(dn_condition)
-
-        if self.period_start:
-            ps_condition = self.period_start.build_query_condition(
-                before_factory=UserUsageBucketConditions.by_period_start_before,
-                after_factory=UserUsageBucketConditions.by_period_start_after,
-                equals_factory=UserUsageBucketConditions.by_period_start,
-                not_equals_factory=UserUsageBucketConditions.by_period_start_not_equals,
-            )
-            if ps_condition:
-                conditions.append(ps_condition)
-
-        if self.period_end:
-            pe_condition = self.period_end.build_query_condition(
-                before_factory=UserUsageBucketConditions.by_period_end_before,
-                after_factory=UserUsageBucketConditions.by_period_end_after,
-                equals_factory=UserUsageBucketConditions.by_period_end,
-                not_equals_factory=UserUsageBucketConditions.by_period_end_not_equals,
-            )
-            if pe_condition:
-                conditions.append(pe_condition)
-
-        if self.AND:
-            for sub_filter in self.AND:
-                conditions.extend(sub_filter.build_conditions())
-
-        if self.OR:
-            or_conditions: list[QueryCondition] = []
-            for sub_filter in self.OR:
-                or_conditions.extend(sub_filter.build_conditions())
-            if or_conditions:
-                conditions.append(combine_conditions_or(or_conditions))
-
-        if self.NOT:
-            not_conditions: list[QueryCondition] = []
-            for sub_filter in self.NOT:
-                not_conditions.extend(sub_filter.build_conditions())
-            if not_conditions:
-                conditions.append(negate_conditions(not_conditions))
-
-        return conditions
-
 
 @strawberry.experimental.pydantic.input(
     model=UserUsageBucketOrderByDTO,
@@ -338,13 +271,6 @@ class UserUsageBucketOrderBy(GQLOrderBy):
             field=UsageBucketOrderFieldDTO(self.field.value),
             direction=OrderDirectionDTO(self.direction.value),
         )
-
-    @override
-    def to_query_order(self) -> QueryOrder:
-        ascending = self.direction == OrderDirection.ASC
-        match self.field:
-            case UsageBucketOrderField.PERIOD_START:
-                return UserUsageBucketOrders.by_period_start(ascending)
 
 
 __all__ = [

@@ -5,12 +5,15 @@ from __future__ import annotations
 import strawberry
 from aiohttp import web
 from strawberry import Info
+from strawberry.relay import PageInfo
 
 from ai.backend.common.contexts.user import current_user
-from ai.backend.manager.api.gql.resource_usage.fetcher import fetch_project_usage_buckets
+from ai.backend.manager.api.gql.base import encode_cursor
 from ai.backend.manager.api.gql.resource_usage.types import (
     ProjectUsageBucketConnection,
+    ProjectUsageBucketEdge,
     ProjectUsageBucketFilter,
+    ProjectUsageBucketGQL,
     ProjectUsageBucketOrderBy,
 )
 from ai.backend.manager.api.gql.types import ResourceGroupProjectScope, StrawberryGQLContext
@@ -34,16 +37,29 @@ async def admin_project_usage_buckets(
     """Search project usage buckets with pagination (admin only)."""
     check_admin_only()
 
-    return await fetch_project_usage_buckets(
-        info=info,
-        filter=filter,
-        order_by=order_by,
-        before=before,
-        after=after,
+    payload = await info.context.adapters.resource_usage.gql_admin_search_project(
+        filter=filter.to_pydantic() if filter else None,
+        order=[o.to_pydantic() for o in order_by] if order_by else None,
         first=first,
+        after=after,
         last=last,
+        before=before,
         limit=limit,
         offset=offset,
+    )
+    nodes = [ProjectUsageBucketGQL.from_node(item) for item in payload.items]
+    edges = [
+        ProjectUsageBucketEdge(node=node, cursor=encode_cursor(str(node.id))) for node in nodes
+    ]
+    return ProjectUsageBucketConnection(
+        edges=edges,
+        page_info=PageInfo(
+            has_next_page=payload.has_next_page,
+            has_previous_page=payload.has_previous_page,
+            start_cursor=edges[0].cursor if edges else None,
+            end_cursor=edges[-1].cursor if edges else None,
+        ),
+        count=payload.total_count,
     )
 
 
@@ -98,14 +114,27 @@ async def project_usage_buckets(
     if me is None or not me.is_superadmin:
         raise web.HTTPForbidden(reason="Only superadmin can access usage bucket data.")
 
-    return await fetch_project_usage_buckets(
-        info=info,
-        filter=filter,
-        order_by=order_by,
-        before=before,
-        after=after,
+    payload = await info.context.adapters.resource_usage.gql_admin_search_project(
+        filter=filter.to_pydantic() if filter else None,
+        order=[o.to_pydantic() for o in order_by] if order_by else None,
         first=first,
+        after=after,
         last=last,
+        before=before,
         limit=limit,
         offset=offset,
+    )
+    nodes = [ProjectUsageBucketGQL.from_node(item) for item in payload.items]
+    edges = [
+        ProjectUsageBucketEdge(node=node, cursor=encode_cursor(str(node.id))) for node in nodes
+    ]
+    return ProjectUsageBucketConnection(
+        edges=edges,
+        page_info=PageInfo(
+            has_next_page=payload.has_next_page,
+            has_previous_page=payload.has_previous_page,
+            start_cursor=edges[0].cursor if edges else None,
+            end_cursor=edges[-1].cursor if edges else None,
+        ),
+        count=payload.total_count,
     )
