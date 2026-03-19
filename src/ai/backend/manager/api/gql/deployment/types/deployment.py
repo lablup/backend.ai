@@ -152,6 +152,7 @@ from ai.backend.manager.data.deployment.types import (
     ReplicaSearchScope,
     RevisionSearchScope,
 )
+from ai.backend.manager.models.deployment_policy import BlueGreenSpec, RollingUpdateSpec
 
 DeploymentStatusGQL: type[ModelDeploymentStatus] = strawberry.enum(
     ModelDeploymentStatus,
@@ -569,10 +570,7 @@ class DeploymentStatusFilter:
         )
 
 
-@gql_pydantic_input(
-    BackendAIGQLMeta(description="", added_version="25.19.0"),
-    model=DeploymentFilterDTO,
-)
+@strawberry.input(name="DeploymentFilter", description="Added in 25.19.0.")
 class DeploymentFilter:
     name: StringFilter | None = None
     status: DeploymentStatusFilter | None = None
@@ -580,9 +578,9 @@ class DeploymentFilter:
     tags: StringFilter | None = None
     endpoint_url: StringFilter | None = None
 
-    AND: list[DeploymentFilter] | None = None
-    OR: list[DeploymentFilter] | None = None
-    NOT: list[DeploymentFilter] | None = None
+    AND: list[Self] | None = None
+    OR: list[Self] | None = None
+    NOT: list[Self] | None = None
 
     def to_pydantic(self) -> DeploymentFilterDTO:
         return DeploymentFilterDTO(
@@ -737,7 +735,10 @@ class DeploymentStrategyInputGQL:
                     raise InvalidAPIParameters("rolling_update config required but not provided")
                 return DeploymentPolicyConfig(
                     strategy=strategy,
-                    strategy_spec=self.rolling_update.to_spec(),
+                    strategy_spec=RollingUpdateSpec(
+                        max_surge=self.rolling_update.max_surge,
+                        max_unavailable=self.rolling_update.max_unavailable,
+                    ),
                     rollback_on_failure=self.rollback_on_failure,
                 )
             case DeploymentStrategy.BLUE_GREEN:
@@ -745,7 +746,10 @@ class DeploymentStrategyInputGQL:
                     raise InvalidAPIParameters("blue_green config required but not provided")
                 return DeploymentPolicyConfig(
                     strategy=strategy,
-                    strategy_spec=self.blue_green.to_spec(),
+                    strategy_spec=BlueGreenSpec(
+                        auto_promote=self.blue_green.auto_promote,
+                        promote_delay_seconds=self.blue_green.promote_delay_seconds,
+                    ),
                     rollback_on_failure=self.rollback_on_failure,
                 )
 
@@ -753,8 +757,18 @@ class DeploymentStrategyInputGQL:
         return DeploymentStrategyInputDTO(
             type=DeploymentStrategy(self.type.value),
             rollback_on_failure=self.rollback_on_failure,
-            rolling_update=self.rolling_update.to_pydantic() if self.rolling_update else None,
-            blue_green=self.blue_green.to_pydantic() if self.blue_green else None,
+            rolling_update=RollingUpdateConfigInputDTO(
+                max_surge=self.rolling_update.max_surge,
+                max_unavailable=self.rolling_update.max_unavailable,
+            )
+            if self.rolling_update
+            else None,
+            blue_green=BlueGreenConfigInputDTO(
+                auto_promote=self.blue_green.auto_promote,
+                promote_delay_seconds=self.blue_green.promote_delay_seconds,
+            )
+            if self.blue_green
+            else None,
         )
 
 

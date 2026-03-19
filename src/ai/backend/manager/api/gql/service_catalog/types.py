@@ -238,10 +238,9 @@ class ServiceCatalogStatusFilterGQL:
         )
 
 
-@gql_pydantic_input(
-    BackendAIGQLMeta(description="Filter for service catalog queries.", added_version="26.3.0"),
-    model=ServiceCatalogFilterDTO,
+@strawberry.input(
     name="ServiceCatalogFilter",
+    description="Added in 26.3.0. Filter for service catalog queries.",
 )
 class ServiceCatalogFilterGQL:
     service_group: StringFilter | None = strawberry.field(
@@ -252,9 +251,9 @@ class ServiceCatalogFilterGQL:
         default=None,
         description="Filter by health status. Supports equals, in, not_equals, and not_in operations.",
     )
-    AND: list[ServiceCatalogFilterGQL] | None = None
-    OR: list[ServiceCatalogFilterGQL] | None = None
-    NOT: list[ServiceCatalogFilterGQL] | None = None
+    AND: list[Self] | None = None
+    OR: list[Self] | None = None
+    NOT: list[Self] | None = None
 
     def to_pydantic(self) -> ServiceCatalogFilterDTO:
         return ServiceCatalogFilterDTO(

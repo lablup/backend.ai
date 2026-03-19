@@ -410,17 +410,14 @@ class ModelRevision(PydanticNodeMixin[RevisionNodeDTO]):
 
 
 # Filter and Order Types
-@gql_pydantic_input(
-    BackendAIGQLMeta(description="", added_version="25.19.0"),
-    model=RevisionFilterDTO,
-)
+@strawberry.input(name="ModelRevisionFilter", description="Added in 25.19.0.")
 class ModelRevisionFilter:
     name: StringFilter | None = None
     deployment_id: ID | None = None
 
-    AND: list[ModelRevisionFilter] | None = None
-    OR: list[ModelRevisionFilter] | None = None
-    NOT: list[ModelRevisionFilter] | None = None
+    AND: list[Self] | None = None
+    OR: list[Self] | None = None
+    NOT: list[Self] | None = None
 
     def to_pydantic(self) -> RevisionFilterDTO:
         return RevisionFilterDTO(

@@ -138,17 +138,14 @@ class TrafficStatusFilter:
 # ========== ModelReplica Types ==========
 
 
-@gql_pydantic_input(
-    BackendAIGQLMeta(description="", added_version="25.19.0"),
-    model=ReplicaFilterDTO,
-)
+@strawberry.input(name="ReplicaFilter", description="Added in 25.19.0.")
 class ReplicaFilter:
     status: ReplicaStatusFilter | None = None
     traffic_status: TrafficStatusFilter | None = None
 
-    AND: list[ReplicaFilter] | None = None
-    OR: list[ReplicaFilter] | None = None
-    NOT: list[ReplicaFilter] | None = None
+    AND: list[Self] | None = None
+    OR: list[Self] | None = None
+    NOT: list[Self] | None = None
 
     def to_pydantic(self) -> ReplicaFilterDTO:
         return ReplicaFilterDTO(

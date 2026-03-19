@@ -271,9 +271,8 @@ class ArtifactVerificationGQLResult:
         return cls(verifiers=verifier_entries)
 
 
-@gql_pydantic_input(
-    BackendAIGQLMeta(description="", added_version="24.09.0"),
-    model=ArtifactGQLFilterInputDTO,
+@strawberry.input(
+    name="ArtifactFilter",
     description=dedent_strip("""
     Added in 25.14.0.
 
@@ -290,9 +289,9 @@ class ArtifactFilter(GQLFilter):
     source: StringFilter | None = None
     availability: list[ArtifactAvailability] | None = None
 
-    AND: list[ArtifactFilter] | None = None
-    OR: list[ArtifactFilter] | None = None
-    NOT: list[ArtifactFilter] | None = None
+    AND: list[Self] | None = None
+    OR: list[Self] | None = None
+    NOT: list[Self] | None = None
 
     def to_pydantic(self) -> ArtifactGQLFilterInputDTO:
         """Convert to pydantic DTO for adapter layer processing."""
@@ -370,9 +369,8 @@ class ArtifactRevisionRemoteStatusFilter:
         )
 
 
-@gql_pydantic_input(
-    BackendAIGQLMeta(description="", added_version="24.09.0"),
-    model=ArtifactRevisionGQLFilterInputDTO,
+@strawberry.input(
+    name="ArtifactRevisionFilter",
     description=dedent_strip("""
     Added in 25.14.0.
 
@@ -390,9 +388,9 @@ class ArtifactRevisionFilter(GQLFilter):
     artifact_id: UUIDFilter | None = strawberry.field(default=None)
     size: IntFilter | None = None
 
-    AND: list[ArtifactRevisionFilter] | None = None
-    OR: list[ArtifactRevisionFilter] | None = None
-    NOT: list[ArtifactRevisionFilter] | None = None
+    AND: list[Self] | None = None
+    OR: list[Self] | None = None
+    NOT: list[Self] | None = None
 
     def to_pydantic(self) -> ArtifactRevisionGQLFilterInputDTO:
         """Convert to pydantic DTO for adapter layer processing."""
@@ -623,6 +621,11 @@ class UpdateArtifactInput:
 class CancelArtifactInput:
     artifact_revision_id: ID
 
+    def to_pydantic(self) -> CancelArtifactInputDTO:
+        return CancelArtifactInputDTO(
+            artifact_revision_id=uuid.UUID(str(self.artifact_revision_id)),
+        )
+
 
 @gql_pydantic_input(
     BackendAIGQLMeta(description="", added_version="24.09.0"),
@@ -639,6 +642,11 @@ class CancelArtifactInput:
 class CleanupArtifactRevisionsInput:
     artifact_revision_ids: list[ID]
 
+    def to_pydantic(self) -> CleanupArtifactRevisionsInputDTO:
+        return CleanupArtifactRevisionsInputDTO(
+            artifact_revision_ids=[uuid.UUID(str(id_)) for id_ in self.artifact_revision_ids],
+        )
+
 
 @gql_pydantic_input(
     BackendAIGQLMeta(description="", added_version="24.09.0"),
@@ -654,6 +662,11 @@ class CleanupArtifactRevisionsInput:
 )
 class DeleteArtifactsInput:
     artifact_ids: list[ID]
+
+    def to_pydantic(self) -> DeleteArtifactsInputDTO:
+        return DeleteArtifactsInputDTO(
+            artifact_ids=[uuid.UUID(str(id_)) for id_ in self.artifact_ids],
+        )
 
 
 @gql_pydantic_input(

@@ -12,7 +12,7 @@ import uuid as _uuid
 from collections.abc import Iterable
 from decimal import Decimal
 from enum import StrEnum
-from typing import Any, Self, cast
+from typing import Any, Self
 
 import strawberry
 from strawberry import ID, Info
@@ -69,12 +69,15 @@ from ai.backend.manager.data.resource_slot.types import (
 )
 from ai.backend.manager.services.resource_slot.actions.get_agent_resource_by_slot import (
     GetAgentResourceBySlotAction,
+    GetAgentResourceBySlotResult,
 )
 from ai.backend.manager.services.resource_slot.actions.get_kernel_allocation_by_slot import (
     GetKernelAllocationBySlotAction,
+    GetKernelAllocationBySlotResult,
 )
 from ai.backend.manager.services.resource_slot.actions.get_resource_slot_type import (
     GetResourceSlotTypeAction,
+    GetResourceSlotTypeResult,
 )
 
 # ========== Raw data helpers for Node.resolve_nodes ==========
@@ -87,12 +90,12 @@ async def load_resource_slot_type_data(
     slot_name: str,
 ) -> ResourceSlotTypeData:
     """Load raw ResourceSlotTypeData for a single slot_name (used by Node.resolve_nodes)."""
-    action_result = (
+    action_result: GetResourceSlotTypeResult = (
         await info.context.processors.resource_slot.get_resource_slot_type.wait_for_complete(
             GetResourceSlotTypeAction(slot_name=slot_name)
         )
     )
-    return cast(ResourceSlotTypeData, action_result.item)
+    return action_result.item
 
 
 async def load_agent_resource_data(
@@ -104,12 +107,12 @@ async def load_agent_resource_data(
 
     Raises AgentResourceNotFound if the entry does not exist.
     """
-    action_result = (
+    action_result: GetAgentResourceBySlotResult = (
         await info.context.processors.resource_slot.get_agent_resource_by_slot.wait_for_complete(
             GetAgentResourceBySlotAction(agent_id=agent_id, slot_name=slot_name)
         )
     )
-    return cast(AgentResourceData, action_result.item)
+    return action_result.item
 
 
 async def load_kernel_allocation_data(
@@ -121,14 +124,14 @@ async def load_kernel_allocation_data(
 
     Raises ResourceAllocationNotFound if the entry does not exist.
     """
-    action_result = (
+    action_result: GetKernelAllocationBySlotResult = (
         await info.context.processors.resource_slot.get_kernel_allocation_by_slot.wait_for_complete(
             GetKernelAllocationBySlotAction(
                 kernel_id=_uuid.UUID(kernel_id_str), slot_name=slot_name
             )
         )
     )
-    return cast(ResourceAllocationData, action_result.item)
+    return action_result.item
 
 
 # ========== NumberFormat ==========
@@ -258,21 +261,18 @@ class ResourceSlotTypeOrderFieldGQL(StrEnum):
     DISPLAY_NAME = "display_name"
 
 
-@gql_pydantic_input(
-    BackendAIGQLMeta(
-        description="Filter criteria for querying resource slot types.", added_version="26.3.0"
-    ),
-    model=ResourceSlotTypeFilterDTO,
+@strawberry.input(
     name="ResourceSlotTypeFilter",
+    description="Added in 26.3.0. Filter criteria for querying resource slot types.",
 )
 class ResourceSlotTypeFilterGQL:
     slot_name: StringFilter | None = None
     slot_type: StringFilter | None = None
     display_name: StringFilter | None = None
 
-    AND: list[ResourceSlotTypeFilterGQL] | None = None
-    OR: list[ResourceSlotTypeFilterGQL] | None = None
-    NOT: list[ResourceSlotTypeFilterGQL] | None = None
+    AND: list[Self] | None = None
+    OR: list[Self] | None = None
+    NOT: list[Self] | None = None
 
     def to_pydantic(self) -> ResourceSlotTypeFilterDTO:
         return ResourceSlotTypeFilterDTO(
@@ -396,20 +396,17 @@ class AgentResourceSlotOrderFieldGQL(StrEnum):
     USED = "used"
 
 
-@gql_pydantic_input(
-    BackendAIGQLMeta(
-        description="Filter criteria for querying agent resource slots.", added_version="26.3.0"
-    ),
-    model=AgentResourceFilterDTO,
+@strawberry.input(
     name="AgentResourceSlotFilter",
+    description="Added in 26.3.0. Filter criteria for querying agent resource slots.",
 )
 class AgentResourceSlotFilterGQL:
     slot_name: StringFilter | None = None
     agent_id: StringFilter | None = None
 
-    AND: list[AgentResourceSlotFilterGQL] | None = None
-    OR: list[AgentResourceSlotFilterGQL] | None = None
-    NOT: list[AgentResourceSlotFilterGQL] | None = None
+    AND: list[Self] | None = None
+    OR: list[Self] | None = None
+    NOT: list[Self] | None = None
 
     def to_pydantic(self) -> AgentResourceFilterDTO:
         return AgentResourceFilterDTO(
@@ -514,20 +511,16 @@ class KernelResourceAllocationOrderFieldGQL(StrEnum):
     USED = "used"
 
 
-@gql_pydantic_input(
-    BackendAIGQLMeta(
-        description="Filter criteria for querying kernel resource allocations.",
-        added_version="26.3.0",
-    ),
-    model=ResourceAllocationFilterDTO,
+@strawberry.input(
     name="KernelResourceAllocationFilter",
+    description="Added in 26.3.0. Filter criteria for querying kernel resource allocations.",
 )
 class KernelResourceAllocationFilterGQL:
     slot_name: StringFilter | None = None
 
-    AND: list[KernelResourceAllocationFilterGQL] | None = None
-    OR: list[KernelResourceAllocationFilterGQL] | None = None
-    NOT: list[KernelResourceAllocationFilterGQL] | None = None
+    AND: list[Self] | None = None
+    OR: list[Self] | None = None
+    NOT: list[Self] | None = None
 
     def to_pydantic(self) -> ResourceAllocationFilterDTO:
         return ResourceAllocationFilterDTO(

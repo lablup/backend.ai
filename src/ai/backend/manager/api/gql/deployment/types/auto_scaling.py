@@ -70,19 +70,16 @@ class AutoScalingMetricSource(StrEnum):
     INFERENCE_FRAMEWORK = "INFERENCE_FRAMEWORK"
 
 
-@gql_pydantic_input(
-    BackendAIGQLMeta(description="", added_version="25.19.0"),
-    model=AutoScalingRuleFilterDTO,
-)
+@strawberry.input(name="AutoScalingRuleFilter", description="Added in 25.19.0.")
 class AutoScalingRuleFilter:
     """Filter for auto-scaling rules."""
 
     created_at: DateTimeFilter | None = None
     last_triggered_at: DateTimeFilter | None = None
 
-    AND: list[AutoScalingRuleFilter] | None = None
-    OR: list[AutoScalingRuleFilter] | None = None
-    NOT: list[AutoScalingRuleFilter] | None = None
+    AND: list[Self] | None = None
+    OR: list[Self] | None = None
+    NOT: list[Self] | None = None
 
     def to_pydantic(self) -> AutoScalingRuleFilterDTO:
         return AutoScalingRuleFilterDTO(
@@ -286,6 +283,11 @@ class UpdateAutoScalingRuleInput:
 )
 class DeleteAutoScalingRuleInput:
     id: ID
+
+    def to_pydantic(self) -> DeleteAutoScalingRuleInputDTO:
+        return DeleteAutoScalingRuleInputDTO(
+            id=UUID(str(self.id)),
+        )
 
 
 # Payload Types

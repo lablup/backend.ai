@@ -48,10 +48,7 @@ from ai.backend.manager.data.deployment.types import (
 )
 
 
-@gql_pydantic_input(
-    BackendAIGQLMeta(description="", added_version="25.16.0"),
-    model=AccessTokenFilterDTO,
-)
+@strawberry.input(name="AccessTokenFilter", description="Added in 25.16.0.")
 class AccessTokenFilter:
     """Filter for access tokens."""
 
@@ -59,9 +56,9 @@ class AccessTokenFilter:
     valid_until: DateTimeFilter | None = None
     created_at: DateTimeFilter | None = None
 
-    AND: list[AccessTokenFilter] | None = None
-    OR: list[AccessTokenFilter] | None = None
-    NOT: list[AccessTokenFilter] | None = None
+    AND: list[Self] | None = None
+    OR: list[Self] | None = None
+    NOT: list[Self] | None = None
 
     def to_pydantic(self) -> AccessTokenFilterDTO:
         return AccessTokenFilterDTO(

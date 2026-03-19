@@ -300,17 +300,14 @@ class RouteOrderField(StrEnum):
     TRAFFIC_RATIO = "traffic_ratio"
 
 
-@gql_pydantic_input(
-    BackendAIGQLMeta(description="Filter for routes.", added_version="25.19.0"),
-    model=RouteFilterDTO,
-)
+@strawberry.input(name="RouteFilter", description="Added in 25.19.0. Filter for routes.")
 class RouteFilter:
     status: RouteStatusFilterGQL | None = None
     traffic_status: RouteTrafficStatusFilterGQL | None = None
 
-    AND: list[RouteFilter] | None = None
-    OR: list[RouteFilter] | None = None
-    NOT: list[RouteFilter] | None = None
+    AND: list[Self] | None = None
+    OR: list[Self] | None = None
+    NOT: list[Self] | None = None
 
     def to_pydantic(self) -> RouteFilterDTO:
         return RouteFilterDTO(
