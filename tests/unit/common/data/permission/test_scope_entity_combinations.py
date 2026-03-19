@@ -22,6 +22,7 @@ class TestValidScopeEntityCombinations:
             RBACElementType.PROJECT,
             RBACElementType.NETWORK,
             RBACElementType.STORAGE_HOST,
+            RBACElementType.DOMAIN_ADMIN_PAGE,
         }
 
     def test_project_scope_entities(self) -> None:
@@ -35,6 +36,7 @@ class TestValidScopeEntityCombinations:
             RBACElementType.NETWORK,
             RBACElementType.USER,
             RBACElementType.STORAGE_HOST,
+            RBACElementType.PROJECT_ADMIN_PAGE,
         }
 
     def test_user_scope_entities(self) -> None:
