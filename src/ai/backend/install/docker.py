@@ -81,8 +81,9 @@ async def detect_system_docker(ctx: Context) -> str:
     ctx.log.write(Text.from_markup(f"[cyan]{connector=}[/]"))
 
     # Test a docker command to ensure passwordless sudo.
+    docker_cmd = [*ctx.docker_sudo, "docker", "version"]
     proc = await asyncio.create_subprocess_exec(
-        *(*ctx.docker_sudo, "docker", "version"),
+        *docker_cmd,
         stdout=asyncio.subprocess.PIPE,
         stderr=asyncio.subprocess.STDOUT,
     )
@@ -90,14 +91,17 @@ async def detect_system_docker(ctx: Context) -> str:
         raise RuntimeError("Failed to capture docker version output")
     stdout = ""
     try:
-        async with asyncio.timeout(0.5):
+        async with asyncio.timeout(3.0):
             await proc.communicate()
     except TimeoutError as e:
         proc.kill()
         await proc.wait()
+        cmd_str = " ".join(docker_cmd)
         raise PrerequisiteError(
-            "sudo requires prompt.",
-            instruction="Please make sudo available without password prompts.",
+            f"'{cmd_str}' timed out after 3 seconds."
+            " This may indicate a sudo password prompt or a slow Docker daemon response.",
+            instruction="Please ensure passwordless sudo is configured"
+            " (e.g., add NOPASSWD in sudoers) or check Docker daemon status.",
         ) from e
 
     if ctx.docker_sudo:
