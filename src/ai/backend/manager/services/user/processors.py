@@ -29,6 +29,8 @@ from ai.backend.manager.services.user.actions.keypair_ops import (
     RevokeMyKeypairActionResult,
     SwitchMyMainAccessKeyAction,
     SwitchMyMainAccessKeyActionResult,
+    UpdateMyKeypairAction,
+    UpdateMyKeypairActionResult,
 )
 from ai.backend.manager.services.user.actions.modify_user import (
     BulkModifyUserAction,
@@ -89,6 +91,7 @@ class UserProcessors(AbstractProcessorPackage):
     switch_my_main_access_key: ActionProcessor[
         SwitchMyMainAccessKeyAction, SwitchMyMainAccessKeyActionResult
     ]
+    update_my_keypair: ActionProcessor[UpdateMyKeypairAction, UpdateMyKeypairActionResult]
 
     def __init__(
         self,
@@ -121,6 +124,7 @@ class UserProcessors(AbstractProcessorPackage):
         self.switch_my_main_access_key = ActionProcessor(
             user_service.switch_my_main_access_key, action_monitors
         )
+        self.update_my_keypair = ActionProcessor(user_service.update_my_keypair, action_monitors)
 
     @override
     def supported_actions(self) -> list[ActionSpec]:
@@ -142,4 +146,5 @@ class UserProcessors(AbstractProcessorPackage):
             IssueMyKeypairAction.spec(),
             RevokeMyKeypairAction.spec(),
             SwitchMyMainAccessKeyAction.spec(),
+            UpdateMyKeypairAction.spec(),
         ]
