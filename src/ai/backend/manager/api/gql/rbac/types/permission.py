@@ -25,6 +25,9 @@ from ai.backend.common.dto.manager.v2.rbac.request import (
 from ai.backend.common.dto.manager.v2.rbac.response import (
     DeletePermissionPayload as DeletePermissionPayloadDTO,
 )
+from ai.backend.common.dto.manager.v2.rbac.response import (
+    PermissionNode as PermissionNodeDTO,
+)
 from ai.backend.common.dto.manager.v2.rbac.types import (
     OrderDirection as OrderDirectionDTO,
     PermissionOrderField as PermissionOrderFieldDTO,
@@ -297,6 +300,17 @@ class PermissionGQL(PydanticNodeMixin):
             scope_id=data.scope_id,
             entity_type=RBACElementTypeGQL.from_element(data.entity_type.to_element()),
             operation=OperationTypeGQL.from_internal(data.operation),
+        )
+
+    @classmethod
+    def from_node(cls, dto: PermissionNodeDTO) -> Self:
+        return cls(
+            id=ID(str(dto.id)),
+            role_id=dto.role_id,
+            scope_type=RBACElementTypeGQL(dto.scope_type),
+            scope_id=dto.scope_id,
+            entity_type=RBACElementTypeGQL(dto.entity_type),
+            operation=OperationTypeGQL(dto.operation),
         )
 
 

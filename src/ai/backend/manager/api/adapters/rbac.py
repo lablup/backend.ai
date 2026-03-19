@@ -3,10 +3,12 @@
 from __future__ import annotations
 
 from collections.abc import Sequence
+from datetime import UTC, datetime
 from functools import lru_cache
 from uuid import UUID
 
 from ai.backend.common.api_handlers import SENTINEL
+from ai.backend.common.data.permission.types import OperationType as InternalOperationType
 from ai.backend.common.data.permission.types import RBACElementType
 from ai.backend.common.dto.manager.rbac import (
     OrderDirection,
@@ -21,10 +23,15 @@ from ai.backend.common.dto.manager.rbac import (
 )
 from ai.backend.common.dto.manager.rbac.response import PaginationInfo
 from ai.backend.common.dto.manager.v2.rbac import (
+    BulkAssignRoleResultPayload,
+    BulkRevokeRoleResultPayload,
+    BulkRoleOperationFailureInfo,
     CreateRoleInput,
     CreateRolePayload,
     DeleteRolePayload,
+    PermissionNode,
     PurgeRolePayload,
+    RoleAssignmentNode,
     RoleNode,
     UpdateRoleInput,
     UpdateRolePayload,
@@ -39,6 +46,18 @@ from ai.backend.common.dto.manager.v2.rbac.request import (
     AdminSearchRolesGQLInput,
 )
 from ai.backend.common.dto.manager.v2.rbac.request import (
+    AssignRoleInput as AssignRoleInputDTO,
+)
+from ai.backend.common.dto.manager.v2.rbac.request import (
+    BulkAssignRoleInput as BulkAssignRoleInputDTO,
+)
+from ai.backend.common.dto.manager.v2.rbac.request import (
+    BulkRevokeRoleInput as BulkRevokeRoleInputDTO,
+)
+from ai.backend.common.dto.manager.v2.rbac.request import (
+    CreatePermissionInput as CreatePermissionInputDTO,
+)
+from ai.backend.common.dto.manager.v2.rbac.request import (
     EntityFilter as EntityFilterDTO,
 )
 from ai.backend.common.dto.manager.v2.rbac.request import (
@@ -49,6 +68,9 @@ from ai.backend.common.dto.manager.v2.rbac.request import (
 )
 from ai.backend.common.dto.manager.v2.rbac.request import (
     PermissionOrderBy as PermissionOrderByDTO,
+)
+from ai.backend.common.dto.manager.v2.rbac.request import (
+    RevokeRoleInput as RevokeRoleInputDTO,
 )
 from ai.backend.common.dto.manager.v2.rbac.request import (
     RoleAssignmentFilter as RoleAssignmentFilterDTO,
@@ -64,6 +86,9 @@ from ai.backend.common.dto.manager.v2.rbac.request import (
 )
 from ai.backend.common.dto.manager.v2.rbac.request import (
     RoleOrderBy as RoleOrderByDTO,
+)
+from ai.backend.common.dto.manager.v2.rbac.request import (
+    UpdatePermissionInput as UpdatePermissionInputDTO,
 )
 from ai.backend.common.dto.manager.v2.rbac.types import (
     OperationType as OperationTypeDTO,
@@ -83,7 +108,18 @@ from ai.backend.manager.data.permission.association_scopes_entities import (
     AssociationScopesEntitiesData,
 )
 from ai.backend.manager.data.permission.permission import PermissionData
-from ai.backend.manager.data.permission.role import AssignedUserData, RoleData, RoleDetailData
+from ai.backend.manager.data.permission.role import (
+    AssignedUserData,
+    BulkRoleAssignmentResultData,
+    BulkRoleRevocationResultData,
+    BulkUserRoleRevocationInput,
+    RoleData,
+    RoleDetailData,
+    UserRoleAssignmentData,
+    UserRoleAssignmentInput,
+    UserRoleRevocationData,
+    UserRoleRevocationInput,
+)
 from ai.backend.manager.data.permission.status import RoleStatus as InternalRoleStatus
 from ai.backend.manager.data.permission.types import RoleSource as InternalRoleSource
 from ai.backend.manager.models.rbac_models.association_scopes_entities import (
@@ -106,6 +142,7 @@ from ai.backend.manager.models.rbac_models.role import RoleRow
 from ai.backend.manager.models.rbac_models.user_role import UserRoleRow
 from ai.backend.manager.repositories.base import (
     BatchQuerier,
+    BulkCreator,
     OffsetPagination,
     Purger,
     QueryCondition,
@@ -115,17 +152,33 @@ from ai.backend.manager.repositories.base import (
 )
 from ai.backend.manager.repositories.base.creator import Creator
 from ai.backend.manager.repositories.base.updater import Updater
-from ai.backend.manager.repositories.permission_controller.creators import RoleCreatorSpec
-from ai.backend.manager.repositories.permission_controller.updaters import RoleUpdaterSpec
+from ai.backend.manager.repositories.permission_controller.creators import (
+    PermissionCreatorSpec,
+    RoleCreatorSpec,
+    UserRoleCreatorSpec,
+)
+from ai.backend.manager.repositories.permission_controller.updaters import (
+    PermissionUpdaterSpec,
+    RoleUpdaterSpec,
+)
+from ai.backend.manager.services.permission_contoller.actions.assign_role import AssignRoleAction
+from ai.backend.manager.services.permission_contoller.actions.bulk_assign_role import (
+    BulkAssignRoleAction,
+)
+from ai.backend.manager.services.permission_contoller.actions.bulk_revoke_role import (
+    BulkRevokeRoleAction,
+)
 from ai.backend.manager.services.permission_contoller.actions.create_role import CreateRoleAction
 from ai.backend.manager.services.permission_contoller.actions.delete_role import DeleteRoleAction
 from ai.backend.manager.services.permission_contoller.actions.get_role_detail import (
     GetRoleDetailAction,
 )
 from ai.backend.manager.services.permission_contoller.actions.permission import (
+    CreatePermissionAction,
     DeletePermissionAction,
 )
 from ai.backend.manager.services.permission_contoller.actions.purge_role import PurgeRoleAction
+from ai.backend.manager.services.permission_contoller.actions.revoke_role import RevokeRoleAction
 from ai.backend.manager.services.permission_contoller.actions.search_element_associations import (
     SearchElementAssociationsAction,
 )
@@ -135,6 +188,9 @@ from ai.backend.manager.services.permission_contoller.actions.search_permissions
 from ai.backend.manager.services.permission_contoller.actions.search_roles import SearchRolesAction
 from ai.backend.manager.services.permission_contoller.actions.search_users_assigned_to_role import (
     SearchUsersAssignedToRoleAction,
+)
+from ai.backend.manager.services.permission_contoller.actions.update_permission import (
+    UpdatePermissionAction,
 )
 from ai.backend.manager.services.permission_contoller.actions.update_role import UpdateRoleAction
 from ai.backend.manager.types import OptionalState, TriState
@@ -386,6 +442,150 @@ class RBACAdapter(BaseAdapter):
             DeletePermissionAction(purger=purger)
         )
         return DeletePermissionPayloadDTO(id=permission_id)
+
+    # ------------------------------------------------------------------ create_permission / update_permission
+
+    async def create_permission(self, input: CreatePermissionInputDTO) -> PermissionNode:
+        """Create a new scoped permission."""
+        creator: Creator[PermissionRow] = Creator(
+            spec=PermissionCreatorSpec(
+                role_id=input.role_id,
+                scope_type=RBACElementType(input.scope_type).to_scope_type(),
+                scope_id=input.scope_id,
+                entity_type=RBACElementType(input.entity_type).to_entity_type(),
+                operation=InternalOperationType(input.operation),
+            )
+        )
+        action_result = (
+            await self._processors.permission_controller.create_permission.wait_for_complete(
+                CreatePermissionAction(creator=creator)
+            )
+        )
+        return self._permission_data_to_node(action_result.data)
+
+    async def update_permission(self, input: UpdatePermissionInputDTO) -> PermissionNode:
+        """Update an existing scoped permission."""
+        spec = PermissionUpdaterSpec(
+            scope_type=(
+                OptionalState.update(RBACElementType(input.scope_type).to_scope_type())
+                if input.scope_type is not None
+                else OptionalState.nop()
+            ),
+            scope_id=(
+                OptionalState.update(input.scope_id)
+                if input.scope_id is not None
+                else OptionalState.nop()
+            ),
+            entity_type=(
+                OptionalState.update(RBACElementType(input.entity_type).to_entity_type())
+                if input.entity_type is not None
+                else OptionalState.nop()
+            ),
+            operation=(
+                OptionalState.update(InternalOperationType(input.operation))
+                if input.operation is not None
+                else OptionalState.nop()
+            ),
+        )
+        action_result = (
+            await self._processors.permission_controller.update_permission.wait_for_complete(
+                UpdatePermissionAction(updater=Updater(spec=spec, pk_value=input.id))
+            )
+        )
+        return self._permission_data_to_node(action_result.data)
+
+    # ------------------------------------------------------------------ assign_role / revoke_role
+
+    async def assign_role(self, input: AssignRoleInputDTO) -> RoleAssignmentNode:
+        """Assign a role to a user."""
+        action_result = await self._processors.permission_controller.assign_role.wait_for_complete(
+            AssignRoleAction(
+                input=UserRoleAssignmentInput(user_id=input.user_id, role_id=input.role_id)
+            )
+        )
+        data: UserRoleAssignmentData = action_result.data
+        return RoleAssignmentNode(
+            id=data.id,
+            user_id=data.user_id,
+            role_id=data.role_id,
+            granted_by=data.granted_by,
+            granted_at=datetime.now(tz=UTC),
+        )
+
+    async def revoke_role(self, input: RevokeRoleInputDTO) -> RoleAssignmentNode:
+        """Revoke a role from a user."""
+        action_result = await self._processors.permission_controller.revoke_role.wait_for_complete(
+            RevokeRoleAction(
+                input=UserRoleRevocationInput(user_id=input.user_id, role_id=input.role_id)
+            )
+        )
+        data: UserRoleRevocationData = action_result.data
+        return RoleAssignmentNode(
+            id=data.user_role_id,
+            user_id=data.user_id,
+            role_id=data.role_id,
+            granted_by=None,
+            granted_at=datetime.now(tz=UTC),
+        )
+
+    # ------------------------------------------------------------------ bulk_assign_role / bulk_revoke_role
+
+    async def bulk_assign_role(self, input: BulkAssignRoleInputDTO) -> BulkAssignRoleResultPayload:
+        """Bulk-assign a role to multiple users."""
+        specs = [UserRoleCreatorSpec(user_id=uid, role_id=input.role_id) for uid in input.user_ids]
+        action_result = (
+            await self._processors.permission_controller.bulk_assign_role.wait_for_complete(
+                BulkAssignRoleAction(bulk_creator=BulkCreator(specs=specs))
+            )
+        )
+        result: BulkRoleAssignmentResultData = action_result.data
+        now = datetime.now(tz=UTC)
+        return BulkAssignRoleResultPayload(
+            successes=[
+                RoleAssignmentNode(
+                    id=s.id,
+                    user_id=s.user_id,
+                    role_id=s.role_id,
+                    granted_by=s.granted_by,
+                    granted_at=now,
+                )
+                for s in result.successes
+            ],
+            failures=[
+                BulkRoleOperationFailureInfo(user_id=f.user_id, message=f.message)
+                for f in result.failures
+            ],
+        )
+
+    async def bulk_revoke_role(self, input: BulkRevokeRoleInputDTO) -> BulkRevokeRoleResultPayload:
+        """Bulk-revoke a role from multiple users."""
+        action_result = (
+            await self._processors.permission_controller.bulk_revoke_role.wait_for_complete(
+                BulkRevokeRoleAction(
+                    input=BulkUserRoleRevocationInput(
+                        role_id=input.role_id, user_ids=input.user_ids
+                    )
+                )
+            )
+        )
+        result: BulkRoleRevocationResultData = action_result.data
+        now = datetime.now(tz=UTC)
+        return BulkRevokeRoleResultPayload(
+            successes=[
+                RoleAssignmentNode(
+                    id=s.user_role_id,
+                    user_id=s.user_id,
+                    role_id=s.role_id,
+                    granted_by=None,
+                    granted_at=now,
+                )
+                for s in result.successes
+            ],
+            failures=[
+                BulkRoleOperationFailureInfo(user_id=f.user_id, message=f.message)
+                for f in result.failures
+            ],
+        )
 
     # ------------------------------------------------------------------ helpers (REST layer)
 
@@ -762,6 +962,17 @@ class RBACAdapter(BaseAdapter):
                 )
                 for p in data.object_permissions
             ],
+        )
+
+    @staticmethod
+    def _permission_data_to_node(data: PermissionData) -> PermissionNode:
+        return PermissionNode(
+            id=data.id,
+            role_id=data.role_id,
+            scope_type=data.scope_type.to_element().value,
+            scope_id=data.scope_id,
+            entity_type=data.entity_type.to_element().value,
+            operation=data.operation.value,
         )
 
     @staticmethod

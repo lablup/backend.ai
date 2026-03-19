@@ -57,6 +57,12 @@ from ai.backend.common.dto.manager.v2.rbac.request import (
     UpdateRoleInput as UpdateRoleInputDTO,
 )
 from ai.backend.common.dto.manager.v2.rbac.response import (
+    BulkAssignRoleResultPayload as BulkAssignRoleResultPayloadDTO,
+)
+from ai.backend.common.dto.manager.v2.rbac.response import (
+    BulkRevokeRoleResultPayload as BulkRevokeRoleResultPayloadDTO,
+)
+from ai.backend.common.dto.manager.v2.rbac.response import (
     DeleteRolePayload as DeleteRolePayloadDTO,
 )
 from ai.backend.common.dto.manager.v2.rbac.response import (
@@ -900,6 +906,15 @@ class BulkAssignRolePayloadGQL:
         description="List of errors for users that failed to be assigned."
     )
 
+    @classmethod
+    def from_pydantic(cls, dto: BulkAssignRoleResultPayloadDTO) -> Self:
+        return cls(
+            assigned=[RoleAssignmentGQL.from_pydantic(s) for s in dto.successes],
+            failed=[
+                BulkAssignRoleErrorGQL(user_id=f.user_id, message=f.message) for f in dto.failures
+            ],
+        )
+
 
 @strawberry.type(
     name="BulkRevokeRoleError",
@@ -921,6 +936,15 @@ class BulkRevokeRolePayloadGQL:
     failed: list[BulkRevokeRoleErrorGQL] = strawberry.field(
         description="List of errors for users that failed to be revoked."
     )
+
+    @classmethod
+    def from_pydantic(cls, dto: BulkRevokeRoleResultPayloadDTO) -> Self:
+        return cls(
+            revoked=[RoleAssignmentGQL.from_pydantic(s) for s in dto.successes],
+            failed=[
+                BulkRevokeRoleErrorGQL(user_id=f.user_id, message=f.message) for f in dto.failures
+            ],
+        )
 
 
 # ==================== Connection Types ====================
