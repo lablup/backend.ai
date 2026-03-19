@@ -191,7 +191,7 @@ class RoleGQL(PydanticNodeMixin):
         PermissionConnection,
         strawberry.lazy("ai.backend.manager.api.gql.rbac.types.permission"),
     ]:
-        from ai.backend.manager.api.gql.rbac.fetcher.permission import fetch_permissions
+        from ai.backend.manager.api.gql.rbac.resolver.permission import _fetch_permissions
         from ai.backend.manager.api.gql.rbac.types.permission import PermissionFilter
 
         # Add role_id filter to scope permissions to this role
@@ -206,7 +206,7 @@ class RoleGQL(PydanticNodeMixin):
         else:
             combined_filter = role_filter
 
-        return await fetch_permissions(
+        return await _fetch_permissions(
             info,
             filter=combined_filter,
             order_by=order_by,
@@ -231,7 +231,7 @@ class RoleGQL(PydanticNodeMixin):
         limit: int | None = None,
         offset: int | None = None,
     ) -> RoleAssignmentConnection:
-        from ai.backend.manager.api.gql.rbac.fetcher.role import fetch_role_assignments
+        from ai.backend.manager.api.gql.rbac.resolver.role import _fetch_role_assignments
 
         # Add role_id filter to scope assignments to this role
         role_filter = RoleAssignmentFilter(role_id=uuid.UUID(self.id))
@@ -246,7 +246,7 @@ class RoleGQL(PydanticNodeMixin):
         else:
             combined_filter = role_filter
 
-        return await fetch_role_assignments(
+        return await _fetch_role_assignments(
             info,
             filter=combined_filter,
             order_by=order_by,

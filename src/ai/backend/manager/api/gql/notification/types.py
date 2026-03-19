@@ -6,7 +6,7 @@ import uuid
 from collections.abc import Iterable
 from datetime import datetime
 from enum import StrEnum
-from typing import Self, override
+from typing import Self
 
 import strawberry
 from strawberry import ID, UNSET, Info
@@ -95,24 +95,10 @@ from ai.backend.common.dto.manager.v2.notification.types import (
 from ai.backend.common.exception import InvalidNotificationChannelSpec
 from ai.backend.manager.api.gql.base import OrderDirection, StringFilter
 from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin
-from ai.backend.manager.api.gql.types import GQLFilter, GQLOrderBy, StrawberryGQLContext
+from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.data.notification import (
     NotificationChannelData,
     NotificationRuleData,
-)
-from ai.backend.manager.models.notification.conditions import (
-    NotificationChannelConditions,
-    NotificationRuleConditions,
-)
-from ai.backend.manager.models.notification.orders import (
-    NotificationChannelOrders,
-    NotificationRuleOrders,
-)
-from ai.backend.manager.repositories.base import (
-    QueryCondition,
-    QueryOrder,
-    combine_conditions_or,
-    negate_conditions,
 )
 
 # GraphQL enum types
@@ -413,7 +399,8 @@ class NotificationChannelOrderField(StrEnum):
     UPDATED_AT = "updated_at"
 
 
-@strawberry.input(
+@strawberry.experimental.pydantic.input(
+    model=NotificationChannelTypeFilterDTO,
     name="NotificationChannelTypeFilter",
     description="Added in 26.3.0. Filter for notification channel type with equality and membership operators.",
 )
@@ -440,8 +427,12 @@ class NotificationChannelTypeFilterGQL:
         )
 
 
-@strawberry.input(description="Filter for notification channels")
-class NotificationChannelFilter(GQLFilter):
+@strawberry.experimental.pydantic.input(
+    model=NotificationChannelFilterDTO,
+    name="NotificationChannelFilter",
+    description="Filter for notification channels",
+)
+class NotificationChannelFilter:
     name: StringFilter | None = None
     channel_type: NotificationChannelTypeFilterGQL | None = None
     enabled: bool | None = None
@@ -449,80 +440,6 @@ class NotificationChannelFilter(GQLFilter):
     AND: list[NotificationChannelFilter] | None = None
     OR: list[NotificationChannelFilter] | None = None
     NOT: list[NotificationChannelFilter] | None = None
-
-    @override
-    def build_conditions(self) -> list[QueryCondition]:
-        """Build query conditions from this filter.
-
-        Returns a list containing a single combined QueryCondition that represents
-        all filters with proper logical operators applied.
-        """
-        # Collect direct field conditions (these will be combined with AND)
-        field_conditions: list[QueryCondition] = []
-
-        # Apply name filter
-        if self.name:
-            name_condition = self.name.build_query_condition(
-                contains_factory=NotificationChannelConditions.by_name_contains,
-                equals_factory=NotificationChannelConditions.by_name_equals,
-                starts_with_factory=NotificationChannelConditions.by_name_starts_with,
-                ends_with_factory=NotificationChannelConditions.by_name_ends_with,
-            )
-            if name_condition:
-                field_conditions.append(name_condition)
-
-        # Apply channel_type filter
-        if self.channel_type is not None:
-            ct = self.channel_type
-            if ct.equals is not None:
-                field_conditions.append(
-                    NotificationChannelConditions.by_channel_type_equals(ct.equals.to_internal())
-                )
-            if ct.in_ is not None:
-                field_conditions.append(
-                    NotificationChannelConditions.by_channel_types([
-                        t.to_internal() for t in ct.in_
-                    ])
-                )
-            if ct.not_equals is not None:
-                field_conditions.append(
-                    NotificationChannelConditions.by_channel_type_not_equals(
-                        ct.not_equals.to_internal()
-                    )
-                )
-            if ct.not_in is not None:
-                field_conditions.append(
-                    NotificationChannelConditions.by_channel_type_not_in([
-                        t.to_internal() for t in ct.not_in
-                    ])
-                )
-
-        # Apply enabled filter
-        if self.enabled is not None:
-            field_conditions.append(NotificationChannelConditions.by_enabled(self.enabled))
-
-        # Handle AND logical operator - these are implicitly ANDed with field conditions
-        if self.AND:
-            for sub_filter in self.AND:
-                field_conditions.extend(sub_filter.build_conditions())
-
-        # Handle OR logical operator
-        if self.OR:
-            or_sub_conditions: list[QueryCondition] = []
-            for sub_filter in self.OR:
-                or_sub_conditions.extend(sub_filter.build_conditions())
-            if or_sub_conditions:
-                field_conditions.append(combine_conditions_or(or_sub_conditions))
-
-        # Handle NOT logical operator
-        if self.NOT:
-            not_sub_conditions: list[QueryCondition] = []
-            for sub_filter in self.NOT:
-                not_sub_conditions.extend(sub_filter.build_conditions())
-            if not_sub_conditions:
-                field_conditions.append(negate_conditions(not_sub_conditions))
-
-        return field_conditions
 
     def to_pydantic(self) -> NotificationChannelFilterDTO:
         return NotificationChannelFilterDTO(
@@ -537,22 +454,14 @@ class NotificationChannelFilter(GQLFilter):
         )
 
 
-@strawberry.input(description="Order by specification for notification channels")
-class NotificationChannelOrderBy(GQLOrderBy):
+@strawberry.experimental.pydantic.input(
+    model=NotificationChannelOrderDTO,
+    name="NotificationChannelOrderBy",
+    description="Order by specification for notification channels",
+)
+class NotificationChannelOrderBy:
     field: NotificationChannelOrderField
     direction: OrderDirection = OrderDirection.ASC
-
-    @override
-    def to_query_order(self) -> QueryOrder:
-        """Convert to repository QueryOrder."""
-        ascending = self.direction == OrderDirection.ASC
-        match self.field:
-            case NotificationChannelOrderField.NAME:
-                return NotificationChannelOrders.name(ascending)
-            case NotificationChannelOrderField.CREATED_AT:
-                return NotificationChannelOrders.created_at(ascending)
-            case NotificationChannelOrderField.UPDATED_AT:
-                return NotificationChannelOrders.updated_at(ascending)
 
     def to_pydantic(self) -> NotificationChannelOrderDTO:
         return NotificationChannelOrderDTO(
@@ -568,7 +477,8 @@ class NotificationRuleOrderField(StrEnum):
     UPDATED_AT = "updated_at"
 
 
-@strawberry.input(
+@strawberry.experimental.pydantic.input(
+    model=NotificationRuleTypeFilterDTO,
     name="NotificationRuleTypeFilter",
     description="Added in 26.3.0. Filter for notification rule type with equality and membership operators.",
 )
@@ -595,8 +505,12 @@ class NotificationRuleTypeFilterGQL:
         )
 
 
-@strawberry.input(description="Filter for notification rules")
-class NotificationRuleFilter(GQLFilter):
+@strawberry.experimental.pydantic.input(
+    model=NotificationRuleFilterDTO,
+    name="NotificationRuleFilter",
+    description="Filter for notification rules",
+)
+class NotificationRuleFilter:
     name: StringFilter | None = None
     rule_type: NotificationRuleTypeFilterGQL | None = None
     enabled: bool | None = None
@@ -604,80 +518,6 @@ class NotificationRuleFilter(GQLFilter):
     AND: list[NotificationRuleFilter] | None = None
     OR: list[NotificationRuleFilter] | None = None
     NOT: list[NotificationRuleFilter] | None = None
-
-    @override
-    def build_conditions(self) -> list[QueryCondition]:
-        """Build query conditions from this filter.
-
-        Returns a list containing a single combined QueryCondition that represents
-        all filters with proper logical operators applied.
-        """
-        # Collect direct field conditions (these will be combined with AND)
-        field_conditions: list[QueryCondition] = []
-
-        # Apply name filter
-        if self.name:
-            name_condition = self.name.build_query_condition(
-                contains_factory=NotificationRuleConditions.by_name_contains,
-                equals_factory=NotificationRuleConditions.by_name_equals,
-                starts_with_factory=NotificationRuleConditions.by_name_starts_with,
-                ends_with_factory=NotificationRuleConditions.by_name_ends_with,
-            )
-            if name_condition:
-                field_conditions.append(name_condition)
-
-        # Apply rule_type filter
-        if self.rule_type is not None:
-            rt_filter = self.rule_type
-            if rt_filter.equals is not None:
-                field_conditions.append(
-                    NotificationRuleConditions.by_rule_type_equals(rt_filter.equals.to_internal())
-                )
-            if rt_filter.in_ is not None:
-                field_conditions.append(
-                    NotificationRuleConditions.by_rule_types([
-                        t.to_internal() for t in rt_filter.in_
-                    ])
-                )
-            if rt_filter.not_equals is not None:
-                field_conditions.append(
-                    NotificationRuleConditions.by_rule_type_not_equals(
-                        rt_filter.not_equals.to_internal()
-                    )
-                )
-            if rt_filter.not_in is not None:
-                field_conditions.append(
-                    NotificationRuleConditions.by_rule_type_not_in([
-                        t.to_internal() for t in rt_filter.not_in
-                    ])
-                )
-
-        # Apply enabled filter
-        if self.enabled is not None:
-            field_conditions.append(NotificationRuleConditions.by_enabled(self.enabled))
-
-        # Handle AND logical operator - these are implicitly ANDed with field conditions
-        if self.AND:
-            for sub_filter in self.AND:
-                field_conditions.extend(sub_filter.build_conditions())
-
-        # Handle OR logical operator
-        if self.OR:
-            or_sub_conditions: list[QueryCondition] = []
-            for sub_filter in self.OR:
-                or_sub_conditions.extend(sub_filter.build_conditions())
-            if or_sub_conditions:
-                field_conditions.append(combine_conditions_or(or_sub_conditions))
-
-        # Handle NOT logical operator
-        if self.NOT:
-            not_sub_conditions: list[QueryCondition] = []
-            for sub_filter in self.NOT:
-                not_sub_conditions.extend(sub_filter.build_conditions())
-            if not_sub_conditions:
-                field_conditions.append(negate_conditions(not_sub_conditions))
-
-        return field_conditions
 
     def to_pydantic(self) -> NotificationRuleFilterDTO:
         return NotificationRuleFilterDTO(
@@ -690,22 +530,14 @@ class NotificationRuleFilter(GQLFilter):
         )
 
 
-@strawberry.input(description="Order by specification for notification rules")
-class NotificationRuleOrderBy(GQLOrderBy):
+@strawberry.experimental.pydantic.input(
+    model=NotificationRuleOrderDTO,
+    name="NotificationRuleOrderBy",
+    description="Order by specification for notification rules",
+)
+class NotificationRuleOrderBy:
     field: NotificationRuleOrderField
     direction: OrderDirection = OrderDirection.ASC
-
-    @override
-    def to_query_order(self) -> QueryOrder:
-        """Convert to repository QueryOrder."""
-        ascending = self.direction == OrderDirection.ASC
-        match self.field:
-            case NotificationRuleOrderField.NAME:
-                return NotificationRuleOrders.name(ascending)
-            case NotificationRuleOrderField.CREATED_AT:
-                return NotificationRuleOrders.created_at(ascending)
-            case NotificationRuleOrderField.UPDATED_AT:
-                return NotificationRuleOrders.updated_at(ascending)
 
     def to_pydantic(self) -> NotificationRuleOrderDTO:
         return NotificationRuleOrderDTO(

@@ -41,6 +41,7 @@ __all__ = (
     "AutoScalingRuleFilter",
     "AutoScalingRuleOrder",
     "BlueGreenConfigInput",
+    "ClusterConfigInput",
     "CreateAccessTokenInput",
     "CreateAutoScalingRuleInput",
     "CreateDeploymentInput",
@@ -50,11 +51,23 @@ __all__ = (
     "DeploymentOrder",
     "DeploymentPolicyFilter",
     "DeploymentStatusFilter",
+    "DeploymentStrategyInput",
+    "EnvironmentVariableEntryInput",
+    "EnvironmentVariablesInput",
     "ExtraVFolderMountInput",
+    "ImageInput",
+    "ModelDeploymentMetadataInput",
+    "ModelDeploymentNetworkAccessInput",
+    "ModelMountConfigInput",
+    "ModelRuntimeConfigInput",
     "ReplicaFilter",
     "ReplicaOrder",
     "ReplicaStatusFilter",
     "ReplicaTrafficStatusFilter",
+    "ResourceConfigInput",
+    "ResourceGroupInput",
+    "ResourceSlotEntryInput",
+    "ResourceSlotInput",
     "RevisionFilter",
     "RevisionInput",
     "RevisionOrder",
@@ -77,11 +90,106 @@ __all__ = (
 )
 
 
+class ClusterConfigInput(BaseRequestModel):
+    """Cluster configuration input for a revision."""
+
+    mode: ClusterMode = Field(description="Cluster mode")
+    size: int = Field(description="Cluster size (number of nodes)")
+
+
+class ResourceGroupInput(BaseRequestModel):
+    """Resource group input for a revision."""
+
+    name: str = Field(description="Resource group name")
+
+
+class ResourceSlotEntryInput(BaseRequestModel):
+    """Single resource slot entry with resource type and quantity."""
+
+    resource_type: str = Field(description="Resource type identifier (e.g., 'cpu', 'mem')")
+    quantity: str = Field(description="Quantity of the resource as a decimal string")
+
+
+class ResourceSlotInput(BaseRequestModel):
+    """Collection of compute resource allocations."""
+
+    entries: list[ResourceSlotEntryInput] = Field(description="List of resource allocations")
+
+
+class ResourceConfigInput(BaseRequestModel):
+    """Resource configuration input for a revision."""
+
+    resource_group: ResourceGroupInput = Field(description="Resource group")
+    resource_slots: ResourceSlotInput = Field(description="Resource slot allocations")
+    resource_opts: dict[str, str] | None = Field(
+        default=None, description="Additional resource options"
+    )
+
+
+class ImageInput(BaseRequestModel):
+    """Container image input for a revision."""
+
+    id: UUID = Field(description="Container image ID")
+
+
+class EnvironmentVariableEntryInput(BaseRequestModel):
+    """A single environment variable entry with name and value."""
+
+    name: str = Field(description="Environment variable name")
+    value: str = Field(description="Environment variable value")
+
+
+class EnvironmentVariablesInput(BaseRequestModel):
+    """A collection of environment variable entries."""
+
+    entries: list[EnvironmentVariableEntryInput] = Field(
+        description="List of environment variable entries"
+    )
+
+
+class ModelRuntimeConfigInput(BaseRequestModel):
+    """Runtime configuration input for a revision."""
+
+    runtime_variant: str = Field(description="Runtime variant identifier")
+    inference_runtime_config: dict[str, Any] | None = Field(
+        default=None, description="Framework-specific inference runtime configuration"
+    )
+    environ: EnvironmentVariablesInput | None = Field(
+        default=None, description="Environment variables for the service"
+    )
+
+
+class ModelMountConfigInput(BaseRequestModel):
+    """Model mount configuration input for a revision."""
+
+    vfolder_id: UUID = Field(description="VFolder ID for the model")
+    mount_destination: str = Field(description="Mount destination path inside container")
+    definition_path: str = Field(description="Path to model definition file")
+
+
 class ExtraVFolderMountInput(BaseRequestModel):
     """Input for an extra vfolder mount."""
 
     vfolder_id: UUID = Field(description="VFolder ID to mount")
     mount_destination: str | None = Field(default=None, description="Mount destination path")
+
+
+class ModelDeploymentMetadataInput(BaseRequestModel):
+    """Metadata input for creating a model deployment."""
+
+    project_id: UUID = Field(description="Project ID")
+    domain_name: str = Field(description="Domain name")
+    name: str | None = Field(default=None, description="Deployment name")
+    tags: list[str] | None = Field(default=None, description="Deployment tags")
+
+
+class ModelDeploymentNetworkAccessInput(BaseRequestModel):
+    """Network access configuration input for a deployment."""
+
+    preferred_domain_name: str | None = Field(
+        default=None, description="Preferred domain name for URL"
+    )
+    open_to_public: bool = Field(default=False, description="Whether the deployment is public")
 
 
 class RollingUpdateConfigInput(BaseRequestModel):
@@ -101,6 +209,21 @@ class BlueGreenConfigInput(BaseRequestModel):
     auto_promote: bool = Field(default=False, description="Automatically promote new revision")
     promote_delay_seconds: int = Field(
         default=0, ge=0, description="Delay in seconds before promotion"
+    )
+
+
+class DeploymentStrategyInput(BaseRequestModel):
+    """Deployment strategy input with type discriminator."""
+
+    type: DeploymentStrategy = Field(description="Deployment strategy type")
+    rollback_on_failure: bool = Field(
+        default=False, description="Roll back automatically on failure"
+    )
+    rolling_update: RollingUpdateConfigInput | None = Field(
+        default=None, description="Rolling update config (required for ROLLING strategy)"
+    )
+    blue_green: BlueGreenConfigInput | None = Field(
+        default=None, description="Blue/green config (required for BLUE_GREEN strategy)"
     )
 
 

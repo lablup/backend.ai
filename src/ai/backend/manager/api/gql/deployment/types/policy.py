@@ -11,6 +11,12 @@ from strawberry import ID
 from strawberry.relay import NodeID
 
 from ai.backend.common.data.model_deployment.types import DeploymentStrategy
+from ai.backend.common.dto.manager.v2.deployment.request import (
+    BlueGreenConfigInput as BlueGreenConfigInputDTO,
+)
+from ai.backend.common.dto.manager.v2.deployment.request import (
+    RollingUpdateConfigInput as RollingUpdateConfigInputDTO,
+)
 from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin
 from ai.backend.manager.api.gql.utils import dedent_strip
 from ai.backend.manager.data.deployment.types import DeploymentPolicyData
@@ -106,7 +112,8 @@ class DeploymentPolicyGQL(PydanticNodeMixin):
 # ========== Input Types ==========
 
 
-@strawberry.input(
+@strawberry.experimental.pydantic.input(
+    model=RollingUpdateConfigInputDTO,
     name="RollingUpdateConfigInput",
     description="Added in 25.19.0. Configuration for rolling update strategy.",
 )
@@ -120,8 +127,15 @@ class RollingUpdateConfigInputGQL:
             max_unavailable=self.max_unavailable,
         )
 
+    def to_pydantic(self) -> RollingUpdateConfigInputDTO:
+        return RollingUpdateConfigInputDTO(
+            max_surge=self.max_surge,
+            max_unavailable=self.max_unavailable,
+        )
 
-@strawberry.input(
+
+@strawberry.experimental.pydantic.input(
+    model=BlueGreenConfigInputDTO,
     name="BlueGreenConfigInput",
     description="Added in 25.19.0. Configuration for blue-green deployment strategy.",
 )
@@ -131,6 +145,12 @@ class BlueGreenConfigInputGQL:
 
     def to_spec(self) -> BlueGreenSpec:
         return BlueGreenSpec(
+            auto_promote=self.auto_promote,
+            promote_delay_seconds=self.promote_delay_seconds,
+        )
+
+    def to_pydantic(self) -> BlueGreenConfigInputDTO:
+        return BlueGreenConfigInputDTO(
             auto_promote=self.auto_promote,
             promote_delay_seconds=self.promote_delay_seconds,
         )

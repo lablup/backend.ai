@@ -29,20 +29,26 @@ from ai.backend.common.dto.manager.v2.scheduling_history.response import (
 )
 from ai.backend.common.dto.manager.v2.scheduling_history.types import (
     DeploymentHistoryOrderField,
+    DeploymentHistoryScopeDTO,
     OrderDirection,
     RouteHistoryOrderField,
+    RouteHistoryScopeDTO,
     SchedulingResultType,
     SessionHistoryOrderField,
+    SessionHistoryScopeDTO,
     SubStepResultInfo,
 )
 
 __all__ = (
     # Types
     "DeploymentHistoryOrderField",
+    "DeploymentHistoryScopeDTO",
     "OrderDirection",
     "RouteHistoryOrderField",
+    "RouteHistoryScopeDTO",
     "SchedulingResultType",
     "SessionHistoryOrderField",
+    "SessionHistoryScopeDTO",
     "SubStepResultInfo",
     # Input models (request)
     "AdminSearchDeploymentHistoriesInput",

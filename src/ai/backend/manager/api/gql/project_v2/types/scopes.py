@@ -4,8 +4,11 @@ from __future__ import annotations
 
 import strawberry
 
+from ai.backend.common.dto.manager.v2.group.types import DomainProjectScopeDTO
 
-@strawberry.input(
+
+@strawberry.experimental.pydantic.input(
+    model=DomainProjectScopeDTO,
     name="DomainProjectV2Scope",
     description=(
         "Added in 26.2.0. Scope for querying projects within a specific domain. "
@@ -18,3 +21,6 @@ class DomainProjectScope:
     domain_name: str = strawberry.field(
         description="Domain name to scope the query. Only projects belonging to this domain will be returned."
     )
+
+    def to_pydantic(self) -> DomainProjectScopeDTO:
+        return DomainProjectScopeDTO(domain_name=self.domain_name)

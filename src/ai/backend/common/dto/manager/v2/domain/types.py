@@ -6,12 +6,16 @@ from __future__ import annotations
 
 from enum import StrEnum
 
+from pydantic import Field
+
 from ai.backend.common.api_handlers import BaseRequestModel
 from ai.backend.common.dto.manager.query import StringFilter
 
 __all__ = (
+    "DomainFairShareScopeDTO",
     "DomainOrderField",
     "DomainProjectFilter",
+    "DomainUsageScopeDTO",
     "DomainUserFilter",
     "OrderDirection",
 )
@@ -49,3 +53,15 @@ class DomainUserFilter(BaseRequestModel):
     username: StringFilter | None = None
     email: StringFilter | None = None
     is_active: bool | None = None
+
+
+class DomainFairShareScopeDTO(BaseRequestModel):
+    """Scope for domain fair share queries."""
+
+    resource_group_name: str = Field(description="Resource group to filter fair shares by.")
+
+
+class DomainUsageScopeDTO(BaseRequestModel):
+    """Scope for domain usage bucket queries."""
+
+    resource_group_name: str = Field(description="Resource group to filter usage buckets by.")

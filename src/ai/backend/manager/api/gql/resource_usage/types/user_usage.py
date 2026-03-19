@@ -9,6 +9,18 @@ import strawberry
 from strawberry import ID
 from strawberry.relay import Connection, Edge, NodeID
 
+from ai.backend.common.dto.manager.v2.resource_usage.request import (
+    UserUsageBucketFilter as UserUsageBucketFilterDTO,
+)
+from ai.backend.common.dto.manager.v2.resource_usage.request import (
+    UserUsageBucketOrderBy as UserUsageBucketOrderByDTO,
+)
+from ai.backend.common.dto.manager.v2.resource_usage.types import (
+    OrderDirection as OrderDirectionDTO,
+)
+from ai.backend.common.dto.manager.v2.resource_usage.types import (
+    UsageBucketOrderField as UsageBucketOrderFieldDTO,
+)
 from ai.backend.manager.api.gql.base import (
     DateFilter,
     OrderDirection,
@@ -143,7 +155,8 @@ class UserUsageBucketConnection(Connection[UserUsageBucketGQL]):
         self.count = count
 
 
-@strawberry.input(
+@strawberry.experimental.pydantic.input(
+    model=UserUsageBucketFilterDTO,
     name="UserUsageBucketFilter",
     description=(
         "Added in 26.1.0. Filter input for querying user usage bucket records. "
@@ -202,6 +215,19 @@ class UserUsageBucketFilter(GQLFilter):
         default=None,
         description="Negate the specified filters. Records matching these conditions will be excluded.",
     )
+
+    def to_pydantic(self) -> UserUsageBucketFilterDTO:
+        return UserUsageBucketFilterDTO(
+            resource_group=self.resource_group.to_pydantic() if self.resource_group else None,
+            user_uuid=self.user_uuid.to_pydantic() if self.user_uuid else None,
+            project_id=self.project_id.to_pydantic() if self.project_id else None,
+            domain_name=self.domain_name.to_pydantic() if self.domain_name else None,
+            period_start=self.period_start.to_pydantic() if self.period_start else None,
+            period_end=self.period_end.to_pydantic() if self.period_end else None,
+            AND=[f.to_pydantic() for f in self.AND] if self.AND else None,
+            OR=[f.to_pydantic() for f in self.OR] if self.OR else None,
+            NOT=[f.to_pydantic() for f in self.NOT] if self.NOT else None,
+        )
 
     @override
     def build_conditions(self) -> list[QueryCondition]:
@@ -284,7 +310,8 @@ class UserUsageBucketFilter(GQLFilter):
         return conditions
 
 
-@strawberry.input(
+@strawberry.experimental.pydantic.input(
+    model=UserUsageBucketOrderByDTO,
     name="UserUsageBucketOrderBy",
     description=(
         "Added in 26.1.0. Specifies ordering for user usage bucket query results. "
@@ -305,6 +332,12 @@ class UserUsageBucketOrderBy(GQLOrderBy):
             "DESC for reverse chronological order (most recent first)."
         ),
     )
+
+    def to_pydantic(self) -> UserUsageBucketOrderByDTO:
+        return UserUsageBucketOrderByDTO(
+            field=UsageBucketOrderFieldDTO(self.field.value),
+            direction=OrderDirectionDTO(self.direction.value),
+        )
 
     @override
     def to_query_order(self) -> QueryOrder:

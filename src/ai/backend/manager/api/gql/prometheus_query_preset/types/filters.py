@@ -3,89 +3,42 @@
 from __future__ import annotations
 
 from enum import StrEnum
-from typing import override
 
 import strawberry
 
+from ai.backend.common.dto.manager.v2.prometheus_query_preset.request import (
+    QueryDefinitionFilter as QueryDefinitionFilterDTO,
+)
+from ai.backend.common.dto.manager.v2.prometheus_query_preset.request import (
+    QueryDefinitionOrder as QueryDefinitionOrderDTO,
+)
+from ai.backend.common.dto.manager.v2.prometheus_query_preset.types import (
+    OrderDirection as OrderDirectionDTO,
+)
+from ai.backend.common.dto.manager.v2.prometheus_query_preset.types import (
+    QueryDefinitionOrderField as QueryDefinitionOrderFieldDTO,
+)
 from ai.backend.manager.api.gql.base import (
     OrderDirection,
     StringFilter,
 )
-from ai.backend.manager.api.gql.types import GQLFilter, GQLOrderBy
-from ai.backend.manager.models.prometheus_query_preset.conditions import (
-    PrometheusQueryPresetConditions,
-)
-from ai.backend.manager.models.prometheus_query_preset.orders import PrometheusQueryPresetOrders
-from ai.backend.manager.repositories.base import (
-    QueryCondition,
-    QueryOrder,
-    combine_conditions_or,
-    negate_conditions,
-)
 
 
-@strawberry.input(
+@strawberry.experimental.pydantic.input(
+    model=QueryDefinitionFilterDTO,
     name="QueryDefinitionFilter",
     description="Added in 26.3.0. Filter input for querying query definitions.",
 )
-class QueryDefinitionFilter(GQLFilter):
+class QueryDefinitionFilter:
     name: StringFilter | None = strawberry.field(
         default=None,
         description="Filter by name.",
     )
 
-    AND: list[QueryDefinitionFilter] | None = strawberry.field(
-        default=None,
-        description="Combine multiple filters with AND logic.",
-    )
-    OR: list[QueryDefinitionFilter] | None = strawberry.field(
-        default=None,
-        description="Combine multiple filters with OR logic.",
-    )
-    NOT: list[QueryDefinitionFilter] | None = strawberry.field(
-        default=None,
-        description="Negate the specified filters.",
-    )
-
-    @override
-    def build_conditions(self) -> list[QueryCondition]:
-        conditions: list[QueryCondition] = []
-
-        if self.name:
-            condition = self.name.build_query_condition(
-                contains_factory=lambda spec: PrometheusQueryPresetConditions.by_name_contains(
-                    spec
-                ),
-                equals_factory=lambda spec: PrometheusQueryPresetConditions.by_name_equals(spec),
-                starts_with_factory=lambda spec: PrometheusQueryPresetConditions.by_name_starts_with(
-                    spec
-                ),
-                ends_with_factory=lambda spec: PrometheusQueryPresetConditions.by_name_ends_with(
-                    spec
-                ),
-            )
-            if condition:
-                conditions.append(condition)
-
-        if self.AND:
-            for sub_filter in self.AND:
-                conditions.extend(sub_filter.build_conditions())
-
-        if self.OR:
-            or_sub_conditions: list[QueryCondition] = []
-            for sub_filter in self.OR:
-                or_sub_conditions.extend(sub_filter.build_conditions())
-            if or_sub_conditions:
-                conditions.append(combine_conditions_or(or_sub_conditions))
-
-        if self.NOT:
-            not_sub_conditions: list[QueryCondition] = []
-            for sub_filter in self.NOT:
-                not_sub_conditions.extend(sub_filter.build_conditions())
-            if not_sub_conditions:
-                conditions.append(negate_conditions(not_sub_conditions))
-
-        return conditions
+    def to_pydantic(self) -> QueryDefinitionFilterDTO:
+        return QueryDefinitionFilterDTO(
+            name=self.name.to_pydantic() if self.name else None,
+        )
 
 
 @strawberry.enum(
@@ -98,24 +51,20 @@ class QueryDefinitionOrderField(StrEnum):
     NAME = "name"
 
 
-@strawberry.input(
+@strawberry.experimental.pydantic.input(
+    model=QueryDefinitionOrderDTO,
     name="QueryDefinitionOrderBy",
     description="Added in 26.3.0. Specifies ordering for query definition results.",
 )
-class QueryDefinitionOrderBy(GQLOrderBy):
+class QueryDefinitionOrderBy:
     field: QueryDefinitionOrderField = strawberry.field(description="The field to order by.")
     direction: OrderDirection = strawberry.field(
         default=OrderDirection.DESC,
         description="Sort direction.",
     )
 
-    @override
-    def to_query_order(self) -> QueryOrder:
-        ascending = self.direction == OrderDirection.ASC
-        match self.field:
-            case QueryDefinitionOrderField.CREATED_AT:
-                return PrometheusQueryPresetOrders.created_at(ascending)
-            case QueryDefinitionOrderField.UPDATED_AT:
-                return PrometheusQueryPresetOrders.updated_at(ascending)
-            case QueryDefinitionOrderField.NAME:
-                return PrometheusQueryPresetOrders.name(ascending)
+    def to_pydantic(self) -> QueryDefinitionOrderDTO:
+        return QueryDefinitionOrderDTO(
+            field=QueryDefinitionOrderFieldDTO(self.field.value),
+            direction=OrderDirectionDTO(self.direction.value),
+        )

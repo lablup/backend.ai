@@ -6,13 +6,17 @@ from __future__ import annotations
 
 from enum import StrEnum
 
-from ai.backend.common.api_handlers import BaseResponseModel
+from pydantic import Field
+
+from ai.backend.common.api_handlers import BaseRequestModel, BaseResponseModel
 
 __all__ = (
     "AgentResourceOrderField",
     "NumberFormatInfo",
     "OrderDirection",
     "ResourceAllocationOrderField",
+    "ResourceOptsEntryDTO",
+    "ResourceOptsDTOInput",
     "ResourceSlotTypeOrderField",
 )
 
@@ -37,6 +41,8 @@ class AgentResourceOrderField(StrEnum):
 
     AGENT_ID = "agent_id"
     SLOT_NAME = "slot_name"
+    CAPACITY = "capacity"
+    USED = "used"
 
 
 class ResourceAllocationOrderField(StrEnum):
@@ -44,6 +50,8 @@ class ResourceAllocationOrderField(StrEnum):
 
     KERNEL_ID = "kernel_id"
     SLOT_NAME = "slot_name"
+    REQUESTED = "requested"
+    USED = "used"
 
 
 class NumberFormatInfo(BaseResponseModel):
@@ -51,3 +59,16 @@ class NumberFormatInfo(BaseResponseModel):
 
     binary: bool
     round_length: int
+
+
+class ResourceOptsEntryDTO(BaseRequestModel):
+    """Single resource option entry input with name and value."""
+
+    name: str = Field(description="The name of this resource option (e.g., 'shmem').")
+    value: str = Field(description="The value for this resource option (e.g., '64m').")
+
+
+class ResourceOptsDTOInput(BaseRequestModel):
+    """Resource options input containing multiple key-value entries."""
+
+    entries: list[ResourceOptsEntryDTO] = Field(description="List of resource option entries.")

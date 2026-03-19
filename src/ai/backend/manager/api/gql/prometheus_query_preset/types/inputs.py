@@ -16,6 +16,12 @@ from ai.backend.common.dto.manager.v2.prometheus_query_preset.request import (
     CreateQueryDefinitionOptionsInput as CreateQueryDefinitionOptionsInputDTO,
 )
 from ai.backend.common.dto.manager.v2.prometheus_query_preset.request import (
+    ExecuteQueryDefinitionOptionsInput as ExecuteQueryDefinitionOptionsInputDTO,
+)
+from ai.backend.common.dto.manager.v2.prometheus_query_preset.request import (
+    MetricLabelEntry as MetricLabelEntryDTO,
+)
+from ai.backend.common.dto.manager.v2.prometheus_query_preset.request import (
     ModifyQueryDefinitionInput as ModifyQueryDefinitionInputDTO,
 )
 from ai.backend.common.dto.manager.v2.prometheus_query_preset.request import (
@@ -99,7 +105,8 @@ class QueryTimeRangeInput:
         )
 
 
-@strawberry.input(
+@strawberry.experimental.pydantic.input(
+    model=MetricLabelEntryDTO,
     name="MetricLabelEntryInput",
     description="Added in 26.3.0. Key-value label entry for queries.",
 )
@@ -108,7 +115,8 @@ class MetricLabelEntryInput:
     value: str = strawberry.field(description="Label value.")
 
 
-@strawberry.input(
+@strawberry.experimental.pydantic.input(
+    model=ExecuteQueryDefinitionOptionsInputDTO,
     name="ExecuteQueryDefinitionOptionsInput",
     description="Added in 26.3.0. Options for executing a query definition.",
 )

@@ -10,7 +10,7 @@ from enum import StrEnum
 
 from pydantic import Field
 
-from ai.backend.common.api_handlers import BaseResponseModel
+from ai.backend.common.api_handlers import BaseRequestModel, BaseResponseModel
 
 __all__ = (
     # Enums
@@ -27,6 +27,19 @@ __all__ = (
     "FairShareSpecInfo",
     "FairShareCalculationSnapshotInfo",
     "UsageBucketMetadataInfo",
+    # Scope DTOs
+    "ResourceGroupDomainScopeDTO",
+    "ResourceGroupProjectScopeDTO",
+    "ResourceGroupUserScopeDTO",
+    "DomainFairShareScopeDTO",
+    "ProjectFairShareScopeDTO",
+    "UserFairShareScopeDTO",
+    "ProjectUsageScopeDTO",
+    "DomainUsageScopeDTO",
+    "UserUsageScopeDTO",
+    "DomainUsageBucketScopeDTO",
+    "ProjectUsageBucketScopeDTO",
+    "UserUsageBucketScopeDTO",
 )
 
 
@@ -51,6 +64,8 @@ class ProjectFairShareOrderField(StrEnum):
 
     FAIR_SHARE_FACTOR = "fair_share_factor"
     CREATED_AT = "created_at"
+    PROJECT_NAME = "project_name"
+    PROJECT_IS_ACTIVE = "project_is_active"
 
 
 class UserFairShareOrderField(StrEnum):
@@ -58,6 +73,8 @@ class UserFairShareOrderField(StrEnum):
 
     FAIR_SHARE_FACTOR = "fair_share_factor"
     CREATED_AT = "created_at"
+    USER_USERNAME = "user_username"
+    USER_EMAIL = "user_email"
 
 
 class DomainUsageBucketOrderField(StrEnum):
@@ -142,3 +159,87 @@ class UsageBucketMetadataInfo(BaseResponseModel):
     usage_capacity_ratio: ResourceSlotInfo = Field(
         description="Ratio of usage to capacity (usage / total capacity available)"
     )
+
+
+# Scope DTOs for resource group and usage bucket scoped APIs
+
+
+class DomainFairShareScopeDTO(BaseRequestModel):
+    """Scope for domain fair share queries within a resource group."""
+
+    resource_group_name: str = Field(description="Resource group to filter fair shares by.")
+
+
+class ProjectFairShareScopeDTO(BaseRequestModel):
+    """Scope for project fair share queries within a resource group."""
+
+    resource_group_name: str = Field(description="Resource group to filter fair shares by.")
+
+
+class UserFairShareScopeDTO(BaseRequestModel):
+    """Scope for user fair share queries within a resource group."""
+
+    resource_group_name: str = Field(description="Resource group to filter fair shares by.")
+
+
+class DomainUsageScopeDTO(BaseRequestModel):
+    """Scope for domain usage bucket queries within a resource group (node-level context)."""
+
+    resource_group_name: str = Field(description="Resource group to filter usage buckets by.")
+
+
+class ProjectUsageScopeDTO(BaseRequestModel):
+    """Scope for project usage bucket queries within a resource group (node-level context)."""
+
+    resource_group_name: str = Field(description="Resource group to filter usage buckets by.")
+
+
+class UserUsageScopeDTO(BaseRequestModel):
+    """Scope for user usage bucket queries within a resource group (node-level context)."""
+
+    resource_group_name: str = Field(description="Resource group to filter usage buckets by.")
+
+
+class ResourceGroupDomainScopeDTO(BaseRequestModel):
+    """Scope for domain-level APIs within a resource group context."""
+
+    resource_group_name: str = Field(description="Resource group name to scope the operation.")
+
+
+class ResourceGroupProjectScopeDTO(BaseRequestModel):
+    """Scope for project-level APIs within a resource group and domain context."""
+
+    resource_group_name: str = Field(description="Resource group name to scope the operation.")
+    domain_name: str = Field(description="Domain name to scope the operation.")
+
+
+class ResourceGroupUserScopeDTO(BaseRequestModel):
+    """Scope for user-level APIs within a resource group, domain, and project context."""
+
+    resource_group_name: str = Field(description="Resource group name to scope the operation.")
+    domain_name: str = Field(description="Domain name to scope the operation.")
+    project_id: str = Field(description="Project ID to scope the operation.")
+
+
+class DomainUsageBucketScopeDTO(BaseRequestModel):
+    """Scope for domain-level usage bucket APIs."""
+
+    resource_group_name: str = Field(description="Resource group name.")
+    domain_name: str = Field(description="Domain name to retrieve usage buckets for.")
+
+
+class ProjectUsageBucketScopeDTO(BaseRequestModel):
+    """Scope for project-level usage bucket APIs."""
+
+    resource_group_name: str = Field(description="Resource group name.")
+    domain_name: str = Field(description="Domain name.")
+    project_id: str = Field(description="Project ID (will be converted to UUID).")
+
+
+class UserUsageBucketScopeDTO(BaseRequestModel):
+    """Scope for user-level usage bucket APIs."""
+
+    resource_group_name: str = Field(description="Resource group name.")
+    domain_name: str = Field(description="Domain name.")
+    project_id: str = Field(description="Project ID (will be converted to UUID).")
+    user_uuid: str = Field(description="User UUID (will be converted to UUID).")

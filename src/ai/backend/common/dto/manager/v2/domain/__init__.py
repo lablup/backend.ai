@@ -24,8 +24,10 @@ from ai.backend.common.dto.manager.v2.domain.response import (
     SearchDomainsPayload,
 )
 from ai.backend.common.dto.manager.v2.domain.types import (
+    DomainFairShareScopeDTO,
     DomainOrderField,
     DomainProjectFilter,
+    DomainUsageScopeDTO,
     DomainUserFilter,
     OrderDirection,
 )
@@ -51,8 +53,10 @@ __all__ = (
     "DeleteDomainPayload",
     "PurgeDomainPayload",
     # Types
+    "DomainFairShareScopeDTO",
     "DomainOrderField",
     "DomainProjectFilter",
+    "DomainUsageScopeDTO",
     "DomainUserFilter",
     "OrderDirection",
 )

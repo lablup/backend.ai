@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import datetime
 from decimal import Decimal
 from enum import StrEnum
-from typing import TYPE_CHECKING, Annotated, Any, override
+from typing import TYPE_CHECKING, Annotated, Any
 from uuid import UUID
 
 import strawberry
@@ -44,19 +44,8 @@ from ai.backend.common.dto.manager.v2.fair_share.types import (
 )
 from ai.backend.manager.api.gql.base import OrderDirection, StringFilter, UUIDFilter
 from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin
-from ai.backend.manager.api.gql.types import GQLFilter, GQLOrderBy, StrawberryGQLContext
+from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.data.fair_share.types import UserFairShareData
-from ai.backend.manager.models.fair_share.conditions import (
-    RGUserFairShareConditions,
-    UserFairShareConditions,
-)
-from ai.backend.manager.models.fair_share.orders import UserFairShareOrders
-from ai.backend.manager.repositories.base import (
-    QueryCondition,
-    QueryOrder,
-    combine_conditions_or,
-    negate_conditions,
-)
 
 from .common import (
     FairShareCalculationSnapshotGQL,
@@ -284,7 +273,8 @@ class UserFairShareConnection(Connection[UserFairShareGQL]):
         self.count = count
 
 
-@strawberry.input(
+@strawberry.experimental.pydantic.input(
+    model=UserFairShareUserNestedFilterDTO,
     name="UserFairShareUserNestedFilter",
     description=(
         "Added in 26.2.0. Nested filter for user entity fields in user fair share queries. "
@@ -310,32 +300,9 @@ class UserFairShareUserNestedFilter:
     def to_pydantic(self) -> UserFairShareUserNestedFilterDTO:
         return UserFairShareUserNestedFilterDTO(is_active=self.is_active)
 
-    def build_conditions(self) -> list[QueryCondition]:
-        conditions: list[QueryCondition] = []
-        if self.username:
-            username_condition = self.username.build_query_condition(
-                contains_factory=UserFairShareConditions.by_user_username_contains,
-                equals_factory=UserFairShareConditions.by_user_username_equals,
-                starts_with_factory=UserFairShareConditions.by_user_username_starts_with,
-                ends_with_factory=UserFairShareConditions.by_user_username_ends_with,
-            )
-            if username_condition:
-                conditions.append(username_condition)
-        if self.email:
-            email_condition = self.email.build_query_condition(
-                contains_factory=UserFairShareConditions.by_user_email_contains,
-                equals_factory=UserFairShareConditions.by_user_email_equals,
-                starts_with_factory=UserFairShareConditions.by_user_email_starts_with,
-                ends_with_factory=UserFairShareConditions.by_user_email_ends_with,
-            )
-            if email_condition:
-                conditions.append(email_condition)
-        if self.is_active is not None:
-            conditions.append(UserFairShareConditions.by_user_is_active(self.is_active))
-        return conditions
 
-
-@strawberry.input(
+@strawberry.experimental.pydantic.input(
+    model=UserFairShareFilterDTO,
     name="UserFairShareFilter",
     description=(
         "Added in 26.1.0. Filter input for querying user fair shares. "
@@ -344,7 +311,7 @@ class UserFairShareUserNestedFilter:
         "Multiple filters can be combined using AND, OR, and NOT logical operators."
     ),
 )
-class UserFairShareFilter(GQLFilter):
+class UserFairShareFilter:
     """Filter for user fair shares."""
 
     resource_group: StringFilter | None = strawberry.field(
@@ -409,78 +376,16 @@ class UserFairShareFilter(GQLFilter):
             NOT=[f.to_pydantic() for f in self.NOT] if self.NOT else None,
         )
 
-    @override
-    def build_conditions(self) -> list[QueryCondition]:
-        conditions: list[QueryCondition] = []
 
-        if self.resource_group:
-            sg_condition = self.resource_group.build_query_condition(
-                contains_factory=UserFairShareConditions.by_resource_group_contains,
-                equals_factory=UserFairShareConditions.by_resource_group_equals,
-                starts_with_factory=UserFairShareConditions.by_resource_group_starts_with,
-                ends_with_factory=UserFairShareConditions.by_resource_group_ends_with,
-            )
-            if sg_condition:
-                conditions.append(sg_condition)
-
-        if self.user_uuid:
-            uuid_condition = self.user_uuid.build_query_condition(
-                equals_factory=UserFairShareConditions.by_user_uuid,
-                in_factory=UserFairShareConditions.by_user_uuids,
-            )
-            if uuid_condition:
-                conditions.append(uuid_condition)
-
-        if self.project_id:
-            pid_condition = self.project_id.build_query_condition(
-                equals_factory=UserFairShareConditions.by_project_id,
-                in_factory=UserFairShareConditions.by_project_ids,
-            )
-            if pid_condition:
-                conditions.append(pid_condition)
-
-        if self.domain_name:
-            dn_condition = self.domain_name.build_query_condition(
-                contains_factory=UserFairShareConditions.by_domain_name_contains,
-                equals_factory=UserFairShareConditions.by_domain_name_equals,
-                starts_with_factory=UserFairShareConditions.by_domain_name_starts_with,
-                ends_with_factory=UserFairShareConditions.by_domain_name_ends_with,
-            )
-            if dn_condition:
-                conditions.append(dn_condition)
-
-        if self.user:
-            conditions.extend(self.user.build_conditions())
-
-        if self.AND:
-            for sub_filter in self.AND:
-                conditions.extend(sub_filter.build_conditions())
-
-        if self.OR:
-            or_conditions: list[QueryCondition] = []
-            for sub_filter in self.OR:
-                or_conditions.extend(sub_filter.build_conditions())
-            if or_conditions:
-                conditions.append(combine_conditions_or(or_conditions))
-
-        if self.NOT:
-            not_conditions: list[QueryCondition] = []
-            for sub_filter in self.NOT:
-                not_conditions.extend(sub_filter.build_conditions())
-            if not_conditions:
-                conditions.append(negate_conditions(not_conditions))
-
-        return conditions
-
-
-@strawberry.input(
+@strawberry.experimental.pydantic.input(
+    model=UserFairShareFilterDTO,
     name="RGUserFairShareFilter",
     description=(
         "Added in 26.2.0. Filter for user fair shares within a resource group scope. "
         "References resource group membership columns to avoid excluding users without fair share records."
     ),
 )
-class RGUserFairShareFilter(GQLFilter):
+class RGUserFairShareFilter:
     """Filter for user fair shares in RG context (uses INNER JOIN'd columns)."""
 
     resource_group: StringFilter | None = strawberry.field(
@@ -521,69 +426,6 @@ class RGUserFairShareFilter(GQLFilter):
             NOT=[f.to_pydantic() for f in self.NOT] if self.NOT else None,
         )
 
-    @override
-    def build_conditions(self) -> list[QueryCondition]:
-        conditions: list[QueryCondition] = []
-
-        if self.resource_group:
-            sg_condition = self.resource_group.build_query_condition(
-                contains_factory=RGUserFairShareConditions.by_resource_group_contains,
-                equals_factory=RGUserFairShareConditions.by_resource_group_equals,
-                starts_with_factory=RGUserFairShareConditions.by_resource_group_starts_with,
-                ends_with_factory=RGUserFairShareConditions.by_resource_group_ends_with,
-            )
-            if sg_condition:
-                conditions.append(sg_condition)
-
-        if self.user_uuid:
-            uuid_condition = self.user_uuid.build_query_condition(
-                equals_factory=RGUserFairShareConditions.by_user_uuid,
-                in_factory=RGUserFairShareConditions.by_user_uuids,
-            )
-            if uuid_condition:
-                conditions.append(uuid_condition)
-
-        if self.project_id:
-            pid_condition = self.project_id.build_query_condition(
-                equals_factory=RGUserFairShareConditions.by_project_id,
-                in_factory=RGUserFairShareConditions.by_project_ids,
-            )
-            if pid_condition:
-                conditions.append(pid_condition)
-
-        if self.domain_name:
-            dn_condition = self.domain_name.build_query_condition(
-                contains_factory=RGUserFairShareConditions.by_domain_name_contains,
-                equals_factory=RGUserFairShareConditions.by_domain_name_equals,
-                starts_with_factory=RGUserFairShareConditions.by_domain_name_starts_with,
-                ends_with_factory=RGUserFairShareConditions.by_domain_name_ends_with,
-            )
-            if dn_condition:
-                conditions.append(dn_condition)
-
-        if self.user:
-            conditions.extend(self.user.build_conditions())
-
-        if self.AND:
-            for sub_filter in self.AND:
-                conditions.extend(sub_filter.build_conditions())
-
-        if self.OR:
-            or_conditions: list[QueryCondition] = []
-            for sub_filter in self.OR:
-                or_conditions.extend(sub_filter.build_conditions())
-            if or_conditions:
-                conditions.append(combine_conditions_or(or_conditions))
-
-        if self.NOT:
-            not_conditions: list[QueryCondition] = []
-            for sub_filter in self.NOT:
-                not_conditions.extend(sub_filter.build_conditions())
-            if not_conditions:
-                conditions.append(negate_conditions(not_conditions))
-
-        return conditions
-
 
 @strawberry.enum(
     name="UserFairShareOrderField",
@@ -602,7 +444,8 @@ class UserFairShareOrderField(StrEnum):
     USER_EMAIL = "user_email"
 
 
-@strawberry.input(
+@strawberry.experimental.pydantic.input(
+    model=UserFairShareOrderDTO,
     name="UserFairShareOrderBy",
     description=(
         "Added in 26.1.0. Specifies ordering for user fair share query results. "
@@ -610,7 +453,7 @@ class UserFairShareOrderField(StrEnum):
         "Default direction is DESC (descending)."
     ),
 )
-class UserFairShareOrderBy(GQLOrderBy):
+class UserFairShareOrderBy:
     """OrderBy for user fair shares."""
 
     field: UserFairShareOrderField = strawberry.field(
@@ -625,25 +468,11 @@ class UserFairShareOrderBy(GQLOrderBy):
     )
 
     def to_pydantic(self) -> UserFairShareOrderDTO:
-        return UserFairShareOrderDTO(
-            field=UserFairShareOrderFieldDTO(self.field.value),
-            direction=OrderDirectionDTO.ASC
-            if self.direction == OrderDirection.ASC
-            else OrderDirectionDTO.DESC,
-        )
-
-    @override
-    def to_query_order(self) -> QueryOrder:
         ascending = self.direction == OrderDirection.ASC
-        match self.field:
-            case UserFairShareOrderField.FAIR_SHARE_FACTOR:
-                return UserFairShareOrders.by_fair_share_factor(ascending)
-            case UserFairShareOrderField.CREATED_AT:
-                return UserFairShareOrders.by_created_at(ascending)
-            case UserFairShareOrderField.USER_USERNAME:
-                return UserFairShareOrders.by_user_username(ascending)
-            case UserFairShareOrderField.USER_EMAIL:
-                return UserFairShareOrders.by_user_email(ascending)
+        return UserFairShareOrderDTO(
+            field=UserFairShareOrderFieldDTO(self.field),
+            direction=OrderDirectionDTO.ASC if ascending else OrderDirectionDTO.DESC,
+        )
 
 
 # Mutation Input/Payload Types

@@ -42,6 +42,11 @@ from ai.backend.common.dto.manager.v2.scheduling_history.types import (
     DeploymentHistoryOrderField as DeploymentHistoryOrderFieldEnum,
 )
 from ai.backend.common.dto.manager.v2.scheduling_history.types import (
+    DeploymentHistoryScopeDTO,
+    RouteHistoryScopeDTO,
+    SessionHistoryScopeDTO,
+)
+from ai.backend.common.dto.manager.v2.scheduling_history.types import (
     OrderDirection as OrderDirectionEnum,
 )
 from ai.backend.common.dto.manager.v2.scheduling_history.types import (
@@ -429,25 +434,46 @@ class RouteHistory(PydanticNodeMixin):
 # Scope input types (added in 26.2.0)
 
 
-@strawberry.input(description="Scope for session scheduling history query")
+@strawberry.experimental.pydantic.input(
+    model=SessionHistoryScopeDTO,
+    name="SessionScope",
+    description="Scope for session scheduling history query",
+)
 class SessionScope:
     """Scope for session-level scheduling history queries."""
 
     session_id: UUID = strawberry.field(description="Session ID to get history for")
 
+    def to_pydantic(self) -> SessionHistoryScopeDTO:
+        return SessionHistoryScopeDTO(session_id=self.session_id)
 
-@strawberry.input(description="Scope for deployment scheduling history query")
+
+@strawberry.experimental.pydantic.input(
+    model=DeploymentHistoryScopeDTO,
+    name="DeploymentScope",
+    description="Scope for deployment scheduling history query",
+)
 class DeploymentScope:
     """Scope for deployment-level scheduling history queries."""
 
     deployment_id: UUID = strawberry.field(description="Deployment ID to get history for")
 
+    def to_pydantic(self) -> DeploymentHistoryScopeDTO:
+        return DeploymentHistoryScopeDTO(deployment_id=self.deployment_id)
 
-@strawberry.input(description="Scope for route scheduling history query")
+
+@strawberry.experimental.pydantic.input(
+    model=RouteHistoryScopeDTO,
+    name="RouteScope",
+    description="Scope for route scheduling history query",
+)
 class RouteScope:
     """Scope for route-level scheduling history queries."""
 
     route_id: UUID = strawberry.field(description="Route ID to get history for")
+
+    def to_pydantic(self) -> RouteHistoryScopeDTO:
+        return RouteHistoryScopeDTO(route_id=self.route_id)
 
 
 # Filters and orders (pydantic-backed inputs)

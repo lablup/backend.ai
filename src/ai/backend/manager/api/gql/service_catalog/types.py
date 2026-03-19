@@ -11,23 +11,31 @@ import strawberry
 from strawberry.relay import NodeID
 from strawberry.scalars import JSON
 
-from ai.backend.common.dto.manager.v2.service_catalog.types import EndpointInfo
+from ai.backend.common.dto.manager.v2.service_catalog.request import (
+    ServiceCatalogFilter as ServiceCatalogFilterDTO,
+)
+from ai.backend.common.dto.manager.v2.service_catalog.request import (
+    ServiceCatalogOrder as ServiceCatalogOrderDTO,
+)
+from ai.backend.common.dto.manager.v2.service_catalog.types import (
+    EndpointInfo,
+)
+from ai.backend.common.dto.manager.v2.service_catalog.types import (
+    OrderDirection as DtoOrderDirection,
+)
+from ai.backend.common.dto.manager.v2.service_catalog.types import (
+    ServiceCatalogOrderField as ServiceCatalogOrderFieldDTO,
+)
+from ai.backend.common.dto.manager.v2.service_catalog.types import (
+    ServiceCatalogStatusFilter as ServiceCatalogStatusFilterDTO,
+)
 from ai.backend.common.types import ServiceCatalogStatus
 from ai.backend.manager.api.gql.base import OrderDirection, StringFilter
 from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin
-from ai.backend.manager.api.gql.types import GQLFilter, GQLOrderBy
 from ai.backend.manager.api.gql.utils import dedent_strip
 from ai.backend.manager.data.service_catalog.types import (
     ServiceCatalogData,
     ServiceCatalogEndpointData,
-)
-from ai.backend.manager.models.service_catalog.conditions import ServiceCatalogConditions
-from ai.backend.manager.models.service_catalog.row import ServiceCatalogRow
-from ai.backend.manager.repositories.base import (
-    QueryCondition,
-    QueryOrder,
-    combine_conditions_or,
-    negate_conditions,
 )
 
 __all__ = (
@@ -154,33 +162,24 @@ class ServiceCatalogOrderFieldGQL(enum.Enum):
     REGISTERED_AT = "REGISTERED_AT"
 
 
-@strawberry.input(
+@strawberry.experimental.pydantic.input(
+    model=ServiceCatalogOrderDTO,
     name="ServiceCatalogOrderBy",
     description="Added in 26.3.0. Specifies the field and direction for ordering service catalog queries.",
 )
-class ServiceCatalogOrderByGQL(GQLOrderBy):
+class ServiceCatalogOrderByGQL:
     field: ServiceCatalogOrderFieldGQL
     direction: OrderDirection = OrderDirection.ASC
 
-    def to_query_order(self) -> QueryOrder:
-        """Convert to repository QueryOrder."""
-        ascending = self.direction == OrderDirection.ASC
-        match self.field:
-            case ServiceCatalogOrderFieldGQL.SERVICE_GROUP:
-                return (
-                    ServiceCatalogRow.service_group.asc()
-                    if ascending
-                    else ServiceCatalogRow.service_group.desc()
-                )
-            case ServiceCatalogOrderFieldGQL.REGISTERED_AT:
-                return (
-                    ServiceCatalogRow.registered_at.asc()
-                    if ascending
-                    else ServiceCatalogRow.registered_at.desc()
-                )
+    def to_pydantic(self) -> ServiceCatalogOrderDTO:
+        return ServiceCatalogOrderDTO(
+            field=ServiceCatalogOrderFieldDTO[self.field.name],
+            direction=DtoOrderDirection(self.direction.value),
+        )
 
 
-@strawberry.input(
+@strawberry.experimental.pydantic.input(
+    model=ServiceCatalogStatusFilterDTO,
     name="ServiceCatalogStatusFilter",
     description=(
         "Added in 26.3.0. Filter for ServiceCatalogStatus enum fields. "
@@ -208,12 +207,29 @@ class ServiceCatalogStatusFilterGQL:
         description="Exclude any of the provided statuses.",
     )
 
+    def to_pydantic(self) -> ServiceCatalogStatusFilterDTO:
+        return ServiceCatalogStatusFilterDTO(
+            equals=ServiceCatalogStatus(self.equals.value) if self.equals is not None else None,
+            in_=(
+                [ServiceCatalogStatus(s.value) for s in self.in_] if self.in_ is not None else None
+            ),
+            not_equals=(
+                ServiceCatalogStatus(self.not_equals.value) if self.not_equals is not None else None
+            ),
+            not_in=(
+                [ServiceCatalogStatus(s.value) for s in self.not_in]
+                if self.not_in is not None
+                else None
+            ),
+        )
 
-@strawberry.input(
+
+@strawberry.experimental.pydantic.input(
+    model=ServiceCatalogFilterDTO,
     name="ServiceCatalogFilter",
     description="Added in 26.3.0. Filter for service catalog queries.",
 )
-class ServiceCatalogFilterGQL(GQLFilter):
+class ServiceCatalogFilterGQL:
     service_group: StringFilter | None = strawberry.field(
         default=None,
         description="Filter by service group name. Supports equals, contains, startsWith, and endsWith.",
@@ -226,71 +242,13 @@ class ServiceCatalogFilterGQL(GQLFilter):
     OR: list[ServiceCatalogFilterGQL] | None = None
     NOT: list[ServiceCatalogFilterGQL] | None = None
 
-    def build_conditions(self) -> list[QueryCondition]:
-        """Build query conditions from filter fields."""
-        conditions: list[QueryCondition] = []
-
-        if self.service_group:
-            condition = self.service_group.build_query_condition(
-                contains_factory=lambda spec: ServiceCatalogConditions.by_service_group_contains(
-                    spec
-                ),
-                equals_factory=lambda spec: ServiceCatalogConditions.by_service_group_equals(spec),
-                starts_with_factory=lambda spec: ServiceCatalogConditions.by_service_group_starts_with(
-                    spec
-                ),
-                ends_with_factory=lambda spec: ServiceCatalogConditions.by_service_group_ends_with(
-                    spec
-                ),
-            )
-            if condition:
-                conditions.append(condition)
-
-        if self.status:
-            if self.status.equals:
-                conditions.append(
-                    ServiceCatalogConditions.by_status_equals(
-                        ServiceCatalogStatus(self.status.equals.value)
-                    )
-                )
-            if self.status.in_:
-                conditions.append(
-                    ServiceCatalogConditions.by_status_in([
-                        ServiceCatalogStatus(s.value) for s in self.status.in_
-                    ])
-                )
-            if self.status.not_equals:
-                conditions.append(
-                    ServiceCatalogConditions.by_status_not_equals(
-                        ServiceCatalogStatus(self.status.not_equals.value)
-                    )
-                )
-            if self.status.not_in:
-                conditions.append(
-                    ServiceCatalogConditions.by_status_not_in([
-                        ServiceCatalogStatus(s.value) for s in self.status.not_in
-                    ])
-                )
-
-        # Handle AND logical operator
-        if self.AND:
-            for sub_filter in self.AND:
-                conditions.extend(sub_filter.build_conditions())
-
-        # Handle OR logical operator
-        if self.OR:
-            or_sub_conditions: list[QueryCondition] = []
-            for sub_filter in self.OR:
-                or_sub_conditions.extend(sub_filter.build_conditions())
-            if or_sub_conditions:
-                conditions.append(combine_conditions_or(or_sub_conditions))
-
-        # Handle NOT logical operator
-        if self.NOT:
-            not_sub_conditions: list[QueryCondition] = []
-            for sub_filter in self.NOT:
-                not_sub_conditions.extend(sub_filter.build_conditions())
-            if not_sub_conditions:
-                conditions.append(negate_conditions(not_sub_conditions))
-
-        return conditions
+    def to_pydantic(self) -> ServiceCatalogFilterDTO:
+        return ServiceCatalogFilterDTO(
+            service_group=(
+                self.service_group.to_pydantic() if self.service_group is not None else None
+            ),
+            status=self.status.to_pydantic() if self.status is not None else None,
+            AND=[f.to_pydantic() for f in self.AND] if self.AND is not None else None,
+            OR=[f.to_pydantic() for f in self.OR] if self.OR is not None else None,
+            NOT=[f.to_pydantic() for f in self.NOT] if self.NOT is not None else None,
+        )

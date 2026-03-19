@@ -19,7 +19,37 @@ from ai.backend.common.dto.manager.v2.deployment.request import (
     AddRevisionInput as AddRevisionInputDTO,
 )
 from ai.backend.common.dto.manager.v2.deployment.request import (
+    ClusterConfigInput as ClusterConfigInputDTO,
+)
+from ai.backend.common.dto.manager.v2.deployment.request import (
+    EnvironmentVariableEntryInput as EnvironmentVariableEntryInputDTO,
+)
+from ai.backend.common.dto.manager.v2.deployment.request import (
+    EnvironmentVariablesInput as EnvironmentVariablesInputDTO,
+)
+from ai.backend.common.dto.manager.v2.deployment.request import (
     ExtraVFolderMountInput as ExtraVFolderMountInputDTO,
+)
+from ai.backend.common.dto.manager.v2.deployment.request import (
+    ImageInput as ImageInputDTO,
+)
+from ai.backend.common.dto.manager.v2.deployment.request import (
+    ModelMountConfigInput as ModelMountConfigInputDTO,
+)
+from ai.backend.common.dto.manager.v2.deployment.request import (
+    ModelRuntimeConfigInput as ModelRuntimeConfigInputDTO,
+)
+from ai.backend.common.dto.manager.v2.deployment.request import (
+    ResourceConfigInput as ResourceConfigInputDTO,
+)
+from ai.backend.common.dto.manager.v2.deployment.request import (
+    ResourceGroupInput as ResourceGroupInputDTO,
+)
+from ai.backend.common.dto.manager.v2.deployment.request import (
+    ResourceSlotEntryInput as ResourceSlotEntryInputDTO,
+)
+from ai.backend.common.dto.manager.v2.deployment.request import (
+    ResourceSlotInput as ResourceSlotInputDTO,
 )
 from ai.backend.common.dto.manager.v2.deployment.request import (
     RevisionFilter as RevisionFilterDTO,
@@ -434,21 +464,37 @@ class ActivateRevisionPayloadGQL:
 
 
 # Input Types
-@strawberry.input(description="Added in 25.19.0")
+@strawberry.experimental.pydantic.input(
+    model=ClusterConfigInputDTO,
+    description="Added in 25.19.0",
+)
 class ClusterConfigInput:
     mode: ClusterModeGQL
     size: int
 
+    def to_pydantic(self) -> ClusterConfigInputDTO:
+        return ClusterConfigInputDTO(
+            mode=CommonClusterMode(self.mode.value),
+            size=self.size,
+        )
 
-@strawberry.input(description="Added in 25.19.0")
+
+@strawberry.experimental.pydantic.input(
+    model=ResourceGroupInputDTO,
+    description="Added in 25.19.0",
+)
 class ResourceGroupInput:
     name: str
 
+    def to_pydantic(self) -> ResourceGroupInputDTO:
+        return ResourceGroupInputDTO(name=self.name)
 
-@strawberry.input(
+
+@strawberry.experimental.pydantic.input(
+    model=ResourceSlotEntryInputDTO,
     description=(
         "Added in 26.1.0. A single entry representing one resource type and its allocated quantity."
-    )
+    ),
 )
 class ResourceSlotEntryInput:
     """Single resource slot entry input with resource type and quantity."""
@@ -458,9 +504,16 @@ class ResourceSlotEntryInput:
     )
     quantity: str = strawberry.field(description="Quantity of the resource as a decimal string.")
 
+    def to_pydantic(self) -> ResourceSlotEntryInputDTO:
+        return ResourceSlotEntryInputDTO(
+            resource_type=self.resource_type,
+            quantity=self.quantity,
+        )
 
-@strawberry.input(
-    description=("Added in 26.1.0. A collection of compute resource allocations for input.")
+
+@strawberry.experimental.pydantic.input(
+    model=ResourceSlotInputDTO,
+    description="Added in 26.1.0. A collection of compute resource allocations for input.",
 )
 class ResourceSlotInput:
     """Resource slot input containing multiple resource type entries."""
@@ -469,8 +522,16 @@ class ResourceSlotInput:
         description="List of resource allocations."
     )
 
+    def to_pydantic(self) -> ResourceSlotInputDTO:
+        return ResourceSlotInputDTO(
+            entries=[e.to_pydantic() for e in self.entries],
+        )
 
-@strawberry.input(description="Added in 25.19.0")
+
+@strawberry.experimental.pydantic.input(
+    model=ResourceConfigInputDTO,
+    description="Added in 25.19.0",
+)
 class ResourceConfigInput:
     resource_group: ResourceGroupInput
     resource_slots: ResourceSlotInput = strawberry.field(
@@ -481,13 +542,30 @@ class ResourceConfigInput:
         default=None,
     )
 
+    def to_pydantic(self) -> ResourceConfigInputDTO:
+        resource_opts_dict: dict[str, str] | None = None
+        if self.resource_opts is not None:
+            resource_opts_dict = {e.name: e.value for e in self.resource_opts.entries}
+        return ResourceConfigInputDTO(
+            resource_group=self.resource_group.to_pydantic(),
+            resource_slots=self.resource_slots.to_pydantic(),
+            resource_opts=resource_opts_dict,
+        )
 
-@strawberry.input(description="Added in 25.19.0")
+
+@strawberry.experimental.pydantic.input(
+    model=ImageInputDTO,
+    description="Added in 25.19.0",
+)
 class ImageInput:
     id: ID
 
+    def to_pydantic(self) -> ImageInputDTO:
+        return ImageInputDTO(id=UUID(str(self.id)))
 
-@strawberry.input(
+
+@strawberry.experimental.pydantic.input(
+    model=EnvironmentVariableEntryInputDTO,
     name="EnvironmentVariableEntryInput",
     description="Added in 26.1.0. A single environment variable entry with name and value.",
 )
@@ -499,8 +577,12 @@ class EnvironmentVariableEntryInputGQL:
     )
     value: str = strawberry.field(description="Environment variable value.")
 
+    def to_pydantic(self) -> EnvironmentVariableEntryInputDTO:
+        return EnvironmentVariableEntryInputDTO(name=self.name, value=self.value)
 
-@strawberry.input(
+
+@strawberry.experimental.pydantic.input(
+    model=EnvironmentVariablesInputDTO,
     name="EnvironmentVariablesInput",
     description="Added in 26.1.0. A collection of environment variable entries.",
 )
@@ -511,8 +593,16 @@ class EnvironmentVariablesInputGQL:
         description="List of environment variable entries."
     )
 
+    def to_pydantic(self) -> EnvironmentVariablesInputDTO:
+        return EnvironmentVariablesInputDTO(
+            entries=[e.to_pydantic() for e in self.entries],
+        )
 
-@strawberry.input(description="Added in 25.19.0")
+
+@strawberry.experimental.pydantic.input(
+    model=ModelRuntimeConfigInputDTO,
+    description="Added in 25.19.0",
+)
 class ModelRuntimeConfigInput:
     runtime_variant: str
     inference_runtime_config: JSON | None = None
@@ -521,18 +611,46 @@ class ModelRuntimeConfigInput:
         default=None,
     )
 
+    def to_pydantic(self) -> ModelRuntimeConfigInputDTO:
+        return ModelRuntimeConfigInputDTO(
+            runtime_variant=self.runtime_variant,
+            inference_runtime_config=dict(self.inference_runtime_config)
+            if self.inference_runtime_config is not None
+            else None,
+            environ=self.environ.to_pydantic() if self.environ is not None else None,
+        )
 
-@strawberry.input(description="Added in 25.19.0")
+
+@strawberry.experimental.pydantic.input(
+    model=ModelMountConfigInputDTO,
+    description="Added in 25.19.0",
+)
 class ModelMountConfigInput:
     vfolder_id: ID
     mount_destination: str
     definition_path: str
 
+    def to_pydantic(self) -> ModelMountConfigInputDTO:
+        return ModelMountConfigInputDTO(
+            vfolder_id=UUID(str(self.vfolder_id)),
+            mount_destination=self.mount_destination,
+            definition_path=self.definition_path,
+        )
 
-@strawberry.input(description="Added in 25.19.0")
+
+@strawberry.experimental.pydantic.input(
+    model=ExtraVFolderMountInputDTO,
+    description="Added in 25.19.0",
+)
 class ExtraVFolderMountInput:
     vfolder_id: ID
     mount_destination: str | None
+
+    def to_pydantic(self) -> ExtraVFolderMountInputDTO:
+        return ExtraVFolderMountInputDTO(
+            vfolder_id=UUID(str(self.vfolder_id)),
+            mount_destination=self.mount_destination,
+        )
 
 
 @strawberry.experimental.pydantic.input(

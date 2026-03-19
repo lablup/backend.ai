@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import datetime
 from decimal import Decimal
 from enum import StrEnum
-from typing import TYPE_CHECKING, Annotated, Any, override
+from typing import TYPE_CHECKING, Annotated, Any
 from uuid import UUID
 
 import strawberry
@@ -42,22 +42,11 @@ from ai.backend.common.dto.manager.v2.fair_share.types import (
 from ai.backend.common.dto.manager.v2.fair_share.types import (
     ProjectFairShareOrderField as ProjectFairShareOrderFieldDTO,
 )
+from ai.backend.common.dto.manager.v2.group.types import ProjectType, ProjectTypeFilter
 from ai.backend.manager.api.gql.base import OrderDirection, StringFilter, UUIDFilter
 from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin
-from ai.backend.manager.api.gql.types import GQLFilter, GQLOrderBy, StrawberryGQLContext
+from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.data.fair_share.types import ProjectFairShareData
-from ai.backend.manager.data.group.types import ProjectType
-from ai.backend.manager.models.fair_share.conditions import (
-    ProjectFairShareConditions,
-    RGProjectFairShareConditions,
-)
-from ai.backend.manager.models.fair_share.orders import ProjectFairShareOrders
-from ai.backend.manager.repositories.base import (
-    QueryCondition,
-    QueryOrder,
-    combine_conditions_or,
-    negate_conditions,
-)
 
 from .common import (
     FairShareCalculationSnapshotGQL,
@@ -272,7 +261,8 @@ class ProjectFairShareTypeEnum(StrEnum):
     MODEL_STORE = "model-store"
 
 
-@strawberry.input(
+@strawberry.experimental.pydantic.input(
+    model=ProjectTypeFilter,
     name="ProjectFairShareTypeEnumFilter",
     description=(
         "Added in 26.2.0. Filter for project type enum in fair share queries. "
@@ -300,8 +290,17 @@ class ProjectFairShareTypeEnumFilter:
         description="Exclude any of the provided types.",
     )
 
+    def to_pydantic(self) -> ProjectTypeFilter:
+        return ProjectTypeFilter(
+            equals=ProjectType(self.equals.value) if self.equals else None,
+            in_=[ProjectType(t.value) for t in self.in_] if self.in_ else None,
+            not_equals=ProjectType(self.not_equals.value) if self.not_equals else None,
+            not_in=[ProjectType(t.value) for t in self.not_in] if self.not_in else None,
+        )
 
-@strawberry.input(
+
+@strawberry.experimental.pydantic.input(
+    model=ProjectFairShareProjectNestedFilterDTO,
     name="ProjectFairShareProjectNestedFilter",
     description=(
         "Added in 26.2.0. Nested filter for project entity fields in project fair share queries. "
@@ -327,52 +326,9 @@ class ProjectFairShareProjectNestedFilter:
     def to_pydantic(self) -> ProjectFairShareProjectNestedFilterDTO:
         return ProjectFairShareProjectNestedFilterDTO(is_active=self.is_active)
 
-    def build_conditions(self) -> list[QueryCondition]:
-        conditions: list[QueryCondition] = []
-        if self.name:
-            name_condition = self.name.build_query_condition(
-                contains_factory=ProjectFairShareConditions.by_project_name_contains,
-                equals_factory=ProjectFairShareConditions.by_project_name_equals,
-                starts_with_factory=ProjectFairShareConditions.by_project_name_starts_with,
-                ends_with_factory=ProjectFairShareConditions.by_project_name_ends_with,
-            )
-            if name_condition:
-                conditions.append(name_condition)
-        if self.is_active is not None:
-            conditions.append(ProjectFairShareConditions.by_project_is_active(self.is_active))
-        if self.type:
-            if self.type.equals is not None:
-                conditions.append(
-                    ProjectFairShareConditions.by_project_type_equals(
-                        ProjectType(self.type.equals.value)
-                    )
-                )
-            if self.type.in_ is not None:
-                conditions.append(
-                    ProjectFairShareConditions.by_project_type_in([
-                        ProjectType(t.value) for t in self.type.in_
-                    ])
-                )
-            if self.type.not_equals is not None:
-                conditions.append(
-                    negate_conditions([
-                        ProjectFairShareConditions.by_project_type_equals(
-                            ProjectType(self.type.not_equals.value)
-                        )
-                    ])
-                )
-            if self.type.not_in is not None:
-                conditions.append(
-                    negate_conditions([
-                        ProjectFairShareConditions.by_project_type_in([
-                            ProjectType(t.value) for t in self.type.not_in
-                        ])
-                    ])
-                )
-        return conditions
 
-
-@strawberry.input(
+@strawberry.experimental.pydantic.input(
+    model=ProjectFairShareFilterDTO,
     name="ProjectFairShareFilter",
     description=(
         "Added in 26.1.0. Filter input for querying project fair shares. "
@@ -380,7 +336,7 @@ class ProjectFairShareProjectNestedFilter:
         "Multiple filters can be combined using AND, OR, and NOT logical operators."
     ),
 )
-class ProjectFairShareFilter(GQLFilter):
+class ProjectFairShareFilter:
     """Filter for project fair shares."""
 
     resource_group: StringFilter | None = strawberry.field(
@@ -437,70 +393,16 @@ class ProjectFairShareFilter(GQLFilter):
             NOT=[f.to_pydantic() for f in self.NOT] if self.NOT else None,
         )
 
-    @override
-    def build_conditions(self) -> list[QueryCondition]:
-        conditions: list[QueryCondition] = []
 
-        if self.resource_group:
-            sg_condition = self.resource_group.build_query_condition(
-                contains_factory=ProjectFairShareConditions.by_resource_group_contains,
-                equals_factory=ProjectFairShareConditions.by_resource_group_equals,
-                starts_with_factory=ProjectFairShareConditions.by_resource_group_starts_with,
-                ends_with_factory=ProjectFairShareConditions.by_resource_group_ends_with,
-            )
-            if sg_condition:
-                conditions.append(sg_condition)
-
-        if self.project_id:
-            pid_condition = self.project_id.build_query_condition(
-                equals_factory=ProjectFairShareConditions.by_project_id,
-                in_factory=ProjectFairShareConditions.by_project_ids,
-            )
-            if pid_condition:
-                conditions.append(pid_condition)
-
-        if self.domain_name:
-            dn_condition = self.domain_name.build_query_condition(
-                contains_factory=ProjectFairShareConditions.by_domain_name_contains,
-                equals_factory=ProjectFairShareConditions.by_domain_name_equals,
-                starts_with_factory=ProjectFairShareConditions.by_domain_name_starts_with,
-                ends_with_factory=ProjectFairShareConditions.by_domain_name_ends_with,
-            )
-            if dn_condition:
-                conditions.append(dn_condition)
-
-        if self.project:
-            conditions.extend(self.project.build_conditions())
-
-        if self.AND:
-            for sub_filter in self.AND:
-                conditions.extend(sub_filter.build_conditions())
-
-        if self.OR:
-            or_conditions: list[QueryCondition] = []
-            for sub_filter in self.OR:
-                or_conditions.extend(sub_filter.build_conditions())
-            if or_conditions:
-                conditions.append(combine_conditions_or(or_conditions))
-
-        if self.NOT:
-            not_conditions: list[QueryCondition] = []
-            for sub_filter in self.NOT:
-                not_conditions.extend(sub_filter.build_conditions())
-            if not_conditions:
-                conditions.append(negate_conditions(not_conditions))
-
-        return conditions
-
-
-@strawberry.input(
+@strawberry.experimental.pydantic.input(
+    model=ProjectFairShareFilterDTO,
     name="RGProjectFairShareFilter",
     description=(
         "Added in 26.2.0. Filter for project fair shares within a resource group scope. "
         "References resource group membership columns to avoid excluding projects without fair share records."
     ),
 )
-class RGProjectFairShareFilter(GQLFilter):
+class RGProjectFairShareFilter:
     """Filter for project fair shares in RG context (uses INNER JOIN'd columns)."""
 
     resource_group: StringFilter | None = strawberry.field(
@@ -537,61 +439,6 @@ class RGProjectFairShareFilter(GQLFilter):
             NOT=[f.to_pydantic() for f in self.NOT] if self.NOT else None,
         )
 
-    @override
-    def build_conditions(self) -> list[QueryCondition]:
-        conditions: list[QueryCondition] = []
-
-        if self.resource_group:
-            sg_condition = self.resource_group.build_query_condition(
-                contains_factory=RGProjectFairShareConditions.by_resource_group_contains,
-                equals_factory=RGProjectFairShareConditions.by_resource_group_equals,
-                starts_with_factory=RGProjectFairShareConditions.by_resource_group_starts_with,
-                ends_with_factory=RGProjectFairShareConditions.by_resource_group_ends_with,
-            )
-            if sg_condition:
-                conditions.append(sg_condition)
-
-        if self.project_id:
-            pid_condition = self.project_id.build_query_condition(
-                equals_factory=RGProjectFairShareConditions.by_project_id,
-                in_factory=RGProjectFairShareConditions.by_project_ids,
-            )
-            if pid_condition:
-                conditions.append(pid_condition)
-
-        if self.domain_name:
-            dn_condition = self.domain_name.build_query_condition(
-                contains_factory=RGProjectFairShareConditions.by_domain_name_contains,
-                equals_factory=RGProjectFairShareConditions.by_domain_name_equals,
-                starts_with_factory=RGProjectFairShareConditions.by_domain_name_starts_with,
-                ends_with_factory=RGProjectFairShareConditions.by_domain_name_ends_with,
-            )
-            if dn_condition:
-                conditions.append(dn_condition)
-
-        if self.project:
-            conditions.extend(self.project.build_conditions())
-
-        if self.AND:
-            for sub_filter in self.AND:
-                conditions.extend(sub_filter.build_conditions())
-
-        if self.OR:
-            or_conditions: list[QueryCondition] = []
-            for sub_filter in self.OR:
-                or_conditions.extend(sub_filter.build_conditions())
-            if or_conditions:
-                conditions.append(combine_conditions_or(or_conditions))
-
-        if self.NOT:
-            not_conditions: list[QueryCondition] = []
-            for sub_filter in self.NOT:
-                not_conditions.extend(sub_filter.build_conditions())
-            if not_conditions:
-                conditions.append(negate_conditions(not_conditions))
-
-        return conditions
-
 
 @strawberry.enum(
     name="ProjectFairShareOrderField",
@@ -610,7 +457,8 @@ class ProjectFairShareOrderField(StrEnum):
     PROJECT_IS_ACTIVE = "project_is_active"
 
 
-@strawberry.input(
+@strawberry.experimental.pydantic.input(
+    model=ProjectFairShareOrderDTO,
     name="ProjectFairShareOrderBy",
     description=(
         "Added in 26.1.0. Specifies ordering for project fair share query results. "
@@ -618,7 +466,7 @@ class ProjectFairShareOrderField(StrEnum):
         "Default direction is DESC (descending)."
     ),
 )
-class ProjectFairShareOrderBy(GQLOrderBy):
+class ProjectFairShareOrderBy:
     """OrderBy for project fair shares."""
 
     field: ProjectFairShareOrderField = strawberry.field(
@@ -633,25 +481,11 @@ class ProjectFairShareOrderBy(GQLOrderBy):
     )
 
     def to_pydantic(self) -> ProjectFairShareOrderDTO:
-        return ProjectFairShareOrderDTO(
-            field=ProjectFairShareOrderFieldDTO(self.field.value),
-            direction=OrderDirectionDTO.ASC
-            if self.direction == OrderDirection.ASC
-            else OrderDirectionDTO.DESC,
-        )
-
-    @override
-    def to_query_order(self) -> QueryOrder:
         ascending = self.direction == OrderDirection.ASC
-        match self.field:
-            case ProjectFairShareOrderField.FAIR_SHARE_FACTOR:
-                return ProjectFairShareOrders.by_fair_share_factor(ascending)
-            case ProjectFairShareOrderField.CREATED_AT:
-                return ProjectFairShareOrders.by_created_at(ascending)
-            case ProjectFairShareOrderField.PROJECT_NAME:
-                return ProjectFairShareOrders.by_project_name(ascending)
-            case ProjectFairShareOrderField.PROJECT_IS_ACTIVE:
-                return ProjectFairShareOrders.by_project_is_active(ascending)
+        return ProjectFairShareOrderDTO(
+            field=ProjectFairShareOrderFieldDTO(self.field),
+            direction=OrderDirectionDTO.ASC if ascending else OrderDirectionDTO.DESC,
+        )
 
 
 # Mutation Input/Payload Types

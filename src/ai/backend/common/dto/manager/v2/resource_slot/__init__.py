@@ -26,6 +26,8 @@ from ai.backend.common.dto.manager.v2.resource_slot.types import (
     NumberFormatInfo,
     OrderDirection,
     ResourceAllocationOrderField,
+    ResourceOptsDTOInput,
+    ResourceOptsEntryDTO,
     ResourceSlotTypeOrderField,
 )
 
@@ -35,6 +37,8 @@ __all__ = (
     "NumberFormatInfo",
     "OrderDirection",
     "ResourceAllocationOrderField",
+    "ResourceOptsEntryDTO",
+    "ResourceOptsDTOInput",
     "ResourceSlotTypeOrderField",
     # Request models
     "AdminSearchAgentResourcesInput",

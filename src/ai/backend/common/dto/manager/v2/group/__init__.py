@@ -26,6 +26,7 @@ from ai.backend.common.dto.manager.v2.group.response import (
     VFolderHostPermissionEntry,
 )
 from ai.backend.common.dto.manager.v2.group.types import (
+    DomainProjectScopeDTO,
     GroupDomainFilter,
     GroupOrderField,
     GroupUserFilter,
@@ -36,6 +37,7 @@ from ai.backend.common.dto.manager.v2.group.types import (
 
 __all__ = (
     # Types
+    "DomainProjectScopeDTO",
     "ProjectType",
     "OrderDirection",
     "GroupOrderField",

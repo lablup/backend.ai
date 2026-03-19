@@ -10,6 +10,10 @@ import strawberry
 from strawberry import ID, Info
 from strawberry.relay import Connection, Edge, NodeID
 
+from ai.backend.common.dto.manager.v2.fair_share.types import (
+    ProjectFairShareScopeDTO,
+    ProjectUsageScopeDTO,
+)
 from ai.backend.manager.api.gql.fair_share.types import ProjectFairShareGQL
 from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin
 from ai.backend.manager.api.gql.resource_slot.overview_types import ActiveResourceOverviewGQL
@@ -37,7 +41,11 @@ if TYPE_CHECKING:
     from ai.backend.manager.data.group.types import GroupData
 
 
-@strawberry.input(name="ProjectFairShareScope")
+@strawberry.experimental.pydantic.input(
+    model=ProjectFairShareScopeDTO,
+    name="ProjectFairShareScope",
+    description="Scope parameters for filtering project fair shares.",
+)
 class ProjectFairShareScopeGQL:
     """Scope parameters for filtering project fair shares."""
 
@@ -45,14 +53,24 @@ class ProjectFairShareScopeGQL:
         description="Resource group to filter fair shares by."
     )
 
+    def to_pydantic(self) -> ProjectFairShareScopeDTO:
+        return ProjectFairShareScopeDTO(resource_group_name=self.resource_group_name)
 
-@strawberry.input(name="ProjectUsageScope")
+
+@strawberry.experimental.pydantic.input(
+    model=ProjectUsageScopeDTO,
+    name="ProjectUsageScope",
+    description="Scope parameters for filtering project usage buckets.",
+)
 class ProjectUsageScopeGQL:
     """Scope parameters for filtering project usage buckets."""
 
     resource_group_name: str = strawberry.field(
         description="Resource group to filter usage buckets by."
     )
+
+    def to_pydantic(self) -> ProjectUsageScopeDTO:
+        return ProjectUsageScopeDTO(resource_group_name=self.resource_group_name)
 
 
 @strawberry.federation.type(

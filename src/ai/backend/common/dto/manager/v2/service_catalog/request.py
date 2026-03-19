@@ -132,6 +132,18 @@ class ServiceCatalogFilter(BaseRequestModel):
     status: ServiceCatalogStatusFilter | None = Field(
         default=None, description="Filter by health status."
     )
+    AND: list[ServiceCatalogFilter] | None = Field(
+        default=None, description="Logical AND of multiple filter conditions."
+    )
+    OR: list[ServiceCatalogFilter] | None = Field(
+        default=None, description="Logical OR of multiple filter conditions."
+    )
+    NOT: list[ServiceCatalogFilter] | None = Field(
+        default=None, description="Logical NOT of filter conditions."
+    )
+
+
+ServiceCatalogFilter.model_rebuild()
 
 
 class ServiceCatalogOrder(BaseRequestModel):
@@ -161,3 +173,6 @@ class AdminSearchServiceCatalogsInput(BaseRequestModel):
     # Offset-based pagination
     limit: int | None = Field(default=None, ge=1, description="Maximum number of items to return.")
     offset: int | None = Field(default=None, ge=0, description="Number of items to skip.")
+
+
+ServiceCatalogFilter.model_rebuild()

@@ -6,6 +6,14 @@ from typing import TYPE_CHECKING
 
 import strawberry
 
+from ai.backend.common.dto.manager.v2.fair_share.types import (
+    DomainUsageBucketScopeDTO,
+    ProjectUsageBucketScopeDTO,
+    ResourceGroupDomainScopeDTO,
+    ResourceGroupProjectScopeDTO,
+    ResourceGroupUserScopeDTO,
+    UserUsageBucketScopeDTO,
+)
 from ai.backend.manager.api.gql.data_loader.data_loaders import DataLoaders
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.repositories.base import QueryCondition, QueryOrder
@@ -68,7 +76,11 @@ class StrawberryGQLContext:
 # Scope input types for BEP-1041 Resource Group scoped APIs
 
 
-@strawberry.input(description="Resource group scope for domain-level operations")
+@strawberry.experimental.pydantic.input(
+    model=ResourceGroupDomainScopeDTO,
+    name="ResourceGroupDomainScope",
+    description="Resource group scope for domain-level operations",
+)
 class ResourceGroupDomainScope:
     """Scope for domain-level APIs within a resource group context."""
 
@@ -76,8 +88,15 @@ class ResourceGroupDomainScope:
         description="Resource group name to scope the operation"
     )
 
+    def to_pydantic(self) -> ResourceGroupDomainScopeDTO:
+        return ResourceGroupDomainScopeDTO(resource_group_name=self.resource_group_name)
 
-@strawberry.input(description="Resource group + domain scope for project-level operations")
+
+@strawberry.experimental.pydantic.input(
+    model=ResourceGroupProjectScopeDTO,
+    name="ResourceGroupProjectScope",
+    description="Resource group + domain scope for project-level operations",
+)
 class ResourceGroupProjectScope:
     """Scope for project-level APIs within a resource group and domain context."""
 
@@ -86,8 +105,18 @@ class ResourceGroupProjectScope:
     )
     domain_name: str = strawberry.field(description="Domain name to scope the operation")
 
+    def to_pydantic(self) -> ResourceGroupProjectScopeDTO:
+        return ResourceGroupProjectScopeDTO(
+            resource_group_name=self.resource_group_name,
+            domain_name=self.domain_name,
+        )
 
-@strawberry.input(description="Resource group + domain + project scope for user-level operations")
+
+@strawberry.experimental.pydantic.input(
+    model=ResourceGroupUserScopeDTO,
+    name="ResourceGroupUserScope",
+    description="Resource group + domain + project scope for user-level operations",
+)
 class ResourceGroupUserScope:
     """Scope for user-level APIs within a resource group, domain, and project context."""
 
@@ -97,19 +126,40 @@ class ResourceGroupUserScope:
     domain_name: str = strawberry.field(description="Domain name to scope the operation")
     project_id: str = strawberry.field(description="Project ID to scope the operation")
 
+    def to_pydantic(self) -> ResourceGroupUserScopeDTO:
+        return ResourceGroupUserScopeDTO(
+            resource_group_name=self.resource_group_name,
+            domain_name=self.domain_name,
+            project_id=self.project_id,
+        )
+
 
 # Scope input types for Usage Bucket scoped APIs
 
 
-@strawberry.input(description="Domain scope for usage bucket queries")
+@strawberry.experimental.pydantic.input(
+    model=DomainUsageBucketScopeDTO,
+    name="DomainUsageBucketScope",
+    description="Domain scope for usage bucket queries",
+)
 class DomainUsageBucketScope:
     """Scope for domain-level usage bucket APIs."""
 
     resource_group_name: str = strawberry.field(description="Resource group name")
     domain_name: str = strawberry.field(description="Domain name to retrieve usage buckets for")
 
+    def to_pydantic(self) -> DomainUsageBucketScopeDTO:
+        return DomainUsageBucketScopeDTO(
+            resource_group_name=self.resource_group_name,
+            domain_name=self.domain_name,
+        )
 
-@strawberry.input(description="Project scope for usage bucket queries")
+
+@strawberry.experimental.pydantic.input(
+    model=ProjectUsageBucketScopeDTO,
+    name="ProjectUsageBucketScope",
+    description="Project scope for usage bucket queries",
+)
 class ProjectUsageBucketScope:
     """Scope for project-level usage bucket APIs."""
 
@@ -117,8 +167,19 @@ class ProjectUsageBucketScope:
     domain_name: str = strawberry.field(description="Domain name")
     project_id: str = strawberry.field(description="Project ID (will be converted to UUID)")
 
+    def to_pydantic(self) -> ProjectUsageBucketScopeDTO:
+        return ProjectUsageBucketScopeDTO(
+            resource_group_name=self.resource_group_name,
+            domain_name=self.domain_name,
+            project_id=self.project_id,
+        )
 
-@strawberry.input(description="User scope for usage bucket queries")
+
+@strawberry.experimental.pydantic.input(
+    model=UserUsageBucketScopeDTO,
+    name="UserUsageBucketScope",
+    description="User scope for usage bucket queries",
+)
 class UserUsageBucketScope:
     """Scope for user-level usage bucket APIs."""
 
@@ -126,3 +187,11 @@ class UserUsageBucketScope:
     domain_name: str = strawberry.field(description="Domain name")
     project_id: str = strawberry.field(description="Project ID (will be converted to UUID)")
     user_uuid: str = strawberry.field(description="User UUID (will be converted to UUID)")
+
+    def to_pydantic(self) -> UserUsageBucketScopeDTO:
+        return UserUsageBucketScopeDTO(
+            resource_group_name=self.resource_group_name,
+            domain_name=self.domain_name,
+            project_id=self.project_id,
+            user_uuid=self.user_uuid,
+        )

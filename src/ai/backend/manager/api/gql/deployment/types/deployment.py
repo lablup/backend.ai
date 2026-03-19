@@ -41,6 +41,15 @@ from ai.backend.common.dto.manager.v2.deployment.request import (
     DeploymentStatusFilter as DeploymentStatusFilterDTO,
 )
 from ai.backend.common.dto.manager.v2.deployment.request import (
+    DeploymentStrategyInput as DeploymentStrategyInputDTO,
+)
+from ai.backend.common.dto.manager.v2.deployment.request import (
+    ModelDeploymentMetadataInput as ModelDeploymentMetadataInputDTO,
+)
+from ai.backend.common.dto.manager.v2.deployment.request import (
+    ModelDeploymentNetworkAccessInput as ModelDeploymentNetworkAccessInputDTO,
+)
+from ai.backend.common.dto.manager.v2.deployment.request import (
     RollingUpdateConfigInput as RollingUpdateConfigInputDTO,
 )
 from ai.backend.common.dto.manager.v2.deployment.request import (
@@ -538,10 +547,19 @@ class ModelDeployment(PydanticNodeMixin):
 
 
 # Filter Types
-@strawberry.input(description="Added in 25.19.0")
+@strawberry.experimental.pydantic.input(
+    model=DeploymentStatusFilterDTO,
+    description="Added in 25.19.0",
+)
 class DeploymentStatusFilter:
     in_: list[DeploymentStatusGQL] | None = strawberry.field(name="in", default=None)
     equals: DeploymentStatusGQL | None = None
+
+    def to_pydantic(self) -> DeploymentStatusFilterDTO:
+        return DeploymentStatusFilterDTO(
+            equals=self.equals.value if self.equals else None,
+            in_=[s.value for s in self.in_] if self.in_ else None,
+        )
 
 
 @strawberry.experimental.pydantic.input(
@@ -614,15 +632,29 @@ class DeploymentStatusChangedPayload:
 
 
 # Input Types
-@strawberry.input(description="Added in 25.19.0")
+@strawberry.experimental.pydantic.input(
+    model=ModelDeploymentMetadataInputDTO,
+    description="Added in 25.19.0",
+)
 class ModelDeploymentMetadataInput:
     project_id: ID
     domain_name: str
     name: str | None = None
     tags: list[str] | None = None
 
+    def to_pydantic(self) -> ModelDeploymentMetadataInputDTO:
+        return ModelDeploymentMetadataInputDTO(
+            project_id=UUID(str(self.project_id)),
+            domain_name=self.domain_name,
+            name=self.name,
+            tags=self.tags,
+        )
 
-@strawberry.input(description="Added in 25.19.0")
+
+@strawberry.experimental.pydantic.input(
+    model=ModelDeploymentNetworkAccessInputDTO,
+    description="Added in 25.19.0",
+)
 class ModelDeploymentNetworkAccessInput:
     preferred_domain_name: str | None = None
     open_to_public: bool = False
@@ -633,8 +665,15 @@ class ModelDeploymentNetworkAccessInput:
             preferred_domain_name=self.preferred_domain_name,
         )
 
+    def to_pydantic(self) -> ModelDeploymentNetworkAccessInputDTO:
+        return ModelDeploymentNetworkAccessInputDTO(
+            preferred_domain_name=self.preferred_domain_name,
+            open_to_public=self.open_to_public,
+        )
 
-@strawberry.input(
+
+@strawberry.experimental.pydantic.input(
+    model=DeploymentStrategyInputDTO,
     name="DeploymentStrategyInput",
     description="Added in 25.19.0. Deployment strategy configuration with discriminator pattern.",
 )
@@ -679,6 +718,14 @@ class DeploymentStrategyInputGQL:
                     strategy_spec=self.blue_green.to_spec(),
                     rollback_on_failure=self.rollback_on_failure,
                 )
+
+    def to_pydantic(self) -> DeploymentStrategyInputDTO:
+        return DeploymentStrategyInputDTO(
+            type=DeploymentStrategy(self.type.value),
+            rollback_on_failure=self.rollback_on_failure,
+            rolling_update=self.rolling_update.to_pydantic() if self.rolling_update else None,
+            blue_green=self.blue_green.to_pydantic() if self.blue_green else None,
+        )
 
 
 @strawberry.experimental.pydantic.input(

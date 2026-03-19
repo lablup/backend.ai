@@ -95,16 +95,34 @@ TrafficStatus: type[RouteTrafficStatus] = strawberry.enum(
 # ========== Status Filters ==========
 
 
-@strawberry.input(description="Added in 25.19.0")
+@strawberry.experimental.pydantic.input(
+    model=ReplicaStatusFilterDTO,
+    description="Added in 25.19.0",
+)
 class ReplicaStatusFilter:
     in_: list[ReplicaStatus] | None = strawberry.field(name="in", default=None)
     equals: ReplicaStatus | None = None
 
+    def to_pydantic(self) -> ReplicaStatusFilterDTO:
+        return ReplicaStatusFilterDTO(
+            equals=CommonRouteStatus(self.equals.value) if self.equals else None,
+            in_=[CommonRouteStatus(s.value) for s in self.in_] if self.in_ else None,
+        )
 
-@strawberry.input(description="Added in 25.19.0")
+
+@strawberry.experimental.pydantic.input(
+    model=ReplicaTrafficStatusFilterDTO,
+    description="Added in 25.19.0",
+)
 class TrafficStatusFilter:
     in_: list[TrafficStatus] | None = strawberry.field(name="in", default=None)
     equals: TrafficStatus | None = None
+
+    def to_pydantic(self) -> ReplicaTrafficStatusFilterDTO:
+        return ReplicaTrafficStatusFilterDTO(
+            equals=CommonRouteTrafficStatus(self.equals.value) if self.equals else None,
+            in_=[CommonRouteTrafficStatus(s.value) for s in self.in_] if self.in_ else None,
+        )
 
 
 # ========== ModelReplica Types ==========

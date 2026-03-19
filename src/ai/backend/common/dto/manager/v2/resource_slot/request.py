@@ -34,6 +34,20 @@ class ResourceSlotTypeFilter(BaseRequestModel):
     """Filter conditions for resource slot type search."""
 
     slot_name: StringFilter | None = Field(default=None, description="Filter by slot name.")
+    slot_type: StringFilter | None = Field(default=None, description="Filter by slot type.")
+    display_name: StringFilter | None = Field(default=None, description="Filter by display name.")
+    AND: list[ResourceSlotTypeFilter] | None = Field(
+        default=None, description="Logical AND of multiple filter conditions."
+    )
+    OR: list[ResourceSlotTypeFilter] | None = Field(
+        default=None, description="Logical OR of multiple filter conditions."
+    )
+    NOT: list[ResourceSlotTypeFilter] | None = Field(
+        default=None, description="Logical NOT of filter conditions."
+    )
+
+
+ResourceSlotTypeFilter.model_rebuild()
 
 
 class ResourceSlotTypeOrder(BaseRequestModel):
@@ -73,6 +87,18 @@ class AgentResourceFilter(BaseRequestModel):
 
     slot_name: StringFilter | None = Field(default=None, description="Filter by slot name.")
     agent_id: StringFilter | None = Field(default=None, description="Filter by agent ID.")
+    AND: list[AgentResourceFilter] | None = Field(
+        default=None, description="Logical AND of multiple filter conditions."
+    )
+    OR: list[AgentResourceFilter] | None = Field(
+        default=None, description="Logical OR of multiple filter conditions."
+    )
+    NOT: list[AgentResourceFilter] | None = Field(
+        default=None, description="Logical NOT of filter conditions."
+    )
+
+
+AgentResourceFilter.model_rebuild()
 
 
 class AgentResourceOrder(BaseRequestModel):
@@ -112,6 +138,18 @@ class ResourceAllocationFilter(BaseRequestModel):
 
     slot_name: StringFilter | None = Field(default=None, description="Filter by slot name.")
     kernel_id: UUIDFilter | None = Field(default=None, description="Filter by kernel ID.")
+    AND: list[ResourceAllocationFilter] | None = Field(
+        default=None, description="Logical AND of multiple filter conditions."
+    )
+    OR: list[ResourceAllocationFilter] | None = Field(
+        default=None, description="Logical OR of multiple filter conditions."
+    )
+    NOT: list[ResourceAllocationFilter] | None = Field(
+        default=None, description="Logical NOT of filter conditions."
+    )
+
+
+ResourceAllocationFilter.model_rebuild()
 
 
 class ResourceAllocationOrder(BaseRequestModel):

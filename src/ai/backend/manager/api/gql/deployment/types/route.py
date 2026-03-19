@@ -207,7 +207,8 @@ class RouteConnection(Connection[Route]):
 # Filter and OrderBy types
 
 
-@strawberry.input(
+@strawberry.experimental.pydantic.input(
+    model=RouteStatusFilterDTO,
     name="RouteStatusFilter",
     description="Added in 26.3.0. Filter for route status with equality and membership operators.",
 )
@@ -225,8 +226,17 @@ class RouteStatusFilterGQL:
         default=None, description="Excludes routes whose status is in this list."
     )
 
+    def to_pydantic(self) -> RouteStatusFilterDTO:
+        return RouteStatusFilterDTO(
+            equals=RouteStatusCommon(self.equals.value) if self.equals else None,
+            in_=[RouteStatusCommon(s.value) for s in self.in_] if self.in_ else None,
+            not_equals=RouteStatusCommon(self.not_equals.value) if self.not_equals else None,
+            not_in=[RouteStatusCommon(s.value) for s in self.not_in] if self.not_in else None,
+        )
 
-@strawberry.input(
+
+@strawberry.experimental.pydantic.input(
+    model=RouteTrafficStatusFilterDTO,
     name="RouteTrafficStatusFilter",
     description="Added in 26.3.0. Filter for route traffic status with equality and membership operators.",
 )
@@ -243,6 +253,16 @@ class RouteTrafficStatusFilterGQL:
     not_in: list[RouteTrafficStatusGQL] | None = strawberry.field(
         default=None, description="Excludes routes whose traffic status is in this list."
     )
+
+    def to_pydantic(self) -> RouteTrafficStatusFilterDTO:
+        return RouteTrafficStatusFilterDTO(
+            equals=RouteTrafficStatusCommon(self.equals.value) if self.equals else None,
+            in_=[RouteTrafficStatusCommon(s.value) for s in self.in_] if self.in_ else None,
+            not_equals=RouteTrafficStatusCommon(self.not_equals.value) if self.not_equals else None,
+            not_in=[RouteTrafficStatusCommon(s.value) for s in self.not_in]
+            if self.not_in
+            else None,
+        )
 
 
 @strawberry.enum

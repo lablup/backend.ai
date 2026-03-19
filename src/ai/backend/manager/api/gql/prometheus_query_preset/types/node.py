@@ -14,6 +14,9 @@ from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin
 from .payloads import QueryDefinitionOptionsGQL
 
 if TYPE_CHECKING:
+    from ai.backend.common.dto.manager.v2.prometheus_query_preset.response import (
+        QueryDefinitionNode,
+    )
     from ai.backend.manager.data.prometheus_query_preset import PrometheusQueryPresetData
 
 
@@ -49,6 +52,22 @@ class QueryDefinitionGQL(PydanticNodeMixin):
             ),
             created_at=data.created_at,
             updated_at=data.updated_at,
+        )
+
+    @classmethod
+    def from_node(cls, node: QueryDefinitionNode) -> Self:
+        return cls(
+            id=ID(str(node.id)),
+            name=node.name,
+            metric_name=node.metric_name,
+            query_template=node.query_template,
+            time_window=node.time_window,
+            options=QueryDefinitionOptionsGQL(
+                filter_labels=node.options.filter_labels,
+                group_labels=node.options.group_labels,
+            ),
+            created_at=node.created_at,
+            updated_at=node.updated_at,
         )
 
 

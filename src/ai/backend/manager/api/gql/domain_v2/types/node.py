@@ -9,6 +9,10 @@ import strawberry
 from strawberry import ID, Info
 from strawberry.relay import Connection, Edge, NodeID
 
+from ai.backend.common.dto.manager.v2.domain.types import (
+    DomainFairShareScopeDTO,
+    DomainUsageScopeDTO,
+)
 from ai.backend.manager.api.gql.fair_share.types import DomainFairShareGQL
 from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin
 from ai.backend.manager.api.gql.resource_slot.overview_types import ActiveResourceOverviewGQL
@@ -37,7 +41,10 @@ if TYPE_CHECKING:
     from ai.backend.manager.data.domain.types import DomainData
 
 
-@strawberry.input(name="DomainFairShareScope")
+@strawberry.experimental.pydantic.input(
+    model=DomainFairShareScopeDTO,
+    name="DomainFairShareScope",
+)
 class DomainFairShareScopeGQL:
     """Scope parameters for filtering domain fair shares."""
 
@@ -45,14 +52,23 @@ class DomainFairShareScopeGQL:
         description="Resource group to filter fair shares by."
     )
 
+    def to_pydantic(self) -> DomainFairShareScopeDTO:
+        return DomainFairShareScopeDTO(resource_group_name=self.resource_group_name)
 
-@strawberry.input(name="DomainUsageScope")
+
+@strawberry.experimental.pydantic.input(
+    model=DomainUsageScopeDTO,
+    name="DomainUsageScope",
+)
 class DomainUsageScopeGQL:
     """Scope parameters for filtering domain usage buckets."""
 
     resource_group_name: str = strawberry.field(
         description="Resource group to filter usage buckets by."
     )
+
+    def to_pydantic(self) -> DomainUsageScopeDTO:
+        return DomainUsageScopeDTO(resource_group_name=self.resource_group_name)
 
 
 @strawberry.federation.type(

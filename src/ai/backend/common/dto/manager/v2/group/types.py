@@ -6,10 +6,13 @@ from __future__ import annotations
 
 from enum import StrEnum
 
+from pydantic import Field
+
 from ai.backend.common.api_handlers import BaseRequestModel
 from ai.backend.common.dto.manager.query import StringFilter
 
 __all__ = (
+    "DomainProjectScopeDTO",
     "GroupDomainFilter",
     "GroupOrderField",
     "GroupUserFilter",
@@ -68,3 +71,9 @@ class GroupUserFilter(BaseRequestModel):
     username: StringFilter | None = None
     email: StringFilter | None = None
     is_active: bool | None = None
+
+
+class DomainProjectScopeDTO(BaseRequestModel):
+    """Scope for domain-level project queries."""
+
+    domain_name: str = Field(description="Domain name to scope the query.")
