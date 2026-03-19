@@ -123,14 +123,13 @@ class TestAdminUpdatePermission:
             id=permission_id,
             operation=OperationTypeGQL.UPDATE,
         )
-        updater = input_data.to_updater()
-        values = updater.spec.build_values()
+        dto = input_data.to_pydantic()
 
-        assert "operation" in values
-        assert values["operation"] == OperationType.UPDATE
-        assert "scope_type" not in values
-        assert "scope_id" not in values
-        assert "entity_type" not in values
+        assert dto.id == permission_id
+        assert dto.operation is not None
+        assert dto.scope_type is None
+        assert dto.scope_id is None
+        assert dto.entity_type is None
 
         resolver_fn = permission_resolver.admin_update_permission.base_resolver
         result = await resolver_fn(info=info, input=input_data)
@@ -161,13 +160,13 @@ class TestAdminUpdatePermission:
             entity_type=RBACElementTypeGQL.SESSION,
             operation=OperationTypeGQL.CREATE,
         )
-        updater = input_data.to_updater()
-        values = updater.spec.build_values()
+        dto = input_data.to_pydantic()
 
-        assert values["scope_type"] == ScopeType.PROJECT
-        assert values["scope_id"] == "project-1"
-        assert values["entity_type"] == EntityType.SESSION
-        assert values["operation"] == OperationType.CREATE
+        assert dto.id == permission_id
+        assert dto.scope_type is not None
+        assert dto.scope_id == "project-1"
+        assert dto.entity_type is not None
+        assert dto.operation is not None
 
         resolver_fn = permission_resolver.admin_update_permission.base_resolver
         result = await resolver_fn(info=info, input=input_data)

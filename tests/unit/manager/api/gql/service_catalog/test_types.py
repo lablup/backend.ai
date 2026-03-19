@@ -5,6 +5,9 @@ from __future__ import annotations
 import uuid
 from datetime import UTC, datetime
 
+from ai.backend.common.dto.manager.v2.service_catalog.request import (
+    ServiceCatalogFilter as ServiceCatalogFilterDTO,
+)
 from ai.backend.common.types import ServiceCatalogStatus
 from ai.backend.manager.api.gql.base import StringFilter
 from ai.backend.manager.api.gql.service_catalog.types import (
@@ -155,34 +158,41 @@ class TestServiceCatalogGQL:
 
 
 class TestServiceCatalogFilterGQL:
-    """Tests for ServiceCatalogFilterGQL filter conditions."""
+    """Tests for ServiceCatalogFilterGQL.to_pydantic() conversion."""
 
-    def test_build_conditions_empty(self) -> None:
-        """Empty filter should produce no conditions."""
+    def test_to_pydantic_empty(self) -> None:
+        """Empty filter should produce a DTO with all None fields."""
         f = ServiceCatalogFilterGQL()
-        conditions = f.build_conditions()
-        assert conditions == []
+        dto = f.to_pydantic()
+        assert isinstance(dto, ServiceCatalogFilterDTO)
+        assert dto.service_group is None
+        assert dto.status is None
 
-    def test_build_conditions_service_group(self) -> None:
-        """Filter by service_group should produce one condition."""
+    def test_to_pydantic_service_group(self) -> None:
+        """Filter by service_group should produce DTO with service_group set."""
         f = ServiceCatalogFilterGQL(service_group=StringFilter(equals="manager"))
-        conditions = f.build_conditions()
-        assert len(conditions) == 1
-        assert str(conditions[0]().compile(compile_kwargs={"literal_binds": True}))
+        dto = f.to_pydantic()
+        assert isinstance(dto, ServiceCatalogFilterDTO)
+        assert dto.service_group is not None
+        assert dto.service_group.equals == "manager"
 
-    def test_build_conditions_status(self) -> None:
-        """Filter by status should produce one condition."""
+    def test_to_pydantic_status(self) -> None:
+        """Filter by status should produce DTO with status set."""
         f = ServiceCatalogFilterGQL(
             status=ServiceCatalogStatusFilterGQL(equals=ServiceCatalogStatusGQL.HEALTHY)
         )
-        conditions = f.build_conditions()
-        assert len(conditions) == 1
+        dto = f.to_pydantic()
+        assert isinstance(dto, ServiceCatalogFilterDTO)
+        assert dto.status is not None
 
-    def test_build_conditions_combined(self) -> None:
-        """Filter with both fields should produce two conditions."""
+    def test_to_pydantic_combined(self) -> None:
+        """Filter with both fields should produce DTO with both fields set."""
         f = ServiceCatalogFilterGQL(
             service_group=StringFilter(equals="agent"),
             status=ServiceCatalogStatusFilterGQL(equals=ServiceCatalogStatusGQL.DEREGISTERED),
         )
-        conditions = f.build_conditions()
-        assert len(conditions) == 2
+        dto = f.to_pydantic()
+        assert isinstance(dto, ServiceCatalogFilterDTO)
+        assert dto.service_group is not None
+        assert dto.service_group.equals == "agent"
+        assert dto.status is not None

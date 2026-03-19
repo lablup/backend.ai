@@ -155,7 +155,7 @@ class TestRGProjectFairShares:
         mock_connection = MagicMock()
 
         with patch(
-            "ai.backend.manager.api.gql.fair_share.resolver.project.fetch_rg_project_fair_shares",
+            "ai.backend.manager.api.gql.fair_share.resolver.project._fetch_rg_project_fair_shares",
             new_callable=AsyncMock,
             return_value=mock_connection,
         ) as mock_fetch:

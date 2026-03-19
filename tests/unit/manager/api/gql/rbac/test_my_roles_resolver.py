@@ -41,7 +41,7 @@ class TestMyRoles:
                 return_value=user_data,
             ),
             patch(
-                "ai.backend.manager.api.gql.rbac.resolver.role.fetch_role_assignments",
+                "ai.backend.manager.api.gql.rbac.resolver.role._fetch_role_assignments",
                 new_callable=AsyncMock,
                 return_value=mock_connection,
             ) as mock_fetch,
@@ -104,7 +104,7 @@ class TestMyRoles:
                 return_value=user_data,
             ),
             patch(
-                "ai.backend.manager.api.gql.rbac.resolver.role.fetch_role_assignments",
+                "ai.backend.manager.api.gql.rbac.resolver.role._fetch_role_assignments",
                 new_callable=AsyncMock,
                 return_value=mock_connection,
             ) as mock_fetch,

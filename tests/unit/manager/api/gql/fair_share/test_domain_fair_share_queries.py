@@ -249,7 +249,7 @@ class TestAdminDomainFairSharesListQuery:
 
         with with_user(mock_superadmin_user):
             with patch.object(
-                domain_resolver, "fetch_domain_fair_shares", mock_fetcher
+                domain_resolver, "_fetch_domain_fair_shares", mock_fetcher
             ) as patched_fetcher:
                 info = create_mock_info(MagicMock())
                 await domain_resolver.admin_domain_fair_shares.base_resolver(
@@ -284,7 +284,7 @@ class TestAdminDomainFairSharesListQuery:
         )
 
         with with_user(mock_superadmin_user):
-            with patch.object(domain_resolver, "fetch_domain_fair_shares", mock_fetcher):
+            with patch.object(domain_resolver, "_fetch_domain_fair_shares", mock_fetcher):
                 info = create_mock_info(MagicMock())
                 result = await domain_resolver.admin_domain_fair_shares.base_resolver(
                     info=info,
@@ -308,7 +308,7 @@ class TestAdminDomainFairSharesListQuery:
         mock_fetcher = AsyncMock()
 
         with with_user(mock_regular_user):
-            with patch.object(domain_resolver, "fetch_domain_fair_shares", mock_fetcher):
+            with patch.object(domain_resolver, "_fetch_domain_fair_shares", mock_fetcher):
                 info = create_mock_info(MagicMock())
                 with pytest.raises(web.HTTPForbidden):
                     await domain_resolver.admin_domain_fair_shares.base_resolver(
@@ -340,7 +340,7 @@ class TestAdminDomainFairSharesListQuery:
         )
 
         with with_user(mock_superadmin_user):
-            with patch.object(domain_resolver, "fetch_domain_fair_shares", mock_fetcher):
+            with patch.object(domain_resolver, "_fetch_domain_fair_shares", mock_fetcher):
                 info = create_mock_info(MagicMock())
                 result = await domain_resolver.admin_domain_fair_shares.base_resolver(
                     info=info,

@@ -145,7 +145,7 @@ class TestRGDomainFairShares:
         mock_connection = MagicMock()
 
         with patch(
-            "ai.backend.manager.api.gql.fair_share.resolver.domain.fetch_rg_domain_fair_shares",
+            "ai.backend.manager.api.gql.fair_share.resolver.domain._fetch_rg_domain_fair_shares",
             new_callable=AsyncMock,
             return_value=mock_connection,
         ) as mock_fetch:
