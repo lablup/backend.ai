@@ -69,6 +69,27 @@ async def detect_snap_docker() -> str | None:
     return None
 
 
+async def wait_for_docker(ctx: Context, max_wait: int = 60) -> None:
+    for attempt in range(max_wait):
+        proc = await asyncio.create_subprocess_exec(
+            *(*ctx.docker_sudo, "docker", "info"),
+            stdout=asyncio.subprocess.DEVNULL,
+            stderr=asyncio.subprocess.DEVNULL,
+        )
+        await proc.wait()
+        if proc.returncode == 0:
+            if attempt > 0:
+                ctx.log.write(f"Docker daemon is ready (waited {attempt}s).")
+            return
+        if attempt == 0:
+            ctx.log.write("Waiting for Docker daemon to start...")
+        await asyncio.sleep(1)
+    raise PrerequisiteError(
+        f"Docker daemon did not become ready within {max_wait} seconds.",
+        instruction="Please check Docker daemon status with 'systemctl status docker'.",
+    )
+
+
 async def detect_system_docker(ctx: Context) -> str:
     if ctx.docker_sudo:
         ctx.log.write(
@@ -80,6 +101,9 @@ async def detect_system_docker(ctx: Context) -> str:
         raise PrerequisiteError(f"Could not find the docker socket ({e})") from e
     ctx.log.write(Text.from_markup(f"[cyan]{connector=}[/]"))
 
+    # Wait for Docker daemon to be ready before checking version.
+    await wait_for_docker(ctx)
+
     # Test a docker command to ensure passwordless sudo.
     proc = await asyncio.create_subprocess_exec(
         *(*ctx.docker_sudo, "docker", "version"),
@@ -90,16 +114,14 @@ async def detect_system_docker(ctx: Context) -> str:
         raise RuntimeError("Failed to capture docker version output")
     stdout = ""
     try:
-        async with asyncio.timeout(3.0):
+        async with asyncio.timeout(0.5):
             await proc.communicate()
     except TimeoutError as e:
         proc.kill()
         await proc.wait()
         raise PrerequisiteError(
-            "'docker version' timed out after 3 seconds."
-            " This may indicate a sudo password prompt or a slow Docker daemon response.",
-            instruction="Please ensure passwordless sudo is configured"
-            " (e.g., add NOPASSWD in sudoers) or check Docker daemon status.",
+            "sudo requires prompt.",
+            instruction="Please make sudo available without password prompts.",
         ) from e
 
     if ctx.docker_sudo:
