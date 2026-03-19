@@ -14,6 +14,10 @@ from ai.backend.common.dto.manager.query import StringFilter
 from .types import RoleSource, RoleSourceFilter, RoleStatus, RoleStatusFilter
 
 __all__ = (
+    "AdminSearchEntitiesGQLInput",
+    "AdminSearchPermissionsGQLInput",
+    "AdminSearchRoleAssignmentsGQLInput",
+    "AdminSearchRolesGQLInput",
     "AssignRoleInput",
     "BulkAssignRoleInput",
     "BulkRevokeRoleInput",
@@ -235,3 +239,55 @@ class PermissionOrderBy(BaseRequestModel):
 
     field: str
     direction: str = "desc"
+
+
+class AdminSearchPermissionsGQLInput(BaseRequestModel):
+    """GQL pagination search input for scoped permissions."""
+
+    filter: PermissionFilter | None = None
+    order: list[PermissionOrderBy] | None = None
+    first: int | None = None
+    after: str | None = None
+    last: int | None = None
+    before: str | None = None
+    limit: int | None = None
+    offset: int | None = None
+
+
+class AdminSearchRolesGQLInput(BaseRequestModel):
+    """GQL pagination search input for roles."""
+
+    filter: RoleFilter | None = None
+    order: list[RoleOrderBy] | None = None
+    first: int | None = None
+    after: str | None = None
+    last: int | None = None
+    before: str | None = None
+    limit: int | None = None
+    offset: int | None = None
+
+
+class AdminSearchRoleAssignmentsGQLInput(BaseRequestModel):
+    """GQL pagination search input for role assignments."""
+
+    filter: RoleAssignmentFilter | None = None
+    order: list[RoleAssignmentOrderBy] | None = None
+    first: int | None = None
+    after: str | None = None
+    last: int | None = None
+    before: str | None = None
+    limit: int | None = None
+    offset: int | None = None
+
+
+class AdminSearchEntitiesGQLInput(BaseRequestModel):
+    """GQL pagination search input for entity associations."""
+
+    filter: EntityFilter | None = None
+    order: list[EntityOrderBy] | None = None
+    first: int | None = None
+    after: str | None = None
+    last: int | None = None
+    before: str | None = None
+    limit: int | None = None
+    offset: int | None = None

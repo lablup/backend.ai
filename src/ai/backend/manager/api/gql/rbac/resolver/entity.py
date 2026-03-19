@@ -2,12 +2,10 @@
 
 from __future__ import annotations
 
-from functools import lru_cache
-
 import strawberry
 from strawberry import Info
 
-from ai.backend.manager.api.gql.adapter import PaginationOptions, PaginationSpec
+from ai.backend.common.dto.manager.v2.rbac.request import AdminSearchEntitiesGQLInput
 from ai.backend.manager.api.gql.base import encode_cursor
 from ai.backend.manager.api.gql.rbac.types import (
     EntityConnection,
@@ -17,26 +15,7 @@ from ai.backend.manager.api.gql.rbac.types import (
 from ai.backend.manager.api.gql.rbac.types.entity import EntityEdge, EntityRefGQL
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.api.gql.utils import check_admin_only
-from ai.backend.manager.models.rbac_models.association_scopes_entities import (
-    AssociationScopesEntitiesRow,
-)
-from ai.backend.manager.models.rbac_models.conditions import EntityScopeConditions
-from ai.backend.manager.models.rbac_models.orders import EntityScopeOrders
 from ai.backend.manager.repositories.base import QueryCondition
-from ai.backend.manager.services.permission_contoller.actions.search_element_associations import (
-    SearchElementAssociationsAction,
-)
-
-
-@lru_cache(maxsize=1)
-def _get_entity_pagination_spec() -> PaginationSpec:
-    return PaginationSpec(
-        forward_order=EntityScopeOrders.id(ascending=False),
-        backward_order=EntityScopeOrders.id(ascending=True),
-        forward_condition_factory=EntityScopeConditions.by_cursor_forward,
-        backward_condition_factory=EntityScopeConditions.by_cursor_backward,
-        tiebreaker_order=AssociationScopesEntitiesRow.id.asc(),
-    )
 
 
 async def _fetch_entities(
@@ -51,24 +30,24 @@ async def _fetch_entities(
     offset: int | None = None,
     base_conditions: list[QueryCondition] | None = None,
 ) -> EntityConnection:
-    querier = info.context.gql_adapter.build_querier(
-        PaginationOptions(
-            first=first,
-            after=after,
-            last=last,
-            before=before,
-            limit=limit,
-            offset=offset,
-        ),
-        _get_entity_pagination_spec(),
-        filter=filter,
-        order_by=order_by,
+    pydantic_filter = filter.to_pydantic() if filter is not None else None
+    pydantic_order = [o.to_pydantic() for o in order_by] if order_by is not None else None
+
+    search_input = AdminSearchEntitiesGQLInput(
+        filter=pydantic_filter,
+        order=pydantic_order,
+        first=first,
+        after=after,
+        last=last,
+        before=before,
+        limit=limit,
+        offset=offset,
+    )
+    result = await info.context.adapters.rbac.admin_search_entities_gql(
+        search_input,
         base_conditions=base_conditions,
     )
-    action_result = await info.context.processors.permission_controller.search_element_associations.wait_for_complete(
-        SearchElementAssociationsAction(querier=querier)
-    )
-    result = action_result.result
+
     edges = [
         EntityEdge(
             node=EntityRefGQL.from_dataclass(item),

@@ -3,14 +3,16 @@
 from __future__ import annotations
 
 import uuid
-from functools import lru_cache
 
 import strawberry
 from strawberry import ID, Info
 
 from ai.backend.common.contexts.user import current_user
 from ai.backend.common.data.permission.types import RoleStatus
-from ai.backend.manager.api.gql.adapter import PaginationOptions, PaginationSpec
+from ai.backend.common.dto.manager.v2.rbac.request import (
+    AdminSearchRoleAssignmentsGQLInput,
+    AdminSearchRolesGQLInput,
+)
 from ai.backend.manager.api.gql.base import encode_cursor
 from ai.backend.manager.api.gql.rbac.types import (
     AssignRoleInput,
@@ -44,16 +46,8 @@ from ai.backend.manager.data.permission.role import (
     UserRoleAssignmentInput,
     UserRoleRevocationInput,
 )
-from ai.backend.manager.models.rbac_models.conditions import (
-    AssignedUserConditions,
-    RoleConditions,
-)
-from ai.backend.manager.models.rbac_models.orders import (
-    AssignedUserOrders,
-    RoleOrders,
-)
+from ai.backend.manager.models.rbac_models.conditions import AssignedUserConditions
 from ai.backend.manager.models.rbac_models.role import RoleRow
-from ai.backend.manager.models.rbac_models.user_role import UserRoleRow
 from ai.backend.manager.repositories.base import QueryCondition
 from ai.backend.manager.repositories.base.creator import BulkCreator
 from ai.backend.manager.repositories.base.purger import Purger
@@ -81,35 +75,7 @@ from ai.backend.manager.services.permission_contoller.actions.purge_role import 
 from ai.backend.manager.services.permission_contoller.actions.revoke_role import (
     RevokeRoleAction,
 )
-from ai.backend.manager.services.permission_contoller.actions.search_roles import (
-    SearchRolesAction,
-)
-from ai.backend.manager.services.permission_contoller.actions.search_users_assigned_to_role import (
-    SearchUsersAssignedToRoleAction,
-)
 from ai.backend.manager.types import OptionalState
-
-
-@lru_cache(maxsize=1)
-def _get_role_pagination_spec() -> PaginationSpec:
-    return PaginationSpec(
-        forward_order=RoleOrders.created_at(ascending=False),
-        backward_order=RoleOrders.created_at(ascending=True),
-        forward_condition_factory=RoleConditions.by_cursor_forward,
-        backward_condition_factory=RoleConditions.by_cursor_backward,
-        tiebreaker_order=RoleRow.id.asc(),
-    )
-
-
-@lru_cache(maxsize=1)
-def _get_role_assignment_pagination_spec() -> PaginationSpec:
-    return PaginationSpec(
-        forward_order=AssignedUserOrders.granted_at(ascending=False),
-        backward_order=AssignedUserOrders.granted_at(ascending=True),
-        forward_condition_factory=AssignedUserConditions.by_cursor_forward,
-        backward_condition_factory=AssignedUserConditions.by_cursor_backward,
-        tiebreaker_order=UserRoleRow.id.asc(),
-    )
 
 
 async def _fetch_role(
@@ -136,26 +102,24 @@ async def _fetch_roles(
     offset: int | None = None,
     base_conditions: list[QueryCondition] | None = None,
 ) -> RoleConnection:
-    querier = info.context.gql_adapter.build_querier(
-        PaginationOptions(
-            first=first,
-            after=after,
-            last=last,
-            before=before,
-            limit=limit,
-            offset=offset,
-        ),
-        _get_role_pagination_spec(),
-        filter=filter,
-        order_by=order_by,
+    pydantic_filter = filter.to_pydantic() if filter is not None else None
+    pydantic_order = [o.to_pydantic() for o in order_by] if order_by is not None else None
+
+    search_input = AdminSearchRolesGQLInput(
+        filter=pydantic_filter,
+        order=pydantic_order,
+        first=first,
+        after=after,
+        last=last,
+        before=before,
+        limit=limit,
+        offset=offset,
+    )
+    result = await info.context.adapters.rbac.admin_search_roles_gql(
+        search_input,
         base_conditions=base_conditions,
     )
-    action_result = (
-        await info.context.processors.permission_controller.search_roles.wait_for_complete(
-            SearchRolesAction(querier=querier)
-        )
-    )
-    result = action_result.result
+
     edges = [
         RoleEdge(node=RoleGQL.from_dataclass(item), cursor=encode_cursor(str(item.id)))
         for item in result.items
@@ -184,24 +148,24 @@ async def _fetch_role_assignments(
     offset: int | None = None,
     base_conditions: list[QueryCondition] | None = None,
 ) -> RoleAssignmentConnection:
-    querier = info.context.gql_adapter.build_querier(
-        PaginationOptions(
-            first=first,
-            after=after,
-            last=last,
-            before=before,
-            limit=limit,
-            offset=offset,
-        ),
-        _get_role_assignment_pagination_spec(),
-        filter=filter,
-        order_by=order_by,
+    pydantic_filter = filter.to_pydantic() if filter is not None else None
+    pydantic_order = [o.to_pydantic() for o in order_by] if order_by is not None else None
+
+    search_input = AdminSearchRoleAssignmentsGQLInput(
+        filter=pydantic_filter,
+        order=pydantic_order,
+        first=first,
+        after=after,
+        last=last,
+        before=before,
+        limit=limit,
+        offset=offset,
+    )
+    result = await info.context.adapters.rbac.admin_search_role_assignments_gql(
+        search_input,
         base_conditions=base_conditions,
     )
-    action_result = await info.context.processors.permission_controller.search_users_assigned_to_role.wait_for_complete(
-        SearchUsersAssignedToRoleAction(querier=querier)
-    )
-    result = action_result.result
+
     edges = [
         RoleAssignmentEdge(
             node=RoleAssignmentGQL.from_dataclass(item),

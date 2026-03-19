@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-from functools import lru_cache
-
 import strawberry
 from strawberry import ID, Info
 
@@ -14,7 +12,7 @@ from ai.backend.common.data.permission.types import (
     OperationType,
     RBACElementType,
 )
-from ai.backend.manager.api.gql.adapter import PaginationOptions, PaginationSpec
+from ai.backend.common.dto.manager.v2.rbac.request import AdminSearchPermissionsGQLInput
 from ai.backend.manager.api.gql.base import encode_cursor
 from ai.backend.manager.api.gql.rbac.types import (
     CreatePermissionInput,
@@ -31,8 +29,6 @@ from ai.backend.manager.api.gql.rbac.types import (
 from ai.backend.manager.api.gql.rbac.types.permission import PermissionEdge
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.api.gql.utils import check_admin_only
-from ai.backend.manager.models.rbac_models.conditions import ScopedPermissionConditions
-from ai.backend.manager.models.rbac_models.orders import ScopedPermissionOrders
 from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
 from ai.backend.manager.repositories.base import QueryCondition
 from ai.backend.manager.repositories.base.creator import Creator
@@ -44,24 +40,10 @@ from ai.backend.manager.services.permission_contoller.actions.permission import 
     CreatePermissionAction,
     DeletePermissionAction,
 )
-from ai.backend.manager.services.permission_contoller.actions.search_permissions import (
-    SearchPermissionsAction,
-)
 from ai.backend.manager.services.permission_contoller.actions.update_permission import (
     UpdatePermissionAction,
 )
 from ai.backend.manager.types import OptionalState
-
-
-@lru_cache(maxsize=1)
-def _get_permission_pagination_spec() -> PaginationSpec:
-    return PaginationSpec(
-        forward_order=ScopedPermissionOrders.id(ascending=False),
-        backward_order=ScopedPermissionOrders.id(ascending=True),
-        forward_condition_factory=ScopedPermissionConditions.by_cursor_forward,
-        backward_condition_factory=ScopedPermissionConditions.by_cursor_backward,
-        tiebreaker_order=PermissionRow.id.asc(),
-    )
 
 
 async def _fetch_permissions(
@@ -76,26 +58,24 @@ async def _fetch_permissions(
     offset: int | None = None,
     base_conditions: list[QueryCondition] | None = None,
 ) -> PermissionConnection:
-    querier = info.context.gql_adapter.build_querier(
-        PaginationOptions(
-            first=first,
-            after=after,
-            last=last,
-            before=before,
-            limit=limit,
-            offset=offset,
-        ),
-        _get_permission_pagination_spec(),
-        filter=filter,
-        order_by=order_by,
+    pydantic_filter = filter.to_pydantic() if filter is not None else None
+    pydantic_order = [o.to_pydantic() for o in order_by] if order_by is not None else None
+
+    search_input = AdminSearchPermissionsGQLInput(
+        filter=pydantic_filter,
+        order=pydantic_order,
+        first=first,
+        after=after,
+        last=last,
+        before=before,
+        limit=limit,
+        offset=offset,
+    )
+    result = await info.context.adapters.rbac.admin_search_permissions_gql(
+        search_input,
         base_conditions=base_conditions,
     )
-    action_result = (
-        await info.context.processors.permission_controller.search_permissions.wait_for_complete(
-            SearchPermissionsAction(querier=querier)
-        )
-    )
-    result = action_result.result
+
     edges = [
         PermissionEdge(
             node=PermissionGQL.from_dataclass(item),
