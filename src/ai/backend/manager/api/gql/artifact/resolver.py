@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import uuid
 from collections.abc import AsyncGenerator
 from uuid import UUID
 
@@ -7,6 +8,10 @@ import strawberry
 from strawberry import ID, Info
 
 from ai.backend.common.data.storage.registries.types import ModelSortKey
+from ai.backend.common.dto.manager.v2.artifact.request import (
+    AdminSearchArtifactRevisionsInput,
+    AdminSearchArtifactsGQLInput,
+)
 from ai.backend.manager.api.gql.base import (
     encode_cursor,
 )
@@ -19,9 +24,11 @@ from ai.backend.manager.errors.artifact import (
     ArtifactScanLimitExceededError,
 )
 from ai.backend.manager.repositories.artifact.updaters import ArtifactUpdaterSpec
+from ai.backend.manager.repositories.base import QueryCondition
 from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.services.artifact.actions.delegate_scan import DelegateScanArtifactsAction
 from ai.backend.manager.services.artifact.actions.delete_multi import DeleteArtifactsAction
+from ai.backend.manager.services.artifact.actions.get import GetArtifactAction
 from ai.backend.manager.services.artifact.actions.restore_multi import RestoreArtifactsAction
 from ai.backend.manager.services.artifact.actions.retrieve_model_multi import RetrieveModelsAction
 from ai.backend.manager.services.artifact.actions.scan import ScanArtifactsAction
@@ -36,6 +43,7 @@ from ai.backend.manager.services.artifact_revision.actions.cleanup import (
 from ai.backend.manager.services.artifact_revision.actions.delegate_import_revision_batch import (
     DelegateImportArtifactRevisionBatchAction,
 )
+from ai.backend.manager.services.artifact_revision.actions.get import GetArtifactRevisionAction
 from ai.backend.manager.services.artifact_revision.actions.import_revision import (
     ImportArtifactRevisionAction,
 )
@@ -44,18 +52,12 @@ from ai.backend.manager.services.artifact_revision.actions.reject import (
 )
 from ai.backend.manager.types import TriState
 
-from .fetcher import (
-    fetch_artifact,
-    fetch_artifact_revision,
-    fetch_artifact_revisions,
-    fetch_artifacts,
-    get_registry_url,
-)
 from .types import (
     ApproveArtifactInput,
     ApproveArtifactPayload,
     Artifact,
     ArtifactConnection,
+    ArtifactEdge,
     ArtifactFilter,
     ArtifactImportProgressUpdatedPayload,
     ArtifactOrderBy,
@@ -90,7 +92,151 @@ from .types import (
     ScanArtifactsPayload,
     UpdateArtifactInput,
     UpdateArtifactPayload,
+    get_registry_url,
+    make_artifact_from_node,
+    make_artifact_revision_from_node,
 )
+
+
+async def _fetch_artifact_revisions(
+    info: Info[StrawberryGQLContext],
+    filter: ArtifactRevisionFilter | None = None,
+    order_by: list[ArtifactRevisionOrderBy] | None = None,
+    before: str | None = None,
+    after: str | None = None,
+    first: int | None = None,
+    last: int | None = None,
+    limit: int | None = None,
+    offset: int | None = None,
+    base_conditions: list[QueryCondition] | None = None,
+) -> ArtifactRevisionConnection:
+    """Fetch artifact revisions with optional filtering, ordering, and pagination."""
+    pydantic_filter = filter.to_pydantic() if filter is not None else None
+    pydantic_order = [o.to_pydantic() for o in order_by] if order_by is not None else None
+
+    search_input = AdminSearchArtifactRevisionsInput(
+        filter=pydantic_filter,
+        order=pydantic_order,
+        first=first,
+        after=after,
+        last=last,
+        before=before,
+        limit=limit,
+        offset=offset,
+    )
+    payload = await info.context.adapters.artifact.search_revisions_gql(
+        search_input,
+        base_conditions=base_conditions,
+    )
+
+    edges = []
+    for item in payload.items:
+        revision = make_artifact_revision_from_node(item)
+        cursor = encode_cursor(item.id)
+        edges.append(ArtifactRevisionEdge(node=revision, cursor=cursor))
+
+    page_info = strawberry.relay.PageInfo(
+        has_next_page=payload.has_next_page,
+        has_previous_page=payload.has_previous_page,
+        start_cursor=edges[0].cursor if edges else None,
+        end_cursor=edges[-1].cursor if edges else None,
+    )
+
+    return ArtifactRevisionConnection(
+        count=payload.total_count,
+        edges=edges,
+        page_info=page_info,
+    )
+
+
+async def _fetch_artifacts(
+    info: Info[StrawberryGQLContext],
+    filter: ArtifactFilter | None,
+    order_by: list[ArtifactOrderBy] | None,
+    before: str | None,
+    after: str | None,
+    first: int | None,
+    last: int | None,
+    limit: int | None,
+    offset: int | None,
+) -> ArtifactConnection:
+    """Fetch artifacts with optional filtering, ordering, and pagination."""
+    pydantic_filter = filter.to_pydantic() if filter is not None else None
+    pydantic_order = [o.to_pydantic() for o in order_by] if order_by is not None else None
+
+    search_input = AdminSearchArtifactsGQLInput(
+        filter=pydantic_filter,
+        order=pydantic_order,
+        first=first,
+        after=after,
+        last=last,
+        before=before,
+        limit=limit,
+        offset=offset,
+    )
+    payload = await info.context.adapters.artifact.admin_search_gql(search_input)
+
+    data_loaders = info.context.data_loaders
+    edges = []
+    for item in payload.items:
+        registry_url = await get_registry_url(data_loaders, item.registry_id, item.registry_type)
+        source_url = await get_registry_url(
+            data_loaders, item.source_registry_id, item.source_registry_type
+        )
+        artifact = make_artifact_from_node(item, registry_url=registry_url, source_url=source_url)
+        cursor = encode_cursor(item.id)
+        edges.append(ArtifactEdge(node=artifact, cursor=cursor))
+
+    page_info = strawberry.relay.PageInfo(
+        has_next_page=payload.has_next_page,
+        has_previous_page=payload.has_previous_page,
+        start_cursor=edges[0].cursor if edges else None,
+        end_cursor=edges[-1].cursor if edges else None,
+    )
+
+    return ArtifactConnection(
+        count=payload.total_count,
+        edges=edges,
+        page_info=page_info,
+    )
+
+
+async def _fetch_artifact(
+    info: Info[StrawberryGQLContext],
+    artifact_id: uuid.UUID,
+) -> Artifact | None:
+    """Fetch a specific artifact by its ID."""
+    action_result = await info.context.processors.artifact.get.wait_for_complete(
+        GetArtifactAction(
+            artifact_id=artifact_id,
+        )
+    )
+
+    data_loaders = info.context.data_loaders
+    registry_url = await get_registry_url(
+        data_loaders, action_result.result.registry_id, action_result.result.registry_type
+    )
+    source_url = await get_registry_url(
+        data_loaders,
+        action_result.result.source_registry_id,
+        action_result.result.source_registry_type,
+    )
+
+    return Artifact.from_dataclass(action_result.result, registry_url, source_url)
+
+
+async def _fetch_artifact_revision(
+    info: Info[StrawberryGQLContext],
+    artifact_revision_id: uuid.UUID,
+) -> ArtifactRevision | None:
+    """Fetch a specific artifact revision by its ID."""
+    action_result = await info.context.processors.artifact_revision.get.wait_for_complete(
+        GetArtifactRevisionAction(
+            artifact_revision_id=artifact_revision_id,
+        )
+    )
+
+    return ArtifactRevision.from_dataclass(action_result.revision)
 
 
 # Query Fields
@@ -121,7 +267,7 @@ async def artifacts(
 ) -> ArtifactConnection | None:
     if filter is None:
         filter = ArtifactFilter(availability=[ArtifactAvailability.ALIVE])
-    return await fetch_artifacts(
+    return await _fetch_artifacts(
         info,
         filter,
         order_by,
@@ -145,7 +291,7 @@ async def artifacts(
     """)
 )
 async def artifact(id: ID, info: Info[StrawberryGQLContext]) -> Artifact | None:
-    return await fetch_artifact(info, UUID(id))
+    return await _fetch_artifact(info, UUID(id))
 
 
 @strawberry.field(  # type: ignore[misc]
@@ -172,7 +318,7 @@ async def artifact_revisions(
     limit: int | None = None,
     offset: int | None = None,
 ) -> ArtifactRevisionConnection | None:
-    return await fetch_artifact_revisions(
+    return await _fetch_artifact_revisions(
         info,
         filter,
         order_by,
@@ -196,7 +342,7 @@ async def artifact_revisions(
     """)
 )
 async def artifact_revision(id: ID, info: Info[StrawberryGQLContext]) -> ArtifactRevision | None:
-    return await fetch_artifact_revision(info, UUID(id))
+    return await _fetch_artifact_revision(info, UUID(id))
 
 
 @strawberry.mutation(  # type: ignore[misc]

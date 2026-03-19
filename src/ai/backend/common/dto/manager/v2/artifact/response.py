@@ -22,6 +22,7 @@ from .types import (
 )
 
 __all__ = (
+    "AdminSearchArtifactRevisionsPayload",
     "AdminSearchArtifactsPayload",
     "ArtifactNode",
     "ArtifactRevisionImportTaskInfo",
@@ -129,6 +130,17 @@ class AdminSearchArtifactsPayload(BaseResponseModel):
 
     items: list[ArtifactNode] = Field(description="List of matching artifact nodes.")
     total_count: int = Field(description="Total number of matching artifacts.")
+    has_next_page: bool
+    has_previous_page: bool
+
+
+class AdminSearchArtifactRevisionsPayload(BaseResponseModel):
+    """Payload for admin artifact revision search result."""
+
+    items: list[ArtifactRevisionNode] = Field(
+        description="List of matching artifact revision nodes."
+    )
+    total_count: int = Field(description="Total number of matching artifact revisions.")
     has_next_page: bool
     has_previous_page: bool
 

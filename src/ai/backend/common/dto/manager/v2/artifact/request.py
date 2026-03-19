@@ -9,21 +9,34 @@ from uuid import UUID
 from pydantic import Field, field_validator
 
 from ai.backend.common.api_handlers import SENTINEL, BaseRequestModel, Sentinel
-from ai.backend.common.dto.manager.query import StringFilter
+from ai.backend.common.dto.manager.query import IntFilter, StringFilter, UUIDFilter
 
 from .types import (
+    ArtifactAvailability,
     ArtifactAvailabilityFilter,
     ArtifactOrderField,
+    ArtifactRemoteStatus,
+    ArtifactRevisionOrderField,
+    ArtifactStatus,
     ArtifactType,
     ArtifactTypeFilter,
     OrderDirection,
 )
 
 __all__ = (
+    "AdminSearchArtifactRevisionsInput",
+    "AdminSearchArtifactsGQLInput",
     "AdminSearchArtifactsInput",
     "ApproveArtifactInput",
     "ArtifactFilter",
+    "ArtifactGQLFilterInputDTO",
+    "ArtifactGQLOrderByInputDTO",
     "ArtifactOrder",
+    "ArtifactRevisionGQLFilterInputDTO",
+    "ArtifactRevisionGQLOrderByInputDTO",
+    "ArtifactRevisionRemoteStatusFilterDTO",
+    "ArtifactRevisionStatusFilterDTO",
+    "ArtifactStatusChangedInputDTO",
     "CancelImportTaskInput",
     "CleanupRevisionsInput",
     "DeleteArtifactsInput",
@@ -37,6 +50,7 @@ __all__ = (
     "RestoreArtifactsInput",
     "ScanArtifactModelsInput",
     "ScanArtifactsInput",
+    "UpdateArtifactGQLInput",
     "UpdateArtifactInput",
 )
 
@@ -269,3 +283,115 @@ class ScanArtifactModelsInput(BaseRequestModel):
         default=None,
         description="Optional registry ID to scan models from.",
     )
+
+
+class ArtifactStatusChangedInputDTO(BaseRequestModel):
+    """Input for subscribing to artifact status change notifications."""
+
+    artifact_revision_ids: list[UUID] = Field(description="List of artifact revision IDs to watch.")
+
+
+class ArtifactGQLFilterInputDTO(BaseRequestModel):
+    """GQL-facing filter for artifacts."""
+
+    type: list[ArtifactType] | None = Field(default=None)
+    name: StringFilter | None = Field(default=None)
+    registry: StringFilter | None = Field(default=None)
+    source: StringFilter | None = Field(default=None)
+    availability: list[ArtifactAvailability] | None = Field(default=None)
+    AND: list[ArtifactGQLFilterInputDTO] | None = Field(default=None)
+    OR: list[ArtifactGQLFilterInputDTO] | None = Field(default=None)
+    NOT: list[ArtifactGQLFilterInputDTO] | None = Field(default=None)
+
+
+ArtifactGQLFilterInputDTO.model_rebuild()
+
+
+class ArtifactGQLOrderByInputDTO(BaseRequestModel):
+    """GQL-facing order by for artifacts."""
+
+    field: ArtifactOrderField = Field(description="Field to order by.")
+    direction: OrderDirection = Field(default=OrderDirection.ASC)
+
+
+class ArtifactRevisionStatusFilterDTO(BaseRequestModel):
+    """Filter for artifact revision status."""
+
+    in_: list[ArtifactStatus] | None = Field(default=None, alias="in")
+    equals: ArtifactStatus | None = Field(default=None)
+
+
+class ArtifactRevisionRemoteStatusFilterDTO(BaseRequestModel):
+    """Filter for artifact revision remote status."""
+
+    in_: list[ArtifactRemoteStatus] | None = Field(default=None, alias="in")
+    equals: ArtifactRemoteStatus | None = Field(default=None)
+
+
+class ArtifactRevisionGQLFilterInputDTO(BaseRequestModel):
+    """GQL-facing filter for artifact revisions."""
+
+    status: ArtifactRevisionStatusFilterDTO | None = Field(default=None)
+    remote_status: ArtifactRevisionRemoteStatusFilterDTO | None = Field(default=None)
+    version: StringFilter | None = Field(default=None)
+    artifact_id: UUIDFilter | None = Field(default=None)
+    size: IntFilter | None = Field(default=None)
+    AND: list[ArtifactRevisionGQLFilterInputDTO] | None = Field(default=None)
+    OR: list[ArtifactRevisionGQLFilterInputDTO] | None = Field(default=None)
+    NOT: list[ArtifactRevisionGQLFilterInputDTO] | None = Field(default=None)
+
+
+ArtifactRevisionGQLFilterInputDTO.model_rebuild()
+
+
+class ArtifactRevisionGQLOrderByInputDTO(BaseRequestModel):
+    """GQL-facing order by for artifact revisions."""
+
+    field: ArtifactRevisionOrderField = Field(description="Field to order by.")
+    direction: OrderDirection = Field(default=OrderDirection.ASC)
+
+
+class AdminSearchArtifactRevisionsInput(BaseRequestModel):
+    """Input for searching artifact revisions with GQL filters, orders, and pagination."""
+
+    filter: ArtifactRevisionGQLFilterInputDTO | None = Field(
+        default=None, description="Filter conditions."
+    )
+    order: list[ArtifactRevisionGQLOrderByInputDTO] | None = Field(
+        default=None, description="Order specifications."
+    )
+    # Cursor-based pagination (Relay)
+    first: int | None = Field(default=None, ge=1, description="Number of items from the start.")
+    after: str | None = Field(default=None, description="Cursor to paginate forward from.")
+    last: int | None = Field(default=None, ge=1, description="Number of items from the end.")
+    before: str | None = Field(default=None, description="Cursor to paginate backward from.")
+    # Offset-based pagination
+    limit: int | None = Field(default=None, ge=1, description="Maximum number of items to return.")
+    offset: int | None = Field(default=None, ge=0, description="Number of items to skip.")
+
+
+class AdminSearchArtifactsGQLInput(BaseRequestModel):
+    """Input for searching artifacts with GQL filters, orders, and pagination."""
+
+    filter: ArtifactGQLFilterInputDTO | None = Field(default=None, description="Filter conditions.")
+    order: list[ArtifactGQLOrderByInputDTO] | None = Field(
+        default=None, description="Order specifications."
+    )
+    # Cursor-based pagination (Relay)
+    first: int | None = Field(default=None, ge=1, description="Number of items from the start.")
+    after: str | None = Field(default=None, description="Cursor to paginate forward from.")
+    last: int | None = Field(default=None, ge=1, description="Number of items from the end.")
+    before: str | None = Field(default=None, description="Cursor to paginate backward from.")
+    # Offset-based pagination
+    limit: int | None = Field(default=None, ge=1, description="Maximum number of items to return.")
+    offset: int | None = Field(default=None, ge=0, description="Number of items to skip.")
+
+
+class UpdateArtifactGQLInput(BaseRequestModel):
+    """GQL input for updating artifact metadata."""
+
+    artifact_id: UUID = Field(description="ID of the artifact to update.")
+    readonly: bool | None = Field(
+        default=None, description="Whether the artifact should be readonly."
+    )
+    description: str | None = Field(default=None, description="Updated description.")

@@ -22,6 +22,7 @@ __all__ = (
     "ArtifactAvailabilityFilter",
     "ArtifactOrderField",
     "ArtifactRegistryType",
+    "ArtifactRemoteStatus",
     "ArtifactRevisionInfo",
     "ArtifactRevisionOrderField",
     "ArtifactStatus",
@@ -52,6 +53,14 @@ class ArtifactStatus(StrEnum):
     AVAILABLE = "AVAILABLE"
     FAILED = "FAILED"
     REJECTED = "REJECTED"
+
+
+class ArtifactRemoteStatus(StrEnum):
+    """Remote status of an artifact revision."""
+
+    SCANNED = "SCANNED"
+    AVAILABLE = "AVAILABLE"
+    FAILED = "FAILED"
 
 
 class ArtifactAvailability(StrEnum):

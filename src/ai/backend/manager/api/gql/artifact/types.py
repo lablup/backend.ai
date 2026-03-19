@@ -11,10 +11,21 @@ from strawberry.relay import Connection, Edge, NodeID
 from strawberry.scalars import JSON
 
 from ai.backend.common.data.artifact.types import (
+    ArtifactRegistryType,
     VerificationStepResult,
     VerifierResult,
 )
 from ai.backend.common.data.storage.registries.types import ModelTarget as ModelTargetData
+from ai.backend.common.dto.manager.v2.artifact.request import (
+    AdminSearchArtifactRevisionsInput,
+    ArtifactGQLFilterInputDTO,
+    ArtifactGQLOrderByInputDTO,
+    ArtifactRevisionGQLFilterInputDTO,
+    ArtifactRevisionGQLOrderByInputDTO,
+    ArtifactRevisionRemoteStatusFilterDTO,
+    ArtifactRevisionStatusFilterDTO,
+    ArtifactStatusChangedInputDTO,
+)
 from ai.backend.common.dto.manager.v2.artifact.request import (
     ApproveArtifactInput as ApproveArtifactInputDTO,
 )
@@ -57,13 +68,40 @@ from ai.backend.common.dto.manager.v2.artifact.request import (
 from ai.backend.common.dto.manager.v2.artifact.request import (
     ScanArtifactsInput as ScanArtifactsInputDTO,
 )
+from ai.backend.common.dto.manager.v2.artifact.request import (
+    UpdateArtifactGQLInput as UpdateArtifactGQLInputDTO,
+)
+from ai.backend.common.dto.manager.v2.artifact.response import ArtifactNode, ArtifactRevisionNode
+from ai.backend.common.dto.manager.v2.artifact.types import (
+    ArtifactAvailability as ArtifactAvailabilityDTO,
+)
+from ai.backend.common.dto.manager.v2.artifact.types import (
+    ArtifactOrderField as ArtifactOrderFieldDTO,
+)
+from ai.backend.common.dto.manager.v2.artifact.types import (
+    ArtifactRemoteStatus as ArtifactRemoteStatusDTO,
+)
+from ai.backend.common.dto.manager.v2.artifact.types import (
+    ArtifactRevisionOrderField as ArtifactRevisionOrderFieldDTO,
+)
+from ai.backend.common.dto.manager.v2.artifact.types import (
+    ArtifactStatus as ArtifactStatusDTO,
+)
+from ai.backend.common.dto.manager.v2.artifact.types import (
+    ArtifactType as ArtifactTypeDTO,
+)
+from ai.backend.common.dto.manager.v2.artifact.types import (
+    OrderDirection as OrderDirectionDTO,
+)
 from ai.backend.manager.api.gql.base import (
     ByteSize,
     IntFilter,
     OrderDirection,
     StringFilter,
     UUIDFilter,
+    encode_cursor,
 )
+from ai.backend.manager.api.gql.data_loader.data_loaders import DataLoaders
 from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin
 from ai.backend.manager.api.gql.types import GQLFilter, GQLOrderBy, StrawberryGQLContext
 from ai.backend.manager.api.gql.utils import dedent_strip
@@ -79,18 +117,30 @@ from ai.backend.manager.data.artifact.types import (
 )
 from ai.backend.manager.data.artifact.types import DelegateeTarget as DelegateeTargetData
 from ai.backend.manager.defs import ARTIFACT_MAX_SCAN_LIMIT
-from ai.backend.manager.models.artifact.conditions import ArtifactConditions
-from ai.backend.manager.models.artifact.orders import ArtifactOrders
+from ai.backend.manager.errors.artifact_registry import ArtifactRegistryNotFoundError
 from ai.backend.manager.models.artifact_revision.conditions import ArtifactRevisionConditions
-from ai.backend.manager.models.artifact_revision.orders import ArtifactRevisionOrders
-from ai.backend.manager.repositories.base import (
-    QueryCondition,
-    QueryOrder,
-    combine_conditions_or,
-    negate_conditions,
-)
 from ai.backend.manager.services.artifact.actions.get import GetArtifactAction
 from ai.backend.manager.services.artifact_revision.actions.get import GetArtifactRevisionAction
+
+
+async def get_registry_url(
+    data_loaders: DataLoaders,
+    registry_id: uuid.UUID,
+    registry_type: ArtifactRegistryType,
+) -> str:
+    """Get the URL for a registry based on its type."""
+    match registry_type:
+        case ArtifactRegistryType.HUGGINGFACE:
+            hf_registry = await data_loaders.huggingface_registry_loader.load(registry_id)
+            if hf_registry is None:
+                raise ArtifactRegistryNotFoundError(f"HuggingFace registry {registry_id} not found")
+            return hf_registry.url
+        case ArtifactRegistryType.RESERVOIR:
+            reservoir_registry = await data_loaders.reservoir_registry_loader.load(registry_id)
+            if reservoir_registry is None:
+                raise ArtifactRegistryNotFoundError(f"Reservoir registry {registry_id} not found")
+            return reservoir_registry.endpoint
+    raise ArtifactRegistryNotFoundError(f"Unknown registry type: {registry_type}")
 
 
 @strawberry.type(
@@ -222,7 +272,8 @@ class ArtifactVerificationGQLResult:
         return cls(verifiers=verifier_entries)
 
 
-@strawberry.input(
+@strawberry.experimental.pydantic.input(
+    model=ArtifactGQLFilterInputDTO,
     description=dedent_strip("""
     Added in 25.14.0.
 
@@ -230,7 +281,7 @@ class ArtifactVerificationGQLResult:
     source, and availability status.
 
     Supports logical operations (AND, OR, NOT) for complex filtering scenarios.
-    """)
+    """),
 )
 class ArtifactFilter(GQLFilter):
     type: list[ArtifactType] | None = None
@@ -243,134 +294,89 @@ class ArtifactFilter(GQLFilter):
     OR: list[ArtifactFilter] | None = None
     NOT: list[ArtifactFilter] | None = None
 
-    def build_conditions(self) -> list[QueryCondition]:
-        """Build query conditions from this filter.
-
-        Returns a list containing QueryConditions that represent
-        all filters with proper logical operators applied.
-        """
-        # Collect direct field conditions (these will be combined with AND)
-        field_conditions: list[QueryCondition] = []
-
-        # Apply type filter
-        if self.type:
-            field_conditions.append(ArtifactConditions.by_types(self.type))
-
-        # Apply name filter
-        if self.name:
-            name_condition = self.name.build_query_condition(
-                contains_factory=ArtifactConditions.by_name_contains,
-                equals_factory=ArtifactConditions.by_name_equals,
-                starts_with_factory=ArtifactConditions.by_name_starts_with,
-                ends_with_factory=ArtifactConditions.by_name_ends_with,
-            )
-            if name_condition:
-                field_conditions.append(name_condition)
-
-        # Apply registry filter
-        if self.registry:
-            registry_condition = self.registry.build_query_condition(
-                contains_factory=ArtifactConditions.by_registry_contains,
-                equals_factory=ArtifactConditions.by_registry_equals,
-                starts_with_factory=ArtifactConditions.by_registry_starts_with,
-                ends_with_factory=ArtifactConditions.by_registry_ends_with,
-            )
-            if registry_condition:
-                field_conditions.append(registry_condition)
-
-        # Apply source filter
-        if self.source:
-            source_condition = self.source.build_query_condition(
-                contains_factory=ArtifactConditions.by_source_contains,
-                equals_factory=ArtifactConditions.by_source_equals,
-                starts_with_factory=ArtifactConditions.by_source_starts_with,
-                ends_with_factory=ArtifactConditions.by_source_ends_with,
-            )
-            if source_condition:
-                field_conditions.append(source_condition)
-
-        # Apply availability filter
-        if self.availability:
-            field_conditions.append(ArtifactConditions.by_availability(self.availability))
-
-        # Handle AND logical operator - these are implicitly ANDed with field conditions
-        if self.AND:
-            for sub_filter in self.AND:
-                field_conditions.extend(sub_filter.build_conditions())
-
-        # Handle OR logical operator
-        if self.OR:
-            or_sub_conditions: list[QueryCondition] = []
-            for sub_filter in self.OR:
-                or_sub_conditions.extend(sub_filter.build_conditions())
-            if or_sub_conditions:
-                field_conditions.append(combine_conditions_or(or_sub_conditions))
-
-        # Handle NOT logical operator
-        if self.NOT:
-            not_sub_conditions: list[QueryCondition] = []
-            for sub_filter in self.NOT:
-                not_sub_conditions.extend(sub_filter.build_conditions())
-            if not_sub_conditions:
-                field_conditions.append(negate_conditions(not_sub_conditions))
-
-        return field_conditions
+    def to_pydantic(self) -> ArtifactGQLFilterInputDTO:
+        """Convert to pydantic DTO for adapter layer processing."""
+        return ArtifactGQLFilterInputDTO(
+            type=[ArtifactTypeDTO(t.value) for t in self.type] if self.type else None,
+            name=self.name.to_pydantic() if self.name else None,
+            registry=self.registry.to_pydantic() if self.registry else None,
+            source=self.source.to_pydantic() if self.source else None,
+            availability=(
+                [ArtifactAvailabilityDTO(a.value) for a in self.availability]
+                if self.availability
+                else None
+            ),
+            AND=[f.to_pydantic() for f in self.AND] if self.AND else None,
+            OR=[f.to_pydantic() for f in self.OR] if self.OR else None,
+            NOT=[f.to_pydantic() for f in self.NOT] if self.NOT else None,
+        )
 
 
-@strawberry.input(
+@strawberry.experimental.pydantic.input(
+    model=ArtifactGQLOrderByInputDTO,
     description=dedent_strip("""
     Added in 25.14.0.
 
     Specifies the field and direction for ordering artifacts in queries.
-    """)
+    """),
 )
 class ArtifactOrderBy(GQLOrderBy):
     field: ArtifactOrderField
     direction: OrderDirection = OrderDirection.ASC
 
-    def to_query_order(self) -> QueryOrder:
-        """Convert to repository QueryOrder."""
-        ascending = self.direction == OrderDirection.ASC
-        match self.field:
-            case ArtifactOrderField.NAME:
-                return ArtifactOrders.name(ascending)
-            case ArtifactOrderField.TYPE:
-                return ArtifactOrders.type(ascending)
-            case ArtifactOrderField.SCANNED_AT:
-                return ArtifactOrders.scanned_at(ascending)
-            case ArtifactOrderField.UPDATED_AT:
-                return ArtifactOrders.updated_at(ascending)
-            case ArtifactOrderField.SIZE:
-                # SIZE ordering is not supported yet, fall back to updated_at
-                return ArtifactOrders.updated_at(ascending)
+    def to_pydantic(self) -> ArtifactGQLOrderByInputDTO:
+        """Convert to pydantic DTO for adapter layer processing."""
+        return ArtifactGQLOrderByInputDTO(
+            field=ArtifactOrderFieldDTO(self.field.value),
+            direction=OrderDirectionDTO(self.direction.value),
+        )
 
 
-@strawberry.input(
+@strawberry.experimental.pydantic.input(
+    model=ArtifactRevisionStatusFilterDTO,
     description=dedent_strip("""
     Added in 25.14.0.
 
     Filter for artifact revision status. Supports exact match or inclusion in a list of statuses.
-    """)
+    """),
 )
 class ArtifactRevisionStatusFilter:
     in_: list[ArtifactStatus] | None = strawberry.field(name="in", default=None)
     equals: ArtifactStatus | None = None
 
+    def to_pydantic(self) -> ArtifactRevisionStatusFilterDTO:
+        """Convert to pydantic DTO for adapter layer processing."""
+        return ArtifactRevisionStatusFilterDTO(
+            in_=[ArtifactStatusDTO(s.value) for s in self.in_] if self.in_ else None,
+            equals=ArtifactStatusDTO(self.equals.value) if self.equals else None,
+        )
 
-@strawberry.input(description="Added in 25.16.0")
+
+@strawberry.experimental.pydantic.input(
+    model=ArtifactRevisionRemoteStatusFilterDTO,
+    description="Added in 25.16.0",
+)
 class ArtifactRevisionRemoteStatusFilter:
     in_: list[ArtifactRemoteStatus] | None = strawberry.field(name="in", default=None)
     equals: ArtifactRemoteStatus | None = None
 
+    def to_pydantic(self) -> ArtifactRevisionRemoteStatusFilterDTO:
+        """Convert to pydantic DTO for adapter layer processing."""
+        return ArtifactRevisionRemoteStatusFilterDTO(
+            in_=[ArtifactRemoteStatusDTO(s.value) for s in self.in_] if self.in_ else None,
+            equals=ArtifactRemoteStatusDTO(self.equals.value) if self.equals else None,
+        )
 
-@strawberry.input(
+
+@strawberry.experimental.pydantic.input(
+    model=ArtifactRevisionGQLFilterInputDTO,
     description=dedent_strip("""
     Added in 25.14.0.
 
     Filter options for artifact revisions based on status, version, artifact ID, and file size.
 
     Supports logical operations (AND, OR, NOT) for complex filtering scenarios.
-    """)
+    """),
 )
 class ArtifactRevisionFilter(GQLFilter):
     status: ArtifactRevisionStatusFilter | None = None
@@ -385,139 +391,60 @@ class ArtifactRevisionFilter(GQLFilter):
     OR: list[ArtifactRevisionFilter] | None = None
     NOT: list[ArtifactRevisionFilter] | None = None
 
-    def build_conditions(self) -> list[QueryCondition]:
-        """Build query conditions from this filter.
-
-        Returns a list containing QueryConditions that represent
-        all filters with proper logical operators applied.
-        """
-        # Collect direct field conditions (these will be combined with AND)
-        field_conditions: list[QueryCondition] = []
-
-        # Apply status filter
-        if self.status:
-            statuses_to_filter: list[ArtifactStatus] = []
-            if self.status.in_:
-                statuses_to_filter = self.status.in_
-            elif self.status.equals:
-                statuses_to_filter = [self.status.equals]
-
-            if statuses_to_filter:
-                field_conditions.append(ArtifactRevisionConditions.by_statuses(statuses_to_filter))
-
-        # Apply remote_status filter
-        if self.remote_status:
-            remote_statuses_to_filter: list[ArtifactRemoteStatus] = []
-            if self.remote_status.in_:
-                remote_statuses_to_filter = self.remote_status.in_
-            elif self.remote_status.equals:
-                remote_statuses_to_filter = [self.remote_status.equals]
-
-            if remote_statuses_to_filter:
-                field_conditions.append(
-                    ArtifactRevisionConditions.by_remote_statuses(remote_statuses_to_filter)
+    def to_pydantic(self) -> ArtifactRevisionGQLFilterInputDTO:
+        """Convert to pydantic DTO for adapter layer processing."""
+        return ArtifactRevisionGQLFilterInputDTO(
+            status=(
+                ArtifactRevisionStatusFilterDTO(
+                    in_=[ArtifactStatusDTO(s.value) for s in self.status.in_]
+                    if self.status.in_
+                    else None,
+                    equals=ArtifactStatusDTO(self.status.equals.value)
+                    if self.status.equals
+                    else None,
                 )
-
-        # Apply version filter
-        if self.version:
-            version_condition = self.version.build_query_condition(
-                contains_factory=ArtifactRevisionConditions.by_version_contains,
-                equals_factory=ArtifactRevisionConditions.by_version_equals,
-                starts_with_factory=ArtifactRevisionConditions.by_version_starts_with,
-                ends_with_factory=ArtifactRevisionConditions.by_version_ends_with,
-            )
-            if version_condition:
-                field_conditions.append(version_condition)
-
-        # Apply artifact_id filter
-        if self.artifact_id:
-            if self.artifact_id.equals:
-                field_conditions.append(
-                    ArtifactRevisionConditions.by_artifact_id(self.artifact_id.equals)
+                if self.status
+                else None
+            ),
+            remote_status=(
+                ArtifactRevisionRemoteStatusFilterDTO(
+                    in_=[ArtifactRemoteStatusDTO(s.value) for s in self.remote_status.in_]
+                    if self.remote_status.in_
+                    else None,
+                    equals=ArtifactRemoteStatusDTO(self.remote_status.equals.value)
+                    if self.remote_status.equals
+                    else None,
                 )
-            elif self.artifact_id.in_:
-                field_conditions.append(
-                    ArtifactRevisionConditions.by_artifact_ids(self.artifact_id.in_)
-                )
-
-        # Apply size filter
-        if self.size:
-            if self.size.equals is not None:
-                field_conditions.append(ArtifactRevisionConditions.by_size_equals(self.size.equals))
-            elif self.size.not_equals is not None:
-                field_conditions.append(
-                    ArtifactRevisionConditions.by_size_not_equals(self.size.not_equals)
-                )
-            elif self.size.greater_than is not None:
-                field_conditions.append(
-                    ArtifactRevisionConditions.by_size_greater_than(self.size.greater_than)
-                )
-            elif self.size.greater_than_or_equal is not None:
-                field_conditions.append(
-                    ArtifactRevisionConditions.by_size_greater_than_or_equal(
-                        self.size.greater_than_or_equal
-                    )
-                )
-            elif self.size.less_than is not None:
-                field_conditions.append(
-                    ArtifactRevisionConditions.by_size_less_than(self.size.less_than)
-                )
-            elif self.size.less_than_or_equal is not None:
-                field_conditions.append(
-                    ArtifactRevisionConditions.by_size_less_than_or_equal(
-                        self.size.less_than_or_equal
-                    )
-                )
-
-        # Handle AND logical operator - these are implicitly ANDed with field conditions
-        if self.AND:
-            for sub_filter in self.AND:
-                field_conditions.extend(sub_filter.build_conditions())
-
-        # Handle OR logical operator
-        if self.OR:
-            or_sub_conditions: list[QueryCondition] = []
-            for sub_filter in self.OR:
-                or_sub_conditions.extend(sub_filter.build_conditions())
-            if or_sub_conditions:
-                field_conditions.append(combine_conditions_or(or_sub_conditions))
-
-        # Handle NOT logical operator
-        if self.NOT:
-            not_sub_conditions: list[QueryCondition] = []
-            for sub_filter in self.NOT:
-                not_sub_conditions.extend(sub_filter.build_conditions())
-            if not_sub_conditions:
-                field_conditions.append(negate_conditions(not_sub_conditions))
-
-        return field_conditions
+                if self.remote_status
+                else None
+            ),
+            version=self.version.to_pydantic() if self.version else None,
+            artifact_id=self.artifact_id.to_pydantic() if self.artifact_id else None,
+            size=self.size.to_pydantic() if self.size else None,
+            AND=[f.to_pydantic() for f in self.AND] if self.AND else None,
+            OR=[f.to_pydantic() for f in self.OR] if self.OR else None,
+            NOT=[f.to_pydantic() for f in self.NOT] if self.NOT else None,
+        )
 
 
-@strawberry.input(
+@strawberry.experimental.pydantic.input(
+    model=ArtifactRevisionGQLOrderByInputDTO,
     description=dedent_strip("""
     Added in 25.14.0.
 
     Specifies the field and direction for ordering artifact revisions in queries.
-    """)
+    """),
 )
 class ArtifactRevisionOrderBy(GQLOrderBy):
     field: ArtifactRevisionOrderField
     direction: OrderDirection = OrderDirection.ASC
 
-    def to_query_order(self) -> QueryOrder:
-        """Convert to repository QueryOrder."""
-        ascending = self.direction == OrderDirection.ASC
-        match self.field:
-            case ArtifactRevisionOrderField.VERSION:
-                return ArtifactRevisionOrders.version(ascending)
-            case ArtifactRevisionOrderField.STATUS:
-                return ArtifactRevisionOrders.status(ascending)
-            case ArtifactRevisionOrderField.SIZE:
-                return ArtifactRevisionOrders.size(ascending)
-            case ArtifactRevisionOrderField.CREATED_AT:
-                return ArtifactRevisionOrders.created_at(ascending)
-            case ArtifactRevisionOrderField.UPDATED_AT:
-                return ArtifactRevisionOrders.updated_at(ascending)
+    def to_pydantic(self) -> ArtifactRevisionGQLOrderByInputDTO:
+        """Convert to pydantic DTO for adapter layer processing."""
+        return ArtifactRevisionGQLOrderByInputDTO(
+            field=ArtifactRevisionOrderFieldDTO(self.field.value),
+            direction=OrderDirectionDTO(self.direction.value),
+        )
 
 
 @strawberry.experimental.pydantic.input(
@@ -647,7 +574,8 @@ class DelegateImportArtifactsInput:
     )
 
 
-@strawberry.input(
+@strawberry.experimental.pydantic.input(
+    model=UpdateArtifactGQLInputDTO,
     description=dedent_strip("""
     Added in 25.14.0.
 
@@ -655,12 +583,20 @@ class DelegateImportArtifactsInput:
 
     Modifies artifact metadata such as readonly status and description.
     This operation does not affect the actual artifact files or revisions.
-    """)
+    """),
 )
 class UpdateArtifactInput:
     artifact_id: ID
     readonly: bool | None = UNSET
     description: str | None = UNSET
+
+    def to_pydantic(self) -> UpdateArtifactGQLInputDTO:
+        """Convert to pydantic DTO for adapter layer processing."""
+        return UpdateArtifactGQLInputDTO(
+            artifact_id=uuid.UUID(self.artifact_id),
+            readonly=self.readonly if self.readonly is not UNSET else None,
+            description=self.description if self.description is not UNSET else None,
+        )
 
 
 @strawberry.experimental.pydantic.input(
@@ -749,7 +685,8 @@ class RejectArtifactInput:
     artifact_revision_id: ID
 
 
-@strawberry.input(
+@strawberry.experimental.pydantic.input(
+    model=ArtifactStatusChangedInputDTO,
     description=dedent_strip("""
     Added in 25.14.0.
 
@@ -757,10 +694,16 @@ class RejectArtifactInput:
 
     Used with artifact_status_changed subscription to receive real-time updates
     when artifact revision statuses change.
-    """)
+    """),
 )
 class ArtifactStatusChangedInput:
     artifact_revision_ids: list[ID]
+
+    def to_pydantic(self) -> ArtifactStatusChangedInputDTO:
+        """Convert to pydantic DTO for adapter layer processing."""
+        return ArtifactStatusChangedInputDTO(
+            artifact_revision_ids=[uuid.UUID(id_) for id_ in self.artifact_revision_ids],
+        )
 
 
 @strawberry.experimental.pydantic.input(
@@ -861,6 +804,23 @@ class Artifact(PydanticNodeMixin):
             availability=data.availability,
         )
 
+    @classmethod
+    def from_artifact_node(cls, node: ArtifactNode, registry_url: str, source_url: str) -> Self:
+        """Create from an ArtifactNode DTO (search result from adapter)."""
+        return cls(
+            id=ID(str(node.id)),
+            name=node.name,
+            type=ArtifactType(node.type.value),
+            description=node.description,
+            registry=SourceInfo(name=node.registry_type.value, url=registry_url),
+            source=SourceInfo(name=node.source_registry_type.value, url=source_url),
+            readonly=node.readonly,
+            extra=node.extra,
+            scanned_at=node.scanned_at,
+            updated_at=node.updated_at,
+            availability=ArtifactAvailability(node.availability.value),
+        )
+
     @strawberry.field
     async def revisions(
         self,
@@ -874,21 +834,56 @@ class Artifact(PydanticNodeMixin):
         limit: int | None = None,
         offset: int | None = None,
     ) -> ArtifactRevisionConnection:
-        from .fetcher import fetch_artifact_revisions
+        pydantic_filter = filter.to_pydantic() if filter is not None else None
+        pydantic_order = [o.to_pydantic() for o in order_by] if order_by is not None else None
 
         base_conditions = [ArtifactRevisionConditions.by_artifact_id(uuid.UUID(self.id))]
 
-        return await fetch_artifact_revisions(
-            info,
-            filter=filter,
-            order_by=order_by,
-            before=before,
-            after=after,
+        search_input = AdminSearchArtifactRevisionsInput(
+            filter=pydantic_filter,
+            order=pydantic_order,
             first=first,
+            after=after,
             last=last,
+            before=before,
             limit=limit,
             offset=offset,
+        )
+        payload = await info.context.adapters.artifact.search_revisions_gql(
+            search_input,
             base_conditions=base_conditions,
+        )
+
+        edges = []
+        for item in payload.items:
+            revision = ArtifactRevision(
+                id=ID(str(item.id)),
+                status=ArtifactStatus(item.status.value),
+                remote_status=ArtifactRemoteStatus(item.remote_status)
+                if item.remote_status
+                else None,
+                readme=None,
+                version=item.version,
+                size=ByteSize(item.size) if item.size is not None else None,
+                created_at=item.created_at,
+                updated_at=item.updated_at,
+                digest=None,
+                verification_result=None,
+            )
+            cursor = encode_cursor(item.id)
+            edges.append(ArtifactRevisionEdge(node=revision, cursor=cursor))
+
+        page_info = strawberry.relay.PageInfo(
+            has_next_page=payload.has_next_page,
+            has_previous_page=payload.has_previous_page,
+            start_cursor=edges[0].cursor if edges else None,
+            end_cursor=edges[-1].cursor if edges else None,
+        )
+
+        return ArtifactRevisionConnection(
+            count=payload.total_count,
+            edges=edges,
+            page_info=page_info,
         )
 
 
@@ -958,8 +953,6 @@ class ArtifactRevision(PydanticNodeMixin):
 
     @strawberry.field
     async def artifact(self, info: Info[StrawberryGQLContext]) -> Artifact:
-        from ai.backend.manager.api.gql.artifact.fetcher import get_registry_url
-
         revision_action_result = (
             await info.context.processors.artifact_revision.get.wait_for_complete(
                 GetArtifactRevisionAction(artifact_revision_id=uuid.UUID(self.id))
@@ -985,6 +978,39 @@ class ArtifactRevision(PydanticNodeMixin):
         )
 
         return Artifact.from_dataclass(artifact_action_result.result, registry_url, source_url)
+
+
+def make_artifact_from_node(node: ArtifactNode, registry_url: str, source_url: str) -> Artifact:
+    """Create an Artifact GQL type from an ArtifactNode DTO (search result)."""
+    return Artifact(
+        id=ID(str(node.id)),
+        name=node.name,
+        type=ArtifactType(node.type.value),
+        description=node.description,
+        registry=SourceInfo(name=node.registry_type.value, url=registry_url),
+        source=SourceInfo(name=node.source_registry_type.value, url=source_url),
+        readonly=node.readonly,
+        extra=node.extra,
+        scanned_at=node.scanned_at,
+        updated_at=node.updated_at,
+        availability=ArtifactAvailability(node.availability.value),
+    )
+
+
+def make_artifact_revision_from_node(node: ArtifactRevisionNode) -> ArtifactRevision:
+    """Create an ArtifactRevision GQL type from an ArtifactRevisionNode DTO (search result)."""
+    return ArtifactRevision(
+        id=ID(str(node.id)),
+        status=ArtifactStatus(node.status.value),
+        remote_status=ArtifactRemoteStatus(node.remote_status) if node.remote_status else None,
+        readme=None,
+        version=node.version,
+        size=ByteSize(node.size) if node.size is not None else None,
+        created_at=node.created_at,
+        updated_at=node.updated_at,
+        digest=None,
+        verification_result=None,
+    )
 
 
 ArtifactEdge = Edge[Artifact]
