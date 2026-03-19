@@ -31,3 +31,11 @@ class RevokeMyKeypairPayloadGQL:
 )
 class SwitchMyMainAccessKeyPayloadGQL:
     success: bool = strawberry.field(description="Whether the switch was successful.")
+
+
+@strawberry.type(
+    name="UpdateMyKeypairPayload",
+    description="Payload returned after updating a keypair.",
+)
+class UpdateMyKeypairPayloadGQL:
+    success: bool = strawberry.field(description="Whether the update was successful.")
