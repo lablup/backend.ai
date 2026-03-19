@@ -52,8 +52,9 @@ mutation IssueMyKeypair {
 """
 
 # GQL error extension codes produced by GQLExceptionHandlerExtension
-_GQL_ERR_FORBIDDEN = "keypair.read.forbidden"
-_GQL_ERR_NOT_FOUND = "keypair.read.not-found"
+# ErrorCode.__str__() formats as "{domain}_{operation}_{error_detail}" (underscore-separated)
+_GQL_ERR_FORBIDDEN = "keypair_read_forbidden"
+_GQL_ERR_NOT_FOUND = "keypair_read_not-found"
 
 
 # ---------------------------------------------------------------------------
