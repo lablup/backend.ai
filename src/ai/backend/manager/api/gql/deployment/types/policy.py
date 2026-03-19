@@ -11,8 +11,10 @@ from strawberry import ID
 from strawberry.relay import Node, NodeID
 
 from ai.backend.common.data.model_deployment.types import DeploymentStrategy
+from ai.backend.manager.api.gql.utils import dedent_strip
 from ai.backend.manager.data.deployment.types import DeploymentPolicyData
 from ai.backend.manager.data.deployment.upserter import DeploymentPolicyUpserter
+from ai.backend.manager.errors.api import InvalidAPIParameters
 from ai.backend.manager.errors.deployment import InvalidDeploymentStrategySpec
 from ai.backend.manager.models.deployment_policy import BlueGreenSpec, RollingUpdateSpec
 
@@ -20,7 +22,12 @@ from ai.backend.manager.models.deployment_policy import BlueGreenSpec, RollingUp
 DeploymentStrategyTypeGQL: type[DeploymentStrategy] = strawberry.enum(
     DeploymentStrategy,
     name="DeploymentStrategyType",
-    description="Added in 25.19.0. This enum represents the deployment strategy type of a model deployment, indicating the strategy used for deployment.",
+    description=dedent_strip("""
+        Added in 25.19.0.
+        Determines how new revisions of a model deployment are rolled out to replace old ones.
+        ROLLING performs incremental replica replacement controlled by max_surge and max_unavailable,
+        while BLUE_GREEN provisions a complete new replica set before switching traffic.
+    """),
 )
 
 # ========== Output Types (Response) ==========
@@ -28,7 +35,12 @@ DeploymentStrategyTypeGQL: type[DeploymentStrategy] = strawberry.enum(
 
 @strawberry.interface(
     name="DeploymentStrategySpec",
-    description="Added in 25.19.0. Base interface for deployment strategy specifications.",
+    description=dedent_strip("""
+        Added in 25.19.0.
+        Base interface for all deployment strategy specifications.
+        Each concrete implementation (RollingUpdateStrategySpec, BlueGreenStrategySpec)
+        carries strategy-specific parameters that control how replica transitions are performed.
+    """),
 )
 class DeploymentStrategySpecGQL:
     strategy: DeploymentStrategyTypeGQL
@@ -36,7 +48,13 @@ class DeploymentStrategySpecGQL:
 
 @strawberry.type(
     name="RollingUpdateStrategySpec",
-    description="Added in 25.19.0. Rolling update strategy specification.",
+    description=dedent_strip("""
+        Added in 25.19.0.
+        Strategy specification for rolling updates.
+        Replicas are replaced incrementally: max_surge controls how many extra replicas
+        can be created above the desired count, and max_unavailable controls how many
+        existing replicas can be taken down simultaneously during the transition.
+    """),
 )
 class RollingUpdateStrategySpecGQL(DeploymentStrategySpecGQL):
     max_surge: int
@@ -45,7 +63,13 @@ class RollingUpdateStrategySpecGQL(DeploymentStrategySpecGQL):
 
 @strawberry.type(
     name="BlueGreenStrategySpec",
-    description="Added in 25.19.0. Blue-green deployment strategy specification.",
+    description=dedent_strip("""
+        Added in 25.19.0.
+        Strategy specification for blue-green deployments.
+        A complete new replica set (green) is provisioned alongside the existing one (blue).
+        When auto_promote is true, traffic is automatically switched to the green set
+        after promote_delay_seconds; otherwise, manual promotion is required.
+    """),
 )
 class BlueGreenStrategySpecGQL(DeploymentStrategySpecGQL):
     auto_promote: bool
@@ -54,7 +78,14 @@ class BlueGreenStrategySpecGQL(DeploymentStrategySpecGQL):
 
 @strawberry.type(
     name="DeploymentPolicy",
-    description="Added in 25.19.0. Deployment policy configuration.",
+    description=dedent_strip("""
+        Added in 25.19.0.
+        Defines the deployment policy attached to a model deployment,
+        including the rollout strategy (rolling update or blue-green),
+        strategy-specific parameters, and whether to automatically roll back on failure.
+        Each deployment has at most one policy; creating a new policy for the same deployment
+        replaces the existing one (upsert semantics).
+    """),
 )
 class DeploymentPolicyGQL(Node):
     id: NodeID[str]
@@ -105,7 +136,14 @@ class DeploymentPolicyGQL(Node):
 
 @strawberry.input(
     name="RollingUpdateConfigInput",
-    description="Added in 25.19.0. Configuration for rolling update strategy.",
+    description=dedent_strip("""
+        Added in 25.19.0.
+        Input parameters for configuring a rolling update strategy.
+        max_surge sets the maximum number of additional replicas that can be created
+        beyond the desired count during an update (default: 1).
+        max_unavailable sets the maximum number of replicas that can be unavailable
+        during the update (default: 0). At least one of these must be positive.
+    """),
 )
 class RollingUpdateConfigInputGQL:
     max_surge: int = 1
@@ -120,7 +158,13 @@ class RollingUpdateConfigInputGQL:
 
 @strawberry.input(
     name="BlueGreenConfigInput",
-    description="Added in 25.19.0. Configuration for blue-green deployment strategy.",
+    description=dedent_strip("""
+        Added in 25.19.0.
+        Input parameters for configuring a blue-green deployment strategy.
+        When auto_promote is true, traffic is automatically switched from the blue (old)
+        replica set to the green (new) set after promote_delay_seconds elapse.
+        When auto_promote is false (default), an explicit promotion action is required.
+    """),
 )
 class BlueGreenConfigInputGQL:
     auto_promote: bool = False
@@ -138,7 +182,14 @@ class BlueGreenConfigInputGQL:
 
 @strawberry.input(
     name="UpdateDeploymentPolicyInput",
-    description="Added in 26.4.0. Input for updating a deployment policy. Internally upserts the policy.",
+    description=dedent_strip("""
+        Added in 26.4.0.
+        Input for creating or updating a deployment policy (upsert semantics).
+        Specify the target deployment_id and the desired strategy type.
+        Exactly one of rolling_update or blue_green must be provided,
+        matching the chosen strategy type.
+        If a policy already exists for the deployment, it is replaced entirely.
+    """),
 )
 class UpdateDeploymentPolicyInputGQL:
     deployment_id: ID
@@ -149,7 +200,6 @@ class UpdateDeploymentPolicyInputGQL:
 
     def to_upserter(self) -> DeploymentPolicyUpserter:
         """Convert to DeploymentPolicyUpserter for the service layer."""
-        from ai.backend.manager.errors.api import InvalidAPIParameters
 
         strategy = DeploymentStrategy(self.strategy.value)
         strategy_spec: RollingUpdateSpec | BlueGreenSpec
@@ -177,8 +227,11 @@ class UpdateDeploymentPolicyInputGQL:
 
 @strawberry.type(
     name="UpdateDeploymentPolicyPayload",
-    description="Added in 26.4.0. Result of updating a deployment policy.",
+    description=dedent_strip("""
+        Added in 26.4.0.
+        Result payload returned after creating or updating a deployment policy.
+        Contains the full deployment_policy object reflecting the applied configuration.
+    """),
 )
 class UpdateDeploymentPolicyPayloadGQL:
     deployment_policy: DeploymentPolicyGQL
-    created: bool

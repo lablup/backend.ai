@@ -1626,7 +1626,13 @@ to support integers outside the range of a signed 32-bit integer.
 scalar BigInt
   @join__type(graph: GRAPHENE)
 
-"""Added in 25.19.0. Configuration for blue-green deployment strategy."""
+"""
+Added in 25.19.0.
+Input parameters for configuring a blue-green deployment strategy.
+When auto_promote is true, traffic is automatically switched from the blue (old)
+replica set to the green (new) set after promote_delay_seconds elapse.
+When auto_promote is false (default), an explicit promotion action is required.
+"""
 input BlueGreenConfigInput
   @join__type(graph: STRAWBERRY)
 {
@@ -3646,7 +3652,14 @@ enum DeploymentOrderField
   NAME @join__enumValue(graph: STRAWBERRY)
 }
 
-"""Added in 25.19.0. Deployment policy configuration."""
+"""
+Added in 25.19.0.
+Defines the deployment policy attached to a model deployment,
+including the rollout strategy (rolling update or blue-green),
+strategy-specific parameters, and whether to automatically roll back on failure.
+Each deployment has at most one policy; creating a new policy for the same deployment
+replaces the existing one (upsert semantics).
+"""
 type DeploymentPolicy implements Node
   @join__implements(graph: STRAWBERRY, interface: "Node")
   @join__type(graph: STRAWBERRY)
@@ -3717,7 +3730,10 @@ input DeploymentStrategyInput
 }
 
 """
-Added in 25.19.0. Base interface for deployment strategy specifications.
+Added in 25.19.0.
+Base interface for all deployment strategy specifications.
+Each concrete implementation (RollingUpdateStrategySpec, BlueGreenStrategySpec)
+carries strategy-specific parameters that control how replica transitions are performed.
 """
 interface DeploymentStrategySpec
   @join__type(graph: STRAWBERRY)
@@ -3726,7 +3742,10 @@ interface DeploymentStrategySpec
 }
 
 """
-Added in 25.19.0. This enum represents the deployment strategy type of a model deployment, indicating the strategy used for deployment.
+Added in 25.19.0.
+Determines how new revisions of a model deployment are rolled out to replace old ones.
+ROLLING performs incremental replica replacement controlled by max_surge and max_unavailable,
+while BLUE_GREEN provisions a complete new replica set before switching traffic.
 """
 enum DeploymentStrategyType
   @join__type(graph: STRAWBERRY)
@@ -7718,7 +7737,12 @@ type Mutation
   """Added in 25.16.0"""
   addModelRevision(input: AddRevisionInput!): AddRevisionPayload! @join__field(graph: STRAWBERRY)
 
-  """Added in 26.4.0"""
+  """
+  Added in 26.4.0.
+  Create or update the deployment policy for a given deployment (upsert semantics).
+  Requires superadmin privileges.
+  If the deployment already has a policy, it is replaced entirely with the new configuration.
+  """
   adminUpdateDeploymentPolicy(input: UpdateDeploymentPolicyInput!): UpdateDeploymentPolicyPayload! @join__field(graph: STRAWBERRY)
 
   """Create a new notification channel (admin only)"""
@@ -11511,7 +11535,14 @@ enum RoleStatus
   DELETED @join__enumValue(graph: STRAWBERRY)
 }
 
-"""Added in 25.19.0. Configuration for rolling update strategy."""
+"""
+Added in 25.19.0.
+Input parameters for configuring a rolling update strategy.
+max_surge sets the maximum number of additional replicas that can be created
+beyond the desired count during an update (default: 1).
+max_unavailable sets the maximum number of replicas that can be unavailable
+during the update (default: 0). At least one of these must be positive.
+"""
 input RollingUpdateConfigInput
   @join__type(graph: STRAWBERRY)
 {
@@ -12952,7 +12983,12 @@ type UpdateDeploymentPayload
 }
 
 """
-Added in 26.4.0. Input for updating a deployment policy. Internally upserts the policy.
+Added in 26.4.0.
+Input for creating or updating a deployment policy (upsert semantics).
+Specify the target deployment_id and the desired strategy type.
+Exactly one of rolling_update or blue_green must be provided,
+matching the chosen strategy type.
+If a policy already exists for the deployment, it is replaced entirely.
 """
 input UpdateDeploymentPolicyInput
   @join__type(graph: STRAWBERRY)
@@ -12964,12 +13000,15 @@ input UpdateDeploymentPolicyInput
   blueGreen: BlueGreenConfigInput = null
 }
 
-"""Added in 26.4.0. Result of updating a deployment policy."""
+"""
+Added in 26.4.0.
+Result payload returned after creating or updating a deployment policy.
+Contains the full deployment_policy object reflecting the applied configuration.
+"""
 type UpdateDeploymentPolicyPayload
   @join__type(graph: STRAWBERRY)
 {
   deploymentPolicy: DeploymentPolicy!
-  created: Boolean!
 }
 
 """Added in 25.14.0"""

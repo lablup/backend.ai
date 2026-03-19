@@ -11,13 +11,20 @@ from ai.backend.manager.api.gql.deployment.types.policy import (
     UpdateDeploymentPolicyPayloadGQL,
 )
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
-from ai.backend.manager.api.gql.utils import check_admin_only
+from ai.backend.manager.api.gql.utils import check_admin_only, dedent_strip
 from ai.backend.manager.services.deployment.actions.deployment_policy.upsert_deployment_policy import (
     UpsertDeploymentPolicyAction,
 )
 
 
-@strawberry.mutation(description="Added in 26.4.0")  # type: ignore[misc]
+@strawberry.mutation(  # type: ignore[misc]
+    description=dedent_strip("""
+        Added in 26.4.0.
+        Create or update the deployment policy for a given deployment (upsert semantics).
+        Requires superadmin privileges.
+        If the deployment already has a policy, it is replaced entirely with the new configuration.
+    """),
+)
 async def admin_update_deployment_policy(
     input: UpdateDeploymentPolicyInputGQL,
     info: Info[StrawberryGQLContext],
@@ -33,5 +40,4 @@ async def admin_update_deployment_policy(
 
     return UpdateDeploymentPolicyPayloadGQL(
         deployment_policy=DeploymentPolicyGQL.from_data(result.data),
-        created=result.created,
     )
