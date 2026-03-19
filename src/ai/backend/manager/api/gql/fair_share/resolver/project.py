@@ -7,16 +7,18 @@ import uuid
 import strawberry
 from aiohttp import web
 from strawberry import Info
+from strawberry.relay import PageInfo
 
 from ai.backend.common.contexts.user import current_user
-from ai.backend.manager.api.gql.fair_share.fetcher import (
-    fetch_project_fair_shares,
-    fetch_rg_project_fair_shares,
+from ai.backend.common.dto.manager.v2.fair_share.request import (
+    SearchProjectFairSharesInput,
 )
+from ai.backend.manager.api.gql.base import encode_cursor
 from ai.backend.manager.api.gql.fair_share.types import (
     BulkUpsertProjectFairShareWeightInput,
     BulkUpsertProjectFairShareWeightPayload,
     ProjectFairShareConnection,
+    ProjectFairShareEdge,
     ProjectFairShareFilter,
     ProjectFairShareGQL,
     ProjectFairShareOrderBy,
@@ -35,6 +37,94 @@ from ai.backend.manager.services.fair_share.actions import (
     ProjectWeightInput,
     UpsertProjectFairShareWeightAction,
 )
+
+
+async def _fetch_project_fair_shares(
+    info: Info[StrawberryGQLContext],
+    filter: ProjectFairShareFilter | None,
+    order_by: list[ProjectFairShareOrderBy] | None,
+    before: str | None,
+    after: str | None,
+    first: int | None,
+    last: int | None,
+    limit: int | None,
+    offset: int | None,
+) -> ProjectFairShareConnection:
+    pydantic_filter = filter.to_pydantic() if filter else None
+    pydantic_orders = [o.to_pydantic() for o in order_by] if order_by else None
+
+    payload = await info.context.adapters.fair_share.search_project(
+        SearchProjectFairSharesInput(
+            filter=pydantic_filter,
+            order=pydantic_orders,
+            first=first,
+            after=after,
+            last=last,
+            before=before,
+            limit=limit,
+            offset=offset,
+        )
+    )
+
+    nodes = [ProjectFairShareGQL.from_node(item) for item in payload.items]
+    edges = [ProjectFairShareEdge(node=node, cursor=encode_cursor(str(node.id))) for node in nodes]
+
+    return ProjectFairShareConnection(
+        edges=edges,
+        page_info=PageInfo(
+            has_next_page=len(payload.items) > 0 and (first is not None or limit is not None),
+            has_previous_page=(offset or 0) > 0 or last is not None,
+            start_cursor=edges[0].cursor if edges else None,
+            end_cursor=edges[-1].cursor if edges else None,
+        ),
+        count=payload.total_count,
+    )
+
+
+async def _fetch_rg_project_fair_shares(
+    info: Info[StrawberryGQLContext],
+    scope: ProjectFairShareSearchScope,
+    filter: RGProjectFairShareFilter | None,
+    order_by: list[ProjectFairShareOrderBy] | None,
+    before: str | None,
+    after: str | None,
+    first: int | None,
+    last: int | None,
+    limit: int | None,
+    offset: int | None,
+) -> ProjectFairShareConnection:
+    pydantic_filter = filter.to_pydantic() if filter else None
+    pydantic_orders = [o.to_pydantic() for o in order_by] if order_by else None
+
+    payload = await info.context.adapters.fair_share.search_rg_project(
+        SearchProjectFairSharesInput(
+            filter=pydantic_filter,
+            order=pydantic_orders,
+            first=first,
+            after=after,
+            last=last,
+            before=before,
+            limit=limit,
+            offset=offset,
+        ),
+        resource_group=scope.resource_group,
+        domain_name=scope.domain_name,
+    )
+
+    nodes = [ProjectFairShareGQL.from_node(item) for item in payload.items]
+    edges = [ProjectFairShareEdge(node=node, cursor=encode_cursor(str(node.id))) for node in nodes]
+
+    return ProjectFairShareConnection(
+        edges=edges,
+        page_info=PageInfo(
+            has_next_page=len(payload.items) > 0 and (first is not None or limit is not None),
+            has_previous_page=(offset or 0) > 0 or last is not None,
+            start_cursor=edges[0].cursor if edges else None,
+            end_cursor=edges[-1].cursor if edges else None,
+        ),
+        count=payload.total_count,
+    )
+
 
 # Admin APIs
 
@@ -74,7 +164,7 @@ async def admin_project_fair_shares(
     """Search project fair shares with pagination (admin only)."""
     check_admin_only()
 
-    return await fetch_project_fair_shares(
+    return await _fetch_project_fair_shares(
         info=info,
         filter=filter,
         order_by=order_by,
@@ -130,7 +220,7 @@ async def rg_project_fair_shares(
         resource_group=scope.resource_group_name,
         domain_name=scope.domain_name,
     )
-    return await fetch_rg_project_fair_shares(
+    return await _fetch_rg_project_fair_shares(
         info=info,
         scope=repo_scope,
         filter=filter,
@@ -198,7 +288,7 @@ async def project_fair_shares(
     if me is None or not me.is_superadmin:
         raise web.HTTPForbidden(reason="Only superadmin can access fair share data.")
 
-    return await fetch_project_fair_shares(
+    return await _fetch_project_fair_shares(
         info=info,
         filter=filter,
         order_by=order_by,

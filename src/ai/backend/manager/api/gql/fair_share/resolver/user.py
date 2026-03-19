@@ -7,12 +7,13 @@ import uuid
 import strawberry
 from aiohttp import web
 from strawberry import Info
+from strawberry.relay import PageInfo
 
 from ai.backend.common.contexts.user import current_user
-from ai.backend.manager.api.gql.fair_share.fetcher import (
-    fetch_rg_user_fair_shares,
-    fetch_user_fair_shares,
+from ai.backend.common.dto.manager.v2.fair_share.request import (
+    SearchUserFairSharesInput,
 )
+from ai.backend.manager.api.gql.base import encode_cursor
 from ai.backend.manager.api.gql.fair_share.types import (
     BulkUpsertUserFairShareWeightInput,
     BulkUpsertUserFairShareWeightPayload,
@@ -20,6 +21,7 @@ from ai.backend.manager.api.gql.fair_share.types import (
     UpsertUserFairShareWeightInput,
     UpsertUserFairShareWeightPayload,
     UserFairShareConnection,
+    UserFairShareEdge,
     UserFairShareFilter,
     UserFairShareGQL,
     UserFairShareOrderBy,
@@ -35,6 +37,95 @@ from ai.backend.manager.services.fair_share.actions import (
     UpsertUserFairShareWeightAction,
     UserWeightInput,
 )
+
+
+async def _fetch_user_fair_shares(
+    info: Info[StrawberryGQLContext],
+    filter: UserFairShareFilter | None,
+    order_by: list[UserFairShareOrderBy] | None,
+    before: str | None,
+    after: str | None,
+    first: int | None,
+    last: int | None,
+    limit: int | None,
+    offset: int | None,
+) -> UserFairShareConnection:
+    pydantic_filter = filter.to_pydantic() if filter else None
+    pydantic_orders = [o.to_pydantic() for o in order_by] if order_by else None
+
+    payload = await info.context.adapters.fair_share.search_user(
+        SearchUserFairSharesInput(
+            filter=pydantic_filter,
+            order=pydantic_orders,
+            first=first,
+            after=after,
+            last=last,
+            before=before,
+            limit=limit,
+            offset=offset,
+        )
+    )
+
+    nodes = [UserFairShareGQL.from_node(item) for item in payload.items]
+    edges = [UserFairShareEdge(node=node, cursor=encode_cursor(str(node.id))) for node in nodes]
+
+    return UserFairShareConnection(
+        edges=edges,
+        page_info=PageInfo(
+            has_next_page=len(payload.items) > 0 and (first is not None or limit is not None),
+            has_previous_page=(offset or 0) > 0 or last is not None,
+            start_cursor=edges[0].cursor if edges else None,
+            end_cursor=edges[-1].cursor if edges else None,
+        ),
+        count=payload.total_count,
+    )
+
+
+async def _fetch_rg_user_fair_shares(
+    info: Info[StrawberryGQLContext],
+    scope: UserFairShareSearchScope,
+    filter: RGUserFairShareFilter | None,
+    order_by: list[UserFairShareOrderBy] | None,
+    before: str | None,
+    after: str | None,
+    first: int | None,
+    last: int | None,
+    limit: int | None,
+    offset: int | None,
+) -> UserFairShareConnection:
+    pydantic_filter = filter.to_pydantic() if filter else None
+    pydantic_orders = [o.to_pydantic() for o in order_by] if order_by else None
+
+    payload = await info.context.adapters.fair_share.search_rg_user(
+        SearchUserFairSharesInput(
+            filter=pydantic_filter,
+            order=pydantic_orders,
+            first=first,
+            after=after,
+            last=last,
+            before=before,
+            limit=limit,
+            offset=offset,
+        ),
+        resource_group=scope.resource_group,
+        domain_name=scope.domain_name,
+        project_id=scope.project_id,
+    )
+
+    nodes = [UserFairShareGQL.from_node(item) for item in payload.items]
+    edges = [UserFairShareEdge(node=node, cursor=encode_cursor(str(node.id))) for node in nodes]
+
+    return UserFairShareConnection(
+        edges=edges,
+        page_info=PageInfo(
+            has_next_page=len(payload.items) > 0 and (first is not None or limit is not None),
+            has_previous_page=(offset or 0) > 0 or last is not None,
+            start_cursor=edges[0].cursor if edges else None,
+            end_cursor=edges[-1].cursor if edges else None,
+        ),
+        count=payload.total_count,
+    )
+
 
 # Admin APIs
 
@@ -76,7 +167,7 @@ async def admin_user_fair_shares(
     """Search user fair shares with pagination (admin only)."""
     check_admin_only()
 
-    return await fetch_user_fair_shares(
+    return await _fetch_user_fair_shares(
         info=info,
         filter=filter,
         order_by=order_by,
@@ -134,7 +225,7 @@ async def rg_user_fair_shares(
         domain_name=scope.domain_name,
         project_id=uuid.UUID(scope.project_id),
     )
-    return await fetch_rg_user_fair_shares(
+    return await _fetch_rg_user_fair_shares(
         info=info,
         scope=repo_scope,
         filter=filter,
@@ -204,7 +295,7 @@ async def user_fair_shares(
     if me is None or not me.is_superadmin:
         raise web.HTTPForbidden(reason="Only superadmin can access fair share data.")
 
-    return await fetch_user_fair_shares(
+    return await _fetch_user_fair_shares(
         info=info,
         filter=filter,
         order_by=order_by,
