@@ -14,6 +14,9 @@ from ai.backend.common.dto.manager.v2.storage_namespace.request import (
 from ai.backend.common.dto.manager.v2.storage_namespace.request import (
     UnregisterStorageNamespaceInput as UnregisterStorageNamespaceInputDTO,
 )
+from ai.backend.common.dto.manager.v2.storage_namespace.response import (
+    UnregisterStorageNamespacePayload as UnregisterStorageNamespacePayloadDTO,
+)
 from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin
 from ai.backend.manager.api.gql.utils import dedent_strip
 from ai.backend.manager.data.storage_namespace.types import StorageNamespaceData
@@ -113,15 +116,17 @@ class RegisterStorageNamespacePayload:
     id: uuid.UUID
 
 
-@strawberry.type(
+@strawberry.experimental.pydantic.type(
+    model=UnregisterStorageNamespacePayloadDTO,
     description=dedent_strip("""
     Added in 25.15.0.
 
     Payload returned after storage namespace unregistration.
-    """)
+    """),
+    all_fields=True,
 )
 class UnregisterStorageNamespacePayload:
-    id: uuid.UUID
+    """Payload returned after storage namespace unregistration."""
 
 
 @strawberry.mutation(  # type: ignore[misc]
@@ -150,4 +155,4 @@ async def unregister_storage_namespace(
 ) -> UnregisterStorageNamespacePayload:
     pydantic_input = input.to_pydantic()
     payload = await info.context.adapters.storage_namespace.unregister(pydantic_input)
-    return UnregisterStorageNamespacePayload(id=payload.id)
+    return UnregisterStorageNamespacePayload.from_pydantic(payload)

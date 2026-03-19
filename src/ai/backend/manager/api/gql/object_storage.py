@@ -28,6 +28,12 @@ from ai.backend.common.dto.manager.v2.object_storage.request import (
 from ai.backend.common.dto.manager.v2.object_storage.request import (
     UpdateObjectStorageInput as UpdateObjectStorageInputDTO,
 )
+from ai.backend.common.dto.manager.v2.object_storage.response import (
+    PresignedDownloadURLPayload as PresignedDownloadURLPayloadDTO,
+)
+from ai.backend.common.dto.manager.v2.object_storage.response import (
+    PresignedUploadURLPayload as PresignedUploadURLPayloadDTO,
+)
 from ai.backend.manager.api.gql.base import encode_cursor
 from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin
 from ai.backend.manager.data.object_storage.types import ObjectStorageData
@@ -247,15 +253,24 @@ class DeleteObjectStoragePayload:
     id: ID
 
 
-@strawberry.type(description="Added in 25.14.0")
+@strawberry.experimental.pydantic.type(
+    model=PresignedDownloadURLPayloadDTO,
+    name="GetPresignedDownloadURLPayload",
+    description="Added in 25.14.0",
+    all_fields=True,
+)
 class GetPresignedDownloadURLPayload:
-    presigned_url: str
+    """Payload for presigned download URL generation result."""
 
 
-@strawberry.type(description="Added in 25.14.0")
+@strawberry.experimental.pydantic.type(
+    model=PresignedUploadURLPayloadDTO,
+    name="GetPresignedUploadURLPayload",
+    description="Added in 25.14.0",
+    all_fields=True,
+)
 class GetPresignedUploadURLPayload:
-    presigned_url: str
-    fields: str  # JSON string containing the form fields
+    """Payload for presigned upload URL generation result."""
 
 
 @strawberry.mutation(description="Added in 25.14.0")  # type: ignore[misc]
@@ -305,7 +320,9 @@ async def get_presigned_download_url(
         )
     )
 
-    return GetPresignedDownloadURLPayload(presigned_url=action_result.presigned_url)
+    return GetPresignedDownloadURLPayload.from_pydantic(
+        PresignedDownloadURLPayloadDTO(presigned_url=action_result.presigned_url)
+    )
 
 
 @strawberry.mutation(description="Added in 25.14.0")  # type: ignore[misc]
@@ -321,6 +338,9 @@ async def get_presigned_upload_url(
         )
     )
 
-    return GetPresignedUploadURLPayload(
-        presigned_url=action_result.presigned_url, fields=json.dumps(action_result.fields)
+    return GetPresignedUploadURLPayload.from_pydantic(
+        PresignedUploadURLPayloadDTO(
+            presigned_url=action_result.presigned_url,
+            fields=json.dumps(action_result.fields),
+        )
     )
