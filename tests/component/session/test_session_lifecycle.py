@@ -439,8 +439,8 @@ class TestSessionStatusHistory:
         assert isinstance(result, GetStatusHistoryResponse)
         history = result.root
         assert isinstance(history, dict)
-        assert "PENDING" in history
-        assert "RUNNING" in history
+        assert SessionStatus.PENDING.name in history
+        assert SessionStatus.RUNNING.name in history
 
     async def test_terminated_session_status_history_not_found(
         self,
@@ -475,7 +475,7 @@ class TestSessionStatusHistory:
         assert isinstance(result, GetStatusHistoryResponse)
         history = result.root
         assert isinstance(history, dict)
-        assert "RUNNING" in history
+        assert SessionStatus.RUNNING.name in history
 
     async def test_user_cannot_access_admin_session_status_history(
         self,
