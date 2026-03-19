@@ -87,10 +87,10 @@ async def update_my_keypair(
     info: Info[StrawberryGQLContext],
     input: UpdateMyKeypairInputGQL,
 ) -> UpdateMyKeypairPayloadGQL:
-    user_uuid, email = await _get_my_email(info)
+    user_uuid, _ = await _get_my_email(info)
     result = await info.context.processors.user.update_my_keypair.wait_for_complete(
         UpdateMyKeypairAction(
-            user_uuid=user_uuid, email=email, access_key=input.access_key, is_active=input.is_active
+            user_uuid=user_uuid, access_key=input.access_key, is_active=input.is_active
         )
     )
     return UpdateMyKeypairPayloadGQL(success=result.success)

@@ -1309,9 +1309,7 @@ class UserDBSource:
                 sa.update(users).where(users.c.uuid == user_uuid).values(main_access_key=access_key)
             )
 
-    async def update_my_keypair(
-        self, user_uuid: UUID, email: str, access_key: str, is_active: bool
-    ) -> None:
+    async def update_my_keypair(self, user_uuid: UUID, access_key: str, is_active: bool) -> None:
         """Update the active state of a keypair owned by the current user."""
         async with self._db.begin_session() as session:
             kp_row = (

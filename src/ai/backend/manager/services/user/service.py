@@ -406,7 +406,6 @@ class UserService:
     async def update_my_keypair(self, action: UpdateMyKeypairAction) -> UpdateMyKeypairActionResult:
         await self._user_repository.update_my_keypair(
             user_uuid=action.user_uuid,
-            email=action.email,
             access_key=action.access_key,
             is_active=action.is_active,
         )

@@ -70,7 +70,6 @@ class UpdateMyKeypairAction(UserAction):
     """Update a keypair owned by the current user (e.g. toggle active state)."""
 
     user_uuid: UUID
-    email: str
     access_key: str
     is_active: bool
 
