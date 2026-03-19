@@ -1308,3 +1308,26 @@ class UserDBSource:
             await session.execute(
                 sa.update(users).where(users.c.uuid == user_uuid).values(main_access_key=access_key)
             )
+
+    async def update_my_keypair(
+        self, user_uuid: UUID, email: str, access_key: str, is_active: bool
+    ) -> None:
+        """Update the active state of a keypair owned by the current user."""
+        async with self._db.begin_session() as session:
+            kp_row = (
+                await session.scalars(
+                    sa.select(KeyPairRow)
+                    .where(KeyPairRow.access_key == access_key)
+                    .options(noload("*"))
+                )
+            ).first()
+            if not kp_row:
+                raise KeyPairNotFound(f"Keypair {access_key} not found")
+            if kp_row.user != user_uuid:
+                raise KeyPairForbidden("Cannot update another user's keypair")
+
+            await session.execute(
+                sa.update(keypairs)
+                .where(keypairs.c.access_key == access_key)
+                .values(is_active=is_active)
+            )
