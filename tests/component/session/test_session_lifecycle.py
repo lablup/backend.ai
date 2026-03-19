@@ -131,11 +131,16 @@ class TestSessionRestart:
         admin_registry: BackendAIClientRegistry,
         session_seed: SessionSeedData,
     ) -> None:
+        """Scenario: Admin restarts a currently RUNNING session.
+
+        Verifies that the restart API call succeeds and the session
+        remains in RUNNING status afterward (i.e., restart is a no-op
+        on the status when the agent mock simply acknowledges the request).
+        """
         await admin_registry.session.restart(
             session_seed.session_name,
             RestartSessionRequest(),
         )
-        # After restart, session should still be accessible and remain RUNNING
         result = await admin_registry.session.get_info(session_seed.session_name)
         assert result.root["status"] == "RUNNING"
 
@@ -144,7 +149,11 @@ class TestSessionRestart:
         admin_registry: BackendAIClientRegistry,
         terminated_session_seed: SessionSeedData,
     ) -> None:
-        # Terminated sessions are stale and cannot be found for restart
+        """Scenario: Admin attempts to restart a TERMINATED session.
+
+        Verifies that the server rejects the request because the session
+        is stale (allow_stale=False) and cannot be resolved for restart.
+        """
         with pytest.raises((NotFoundError, BackendAPIError)):
             await admin_registry.session.restart(
                 terminated_session_seed.session_name,
@@ -155,6 +164,11 @@ class TestSessionRestart:
         self,
         admin_registry: BackendAIClientRegistry,
     ) -> None:
+        """Scenario: Admin attempts to restart a session that does not exist.
+
+        Verifies that a completely unknown session name results in a
+        NotFoundError rather than an unexpected server error.
+        """
         with pytest.raises(NotFoundError):
             await admin_registry.session.restart(
                 "nonexistent-session-xyz-99999",
@@ -165,29 +179,68 @@ class TestSessionRestart:
 class TestSessionStatusTransition:
     """Test session status transit endpoint (POST /_/transit-status)."""
 
-    @pytest.mark.xfail(
-        reason="Requires live agent — agent_registry mock does not return proper transit result"
-    )
+    @pytest.fixture()
+    def session_lifecycle_manager_mock(
+        self,
+        agent_registry: AsyncMock,
+    ) -> AsyncMock:
+        """Mock SessionLifecycleManager and attach it to the agent_registry."""
+        lifecycle_manager = AsyncMock()
+        lifecycle_manager.deregister_status_updatable_session.return_value = None
+        agent_registry.session_lifecycle_mgr = lifecycle_manager
+        return lifecycle_manager
+
     async def test_transit_single_session_status(
         self,
         admin_registry: BackendAIClientRegistry,
         session_seed: SessionSeedData,
+        session_lifecycle_manager_mock: AsyncMock,
     ) -> None:
+        """Scenario: Admin triggers status transition for a single RUNNING session.
+
+        Verifies that the transit-status endpoint returns a valid response
+        containing the session ID in the status map, confirming that the
+        lifecycle manager was invoked and the result was serialized correctly.
+        """
+        mock_row = AsyncMock()
+        mock_row.id = session_seed.session_id
+        mock_row.status = SessionStatus.RUNNING
+        session_lifecycle_manager_mock.transit_session_status.return_value = [
+            (mock_row, False),
+        ]
         result = await admin_registry.session.transit_session_status(
             TransitSessionStatusRequest(ids=[session_seed.session_id]),
         )
         assert isinstance(result, TransitSessionStatusResponse)
         assert isinstance(result.session_status_map, dict)
+        assert session_seed.session_id in result.session_status_map
 
-    @pytest.mark.xfail(
-        reason="Requires live agent — agent_registry mock does not return proper transit result"
-    )
     async def test_transit_multiple_sessions(
         self,
         admin_registry: BackendAIClientRegistry,
         session_seed: SessionSeedData,
         terminated_session_seed: SessionSeedData,
+        session_lifecycle_manager_mock: AsyncMock,
     ) -> None:
+        """Scenario: Admin triggers status transition for multiple sessions at once.
+
+        Sends a batch request with both a RUNNING and a TERMINATED session.
+        Verifies that the handler iterates over each session ID individually,
+        calls the lifecycle manager per session, and aggregates all results
+        into a single response map.
+        """
+        running_row = AsyncMock()
+        running_row.id = session_seed.session_id
+        running_row.status = SessionStatus.RUNNING
+
+        terminated_row = AsyncMock()
+        terminated_row.id = terminated_session_seed.session_id
+        terminated_row.status = SessionStatus.TERMINATED
+
+        session_lifecycle_manager_mock.transit_session_status.side_effect = [
+            [(running_row, False)],
+            [(terminated_row, False)],
+        ]
         result = await admin_registry.session.transit_session_status(
             TransitSessionStatusRequest(
                 ids=[session_seed.session_id, terminated_session_seed.session_id],
@@ -195,21 +248,24 @@ class TestSessionStatusTransition:
         )
         assert isinstance(result, TransitSessionStatusResponse)
         assert isinstance(result.session_status_map, dict)
+        assert session_seed.session_id in result.session_status_map
+        assert terminated_session_seed.session_id in result.session_status_map
 
     async def test_user_cannot_transit_others_session(
         self,
         user_registry: BackendAIClientRegistry,
         session_seed: SessionSeedData,
     ) -> None:
-        """Regular user cannot transit status of admin-owned sessions.
+        """Scenario: Regular user attempts to transit status of an admin-owned session.
 
-        The service returns an empty result map for sessions the user does not own.
+        Verifies that the service checks ownership before delegating to the
+        lifecycle manager. Since the user does not own the session, the result
+        map should be empty (the request succeeds but has no effect).
         """
         result = await user_registry.session.transit_session_status(
             TransitSessionStatusRequest(ids=[session_seed.session_id]),
         )
         assert isinstance(result, TransitSessionStatusResponse)
-        # The result should be empty because the user doesn't own this session
         assert session_seed.session_id not in result.session_status_map
 
 
@@ -221,23 +277,23 @@ class TestSessionRenameLifecycle:
         admin_registry: BackendAIClientRegistry,
         session_seed: SessionSeedData,
     ) -> None:
-        """Rename session, then rename back to original name."""
+        """Scenario: Admin renames a session to a new name, then reverts to the original.
+
+        Verifies that rename is fully reversible — after each rename the new name
+        resolves successfully while the old name returns NotFoundError.
+        """
         original_name = session_seed.session_name
         new_name = f"{original_name}-lifecycle-test"
 
-        # Rename to new name
         await admin_registry.session.rename(
             original_name,
             RenameSessionRequest(session_name=new_name),
         )
-        # New name should be accessible
         result = await admin_registry.session.get_info(new_name)
         assert result.root["status"] == "RUNNING"
-        # Old name should no longer resolve
         with pytest.raises(NotFoundError):
             await admin_registry.session.get_info(original_name)
 
-        # Rename back to original name
         await admin_registry.session.rename(
             new_name,
             RenameSessionRequest(session_name=original_name),
@@ -252,7 +308,11 @@ class TestSessionRenameLifecycle:
         admin_registry: BackendAIClientRegistry,
         session_seed: SessionSeedData,
     ) -> None:
-        """Renaming a session to the same name is rejected by the server."""
+        """Scenario: Admin attempts to rename a session to its current name.
+
+        Verifies that the server rejects a no-op rename as an invalid
+        request rather than silently succeeding.
+        """
         with pytest.raises(BackendAPIError):
             await admin_registry.session.rename(
                 session_seed.session_name,
@@ -264,17 +324,19 @@ class TestSessionRenameLifecycle:
         user_registry: BackendAIClientRegistry,
         user_session_seed: SessionSeedData,
     ) -> None:
-        """Regular user can rename their own session."""
+        """Scenario: Regular user renames their own session.
+
+        Verifies that non-admin users have rename permission on sessions
+        they own, and that the old name is no longer resolvable after rename.
+        """
         original_name = user_session_seed.session_name
         new_name = f"{original_name}-renamed"
         await user_registry.session.rename(
             original_name,
             RenameSessionRequest(session_name=new_name),
         )
-        # New name should be accessible
         result = await user_registry.session.get_info(new_name)
         assert result.root["status"] == "RUNNING"
-        # Old name should no longer resolve
         with pytest.raises(NotFoundError):
             await user_registry.session.get_info(original_name)
 
@@ -287,7 +349,11 @@ class TestSessionPermissions:
         user_registry: BackendAIClientRegistry,
         user_session_seed: SessionSeedData,
     ) -> None:
-        """Regular user can access their own session."""
+        """Scenario: Regular user queries info of their own RUNNING session.
+
+        Verifies that users can read their own session metadata including
+        status and domain name through the get_info endpoint.
+        """
         result = await user_registry.session.get_info(user_session_seed.session_name)
         assert result.root["status"] == "RUNNING"
         assert result.root["domainName"] == user_session_seed.domain_name
@@ -297,7 +363,11 @@ class TestSessionPermissions:
         user_registry: BackendAIClientRegistry,
         session_seed: SessionSeedData,
     ) -> None:
-        """Regular user cannot access admin-owned sessions."""
+        """Scenario: Regular user attempts to query an admin-owned session.
+
+        Verifies that session visibility is scoped by access key — a user
+        keypair cannot resolve sessions belonging to a different keypair.
+        """
         with pytest.raises((NotFoundError, BackendAPIError)):
             await user_registry.session.get_info(session_seed.session_name)
 
@@ -306,11 +376,12 @@ class TestSessionPermissions:
         admin_registry: BackendAIClientRegistry,
         user_session_seed: SessionSeedData,
     ) -> None:
-        """Admin cannot access user sessions via get_info without matching access key.
+        """Scenario: Admin queries a session owned by a regular user's keypair.
 
-        This is a known limitation of the current implementation: the get_info handler
-        resolves scope using the requester's own access key, so sessions owned by
-        other access keys are not found. This behavior may change in future refactoring.
+        The get_info handler resolves scope using the requester's own access
+        key, so sessions owned by other access keys are not found. This is a
+        known limitation of the current implementation that may change in
+        future refactoring.
         """
         with pytest.raises(NotFoundError):
             await admin_registry.session.get_info(user_session_seed.session_name)
@@ -320,7 +391,11 @@ class TestSessionPermissions:
         user_registry: BackendAIClientRegistry,
         session_seed: SessionSeedData,
     ) -> None:
-        """Regular user cannot destroy admin-owned sessions."""
+        """Scenario: Regular user attempts to force-destroy an admin-owned session.
+
+        Verifies that the destroy endpoint enforces ownership — the session
+        is not resolvable under the user's access key scope.
+        """
         with pytest.raises((NotFoundError, BackendAPIError)):
             await user_registry.session.destroy(
                 session_seed.session_name,
@@ -332,7 +407,11 @@ class TestSessionPermissions:
         user_registry: BackendAIClientRegistry,
         session_seed: SessionSeedData,
     ) -> None:
-        """Regular user cannot rename admin-owned sessions."""
+        """Scenario: Regular user attempts to rename an admin-owned session.
+
+        Verifies that the rename endpoint enforces ownership — the session
+        is not resolvable under the user's access key scope.
+        """
         with pytest.raises((NotFoundError, BackendAPIError)):
             await user_registry.session.rename(
                 session_seed.session_name,
@@ -348,14 +427,18 @@ class TestSessionStatusHistory:
         admin_registry: BackendAIClientRegistry,
         session_seed: SessionSeedData,
     ) -> None:
-        """A running session should have PENDING and RUNNING in status history."""
+        """Scenario: Admin queries status history of a RUNNING session.
+
+        The seeded session was created with PENDING -> RUNNING transitions.
+        Verifies that both status entries are recorded in the history and
+        returned by the get_status_history endpoint.
+        """
         result = await admin_registry.session.get_status_history(
             session_seed.session_name,
         )
         assert isinstance(result, GetStatusHistoryResponse)
         history = result.root
         assert isinstance(history, dict)
-        # Seeded session has PENDING and RUNNING in status_history
         assert "PENDING" in history
         assert "RUNNING" in history
 
@@ -364,10 +447,12 @@ class TestSessionStatusHistory:
         admin_registry: BackendAIClientRegistry,
         terminated_session_seed: SessionSeedData,
     ) -> None:
-        """Terminated (stale) sessions are not found by get_status_history.
+        """Scenario: Admin queries status history of a TERMINATED session.
 
-        The handler uses get_session_validated with allow_stale=False,
-        so terminated sessions return 404.
+        The get_status_history handler resolves the session with
+        allow_stale=False, so terminated sessions are treated as
+        non-existent and return 404. This prevents querying history
+        of stale sessions through this endpoint.
         """
         with pytest.raises(NotFoundError):
             await admin_registry.session.get_status_history(
@@ -379,7 +464,11 @@ class TestSessionStatusHistory:
         user_registry: BackendAIClientRegistry,
         user_session_seed: SessionSeedData,
     ) -> None:
-        """Regular user can access status history of their own session."""
+        """Scenario: Regular user queries status history of their own RUNNING session.
+
+        Verifies that the status history endpoint is accessible to
+        non-admin users for sessions they own.
+        """
         result = await user_registry.session.get_status_history(
             user_session_seed.session_name,
         )
@@ -393,7 +482,11 @@ class TestSessionStatusHistory:
         user_registry: BackendAIClientRegistry,
         session_seed: SessionSeedData,
     ) -> None:
-        """Regular user cannot access status history of admin-owned session."""
+        """Scenario: Regular user attempts to query status history of an admin-owned session.
+
+        Verifies that ownership scoping applies to the status history
+        endpoint — sessions not owned by the requester are not resolvable.
+        """
         with pytest.raises((NotFoundError, BackendAPIError)):
             await user_registry.session.get_status_history(
                 session_seed.session_name,
@@ -409,7 +502,12 @@ class TestSessionDestroyLifecycle:
         terminated_session_seed: SessionSeedData,
         scheduling_controller_mock: AsyncMock,
     ) -> None:
-        """Destroying an already-terminated session succeeds (forced destroy is idempotent)."""
+        """Scenario: Admin force-destroys a session that is already TERMINATED.
+
+        Verifies that forced destroy is idempotent — calling destroy on an
+        already-terminated session does not raise an error and returns a
+        valid response with status "terminated".
+        """
         scheduling_controller_mock.mark_sessions_for_termination.return_value = (
             MarkTerminatingResult(
                 cancelled_sessions=[],
@@ -431,7 +529,12 @@ class TestSessionDestroyLifecycle:
         user_session_seed: SessionSeedData,
         scheduling_controller_mock: AsyncMock,
     ) -> None:
-        """Regular user can destroy their own session."""
+        """Scenario: Regular user force-destroys their own RUNNING session.
+
+        Verifies that non-admin users have destroy permission on sessions
+        they own, and that the scheduling controller correctly marks the
+        session for termination.
+        """
         scheduling_controller_mock.mark_sessions_for_termination.return_value = (
             MarkTerminatingResult(
                 cancelled_sessions=[],
