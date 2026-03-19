@@ -374,7 +374,7 @@ class DeploymentInfo:
     state: DeploymentState
     replica_spec: ReplicaSpec
     network: DeploymentNetworkSpec
-    model_revisions: list[ModelRevisionSpec] = field(default_factory=list)
+    model_revisions: list[ModelRevisionSpec]
     current_revision_id: UUID | None = None
     policy: DeploymentPolicyData | None = None
     deploying_revision_id: UUID | None = None
