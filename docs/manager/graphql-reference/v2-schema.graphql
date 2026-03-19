@@ -2677,7 +2677,7 @@ input EntityFilter {
   NOT: [EntityFilter!] = null
 }
 
-union EntityNode = UserV2 | ProjectV2 | DomainV2 | VirtualFolderNode | ImageV2 | ComputeSessionNode | Artifact | ArtifactRegistry | AppConfig | NotificationChannel | NotificationRule | ModelDeployment | ResourceGroup | ContainerRegistryV2 | ArtifactRevision | Role
+union EntityNode = UserV2 | ProjectV2 | DomainV2 | VirtualFolderNode | ImageV2 | ComputeSessionNode | SessionV2 | Artifact | ArtifactRegistry | AppConfig | NotificationChannel | NotificationRule | ModelDeployment | ResourceGroup | ContainerRegistryV2 | ArtifactRevision | Role
 
 """Added in 26.3.0. Order by specification for entity associations"""
 input EntityOrderBy {

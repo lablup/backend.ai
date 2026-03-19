@@ -4639,6 +4639,7 @@ union EntityNode
   @join__unionMember(graph: STRAWBERRY, member: "VirtualFolderNode")
   @join__unionMember(graph: STRAWBERRY, member: "ImageV2")
   @join__unionMember(graph: STRAWBERRY, member: "ComputeSessionNode")
+  @join__unionMember(graph: STRAWBERRY, member: "SessionV2")
   @join__unionMember(graph: STRAWBERRY, member: "Artifact")
   @join__unionMember(graph: STRAWBERRY, member: "ArtifactRegistry")
   @join__unionMember(graph: STRAWBERRY, member: "AppConfig")
@@ -4649,7 +4650,7 @@ union EntityNode
   @join__unionMember(graph: STRAWBERRY, member: "ContainerRegistryV2")
   @join__unionMember(graph: STRAWBERRY, member: "ArtifactRevision")
   @join__unionMember(graph: STRAWBERRY, member: "Role")
- = UserV2 | ProjectV2 | DomainV2 | VirtualFolderNode | ImageV2 | ComputeSessionNode | Artifact | ArtifactRegistry | AppConfig | NotificationChannel | NotificationRule | ModelDeployment | ResourceGroup | ContainerRegistryV2 | ArtifactRevision | Role
+ = UserV2 | ProjectV2 | DomainV2 | VirtualFolderNode | ImageV2 | ComputeSessionNode | SessionV2 | Artifact | ArtifactRegistry | AppConfig | NotificationChannel | NotificationRule | ModelDeployment | ResourceGroup | ContainerRegistryV2 | ArtifactRevision | Role
 
 """Added in 26.3.0. Order by specification for entity associations"""
 input EntityOrderBy
