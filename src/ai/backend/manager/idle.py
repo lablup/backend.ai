@@ -1253,10 +1253,7 @@ class UtilizationIdleChecker(BaseIdleChecker):
                 mem_slots = float(occupied_slots.get("mem", 0))
                 mem_current = float(nmget(live_stat, "mem.current", 0.0))
                 if mem_slots > 0:
-                    utilization_sums["mem"] = (
-                        utilization_sums["mem"] + mem_current / mem_slots * 100
-                    )
-                    utilization_counts["mem"] += 1
+                    utilization_sums["mem"] += mem_current / mem_slots * 100
 
                 kernel_counter += 1
             if kernel_counter == 0:

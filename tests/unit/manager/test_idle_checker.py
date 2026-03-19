@@ -804,8 +804,8 @@ class TestUtilizationIdleChecker:
         expected_utilization = {
             "cpu_util": current_test_config.expected_cpu_util,
             "mem": current_test_config.expected_mem_util,
-            "cuda_mem": 0.0,
-            "cuda_util": 0.0,
+            "cuda_mem": None,
+            "cuda_util": None,
         }
 
         # When
