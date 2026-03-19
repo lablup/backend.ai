@@ -97,8 +97,20 @@ class AdminSearchObjectStoragesInput(BaseRequestModel):
 
     filter: ObjectStorageFilter | None = Field(default=None, description="Filter criteria.")
     order: list[ObjectStorageOrder] | None = Field(default=None, description="Ordering criteria.")
-    limit: int | None = Field(default=None, ge=1, description="Maximum number of results.")
-    offset: int | None = Field(default=None, ge=0, description="Number of results to skip.")
+    first: int | None = Field(
+        default=None, ge=1, description="Cursor-based: number of items after cursor"
+    )
+    after: str | None = Field(default=None, description="Cursor-based: start cursor (exclusive)")
+    last: int | None = Field(
+        default=None, ge=1, description="Cursor-based: number of items before cursor"
+    )
+    before: str | None = Field(default=None, description="Cursor-based: end cursor (exclusive)")
+    limit: int | None = Field(
+        default=None, ge=1, description="Offset-based: maximum number of results."
+    )
+    offset: int | None = Field(
+        default=None, ge=0, description="Offset-based: number of results to skip."
+    )
 
 
 class GetPresignedDownloadURLInput(BaseRequestModel):

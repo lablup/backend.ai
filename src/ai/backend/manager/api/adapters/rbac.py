@@ -97,7 +97,7 @@ class RBACAdapter(BaseAdapter):
 
     async def admin_search(self, input: SearchRolesRequest) -> SearchRolesResponse:
         """Search roles with no scope restriction (admin only)."""
-        querier = self._build_querier(input)
+        querier = self._build_search_querier(input)
         action_result = await self._processors.permission_controller.search_roles.wait_for_complete(
             SearchRolesAction(querier=querier)
         )
@@ -155,7 +155,7 @@ class RBACAdapter(BaseAdapter):
 
     # ------------------------------------------------------------------ helpers
 
-    def _build_querier(self, input: SearchRolesRequest) -> BatchQuerier:
+    def _build_search_querier(self, input: SearchRolesRequest) -> BatchQuerier:
         conditions = self._convert_filter(input.filter) if input.filter else []
         orders: list[QueryOrder] = []
         if input.order is not None:

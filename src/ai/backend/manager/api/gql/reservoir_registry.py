@@ -114,7 +114,14 @@ async def reservoir_registries(
     limit: int | None = None,
 ) -> ReservoirRegistryConnection | None:
     payload = await info.context.adapters.reservoir_registry.search(
-        AdminSearchReservoirRegistriesInput(limit=limit, offset=offset)
+        AdminSearchReservoirRegistriesInput(
+            first=first,
+            after=after,
+            last=last,
+            before=before,
+            limit=limit,
+            offset=offset,
+        )
     )
     nodes = [ReservoirRegistry.from_pydantic(item) for item in payload.items]
     edges = [ReservoirRegistryEdge(node=node, cursor=encode_cursor(node.id)) for node in nodes]

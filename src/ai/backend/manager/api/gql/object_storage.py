@@ -145,7 +145,14 @@ async def object_storages(
     offset: int | None = None,
 ) -> ObjectStorageConnection | None:
     payload = await info.context.adapters.object_storage.admin_search(
-        AdminSearchObjectStoragesInput(limit=limit, offset=offset)
+        AdminSearchObjectStoragesInput(
+            first=first,
+            after=after,
+            last=last,
+            before=before,
+            limit=limit,
+            offset=offset,
+        )
     )
     nodes = [
         ObjectStorage.from_pydantic(item, extra={"region": item.region or ""})

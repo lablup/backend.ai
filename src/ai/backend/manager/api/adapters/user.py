@@ -77,7 +77,7 @@ class UserAdapter(BaseAdapter):
         input: SearchUsersRequest,
     ) -> SearchUsersPayload:
         """Search users with no scope restriction (admin only)."""
-        querier = self._build_querier(input)
+        querier = self._build_search_querier(input)
         action_result = await self._processors.user.search_users.wait_for_complete(
             SearchUsersAction(querier=querier)
         )
@@ -96,7 +96,7 @@ class UserAdapter(BaseAdapter):
         input: SearchUsersRequest,
     ) -> SearchUsersPayload:
         """Search users within a domain."""
-        querier = self._build_querier(input)
+        querier = self._build_search_querier(input)
         scope = DomainUserSearchScope(domain_name=domain_name)
         action_result = await self._processors.user.search_users_by_domain.wait_for_complete(
             SearchUsersByDomainAction(scope=scope, querier=querier)
@@ -116,7 +116,7 @@ class UserAdapter(BaseAdapter):
         input: SearchUsersRequest,
     ) -> SearchUsersPayload:
         """Search users within a project."""
-        querier = self._build_querier(input)
+        querier = self._build_search_querier(input)
         scope = ProjectUserSearchScope(project_id=project_id)
         action_result = await self._processors.user.search_users_by_project.wait_for_complete(
             SearchUsersByProjectAction(scope=scope, querier=querier)
@@ -136,7 +136,7 @@ class UserAdapter(BaseAdapter):
         input: SearchUsersRequest,
     ) -> SearchUsersPayload:
         """Search users assigned to a role."""
-        querier = self._build_querier(input)
+        querier = self._build_search_querier(input)
         scope = RoleUserSearchScope(role_id=role_id)
         action_result = await self._processors.user.search_users_by_role.wait_for_complete(
             SearchUsersByRoleAction(scope=scope, querier=querier)
@@ -161,7 +161,7 @@ class UserAdapter(BaseAdapter):
 
     # ------------------------------------------------------------------ helpers
 
-    def _build_querier(self, input: SearchUsersRequest) -> BatchQuerier:
+    def _build_search_querier(self, input: SearchUsersRequest) -> BatchQuerier:
         """Build a BatchQuerier from the search request DTO."""
         conditions = self._convert_filter(input.filter) if input.filter else []
         orders = self._convert_orders(input.order) if input.order else []

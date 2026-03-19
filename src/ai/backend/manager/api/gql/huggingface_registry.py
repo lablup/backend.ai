@@ -105,7 +105,14 @@ async def huggingface_registries(
     limit: int | None = None,
 ) -> HuggingFaceRegistryConnection | None:
     payload = await info.context.adapters.huggingface_registry.search(
-        AdminSearchHuggingFaceRegistriesInput(limit=limit, offset=offset)
+        AdminSearchHuggingFaceRegistriesInput(
+            first=first,
+            after=after,
+            last=last,
+            before=before,
+            limit=limit,
+            offset=offset,
+        )
     )
     nodes = [HuggingFaceRegistry.from_pydantic(item) for item in payload.items]
     edges = [HuggingFaceRegistryEdge(node=node, cursor=encode_cursor(node.id)) for node in nodes]

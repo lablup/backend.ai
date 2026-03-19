@@ -46,5 +46,13 @@ class DeleteReservoirRegistryInput(BaseRequestModel):
 class AdminSearchReservoirRegistriesInput(BaseRequestModel):
     """Input for searching Reservoir registries (admin, no scope)."""
 
-    limit: int | None = Field(default=None, ge=1, description="Max results per page")
-    offset: int | None = Field(default=None, ge=0, description="Pagination offset")
+    first: int | None = Field(
+        default=None, ge=1, description="Cursor-based: number of items after cursor"
+    )
+    after: str | None = Field(default=None, description="Cursor-based: start cursor (exclusive)")
+    last: int | None = Field(
+        default=None, ge=1, description="Cursor-based: number of items before cursor"
+    )
+    before: str | None = Field(default=None, description="Cursor-based: end cursor (exclusive)")
+    limit: int | None = Field(default=None, ge=1, description="Offset-based: max results per page")
+    offset: int | None = Field(default=None, ge=0, description="Offset-based: pagination offset")
