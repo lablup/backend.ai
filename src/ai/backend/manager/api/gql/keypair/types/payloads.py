@@ -4,33 +4,45 @@ from __future__ import annotations
 
 import strawberry
 
+from ai.backend.common.dto.manager.v2.keypair.response import (
+    IssueMyKeypairPayload as IssueMyKeypairPayloadDTO,
+)
+from ai.backend.common.dto.manager.v2.keypair.response import (
+    RevokeMyKeypairPayload as RevokeMyKeypairPayloadDTO,
+)
+from ai.backend.common.dto.manager.v2.keypair.response import (
+    SwitchMyMainAccessKeyPayload as SwitchMyMainAccessKeyPayloadDTO,
+)
 
-@strawberry.type(
+
+@strawberry.experimental.pydantic.type(
+    model=IssueMyKeypairPayloadDTO,
     name="IssueMyKeypairPayload",
     description="Payload returned after issuing a new keypair. The secret_key is only shown once.",
+    all_fields=True,
 )
 class IssueMyKeypairPayloadGQL:
-    access_key: str = strawberry.field(description="The newly generated access key.")
-    secret_key: str = strawberry.field(
-        description="The newly generated secret key. This value is only returned at creation time."
-    )
-    ssh_public_key: str = strawberry.field(description="The generated SSH public key.")
+    """Payload returned after issuing a new keypair."""
 
 
-@strawberry.type(
+@strawberry.experimental.pydantic.type(
+    model=RevokeMyKeypairPayloadDTO,
     name="RevokeMyKeypairPayload",
     description="Payload returned after revoking a keypair.",
+    all_fields=True,
 )
 class RevokeMyKeypairPayloadGQL:
-    success: bool = strawberry.field(description="Whether the revocation was successful.")
+    """Payload returned after revoking a keypair."""
 
 
-@strawberry.type(
+@strawberry.experimental.pydantic.type(
+    model=SwitchMyMainAccessKeyPayloadDTO,
     name="SwitchMyMainAccessKeyPayload",
     description="Payload returned after switching the main access key.",
+    all_fields=True,
 )
 class SwitchMyMainAccessKeyPayloadGQL:
-    success: bool = strawberry.field(description="Whether the switch was successful.")
+    """Payload returned after switching the main access key."""
 
 
 @strawberry.type(
