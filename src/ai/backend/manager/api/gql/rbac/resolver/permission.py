@@ -95,16 +95,34 @@ async def admin_permissions(
     offset: int | None = None,
 ) -> PermissionConnection:
     check_admin_only()
-    return await _fetch_permissions(
-        info,
-        filter=filter,
-        order_by=order_by,
-        before=before,
-        after=after,
-        first=first,
-        last=last,
-        limit=limit,
-        offset=offset,
+    result = await info.context.adapters.rbac.admin_search_permissions_gql(
+        AdminSearchPermissionsGQLInput(
+            filter=filter.to_pydantic() if filter is not None else None,
+            order=[o.to_pydantic() for o in order_by] if order_by is not None else None,
+            first=first,
+            after=after,
+            last=last,
+            before=before,
+            limit=limit,
+            offset=offset,
+        )
+    )
+    edges = [
+        PermissionEdge(
+            node=PermissionGQL.from_dataclass(item),
+            cursor=encode_cursor(str(item.id)),
+        )
+        for item in result.items
+    ]
+    return PermissionConnection(
+        edges=edges,
+        page_info=strawberry.relay.PageInfo(
+            has_next_page=result.has_next_page,
+            has_previous_page=result.has_previous_page,
+            start_cursor=edges[0].cursor if edges else None,
+            end_cursor=edges[-1].cursor if edges else None,
+        ),
+        count=result.total_count,
     )
 
 

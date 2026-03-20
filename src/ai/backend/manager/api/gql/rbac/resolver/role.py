@@ -39,118 +39,6 @@ from ai.backend.manager.api.gql.rbac.types.role import RoleAssignmentEdge, RoleE
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.api.gql.utils import check_admin_only
 from ai.backend.manager.models.rbac_models.conditions import AssignedUserConditions
-from ai.backend.manager.repositories.base import QueryCondition
-from ai.backend.manager.services.permission_contoller.actions.get_role_detail import (
-    GetRoleDetailAction,
-)
-
-
-async def _fetch_role(
-    info: Info[StrawberryGQLContext],
-    id: uuid.UUID,
-) -> RoleGQL | None:
-    action_result = (
-        await info.context.processors.permission_controller.get_role_detail.wait_for_complete(
-            GetRoleDetailAction(role_id=id)
-        )
-    )
-    return RoleGQL.from_dataclass(action_result.role)
-
-
-async def _fetch_roles(
-    info: Info[StrawberryGQLContext],
-    filter: RoleFilter | None = None,
-    order_by: list[RoleOrderBy] | None = None,
-    before: str | None = None,
-    after: str | None = None,
-    first: int | None = None,
-    last: int | None = None,
-    limit: int | None = None,
-    offset: int | None = None,
-    base_conditions: list[QueryCondition] | None = None,
-) -> RoleConnection:
-    pydantic_filter = filter.to_pydantic() if filter is not None else None
-    pydantic_order = [o.to_pydantic() for o in order_by] if order_by is not None else None
-
-    search_input = AdminSearchRolesGQLInput(
-        filter=pydantic_filter,
-        order=pydantic_order,
-        first=first,
-        after=after,
-        last=last,
-        before=before,
-        limit=limit,
-        offset=offset,
-    )
-    result = await info.context.adapters.rbac.admin_search_roles_gql(
-        search_input,
-        base_conditions=base_conditions,
-    )
-
-    edges = [
-        RoleEdge(node=RoleGQL.from_dataclass(item), cursor=encode_cursor(str(item.id)))
-        for item in result.items
-    ]
-    return RoleConnection(
-        edges=edges,
-        page_info=strawberry.relay.PageInfo(
-            has_next_page=result.has_next_page,
-            has_previous_page=result.has_previous_page,
-            start_cursor=edges[0].cursor if edges else None,
-            end_cursor=edges[-1].cursor if edges else None,
-        ),
-        count=result.total_count,
-    )
-
-
-async def _fetch_role_assignments(
-    info: Info[StrawberryGQLContext],
-    filter: RoleAssignmentFilter | None = None,
-    order_by: list[RoleAssignmentOrderBy] | None = None,
-    before: str | None = None,
-    after: str | None = None,
-    first: int | None = None,
-    last: int | None = None,
-    limit: int | None = None,
-    offset: int | None = None,
-    base_conditions: list[QueryCondition] | None = None,
-) -> RoleAssignmentConnection:
-    pydantic_filter = filter.to_pydantic() if filter is not None else None
-    pydantic_order = [o.to_pydantic() for o in order_by] if order_by is not None else None
-
-    search_input = AdminSearchRoleAssignmentsGQLInput(
-        filter=pydantic_filter,
-        order=pydantic_order,
-        first=first,
-        after=after,
-        last=last,
-        before=before,
-        limit=limit,
-        offset=offset,
-    )
-    result = await info.context.adapters.rbac.admin_search_role_assignments_gql(
-        search_input,
-        base_conditions=base_conditions,
-    )
-
-    edges = [
-        RoleAssignmentEdge(
-            node=RoleAssignmentGQL.from_dataclass(item),
-            cursor=encode_cursor(str(item.id)),
-        )
-        for item in result.items
-    ]
-    return RoleAssignmentConnection(
-        edges=edges,
-        page_info=strawberry.relay.PageInfo(
-            has_next_page=result.has_next_page,
-            has_previous_page=result.has_previous_page,
-            start_cursor=edges[0].cursor if edges else None,
-            end_cursor=edges[-1].cursor if edges else None,
-        ),
-        count=result.total_count,
-    )
-
 
 # ==================== Query Resolvers ====================
 
@@ -161,7 +49,8 @@ async def admin_role(
     id: uuid.UUID,
 ) -> RoleGQL | None:
     check_admin_only()
-    return await _fetch_role(info, id)
+    node = await info.context.adapters.rbac.get(id)
+    return RoleGQL.from_pydantic(node)
 
 
 @strawberry.field(
@@ -179,16 +68,31 @@ async def admin_roles(
     offset: int | None = None,
 ) -> RoleConnection:
     check_admin_only()
-    return await _fetch_roles(
-        info,
-        filter=filter,
-        order_by=order_by,
-        before=before,
-        after=after,
-        first=first,
-        last=last,
-        limit=limit,
-        offset=offset,
+    result = await info.context.adapters.rbac.admin_search_roles_gql(
+        AdminSearchRolesGQLInput(
+            filter=filter.to_pydantic() if filter is not None else None,
+            order=[o.to_pydantic() for o in order_by] if order_by is not None else None,
+            first=first,
+            after=after,
+            last=last,
+            before=before,
+            limit=limit,
+            offset=offset,
+        )
+    )
+    edges = [
+        RoleEdge(node=RoleGQL.from_dataclass(item), cursor=encode_cursor(str(item.id)))
+        for item in result.items
+    ]
+    return RoleConnection(
+        edges=edges,
+        page_info=strawberry.relay.PageInfo(
+            has_next_page=result.has_next_page,
+            has_previous_page=result.has_previous_page,
+            start_cursor=edges[0].cursor if edges else None,
+            end_cursor=edges[-1].cursor if edges else None,
+        ),
+        count=result.total_count,
     )
 
 
@@ -207,16 +111,34 @@ async def admin_role_assignments(
     offset: int | None = None,
 ) -> RoleAssignmentConnection:
     check_admin_only()
-    return await _fetch_role_assignments(
-        info,
-        filter=filter,
-        order_by=order_by,
-        before=before,
-        after=after,
-        first=first,
-        last=last,
-        limit=limit,
-        offset=offset,
+    result = await info.context.adapters.rbac.admin_search_role_assignments_gql(
+        AdminSearchRoleAssignmentsGQLInput(
+            filter=filter.to_pydantic() if filter is not None else None,
+            order=[o.to_pydantic() for o in order_by] if order_by is not None else None,
+            first=first,
+            after=after,
+            last=last,
+            before=before,
+            limit=limit,
+            offset=offset,
+        )
+    )
+    edges = [
+        RoleAssignmentEdge(
+            node=RoleAssignmentGQL.from_dataclass(item),
+            cursor=encode_cursor(str(item.id)),
+        )
+        for item in result.items
+    ]
+    return RoleAssignmentConnection(
+        edges=edges,
+        page_info=strawberry.relay.PageInfo(
+            has_next_page=result.has_next_page,
+            has_previous_page=result.has_previous_page,
+            start_cursor=edges[0].cursor if edges else None,
+            end_cursor=edges[-1].cursor if edges else None,
+        ),
+        count=result.total_count,
     )
 
 
@@ -240,17 +162,35 @@ async def my_roles(
 
         raise InsufficientPrivilege("Authentication required")
 
-    return await _fetch_role_assignments(
-        info,
-        filter=filter,
-        order_by=order_by,
-        before=before,
-        after=after,
-        first=first,
-        last=last,
-        limit=limit,
-        offset=offset,
+    result = await info.context.adapters.rbac.admin_search_role_assignments_gql(
+        AdminSearchRoleAssignmentsGQLInput(
+            filter=filter.to_pydantic() if filter is not None else None,
+            order=[o.to_pydantic() for o in order_by] if order_by is not None else None,
+            first=first,
+            after=after,
+            last=last,
+            before=before,
+            limit=limit,
+            offset=offset,
+        ),
         base_conditions=[AssignedUserConditions.by_user_id(me.user_id)],
+    )
+    edges = [
+        RoleAssignmentEdge(
+            node=RoleAssignmentGQL.from_dataclass(item),
+            cursor=encode_cursor(str(item.id)),
+        )
+        for item in result.items
+    ]
+    return RoleAssignmentConnection(
+        edges=edges,
+        page_info=strawberry.relay.PageInfo(
+            has_next_page=result.has_next_page,
+            has_previous_page=result.has_previous_page,
+            start_cursor=edges[0].cursor if edges else None,
+            end_cursor=edges[-1].cursor if edges else None,
+        ),
+        count=result.total_count,
     )
 
 
