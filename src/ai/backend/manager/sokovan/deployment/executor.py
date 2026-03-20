@@ -29,7 +29,6 @@ from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.deployment.scale import AutoScalingRule
 from ai.backend.manager.data.deployment.types import (
     DeploymentInfo,
-    ModelRevisionSpec,
     RouteInfo,
     RouteStatus,
     RouteTrafficStatus,
@@ -438,15 +437,11 @@ class DeploymentExecutor:
 
         with recorder.phase("register_endpoint"):
             with recorder.step("check_target_revision"):
-                target_revision: ModelRevisionSpec | None = None
                 if deployment.current_revision_id is not None:
                     target_revision = deployment.resolve_revision_spec(
                         deployment.current_revision_id
                     )
-                if target_revision is None:
-                    # No current_revision set yet — fall back to endpoint-level
-                    # fields (image, runtime_variant, etc.) stored directly on
-                    # the endpoint row during deployment creation.
+                else:
                     target_revision = await self._deployment_repo.get_revision_spec_from_endpoint(
                         deployment.id
                     )

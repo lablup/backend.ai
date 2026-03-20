@@ -21,6 +21,7 @@ from ai.backend.common.data.model_deployment.types import (
     ModelDeploymentStatus,
     ReadinessStatus,
 )
+from ai.backend.manager.errors.deployment import DeploymentRevisionNotFound
 
 if TYPE_CHECKING:
     from ai.backend.manager.data.session.types import SchedulingResult, SubStepResult
@@ -379,11 +380,17 @@ class DeploymentInfo:
     deploying_revision_id: UUID | None = None
     sub_step: DeploymentLifecycleSubStep | None = None
 
-    def resolve_revision_spec(self, revision_id: UUID) -> ModelRevisionSpec | None:
-        """Find a ModelRevisionSpec by revision_id from model_revisions."""
-        return next(
-            (r for r in self.model_revisions if r.revision_id == revision_id),
-            None,
+    def resolve_revision_spec(self, revision_id: UUID) -> ModelRevisionSpec:
+        """Find a ModelRevisionSpec by revision_id from model_revisions.
+
+        Raises:
+            DeploymentRevisionNotFound: If the revision is not found.
+        """
+        for revision in self.model_revisions:
+            if revision.revision_id == revision_id:
+                return revision
+        raise DeploymentRevisionNotFound(
+            f"Revision {revision_id} not found in model_revisions of deployment {self.id}"
         )
 
 
