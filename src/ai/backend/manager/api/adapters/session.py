@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from uuid import UUID
 
 from ai.backend.common.dto.manager.v2.kernel.request import (
@@ -33,7 +34,7 @@ from ai.backend.common.dto.manager.v2.session.response import (
     SessionResourceInfo,
     SessionRuntimeInfo,
 )
-from ai.backend.common.types import AgentId, SessionId
+from ai.backend.common.types import AgentId, KernelId, SessionId
 from ai.backend.manager.api.adapters.pagination import PaginationSpec
 from ai.backend.manager.data.kernel.types import KernelInfo, KernelStatus, KernelStatusInMatchSpec
 from ai.backend.manager.data.session.types import SessionData
@@ -64,6 +65,8 @@ from ai.backend.manager.models.session.orders import (
     resolve_order as resolve_session_order,
 )
 from ai.backend.manager.repositories.base import (
+    BatchQuerier,
+    NoPagination,
     QueryCondition,
     QueryOrder,
     combine_conditions_or,
@@ -93,6 +96,50 @@ _KERNEL_PAGINATION_SPEC = PaginationSpec(
 
 class SessionAdapter(BaseAdapter):
     """Adapter for session and kernel domain operations."""
+
+    # -------------------------------------------------------------------------
+    # Batch load (DataLoader)
+    # -------------------------------------------------------------------------
+
+    async def batch_load_by_ids(self, session_ids: Sequence[SessionId]) -> list[SessionNode | None]:
+        """Batch load sessions by ID for DataLoader use.
+
+        Returns SessionNode DTOs in the same order as the input session_ids list.
+        """
+        if not session_ids:
+            return []
+        querier = BatchQuerier(
+            pagination=NoPagination(),
+            conditions=[SessionConditions.by_ids(session_ids)],
+        )
+        action_result = await self._processors.session.search_sessions.wait_for_complete(
+            SearchSessionsAction(querier=querier)
+        )
+        session_map: dict[SessionId, SessionNode] = {
+            SessionId(data.id): self._session_data_to_node(data) for data in action_result.data
+        }
+        return [session_map.get(session_id) for session_id in session_ids]
+
+    async def batch_load_kernels_by_ids(
+        self, kernel_ids: Sequence[KernelId]
+    ) -> list[KernelNode | None]:
+        """Batch load kernels by ID for DataLoader use.
+
+        Returns KernelNode DTOs in the same order as the input kernel_ids list.
+        """
+        if not kernel_ids:
+            return []
+        querier = BatchQuerier(
+            pagination=NoPagination(),
+            conditions=[KernelConditions.by_ids(kernel_ids)],
+        )
+        action_result = await self._processors.session.search_kernels.wait_for_complete(
+            SearchKernelsAction(querier=querier)
+        )
+        kernel_map: dict[KernelId, KernelNode] = {
+            info.id: self._kernel_info_to_node(info) for info in action_result.data
+        }
+        return [kernel_map.get(kernel_id) for kernel_id in kernel_ids]
 
     # -------------------------------------------------------------------------
     # Session search
