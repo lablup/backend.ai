@@ -319,7 +319,7 @@ class DeploymentCoordinator:
                 DeployingRollingBackHandler(
                     deployment_controller=self._deployment_controller,
                     route_controller=self._route_controller,
-                    applier=applier,
+                    deployment_repo=self._deployment_repository,
                 ),
             ),
         ]
@@ -355,12 +355,18 @@ class DeploymentCoordinator:
         handler_name = handler.name()
         target_statuses = handler.target_statuses()
         lifecycle_stages = [status.lifecycle for status in target_statuses]
+        target_sub_steps: list[DeploymentLifecycleSubStep] = [
+            status.sub_step for status in target_statuses if status.sub_step is not None
+        ]
         deployments = await self._deployment_repository.get_deployments_for_handler(
-            lifecycle_stages, handler_name
+            lifecycle_stages,
+            handler_name,
+            sub_steps=target_sub_steps or None,
         )
         if not deployments:
             log.trace("No deployments to process for handler: {}", handler_name)
             return
+
         log.info("handler: {} - processing {} deployments", handler_name, len(deployments))
 
         deployment_ids = [deployment.deployment_info.id for deployment in deployments]
@@ -444,6 +450,33 @@ class DeploymentCoordinator:
             batch_updaters.append(transition.updater)
             all_history_specs.extend(transition.history_specs)
             notification_events.extend(transition.notification_events)
+
+        # Expired transitions for skipped deployments — check timeout even when
+        # no execution error occurred (e.g. deployment is just waiting for routes).
+        if result.skipped and transitions.expired is not None:
+            current_dbtime = await self._deployment_repository.get_db_now()
+            timed_out: list[DeploymentWithHistory] = []
+            for deployment in result.skipped:
+                lifecycle = deployment.deployment_info.state.lifecycle
+                if _is_transition_timed_out(deployment.phase_started_at, lifecycle, current_dbtime):
+                    timed_out.append(deployment)
+            if timed_out:
+                log.warning(
+                    "handler {}: {} skipped deployments timed out — transitioning to expired",
+                    handler_name,
+                    len(timed_out),
+                )
+                transition = self._build_success_transition(
+                    handler_name=handler_name,
+                    deployments=timed_out,
+                    lifecycle_status=transitions.expired,
+                    target_lifecycles=target_statuses,
+                    records=records,
+                    timestamp_now=timestamp_now,
+                )
+                batch_updaters.append(transition.updater)
+                all_history_specs.extend(transition.history_specs)
+                notification_events.extend(transition.notification_events)
 
         # Failure transitions — classify into need_retry/expired/give_up
         if result.errors:
@@ -706,9 +739,8 @@ class DeploymentCoordinator:
         sub_step: DeploymentLifecycleSubStep | None = None,
     ) -> None:
         """Process deployment lifecycle operation if needed (based on internal state)."""
-        sub_step_value = sub_step.value if sub_step is not None else None
         if not await self._valkey_schedule.load_and_delete_deployment_mark(
-            lifecycle_type.value, sub_step_value
+            lifecycle_type.value, sub_step.value if sub_step is not None else None
         ):
             return
         await self.process_deployment_lifecycle(lifecycle_type, sub_step)

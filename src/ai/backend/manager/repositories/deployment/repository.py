@@ -55,6 +55,7 @@ from ai.backend.manager.data.deployment.types import (
     DeploymentWithHistory,
     ModelDeploymentAutoScalingRuleData,
     ModelRevisionData,
+    ModelRevisionSpec,
     RevisionSearchResult,
     RouteInfo,
     RouteSearchResult,
@@ -298,6 +299,7 @@ class DeploymentRepository:
         self,
         statuses: list[EndpointLifecycle],
         handler_name: str,
+        sub_steps: list[DeploymentLifecycleSubStep] | None = None,
     ) -> list[DeploymentWithHistory]:
         """Get deployments for handler execution with history populated.
 
@@ -308,11 +310,14 @@ class DeploymentRepository:
         Args:
             statuses: Endpoint lifecycle statuses to include
             handler_name: Current handler phase name for history matching
+            sub_steps: Optional sub-step filter for deployment handlers
 
         Returns:
             List of DeploymentWithHistory with history fields populated.
         """
-        return await self._db_source.fetch_deployments_for_handler(statuses, handler_name)
+        return await self._db_source.fetch_deployments_for_handler(
+            statuses, handler_name, sub_steps
+        )
 
     @deployment_repository_resilience.apply()
     async def get_endpoint_info(
@@ -1119,6 +1124,17 @@ class DeploymentRepository:
             DeploymentRevisionNotFound: If the endpoint has no current revision.
         """
         return await self._db_source.get_current_revision(endpoint_id)
+
+    @deployment_repository_resilience.apply()
+    async def get_revision_spec_from_endpoint(
+        self,
+        endpoint_id: uuid.UUID,
+    ) -> ModelRevisionSpec:
+        """Get a ModelRevisionSpec built from endpoint-level fields.
+
+        Used when no deployment_revisions record exists yet.
+        """
+        return await self._db_source.get_revision_spec_from_endpoint(endpoint_id)
 
     @deployment_repository_resilience.apply()
     async def search_revisions(

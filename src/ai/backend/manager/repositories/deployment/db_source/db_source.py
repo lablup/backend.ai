@@ -52,6 +52,7 @@ from ai.backend.manager.data.deployment.types import (
     ModelDeploymentAccessTokenData,
     ModelDeploymentAutoScalingRuleData,
     ModelRevisionData,
+    ModelRevisionSpec,
     RevisionSearchResult,
     RouteInfo,
     RouteSearchResult,
@@ -506,6 +507,7 @@ class DeploymentDBSource:
         self,
         statuses: list[EndpointLifecycle],
         handler_name: str,
+        sub_steps: list[DeploymentLifecycleSubStep] | None = None,
     ) -> list[DeploymentWithHistory]:
         """Fetch deployments for handler execution with history populated.
 
@@ -518,12 +520,13 @@ class DeploymentDBSource:
         Args:
             statuses: Endpoint lifecycle statuses to include
             handler_name: Current handler phase name for history matching
+            sub_steps: Optional sub-step filter for deployment handlers
 
         Returns:
             List of DeploymentWithHistory with history fields populated.
         """
         async with self._begin_readonly_session_read_committed() as db_sess:
-            rows = await self._get_endpoints_by_statuses(db_sess, statuses)
+            rows = await self._get_endpoints_by_statuses(db_sess, statuses, sub_steps)
             if not rows:
                 return []
 
@@ -2185,6 +2188,27 @@ class DeploymentDBSource:
                 )
             return row.to_data()
 
+    async def get_revision_spec_from_endpoint(
+        self,
+        endpoint_id: uuid.UUID,
+    ) -> ModelRevisionSpec:
+        """Build a ModelRevisionSpec from the endpoint-level fields.
+
+        Used when no deployment_revisions record exists yet (e.g., newly
+        created deployments before any revision is explicitly added/activated).
+        """
+        async with self._db.begin_readonly_session() as db_sess:
+            query = (
+                sa.select(EndpointRow)
+                .where(EndpointRow.id == endpoint_id)
+                .options(selectinload(EndpointRow.image_row))
+            )
+            result = await db_sess.execute(query)
+            endpoint = result.scalar_one_or_none()
+            if endpoint is None:
+                raise EndpointNotFound(f"Endpoint {endpoint_id} not found")
+            return endpoint.build_revision_spec_from_endpoint()
+
     async def search_revisions(
         self,
         querier: BatchQuerier,
@@ -2266,6 +2290,7 @@ class DeploymentDBSource:
                 .values(
                     deploying_revision=revision_id,
                     lifecycle_stage=EndpointLifecycle.DEPLOYING,
+                    sub_step=DeploymentLifecycleSubStep.DEPLOYING_PROVISIONING,
                 )
                 .returning(EndpointRow.current_revision)
             )

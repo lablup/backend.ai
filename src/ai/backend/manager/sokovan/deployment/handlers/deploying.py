@@ -37,6 +37,7 @@ from ai.backend.manager.data.deployment.types import (
 )
 from ai.backend.manager.data.model_serving.types import EndpointLifecycle
 from ai.backend.manager.defs import LockID
+from ai.backend.manager.repositories.deployment.repository import DeploymentRepository
 from ai.backend.manager.sokovan.deployment.deployment_controller import DeploymentController
 from ai.backend.manager.sokovan.deployment.route.route_controller import RouteController
 from ai.backend.manager.sokovan.deployment.route.types import RouteLifecycleType
@@ -120,6 +121,10 @@ class DeployingProvisioningHandler(DeploymentHandler):
                 lifecycle=EndpointLifecycle.DEPLOYING,
                 sub_step=DeploymentLifecycleSubStep.DEPLOYING_PROVISIONING,
             ),
+            expired=DeploymentLifecycleStatus(
+                lifecycle=EndpointLifecycle.DEPLOYING,
+                sub_step=DeploymentLifecycleSubStep.DEPLOYING_ROLLING_BACK,
+            ),
         )
 
     @override
@@ -195,6 +200,10 @@ class DeployingProvisioningHandler(DeploymentHandler):
             DeploymentLifecycleType.DEPLOYING,
             sub_step=DeploymentLifecycleSubStep.DEPLOYING_PROVISIONING,
         )
+        await self._deployment_controller.mark_lifecycle_needed(
+            DeploymentLifecycleType.DEPLOYING,
+            sub_step=DeploymentLifecycleSubStep.DEPLOYING_ROLLING_BACK,
+        )
         await self._route_controller.mark_lifecycle_needed(RouteLifecycleType.PROVISIONING)
 
 
@@ -202,18 +211,17 @@ class DeployingRollingBackHandler(DeploymentHandler):
     """Handler for DEPLOYING / ROLLING_BACK sub-step.
 
     Clears ``deploying_revision`` and transitions directly to READY.
-    This is a cleanup-only operation — no FSM evaluation needed.
     """
 
     def __init__(
         self,
         deployment_controller: DeploymentController,
         route_controller: RouteController,
-        applier: StrategyResultApplier,
+        deployment_repo: DeploymentRepository,
     ) -> None:
         self._deployment_controller = deployment_controller
         self._route_controller = route_controller
-        self._applier = applier
+        self._deployment_repo = deployment_repo
 
     @classmethod
     @override
@@ -250,11 +258,12 @@ class DeployingRollingBackHandler(DeploymentHandler):
         self, deployments: Sequence[DeploymentWithHistory]
     ) -> DeploymentExecutionResult:
         all_deployment_ids = {deployment.deployment_info.id for deployment in deployments}
-        await self._applier.clear_deploying_revision(all_deployment_ids)
+        await self._deployment_repo.clear_deploying_revision(all_deployment_ids)
         log.info(
             "Cleared deploying_revision for {} rolling-back deployments",
             len(all_deployment_ids),
         )
+
         return DeploymentExecutionResult(successes=list(deployments))
 
     @override

@@ -51,9 +51,8 @@ class StrategyEvaluationSummary:
     """Aggregate result of evaluating all DEPLOYING deployments.
 
     The evaluator classifies each deployment into a sub_step and records
-    the mapping so the applier can bulk-update the DB column.
-    All outcomes — including ROLLING_BACK and COMPLETED — are expressed
-    as sub_step values and persisted to the DB by the applier.
+    the mapping.  The applier uses COMPLETED assignments to trigger
+    revision swaps.  Sub-step transitions are handled by the coordinator.
     """
 
     # Mapping from endpoint ID to its evaluated sub_step — used to bulk-update the DB.
@@ -62,7 +61,7 @@ class StrategyEvaluationSummary:
     # Aggregated route mutations from all per-deployment evaluations.
     route_changes: RouteChanges = field(default_factory=RouteChanges)
 
-    # Deployments that failed evaluation (no policy, strategy error, etc.)
+    # Deployments that failed evaluation or have failed routes.
     errors: list[EvaluationErrorData] = field(default_factory=list)
 
 

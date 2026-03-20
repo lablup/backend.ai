@@ -53,9 +53,6 @@ class StrategyResultApplier:
     2. Revision swap for COMPLETED deployments
 
     Sub-step transitions are handled exclusively by the coordinator.
-    Clearing ``deploying_revision`` for rolled-back deployments is the
-    responsibility of ``DeployingRollingBackHandler``, which explicitly
-    calls ``clear_deploying_revision`` after rollback completes.
     """
 
     def __init__(self, deployment_repo: DeploymentRepository) -> None:
@@ -109,11 +106,3 @@ class StrategyResultApplier:
             )
 
         return result
-
-    async def clear_deploying_revision(self, deployment_ids: set[UUID]) -> None:
-        """Clear deploying_revision and sub_step for rolled-back deployments.
-
-        Called explicitly by ``DeployingRollingBackHandler`` after rollback
-        completes — NOT automatically during ``apply()``.
-        """
-        await self._deployment_repo.clear_deploying_revision(deployment_ids)
