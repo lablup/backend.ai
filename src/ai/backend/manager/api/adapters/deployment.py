@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import uuid
+from collections.abc import Sequence
 from functools import lru_cache
 from pathlib import PurePosixPath
 from uuid import UUID
@@ -145,6 +147,8 @@ from ai.backend.manager.models.routing.conditions import RouteConditions
 from ai.backend.manager.models.routing.orders import RouteOrders
 from ai.backend.manager.repositories.base import (
     BatchQuerier,
+    NoPagination,
+    OffsetPagination,
     QueryCondition,
     QueryOrder,
     Updater,
@@ -872,6 +876,161 @@ class DeploymentAdapter(BaseAdapter):
             )
         )
         return self._route_info_to_dto(action_result.route)
+
+    # ------------------------------------------------------------------
+    # Batch load methods for DataLoader use
+    # ------------------------------------------------------------------
+
+    async def batch_load_by_ids(
+        self,
+        deployment_ids: Sequence[uuid.UUID],
+    ) -> list[DeploymentNode | None]:
+        """Batch load deployments by ID for DataLoader use.
+
+        Returns DeploymentNode DTOs in the same order as the input deployment_ids list.
+        """
+        if not deployment_ids:
+            return []
+        querier = BatchQuerier(
+            pagination=OffsetPagination(limit=len(deployment_ids)),
+            conditions=[DeploymentConditions.by_ids(deployment_ids)],
+        )
+        action_result = await self._processors.deployment.search_deployments.wait_for_complete(
+            SearchDeploymentsAction(querier=querier)
+        )
+        deployment_map = {
+            data.id: self._deployment_data_to_dto(data) for data in action_result.data
+        }
+        return [deployment_map.get(deployment_id) for deployment_id in deployment_ids]
+
+    async def batch_load_revisions_by_ids(
+        self,
+        revision_ids: Sequence[uuid.UUID],
+    ) -> list[RevisionNode | None]:
+        """Batch load revisions by ID for DataLoader use.
+
+        Returns RevisionNode DTOs in the same order as the input revision_ids list.
+        """
+        if not revision_ids:
+            return []
+        querier = BatchQuerier(
+            pagination=OffsetPagination(limit=len(revision_ids)),
+            conditions=[RevisionConditions.by_ids(revision_ids)],
+        )
+        action_result = await self._processors.deployment.search_revisions.wait_for_complete(
+            SearchRevisionsAction(querier=querier)
+        )
+        revision_map = {data.id: self._revision_data_to_dto(data) for data in action_result.data}
+        return [revision_map.get(revision_id) for revision_id in revision_ids]
+
+    async def batch_load_replicas_by_ids(
+        self,
+        replica_ids: Sequence[uuid.UUID],
+    ) -> list[ReplicaNode | None]:
+        """Batch load replicas by ID for DataLoader use.
+
+        Returns ReplicaNode DTOs in the same order as the input replica_ids list.
+        """
+        if not replica_ids:
+            return []
+        querier = BatchQuerier(
+            pagination=OffsetPagination(limit=len(replica_ids)),
+            conditions=[RouteConditions.by_ids(replica_ids)],
+        )
+        action_result = await self._processors.deployment.search_replicas.wait_for_complete(
+            SearchReplicasAction(querier=querier)
+        )
+        replica_map = {data.id: self._replica_data_to_dto(data) for data in action_result.data}
+        return [replica_map.get(replica_id) for replica_id in replica_ids]
+
+    async def batch_load_routes_by_ids(
+        self,
+        route_ids: Sequence[uuid.UUID],
+    ) -> list[RouteNode | None]:
+        """Batch load routes by ID for DataLoader use.
+
+        Returns RouteNode DTOs in the same order as the input route_ids list.
+        """
+        if not route_ids:
+            return []
+        querier = BatchQuerier(
+            pagination=OffsetPagination(limit=len(route_ids)),
+            conditions=[RouteConditions.by_ids(route_ids)],
+        )
+        action_result = await self._processors.deployment.search_routes.wait_for_complete(
+            SearchRoutesAction(querier=querier)
+        )
+        route_map = {
+            route.route_id: self._route_info_to_dto(route) for route in action_result.routes
+        }
+        return [route_map.get(route_id) for route_id in route_ids]
+
+    async def batch_load_access_tokens_by_ids(
+        self,
+        token_ids: Sequence[uuid.UUID],
+    ) -> list[AccessTokenNode | None]:
+        """Batch load access tokens by ID for DataLoader use.
+
+        Returns AccessTokenNode DTOs in the same order as the input token_ids list.
+        """
+        if not token_ids:
+            return []
+        querier = BatchQuerier(
+            pagination=OffsetPagination(limit=len(token_ids)),
+            conditions=[AccessTokenConditions.by_ids(token_ids)],
+        )
+        action_result = await self._processors.deployment.search_access_tokens.wait_for_complete(
+            SearchAccessTokensAction(querier=querier)
+        )
+        token_map = {data.id: self._access_token_data_to_dto(data) for data in action_result.data}
+        return [token_map.get(token_id) for token_id in token_ids]
+
+    async def batch_load_auto_scaling_rules_by_ids(
+        self,
+        rule_ids: Sequence[uuid.UUID],
+    ) -> list[AutoScalingRuleNode | None]:
+        """Batch load auto-scaling rules by ID for DataLoader use.
+
+        Returns AutoScalingRuleNode DTOs in the same order as the input rule_ids list.
+        """
+        if not rule_ids:
+            return []
+        querier = BatchQuerier(
+            pagination=OffsetPagination(limit=len(rule_ids)),
+            conditions=[AutoScalingRuleConditions.by_ids(rule_ids)],
+        )
+        action_result = (
+            await self._processors.deployment.search_auto_scaling_rules.wait_for_complete(
+                SearchAutoScalingRulesAction(querier=querier)
+            )
+        )
+        rule_map = {
+            data.id: self._auto_scaling_rule_data_to_dto(data) for data in action_result.data
+        }
+        return [rule_map.get(rule_id) for rule_id in rule_ids]
+
+    async def batch_load_policies_by_endpoint_ids(
+        self,
+        endpoint_ids: Sequence[uuid.UUID],
+    ) -> list[DeploymentPolicyNode | None]:
+        """Batch load deployment policies by endpoint ID for DataLoader use.
+
+        Each endpoint has at most one deployment policy (1:1 relationship).
+        Returns DeploymentPolicyNode DTOs in the same order as the input endpoint_ids list.
+        """
+        if not endpoint_ids:
+            return []
+        querier = BatchQuerier(
+            pagination=NoPagination(),
+            conditions=[DeploymentPolicyConditions.by_endpoint_ids(endpoint_ids)],
+        )
+        action_result = (
+            await self._processors.deployment.search_deployment_policies.wait_for_complete(
+                SearchDeploymentPoliciesAction(querier=querier)
+            )
+        )
+        policy_map = {data.endpoint: self._policy_data_to_dto(data) for data in action_result.data}
+        return [policy_map.get(endpoint_id) for endpoint_id in endpoint_ids]
 
     # ------------------------------------------------------------------
     # Querier builders
