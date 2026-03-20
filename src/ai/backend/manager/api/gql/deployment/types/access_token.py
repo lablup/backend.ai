@@ -111,10 +111,9 @@ class AccessToken(PydanticNodeMixin[AccessTokenNodeDTO]):
         node_ids: Iterable[str],
         required: bool = False,
     ) -> Iterable[Self | None]:
-        results = await info.context.data_loaders.access_token_loader.load_many([
+        return await info.context.data_loaders.access_token_loader.load_many([
             UUID(nid) for nid in node_ids
         ])
-        return [cls.from_dataclass(data) if data is not None else None for data in results]
 
     @classmethod
     def from_dataclass(cls, data: ModelDeploymentAccessTokenData) -> Self:

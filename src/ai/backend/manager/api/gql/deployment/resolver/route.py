@@ -80,11 +80,7 @@ async def routes(
 async def route(id: ID, info: Info[StrawberryGQLContext]) -> Route | None:
     """Get a specific route by ID."""
     _, route_id = resolve_global_id(id)
-
-    route_info = await info.context.data_loaders.route_loader.load(UUID(route_id))
-    if route_info is None:
-        return None
-    return Route.from_dataclass(route_info)
+    return await info.context.data_loaders.route_loader.load(UUID(route_id))
 
 
 # Mutation resolvers

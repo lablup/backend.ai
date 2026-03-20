@@ -125,14 +125,12 @@ class Route(PydanticNodeMixin[RouteNodeDTO]):
         self, info: Info[StrawberryGQLContext]
     ) -> Annotated[ModelDeployment, strawberry.lazy(".deployment")]:
         """Resolve deployment using dataloader."""
-        from ai.backend.manager.api.gql.deployment.types.deployment import ModelDeployment
-
         deployment_data = await info.context.data_loaders.deployment_loader.load(
             self._deployment_id
         )
         if deployment_data is None:
             raise EndpointNotFound(extra_msg=f"id={self._deployment_id}")
-        return ModelDeployment.from_dataclass(deployment_data)
+        return deployment_data
 
     @strawberry.field(  # type: ignore[misc]
         description="The session associated with the route. Can be null if the route is still provisioning."
@@ -151,14 +149,9 @@ class Route(PydanticNodeMixin[RouteNodeDTO]):
         self, info: Info[StrawberryGQLContext]
     ) -> Annotated[ModelRevision, strawberry.lazy(".revision")] | None:
         """Resolve revision using dataloader."""
-        from ai.backend.manager.api.gql.deployment.types.revision import ModelRevision
-
         if self._revision_id is None:
             return None
-        revision_data = await info.context.data_loaders.revision_loader.load(self._revision_id)
-        if revision_data is None:
-            return None
-        return ModelRevision.from_dataclass(revision_data)
+        return await info.context.data_loaders.revision_loader.load(self._revision_id)
 
     @classmethod
     async def resolve_nodes(  # type: ignore[override]  # Strawberry Node uses AwaitableOrValue overloads incompatible with async def
@@ -168,10 +161,9 @@ class Route(PydanticNodeMixin[RouteNodeDTO]):
         node_ids: Iterable[str],
         required: bool = False,
     ) -> Iterable[Self | None]:
-        results = await info.context.data_loaders.route_loader.load_many([
+        return await info.context.data_loaders.route_loader.load_many([
             UUID(nid) for nid in node_ids
         ])
-        return [cls.from_dataclass(data) if data is not None else None for data in results]
 
     @classmethod
     def from_dataclass(cls, data: RouteInfo) -> Self:
