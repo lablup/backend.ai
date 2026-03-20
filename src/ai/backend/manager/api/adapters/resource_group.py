@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Any
@@ -39,6 +40,8 @@ from ai.backend.manager.models.scaling_group import ScalingGroupRow
 from ai.backend.manager.models.scaling_group.conditions import ScalingGroupConditions
 from ai.backend.manager.models.scaling_group.orders import ScalingGroupOrders
 from ai.backend.manager.repositories.base import (
+    BatchQuerier,
+    OffsetPagination,
     QueryCondition,
     combine_conditions_or,
     negate_conditions,
@@ -114,6 +117,25 @@ class ResourceGroupAdapter(BaseAdapter):
         zero-UUID because no UUID is available in the data model.  Callers that
         need an opaque identifier should use the ``name`` field instead.
     """
+
+    async def batch_load_by_names(self, names: Sequence[str]) -> list[ScalingGroupData | None]:
+        """Batch load resource groups by name for DataLoader use.
+
+        Returns ScalingGroupData items in the same order as the input names list.
+        """
+        if not names:
+            return []
+        querier = BatchQuerier(
+            pagination=OffsetPagination(limit=len(names)),
+            conditions=[ScalingGroupConditions.by_names(names)],
+        )
+        action_result = (
+            await self._processors.scaling_group.search_scaling_groups.wait_for_complete(
+                SearchScalingGroupsAction(querier=querier)
+            )
+        )
+        rg_map = {sg.name: sg for sg in action_result.scaling_groups}
+        return [rg_map.get(name) for name in names]
 
     async def search(self, input: AdminSearchResourceGroupsInput) -> ResourceGroupSearchPayload:
         """Search resource groups with filters, ordering, and pagination."""

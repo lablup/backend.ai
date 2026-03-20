@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from uuid import UUID
 
 from ai.backend.common.api_handlers import Sentinel
@@ -61,6 +62,8 @@ from ai.backend.manager.models.notification.orders import (
     NotificationRuleOrders,
 )
 from ai.backend.manager.repositories.base import (
+    BatchQuerier,
+    OffsetPagination,
     QueryCondition,
     QueryOrder,
     Updater,
@@ -117,6 +120,44 @@ def _rule_pagination_spec() -> PaginationSpec:
 
 class NotificationAdapter(BaseAdapter):
     """Adapter for notification domain operations (channel + rule)."""
+
+    async def batch_load_channels_by_ids(
+        self, ids: Sequence[UUID]
+    ) -> list[NotificationChannelNode | None]:
+        """Batch load notification channels by ID for DataLoader use.
+
+        Returns NotificationChannelNode DTOs in the same order as the input ids list.
+        """
+        if not ids:
+            return []
+        querier = BatchQuerier(
+            pagination=OffsetPagination(limit=len(ids)),
+            conditions=[NotificationChannelConditions.by_ids(ids)],
+        )
+        action_result = await self._processors.notification.search_channels.wait_for_complete(
+            SearchChannelsAction(querier=querier)
+        )
+        channel_map = {ch.id: self._channel_data_to_dto(ch) for ch in action_result.channels}
+        return [channel_map.get(channel_id) for channel_id in ids]
+
+    async def batch_load_rules_by_ids(
+        self, ids: Sequence[UUID]
+    ) -> list[NotificationRuleNode | None]:
+        """Batch load notification rules by ID for DataLoader use.
+
+        Returns NotificationRuleNode DTOs in the same order as the input ids list.
+        """
+        if not ids:
+            return []
+        querier = BatchQuerier(
+            pagination=OffsetPagination(limit=len(ids)),
+            conditions=[NotificationRuleConditions.by_ids(ids)],
+        )
+        action_result = await self._processors.notification.search_rules.wait_for_complete(
+            SearchRulesAction(querier=querier)
+        )
+        rule_map = {rule.id: self._rule_data_to_dto(rule) for rule in action_result.rules}
+        return [rule_map.get(rule_id) for rule_id in ids]
 
     # ------------------------------------------------------------------ channels
 

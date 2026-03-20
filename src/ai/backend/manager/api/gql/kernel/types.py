@@ -459,10 +459,7 @@ class KernelV2GQL(PydanticNodeMixin[KernelNode]):
     async def domain(self, info: Info[StrawberryGQLContext]) -> DomainV2GQL | None:
         if self.user_info.domain_name is None:
             return None
-        domain_data = await info.context.data_loaders.domain_loader.load(self.user_info.domain_name)
-        if domain_data is None:
-            return None
-        return DomainV2GQL.from_data(domain_data)
+        return await info.context.data_loaders.domain_loader.load(self.user_info.domain_name)
 
     @strawberry.field(  # type: ignore[misc]
         description="Added in 26.2.0. The resource group this kernel is assigned to."
@@ -475,7 +472,7 @@ class KernelV2GQL(PydanticNodeMixin[KernelNode]):
         )
         if resource_group_data is None:
             return None
-        return ResourceGroupGQL.from_dataclass(resource_group_data)
+        return resource_group_data
 
     @strawberry.field(  # type: ignore[misc]
         description="Added in 26.3.0. The session this kernel belongs to."

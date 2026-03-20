@@ -24,12 +24,10 @@ from ai.backend.manager.data.deployment.types import (
     RouteHistoryData,
     RouteInfo,
 )
-from ai.backend.manager.data.domain.types import DomainData
 from ai.backend.manager.data.group.types import GroupData
 from ai.backend.manager.data.huggingface_registry.types import HuggingFaceRegistryData
 from ai.backend.manager.data.image.types import ImageAliasData, ImageData
 from ai.backend.manager.data.kernel.types import KernelInfo
-from ai.backend.manager.data.notification import NotificationChannelData, NotificationRuleData
 from ai.backend.manager.data.object_storage.types import ObjectStorageData
 from ai.backend.manager.data.permission.association_scopes_entities import (
     AssociationScopesEntitiesData,
@@ -39,13 +37,21 @@ from ai.backend.manager.data.permission.id import ObjectId
 from ai.backend.manager.data.permission.permission import PermissionData
 from ai.backend.manager.data.permission.role import AssignedUserData, RoleData
 from ai.backend.manager.data.reservoir_registry.types import ReservoirRegistryData
-from ai.backend.manager.data.scaling_group.types import ScalingGroupData
 from ai.backend.manager.data.session.types import SessionData, SessionSchedulingHistoryData
 from ai.backend.manager.data.storage_namespace.types import StorageNamespaceData
 from ai.backend.manager.data.user.types import UserData
 from ai.backend.manager.data.vfs_storage.types import VFSStorageData
 
 if TYPE_CHECKING:
+    from ai.backend.manager.api.adapters.registry import Adapters  # pants: no-infer-dep
+    from ai.backend.manager.api.gql.domain_v2.types.node import DomainV2GQL  # pants: no-infer-dep
+    from ai.backend.manager.api.gql.notification.types import (  # pants: no-infer-dep
+        NotificationChannel,
+        NotificationRule,
+    )
+    from ai.backend.manager.api.gql.resource_group.types import (  # pants: no-infer-dep
+        ResourceGroupGQL,
+    )
     from ai.backend.manager.services.processors import Processors  # pants: no-infer-dep
 
 from .agent import load_agents_by_ids, load_container_counts
@@ -63,11 +69,9 @@ from .deployment import (
     load_revisions_by_ids,
     load_routes_by_ids,
 )
-from .domain import load_domains_by_names
 from .huggingface_registry import load_huggingface_registries_by_ids
 from .image import load_alias_by_ids, load_image_last_used_by_ids, load_images_by_ids
 from .kernel import load_kernels_by_ids
-from .notification import load_channels_by_ids, load_rules_by_ids
 from .object_storage import load_object_storages_by_ids
 from .project import load_projects_by_ids
 from .rbac import (
@@ -82,7 +86,6 @@ from .rbac import (
     load_roles_by_ids,
 )
 from .reservoir_registry import load_reservoir_registries_by_ids
-from .resource_group import load_resource_groups_by_names
 from .scheduling_history import (
     load_deployment_histories_by_ids,
     load_route_histories_by_ids,
@@ -104,9 +107,11 @@ class DataLoaders:
     """
 
     _processors: Processors
+    _adapters: Adapters
 
-    def __init__(self, processors: Processors) -> None:
+    def __init__(self, processors: Processors, adapters: Adapters) -> None:
         self._processors = processors
+        self._adapters = adapters
 
     @cached_property
     def audit_log_loader(
@@ -117,22 +122,50 @@ class DataLoaders:
     @cached_property
     def resource_group_loader(
         self,
-    ) -> DataLoader[str, ScalingGroupData | None]:
-        return DataLoader(
-            load_fn=partial(load_resource_groups_by_names, self._processors.scaling_group)
-        )
+    ) -> DataLoader[str, ResourceGroupGQL | None]:
+        adapter = self._adapters.resource_group
+
+        async def load_fn(names: list[str]) -> list[ResourceGroupGQL | None]:
+            from ai.backend.manager.api.gql.resource_group.types import (
+                ResourceGroupGQL as RG,
+            )
+
+            dtos = await adapter.batch_load_by_names(names)
+            return [RG.from_pydantic(dto) if dto is not None else None for dto in dtos]
+
+        return DataLoader(load_fn=load_fn)
 
     @cached_property
     def notification_channel_loader(
         self,
-    ) -> DataLoader[uuid.UUID, NotificationChannelData | None]:
-        return DataLoader(load_fn=partial(load_channels_by_ids, self._processors.notification))
+    ) -> DataLoader[uuid.UUID, NotificationChannel | None]:
+        adapter = self._adapters.notification
+
+        async def load_fn(ids: list[uuid.UUID]) -> list[NotificationChannel | None]:
+            from ai.backend.manager.api.gql.notification.types import (
+                NotificationChannel as NC,
+            )
+
+            dtos = await adapter.batch_load_channels_by_ids(ids)
+            return [NC.from_pydantic(dto) if dto is not None else None for dto in dtos]
+
+        return DataLoader(load_fn=load_fn)
 
     @cached_property
     def notification_rule_loader(
         self,
-    ) -> DataLoader[uuid.UUID, NotificationRuleData | None]:
-        return DataLoader(load_fn=partial(load_rules_by_ids, self._processors.notification))
+    ) -> DataLoader[uuid.UUID, NotificationRule | None]:
+        adapter = self._adapters.notification
+
+        async def load_fn(ids: list[uuid.UUID]) -> list[NotificationRule | None]:
+            from ai.backend.manager.api.gql.notification.types import (
+                NotificationRule as NR,
+            )
+
+            dtos = await adapter.batch_load_rules_by_ids(ids)
+            return [NR.from_pydantic(dto) if dto is not None else None for dto in dtos]
+
+        return DataLoader(load_fn=load_fn)
 
     @cached_property
     def artifact_registry_loader(
@@ -273,8 +306,18 @@ class DataLoaders:
     @cached_property
     def domain_loader(
         self,
-    ) -> DataLoader[str, DomainData | None]:
-        return DataLoader(load_fn=partial(load_domains_by_names, self._processors.domain))
+    ) -> DataLoader[str, DomainV2GQL | None]:
+        adapter = self._adapters.domain
+
+        async def load_fn(names: list[str]) -> list[DomainV2GQL | None]:
+            from ai.backend.manager.api.gql.domain_v2.types.node import (
+                DomainV2GQL as D,
+            )
+
+            dtos = await adapter.batch_load_by_names(names)
+            return [D.from_pydantic(dto) if dto is not None else None for dto in dtos]
+
+        return DataLoader(load_fn=load_fn)
 
     @cached_property
     def project_loader(

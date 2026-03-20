@@ -221,13 +221,14 @@ class ProjectV2GQL(PydanticNodeMixin[ProjectNode]):
         DomainV2GQL,
         strawberry.lazy("ai.backend.manager.api.gql.domain_v2.types.node"),
     ]:
-        from ai.backend.manager.api.gql.domain_v2.types.node import DomainV2GQL
         from ai.backend.manager.errors.resource import DomainNotFound
 
-        data = await info.context.data_loaders.domain_loader.load(self.organization.domain_name)
-        if data is None:
+        domain: DomainV2GQL | None = await info.context.data_loaders.domain_loader.load(
+            self.organization.domain_name
+        )
+        if domain is None:
             raise DomainNotFound(self.organization.domain_name)
-        return DomainV2GQL.from_data(data)
+        return domain
 
     @strawberry.field(  # type: ignore[misc]
         description="Users who are members of this project.",

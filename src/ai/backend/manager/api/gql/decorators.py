@@ -35,11 +35,11 @@ __all__ = (
     "gql_connection_type",
     "gql_node_type",
     "gql_pydantic_input",
+    "gql_pydantic_interface",
     "gql_pydantic_type",
 )
 
 T = TypeVar("T")
-PydanticModel = TypeVar("PydanticModel", bound=BaseModel)
 
 
 @dataclass_transform(
@@ -145,6 +145,41 @@ def gql_pydantic_input[PydanticModel: BaseModel](
         fields=fields,
         name=name,
         description=desc,
+        directives=directives,
+        use_pydantic_alias=use_pydantic_alias,
+    )
+
+
+@dataclass_transform(
+    order_default=True,
+    kw_only_default=True,
+    field_specifiers=(strawberry_field, StrawberryField),
+)
+def gql_pydantic_interface[PydanticModel: BaseModel](
+    meta: BackendAIGQLMeta,
+    *,
+    model: type[PydanticModel],
+    fields: list[str] | None = None,
+    name: str | None = None,
+    directives: Sequence[object] = (),
+    use_pydantic_alias: bool = True,
+) -> Callable[..., type[StrawberryTypeFromPydantic[PydanticModel]]]:
+    """Decorator for GQL interface types backed by a v2 Pydantic DTO.
+
+    Wraps strawberry.experimental.pydantic.interface so that every GQL
+    interface type carries consistent version and description metadata.
+    Use for interface types where all implementors share a common Pydantic
+    model structure.
+    """
+    description = f"Added in {meta.added_version}. {meta.description}"
+    if meta.deprecated_version is not None:
+        hint = f" Use {meta.deprecation_hint}." if meta.deprecation_hint else ""
+        description += f" Deprecated since {meta.deprecated_version}.{hint}"
+    return strawberry.experimental.pydantic.interface(
+        model=model,
+        fields=fields,
+        name=name,
+        description=description,
         directives=directives,
         use_pydantic_alias=use_pydantic_alias,
     )

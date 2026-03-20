@@ -48,7 +48,7 @@ def setup_api(
         user_repository=r.domain.repositories.user.repository,
         agent_repository=r.domain.repositories.agent.repository,
         strawberry_gql_adapter=BaseGQLAdapter(),
-        strawberry_data_loaders=DataLoaders(r.processing.processors),
+        strawberry_data_loaders=DataLoaders(r.processing.processors, adapters),
         adapters=adapters,
     )
 

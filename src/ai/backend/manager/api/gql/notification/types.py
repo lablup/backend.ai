@@ -124,10 +124,6 @@ from ai.backend.manager.api.gql.decorators import (
 )
 from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
-from ai.backend.manager.data.notification import (
-    NotificationChannelData,
-    NotificationRuleData,
-)
 
 # GraphQL enum types
 
@@ -206,13 +202,6 @@ class NotificationChannelSpecGQL:
 class WebhookSpecGQL(NotificationChannelSpecGQL):
     url: str
 
-    @classmethod
-    def from_dataclass(cls, config: WebhookSpec) -> Self:
-        return cls(
-            channel_type=NotificationChannelTypeGQL.WEBHOOK,
-            url=config.url,
-        )
-
 
 @gql_node_type(
     BackendAIGQLMeta(added_version="26.3.0", description="SMTP authentication credentials."),
@@ -254,24 +243,6 @@ class EmailSpecGQL(NotificationChannelSpecGQL):
     message: EmailMessageGQL
     auth: SMTPAuthGQL | None
 
-    @classmethod
-    def from_dataclass(cls, config: EmailSpec) -> Self:
-        return cls(
-            channel_type=NotificationChannelTypeGQL.EMAIL,
-            smtp=SMTPConnectionGQL(
-                host=config.smtp.host,
-                port=config.smtp.port,
-                use_tls=config.smtp.use_tls,
-                timeout=config.smtp.timeout,
-            ),
-            auth=SMTPAuthGQL(username=config.auth.username) if config.auth is not None else None,
-            message=EmailMessageGQL(
-                from_email=config.message.from_email,
-                to_emails=config.message.to_emails,
-                subject_template=config.message.subject_template,
-            ),
-        )
-
 
 @gql_node_type(BackendAIGQLMeta(added_version="26.3.0", description="Notification channel."))
 class NotificationChannel(PydanticNodeMixin[NotificationChannelNode]):
@@ -290,37 +261,10 @@ class NotificationChannel(PydanticNodeMixin[NotificationChannelNode]):
         info: Info[StrawberryGQLContext],
         node_ids: Iterable[str],
         required: bool = False,
-    ) -> Iterable[Self | None]:
-        results = await info.context.data_loaders.notification_channel_loader.load_many([
+    ) -> Iterable[NotificationChannel | None]:
+        return await info.context.data_loaders.notification_channel_loader.load_many([
             uuid.UUID(nid) for nid in node_ids
         ])
-        return [cls.from_dataclass(data) if data is not None else None for data in results]
-
-    @classmethod
-    def from_dataclass(cls, data: NotificationChannelData) -> Self:
-        final_spec: NotificationChannelSpecGQL
-        match data.channel_type:
-            case NotificationChannelType.WEBHOOK:
-                if not isinstance(data.spec, WebhookSpec):
-                    raise InvalidNotificationChannelSpec(
-                        f"Expected WebhookSpec for WEBHOOK channel, got {type(data.spec).__name__}"
-                    )
-                final_spec = WebhookSpecGQL.from_dataclass(data.spec)
-            case NotificationChannelType.EMAIL:
-                if not isinstance(data.spec, EmailSpec):
-                    raise InvalidNotificationChannelSpec(
-                        f"Expected EmailSpec for EMAIL channel, got {type(data.spec).__name__}"
-                    )
-                final_spec = EmailSpecGQL.from_dataclass(data.spec)
-        return cls(
-            id=ID(str(data.id)),
-            name=data.name,
-            description=data.description,
-            channel_type=NotificationChannelTypeGQL.from_internal(data.channel_type),
-            spec=final_spec,
-            enabled=data.enabled,
-            created_at=data.created_at,
-        )
 
     @classmethod
     def from_pydantic(
@@ -394,24 +338,10 @@ class NotificationRule(PydanticNodeMixin[NotificationRuleNode]):
         info: Info[StrawberryGQLContext],
         node_ids: Iterable[str],
         required: bool = False,
-    ) -> Iterable[Self | None]:
-        results = await info.context.data_loaders.notification_rule_loader.load_many([
+    ) -> Iterable[NotificationRule | None]:
+        return await info.context.data_loaders.notification_rule_loader.load_many([
             uuid.UUID(nid) for nid in node_ids
         ])
-        return [cls.from_dataclass(data) if data is not None else None for data in results]
-
-    @classmethod
-    def from_dataclass(cls, data: NotificationRuleData) -> Self:
-        return cls(
-            id=ID(str(data.id)),
-            name=data.name,
-            description=data.description,
-            rule_type=NotificationRuleTypeGQL.from_internal(data.rule_type),
-            channel=NotificationChannel.from_dataclass(data.channel),
-            message_template=data.message_template,
-            enabled=data.enabled,
-            created_at=data.created_at,
-        )
 
     @classmethod
     def from_pydantic(

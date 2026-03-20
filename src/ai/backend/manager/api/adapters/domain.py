@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from collections.abc import Sequence
+
 from ai.backend.common.dto.manager.query import StringFilter
 from ai.backend.common.dto.manager.v2.domain.request import (
     AdminSearchDomainsInput,
@@ -22,6 +24,8 @@ from ai.backend.manager.models.domain.conditions import DomainConditions
 from ai.backend.manager.models.domain.orders import DomainOrders
 from ai.backend.manager.models.domain.row import DomainRow
 from ai.backend.manager.repositories.base import (
+    BatchQuerier,
+    NoPagination,
     QueryCondition,
     QueryOrder,
     combine_conditions_or,
@@ -45,6 +49,23 @@ _DOMAIN_PAGINATION_SPEC = PaginationSpec(
 
 class DomainAdapter(BaseAdapter):
     """Adapter for domain operations."""
+
+    async def batch_load_by_names(self, names: Sequence[str]) -> list[DomainNode | None]:
+        """Batch load domains by name for DataLoader use.
+
+        Returns DomainNode DTOs in the same order as the input names list.
+        """
+        if not names:
+            return []
+        querier = BatchQuerier(
+            pagination=NoPagination(),
+            conditions=[DomainConditions.by_names(names)],
+        )
+        action_result = await self._processors.domain.search_domains.wait_for_complete(
+            SearchDomainsAction(querier=querier)
+        )
+        domain_map = {data.name: self._domain_data_to_node(data) for data in action_result.items}
+        return [domain_map.get(name) for name in names]
 
     async def get(self, domain_name: str) -> DomainNode:
         """Retrieve a single domain by name."""

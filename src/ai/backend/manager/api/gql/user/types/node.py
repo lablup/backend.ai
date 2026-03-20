@@ -233,14 +233,12 @@ class UserV2GQL(PydanticNodeMixin[UserNode]):
         ]
         | None
     ):
-        from ai.backend.manager.api.gql.domain_v2.types.node import DomainV2GQL
-
         if self.organization.domain_name is None:
             return None
-        data = await info.context.data_loaders.domain_loader.load(self.organization.domain_name)
-        if data is None:
-            return None
-        return DomainV2GQL.from_data(data)
+        domain: DomainV2GQL | None = await info.context.data_loaders.domain_loader.load(
+            self.organization.domain_name
+        )
+        return domain
 
     @strawberry.field(  # type: ignore[misc]
         description="Projects this user is a member of.",

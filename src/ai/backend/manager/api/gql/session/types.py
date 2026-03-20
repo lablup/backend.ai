@@ -385,10 +385,7 @@ class SessionV2GQL(PydanticNodeMixin[SessionNode]):
         description="Added in 26.3.0. The domain this session belongs to."
     )
     async def domain(self, info: Info[StrawberryGQLContext]) -> DomainV2GQL | None:
-        domain_data = await info.context.data_loaders.domain_loader.load(self._domain_name)
-        if domain_data is None:
-            return None
-        return DomainV2GQL.from_data(domain_data)
+        return await info.context.data_loaders.domain_loader.load(self._domain_name)
 
     @strawberry.field(  # type: ignore[misc]
         description="Added in 26.3.0. The user who owns this session."
@@ -419,7 +416,7 @@ class SessionV2GQL(PydanticNodeMixin[SessionNode]):
         )
         if resource_group_data is None:
             return None
-        return ResourceGroupGQL.from_dataclass(resource_group_data)
+        return resource_group_data
 
     @strawberry.field(  # type: ignore[misc]
         description="Added in 26.3.0. The candidate resource groups considered during scheduling."
@@ -431,7 +428,7 @@ class SessionV2GQL(PydanticNodeMixin[SessionNode]):
         if not names:
             return None
         results = await info.context.data_loaders.resource_group_loader.load_many(names)
-        nodes = [ResourceGroupGQL.from_dataclass(data) for data in results if data is not None]
+        nodes = [data for data in results if data is not None]
         edges = [ResourceGroupEdge(node=node, cursor=encode_cursor(node.id)) for node in nodes]
         return ResourceGroupConnection(
             edges=edges,

@@ -130,12 +130,7 @@ class ProjectFairShareGQL(PydanticNodeMixin[ProjectFairShareNode]):
         ]
         | None
     ):
-        from ai.backend.manager.api.gql.domain_v2.types.node import DomainV2GQL
-
-        domain_data = await info.context.data_loaders.domain_loader.load(self.domain_name)
-        if domain_data is None:
-            return None
-        return DomainV2GQL.from_data(domain_data)
+        return await info.context.data_loaders.domain_loader.load(self.domain_name)
 
     @strawberry.field(  # type: ignore[misc]
         description=("Added in 26.2.0. The resource group associated with this fair share record."),
@@ -150,14 +145,7 @@ class ProjectFairShareGQL(PydanticNodeMixin[ProjectFairShareNode]):
         ]
         | None
     ):
-        from ai.backend.manager.api.gql.resource_group.types import ResourceGroupGQL
-
-        rg_data = await info.context.data_loaders.resource_group_loader.load(
-            self.resource_group_name
-        )
-        if rg_data is None:
-            return None
-        return ResourceGroupGQL.from_dataclass(rg_data)
+        return await info.context.data_loaders.resource_group_loader.load(self.resource_group_name)
 
     @classmethod
     def from_dataclass(cls, data: ProjectFairShareData) -> ProjectFairShareGQL:

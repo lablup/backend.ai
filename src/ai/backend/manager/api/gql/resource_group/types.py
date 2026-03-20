@@ -397,9 +397,8 @@ class ResourceGroupGQL(PydanticNodeMixin[Any]):
         info: Info[StrawberryGQLContext],
         node_ids: Iterable[str],
         required: bool = False,
-    ) -> Iterable[Self | None]:
-        results = await info.context.data_loaders.resource_group_loader.load_many(node_ids)
-        return [cls.from_dataclass(data) if data is not None else None for data in results]
+    ) -> Iterable[ResourceGroupGQL | None]:
+        return await info.context.data_loaders.resource_group_loader.load_many(node_ids)
 
     @classmethod
     def from_pydantic(
@@ -434,10 +433,6 @@ class ResourceGroupGQL(PydanticNodeMixin[Any]):
             ),
             _fair_share_spec_data=dto.fair_share_spec,
         )
-
-    @classmethod
-    def from_dataclass(cls, data: ScalingGroupData) -> Self:
-        return cls.from_pydantic(data)
 
     @strawberry.field(  # type: ignore[misc]
         description=(
