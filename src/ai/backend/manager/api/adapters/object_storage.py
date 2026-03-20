@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from uuid import UUID
 
 from ai.backend.common.api_handlers import Sentinel
@@ -18,6 +19,8 @@ from ai.backend.common.dto.manager.v2.object_storage.response import (
     CreateObjectStoragePayload,
     DeleteObjectStoragePayload,
     ObjectStorageNode,
+    PresignedDownloadURLPayload,
+    PresignedUploadURLPayload,
     UpdateObjectStoragePayload,
 )
 from ai.backend.common.dto.manager.v2.object_storage.types import OrderDirection
@@ -37,6 +40,12 @@ from ai.backend.manager.repositories.object_storage.updaters import ObjectStorag
 from ai.backend.manager.services.object_storage.actions.create import CreateObjectStorageAction
 from ai.backend.manager.services.object_storage.actions.delete import DeleteObjectStorageAction
 from ai.backend.manager.services.object_storage.actions.get import GetObjectStorageAction
+from ai.backend.manager.services.object_storage.actions.get_download_presigned_url import (
+    GetDownloadPresignedURLAction,
+)
+from ai.backend.manager.services.object_storage.actions.get_upload_presigned_url import (
+    GetUploadPresignedURLAction,
+)
 from ai.backend.manager.services.object_storage.actions.search import SearchObjectStoragesAction
 from ai.backend.manager.services.object_storage.actions.update import UpdateObjectStorageAction
 from ai.backend.manager.types import OptionalState, TriState
@@ -193,6 +202,43 @@ class ObjectStorageAdapter(BaseAdapter):
             DeleteObjectStorageAction(storage_id=input.id)
         )
         return DeleteObjectStoragePayload(id=action_result.deleted_storage_id)
+
+    async def get_presigned_download_url(
+        self,
+        artifact_revision_id: UUID,
+        key: str,
+        expiration: int | None = None,
+    ) -> PresignedDownloadURLPayload:
+        """Generate a presigned download URL for an artifact revision."""
+        action_result = (
+            await self._processors.object_storage.get_presigned_download_url.wait_for_complete(
+                GetDownloadPresignedURLAction(
+                    artifact_revision_id=artifact_revision_id,
+                    key=key,
+                    expiration=expiration,
+                )
+            )
+        )
+        return PresignedDownloadURLPayload(presigned_url=action_result.presigned_url)
+
+    async def get_presigned_upload_url(
+        self,
+        artifact_revision_id: UUID,
+        key: str,
+    ) -> PresignedUploadURLPayload:
+        """Generate a presigned upload URL for an artifact revision."""
+        action_result = (
+            await self._processors.object_storage.get_presigned_upload_url.wait_for_complete(
+                GetUploadPresignedURLAction(
+                    artifact_revision_id=artifact_revision_id,
+                    key=key,
+                )
+            )
+        )
+        return PresignedUploadURLPayload(
+            presigned_url=action_result.presigned_url,
+            fields=json.dumps(action_result.fields),
+        )
 
     @staticmethod
     def _data_to_dto(data: ObjectStorageData) -> ObjectStorageNode:

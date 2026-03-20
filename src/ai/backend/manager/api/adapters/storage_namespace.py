@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import uuid
+
 from ai.backend.common.dto.manager.v2.storage_namespace.request import (
     AdminSearchStorageNamespacesInput,
     RegisterStorageNamespaceInput,
@@ -17,6 +19,7 @@ from ai.backend.manager.data.storage_namespace.types import StorageNamespaceData
 from ai.backend.manager.repositories.base import BatchQuerier, OffsetPagination
 from ai.backend.manager.repositories.base.creator import Creator
 from ai.backend.manager.repositories.storage_namespace import StorageNamespaceCreatorSpec
+from ai.backend.manager.services.storage_namespace.actions.get_multi import GetNamespacesAction
 from ai.backend.manager.services.storage_namespace.actions.register import RegisterNamespaceAction
 from ai.backend.manager.services.storage_namespace.actions.search import (
     SearchStorageNamespacesAction,
@@ -62,6 +65,13 @@ class StorageNamespaceAdapter(BaseAdapter):
             )
         )
         return UnregisterStorageNamespacePayload(id=action_result.storage_id)
+
+    async def get_namespaces(self, storage_id: uuid.UUID) -> list[StorageNamespaceNode]:
+        """Retrieve all namespaces for a given storage."""
+        action_result = await self._processors.storage_namespace.get_namespaces.wait_for_complete(
+            GetNamespacesAction(storage_id)
+        )
+        return [self._storage_namespace_data_to_dto(item) for item in action_result.result]
 
     async def search(
         self, input: AdminSearchStorageNamespacesInput

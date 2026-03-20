@@ -37,6 +37,9 @@ from ai.backend.manager.services.artifact_registry.actions.reservoir.delete impo
 from ai.backend.manager.services.artifact_registry.actions.reservoir.get import (
     GetReservoirRegistryAction,
 )
+from ai.backend.manager.services.artifact_registry.actions.reservoir.get_multi import (
+    GetReservoirRegistriesAction,
+)
 from ai.backend.manager.services.artifact_registry.actions.reservoir.search import (
     SearchReservoirRegistriesAction,
 )
@@ -144,6 +147,15 @@ class ReservoirRegistryAdapter(BaseAdapter):
         return UpdateReservoirRegistryPayload(
             registry=self._reservoir_registry_data_to_dto(action_result.result)
         )
+
+    async def get_many(self, registry_ids: list[UUID]) -> list[ReservoirRegistryNode]:
+        """Retrieve multiple Reservoir registries by IDs."""
+        action_result = (
+            await self._processors.artifact_registry.get_reservoir_registries.wait_for_complete(
+                GetReservoirRegistriesAction(registry_ids=registry_ids)
+            )
+        )
+        return [self._reservoir_registry_data_to_dto(item) for item in action_result.result]
 
     async def delete(self, input: DeleteReservoirRegistryInput) -> DeleteReservoirRegistryPayload:
         """Delete a Reservoir registry."""

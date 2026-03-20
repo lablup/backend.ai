@@ -132,8 +132,6 @@ from ai.backend.manager.data.artifact.types import DelegateeTarget as DelegateeT
 from ai.backend.manager.defs import ARTIFACT_MAX_SCAN_LIMIT
 from ai.backend.manager.errors.artifact_registry import ArtifactRegistryNotFoundError
 from ai.backend.manager.models.artifact_revision.conditions import ArtifactRevisionConditions
-from ai.backend.manager.services.artifact.actions.get import GetArtifactAction
-from ai.backend.manager.services.artifact_revision.actions.get import GetArtifactRevisionAction
 
 
 async def get_registry_url(
@@ -946,31 +944,22 @@ class ArtifactRevision(PydanticNodeMixin[ArtifactRevisionNode]):
 
     @strawberry.field
     async def artifact(self, info: Info[StrawberryGQLContext]) -> Artifact:
-        revision_action_result = (
-            await info.context.processors.artifact_revision.get.wait_for_complete(
-                GetArtifactRevisionAction(artifact_revision_id=uuid.UUID(self.id))
-            )
-        )
-
-        artifact_id = revision_action_result.revision.artifact_id
-
-        artifact_action_result = await info.context.processors.artifact.get.wait_for_complete(
-            GetArtifactAction(artifact_id=artifact_id)
-        )
+        revision_node = await info.context.adapters.artifact.get_revision(uuid.UUID(self.id))
+        artifact_node = await info.context.adapters.artifact.get(revision_node.artifact_id)
 
         data_loaders = info.context.data_loaders
         registry_url = await get_registry_url(
             data_loaders,
-            artifact_action_result.result.registry_id,
-            artifact_action_result.result.registry_type,
+            artifact_node.registry_id,
+            artifact_node.registry_type,
         )
         source_url = await get_registry_url(
             data_loaders,
-            artifact_action_result.result.source_registry_id,
-            artifact_action_result.result.source_registry_type,
+            artifact_node.source_registry_id,
+            artifact_node.source_registry_type,
         )
 
-        return Artifact.from_dataclass(artifact_action_result.result, registry_url, source_url)
+        return Artifact.from_artifact_node(artifact_node, registry_url, source_url)
 
 
 def make_artifact_from_node(node: ArtifactNode, registry_url: str, source_url: str) -> Artifact:

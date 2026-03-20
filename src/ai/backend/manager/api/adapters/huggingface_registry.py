@@ -37,6 +37,9 @@ from ai.backend.manager.services.artifact_registry.actions.huggingface.delete im
 from ai.backend.manager.services.artifact_registry.actions.huggingface.get import (
     GetHuggingFaceRegistryAction,
 )
+from ai.backend.manager.services.artifact_registry.actions.huggingface.get_multi import (
+    GetHuggingFaceRegistriesAction,
+)
 from ai.backend.manager.services.artifact_registry.actions.huggingface.search import (
     SearchHuggingFaceRegistriesAction,
 )
@@ -132,6 +135,15 @@ class HuggingFaceRegistryAdapter(BaseAdapter):
         return UpdateHuggingFaceRegistryPayload(
             registry=self._huggingface_registry_data_to_dto(action_result.result)
         )
+
+    async def get_many(self, registry_ids: list[UUID]) -> list[HuggingFaceRegistryNode]:
+        """Retrieve multiple HuggingFace registries by IDs."""
+        action_result = (
+            await self._processors.artifact_registry.get_huggingface_registries.wait_for_complete(
+                GetHuggingFaceRegistriesAction(registry_ids=registry_ids)
+            )
+        )
+        return [self._huggingface_registry_data_to_dto(item) for item in action_result.result]
 
     async def delete(
         self, input: DeleteHuggingFaceRegistryInput

@@ -30,9 +30,6 @@ from ai.backend.manager.api.gql.decorators import (
 from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin
 from ai.backend.manager.data.reservoir_registry.types import ReservoirRegistryData
 from ai.backend.manager.errors.api import NotImplementedAPI
-from ai.backend.manager.services.artifact_registry.actions.reservoir.get_multi import (
-    GetReservoirRegistriesAction,
-)
 
 from .types import StrawberryGQLContext
 
@@ -79,17 +76,8 @@ class ReservoirRegistry(PydanticNodeMixin[ReservoirRegistryNode]):
     async def load_by_id(
         cls, ctx: StrawberryGQLContext, reservoir_ids: Sequence[uuid.UUID]
     ) -> list["ReservoirRegistry"]:
-        action_result = (
-            await ctx.processors.artifact_registry.get_reservoir_registries.wait_for_complete(
-                GetReservoirRegistriesAction(registry_ids=list(reservoir_ids))
-            )
-        )
-
-        reservoirs = []
-        for reservoir in action_result.result:
-            reservoirs.append(ReservoirRegistry.from_dataclass(reservoir))
-
-        return reservoirs
+        nodes = await ctx.adapters.reservoir_registry.get_many(list(reservoir_ids))
+        return [ReservoirRegistry.from_pydantic(node) for node in nodes]
 
     @strawberry.field
     @classmethod

@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import json
 import uuid
 from collections.abc import Iterable
 from typing import Self
@@ -56,15 +55,6 @@ from ai.backend.manager.api.gql.decorators import (
 )
 from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin
 from ai.backend.manager.data.object_storage.types import ObjectStorageData
-from ai.backend.manager.services.object_storage.actions.get_download_presigned_url import (
-    GetDownloadPresignedURLAction,
-)
-from ai.backend.manager.services.object_storage.actions.get_upload_presigned_url import (
-    GetUploadPresignedURLAction,
-)
-from ai.backend.manager.services.storage_namespace.actions.get_multi import (
-    GetNamespacesAction,
-)
 
 from .storage_namespace import StorageNamespace, StorageNamespaceConnection, StorageNamespaceEdge
 from .types import StrawberryGQLContext
@@ -122,13 +112,8 @@ class ObjectStorage(PydanticNodeMixin[ObjectStorageNode]):
         offset: int | None,
     ) -> StorageNamespaceConnection:
         # TODO: Support pagination
-        action_result = (
-            await info.context.processors.storage_namespace.get_namespaces.wait_for_complete(
-                GetNamespacesAction(uuid.UUID(self.id))
-            )
-        )
-
-        nodes = [StorageNamespace.from_dataclass(bucket) for bucket in action_result.result]
+        items = await info.context.adapters.storage_namespace.get_namespaces(uuid.UUID(self.id))
+        nodes = [StorageNamespace.from_pydantic(item) for item in items]
         edges = [StorageNamespaceEdge(node=node, cursor=encode_cursor(node.id)) for node in nodes]
 
         return StorageNamespaceConnection(
@@ -397,33 +382,25 @@ async def delete_object_storage(
 async def get_presigned_download_url(
     input: GetPresignedDownloadURLInput, info: Info[StrawberryGQLContext]
 ) -> GetPresignedDownloadURLPayload:
-    processors = info.context.processors
     dto = input.to_pydantic()
-    action_result = await processors.object_storage.get_presigned_download_url.wait_for_complete(
-        GetDownloadPresignedURLAction(
-            artifact_revision_id=dto.artifact_revision_id,
-            key=dto.key,
-            expiration=dto.expiration,
-        )
+    result = await info.context.adapters.object_storage.get_presigned_download_url(
+        artifact_revision_id=dto.artifact_revision_id,
+        key=dto.key,
+        expiration=dto.expiration,
     )
-
-    return GetPresignedDownloadURLPayload(presigned_url=action_result.presigned_url)
+    return GetPresignedDownloadURLPayload(presigned_url=result.presigned_url)
 
 
 @strawberry.mutation(description="Added in 25.14.0")  # type: ignore[misc]
 async def get_presigned_upload_url(
     input: GetPresignedUploadURLInput, info: Info[StrawberryGQLContext]
 ) -> GetPresignedUploadURLPayload:
-    processors = info.context.processors
     dto = input.to_pydantic()
-    action_result = await processors.object_storage.get_presigned_upload_url.wait_for_complete(
-        GetUploadPresignedURLAction(
-            artifact_revision_id=dto.artifact_revision_id,
-            key=dto.key,
-        )
+    result = await info.context.adapters.object_storage.get_presigned_upload_url(
+        artifact_revision_id=dto.artifact_revision_id,
+        key=dto.key,
     )
-
     return GetPresignedUploadURLPayload(
-        presigned_url=action_result.presigned_url,
-        fields=json.dumps(action_result.fields),
+        presigned_url=result.presigned_url,
+        fields=result.fields,
     )

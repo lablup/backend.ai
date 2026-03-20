@@ -39,8 +39,6 @@ from ai.backend.manager.api.gql.decorators import (
 )
 from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin
 from ai.backend.manager.data.vfs_storage.types import VFSStorageData
-from ai.backend.manager.services.vfs_storage.actions.get import GetVFSStorageAction
-from ai.backend.manager.services.vfs_storage.actions.list import ListVFSStorageAction
 
 from .types import StrawberryGQLContext
 
@@ -97,11 +95,8 @@ class VFSStorageConnection(Connection[VFSStorage]):
 
 @strawberry.field(description="Added in 25.16.0. Get a VFS storage by ID")  # type: ignore[misc]
 async def vfs_storage(id: ID, info: Info[StrawberryGQLContext]) -> VFSStorage | None:
-    processors = info.context.processors
-    action_result = await processors.vfs_storage.get.wait_for_complete(
-        GetVFSStorageAction(storage_id=uuid.UUID(id))
-    )
-    return VFSStorage.from_dataclass(action_result.result)
+    node = await info.context.adapters.vfs_storage.get(uuid.UUID(id))
+    return VFSStorage.from_pydantic(node)
 
 
 @strawberry.field(description="Added in 25.16.0. List all VFS storages")  # type: ignore[misc]
@@ -114,13 +109,8 @@ async def vfs_storages(
     limit: int | None = None,
     offset: int | None = None,
 ) -> VFSStorageConnection | None:
-    processors = info.context.processors
-
-    action_result = await processors.vfs_storage.list_storages.wait_for_complete(
-        ListVFSStorageAction()
-    )
-
-    nodes = [VFSStorage.from_dataclass(data) for data in action_result.data]
+    items = await info.context.adapters.vfs_storage.list_all()
+    nodes = [VFSStorage.from_pydantic(item) for item in items]
     edges = [VFSStorageEdge(node=node, cursor=encode_cursor(node.id)) for node in nodes]
 
     return VFSStorageConnection(

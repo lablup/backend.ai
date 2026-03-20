@@ -5,6 +5,7 @@ from __future__ import annotations
 from uuid import UUID
 
 from ai.backend.common.api_handlers import Sentinel
+from ai.backend.common.data.storage.registries.types import ModelSortKey, ModelTarget
 from ai.backend.common.dto.manager.v2.artifact.request import (
     AdminSearchArtifactRevisionsInput,
     AdminSearchArtifactsGQLInput,
@@ -43,7 +44,9 @@ from ai.backend.manager.data.artifact.types import (
 )
 from ai.backend.manager.data.artifact.types import (
     ArtifactData,
+    ArtifactDataWithRevisions,
     ArtifactRevisionData,
+    DelegateeTarget,
 )
 from ai.backend.manager.data.artifact.types import (
     ArtifactRemoteStatus as DataArtifactRemoteStatus,
@@ -74,10 +77,43 @@ from ai.backend.manager.repositories.base import (
     negate_conditions,
 )
 from ai.backend.manager.repositories.base.updater import Updater
+from ai.backend.manager.services.artifact.actions.delegate_scan import (
+    DelegateScanArtifactsAction,
+    DelegateScanArtifactsActionResult,
+)
 from ai.backend.manager.services.artifact.actions.delete_multi import DeleteArtifactsAction
 from ai.backend.manager.services.artifact.actions.get import GetArtifactAction
+from ai.backend.manager.services.artifact.actions.restore_multi import (
+    RestoreArtifactsAction,
+    RestoreArtifactsActionResult,
+)
+from ai.backend.manager.services.artifact.actions.retrieve_model_multi import (
+    RetrieveModelsAction,
+    RetrieveModelsActionResult,
+)
+from ai.backend.manager.services.artifact.actions.scan import (
+    ScanArtifactsAction,
+    ScanArtifactsActionResult,
+)
 from ai.backend.manager.services.artifact.actions.search import SearchArtifactsAction
 from ai.backend.manager.services.artifact.actions.update import UpdateArtifactAction
+from ai.backend.manager.services.artifact_revision.actions.approve import (
+    ApproveArtifactRevisionAction,
+)
+from ai.backend.manager.services.artifact_revision.actions.cancel_import import CancelImportAction
+from ai.backend.manager.services.artifact_revision.actions.cleanup import (
+    CleanupArtifactRevisionAction,
+)
+from ai.backend.manager.services.artifact_revision.actions.delegate_import_revision_batch import (
+    DelegateImportArtifactRevisionBatchAction,
+)
+from ai.backend.manager.services.artifact_revision.actions.get import GetArtifactRevisionAction
+from ai.backend.manager.services.artifact_revision.actions.import_revision import (
+    ImportArtifactRevisionAction,
+)
+from ai.backend.manager.services.artifact_revision.actions.reject import (
+    RejectArtifactRevisionAction,
+)
 from ai.backend.manager.services.artifact_revision.actions.search import (
     SearchArtifactRevisionsAction,
 )
@@ -210,6 +246,151 @@ class ArtifactAdapter(BaseAdapter):
         return DeleteArtifactsPayload(
             artifacts=[self._data_to_dto(item) for item in action_result.artifacts]
         )
+
+    async def get_revision(self, artifact_revision_id: UUID) -> ArtifactRevisionNode:
+        """Retrieve a single artifact revision by ID."""
+        action_result = await self._processors.artifact_revision.get.wait_for_complete(
+            GetArtifactRevisionAction(artifact_revision_id=artifact_revision_id)
+        )
+        return self._revision_data_to_dto(action_result.revision)
+
+    async def scan(
+        self,
+        artifact_type: DataArtifactType | None,
+        registry_id: UUID | None,
+        limit: int | None,
+        order: ModelSortKey | None,
+        search: str | None,
+    ) -> list[ArtifactDataWithRevisions]:
+        """Scan external registries to discover available artifacts."""
+        action_result: ScanArtifactsActionResult = (
+            await self._processors.artifact.scan.wait_for_complete(
+                ScanArtifactsAction(
+                    artifact_type=artifact_type,
+                    registry_id=registry_id,
+                    limit=limit,
+                    order=order,
+                    search=search,
+                )
+            )
+        )
+        return action_result.result
+
+    async def import_revision(
+        self,
+        artifact_revision_id: UUID,
+        vfolder_id: UUID | None,
+        storage_prefix: str | None,
+        force: bool,
+    ) -> tuple[ArtifactRevisionNode, UUID | None]:
+        """Import a single artifact revision and return (revision_node, task_id)."""
+        action_result = await self._processors.artifact_revision.import_revision.wait_for_complete(
+            ImportArtifactRevisionAction(
+                artifact_revision_id=artifact_revision_id,
+                vfolder_id=vfolder_id,
+                storage_prefix=storage_prefix,
+                force=force,
+            )
+        )
+        return self._revision_data_to_dto(action_result.result), action_result.task_id
+
+    async def delegate_scan(
+        self,
+        delegator_reservoir_id: UUID | None,
+        delegatee_target: DelegateeTarget | None,
+        artifact_type: DataArtifactType | None,
+        limit: int | None,
+        order: ModelSortKey | None,
+        search: str | None,
+    ) -> list[ArtifactDataWithRevisions]:
+        """Trigger artifact scanning on a remote reservoir registry."""
+        action_result: DelegateScanArtifactsActionResult = (
+            await self._processors.artifact.delegate_scan.wait_for_complete(
+                DelegateScanArtifactsAction(
+                    delegator_reservoir_id=delegator_reservoir_id,
+                    delegatee_target=delegatee_target,
+                    artifact_type=artifact_type,
+                    limit=limit,
+                    order=order,
+                    search=search,
+                )
+            )
+        )
+        return action_result.result
+
+    async def delegate_import_batch(
+        self,
+        delegator_reservoir_id: UUID | None,
+        delegatee_target: DelegateeTarget | None,
+        artifact_type: DataArtifactType | None,
+        artifact_revision_ids: list[UUID],
+        force: bool,
+    ) -> tuple[list[ArtifactRevisionNode], list[UUID | None]]:
+        """Import artifact revisions from a remote reservoir registry in batch.
+
+        Returns a tuple of (revision_nodes, task_ids).
+        """
+        action_result = await self._processors.artifact_revision.delegate_import_revision_batch.wait_for_complete(
+            DelegateImportArtifactRevisionBatchAction(
+                delegator_reservoir_id=delegator_reservoir_id,
+                delegatee_target=delegatee_target,
+                artifact_type=artifact_type,
+                artifact_revision_ids=artifact_revision_ids,
+                force=force,
+            )
+        )
+        revision_nodes = [self._revision_data_to_dto(r) for r in action_result.result]
+        return revision_nodes, action_result.task_ids
+
+    async def cleanup_revision(self, artifact_revision_id: UUID) -> ArtifactRevisionNode:
+        """Clean up stored artifact revision data and revert to SCANNED status."""
+        action_result = await self._processors.artifact_revision.cleanup.wait_for_complete(
+            CleanupArtifactRevisionAction(artifact_revision_id=artifact_revision_id)
+        )
+        return self._revision_data_to_dto(action_result.result)
+
+    async def restore(self, artifact_ids: list[UUID]) -> list[ArtifactData]:
+        """Restore previously deleted artifacts."""
+        action_result: RestoreArtifactsActionResult = (
+            await self._processors.artifact.restore_artifacts.wait_for_complete(
+                RestoreArtifactsAction(artifact_ids=artifact_ids)
+            )
+        )
+        return action_result.artifacts
+
+    async def cancel_import(self, artifact_revision_id: UUID) -> ArtifactRevisionNode:
+        """Cancel an in-progress artifact import and revert to SCANNED status."""
+        action_result = await self._processors.artifact_revision.cancel_import.wait_for_complete(
+            CancelImportAction(artifact_revision_id=artifact_revision_id)
+        )
+        return self._revision_data_to_dto(action_result.result)
+
+    async def approve_revision(self, artifact_revision_id: UUID) -> ArtifactRevisionNode:
+        """Approve an artifact revision for general use."""
+        action_result = await self._processors.artifact_revision.approve.wait_for_complete(
+            ApproveArtifactRevisionAction(artifact_revision_id=artifact_revision_id)
+        )
+        return self._revision_data_to_dto(action_result.result)
+
+    async def reject_revision(self, artifact_revision_id: UUID) -> ArtifactRevisionNode:
+        """Reject an artifact revision, preventing its use."""
+        action_result = await self._processors.artifact_revision.reject.wait_for_complete(
+            RejectArtifactRevisionAction(artifact_revision_id=artifact_revision_id)
+        )
+        return self._revision_data_to_dto(action_result.result)
+
+    async def retrieve_models(
+        self,
+        models: list[ModelTarget],
+        registry_id: UUID | None,
+    ) -> list[ArtifactDataWithRevisions]:
+        """Perform detailed scanning of specific models from external registries."""
+        action_result: RetrieveModelsActionResult = (
+            await self._processors.artifact.retrieve_models.wait_for_complete(
+                RetrieveModelsAction(models=models, registry_id=registry_id)
+            )
+        )
+        return action_result.result
 
     def build_querier(self, input: AdminSearchArtifactsInput) -> BatchQuerier:
         """Build a BatchQuerier from the search input DTO."""

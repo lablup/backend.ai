@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from typing import cast
 from uuid import UUID
 
 from ai.backend.common.data.user.types import UserRole
@@ -21,8 +22,15 @@ from ai.backend.common.dto.manager.v2.user.request import (
 )
 from ai.backend.common.dto.manager.v2.user.response import (
     AdminSearchUsersPayload,
+    BulkCreateUsersPayload,
+    BulkCreateUserV2Error,
+    BulkPurgeUsersPayload,
+    BulkPurgeUserV2Error,
+    BulkUpdateUsersPayload,
+    BulkUpdateUserV2Error,
     EntityTimestamps,
     SearchUsersPayload,
+    UpdateMyAllowedClientIPPayload,
     UserBasicInfo,
     UserContainerSettings,
     UserNode,
@@ -60,11 +68,13 @@ from ai.backend.manager.repositories.base import (
     combine_conditions_or,
     negate_conditions,
 )
+from ai.backend.manager.repositories.user.creators import UserCreatorSpec
 from ai.backend.manager.repositories.user.types import (
     DomainUserSearchScope,
     ProjectUserSearchScope,
     RoleUserSearchScope,
 )
+from ai.backend.manager.services.user.actions.create_user import BulkCreateUserAction
 from ai.backend.manager.services.user.actions.get_user import GetUserAction
 from ai.backend.manager.services.user.actions.keypair_ops import (
     IssueMyKeypairAction,
@@ -72,6 +82,11 @@ from ai.backend.manager.services.user.actions.keypair_ops import (
     SwitchMyMainAccessKeyAction,
     UpdateMyKeypairAction,
 )
+from ai.backend.manager.services.user.actions.modify_user import (
+    BulkModifyUserAction,
+    ModifyUserAction,
+)
+from ai.backend.manager.services.user.actions.purge_user import BulkPurgeUserAction
 from ai.backend.manager.services.user.actions.search_users import SearchUsersAction
 from ai.backend.manager.services.user.actions.search_users_by_domain import (
     SearchUsersByDomainAction,
@@ -280,6 +295,56 @@ class UserAdapter(BaseAdapter):
             GetUserAction(user_uuid=user_id)
         )
         return UserPayload(user=self._user_data_to_node(action_result.user))
+
+    # ------------------------------------------------------------------ bulk create/update/purge
+
+    async def bulk_create_users(self, action: BulkCreateUserAction) -> BulkCreateUsersPayload:
+        """Bulk-create users. Each item's transformation is the caller's responsibility."""
+        result = await self._processors.user.bulk_create_users.wait_for_complete(action)
+        created_users = [self._user_data_to_node(u) for u in result.data.successes]
+        failed = [
+            BulkCreateUserV2Error(
+                index=error.index,
+                username=cast(UserCreatorSpec, error.spec).username,
+                email=cast(UserCreatorSpec, error.spec).email,
+                message=str(error.exception),
+            )
+            for error in result.data.failures
+        ]
+        return BulkCreateUsersPayload(created_users=created_users, failed=failed)
+
+    async def bulk_modify_users(self, action: BulkModifyUserAction) -> BulkUpdateUsersPayload:
+        """Bulk-modify users. Each item's transformation is the caller's responsibility."""
+        result = await self._processors.user.bulk_modify_users.wait_for_complete(action)
+        updated_users = [self._user_data_to_node(u) for u in result.data.successes]
+        failed = [
+            BulkUpdateUserV2Error(
+                user_id=action.items[error.index].user_id,
+                message=str(error.exception),
+            )
+            for error in result.data.failures
+        ]
+        return BulkUpdateUsersPayload(updated_users=updated_users, failed=failed)
+
+    async def bulk_purge_users(self, action: BulkPurgeUserAction) -> BulkPurgeUsersPayload:
+        """Bulk-purge users permanently."""
+        result = await self._processors.user.bulk_purge_users.wait_for_complete(action)
+        failed = [
+            BulkPurgeUserV2Error(
+                user_id=error.user_id,
+                message=str(error.exception),
+            )
+            for error in result.data.failures
+        ]
+        return BulkPurgeUsersPayload(
+            purged_count=result.data.purged_count(),
+            failed=failed,
+        )
+
+    async def modify_user(self, action: ModifyUserAction) -> UpdateMyAllowedClientIPPayload:
+        """Modify a user. Caller is responsible for building the action."""
+        await self._processors.user.modify_user.wait_for_complete(action)
+        return UpdateMyAllowedClientIPPayload(success=True)
 
     # ------------------------------------------------------------------ keypair operations
 

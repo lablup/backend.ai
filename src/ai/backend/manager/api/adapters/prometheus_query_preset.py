@@ -2,9 +2,12 @@
 
 from __future__ import annotations
 
+from typing import cast
 from uuid import UUID
 
 from ai.backend.common.api_handlers import Sentinel
+from ai.backend.common.dto.clients.prometheus.request import QueryTimeRange
+from ai.backend.common.dto.clients.prometheus.response import PrometheusResponse
 from ai.backend.common.dto.manager.v2.prometheus_query_preset.request import (
     CreateQueryDefinitionInput,
     DeleteQueryDefinitionInput,
@@ -25,7 +28,10 @@ from ai.backend.common.dto.manager.v2.prometheus_query_preset.types import (
     OrderDirection,
     QueryDefinitionOptionsInfo,
 )
-from ai.backend.manager.data.prometheus_query_preset import PrometheusQueryPresetData
+from ai.backend.manager.data.prometheus_query_preset import (
+    ExecutePresetOptions,
+    PrometheusQueryPresetData,
+)
 from ai.backend.manager.models.prometheus_query_preset import PrometheusQueryPresetRow
 from ai.backend.manager.models.prometheus_query_preset.conditions import (
     PrometheusQueryPresetConditions,
@@ -48,6 +54,7 @@ from ai.backend.manager.repositories.prometheus_query_preset.updaters import (
 from ai.backend.manager.services.prometheus_query_preset.actions import (
     CreatePresetAction,
     DeletePresetAction,
+    ExecutePresetAction,
     GetPresetAction,
     ModifyPresetAction,
     SearchPresetsAction,
@@ -126,6 +133,26 @@ class PrometheusQueryPresetAdapter(BaseAdapter):
         )
 
         return ModifyQueryDefinitionPayload(item=self._data_to_dto(action_result.preset))
+
+    async def execute_preset(
+        self,
+        preset_id: UUID,
+        options: ExecutePresetOptions,
+        time_window: str | None,
+        time_range: QueryTimeRange | None,
+    ) -> PrometheusResponse:
+        """Execute a query definition and return the Prometheus response."""
+        action_result = (
+            await self._processors.prometheus_query_preset.execute_preset.wait_for_complete(
+                ExecutePresetAction(
+                    preset_id=preset_id,
+                    options=options,
+                    time_window=time_window,
+                    time_range=time_range,
+                )
+            )
+        )
+        return cast(PrometheusResponse, action_result.response)
 
     async def delete(self, input: DeleteQueryDefinitionInput) -> DeleteQueryDefinitionPayload:
         """Delete a query definition by ID."""

@@ -25,6 +25,7 @@ from ai.backend.manager.repositories.vfs_storage.updaters import VFSStorageUpdat
 from ai.backend.manager.services.vfs_storage.actions.create import CreateVFSStorageAction
 from ai.backend.manager.services.vfs_storage.actions.delete import DeleteVFSStorageAction
 from ai.backend.manager.services.vfs_storage.actions.get import GetVFSStorageAction
+from ai.backend.manager.services.vfs_storage.actions.list import ListVFSStorageAction
 from ai.backend.manager.services.vfs_storage.actions.search import SearchVFSStoragesAction
 from ai.backend.manager.services.vfs_storage.actions.update import UpdateVFSStorageAction
 from ai.backend.manager.types import OptionalState
@@ -77,6 +78,13 @@ class VFSStorageAdapter(BaseAdapter):
             GetVFSStorageAction(storage_id=storage_id)
         )
         return self._vfs_storage_data_to_dto(action_result.result)
+
+    async def list_all(self) -> list[VFSStorageNode]:
+        """List all VFS storages without pagination."""
+        action_result = await self._processors.vfs_storage.list_storages.wait_for_complete(
+            ListVFSStorageAction()
+        )
+        return [self._vfs_storage_data_to_dto(item) for item in action_result.data]
 
     async def update(self, input: UpdateVFSStorageInput) -> UpdateVFSStoragePayload:
         """Update an existing VFS storage."""

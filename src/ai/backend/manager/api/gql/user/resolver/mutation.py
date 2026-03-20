@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import ipaddress
-from typing import cast
 from uuid import UUID
 
 import strawberry
@@ -51,7 +50,6 @@ from ai.backend.manager.services.user.actions.create_user import (
     BulkCreateUserAction,
     UserCreateSpec,
 )
-from ai.backend.manager.services.user.actions.get_user import GetUserAction
 from ai.backend.manager.services.user.actions.modify_user import (
     BulkModifyUserAction,
     ModifyUserAction,
@@ -148,17 +146,17 @@ async def admin_bulk_create_users_v2(
         items.append(UserCreateSpec(creator=Creator(spec=spec), group_ids=group_ids))
 
     action = BulkCreateUserAction(items=items)
-    result = await ctx.processors.user.bulk_create_users.wait_for_complete(action)
+    payload = await ctx.adapters.user.bulk_create_users(action)
 
-    created_users = [UserV2GQL.from_data(user_data) for user_data in result.data.successes]
+    created_users = [UserV2GQL.from_pydantic(node) for node in payload.created_users]
     failed = [
         BulkCreateUserV2ErrorGQL(
             index=error.index,
-            username=cast(UserCreatorSpec, error.spec).username,
-            email=cast(UserCreatorSpec, error.spec).email,
-            message=str(error.exception),
+            username=error.username,
+            email=error.email,
+            message=error.message,
         )
-        for error in result.data.failures
+        for error in payload.failed
     ]
 
     return BulkCreateUsersV2PayloadGQL(
@@ -324,15 +322,15 @@ async def admin_bulk_update_users_v2(
         items.append(UserUpdateSpec(user_id=user_item.user_id, updater_spec=updater_spec))
 
     action = BulkModifyUserAction(items=items)
-    result = await ctx.processors.user.bulk_modify_users.wait_for_complete(action)
+    payload = await ctx.adapters.user.bulk_modify_users(action)
 
-    updated_users = [UserV2GQL.from_data(user_data) for user_data in result.data.successes]
+    updated_users = [UserV2GQL.from_pydantic(node) for node in payload.updated_users]
     failed = [
         BulkUpdateUserV2ErrorGQL(
-            user_id=items[error.index].user_id,
-            message=str(error.exception),
+            user_id=error.user_id,
+            message=error.message,
         )
-        for error in result.data.failures
+        for error in payload.failed
     ]
 
     return BulkUpdateUsersV2PayloadGQL(
@@ -496,18 +494,18 @@ async def admin_bulk_purge_users_v2(
             else OptionalState.nop()
         ),
     )
-    result = await ctx.processors.user.bulk_purge_users.wait_for_complete(action)
+    payload = await ctx.adapters.user.bulk_purge_users(action)
 
     failed = [
         BulkPurgeUserV2ErrorGQL(
             user_id=error.user_id,
-            message=str(error.exception),
+            message=error.message,
         )
-        for error in result.data.failures
+        for error in payload.failed
     ]
 
     return BulkPurgeUsersV2PayloadGQL(
-        purged_count=result.data.purged_count(),
+        purged_count=payload.purged_count,
         failed=failed,
     )
 
@@ -534,10 +532,8 @@ async def update_my_allowed_client_ip(
     ctx = info.context
 
     # Get user email (needed for ModifyUserAction)
-    user_result = await ctx.processors.user.get_user.wait_for_complete(
-        GetUserAction(user_uuid=me.user_id)
-    )
-    email = user_result.user.email
+    user_payload = await ctx.adapters.user.get(me.user_id)
+    email = user_payload.user.basic_info.email
 
     new_allowlist = input.allowed_client_ip
 
@@ -590,6 +586,6 @@ async def update_my_allowed_client_ip(
         email=email,
         updater=Updater(spec=updater_spec, pk_value=email),
     )
-    await ctx.processors.user.modify_user.wait_for_complete(action)
+    await ctx.adapters.user.modify_user(action)
 
     return UpdateMyAllowedClientIPPayloadGQL(success=True)

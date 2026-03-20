@@ -14,13 +14,8 @@ from ai.backend.manager.api.gql.decorators import (
     gql_node_type,
 )
 from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin
-from ai.backend.manager.data.artifact_registries.types import (
-    ArtifactRegistryData,
-)
+from ai.backend.manager.data.artifact_registries.types import ArtifactRegistryData
 from ai.backend.manager.errors.artifact_registry import ArtifactRegistryNotFoundError
-from ai.backend.manager.services.artifact_registry.actions.common.get_multi import (
-    GetArtifactRegistryMetasAction,
-)
 
 from .types import StrawberryGQLContext
 
@@ -53,14 +48,12 @@ class ArtifactRegistryMeta(PydanticNodeMixin[Any]):
         cls, ctx: StrawberryGQLContext, registry_ids: Sequence[uuid.UUID]
     ) -> list[Self]:
         # Get all registry metas in a single batch query
-        registry_metas_action = (
-            await ctx.processors.artifact_registry.get_registry_metas.wait_for_complete(
-                GetArtifactRegistryMetasAction(registry_ids=list(registry_ids))
-            )
+        registry_meta_dtos = await ctx.adapters.artifact_registry.get_registry_metas(
+            list(registry_ids)
         )
 
         # Create a mapping for efficient lookup
-        registry_meta_map = {meta.registry_id: meta for meta in registry_metas_action.result}
+        registry_meta_map = {meta.registry_id: meta for meta in registry_meta_dtos}
 
         registries = []
         for registry_id in registry_ids:
@@ -87,7 +80,15 @@ class ArtifactRegistryMeta(PydanticNodeMixin[Any]):
                         raise ArtifactRegistryNotFoundError
                     url = reservoir_registry.endpoint
 
-            registries.append(cls.from_dataclass(registry_meta, url=url))
+            registries.append(
+                cls(
+                    id=ID(str(registry_meta.id)),
+                    name=registry_meta.name,
+                    registry_id=ID(str(registry_meta.registry_id)),
+                    type=registry_meta.type,
+                    url=url,
+                )
+            )
         return registries
 
 

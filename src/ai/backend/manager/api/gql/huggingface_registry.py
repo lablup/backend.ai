@@ -32,9 +32,6 @@ from ai.backend.manager.api.gql.decorators import (
 )
 from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin
 from ai.backend.manager.data.huggingface_registry.types import HuggingFaceRegistryData
-from ai.backend.manager.services.artifact_registry.actions.huggingface.get_multi import (
-    GetHuggingFaceRegistriesAction,
-)
 
 from .types import StrawberryGQLContext
 
@@ -77,17 +74,8 @@ class HuggingFaceRegistry(PydanticNodeMixin[HuggingFaceRegistryNode]):
     async def load_by_id(
         cls, ctx: StrawberryGQLContext, registry_ids: Sequence[uuid.UUID]
     ) -> list[HuggingFaceRegistry]:
-        action_result = (
-            await ctx.processors.artifact_registry.get_huggingface_registries.wait_for_complete(
-                GetHuggingFaceRegistriesAction(registry_ids=list(registry_ids))
-            )
-        )
-
-        registries = []
-        for registry in action_result.result:
-            registries.append(HuggingFaceRegistry.from_dataclass(registry))
-
-        return registries
+        nodes = await ctx.adapters.huggingface_registry.get_many(list(registry_ids))
+        return [HuggingFaceRegistry.from_pydantic(node) for node in nodes]
 
 
 HuggingFaceRegistryEdge = Edge[HuggingFaceRegistry]

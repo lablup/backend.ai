@@ -26,10 +26,6 @@ from ai.backend.manager.api.gql.prometheus_query_preset.types.payloads import Me
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.api.gql.utils import check_admin_only
 from ai.backend.manager.data.prometheus_query_preset import ExecutePresetOptions
-from ai.backend.manager.services.prometheus_query_preset.actions import (
-    ExecutePresetAction,
-    GetPresetAction,
-)
 
 
 @strawberry.field(description="Added in 26.3.0. Get a single query definition by ID (admin only).")  # type: ignore[misc]
@@ -38,11 +34,10 @@ async def admin_prometheus_query_preset(
     id: ID,
 ) -> QueryDefinitionGQL | None:
     check_admin_only()
-    processors = info.context.processors
-    action_result = await processors.prometheus_query_preset.get_preset.wait_for_complete(
-        GetPresetAction(preset_id=UUID(id))
-    )
-    return QueryDefinitionGQL.from_data(action_result.preset)
+    payload = await info.context.adapters.prometheus_query_preset.get(UUID(id))
+    if payload.item is None:
+        return None
+    return QueryDefinitionGQL.from_pydantic(payload.item)
 
 
 @strawberry.field(
@@ -95,7 +90,6 @@ async def admin_prometheus_query_preset_result(
     time_window: str | None = None,
 ) -> QueryDefinitionResultGQL:
     check_admin_only()
-    processors = info.context.processors
 
     execute_options = (
         options.to_internal()
@@ -103,16 +97,12 @@ async def admin_prometheus_query_preset_result(
         else ExecutePresetOptions(filter_labels={}, group_labels=[])
     )
 
-    action_result = await processors.prometheus_query_preset.execute_preset.wait_for_complete(
-        ExecutePresetAction(
-            preset_id=UUID(id),
-            options=execute_options,
-            time_window=time_window,
-            time_range=time_range.to_internal() if time_range is not None else None,
-        )
+    response = await info.context.adapters.prometheus_query_preset.execute_preset(
+        preset_id=UUID(id),
+        options=execute_options,
+        time_window=time_window,
+        time_range=time_range.to_internal() if time_range is not None else None,
     )
-
-    response = action_result.response
 
     return QueryDefinitionResultGQL(
         status=response.status,

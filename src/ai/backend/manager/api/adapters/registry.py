@@ -5,7 +5,9 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from ai.backend.manager.api.adapters.agent import AgentAdapter
+from ai.backend.manager.api.adapters.app_config import AppConfigAdapter
 from ai.backend.manager.api.adapters.artifact import ArtifactAdapter
+from ai.backend.manager.api.adapters.artifact_registry import ArtifactRegistryAdapter
 from ai.backend.manager.api.adapters.audit_log import AuditLogAdapter
 from ai.backend.manager.api.adapters.container_registry import ContainerRegistryAdapter
 from ai.backend.manager.api.adapters.deployment import DeploymentAdapter
@@ -44,7 +46,9 @@ class Adapters:
     def __init__(
         self,
         agent: AgentAdapter,
+        app_config: AppConfigAdapter,
         artifact: ArtifactAdapter,
+        artifact_registry: ArtifactRegistryAdapter,
         audit_log: AuditLogAdapter,
         container_registry: ContainerRegistryAdapter,
         deployment: DeploymentAdapter,
@@ -69,7 +73,9 @@ class Adapters:
         vfs_storage: VFSStorageAdapter,
     ) -> None:
         self.agent = agent
+        self.app_config = app_config
         self.artifact = artifact
+        self.artifact_registry = artifact_registry
         self.audit_log = audit_log
         self.container_registry = container_registry
         self.deployment = deployment
@@ -98,7 +104,9 @@ class Adapters:
         """Factory that wires up all adapters from the shared Processors."""
         return cls(
             agent=AgentAdapter(processors),
+            app_config=AppConfigAdapter(processors),
             artifact=ArtifactAdapter(processors),
+            artifact_registry=ArtifactRegistryAdapter(processors),
             audit_log=AuditLogAdapter(processors),
             container_registry=ContainerRegistryAdapter(processors),
             deployment=DeploymentAdapter(processors),

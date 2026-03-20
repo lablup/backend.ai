@@ -26,7 +26,6 @@ from ai.backend.manager.repositories.user.types import (
     DomainUserSearchScope,
     ProjectUserSearchScope,
 )
-from ai.backend.manager.services.user.actions.get_user import GetUserAction
 
 
 @strawberry.field(
@@ -40,13 +39,8 @@ async def admin_user_v2(
     user_id: UUID,
 ) -> UserV2GQL | None:
     check_admin_only()
-    processors = info.context.processors
-
-    action_result = await processors.user.get_user.wait_for_complete(
-        GetUserAction(user_uuid=user_id)
-    )
-
-    return UserV2GQL.from_data(action_result.user)
+    payload = await info.context.adapters.user.get(user_id)
+    return UserV2GQL.from_pydantic(payload.user)
 
 
 @strawberry.field(
@@ -199,10 +193,5 @@ async def my_user_v2(
 
         raise web.HTTPUnauthorized(reason="Authentication required")
 
-    processors = info.context.processors
-
-    action_result = await processors.user.get_user.wait_for_complete(
-        GetUserAction(user_uuid=me.user_id)
-    )
-
-    return UserV2GQL.from_data(action_result.user)
+    payload = await info.context.adapters.user.get(me.user_id)
+    return UserV2GQL.from_pydantic(payload.user)
