@@ -57,6 +57,8 @@ from .policy import (
     DeploymentStrategyTypeGQL,
     RollingUpdateConfigInputGQL,
     RollingUpdateStrategySpecGQL,
+    UpdateDeploymentPolicyInputGQL,
+    UpdateDeploymentPolicyPayloadGQL,
 )
 from .replica import (
     ActivenessStatus,
@@ -166,6 +168,8 @@ __all__ = [
     "DeploymentStrategyTypeGQL",
     "RollingUpdateConfigInputGQL",
     "RollingUpdateStrategySpecGQL",
+    "UpdateDeploymentPolicyInputGQL",
+    "UpdateDeploymentPolicyPayloadGQL",
     # Replica
     "ActivenessStatus",
     "LivenessStatus",

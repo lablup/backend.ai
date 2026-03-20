@@ -76,6 +76,7 @@ from .deployment import (
     routes,
     sync_replicas,
     update_auto_scaling_rule,
+    update_deployment_policy,
     update_model_deployment,
     update_route_traffic_status,
 )
@@ -430,6 +431,7 @@ class Mutation:
     delete_model_deployment = delete_model_deployment
     sync_replicas = sync_replicas
     add_model_revision = add_model_revision
+    update_deployment_policy = update_deployment_policy
     # Notification - Admin APIs
     admin_create_notification_channel = admin_create_notification_channel
     admin_update_notification_channel = admin_update_notification_channel

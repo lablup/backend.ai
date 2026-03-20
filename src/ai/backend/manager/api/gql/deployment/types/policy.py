@@ -4,13 +4,17 @@ from __future__ import annotations
 
 from datetime import datetime
 from typing import Self
+from uuid import UUID
 
 import strawberry
 from strawberry import ID
 from strawberry.relay import Node, NodeID
 
 from ai.backend.common.data.model_deployment.types import DeploymentStrategy
+from ai.backend.manager.api.gql.utils import dedent_strip
 from ai.backend.manager.data.deployment.types import DeploymentPolicyData
+from ai.backend.manager.data.deployment.upserter import DeploymentPolicyUpserter
+from ai.backend.manager.errors.api import InvalidAPIParameters
 from ai.backend.manager.errors.deployment import InvalidDeploymentStrategySpec
 from ai.backend.manager.models.deployment_policy import BlueGreenSpec, RollingUpdateSpec
 
@@ -129,3 +133,63 @@ class BlueGreenConfigInputGQL:
             auto_promote=self.auto_promote,
             promote_delay_seconds=self.promote_delay_seconds,
         )
+
+
+# ========== Mutation Input/Payload Types ==========
+
+
+@strawberry.input(
+    name="UpdateDeploymentPolicyInput",
+    description=dedent_strip("""
+        Added in 26.4.0.
+        Input for creating or updating a deployment policy (upsert semantics).
+        Specify the target deployment_id and the desired strategy type.
+        Exactly one of rolling_update or blue_green must be provided,
+        matching the chosen strategy type.
+        If a policy already exists for the deployment, it is replaced entirely.
+    """),
+)
+class UpdateDeploymentPolicyInputGQL:
+    deployment_id: ID
+    strategy: DeploymentStrategyTypeGQL
+    rollback_on_failure: bool = False
+    rolling_update: RollingUpdateConfigInputGQL | None = None
+    blue_green: BlueGreenConfigInputGQL | None = None
+
+    def to_upserter(self) -> DeploymentPolicyUpserter:
+        """Convert to DeploymentPolicyUpserter for the service layer."""
+
+        strategy = DeploymentStrategy(self.strategy.value)
+        strategy_spec: RollingUpdateSpec | BlueGreenSpec
+        match strategy:
+            case DeploymentStrategy.ROLLING:
+                if self.rolling_update is None:
+                    raise InvalidAPIParameters(
+                        "rolling_update config required for ROLLING strategy"
+                    )
+                strategy_spec = self.rolling_update.to_spec()
+            case DeploymentStrategy.BLUE_GREEN:
+                if self.blue_green is None:
+                    raise InvalidAPIParameters("blue_green config required for BLUE_GREEN strategy")
+                strategy_spec = self.blue_green.to_spec()
+            case _:
+                raise InvalidAPIParameters(f"Unsupported deployment strategy: {strategy}")
+
+        return DeploymentPolicyUpserter(
+            deployment_id=UUID(str(self.deployment_id)),
+            strategy=strategy,
+            strategy_spec=strategy_spec,
+            rollback_on_failure=self.rollback_on_failure,
+        )
+
+
+@strawberry.type(
+    name="UpdateDeploymentPolicyPayload",
+    description=dedent_strip("""
+        Added in 26.4.0.
+        Result payload returned after creating or updating a deployment policy.
+        Contains the full deployment_policy object reflecting the applied configuration.
+    """),
+)
+class UpdateDeploymentPolicyPayloadGQL:
+    deployment_policy: DeploymentPolicyGQL

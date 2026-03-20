@@ -7718,6 +7718,13 @@ type Mutation
   """Added in 25.16.0"""
   addModelRevision(input: AddRevisionInput!): AddRevisionPayload! @join__field(graph: STRAWBERRY)
 
+  """
+  Added in 26.4.0.
+  Create or update the deployment policy for a given deployment (upsert semantics).
+  If the deployment already has a policy, it is replaced entirely with the new configuration.
+  """
+  updateDeploymentPolicy(input: UpdateDeploymentPolicyInput!): UpdateDeploymentPolicyPayload! @join__field(graph: STRAWBERRY)
+
   """Create a new notification channel (admin only)"""
   adminCreateNotificationChannel(input: CreateNotificationChannelInput!): CreateNotificationChannelPayload! @join__field(graph: STRAWBERRY)
 
@@ -12946,6 +12953,35 @@ type UpdateDeploymentPayload
   @join__type(graph: STRAWBERRY)
 {
   deployment: ModelDeployment!
+}
+
+"""
+Added in 26.4.0.
+Input for creating or updating a deployment policy (upsert semantics).
+Specify the target deployment_id and the desired strategy type.
+Exactly one of rolling_update or blue_green must be provided,
+matching the chosen strategy type.
+If a policy already exists for the deployment, it is replaced entirely.
+"""
+input UpdateDeploymentPolicyInput
+  @join__type(graph: STRAWBERRY)
+{
+  deploymentId: ID!
+  strategy: DeploymentStrategyType!
+  rollbackOnFailure: Boolean! = false
+  rollingUpdate: RollingUpdateConfigInput = null
+  blueGreen: BlueGreenConfigInput = null
+}
+
+"""
+Added in 26.4.0.
+Result payload returned after creating or updating a deployment policy.
+Contains the full deployment_policy object reflecting the applied configuration.
+"""
+type UpdateDeploymentPolicyPayload
+  @join__type(graph: STRAWBERRY)
+{
+  deploymentPolicy: DeploymentPolicy!
 }
 
 """Added in 25.14.0"""
