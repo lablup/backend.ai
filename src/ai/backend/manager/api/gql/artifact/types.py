@@ -116,7 +116,7 @@ from ai.backend.manager.api.gql.decorators import (
     gql_pydantic_type,
 )
 from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin
-from ai.backend.manager.api.gql.types import GQLFilter, GQLOrderBy, StrawberryGQLContext
+from ai.backend.manager.api.gql.types import GQLOrderBy, StrawberryGQLContext
 from ai.backend.manager.api.gql.utils import dedent_strip
 from ai.backend.manager.data.artifact.types import (
     ArtifactAvailability,
@@ -271,18 +271,22 @@ class ArtifactVerificationGQLResult:
         return cls(verifiers=verifier_entries)
 
 
-@strawberry.input(
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description=dedent_strip("""
+        Added in 25.14.0.
+
+        Filter options for artifacts based on various criteria such as type, name, registry,
+        source, and availability status.
+
+        Supports logical operations (AND, OR, NOT) for complex filtering scenarios.
+        """),
+        added_version="25.14.0",
+    ),
+    model=ArtifactGQLFilterInputDTO,
     name="ArtifactFilter",
-    description=dedent_strip("""
-    Added in 25.14.0.
-
-    Filter options for artifacts based on various criteria such as type, name, registry,
-    source, and availability status.
-
-    Supports logical operations (AND, OR, NOT) for complex filtering scenarios.
-    """),
 )
-class ArtifactFilter(GQLFilter):
+class ArtifactFilter:
     type: list[ArtifactType] | None = None
     name: StringFilter | None = None
     registry: StringFilter | None = None

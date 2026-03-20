@@ -247,9 +247,13 @@ class CreateAutoScalingRuleInput:
         )
 
 
-@strawberry.input(
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description="Added in 25.19.0. Input for updating an auto-scaling rule.",
+        added_version="25.19.0",
+    ),
+    model=UpdateAutoScalingRuleInputDTO,
     name="UpdateAutoScalingRuleInput",
-    description="Added in 25.19.0. Input for updating an auto-scaling rule.",
 )
 class UpdateAutoScalingRuleInput:
     id: ID
@@ -264,6 +268,7 @@ class UpdateAutoScalingRuleInput:
 
     def to_pydantic(self) -> UpdateAutoScalingRuleInputDTO:
         return UpdateAutoScalingRuleInputDTO(
+            id=UUID(str(self.id)),
             metric_source=None
             if self.metric_source is None
             else CommonAutoScalingMetricSource(self.metric_source.lower()),

@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-from uuid import UUID
-
 import strawberry
 from strawberry import ID, Info
 
@@ -73,7 +71,7 @@ async def update_auto_scaling_rule(
     )
     action_result = await processor.update_auto_scaling_rule.wait_for_complete(
         UpdateAutoScalingRuleAction(
-            auto_scaling_rule_id=UUID(input.id),
+            auto_scaling_rule_id=dto.id,
             modifier=ModelDeploymentAutoScalingRuleModifier(
                 metric_source=metric_source_state,
                 metric_name=OptionalState.from_graphql(dto.metric_name),

@@ -158,9 +158,13 @@ class BulkCreateUserV2InputGQL:
 # Update User Inputs
 
 
-@strawberry.input(
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description="Input for updating user information. All fields are optional - only provided fields will be updated.",
+        added_version="26.3.0",
+    ),
+    model=UpdateUserInputDTO,
     name="UpdateUserV2Input",
-    description="Added in 26.3.0. Input for updating user information. All fields are optional - only provided fields will be updated.",
 )
 class UpdateUserV2InputGQL:
     """Input for updating user information. All fields optional."""

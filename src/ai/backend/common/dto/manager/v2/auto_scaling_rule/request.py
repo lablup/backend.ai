@@ -46,6 +46,7 @@ class UpdateAutoScalingRuleInput(BaseRequestModel):
     Fields that cannot be cleared use None to signal no change.
     """
 
+    id: UUID = Field(description="ID of the auto-scaling rule to update")
     metric_source: AutoScalingMetricSource | None = Field(
         default=None, description="Updated metric source. None means no change."
     )

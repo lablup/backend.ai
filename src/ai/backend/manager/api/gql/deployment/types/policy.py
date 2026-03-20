@@ -17,6 +17,9 @@ from ai.backend.common.dto.manager.v2.deployment.request import (
 from ai.backend.common.dto.manager.v2.deployment.request import (
     RollingUpdateConfigInput as RollingUpdateConfigInputDTO,
 )
+from ai.backend.common.dto.manager.v2.deployment.request import (
+    UpsertDeploymentPolicyInput as UpsertDeploymentPolicyInputDTO,
+)
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     gql_node_type,
@@ -146,16 +149,19 @@ class BlueGreenConfigInputGQL:
 # ========== Mutation Input/Payload Types ==========
 
 
-@strawberry.input(
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description=dedent_strip("""
+            Input for creating or updating a deployment policy (upsert semantics).
+            Specify the target deployment_id and the desired strategy type.
+            Exactly one of rolling_update or blue_green must be provided,
+            matching the chosen strategy type.
+            If a policy already exists for the deployment, it is replaced entirely.
+        """),
+        added_version="26.4.0",
+    ),
+    model=UpsertDeploymentPolicyInputDTO,
     name="UpdateDeploymentPolicyInput",
-    description=dedent_strip("""
-        Added in 26.4.0.
-        Input for creating or updating a deployment policy (upsert semantics).
-        Specify the target deployment_id and the desired strategy type.
-        Exactly one of rolling_update or blue_green must be provided,
-        matching the chosen strategy type.
-        If a policy already exists for the deployment, it is replaced entirely.
-    """),
 )
 class UpdateDeploymentPolicyInputGQL:
     deployment_id: ID
@@ -163,6 +169,15 @@ class UpdateDeploymentPolicyInputGQL:
     rollback_on_failure: bool = False
     rolling_update: RollingUpdateConfigInputGQL | None = None
     blue_green: BlueGreenConfigInputGQL | None = None
+
+    def to_pydantic(self) -> UpsertDeploymentPolicyInputDTO:
+        return UpsertDeploymentPolicyInputDTO(
+            deployment_id=UUID(str(self.deployment_id)),
+            strategy=self.strategy,
+            rollback_on_failure=self.rollback_on_failure,
+            rolling_update=self.rolling_update.to_pydantic() if self.rolling_update else None,
+            blue_green=self.blue_green.to_pydantic() if self.blue_green else None,
+        )
 
     def to_upserter(self) -> DeploymentPolicyUpserter:
         """Convert to DeploymentPolicyUpserter for the service layer."""

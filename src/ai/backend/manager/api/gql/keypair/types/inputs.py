@@ -10,6 +10,9 @@ from ai.backend.common.dto.manager.v2.auth.request import (
 from ai.backend.common.dto.manager.v2.auth.request import (
     SwitchMyMainAccessKeyInput as SwitchMyMainAccessKeyInputDTO,
 )
+from ai.backend.common.dto.manager.v2.auth.request import (
+    UpdateMyKeypairInput as UpdateMyKeypairInputDTO,
+)
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     gql_pydantic_input,
@@ -44,12 +47,19 @@ class SwitchMyMainAccessKeyInputGQL:
     )
 
 
-@strawberry.input(
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description="Input for updating a keypair owned by the current user.",
+        added_version="24.09.0",
+    ),
+    model=UpdateMyKeypairInputDTO,
     name="UpdateMyKeypairInput",
-    description="Input for updating a keypair owned by the current user.",
 )
 class UpdateMyKeypairInputGQL:
     access_key: str = strawberry.field(
         description="Access key of the keypair to update. Must be owned by the current user."
     )
     is_active: bool = strawberry.field(description="Target active state for the keypair.")
+
+    def to_pydantic(self) -> UpdateMyKeypairInputDTO:
+        return UpdateMyKeypairInputDTO(access_key=self.access_key, is_active=self.is_active)

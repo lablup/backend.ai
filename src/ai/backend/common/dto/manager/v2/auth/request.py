@@ -15,6 +15,7 @@ __all__ = (
     "AuthorizeInput",
     "GetRoleInput",
     "RevokeMyKeypairInput",
+    "UpdateMyKeypairInput",
     "SignupInput",
     "SignoutInput",
     "SwitchMyMainAccessKeyInput",
@@ -225,6 +226,15 @@ class UpdatePasswordNoAuthInput(BaseRequestModel):
         min_length=1,
         description="New password; must differ from current password",
     )
+
+
+class UpdateMyKeypairInput(BaseRequestModel):
+    """Input for updating the active state of a keypair owned by the current user."""
+
+    access_key: str = Field(
+        description="Access key of the keypair to update. Must be owned by the current user."
+    )
+    is_active: bool = Field(description="Target active state for the keypair.")
 
 
 class RevokeMyKeypairInput(BaseRequestModel):

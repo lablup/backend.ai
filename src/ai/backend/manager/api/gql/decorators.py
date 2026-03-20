@@ -116,9 +116,17 @@ def gql_pydantic_input[PydanticModel: BaseModel](
 ) -> Callable[..., type[StrawberryTypeFromPydantic[PydanticModel]]]:
     """Decorator for GQL input types backed by a v2 Pydantic DTO.
 
-    Strawberry auto-generates from_pydantic() and to_pydantic() methods.
-    Use all_fields=True for scalar-only types, or declare fields explicitly
-    for types with nested GQL input fields.
+    Strawberry auto-generates to_pydantic() for simple types where all GQL field
+    types map directly to the pydantic model fields (same scalar types).
+
+    When explicit conversion is required — e.g., strawberry.ID → uuid.UUID,
+    UNSET/SENTINEL mapping, or enum type coercion — define to_pydantic() in the
+    class body. A user-defined to_pydantic() takes precedence over Strawberry's
+    auto-generated one.
+
+    Use all_fields=True for scalar-only types where the pydantic model defines
+    all fields. Declare fields explicitly when adding descriptions or when only
+    a subset of pydantic fields are exposed.
 
     The description param is accepted for backward compatibility but the
     canonical description is always built from BackendAIGQLMeta.
