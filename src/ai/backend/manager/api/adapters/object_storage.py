@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from collections.abc import Sequence
 from uuid import UUID
 
 from ai.backend.common.api_handlers import Sentinel
@@ -139,6 +140,25 @@ class ObjectStorageAdapter(BaseAdapter):
             limit=input.limit if input.limit is not None else DEFAULT_PAGINATION_LIMIT,
             offset=input.offset if input.offset is not None else 0,
         )
+
+    async def batch_load_by_ids(self, ids: Sequence[UUID]) -> list[ObjectStorageNode | None]:
+        """Batch load object storages by IDs for DataLoader use.
+
+        Returns ObjectStorageNode DTOs in the same order as the input ids list.
+        """
+        if not ids:
+            return []
+        querier = BatchQuerier(
+            pagination=OffsetPagination(limit=len(ids)),
+            conditions=[ObjectStorageConditions.by_ids(ids)],
+        )
+        action_result = (
+            await self._processors.object_storage.search_object_storages.wait_for_complete(
+                SearchObjectStoragesAction(querier=querier)
+            )
+        )
+        storage_map = {item.id: self._data_to_dto(item) for item in action_result.storages}
+        return [storage_map.get(storage_id) for storage_id in ids]
 
     async def get(self, storage_id: UUID) -> ObjectStorageNode:
         """Retrieve a single object storage by ID."""

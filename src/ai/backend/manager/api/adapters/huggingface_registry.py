@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from uuid import UUID
 
 from ai.backend.common.dto.manager.v2.huggingface_registry.request import (
@@ -22,6 +23,7 @@ from ai.backend.manager.data.artifact_registries.types import (
     ArtifactRegistryModifierMeta,
 )
 from ai.backend.manager.data.huggingface_registry.types import HuggingFaceRegistryData
+from ai.backend.manager.models.huggingface_registry.conditions import HuggingFaceRegistryConditions
 from ai.backend.manager.repositories.base import BatchQuerier, OffsetPagination, Updater
 from ai.backend.manager.repositories.base.creator import Creator
 from ai.backend.manager.repositories.huggingface_registry import HuggingFaceRegistryCreatorSpec
@@ -144,6 +146,26 @@ class HuggingFaceRegistryAdapter(BaseAdapter):
             )
         )
         return [self._huggingface_registry_data_to_dto(item) for item in action_result.result]
+
+    async def batch_load_by_ids(self, ids: Sequence[UUID]) -> list[HuggingFaceRegistryNode | None]:
+        """Batch load HuggingFace registries by IDs for DataLoader use.
+
+        Returns HuggingFaceRegistryNode DTOs in the same order as the input ids list.
+        """
+        if not ids:
+            return []
+        querier = BatchQuerier(
+            pagination=OffsetPagination(limit=len(ids)),
+            conditions=[HuggingFaceRegistryConditions.by_ids(ids)],
+        )
+        action_result = await self._processors.artifact_registry.search_huggingface_registries.wait_for_complete(
+            SearchHuggingFaceRegistriesAction(querier=querier)
+        )
+        registry_map = {
+            item.id: self._huggingface_registry_data_to_dto(item)
+            for item in action_result.registries
+        }
+        return [registry_map.get(registry_id) for registry_id in ids]
 
     async def delete(
         self, input: DeleteHuggingFaceRegistryInput

@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+import uuid
+from collections.abc import Sequence
+
 from ai.backend.common.dto.manager.query import StringFilter
 from ai.backend.common.dto.manager.v2.container_registry.request import (
     AdminSearchContainerRegistriesInput,
@@ -118,6 +121,27 @@ class ContainerRegistryAdapter(BaseAdapter):
             limit=input.limit if input.limit is not None else DEFAULT_PAGINATION_LIMIT,
             offset=input.offset if input.offset is not None else 0,
         )
+
+    async def batch_load_by_ids(
+        self, ids: Sequence[uuid.UUID]
+    ) -> list[ContainerRegistryNode | None]:
+        """Batch load container registries by IDs for DataLoader use.
+
+        Returns ContainerRegistryNode DTOs in the same order as the input ids list.
+        """
+        if not ids:
+            return []
+        querier = BatchQuerier(
+            pagination=OffsetPagination(limit=len(ids)),
+            conditions=[ContainerRegistryConditions.by_ids(ids)],
+        )
+        action_result = (
+            await self._processors.container_registry.search_container_registries.wait_for_complete(
+                SearchContainerRegistriesAction(querier=querier)
+            )
+        )
+        registry_map = {item.id: self._data_to_dto(item) for item in action_result.data}
+        return [registry_map.get(registry_id) for registry_id in ids]
 
     @staticmethod
     def _data_to_dto(data: ContainerRegistryData) -> ContainerRegistryNode:

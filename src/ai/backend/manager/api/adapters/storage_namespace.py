@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import uuid
+from collections.abc import Sequence
 
 from ai.backend.common.dto.manager.v2.storage_namespace.request import (
     AdminSearchStorageNamespacesInput,
@@ -16,6 +17,7 @@ from ai.backend.common.dto.manager.v2.storage_namespace.response import (
     UnregisterStorageNamespacePayload,
 )
 from ai.backend.manager.data.storage_namespace.types import StorageNamespaceData
+from ai.backend.manager.models.storage_namespace.conditions import StorageNamespaceConditions
 from ai.backend.manager.repositories.base import BatchQuerier, OffsetPagination
 from ai.backend.manager.repositories.base.creator import Creator
 from ai.backend.manager.repositories.storage_namespace import StorageNamespaceCreatorSpec
@@ -72,6 +74,29 @@ class StorageNamespaceAdapter(BaseAdapter):
             GetNamespacesAction(storage_id)
         )
         return [self._storage_namespace_data_to_dto(item) for item in action_result.result]
+
+    async def batch_load_by_ids(
+        self, ids: Sequence[uuid.UUID]
+    ) -> list[StorageNamespaceNode | None]:
+        """Batch load storage namespaces by IDs for DataLoader use.
+
+        Returns StorageNamespaceNode DTOs in the same order as the input ids list.
+        """
+        if not ids:
+            return []
+        querier = BatchQuerier(
+            pagination=OffsetPagination(limit=len(ids)),
+            conditions=[StorageNamespaceConditions.by_ids(ids)],
+        )
+        action_result = (
+            await self._processors.storage_namespace.search_storage_namespaces.wait_for_complete(
+                SearchStorageNamespacesAction(querier=querier)
+            )
+        )
+        namespace_map = {
+            item.id: self._storage_namespace_data_to_dto(item) for item in action_result.namespaces
+        }
+        return [namespace_map.get(namespace_id) for namespace_id in ids]
 
     async def search(
         self, input: AdminSearchStorageNamespacesInput

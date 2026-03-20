@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from uuid import UUID
 
 from ai.backend.common.dto.manager.v2.vfs_storage.request import (
@@ -18,6 +19,7 @@ from ai.backend.common.dto.manager.v2.vfs_storage.response import (
     VFSStorageNode,
 )
 from ai.backend.manager.data.vfs_storage.types import VFSStorageData
+from ai.backend.manager.models.vfs_storage.conditions import VFSStorageConditions
 from ai.backend.manager.repositories.base import BatchQuerier, OffsetPagination, Updater
 from ai.backend.manager.repositories.base.creator import Creator
 from ai.backend.manager.repositories.vfs_storage import VFSStorageCreatorSpec
@@ -71,6 +73,25 @@ class VFSStorageAdapter(BaseAdapter):
             has_next_page=action_result.has_next_page,
             has_previous_page=action_result.has_previous_page,
         )
+
+    async def batch_load_by_ids(self, ids: Sequence[UUID]) -> list[VFSStorageNode | None]:
+        """Batch load VFS storages by IDs for DataLoader use.
+
+        Returns VFSStorageNode DTOs in the same order as the input ids list.
+        """
+        if not ids:
+            return []
+        querier = BatchQuerier(
+            pagination=OffsetPagination(limit=len(ids)),
+            conditions=[VFSStorageConditions.by_ids(ids)],
+        )
+        action_result = await self._processors.vfs_storage.search_vfs_storages.wait_for_complete(
+            SearchVFSStoragesAction(querier=querier)
+        )
+        storage_map = {
+            item.id: self._vfs_storage_data_to_dto(item) for item in action_result.storages
+        }
+        return [storage_map.get(storage_id) for storage_id in ids]
 
     async def get(self, storage_id: UUID) -> VFSStorageNode:
         """Retrieve a single VFS storage by ID."""
