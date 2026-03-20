@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from collections.abc import Sequence
+
 from ai.backend.common.dto.manager.query import StringFilter
 from ai.backend.common.dto.manager.v2.agent.request import (
     AdminSearchAgentsInput,
@@ -18,6 +20,7 @@ from ai.backend.common.dto.manager.v2.agent.response import (
 )
 from ai.backend.common.dto.manager.v2.agent.types import AgentStatusFilter
 from ai.backend.common.resource.types import TotalResourceData
+from ai.backend.common.types import AgentId
 from ai.backend.manager.data.agent.types import AgentDetailData, AgentStatus
 from ai.backend.manager.models.agent.conditions import AgentConditions
 from ai.backend.manager.models.agent.orders import (
@@ -27,12 +30,20 @@ from ai.backend.manager.models.agent.orders import (
     resolve_order,
 )
 from ai.backend.manager.repositories.base import (
+    BatchQuerier,
+    NoPagination,
     QueryCondition,
     QueryOrder,
     combine_conditions_or,
     negate_conditions,
 )
-from ai.backend.manager.services.agent.actions.get_total_resources import GetTotalResourcesAction
+from ai.backend.manager.services.agent.actions.get_total_resources import (
+    GetTotalResourcesAction,
+    GetTotalResourcesActionResult,
+)
+from ai.backend.manager.services.agent.actions.load_container_counts import (
+    LoadContainerCountsAction,
+)
 from ai.backend.manager.services.agent.actions.search_agents import SearchAgentsAction
 
 from .base import BaseAdapter
@@ -49,6 +60,40 @@ _AGENT_PAGINATION_SPEC = PaginationSpec(
 
 class AgentAdapter(BaseAdapter):
     """Adapter for agent domain operations."""
+
+    # ------------------------------------------------------------------ batch load (DataLoader)
+
+    async def batch_load_by_ids(self, agent_ids: Sequence[AgentId]) -> list[AgentNode | None]:
+        """Batch load agents by ID for DataLoader use.
+
+        Returns AgentNode DTOs in the same order as the input agent_ids list.
+        """
+        if not agent_ids:
+            return []
+        querier = BatchQuerier(
+            pagination=NoPagination(),
+            conditions=[AgentConditions.by_ids(agent_ids)],
+        )
+        action_result = await self._processors.agent.search_agents.wait_for_complete(
+            SearchAgentsAction(querier=querier)
+        )
+        agent_map = {detail.agent.id: self._data_to_dto(detail) for detail in action_result.agents}
+        return [agent_map.get(agent_id) for agent_id in agent_ids]
+
+    async def batch_load_container_counts(self, agent_ids: Sequence[AgentId]) -> list[int]:
+        """Batch load container counts for agents by ID for DataLoader use.
+
+        Returns container counts in the same order as the input agent_ids list.
+        Returns 0 for agents not found.
+        """
+        if not agent_ids:
+            return []
+        action_result = await self._processors.agent.load_container_counts.wait_for_complete(
+            LoadContainerCountsAction(agent_ids=agent_ids)
+        )
+        return list(action_result.container_counts)
+
+    # ------------------------------------------------------------------ search
 
     async def admin_search(
         self,
@@ -152,8 +197,10 @@ class AgentAdapter(BaseAdapter):
 
     async def get_total_resources(self) -> TotalResourceData:
         """Retrieve aggregate resource capacity/usage across all agents."""
-        action_result = await self._processors.agent.get_total_resources.wait_for_complete(
-            GetTotalResourcesAction()
+        action_result: GetTotalResourcesActionResult = (
+            await self._processors.agent.get_total_resources.wait_for_complete(
+                GetTotalResourcesAction()
+            )
         )
         return action_result.total_resources
 

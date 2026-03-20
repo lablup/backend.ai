@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import uuid
 from collections.abc import Sequence
+from datetime import datetime
 from decimal import Decimal
 from functools import lru_cache
 
@@ -30,17 +32,22 @@ from ai.backend.common.dto.manager.v2.image.types import (
 )
 from ai.backend.common.types import ImageID
 from ai.backend.manager.data.image.types import ImageAliasData, ImageData, ImageStatus
-from ai.backend.manager.models.image.conditions import ImageAliasConditions, ImageConditions
+from ai.backend.manager.models.image.conditions import (
+    ImageAliasConditions,
+    ImageConditions,
+)
 from ai.backend.manager.models.image.orders import ImageAliasOrders, ImageOrders
 from ai.backend.manager.models.image.row import ImageAliasRow, ImageRow
 from ai.backend.manager.repositories.base import (
     BatchQuerier,
+    NoPagination,
     OffsetPagination,
     QueryCondition,
     QueryOrder,
     combine_conditions_or,
     negate_conditions,
 )
+from ai.backend.manager.services.image.actions.load_image_last_used import LoadImageLastUsedAction
 from ai.backend.manager.services.image.actions.search_aliases import SearchAliasesAction
 from ai.backend.manager.services.image.actions.search_images import SearchImagesAction
 
@@ -76,6 +83,64 @@ def _get_alias_pagination_spec() -> PaginationSpec:
 
 class ImageAdapter(BaseAdapter):
     """Adapter for image domain operations."""
+
+    # ------------------------------------------------------------------ batch load (DataLoader)
+
+    async def batch_load_by_ids(self, image_ids: Sequence[ImageID]) -> list[ImageNode | None]:
+        """Batch load images by ID for DataLoader use.
+
+        Returns ImageNode DTOs in the same order as the input image_ids list.
+        """
+        if not image_ids:
+            return []
+        querier = BatchQuerier(
+            pagination=NoPagination(),
+            conditions=[ImageConditions.by_ids(image_ids)],
+        )
+        action_result = await self._processors.image.search_images.wait_for_complete(
+            SearchImagesAction(querier=querier)
+        )
+        image_map: dict[ImageID, ImageNode] = {
+            ImageID(item.id): self._data_to_dto(item) for item in action_result.data
+        }
+        return [image_map.get(image_id) for image_id in image_ids]
+
+    async def batch_load_aliases_by_ids(
+        self, alias_ids: Sequence[uuid.UUID]
+    ) -> list[ImageAliasNode | None]:
+        """Batch load image aliases by alias ID for DataLoader use.
+
+        Returns ImageAliasNode DTOs in the same order as the input alias_ids list.
+        """
+        if not alias_ids:
+            return []
+        querier = BatchQuerier(
+            pagination=NoPagination(),
+            conditions=[ImageAliasConditions.by_ids(alias_ids)],
+        )
+        action_result = await self._processors.image.search_aliases.wait_for_complete(
+            SearchAliasesAction(querier=querier)
+        )
+        alias_map: dict[uuid.UUID, ImageAliasNode] = {
+            item.id: self._alias_data_to_dto(item) for item in action_result.data
+        }
+        return [alias_map.get(alias_id) for alias_id in alias_ids]
+
+    async def batch_load_last_used_by_ids(
+        self, image_ids: Sequence[ImageID]
+    ) -> list[datetime | None]:
+        """Batch load last used timestamps for images by ID for DataLoader use.
+
+        Returns datetime values (or None if never used) in the same order as image_ids.
+        """
+        if not image_ids:
+            return []
+        action_result = await self._processors.image.load_image_last_used.wait_for_complete(
+            LoadImageLastUsedAction(image_ids=image_ids)
+        )
+        return [action_result.last_used_map.get(image_id) for image_id in image_ids]
+
+    # ------------------------------------------------------------------ search
 
     async def admin_search(self, input: AdminSearchImagesInput) -> AdminSearchImagesPayload:
         """Search images with admin scope using offset pagination."""

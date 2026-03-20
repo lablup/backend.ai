@@ -2,9 +2,12 @@
 
 from __future__ import annotations
 
+import uuid
+from collections.abc import Sequence
 from typing import cast
 from uuid import UUID
 
+from ai.backend.common.data.filter_specs import UUIDInMatchSpec
 from ai.backend.common.data.user.types import UserRole
 from ai.backend.common.data.user.types import UserRole as DataUserRole
 from ai.backend.common.dto.manager.pagination import PaginationInfo
@@ -62,6 +65,7 @@ from ai.backend.manager.models.user.orders import UserOrders
 from ai.backend.manager.models.user.row import UserRow
 from ai.backend.manager.repositories.base import (
     BatchQuerier,
+    NoPagination,
     OffsetPagination,
     QueryCondition,
     QueryOrder,
@@ -118,6 +122,27 @@ class UserAdapter(BaseAdapter):
     - update/delete/purge: require email-based action signatures not yet bridged;
       the corresponding GQL mutations currently raise NotImplementedError
     """
+
+    # ------------------------------------------------------------------ batch load (DataLoader)
+
+    async def batch_load_by_ids(self, user_ids: Sequence[uuid.UUID]) -> list[UserNode | None]:
+        """Batch load users by UUID for DataLoader use.
+
+        Returns UserNode DTOs in the same order as the input user_ids list.
+        """
+        if not user_ids:
+            return []
+        querier = BatchQuerier(
+            pagination=NoPagination(),
+            conditions=[
+                UserConditions.by_uuid_in(UUIDInMatchSpec(values=list(user_ids), negated=False))
+            ],
+        )
+        action_result = await self._processors.user.search_users.wait_for_complete(
+            SearchUsersAction(querier=querier)
+        )
+        user_map = {user.uuid: self._user_data_to_node(user) for user in action_result.users}
+        return [user_map.get(user_id) for user_id in user_ids]
 
     # ------------------------------------------------------------------ GQL search (cursor-based)
 

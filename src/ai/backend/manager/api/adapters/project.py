@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from uuid import UUID
 
+from ai.backend.common.data.filter_specs import UUIDInMatchSpec
 from ai.backend.common.dto.manager.query import DateTimeFilter, StringFilter, UUIDFilter
 from ai.backend.common.dto.manager.v2.group.request import (
     AdminSearchGroupsInput,
@@ -34,6 +36,8 @@ from ai.backend.manager.models.group.conditions import GroupConditions
 from ai.backend.manager.models.group.orders import GroupOrders
 from ai.backend.manager.models.group.row import GroupRow
 from ai.backend.manager.repositories.base import (
+    BatchQuerier,
+    NoPagination,
     QueryCondition,
     QueryOrder,
     combine_conditions_or,
@@ -65,6 +69,29 @@ _PROJECT_PAGINATION_SPEC = PaginationSpec(
 
 class ProjectAdapter(BaseAdapter):
     """Adapter for project (group) operations."""
+
+    # ------------------------------------------------------------------ batch load (DataLoader)
+
+    async def batch_load_by_ids(self, group_ids: Sequence[UUID]) -> list[ProjectNode | None]:
+        """Batch load projects by UUID for DataLoader use.
+
+        Returns ProjectNode DTOs in the same order as the input group_ids list.
+        """
+        if not group_ids:
+            return []
+        querier = BatchQuerier(
+            pagination=NoPagination(),
+            conditions=[
+                GroupConditions.by_id_in(UUIDInMatchSpec(values=list(group_ids), negated=False))
+            ],
+        )
+        action_result = await self._processors.group.search_projects.wait_for_complete(
+            SearchProjectsAction(querier=querier)
+        )
+        project_map = {group.id: self._group_data_to_node(group) for group in action_result.items}
+        return [project_map.get(group_id) for group_id in group_ids]
+
+    # ------------------------------------------------------------------ get
 
     async def get(self, project_id: UUID) -> ProjectNode:
         """Retrieve a single project by UUID."""
