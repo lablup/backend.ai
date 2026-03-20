@@ -145,14 +145,10 @@ class ProjectV2GQL(PydanticNodeMixin[ProjectNode]):
         self,
         info: Info,
     ) -> ActiveResourceOverviewGQL:
-        from ai.backend.manager.services.resource_slot.actions.get_project_resource_overview import (
-            GetProjectResourceOverviewAction,
+        occupancy = await info.context.adapters.resource_slot.get_project_resource_overview(
+            UUID(str(self.id))
         )
-
-        result = await info.context.processors.resource_slot.get_project_resource_overview.wait_for_complete(
-            GetProjectResourceOverviewAction(project_id=UUID(str(self.id)))
-        )
-        return ActiveResourceOverviewGQL.from_occupancy(result.item)
+        return ActiveResourceOverviewGQL.from_occupancy(occupancy)
 
     @strawberry.field(  # type: ignore[misc]
         description=(

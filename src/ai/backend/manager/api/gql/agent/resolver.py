@@ -15,19 +15,15 @@ from ai.backend.manager.api.gql.agent.types import (
 )
 from ai.backend.manager.api.gql.base import to_global_id
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
-from ai.backend.manager.services.agent.actions.get_total_resources import GetTotalResourcesAction
 
 
 @strawberry.field(description="Added in 25.15.0")  # type: ignore[misc]
 async def agent_stats(info: Info[StrawberryGQLContext]) -> AgentStatsGQL | None:
-    result = await info.context.processors.agent.get_total_resources.wait_for_complete(
-        GetTotalResourcesAction()
-    )
-
+    total = await info.context.adapters.agent.get_total_resources()
     resource = AgentResourceGQL(
-        free=result.total_resources.total_free_slots.to_json(),
-        used=result.total_resources.total_used_slots.to_json(),
-        capacity=result.total_resources.total_capacity_slots.to_json(),
+        free=total.total_free_slots.to_json(),
+        used=total.total_used_slots.to_json(),
+        capacity=total.total_capacity_slots.to_json(),
     )
     return AgentStatsGQL(total_resource=resource)
 

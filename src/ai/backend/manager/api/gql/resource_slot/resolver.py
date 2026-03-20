@@ -11,9 +11,6 @@ from ai.backend.common.dto.manager.v2.resource_slot.request import (
 from ai.backend.common.dto.manager.v2.resource_slot.response import ResourceSlotTypeNode
 from ai.backend.manager.api.gql.base import encode_cursor
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
-from ai.backend.manager.services.resource_slot.actions.get_resource_slot_type import (
-    GetResourceSlotTypeAction,
-)
 
 from .types import (
     NumberFormatGQL,
@@ -52,12 +49,8 @@ async def resource_slot_type(
     info: Info[StrawberryGQLContext],
     slot_name: str,
 ) -> ResourceSlotTypeGQL | None:
-    action_result = (
-        await info.context.processors.resource_slot.get_resource_slot_type.wait_for_complete(
-            GetResourceSlotTypeAction(slot_name=slot_name)
-        )
-    )
-    return ResourceSlotTypeGQL.from_data(action_result.item)
+    data = await info.context.adapters.resource_slot.get_slot_type(slot_name)
+    return ResourceSlotTypeGQL.from_data(data)
 
 
 @strawberry.field(

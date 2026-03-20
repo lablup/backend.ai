@@ -67,18 +67,6 @@ from ai.backend.manager.data.resource_slot.types import (
     ResourceAllocationData,
     ResourceSlotTypeData,
 )
-from ai.backend.manager.services.resource_slot.actions.get_agent_resource_by_slot import (
-    GetAgentResourceBySlotAction,
-    GetAgentResourceBySlotResult,
-)
-from ai.backend.manager.services.resource_slot.actions.get_kernel_allocation_by_slot import (
-    GetKernelAllocationBySlotAction,
-    GetKernelAllocationBySlotResult,
-)
-from ai.backend.manager.services.resource_slot.actions.get_resource_slot_type import (
-    GetResourceSlotTypeAction,
-    GetResourceSlotTypeResult,
-)
 
 # ========== Raw data helpers for Node.resolve_nodes ==========
 # These return raw data types so that resolve_nodes can call cls.from_data(),
@@ -90,12 +78,7 @@ async def load_resource_slot_type_data(
     slot_name: str,
 ) -> ResourceSlotTypeData:
     """Load raw ResourceSlotTypeData for a single slot_name (used by Node.resolve_nodes)."""
-    action_result: GetResourceSlotTypeResult = (
-        await info.context.processors.resource_slot.get_resource_slot_type.wait_for_complete(
-            GetResourceSlotTypeAction(slot_name=slot_name)
-        )
-    )
-    return action_result.item
+    return await info.context.adapters.resource_slot.get_slot_type(slot_name)
 
 
 async def load_agent_resource_data(
@@ -107,12 +90,7 @@ async def load_agent_resource_data(
 
     Raises AgentResourceNotFound if the entry does not exist.
     """
-    action_result: GetAgentResourceBySlotResult = (
-        await info.context.processors.resource_slot.get_agent_resource_by_slot.wait_for_complete(
-            GetAgentResourceBySlotAction(agent_id=agent_id, slot_name=slot_name)
-        )
-    )
-    return action_result.item
+    return await info.context.adapters.resource_slot.get_agent_resource(agent_id, slot_name)
 
 
 async def load_kernel_allocation_data(
@@ -124,14 +102,9 @@ async def load_kernel_allocation_data(
 
     Raises ResourceAllocationNotFound if the entry does not exist.
     """
-    action_result: GetKernelAllocationBySlotResult = (
-        await info.context.processors.resource_slot.get_kernel_allocation_by_slot.wait_for_complete(
-            GetKernelAllocationBySlotAction(
-                kernel_id=_uuid.UUID(kernel_id_str), slot_name=slot_name
-            )
-        )
+    return await info.context.adapters.resource_slot.get_kernel_allocation(
+        _uuid.UUID(kernel_id_str), slot_name
     )
-    return action_result.item
 
 
 # ========== NumberFormat ==========

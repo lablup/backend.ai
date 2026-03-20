@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import uuid
+
 from ai.backend.common.dto.manager.query import StringFilter, UUIDFilter
 from ai.backend.common.dto.manager.v2.resource_slot.request import (
     AdminSearchAgentResourcesInput,
@@ -26,6 +28,7 @@ from ai.backend.common.dto.manager.v2.resource_slot.types import NumberFormatInf
 from ai.backend.manager.data.resource_slot.types import (
     AgentResourceData,
     ResourceAllocationData,
+    ResourceOccupancy,
     ResourceSlotTypeData,
 )
 from ai.backend.manager.models.resource_slot.conditions import (
@@ -49,6 +52,21 @@ from ai.backend.manager.repositories.base import (
     OffsetPagination,
     QueryCondition,
     QueryOrder,
+)
+from ai.backend.manager.services.resource_slot.actions.get_agent_resource_by_slot import (
+    GetAgentResourceBySlotAction,
+)
+from ai.backend.manager.services.resource_slot.actions.get_domain_resource_overview import (
+    GetDomainResourceOverviewAction,
+)
+from ai.backend.manager.services.resource_slot.actions.get_kernel_allocation_by_slot import (
+    GetKernelAllocationBySlotAction,
+)
+from ai.backend.manager.services.resource_slot.actions.get_project_resource_overview import (
+    GetProjectResourceOverviewAction,
+)
+from ai.backend.manager.services.resource_slot.actions.get_resource_slot_type import (
+    GetResourceSlotTypeAction,
 )
 from ai.backend.manager.services.resource_slot.actions.search_agent_resources import (
     SearchAgentResourcesAction,
@@ -358,3 +376,58 @@ class ResourceSlotAdapter(BaseAdapter):
             requested=str(data.requested),
             used=str(data.used) if data.used is not None else None,
         )
+
+    # -------------------------------------------------------------------------
+    # Single-item getters
+    # -------------------------------------------------------------------------
+
+    async def get_slot_type(self, slot_name: str) -> ResourceSlotTypeData:
+        """Retrieve a single resource slot type by slot name."""
+        action_result = (
+            await self._processors.resource_slot.get_resource_slot_type.wait_for_complete(
+                GetResourceSlotTypeAction(slot_name=slot_name)
+            )
+        )
+        return action_result.item
+
+    async def get_agent_resource(self, agent_id: str, slot_name: str) -> AgentResourceData:
+        """Retrieve a single agent resource by agent ID and slot name."""
+        action_result = (
+            await self._processors.resource_slot.get_agent_resource_by_slot.wait_for_complete(
+                GetAgentResourceBySlotAction(agent_id=agent_id, slot_name=slot_name)
+            )
+        )
+        return action_result.item
+
+    async def get_kernel_allocation(
+        self, kernel_id: uuid.UUID, slot_name: str
+    ) -> ResourceAllocationData:
+        """Retrieve a single kernel resource allocation by kernel ID and slot name."""
+        action_result = (
+            await self._processors.resource_slot.get_kernel_allocation_by_slot.wait_for_complete(
+                GetKernelAllocationBySlotAction(kernel_id=kernel_id, slot_name=slot_name)
+            )
+        )
+        return action_result.item
+
+    # -------------------------------------------------------------------------
+    # Resource overview
+    # -------------------------------------------------------------------------
+
+    async def get_domain_resource_overview(self, domain_name: str) -> ResourceOccupancy:
+        """Retrieve active resource occupancy overview for a domain."""
+        action_result = (
+            await self._processors.resource_slot.get_domain_resource_overview.wait_for_complete(
+                GetDomainResourceOverviewAction(domain_name=domain_name)
+            )
+        )
+        return action_result.item
+
+    async def get_project_resource_overview(self, project_id: uuid.UUID) -> ResourceOccupancy:
+        """Retrieve active resource occupancy overview for a project."""
+        action_result = (
+            await self._processors.resource_slot.get_project_resource_overview.wait_for_complete(
+                GetProjectResourceOverviewAction(project_id=project_id)
+            )
+        )
+        return action_result.item

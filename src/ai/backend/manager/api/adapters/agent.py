@@ -17,6 +17,7 @@ from ai.backend.common.dto.manager.v2.agent.response import (
     AgentSystemInfo,
 )
 from ai.backend.common.dto.manager.v2.agent.types import AgentStatusFilter
+from ai.backend.common.resource.types import TotalResourceData
 from ai.backend.manager.data.agent.types import AgentDetailData, AgentStatus
 from ai.backend.manager.models.agent.conditions import AgentConditions
 from ai.backend.manager.models.agent.orders import (
@@ -31,6 +32,7 @@ from ai.backend.manager.repositories.base import (
     combine_conditions_or,
     negate_conditions,
 )
+from ai.backend.manager.services.agent.actions.get_total_resources import GetTotalResourcesAction
 from ai.backend.manager.services.agent.actions.search_agents import SearchAgentsAction
 
 from .base import BaseAdapter
@@ -147,6 +149,13 @@ class AgentAdapter(BaseAdapter):
     @staticmethod
     def _convert_orders(order: list[AgentOrder]) -> list[QueryOrder]:
         return [resolve_order(o.field, o.direction) for o in order]
+
+    async def get_total_resources(self) -> TotalResourceData:
+        """Retrieve aggregate resource capacity/usage across all agents."""
+        action_result = await self._processors.agent.get_total_resources.wait_for_complete(
+            GetTotalResourcesAction()
+        )
+        return action_result.total_resources
 
     @staticmethod
     def _data_to_dto(detail: AgentDetailData) -> AgentNode:

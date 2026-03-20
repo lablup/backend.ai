@@ -138,14 +138,10 @@ class DomainV2GQL(PydanticNodeMixin[DomainNode]):
         self,
         info: Info,
     ) -> ActiveResourceOverviewGQL:
-        from ai.backend.manager.services.resource_slot.actions.get_domain_resource_overview import (
-            GetDomainResourceOverviewAction,
+        occupancy = await info.context.adapters.resource_slot.get_domain_resource_overview(
+            str(self.id)
         )
-
-        result = await info.context.processors.resource_slot.get_domain_resource_overview.wait_for_complete(
-            GetDomainResourceOverviewAction(domain_name=str(self.id))
-        )
-        return ActiveResourceOverviewGQL.from_occupancy(result.item)
+        return ActiveResourceOverviewGQL.from_occupancy(occupancy)
 
     @strawberry.field(  # type: ignore[misc]
         description=(
