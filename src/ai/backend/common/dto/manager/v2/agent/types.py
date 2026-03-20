@@ -9,6 +9,7 @@ from enum import StrEnum
 from pydantic import Field
 
 from ai.backend.common.api_handlers import BaseRequestModel
+from ai.backend.common.dto.manager.v2.common import OrderDirection
 
 __all__ = (
     "AgentOrderField",
@@ -35,13 +36,6 @@ class AgentOrderField(StrEnum):
     RESOURCE_GROUP = "resource_group"
     FIRST_CONTACT = "first_contact"
     SCHEDULABLE = "schedulable"
-
-
-class OrderDirection(StrEnum):
-    """Order direction for sorting."""
-
-    ASC = "asc"
-    DESC = "desc"
 
 
 class AgentStatusFilter(BaseRequestModel):

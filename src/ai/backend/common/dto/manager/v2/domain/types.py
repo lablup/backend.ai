@@ -10,6 +10,7 @@ from pydantic import Field
 
 from ai.backend.common.api_handlers import BaseRequestModel
 from ai.backend.common.dto.manager.query import StringFilter
+from ai.backend.common.dto.manager.v2.common import OrderDirection
 
 __all__ = (
     "DomainFairShareScopeDTO",
@@ -19,13 +20,6 @@ __all__ = (
     "DomainUserFilter",
     "OrderDirection",
 )
-
-
-class OrderDirection(StrEnum):
-    """Order direction for sorting."""
-
-    ASC = "asc"
-    DESC = "desc"
 
 
 class DomainOrderField(StrEnum):

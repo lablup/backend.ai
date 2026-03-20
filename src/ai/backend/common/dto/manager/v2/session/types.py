@@ -7,6 +7,7 @@ from __future__ import annotations
 from enum import StrEnum
 
 from ai.backend.common.api_handlers import BaseRequestModel
+from ai.backend.common.dto.manager.v2.common import OrderDirection
 
 __all__ = (
     "OrderDirection",
@@ -62,13 +63,6 @@ class SessionOrderField(StrEnum):
     STATUS = "status"
     ID = "id"
     NAME = "name"
-
-
-class OrderDirection(StrEnum):
-    """Order direction for sorting."""
-
-    ASC = "asc"
-    DESC = "desc"
 
 
 class SessionStatusFilter(BaseRequestModel):

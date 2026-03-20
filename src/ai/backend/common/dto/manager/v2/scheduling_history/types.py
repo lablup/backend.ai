@@ -11,6 +11,7 @@ from uuid import UUID
 from pydantic import Field
 
 from ai.backend.common.api_handlers import BaseRequestModel, BaseResponseModel
+from ai.backend.common.dto.manager.v2.common import OrderDirection
 
 __all__ = (
     "DeploymentHistoryOrderField",
@@ -23,13 +24,6 @@ __all__ = (
     "SessionHistoryScopeDTO",
     "SubStepResultInfo",
 )
-
-
-class OrderDirection(StrEnum):
-    """Order direction for sorting."""
-
-    ASC = "asc"
-    DESC = "desc"
 
 
 class SchedulingResultType(StrEnum):

@@ -10,6 +10,7 @@ from pydantic import Field
 
 from ai.backend.common.api_handlers import BaseRequestModel
 from ai.backend.common.dto.manager.query import StringFilter
+from ai.backend.common.dto.manager.v2.common import OrderDirection
 
 __all__ = (
     "DomainProjectScopeDTO",
@@ -27,13 +28,6 @@ class ProjectType(StrEnum):
 
     GENERAL = "general"
     MODEL_STORE = "model-store"
-
-
-class OrderDirection(StrEnum):
-    """Order direction for sorting."""
-
-    ASC = "asc"
-    DESC = "desc"
 
 
 class GroupOrderField(StrEnum):

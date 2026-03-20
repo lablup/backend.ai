@@ -13,6 +13,7 @@ from ai.backend.common.data.permission.types import (
     RoleSource,
     RoleStatus,
 )
+from ai.backend.common.dto.manager.v2.common import OrderDirection
 
 __all__ = (
     "EntityOrderField",
@@ -29,13 +30,6 @@ __all__ = (
     "RoleStatus",
     "RoleStatusFilter",
 )
-
-
-class OrderDirection(StrEnum):
-    """Order direction for sorting."""
-
-    ASC = "asc"
-    DESC = "desc"
 
 
 class RoleOrderField(StrEnum):

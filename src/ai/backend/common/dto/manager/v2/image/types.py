@@ -8,6 +8,7 @@ from decimal import Decimal
 from enum import StrEnum
 
 from ai.backend.common.api_handlers import BaseResponseModel
+from ai.backend.common.dto.manager.v2.common import OrderDirection
 
 __all__ = (
     "ImageLabelInfo",
@@ -35,13 +36,6 @@ class ImageTypeEnum(StrEnum):
     COMPUTE = "compute"
     SYSTEM = "system"
     SERVICE = "service"
-
-
-class OrderDirection(StrEnum):
-    """Order direction for sorting."""
-
-    ASC = "asc"
-    DESC = "desc"
 
 
 class ImageOrderField(StrEnum):

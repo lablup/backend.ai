@@ -5,6 +5,7 @@ from __future__ import annotations
 from enum import StrEnum
 
 from ai.backend.common.api_handlers import BaseRequestModel
+from ai.backend.common.dto.manager.v2.common import OrderDirection
 
 __all__ = (
     "KernelOrderField",
@@ -12,13 +13,6 @@ __all__ = (
     "KernelStatusFilter",
     "OrderDirection",
 )
-
-
-class OrderDirection(StrEnum):
-    """Order direction for sorting."""
-
-    ASC = "asc"
-    DESC = "desc"
 
 
 class KernelOrderField(StrEnum):

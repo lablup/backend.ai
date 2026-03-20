@@ -6,17 +6,12 @@ from __future__ import annotations
 
 from enum import StrEnum
 
+from ai.backend.common.dto.manager.v2.common import OrderDirection
+
 __all__ = (
     "OrderDirection",
     "QuotaScopeOrderField",
 )
-
-
-class OrderDirection(StrEnum):
-    """Order direction for sorting."""
-
-    ASC = "asc"
-    DESC = "desc"
 
 
 class QuotaScopeOrderField(StrEnum):

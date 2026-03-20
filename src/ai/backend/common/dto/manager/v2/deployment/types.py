@@ -16,6 +16,7 @@ from ai.backend.common.data.model_deployment.types import (
     RouteStatus,
     RouteTrafficStatus,
 )
+from ai.backend.common.dto.manager.v2.common import OrderDirection
 from ai.backend.common.types import ClusterMode, RuntimeVariant
 
 __all__ = (
@@ -41,13 +42,6 @@ __all__ = (
     "RouteTrafficStatus",
     "RuntimeVariant",
 )
-
-
-class OrderDirection(StrEnum):
-    """Order direction for sorting."""
-
-    ASC = "asc"
-    DESC = "desc"
 
 
 class DeploymentOrderField(StrEnum):

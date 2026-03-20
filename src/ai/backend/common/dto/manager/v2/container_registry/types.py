@@ -8,6 +8,7 @@ from pydantic import Field
 
 from ai.backend.common.api_handlers import BaseRequestModel
 from ai.backend.common.container_registry import ContainerRegistryType
+from ai.backend.common.dto.manager.v2.common import OrderDirection
 
 __all__ = (
     "ContainerRegistryOrderField",
@@ -15,13 +16,6 @@ __all__ = (
     "ContainerRegistryTypeFilter",
     "OrderDirection",
 )
-
-
-class OrderDirection(StrEnum):
-    """Order direction for sorting."""
-
-    ASC = "asc"
-    DESC = "desc"
 
 
 class ContainerRegistryOrderField(StrEnum):

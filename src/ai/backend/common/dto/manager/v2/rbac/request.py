@@ -11,7 +11,7 @@ from pydantic import Field, field_validator
 from ai.backend.common.api_handlers import SENTINEL, BaseRequestModel, Sentinel
 from ai.backend.common.dto.manager.query import StringFilter
 
-from .types import RoleSource, RoleSourceFilter, RoleStatus, RoleStatusFilter
+from .types import OrderDirection, RoleSource, RoleSourceFilter, RoleStatus, RoleStatusFilter
 
 __all__ = (
     "AdminSearchEntitiesGQLInput",
@@ -217,28 +217,28 @@ class RoleOrderBy(BaseRequestModel):
     """Order by specification for roles."""
 
     field: str
-    direction: str = "desc"
+    direction: OrderDirection = OrderDirection.DESC
 
 
 class RoleAssignmentOrderBy(BaseRequestModel):
     """Order by specification for role assignments."""
 
     field: str
-    direction: str = "desc"
+    direction: OrderDirection = OrderDirection.DESC
 
 
 class EntityOrderBy(BaseRequestModel):
     """Order by specification for entity associations."""
 
     field: str
-    direction: str = "desc"
+    direction: OrderDirection = OrderDirection.DESC
 
 
 class PermissionOrderBy(BaseRequestModel):
     """Order by specification for permissions."""
 
     field: str
-    direction: str = "desc"
+    direction: OrderDirection = OrderDirection.DESC
 
 
 class AdminSearchPermissionsGQLInput(BaseRequestModel):

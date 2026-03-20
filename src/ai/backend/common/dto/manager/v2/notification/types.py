@@ -13,6 +13,7 @@ from ai.backend.common.data.notification.types import (
     NotificationChannelType,
     NotificationRuleType,
 )
+from ai.backend.common.dto.manager.v2.common import OrderDirection
 
 __all__ = (
     "EmailSpecInfo",
@@ -23,13 +24,6 @@ __all__ = (
     "OrderDirection",
     "WebhookSpecInfo",
 )
-
-
-class OrderDirection(StrEnum):
-    """Order direction for sorting."""
-
-    ASC = "asc"
-    DESC = "desc"
 
 
 class NotificationChannelOrderField(StrEnum):

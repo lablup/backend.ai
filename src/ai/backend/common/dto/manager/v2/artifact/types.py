@@ -16,6 +16,7 @@ from ai.backend.common.data.artifact.types import (
     CombinedDownloadProgress,
     VerificationStepResult,
 )
+from ai.backend.common.dto.manager.v2.common import OrderDirection
 
 __all__ = (
     "ArtifactAvailability",
@@ -88,13 +89,6 @@ class ArtifactRevisionOrderField(StrEnum):
     CREATED_AT = "CREATED_AT"
     UPDATED_AT = "UPDATED_AT"
     STATUS = "STATUS"
-
-
-class OrderDirection(StrEnum):
-    """Order direction for sorting."""
-
-    ASC = "asc"
-    DESC = "desc"
 
 
 class ArtifactTypeFilter(BaseRequestModel):

@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from enum import StrEnum
 
+from ai.backend.common.dto.manager.v2.common import OrderDirection
+
 __all__ = (
     "AuditLogOrderField",
     "AuditLogStatus",
@@ -27,10 +29,3 @@ class AuditLogOrderField(StrEnum):
     ENTITY_TYPE = "entity_type"
     OPERATION = "operation"
     STATUS = "status"
-
-
-class OrderDirection(StrEnum):
-    """Order direction for sorting."""
-
-    ASC = "asc"
-    DESC = "desc"

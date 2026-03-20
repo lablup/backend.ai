@@ -6,6 +6,8 @@ from __future__ import annotations
 
 from enum import StrEnum
 
+from ai.backend.common.dto.manager.v2.common import OrderDirection
+
 __all__ = (
     "OrderDirection",
     "ResourceGroupOrderDirection",
@@ -13,18 +15,11 @@ __all__ = (
 )
 
 
-class OrderDirection(StrEnum):
-    """Order direction for sorting."""
-
-    ASC = "asc"
-    DESC = "desc"
-
-
 class ResourceGroupOrderDirection(StrEnum):
     """Order direction for resource group sorting."""
 
-    ASC = "asc"
-    DESC = "desc"
+    ASC = "ASC"
+    DESC = "DESC"
 
 
 class ResourceGroupOrderField(StrEnum):

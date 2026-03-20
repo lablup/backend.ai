@@ -10,6 +10,7 @@ from pydantic import Field
 
 from ai.backend.common.api_handlers import BaseRequestModel
 from ai.backend.common.dto.manager.query import StringFilter
+from ai.backend.common.dto.manager.v2.common import OrderDirection
 
 __all__ = (
     "ComputeSessionFilter",
@@ -24,13 +25,6 @@ class ComputeSessionOrderField(StrEnum):
 
     CREATED_AT = "created_at"
     ID = "id"
-
-
-class OrderDirection(StrEnum):
-    """Order direction for sorting."""
-
-    ASC = "asc"
-    DESC = "desc"
 
 
 class ComputeSessionFilter(BaseRequestModel):
