@@ -16,6 +16,26 @@ Changes
 
 <!-- towncrier release notes start -->
 
+## 26.3.1 (2026-03-20)
+
+### Features
+* Add AND, OR, NOT logical operators to GraphQL filter types for complex boolean filter expressions. ([#10250](https://github.com/lablup/backend.ai/issues/10250))
+* Add internal health endpoint (`/health`) to the manager's internal app, and simplify the public health handler to a plain liveness probe. ([#10308](https://github.com/lablup/backend.ai/issues/10308))
+
+### Improvements
+* Add `TimeoutSeconds` annotated type to centralize and simplify session timeout validation in request DTOs. ([#10267](https://github.com/lablup/backend.ai/issues/10267))
+
+### Fixes
+* Fix global container registry RBAC migration to map to project scopes instead of domain scopes ([#10082](https://github.com/lablup/backend.ai/issues/10082))
+* Fix resource preset check returning incorrect occupancy when scaling groups have no active sessions ([#10268](https://github.com/lablup/backend.ai/issues/10268))
+* Fix session dependency GraphQL dataloaders returning empty results due to incorrect key mapping and missing eager loading ([#10280](https://github.com/lablup/backend.ai/issues/10280))
+* Restore `db` and `config_provider` access for webapp plugins (OpenID, TOTP) after DI refactoring by injecting them into the root app context ([#10292](https://github.com/lablup/backend.ai/issues/10292))
+* Add otp field to AuthorizeRequest and AuthorizeAction for TOTP two-factor authentication compatibility. ([#10305](https://github.com/lablup/backend.ai/issues/10305))
+* Exclude unmeasurable metrics from utilization idle check instead of treating stat collection failures as 0% usage ([#10316](https://github.com/lablup/backend.ai/issues/10316))
+* Restore `etcd` and `valkey_stat` access for webapp plugins (Cloud) after DI refactoring by injecting them into the root app context ([#10318](https://github.com/lablup/backend.ai/issues/10318))
+* Route authenticated TOTP endpoints through web_handler instead of anonymous handler ([#10345](https://github.com/lablup/backend.ai/issues/10345))
+
+
 ## 26.3.0 (2026-03-16)
 
 ### Features
