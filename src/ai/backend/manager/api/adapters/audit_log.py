@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+import uuid
+from collections.abc import Sequence
+
 from ai.backend.common.dto.manager.v2.audit_log.request import (
     AdminSearchAuditLogsInput,
     AuditLogFilter,
@@ -21,6 +24,8 @@ from ai.backend.manager.data.audit_log.types import AuditLogData
 from ai.backend.manager.models.audit_log import AuditLogRow
 from ai.backend.manager.repositories.audit_log.options import AuditLogConditions, AuditLogOrders
 from ai.backend.manager.repositories.base import (
+    BatchQuerier,
+    OffsetPagination,
     QueryCondition,
     QueryOrder,
     combine_conditions_or,
@@ -42,6 +47,23 @@ _AUDIT_LOG_PAGINATION_SPEC = PaginationSpec(
 
 class AuditLogAdapter(BaseAdapter):
     """Adapter for audit log domain operations."""
+
+    async def batch_load_by_ids(self, ids: Sequence[uuid.UUID]) -> list[AuditLogNode | None]:
+        """Batch load audit logs by their IDs for DataLoader use.
+
+        Returns AuditLogNode DTOs in the same order as the input ids list.
+        """
+        if not ids:
+            return []
+        querier = BatchQuerier(
+            pagination=OffsetPagination(limit=len(ids)),
+            conditions=[AuditLogConditions.by_ids(ids)],
+        )
+        action_result = await self._processors.audit_log.search.wait_for_complete(
+            SearchAuditLogsAction(querier=querier)
+        )
+        audit_log_map = {item.id: self._data_to_node(item) for item in action_result.data}
+        return [audit_log_map.get(audit_log_id) for audit_log_id in ids]
 
     async def admin_search(self, input: AdminSearchAuditLogsInput) -> AdminSearchAuditLogsPayload:
         """Search audit logs with filters, ordering, and pagination."""

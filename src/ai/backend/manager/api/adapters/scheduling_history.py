@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from uuid import UUID
 
 from ai.backend.common.dto.manager.v2.scheduling_history.request import (
@@ -52,6 +53,7 @@ from ai.backend.manager.models.scheduling_history.orders import (
 )
 from ai.backend.manager.repositories.base import (
     BatchQuerier,
+    OffsetPagination,
     QueryCondition,
     QueryOrder,
     combine_conditions_or,
@@ -110,6 +112,71 @@ _ROUTE_HISTORY_PAGINATION_SPEC = PaginationSpec(
 
 class SchedulingHistoryAdapter(BaseAdapter):
     """Adapter for scheduling history domain operations."""
+
+    # ========== Batch Load (DataLoader) ==========
+
+    async def batch_load_session_histories_by_ids(
+        self, ids: Sequence[UUID]
+    ) -> list[SessionHistoryNode | None]:
+        """Batch load session scheduling histories by their IDs for DataLoader use.
+
+        Returns SessionHistoryNode DTOs in the same order as the input ids list.
+        """
+        if not ids:
+            return []
+        querier = BatchQuerier(
+            pagination=OffsetPagination(limit=len(ids)),
+            conditions=[SessionSchedulingHistoryConditions.by_ids(ids)],
+        )
+        action_result = (
+            await self._processors.scheduling_history.search_session_history.wait_for_complete(
+                SearchSessionHistoryAction(querier=querier)
+            )
+        )
+        history_map = {h.id: self._session_data_to_dto(h) for h in action_result.histories}
+        return [history_map.get(history_id) for history_id in ids]
+
+    async def batch_load_deployment_histories_by_ids(
+        self, ids: Sequence[UUID]
+    ) -> list[DeploymentHistoryNode | None]:
+        """Batch load deployment histories by their IDs for DataLoader use.
+
+        Returns DeploymentHistoryNode DTOs in the same order as the input ids list.
+        """
+        if not ids:
+            return []
+        querier = BatchQuerier(
+            pagination=OffsetPagination(limit=len(ids)),
+            conditions=[DeploymentHistoryConditions.by_ids(ids)],
+        )
+        action_result = (
+            await self._processors.scheduling_history.search_deployment_history.wait_for_complete(
+                SearchDeploymentHistoryAction(querier=querier)
+            )
+        )
+        history_map = {h.id: self._deployment_data_to_dto(h) for h in action_result.histories}
+        return [history_map.get(history_id) for history_id in ids]
+
+    async def batch_load_route_histories_by_ids(
+        self, ids: Sequence[UUID]
+    ) -> list[RouteHistoryNode | None]:
+        """Batch load route histories by their IDs for DataLoader use.
+
+        Returns RouteHistoryNode DTOs in the same order as the input ids list.
+        """
+        if not ids:
+            return []
+        querier = BatchQuerier(
+            pagination=OffsetPagination(limit=len(ids)),
+            conditions=[RouteHistoryConditions.by_ids(ids)],
+        )
+        action_result = (
+            await self._processors.scheduling_history.search_route_history.wait_for_complete(
+                SearchRouteHistoryAction(querier=querier)
+            )
+        )
+        history_map = {h.id: self._route_data_to_dto(h) for h in action_result.histories}
+        return [history_map.get(history_id) for history_id in ids]
 
     # ========== Session History ==========
 
