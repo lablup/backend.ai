@@ -17,10 +17,10 @@ class TestOrderDirection:
     """Tests for OrderDirection StrEnum."""
 
     def test_asc_value(self) -> None:
-        assert OrderDirection.ASC.value == "asc"
+        assert OrderDirection.ASC.value == "ASC"
 
     def test_desc_value(self) -> None:
-        assert OrderDirection.DESC.value == "desc"
+        assert OrderDirection.DESC.value == "DESC"
 
     def test_enum_members_count(self) -> None:
         assert len(list(OrderDirection)) == 2
@@ -30,10 +30,10 @@ class TestOrderDirection:
             assert isinstance(member.value, str)
 
     def test_from_string_asc(self) -> None:
-        assert OrderDirection("asc") is OrderDirection.ASC
+        assert OrderDirection("ASC") is OrderDirection.ASC
 
     def test_from_string_desc(self) -> None:
-        assert OrderDirection("desc") is OrderDirection.DESC
+        assert OrderDirection("DESC") is OrderDirection.DESC
 
 
 class TestExportReportKey:
