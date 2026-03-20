@@ -787,11 +787,8 @@ class DeploymentCoordinator:
                 initial_delay=25.0,
             ),
         ]
-        # Deploying — one task per sub-step
-        for sub_step in (
-            DeploymentLifecycleSubStep.DEPLOYING_PROVISIONING,
-            DeploymentLifecycleSubStep.DEPLOYING_ROLLING_BACK,
-        ):
+        # Deploying — one task per handler sub-step
+        for sub_step in DeploymentLifecycleSubStep.deploying_handler_sub_steps():
             specs.append(
                 DeploymentTaskSpec(
                     DeploymentLifecycleType.DEPLOYING,
