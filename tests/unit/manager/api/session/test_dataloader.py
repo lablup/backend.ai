@@ -5,9 +5,22 @@ from __future__ import annotations
 import uuid
 from unittest.mock import AsyncMock, MagicMock
 
+from ai.backend.common.contexts.user import with_user
+from ai.backend.common.data.user.types import UserData, UserRole
 from ai.backend.common.types import KernelId
 from ai.backend.manager.api.gql.data_loader.kernel.loader import load_kernels_by_ids
 from ai.backend.manager.data.kernel.types import KernelInfo
+
+
+def _make_user_data() -> UserData:
+    return UserData(
+        user_id=uuid.uuid4(),
+        is_authorized=True,
+        is_admin=False,
+        is_superadmin=False,
+        role=UserRole.USER,
+        domain_name="default",
+    )
 
 
 class TestLoadKernelsByIds:
@@ -47,7 +60,8 @@ class TestLoadKernelsByIds:
         )
 
         # When
-        result = await load_kernels_by_ids(mock_processor, [id1, id2, id3])
+        with with_user(_make_user_data()):
+            result = await load_kernels_by_ids(mock_processor, [id1, id2, id3])
 
         # Then
         assert result == [kernel1, kernel2, kernel3]
@@ -60,7 +74,8 @@ class TestLoadKernelsByIds:
         mock_processor = self.create_mock_processor([existing_kernel])
 
         # When
-        result = await load_kernels_by_ids(mock_processor, [existing_id, missing_id])
+        with with_user(_make_user_data()):
+            result = await load_kernels_by_ids(mock_processor, [existing_id, missing_id])
 
         # Then
         assert result == [existing_kernel, None]
