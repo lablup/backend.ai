@@ -27,7 +27,7 @@ from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     gql_pydantic_input,
 )
-from ai.backend.manager.data.common.types import IntFilterData, SearchResult, StringFilterData
+from ai.backend.manager.data.common.types import SearchResult
 
 if TYPE_CHECKING:
     from ai.backend.manager.repositories.base import QueryCondition
@@ -85,20 +85,6 @@ class StringFilter:
     i_not_starts_with: str | None = strawberry.field(name="iNotStartsWith", default=None)
     i_not_ends_with: str | None = strawberry.field(name="iNotEndsWith", default=None)
     i_not_equals: str | None = strawberry.field(name="iNotEquals", default=None)
-
-    def to_dataclass(self) -> StringFilterData:
-        return StringFilterData(
-            contains=self.contains,
-            starts_with=self.starts_with,
-            ends_with=self.ends_with,
-            equals=self.equals,
-            not_equals=self.not_equals,
-            i_contains=self.i_contains,
-            i_starts_with=self.i_starts_with,
-            i_ends_with=self.i_ends_with,
-            i_equals=self.i_equals,
-            i_not_equals=self.i_not_equals,
-        )
 
     def to_pydantic(self) -> StringFilterDTO:
         return StringFilterDTO(
@@ -228,16 +214,6 @@ class IntFilter:
     greater_than_or_equal: int | None = None
     less_than: int | None = None
     less_than_or_equal: int | None = None
-
-    def to_dataclass(self) -> IntFilterData:
-        return IntFilterData(
-            equals=self.equals,
-            not_equals=self.not_equals,
-            greater_than=self.greater_than,
-            greater_than_or_equal=self.greater_than_or_equal,
-            less_than=self.less_than,
-            less_than_or_equal=self.less_than_or_equal,
-        )
 
     def to_pydantic(self) -> IntFilterDTO:
         return IntFilterDTO(

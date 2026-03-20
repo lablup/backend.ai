@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import uuid
 from collections.abc import Iterable
-from typing import Self
+from typing import Self, cast
 
 import strawberry
 from strawberry import ID, UNSET, Info
@@ -54,7 +54,6 @@ from ai.backend.manager.api.gql.decorators import (
     gql_pydantic_type,
 )
 from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin
-from ai.backend.manager.data.object_storage.types import ObjectStorageData
 
 from .storage_namespace import StorageNamespace, StorageNamespaceConnection, StorageNamespaceEdge
 from .types import StrawberryGQLContext
@@ -86,19 +85,7 @@ class ObjectStorage(PydanticNodeMixin[ObjectStorageNode]):
         results = await info.context.data_loaders.object_storage_loader.load_many([
             uuid.UUID(nid) for nid in node_ids
         ])
-        return [cls.from_dataclass(data) if data is not None else None for data in results]
-
-    @classmethod
-    def from_dataclass(cls, data: ObjectStorageData) -> Self:
-        return cls(
-            id=ID(str(data.id)),
-            name=data.name,
-            host=data.host,
-            access_key=data.access_key,
-            secret_key=data.secret_key,
-            endpoint=data.endpoint,
-            region=data.region or "",
-        )
+        return cast(list[Self | None], results)
 
     @strawberry.field
     async def namespaces(

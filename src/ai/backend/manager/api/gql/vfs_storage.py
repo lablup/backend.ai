@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import uuid
 from collections.abc import Iterable
-from typing import Self
+from typing import Self, cast
 
 import strawberry
 from strawberry import ID, UNSET, Info
@@ -38,7 +38,6 @@ from ai.backend.manager.api.gql.decorators import (
     gql_pydantic_type,
 )
 from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin
-from ai.backend.manager.data.vfs_storage.types import VFSStorageData
 
 from .types import StrawberryGQLContext
 
@@ -66,16 +65,7 @@ class VFSStorage(PydanticNodeMixin[VFSStorageNode]):
         results = await info.context.data_loaders.vfs_storage_loader.load_many([
             uuid.UUID(nid) for nid in node_ids
         ])
-        return [cls.from_dataclass(data) if data is not None else None for data in results]
-
-    @classmethod
-    def from_dataclass(cls, data: VFSStorageData) -> Self:
-        return cls(
-            id=ID(str(data.id)),
-            name=data.name,
-            host=data.host,
-            base_path=str(data.base_path),
-        )
+        return cast(list[Self | None], results)
 
 
 VFSStorageEdge = Edge[VFSStorage]

@@ -14,7 +14,6 @@ from ai.backend.manager.api.gql.decorators import (
     gql_node_type,
 )
 from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin
-from ai.backend.manager.data.artifact_registries.types import ArtifactRegistryData
 from ai.backend.manager.errors.artifact_registry import ArtifactRegistryNotFoundError
 
 from .types import StrawberryGQLContext
@@ -32,16 +31,6 @@ class ArtifactRegistryMeta(PydanticNodeMixin[Any]):
     registry_id: ID
     type: ArtifactRegistryType
     url: str
-
-    @classmethod
-    def from_dataclass(cls, data: ArtifactRegistryData, url: str) -> Self:
-        return cls(
-            id=ID(str(data.id)),
-            name=data.name,
-            registry_id=ID(str(data.registry_id)),
-            type=data.type,
-            url=url,
-        )
 
     @classmethod
     async def load_by_id(

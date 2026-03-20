@@ -1,6 +1,6 @@
 import uuid
 from collections.abc import Iterable, Sequence
-from typing import Self
+from typing import Self, cast
 
 import strawberry
 from strawberry import ID, UNSET, Info
@@ -28,7 +28,6 @@ from ai.backend.manager.api.gql.decorators import (
     gql_pydantic_input,
 )
 from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin
-from ai.backend.manager.data.reservoir_registry.types import ReservoirRegistryData
 from ai.backend.manager.errors.api import NotImplementedAPI
 
 from .types import StrawberryGQLContext
@@ -59,18 +58,7 @@ class ReservoirRegistry(PydanticNodeMixin[ReservoirRegistryNode]):
         results = await info.context.data_loaders.reservoir_registry_loader.load_many([
             uuid.UUID(nid) for nid in node_ids
         ])
-        return [cls.from_dataclass(data) if data is not None else None for data in results]
-
-    @classmethod
-    def from_dataclass(cls, data: ReservoirRegistryData) -> Self:
-        return cls(
-            id=ID(str(data.id)),
-            name=data.name,
-            endpoint=data.endpoint,
-            access_key=data.access_key,
-            secret_key=data.secret_key,
-            api_version=data.api_version,
-        )
+        return cast(list[Self | None], results)
 
     @classmethod
     async def load_by_id(

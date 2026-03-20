@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import uuid
 from collections.abc import Iterable
-from typing import Any, Self
+from typing import Any, Self, cast
 
 import strawberry
 from strawberry import ID, Info
@@ -29,7 +29,6 @@ from ai.backend.manager.api.gql.decorators import (
 )
 from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin
 from ai.backend.manager.api.gql.utils import dedent_strip
-from ai.backend.manager.data.storage_namespace.types import StorageNamespaceData
 
 from .types import StrawberryGQLContext
 
@@ -63,15 +62,7 @@ class StorageNamespace(PydanticNodeMixin[Any]):
         results = await info.context.data_loaders.storage_namespace_loader.load_many([
             uuid.UUID(nid) for nid in node_ids
         ])
-        return [cls.from_dataclass(data) if data is not None else None for data in results]
-
-    @classmethod
-    def from_dataclass(cls, data: StorageNamespaceData) -> Self:
-        return cls(
-            id=ID(str(data.id)),
-            storage_id=ID(str(data.storage_id)),
-            namespace=data.namespace,
-        )
+        return cast(list[Self | None], results)
 
 
 StorageNamespaceEdge = Edge[StorageNamespace]
