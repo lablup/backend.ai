@@ -12,7 +12,7 @@ from pydantic import BaseModel
 from ai.backend.common.data.model_deployment.types import DeploymentStrategy
 from ai.backend.manager.data.deployment.types import (
     DeploymentInfo,
-    DeploymentSubStep,
+    DeploymentLifecycleSubStep,
     RouteInfo,
 )
 from ai.backend.manager.models.routing import RoutingRow
@@ -34,7 +34,7 @@ class StrategyCycleResult:
     ``sub_step`` indicates the next state: PROVISIONING or COMPLETED.
     """
 
-    sub_step: DeploymentSubStep
+    sub_step: DeploymentLifecycleSubStep
     route_changes: RouteChanges = field(default_factory=RouteChanges)
 
 
@@ -57,7 +57,7 @@ class StrategyEvaluationSummary:
     """
 
     # Mapping from endpoint ID to its evaluated sub_step — used to bulk-update the DB.
-    assignments: dict[UUID, DeploymentSubStep] = field(default_factory=dict)
+    assignments: dict[UUID, DeploymentLifecycleSubStep] = field(default_factory=dict)
 
     # Aggregated route mutations from all per-deployment evaluations.
     route_changes: RouteChanges = field(default_factory=RouteChanges)

@@ -13,8 +13,8 @@ from ai.backend.manager.data.deployment.creator import DeploymentCreationDraft
 from ai.backend.manager.data.deployment.scale import AutoScalingRule, AutoScalingRuleCreator
 from ai.backend.manager.data.deployment.types import (
     DeploymentInfo,
+    DeploymentLifecycleSubStep,
     DeploymentPolicyData,
-    DeploymentSubStep,
     RouteInfo,
     RouteSearchResult,
     RouteTrafficStatus,
@@ -205,7 +205,7 @@ class DeploymentController:
     async def mark_lifecycle_needed(
         self,
         lifecycle_type: DeploymentLifecycleType,
-        sub_step: DeploymentSubStep | None = None,
+        sub_step: DeploymentLifecycleSubStep | None = None,
     ) -> None:
         """
         Mark that a deployment lifecycle operation is needed for the next cycle.

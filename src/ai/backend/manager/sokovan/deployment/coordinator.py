@@ -30,8 +30,7 @@ from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.deployment.types import (
     DeploymentInfo,
     DeploymentLifecycleStatus,
-    DeploymentSubStatus,
-    DeploymentSubStep,
+    DeploymentLifecycleSubStep,
 )
 from ai.backend.manager.data.session.types import SchedulingResult, SubStepResult
 from ai.backend.manager.defs import SERVICE_MAX_RETRIES
@@ -84,7 +83,7 @@ log = BraceStyleAdapter(logging.getLogger(__name__))
 
 # Handler registry key: (lifecycle_type, sub_step).
 # sub_step is None for handlers that don't filter by sub-step.
-type HandlerKey = tuple[DeploymentLifecycleType, DeploymentSubStep | None]
+type HandlerKey = tuple[DeploymentLifecycleType, DeploymentLifecycleSubStep | None]
 
 # Timeout thresholds for deployment lifecycle statuses (seconds).
 _DEPLOYMENT_STATUS_TIMEOUT_MAP: dict[EndpointLifecycle, float] = {
@@ -151,39 +150,24 @@ class HandlerRegistry:
 
     handlers: dict[HandlerKey, DeploymentHandler]
 
-    def sub_steps_for(self, lifecycle_type: DeploymentLifecycleType) -> list[DeploymentSubStep]:
-        """Derive sub-steps from registered handler keys."""
-        return [
-            sub_step
-            for lt, sub_step in self.handlers
-            if lt == lifecycle_type and sub_step is not None
-        ]
-
 
 @dataclass
 class DeploymentTaskSpec:
     """Specification for a deployment lifecycle periodic task."""
 
     lifecycle_type: DeploymentLifecycleType
-    sub_step: DeploymentSubStep | None = None
+    sub_step: DeploymentLifecycleSubStep | None = None
     short_interval: float | None = None  # None means no short-cycle task
     long_interval: float = 60.0
     initial_delay: float = 30.0
 
-    def _sub_step_value(self) -> str | None:
-        return self.sub_step.value if self.sub_step is not None else None
-
     def create_if_needed_event(self) -> DoDeploymentLifecycleIfNeededEvent:
         """Create event for checking if processing is needed."""
-        return DoDeploymentLifecycleIfNeededEvent(
-            self.lifecycle_type.value, sub_step=self._sub_step_value()
-        )
+        return DoDeploymentLifecycleIfNeededEvent(self.lifecycle_type.value, sub_step=self.sub_step)
 
     def create_process_event(self) -> DoDeploymentLifecycleEvent:
         """Create event for forced processing."""
-        return DoDeploymentLifecycleEvent(
-            self.lifecycle_type.value, sub_step=self._sub_step_value()
-        )
+        return DoDeploymentLifecycleEvent(self.lifecycle_type.value, sub_step=self.sub_step)
 
     @property
     def _suffix(self) -> str:
@@ -316,7 +300,10 @@ class DeploymentCoordinator:
                 ),
             ),
             (
-                (DeploymentLifecycleType.DEPLOYING, DeploymentSubStep.PROVISIONING),
+                (
+                    DeploymentLifecycleType.DEPLOYING,
+                    DeploymentLifecycleSubStep.DEPLOYING_PROVISIONING,
+                ),
                 DeployingProvisioningHandler(
                     deployment_controller=self._deployment_controller,
                     route_controller=self._route_controller,
@@ -325,7 +312,10 @@ class DeploymentCoordinator:
                 ),
             ),
             (
-                (DeploymentLifecycleType.DEPLOYING, DeploymentSubStep.ROLLING_BACK),
+                (
+                    DeploymentLifecycleType.DEPLOYING,
+                    DeploymentLifecycleSubStep.DEPLOYING_ROLLING_BACK,
+                ),
                 DeployingRollingBackHandler(
                     deployment_controller=self._deployment_controller,
                     route_controller=self._route_controller,
@@ -339,7 +329,7 @@ class DeploymentCoordinator:
     async def process_deployment_lifecycle(
         self,
         lifecycle_type: DeploymentLifecycleType,
-        sub_step: DeploymentSubStep | None = None,
+        sub_step: DeploymentLifecycleSubStep | None = None,
     ) -> None:
         handler = self._registry.handlers.get((lifecycle_type, sub_step))
         if handler is None:
@@ -512,7 +502,7 @@ class DeploymentCoordinator:
         return BatchUpdater(
             spec=EndpointLifecycleBatchUpdaterSpec(
                 lifecycle_stage=lifecycle_status.lifecycle,
-                sub_step=lifecycle_status.sub_status,
+                sub_step=lifecycle_status.sub_step,
             ),
             conditions=[
                 DeploymentConditions.by_ids(endpoint_ids),
@@ -667,16 +657,16 @@ class DeploymentCoordinator:
     def _build_history_sub_steps(
         entity_id: UUID,
         records: Mapping[UUID, ExecutionRecord],
-        sub_status: DeploymentSubStatus | None,
+        sub_step: DeploymentLifecycleSubStep | None,
         scheduling_result: SchedulingResult,
     ) -> list[SubStepResult]:
-        """Build sub_steps list, appending sub_status as an entry if present."""
+        """Build sub_steps list, appending sub_step as an entry if present."""
         sub_steps = extract_sub_steps_for_entity(entity_id, records)
-        if sub_status is not None:
+        if sub_step is not None:
             now = datetime.now(UTC)
             sub_steps.append(
                 SubStepResult(
-                    step=sub_status.value,
+                    step=sub_step.value,
                     result=scheduling_result,
                     started_at=now,
                     ended_at=now,
@@ -713,7 +703,7 @@ class DeploymentCoordinator:
     async def process_if_needed(
         self,
         lifecycle_type: DeploymentLifecycleType,
-        sub_step: DeploymentSubStep | None = None,
+        sub_step: DeploymentLifecycleSubStep | None = None,
     ) -> None:
         """Process deployment lifecycle operation if needed (based on internal state)."""
         sub_step_value = sub_step.value if sub_step is not None else None
@@ -766,7 +756,10 @@ class DeploymentCoordinator:
             ),
         ]
         # Deploying — one task per sub-step
-        for sub_step in self._registry.sub_steps_for(DeploymentLifecycleType.DEPLOYING):
+        for sub_step in (
+            DeploymentLifecycleSubStep.DEPLOYING_PROVISIONING,
+            DeploymentLifecycleSubStep.DEPLOYING_ROLLING_BACK,
+        ):
             specs.append(
                 DeploymentTaskSpec(
                     DeploymentLifecycleType.DEPLOYING,

@@ -148,45 +148,37 @@ class RouteTrafficStatus(enum.StrEnum):
 # ========== Status Transition Types (BEP-1030) ==========
 
 
-class DeploymentSubStatus(enum.StrEnum):
-    """Base class for deployment lifecycle sub-statuses.
+class DeploymentLifecycleSubStep(enum.StrEnum):
+    """Sub-steps within deployment lifecycle phases.
 
-    Each lifecycle type can define its own sub-status enum by
-    inheriting from this class.  For example, DEPLOYING handlers
-    use ``DeploymentSubStep`` (provisioning, rolling_back, …).
+    Member names are prefixed with the lifecycle phase they belong to
+    (e.g. ``DEPLOYING_``).  String values are stored in the database as-is.
     """
 
-
-class DeploymentSubStep(DeploymentSubStatus):
-    """Sub-steps for the DEPLOYING lifecycle phase.
-
-    - PROVISIONING: New revision routes are being provisioned and old routes
-      are being drained.  The main handler for rolling updates.
-    - ROLLING_BACK: Clearing deploying_revision and transitioning to READY.
-    - COMPLETED: All strategy conditions satisfied; triggers revision swap.
-    """
-
-    PROVISIONING = "provisioning"
-    ROLLING_BACK = "rolling_back"
-    COMPLETED = "completed"
+    # -- DEPLOYING phase --
+    DEPLOYING_PROVISIONING = "provisioning"
+    """New revision routes are being provisioned and old routes are being drained."""
+    DEPLOYING_ROLLING_BACK = "rolling_back"
+    """Clearing deploying_revision and transitioning to READY."""
+    DEPLOYING_COMPLETED = "completed"
+    """All strategy conditions satisfied; triggers revision swap."""
 
 
 @dataclass(frozen=True)
 class DeploymentLifecycleStatus:
     """Target lifecycle state for a deployment status transition.
 
-    Pairs an EndpointLifecycle with an optional sub-status to provide
+    Pairs an EndpointLifecycle with an optional sub-step to provide
     context about which sub-step led to this transition.
 
     Attributes:
         lifecycle: The target endpoint lifecycle state
-        sub_status: Optional sub-status indicating what determined this
-            transition. Concrete values come from DeploymentSubStatus
-            subclasses (e.g. DeploymentSubStep for DEPLOYING handlers).
+        sub_step: Optional sub-step indicating what determined this
+            transition (e.g. DEPLOYING_* members for DEPLOYING handlers).
     """
 
     lifecycle: EndpointLifecycle
-    sub_status: DeploymentSubStatus | None = None
+    sub_step: DeploymentLifecycleSubStep | None = None
 
 
 @dataclass(frozen=True)
@@ -376,7 +368,7 @@ class DeploymentInfo:
     current_revision_id: UUID | None = None
     policy: DeploymentPolicyData | None = None
     deploying_revision_id: UUID | None = None
-    sub_step: DeploymentSubStep | None = None
+    sub_step: DeploymentLifecycleSubStep | None = None
 
     def resolve_revision_spec(self, revision_id: UUID) -> ModelRevisionSpec | None:
         """Find a ModelRevisionSpec by revision_id from model_revisions."""

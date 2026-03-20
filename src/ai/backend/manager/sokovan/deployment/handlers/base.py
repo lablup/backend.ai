@@ -48,7 +48,7 @@ class DeploymentHandler:
         """Get the target deployment statuses for this handler.
 
         Each entry pairs an ``EndpointLifecycle`` with an optional
-        ``DeploymentSubStatus`` (sub-step).  The coordinator uses these
+        ``DeploymentLifecycleSubStep`` (sub-step).  The coordinator uses these
         to filter deployments from the DB and to build registry keys.
 
         Returns:

@@ -8,7 +8,7 @@ from uuid import UUID
 
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.deployment.types import (
-    DeploymentSubStep,
+    DeploymentLifecycleSubStep,
     RouteStatus,
     RouteTrafficStatus,
 )
@@ -65,7 +65,7 @@ class StrategyResultApplier:
         changes = summary.route_changes
         completed_ids: set[UUID] = set()
         for endpoint_id, sub_step in summary.assignments.items():
-            if sub_step == DeploymentSubStep.COMPLETED:
+            if sub_step == DeploymentLifecycleSubStep.DEPLOYING_COMPLETED:
                 completed_ids.add(endpoint_id)
 
         result = StrategyApplyResult(

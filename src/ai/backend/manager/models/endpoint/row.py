@@ -64,10 +64,10 @@ from ai.backend.manager.data.deployment.scale_modifier import (
 )
 from ai.backend.manager.data.deployment.types import (
     DeploymentInfo,
+    DeploymentLifecycleSubStep,
     DeploymentMetadata,
     DeploymentNetworkSpec,
     DeploymentState,
-    DeploymentSubStep,
     ExecutionSpec,
     ModelDeploymentAutoScalingRuleData,
     ModelRevisionSpec,
@@ -315,9 +315,9 @@ class EndpointRow(Base):  # type: ignore[misc]
     deploying_revision: Mapped[UUID | None] = mapped_column(
         "deploying_revision", GUID, nullable=True
     )
-    sub_step: Mapped[DeploymentSubStep | None] = mapped_column(
+    sub_step: Mapped[DeploymentLifecycleSubStep | None] = mapped_column(
         "sub_step",
-        StrEnumType(DeploymentSubStep),
+        StrEnumType(DeploymentLifecycleSubStep),
         nullable=True,
         default=None,
     )

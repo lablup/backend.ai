@@ -32,8 +32,8 @@ from typing import override
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.deployment.types import (
     DeploymentLifecycleStatus,
+    DeploymentLifecycleSubStep,
     DeploymentStatusTransitions,
-    DeploymentSubStep,
 )
 from ai.backend.manager.data.model_serving.types import EndpointLifecycle
 from ai.backend.manager.defs import LockID
@@ -104,7 +104,7 @@ class DeployingProvisioningHandler(DeploymentHandler):
         return [
             DeploymentLifecycleStatus(
                 lifecycle=EndpointLifecycle.DEPLOYING,
-                sub_status=DeploymentSubStep.PROVISIONING,
+                sub_step=DeploymentLifecycleSubStep.DEPLOYING_PROVISIONING,
             ),
         ]
 
@@ -114,11 +114,11 @@ class DeployingProvisioningHandler(DeploymentHandler):
         return DeploymentStatusTransitions(
             success=DeploymentLifecycleStatus(
                 lifecycle=EndpointLifecycle.READY,
-                sub_status=None,
+                sub_step=None,
             ),
             need_retry=DeploymentLifecycleStatus(
                 lifecycle=EndpointLifecycle.DEPLOYING,
-                sub_status=DeploymentSubStep.PROVISIONING,
+                sub_step=DeploymentLifecycleSubStep.DEPLOYING_PROVISIONING,
             ),
         )
 
@@ -192,7 +192,8 @@ class DeployingProvisioningHandler(DeploymentHandler):
     @override
     async def post_process(self, result: DeploymentExecutionResult) -> None:
         await self._deployment_controller.mark_lifecycle_needed(
-            DeploymentLifecycleType.DEPLOYING, sub_step=DeploymentSubStep.PROVISIONING
+            DeploymentLifecycleType.DEPLOYING,
+            sub_step=DeploymentLifecycleSubStep.DEPLOYING_PROVISIONING,
         )
         await self._route_controller.mark_lifecycle_needed(RouteLifecycleType.PROVISIONING)
 
@@ -230,7 +231,7 @@ class DeployingRollingBackHandler(DeploymentHandler):
         return [
             DeploymentLifecycleStatus(
                 lifecycle=EndpointLifecycle.DEPLOYING,
-                sub_status=DeploymentSubStep.ROLLING_BACK,
+                sub_step=DeploymentLifecycleSubStep.DEPLOYING_ROLLING_BACK,
             )
         ]
 
@@ -240,7 +241,7 @@ class DeployingRollingBackHandler(DeploymentHandler):
         return DeploymentStatusTransitions(
             success=DeploymentLifecycleStatus(
                 lifecycle=EndpointLifecycle.READY,
-                sub_status=None,
+                sub_step=None,
             ),
         )
 
@@ -259,6 +260,7 @@ class DeployingRollingBackHandler(DeploymentHandler):
     @override
     async def post_process(self, result: DeploymentExecutionResult) -> None:
         await self._deployment_controller.mark_lifecycle_needed(
-            DeploymentLifecycleType.DEPLOYING, sub_step=DeploymentSubStep.ROLLING_BACK
+            DeploymentLifecycleType.DEPLOYING,
+            sub_step=DeploymentLifecycleSubStep.DEPLOYING_ROLLING_BACK,
         )
         await self._route_controller.mark_lifecycle_needed(RouteLifecycleType.PROVISIONING)
