@@ -662,7 +662,6 @@ class UpdateRoleInput:
 @gql_pydantic_input(
     BackendAIGQLMeta(description="Input for assigning a role to a user", added_version="26.3.0"),
     model=AssignRoleInputDTO,
-    all_fields=True,
 )
 class AssignRoleInput:
     user_id: uuid.UUID
@@ -678,7 +677,6 @@ class AssignRoleInput:
 @gql_pydantic_input(
     BackendAIGQLMeta(description="Input for revoking a role from a user", added_version="26.3.0"),
     model=RevokeRoleInputDTO,
-    all_fields=True,
 )
 class RevokeRoleInput:
     user_id: uuid.UUID
@@ -697,7 +695,6 @@ class RevokeRoleInput:
     ),
     model=BulkAssignRoleInputDTO,
     name="BulkAssignRoleInput",
-    all_fields=True,
 )
 class BulkAssignRoleInputGQL:
     role_id: uuid.UUID
@@ -716,7 +713,6 @@ class BulkAssignRoleInputGQL:
     ),
     model=BulkRevokeRoleInputDTO,
     name="BulkRevokeRoleInput",
-    all_fields=True,
 )
 class BulkRevokeRoleInputGQL:
     role_id: uuid.UUID

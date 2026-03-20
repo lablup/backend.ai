@@ -145,7 +145,6 @@ async def reservoir_registries(
 @gql_pydantic_input(
     BackendAIGQLMeta(description="", added_version="25.14.0"),
     model=CreateReservoirRegistryInputDTO,
-    all_fields=True,
 )
 class CreateReservoirRegistryInput:
     name: str

@@ -53,7 +53,6 @@ class AppConfig:
     model=UpsertDomainConfigInputDTO,
     description=dedent_strip(
         """\
-        Added in 25.16.0.
         Input for creating or updating domain-level app configuration.
         The provided extra_config object will completely replace the existing configuration;
         existing keys not present in the new extra_config will be removed.
@@ -73,7 +72,6 @@ class UpsertDomainConfigInput:
     model=UpsertUserConfigInputDTO,
     description=dedent_strip(
         """\
-        Added in 25.16.0.
         Input for creating or updating user-level app configuration.
         The provided extra_config object will completely replace the existing configuration;
         existing keys not present in the new extra_config will be removed.
@@ -106,7 +104,6 @@ class DeleteDomainConfigInput:
     model=DeleteUserConfigInputDTO,
     description=dedent_strip(
         """\
-        Added in 25.16.0.
         Input for deleting user-level app configuration.
         If user_id is not provided, the current user's configuration will be deleted.
         """

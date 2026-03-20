@@ -175,7 +175,7 @@ class SessionV2StatusFilterGQL:
 
 @gql_pydantic_input(
     BackendAIGQLMeta(
-        description="Added in 26.3.0. Filter criteria for querying sessions.",
+        description="Filter criteria for querying sessions.",
         added_version="26.3.0",
     ),
     model=SessionFilter,

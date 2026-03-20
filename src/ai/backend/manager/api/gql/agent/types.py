@@ -102,7 +102,7 @@ class AgentOrderFieldGQL(StrEnum):
     model=AgentStatusFilter,
     name="AgentStatusFilter",
     description=dedent_strip("""
-        Added in 26.1.0. Filter options for agent status within AgentFilter.
+        Filter options for agent status within AgentFilter.
         It includes options to filter whether agent status is in a specific list or equals a specific value.
     """),
 )

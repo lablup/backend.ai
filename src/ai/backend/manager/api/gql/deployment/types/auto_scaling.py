@@ -249,7 +249,7 @@ class CreateAutoScalingRuleInput:
 
 @gql_pydantic_input(
     BackendAIGQLMeta(
-        description="Added in 25.19.0. Input for updating an auto-scaling rule.",
+        description="Input for updating an auto-scaling rule.",
         added_version="25.19.0",
     ),
     model=UpdateAutoScalingRuleInputDTO,

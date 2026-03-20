@@ -167,7 +167,7 @@ class KernelV2StatusFilterGQL:
 
 @gql_pydantic_input(
     BackendAIGQLMeta(
-        description="Added in 26.2.0. Filter criteria for querying kernels.",
+        description="Filter criteria for querying kernels.",
         added_version="26.2.0",
     ),
     model=KernelFilter,

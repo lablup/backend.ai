@@ -188,7 +188,6 @@ async def object_storages(
 @gql_pydantic_input(
     BackendAIGQLMeta(description="", added_version="25.14.0"),
     model=CreateObjectStorageInputDTO,
-    all_fields=True,
 )
 class CreateObjectStorageInput:
     name: str

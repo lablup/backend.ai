@@ -272,8 +272,6 @@ class ArtifactVerificationGQLResult:
 @gql_pydantic_input(
     BackendAIGQLMeta(
         description=dedent_strip("""
-        Added in 25.14.0.
-
         Filter options for artifacts based on various criteria such as type, name, registry,
         source, and availability status.
 
@@ -317,8 +315,6 @@ class ArtifactFilter:
     BackendAIGQLMeta(description="", added_version="24.09.0"),
     model=ArtifactGQLOrderByInputDTO,
     description=dedent_strip("""
-    Added in 25.14.0.
-
     Specifies the field and direction for ordering artifacts in queries.
     """),
 )
@@ -338,8 +334,6 @@ class ArtifactOrderBy(GQLOrderBy):
     BackendAIGQLMeta(description="", added_version="24.09.0"),
     model=ArtifactRevisionStatusFilterDTO,
     description=dedent_strip("""
-    Added in 25.14.0.
-
     Filter for artifact revision status. Supports exact match or inclusion in a list of statuses.
     """),
 )
@@ -374,8 +368,6 @@ class ArtifactRevisionRemoteStatusFilter:
 @gql_pydantic_input(
     BackendAIGQLMeta(
         description=dedent_strip("""
-        Added in 25.14.0.
-
         Filter options for artifact revisions based on status, version, artifact ID, and file size.
 
         Supports logical operations (AND, OR, NOT) for complex filtering scenarios.
@@ -415,8 +407,6 @@ class ArtifactRevisionFilter:
     BackendAIGQLMeta(description="", added_version="24.09.0"),
     model=ArtifactRevisionGQLOrderByInputDTO,
     description=dedent_strip("""
-    Added in 25.14.0.
-
     Specifies the field and direction for ordering artifact revisions in queries.
     """),
 )
@@ -436,8 +426,6 @@ class ArtifactRevisionOrderBy(GQLOrderBy):
     BackendAIGQLMeta(description="", added_version="24.09.0"),
     model=ScanArtifactsInputDTO,
     description=dedent_strip("""
-    Added in 25.14.0.
-
     Input for scanning artifacts from external registries (HuggingFace, Reservoir).
 
     Discovers available artifacts and registers their metadata in the system.
@@ -457,8 +445,6 @@ class ScanArtifactsInput:
     BackendAIGQLMeta(description="", added_version="24.09.0"),
     model=ImportArtifactsOptionsInputDTO,
     description=dedent_strip("""
-    Added in 26.1.0.
-
     Options for importing artifact revisions.
 
     Controls import behavior such as forcing re-download regardless of digest freshness.
@@ -475,8 +461,6 @@ class ImportArtifactsOptionsGQL:
     BackendAIGQLMeta(description="", added_version="24.09.0"),
     model=ImportArtifactsInputDTO,
     description=dedent_strip("""
-    Added in 25.14.0.
-
     Input for importing scanned artifact revisions from external registries.
 
     Downloads artifact files from the external source and transitions them through:
@@ -514,8 +498,6 @@ class DelegateeTarget:
     BackendAIGQLMeta(description="", added_version="24.09.0"),
     model=DelegateScanArtifactsInputDTO,
     description=dedent_strip("""
-    Added in 25.15.0.
-
     Input type for delegated scanning of artifacts from a delegatee reservoir registry's remote registry.
 """),
 )
@@ -542,8 +524,6 @@ class DelegateScanArtifactsInput:
     BackendAIGQLMeta(description="", added_version="24.09.0"),
     model=DelegateImportArtifactsInputDTO,
     description=dedent_strip("""
-    Added in 25.15.0.
-
     Input type for delegated import of artifact revisions from a reservoir registry's remote registry.
     Used to specify which artifact revisions should be imported from the remote registry source
     into the local reservoir registry storage.
@@ -568,8 +548,6 @@ class DelegateImportArtifactsInput:
     BackendAIGQLMeta(description="", added_version="24.09.0"),
     model=UpdateArtifactGQLInputDTO,
     description=dedent_strip("""
-    Added in 25.14.0.
-
     Input for updating artifact metadata properties.
 
     Modifies artifact metadata such as readonly status and description.
@@ -594,8 +572,6 @@ class UpdateArtifactInput:
     BackendAIGQLMeta(description="", added_version="24.09.0"),
     model=CancelArtifactInputDTO,
     description=dedent_strip("""
-    Added in 25.14.0.
-
     Input for canceling an in-progress artifact import operation.
 
     Stops the download process and reverts the artifact revision status back to SCANNED.
@@ -614,8 +590,6 @@ class CancelArtifactInput:
     BackendAIGQLMeta(description="", added_version="24.09.0"),
     model=CleanupArtifactRevisionsInputDTO,
     description=dedent_strip("""
-    Added in 25.14.0.
-
     Input for cleaning up stored artifact revision data.
 
     Removes downloaded files from storage and transitions the artifact revision
@@ -635,8 +609,6 @@ class CleanupArtifactRevisionsInput:
     BackendAIGQLMeta(description="", added_version="24.09.0"),
     model=DeleteArtifactsInputDTO,
     description=dedent_strip("""
-    Added in 25.15.0.
-
     Input for soft-deleting artifacts from the system.
 
     Marks artifacts as deleted without permanently removing them.
@@ -656,8 +628,6 @@ class DeleteArtifactsInput:
     BackendAIGQLMeta(description="", added_version="24.09.0"),
     model=RestoreArtifactsInputDTO,
     description=dedent_strip("""
-    Added in 25.15.0.
-
     Input for restoring previously deleted artifacts.
 
     Reverses the soft-delete operation, making the artifacts available again.
@@ -671,8 +641,6 @@ class RestoreArtifactsInput:
     BackendAIGQLMeta(description="", added_version="24.09.0"),
     model=ApproveArtifactInputDTO,
     description=dedent_strip("""
-    Added in 25.14.0.
-
     Input for approving an artifact revision.
 
     Admin-only operation to approve artifact revisions for general use.
@@ -686,8 +654,6 @@ class ApproveArtifactInput:
     BackendAIGQLMeta(description="", added_version="24.09.0"),
     model=RejectArtifactInputDTO,
     description=dedent_strip("""
-    Added in 25.14.0.
-
     Input for rejecting an artifact revision.
 
     Admin-only operation to reject artifact revisions, preventing their use.
@@ -701,8 +667,6 @@ class RejectArtifactInput:
     BackendAIGQLMeta(description="", added_version="24.09.0"),
     model=ArtifactStatusChangedInputDTO,
     description=dedent_strip("""
-    Added in 25.14.0.
-
     Input for subscribing to artifact status change notifications.
 
     Used with artifact_status_changed subscription to receive real-time updates
@@ -723,8 +687,6 @@ class ArtifactStatusChangedInput:
     BackendAIGQLMeta(description="", added_version="24.09.0"),
     model=ModelTargetInputDTO,
     description=dedent_strip("""
-    Added in 25.14.0.
-
     Specifies a target model for scanning operations.
 
     Used to identify specific models in external registries for detailed scanning.
@@ -743,8 +705,6 @@ class ModelTarget:
     BackendAIGQLMeta(description="", added_version="24.09.0"),
     model=ScanArtifactModelsInputDTO,
     description=dedent_strip("""
-    Added in 25.14.0.
-
     Input for batch scanning of specific models from external registries.
 
     Scans multiple specified models and retrieves detailed information including

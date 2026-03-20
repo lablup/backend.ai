@@ -138,7 +138,6 @@ async def huggingface_registries(
 @gql_pydantic_input(
     BackendAIGQLMeta(description="", added_version="25.14.0"),
     model=CreateHuggingFaceRegistryInputDTO,
-    all_fields=True,
 )
 class CreateHuggingFaceRegistryInput:
     name: str

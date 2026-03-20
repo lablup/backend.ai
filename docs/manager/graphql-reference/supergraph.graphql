@@ -64,15 +64,26 @@ type AccessTokenEdge
   node: AccessToken!
 }
 
-"""Added in 25.16.0."""
+"""Added in 25.16.0. """
 input AccessTokenFilter
   @join__type(graph: STRAWBERRY)
 {
+  """Token value filter"""
   token: StringFilter = null
+
+  """Expiration datetime filter"""
   validUntil: DateTimeFilter = null
+
+  """Creation datetime filter"""
   createdAt: DateTimeFilter = null
+
+  """AND conjunction"""
   AND: [AccessTokenFilter!] = null
+
+  """OR conjunction"""
   OR: [AccessTokenFilter!] = null
+
+  """NOT negation"""
   NOT: [AccessTokenFilter!] = null
 }
 
@@ -236,12 +247,26 @@ type AgentEdge
 input AgentFilter
   @join__type(graph: STRAWBERRY)
 {
-  id: StringFilter = null
-  status: AgentStatusFilter = null
-  schedulable: Boolean = null
   scalingGroup: StringFilter = null
+
+  """Filter by agent ID. Supports string match operations."""
+  id: StringFilter = null
+
+  """
+  Filter by agent status. Supports equals, in, not_equals, and not_in operations.
+  """
+  status: AgentStatusFilter = null
+
+  """Filter by schedulable flag."""
+  schedulable: Boolean = null
+
+  """All sub-conditions must match."""
   AND: [AgentFilter!] = null
+
+  """At least one sub-condition must match."""
   OR: [AgentFilter!] = null
+
+  """None of the sub-conditions must match."""
   NOT: [AgentFilter!] = null
 }
 
@@ -415,10 +440,19 @@ type AgentResourceSlotEdge
 input AgentResourceSlotFilter
   @join__type(graph: STRAWBERRY)
 {
+  """Filter by slot name."""
   slotName: StringFilter = null
+
+  """Filter by agent ID."""
   agentId: StringFilter = null
+
+  """Logical AND of multiple filter conditions."""
   AND: [AgentResourceSlotFilter!] = null
+
+  """Logical OR of multiple filter conditions."""
   OR: [AgentResourceSlotFilter!] = null
+
+  """Logical NOT of filter conditions."""
   NOT: [AgentResourceSlotFilter!] = null
 }
 
@@ -462,7 +496,7 @@ enum AgentStatus
 }
 
 """
-Added in 24.09.0. Added in 26.1.0. Filter options for agent status within AgentFilter.
+Added in 24.09.0. Filter options for agent status within AgentFilter.
 It includes options to filter whether agent status is in a specific list or equals a specific value.
 """
 input AgentStatusFilter
@@ -663,9 +697,7 @@ type AppConfig
 }
 
 """
-Added in 24.09.0. Added in 25.14.0.
-
-Input for approving an artifact revision.
+Added in 24.09.0. Input for approving an artifact revision.
 
 Admin-only operation to approve artifact revisions for general use.
 """
@@ -740,9 +772,7 @@ type ArtifactEdge
 }
 
 """
-Added in 25.14.0.
-
-Filter options for artifacts based on various criteria such as type, name, registry,
+Added in 25.14.0. Filter options for artifacts based on various criteria such as type, name, registry,
 source, and availability status.
 
 Supports logical operations (AND, OR, NOT) for complex filtering scenarios.
@@ -777,9 +807,7 @@ type ArtifactImportProgressUpdatedPayload
 }
 
 """
-Added in 24.09.0. Added in 25.14.0.
-
-Specifies the field and direction for ordering artifacts in queries.
+Added in 24.09.0. Specifies the field and direction for ordering artifacts in queries.
 """
 input ArtifactOrderBy
   @join__type(graph: STRAWBERRY)
@@ -928,9 +956,7 @@ type ArtifactRevisionEdge
 }
 
 """
-Added in 25.14.0.
-
-Filter options for artifact revisions based on status, version, artifact ID, and file size.
+Added in 25.14.0. Filter options for artifact revisions based on status, version, artifact ID, and file size.
 
 Supports logical operations (AND, OR, NOT) for complex filtering scenarios.
 """
@@ -938,8 +964,6 @@ input ArtifactRevisionFilter
   @join__type(graph: STRAWBERRY)
 {
   status: ArtifactRevisionStatusFilter = null
-
-  """Added in 25.16.0"""
   remoteStatus: ArtifactRevisionRemoteStatusFilter = null
   version: StringFilter = null
   artifactId: UUIDFilter = null
@@ -960,9 +984,7 @@ type ArtifactRevisionImportTask
 }
 
 """
-Added in 24.09.0. Added in 25.14.0.
-
-Specifies the field and direction for ordering artifact revisions in queries.
+Added in 24.09.0. Specifies the field and direction for ordering artifact revisions in queries.
 """
 input ArtifactRevisionOrderBy
   @join__type(graph: STRAWBERRY)
@@ -991,9 +1013,7 @@ input ArtifactRevisionRemoteStatusFilter
 }
 
 """
-Added in 24.09.0. Added in 25.14.0.
-
-Filter for artifact revision status. Supports exact match or inclusion in a list of statuses.
+Added in 24.09.0. Filter for artifact revision status. Supports exact match or inclusion in a list of statuses.
 """
 input ArtifactRevisionStatusFilter
   @join__type(graph: STRAWBERRY)
@@ -1016,9 +1036,7 @@ enum ArtifactStatus
 }
 
 """
-Added in 24.09.0. Added in 25.14.0.
-
-Input for subscribing to artifact status change notifications.
+Added in 24.09.0. Input for subscribing to artifact status change notifications.
 
 Used with artifact_status_changed subscription to receive real-time updates
 when artifact revision statuses change.
@@ -1206,13 +1224,28 @@ type AuditLogEdge
 input AuditLogFilter
   @join__type(graph: STRAWBERRY)
 {
+  """Entity type filter"""
   entityType: StringFilter = null
+
+  """Operation filter"""
   operation: StringFilter = null
+
+  """Status filter"""
   status: AuditLogStatusFilter = null
-  createdAt: DateTimeFilter = null
+
+  """Triggered-by filter"""
   triggeredBy: StringFilter = null
+
+  """Filter logs by created_at datetime"""
+  createdAt: DateTimeFilter = null
+
+  """All conditions must match"""
   AND: [AuditLogFilter!] = null
+
+  """At least one condition must match"""
   OR: [AuditLogFilter!] = null
+
+  """None of the conditions must match"""
   NOT: [AuditLogFilter!] = null
 }
 
@@ -1465,14 +1498,23 @@ type AutoScalingRuleEdge
   node: AutoScalingRule!
 }
 
-"""Added in 25.19.0."""
+"""Added in 25.19.0. """
 input AutoScalingRuleFilter
   @join__type(graph: STRAWBERRY)
 {
+  """Creation datetime filter"""
   createdAt: DateTimeFilter = null
+
+  """Last triggered datetime filter"""
   lastTriggeredAt: DateTimeFilter = null
+
+  """AND conjunction"""
   AND: [AutoScalingRuleFilter!] = null
+
+  """OR conjunction"""
   OR: [AutoScalingRuleFilter!] = null
+
+  """NOT negation"""
   NOT: [AutoScalingRuleFilter!] = null
 }
 
@@ -1846,9 +1888,7 @@ scalar ByteSize
   @join__type(graph: STRAWBERRY)
 
 """
-Added in 24.09.0. Added in 25.14.0.
-
-Input for canceling an in-progress artifact import operation.
+Added in 24.09.0. Input for canceling an in-progress artifact import operation.
 
 Stops the download process and reverts the artifact revision status back to SCANNED.
 """
@@ -1885,9 +1925,7 @@ input CheckAndTransitStatusInput
 }
 
 """
-Added in 24.09.0. Added in 25.14.0.
-
-Input for cleaning up stored artifact revision data.
+Added in 24.09.0. Input for cleaning up stored artifact revision data.
 
 Removes downloaded files from storage and transitions the artifact revision
 back to SCANNED status, freeing up storage space.
@@ -3161,9 +3199,7 @@ input DelegateeTarget
 }
 
 """
-Added in 24.09.0. Added in 25.15.0.
-
-Input type for delegated import of artifact revisions from a reservoir registry's remote registry.
+Added in 24.09.0. Input type for delegated import of artifact revisions from a reservoir registry's remote registry.
 Used to specify which artifact revisions should be imported from the remote registry source
 into the local reservoir registry storage.
 """
@@ -3202,9 +3238,7 @@ type DelegateImportArtifactsPayload
 }
 
 """
-Added in 24.09.0. Added in 25.15.0.
-
-Input type for delegated scanning of artifacts from a delegatee reservoir registry's remote registry.
+Added in 24.09.0. Input type for delegated scanning of artifacts from a delegatee reservoir registry's remote registry.
 """
 input DelegateScanArtifactsInput
   @join__type(graph: STRAWBERRY)
@@ -3238,9 +3272,7 @@ type DelegateScanArtifactsPayload
 }
 
 """
-Added in 24.09.0. Added in 25.15.0.
-
-Input for soft-deleting artifacts from the system.
+Added in 24.09.0. Input for soft-deleting artifacts from the system.
 
 Marks artifacts as deleted without permanently removing them.
 Deleted artifacts can be restored using restore_artifacts.
@@ -3414,7 +3446,7 @@ type DeleteNotificationChannelPayload
   @join__type(graph: STRAWBERRY)
 {
   """ID of the deleted notification channel."""
-  id: UUID!
+  id: ID!
 }
 
 """Added in 24.09.0. Input for deleting a notification rule"""
@@ -3430,7 +3462,7 @@ type DeleteNotificationRulePayload
   @join__type(graph: STRAWBERRY)
 {
   """ID of the deleted notification rule."""
-  id: UUID!
+  id: ID!
 }
 
 """Added in 25.14.0. """
@@ -3445,8 +3477,8 @@ input DeleteObjectStorageInput
 type DeleteObjectStoragePayload
   @join__type(graph: STRAWBERRY)
 {
-  """ID of the deleted object storage"""
-  id: UUID!
+  """ID of the deleted object storage."""
+  id: ID!
 }
 
 """Added in 26.3.0. Input for deleting a scoped permission"""
@@ -3462,7 +3494,7 @@ type DeletePermissionPayload
   @join__type(graph: STRAWBERRY)
 {
   """ID of the deleted permission."""
-  id: UUID!
+  id: ID!
 }
 
 type DeleteProjectResourcePolicy
@@ -3477,7 +3509,7 @@ type DeleteQueryDefinitionPayload
   @join__type(graph: STRAWBERRY)
 {
   """Deleted query definition ID."""
-  id: String!
+  id: ID!
 }
 
 """Added in 25.14.0. """
@@ -3515,7 +3547,7 @@ type DeleteRolePayload
   @join__type(graph: STRAWBERRY)
 {
   """ID of the deleted role."""
-  id: UUID!
+  id: ID!
 }
 
 type DeleteScalingGroup
@@ -3538,8 +3570,7 @@ type DeleteUser
 }
 
 """
-Added in 24.09.0. Added in 25.16.0.
-Input for deleting user-level app configuration.
+Added in 24.09.0. Input for deleting user-level app configuration.
 If user_id is not provided, the current user's configuration will be deleted.
 """
 input DeleteUserConfigInput
@@ -3604,21 +3635,36 @@ input DeleteVFSStorageInput
 type DeleteVFSStoragePayload
   @join__type(graph: STRAWBERRY)
 {
-  """ID of the deleted VFS storage"""
-  id: UUID!
+  """ID of the deleted VFS storage."""
+  id: ID!
 }
 
-"""Added in 25.19.0."""
+"""Added in 25.19.0. """
 input DeploymentFilter
   @join__type(graph: STRAWBERRY)
 {
+  """Name filter"""
   name: StringFilter = null
+
+  """Status filter"""
   status: DeploymentStatusFilter = null
+
+  """Public access filter"""
   openToPublic: Boolean = null
+
+  """Tags filter"""
   tags: StringFilter = null
+
+  """Endpoint URL filter"""
   endpointUrl: StringFilter = null
+
+  """AND conjunction"""
   AND: [DeploymentFilter!] = null
+
+  """OR conjunction"""
   OR: [DeploymentFilter!] = null
+
+  """NOT negation"""
   NOT: [DeploymentFilter!] = null
 }
 
@@ -3671,18 +3717,43 @@ type DeploymentHistoryEdge
 input DeploymentHistoryFilter
   @join__type(graph: STRAWBERRY)
 {
+  """Filter by history record ID"""
   id: UUIDFilter = null
+
+  """Filter by deployment ID"""
   deploymentId: UUIDFilter = null
+
+  """Filter by scheduling phase"""
   phase: StringFilter = null
+
+  """Filter by from_status values"""
   fromStatus: [String!] = null
+
+  """Filter by to_status values"""
   toStatus: [String!] = null
+
+  """Filter by scheduling result"""
   result: SchedulingResultFilter = null
+
+  """Filter by error code"""
   errorCode: StringFilter = null
+
+  """Filter by message"""
   message: StringFilter = null
+
+  """Filter by created_at"""
   createdAt: DateTimeFilter = null
+
+  """Filter by updated_at"""
   updatedAt: DateTimeFilter = null
+
+  """AND conjunction."""
   AND: [DeploymentHistoryFilter!] = null
+
+  """OR conjunction."""
   OR: [DeploymentHistoryFilter!] = null
+
+  """NOT negation."""
   NOT: [DeploymentHistoryFilter!] = null
 }
 
@@ -4020,32 +4091,22 @@ Added in 26.1.0. Filter input for querying domain fair shares. Supports filterin
 input DomainFairShareFilter
   @join__type(graph: STRAWBERRY)
 {
-  """
-  Filter by scaling group name. Scaling groups define resource pool boundaries where domains compete for resources. Supports equals, contains, startsWith, and endsWith operations.
-  """
+  """Filter by scaling group"""
   resourceGroup: StringFilter = null
 
-  """
-  Filter by domain name. Domains are organizational units containing projects and users. Supports equals, contains, startsWith, and endsWith operations.
-  """
+  """Filter by domain name"""
   domainName: StringFilter = null
 
-  """
-  Added in 26.2.0. Nested filter for domain entity properties. Allows filtering by domain active status.
-  """
+  """Filter by domain entity properties"""
   domain: DomainFairShareDomainNestedFilter = null
 
-  """Combine multiple filters with AND logic. All conditions must match."""
+  """Combine with AND logic"""
   AND: [DomainFairShareFilter!] = null
 
-  """
-  Combine multiple filters with OR logic. At least one condition must match.
-  """
+  """Combine with OR logic"""
   OR: [DomainFairShareFilter!] = null
 
-  """
-  Negate the specified filters. Records matching these conditions will be excluded.
-  """
+  """Negate filters"""
   NOT: [DomainFairShareFilter!] = null
 }
 
@@ -4250,33 +4311,25 @@ Added in 26.1.0. Filter input for querying domain usage bucket records. Usage bu
 input DomainUsageBucketFilter
   @join__type(graph: STRAWBERRY)
 {
-  """
-  Filter by scaling group name. Scaling groups define where usage was recorded. Supports equals, contains, startsWith, and endsWith operations.
-  """
+  """Filter by resource group name"""
   resourceGroup: StringFilter = null
 
-  """
-  Filter by domain name. This filters usage buckets for a specific domain. Supports equals, contains, startsWith, and endsWith operations.
-  """
+  """Filter by domain name"""
   domainName: StringFilter = null
 
-  """Filter by usage measurement period start date."""
+  """Filter by period start date"""
   periodStart: DateFilter = null
 
-  """Filter by usage measurement period end date."""
+  """Filter by period end date"""
   periodEnd: DateFilter = null
 
-  """Combine multiple filters with AND logic. All conditions must match."""
+  """Combine with AND logic"""
   AND: [DomainUsageBucketFilter!] = null
 
-  """
-  Combine multiple filters with OR logic. At least one condition must match.
-  """
+  """Combine with OR logic"""
   OR: [DomainUsageBucketFilter!] = null
 
-  """
-  Negate the specified filters. Records matching these conditions will be excluded.
-  """
+  """Negate filters"""
   NOT: [DomainUsageBucketFilter!] = null
 }
 
@@ -4396,15 +4449,34 @@ Added in 26.2.0. Filter input for querying domains. Supports filtering by name, 
 input DomainV2Filter
   @join__type(graph: STRAWBERRY)
 {
+  """Filter by domain name."""
   name: StringFilter = null
+
+  """Filter by description."""
   description: StringFilter = null
+
+  """Filter by active status."""
   isActive: Boolean = null
+
+  """Filter by creation time."""
   createdAt: DateTimeFilter = null
+
+  """Filter by last modification time."""
   modifiedAt: DateTimeFilter = null
+
+  """Filter by nested project conditions."""
   project: DomainProjectNestedFilter = null
+
+  """Filter by nested user conditions."""
   user: DomainUserNestedFilter = null
+
+  """AND logical combinator."""
   AND: [DomainV2Filter!] = null
+
+  """OR logical combinator."""
   OR: [DomainV2Filter!] = null
+
+  """NOT logical combinator."""
   NOT: [DomainV2Filter!] = null
 }
 
@@ -5434,12 +5506,19 @@ Added in 26.2.0. Filter options for image aliases. Supports filtering by alias s
 input ImageV2AliasFilter
   @join__type(graph: STRAWBERRY)
 {
+  """Filter by alias string."""
   alias: StringFilter = null
 
-  """Added in 26.4.0. Filter by image ID."""
+  """Filter by image ID."""
   imageId: UUIDFilter = null
+
+  """Combine with AND logic."""
   AND: [ImageV2AliasFilter!] = null
+
+  """Combine with OR logic."""
   OR: [ImageV2AliasFilter!] = null
+
+  """Negate filters."""
   NOT: [ImageV2AliasFilter!] = null
 }
 
@@ -5500,20 +5579,31 @@ Added in 26.2.0. Filter options for images based on various criteria such as sta
 input ImageV2Filter
   @join__type(graph: STRAWBERRY)
 {
+  """Filter by status."""
   status: ImageV2StatusFilter = null
+
+  """Filter by name."""
   name: StringFilter = null
+
+  """Filter by architecture."""
   architecture: StringFilter = null
 
-  """Added in 26.4.0. Filter by container registry ID."""
+  """Filter by container registry ID."""
   registryId: UUIDFilter = null
 
-  """Added in 26.3.0. Filter by nested alias conditions."""
+  """Filter by nested alias conditions."""
   alias: ImageAliasNestedFilter = null
 
-  """Added in 26.3.0. Filter by last used datetime (before/after)."""
+  """Filter by last used datetime (before/after)."""
   lastUsed: DateTimeFilter = null
+
+  """Combine with AND logic."""
   AND: [ImageV2Filter!] = null
+
+  """Combine with OR logic."""
   OR: [ImageV2Filter!] = null
+
+  """Negate filters."""
   NOT: [ImageV2Filter!] = null
 }
 
@@ -5694,9 +5784,7 @@ type ImageV2TagEntry
 }
 
 """
-Added in 24.09.0. Added in 25.14.0.
-
-Input for importing scanned artifact revisions from external registries.
+Added in 24.09.0. Input for importing scanned artifact revisions from external registries.
 
 Downloads artifact files from the external source and transitions them through:
 SCANNED → PULLING → PULLED → AVAILABLE status progression.
@@ -5715,9 +5803,7 @@ input ImportArtifactsInput
 }
 
 """
-Added in 24.09.0. Added in 26.1.0.
-
-Options for importing artifact revisions.
+Added in 24.09.0. Options for importing artifact revisions.
 
 Controls import behavior such as forcing re-download regardless of digest freshness.
 """
@@ -5932,9 +6018,16 @@ Added in 26.3.0. Filter criteria for querying kernel resource allocations.
 input KernelResourceAllocationFilter
   @join__type(graph: STRAWBERRY)
 {
+  """Filter by slot name."""
   slotName: StringFilter = null
+
+  """Logical AND of multiple filter conditions."""
   AND: [KernelResourceAllocationFilter!] = null
+
+  """Logical OR of multiple filter conditions."""
   OR: [KernelResourceAllocationFilter!] = null
+
+  """Logical NOT of filter conditions."""
   NOT: [KernelResourceAllocationFilter!] = null
 }
 
@@ -6061,11 +6154,22 @@ type KernelV2Edge
 input KernelV2Filter
   @join__type(graph: STRAWBERRY)
 {
+  """Filter by kernel ID"""
   id: UUIDFilter = null
-  status: KernelV2StatusFilter = null
+
+  """Filter by session ID"""
   sessionId: UUIDFilter = null
+
+  """Filter by status"""
+  status: KernelV2StatusFilter = null
+
+  """AND logical operator"""
   AND: [KernelV2Filter!] = null
+
+  """OR logical operator"""
   OR: [KernelV2Filter!] = null
+
+  """NOT logical operator"""
   NOT: [KernelV2Filter!] = null
 }
 
@@ -6719,14 +6823,23 @@ type ModelRevisionEdge
   node: ModelRevision!
 }
 
-"""Added in 25.19.0."""
+"""Added in 25.19.0. """
 input ModelRevisionFilter
   @join__type(graph: STRAWBERRY)
 {
+  """Name filter"""
   name: StringFilter = null
+
+  """Filter by deployment ID"""
   deploymentId: ID = null
+
+  """AND conjunction"""
   AND: [ModelRevisionFilter!] = null
+
+  """OR conjunction"""
   OR: [ModelRevisionFilter!] = null
+
+  """NOT negation"""
   NOT: [ModelRevisionFilter!] = null
 }
 
@@ -6776,9 +6889,7 @@ input ModelRuntimeConfigInput
 }
 
 """
-Added in 24.09.0. Added in 25.14.0.
-
-Specifies a target model for scanning operations.
+Added in 24.09.0. Specifies a target model for scanning operations.
 
 Used to identify specific models in external registries for detailed scanning.
 If revision is not specified, defaults to 'main' revision.
@@ -7163,7 +7274,7 @@ input ModifyQueryDefinitionInput
   """
   Updated default time window. Pass SENTINEL (default) to leave unchanged; pass None to clear.
   """
-  timeWindow: String = "Sentinel.TOKEN"
+  timeWindow: String
 
   """Updated query definition options"""
   options: QueryDefinitionOptionsInput = null
@@ -8283,11 +8394,22 @@ type NotificationChannelEdge
 input NotificationChannelFilter
   @join__type(graph: STRAWBERRY)
 {
+  """Filter by channel name"""
   name: StringFilter = null
+
+  """Filter by channel type"""
   channelType: NotificationChannelTypeFilter = null
+
+  """Filter by enabled status"""
   enabled: Boolean = null
+
+  """Combine with AND logic"""
   AND: [NotificationChannelFilter!] = null
+
+  """Combine with OR logic"""
   OR: [NotificationChannelFilter!] = null
+
+  """Negate filters"""
   NOT: [NotificationChannelFilter!] = null
 }
 
@@ -8400,11 +8522,22 @@ type NotificationRuleEdge
 input NotificationRuleFilter
   @join__type(graph: STRAWBERRY)
 {
+  """Filter by rule name"""
   name: StringFilter = null
+
+  """Filter by rule type"""
   ruleType: NotificationRuleTypeFilter = null
+
+  """Filter by enabled status"""
   enabled: Boolean = null
+
+  """Combine with AND logic"""
   AND: [NotificationRuleFilter!] = null
+
+  """Combine with OR logic"""
   OR: [NotificationRuleFilter!] = null
+
+  """Negate filters"""
   NOT: [NotificationRuleFilter!] = null
 }
 
@@ -8801,37 +8934,25 @@ Added in 26.1.0. Filter input for querying project fair shares. Supports filteri
 input ProjectFairShareFilter
   @join__type(graph: STRAWBERRY)
 {
-  """
-  Filter by scaling group name. Scaling groups define resource pool boundaries where projects compete for resources within their domain. Supports equals, contains, startsWith, and endsWith operations.
-  """
+  """Filter by scaling group"""
   resourceGroup: StringFilter = null
 
-  """
-  Filter by project UUID. Projects are containers for sessions and user activities. Supports equals operation for exact match or 'in' operation for multiple UUIDs.
-  """
+  """Filter by project ID"""
   projectId: UUIDFilter = null
 
-  """
-  Filter by domain name. This filters projects belonging to a specific domain. Supports equals, contains, startsWith, and endsWith operations.
-  """
+  """Filter by domain name"""
   domainName: StringFilter = null
 
-  """
-  Added in 26.2.0. Nested filter for project entity properties. Allows filtering by project name, active status, and type.
-  """
+  """Filter by project entity properties"""
   project: ProjectFairShareProjectNestedFilter = null
 
-  """Combine multiple filters with AND logic. All conditions must match."""
+  """Combine with AND logic"""
   AND: [ProjectFairShareFilter!] = null
 
-  """
-  Combine multiple filters with OR logic. At least one condition must match.
-  """
+  """Combine with OR logic"""
   OR: [ProjectFairShareFilter!] = null
 
-  """
-  Negate the specified filters. Records matching these conditions will be excluded.
-  """
+  """Negate filters"""
   NOT: [ProjectFairShareFilter!] = null
 }
 
@@ -9078,38 +9199,28 @@ Added in 26.1.0. Filter input for querying project usage bucket records. Usage b
 input ProjectUsageBucketFilter
   @join__type(graph: STRAWBERRY)
 {
-  """
-  Filter by scaling group name. Scaling groups define where usage was recorded. Supports equals, contains, startsWith, and endsWith operations.
-  """
+  """Filter by resource group name"""
   resourceGroup: StringFilter = null
 
-  """
-  Filter by project UUID. This filters usage buckets for a specific project. Supports equals operation for exact match.
-  """
+  """Filter by project UUID"""
   projectId: UUIDFilter = null
 
-  """
-  Filter by domain name. This filters usage buckets for projects within a specific domain. Supports equals, contains, startsWith, and endsWith operations.
-  """
+  """Filter by domain name"""
   domainName: StringFilter = null
 
-  """Filter by usage measurement period start date."""
+  """Filter by period start date"""
   periodStart: DateFilter = null
 
-  """Filter by usage measurement period end date."""
+  """Filter by period end date"""
   periodEnd: DateFilter = null
 
-  """Combine multiple filters with AND logic. All conditions must match."""
+  """Combine with AND logic"""
   AND: [ProjectUsageBucketFilter!] = null
 
-  """
-  Combine multiple filters with OR logic. At least one condition must match.
-  """
+  """Combine with OR logic"""
   OR: [ProjectUsageBucketFilter!] = null
 
-  """
-  Negate the specified filters. Records matching these conditions will be excluded.
-  """
+  """Negate filters"""
   NOT: [ProjectUsageBucketFilter!] = null
 }
 
@@ -9236,17 +9347,40 @@ Added in 26.2.0. Filter input for querying projects. Supports filtering by ID, n
 input ProjectV2Filter
   @join__type(graph: STRAWBERRY)
 {
+  """Filter by project ID (UUID)."""
   id: UUIDFilter = null
+
+  """Filter by group name."""
   name: StringFilter = null
+
+  """Filter by domain name."""
   domainName: StringFilter = null
+
+  """Filter by project type."""
   type: ProjectTypeV2EnumFilter = null
+
+  """Filter by active status."""
   isActive: Boolean = null
+
+  """Filter by creation timestamp."""
   createdAt: DateTimeFilter = null
+
+  """Filter by last modification timestamp."""
   modifiedAt: DateTimeFilter = null
+
+  """Nested filter for domain conditions."""
   domain: ProjectDomainNestedFilter = null
+
+  """Nested filter for user conditions."""
   user: ProjectUserNestedFilter = null
+
+  """Combine filters with AND logic."""
   AND: [ProjectV2Filter!] = null
+
+  """Combine filters with OR logic."""
   OR: [ProjectV2Filter!] = null
+
+  """Negate the specified filters."""
   NOT: [ProjectV2Filter!] = null
 }
 
@@ -9380,7 +9514,7 @@ type PurgeRolePayload
   @join__type(graph: STRAWBERRY)
 {
   """ID of the purged role."""
-  id: UUID!
+  id: ID!
 }
 
 """
@@ -10582,9 +10716,7 @@ type RegisterStorageNamespacePayload
 }
 
 """
-Added in 24.09.0. Added in 25.14.0.
-
-Input for rejecting an artifact revision.
+Added in 24.09.0. Input for rejecting an artifact revision.
 
 Admin-only operation to reject artifact revisions, preventing their use.
 """
@@ -10604,14 +10736,23 @@ type RejectArtifactPayload
   artifactRevision: ArtifactRevision!
 }
 
-"""Added in 25.19.0."""
+"""Added in 25.19.0. """
 input ReplicaFilter
   @join__type(graph: STRAWBERRY)
 {
+  """Replica status filter"""
   status: ReplicaStatusFilter = null
+
+  """Replica traffic status filter"""
   trafficStatus: TrafficStatusFilter = null
+
+  """AND conjunction"""
   AND: [ReplicaFilter!] = null
+
+  """OR conjunction"""
   OR: [ReplicaFilter!] = null
+
+  """NOT negation"""
   NOT: [ReplicaFilter!] = null
 }
 
@@ -10864,12 +11005,25 @@ type ResourceGroupEdge
 input ResourceGroupFilter
   @join__type(graph: STRAWBERRY)
 {
+  """Filter by name."""
   name: StringFilter = null
+
+  """Filter by description."""
   description: StringFilter = null
+
+  """Filter by active status."""
   isActive: Boolean = null
+
+  """Filter by public status."""
   isPublic: Boolean = null
+
+  """AND conjunction."""
   AND: [ResourceGroupFilter!] = null
+
+  """OR conjunction."""
   OR: [ResourceGroupFilter!] = null
+
+  """NOT negation."""
   NOT: [ResourceGroupFilter!] = null
 }
 
@@ -11196,11 +11350,22 @@ type ResourceSlotTypeEdge
 input ResourceSlotTypeFilter
   @join__type(graph: STRAWBERRY)
 {
+  """Filter by slot name."""
   slotName: StringFilter = null
+
+  """Filter by slot type."""
   slotType: StringFilter = null
+
+  """Filter by display name."""
   displayName: StringFilter = null
+
+  """Logical AND of multiple filter conditions."""
   AND: [ResourceSlotTypeFilter!] = null
+
+  """Logical OR of multiple filter conditions."""
   OR: [ResourceSlotTypeFilter!] = null
+
+  """Logical NOT of filter conditions."""
   NOT: [ResourceSlotTypeFilter!] = null
 }
 
@@ -11260,9 +11425,7 @@ input ResourceWeightEntryInput
 }
 
 """
-Added in 24.09.0. Added in 25.15.0.
-
-Input for restoring previously deleted artifacts.
+Added in 24.09.0. Input for restoring previously deleted artifacts.
 
 Reverses the soft-delete operation, making the artifacts available again.
 """
@@ -11317,22 +11480,22 @@ Added in 26.2.0. Filter for domain fair shares within a resource group scope. Re
 input RGDomainFairShareFilter
   @join__type(graph: STRAWBERRY)
 {
-  """Filter by scaling group name."""
+  """Filter by scaling group"""
   resourceGroup: StringFilter = null
 
-  """Filter by domain name."""
+  """Filter by domain name"""
   domainName: StringFilter = null
 
-  """Filter by domain properties."""
+  """Filter by domain entity properties"""
   domain: DomainFairShareDomainNestedFilter = null
 
-  """Combine with AND logic."""
+  """Combine with AND logic"""
   AND: [RGDomainFairShareFilter!] = null
 
-  """Combine with OR logic."""
+  """Combine with OR logic"""
   OR: [RGDomainFairShareFilter!] = null
 
-  """Negate filters."""
+  """Negate filters"""
   NOT: [RGDomainFairShareFilter!] = null
 }
 
@@ -11342,25 +11505,25 @@ Added in 26.2.0. Filter for project fair shares within a resource group scope. R
 input RGProjectFairShareFilter
   @join__type(graph: STRAWBERRY)
 {
-  """Filter by scaling group name."""
+  """Filter by scaling group"""
   resourceGroup: StringFilter = null
 
-  """Filter by project UUID."""
+  """Filter by project ID"""
   projectId: UUIDFilter = null
 
-  """Filter by domain name."""
+  """Filter by domain name"""
   domainName: StringFilter = null
 
-  """Filter by project properties."""
+  """Filter by project entity properties"""
   project: ProjectFairShareProjectNestedFilter = null
 
-  """Combine with AND logic."""
+  """Combine with AND logic"""
   AND: [RGProjectFairShareFilter!] = null
 
-  """Combine with OR logic."""
+  """Combine with OR logic"""
   OR: [RGProjectFairShareFilter!] = null
 
-  """Negate filters."""
+  """Negate filters"""
   NOT: [RGProjectFairShareFilter!] = null
 }
 
@@ -11370,28 +11533,28 @@ Added in 26.2.0. Filter for user fair shares within a resource group scope. Refe
 input RGUserFairShareFilter
   @join__type(graph: STRAWBERRY)
 {
-  """Filter by scaling group name."""
+  """Filter by scaling group"""
   resourceGroup: StringFilter = null
 
-  """Filter by user UUID."""
+  """Filter by user UUID"""
   userUuid: UUIDFilter = null
 
-  """Filter by project UUID."""
+  """Filter by project ID"""
   projectId: UUIDFilter = null
 
-  """Filter by domain name."""
+  """Filter by domain name"""
   domainName: StringFilter = null
 
-  """Filter by user properties."""
+  """Filter by user entity properties"""
   user: UserFairShareUserNestedFilter = null
 
-  """Combine with AND logic."""
+  """Combine with AND logic"""
   AND: [RGUserFairShareFilter!] = null
 
-  """Combine with OR logic."""
+  """Combine with OR logic"""
   OR: [RGUserFairShareFilter!] = null
 
-  """Negate filters."""
+  """Negate filters"""
   NOT: [RGUserFairShareFilter!] = null
 }
 
@@ -11679,10 +11842,19 @@ type RouteEdge
 input RouteFilter
   @join__type(graph: STRAWBERRY)
 {
+  """Route status filter"""
   status: RouteStatusFilter = null
+
+  """Traffic status filter"""
   trafficStatus: RouteTrafficStatusFilter = null
+
+  """AND conjunction"""
   AND: [RouteFilter!] = null
+
+  """OR conjunction"""
   OR: [RouteFilter!] = null
+
+  """NOT negation"""
   NOT: [RouteFilter!] = null
 }
 
@@ -11738,19 +11910,46 @@ type RouteHistoryEdge
 input RouteHistoryFilter
   @join__type(graph: STRAWBERRY)
 {
+  """Filter by history record ID"""
   id: UUIDFilter = null
+
+  """Filter by route ID"""
   routeId: UUIDFilter = null
+
+  """Filter by deployment ID"""
   deploymentId: UUIDFilter = null
+
+  """Filter by scheduling phase"""
   phase: StringFilter = null
+
+  """Filter by from_status values"""
   fromStatus: [String!] = null
+
+  """Filter by to_status values"""
   toStatus: [String!] = null
+
+  """Filter by scheduling result"""
   result: SchedulingResultFilter = null
+
+  """Filter by error code"""
   errorCode: StringFilter = null
+
+  """Filter by message"""
   message: StringFilter = null
+
+  """Filter by created_at"""
   createdAt: DateTimeFilter = null
+
+  """Filter by updated_at"""
   updatedAt: DateTimeFilter = null
+
+  """AND conjunction."""
   AND: [RouteHistoryFilter!] = null
+
+  """OR conjunction."""
   OR: [RouteHistoryFilter!] = null
+
+  """NOT negation."""
   NOT: [RouteHistoryFilter!] = null
 }
 
@@ -11997,9 +12196,7 @@ type ScalingRule
 }
 
 """
-Added in 24.09.0. Added in 25.14.0.
-
-Input for batch scanning of specific models from external registries.
+Added in 24.09.0. Input for batch scanning of specific models from external registries.
 
 Scans multiple specified models and retrieves detailed information including
 README content and file sizes. This operation performs immediate detailed scanning
@@ -12025,9 +12222,7 @@ type ScanArtifactModelsPayload
 }
 
 """
-Added in 24.09.0. Added in 25.14.0.
-
-Input for scanning artifacts from external registries (HuggingFace, Reservoir).
+Added in 24.09.0. Input for scanning artifacts from external registries (HuggingFace, Reservoir).
 
 Discovers available artifacts and registers their metadata in the system.
 Artifacts remain in SCANNED status until explicitly imported via import_artifacts.
@@ -12216,17 +12411,19 @@ type ServiceCatalogEndpoint
 input ServiceCatalogFilter
   @join__type(graph: STRAWBERRY)
 {
-  """
-  Filter by service group name. Supports equals, contains, startsWith, and endsWith.
-  """
+  """Filter by service group name."""
   serviceGroup: StringFilter = null
 
-  """
-  Filter by health status. Supports equals, in, not_equals, and not_in operations.
-  """
+  """Filter by health status."""
   status: ServiceCatalogStatusFilter = null
+
+  """Logical AND of multiple filter conditions."""
   AND: [ServiceCatalogFilter!] = null
+
+  """Logical OR of multiple filter conditions."""
   OR: [ServiceCatalogFilter!] = null
+
+  """Logical NOT of filter conditions."""
   NOT: [ServiceCatalogFilter!] = null
 }
 
@@ -12447,18 +12644,43 @@ type SessionSchedulingHistoryEdge
 input SessionSchedulingHistoryFilter
   @join__type(graph: STRAWBERRY)
 {
+  """Filter by history record ID"""
   id: UUIDFilter = null
+
+  """Filter by session ID"""
   sessionId: UUIDFilter = null
+
+  """Filter by scheduling phase"""
   phase: StringFilter = null
+
+  """Filter by from_status values"""
   fromStatus: [String!] = null
+
+  """Filter by to_status values"""
   toStatus: [String!] = null
+
+  """Filter by scheduling result"""
   result: SchedulingResultFilter = null
+
+  """Filter by error code"""
   errorCode: StringFilter = null
+
+  """Filter by message"""
   message: StringFilter = null
+
+  """Filter by created_at"""
   createdAt: DateTimeFilter = null
+
+  """Filter by updated_at"""
   updatedAt: DateTimeFilter = null
+
+  """AND conjunction."""
   AND: [SessionSchedulingHistoryFilter!] = null
+
+  """OR conjunction."""
   OR: [SessionSchedulingHistoryFilter!] = null
+
+  """NOT negation."""
   NOT: [SessionSchedulingHistoryFilter!] = null
 }
 
@@ -13099,9 +13321,7 @@ type UntagImageFromRegistry
 }
 
 """
-Added in 24.09.0. Added in 25.14.0.
-
-Input for updating artifact metadata properties.
+Added in 24.09.0. Input for updating artifact metadata properties.
 
 Modifies artifact metadata such as readonly status and description.
 This operation does not affect the actual artifact files or revisions.
@@ -13132,15 +13352,32 @@ type UpdateArtifactPayload
 input UpdateAutoScalingRuleInput
   @join__type(graph: STRAWBERRY)
 {
+  """ID of the auto-scaling rule to update"""
   id: ID!
+
+  """Updated metric source. None means no change."""
   metricSource: AutoScalingMetricSource = null
+
+  """Updated metric name. None means no change."""
   metricName: String = null
-  minThreshold: Decimal = null
-  maxThreshold: Decimal = null
+
+  """Updated minimum threshold. SENTINEL = no change, None = clear."""
+  minThreshold: Decimal
+
+  """Updated maximum threshold. SENTINEL = no change, None = clear."""
+  maxThreshold: Decimal
+
+  """Updated step size. None means no change."""
   stepSize: Int = null
+
+  """Updated time window in seconds. None means no change."""
   timeWindow: Int = null
-  minReplicas: Int = null
-  maxReplicas: Int = null
+
+  """Updated minimum replicas. SENTINEL = no change, None = clear."""
+  minReplicas: Int
+
+  """Updated maximum replicas. SENTINEL = no change, None = clear."""
+  maxReplicas: Int
 }
 
 """Added in 25.19.0. Payload for updating an auto-scaling rule."""
@@ -13164,17 +13401,25 @@ input UpdateDeploymentInput
   @join__type(graph: STRAWBERRY)
 {
   id: ID!
-  openToPublic: Boolean = null
-  defaultDeploymentStrategy: DeploymentStrategyInput = null
-  activeRevisionId: ID = null
   desiredReplicaCount: Int = null
-  preferredDomainName: String = null
 
   """Updated deployment name"""
   name: String = null
 
   """Updated tags. Use SENTINEL to clear."""
-  tags: [String!] = "Sentinel.TOKEN"
+  tags: [String!]
+
+  """Updated network visibility. None means no change."""
+  openToPublic: Boolean = null
+
+  """Updated preferred domain name. None means no change."""
+  preferredDomainName: String = null
+
+  """ID of the revision to activate. None means no change."""
+  activeRevisionId: ID = null
+
+  """Updated deployment strategy. None means no change."""
+  defaultDeploymentStrategy: DeploymentStrategyInput = null
 }
 
 """Added in 25.19.0. Payload for updating a model deployment."""
@@ -13186,8 +13431,7 @@ type UpdateDeploymentPayload
 }
 
 """
-Added in 26.4.0.
-Input for creating or updating a deployment policy (upsert semantics).
+Added in 26.4.0. Input for creating or updating a deployment policy (upsert semantics).
 Specify the target deployment_id and the desired strategy type.
 Exactly one of rolling_update or blue_green must be provided,
 matching the chosen strategy type.
@@ -13196,10 +13440,19 @@ If a policy already exists for the deployment, it is replaced entirely.
 input UpdateDeploymentPolicyInput
   @join__type(graph: STRAWBERRY)
 {
+  """Deployment ID"""
   deploymentId: ID!
+
+  """Deployment strategy"""
   strategy: DeploymentStrategyType!
+
+  """Roll back on failure"""
   rollbackOnFailure: Boolean! = false
+
+  """Rolling update config (required for ROLLING strategy)"""
   rollingUpdate: RollingUpdateConfigInput = null
+
+  """Blue/green config (required for BLUE_GREEN strategy)"""
   blueGreen: BlueGreenConfigInput = null
 }
 
@@ -13263,7 +13516,9 @@ type UpdateMyAllowedClientIPPayload
   success: Boolean!
 }
 
-"""Input for updating a keypair owned by the current user."""
+"""
+Added in 24.09.0. Input for updating a keypair owned by the current user.
+"""
 input UpdateMyKeypairInput
   @join__type(graph: STRAWBERRY)
 {
@@ -13294,7 +13549,7 @@ input UpdateNotificationChannelInput
   name: String = null
 
   """Updated channel description. Use SENTINEL to clear."""
-  description: String = "Sentinel.TOKEN"
+  description: String
 
   """Updated channel specification"""
   spec: NotificationChannelSpecInput = null
@@ -13320,7 +13575,7 @@ input UpdateNotificationRuleInput
   name: String = null
 
   """Updated rule description. Use SENTINEL to clear."""
-  description: String = "Sentinel.TOKEN"
+  description: String
 
   """Updated message template (max 64KB)"""
   messageTemplate: String = null
@@ -13359,7 +13614,7 @@ input UpdateObjectStorageInput
   endpoint: String = null
 
   """Updated region. Use SENTINEL (default) for no change, None to clear."""
-  region: String = "Sentinel.TOKEN"
+  region: String
 }
 
 """Added in 25.14.0. Payload for updating an object storage."""
@@ -13519,7 +13774,7 @@ input UpdateRoleInput
   name: String = null
 
   """Updated role description. Use SENTINEL to clear."""
-  description: String = "Sentinel.TOKEN"
+  description: String
 
   """Updated role status"""
   status: RoleStatus = null
@@ -13551,51 +13806,55 @@ input UpdateUserV2Input
   @join__type(graph: STRAWBERRY)
 {
   """New username."""
-  username: String
+  username: String = null
 
   """New password."""
-  password: String
+  password: String = null
 
-  """New full display name."""
+  """New full display name. Set to null to clear."""
   fullName: String
 
-  """New description."""
+  """New description. Set to null to clear."""
   description: String
 
   """New account status."""
-  status: UserStatusV2
+  status: UserStatusV2 = null
 
   """New user role."""
-  role: UserRoleV2
+  role: UserRoleV2 = null
 
   """New domain assignment."""
-  domainName: String
+  domainName: String = null
 
-  """New project (group) assignments. Replaces existing assignments."""
+  """
+  New project (group) assignments. Replaces existing assignments. Set to null to clear.
+  """
   groupIds: [UUID!]
 
-  """New allowed client IP addresses or CIDR ranges."""
+  """
+  New allowed client IP addresses or CIDR ranges. Set to null to allow all.
+  """
   allowedClientIp: [String!]
 
   """Set password change requirement."""
-  needPasswordChange: Boolean
+  needPasswordChange: Boolean = null
 
   """New user resource policy name."""
-  resourcePolicy: String
+  resourcePolicy: String = null
 
   """Enable or disable sudo session capability."""
-  sudoSessionEnabled: Boolean
+  sudoSessionEnabled: Boolean = null
 
-  """Set the primary API access key."""
+  """Set the primary API access key. Set to null to clear."""
   mainAccessKey: String
 
-  """New container user ID."""
+  """New container user ID. Set to null to clear."""
   containerUid: Int
 
-  """New container primary group ID."""
+  """New container primary group ID. Set to null to clear."""
   containerMainGid: Int
 
-  """New container supplementary group IDs."""
+  """New container supplementary group IDs. Set to null to clear."""
   containerGids: [Int!]
 }
 
@@ -13633,8 +13892,7 @@ type UpdateVFSStoragePayload
 }
 
 """
-Added in 24.09.0. Added in 25.16.0.
-Input for creating or updating domain-level app configuration.
+Added in 24.09.0. Input for creating or updating domain-level app configuration.
 The provided extra_config object will completely replace the existing configuration;
 existing keys not present in the new extra_config will be removed.
 All users in this domain will be affected by these settings when their configurations are merged.
@@ -13718,8 +13976,7 @@ type UpsertProjectFairShareWeightPayload
 }
 
 """
-Added in 24.09.0. Added in 25.16.0.
-Input for creating or updating user-level app configuration.
+Added in 24.09.0. Input for creating or updating user-level app configuration.
 The provided extra_config object will completely replace the existing configuration;
 existing keys not present in the new extra_config will be removed.
 These settings will override domain-level settings when configurations are merged for this user.
@@ -13983,42 +14240,28 @@ Added in 26.1.0. Filter input for querying user fair shares. Supports filtering 
 input UserFairShareFilter
   @join__type(graph: STRAWBERRY)
 {
-  """
-  Filter by scaling group name. Scaling groups define resource pool boundaries where users compete for resources within their project. Supports equals, contains, startsWith, and endsWith operations.
-  """
+  """Filter by scaling group"""
   resourceGroup: StringFilter = null
 
-  """
-  Filter by user UUID. Users are individual accounts that create and run sessions. Supports equals operation for exact match or 'in' operation for multiple UUIDs.
-  """
+  """Filter by user UUID"""
   userUuid: UUIDFilter = null
 
-  """
-  Filter by project UUID. This filters users by their project membership. Supports equals operation for exact match or 'in' operation for multiple UUIDs.
-  """
+  """Filter by project ID"""
   projectId: UUIDFilter = null
 
-  """
-  Filter by domain name. This filters users belonging to a specific domain. Supports equals, contains, startsWith, and endsWith operations.
-  """
+  """Filter by domain name"""
   domainName: StringFilter = null
 
-  """
-  Added in 26.2.0. Nested filter for user entity properties. Allows filtering by username, email, and active status.
-  """
+  """Filter by user entity properties"""
   user: UserFairShareUserNestedFilter = null
 
-  """Combine multiple filters with AND logic. All conditions must match."""
+  """Combine with AND logic"""
   AND: [UserFairShareFilter!] = null
 
-  """
-  Combine multiple filters with OR logic. At least one condition must match.
-  """
+  """Combine with OR logic"""
   OR: [UserFairShareFilter!] = null
 
-  """
-  Negate the specified filters. Records matching these conditions will be excluded.
-  """
+  """Negate filters"""
   NOT: [UserFairShareFilter!] = null
 }
 
@@ -14373,43 +14616,31 @@ Added in 26.1.0. Filter input for querying user usage bucket records. Usage buck
 input UserUsageBucketFilter
   @join__type(graph: STRAWBERRY)
 {
-  """
-  Filter by scaling group name. Scaling groups define where usage was recorded. Supports equals, contains, startsWith, and endsWith operations.
-  """
+  """Filter by resource group name"""
   resourceGroup: StringFilter = null
 
-  """
-  Filter by user UUID. This filters usage buckets for a specific user. Supports equals operation for exact match.
-  """
+  """Filter by user UUID"""
   userUuid: UUIDFilter = null
 
-  """
-  Filter by project UUID. This filters usage buckets for users within a specific project. Supports equals operation for exact match.
-  """
+  """Filter by project UUID"""
   projectId: UUIDFilter = null
 
-  """
-  Filter by domain name. This filters usage buckets for users within a specific domain. Supports equals, contains, startsWith, and endsWith operations.
-  """
+  """Filter by domain name"""
   domainName: StringFilter = null
 
-  """Filter by usage measurement period start date."""
+  """Filter by period start date"""
   periodStart: DateFilter = null
 
-  """Filter by usage measurement period end date."""
+  """Filter by period end date"""
   periodEnd: DateFilter = null
 
-  """Combine multiple filters with AND logic. All conditions must match."""
+  """Combine with AND logic"""
   AND: [UserUsageBucketFilter!] = null
 
-  """
-  Combine multiple filters with OR logic. At least one condition must match.
-  """
+  """Combine with OR logic"""
   OR: [UserUsageBucketFilter!] = null
 
-  """
-  Negate the specified filters. Records matching these conditions will be excluded.
-  """
+  """Negate filters"""
   NOT: [UserUsageBucketFilter!] = null
 }
 
@@ -14586,17 +14817,40 @@ Added in 26.2.0. Filter input for querying users. Supports filtering by UUID, us
 input UserV2Filter
   @join__type(graph: STRAWBERRY)
 {
+  """Filter by user UUID."""
   uuid: UUIDFilter = null
+
+  """Filter by username."""
   username: StringFilter = null
+
+  """Filter by email."""
   email: StringFilter = null
+
+  """Filter by account status."""
   status: UserStatusV2EnumFilter = null
+
+  """Filter by domain name."""
   domainName: StringFilter = null
+
+  """Filter by user role."""
   role: UserRoleV2EnumFilter = null
+
+  """Filter by creation timestamp."""
   createdAt: DateTimeFilter = null
+
+  """Nested filter for the domain a user belongs to."""
   domain: UserDomainNestedFilter = null
+
+  """Nested filter for projects a user belongs to."""
   project: UserProjectNestedFilter = null
+
+  """Combine multiple filters with AND logic."""
   AND: [UserV2Filter!] = null
+
+  """Combine multiple filters with OR logic."""
   OR: [UserV2Filter!] = null
+
+  """Negate the specified filters."""
   NOT: [UserV2Filter!] = null
 }
 
@@ -14757,7 +15011,7 @@ type ValidateNotificationChannelPayload
   @join__type(graph: STRAWBERRY)
 {
   """ID of the validated notification channel."""
-  channelId: UUID!
+  id: ID!
 }
 
 """Added in 24.09.0. Input for validate notification rule mutation"""
