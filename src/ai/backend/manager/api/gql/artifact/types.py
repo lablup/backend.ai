@@ -369,17 +369,21 @@ class ArtifactRevisionRemoteStatusFilter:
         )
 
 
-@strawberry.input(
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description=dedent_strip("""
+        Added in 25.14.0.
+
+        Filter options for artifact revisions based on status, version, artifact ID, and file size.
+
+        Supports logical operations (AND, OR, NOT) for complex filtering scenarios.
+        """),
+        added_version="25.14.0",
+    ),
+    model=ArtifactRevisionGQLFilterInputDTO,
     name="ArtifactRevisionFilter",
-    description=dedent_strip("""
-    Added in 25.14.0.
-
-    Filter options for artifact revisions based on status, version, artifact ID, and file size.
-
-    Supports logical operations (AND, OR, NOT) for complex filtering scenarios.
-    """),
 )
-class ArtifactRevisionFilter(GQLFilter):
+class ArtifactRevisionFilter:
     status: ArtifactRevisionStatusFilter | None = None
     remote_status: ArtifactRevisionRemoteStatusFilter | None = strawberry.field(
         default=None, description="Added in 25.16.0"
@@ -393,32 +397,9 @@ class ArtifactRevisionFilter(GQLFilter):
     NOT: list[Self] | None = None
 
     def to_pydantic(self) -> ArtifactRevisionGQLFilterInputDTO:
-        """Convert to pydantic DTO for adapter layer processing."""
         return ArtifactRevisionGQLFilterInputDTO(
-            status=(
-                ArtifactRevisionStatusFilterDTO(
-                    in_=[ArtifactStatusDTO(s.value) for s in self.status.in_]
-                    if self.status.in_
-                    else None,
-                    equals=ArtifactStatusDTO(self.status.equals.value)
-                    if self.status.equals
-                    else None,
-                )
-                if self.status
-                else None
-            ),
-            remote_status=(
-                ArtifactRevisionRemoteStatusFilterDTO(
-                    in_=[ArtifactRemoteStatusDTO(s.value) for s in self.remote_status.in_]
-                    if self.remote_status.in_
-                    else None,
-                    equals=ArtifactRemoteStatusDTO(self.remote_status.equals.value)
-                    if self.remote_status.equals
-                    else None,
-                )
-                if self.remote_status
-                else None
-            ),
+            status=self.status.to_pydantic() if self.status else None,
+            remote_status=self.remote_status.to_pydantic() if self.remote_status else None,
             version=self.version.to_pydantic() if self.version else None,
             artifact_id=self.artifact_id.to_pydantic() if self.artifact_id else None,
             size=self.size.to_pydantic() if self.size else None,

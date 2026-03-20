@@ -102,9 +102,13 @@ class ProjectTypeEnumFilter:
         )
 
 
-@strawberry.input(
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description="Added in 26.2.0. Filter input for querying projects. Supports filtering by ID, name, domain, type, active status, and timestamps. Multiple filters can be combined using AND, OR, and NOT logical operators.",
+        added_version="26.2.0",
+    ),
+    model=GroupFilter,
     name="ProjectV2Filter",
-    description="Added in 26.2.0. Filter input for querying projects. Supports filtering by ID, name, domain, type, active status, and timestamps. Multiple filters can be combined using AND, OR, and NOT logical operators.",
 )
 class ProjectV2Filter:
     """Filter for project queries."""

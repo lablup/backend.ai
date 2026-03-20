@@ -165,9 +165,13 @@ class KernelV2StatusFilterGQL:
         )
 
 
-@strawberry.input(
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description="Added in 26.2.0. Filter criteria for querying kernels.",
+        added_version="26.2.0",
+    ),
+    model=KernelFilter,
     name="KernelV2Filter",
-    description="Added in 26.2.0. Filter criteria for querying kernels.",
 )
 class KernelV2FilterGQL:
     id: UUIDFilter | None = None

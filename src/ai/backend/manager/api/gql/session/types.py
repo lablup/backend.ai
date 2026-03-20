@@ -178,9 +178,13 @@ class SessionV2StatusFilterGQL:
         )
 
 
-@strawberry.input(
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description="Added in 26.3.0. Filter criteria for querying sessions.",
+        added_version="26.3.0",
+    ),
+    model=SessionFilter,
     name="SessionV2Filter",
-    description="Added in 26.3.0. Filter criteria for querying sessions.",
 )
 class SessionV2FilterGQL:
     id: UUIDFilter | None = None
