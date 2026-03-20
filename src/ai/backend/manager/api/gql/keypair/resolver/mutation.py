@@ -19,12 +19,6 @@ from ai.backend.manager.api.gql.keypair.types import (
     UpdateMyKeypairPayloadGQL,
 )
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
-from ai.backend.manager.services.user.actions.keypair_ops import (
-    IssueMyKeypairAction,
-    RevokeMyKeypairAction,
-    SwitchMyMainAccessKeyAction,
-    UpdateMyKeypairAction,
-)
 
 
 def _get_current_user_id() -> UUID:
@@ -44,15 +38,9 @@ def _get_current_user_id() -> UUID:
 async def issue_my_keypair(
     info: Info[StrawberryGQLContext],
 ) -> IssueMyKeypairPayloadGQL:
-    user_uuid = _get_current_user_id()
-    result = await info.context.processors.user.issue_my_keypair.wait_for_complete(
-        IssueMyKeypairAction(user_uuid=user_uuid)
-    )
-    return IssueMyKeypairPayloadGQL(
-        access_key=result.generated_data.access_key,
-        secret_key=result.generated_data.secret_key,
-        ssh_public_key=result.generated_data.ssh_public_key,
-    )
+    user_id = _get_current_user_id()
+    payload = await info.context.adapters.user.issue_my_keypair(user_id)
+    return IssueMyKeypairPayloadGQL.from_pydantic(payload)
 
 
 @strawberry.mutation(
@@ -65,11 +53,9 @@ async def revoke_my_keypair(
     info: Info[StrawberryGQLContext],
     input: RevokeMyKeypairInputGQL,
 ) -> RevokeMyKeypairPayloadGQL:
-    user_uuid = _get_current_user_id()
-    result = await info.context.processors.user.revoke_my_keypair.wait_for_complete(
-        RevokeMyKeypairAction(user_uuid=user_uuid, access_key=input.access_key)
-    )
-    return RevokeMyKeypairPayloadGQL(success=result.success)
+    user_id = _get_current_user_id()
+    payload = await info.context.adapters.user.revoke_my_keypair(user_id, input.access_key)
+    return RevokeMyKeypairPayloadGQL.from_pydantic(payload)
 
 
 @strawberry.mutation(
@@ -82,13 +68,11 @@ async def update_my_keypair(
     info: Info[StrawberryGQLContext],
     input: UpdateMyKeypairInputGQL,
 ) -> UpdateMyKeypairPayloadGQL:
-    user_uuid = _get_current_user_id()
-    result = await info.context.processors.user.update_my_keypair.wait_for_complete(
-        UpdateMyKeypairAction(
-            user_uuid=user_uuid, access_key=input.access_key, is_active=input.is_active
-        )
+    user_id = _get_current_user_id()
+    payload = await info.context.adapters.user.update_my_keypair(
+        user_id, input.access_key, input.is_active
     )
-    return UpdateMyKeypairPayloadGQL(success=result.success)
+    return UpdateMyKeypairPayloadGQL.from_pydantic(payload)
 
 
 @strawberry.mutation(
@@ -101,8 +85,6 @@ async def switch_my_main_access_key(
     info: Info[StrawberryGQLContext],
     input: SwitchMyMainAccessKeyInputGQL,
 ) -> SwitchMyMainAccessKeyPayloadGQL:
-    user_uuid = _get_current_user_id()
-    result = await info.context.processors.user.switch_my_main_access_key.wait_for_complete(
-        SwitchMyMainAccessKeyAction(user_uuid=user_uuid, access_key=input.access_key)
-    )
-    return SwitchMyMainAccessKeyPayloadGQL(success=result.success)
+    user_id = _get_current_user_id()
+    payload = await info.context.adapters.user.switch_my_main_access_key(user_id, input.access_key)
+    return SwitchMyMainAccessKeyPayloadGQL.from_pydantic(payload)

@@ -7,6 +7,12 @@ from uuid import UUID
 from ai.backend.common.data.user.types import UserRole
 from ai.backend.common.data.user.types import UserRole as DataUserRole
 from ai.backend.common.dto.manager.pagination import PaginationInfo
+from ai.backend.common.dto.manager.v2.keypair.response import (
+    IssueMyKeypairPayload,
+    RevokeMyKeypairPayload,
+    SwitchMyMainAccessKeyPayload,
+    UpdateMyKeypairPayload,
+)
 from ai.backend.common.dto.manager.v2.user.request import (
     AdminSearchUsersInput,
     SearchUsersRequest,
@@ -60,6 +66,12 @@ from ai.backend.manager.repositories.user.types import (
     RoleUserSearchScope,
 )
 from ai.backend.manager.services.user.actions.get_user import GetUserAction
+from ai.backend.manager.services.user.actions.keypair_ops import (
+    IssueMyKeypairAction,
+    RevokeMyKeypairAction,
+    SwitchMyMainAccessKeyAction,
+    UpdateMyKeypairAction,
+)
 from ai.backend.manager.services.user.actions.search_users import SearchUsersAction
 from ai.backend.manager.services.user.actions.search_users_by_domain import (
     SearchUsersByDomainAction,
@@ -268,6 +280,44 @@ class UserAdapter(BaseAdapter):
             GetUserAction(user_uuid=user_id)
         )
         return UserPayload(user=self._user_data_to_node(action_result.user))
+
+    # ------------------------------------------------------------------ keypair operations
+
+    async def issue_my_keypair(self, user_id: UUID) -> IssueMyKeypairPayload:
+        """Issue a new keypair for the current user."""
+        result = await self._processors.user.issue_my_keypair.wait_for_complete(
+            IssueMyKeypairAction(user_uuid=user_id)
+        )
+        return IssueMyKeypairPayload(
+            access_key=result.generated_data.access_key,
+            secret_key=result.generated_data.secret_key,
+            ssh_public_key=result.generated_data.ssh_public_key,
+        )
+
+    async def revoke_my_keypair(self, user_id: UUID, access_key: str) -> RevokeMyKeypairPayload:
+        """Revoke a keypair owned by the current user."""
+        result = await self._processors.user.revoke_my_keypair.wait_for_complete(
+            RevokeMyKeypairAction(user_uuid=user_id, access_key=access_key)
+        )
+        return RevokeMyKeypairPayload(success=result.success)
+
+    async def update_my_keypair(
+        self, user_id: UUID, access_key: str, is_active: bool
+    ) -> UpdateMyKeypairPayload:
+        """Update a keypair owned by the current user."""
+        result = await self._processors.user.update_my_keypair.wait_for_complete(
+            UpdateMyKeypairAction(user_uuid=user_id, access_key=access_key, is_active=is_active)
+        )
+        return UpdateMyKeypairPayload(success=result.success)
+
+    async def switch_my_main_access_key(
+        self, user_id: UUID, access_key: str
+    ) -> SwitchMyMainAccessKeyPayload:
+        """Switch the main access key for the current user."""
+        result = await self._processors.user.switch_my_main_access_key.wait_for_complete(
+            SwitchMyMainAccessKeyAction(user_uuid=user_id, access_key=access_key)
+        )
+        return SwitchMyMainAccessKeyPayload(success=result.success)
 
     # ------------------------------------------------------------------ GQL filter/order helpers
 

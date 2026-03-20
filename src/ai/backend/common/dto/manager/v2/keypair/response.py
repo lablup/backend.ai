@@ -12,6 +12,7 @@ __all__ = (
     "IssueMyKeypairPayload",
     "RevokeMyKeypairPayload",
     "SwitchMyMainAccessKeyPayload",
+    "UpdateMyKeypairPayload",
 )
 
 
@@ -29,6 +30,12 @@ class RevokeMyKeypairPayload(BaseResponseModel):
     """Payload returned after revoking a keypair."""
 
     success: bool = Field(description="Whether the revocation was successful.")
+
+
+class UpdateMyKeypairPayload(BaseResponseModel):
+    """Payload returned after updating a keypair."""
+
+    success: bool = Field(description="Whether the update was successful.")
 
 
 class SwitchMyMainAccessKeyPayload(BaseResponseModel):

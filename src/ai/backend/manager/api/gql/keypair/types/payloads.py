@@ -13,6 +13,9 @@ from ai.backend.common.dto.manager.v2.keypair.response import (
 from ai.backend.common.dto.manager.v2.keypair.response import (
     SwitchMyMainAccessKeyPayload as SwitchMyMainAccessKeyPayloadDTO,
 )
+from ai.backend.common.dto.manager.v2.keypair.response import (
+    UpdateMyKeypairPayload as UpdateMyKeypairPayloadDTO,
+)
 from ai.backend.manager.api.gql.decorators import BackendAIGQLMeta, gql_node_type
 
 
@@ -84,3 +87,7 @@ class SwitchMyMainAccessKeyPayloadGQL:
 )
 class UpdateMyKeypairPayloadGQL:
     success: bool = strawberry.field(description="Whether the update was successful.")
+
+    @classmethod
+    def from_pydantic(cls, dto: UpdateMyKeypairPayloadDTO) -> UpdateMyKeypairPayloadGQL:
+        return cls(success=dto.success)
