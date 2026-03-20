@@ -6,6 +6,7 @@ import uuid
 
 from ai.backend.common.data.permission.types import RoleStatus
 from ai.backend.manager.api.gql.rbac.types.role import RoleStatusGQL, UpdateRoleInput
+from ai.backend.manager.repositories.permission_controller.updaters import RoleUpdaterSpec
 from ai.backend.manager.types import _TriStateEnum
 
 
@@ -20,8 +21,10 @@ class TestUpdateRoleInputToUpdater:
         )
 
         updater = role_input.to_updater()
+        spec = updater.spec
+        assert isinstance(spec, RoleUpdaterSpec)
 
-        assert updater.spec.description._state == _TriStateEnum.NULLIFY
+        assert spec.description._state == _TriStateEnum.NULLIFY
 
     def test_description_with_unset_creates_nop_tristate(self) -> None:
         """UpdateRoleInput with description=UNSET → TriState.nop() in updater spec."""
@@ -31,8 +34,10 @@ class TestUpdateRoleInputToUpdater:
         )
 
         updater = role_input.to_updater()
+        spec = updater.spec
+        assert isinstance(spec, RoleUpdaterSpec)
 
-        assert updater.spec.description._state == _TriStateEnum.NOP
+        assert spec.description._state == _TriStateEnum.NOP
 
     def test_description_with_string_creates_update_tristate(self) -> None:
         """UpdateRoleInput with description="text" → TriState.update("text") in updater spec."""
@@ -42,9 +47,11 @@ class TestUpdateRoleInputToUpdater:
         )
 
         updater = role_input.to_updater()
+        spec = updater.spec
+        assert isinstance(spec, RoleUpdaterSpec)
 
-        assert updater.spec.description._state == _TriStateEnum.UPDATE
-        assert updater.spec.description.value() == "some text"
+        assert spec.description._state == _TriStateEnum.UPDATE
+        assert spec.description.value() == "some text"
 
     def test_name_with_unset_creates_nop_optionalstate(self) -> None:
         """UpdateRoleInput with name=UNSET → OptionalState.nop() in updater spec."""
@@ -54,8 +61,10 @@ class TestUpdateRoleInputToUpdater:
         )
 
         updater = role_input.to_updater()
+        spec = updater.spec
+        assert isinstance(spec, RoleUpdaterSpec)
 
-        assert updater.spec.name._state == _TriStateEnum.NOP
+        assert spec.name._state == _TriStateEnum.NOP
 
     def test_name_with_string_creates_update_optionalstate(self) -> None:
         """UpdateRoleInput with name="new name" → OptionalState.update("new name") in updater spec."""
@@ -65,9 +74,11 @@ class TestUpdateRoleInputToUpdater:
         )
 
         updater = role_input.to_updater()
+        spec = updater.spec
+        assert isinstance(spec, RoleUpdaterSpec)
 
-        assert updater.spec.name._state == _TriStateEnum.UPDATE
-        assert updater.spec.name.value() == "new name"
+        assert spec.name._state == _TriStateEnum.UPDATE
+        assert spec.name.value() == "new name"
 
     def test_status_with_unset_creates_nop_optionalstate(self) -> None:
         """UpdateRoleInput with status=UNSET → OptionalState.nop() in updater spec."""
@@ -77,8 +88,10 @@ class TestUpdateRoleInputToUpdater:
         )
 
         updater = role_input.to_updater()
+        spec = updater.spec
+        assert isinstance(spec, RoleUpdaterSpec)
 
-        assert updater.spec.status._state == _TriStateEnum.NOP
+        assert spec.status._state == _TriStateEnum.NOP
 
     def test_status_with_active_creates_update_optionalstate(self) -> None:
         """UpdateRoleInput with status=RoleStatusGQL.ACTIVE → OptionalState.update(RoleStatus.ACTIVE)."""
@@ -88,9 +101,11 @@ class TestUpdateRoleInputToUpdater:
         )
 
         updater = role_input.to_updater()
+        spec = updater.spec
+        assert isinstance(spec, RoleUpdaterSpec)
 
-        assert updater.spec.status._state == _TriStateEnum.UPDATE
-        assert updater.spec.status.value() == RoleStatus.ACTIVE
+        assert spec.status._state == _TriStateEnum.UPDATE
+        assert spec.status.value() == RoleStatus.ACTIVE
 
     def test_status_with_inactive_creates_update_optionalstate(self) -> None:
         """UpdateRoleInput with status=RoleStatusGQL.INACTIVE → OptionalState.update(RoleStatus.INACTIVE)."""
@@ -100,9 +115,11 @@ class TestUpdateRoleInputToUpdater:
         )
 
         updater = role_input.to_updater()
+        spec = updater.spec
+        assert isinstance(spec, RoleUpdaterSpec)
 
-        assert updater.spec.status._state == _TriStateEnum.UPDATE
-        assert updater.spec.status.value() == RoleStatus.INACTIVE
+        assert spec.status._state == _TriStateEnum.UPDATE
+        assert spec.status.value() == RoleStatus.INACTIVE
 
     def test_multiple_fields_with_mixed_states(self) -> None:
         """Test multiple fields with different states."""
@@ -115,13 +132,15 @@ class TestUpdateRoleInputToUpdater:
         )
 
         updater = role_input.to_updater()
+        spec = updater.spec
+        assert isinstance(spec, RoleUpdaterSpec)
 
         assert updater.pk_value == role_id
-        assert updater.spec.name._state == _TriStateEnum.UPDATE
-        assert updater.spec.name.value() == "updated role"
-        assert updater.spec.description._state == _TriStateEnum.NULLIFY
-        assert updater.spec.status._state == _TriStateEnum.UPDATE
-        assert updater.spec.status.value() == RoleStatus.ACTIVE
+        assert spec.name._state == _TriStateEnum.UPDATE
+        assert spec.name.value() == "updated role"
+        assert spec.description._state == _TriStateEnum.NULLIFY
+        assert spec.status._state == _TriStateEnum.UPDATE
+        assert spec.status.value() == RoleStatus.ACTIVE
 
     def test_all_fields_unset_creates_all_nop(self) -> None:
         """When all fields are UNSET, all spec fields should be nop."""
@@ -131,10 +150,12 @@ class TestUpdateRoleInputToUpdater:
         )
 
         updater = role_input.to_updater()
+        spec = updater.spec
+        assert isinstance(spec, RoleUpdaterSpec)
 
-        assert updater.spec.name._state == _TriStateEnum.NOP
-        assert updater.spec.description._state == _TriStateEnum.NOP
-        assert updater.spec.status._state == _TriStateEnum.NOP
+        assert spec.name._state == _TriStateEnum.NOP
+        assert spec.description._state == _TriStateEnum.NOP
+        assert spec.status._state == _TriStateEnum.NOP
 
     def test_updater_pk_value_matches_input_id(self) -> None:
         """Updater.pk_value should match the input id."""
