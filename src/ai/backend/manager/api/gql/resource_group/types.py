@@ -53,9 +53,6 @@ from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.api.gql.utils import dedent_strip
 from ai.backend.manager.data.scaling_group.types import (
-    PreemptionConfig as DataPreemptionConfig,
-)
-from ai.backend.manager.data.scaling_group.types import (
     ResourceInfo,
     ScalingGroupData,
     SchedulerType,
@@ -169,15 +166,6 @@ class PreemptionConfigGQL:
     preemptible_priority: strawberry.auto
     order: PreemptionOrderGQL
     mode: PreemptionModeGQL
-
-    @classmethod
-    def from_dataclass(cls, data: DataPreemptionConfig) -> Self:
-        """Convert from data layer PreemptionConfig to GQL type."""
-        return cls(
-            preemptible_priority=data.preemptible_priority,
-            order=PreemptionOrderGQL.from_preemption_order(data.order),
-            mode=PreemptionModeGQL.from_preemption_mode(data.mode),
-        )
 
 
 @gql_node_type(
@@ -438,7 +426,11 @@ class ResourceGroupGQL(PydanticNodeMixin[Any]):
             ),
             scheduler=ResourceGroupSchedulerConfigGQL(
                 type=SchedulerTypeGQL.from_scheduler_type(dto.scheduler.name),
-                preemption=PreemptionConfigGQL.from_dataclass(dto.scheduler.options.preemption),
+                preemption=PreemptionConfigGQL(
+                    preemptible_priority=dto.scheduler.options.preemption.preemptible_priority,
+                    order=PreemptionOrderGQL(dto.scheduler.options.preemption.order.value),
+                    mode=PreemptionModeGQL(dto.scheduler.options.preemption.mode.value),
+                ),
             ),
             _fair_share_spec_data=dto.fair_share_spec,
         )
