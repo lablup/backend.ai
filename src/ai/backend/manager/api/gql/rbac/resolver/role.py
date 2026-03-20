@@ -81,7 +81,7 @@ async def admin_roles(
         )
     )
     edges = [
-        RoleEdge(node=RoleGQL.from_dataclass(item), cursor=encode_cursor(str(item.id)))
+        RoleEdge(node=RoleGQL.from_pydantic(item), cursor=encode_cursor(str(item.id)))
         for item in result.items
     ]
     return RoleConnection(
@@ -125,7 +125,7 @@ async def admin_role_assignments(
     )
     edges = [
         RoleAssignmentEdge(
-            node=RoleAssignmentGQL.from_dataclass(item),
+            node=RoleAssignmentGQL.from_pydantic(item),
             cursor=encode_cursor(str(item.id)),
         )
         for item in result.items
@@ -177,7 +177,7 @@ async def my_roles(
     )
     edges = [
         RoleAssignmentEdge(
-            node=RoleAssignmentGQL.from_dataclass(item),
+            node=RoleAssignmentGQL.from_pydantic(item),
             cursor=encode_cursor(str(item.id)),
         )
         for item in result.items

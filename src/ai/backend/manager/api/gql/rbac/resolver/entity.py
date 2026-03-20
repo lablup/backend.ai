@@ -47,7 +47,7 @@ async def admin_entities(
     )
     edges = [
         EntityEdge(
-            node=EntityRefGQL.from_dataclass(item),
+            node=EntityRefGQL.from_pydantic(item),
             cursor=encode_cursor(str(item.id)),
         )
         for item in result.items

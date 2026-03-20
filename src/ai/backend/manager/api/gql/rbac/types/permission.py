@@ -5,7 +5,7 @@ from __future__ import annotations
 import uuid
 from collections.abc import Iterable
 from enum import StrEnum
-from typing import TYPE_CHECKING, Annotated, Any, Self
+from typing import TYPE_CHECKING, Annotated, Any, Self, cast
 
 import strawberry
 from strawberry import ID, Info
@@ -180,9 +180,10 @@ class PermissionGQL(PydanticNodeMixin[PermissionNodeDTO]):
         required: bool = False,
     ) -> Iterable[Self | None]:
         # DataLoader already returns PermissionGQL | None via from_pydantic conversion
-        return await info.context.data_loaders.permission_loader.load_many([
+        results = await info.context.data_loaders.permission_loader.load_many([
             uuid.UUID(nid) for nid in node_ids
         ])
+        return cast(list[Self | None], results)
 
     @strawberry.field(description="The role this permission belongs to.")  # type: ignore[misc]
     async def role(
@@ -205,25 +206,15 @@ class PermissionGQL(PydanticNodeMixin[PermissionNodeDTO]):
         *,
         info: Info[StrawberryGQLContext],
     ) -> EntityNode | None:
-        from ai.backend.manager.api.gql.container_registry.types import ContainerRegistryGQL
-        from ai.backend.manager.api.gql.deployment.types.deployment import ModelDeployment
-        from ai.backend.manager.api.gql.project_v2.types.node import ProjectV2GQL
-        from ai.backend.manager.api.gql.session.types import SessionV2GQL
-        from ai.backend.manager.api.gql.user.types.node import UserV2GQL
-
         element_type = self.scope_type.to_element()
         data_loaders = info.context.data_loaders
         match element_type:
             case RBACElementType.USER:
-                user_data = await data_loaders.user_loader.load(uuid.UUID(self.scope_id))
-                if user_data is None:
-                    return None
-                return UserV2GQL.from_data(user_data)
+                # DataLoader already returns UserV2GQL | None via from_pydantic conversion
+                return await data_loaders.user_loader.load(uuid.UUID(self.scope_id))
             case RBACElementType.PROJECT:
-                project_data = await data_loaders.project_loader.load(uuid.UUID(self.scope_id))
-                if project_data is None:
-                    return None
-                return ProjectV2GQL.from_data(project_data)
+                # DataLoader already returns ProjectV2GQL | None via from_pydantic conversion
+                return await data_loaders.project_loader.load(uuid.UUID(self.scope_id))
             case RBACElementType.DOMAIN:
                 return await data_loaders.domain_loader.load(self.scope_id)
             case RBACElementType.ROLE:
@@ -232,27 +223,17 @@ class PermissionGQL(PydanticNodeMixin[PermissionNodeDTO]):
             case RBACElementType.RESOURCE_GROUP:
                 return await data_loaders.resource_group_loader.load(self.scope_id)
             case RBACElementType.MODEL_DEPLOYMENT:
-                deploy_data = await data_loaders.deployment_loader.load(uuid.UUID(self.scope_id))
-                if deploy_data is None:
-                    return None
-                return ModelDeployment.from_dataclass(deploy_data)
+                # DataLoader already returns ModelDeployment | None via from_pydantic conversion
+                return await data_loaders.deployment_loader.load(uuid.UUID(self.scope_id))
             case RBACElementType.ARTIFACT_REVISION:
                 # DataLoader already returns ArtifactRevision | None via from_pydantic
                 return await data_loaders.artifact_revision_loader.load(uuid.UUID(self.scope_id))
             case RBACElementType.CONTAINER_REGISTRY:
-                cr_data = await data_loaders.container_registry_loader.load(
-                    uuid.UUID(self.scope_id)
-                )
-                if cr_data is None:
-                    return None
-                return ContainerRegistryGQL.from_data(cr_data)
+                # DataLoader already returns ContainerRegistryGQL | None via from_pydantic
+                return await data_loaders.container_registry_loader.load(uuid.UUID(self.scope_id))
             case RBACElementType.SESSION:
-                session_data = await data_loaders.session_loader.load(
-                    SessionId(uuid.UUID(self.scope_id))
-                )
-                if session_data is None:
-                    return None
-                return SessionV2GQL.from_data(session_data)
+                # DataLoader already returns SessionV2GQL | None via from_pydantic conversion
+                return await data_loaders.session_loader.load(SessionId(uuid.UUID(self.scope_id)))
             case (
                 RBACElementType.VFOLDER
                 | RBACElementType.KEYPAIR

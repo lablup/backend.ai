@@ -6,7 +6,7 @@ import uuid
 from collections.abc import Iterable
 from datetime import datetime
 from enum import StrEnum
-from typing import Any, Self
+from typing import Any, Self, cast
 
 import strawberry
 from strawberry import ID, Info
@@ -76,43 +76,27 @@ class EntityRefGQL(PydanticNodeMixin[AssociationScopesEntitiesNode]):
         info: Info[StrawberryGQLContext],
     ) -> EntityNode | None:
         from ai.backend.common.types import ImageID, SessionId
-        from ai.backend.manager.api.gql.container_registry.types import ContainerRegistryGQL
-        from ai.backend.manager.api.gql.deployment.types.deployment import ModelDeployment
-        from ai.backend.manager.api.gql.image.types import ImageV2GQL
-        from ai.backend.manager.api.gql.project_v2.types.node import ProjectV2GQL
-        from ai.backend.manager.api.gql.session.types import SessionV2GQL
-        from ai.backend.manager.api.gql.user.types.node import UserV2GQL
 
         element_type = self.entity_type.to_element()
         data_loaders = info.context.data_loaders
         match element_type:
             case RBACElementType.USER:
-                user_data = await data_loaders.user_loader.load(uuid.UUID(self.entity_id))
-                if user_data is None:
-                    return None
-                return UserV2GQL.from_data(user_data)
+                # DataLoader already returns UserV2GQL | None via from_pydantic conversion
+                return await data_loaders.user_loader.load(uuid.UUID(self.entity_id))
             case RBACElementType.PROJECT:
-                project_data = await data_loaders.project_loader.load(uuid.UUID(self.entity_id))
-                if project_data is None:
-                    return None
-                return ProjectV2GQL.from_data(project_data)
+                # DataLoader already returns ProjectV2GQL | None via from_pydantic conversion
+                return await data_loaders.project_loader.load(uuid.UUID(self.entity_id))
             case RBACElementType.DOMAIN:
                 return await data_loaders.domain_loader.load(self.entity_id)
             case RBACElementType.ROLE:
                 # DataLoader already returns RoleGQL | None via from_pydantic conversion
                 return await data_loaders.role_loader.load(uuid.UUID(self.entity_id))
             case RBACElementType.IMAGE:
-                image_data = await data_loaders.image_loader.load(
-                    ImageID(uuid.UUID(self.entity_id))
-                )
-                if image_data is None:
-                    return None
-                return ImageV2GQL.from_data(image_data)
+                # DataLoader already returns ImageV2GQL | None via from_pydantic conversion
+                return await data_loaders.image_loader.load(ImageID(uuid.UUID(self.entity_id)))
             case RBACElementType.MODEL_DEPLOYMENT:
-                deploy_data = await data_loaders.deployment_loader.load(uuid.UUID(self.entity_id))
-                if deploy_data is None:
-                    return None
-                return ModelDeployment.from_dataclass(deploy_data)
+                # DataLoader already returns ModelDeployment | None via from_pydantic conversion
+                return await data_loaders.deployment_loader.load(uuid.UUID(self.entity_id))
             case RBACElementType.RESOURCE_GROUP:
                 return await data_loaders.resource_group_loader.load(self.entity_id)
             case RBACElementType.NOTIFICATION_CHANNEL:
@@ -125,19 +109,11 @@ class EntityRefGQL(PydanticNodeMixin[AssociationScopesEntitiesNode]):
                 # DataLoader already returns ArtifactRevision | None via from_pydantic
                 return await data_loaders.artifact_revision_loader.load(uuid.UUID(self.entity_id))
             case RBACElementType.CONTAINER_REGISTRY:
-                cr_data = await data_loaders.container_registry_loader.load(
-                    uuid.UUID(self.entity_id)
-                )
-                if cr_data is None:
-                    return None
-                return ContainerRegistryGQL.from_data(cr_data)
+                # DataLoader already returns ContainerRegistryGQL | None via from_pydantic
+                return await data_loaders.container_registry_loader.load(uuid.UUID(self.entity_id))
             case RBACElementType.SESSION:
-                session_data = await data_loaders.session_loader.load(
-                    SessionId(uuid.UUID(self.entity_id))
-                )
-                if session_data is None:
-                    return None
-                return SessionV2GQL.from_data(session_data)
+                # DataLoader already returns SessionV2GQL | None via from_pydantic conversion
+                return await data_loaders.session_loader.load(SessionId(uuid.UUID(self.entity_id)))
             case (
                 RBACElementType.VFOLDER
                 | RBACElementType.KEYPAIR
@@ -172,18 +148,23 @@ class EntityRefGQL(PydanticNodeMixin[AssociationScopesEntitiesNode]):
         required: bool = False,
     ) -> Iterable[Self | None]:
         # DataLoader already returns EntityRefGQL | None via from_pydantic conversion
-        return await info.context.data_loaders.element_association_loader.load_many([
+        results = await info.context.data_loaders.element_association_loader.load_many([
             uuid.UUID(nid) for nid in node_ids
         ])
+        return cast(list[Self | None], results)
 
     @classmethod
     def from_pydantic(
         cls,
-        dto: AssociationScopesEntitiesNode,
+        dto: Any,
         extra: dict[str, Any] | None = None,
         *,
         id_field: str = "id",
     ) -> Self:
+        """Convert a DTO to EntityRefGQL.
+
+        Accepts AssociationScopesEntitiesNode (the primary type for this GQL node).
+        """
         return cls(
             id=ID(str(dto.id)),
             scope_type=RBACElementTypeGQL(dto.scope_type),

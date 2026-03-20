@@ -6,7 +6,7 @@ import uuid
 from collections.abc import Iterable
 from datetime import UTC, datetime
 from enum import StrEnum
-from typing import TYPE_CHECKING, Annotated, Any, Self
+from typing import TYPE_CHECKING, Annotated, Any, Self, cast
 
 import strawberry
 import strawberry.relay
@@ -78,6 +78,7 @@ from ai.backend.common.dto.manager.v2.rbac.response import (
 )
 from ai.backend.common.dto.manager.v2.rbac.response import (
     RoleAssignmentNode,
+    RoleNode,
 )
 from ai.backend.common.dto.manager.v2.rbac.types import (
     OrderDirection as OrderDirectionDTO,
@@ -110,9 +111,6 @@ from ai.backend.manager.api.gql.decorators import (
 from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin
 from ai.backend.manager.api.gql.types import GQLFilter, GQLOrderBy, StrawberryGQLContext
 from ai.backend.manager.data.permission.role import (
-    AssignedUserData,
-    RoleData,
-    RoleDetailData,
     UserRoleAssignmentData,
     UserRoleRevocationData,
 )
@@ -192,22 +190,29 @@ class RoleGQL(PydanticNodeMixin[Any]):
         node_ids: Iterable[str],
         required: bool = False,
     ) -> Iterable[Self | None]:
+        # DataLoader already returns RoleGQL | None via from_pydantic conversion
         results = await info.context.data_loaders.role_loader.load_many([
             uuid.UUID(nid) for nid in node_ids
         ])
-        return [cls.from_dataclass(data) if data is not None else None for data in results]
+        return cast(list[Self | None], results)
 
     @classmethod
-    def from_dataclass(cls, data: RoleData | RoleDetailData) -> Self:
+    def from_pydantic(
+        cls,
+        dto: RoleNode,
+        extra: dict[str, Any] | None = None,
+        *,
+        id_field: str = "id",
+    ) -> Self:
         return cls(
-            id=ID(str(data.id)),
-            name=data.name,
-            description=data.description,
-            source=RoleSourceGQL.from_internal(data.source),
-            status=RoleStatusGQL.from_internal(data.status),
-            created_at=data.created_at,
-            updated_at=data.updated_at,
-            deleted_at=data.deleted_at,
+            id=ID(str(dto.id)),
+            name=dto.name,
+            description=dto.description,
+            source=RoleSourceGQL.from_enum(dto.source),
+            status=RoleStatusGQL.from_enum(dto.status),
+            created_at=dto.created_at,
+            updated_at=dto.updated_at,
+            deleted_at=dto.deleted_at,
         )
 
     @strawberry.field(description="Added in 26.3.0. Permissions associated with this role.")  # type: ignore[misc]
@@ -271,7 +276,7 @@ class RoleGQL(PydanticNodeMixin[Any]):
 
         edges = [
             PermissionEdge(
-                node=PermissionGQL.from_dataclass(item),
+                node=PermissionGQL.from_pydantic(item),
                 cursor=encode_cursor(str(item.id)),
             )
             for item in result.items
@@ -330,7 +335,7 @@ class RoleGQL(PydanticNodeMixin[Any]):
         )
         edges = [
             RoleAssignmentEdge(
-                node=RoleAssignmentGQL.from_dataclass(item),
+                node=RoleAssignmentGQL.from_pydantic(item),
                 cursor=encode_cursor(str(item.id)),
             )
             for item in result.items
@@ -370,17 +375,16 @@ class RoleAssignmentGQL(PydanticNodeMixin[RoleAssignmentNode]):
         node_ids: Iterable[str],
         required: bool = False,
     ) -> Iterable[Self | None]:
+        # DataLoader already returns RoleAssignmentGQL | None via from_pydantic conversion
         results = await info.context.data_loaders.role_assignment_loader.load_many([
             uuid.UUID(nid) for nid in node_ids
         ])
-        return [cls.from_dataclass(data) if data is not None else None for data in results]
+        return cast(list[Self | None], results)
 
     @strawberry.field(description="The assigned role.")  # type: ignore[misc]
     async def role(self, info: Info[StrawberryGQLContext]) -> RoleGQL | None:
-        data = await info.context.data_loaders.role_loader.load(self.role_id)
-        if data is None:
-            return None
-        return RoleGQL.from_dataclass(data)
+        # DataLoader already returns RoleGQL | None via from_pydantic conversion
+        return await info.context.data_loaders.role_loader.load(self.role_id)
 
     @strawberry.field(description="The assigned user.")  # type: ignore[misc]
     async def user(
@@ -392,21 +396,23 @@ class RoleAssignmentGQL(PydanticNodeMixin[RoleAssignmentNode]):
         ]
         | None
     ):
-        from ai.backend.manager.api.gql.user.types.node import UserV2GQL
-
-        data = await info.context.data_loaders.user_loader.load(self.user_id)
-        if data is None:
-            return None
-        return UserV2GQL.from_data(data)
+        # DataLoader already returns UserV2GQL | None via from_pydantic conversion
+        return await info.context.data_loaders.user_loader.load(self.user_id)
 
     @classmethod
-    def from_dataclass(cls, data: AssignedUserData) -> Self:
+    def from_pydantic(
+        cls,
+        dto: RoleAssignmentNode,
+        extra: dict[str, Any] | None = None,
+        *,
+        id_field: str = "id",
+    ) -> Self:
         return cls(
-            id=ID(str(data.id)),
-            user_id=data.user_id,
-            role_id=data.role_id,
-            granted_by=data.granted_by,
-            granted_at=data.granted_at,
+            id=ID(str(dto.id)),
+            user_id=dto.user_id,
+            role_id=dto.role_id,
+            granted_by=dto.granted_by,
+            granted_at=dto.granted_at,
         )
 
     @classmethod

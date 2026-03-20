@@ -512,7 +512,7 @@ class RBACAdapter(BaseAdapter):
         self,
         input: AdminSearchPermissionsGQLInput,
         base_conditions: Sequence[QueryCondition] | None = None,
-    ) -> SearchResult[PermissionData]:
+    ) -> SearchResult[PermissionNode]:
         """Search scoped permissions with cursor/offset pagination."""
         conditions = self._convert_permission_filter(input.filter) if input.filter else []
         orders = self._convert_permission_orders(input.order) if input.order else []
@@ -533,13 +533,19 @@ class RBACAdapter(BaseAdapter):
                 SearchPermissionsAction(querier=querier)
             )
         )
-        return action_result.result
+        raw = action_result.result
+        return SearchResult(
+            items=[self._permission_data_to_node(item) for item in raw.items],
+            total_count=raw.total_count,
+            has_next_page=raw.has_next_page,
+            has_previous_page=raw.has_previous_page,
+        )
 
     async def admin_search_roles_gql(
         self,
         input: AdminSearchRolesGQLInput,
         base_conditions: Sequence[QueryCondition] | None = None,
-    ) -> SearchResult[RoleData]:
+    ) -> SearchResult[RoleNode]:
         """Search roles with cursor/offset pagination."""
         conditions = self._convert_role_filter_gql(input.filter) if input.filter else []
         orders = self._convert_role_orders_gql(input.order) if input.order else []
@@ -560,13 +566,19 @@ class RBACAdapter(BaseAdapter):
                 SearchRolesAction(querier=querier)
             )
         )
-        return action_result.result
+        raw = action_result.result
+        return SearchResult(
+            items=[self._role_data_to_node(item) for item in raw.items],
+            total_count=raw.total_count,
+            has_next_page=raw.has_next_page,
+            has_previous_page=raw.has_previous_page,
+        )
 
     async def admin_search_role_assignments_gql(
         self,
         input: AdminSearchRoleAssignmentsGQLInput,
         base_conditions: Sequence[QueryCondition] | None = None,
-    ) -> SearchResult[AssignedUserData]:
+    ) -> SearchResult[RoleAssignmentNode]:
         """Search role assignments with cursor/offset pagination."""
         conditions = self._convert_assignment_filter(input.filter) if input.filter else []
         orders = self._convert_assignment_orders(input.order) if input.order else []
@@ -585,13 +597,19 @@ class RBACAdapter(BaseAdapter):
         action_result: SearchUsersAssignedToRoleActionResult = await self._processors.permission_controller.search_users_assigned_to_role.wait_for_complete(
             SearchUsersAssignedToRoleAction(querier=querier)
         )
-        return action_result.result
+        raw = action_result.result
+        return SearchResult(
+            items=[self._assignment_data_to_node(item) for item in raw.items],
+            total_count=raw.total_count,
+            has_next_page=raw.has_next_page,
+            has_previous_page=raw.has_previous_page,
+        )
 
     async def admin_search_entities_gql(
         self,
         input: AdminSearchEntitiesGQLInput,
         base_conditions: Sequence[QueryCondition] | None = None,
-    ) -> SearchResult[AssociationScopesEntitiesData]:
+    ) -> SearchResult[AssociationScopesEntitiesNode]:
         """Search entity associations with cursor/offset pagination."""
         conditions = self._convert_entity_filter(input.filter) if input.filter else []
         orders = self._convert_entity_orders(input.order) if input.order else []
@@ -610,7 +628,13 @@ class RBACAdapter(BaseAdapter):
         action_result: SearchElementAssociationsActionResult = await self._processors.permission_controller.search_element_associations.wait_for_complete(
             SearchElementAssociationsAction(querier=querier)
         )
-        return action_result.result
+        raw = action_result.result
+        return SearchResult(
+            items=[self._association_data_to_node(item) for item in raw.items],
+            total_count=raw.total_count,
+            has_next_page=raw.has_next_page,
+            has_previous_page=raw.has_previous_page,
+        )
 
     # ------------------------------------------------------------------ get
 

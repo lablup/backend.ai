@@ -58,7 +58,7 @@ async def admin_permissions(
     )
     edges = [
         PermissionEdge(
-            node=PermissionGQL.from_dataclass(item),
+            node=PermissionGQL.from_pydantic(item),
             cursor=encode_cursor(str(item.id)),
         )
         for item in result.items
