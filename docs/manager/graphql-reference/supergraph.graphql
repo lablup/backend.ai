@@ -13233,9 +13233,9 @@ input UpdateRoleInput
   @join__type(graph: STRAWBERRY)
 {
   id: UUID!
-  name: String = null
-  description: String = null
-  status: RoleStatus = null
+  name: String
+  description: String
+  status: RoleStatus
 }
 
 """Added in 25.19.0. Input for updating route traffic status."""

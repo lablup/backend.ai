@@ -8131,9 +8131,9 @@ type UpdateResourceGroupPayload {
 """Added in 26.3.0. Input for updating a role"""
 input UpdateRoleInput {
   id: UUID!
-  name: String = null
-  description: String = null
-  status: RoleStatus = null
+  name: String
+  description: String
+  status: RoleStatus
 }
 
 """Added in 25.19.0. Input for updating route traffic status."""
