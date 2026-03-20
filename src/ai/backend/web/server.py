@@ -855,7 +855,9 @@ async def webapp_ctx(
     cors.add(app.router.add_route("GET", "/func/{path:openid/.*$}", anon_web_plugin_handler))
     cors.add(app.router.add_route("POST", "/func/{path:openid/.*$}", anon_web_plugin_handler))
     cors.add(app.router.add_route("POST", "/func/{path:saml/.*$}", anon_web_plugin_handler))
-    cors.add(app.router.add_route("POST", "/func/{path:totp/.*$}", anon_web_plugin_handler))
+    cors.add(
+        app.router.add_route("POST", "/func/{path:totp/anon(?:/.*)?$}", anon_web_plugin_handler)
+    )
     cors.add(app.router.add_route("POST", "/func/{path:auth/signup}", anon_web_plugin_handler))
     cors.add(app.router.add_route("POST", "/func/{path:auth/signout}", web_handler))
     cors.add(app.router.add_route("GET", "/func/{path:stream/kernel/_/events}", web_handler))
