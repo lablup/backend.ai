@@ -16,6 +16,22 @@ Changes
 
 <!-- towncrier release notes start -->
 
+## 25.11.4 (2026-03-20)
+
+### Features
+* Execute Resource Usage Recalculation periodically ([#5646](https://github.com/lablup/backend.ai/issues/5646))
+
+### Improvements
+* Add per-plugin timeout (120s) to `gather_container_measures` calls so a single hung plugin does not block stat collection from all other plugins ([#9781](https://github.com/lablup/backend.ai/issues/9781))
+
+### Fixes
+* Fix wrong value type of Valkey client address ([#5649](https://github.com/lablup/backend.ai/issues/5649))
+* Remove the unnecessary `asyncio.Lock` from `StatContext` as self-concurrency is already prevented by `TimerDelayPolicy.CANCEL` and each collect method operates on independent data structures ([#9256](https://github.com/lablup/backend.ai/issues/9256))
+* Fix container net_rx/net_tx stats reading host namespace counters due to unchecked setns() return value ([#9681](https://github.com/lablup/backend.ai/issues/9681))
+* Pre-validate namespace path before `netstat_ns()` to prevent thread pool exhaustion from hung threads on stale network namespaces ([#9782](https://github.com/lablup/backend.ai/issues/9782))
+* Exclude unmeasurable metrics from utilization idle check instead of treating stat collection failures as 0% usage ([#10316](https://github.com/lablup/backend.ai/issues/10316))
+
+
 ## 25.11.3 (2025-08-18)
 No significant changes.
 
