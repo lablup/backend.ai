@@ -864,9 +864,7 @@ class EndpointRow(Base):  # type: ignore[misc]
             model_revisions=list(model_revisions),
             current_revision_id=self.current_revision,
             deploying_revision_id=self.deploying_revision,
-            sub_step=DeploymentLifecycleSubStep(self.sub_step)
-            if self.sub_step is not None
-            else None,
+            sub_step=self.sub_step,
         )
 
     def build_revision_spec_from_endpoint(self) -> ModelRevisionSpec:
@@ -934,9 +932,7 @@ class EndpointRow(Base):  # type: ignore[misc]
             model_revisions=[self.build_revision_spec_from_endpoint()],
             current_revision_id=self.current_revision,
             deploying_revision_id=self.deploying_revision,
-            sub_step=DeploymentLifecycleSubStep(self.sub_step)
-            if self.sub_step is not None
-            else None,
+            sub_step=self.sub_step,
         )
 
 
