@@ -72,18 +72,18 @@ class TestCheckPendingDeployments:
         assert pending_deployment.deployment_info.id in url_updates
         assert url_updates[pending_deployment.deployment_info.id] == expected_url
 
-    async def test_deployment_without_revision_skipped(
+    async def test_deployment_without_revision_uses_endpoint_fallback(
         self,
         deployment_executor: DeploymentExecutor,
         mock_deployment_repo: AsyncMock,
         pending_deployment_no_revision: DeploymentWithHistory,
         proxy_targets_by_scaling_group: dict[str, ScalingGroupProxyTarget],
     ) -> None:
-        """CD-002: Deployment without target revision is skipped.
+        """CD-002: Deployment without current_revision_id falls back to endpoint-level fields.
 
         Given: PENDING deployment without target revision
         When: Check pending deployments
-        Then: Deployment skipped (no endpoint registration)
+        Then: Falls back to get_revision_spec_from_endpoint and succeeds
         """
         # Arrange
         mock_deployment_repo.fetch_scaling_group_proxy_targets.return_value = (
@@ -97,10 +97,10 @@ class TestCheckPendingDeployments:
                 pending_deployment_no_revision
             ])
 
-        # Assert - No successful registrations
-        assert len(result.successes) == 0
+        # Assert - Fallback succeeded, endpoint registered
+        assert len(result.successes) == 1
         assert len(result.errors) == 0
-        mock_deployment_repo.update_endpoint_urls_bulk.assert_not_awaited()
+        mock_deployment_repo.get_revision_spec_from_endpoint.assert_awaited_once()
 
     async def test_no_proxy_target_deployment_skipped(
         self,
