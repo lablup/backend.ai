@@ -148,15 +148,6 @@ class HandlerRegistry:
 
     handlers: dict[HandlerKey, DeploymentHandler]
 
-    def resolve_sub_step(
-        self, lifecycle_type: DeploymentLifecycleType, raw: str
-    ) -> DeploymentLifecycleSubStep:
-        """Resolve a raw sub-step string using registered handler keys."""
-        for lt, sub_step in self.handlers:
-            if lt == lifecycle_type and sub_step is not None and sub_step.value == raw:
-                return sub_step
-        raise ValueError(f"Unknown sub-step {raw!r} for lifecycle type {lifecycle_type!r}")
-
 
 @dataclass
 class DeploymentTaskSpec:
