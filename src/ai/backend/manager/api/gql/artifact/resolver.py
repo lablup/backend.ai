@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import uuid
 from collections.abc import AsyncGenerator
 from uuid import UUID
 
@@ -27,7 +26,6 @@ from ai.backend.manager.errors.artifact import (
     ArtifactImportDelegationError,
     ArtifactScanLimitExceededError,
 )
-from ai.backend.manager.repositories.base import QueryCondition
 
 from .types import (
     ApproveArtifactInput,
@@ -75,69 +73,34 @@ from .types import (
 )
 
 
-async def _fetch_artifact_revisions(
+# Query Fields
+@strawberry.field(  # type: ignore[misc]
+    description=dedent_strip("""
+    Added in 25.14.0.
+
+    Query artifacts with optional filtering, ordering, and pagination.
+
+    Returns artifacts that are available in the system, discovered through scanning
+    external registries like HuggingFace or Reservoir. By default, only shows
+    ALIVE (non-deleted) artifacts.
+
+    Use filters to narrow down results by type, name, registry, or availability.
+    Supports cursor-based pagination for efficient browsing of large datasets.
+    """)
+)
+async def artifacts(
     info: Info[StrawberryGQLContext],
-    filter: ArtifactRevisionFilter | None = None,
-    order_by: list[ArtifactRevisionOrderBy] | None = None,
+    filter: ArtifactFilter | None = None,
+    order_by: list[ArtifactOrderBy] | None = None,
     before: str | None = None,
     after: str | None = None,
     first: int | None = None,
     last: int | None = None,
     limit: int | None = None,
     offset: int | None = None,
-    base_conditions: list[QueryCondition] | None = None,
-) -> ArtifactRevisionConnection:
-    """Fetch artifact revisions with optional filtering, ordering, and pagination."""
-    pydantic_filter = filter.to_pydantic() if filter is not None else None
-    pydantic_order = [o.to_pydantic() for o in order_by] if order_by is not None else None
-
-    search_input = AdminSearchArtifactRevisionsInput(
-        filter=pydantic_filter,
-        order=pydantic_order,
-        first=first,
-        after=after,
-        last=last,
-        before=before,
-        limit=limit,
-        offset=offset,
-    )
-    payload = await info.context.adapters.artifact.search_revisions_gql(
-        search_input,
-        base_conditions=base_conditions,
-    )
-
-    edges = []
-    for item in payload.items:
-        revision = make_artifact_revision_from_node(item)
-        cursor = encode_cursor(item.id)
-        edges.append(ArtifactRevisionEdge(node=revision, cursor=cursor))
-
-    page_info = strawberry.relay.PageInfo(
-        has_next_page=payload.has_next_page,
-        has_previous_page=payload.has_previous_page,
-        start_cursor=edges[0].cursor if edges else None,
-        end_cursor=edges[-1].cursor if edges else None,
-    )
-
-    return ArtifactRevisionConnection(
-        count=payload.total_count,
-        edges=edges,
-        page_info=page_info,
-    )
-
-
-async def _fetch_artifacts(
-    info: Info[StrawberryGQLContext],
-    filter: ArtifactFilter | None,
-    order_by: list[ArtifactOrderBy] | None,
-    before: str | None,
-    after: str | None,
-    first: int | None,
-    last: int | None,
-    limit: int | None,
-    offset: int | None,
-) -> ArtifactConnection:
-    """Fetch artifacts with optional filtering, ordering, and pagination."""
+) -> ArtifactConnection | None:
+    if filter is None:
+        filter = ArtifactFilter(availability=[ArtifactAvailability.ALIVE])
     pydantic_filter = filter.to_pydantic() if filter is not None else None
     pydantic_order = [o.to_pydantic() for o in order_by] if order_by is not None else None
 
@@ -178,11 +141,18 @@ async def _fetch_artifacts(
     )
 
 
-async def _fetch_artifact(
-    info: Info[StrawberryGQLContext],
-    artifact_id: uuid.UUID,
-) -> Artifact | None:
-    """Fetch a specific artifact by its ID."""
+@strawberry.field(  # type: ignore[misc]
+    description=dedent_strip("""
+    Added in 25.14.0.
+
+    Retrieve a specific artifact by its ID.
+
+    Returns detailed information about the artifact including its metadata,
+    registry information, and availability status.
+    """)
+)
+async def artifact(id: ID, info: Info[StrawberryGQLContext]) -> Artifact | None:
+    artifact_id = UUID(id)
     artifact_node = await info.context.adapters.artifact.get(artifact_id)
 
     data_loaders = info.context.data_loaders
@@ -196,70 +166,6 @@ async def _fetch_artifact(
     )
 
     return Artifact.from_artifact_node(artifact_node, registry_url, source_url)
-
-
-async def _fetch_artifact_revision(
-    info: Info[StrawberryGQLContext],
-    artifact_revision_id: uuid.UUID,
-) -> ArtifactRevision | None:
-    """Fetch a specific artifact revision by its ID."""
-    revision_node = await info.context.adapters.artifact.get_revision(artifact_revision_id)
-    return make_artifact_revision_from_node(revision_node)
-
-
-# Query Fields
-@strawberry.field(  # type: ignore[misc]
-    description=dedent_strip("""
-    Added in 25.14.0.
-
-    Query artifacts with optional filtering, ordering, and pagination.
-
-    Returns artifacts that are available in the system, discovered through scanning
-    external registries like HuggingFace or Reservoir. By default, only shows
-    ALIVE (non-deleted) artifacts.
-
-    Use filters to narrow down results by type, name, registry, or availability.
-    Supports cursor-based pagination for efficient browsing of large datasets.
-    """)
-)
-async def artifacts(
-    info: Info[StrawberryGQLContext],
-    filter: ArtifactFilter | None = None,
-    order_by: list[ArtifactOrderBy] | None = None,
-    before: str | None = None,
-    after: str | None = None,
-    first: int | None = None,
-    last: int | None = None,
-    limit: int | None = None,
-    offset: int | None = None,
-) -> ArtifactConnection | None:
-    if filter is None:
-        filter = ArtifactFilter(availability=[ArtifactAvailability.ALIVE])
-    return await _fetch_artifacts(
-        info,
-        filter,
-        order_by,
-        before,
-        after,
-        first,
-        last,
-        limit,
-        offset,
-    )
-
-
-@strawberry.field(  # type: ignore[misc]
-    description=dedent_strip("""
-    Added in 25.14.0.
-
-    Retrieve a specific artifact by its ID.
-
-    Returns detailed information about the artifact including its metadata,
-    registry information, and availability status.
-    """)
-)
-async def artifact(id: ID, info: Info[StrawberryGQLContext]) -> Artifact | None:
-    return await _fetch_artifact(info, UUID(id))
 
 
 @strawberry.field(  # type: ignore[misc]
@@ -286,16 +192,38 @@ async def artifact_revisions(
     limit: int | None = None,
     offset: int | None = None,
 ) -> ArtifactRevisionConnection | None:
-    return await _fetch_artifact_revisions(
-        info,
-        filter,
-        order_by,
-        before,
-        after,
-        first,
-        last,
-        limit,
-        offset,
+    pydantic_filter = filter.to_pydantic() if filter is not None else None
+    pydantic_order = [o.to_pydantic() for o in order_by] if order_by is not None else None
+
+    search_input = AdminSearchArtifactRevisionsInput(
+        filter=pydantic_filter,
+        order=pydantic_order,
+        first=first,
+        after=after,
+        last=last,
+        before=before,
+        limit=limit,
+        offset=offset,
+    )
+    payload = await info.context.adapters.artifact.search_revisions_gql(search_input)
+
+    edges = []
+    for item in payload.items:
+        revision = make_artifact_revision_from_node(item)
+        cursor = encode_cursor(item.id)
+        edges.append(ArtifactRevisionEdge(node=revision, cursor=cursor))
+
+    page_info = strawberry.relay.PageInfo(
+        has_next_page=payload.has_next_page,
+        has_previous_page=payload.has_previous_page,
+        start_cursor=edges[0].cursor if edges else None,
+        end_cursor=edges[-1].cursor if edges else None,
+    )
+
+    return ArtifactRevisionConnection(
+        count=payload.total_count,
+        edges=edges,
+        page_info=page_info,
     )
 
 
@@ -310,7 +238,8 @@ async def artifact_revisions(
     """)
 )
 async def artifact_revision(id: ID, info: Info[StrawberryGQLContext]) -> ArtifactRevision | None:
-    return await _fetch_artifact_revision(info, UUID(id))
+    revision_node = await info.context.adapters.artifact.get_revision(UUID(id))
+    return make_artifact_revision_from_node(revision_node)
 
 
 @strawberry.mutation(  # type: ignore[misc]

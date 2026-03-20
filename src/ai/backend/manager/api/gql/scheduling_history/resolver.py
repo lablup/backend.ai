@@ -80,132 +80,6 @@ class RouteHistoryConnection(Connection[RouteHistory]):
         self.count = count
 
 
-# Helper functions for scoped queries
-
-
-async def fetch_session_scoped_scheduling_histories(
-    info: Info[StrawberryGQLContext],
-    scope: SessionScope,
-    filter: SessionSchedulingHistoryFilter | None = None,
-    order_by: list[SessionSchedulingHistoryOrderBy] | None = None,
-    before: str | None = None,
-    after: str | None = None,
-    first: int | None = None,
-    last: int | None = None,
-    limit: int | None = None,
-    offset: int | None = None,
-) -> SessionSchedulingHistoryConnection:
-    """Fetch session-scoped scheduling histories via adapter."""
-    result = await info.context.adapters.scheduling_history.session_scoped_search(
-        scope.session_id,
-        AdminSearchSessionHistoriesInput(
-            filter=filter.to_pydantic() if filter else None,
-            order=[o.to_pydantic() for o in order_by] if order_by else None,
-            first=first,
-            after=after,
-            last=last,
-            before=before,
-            limit=limit,
-            offset=offset,
-        ),
-    )
-    nodes = [SessionSchedulingHistory.from_pydantic(item) for item in result.items]
-    edges = [
-        SessionSchedulingHistoryEdge(node=node, cursor=encode_cursor(str(node.id)))
-        for node in nodes
-    ]
-    return SessionSchedulingHistoryConnection(
-        edges=edges,
-        page_info=strawberry.relay.PageInfo(
-            has_next_page=result.has_next_page,
-            has_previous_page=result.has_previous_page,
-            start_cursor=edges[0].cursor if edges else None,
-            end_cursor=edges[-1].cursor if edges else None,
-        ),
-        count=result.total_count,
-    )
-
-
-async def fetch_deployment_scoped_scheduling_histories(
-    info: Info[StrawberryGQLContext],
-    scope: DeploymentScope,
-    filter: DeploymentHistoryFilter | None = None,
-    order_by: list[DeploymentHistoryOrderBy] | None = None,
-    before: str | None = None,
-    after: str | None = None,
-    first: int | None = None,
-    last: int | None = None,
-    limit: int | None = None,
-    offset: int | None = None,
-) -> DeploymentHistoryConnection:
-    """Fetch deployment-scoped scheduling histories via adapter."""
-    result = await info.context.adapters.scheduling_history.deployment_scoped_search(
-        scope.deployment_id,
-        AdminSearchDeploymentHistoriesInput(
-            filter=filter.to_pydantic() if filter else None,
-            order=[o.to_pydantic() for o in order_by] if order_by else None,
-            first=first,
-            after=after,
-            last=last,
-            before=before,
-            limit=limit,
-            offset=offset,
-        ),
-    )
-    nodes = [DeploymentHistory.from_pydantic(item) for item in result.items]
-    edges = [DeploymentHistoryEdge(node=node, cursor=encode_cursor(str(node.id))) for node in nodes]
-    return DeploymentHistoryConnection(
-        edges=edges,
-        page_info=strawberry.relay.PageInfo(
-            has_next_page=result.has_next_page,
-            has_previous_page=result.has_previous_page,
-            start_cursor=edges[0].cursor if edges else None,
-            end_cursor=edges[-1].cursor if edges else None,
-        ),
-        count=result.total_count,
-    )
-
-
-async def fetch_route_scoped_scheduling_histories(
-    info: Info[StrawberryGQLContext],
-    scope: RouteScope,
-    filter: RouteHistoryFilter | None = None,
-    order_by: list[RouteHistoryOrderBy] | None = None,
-    before: str | None = None,
-    after: str | None = None,
-    first: int | None = None,
-    last: int | None = None,
-    limit: int | None = None,
-    offset: int | None = None,
-) -> RouteHistoryConnection:
-    """Fetch route-scoped scheduling histories via adapter."""
-    result = await info.context.adapters.scheduling_history.route_scoped_search(
-        scope.route_id,
-        AdminSearchRouteHistoriesInput(
-            filter=filter.to_pydantic() if filter else None,
-            order=[o.to_pydantic() for o in order_by] if order_by else None,
-            first=first,
-            after=after,
-            last=last,
-            before=before,
-            limit=limit,
-            offset=offset,
-        ),
-    )
-    nodes = [RouteHistory.from_pydantic(item) for item in result.items]
-    edges = [RouteHistoryEdge(node=node, cursor=encode_cursor(str(node.id))) for node in nodes]
-    return RouteHistoryConnection(
-        edges=edges,
-        page_info=strawberry.relay.PageInfo(
-            has_next_page=result.has_next_page,
-            has_previous_page=result.has_previous_page,
-            start_cursor=edges[0].cursor if edges else None,
-            end_cursor=edges[-1].cursor if edges else None,
-        ),
-        count=result.total_count,
-    )
-
-
 # Query fields
 
 
@@ -492,17 +366,33 @@ async def session_scoped_scheduling_histories(
     offset: int | None = None,
 ) -> SessionSchedulingHistoryConnection | None:
     """Get scheduling history for a specific session."""
-    return await fetch_session_scoped_scheduling_histories(
-        info=info,
-        scope=scope,
-        filter=filter,
-        order_by=order_by,
-        before=before,
-        after=after,
-        first=first,
-        last=last,
-        limit=limit,
-        offset=offset,
+    result = await info.context.adapters.scheduling_history.session_scoped_search(
+        scope.session_id,
+        AdminSearchSessionHistoriesInput(
+            filter=filter.to_pydantic() if filter else None,
+            order=[o.to_pydantic() for o in order_by] if order_by else None,
+            first=first,
+            after=after,
+            last=last,
+            before=before,
+            limit=limit,
+            offset=offset,
+        ),
+    )
+    nodes = [SessionSchedulingHistory.from_pydantic(item) for item in result.items]
+    edges = [
+        SessionSchedulingHistoryEdge(node=node, cursor=encode_cursor(str(node.id)))
+        for node in nodes
+    ]
+    return SessionSchedulingHistoryConnection(
+        edges=edges,
+        page_info=strawberry.relay.PageInfo(
+            has_next_page=result.has_next_page,
+            has_previous_page=result.has_previous_page,
+            start_cursor=edges[0].cursor if edges else None,
+            end_cursor=edges[-1].cursor if edges else None,
+        ),
+        count=result.total_count,
     )
 
 
@@ -522,17 +412,30 @@ async def deployment_scoped_scheduling_histories(
     offset: int | None = None,
 ) -> DeploymentHistoryConnection | None:
     """Get scheduling history for a specific deployment."""
-    return await fetch_deployment_scoped_scheduling_histories(
-        info=info,
-        scope=scope,
-        filter=filter,
-        order_by=order_by,
-        before=before,
-        after=after,
-        first=first,
-        last=last,
-        limit=limit,
-        offset=offset,
+    result = await info.context.adapters.scheduling_history.deployment_scoped_search(
+        scope.deployment_id,
+        AdminSearchDeploymentHistoriesInput(
+            filter=filter.to_pydantic() if filter else None,
+            order=[o.to_pydantic() for o in order_by] if order_by else None,
+            first=first,
+            after=after,
+            last=last,
+            before=before,
+            limit=limit,
+            offset=offset,
+        ),
+    )
+    nodes = [DeploymentHistory.from_pydantic(item) for item in result.items]
+    edges = [DeploymentHistoryEdge(node=node, cursor=encode_cursor(str(node.id))) for node in nodes]
+    return DeploymentHistoryConnection(
+        edges=edges,
+        page_info=strawberry.relay.PageInfo(
+            has_next_page=result.has_next_page,
+            has_previous_page=result.has_previous_page,
+            start_cursor=edges[0].cursor if edges else None,
+            end_cursor=edges[-1].cursor if edges else None,
+        ),
+        count=result.total_count,
     )
 
 
@@ -552,15 +455,28 @@ async def route_scoped_scheduling_histories(
     offset: int | None = None,
 ) -> RouteHistoryConnection | None:
     """Get scheduling history for a specific route."""
-    return await fetch_route_scoped_scheduling_histories(
-        info=info,
-        scope=scope,
-        filter=filter,
-        order_by=order_by,
-        before=before,
-        after=after,
-        first=first,
-        last=last,
-        limit=limit,
-        offset=offset,
+    result = await info.context.adapters.scheduling_history.route_scoped_search(
+        scope.route_id,
+        AdminSearchRouteHistoriesInput(
+            filter=filter.to_pydantic() if filter else None,
+            order=[o.to_pydantic() for o in order_by] if order_by else None,
+            first=first,
+            after=after,
+            last=last,
+            before=before,
+            limit=limit,
+            offset=offset,
+        ),
+    )
+    nodes = [RouteHistory.from_pydantic(item) for item in result.items]
+    edges = [RouteHistoryEdge(node=node, cursor=encode_cursor(str(node.id))) for node in nodes]
+    return RouteHistoryConnection(
+        edges=edges,
+        page_info=strawberry.relay.PageInfo(
+            has_next_page=result.has_next_page,
+            has_previous_page=result.has_previous_page,
+            start_cursor=edges[0].cursor if edges else None,
+            end_cursor=edges[-1].cursor if edges else None,
+        ),
+        count=result.total_count,
     )

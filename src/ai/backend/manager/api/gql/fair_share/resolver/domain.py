@@ -27,96 +27,6 @@ from ai.backend.manager.api.gql.fair_share.types import (
 )
 from ai.backend.manager.api.gql.types import ResourceGroupDomainScope, StrawberryGQLContext
 from ai.backend.manager.api.gql.utils import check_admin_only
-from ai.backend.manager.repositories.fair_share.types import (
-    DomainFairShareSearchScope,
-)
-
-
-async def _fetch_domain_fair_shares(
-    info: Info[StrawberryGQLContext],
-    filter: DomainFairShareFilter | None,
-    order_by: list[DomainFairShareOrderBy] | None,
-    before: str | None,
-    after: str | None,
-    first: int | None,
-    last: int | None,
-    limit: int | None,
-    offset: int | None,
-) -> DomainFairShareConnection:
-    pydantic_filter = filter.to_pydantic() if filter else None
-    pydantic_orders = [o.to_pydantic() for o in order_by] if order_by else None
-
-    payload = await info.context.adapters.fair_share.search_domain(
-        SearchDomainFairSharesInput(
-            filter=pydantic_filter,
-            order=pydantic_orders,
-            first=first,
-            after=after,
-            last=last,
-            before=before,
-            limit=limit,
-            offset=offset,
-        )
-    )
-
-    nodes = [DomainFairShareGQL.from_pydantic(item) for item in payload.items]
-    edges = [DomainFairShareEdge(node=node, cursor=encode_cursor(str(node.id))) for node in nodes]
-
-    return DomainFairShareConnection(
-        edges=edges,
-        page_info=PageInfo(
-            has_next_page=len(payload.items) > 0 and (first is not None or limit is not None),
-            has_previous_page=(offset or 0) > 0 or last is not None,
-            start_cursor=edges[0].cursor if edges else None,
-            end_cursor=edges[-1].cursor if edges else None,
-        ),
-        count=payload.total_count,
-    )
-
-
-async def _fetch_rg_domain_fair_shares(
-    info: Info[StrawberryGQLContext],
-    scope: DomainFairShareSearchScope,
-    filter: RGDomainFairShareFilter | None,
-    order_by: list[DomainFairShareOrderBy] | None,
-    before: str | None,
-    after: str | None,
-    first: int | None,
-    last: int | None,
-    limit: int | None,
-    offset: int | None,
-) -> DomainFairShareConnection:
-    pydantic_filter = filter.to_pydantic() if filter else None
-    pydantic_orders = [o.to_pydantic() for o in order_by] if order_by else None
-
-    payload = await info.context.adapters.fair_share.search_rg_domain(
-        SearchDomainFairSharesInput(
-            filter=pydantic_filter,
-            order=pydantic_orders,
-            first=first,
-            after=after,
-            last=last,
-            before=before,
-            limit=limit,
-            offset=offset,
-        ),
-        resource_group=scope.resource_group,
-    )
-
-    nodes = [DomainFairShareGQL.from_pydantic(item) for item in payload.items]
-    edges = [DomainFairShareEdge(node=node, cursor=encode_cursor(str(node.id))) for node in nodes]
-
-    return DomainFairShareConnection(
-        edges=edges,
-        page_info=PageInfo(
-            has_next_page=len(payload.items) > 0 and (first is not None or limit is not None),
-            has_previous_page=(offset or 0) > 0 or last is not None,
-            start_cursor=edges[0].cursor if edges else None,
-            end_cursor=edges[-1].cursor if edges else None,
-        ),
-        count=payload.total_count,
-    )
-
 
 # Admin APIs
 
@@ -151,16 +61,34 @@ async def admin_domain_fair_shares(
     """Search domain fair shares with pagination (admin only)."""
     check_admin_only()
 
-    return await _fetch_domain_fair_shares(
-        info=info,
-        filter=filter,
-        order_by=order_by,
-        before=before,
-        after=after,
-        first=first,
-        last=last,
-        limit=limit,
-        offset=offset,
+    pydantic_filter = filter.to_pydantic() if filter else None
+    pydantic_orders = [o.to_pydantic() for o in order_by] if order_by else None
+
+    payload = await info.context.adapters.fair_share.search_domain(
+        SearchDomainFairSharesInput(
+            filter=pydantic_filter,
+            order=pydantic_orders,
+            first=first,
+            after=after,
+            last=last,
+            before=before,
+            limit=limit,
+            offset=offset,
+        )
+    )
+
+    nodes = [DomainFairShareGQL.from_pydantic(item) for item in payload.items]
+    edges = [DomainFairShareEdge(node=node, cursor=encode_cursor(str(node.id))) for node in nodes]
+
+    return DomainFairShareConnection(
+        edges=edges,
+        page_info=PageInfo(
+            has_next_page=len(payload.items) > 0 and (first is not None or limit is not None),
+            has_previous_page=(offset or 0) > 0 or last is not None,
+            start_cursor=edges[0].cursor if edges else None,
+            end_cursor=edges[-1].cursor if edges else None,
+        ),
+        count=payload.total_count,
     )
 
 
@@ -198,18 +126,35 @@ async def rg_domain_fair_shares(
     offset: int | None = None,
 ) -> DomainFairShareConnection | None:
     """Search domain fair shares within resource group scope."""
-    repo_scope = DomainFairShareSearchScope(resource_group=scope.resource_group_name)
-    return await _fetch_rg_domain_fair_shares(
-        info=info,
-        scope=repo_scope,
-        filter=filter,
-        order_by=order_by,
-        before=before,
-        after=after,
-        first=first,
-        last=last,
-        limit=limit,
-        offset=offset,
+    pydantic_filter = filter.to_pydantic() if filter else None
+    pydantic_orders = [o.to_pydantic() for o in order_by] if order_by else None
+
+    payload = await info.context.adapters.fair_share.search_rg_domain(
+        SearchDomainFairSharesInput(
+            filter=pydantic_filter,
+            order=pydantic_orders,
+            first=first,
+            after=after,
+            last=last,
+            before=before,
+            limit=limit,
+            offset=offset,
+        ),
+        resource_group=scope.resource_group_name,
+    )
+
+    nodes = [DomainFairShareGQL.from_pydantic(item) for item in payload.items]
+    edges = [DomainFairShareEdge(node=node, cursor=encode_cursor(str(node.id))) for node in nodes]
+
+    return DomainFairShareConnection(
+        edges=edges,
+        page_info=PageInfo(
+            has_next_page=len(payload.items) > 0 and (first is not None or limit is not None),
+            has_previous_page=(offset or 0) > 0 or last is not None,
+            start_cursor=edges[0].cursor if edges else None,
+            end_cursor=edges[-1].cursor if edges else None,
+        ),
+        count=payload.total_count,
     )
 
 
@@ -262,16 +207,34 @@ async def domain_fair_shares(
     if me is None or not me.is_superadmin:
         raise web.HTTPForbidden(reason="Only superadmin can access fair share data.")
 
-    return await _fetch_domain_fair_shares(
-        info=info,
-        filter=filter,
-        order_by=order_by,
-        before=before,
-        after=after,
-        first=first,
-        last=last,
-        limit=limit,
-        offset=offset,
+    pydantic_filter = filter.to_pydantic() if filter else None
+    pydantic_orders = [o.to_pydantic() for o in order_by] if order_by else None
+
+    payload = await info.context.adapters.fair_share.search_domain(
+        SearchDomainFairSharesInput(
+            filter=pydantic_filter,
+            order=pydantic_orders,
+            first=first,
+            after=after,
+            last=last,
+            before=before,
+            limit=limit,
+            offset=offset,
+        )
+    )
+
+    nodes = [DomainFairShareGQL.from_pydantic(item) for item in payload.items]
+    edges = [DomainFairShareEdge(node=node, cursor=encode_cursor(str(node.id))) for node in nodes]
+
+    return DomainFairShareConnection(
+        edges=edges,
+        page_info=PageInfo(
+            has_next_page=len(payload.items) > 0 and (first is not None or limit is not None),
+            has_previous_page=(offset or 0) > 0 or last is not None,
+            start_cursor=edges[0].cursor if edges else None,
+            end_cursor=edges[-1].cursor if edges else None,
+        ),
+        count=payload.total_count,
     )
 
 

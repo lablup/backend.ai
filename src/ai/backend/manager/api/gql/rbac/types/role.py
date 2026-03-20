@@ -9,6 +9,7 @@ from enum import StrEnum
 from typing import TYPE_CHECKING, Annotated, Any, Self
 
 import strawberry
+import strawberry.relay
 from strawberry import ID, UNSET, Info
 from strawberry.relay import Connection, Edge, NodeID
 
@@ -16,6 +17,10 @@ from ai.backend.common.api_handlers import SENTINEL
 from ai.backend.common.data.permission.types import (
     RoleSource,
     RoleStatus,
+)
+from ai.backend.common.dto.manager.v2.rbac.request import (
+    AdminSearchPermissionsGQLInput,
+    AdminSearchRoleAssignmentsGQLInput,
 )
 from ai.backend.common.dto.manager.v2.rbac.request import (
     AssignRoleInput as AssignRoleInputDTO,
@@ -95,7 +100,7 @@ from ai.backend.common.dto.manager.v2.rbac.types import (
 from ai.backend.common.dto.manager.v2.rbac.types import (
     RoleStatusFilter as RoleStatusFilterDTO,
 )
-from ai.backend.manager.api.gql.base import OrderDirection, StringFilter
+from ai.backend.manager.api.gql.base import OrderDirection, StringFilter, encode_cursor
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     gql_connection_type,
@@ -231,8 +236,11 @@ class RoleGQL(PydanticNodeMixin[Any]):
         PermissionConnection,
         strawberry.lazy("ai.backend.manager.api.gql.rbac.types.permission"),
     ]:
-        from ai.backend.manager.api.gql.rbac.resolver.permission import _fetch_permissions
-        from ai.backend.manager.api.gql.rbac.types.permission import PermissionFilter
+        from ai.backend.manager.api.gql.rbac.types.permission import (
+            PermissionEdge,
+            PermissionFilter,
+            PermissionGQL,
+        )
 
         # Add role_id filter to scope permissions to this role
         role_filter = PermissionFilter(role_id=uuid.UUID(self.id))
@@ -246,16 +254,37 @@ class RoleGQL(PydanticNodeMixin[Any]):
         else:
             combined_filter = role_filter
 
-        return await _fetch_permissions(
-            info,
-            filter=combined_filter,
-            order_by=order_by,
-            before=before,
-            after=after,
+        pydantic_filter = combined_filter.to_pydantic() if combined_filter is not None else None
+        pydantic_order = [o.to_pydantic() for o in order_by] if order_by is not None else None
+
+        search_input = AdminSearchPermissionsGQLInput(
+            filter=pydantic_filter,
+            order=pydantic_order,
             first=first,
+            after=after,
             last=last,
+            before=before,
             limit=limit,
             offset=offset,
+        )
+        result = await info.context.adapters.rbac.admin_search_permissions_gql(search_input)
+
+        edges = [
+            PermissionEdge(
+                node=PermissionGQL.from_dataclass(item),
+                cursor=encode_cursor(str(item.id)),
+            )
+            for item in result.items
+        ]
+        return PermissionConnection(
+            edges=edges,
+            page_info=strawberry.relay.PageInfo(
+                has_next_page=result.has_next_page,
+                has_previous_page=result.has_previous_page,
+                start_cursor=edges[0].cursor if edges else None,
+                end_cursor=edges[-1].cursor if edges else None,
+            ),
+            count=result.total_count,
         )
 
     @strawberry.field(description="Added in 26.3.0. Users assigned to this role.")  # type: ignore[misc]
@@ -271,8 +300,6 @@ class RoleGQL(PydanticNodeMixin[Any]):
         limit: int | None = None,
         offset: int | None = None,
     ) -> RoleAssignmentConnection:
-        from ai.backend.manager.api.gql.rbac.resolver.role import _fetch_role_assignments
-
         # Add role_id filter to scope assignments to this role
         role_filter = RoleAssignmentFilter(role_id=uuid.UUID(self.id))
         if filter is not None:
@@ -286,16 +313,37 @@ class RoleGQL(PydanticNodeMixin[Any]):
         else:
             combined_filter = role_filter
 
-        return await _fetch_role_assignments(
-            info,
-            filter=combined_filter,
-            order_by=order_by,
-            before=before,
-            after=after,
-            first=first,
-            last=last,
-            limit=limit,
-            offset=offset,
+        pydantic_filter = combined_filter.to_pydantic() if combined_filter is not None else None
+        pydantic_order = [o.to_pydantic() for o in order_by] if order_by is not None else None
+
+        result = await info.context.adapters.rbac.admin_search_role_assignments_gql(
+            AdminSearchRoleAssignmentsGQLInput(
+                filter=pydantic_filter,
+                order=pydantic_order,
+                first=first,
+                after=after,
+                last=last,
+                before=before,
+                limit=limit,
+                offset=offset,
+            )
+        )
+        edges = [
+            RoleAssignmentEdge(
+                node=RoleAssignmentGQL.from_dataclass(item),
+                cursor=encode_cursor(str(item.id)),
+            )
+            for item in result.items
+        ]
+        return RoleAssignmentConnection(
+            edges=edges,
+            page_info=strawberry.relay.PageInfo(
+                has_next_page=result.has_next_page,
+                has_previous_page=result.has_previous_page,
+                start_cursor=edges[0].cursor if edges else None,
+                end_cursor=edges[-1].cursor if edges else None,
+            ),
+            count=result.total_count,
         )
 
 
