@@ -564,23 +564,15 @@ class CreateRoleInput:
 @strawberry.input(description="Added in 26.3.0. Input for updating a role")
 class UpdateRoleInput:
     id: uuid.UUID
-    name: str | None = None
-    description: str | None = None
-    status: RoleStatusGQL | None = None
+    name: str | None = strawberry.UNSET
+    description: str | None = strawberry.UNSET
+    status: RoleStatusGQL | None = strawberry.UNSET
 
     def to_updater(self) -> Updater[RoleRow]:
         spec = RoleUpdaterSpec(
-            name=OptionalState.update(self.name) if self.name is not None else OptionalState.nop(),
-            description=(
-                TriState.update(self.description)
-                if self.description is not None
-                else TriState.nop()
-            ),
-            status=(
-                OptionalState.update(self.status.to_internal())
-                if self.status is not None
-                else OptionalState.nop()
-            ),
+            name=OptionalState.from_graphql(self.name),
+            description=TriState.from_graphql(self.description),
+            status=OptionalState.from_graphql(self.status).map(lambda s: s.to_internal()),
         )
         return Updater(spec=spec, pk_value=self.id)
 
