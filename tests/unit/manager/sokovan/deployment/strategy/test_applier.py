@@ -221,7 +221,7 @@ class TestStrategyResultApplier:
         mock_deployment_repo.apply_strategy_mutations.assert_called_once()
         kwargs = mock_deployment_repo.apply_strategy_mutations.call_args.kwargs
         assert kwargs["completed_ids"] == {completed_id}
-        assert len(kwargs["rollout"].specs) == 1
+        assert len(kwargs["rollout"]) == 1
         assert kwargs["drain"] is not None
         assert result.completed_ids == {completed_id}
         assert result.routes_created == 1
