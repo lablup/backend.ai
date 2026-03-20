@@ -44,6 +44,7 @@ from ai.backend.manager.repositories.group.types import (
     UserProjectSearchScope,
 )
 from ai.backend.manager.services.group.actions.search_projects import (
+    GetProjectAction,
     SearchProjectsAction,
     SearchProjectsByDomainAction,
     SearchProjectsByUserAction,
@@ -64,6 +65,13 @@ _PROJECT_PAGINATION_SPEC = PaginationSpec(
 
 class ProjectAdapter(BaseAdapter):
     """Adapter for project (group) operations."""
+
+    async def get(self, project_id: UUID) -> ProjectNode:
+        """Retrieve a single project by UUID."""
+        action_result = await self._processors.group.get_project.wait_for_complete(
+            GetProjectAction(project_id=project_id)
+        )
+        return self._group_data_to_node(action_result.data)
 
     async def admin_search(
         self,

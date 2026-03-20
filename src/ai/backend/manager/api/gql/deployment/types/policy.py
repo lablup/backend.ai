@@ -20,6 +20,9 @@ from ai.backend.common.dto.manager.v2.deployment.request import (
 from ai.backend.common.dto.manager.v2.deployment.request import (
     UpsertDeploymentPolicyInput as UpsertDeploymentPolicyInputDTO,
 )
+from ai.backend.common.dto.manager.v2.deployment.response import (
+    DeploymentPolicyNode as DeploymentPolicyNodeDTO,
+)
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     gql_node_type,
@@ -117,6 +120,41 @@ class DeploymentPolicyGQL(PydanticNodeMixin[Any]):
                     created_at=data.created_at,
                     updated_at=data.updated_at,
                 )
+
+    @classmethod
+    def from_pydantic(  # type: ignore[override]
+        cls,
+        dto: DeploymentPolicyNodeDTO,
+        extra: dict[str, Any] | None = None,
+        *,
+        id_field: str = "id",
+    ) -> Self:
+        match dto.strategy:
+            case DeploymentStrategy.ROLLING:
+                rolling = dto.rolling_update
+                strategy_spec: DeploymentStrategySpecGQL = RollingUpdateStrategySpecGQL(
+                    strategy=DeploymentStrategyTypeGQL.ROLLING,
+                    max_surge=rolling.max_surge if rolling is not None else 1,
+                    max_unavailable=rolling.max_unavailable if rolling is not None else 0,
+                )
+            case DeploymentStrategy.BLUE_GREEN:
+                bg = dto.blue_green
+                strategy_spec = BlueGreenStrategySpecGQL(
+                    strategy=DeploymentStrategyTypeGQL.BLUE_GREEN,
+                    auto_promote=bg.auto_promote if bg is not None else False,
+                    promote_delay_seconds=bg.promote_delay_seconds if bg is not None else 0,
+                )
+            case _:
+                raise InvalidDeploymentStrategySpec(
+                    f"Unsupported deployment strategy: {dto.strategy}"
+                )
+        return cls(
+            id=ID(str(dto.id)),
+            strategy_spec=strategy_spec,
+            rollback_on_failure=dto.rollback_on_failure,
+            created_at=dto.created_at,
+            updated_at=dto.updated_at,
+        )
 
 
 # ========== Input Types ==========

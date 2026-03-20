@@ -304,6 +304,18 @@ class UpdateDeploymentInput(BaseRequestModel):
     tags: list[str] | Sentinel | None = Field(
         default=SENTINEL, description="Updated tags. Use SENTINEL to clear."
     )
+    open_to_public: bool | None = Field(
+        default=None, description="Updated network visibility. None means no change."
+    )
+    preferred_domain_name: str | None = Field(
+        default=None, description="Updated preferred domain name. None means no change."
+    )
+    active_revision_id: UUID | None = Field(
+        default=None, description="ID of the revision to activate. None means no change."
+    )
+    default_deployment_strategy: DeploymentStrategyInput | None = Field(
+        default=None, description="Updated deployment strategy. None means no change."
+    )
 
     @field_validator("name")
     @classmethod

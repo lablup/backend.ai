@@ -21,7 +21,6 @@ from ai.backend.manager.api.gql.project_v2.types import (
 from ai.backend.manager.api.gql.project_v2.types.node import ProjectV2Edge
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.api.gql.utils import check_admin_only
-from ai.backend.manager.services.group.actions.search_projects import GetProjectAction
 
 
 @strawberry.field(
@@ -34,10 +33,8 @@ async def project_v2(
     project_id: UUID,
 ) -> ProjectV2GQL | None:
     """Get a single project by UUID."""
-    action_result = await info.context.processors.group.get_project.wait_for_complete(
-        GetProjectAction(project_id=project_id)
-    )
-    return ProjectV2GQL.from_data(action_result.data)
+    node = await info.context.adapters.project.get(project_id)
+    return ProjectV2GQL.from_pydantic(node)
 
 
 @strawberry.field(
@@ -145,12 +142,6 @@ async def project_domain_v2(
     project_id: UUID,
 ) -> DomainV2GQL | None:
     """Get the domain that a project belongs to."""
-    from ai.backend.manager.services.domain.actions.get_domain import GetDomainAction
-
-    action_result = await info.context.processors.group.get_project.wait_for_complete(
-        GetProjectAction(project_id=project_id)
-    )
-    domain_result = await info.context.processors.domain.get_domain.wait_for_complete(
-        GetDomainAction(domain_name=action_result.data.domain_name)
-    )
-    return DomainV2GQL.from_data(domain_result.data)
+    project_node = await info.context.adapters.project.get(project_id)
+    domain_node = await info.context.adapters.domain.get(project_node.organization.domain_name)
+    return DomainV2GQL.from_pydantic(domain_node)

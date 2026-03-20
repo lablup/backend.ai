@@ -20,9 +20,6 @@ from ai.backend.manager.api.gql.deployment.types.replica import (
     ReplicaStatusChangedPayload,
 )
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
-from ai.backend.manager.services.deployment.actions.get_replica_by_id import (
-    GetReplicaByIdAction,
-)
 
 # Query resolvers
 
@@ -72,13 +69,10 @@ async def replicas(
 async def replica(id: ID, info: Info[StrawberryGQLContext]) -> ModelReplica | None:
     """Get a specific replica by ID."""
     _, replica_id = resolve_global_id(id)
-    processor = info.context.processors.deployment
-    result = await processor.get_replica_by_id.wait_for_complete(
-        GetReplicaByIdAction(replica_id=UUID(replica_id))
-    )
-    if result.data is None:
+    node = await info.context.adapters.deployment.get_replica(UUID(replica_id))
+    if node is None:
         return None
-    return ModelReplica.from_dataclass(result.data)
+    return ModelReplica.from_pydantic(node)
 
 
 # Subscription resolvers

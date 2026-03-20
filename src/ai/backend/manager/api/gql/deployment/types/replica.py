@@ -63,9 +63,6 @@ from ai.backend.manager.data.deployment.types import (
     RouteStatus,
     RouteTrafficStatus,
 )
-from ai.backend.manager.services.deployment.actions.model_revision.get_revision_by_id import (
-    GetRevisionByIdAction,
-)
 
 from .revision import ModelRevision
 
@@ -230,11 +227,8 @@ class ModelReplica(PydanticNodeMixin[ReplicaNodeDTO]):
     @strawberry.field
     async def revision(self, info: Info[StrawberryGQLContext]) -> ModelRevision:
         """Resolve revision by ID."""
-        processor = info.context.processors.deployment
-        result = await processor.get_revision_by_id.wait_for_complete(
-            GetRevisionByIdAction(revision_id=self._revision_id)
-        )
-        return ModelRevision.from_dataclass(result.data)
+        node = await info.context.adapters.deployment.get_revision(self._revision_id)
+        return ModelRevision.from_pydantic(node)
 
     @classmethod
     async def resolve_nodes(  # type: ignore[override]  # Strawberry Node uses AwaitableOrValue overloads incompatible with async def

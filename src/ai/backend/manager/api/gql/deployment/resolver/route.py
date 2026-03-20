@@ -8,6 +8,9 @@ import strawberry
 from strawberry import ID, Info
 from strawberry.relay import PageInfo
 
+from ai.backend.common.data.model_deployment.types import (
+    RouteTrafficStatus as RouteTrafficStatusCommon,
+)
 from ai.backend.common.dto.manager.v2.deployment.request import SearchRoutesInput
 from ai.backend.manager.api.gql.base import encode_cursor, resolve_global_id
 from ai.backend.manager.api.gql.deployment.types.route import (
@@ -22,12 +25,6 @@ from ai.backend.manager.api.gql.deployment.types.route import (
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.data.deployment.types import (
     RouteSearchScope,
-)
-from ai.backend.manager.data.deployment.types import (
-    RouteTrafficStatus as RouteTrafficStatusEnum,
-)
-from ai.backend.manager.services.deployment.actions.route import (
-    UpdateRouteTrafficStatusAction,
 )
 
 # Query resolvers
@@ -100,15 +97,10 @@ async def update_route_traffic_status(
 ) -> UpdateRouteTrafficStatusPayloadGQL:
     """Update route traffic status (ACTIVE/INACTIVE)."""
     _, route_id = resolve_global_id(input.route_id)
-
-    processor = info.context.processors.deployment
-    result = await processor.update_route_traffic_status.wait_for_complete(
-        UpdateRouteTrafficStatusAction(
-            route_id=UUID(route_id),
-            traffic_status=RouteTrafficStatusEnum(input.traffic_status.value),
-        )
+    route_node = await info.context.adapters.deployment.update_route_traffic(
+        UUID(route_id),
+        RouteTrafficStatusCommon(input.traffic_status.value),
     )
-
     return UpdateRouteTrafficStatusPayloadGQL(
-        route=Route.from_dataclass(result.route),
+        route=Route.from_pydantic(route_node),
     )

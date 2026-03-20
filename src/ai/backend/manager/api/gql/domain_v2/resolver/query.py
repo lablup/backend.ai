@@ -28,12 +28,8 @@ async def domain_v2(
     info: Info[StrawberryGQLContext],
     domain_name: str,
 ) -> DomainV2GQL | None:
-    from ai.backend.manager.services.domain.actions.get_domain import GetDomainAction
-
-    action_result = await info.context.processors.domain.get_domain.wait_for_complete(
-        GetDomainAction(domain_name=domain_name)
-    )
-    return DomainV2GQL.from_data(action_result.data)
+    node = await info.context.adapters.domain.get(domain_name)
+    return DomainV2GQL.from_pydantic(node)
 
 
 @strawberry.field(

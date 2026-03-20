@@ -832,10 +832,19 @@ class UpdateDeploymentInput:
     preferred_domain_name: str | None = None
 
     def to_pydantic(self) -> UpdateDeploymentInputDTO:
+        strategy_dto: DeploymentStrategyInputDTO | None = None
+        if self.default_deployment_strategy is not None:
+            strategy_dto = self.default_deployment_strategy.to_pydantic()
         return UpdateDeploymentInputDTO(
             name=self.name,
             desired_replicas=self.desired_replica_count,
             tags=SENTINEL if self.tags is None else self.tags,
+            open_to_public=self.open_to_public,
+            preferred_domain_name=self.preferred_domain_name,
+            active_revision_id=UUID(str(self.active_revision_id))
+            if self.active_revision_id is not None
+            else None,
+            default_deployment_strategy=strategy_dto,
         )
 
 

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from functools import lru_cache
+from pathlib import PurePosixPath
 from uuid import UUID
 
 from ai.backend.common.api_handlers import Sentinel
@@ -11,14 +12,18 @@ from ai.backend.common.data.model_deployment.types import (
     RouteStatus,
     RouteTrafficStatus,
 )
+from ai.backend.common.dto.manager.v2.auto_scaling_rule.request import (
+    CreateAutoScalingRuleInput,
+    DeleteAutoScalingRuleInput,
+    UpdateAutoScalingRuleInput,
+)
 from ai.backend.common.dto.manager.v2.deployment.request import (
+    ActivateRevisionInput,
     AddRevisionInput,
     AdminSearchDeploymentsInput,
     AdminSearchRevisionsInput,
     CreateAccessTokenInput,
-    CreateAutoScalingRuleInput,
     CreateDeploymentInput,
-    DeleteAutoScalingRuleInput,
     DeleteDeploymentInput,
     DeploymentOrder,
     ReplicaOrder,
@@ -29,12 +34,13 @@ from ai.backend.common.dto.manager.v2.deployment.request import (
     SearchDeploymentPoliciesInput,
     SearchReplicasInput,
     SearchRoutesInput,
-    UpdateAutoScalingRuleInput,
+    SyncReplicaInput,
     UpdateDeploymentInput,
     UpsertDeploymentPolicyInput,
 )
 from ai.backend.common.dto.manager.v2.deployment.response import (
     AccessTokenNode,
+    ActivateRevisionPayload,
     AddRevisionPayload,
     AdminSearchDeploymentsPayload,
     AdminSearchRevisionsPayload,
@@ -57,6 +63,7 @@ from ai.backend.common.dto.manager.v2.deployment.response import (
     SearchDeploymentPoliciesPayload,
     SearchReplicasPayload,
     SearchRoutesPayload,
+    SyncReplicaPayload,
     UpdateAutoScalingRulePayload,
     UpdateDeploymentPayload,
     UpsertDeploymentPolicyPayload,
@@ -144,8 +151,10 @@ from ai.backend.manager.repositories.base import (
 )
 from ai.backend.manager.repositories.deployment.updaters import (
     DeploymentMetadataUpdaterSpec,
+    DeploymentNetworkSpecUpdaterSpec,
     DeploymentUpdaterSpec,
     ReplicaSpecUpdaterSpec,
+    RevisionStateUpdaterSpec,
 )
 from ai.backend.manager.services.deployment.actions.access_token.create_access_token import (
     CreateAccessTokenAction,
@@ -184,6 +193,9 @@ from ai.backend.manager.services.deployment.actions.destroy_deployment import (
 from ai.backend.manager.services.deployment.actions.get_deployment_by_id import (
     GetDeploymentByIdAction,
 )
+from ai.backend.manager.services.deployment.actions.get_replica_by_id import (
+    GetReplicaByIdAction,
+)
 from ai.backend.manager.services.deployment.actions.model_revision.add_model_revision import (
     AddModelRevisionAction,
 )
@@ -193,6 +205,9 @@ from ai.backend.manager.services.deployment.actions.model_revision.get_revision_
 from ai.backend.manager.services.deployment.actions.model_revision.search_revisions import (
     SearchRevisionsAction,
 )
+from ai.backend.manager.services.deployment.actions.revision_operations import (
+    ActivateRevisionAction,
+)
 from ai.backend.manager.services.deployment.actions.route.search_routes import SearchRoutesAction
 from ai.backend.manager.services.deployment.actions.route.update_route_traffic_status import (
     UpdateRouteTrafficStatusAction,
@@ -201,6 +216,7 @@ from ai.backend.manager.services.deployment.actions.search_deployments import (
     SearchDeploymentsAction,
 )
 from ai.backend.manager.services.deployment.actions.search_replicas import SearchReplicasAction
+from ai.backend.manager.services.deployment.actions.sync_replicas import SyncReplicaAction
 from ai.backend.manager.services.deployment.actions.update_deployment import UpdateDeploymentAction
 from ai.backend.manager.types import OptionalState, TriState
 
@@ -296,7 +312,7 @@ class DeploymentAdapter(BaseAdapter):
             extra_mounts=[
                 MountInfo(
                     vfolder_id=m.vfolder_id,
-                    kernel_path=None,
+                    kernel_path=PurePosixPath(m.mount_destination) if m.mount_destination else None,
                 )
                 for m in (input.initial_revision.extra_mounts or [])
             ],
@@ -423,15 +439,48 @@ class DeploymentAdapter(BaseAdapter):
             replica_spec = ReplicaSpecUpdaterSpec(
                 desired_replica_count=OptionalState.update(input.desired_replicas),
             )
+        network_spec: DeploymentNetworkSpecUpdaterSpec | None = None
+        if input.open_to_public is not None:
+            network_spec = DeploymentNetworkSpecUpdaterSpec(
+                open_to_public=OptionalState.from_graphql(input.open_to_public),
+            )
+        revision_state_spec: RevisionStateUpdaterSpec | None = None
+        if input.active_revision_id is not None:
+            revision_state_spec = RevisionStateUpdaterSpec(
+                current_revision=TriState[UUID].from_graphql(input.active_revision_id),
+            )
         spec = DeploymentUpdaterSpec(
             metadata=metadata_spec,
             replica_spec=replica_spec,
+            network=network_spec,
+            revision_state=revision_state_spec,
         )
         updater: Updater[EndpointRow] = Updater(spec=spec, pk_value=deployment_id)
         action_result = await self._processors.deployment.update_deployment.wait_for_complete(
             UpdateDeploymentAction(updater=updater)
         )
         return UpdateDeploymentPayload(deployment=self._deployment_data_to_dto(action_result.data))
+
+    async def sync_replicas(self, input: SyncReplicaInput) -> SyncReplicaPayload:
+        """Force sync replica information for a deployment."""
+        await self._processors.deployment.sync_replicas.wait_for_complete(
+            SyncReplicaAction(deployment_id=input.model_deployment_id)
+        )
+        return SyncReplicaPayload(success=True)
+
+    async def activate_revision(self, input: ActivateRevisionInput) -> ActivateRevisionPayload:
+        """Activate a specific revision as the current revision."""
+        action_result = await self._processors.deployment.activate_revision.wait_for_complete(
+            ActivateRevisionAction(
+                deployment_id=input.deployment_id,
+                revision_id=input.revision_id,
+            )
+        )
+        return ActivateRevisionPayload(
+            deployment=self._deployment_data_to_dto(action_result.deployment),
+            previous_revision_id=action_result.previous_revision_id,
+            activated_revision_id=action_result.activated_revision_id,
+        )
 
     async def delete(self, input: DeleteDeploymentInput) -> DeleteDeploymentPayload:
         """Delete a deployment."""
@@ -487,7 +536,7 @@ class DeploymentAdapter(BaseAdapter):
     ) -> CreateAutoScalingRulePayload:
         """Create a new auto-scaling rule for a deployment."""
         creator = ModelDeploymentAutoScalingRuleCreator(
-            model_deployment_id=input.deployment_id,
+            model_deployment_id=input.model_deployment_id,
             metric_source=input.metric_source,
             metric_name=input.metric_name,
             min_threshold=input.min_threshold,
@@ -537,7 +586,6 @@ class DeploymentAdapter(BaseAdapter):
     async def update_rule(
         self,
         input: UpdateAutoScalingRuleInput,
-        rule_id: UUID,
     ) -> UpdateAutoScalingRulePayload:
         """Update an auto-scaling rule."""
         modifier = ModelDeploymentAutoScalingRuleModifier(
@@ -553,12 +601,12 @@ class DeploymentAdapter(BaseAdapter):
             ),
             min_threshold=(
                 OptionalState.update(input.min_threshold)
-                if input.min_threshold is not None
+                if not isinstance(input.min_threshold, Sentinel) and input.min_threshold is not None
                 else OptionalState.nop()
             ),
             max_threshold=(
                 OptionalState.update(input.max_threshold)
-                if input.max_threshold is not None
+                if not isinstance(input.max_threshold, Sentinel) and input.max_threshold is not None
                 else OptionalState.nop()
             ),
             step_size=(
@@ -573,18 +621,18 @@ class DeploymentAdapter(BaseAdapter):
             ),
             min_replicas=(
                 OptionalState.update(input.min_replicas)
-                if input.min_replicas is not None
+                if not isinstance(input.min_replicas, Sentinel) and input.min_replicas is not None
                 else OptionalState.nop()
             ),
             max_replicas=(
                 OptionalState.update(input.max_replicas)
-                if input.max_replicas is not None
+                if not isinstance(input.max_replicas, Sentinel) and input.max_replicas is not None
                 else OptionalState.nop()
             ),
         )
         action_result = (
             await self._processors.deployment.update_auto_scaling_rule.wait_for_complete(
-                UpdateAutoScalingRuleAction(auto_scaling_rule_id=rule_id, modifier=modifier)
+                UpdateAutoScalingRuleAction(auto_scaling_rule_id=input.id, modifier=modifier)
             )
         )
         return UpdateAutoScalingRulePayload(
@@ -675,7 +723,7 @@ class DeploymentAdapter(BaseAdapter):
             extra_mounts=[
                 MountInfo(
                     vfolder_id=m.vfolder_id,
-                    kernel_path=None,
+                    kernel_path=PurePosixPath(m.mount_destination) if m.mount_destination else None,
                 )
                 for m in (input.revision.extra_mounts or [])
             ],
@@ -692,6 +740,9 @@ class DeploymentAdapter(BaseAdapter):
             execution=ExecutionSpec(
                 runtime_variant=input.revision.runtime_variant,
                 environ=dict(input.revision.environ) if input.revision.environ else None,
+                inference_runtime_config=dict(input.revision.inference_runtime_config)
+                if input.revision.inference_runtime_config
+                else None,
             ),
         )
         action_result = await self._processors.deployment.add_model_revision.wait_for_complete(
@@ -796,6 +847,15 @@ class DeploymentAdapter(BaseAdapter):
             has_next_page=action_result.has_next_page,
             has_previous_page=action_result.has_previous_page,
         )
+
+    async def get_replica(self, replica_id: UUID) -> ReplicaNode | None:
+        """Retrieve a single replica by ID."""
+        action_result = await self._processors.deployment.get_replica_by_id.wait_for_complete(
+            GetReplicaByIdAction(replica_id=replica_id)
+        )
+        if action_result.data is None:
+            return None
+        return self._replica_data_to_dto(action_result.data)
 
     async def update_route_traffic(
         self,

@@ -28,6 +28,7 @@ from ai.backend.manager.repositories.base import (
     negate_conditions,
 )
 from ai.backend.manager.repositories.domain.types import DomainSearchScope
+from ai.backend.manager.services.domain.actions.get_domain import GetDomainAction
 from ai.backend.manager.services.domain.actions.search_domains import SearchDomainsAction
 from ai.backend.manager.services.domain.actions.search_rg_domains import SearchRGDomainsAction
 
@@ -44,6 +45,13 @@ _DOMAIN_PAGINATION_SPEC = PaginationSpec(
 
 class DomainAdapter(BaseAdapter):
     """Adapter for domain operations."""
+
+    async def get(self, domain_name: str) -> DomainNode:
+        """Retrieve a single domain by name."""
+        action_result = await self._processors.domain.get_domain.wait_for_complete(
+            GetDomainAction(domain_name=domain_name)
+        )
+        return self._domain_data_to_node(action_result.data)
 
     async def admin_search(
         self,
