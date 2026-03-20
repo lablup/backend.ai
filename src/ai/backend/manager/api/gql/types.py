@@ -20,7 +20,6 @@ from ai.backend.manager.api.gql.decorators import (
     gql_pydantic_input,
 )
 from ai.backend.manager.config.provider import ManagerConfigProvider
-from ai.backend.manager.repositories.base import QueryCondition, QueryOrder
 
 if TYPE_CHECKING:
     from ai.backend.common.events.fetcher import EventFetcher
@@ -32,35 +31,11 @@ if TYPE_CHECKING:
 
 
 class GQLFilter(ABC):
-    """Base class for GraphQL filter types.
-
-    All GraphQL filter input types should inherit from this class.
-    Subclasses may implement build_conditions() for legacy adapter usage.
-    """
-
-    def build_conditions(self) -> list[QueryCondition]:
-        """Build query conditions from this filter.
-
-        Returns:
-            A list of QueryCondition callables that can be applied to SQLAlchemy queries.
-        """
-        raise NotImplementedError
+    """Base class for GraphQL filter types."""
 
 
 class GQLOrderBy(ABC):
-    """Base class for GraphQL order by types.
-
-    All GraphQL order by input types should inherit from this class.
-    Subclasses may implement to_query_order() for legacy adapter usage.
-    """
-
-    def to_query_order(self) -> QueryOrder:
-        """Convert to repository QueryOrder.
-
-        Returns:
-            A QueryOrder (SQLAlchemy UnaryExpression) for ordering query results.
-        """
-        raise NotImplementedError
+    """Base class for GraphQL order by types."""
 
 
 @dataclass

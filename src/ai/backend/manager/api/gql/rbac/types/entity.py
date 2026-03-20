@@ -6,7 +6,7 @@ import uuid
 from collections.abc import Iterable
 from datetime import datetime
 from enum import StrEnum
-from typing import Any, Self, override
+from typing import Any, Self
 
 import strawberry
 from strawberry import ID, Info
@@ -38,14 +38,6 @@ from ai.backend.manager.api.gql.rbac.types.permission import RBACElementTypeGQL
 from ai.backend.manager.api.gql.types import GQLFilter, GQLOrderBy, StrawberryGQLContext
 from ai.backend.manager.data.permission.association_scopes_entities import (
     AssociationScopesEntitiesData,
-)
-from ai.backend.manager.models.rbac_models.conditions import EntityScopeConditions
-from ai.backend.manager.models.rbac_models.orders import EntityScopeOrders
-from ai.backend.manager.repositories.base import (
-    QueryCondition,
-    QueryOrder,
-    combine_conditions_or,
-    negate_conditions,
 )
 
 # ==================== Enums ====================
@@ -248,48 +240,6 @@ class EntityFilter(GQLFilter):
             NOT=[f.to_pydantic() for f in self.NOT] if self.NOT else None,
         )
 
-    @override
-    def build_conditions(self) -> list[QueryCondition]:
-        conditions: list[QueryCondition] = []
-
-        if self.entity_type is not None:
-            conditions.append(
-                EntityScopeConditions.by_entity_type(self.entity_type.to_element().to_entity_type())
-            )
-
-        if self.entity_id is not None:
-            condition = self.entity_id.build_query_condition(
-                contains_factory=EntityScopeConditions.by_entity_id_contains,
-                equals_factory=EntityScopeConditions.by_entity_id_equals,
-                starts_with_factory=EntityScopeConditions.by_entity_id_starts_with,
-                ends_with_factory=EntityScopeConditions.by_entity_id_ends_with,
-            )
-            if condition:
-                conditions.append(condition)
-
-        # Handle AND logical operator
-        if self.AND:
-            for sub_filter in self.AND:
-                conditions.extend(sub_filter.build_conditions())
-
-        # Handle OR logical operator
-        if self.OR:
-            or_sub_conditions: list[QueryCondition] = []
-            for sub_filter in self.OR:
-                or_sub_conditions.extend(sub_filter.build_conditions())
-            if or_sub_conditions:
-                conditions.append(combine_conditions_or(or_sub_conditions))
-
-        # Handle NOT logical operator
-        if self.NOT:
-            not_sub_conditions: list[QueryCondition] = []
-            for sub_filter in self.NOT:
-                not_sub_conditions.extend(sub_filter.build_conditions())
-            if not_sub_conditions:
-                conditions.append(negate_conditions(not_sub_conditions))
-
-        return conditions
-
 
 # ==================== OrderBy Types ====================
 
@@ -310,15 +260,6 @@ class EntityOrderBy(GQLOrderBy):
             field=EntityOrderFieldDTO(self.field.value),
             direction=OrderDirectionDTO(self.direction.value),
         )
-
-    @override
-    def to_query_order(self) -> QueryOrder:
-        ascending = self.direction == OrderDirection.ASC
-        match self.field:
-            case EntityOrderField.ENTITY_TYPE:
-                return EntityScopeOrders.entity_type(ascending)
-            case EntityOrderField.REGISTERED_AT:
-                return EntityScopeOrders.registered_at(ascending)
 
 
 # ==================== Connection Types ====================
