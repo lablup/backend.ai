@@ -377,7 +377,7 @@ class DeploymentCoordinator:
             except Exception:
                 log.exception("handler {}: execute() raised an unexpected error", handler_name)
                 result = DeploymentExecutionResult(
-                    errors=[
+                    failures=[
                         DeploymentExecutionError(
                             deployment_info=deployment,
                             reason=f"Unexpected error in {handler_name}",
@@ -436,21 +436,6 @@ class DeploymentCoordinator:
             all_history_specs.extend(transition.history_specs)
             notification_events.extend(transition.notification_events)
 
-        # Explicit need_retry from handlers (e.g. route mutations in progress).
-        # These are never escalated to give_up — they represent normal progress.
-        if result.need_retry and transitions.need_retry is not None:
-            transition = self._build_success_transition(
-                handler_name=handler_name,
-                deployments=result.need_retry,
-                lifecycle_status=transitions.need_retry,
-                target_lifecycles=target_statuses,
-                records=records,
-                timestamp_now=timestamp_now,
-            )
-            batch_updaters.append(transition.updater)
-            all_history_specs.extend(transition.history_specs)
-            notification_events.extend(transition.notification_events)
-
         # Expired transitions for skipped deployments — check timeout even when
         # no execution error occurred (e.g. deployment is just waiting for routes).
         if result.skipped and transitions.expired is not None:
@@ -479,9 +464,9 @@ class DeploymentCoordinator:
                 notification_events.extend(transition.notification_events)
 
         # Failure transitions — classify into need_retry/expired/give_up
-        if result.errors:
+        if result.failures:
             current_dbtime = await self._deployment_repository.get_db_now()
-            classified = self._classify_failures(result.errors, current_dbtime)
+            classified = self._classify_failures(result.failures, current_dbtime)
 
             failure_categories = [
                 (classified.give_up, transitions.give_up, SchedulingResult.GIVE_UP, "give_up"),

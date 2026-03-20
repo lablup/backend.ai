@@ -185,7 +185,7 @@ class DeploymentExecutor:
 
         return DeploymentExecutionResult(
             successes=successful_deployments,
-            errors=errors,
+            failures=errors,
         )
 
     async def check_ready_deployments_that_need_scaling(
@@ -224,7 +224,7 @@ class DeploymentExecutor:
 
         return DeploymentExecutionResult(
             successes=successes,
-            errors=errors,
+            failures=errors,
         )
 
     async def scale_deployment(
@@ -291,7 +291,7 @@ class DeploymentExecutor:
         return DeploymentExecutionResult(
             successes=successes,
             skipped=skipped,
-            errors=errors,
+            failures=errors,
         )
 
     async def calculate_desired_replicas(
@@ -361,7 +361,7 @@ class DeploymentExecutor:
         return DeploymentExecutionResult(
             successes=successes,
             skipped=skipped,
-            errors=errors,
+            failures=errors,
         )
 
     async def destroy_deployment(
@@ -423,7 +423,7 @@ class DeploymentExecutor:
 
         return DeploymentExecutionResult(
             successes=successes,
-            errors=errors,
+            failures=errors,
         )
 
     # Private helper methods

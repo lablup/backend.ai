@@ -151,9 +151,8 @@ class DeployingProvisioningHandler(DeploymentHandler):
             )
 
         successes: list[DeploymentWithHistory] = []
-        errors: list[DeploymentExecutionError] = []
+        failures: list[DeploymentExecutionError] = []
         skipped: list[DeploymentWithHistory] = []
-        need_retry: list[DeploymentWithHistory] = []
 
         # COMPLETED → success (coordinator transitions to READY)
         for endpoint_id in apply_result.completed_ids:
@@ -163,11 +162,11 @@ class DeployingProvisioningHandler(DeploymentHandler):
             if deployment is not None:
                 successes.append(deployment)
 
-        # Evaluation errors → execution errors
+        # Evaluation errors → failures
         for error_data in summary.errors:
             deployment = deployment_map.get(error_data.deployment.id)
             if deployment is not None:
-                errors.append(
+                failures.append(
                     DeploymentExecutionError(
                         deployment_info=deployment,
                         reason=error_data.reason,
@@ -175,8 +174,8 @@ class DeployingProvisioningHandler(DeploymentHandler):
                     )
                 )
 
-        # Classify rest: route mutations happened → need_retry (never give_up),
-        # no changes → skipped (no history).
+        # Classify rest: route mutations happened → failures (recoverable, coordinator
+        # will classify as need_retry), no changes → skipped (no history).
         completed_or_error_ids = apply_result.completed_ids | {
             e.deployment.id for e in summary.errors
         }
@@ -186,13 +185,17 @@ class DeployingProvisioningHandler(DeploymentHandler):
             if endpoint_id in completed_or_error_ids or endpoint_id in destroying_ids:
                 continue
             if has_route_mutations:
-                need_retry.append(deployment)
+                failures.append(
+                    DeploymentExecutionError(
+                        deployment_info=deployment,
+                        reason="Route mutations in progress",
+                        error_detail="Waiting for route provisioning to complete",
+                    )
+                )
             else:
                 skipped.append(deployment)
 
-        return DeploymentExecutionResult(
-            successes=successes, errors=errors, skipped=skipped, need_retry=need_retry
-        )
+        return DeploymentExecutionResult(successes=successes, failures=failures, skipped=skipped)
 
     @override
     async def post_process(self, result: DeploymentExecutionResult) -> None:
