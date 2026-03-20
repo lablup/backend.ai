@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from uuid import UUID
 
 from ai.backend.common.api_handlers import Sentinel
@@ -206,6 +207,48 @@ class ArtifactAdapter(BaseAdapter):
             has_next_page=action_result.has_next_page,
             has_previous_page=action_result.has_previous_page,
         )
+
+    async def batch_load_by_ids(self, artifact_ids: Sequence[UUID]) -> list[ArtifactNode | None]:
+        """Batch load artifacts by their IDs for DataLoader use.
+
+        Returns ArtifactNode DTOs in the same order as the input artifact_ids list.
+        """
+        if not artifact_ids:
+            return []
+
+        querier = BatchQuerier(
+            pagination=OffsetPagination(limit=len(artifact_ids)),
+            conditions=[ArtifactConditions.by_ids(artifact_ids)],
+        )
+
+        action_result = await self._processors.artifact.search_artifacts.wait_for_complete(
+            SearchArtifactsAction(querier=querier)
+        )
+
+        artifact_map = {item.id: self._data_to_dto(item) for item in action_result.data}
+        return [artifact_map.get(artifact_id) for artifact_id in artifact_ids]
+
+    async def batch_load_revisions_by_ids(
+        self, revision_ids: Sequence[UUID]
+    ) -> list[ArtifactRevisionNode | None]:
+        """Batch load artifact revisions by their IDs for DataLoader use.
+
+        Returns ArtifactRevisionNode DTOs in the same order as the input revision_ids list.
+        """
+        if not revision_ids:
+            return []
+
+        querier = BatchQuerier(
+            pagination=OffsetPagination(limit=len(revision_ids)),
+            conditions=[ArtifactRevisionConditions.by_ids(revision_ids)],
+        )
+
+        action_result = await self._processors.artifact_revision.search_revision.wait_for_complete(
+            SearchArtifactRevisionsAction(querier=querier)
+        )
+
+        revision_map = {item.id: self._revision_data_to_dto(item) for item in action_result.data}
+        return [revision_map.get(revision_id) for revision_id in revision_ids]
 
     async def get(self, artifact_id: UUID) -> ArtifactNode:
         """Retrieve a single artifact by ID."""
