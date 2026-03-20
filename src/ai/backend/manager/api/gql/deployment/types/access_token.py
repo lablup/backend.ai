@@ -44,7 +44,6 @@ from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.data.deployment.types import (
     AccessTokenOrderField,
-    ModelDeploymentAccessTokenData,
 )
 
 
@@ -114,15 +113,6 @@ class AccessToken(PydanticNodeMixin[AccessTokenNodeDTO]):
         return await info.context.data_loaders.access_token_loader.load_many([
             UUID(nid) for nid in node_ids
         ])
-
-    @classmethod
-    def from_dataclass(cls, data: ModelDeploymentAccessTokenData) -> Self:
-        return cls(
-            id=ID(str(data.id)),
-            token=data.token,
-            created_at=data.created_at,
-            valid_until=data.valid_until,
-        )
 
     @classmethod
     def from_pydantic(

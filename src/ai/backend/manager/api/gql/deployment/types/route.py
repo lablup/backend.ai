@@ -63,9 +63,6 @@ from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.api.gql_legacy.session import ComputeSessionNode
 from ai.backend.manager.data.deployment.types import (
-    RouteInfo,
-)
-from ai.backend.manager.data.deployment.types import (
     RouteStatus as RouteStatusEnum,
 )
 from ai.backend.manager.data.deployment.types import (
@@ -164,20 +161,6 @@ class Route(PydanticNodeMixin[RouteNodeDTO]):
         return await info.context.data_loaders.route_loader.load_many([
             UUID(nid) for nid in node_ids
         ])
-
-    @classmethod
-    def from_dataclass(cls, data: RouteInfo) -> Self:
-        return cls(
-            id=ID(str(data.route_id)),
-            _deployment_id=data.endpoint_id,
-            _session_id=UUID(str(data.session_id)) if data.session_id else None,
-            _revision_id=data.revision_id,
-            status=RouteStatusGQL(data.status),
-            traffic_status=RouteTrafficStatusGQL(data.traffic_status),
-            traffic_ratio=data.traffic_ratio,
-            created_at=data.created_at,
-            error_data=data.error_data,
-        )
 
     @classmethod
     def from_pydantic(

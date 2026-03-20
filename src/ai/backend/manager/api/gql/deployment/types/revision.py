@@ -110,12 +110,7 @@ from ai.backend.manager.api.gql_legacy.image import ImageNode
 from ai.backend.manager.api.gql_legacy.scaling_group import ScalingGroupNode
 from ai.backend.manager.api.gql_legacy.vfolder import VirtualFolderNode
 from ai.backend.manager.data.deployment.types import (
-    ClusterConfigData,
-    ModelMountConfigData,
-    ModelRevisionData,
     ModelRevisionOrderField,
-    ModelRuntimeConfigData,
-    ResourceConfigData,
 )
 
 if TYPE_CHECKING:
@@ -180,16 +175,6 @@ class ModelMountConfig:
         )
         return VFolder(id=ID(vfolder_global_id))
 
-    @classmethod
-    def from_dataclass(cls, data: ModelMountConfigData) -> ModelMountConfig | None:
-        if data.vfolder_id is None or data.mount_destination is None:
-            return None
-        return cls(
-            _vfolder_id=data.vfolder_id,
-            mount_destination=data.mount_destination,
-            definition_path=data.definition_path,
-        )
-
 
 @gql_node_type(
     BackendAIGQLMeta(
@@ -209,22 +194,6 @@ class ModelRuntimeConfig:
         description="Environment variables for the service, e.g. CUDA_VISIBLE_DEVICES=0.",
         default=None,
     )
-
-    @classmethod
-    def from_dataclass(cls, data: ModelRuntimeConfigData) -> ModelRuntimeConfig:
-        environ_gql: EnvironmentVariablesGQL | None = None
-        if data.environ is not None:
-            environ_gql = EnvironmentVariablesGQL(
-                entries=[
-                    EnvironmentVariableEntryGQL(name=key, value=value)
-                    for key, value in data.environ.items()
-                ]
-            )
-        return cls(
-            runtime_variant=data.runtime_variant,
-            inference_runtime_config=data.inference_runtime_config,
-            environ=environ_gql,
-        )
 
 
 @gql_node_type(
@@ -251,16 +220,6 @@ class ResourceConfig:
         )
         return ResourceGroup(id=ID(global_id))
 
-    @classmethod
-    def from_dataclass(cls, data: ResourceConfigData) -> ResourceConfig:
-        return cls(
-            _resource_group_name=data.resource_group_name,
-            resource_slots=ResourceSlotGQL.from_resource_slot(data.resource_slot),
-            resource_opts=ResourceOptsGQL.from_mapping(data.resource_opts)
-            if data.resource_opts
-            else None,
-        )
-
 
 @gql_node_type(
     BackendAIGQLMeta(
@@ -271,13 +230,6 @@ class ResourceConfig:
 class ClusterConfig:
     mode: ClusterModeGQL = strawberry.field(description="The clustering mode (e.g., SINGLE_NODE).")
     size: int = strawberry.field(description="Number of replicas in the cluster.")
-
-    @classmethod
-    def from_dataclass(cls, data: ClusterConfigData) -> ClusterConfig:
-        return cls(
-            mode=ClusterModeGQL(data.mode.name),
-            size=data.size,
-        )
 
 
 @gql_node_type(
@@ -325,20 +277,6 @@ class ModelRevision(PydanticNodeMixin[RevisionNodeDTO]):
         ])
 
     @classmethod
-    def from_dataclass(cls, data: ModelRevisionData) -> Self:
-        return cls(
-            id=ID(str(data.id)),
-            name=data.name,
-            cluster_config=ClusterConfig.from_dataclass(data.cluster_config),
-            resource_config=ResourceConfig.from_dataclass(data.resource_config),
-            model_runtime_config=ModelRuntimeConfig.from_dataclass(data.model_runtime_config),
-            model_mount_config=ModelMountConfig.from_dataclass(data.model_mount_config),
-            extra_mounts=ExtraVFolderMountConnection.from_dataclass(data.extra_vfolder_mounts),
-            _image_id=data.image_id,
-            created_at=data.created_at,
-        )
-
-    @classmethod
     def from_pydantic(
         cls,
         dto: RevisionNodeDTO,
@@ -372,8 +310,6 @@ class ModelRevision(PydanticNodeMixin[RevisionNodeDTO]):
         extra_mount_edges = [
             ExtraVFolderMountEdge(node=n, cursor=str(n.id)) for n in extra_mount_nodes
         ]
-        from strawberry.relay import PageInfo
-
         extra_mounts = ExtraVFolderMountConnection(
             count=len(extra_mount_nodes),
             edges=extra_mount_edges,
@@ -804,17 +740,3 @@ class ModelRevisionConnection(Connection[ModelRevision]):
     def __init__(self, *args: Any, count: int, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
         self.count = count
-
-    @classmethod
-    def from_dataclass(cls, revisions_data: list[ModelRevisionData]) -> ModelRevisionConnection:
-        nodes = [ModelRevision.from_dataclass(data) for data in revisions_data]
-        edges = [ModelRevisionEdge(node=node, cursor=str(node.id)) for node in nodes]
-
-        page_info = PageInfo(
-            has_next_page=False,
-            has_previous_page=False,
-            start_cursor=edges[0].cursor if edges else None,
-            end_cursor=edges[-1].cursor if edges else None,
-        )
-
-        return cls(count=len(nodes), edges=edges, page_info=page_info)

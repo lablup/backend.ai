@@ -147,8 +147,6 @@ from ai.backend.manager.data.deployment.types import (
     AutoScalingRuleSearchScope,
     DeploymentNetworkSpec,
     DeploymentOrderField,
-    ModelDeploymentData,
-    ModelDeploymentMetadataInfo,
     ReplicaSearchScope,
     RevisionSearchScope,
 )
@@ -305,18 +303,6 @@ class ModelDeploymentMetadata:
         )
         return Domain(id=ID(domain_global_id))
 
-    @classmethod
-    def from_dataclass(cls, data: ModelDeploymentMetadataInfo) -> ModelDeploymentMetadata:
-        return cls(
-            name=data.name,
-            status=DeploymentStatusGQL(data.status),
-            tags=data.tags,
-            _project_id=data.project_id,
-            _domain_name=data.domain_name,
-            created_at=data.created_at,
-            updated_at=data.updated_at,
-        )
-
 
 @gql_node_type(
     BackendAIGQLMeta(
@@ -370,17 +356,6 @@ class ModelDeploymentNetworkAccess:
                 start_cursor=edges[0].cursor if edges else None,
                 end_cursor=edges[-1].cursor if edges else None,
             ),
-        )
-
-    @classmethod
-    def from_dataclass(
-        cls, data: DeploymentNetworkSpec, deployment_id: UUID
-    ) -> ModelDeploymentNetworkAccess:
-        return cls(
-            _deployment_id=deployment_id,
-            endpoint_url=data.url,
-            preferred_domain_name=data.preferred_domain_name,
-            open_to_public=data.open_to_public,
         )
 
 
@@ -478,39 +453,6 @@ class ModelDeployment(PydanticNodeMixin[DeploymentNodeDTO]):
         return await info.context.data_loaders.deployment_loader.load_many([
             UUID(nid) for nid in node_ids
         ])
-
-    @classmethod
-    def from_dataclass(
-        cls,
-        data: ModelDeploymentData,
-    ) -> Self:
-        metadata = ModelDeploymentMetadata(
-            name=data.metadata.name,
-            status=DeploymentStatusGQL(data.metadata.status),
-            tags=data.metadata.tags,
-            _project_id=data.metadata.project_id,
-            _domain_name=data.metadata.domain_name,
-            created_at=data.metadata.created_at,
-            updated_at=data.metadata.updated_at,
-        )
-
-        return cls(
-            id=ID(str(data.id)),
-            metadata=metadata,
-            network_access=ModelDeploymentNetworkAccess.from_dataclass(
-                data.network_access, deployment_id=data.id
-            ),
-            revision=ModelRevision.from_dataclass(data.revision) if data.revision else None,
-            default_deployment_strategy=DeploymentStrategyGQL(
-                type=DeploymentStrategyTypeGQL(data.default_deployment_strategy)
-            ),
-            replica_state=ReplicaState(
-                desired_replica_count=data.replica_state.desired_replica_count,
-                _deployment_id=data.id,
-            ),
-            _created_user_id=data.created_user_id,
-            _deployment_id=data.id,
-        )
 
     @classmethod
     def from_pydantic(

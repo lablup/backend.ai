@@ -9,7 +9,7 @@ from uuid import UUID
 
 import strawberry
 from strawberry import ID, Info
-from strawberry.relay import Connection, Edge, NodeID, PageInfo
+from strawberry.relay import Connection, Edge, NodeID
 
 from ai.backend.common.data.model_deployment.types import ActivenessStatus as CommonActivenessStatus
 from ai.backend.common.data.model_deployment.types import LivenessStatus as CommonLivenessStatus
@@ -58,7 +58,6 @@ from ai.backend.manager.api.gql.session_federation import Session
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.api.gql_legacy.session import ComputeSessionNode
 from ai.backend.manager.data.deployment.types import (
-    ModelReplicaData,
     ReplicaOrderField,
     RouteStatus,
     RouteTrafficStatus,
@@ -243,19 +242,6 @@ class ModelReplica(PydanticNodeMixin[ReplicaNodeDTO]):
         ])
 
     @classmethod
-    def from_dataclass(cls, data: ModelReplicaData) -> Self:
-        return cls(
-            id=ID(str(data.id)),
-            _revision_id=data.revision_id,
-            _session_id=data.session_id,
-            readiness_status=ReadinessStatus(data.readiness_status),
-            liveness_status=LivenessStatus(data.liveness_status),
-            activeness_status=ActivenessStatus(data.activeness_status),
-            weight=data.weight,
-            created_at=data.created_at,
-        )
-
-    @classmethod
     def from_pydantic(
         cls,
         dto: ReplicaNodeDTO,
@@ -290,20 +276,6 @@ class ModelReplicaConnection(Connection[ModelReplica]):
     def __init__(self, *args: Any, count: int, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
         self.count = count
-
-    @classmethod
-    def from_dataclass(cls, replicas_data: list[ModelReplicaData]) -> ModelReplicaConnection:
-        nodes = [ModelReplica.from_dataclass(data) for data in replicas_data]
-        edges = [ModelReplicaEdge(node=node, cursor=str(node.id)) for node in nodes]
-
-        page_info = PageInfo(
-            has_next_page=False,
-            has_previous_page=False,
-            start_cursor=edges[0].cursor if edges else None,
-            end_cursor=edges[-1].cursor if edges else None,
-        )
-
-        return cls(count=len(nodes), edges=edges, page_info=page_info)
 
 
 @gql_pydantic_type(

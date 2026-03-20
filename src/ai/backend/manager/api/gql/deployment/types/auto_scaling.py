@@ -60,7 +60,6 @@ from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.data.deployment.types import (
     AutoScalingRuleOrderField,
-    ModelDeploymentAutoScalingRuleData,
 )
 
 
@@ -160,22 +159,6 @@ class AutoScalingRule(PydanticNodeMixin[AutoScalingRuleNodeDTO]):
         return await info.context.data_loaders.auto_scaling_rule_loader.load_many([
             UUID(nid) for nid in node_ids
         ])
-
-    @classmethod
-    def from_dataclass(cls, data: ModelDeploymentAutoScalingRuleData) -> Self:
-        return cls(
-            id=ID(str(data.id)),
-            metric_source=AutoScalingMetricSource(data.metric_source.name),
-            metric_name=data.metric_name,
-            min_threshold=data.min_threshold,
-            max_threshold=data.max_threshold,
-            step_size=data.step_size,
-            time_window=data.time_window,
-            min_replicas=data.min_replicas,
-            max_replicas=data.max_replicas,
-            created_at=data.created_at,
-            last_triggered_at=data.last_triggered_at,
-        )
 
     @classmethod
     def from_pydantic(
