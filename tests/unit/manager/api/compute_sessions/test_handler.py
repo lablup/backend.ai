@@ -500,12 +500,12 @@ class TestComputeSessionsHandler:
     ) -> None:
         """Handler should call both search_sessions and search_kernels."""
         await mock_processors.session.search_sessions.wait_for_complete(
-            SearchSessionsAction(querier=MagicMock())
+            SearchSessionsAction(querier=MagicMock(), user_id=uuid4())
         )
         mock_processors.session.search_sessions.wait_for_complete.assert_called_once()
 
         await mock_processors.session.search_kernels.wait_for_complete(
-            SearchKernelsAction(querier=MagicMock())
+            SearchKernelsAction(querier=MagicMock(), user_id=uuid4())
         )
         mock_processors.session.search_kernels.wait_for_complete.assert_called_once()
 
@@ -520,7 +520,7 @@ class TestComputeSessionsHandler:
         )
 
         result = await processors.session.search_sessions.wait_for_complete(
-            SearchSessionsAction(querier=MagicMock())
+            SearchSessionsAction(querier=MagicMock(), user_id=uuid4())
         )
 
         assert result.data == []
@@ -534,10 +534,10 @@ class TestComputeSessionsHandler:
     ) -> None:
         """Kernels should be correctly grouped by session ID."""
         session_result = await mock_processors.session.search_sessions.wait_for_complete(
-            SearchSessionsAction(querier=MagicMock())
+            SearchSessionsAction(querier=MagicMock(), user_id=uuid4())
         )
         kernel_result = await mock_processors.session.search_kernels.wait_for_complete(
-            SearchKernelsAction(querier=MagicMock())
+            SearchKernelsAction(querier=MagicMock(), user_id=uuid4())
         )
 
         adapter = ComputeSessionsAdapter()
@@ -559,7 +559,7 @@ class TestComputeSessionsHandler:
     ) -> None:
         """Pagination info should reflect the session search result."""
         session_result = await mock_processors.session.search_sessions.wait_for_complete(
-            SearchSessionsAction(querier=MagicMock())
+            SearchSessionsAction(querier=MagicMock(), user_id=uuid4())
         )
 
         assert session_result.total_count == 2
