@@ -42,9 +42,6 @@ from ai.backend.manager.api.gql.decorators import (
 from ai.backend.manager.api.gql.fair_share.types import ResourceSlotGQL
 from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin
 from ai.backend.manager.api.gql.types import GQLFilter, GQLOrderBy
-from ai.backend.manager.repositories.resource_usage_history.types import (
-    UserUsageBucketData,
-)
 
 from .common import UsageBucketMetadataGQL, UsageBucketOrderField
 from .common_calculations import (
@@ -118,27 +115,6 @@ class UserUsageBucketGQL(PydanticNodeMixin[UserUsageBucketNode]):
         return calculate_usage_capacity_ratio(
             self.resource_usage,
             self.capacity_snapshot,
-        )
-
-    @classmethod
-    def from_dataclass(cls, data: UserUsageBucketData) -> UserUsageBucketGQL:
-        return cls(
-            id=ID(str(data.id)),
-            user_uuid=data.user_uuid,
-            project_id=data.project_id,
-            domain_name=data.domain_name,
-            resource_group_name=data.resource_group,
-            metadata=UsageBucketMetadataGQL.from_pydantic(
-                UsageBucketMetadataNodeDTO(
-                    period_start=data.period_start,
-                    period_end=data.period_end,
-                    decay_unit_days=data.decay_unit_days,
-                    created_at=data.created_at,
-                    updated_at=data.updated_at,
-                )
-            ),
-            resource_usage=ResourceSlotGQL.from_resource_slot(data.resource_usage),
-            capacity_snapshot=ResourceSlotGQL.from_resource_slot(data.capacity_snapshot),
         )
 
     @classmethod

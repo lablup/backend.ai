@@ -5,7 +5,7 @@ from __future__ import annotations
 from collections.abc import Iterable
 from datetime import datetime
 from enum import StrEnum
-from typing import Any, Self
+from typing import Any, Self, cast
 from uuid import UUID
 
 import strawberry
@@ -71,12 +71,7 @@ from ai.backend.manager.api.gql.decorators import (
 )
 from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
-from ai.backend.manager.data.deployment.types import DeploymentHistoryData, RouteHistoryData
-from ai.backend.manager.data.session.types import (
-    SchedulingResult,
-    SessionSchedulingHistoryData,
-    SubStepResult,
-)
+from ai.backend.manager.data.session.types import SchedulingResult
 
 __all__ = (
     # Enums
@@ -188,17 +183,6 @@ class SubStepResultGQL:
     started_at: datetime | None
     ended_at: datetime | None
 
-    @classmethod
-    def from_dataclass(cls, data: SubStepResult) -> Self:
-        return cls(
-            step=data.step,
-            result=SchedulingResultGQL.from_internal(data.result),
-            error_code=data.error_code,
-            message=data.message,
-            started_at=data.started_at,
-            ended_at=data.ended_at,
-        )
-
 
 @gql_node_type(
     BackendAIGQLMeta(added_version="26.3.0", description="Session scheduling history record.")
@@ -229,10 +213,11 @@ class SessionSchedulingHistory(PydanticNodeMixin[SessionHistoryNode]):
         node_ids: Iterable[str],
         required: bool = False,
     ) -> Iterable[Self | None]:
+        # DataLoader returns GQL type instances directly via from_pydantic adapter.
         results = await info.context.data_loaders.session_history_loader.load_many([
             UUID(nid) for nid in node_ids
         ])
-        return [cls.from_dataclass(data) if data is not None else None for data in results]
+        return cast(list[Self | None], results)
 
     @classmethod
     def from_pydantic(
@@ -267,23 +252,6 @@ class SessionSchedulingHistory(PydanticNodeMixin[SessionHistoryNode]):
             updated_at=dto.updated_at,
         )
 
-    @classmethod
-    def from_dataclass(cls, data: SessionSchedulingHistoryData) -> Self:
-        return cls(
-            id=ID(str(data.id)),
-            _session_id=data.session_id,
-            phase=data.phase,
-            from_status=data.from_status.value if data.from_status else None,
-            to_status=data.to_status.value if data.to_status else None,
-            result=SchedulingResultGQL.from_internal(data.result),
-            error_code=data.error_code,
-            message=data.message,
-            sub_steps=[SubStepResultGQL.from_dataclass(s) for s in data.sub_steps],
-            attempts=data.attempts,
-            created_at=data.created_at,
-            updated_at=data.updated_at,
-        )
-
 
 @gql_node_type(BackendAIGQLMeta(added_version="26.3.0", description="Deployment history record."))
 class DeploymentHistory(PydanticNodeMixin[DeploymentHistoryNode]):
@@ -312,10 +280,11 @@ class DeploymentHistory(PydanticNodeMixin[DeploymentHistoryNode]):
         node_ids: Iterable[str],
         required: bool = False,
     ) -> Iterable[Self | None]:
+        # DataLoader returns GQL type instances directly via from_pydantic adapter.
         results = await info.context.data_loaders.deployment_history_loader.load_many([
             UUID(nid) for nid in node_ids
         ])
-        return [cls.from_dataclass(data) if data is not None else None for data in results]
+        return cast(list[Self | None], results)
 
     @classmethod
     def from_pydantic(
@@ -348,23 +317,6 @@ class DeploymentHistory(PydanticNodeMixin[DeploymentHistoryNode]):
             attempts=dto.attempts,
             created_at=dto.created_at,
             updated_at=dto.updated_at,
-        )
-
-    @classmethod
-    def from_dataclass(cls, data: DeploymentHistoryData) -> Self:
-        return cls(
-            id=ID(str(data.id)),
-            _deployment_id=data.deployment_id,
-            phase=data.phase,
-            from_status=data.from_status.value if data.from_status else None,
-            to_status=data.to_status.value if data.to_status else None,
-            result=SchedulingResultGQL.from_internal(data.result),
-            error_code=data.error_code,
-            message=data.message,
-            sub_steps=[SubStepResultGQL.from_dataclass(s) for s in data.sub_steps],
-            attempts=data.attempts,
-            created_at=data.created_at,
-            updated_at=data.updated_at,
         )
 
 
@@ -400,10 +352,11 @@ class RouteHistory(PydanticNodeMixin[RouteHistoryNode]):
         node_ids: Iterable[str],
         required: bool = False,
     ) -> Iterable[Self | None]:
+        # DataLoader returns GQL type instances directly via from_pydantic adapter.
         results = await info.context.data_loaders.route_history_loader.load_many([
             UUID(nid) for nid in node_ids
         ])
-        return [cls.from_dataclass(data) if data is not None else None for data in results]
+        return cast(list[Self | None], results)
 
     @classmethod
     def from_pydantic(
@@ -437,24 +390,6 @@ class RouteHistory(PydanticNodeMixin[RouteHistoryNode]):
             attempts=dto.attempts,
             created_at=dto.created_at,
             updated_at=dto.updated_at,
-        )
-
-    @classmethod
-    def from_dataclass(cls, data: RouteHistoryData) -> Self:
-        return cls(
-            id=ID(str(data.id)),
-            _route_id=data.route_id,
-            _deployment_id=data.deployment_id,
-            phase=data.phase,
-            from_status=data.from_status.value if data.from_status else None,
-            to_status=data.to_status.value if data.to_status else None,
-            result=SchedulingResultGQL.from_internal(data.result),
-            error_code=data.error_code,
-            message=data.message,
-            sub_steps=[SubStepResultGQL.from_dataclass(s) for s in data.sub_steps],
-            attempts=data.attempts,
-            created_at=data.created_at,
-            updated_at=data.updated_at,
         )
 
 

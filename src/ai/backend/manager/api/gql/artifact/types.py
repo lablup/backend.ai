@@ -3,7 +3,7 @@ from __future__ import annotations
 import uuid
 from collections.abc import Iterable, Mapping
 from datetime import datetime
-from typing import Any, Self
+from typing import Any, Self, cast
 
 import strawberry
 from strawberry import ID, UNSET, Info
@@ -871,6 +871,38 @@ class ArtifactRevision(PydanticNodeMixin[ArtifactRevisionNode]):
     )
 
     @classmethod
+    def from_pydantic(
+        cls,
+        dto: ArtifactRevisionNode,
+        extra: dict[str, Any] | None = None,
+        *,
+        id_field: str = "id",
+    ) -> Self:
+        """Convert an ArtifactRevisionNode DTO to an ArtifactRevision GQL type.
+
+        Overrides PydanticNodeMixin.from_pydantic to handle:
+        - Missing readme field (not present in ArtifactRevisionNode DTO)
+        - VerificationStepResult -> ArtifactVerificationGQLResult conversion
+        """
+        verification_result: ArtifactVerificationGQLResult | None = None
+        if dto.verification_result is not None:
+            verification_result = ArtifactVerificationGQLResult.from_dataclass(
+                dto.verification_result
+            )
+        return cls(
+            id=ID(str(dto.id)),
+            status=ArtifactStatus(dto.status.value),
+            remote_status=ArtifactRemoteStatus(dto.remote_status) if dto.remote_status else None,
+            version=dto.version,
+            readme=None,
+            size=ByteSize(dto.size) if dto.size is not None else None,
+            created_at=dto.created_at,
+            updated_at=dto.updated_at,
+            digest=dto.digest,
+            verification_result=verification_result,
+        )
+
+    @classmethod
     async def resolve_nodes(  # type: ignore[override]  # Strawberry Node uses AwaitableOrValue overloads incompatible with async def
         cls,
         *,
@@ -878,10 +910,13 @@ class ArtifactRevision(PydanticNodeMixin[ArtifactRevisionNode]):
         node_ids: Iterable[str],
         required: bool = False,
     ) -> Iterable[Self | None]:
+        # DataLoader already returns ArtifactRevision | None via from_pydantic.
+        # cast is required because mypy cannot unify list[ArtifactRevision | None]
+        # with Iterable[Self | None] across generic DataLoader[UUID, ArtifactRevision | None].
         results = await info.context.data_loaders.artifact_revision_loader.load_many([
             uuid.UUID(nid) for nid in node_ids
         ])
-        return [cls.from_dataclass(data) if data is not None else None for data in results]
+        return cast(list[Self | None], results)
 
     @classmethod
     def from_dataclass(cls, data: ArtifactRevisionData) -> Self:

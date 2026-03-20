@@ -19,6 +19,9 @@ from ai.backend.common.dto.manager.v2.rbac.request import (
 from ai.backend.common.dto.manager.v2.rbac.request import (
     EntityOrderBy as EntityOrderByDTO,
 )
+from ai.backend.common.dto.manager.v2.rbac.response import (
+    AssociationScopesEntitiesNode,
+)
 from ai.backend.common.dto.manager.v2.rbac.types import (
     EntityOrderField as EntityOrderFieldDTO,
 )
@@ -36,9 +39,6 @@ from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin
 from ai.backend.manager.api.gql.rbac.types.entity_node import EntityNode
 from ai.backend.manager.api.gql.rbac.types.permission import RBACElementTypeGQL
 from ai.backend.manager.api.gql.types import GQLFilter, GQLOrderBy, StrawberryGQLContext
-from ai.backend.manager.data.permission.association_scopes_entities import (
-    AssociationScopesEntitiesData,
-)
 
 # ==================== Enums ====================
 
@@ -59,7 +59,7 @@ class EntityOrderField(StrEnum):
     ),
     name="EntityRef",
 )
-class EntityRefGQL(PydanticNodeMixin[Any]):
+class EntityRefGQL(PydanticNodeMixin[AssociationScopesEntitiesNode]):
     id: NodeID[str]
     scope_type: RBACElementTypeGQL
     scope_id: str
@@ -76,12 +76,10 @@ class EntityRefGQL(PydanticNodeMixin[Any]):
         info: Info[StrawberryGQLContext],
     ) -> EntityNode | None:
         from ai.backend.common.types import ImageID, SessionId
-        from ai.backend.manager.api.gql.artifact.types import ArtifactRevision
         from ai.backend.manager.api.gql.container_registry.types import ContainerRegistryGQL
         from ai.backend.manager.api.gql.deployment.types.deployment import ModelDeployment
         from ai.backend.manager.api.gql.image.types import ImageV2GQL
         from ai.backend.manager.api.gql.project_v2.types.node import ProjectV2GQL
-        from ai.backend.manager.api.gql.rbac.types.role import RoleGQL
         from ai.backend.manager.api.gql.session.types import SessionV2GQL
         from ai.backend.manager.api.gql.user.types.node import UserV2GQL
 
@@ -101,10 +99,8 @@ class EntityRefGQL(PydanticNodeMixin[Any]):
             case RBACElementType.DOMAIN:
                 return await data_loaders.domain_loader.load(self.entity_id)
             case RBACElementType.ROLE:
-                role_data = await data_loaders.role_loader.load(uuid.UUID(self.entity_id))
-                if role_data is None:
-                    return None
-                return RoleGQL.from_dataclass(role_data)
+                # DataLoader already returns RoleGQL | None via from_pydantic conversion
+                return await data_loaders.role_loader.load(uuid.UUID(self.entity_id))
             case RBACElementType.IMAGE:
                 image_data = await data_loaders.image_loader.load(
                     ImageID(uuid.UUID(self.entity_id))
@@ -126,12 +122,8 @@ class EntityRefGQL(PydanticNodeMixin[Any]):
             case RBACElementType.NOTIFICATION_RULE:
                 return await data_loaders.notification_rule_loader.load(uuid.UUID(self.entity_id))
             case RBACElementType.ARTIFACT_REVISION:
-                rev_data = await data_loaders.artifact_revision_loader.load(
-                    uuid.UUID(self.entity_id)
-                )
-                if rev_data is None:
-                    return None
-                return ArtifactRevision.from_dataclass(rev_data)
+                # DataLoader already returns ArtifactRevision | None via from_pydantic
+                return await data_loaders.artifact_revision_loader.load(uuid.UUID(self.entity_id))
             case RBACElementType.CONTAINER_REGISTRY:
                 cr_data = await data_loaders.container_registry_loader.load(
                     uuid.UUID(self.entity_id)
@@ -179,20 +171,26 @@ class EntityRefGQL(PydanticNodeMixin[Any]):
         node_ids: Iterable[str],
         required: bool = False,
     ) -> Iterable[Self | None]:
-        results = await info.context.data_loaders.element_association_loader.load_many([
+        # DataLoader already returns EntityRefGQL | None via from_pydantic conversion
+        return await info.context.data_loaders.element_association_loader.load_many([
             uuid.UUID(nid) for nid in node_ids
         ])
-        return [cls.from_dataclass(data) if data is not None else None for data in results]
 
     @classmethod
-    def from_dataclass(cls, data: AssociationScopesEntitiesData) -> Self:
+    def from_pydantic(
+        cls,
+        dto: AssociationScopesEntitiesNode,
+        extra: dict[str, Any] | None = None,
+        *,
+        id_field: str = "id",
+    ) -> Self:
         return cls(
-            id=ID(str(data.id)),
-            scope_type=RBACElementTypeGQL.from_element(data.scope_id.scope_type.to_element()),
-            scope_id=data.scope_id.scope_id,
-            entity_type=RBACElementTypeGQL.from_element(data.object_id.entity_type.to_element()),
-            entity_id=data.object_id.entity_id,
-            registered_at=data.registered_at,
+            id=ID(str(dto.id)),
+            scope_type=RBACElementTypeGQL(dto.scope_type),
+            scope_id=dto.scope_id,
+            entity_type=RBACElementTypeGQL(dto.entity_type),
+            entity_id=dto.entity_id,
+            registered_at=dto.registered_at,
         )
 
 

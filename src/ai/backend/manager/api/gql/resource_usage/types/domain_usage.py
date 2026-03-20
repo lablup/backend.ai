@@ -43,9 +43,6 @@ from ai.backend.manager.api.gql.types import GQLFilter, GQLOrderBy, StrawberryGQ
 from ai.backend.manager.repositories.resource_usage_history.options import (
     ProjectUsageBucketConditions,
 )
-from ai.backend.manager.repositories.resource_usage_history.types import (
-    DomainUsageBucketData,
-)
 
 from .common import UsageBucketMetadataGQL, UsageBucketOrderField
 from .common_calculations import (
@@ -127,25 +124,6 @@ class DomainUsageBucketGQL(PydanticNodeMixin[DomainUsageBucketNode]):
         return calculate_usage_capacity_ratio(
             self.resource_usage,
             self.capacity_snapshot,
-        )
-
-    @classmethod
-    def from_dataclass(cls, data: DomainUsageBucketData) -> DomainUsageBucketGQL:
-        return cls(
-            id=ID(str(data.id)),
-            domain_name=data.domain_name,
-            resource_group_name=data.resource_group,
-            metadata=UsageBucketMetadataGQL.from_pydantic(
-                UsageBucketMetadataNodeDTO(
-                    period_start=data.period_start,
-                    period_end=data.period_end,
-                    decay_unit_days=data.decay_unit_days,
-                    created_at=data.created_at,
-                    updated_at=data.updated_at,
-                )
-            ),
-            resource_usage=ResourceSlotGQL.from_resource_slot(data.resource_usage),
-            capacity_snapshot=ResourceSlotGQL.from_resource_slot(data.capacity_snapshot),
         )
 
     @classmethod

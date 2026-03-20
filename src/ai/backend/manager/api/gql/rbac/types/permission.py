@@ -53,7 +53,6 @@ from ai.backend.manager.api.gql.decorators import (
 from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin
 from ai.backend.manager.api.gql.rbac.types.entity_node import EntityNode
 from ai.backend.manager.api.gql.types import GQLFilter, GQLOrderBy, StrawberryGQLContext
-from ai.backend.manager.data.permission.permission import PermissionData
 from ai.backend.manager.errors.api import InvalidAPIParameters
 
 if TYPE_CHECKING:
@@ -180,10 +179,10 @@ class PermissionGQL(PydanticNodeMixin[PermissionNodeDTO]):
         node_ids: Iterable[str],
         required: bool = False,
     ) -> Iterable[Self | None]:
-        results = await info.context.data_loaders.permission_loader.load_many([
+        # DataLoader already returns PermissionGQL | None via from_pydantic conversion
+        return await info.context.data_loaders.permission_loader.load_many([
             uuid.UUID(nid) for nid in node_ids
         ])
-        return [cls.from_dataclass(data) if data is not None else None for data in results]
 
     @strawberry.field(description="The role this permission belongs to.")  # type: ignore[misc]
     async def role(
@@ -195,12 +194,8 @@ class PermissionGQL(PydanticNodeMixin[PermissionNodeDTO]):
         ]
         | None
     ):
-        from ai.backend.manager.api.gql.rbac.types.role import RoleGQL
-
-        data = await info.context.data_loaders.role_loader.load(self.role_id)
-        if data is None:
-            return None
-        return RoleGQL.from_dataclass(data)
+        # DataLoader already returns RoleGQL | None via from_pydantic conversion
+        return await info.context.data_loaders.role_loader.load(self.role_id)
 
     @strawberry.field(  # type: ignore[misc]
         description="The scope this permission applies to."
@@ -210,11 +205,9 @@ class PermissionGQL(PydanticNodeMixin[PermissionNodeDTO]):
         *,
         info: Info[StrawberryGQLContext],
     ) -> EntityNode | None:
-        from ai.backend.manager.api.gql.artifact.types import ArtifactRevision
         from ai.backend.manager.api.gql.container_registry.types import ContainerRegistryGQL
         from ai.backend.manager.api.gql.deployment.types.deployment import ModelDeployment
         from ai.backend.manager.api.gql.project_v2.types.node import ProjectV2GQL
-        from ai.backend.manager.api.gql.rbac.types.role import RoleGQL
         from ai.backend.manager.api.gql.session.types import SessionV2GQL
         from ai.backend.manager.api.gql.user.types.node import UserV2GQL
 
@@ -234,10 +227,8 @@ class PermissionGQL(PydanticNodeMixin[PermissionNodeDTO]):
             case RBACElementType.DOMAIN:
                 return await data_loaders.domain_loader.load(self.scope_id)
             case RBACElementType.ROLE:
-                role_data = await data_loaders.role_loader.load(uuid.UUID(self.scope_id))
-                if role_data is None:
-                    return None
-                return RoleGQL.from_dataclass(role_data)
+                # DataLoader already returns RoleGQL | None via from_pydantic conversion
+                return await data_loaders.role_loader.load(uuid.UUID(self.scope_id))
             case RBACElementType.RESOURCE_GROUP:
                 return await data_loaders.resource_group_loader.load(self.scope_id)
             case RBACElementType.MODEL_DEPLOYMENT:
@@ -246,12 +237,8 @@ class PermissionGQL(PydanticNodeMixin[PermissionNodeDTO]):
                     return None
                 return ModelDeployment.from_dataclass(deploy_data)
             case RBACElementType.ARTIFACT_REVISION:
-                rev_data = await data_loaders.artifact_revision_loader.load(
-                    uuid.UUID(self.scope_id)
-                )
-                if rev_data is None:
-                    return None
-                return ArtifactRevision.from_dataclass(rev_data)
+                # DataLoader already returns ArtifactRevision | None via from_pydantic
+                return await data_loaders.artifact_revision_loader.load(uuid.UUID(self.scope_id))
             case RBACElementType.CONTAINER_REGISTRY:
                 cr_data = await data_loaders.container_registry_loader.load(
                     uuid.UUID(self.scope_id)
@@ -293,17 +280,6 @@ class PermissionGQL(PydanticNodeMixin[PermissionNodeDTO]):
                 | RBACElementType.IMAGE_ALIAS
             ):
                 return None
-
-    @classmethod
-    def from_dataclass(cls, data: PermissionData) -> Self:
-        return cls(
-            id=ID(str(data.id)),
-            role_id=data.role_id,
-            scope_type=RBACElementTypeGQL.from_element(data.scope_type.to_element()),
-            scope_id=data.scope_id,
-            entity_type=RBACElementTypeGQL.from_element(data.entity_type.to_element()),
-            operation=OperationTypeGQL.from_internal(data.operation),
-        )
 
     @classmethod
     def from_pydantic(

@@ -51,7 +51,6 @@ from ai.backend.manager.api.gql.decorators import (
 )
 from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
-from ai.backend.manager.data.fair_share.types import DomainFairShareData
 
 from .common import (
     FairShareCalculationSnapshotGQL,
@@ -122,44 +121,6 @@ class DomainFairShareGQL(PydanticNodeMixin[DomainFairShareNode]):
         | None
     ):
         return await info.context.data_loaders.resource_group_loader.load(self.resource_group_name)
-
-    @classmethod
-    def from_dataclass(cls, data: DomainFairShareData) -> DomainFairShareGQL:
-        """Convert DomainFairShareData to GraphQL type.
-
-        No async needed - Repository provides complete data.
-        Note: metadata can be None for default-generated records.
-        """
-        return cls(
-            id=ID(f"{data.resource_group}:{data.domain_name}"),
-            resource_group_name=data.resource_group,
-            domain_name=data.domain_name,
-            spec=FairShareSpecGQL.from_spec(
-                data.data.spec,
-                data.data.use_default,
-                data.data.uses_default_resources,
-            ),
-            calculation_snapshot=FairShareCalculationSnapshotGQL(
-                fair_share_factor=data.data.calculation_snapshot.fair_share_factor,
-                total_decayed_usage=ResourceSlotGQL.from_slot_quantities(
-                    data.data.calculation_snapshot.total_decayed_usage
-                ),
-                normalized_usage=data.data.calculation_snapshot.normalized_usage,
-                lookback_start=data.data.calculation_snapshot.lookback_start,
-                lookback_end=data.data.calculation_snapshot.lookback_end,
-                last_calculated_at=data.data.calculation_snapshot.last_calculated_at,
-            ),
-            created_at=(
-                data.data.metadata.created_at
-                if data.data.metadata
-                else data.data.calculation_snapshot.last_calculated_at
-            ),
-            updated_at=(
-                data.data.metadata.updated_at
-                if data.data.metadata
-                else data.data.calculation_snapshot.last_calculated_at
-            ),
-        )
 
     @classmethod
     def from_pydantic(
