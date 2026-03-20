@@ -9,7 +9,7 @@ from enum import StrEnum
 from typing import TYPE_CHECKING, Annotated, Any, Self, override
 
 import strawberry
-from strawberry import ID, Info
+from strawberry import ID, UNSET, Info
 from strawberry.relay import Connection, Edge, Node, NodeID
 
 from ai.backend.common.data.permission.types import (
@@ -564,9 +564,9 @@ class CreateRoleInput:
 @strawberry.input(description="Added in 26.3.0. Input for updating a role")
 class UpdateRoleInput:
     id: uuid.UUID
-    name: str | None = strawberry.UNSET
-    description: str | None = strawberry.UNSET
-    status: RoleStatusGQL | None = strawberry.UNSET
+    name: str | None = UNSET
+    description: str | None = UNSET
+    status: RoleStatusGQL | None = UNSET
 
     def to_updater(self) -> Updater[RoleRow]:
         spec = RoleUpdaterSpec(
