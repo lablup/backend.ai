@@ -141,6 +141,7 @@ class DeploymentAdapter(BaseFilterAdapter):
             default_deployment_strategy=data.default_deployment_strategy,
             current_revision=current_revision,
             deployment_policy=deployment_policy,
+            sub_step=data.sub_step,
         )
 
     def build_querier(self, request: SearchDeploymentsRequest) -> BatchQuerier:

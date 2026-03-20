@@ -93,7 +93,7 @@ class ScheduleEventHandler:
     ) -> None:
         """Handle deployment lifecycle if needed event (checks marks)."""
         lifecycle_type = DeploymentLifecycleType(ev.lifecycle_type)
-        sub_step = DeploymentLifecycleSubStep(ev.sub_step) if ev.sub_step else None
+        sub_step = DeploymentLifecycleSubStep(ev.sub_step) if ev.sub_step is not None else None
         await self._deployment_coordinator.process_if_needed(lifecycle_type, sub_step)
 
     async def handle_do_deployment_lifecycle(
@@ -101,7 +101,7 @@ class ScheduleEventHandler:
     ) -> None:
         """Handle deployment lifecycle event (unconditional)."""
         lifecycle_type = DeploymentLifecycleType(ev.lifecycle_type)
-        sub_step = DeploymentLifecycleSubStep(ev.sub_step) if ev.sub_step else None
+        sub_step = DeploymentLifecycleSubStep(ev.sub_step) if ev.sub_step is not None else None
         await self._deployment_coordinator.process_deployment_lifecycle(lifecycle_type, sub_step)
 
     async def handle_do_route_lifecycle_if_needed(

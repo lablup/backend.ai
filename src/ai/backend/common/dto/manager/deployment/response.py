@@ -134,6 +134,9 @@ class DeploymentDTO(BaseModel):
     deployment_policy: DeploymentPolicyDTO | None = Field(
         default=None, description="Deployment rollout policy"
     )
+    sub_step: str | None = Field(
+        default=None, description="Current deployment sub-step (e.g. provisioning, rolling_back)"
+    )
 
 
 class CreateDeploymentResponse(BaseResponseModel):

@@ -121,6 +121,10 @@ class RouteStatus(enum.Enum):
     def is_inactive(self) -> bool:
         return self in self.inactive_route_statuses()
 
+    def is_provisioning(self) -> bool:
+        """PROVISIONING or DEGRADED (still warming up, health checks not yet passing)."""
+        return self in (RouteStatus.PROVISIONING, RouteStatus.DEGRADED)
+
     def termination_priority(self) -> int:
         priority_map = {
             RouteStatus.UNHEALTHY: 1,
@@ -561,6 +565,7 @@ class ModelDeploymentData:
     created_user_id: UUID
     policy: DeploymentPolicyData | None = None
     access_token_ids: list[UUID] | None = None
+    sub_step: DeploymentLifecycleSubStep | None = None
 
 
 class DeploymentOrderField(enum.StrEnum):
