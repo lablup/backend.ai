@@ -14,12 +14,14 @@ from ai.backend.common.api_handlers import BaseResponseModel
 from .types import PermissionSummary, RoleSource, RoleStatus
 
 __all__ = (
+    "AssociationScopesEntitiesNode",
     "BulkAssignRoleResultPayload",
     "BulkRevokeRoleResultPayload",
     "BulkRoleOperationFailureInfo",
     "CreateRolePayload",
     "DeletePermissionPayload",
     "DeleteRolePayload",
+    "EntityNode",
     "PermissionNode",
     "PurgeRolePayload",
     "RoleAssignmentNode",
@@ -122,3 +124,22 @@ class PermissionNode(BaseResponseModel):
     scope_id: str = Field(description="Scope element ID")
     entity_type: str = Field(description="Entity element type value (e.g. 'session', 'vfolder')")
     operation: str = Field(description="Operation type value (e.g. 'read', 'create')")
+
+
+class EntityNode(BaseResponseModel):
+    """Node representing an entity reference in the RBAC system."""
+
+    entity_type: str = Field(description="Entity type value (e.g. 'user', 'project')")
+    entity_id: str = Field(description="Entity identifier")
+
+
+class AssociationScopesEntitiesNode(BaseResponseModel):
+    """Node representing an association between a scope and an entity."""
+
+    id: UUID = Field(description="Association ID")
+    scope_type: str = Field(description="Scope element type value")
+    scope_id: str = Field(description="Scope element ID")
+    entity_type: str = Field(description="Entity element type value")
+    entity_id: str = Field(description="Entity identifier")
+    relation_type: str = Field(description="Relation type value")
+    registered_at: datetime = Field(description="Registration timestamp")
