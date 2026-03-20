@@ -17,7 +17,6 @@ from ai.backend.common.events.event_types.session.broadcast import SchedulingBro
 from ai.backend.common.events.hub.hub import EventHub
 from ai.backend.common.types import AgentId
 from ai.backend.logging.utils import BraceStyleAdapter
-from ai.backend.manager.data.deployment.types import DeploymentLifecycleSubStep
 from ai.backend.manager.scheduler.types import ScheduleType
 from ai.backend.manager.sokovan.deployment.coordinator import DeploymentCoordinator
 from ai.backend.manager.sokovan.deployment.route.coordinator import RouteCoordinator
