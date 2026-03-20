@@ -158,7 +158,6 @@ class HandlerRegistry:
                 return sub_step
         raise ValueError(f"Unknown sub-step {raw!r} for lifecycle type {lifecycle_type!r}")
 
-
 @dataclass
 class DeploymentTaskSpec:
     """Specification for a deployment lifecycle periodic task."""
@@ -337,11 +336,8 @@ class DeploymentCoordinator:
     async def process_deployment_lifecycle(
         self,
         lifecycle_type: DeploymentLifecycleType,
-        raw_sub_step: str | None = None,
+        sub_step: DeploymentLifecycleSubStep | None = None,
     ) -> None:
-        sub_step = (
-            self._registry.resolve_sub_step(lifecycle_type, raw_sub_step) if raw_sub_step else None
-        )
         handler = self._registry.handlers.get((lifecycle_type, sub_step))
         if handler is None:
             log.warning(
