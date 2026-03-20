@@ -725,6 +725,18 @@ class DeploymentRepository:
         """
         return await self._db_source.fetch_deployment_context(deployment_info, revision_id)
 
+    @deployment_repository_resilience.apply()
+    async def fetch_deployment_context_from_endpoint(
+        self,
+        deployment_info: DeploymentInfo,
+    ) -> DeploymentContext:
+        """Fetch deployment context using endpoint-level fields as image source.
+
+        Used when no revision exists yet (e.g., newly created deployments
+        before any revision is explicitly added/activated).
+        """
+        return await self._db_source.fetch_deployment_context_from_endpoint(deployment_info)
+
     # Auto-scaling operations
 
     @deployment_repository_resilience.apply()

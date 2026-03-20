@@ -1893,6 +1893,100 @@ class DeploymentDBSource:
                 ),
             )
 
+    async def fetch_deployment_context_from_endpoint(
+        self,
+        deployment_info: DeploymentInfo,
+    ) -> DeploymentContext:
+        """Fetch deployment context using endpoint-level fields as image source.
+
+        Used when no revision exists yet (e.g., newly created deployments
+        before any revision is explicitly added/activated).
+        """
+        async with self._begin_readonly_session_read_committed() as db_sess:
+            created_user_query = (
+                sa.select(UserRow, keypairs.c.access_key)
+                .select_from(sa.join(UserRow, keypairs, UserRow.uuid == keypairs.c.user))
+                .where(UserRow.uuid == deployment_info.metadata.created_user)
+            )
+            created_user_result = await db_sess.execute(created_user_query)
+            created_user_row = created_user_result.first()
+            if not created_user_row:
+                raise UserNotFoundInDeployment(
+                    f"Created user {deployment_info.metadata.created_user} not found"
+                )
+
+            if deployment_info.metadata.session_owner != deployment_info.metadata.created_user:
+                session_owner_query = (
+                    sa.select(UserRow, keypairs.c.access_key)
+                    .select_from(sa.join(UserRow, keypairs, UserRow.uuid == keypairs.c.user))
+                    .where(UserRow.uuid == deployment_info.metadata.session_owner)
+                )
+                session_owner_result = await db_sess.execute(session_owner_query)
+                session_owner_row = session_owner_result.first()
+                if not session_owner_row:
+                    raise UserNotFoundInDeployment(
+                        f"Session owner {deployment_info.metadata.session_owner} not found"
+                    )
+            else:
+                session_owner_row = created_user_row
+
+            _owner_uuid, group_id, resource_policy = await query_userinfo_from_session(
+                db_sess,
+                created_user_row.UserRow.uuid,
+                AccessKey(created_user_row.access_key),
+                created_user_row.UserRow.role,
+                created_user_row.UserRow.domain_name,
+                None,
+                deployment_info.metadata.domain,
+                deployment_info.metadata.project,
+                query_on_behalf_of=AccessKey(session_owner_row.access_key)
+                if session_owner_row != created_user_row
+                else None,
+            )
+
+            endpoint_query = (
+                sa.select(EndpointRow)
+                .where(EndpointRow.id == deployment_info.id)
+                .options(selectinload(EndpointRow.image_row))
+            )
+            endpoint_result = await db_sess.execute(endpoint_query)
+            endpoint_row = endpoint_result.scalar_one_or_none()
+            if endpoint_row is None or endpoint_row.image_row is None:
+                raise DeploymentHasNoTargetRevision(
+                    f"Endpoint {deployment_info.id} not found or has no image"
+                )
+            image_identifier = ImageIdentifier(
+                canonical=endpoint_row.image_row.name,
+                architecture=endpoint_row.image_row.architecture,
+            )
+            image_row = await ImageRow.resolve(db_sess, [image_identifier])
+
+            return DeploymentContext(
+                created_user=UserContext(
+                    uuid=created_user_row.UserRow.uuid,
+                    access_key=AccessKey(created_user_row.access_key),
+                    role=str(created_user_row.UserRow.role),
+                    sudo_session_enabled=created_user_row.UserRow.sudo_session_enabled or False,
+                ),
+                session_owner=UserContext(
+                    uuid=session_owner_row.UserRow.uuid,
+                    access_key=AccessKey(session_owner_row.access_key),
+                    role=str(session_owner_row.UserRow.role),
+                    sudo_session_enabled=session_owner_row.UserRow.sudo_session_enabled or False,
+                ),
+                container_user=ContainerUserContext(
+                    uid=session_owner_row.UserRow.container_uid,
+                    main_gid=session_owner_row.UserRow.container_main_gid,
+                    supplementary_gids=session_owner_row.UserRow.container_gids or [],
+                ),
+                group_id=group_id,
+                resource_policy=dict(resource_policy),
+                image=ImageContext(
+                    ref=image_row.image_ref,
+                    labels=image_row.labels or {},
+                ),
+            )
+
     async def fetch_session_statuses_by_route_ids(
         self,
         route_ids: set[uuid.UUID],

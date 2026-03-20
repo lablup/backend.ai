@@ -18,7 +18,6 @@ from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.deployment.types import DeploymentInfo, RouteStatus
 from ai.backend.manager.errors.deployment import (
-    DeploymentHasNoTargetRevision,
     EndpointNotFound,
     RouteSessionNotFound,
     RouteSessionTerminated,
@@ -404,16 +403,20 @@ class RouteExecutor:
                     or deployment.deploying_revision_id
                     or deployment.current_revision_id
                 )
-                if target_revision_id is None:
-                    raise DeploymentHasNoTargetRevision(
-                        "Deployment has no revision for image resolution"
-                    )
 
-                # Fetch deployment context with all necessary data
-                deployment_context = await self._deployment_repo.fetch_deployment_context(
-                    deployment,
-                    revision_id=target_revision_id,
-                )
+                # Fetch deployment context — fall back to endpoint-level fields
+                # when no revision exists (e.g., first deployment before activate_revision).
+                if target_revision_id is not None:
+                    deployment_context = await self._deployment_repo.fetch_deployment_context(
+                        deployment,
+                        revision_id=target_revision_id,
+                    )
+                else:
+                    deployment_context = (
+                        await self._deployment_repo.fetch_deployment_context_from_endpoint(
+                            deployment,
+                        )
+                    )
 
                 # Create session with full context
                 return await self._scheduling_controller.enqueue_session(
