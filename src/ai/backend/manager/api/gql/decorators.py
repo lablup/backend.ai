@@ -24,6 +24,7 @@ import strawberry
 import strawberry.experimental.pydantic
 from pydantic import BaseModel
 from strawberry.experimental.pydantic.conversion_types import StrawberryTypeFromPydantic
+from strawberry.schema_directives import OneOf
 from strawberry.types.field import StrawberryField
 from strawberry.types.field import field as strawberry_field
 
@@ -111,6 +112,7 @@ def gql_pydantic_input[PydanticModel: BaseModel](
     directives: Sequence[object] = (),
     use_pydantic_alias: bool = True,
     description: str | None = None,
+    one_of: bool = False,
 ) -> Callable[..., type[StrawberryTypeFromPydantic[PydanticModel]]]:
     """Decorator for GQL input types backed by a v2 Pydantic DTO.
 
@@ -120,11 +122,16 @@ def gql_pydantic_input[PydanticModel: BaseModel](
 
     The description param is accepted for backward compatibility but the
     canonical description is always built from BackendAIGQLMeta.
+
+    When one_of=True, injects the @oneOf directive so exactly one field must
+    be provided (mirrors @strawberry.input(one_of=True) behaviour).
     """
     desc = f"Added in {meta.added_version}. {meta.description or (description or '')}"
     if meta.deprecated_version is not None:
         hint = f" Use {meta.deprecation_hint}." if meta.deprecation_hint else ""
         desc += f" Deprecated since {meta.deprecated_version}.{hint}"
+    if one_of:
+        directives = (*directives, OneOf())
     return strawberry.experimental.pydantic.input(
         model=model,
         fields=fields,

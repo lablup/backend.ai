@@ -474,9 +474,10 @@ class NotificationChannelTypeFilterGQL:
         )
 
 
-@strawberry.input(
+@gql_pydantic_input(
+    BackendAIGQLMeta(description="Filter for notification channels", added_version="24.09.0"),
+    model=NotificationChannelFilterDTO,
     name="NotificationChannelFilter",
-    description="Added in 24.09.0. Filter for notification channels",
 )
 class NotificationChannelFilter:
     name: StringFilter | None = None
@@ -556,9 +557,10 @@ class NotificationRuleTypeFilterGQL:
         )
 
 
-@strawberry.input(
+@gql_pydantic_input(
+    BackendAIGQLMeta(description="Filter for notification rules", added_version="24.09.0"),
+    model=NotificationRuleFilterDTO,
     name="NotificationRuleFilter",
-    description="Added in 24.09.0. Filter for notification rules",
 )
 class NotificationRuleFilter:
     name: StringFilter | None = None
@@ -723,6 +725,7 @@ class EmailSpecInput:
     ),
     model=NotificationChannelSpecInputDTO,
     name="NotificationChannelSpecInput",
+    one_of=True,
 )
 class NotificationChannelSpecInput:
     webhook: WebhookSpecInput | None = UNSET
@@ -909,11 +912,11 @@ class UpdateNotificationChannelPayload:
 class DeleteNotificationChannelPayload:
     """Payload for notification channel deletion mutation."""
 
-    id: uuid.UUID = strawberry.field(description="ID of the deleted notification channel.")
+    id: ID = strawberry.field(description="ID of the deleted notification channel.")
 
     @classmethod
     def from_pydantic(cls, instance: DeleteNotificationChannelPayloadDTO) -> Self:
-        return cls(id=instance.id)
+        return cls(id=ID(str(instance.id)))
 
 
 @gql_node_type(
@@ -951,11 +954,11 @@ class UpdateNotificationRulePayload:
 class DeleteNotificationRulePayload:
     """Payload for notification rule deletion mutation."""
 
-    id: uuid.UUID = strawberry.field(description="ID of the deleted notification rule.")
+    id: ID = strawberry.field(description="ID of the deleted notification rule.")
 
     @classmethod
     def from_pydantic(cls, instance: DeleteNotificationRulePayloadDTO) -> Self:
-        return cls(id=instance.id)
+        return cls(id=ID(str(instance.id)))
 
 
 # Validate mutations
@@ -987,13 +990,11 @@ class ValidateNotificationChannelInput:
 class ValidateNotificationChannelPayload:
     """Payload for notification channel validation mutation."""
 
-    channel_id: uuid.UUID = strawberry.field(
-        description="ID of the validated notification channel."
-    )
+    id: ID = strawberry.field(description="ID of the validated notification channel.")
 
     @classmethod
     def from_pydantic(cls, instance: ValidateNotificationChannelPayloadDTO) -> Self:
-        return cls(channel_id=instance.channel_id)
+        return cls(id=ID(str(instance.channel_id)))
 
 
 @gql_pydantic_input(

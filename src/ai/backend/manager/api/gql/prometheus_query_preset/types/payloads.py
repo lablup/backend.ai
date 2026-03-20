@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any, Self
 
 import strawberry
+from strawberry import ID
 
 from ai.backend.common.dto.manager.v2.prometheus_query_preset.response import (
     DeleteQueryDefinitionPayload as DeleteQueryDefinitionPayloadDTO,
@@ -138,8 +139,8 @@ class QueryDefinitionResultGQL:
 class DeleteQueryDefinitionPayload:
     """Payload for query definition deletion mutation."""
 
-    id: str = strawberry.field(description="Deleted query definition ID.")
+    id: ID = strawberry.field(description="Deleted query definition ID.")
 
     @classmethod
     def from_pydantic(cls, dto: DeleteQueryDefinitionPayloadDTO) -> Self:
-        return cls(id=str(dto.id))
+        return cls(id=ID(str(dto.id)))

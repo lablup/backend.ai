@@ -461,9 +461,10 @@ class RoleStatusFilterGQL:
         )
 
 
-@strawberry.input(
+@gql_pydantic_input(
+    BackendAIGQLMeta(description="Filter for roles", added_version="26.3.0"),
+    model=RoleFilterDTO,
     name="RoleFilter",
-    description="Added in 26.3.0. Filter for roles",
 )
 class RoleFilter(GQLFilter):
     name: StringFilter | None = None
@@ -551,9 +552,13 @@ class RoleFilter(GQLFilter):
 # TODO: Add user_id filter (requires AssignedUserConditions.by_user_id)
 
 
-@strawberry.input(
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description="Nested filter for roles within a role assignment. Filters assignments that have a role matching all specified conditions.",
+        added_version="26.3.0",
+    ),
+    model=RoleNestedFilterDTO,
     name="RoleAssignmentRoleNestedFilter",
-    description="Added in 26.3.0. Nested filter for roles within a role assignment. Filters assignments that have a role matching all specified conditions.",
 )
 class RoleAssignmentRoleNestedFilterGQL:
     name: StringFilter | None = None
@@ -641,9 +646,10 @@ class RoleAssignmentRoleNestedFilterGQL:
         return conditions
 
 
-@strawberry.input(
+@gql_pydantic_input(
+    BackendAIGQLMeta(description="Filter for role assignments", added_version="26.3.0"),
+    model=RoleAssignmentFilterDTO,
     name="RoleAssignmentFilter",
-    description="Added in 26.3.0. Filter for role assignments",
 )
 class RoleAssignmentFilter(GQLFilter):
     role_id: uuid.UUID | None = None
@@ -922,11 +928,11 @@ class PurgeRoleInput:
 class DeleteRolePayload:
     """Payload for role soft-deletion mutation."""
 
-    id: uuid.UUID = strawberry.field(description="ID of the deleted role.")
+    id: ID = strawberry.field(description="ID of the deleted role.")
 
     @classmethod
     def from_pydantic(cls, instance: DeleteRolePayloadDTO) -> Self:
-        return cls(id=instance.id)
+        return cls(id=ID(str(instance.id)))
 
 
 @gql_node_type(
@@ -936,11 +942,11 @@ class DeleteRolePayload:
 class PurgeRolePayload:
     """Payload for role purge mutation."""
 
-    id: uuid.UUID = strawberry.field(description="ID of the purged role.")
+    id: ID = strawberry.field(description="ID of the purged role.")
 
     @classmethod
     def from_pydantic(cls, instance: PurgeRolePayloadDTO) -> Self:
-        return cls(id=instance.id)
+        return cls(id=ID(str(instance.id)))
 
 
 @gql_node_type(

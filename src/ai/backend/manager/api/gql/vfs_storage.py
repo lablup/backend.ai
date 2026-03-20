@@ -205,17 +205,21 @@ class UpdateVFSStoragePayload:
     vfs_storage: VFSStorage
 
 
-@gql_pydantic_type(
+@gql_node_type(
     BackendAIGQLMeta(
         added_version="25.16.0",
         description="Payload for deleting VFS storage.",
     ),
-    model=DeleteVFSStoragePayloadDTO,
+    name="DeleteVFSStoragePayload",
 )
 class DeleteVFSStoragePayload:
     """Payload for VFS storage deletion mutation."""
 
-    id: strawberry.auto
+    id: ID = strawberry.field(description="ID of the deleted VFS storage.")
+
+    @classmethod
+    def from_pydantic(cls, instance: DeleteVFSStoragePayloadDTO) -> Self:
+        return cls(id=ID(str(instance.id)))
 
 
 @strawberry.mutation(  # type: ignore[misc]
@@ -243,4 +247,4 @@ async def delete_vfs_storage(
     input: DeleteVFSStorageInput, info: Info[StrawberryGQLContext]
 ) -> DeleteVFSStoragePayload:
     result = await info.context.adapters.vfs_storage.delete(input.to_pydantic())
-    return DeleteVFSStoragePayload(id=result.id)
+    return DeleteVFSStoragePayload.from_pydantic(result)

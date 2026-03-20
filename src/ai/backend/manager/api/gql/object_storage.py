@@ -316,15 +316,19 @@ class UpdateObjectStoragePayload:
     object_storage: ObjectStorage
 
 
-@gql_pydantic_type(
+@gql_node_type(
     BackendAIGQLMeta(
         added_version="25.14.0",
         description="Payload for deleting an object storage.",
     ),
-    model=DeleteObjectStoragePayloadDTO,
+    name="DeleteObjectStoragePayload",
 )
 class DeleteObjectStoragePayload:
-    id: strawberry.auto
+    id: ID = strawberry.field(description="ID of the deleted object storage.")
+
+    @classmethod
+    def from_pydantic(cls, instance: DeleteObjectStoragePayloadDTO) -> Self:
+        return cls(id=ID(str(instance.id)))
 
 
 @gql_pydantic_type(
@@ -386,7 +390,7 @@ async def delete_object_storage(
 ) -> DeleteObjectStoragePayload:
     pydantic_input = input.to_pydantic()
     result = await info.context.adapters.object_storage.delete(pydantic_input)
-    return DeleteObjectStoragePayload(id=result.id)
+    return DeleteObjectStoragePayload.from_pydantic(result)
 
 
 @strawberry.mutation(description="Added in 25.14.0")  # type: ignore[misc]

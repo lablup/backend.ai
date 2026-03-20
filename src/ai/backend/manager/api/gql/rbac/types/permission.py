@@ -332,9 +332,10 @@ class PermissionGQL(PydanticNodeMixin[PermissionNodeDTO]):
 # ==================== Filter Types ====================
 
 
-@strawberry.input(
+@gql_pydantic_input(
+    BackendAIGQLMeta(description="Filter for scoped permissions", added_version="26.3.0"),
+    model=PermissionFilterDTO,
     name="PermissionFilter",
-    description="Added in 26.3.0. Filter for scoped permissions",
 )
 class PermissionFilter(GQLFilter):
     role_id: uuid.UUID | None = None
@@ -490,11 +491,11 @@ class DeletePermissionInput:
 class DeletePermissionPayload:
     """Payload for permission deletion mutation."""
 
-    id: uuid.UUID = strawberry.field(description="ID of the deleted permission.")
+    id: ID = strawberry.field(description="ID of the deleted permission.")
 
     @classmethod
     def from_pydantic(cls, instance: DeletePermissionPayloadDTO) -> Self:
-        return cls(id=instance.id)
+        return cls(id=ID(str(instance.id)))
 
 
 # ==================== Connection Types ====================
