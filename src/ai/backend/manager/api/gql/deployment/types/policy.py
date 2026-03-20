@@ -122,7 +122,7 @@ class DeploymentPolicyGQL(PydanticNodeMixin[Any]):
                 )
 
     @classmethod
-    def from_pydantic(  # type: ignore[override]
+    def from_pydantic(
         cls,
         dto: DeploymentPolicyNodeDTO,
         extra: dict[str, Any] | None = None,
@@ -171,6 +171,12 @@ class RollingUpdateConfigInputGQL:
     max_surge: int = 1
     max_unavailable: int = 0
 
+    def to_pydantic(self) -> RollingUpdateConfigInputDTO:
+        return RollingUpdateConfigInputDTO(
+            max_surge=self.max_surge,
+            max_unavailable=self.max_unavailable,
+        )
+
 
 @gql_pydantic_input(
     BackendAIGQLMeta(
@@ -182,6 +188,12 @@ class RollingUpdateConfigInputGQL:
 class BlueGreenConfigInputGQL:
     auto_promote: bool = False
     promote_delay_seconds: int = 0
+
+    def to_pydantic(self) -> BlueGreenConfigInputDTO:
+        return BlueGreenConfigInputDTO(
+            auto_promote=self.auto_promote,
+            promote_delay_seconds=self.promote_delay_seconds,
+        )
 
 
 # ========== Mutation Input/Payload Types ==========

@@ -20,7 +20,7 @@ class TestOrderDirection:
 
     def test_all_values_present(self) -> None:
         values = {e.value for e in OrderDirection}
-        assert values == {"asc", "desc"}
+        assert values == {"ASC", "DESC"}
 
 
 class TestResourceSlotTypeOrderField:

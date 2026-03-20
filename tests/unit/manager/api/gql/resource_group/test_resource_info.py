@@ -25,9 +25,6 @@ from ai.backend.manager.api.gql.resource_group.types import (
 from ai.backend.manager.data.scaling_group.types import ResourceInfo
 from ai.backend.manager.errors.resource import ScalingGroupNotFound
 from ai.backend.manager.models.scaling_group.types import FairShareScalingGroupSpec
-from ai.backend.manager.services.scaling_group.actions.get_resource_info import (
-    GetResourceInfoActionResult,
-)
 
 
 class TestResourceSlotGQLNormalization:
@@ -195,17 +192,10 @@ class TestResourceGroupGQLResourceInfoResolver:
     """Tests for ResourceGroupGQL.resource_info resolver."""
 
     @pytest.fixture
-    def mock_get_resource_info_processor(self) -> AsyncMock:
-        """Create mock get_resource_info ActionProcessor."""
-        return AsyncMock()
-
-    @pytest.fixture
-    def mock_context(self, mock_get_resource_info_processor: AsyncMock) -> MagicMock:
-        """Create mock GraphQL context with processors."""
+    def mock_context(self) -> MagicMock:
+        """Create mock GraphQL context with adapter."""
         context = MagicMock()
-        context.processors = MagicMock()
-        context.processors.scaling_group = MagicMock()
-        context.processors.scaling_group.get_resource_info = mock_get_resource_info_processor
+        context.adapters.resource_group.get_resource_info = AsyncMock()
         return context
 
     @pytest.fixture
@@ -259,41 +249,34 @@ class TestResourceGroupGQLResourceInfoResolver:
             free=[SlotQuantity("cpu", Decimal("3")), SlotQuantity("mem", Decimal("6442450944"))],
         )
 
-    async def test_resolver_calls_processor_with_correct_action(
+    async def test_resolver_calls_adapter_with_correct_name(
         self,
         resource_group_gql: ResourceGroupGQL,
         mock_info: MagicMock,
-        mock_get_resource_info_processor: AsyncMock,
+        mock_context: MagicMock,
         sample_resource_info: ResourceInfo,
     ) -> None:
-        """Test that resolver calls processor with correct action."""
+        """Test that resolver calls adapter with correct scaling group name."""
         # Given
-        mock_get_resource_info_processor.wait_for_complete.return_value = (
-            GetResourceInfoActionResult(resource_info=sample_resource_info)
-        )
+        mock_context.adapters.resource_group.get_resource_info.return_value = sample_resource_info
 
         # When
         result = await resource_group_gql.resource_info(info=mock_info)
 
         # Then
-        mock_get_resource_info_processor.wait_for_complete.assert_called_once()
-        call_args = mock_get_resource_info_processor.wait_for_complete.call_args
-        action = call_args[0][0]
-        assert action.scaling_group == "test-group"
+        mock_context.adapters.resource_group.get_resource_info.assert_called_once_with("test-group")
         assert isinstance(result, ResourceInfoGQL)
 
     async def test_resolver_returns_converted_gql_type(
         self,
         resource_group_gql: ResourceGroupGQL,
         mock_info: MagicMock,
-        mock_get_resource_info_processor: AsyncMock,
+        mock_context: MagicMock,
         sample_resource_info: ResourceInfo,
     ) -> None:
         """Test that resolver returns properly converted ResourceInfoGQL."""
         # Given
-        mock_get_resource_info_processor.wait_for_complete.return_value = (
-            GetResourceInfoActionResult(resource_info=sample_resource_info)
-        )
+        mock_context.adapters.resource_group.get_resource_info.return_value = sample_resource_info
 
         # When
         result = await resource_group_gql.resource_info(info=mock_info)
@@ -317,11 +300,11 @@ class TestResourceGroupGQLResourceInfoResolver:
         self,
         resource_group_gql: ResourceGroupGQL,
         mock_info: MagicMock,
-        mock_get_resource_info_processor: AsyncMock,
+        mock_context: MagicMock,
     ) -> None:
         """Test that ScalingGroupNotFound exception propagates correctly."""
         # Given
-        mock_get_resource_info_processor.wait_for_complete.side_effect = ScalingGroupNotFound(
+        mock_context.adapters.resource_group.get_resource_info.side_effect = ScalingGroupNotFound(
             "test-group"
         )
 

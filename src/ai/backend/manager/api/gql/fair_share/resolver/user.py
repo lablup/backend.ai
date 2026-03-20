@@ -50,7 +50,7 @@ async def admin_user_fair_share(
             user_uuid=user_uuid,
         )
     )
-    return UserFairShareGQL.from_pydantic(result.item)
+    return UserFairShareGQL.from_pydantic(result.item) if result.item is not None else None
 
 
 @strawberry.field(description="Added in 26.2.0. List user fair shares (admin only).")  # type: ignore[misc]
@@ -118,7 +118,7 @@ async def rg_user_fair_share(
             user_uuid=user_uuid,
         )
     )
-    return UserFairShareGQL.from_pydantic(result.item)
+    return UserFairShareGQL.from_pydantic(result.item) if result.item is not None else None
 
 
 @strawberry.field(  # type: ignore[misc]
@@ -199,7 +199,7 @@ async def user_fair_share(
             user_uuid=user_uuid,
         )
     )
-    return UserFairShareGQL.from_pydantic(result.item)
+    return UserFairShareGQL.from_pydantic(result.item) if result.item is not None else None
 
 
 @strawberry.field(  # type: ignore[misc]

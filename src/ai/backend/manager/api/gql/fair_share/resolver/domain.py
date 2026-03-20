@@ -43,7 +43,7 @@ async def admin_domain_fair_share(
     result = await info.context.adapters.fair_share.get_domain(
         GetDomainFairShareInput(resource_group=resource_group_name, domain_name=domain_name)
     )
-    return DomainFairShareGQL.from_pydantic(result.item)
+    return DomainFairShareGQL.from_pydantic(result.item) if result.item is not None else None
 
 
 @strawberry.field(description="Added in 26.2.0. List domain fair shares (admin only).")  # type: ignore[misc]
@@ -107,7 +107,7 @@ async def rg_domain_fair_share(
     result = await info.context.adapters.fair_share.get_domain(
         GetDomainFairShareInput(resource_group=scope.resource_group_name, domain_name=domain_name)
     )
-    return DomainFairShareGQL.from_pydantic(result.item)
+    return DomainFairShareGQL.from_pydantic(result.item) if result.item is not None else None
 
 
 @strawberry.field(  # type: ignore[misc]
@@ -181,7 +181,7 @@ async def domain_fair_share(
     result = await info.context.adapters.fair_share.get_domain(
         GetDomainFairShareInput(resource_group=resource_group_name, domain_name=domain_name)
     )
-    return DomainFairShareGQL.from_pydantic(result.item)
+    return DomainFairShareGQL.from_pydantic(result.item) if result.item is not None else None
 
 
 @strawberry.field(  # type: ignore[misc]

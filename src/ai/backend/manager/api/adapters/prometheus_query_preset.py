@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from typing import cast
 from uuid import UUID
 
 from ai.backend.common.api_handlers import Sentinel
@@ -152,7 +151,7 @@ class PrometheusQueryPresetAdapter(BaseAdapter):
                 )
             )
         )
-        return cast(PrometheusResponse, action_result.response)
+        return action_result.response
 
     async def delete(self, input: DeleteQueryDefinitionInput) -> DeleteQueryDefinitionPayload:
         """Delete a query definition by ID."""

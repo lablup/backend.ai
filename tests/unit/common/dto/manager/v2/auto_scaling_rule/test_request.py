@@ -180,8 +180,12 @@ class TestCreateAutoScalingRuleInput:
 class TestUpdateAutoScalingRuleInput:
     """Tests for UpdateAutoScalingRuleInput SENTINEL handling."""
 
-    def test_default_sentinel_fields(self) -> None:
-        req = UpdateAutoScalingRuleInput()
+    @pytest.fixture
+    def rule_id(self) -> uuid.UUID:
+        return uuid.UUID("00000000-0000-0000-0000-000000000001")
+
+    def test_default_sentinel_fields(self, rule_id: uuid.UUID) -> None:
+        req = UpdateAutoScalingRuleInput(id=rule_id)
         assert req.min_threshold is SENTINEL
         assert isinstance(req.min_threshold, Sentinel)
         assert req.max_threshold is SENTINEL
@@ -191,43 +195,46 @@ class TestUpdateAutoScalingRuleInput:
         assert req.max_replicas is SENTINEL
         assert isinstance(req.max_replicas, Sentinel)
 
-    def test_none_for_non_sentinel_fields_means_no_change(self) -> None:
-        req = UpdateAutoScalingRuleInput()
+    def test_none_for_non_sentinel_fields_means_no_change(self, rule_id: uuid.UUID) -> None:
+        req = UpdateAutoScalingRuleInput(id=rule_id)
         assert req.metric_source is None
         assert req.metric_name is None
         assert req.step_size is None
         assert req.time_window is None
 
-    def test_set_min_threshold_to_none_clears_field(self) -> None:
-        req = UpdateAutoScalingRuleInput(min_threshold=None)
+    def test_set_min_threshold_to_none_clears_field(self, rule_id: uuid.UUID) -> None:
+        req = UpdateAutoScalingRuleInput(id=rule_id, min_threshold=None)
         assert req.min_threshold is None
 
-    def test_set_min_threshold_to_value(self) -> None:
-        req = UpdateAutoScalingRuleInput(min_threshold=Decimal("0.3"))
+    def test_set_min_threshold_to_value(self, rule_id: uuid.UUID) -> None:
+        req = UpdateAutoScalingRuleInput(id=rule_id, min_threshold=Decimal("0.3"))
         assert req.min_threshold == Decimal("0.3")
 
-    def test_set_max_threshold_to_none_clears_field(self) -> None:
-        req = UpdateAutoScalingRuleInput(max_threshold=None)
+    def test_set_max_threshold_to_none_clears_field(self, rule_id: uuid.UUID) -> None:
+        req = UpdateAutoScalingRuleInput(id=rule_id, max_threshold=None)
         assert req.max_threshold is None
 
-    def test_set_min_replicas_to_none_clears_field(self) -> None:
-        req = UpdateAutoScalingRuleInput(min_replicas=None)
+    def test_set_min_replicas_to_none_clears_field(self, rule_id: uuid.UUID) -> None:
+        req = UpdateAutoScalingRuleInput(id=rule_id, min_replicas=None)
         assert req.min_replicas is None
 
-    def test_set_max_replicas_to_value(self) -> None:
-        req = UpdateAutoScalingRuleInput(max_replicas=5)
+    def test_set_max_replicas_to_value(self, rule_id: uuid.UUID) -> None:
+        req = UpdateAutoScalingRuleInput(id=rule_id, max_replicas=5)
         assert req.max_replicas == 5
 
-    def test_update_metric_source(self) -> None:
-        req = UpdateAutoScalingRuleInput(metric_source=AutoScalingMetricSource.INFERENCE_FRAMEWORK)
+    def test_update_metric_source(self, rule_id: uuid.UUID) -> None:
+        req = UpdateAutoScalingRuleInput(
+            id=rule_id, metric_source=AutoScalingMetricSource.INFERENCE_FRAMEWORK
+        )
         assert req.metric_source == AutoScalingMetricSource.INFERENCE_FRAMEWORK
 
-    def test_update_step_size(self) -> None:
-        req = UpdateAutoScalingRuleInput(step_size=3)
+    def test_update_step_size(self, rule_id: uuid.UUID) -> None:
+        req = UpdateAutoScalingRuleInput(id=rule_id, step_size=3)
         assert req.step_size == 3
 
-    def test_round_trip_with_none_values(self) -> None:
+    def test_round_trip_with_none_values(self, rule_id: uuid.UUID) -> None:
         req = UpdateAutoScalingRuleInput(
+            id=rule_id,
             metric_source=None,
             metric_name=None,
             min_threshold=None,
@@ -245,8 +252,9 @@ class TestUpdateAutoScalingRuleInput:
         assert restored.min_replicas is None
         assert restored.max_replicas is None
 
-    def test_round_trip_with_decimal_threshold(self) -> None:
+    def test_round_trip_with_decimal_threshold(self, rule_id: uuid.UUID) -> None:
         req = UpdateAutoScalingRuleInput(
+            id=rule_id,
             min_threshold=Decimal("0.25"),
             max_threshold=Decimal("0.75"),
             step_size=None,

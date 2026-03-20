@@ -45,7 +45,7 @@ async def admin_project_fair_share(
     result = await info.context.adapters.fair_share.get_project(
         GetProjectFairShareInput(resource_group=resource_group_name, project_id=project_id)
     )
-    return ProjectFairShareGQL.from_pydantic(result.item)
+    return ProjectFairShareGQL.from_pydantic(result.item) if result.item is not None else None
 
 
 @strawberry.field(description="Added in 26.2.0. List project fair shares (admin only).")  # type: ignore[misc]
@@ -109,7 +109,7 @@ async def rg_project_fair_share(
     result = await info.context.adapters.fair_share.get_project(
         GetProjectFairShareInput(resource_group=scope.resource_group_name, project_id=project_id)
     )
-    return ProjectFairShareGQL.from_pydantic(result.item)
+    return ProjectFairShareGQL.from_pydantic(result.item) if result.item is not None else None
 
 
 @strawberry.field(  # type: ignore[misc]
@@ -184,7 +184,7 @@ async def project_fair_share(
     result = await info.context.adapters.fair_share.get_project(
         GetProjectFairShareInput(resource_group=resource_group_name, project_id=project_id)
     )
-    return ProjectFairShareGQL.from_pydantic(result.item)
+    return ProjectFairShareGQL.from_pydantic(result.item) if result.item is not None else None
 
 
 @strawberry.field(  # type: ignore[misc]

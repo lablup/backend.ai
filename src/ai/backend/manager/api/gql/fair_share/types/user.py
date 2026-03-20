@@ -513,6 +513,15 @@ class UpsertUserFairShareWeightInput:
         ),
     )
 
+    def to_pydantic(self) -> UpsertUserFairShareWeightInputDTO:
+        return UpsertUserFairShareWeightInputDTO(
+            resource_group_name=self.resource_group_name,
+            project_id=self.project_id,
+            user_uuid=self.user_uuid,
+            domain_name=self.domain_name,
+            weight=self.weight,
+        )
+
 
 @gql_node_type(
     BackendAIGQLMeta(
@@ -575,6 +584,20 @@ class BulkUpsertUserFairShareWeightInput:
         description="List of user weight updates to apply."
     )
 
+    def to_pydantic(self) -> BulkUpsertUserFairShareWeightInputDTO:
+        return BulkUpsertUserFairShareWeightInputDTO(
+            resource_group_name=self.resource_group_name,
+            inputs=[
+                UserWeightEntryInputDTO(
+                    user_uuid=item.user_uuid,
+                    project_id=item.project_id,
+                    domain_name=item.domain_name,
+                    weight=item.weight,
+                )
+                for item in self.inputs
+            ],
+        )
+
 
 @gql_pydantic_type(
     BackendAIGQLMeta(
@@ -588,3 +611,11 @@ class BulkUpsertUserFairShareWeightPayload:
     """Payload for bulk user fair share weight upsert mutation."""
 
     upserted_count: int = strawberry.field(description="Number of records upserted")
+
+    @classmethod
+    def from_pydantic(
+        cls,
+        instance: BulkUpsertUserFairShareWeightPayloadDTO,
+        extra: dict[str, Any] | None = None,
+    ) -> Self:
+        return cls(upserted_count=instance.upserted_count)
