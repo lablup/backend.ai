@@ -70,7 +70,11 @@ class AutoScalingMetricSource(StrEnum):
     INFERENCE_FRAMEWORK = "INFERENCE_FRAMEWORK"
 
 
-@strawberry.input(name="AutoScalingRuleFilter", description="Added in 25.19.0.")
+@gql_pydantic_input(
+    BackendAIGQLMeta(description="", added_version="25.19.0"),
+    model=AutoScalingRuleFilterDTO,
+    name="AutoScalingRuleFilter",
+)
 class AutoScalingRuleFilter:
     """Filter for auto-scaling rules."""
 
@@ -104,7 +108,7 @@ class AutoScalingRuleOrderBy:
     def to_pydantic(self) -> AutoScalingRuleOrderDTO:
         return AutoScalingRuleOrderDTO(
             field=DTOAutoScalingRuleOrderField(self.field.value.lower()),
-            direction=DTOOrderDirection(self.direction.value.lower()),
+            direction=DTOOrderDirection(self.direction.value),
         )
 
 
@@ -243,22 +247,20 @@ class CreateAutoScalingRuleInput:
         )
 
 
-@gql_pydantic_input(
-    BackendAIGQLMeta(
-        description="Input for updating an auto-scaling rule.", added_version="25.19.0"
-    ),
-    model=UpdateAutoScalingRuleInputDTO,
+@strawberry.input(
+    name="UpdateAutoScalingRuleInput",
+    description="Added in 25.19.0. Input for updating an auto-scaling rule.",
 )
 class UpdateAutoScalingRuleInput:
     id: ID
-    metric_source: AutoScalingMetricSource | None
-    metric_name: str | None
-    min_threshold: Decimal | None
-    max_threshold: Decimal | None
-    step_size: int | None
-    time_window: int | None
-    min_replicas: int | None
-    max_replicas: int | None
+    metric_source: AutoScalingMetricSource | None = None
+    metric_name: str | None = None
+    min_threshold: Decimal | None = None
+    max_threshold: Decimal | None = None
+    step_size: int | None = None
+    time_window: int | None = None
+    min_replicas: int | None = None
+    max_replicas: int | None = None
 
     def to_pydantic(self) -> UpdateAutoScalingRuleInputDTO:
         return UpdateAutoScalingRuleInputDTO(

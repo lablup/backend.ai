@@ -48,7 +48,11 @@ from ai.backend.manager.data.deployment.types import (
 )
 
 
-@strawberry.input(name="AccessTokenFilter", description="Added in 25.16.0.")
+@gql_pydantic_input(
+    BackendAIGQLMeta(description="", added_version="25.16.0"),
+    model=AccessTokenFilterDTO,
+    name="AccessTokenFilter",
+)
 class AccessTokenFilter:
     """Filter for access tokens."""
 
@@ -82,7 +86,7 @@ class AccessTokenOrderBy:
     def to_pydantic(self) -> AccessTokenOrderDTO:
         return AccessTokenOrderDTO(
             field=DTOAccessTokenOrderField(self.field.value.lower()),
-            direction=DTOOrderDirection(self.direction.value.lower()),
+            direction=DTOOrderDirection(self.direction.value),
         )
 
 

@@ -94,6 +94,9 @@ from ai.backend.common.dto.manager.v2.rbac.types import (
     OperationType as OperationTypeDTO,
 )
 from ai.backend.common.dto.manager.v2.rbac.types import (
+    OrderDirection as OrderDirectionV2,
+)
+from ai.backend.common.dto.manager.v2.rbac.types import (
     PermissionSummary,
 )
 from ai.backend.common.dto.manager.v2.rbac.types import (
@@ -664,7 +667,7 @@ class RBACAdapter(BaseAdapter):
     def _convert_permission_orders(orders: list[PermissionOrderByDTO]) -> list[QueryOrder]:
         result: list[QueryOrder] = []
         for o in orders:
-            ascending = o.direction == "asc"
+            ascending = o.direction == OrderDirectionV2.ASC
             if o.field == "id":
                 result.append(ScopedPermissionOrders.id(ascending))
             elif o.field == "entity_type":
@@ -736,7 +739,7 @@ class RBACAdapter(BaseAdapter):
     def _convert_role_orders_gql(orders: list[RoleOrderByDTO]) -> list[QueryOrder]:
         result: list[QueryOrder] = []
         for o in orders:
-            ascending = o.direction == "asc"
+            ascending = o.direction == OrderDirectionV2.ASC
             if o.field == "name":
                 result.append(RoleOrders.name(ascending))
             elif o.field == "created_at":
@@ -860,7 +863,7 @@ class RBACAdapter(BaseAdapter):
     def _convert_assignment_orders(orders: list[RoleAssignmentOrderByDTO]) -> list[QueryOrder]:
         result: list[QueryOrder] = []
         for o in orders:
-            ascending = o.direction == "asc"
+            ascending = o.direction == OrderDirectionV2.ASC
             if o.field == "username":
                 result.append(AssignedUserOrders.username(ascending))
             elif o.field == "email":
@@ -905,7 +908,7 @@ class RBACAdapter(BaseAdapter):
     def _convert_entity_orders(orders: list[EntityOrderByDTO]) -> list[QueryOrder]:
         result: list[QueryOrder] = []
         for o in orders:
-            ascending = o.direction == "asc"
+            ascending = o.direction == OrderDirectionV2.ASC
             if o.field == "entity_type":
                 result.append(EntityScopeOrders.entity_type(ascending))
             elif o.field == "registered_at":

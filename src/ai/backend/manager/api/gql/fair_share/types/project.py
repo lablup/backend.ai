@@ -346,9 +346,13 @@ class ProjectFairShareProjectNestedFilter:
         return ProjectFairShareProjectNestedFilterDTO(is_active=self.is_active)
 
 
-@strawberry.input(
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description="Filter input for querying project fair shares. Supports filtering by scaling group, project ID, and domain name. Multiple filters can be combined using AND, OR, and NOT logical operators.",
+        added_version="26.1.0",
+    ),
+    model=ProjectFairShareFilterDTO,
     name="ProjectFairShareFilter",
-    description="Added in 26.1.0. Filter input for querying project fair shares. Supports filtering by scaling group, project ID, and domain name. Multiple filters can be combined using AND, OR, and NOT logical operators.",
 )
 class ProjectFairShareFilter:
     """Filter for project fair shares."""
@@ -408,9 +412,13 @@ class ProjectFairShareFilter:
         )
 
 
-@strawberry.input(
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description="Filter for project fair shares within a resource group scope. References resource group membership columns to avoid excluding projects without fair share records.",
+        added_version="26.2.0",
+    ),
+    model=ProjectFairShareFilterDTO,
     name="RGProjectFairShareFilter",
-    description="Added in 26.2.0. Filter for project fair shares within a resource group scope. References resource group membership columns to avoid excluding projects without fair share records.",
 )
 class RGProjectFairShareFilter:
     """Filter for project fair shares in RG context (uses INNER JOIN'd columns)."""

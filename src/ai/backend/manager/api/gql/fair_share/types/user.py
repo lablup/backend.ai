@@ -320,9 +320,13 @@ class UserFairShareUserNestedFilter:
         return UserFairShareUserNestedFilterDTO(is_active=self.is_active)
 
 
-@strawberry.input(
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description="Filter input for querying user fair shares. Supports filtering by scaling group, user UUID, project ID, and domain name. This is the most granular level of fair share filtering. Multiple filters can be combined using AND, OR, and NOT logical operators.",
+        added_version="26.1.0",
+    ),
+    model=UserFairShareFilterDTO,
     name="UserFairShareFilter",
-    description="Added in 26.1.0. Filter input for querying user fair shares. Supports filtering by scaling group, user UUID, project ID, and domain name. This is the most granular level of fair share filtering. Multiple filters can be combined using AND, OR, and NOT logical operators.",
 )
 class UserFairShareFilter:
     """Filter for user fair shares."""
@@ -390,9 +394,13 @@ class UserFairShareFilter:
         )
 
 
-@strawberry.input(
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description="Filter for user fair shares within a resource group scope. References resource group membership columns to avoid excluding users without fair share records.",
+        added_version="26.2.0",
+    ),
+    model=UserFairShareFilterDTO,
     name="RGUserFairShareFilter",
-    description="Added in 26.2.0. Filter for user fair shares within a resource group scope. References resource group membership columns to avoid excluding users without fair share records.",
 )
 class RGUserFairShareFilter:
     """Filter for user fair shares in RG context (uses INNER JOIN'd columns)."""

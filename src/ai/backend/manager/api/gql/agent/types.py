@@ -117,9 +117,10 @@ class AgentStatusFilterGQL:
         )
 
 
-@strawberry.input(
+@gql_pydantic_input(
+    BackendAIGQLMeta(description="Filter options for querying agents", added_version="26.1.0"),
+    model=AgentFilter,
     name="AgentFilter",
-    description="Added in 26.1.0. Filter options for querying agents",
 )
 class AgentFilterGQL:
     id: StringFilter | None = None

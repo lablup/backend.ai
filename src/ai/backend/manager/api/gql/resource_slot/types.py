@@ -261,9 +261,12 @@ class ResourceSlotTypeOrderFieldGQL(StrEnum):
     DISPLAY_NAME = "display_name"
 
 
-@strawberry.input(
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description="Filter criteria for querying resource slot types.", added_version="26.3.0"
+    ),
+    model=ResourceSlotTypeFilterDTO,
     name="ResourceSlotTypeFilter",
-    description="Added in 26.3.0. Filter criteria for querying resource slot types.",
 )
 class ResourceSlotTypeFilterGQL:
     slot_name: StringFilter | None = None
@@ -396,9 +399,12 @@ class AgentResourceSlotOrderFieldGQL(StrEnum):
     USED = "used"
 
 
-@strawberry.input(
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description="Filter criteria for querying agent resource slots.", added_version="26.3.0"
+    ),
+    model=AgentResourceFilterDTO,
     name="AgentResourceSlotFilter",
-    description="Added in 26.3.0. Filter criteria for querying agent resource slots.",
 )
 class AgentResourceSlotFilterGQL:
     slot_name: StringFilter | None = None
@@ -511,9 +517,13 @@ class KernelResourceAllocationOrderFieldGQL(StrEnum):
     USED = "used"
 
 
-@strawberry.input(
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description="Filter criteria for querying kernel resource allocations.",
+        added_version="26.3.0",
+    ),
+    model=ResourceAllocationFilterDTO,
     name="KernelResourceAllocationFilter",
-    description="Added in 26.3.0. Filter criteria for querying kernel resource allocations.",
 )
 class KernelResourceAllocationFilterGQL:
     slot_name: StringFilter | None = None

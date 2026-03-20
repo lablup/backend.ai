@@ -238,9 +238,10 @@ class ServiceCatalogStatusFilterGQL:
         )
 
 
-@strawberry.input(
+@gql_pydantic_input(
+    BackendAIGQLMeta(description="Filter for service catalog queries.", added_version="26.3.0"),
+    model=ServiceCatalogFilterDTO,
     name="ServiceCatalogFilter",
-    description="Added in 26.3.0. Filter for service catalog queries.",
 )
 class ServiceCatalogFilterGQL:
     service_group: StringFilter | None = strawberry.field(

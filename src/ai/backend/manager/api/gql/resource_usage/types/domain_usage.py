@@ -251,9 +251,13 @@ class DomainUsageBucketConnection(Connection[DomainUsageBucketGQL]):
         self.count = count
 
 
-@strawberry.input(
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description="Filter input for querying domain usage bucket records. Usage buckets contain historical resource consumption data aggregated by time period. Multiple filters can be combined using AND, OR, and NOT logical operators.",
+        added_version="26.1.0",
+    ),
+    model=DomainUsageBucketFilterDTO,
     name="DomainUsageBucketFilter",
-    description="Added in 26.1.0. Filter input for querying domain usage bucket records. Usage buckets contain historical resource consumption data aggregated by time period. Multiple filters can be combined using AND, OR, and NOT logical operators.",
 )
 class DomainUsageBucketFilter(GQLFilter):
     """Filter for domain usage buckets."""

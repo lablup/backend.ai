@@ -193,9 +193,13 @@ class UserUsageBucketConnection(Connection[UserUsageBucketGQL]):
         self.count = count
 
 
-@strawberry.input(
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description="Filter input for querying user usage bucket records. Usage buckets contain historical resource consumption data aggregated by time period for users. This is the most granular level of usage bucket filtering. Multiple filters can be combined using AND, OR, and NOT logical operators.",
+        added_version="26.1.0",
+    ),
+    model=UserUsageBucketFilterDTO,
     name="UserUsageBucketFilter",
-    description="Added in 26.1.0. Filter input for querying user usage bucket records. Usage buckets contain historical resource consumption data aggregated by time period for users. This is the most granular level of usage bucket filtering. Multiple filters can be combined using AND, OR, and NOT logical operators.",
 )
 class UserUsageBucketFilter(GQLFilter):
     """Filter for user usage buckets."""

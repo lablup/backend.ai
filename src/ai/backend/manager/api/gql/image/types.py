@@ -638,9 +638,13 @@ class ImageV2StatusFilterGQL:
         )
 
 
-@strawberry.input(
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description="Filter options for images based on various criteria such as status, name, and architecture. Supports logical operations (AND, OR, NOT) for complex filtering scenarios.",
+        added_version="26.2.0",
+    ),
+    model=ImageFilterInputDTO,
     name="ImageV2Filter",
-    description="Added in 26.2.0. Filter options for images based on various criteria such as status, name, and architecture. Supports logical operations (AND, OR, NOT) for complex filtering scenarios.",
 )
 class ImageV2FilterGQL(GQLFilter):
     status: ImageV2StatusFilterGQL | None = None
@@ -706,7 +710,7 @@ class ImageV2OrderByGQL(GQLOrderBy):
         """Convert to pydantic DTO for adapter layer processing."""
         return ImageOrderByInputDTO(
             field=ImageOrderFieldDTO(self.field.value.lower()),
-            direction=OrderDirectionDTO(self.direction.value.lower()),
+            direction=OrderDirectionDTO(self.direction.value),
         )
 
 
@@ -733,9 +737,13 @@ class ImageV2AliasConnectionGQL(Connection[ImageV2AliasGQL]):
         self.count = count
 
 
-@strawberry.input(
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description="Filter options for image aliases. Supports filtering by alias string and image ID.",
+        added_version="26.2.0",
+    ),
+    model=ImageAliasFilterInputDTO,
     name="ImageV2AliasFilter",
-    description="Added in 26.2.0. Filter options for image aliases. Supports filtering by alias string and image ID.",
 )
 class ImageV2AliasFilterGQL(GQLFilter):
     alias: StringFilter | None = None
@@ -786,5 +794,5 @@ class ImageV2AliasOrderByGQL(GQLOrderBy):
         """Convert to pydantic DTO for adapter layer processing."""
         return ImageAliasOrderByInputDTO(
             field=self.field.value.lower(),
-            direction=OrderDirectionDTO(self.direction.value.lower()),
+            direction=OrderDirectionDTO(self.direction.value),
         )

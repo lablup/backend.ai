@@ -138,7 +138,11 @@ class TrafficStatusFilter:
 # ========== ModelReplica Types ==========
 
 
-@strawberry.input(name="ReplicaFilter", description="Added in 25.19.0.")
+@gql_pydantic_input(
+    BackendAIGQLMeta(description="", added_version="25.19.0"),
+    model=ReplicaFilterDTO,
+    name="ReplicaFilter",
+)
 class ReplicaFilter:
     status: ReplicaStatusFilter | None = None
     traffic_status: TrafficStatusFilter | None = None
@@ -186,7 +190,7 @@ class ReplicaOrderBy:
     def to_pydantic(self) -> ReplicaOrderDTO:
         return ReplicaOrderDTO(
             field=DTOReplicaOrderField(self.field.value.lower()),
-            direction=DTOOrderDirection(self.direction.value.lower()),
+            direction=DTOOrderDirection(self.direction.value),
         )
 
 

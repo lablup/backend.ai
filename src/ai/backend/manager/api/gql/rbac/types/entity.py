@@ -227,9 +227,10 @@ class EntityRefGQL(PydanticNodeMixin[Any]):
 # ==================== Filter Types ====================
 
 
-@strawberry.input(
+@gql_pydantic_input(
+    BackendAIGQLMeta(description="Filter for entity associations", added_version="26.3.0"),
+    model=EntityFilterDTO,
     name="EntityFilter",
-    description="Added in 26.3.0. Filter for entity associations",
 )
 class EntityFilter(GQLFilter):
     entity_type: RBACElementTypeGQL | None = None

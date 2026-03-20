@@ -263,9 +263,13 @@ class DomainFairShareDomainNestedFilter:
         return DomainFairShareDomainNestedFilterDTO(is_active=self.is_active)
 
 
-@strawberry.input(
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description="Filter input for querying domain fair shares. Supports filtering by scaling group and domain name with various string matching operations. Multiple filters can be combined using AND, OR, and NOT logical operators.",
+        added_version="26.1.0",
+    ),
+    model=DomainFairShareFilterDTO,
     name="DomainFairShareFilter",
-    description="Added in 26.1.0. Filter input for querying domain fair shares. Supports filtering by scaling group and domain name with various string matching operations. Multiple filters can be combined using AND, OR, and NOT logical operators.",
 )
 class DomainFairShareFilter:
     """Filter for domain fair shares."""
@@ -316,9 +320,13 @@ class DomainFairShareFilter:
         )
 
 
-@strawberry.input(
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description="Filter for domain fair shares within a resource group scope. References resource group membership columns to avoid excluding domains without fair share records.",
+        added_version="26.2.0",
+    ),
+    model=DomainFairShareFilterDTO,
     name="RGDomainFairShareFilter",
-    description="Added in 26.2.0. Filter for domain fair shares within a resource group scope. References resource group membership columns to avoid excluding domains without fair share records.",
 )
 class RGDomainFairShareFilter:
     """Filter for domain fair shares in RG context (uses INNER JOIN'd columns)."""

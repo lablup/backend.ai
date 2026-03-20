@@ -128,9 +128,13 @@ class UserProjectNestedFilterGQL:
         )
 
 
-@strawberry.input(
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description="Filter input for querying users. Supports filtering by UUID, username, email, status, domain, role, creation time, and nested domain/project filters. Multiple filters can be combined using AND, OR, and NOT logical operators.",
+        added_version="26.2.0",
+    ),
+    model=UserFilter,
     name="UserV2Filter",
-    description="Added in 26.2.0. Filter input for querying users. Supports filtering by UUID, username, email, status, domain, role, creation time, and nested domain/project filters. Multiple filters can be combined using AND, OR, and NOT logical operators.",
 )
 class UserFilterGQL:
     """Filter for user queries."""

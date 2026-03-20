@@ -527,9 +527,10 @@ class ResourceGroupOrderFieldGQL(StrEnum):
     IS_ACTIVE = "is_active"
 
 
-@strawberry.input(
+@gql_pydantic_input(
+    BackendAIGQLMeta(description="Filter for resource groups", added_version="26.1.0"),
+    model=ResourceGroupFilterDTO,
     name="ResourceGroupFilter",
-    description="Added in 26.1.0. Filter for resource groups",
 )
 class ResourceGroupFilterGQL:
     name: StringFilter | None = None
@@ -567,7 +568,7 @@ class ResourceGroupOrderByGQL:
     def to_pydantic(self) -> ResourceGroupOrderDTO:
         return ResourceGroupOrderDTO(
             field=ResourceGroupOrderFieldEnum(self.field.value),
-            direction=ResourceGroupOrderDirectionEnum(self.direction.value.lower()),
+            direction=ResourceGroupOrderDirectionEnum(self.direction.value),
         )
 
 

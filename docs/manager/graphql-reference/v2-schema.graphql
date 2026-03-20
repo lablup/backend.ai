@@ -1,11 +1,10 @@
-directive @oneOf on INPUT_OBJECT
-
 schema @link(url: "https://specs.apollo.dev/federation/v2.7", import: ["@external", "@key", "@shareable"]) {
   query: Query
   mutation: Mutation
   subscription: Subscription
 }
 
+"""Added in 25.16.0. An access token for model deployment."""
 type AccessToken implements Node {
   """The Globally Unique ID of this object"""
   id: ID!
@@ -20,7 +19,7 @@ type AccessToken implements Node {
   validUntil: DateTime!
 }
 
-"""Added in 25.16.0"""
+"""Added in 25.16.0. Connection for access tokens."""
 type AccessTokenConnection {
   """Pagination data for this connection"""
   pageInfo: PageInfo!
@@ -39,7 +38,7 @@ type AccessTokenEdge {
   node: AccessToken!
 }
 
-"""Added in 25.16.0"""
+"""Added in 25.16.0."""
 input AccessTokenFilter {
   token: StringFilter = null
   validUntil: DateTimeFilter = null
@@ -49,7 +48,7 @@ input AccessTokenFilter {
   NOT: [AccessTokenFilter!] = null
 }
 
-"""Added in 25.16.0"""
+"""Added in 25.16.0. """
 input AccessTokenOrderBy {
   field: AccessTokenOrderField!
   direction: OrderDirection! = DESC
@@ -63,14 +62,22 @@ enum AccessTokenOrderField {
 Added in 25.19.0. Input for activating a revision to be the current revision.
 """
 input ActivateRevisionInput {
+  """Deployment ID"""
   deploymentId: ID!
+
+  """Revision ID to activate"""
   revisionId: ID!
 }
 
 """Added in 25.19.0. Result of activating a revision."""
 type ActivateRevisionPayload {
+  """The deployment with the activated revision"""
   deployment: ModelDeployment!
+
+  """ID of the previously active revision"""
   previousRevisionId: ID
+
+  """ID of the newly activated revision"""
   activatedRevisionId: ID!
 }
 
@@ -97,20 +104,23 @@ enum ActivenessStatus {
   INACTIVE
 }
 
-"""Added in 25.19.0"""
+"""Added in 25.19.0. """
 input AddRevisionInput {
   name: String = null
-  deploymentId: ID!
   clusterConfig: ClusterConfigInput!
   resourceConfig: ResourceConfigInput!
   image: ImageInput!
   modelRuntimeConfig: ModelRuntimeConfigInput!
   modelMountConfig: ModelMountConfigInput!
   extraMounts: [ExtraVFolderMountInput!]
+
+  """Deployment ID"""
+  deploymentId: ID!
 }
 
-"""Added in 25.19.0"""
+"""Added in 25.19.0. Payload for adding a revision."""
 type AddRevisionPayload {
+  """Added revision"""
   revision: ModelRevision!
 }
 
@@ -125,22 +135,23 @@ input AgentFilter {
   NOT: [AgentFilter!] = null
 }
 
-"""Added in 26.1.0. Network-related information for an agent"""
+"""Added in 26.1.0. Network-related information for an agent."""
 type AgentNetworkInfo {
   """Logical region where the agent is deployed."""
   region: String!
 
   """
-  Network address and port where the agent can be reached (format: "host:port").
-  This is the bind or advertised address used by the manager to communicate
-  with the agent for session lifecycle management and health monitoring.
+  Network address and port where the agent can be reached (format: "host:port"). Used by the manager to communicate with the agent.
   """
   addr: String!
 }
 
 """Added in 26.1.0. Options for ordering agents"""
 input AgentOrderBy {
+  """Field to order by"""
   field: AgentOrderField!
+
+  """Order direction"""
   direction: OrderDirection! = ASC
 }
 
@@ -161,29 +172,22 @@ enum AgentPermission {
   CREATE_SERVICE
 }
 
-"""Added in 25.15.0"""
+"""
+Added in 25.15.0. Hardware resource capacity, usage, and availability of an agent.
+"""
 type AgentResource {
   """
-  Total hardware resource capacity available on the agent.
-  Expressed as a JSON object containing resource slots (e.g., cpu, mem, accelerators).
-  Each slot represents the maximum amount of that resource type the agent can provide.
+  Total hardware resource capacity available on the agent. Expressed as a JSON object containing resource slots.
   """
   capacity: JSON!
 
   """
-  Total amount of resources currently consumed by running and scheduled compute sessions.
-  Includes both the requested resources for sessions being prepared and already allocated
-  resources for active sessions. The sum of occupied resources across all session states
-  that occupy agent resources (PREPARING, PULLING, RUNNING, RESTARTING, etc.).
-  Expressed as a JSON object with the same structure as capacity.
+  Total amount of resources currently consumed by running and scheduled sessions.
   """
   used: JSON!
 
   """
   Available resources for scheduling new compute sessions (capacity - used).
-  This represents the maximum resources that can be allocated to new sessions
-  without exceeding the agent's capacity. Expressed as a JSON object with
-  the same structure as capacity.
   """
   free: JSON!
 }
@@ -230,6 +234,7 @@ type AgentResourceSlotEdge {
 """Added in 26.3.0. Filter criteria for querying agent resource slots."""
 input AgentResourceSlotFilter {
   slotName: StringFilter = null
+  agentId: StringFilter = null
   AND: [AgentResourceSlotFilter!] = null
   OR: [AgentResourceSlotFilter!] = null
   NOT: [AgentResourceSlotFilter!] = null
@@ -237,7 +242,10 @@ input AgentResourceSlotFilter {
 
 """Added in 26.3.0. Ordering specification for agent resource slots."""
 input AgentResourceSlotOrderBy {
+  """Field to order by."""
   field: AgentResourceSlotOrderField!
+
+  """Order direction."""
   direction: OrderDirection! = ASC
 }
 
@@ -248,9 +256,11 @@ enum AgentResourceSlotOrderField {
   USED
 }
 
-"""Added in 25.15.0"""
+"""Added in 25.15.0. Aggregated resource statistics for an agent."""
 type AgentStats {
-  """Added in 25.15.0"""
+  """
+  Total hardware resource capacity, usage, and availability across all agents.
+  """
   totalResource: AgentResource!
 }
 
@@ -262,81 +272,58 @@ enum AgentStatus {
 }
 
 """
-Added in 26.1.0. Filter options for agent status within AgentFilter.
+Added in 24.09.0. Added in 26.1.0. Filter options for agent status within AgentFilter.
 It includes options to filter whether agent status is in a specific list or equals a specific value.
 """
 input AgentStatusFilter {
-  in: [AgentStatus!] = null
+  """Exact match for agent status."""
   equals: AgentStatus = null
+
+  """Match any of the provided statuses."""
+  in: [AgentStatus!] = null
 }
 
-"""Added in 26.1.0. Status and lifecycle information for an agent"""
+"""Added in 26.1.0. Status and lifecycle information for an agent."""
 type AgentStatusInfo {
   """
-  Current operational status of the agent.
-  Indicates whether the agent is ALIVE (active and reachable), LOST (unreachable),
-  TERMINATED (intentionally stopped), or RESTARTING (in recovery process).
+  Current operational status of the agent. One of: ALIVE, LOST, TERMINATED, RESTARTING.
   """
   status: AgentStatus!
 
-  """
-  Timestamp when the agent last changed its status.
-  Updated whenever the agent transitions between different status states
-  (e.g., from ALIVE to LOST, or RESTARTING to ALIVE).
-  Will be null if the agent status has never changed since initial registration.
-  """
+  """Timestamp when the agent last changed its status."""
   statusChanged: DateTime
 
-  """
-  Timestamp when the agent first registered with the manager.
-  This value remains constant throughout the agent's lifecycle and can be used
-  to track the agent's age or identify when it was initially deployed.
-  """
+  """Timestamp when the agent first registered with the manager."""
   firstContact: DateTime
 
   """
-  Timestamp when the agent was marked as lost or unreachable.
-  Set when the manager detects the agent has stopped sending heartbeats.
-  Will be null if the agent has never been lost or is currently alive.
+  Timestamp when the agent was marked as lost or unreachable. Null if the agent has never been lost or is currently alive.
   """
   lostAt: DateTime
 
   """
   Indicates whether the agent is available for scheduling new compute sessions.
-  An agent can be non-schedulable due to maintenance mode, resource constraints or other operational reasons by admin.
-  When false, no new sessions will be assigned to this agent.
   """
   schedulable: Boolean!
 }
 
-"""Added in 26.1.0. System and configuration information for an agent"""
+"""Added in 26.1.0. System and configuration information for an agent."""
 type AgentSystemInfo {
   """
-  Hardware architecture of the agent's host system (e.g., "x86_64", "aarch64").
-  Used to match compute sessions with compatible container images and ensure
-  proper binary execution on the agent.
+  Hardware architecture of the agent's host system (e.g., "x86_64", "aarch64"). Used to match compute sessions with compatible container images.
   """
   architecture: String!
 
   """
-  Version string of the Backend.AI agent software running on this node.
-  Follows semantic versioning (e.g., "26.1.0") and helps identify
-  compatibility and available features.
+  Version string of the Backend.AI agent software running on this node. Follows semantic versioning (e.g., "26.1.0").
   """
   version: String!
 
-  """
-  Legacy configuration flag, no longer actively used in the system.
-  Retained for backward compatibility and schema consistency.
-  Originally intended to control automatic termination of misbehaving sessions.
-  """
+  """Legacy configuration flag, no longer actively used in the system."""
   autoTerminateAbusingKernel: Boolean! @deprecated(reason: "Legacy feature no longer in use.")
 
   """
-  List of compute plugin metadata supported by this agent.
-  Each plugin represents a specific accelerator or resource type (e.g., CUDA).
-  Entries contain plugin names and their associated metadata with
-  plugin-specific configuration and capabilities.
+  List of compute plugin metadata supported by this agent. Typed as Any because this field holds a nested GQL type (ComputePluginsGQL).
   """
   computePlugins: ComputePlugins!
 }
@@ -405,7 +392,7 @@ type AgentV2 implements Node {
 }
 
 """
-Added in 26.1.0. Relay-style connection type for paginated lists of agents
+Added in 26.1.0. Relay-style connection type for paginated lists of agents.
 """
 type AgentV2Connection {
   """Pagination data for this connection"""
@@ -425,48 +412,32 @@ type AgentV2Edge {
   node: AgentV2!
 }
 
-"""Added in 25.16.0. App configuration data"""
+"""Added in 25.16.0. App configuration data."""
 type AppConfig {
   extraConfig: JSON!
 }
 
 """
-Added in 25.14.0.
+Added in 24.09.0. Added in 25.14.0.
 
 Input for approving an artifact revision.
 
 Admin-only operation to approve artifact revisions for general use.
 """
 input ApproveArtifactInput {
+  """The artifact revision ID to approve."""
   artifactRevisionId: ID!
 }
 
 """
-Added in 25.14.0.
-
-Response payload for artifact revision approval operations.
-
-Contains the approved artifact revision. Admin-only operation.
+Added in 25.14.0. Response payload for artifact revision approval operations. Contains the approved artifact revision. Admin-only operation.
 """
 type ApproveArtifactPayload {
   artifactRevision: ArtifactRevision!
 }
 
 """
-Added in 25.14.0.
-
-An artifact represents AI models, packages, images, or other resources that can be
-stored, managed, and used within Backend.AI.
-
-Artifacts are discovered through scanning external registries and,
-can have multiple revisions.
-
-Each artifact contains metadata and references to its source registry.
-
-Key concepts:
-- Type: MODEL, PACKAGE, or IMAGE
-- Availability: ALIVE (available), DELETED (soft-deleted)
-- Source: Original external registry where it was discovered
+Added in 25.14.0. An artifact represents AI models, packages, images, or other resources that can be stored, managed, and used within Backend.AI. Artifacts are discovered through scanning external registries and can have multiple revisions. Each artifact contains metadata and references to its source registry. Key concepts: Type (MODEL, PACKAGE, or IMAGE), Availability (ALIVE or DELETED), Source (original external registry where it was discovered).
 """
 type Artifact implements Node {
   """The Globally Unique ID of this object"""
@@ -490,11 +461,7 @@ enum ArtifactAvailability {
 }
 
 """
-Added in 25.14.0.
-
-Paginated connection for artifacts with total count information.
-
-Used for relay-style pagination with cursor-based navigation.
+Added in 25.14.0. Paginated connection for artifacts with total count information. Used for relay-style pagination with cursor-based navigation.
 """
 type ArtifactConnection {
   """Pagination data for this connection"""
@@ -534,25 +501,26 @@ input ArtifactFilter {
 }
 
 """
-Added in 25.14.0.
-
-Payload for artifact import progress subscription events.
-
-Provides real-time updates during the artifact import process,
-including progress percentage and current status.
+Added in 25.14.0. Payload for artifact import progress subscription events. Provides real-time updates during the artifact import process, including progress percentage and current status.
 """
 type ArtifactImportProgressUpdatedPayload {
+  """Artifact revision ID."""
   artifactId: ID!
+
+  """Import progress as a percentage."""
   progress: Float!
+
+  """Current import status."""
   status: ArtifactStatus!
 }
 
 """
-Added in 25.14.0.
+Added in 24.09.0. Added in 25.14.0.
 
 Specifies the field and direction for ordering artifacts in queries.
 """
 input ArtifactOrderBy {
+  """Field to order by."""
   field: ArtifactOrderField!
   direction: OrderDirection! = ASC
 }
@@ -565,30 +533,23 @@ enum ArtifactOrderField {
   UPDATED_AT
 }
 
-"""Added in 25.14.0"""
+"""Added in 25.14.0. Artifact registry node."""
 type ArtifactRegistry {
-  """
-  Added in 25.17.0. Internal identifier for the artifact registry metadata record in the 'artifact_registries' table. This ID is unique across all registry types and represents the metadata record itself. Example: When you need to reference a registry entry in the metadata table, use this ID.
-  """
+  """Internal identifier of the artifact registry metadata record."""
   id: ID!
 
-  """
-  Added in 25.17.0. Identifier of the actual registry implementation (e.g., HuggingFace registry, Reservoir registry). This ID corresponds to the primary key in the registry-type-specific table. Example: For a HuggingFace registry, this value matches the 'id' field in the 'huggingface_registries' table. Use this ID when you need to access type-specific registry details.
-  """
+  """Identifier of the actual registry implementation."""
   registryId: ID!
 
-  """Name of the default artifact registry."""
+  """Name of the artifact registry."""
   name: String!
 
-  """Type of the default artifact registry."""
+  """Type of the artifact registry."""
   type: ArtifactRegistryType!
 }
 
 """
-Added in 25.15.0.
-
-Represents common metadata for an artifact registry.
-All artifact registry nodes expose that information regardless of type.
+Added in 25.15.0. Represents common metadata for an artifact registry. All artifact registry nodes expose that information regardless of type.
 """
 type ArtifactRegistryMeta implements Node {
   """The Globally Unique ID of this object"""
@@ -599,7 +560,9 @@ type ArtifactRegistryMeta implements Node {
   url: String!
 }
 
-"""Added in 25.15.0"""
+"""
+Added in 25.15.0. Relay-style connection for paginated artifact registry meta queries.
+"""
 type ArtifactRegistryMetaConnection {
   """Pagination data for this connection"""
   pageInfo: PageInfo!
@@ -630,18 +593,7 @@ enum ArtifactRemoteStatus {
 }
 
 """
-Added in 25.14.0.
-
-A specific version/revision of an artifact containing the actual file data.
-
-Artifact revisions progress through different statuses:
-- SCANNED: Discovered in external registry, metadata only
-- PULLING: Currently downloading from external source
-- PULLED: Downloaded to temporary storage
-- AVAILABLE: Ready for use by users
-
-Contains version information, file size, README content, and timestamps.
-Most HuggingFace models only have a 'main' revision.
+Added in 25.14.0. A specific version/revision of an artifact containing the actual file data. Artifact revisions progress through different statuses: SCANNED (discovered in external registry, metadata only), PULLING (currently downloading from external source), PULLED (downloaded to temporary storage), AVAILABLE (ready for use by users). Contains version information, file size, README content, and timestamps. Most HuggingFace models only have a 'main' revision.
 """
 type ArtifactRevision implements Node {
   """The Globally Unique ID of this object"""
@@ -669,11 +621,7 @@ type ArtifactRevision implements Node {
 }
 
 """
-Added in 25.14.0.
-
-Paginated connection for artifact revisions with total count information.
-
-Used for relay-style pagination with cursor-based navigation.
+Added in 25.14.0. Paginated connection for artifact revisions with total count information. Used for relay-style pagination with cursor-based navigation.
 """
 type ArtifactRevisionConnection {
   """Pagination data for this connection"""
@@ -714,12 +662,7 @@ input ArtifactRevisionFilter {
 }
 
 """
-Added in 25.14.0.
-
-Represents a background task for importing an artifact revision.
-
-Contains the task ID for monitoring progress and the associated artifact revision
-being imported from external registries.
+Added in 25.14.0. Represents a background task for importing an artifact revision. Contains the task ID for monitoring progress and the associated artifact revision being imported from external registries.
 """
 type ArtifactRevisionImportTask {
   taskId: ID
@@ -727,11 +670,12 @@ type ArtifactRevisionImportTask {
 }
 
 """
-Added in 25.14.0.
+Added in 24.09.0. Added in 25.14.0.
 
 Specifies the field and direction for ordering artifact revisions in queries.
 """
 input ArtifactRevisionOrderBy {
+  """Field to order by."""
   field: ArtifactRevisionOrderField!
   direction: OrderDirection! = ASC
 }
@@ -744,14 +688,14 @@ enum ArtifactRevisionOrderField {
   STATUS
 }
 
-"""Added in 25.16.0"""
+"""Added in 25.16.0. """
 input ArtifactRevisionRemoteStatusFilter {
   in: [ArtifactRemoteStatus!] = null
   equals: ArtifactRemoteStatus = null
 }
 
 """
-Added in 25.14.0.
+Added in 24.09.0. Added in 25.14.0.
 
 Filter for artifact revision status. Supports exact match or inclusion in a list of statuses.
 """
@@ -772,7 +716,7 @@ enum ArtifactStatus {
 }
 
 """
-Added in 25.14.0.
+Added in 24.09.0. Added in 25.14.0.
 
 Input for subscribing to artifact status change notifications.
 
@@ -780,16 +724,12 @@ Used with artifact_status_changed subscription to receive real-time updates
 when artifact revision statuses change.
 """
 input ArtifactStatusChangedInput {
+  """List of artifact revision IDs to watch."""
   artifactRevisionIds: [ID!]!
 }
 
 """
-Added in 25.14.0.
-
-Payload for artifact status change subscription events.
-
-Provides real-time notifications when artifact revision statuses change
-during import, cleanup, or other operations.
+Added in 25.14.0. Payload for artifact status change subscription events. Provides real-time notifications when artifact revision statuses change during import, cleanup, or other operations.
 """
 type ArtifactStatusChangedPayload {
   artifactRevision: ArtifactRevision!
@@ -802,12 +742,7 @@ enum ArtifactType {
 }
 
 """
-Added in 25.17.0.
-
-Complete verification result containing results from all configured verifiers.
-
-Artifacts undergo malware scanning through multiple verifiers after being imported.
-This type aggregates results from all verifiers that were run on the artifact.
+Added in 25.17.0. Complete verification result containing results from all configured verifiers. Artifacts undergo malware scanning through multiple verifiers after being imported. This type aggregates results from all verifiers that were run on the artifact.
 """
 type ArtifactVerificationResult {
   """Results from each verifier that scanned the artifact"""
@@ -815,10 +750,7 @@ type ArtifactVerificationResult {
 }
 
 """
-Added in 26.1.0.
-
-A collection of metadata from an artifact verifier.
-Contains key-value pairs providing additional information about the verification.
+Added in 26.1.0. A collection of metadata from an artifact verifier. Contains key-value pairs providing additional information about the verification.
 """
 type ArtifactVerifierMetadata {
   """List of metadata entries. Each entry contains a key-value pair."""
@@ -826,10 +758,7 @@ type ArtifactVerifierMetadata {
 }
 
 """
-Added in 26.1.0.
-
-A single key-value entry representing metadata from an artifact verifier.
-Contains additional information about the verification process.
+Added in 26.1.0. A single key-value entry representing metadata from an artifact verifier. Contains additional information about the verification process.
 """
 type ArtifactVerifierMetadataEntry {
   """The key identifier for this metadata entry."""
@@ -840,12 +769,7 @@ type ArtifactVerifierMetadataEntry {
 }
 
 """
-Added in 25.17.0.
-
-Result from a single malware verifier containing scan results and metadata.
-
-Each verifier scans the artifact for potential security issues and reports
-findings including infected file count, scan time, and any errors encountered.
+Added in 25.17.0. Result from a single malware verifier containing scan results and metadata. Each verifier scans the artifact for potential security issues and reports findings including infected file count, scan time, and any errors encountered.
 """
 type ArtifactVerifierResult {
   """Whether the verification completed successfully"""
@@ -871,11 +795,7 @@ type ArtifactVerifierResult {
 }
 
 """
-Added in 25.17.0.
-
-Entry for a single verifier's result in the verification results.
-
-Associates a verifier name with its scan results.
+Added in 25.17.0. Entry for a single verifier's result in the verification results. Associates a verifier name with its scan results.
 """
 type ArtifactVerifierResultEntry {
   """Name of the verifier (e.g., 'clamav', 'custom')"""
@@ -887,11 +807,14 @@ type ArtifactVerifierResultEntry {
 
 """Added in 26.3.0. Input for assigning a role to a user"""
 input AssignRoleInput {
+  """User ID to assign the role to"""
   userId: UUID!
+
+  """Role ID to assign"""
   roleId: UUID!
 }
 
-"""Filter criteria for querying audit logs."""
+"""Added in 24.09.0. Filter criteria for querying audit logs."""
 input AuditLogFilter {
   entityType: StringFilter = null
   operation: StringFilter = null
@@ -903,7 +826,7 @@ input AuditLogFilter {
   NOT: [AuditLogFilter!] = null
 }
 
-"""Ordering specification for audit logs."""
+"""Added in 24.09.0. Ordering specification for audit logs."""
 input AuditLogOrderBy {
   field: AuditLogOrderField!
   direction: OrderDirection! = DESC
@@ -925,13 +848,18 @@ enum AuditLogStatus {
   RUNNING
 }
 
-"""Filter for audit log status field."""
+"""Added in 24.09.0. Filter for audit log status field."""
 input AuditLogStatusFilter {
+  """Status is in list"""
   in: [AuditLogStatus!] = null
+
+  """Status is not in list"""
   notIn: [AuditLogStatus!] = null
 }
 
-"""Represents an audit log entry tracking system operations."""
+"""
+Added in 26.3.0. Represents an audit log entry tracking system operations.
+"""
 type AuditLogV2 implements Node {
   """The Globally Unique ID of this object"""
   id: ID!
@@ -972,7 +900,7 @@ type AuditLogV2 implements Node {
   user: UserV2
 }
 
-"""Connection type for paginated audit log results."""
+"""Added in 26.3.0. Connection type for paginated audit log results."""
 type AuditLogV2Connection {
   """Pagination data for this connection"""
   pageInfo: PageInfo!
@@ -999,6 +927,7 @@ enum AutoScalingMetricSource {
   INFERENCE_FRAMEWORK
 }
 
+"""Added in 25.19.0. An auto-scaling rule for a model deployment."""
 type AutoScalingRule implements Node {
   """The Globally Unique ID of this object"""
   id: ID!
@@ -1028,7 +957,7 @@ type AutoScalingRule implements Node {
   lastTriggeredAt: DateTime!
 }
 
-"""Added in 25.19.0"""
+"""Added in 25.19.0. Connection for auto-scaling rules."""
 type AutoScalingRuleConnection {
   """Pagination data for this connection"""
   pageInfo: PageInfo!
@@ -1047,7 +976,7 @@ type AutoScalingRuleEdge {
   node: AutoScalingRule!
 }
 
-"""Added in 25.19.0"""
+"""Added in 25.19.0."""
 input AutoScalingRuleFilter {
   createdAt: DateTimeFilter = null
   lastTriggeredAt: DateTimeFilter = null
@@ -1056,7 +985,7 @@ input AutoScalingRuleFilter {
   NOT: [AutoScalingRuleFilter!] = null
 }
 
-"""Added in 25.19.0"""
+"""Added in 25.19.0. """
 input AutoScalingRuleOrderBy {
   field: AutoScalingRuleOrderField!
   direction: OrderDirection! = DESC
@@ -1066,7 +995,7 @@ enum AutoScalingRuleOrderField {
   CREATED_AT
 }
 
-"""Background task event payload"""
+"""Added in 24.3.0. Background task event payload."""
 type BackgroundTaskEventPayload {
   taskId: ID!
   eventType: BgtaskEventType!
@@ -1085,7 +1014,10 @@ enum BgtaskEventType {
 
 """Added in 25.19.0. Configuration for blue-green deployment strategy."""
 input BlueGreenConfigInput {
+  """Automatically promote new revision"""
   autoPromote: Boolean! = false
+
+  """Delay in seconds before promotion"""
   promoteDelaySeconds: Int! = 0
 }
 
@@ -1102,7 +1034,10 @@ type BulkAssignRoleError {
 
 """Added in 26.3.0. Input for bulk assigning a role to multiple users"""
 input BulkAssignRoleInput {
+  """Role ID to assign"""
   roleId: UUID!
+
+  """List of user IDs to assign the role to"""
   userIds: [UUID!]!
 }
 
@@ -1200,7 +1135,10 @@ type BulkRevokeRoleError {
 
 """Added in 26.3.0. Input for bulk revoking a role from multiple users"""
 input BulkRevokeRoleInput {
+  """Role ID to revoke"""
   roleId: UUID!
+
+  """List of user IDs to revoke the role from"""
   userIds: [UUID!]!
 }
 
@@ -1254,10 +1192,10 @@ type BulkUpdateUsersV2Payload {
 Added in 26.1.0. Input for bulk upserting domain fair share weights. Allows updating multiple domains in a single transaction.
 """
 input BulkUpsertDomainFairShareWeightInput {
-  """Name of the scaling group (resource group) for all fair shares."""
+  """Scaling group name."""
   resourceGroupName: String!
 
-  """List of domain weight updates to apply."""
+  """List of domain weights to upsert."""
   inputs: [DomainWeightInputItem!]!
 }
 
@@ -1265,7 +1203,7 @@ input BulkUpsertDomainFairShareWeightInput {
 Added in 26.1.0. Payload for bulk domain fair share weight upsert mutation.
 """
 type BulkUpsertDomainFairShareWeightPayload {
-  """Number of domain fair share records created or updated."""
+  """Number of records upserted"""
   upsertedCount: Int!
 }
 
@@ -1273,10 +1211,10 @@ type BulkUpsertDomainFairShareWeightPayload {
 Added in 26.1.0. Input for bulk upserting project fair share weights. Allows updating multiple projects in a single transaction.
 """
 input BulkUpsertProjectFairShareWeightInput {
-  """Name of the scaling group (resource group) for all fair shares."""
+  """Scaling group name."""
   resourceGroupName: String!
 
-  """List of project weight updates to apply."""
+  """List of project weights to upsert."""
   inputs: [ProjectWeightInputItem!]!
 }
 
@@ -1284,7 +1222,7 @@ input BulkUpsertProjectFairShareWeightInput {
 Added in 26.1.0. Payload for bulk project fair share weight upsert mutation.
 """
 type BulkUpsertProjectFairShareWeightPayload {
-  """Number of project fair share records created or updated."""
+  """Number of records upserted"""
   upsertedCount: Int!
 }
 
@@ -1292,10 +1230,10 @@ type BulkUpsertProjectFairShareWeightPayload {
 Added in 26.1.0. Input for bulk upserting user fair share weights. Allows updating multiple users in a single transaction.
 """
 input BulkUpsertUserFairShareWeightInput {
-  """Name of the scaling group (resource group) for all fair shares."""
+  """Scaling group name."""
   resourceGroupName: String!
 
-  """List of user weight updates to apply."""
+  """List of user weights to upsert."""
   inputs: [UserWeightInputItem!]!
 }
 
@@ -1303,37 +1241,33 @@ input BulkUpsertUserFairShareWeightInput {
 Added in 26.1.0. Payload for bulk user fair share weight upsert mutation.
 """
 type BulkUpsertUserFairShareWeightPayload {
-  """Number of user fair share records created or updated."""
+  """Number of records upserted"""
   upsertedCount: Int!
 }
 
 scalar ByteSize
 
 """
-Added in 25.14.0.
+Added in 24.09.0. Added in 25.14.0.
 
 Input for canceling an in-progress artifact import operation.
 
 Stops the download process and reverts the artifact revision status back to SCANNED.
 """
 input CancelArtifactInput {
+  """The artifact revision ID whose import task should be cancelled."""
   artifactRevisionId: ID!
 }
 
 """
-Added in 25.14.0.
-
-Response payload for canceling artifact import operations.
-
-Contains the artifact revision whose import was canceled,
-reverting its status back to SCANNED.
+Added in 25.14.0. Response payload for canceling artifact import operations. Contains the artifact revision whose import was canceled, reverting its status back to SCANNED.
 """
 type CancelImportArtifactPayload {
   artifactRevision: ArtifactRevision!
 }
 
 """
-Added in 25.14.0.
+Added in 24.09.0. Added in 25.14.0.
 
 Input for cleaning up stored artifact revision data.
 
@@ -1341,21 +1275,20 @@ Removes downloaded files from storage and transitions the artifact revision
 back to SCANNED status, freeing up storage space.
 """
 input CleanupArtifactRevisionsInput {
+  """List of artifact revision IDs to cleanup."""
   artifactRevisionIds: [ID!]!
 }
 
 """
-Added in 25.14.0.
-
-Response payload for artifact revision cleanup operations.
-
-Contains the cleaned artifact revisions that have had their stored data removed,
-transitioning them back to SCANNED status to free storage space.
+Added in 25.14.0. Response payload for artifact revision cleanup operations. Contains the cleaned artifact revisions that have had their stored data removed, transitioning them back to SCANNED status to free storage space.
 """
 type CleanupArtifactRevisionsPayload {
   artifactRevisions: ArtifactRevisionConnection!
 }
 
+"""
+Added in 25.19.0. Cluster configuration for model deployment replicas. Defines the clustering mode and number of replicas.
+"""
 type ClusterConfig {
   """The clustering mode (e.g., SINGLE_NODE)."""
   mode: ClusterMode!
@@ -1364,9 +1297,12 @@ type ClusterConfig {
   size: Int!
 }
 
-"""Added in 25.19.0"""
+"""Added in 25.19.0. """
 input ClusterConfigInput {
+  """Cluster mode"""
   mode: ClusterMode!
+
+  """Cluster size (number of nodes)"""
   size: Int!
 }
 
@@ -1396,7 +1332,7 @@ Added in 26.1.0. A collection of compute plugins available on an agent. Each ent
 """
 type ComputePlugins {
   """
-  List of compute plugins. Each entry contains a plugin name and its metadata. The list includes all accelerator and resource type plugins installed on the agent.
+  List of compute plugins. Each entry contains a plugin name and its metadata.
   """
   entries: [ComputePluginEntry!]!
 }
@@ -1406,9 +1342,7 @@ extend type ComputeSessionNode @key(fields: "id") {
 }
 
 """
-Added in 26.2.0.
-
-Scope for querying images within a specific container registry.
+Added in 26.2.0. Scope for querying images within a specific container registry.
 """
 input ContainerRegistryScope {
   """UUID of the container registry to scope the query to."""
@@ -1461,148 +1395,234 @@ type ContainerRegistryV2 implements Node {
   extra: JSON
 }
 
+"""
+Added in 25.16.0. Input for creating an access token for a model deployment.
+"""
 input CreateAccessTokenInput {
   """
   Added in 25.16.0: The ID of the model deployment for which the access token is created.
   """
   modelDeploymentId: ID!
 
-  """Added in 25.16.0: The expiration timestamp of the access token."""
+  """Token expiration timestamp"""
   validUntil: DateTime!
 }
 
+"""Added in 25.16.0. Payload for creating an access token."""
 type CreateAccessTokenPayload {
+  """Created access token"""
   accessToken: AccessToken!
 }
 
+"""Added in 25.19.0. Input for creating an auto-scaling rule."""
 input CreateAutoScalingRuleInput {
+  """ID of the deployment to attach the rule to"""
   modelDeploymentId: ID!
+
+  """Source of the metric (e.g. KERNEL, INFERENCE_FRAMEWORK)"""
   metricSource: AutoScalingMetricSource!
+
+  """Name of the metric to monitor"""
   metricName: String!
-  minThreshold: Decimal
-  maxThreshold: Decimal
+
+  """Minimum threshold for scaling"""
+  minThreshold: Decimal = null
+
+  """Maximum threshold for scaling"""
+  maxThreshold: Decimal = null
+
+  """Step size for scaling"""
   stepSize: Int!
+
+  """Time window in seconds for scaling evaluation"""
   timeWindow: Int!
-  minReplicas: Int
-  maxReplicas: Int
+
+  """Minimum number of replicas"""
+  minReplicas: Int = null
+
+  """Maximum number of replicas"""
+  maxReplicas: Int = null
 }
 
+"""Added in 25.19.0. Payload for creating an auto-scaling rule."""
 type CreateAutoScalingRulePayload {
-  autoScalingRule: AutoScalingRule!
+  """Created auto-scaling rule"""
+  rule: AutoScalingRule!
 }
 
-"""Added in 25.19.0"""
+"""Added in 25.19.0. """
 input CreateDeploymentInput {
   metadata: ModelDeploymentMetadataInput!
   networkAccess: ModelDeploymentNetworkAccessInput!
   defaultDeploymentStrategy: DeploymentStrategyInput!
+
+  """Desired number of replicas"""
   desiredReplicaCount: Int!
+
+  """Initial revision configuration"""
   initialRevision: CreateRevisionInput!
 }
 
-"""Added in 25.19.0"""
+"""Added in 25.19.0. Payload for creating a model deployment."""
 type CreateDeploymentPayload {
+  """Created deployment"""
   deployment: ModelDeployment!
 }
 
-"""Added in 25.14.0"""
+"""Added in 25.14.0. """
 input CreateHuggingFaceRegistryInput {
-  url: String!
+  """Registry name"""
   name: String!
+
+  """HuggingFace Hub URL"""
+  url: String!
+
+  """Access token for the registry"""
   token: String = null
 }
 
-"""Added in 25.14.0"""
+"""Added in 25.14.0. Payload for creating a HuggingFace registry."""
 type CreateHuggingFaceRegistryPayload {
   huggingfaceRegistry: HuggingFaceRegistry!
 }
 
-"""Input for creating a notification channel"""
+"""Added in 24.09.0. Input for creating a notification channel"""
 input CreateNotificationChannelInput {
+  """Channel name"""
   name: String!
+
+  """Channel description"""
   description: String = null
+
+  """Channel type"""
   channelType: NotificationChannelType!
+
+  """Channel specification"""
   spec: NotificationChannelSpecInput!
+
+  """Whether the channel is enabled"""
   enabled: Boolean! = true
 }
 
-"""Payload for create notification channel mutation"""
+"""Added in 26.3.0. Payload for create notification channel mutation."""
 type CreateNotificationChannelPayload {
   channel: NotificationChannel!
 }
 
-"""Input for creating a notification rule"""
+"""Added in 24.09.0. Input for creating a notification rule"""
 input CreateNotificationRuleInput {
+  """Rule name"""
   name: String!
+
+  """Rule description"""
   description: String = null
+
+  """Rule type"""
   ruleType: NotificationRuleType!
+
+  """ID of the channel to use"""
   channelId: ID!
+
+  """Jinja2 template for notification message (max 64KB)"""
   messageTemplate: String!
+
+  """Whether the rule is enabled"""
   enabled: Boolean! = true
 }
 
-"""Payload for create notification rule mutation"""
+"""Added in 26.3.0. Payload for create notification rule mutation."""
 type CreateNotificationRulePayload {
   rule: NotificationRule!
 }
 
-"""Added in 25.14.0"""
+"""Added in 25.14.0. """
 input CreateObjectStorageInput {
+  """Object storage name"""
   name: String!
+
+  """Host address of the object storage"""
   host: String!
+
+  """Access key for authentication"""
   accessKey: String!
+
+  """Secret key for authentication"""
   secretKey: String!
+
+  """Endpoint URL of the object storage"""
   endpoint: String!
+
+  """Region of the object storage"""
   region: String!
 }
 
-"""Added in 25.14.0"""
+"""Added in 25.14.0. Payload for creating an object storage."""
 type CreateObjectStoragePayload {
+  """Created object storage"""
   objectStorage: ObjectStorage!
 }
 
 """Added in 26.3.0. Input for creating a scoped permission"""
 input CreatePermissionInput {
+  """Role ID to assign this permission to"""
   roleId: UUID!
+
+  """Scope element type (e.g. 'domain', 'project')"""
   scopeType: RBACElementType!
+
+  """Scope element ID"""
   scopeId: String!
+
+  """Entity element type (e.g. 'session', 'vfolder')"""
   entityType: RBACElementType!
+
+  """Operation type (e.g. 'read', 'create')"""
   operation: OperationType!
 }
 
 """Added in 26.3.0. Input for creating a new query definition."""
 input CreateQueryDefinitionInput {
-  """Human-readable identifier (must be unique)."""
+  """Human-readable name"""
   name: String!
 
-  """Prometheus metric name."""
+  """Prometheus metric name"""
   metricName: String!
 
-  """PromQL template with {labels}, {window}, {group_by} placeholders."""
+  """PromQL template with placeholders"""
   queryTemplate: String!
 
-  """Default time window."""
+  """Default time window (e.g. '5m', '1h')"""
   timeWindow: String = null
 
-  """Query definition options including filter and group labels."""
+  """Query definition options"""
   options: QueryDefinitionOptionsInput!
 }
 
 """Added in 26.3.0. Payload returned after creating a query definition."""
 type CreateQueryDefinitionPayload {
+  """Created query definition."""
   preset: QueryDefinition!
 }
 
-"""Added in 25.14.0"""
+"""Added in 25.14.0. """
 input CreateReservoirRegistryInput {
+  """Registry name"""
   name: String!
+
+  """Reservoir endpoint URL"""
   endpoint: String!
+
+  """Access key for authentication"""
   accessKey: String!
+
+  """Secret key for authentication"""
   secretKey: String!
+
+  """API version string"""
   apiVersion: String!
 }
 
-"""Added in 25.14.0"""
+"""Added in 25.14.0. Payload for creating a reservoir registry."""
 type CreateReservoirRegistryPayload {
   reservoir: ReservoirRegistry!
 }
@@ -1611,20 +1631,29 @@ type CreateReservoirRegistryPayload {
 Added in 25.19.0. Input for specifying revision configuration within a deployment.
 """
 input CreateRevisionInput {
-  name: String = null
   clusterConfig: ClusterConfigInput!
   resourceConfig: ResourceConfigInput!
   image: ImageInput!
   modelRuntimeConfig: ModelRuntimeConfigInput!
   modelMountConfig: ModelMountConfigInput!
-  extraMounts: [ExtraVFolderMountInput!]
+
+  """Revision name"""
+  name: String = null
+
+  """Additional vfolder mounts"""
+  extraMounts: [ExtraVFolderMountInput!] = null
 }
 
 """Added in 26.3.0. Input for creating a role"""
 input CreateRoleInput {
+  """Role name"""
   name: String!
+
+  """Role description"""
   description: String = null
-  source: RoleSource = null
+
+  """Role source"""
+  source: RoleSource = CUSTOM
 }
 
 """
@@ -1644,7 +1673,7 @@ input CreateUserV2Input {
   domainName: String!
 
   """If true, user must change password on first login."""
-  needPasswordChange: Boolean!
+  needPasswordChange: Boolean! = false
 
   """Initial account status."""
   status: UserStatusV2!
@@ -1691,33 +1720,59 @@ type CreateUserV2Payload {
 
 """Added in 25.16.0. Input for creating VFS storage"""
 input CreateVFSStorageInput {
+  """Storage name"""
   name: String!
+
+  """Storage host address"""
   host: String!
+
+  """Base path on the storage host"""
   basePath: String!
 }
 
-"""Added in 25.16.0. Payload for creating VFS storage"""
+"""Added in 25.16.0. Payload for creating VFS storage."""
 type CreateVFSStoragePayload {
+  """Created VFS storage"""
   vfsStorage: VFSStorage!
 }
 
 """Date (isoformat)"""
 scalar Date
 
+"""
+Added in 24.09.0. Filter for date fields (not datetime) supporting range and equality operations.
+"""
 input DateFilter {
+  """Before this date (inclusive)"""
   before: Date = null
+
+  """After this date (inclusive)"""
   after: Date = null
+
+  """Exact date match"""
   equals: Date = null
+
+  """Not equal to this date"""
   notEquals: Date = null
 }
 
 """Date with time (isoformat)"""
 scalar DateTime
 
+"""
+Added in 24.09.0. Filter for datetime fields supporting range and equality operations.
+"""
 input DateTimeFilter {
+  """Before this datetime (inclusive)"""
   before: DateTime = null
+
+  """After this datetime (inclusive)"""
   after: DateTime = null
+
+  """Exact datetime match"""
   equals: DateTime = null
+
+  """Not equal to this datetime"""
   notEquals: DateTime = null
 }
 
@@ -1725,33 +1780,31 @@ input DateTimeFilter {
 scalar Decimal
 
 """
-Added in 25.15.0.
+Added in 24.09.0. Added in 25.15.0.
 
 Input type for delegated import of artifact revisions from a reservoir registry's remote registry.
 Used to specify which artifact revisions should be imported from the remote registry source
 into the local reservoir registry storage.
 """
 input DelegateImportArtifactsInput {
-  """List of artifact revision IDs of delegatee artifact registry"""
+  """List of artifact revision IDs of delegatee artifact registry."""
   artifactRevisionIds: [ID!]!
 
-  """ID of the reservoir registry to delegate the import request to"""
+  """ID of the reservoir registry to delegate the import request to."""
   delegatorReservoirId: ID = null
+
+  """Filter artifacts by type."""
   artifactType: ArtifactType = null
+
+  """Target delegatee reservoir registry."""
   delegateeTarget: DelegateeTarget = null
 
-  """
-  Options controlling import behavior such as forcing re-download. Added in 26.1.0.
-  """
+  """Options controlling import behavior."""
   options: ImportArtifactsOptionsGQL = null
 }
 
 """
-Added in 25.15.0.
-
-Response payload for delegated artifact import operation.
-Contains the imported artifact revisions and associated background tasks.
-The tasks can be monitored to track the progress of the import operation.
+Added in 25.15.0. Response payload for delegated artifact import operation. Contains the imported artifact revisions and associated background tasks. The tasks can be monitored to track the progress of the import operation.
 """
 type DelegateImportArtifactsPayload {
   """
@@ -1764,33 +1817,29 @@ type DelegateImportArtifactsPayload {
 }
 
 """
-Added in 25.15.0.
+Added in 24.09.0. Added in 25.15.0.
 
 Input type for delegated scanning of artifacts from a delegatee reservoir registry's remote registry.
 """
 input DelegateScanArtifactsInput {
-  """ID of the reservoir registry to delegate the scan request to"""
+  """ID of the reservoir registry to delegate the scan request to."""
   delegatorReservoirId: ID = null
 
-  """Target delegatee reservoir registry and its remote registry to scan"""
+  """Target delegatee reservoir registry and its remote registry to scan."""
   delegateeTarget: DelegateeTarget = null
 
-  """Maximum number of artifacts to scan (max: 500)"""
+  """Maximum number of artifacts to scan."""
   limit: Int!
 
-  """Filter artifacts by type (e.g., model, image, package)"""
+  """Filter artifacts by type."""
   artifactType: ArtifactType = null
 
-  """Search term to filter artifacts by name or description"""
+  """Search term to filter artifacts by name or description."""
   search: String = null
 }
 
 """
-Added in 25.15.0.
-
-Response payload for delegated artifact scanning operation.
-Contains the list of artifacts discovered during the scan of a reservoir registry's remote registry.
-These artifacts are now available for import or direct use.
+Added in 25.15.0. Response payload for delegated artifact scanning operation. Contains the list of artifacts discovered during the scan of a reservoir registry's remote registry. These artifacts are now available for import or direct use.
 """
 type DelegateScanArtifactsPayload {
   """
@@ -1799,14 +1848,17 @@ type DelegateScanArtifactsPayload {
   artifacts: [Artifact!]!
 }
 
-"""Added in 25.15.0"""
+"""Added in 25.15.0. """
 input DelegateeTarget {
+  """ID of the delegatee reservoir registry."""
   delegateeReservoirId: ID!
+
+  """ID of the target registry within the delegatee reservoir."""
   targetRegistryId: ID!
 }
 
 """
-Added in 25.15.0.
+Added in 24.09.0. Added in 25.15.0.
 
 Input for soft-deleting artifacts from the system.
 
@@ -1814,143 +1866,158 @@ Marks artifacts as deleted without permanently removing them.
 Deleted artifacts can be restored using restore_artifacts.
 """
 input DeleteArtifactsInput {
+  """List of artifact IDs to delete."""
   artifactIds: [ID!]!
 }
 
 """
-Added in 25.15.0.
-
-Response payload for artifact deletion operations.
-
-Contains the artifacts that were soft-deleted. These can be restored later.
+Added in 25.15.0. Response payload for artifact deletion operations. Contains the artifacts that were soft-deleted. These can be restored later.
 """
 type DeleteArtifactsPayload {
   artifacts: [Artifact!]!
 }
 
+"""Added in 25.16.0. Input for deleting an auto-scaling rule"""
 input DeleteAutoScalingRuleInput {
+  """ID of the auto-scaling rule to delete"""
   id: ID!
 }
 
+"""Added in 25.19.0. Payload for deleting an auto-scaling rule."""
 type DeleteAutoScalingRulePayload {
+  """ID of the deleted auto-scaling rule"""
   id: ID!
 }
 
-"""Added in 25.19.0"""
+"""Added in 25.19.0. """
 input DeleteDeploymentInput {
+  """Deployment ID to delete"""
   id: ID!
 }
 
-"""Added in 25.19.0"""
+"""Added in 25.19.0. Payload for deleting a model deployment."""
 type DeleteDeploymentPayload {
+  """ID of the deleted deployment"""
   id: ID!
 }
 
 """Added in 25.16.0. Input for deleting domain-level app configuration"""
 input DeleteDomainConfigInput {
+  """Domain name whose configuration will be deleted."""
   domainName: String!
 }
 
 """
-Added in 25.16.0.
-Payload returned after deleting domain-level app configuration.
-Indicates whether the deletion was successful.
+Added in 25.16.0. Payload returned after deleting domain-level app configuration. Indicates whether the deletion was successful.
 """
 type DeleteDomainConfigPayload {
+  """Whether the deletion was successful."""
   deleted: Boolean!
 }
 
-"""Added in 25.14.0"""
+"""Added in 25.14.0. """
 input DeleteHuggingFaceRegistryInput {
+  """Registry ID to delete"""
   id: ID!
 }
 
-"""Added in 25.14.0"""
+"""Added in 25.14.0. Payload for deleting a HuggingFace registry."""
 type DeleteHuggingFaceRegistryPayload {
   id: ID!
 }
 
-"""Input for deleting a notification channel"""
+"""Added in 24.09.0. Input for deleting a notification channel"""
 input DeleteNotificationChannelInput {
+  """Channel ID to delete"""
   id: ID!
 }
 
-"""Payload for delete notification channel mutation"""
+"""Added in 26.3.0. Payload for delete notification channel mutation."""
 type DeleteNotificationChannelPayload {
-  id: ID!
+  """ID of the deleted notification channel."""
+  id: UUID!
 }
 
-"""Input for deleting a notification rule"""
+"""Added in 24.09.0. Input for deleting a notification rule"""
 input DeleteNotificationRuleInput {
+  """Rule ID to delete"""
   id: ID!
 }
 
-"""Payload for delete notification rule mutation"""
+"""Added in 26.3.0. Payload for delete notification rule mutation."""
 type DeleteNotificationRulePayload {
-  id: ID!
+  """ID of the deleted notification rule."""
+  id: UUID!
 }
 
-"""Added in 25.14.0"""
+"""Added in 25.14.0. """
 input DeleteObjectStorageInput {
+  """Object storage ID to delete"""
   id: ID!
 }
 
-"""Added in 25.14.0"""
+"""Added in 25.14.0. Payload for deleting an object storage."""
 type DeleteObjectStoragePayload {
-  id: ID!
+  """ID of the deleted object storage"""
+  id: UUID!
 }
 
 """Added in 26.3.0. Input for deleting a scoped permission"""
 input DeletePermissionInput {
+  """Permission ID to delete"""
   id: UUID!
 }
 
-"""Added in 26.3.0. Payload for delete permission mutation"""
+"""Added in 26.3.0. Payload for delete permission mutation."""
 type DeletePermissionPayload {
-  id: ID!
+  """ID of the deleted permission."""
+  id: UUID!
 }
 
 """Added in 26.3.0. Payload returned after deleting a query definition."""
 type DeleteQueryDefinitionPayload {
-  """ID of the deleted query definition."""
-  id: ID!
+  """Deleted query definition ID."""
+  id: String!
 }
 
-"""Added in 25.14.0"""
+"""Added in 25.14.0. """
 input DeleteReservoirRegistryInput {
+  """Registry ID to delete"""
   id: ID!
 }
 
-"""Added in 25.14.0"""
+"""Added in 25.14.0. Payload for deleting a reservoir registry."""
 type DeleteReservoirRegistryPayload {
   id: ID!
 }
 
 """Added in 26.3.0. Input for soft-deleting a role"""
 input DeleteRoleInput {
+  """Role ID to delete"""
   id: UUID!
 }
 
-"""Added in 26.3.0. Payload for delete role mutation"""
+"""Added in 26.3.0. Payload for delete role mutation."""
 type DeleteRolePayload {
-  id: ID!
+  """ID of the deleted role."""
+  id: UUID!
 }
 
 """
-Added in 25.16.0.
+Added in 24.09.0. Added in 25.16.0.
 Input for deleting user-level app configuration.
 If user_id is not provided, the current user's configuration will be deleted.
 """
 input DeleteUserConfigInput {
+  """User ID whose configuration will be deleted. Defaults to current user."""
   userId: ID = null
 }
 
 """
-Added in 25.16.0.
-Payload returned after deleting user-level app configuration.
-Indicates whether the deletion was successful.
+Added in 25.16.0. Payload returned after deleting user-level app configuration. Indicates whether the deletion was successful.
 """
 type DeleteUserConfigPayload {
+  """Whether the deletion was successful."""
   deleted: Boolean!
 }
 
@@ -1976,15 +2043,17 @@ type DeleteUsersV2Payload {
 
 """Added in 25.16.0. Input for deleting VFS storage"""
 input DeleteVFSStorageInput {
+  """Storage ID to delete"""
   id: ID!
 }
 
-"""Added in 25.16.0. Payload for deleting VFS storage"""
+"""Added in 25.16.0. Payload for deleting VFS storage."""
 type DeleteVFSStoragePayload {
-  id: ID!
+  """ID of the deleted VFS storage"""
+  id: UUID!
 }
 
-"""Added in 25.19.0"""
+"""Added in 25.19.0."""
 input DeploymentFilter {
   name: StringFilter = null
   status: DeploymentStatusFilter = null
@@ -1996,7 +2065,7 @@ input DeploymentFilter {
   NOT: [DeploymentFilter!] = null
 }
 
-"""Deployment history record"""
+"""Added in 26.3.0. Deployment history record."""
 type DeploymentHistory implements Node {
   """The Globally Unique ID of this object"""
   id: ID!
@@ -2015,7 +2084,7 @@ type DeploymentHistory implements Node {
   deploymentId: ID!
 }
 
-"""Deployment history connection"""
+"""Added in 26.3.0. Deployment history connection."""
 type DeploymentHistoryConnection {
   """Pagination data for this connection"""
   pageInfo: PageInfo!
@@ -2034,14 +2103,14 @@ type DeploymentHistoryEdge {
   node: DeploymentHistory!
 }
 
-"""Filter for deployment history"""
+"""Added in 24.09.0. Filter for deployment history"""
 input DeploymentHistoryFilter {
   id: UUIDFilter = null
   deploymentId: UUIDFilter = null
   phase: StringFilter = null
   fromStatus: [String!] = null
   toStatus: [String!] = null
-  result: [SchedulingResult!] = null
+  result: SchedulingResultFilter = null
   errorCode: StringFilter = null
   message: StringFilter = null
   createdAt: DateTimeFilter = null
@@ -2051,9 +2120,12 @@ input DeploymentHistoryFilter {
   NOT: [DeploymentHistoryFilter!] = null
 }
 
-"""Order by specification for deployment history"""
+"""Added in 24.09.0. Order by specification for deployment history"""
 input DeploymentHistoryOrderBy {
+  """Field to order by"""
   field: DeploymentHistoryOrderField!
+
+  """Order direction"""
   direction: OrderDirection! = DESC
 }
 
@@ -2062,7 +2134,7 @@ enum DeploymentHistoryOrderField {
   UPDATED_AT
 }
 
-"""Added in 25.19.0"""
+"""Added in 25.19.0. """
 input DeploymentOrderBy {
   field: DeploymentOrderField!
   direction: OrderDirection! = DESC
@@ -2084,9 +2156,9 @@ type DeploymentPolicy implements Node {
   updatedAt: DateTime!
 }
 
-"""Scope for deployment scheduling history query"""
+"""Added in 24.09.0. Scope for deployment scheduling history query"""
 input DeploymentScope {
-  """Deployment ID to get history for"""
+  """Deployment ID to get history for."""
   deploymentId: UUID!
 }
 
@@ -2104,17 +2176,24 @@ enum DeploymentStatus {
   STOPPED
 }
 
-"""Added in 25.19.0"""
+"""Added in 25.19.0. Payload for deployment status changed event."""
 type DeploymentStatusChangedPayload {
+  """The deployment whose status changed"""
   deployment: ModelDeployment!
 }
 
-"""Added in 25.19.0"""
+"""Added in 25.19.0. """
 input DeploymentStatusFilter {
-  in: [DeploymentStatus!] = null
+  """Exact status match"""
   equals: DeploymentStatus = null
+
+  """Status is in list"""
+  in: [DeploymentStatus!] = null
 }
 
+"""
+Added in 25.19.0. Represents the deployment strategy configuration that determines how updates are rolled out to replicas (e.g., rolling update, blue-green).
+"""
 type DeploymentStrategyGQL {
   type: DeploymentStrategyType!
 }
@@ -2123,9 +2202,16 @@ type DeploymentStrategyGQL {
 Added in 25.19.0. Deployment strategy configuration with discriminator pattern.
 """
 input DeploymentStrategyInput {
+  """Deployment strategy type"""
   type: DeploymentStrategyType!
+
+  """Roll back automatically on failure"""
   rollbackOnFailure: Boolean! = false
+
+  """Rolling update config (required for ROLLING strategy)"""
   rollingUpdate: RollingUpdateConfigInput = null
+
+  """Blue/green config (required for BLUE_GREEN strategy)"""
   blueGreen: BlueGreenConfigInput = null
 }
 
@@ -2212,7 +2298,7 @@ type DomainFairShareConnection {
 Added in 26.2.0. Nested filter for domain entity fields in domain fair share queries. Allows filtering by domain properties such as active status.
 """
 input DomainFairShareDomainNestedFilter {
-  """Filter by domain active status."""
+  """Filter by domain active status"""
   isActive: Boolean = null
 }
 
@@ -2262,14 +2348,10 @@ input DomainFairShareFilter {
 Added in 26.1.0. Specifies ordering for domain fair share query results. Combine field selection with direction to sort results. Default direction is DESC (descending).
 """
 input DomainFairShareOrderBy {
-  """
-  The field to order by. See DomainFairShareOrderField for available options.
-  """
+  """Field to order by"""
   field: DomainFairShareOrderField!
 
-  """
-  Sort direction. ASC for ascending (lowest first), DESC for descending (highest first). For fair_share_factor, ASC shows highest priority domains first.
-  """
+  """Order direction"""
   direction: OrderDirection! = DESC
 }
 
@@ -2283,6 +2365,7 @@ enum DomainFairShareOrderField {
   DOMAIN_IS_ACTIVE
 }
 
+"""Added in 24.09.0. """
 input DomainFairShareScope {
   """Resource group to filter fair shares by."""
   resourceGroupName: String!
@@ -2312,12 +2395,7 @@ extend type DomainNode @key(fields: "id") {
 Added in 26.2.0. Nested filter for projects belonging to a domain. Filters domains that have at least one project matching all specified conditions.
 """
 input DomainProjectNestedFilter {
-  """
-  Filter by project name. Supports equals, contains, startsWith, and endsWith.
-  """
   name: StringFilter = null
-
-  """Filter by project active status."""
   isActive: Boolean = null
 }
 
@@ -2325,9 +2403,7 @@ input DomainProjectNestedFilter {
 Added in 26.2.0. Scope for querying projects within a specific domain. Used to restrict project queries to a particular domain context.
 """
 input DomainProjectV2Scope {
-  """
-  Domain name to scope the query. Only projects belonging to this domain will be returned.
-  """
+  """Domain name to scope the query."""
   domainName: String!
 }
 
@@ -2446,17 +2522,14 @@ input DomainUsageBucketFilter {
 Added in 26.1.0. Specifies ordering for domain usage bucket query results. Combine field selection with direction to sort results. Default direction is DESC (most recent first).
 """
 input DomainUsageBucketOrderBy {
-  """
-  The field to order by. See UsageBucketOrderField for available options.
-  """
+  """Field to order by"""
   field: UsageBucketOrderField!
 
-  """
-  Sort direction. ASC for chronological order (oldest first), DESC for reverse chronological order (most recent first).
-  """
+  """Order direction"""
   direction: OrderDirection! = DESC
 }
 
+"""Added in 24.09.0. """
 input DomainUsageScope {
   """Resource group to filter usage buckets by."""
   resourceGroupName: String!
@@ -2466,17 +2539,8 @@ input DomainUsageScope {
 Added in 26.2.0. Nested filter for users belonging to a domain. Filters domains that have at least one user matching all specified conditions.
 """
 input DomainUserNestedFilter {
-  """
-  Filter by username. Supports equals, contains, startsWith, and endsWith.
-  """
   username: StringFilter = null
-
-  """Filter by email. Supports equals, contains, startsWith, and endsWith."""
   email: StringFilter = null
-
-  """
-  Filter by user active status. True for active users (status=ACTIVE), False for inactive.
-  """
   isActive: Boolean = null
 }
 
@@ -2484,9 +2548,7 @@ input DomainUserNestedFilter {
 Added in 26.2.0. Scope for querying users within a specific domain. Used to restrict user queries to a particular domain context.
 """
 input DomainUserV2Scope {
-  """
-  Domain name to scope the user query. Only users belonging to this domain will be returned.
-  """
+  """Domain name to scope the user query."""
   domainName: String!
 }
 
@@ -2555,52 +2617,15 @@ type DomainV2Edge {
 Added in 26.2.0. Filter input for querying domains. Supports filtering by name, description, active status, timestamps, and nested project/user filters. Multiple filters can be combined using AND, OR, and NOT logical operators.
 """
 input DomainV2Filter {
-  """
-  Filter by domain name. Supports equals, contains, startsWith, and endsWith.
-  """
   name: StringFilter = null
-
-  """
-  Filter by domain description. Supports equals, contains, startsWith, and endsWith.
-  """
   description: StringFilter = null
-
-  """
-  Filter by active status. True for active domains, False for inactive domains.
-  """
   isActive: Boolean = null
-
-  """
-  Filter by creation timestamp. Supports before, after, and between operations.
-  """
   createdAt: DateTimeFilter = null
-
-  """
-  Filter by last modification timestamp. Supports before, after, and between operations.
-  """
   modifiedAt: DateTimeFilter = null
-
-  """
-  Filter by nested project conditions. Returns domains that have at least one project matching all specified conditions.
-  """
   project: DomainProjectNestedFilter = null
-
-  """
-  Filter by nested user conditions. Returns domains that have at least one user matching all specified conditions.
-  """
   user: DomainUserNestedFilter = null
-
-  """Combine multiple filters with AND logic. All conditions must match."""
   AND: [DomainV2Filter!] = null
-
-  """
-  Combine multiple filters with OR logic. At least one condition must match.
-  """
   OR: [DomainV2Filter!] = null
-
-  """
-  Negate the specified filters. Records matching these conditions will be excluded.
-  """
   NOT: [DomainV2Filter!] = null
 }
 
@@ -2608,11 +2633,11 @@ input DomainV2Filter {
 Added in 26.2.0. Specifies ordering for domain query results. Combine field selection with direction to sort results. Default direction is DESC (descending).
 """
 input DomainV2OrderBy {
-  """The field to order by. See DomainV2OrderField for available options."""
+  """Field to order by."""
   field: DomainV2OrderField!
 
-  """Sort direction. ASC for ascending, DESC for descending."""
-  direction: OrderDirection! = DESC
+  """Order direction."""
+  direction: OrderDirection! = ASC
 }
 
 """
@@ -2632,37 +2657,45 @@ enum DomainV2OrderField {
 Added in 26.1.0. Input item for a single domain weight in bulk upsert. Represents one domain's weight configuration.
 """
 input DomainWeightInputItem {
-  """Name of the domain to update weight for."""
+  """Domain name"""
   domainName: String!
 
-  """
-  Priority weight multiplier. Higher weight = higher priority allocation ratio. Set to null to use resource group's default_weight.
-  """
-  weight: Decimal = null
+  """Fair share weight (null for default)"""
+  weight: Decimal
 }
 
-"""Input for email message settings"""
+"""Added in 24.09.0. Input for email message settings"""
 input EmailMessageInput {
+  """Sender email address."""
   fromEmail: String!
+
+  """Recipient email addresses."""
   toEmails: [String!]!
+
+  """Email subject template."""
   subjectTemplate: String = null
 }
 
-"""Input for email notification channel configuration"""
+"""Added in 24.09.0. Input for email notification channel configuration"""
 input EmailSpecInput {
+  """SMTP connection settings."""
   smtp: SMTPConnectionInput!
+
+  """Email message settings."""
   message: EmailMessageInput!
+
+  """SMTP authentication."""
   auth: SMTPAuthInput = null
 }
 
-"""Added in 26.3.0. Entity connection"""
+"""Added in 26.3.0. Entity connection."""
 type EntityConnection {
   edges: [EntityEdge!]!
   pageInfo: PageInfo!
   count: Int!
 }
 
-"""Added in 26.3.0. Entity edge"""
+"""Added in 26.3.0. Entity edge."""
 type EntityEdge {
   node: EntityRef!
   cursor: String!
@@ -2692,7 +2725,7 @@ enum EntityOrderField {
 }
 
 """
-Added in 26.3.0. Entity reference from the association_scopes_entities table
+Added in 26.3.0. Entity reference from the association_scopes_entities table.
 """
 type EntityRef implements Node {
   """The Globally Unique ID of this object"""
@@ -2733,10 +2766,10 @@ type EnvironmentVariableEntry {
 Added in 26.1.0. A single environment variable entry with name and value.
 """
 input EnvironmentVariableEntryInput {
-  """Environment variable name (e.g., CUDA_VISIBLE_DEVICES)."""
+  """Environment variable name"""
   name: String!
 
-  """Environment variable value."""
+  """Environment variable value"""
   value: String!
 }
 
@@ -2748,19 +2781,20 @@ type EnvironmentVariables {
 
 """Added in 26.1.0. A collection of environment variable entries."""
 input EnvironmentVariablesInput {
-  """List of environment variable entries."""
+  """List of environment variable entries"""
   entries: [EnvironmentVariableEntryInput!]!
 }
 
 """Added in 26.3.0. Options for executing a query definition."""
 input ExecuteQueryDefinitionOptionsInput {
-  """Label key-value pairs to filter by."""
-  filterLabels: [MetricLabelEntryInput!] = null
+  """Filter labels as key-value pairs"""
+  filterLabels: [MetricLabelEntryInput!] = []
 
-  """Label keys to group results by."""
-  groupLabels: [String!] = null
+  """Group-by labels"""
+  groupLabels: [String!] = []
 }
 
+"""Added in 24.3.0. Represents a virtual folder mount in a deployment."""
 type ExtraVFolderMount implements Node {
   """The Globally Unique ID of this object"""
   id: ID!
@@ -2768,7 +2802,9 @@ type ExtraVFolderMount implements Node {
   vfolder: VirtualFolderNode!
 }
 
-"""Added in 25.16.0"""
+"""
+Added in 25.16.0. Connection type for paginated virtual folder mount results.
+"""
 type ExtraVFolderMountConnection {
   """Pagination data for this connection"""
   pageInfo: PageInfo!
@@ -2787,10 +2823,13 @@ type ExtraVFolderMountEdge {
   node: ExtraVFolderMount!
 }
 
-"""Added in 25.19.0"""
+"""Added in 25.19.0. """
 input ExtraVFolderMountInput {
+  """VFolder ID to mount"""
   vfolderId: ID!
-  mountDestination: String
+
+  """Mount destination path"""
+  mountDestination: String = null
 }
 
 """
@@ -2898,27 +2937,41 @@ type FairShareSpec {
   resourceWeights: [ResourceWeightEntry!]!
 }
 
-"""Added in 25.14.0"""
+"""Added in 25.14.0. """
 input GetPresignedDownloadURLInput {
+  """The unique identifier of the artifact revision"""
   artifactRevisionId: ID!
+
+  """Object key"""
   key: String!
+
+  """URL expiration time in seconds"""
   expiration: Int = null
 }
 
-"""Added in 25.14.0"""
+"""
+Added in 25.14.0. Payload for presigned download URL generation result.
+"""
 type GetPresignedDownloadURLPayload {
+  """Presigned URL for downloading"""
   presignedUrl: String!
 }
 
-"""Added in 25.14.0"""
+"""Added in 25.14.0. """
 input GetPresignedUploadURLInput {
+  """The unique identifier of the artifact revision"""
   artifactRevisionId: ID!
+
+  """Object key"""
   key: String!
 }
 
-"""Added in 25.14.0"""
+"""Added in 25.14.0. Payload for presigned upload URL generation result."""
 type GetPresignedUploadURLPayload {
+  """Presigned URL for uploading"""
   presignedUrl: String!
+
+  """Additional fields required for the upload request"""
   fields: String!
 }
 
@@ -2926,7 +2979,7 @@ extend type GroupNode @key(fields: "id") {
   id: ID! @external
 }
 
-"""Added in 25.14.0"""
+"""Added in 25.14.0. HuggingFace registry node."""
 type HuggingFaceRegistry implements Node {
   """The Globally Unique ID of this object"""
   id: ID!
@@ -2935,7 +2988,9 @@ type HuggingFaceRegistry implements Node {
   token: String
 }
 
-"""Added in 25.14.0"""
+"""
+Added in 25.14.0. Relay-style connection for paginated HuggingFace registry queries.
+"""
 type HuggingFaceRegistryConnection {
   """Pagination data for this connection"""
   pageInfo: PageInfo!
@@ -2958,14 +3013,13 @@ type HuggingFaceRegistryEdge {
 Added in 26.3.0. Nested filter for aliases belonging to an image. Filters images that have at least one alias matching all specified conditions.
 """
 input ImageAliasNestedFilter {
-  """
-  Filter by alias string. Supports equals, contains, startsWith, and endsWith.
-  """
+  """Filter by alias string."""
   alias: StringFilter = null
 }
 
-"""Added in 25.19.0"""
+"""Added in 25.19.0. """
 input ImageInput {
+  """Container image ID"""
   id: ID!
 }
 
@@ -2974,16 +3028,7 @@ extend type ImageNode @key(fields: "id") {
 }
 
 """
-Added in 26.2.0.
-
-Represents a container image in Backend.AI.
-
-Images are container specifications that define the runtime environment
-for compute sessions. Each image has identity information, metadata,
-resource requirements, and permission settings.
-
-This is the V2 implementation using Strawberry GraphQL with Relay-style
-connections as part of BEP-1010 migration.
+Added in 26.2.0. Represents a container image in Backend.AI. Images are container specifications that define the runtime environment for compute sessions. Each image has identity information, metadata, resource requirements, and permission settings. This is the V2 implementation using Strawberry GraphQL with Relay-style connections as part of BEP-1010 migration.
 """
 type ImageV2 implements Node {
   """The Globally Unique ID of this object"""
@@ -3010,14 +3055,11 @@ type ImageV2 implements Node {
   lastUsed: DateTime
 
   """Added in 26.2.0. Aliases for this image."""
-  aliases(filter: ImageV2AliasFilterGQL = null, orderBy: [ImageV2AliasOrderByGQL!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null): ImageV2AliasConnection!
+  aliases(filter: ImageV2AliasFilter = null, orderBy: [ImageV2AliasOrderByGQL!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null): ImageV2AliasConnection!
 }
 
 """
-Added in 26.2.0.
-
-Represents an alias for a container image.
-Aliases provide alternative names for images.
+Added in 26.2.0. Represents an alias for a container image. Aliases provide alternative names for images.
 """
 type ImageV2Alias implements Node {
   """The Globally Unique ID of this object"""
@@ -3028,10 +3070,7 @@ type ImageV2Alias implements Node {
 }
 
 """
-Added in 26.2.0.
-
-Relay-style connection for paginated image alias queries.
-Includes total count for pagination UI.
+Added in 26.2.0. Relay-style connection for paginated image alias queries. Includes total count for pagination UI.
 """
 type ImageV2AliasConnection {
   """Pagination data for this connection"""
@@ -3054,25 +3093,26 @@ type ImageV2AliasEdge {
 }
 
 """
-Added in 26.2.0.
-
-Filter options for image aliases.
-Supports filtering by alias string.
+Added in 26.2.0. Filter options for image aliases. Supports filtering by alias string and image ID.
 """
-input ImageV2AliasFilterGQL {
+input ImageV2AliasFilter {
   alias: StringFilter = null
-  AND: [ImageV2AliasFilterGQL!] = null
-  OR: [ImageV2AliasFilterGQL!] = null
-  NOT: [ImageV2AliasFilterGQL!] = null
+
+  """Added in 26.4.0. Filter by image ID."""
+  imageId: UUIDFilter = null
+  AND: [ImageV2AliasFilter!] = null
+  OR: [ImageV2AliasFilter!] = null
+  NOT: [ImageV2AliasFilter!] = null
 }
 
 """
-Added in 26.2.0.
-
-Specifies the field and direction for ordering image aliases in queries.
+Added in 26.2.0. Specifies the field and direction for ordering image aliases in queries.
 """
 input ImageV2AliasOrderByGQL {
+  """Field to order by."""
   field: ImageV2AliasOrderField!
+
+  """Order direction."""
   direction: OrderDirection! = ASC
 }
 
@@ -3086,10 +3126,7 @@ enum ImageV2AliasOrderField {
 }
 
 """
-Added in 26.2.0.
-
-Relay-style connection for paginated image queries.
-Includes total count for pagination UI.
+Added in 26.2.0. Relay-style connection for paginated image queries. Includes total count for pagination UI.
 """
 type ImageV2Connection {
   """Pagination data for this connection"""
@@ -3112,64 +3149,50 @@ type ImageV2Edge {
 }
 
 """
-Added in 26.2.0.
-
-Filter options for images based on various criteria such as status,
-name, and architecture.
-
-Supports logical operations (AND, OR, NOT) for complex filtering scenarios.
+Added in 26.2.0. Filter options for images based on various criteria such as status, name, and architecture. Supports logical operations (AND, OR, NOT) for complex filtering scenarios.
 """
-input ImageV2FilterGQL {
-  status: [ImageV2Status!] = null
+input ImageV2Filter {
+  status: ImageV2StatusFilter = null
   name: StringFilter = null
   architecture: StringFilter = null
+
+  """Added in 26.4.0. Filter by container registry ID."""
+  registryId: UUIDFilter = null
 
   """Added in 26.3.0. Filter by nested alias conditions."""
   alias: ImageAliasNestedFilter = null
 
   """Added in 26.3.0. Filter by last used datetime (before/after)."""
   lastUsed: DateTimeFilter = null
-  AND: [ImageV2FilterGQL!] = null
-  OR: [ImageV2FilterGQL!] = null
-  NOT: [ImageV2FilterGQL!] = null
+  AND: [ImageV2Filter!] = null
+  OR: [ImageV2Filter!] = null
+  NOT: [ImageV2Filter!] = null
 }
 
 """
-Added in 26.2.0.
-
-Identity information for an image.
-Contains the canonical name, namespace, and architecture.
+Added in 26.2.0. Identity information for an image. Contains the canonical name, namespace, and architecture.
 """
 type ImageV2IdentityInfo {
-  """Full canonical name (e.g., 'cr.backend.ai/stable/python:3.9')."""
+  """Full canonical name of the image."""
   canonicalName: String!
 
-  """Image namespace/path within the registry (e.g., 'stable/python')."""
+  """Image namespace/path within the registry."""
   namespace: String!
 
-  """CPU architecture (e.g., 'x86_64', 'aarch64')."""
+  """CPU architecture."""
   architecture: String!
 }
 
 """
-Added in 26.2.0.
-
-A key-value pair representing a Docker label on the image.
-Labels contain metadata about the image such as maintainer, version, etc.
+Added in 26.2.0. A key-value pair representing a Docker label on the image. Labels contain metadata about the image such as maintainer, version, etc.
 """
 type ImageV2LabelEntry {
-  """The label key (e.g., 'maintainer')."""
   key: String!
-
-  """The label value."""
   value: String!
 }
 
 """
-Added in 26.2.0.
-
-Metadata information for an image.
-Contains tags, labels, digest, size, status, and creation timestamp.
+Added in 26.2.0. Metadata information for an image. Contains tags, labels, digest, size, status, and creation timestamp.
 """
 type ImageV2MetadataInfo {
   """
@@ -3180,26 +3203,27 @@ type ImageV2MetadataInfo {
   """Docker labels."""
   labels: [ImageV2LabelEntry!]!
 
-  """Config digest (image hash) for verification."""
+  """Image status (ALIVE or DELETED)."""
+  status: ImageV2Status!
+
+  """Config digest for verification."""
   digest: String
 
   """Image size in bytes."""
   sizeBytes: Int!
 
-  """Image status (ALIVE or DELETED)."""
-  status: ImageV2Status!
-
-  """Timestamp when the image was created/registered."""
+  """Image creation timestamp."""
   createdAt: DateTime
 }
 
 """
-Added in 26.2.0.
-
-Specifies the field and direction for ordering images in queries.
+Added in 26.2.0. Specifies the field and direction for ordering images in queries.
 """
 input ImageV2OrderByGQL {
+  """Field to order by."""
   field: ImageV2OrderField!
+
+  """Order direction."""
   direction: OrderDirection! = ASC
 }
 
@@ -3227,10 +3251,7 @@ enum ImageV2Permission {
 }
 
 """
-Added in 26.2.0.
-
-Permission information for an image.
-Contains the list of permissions the current user has on this image.
+Added in 26.2.0. Permission information for an image. Contains the list of permissions the current user has on this image.
 """
 type ImageV2PermissionInfo {
   """List of permissions the user has on this image."""
@@ -3238,41 +3259,26 @@ type ImageV2PermissionInfo {
 }
 
 """
-Added in 26.2.0.
-
-Runtime requirements information for an image.
-Contains resource limits and supported accelerators.
+Added in 26.2.0. Runtime requirements information for an image. Contains resource limits and supported accelerators.
 """
 type ImageV2RequirementsInfo {
   """Resource slot limits (cpu, memory, accelerators, etc.)."""
   resourceLimits: [ImageV2ResourceLimit!]!
 
-  """List of supported accelerator types (e.g., 'cuda', 'rocm')."""
+  """List of supported accelerator types."""
   supportedAccelerators: [String!]!
 }
 
 """
-Added in 26.2.0.
-
-Resource limit specification for an image.
-Defines minimum and maximum values for a resource slot.
+Added in 26.2.0. Resource limit specification for an image. Defines minimum and maximum values for a resource slot.
 """
 type ImageV2ResourceLimit {
-  """Resource slot name (e.g., 'cpu', 'mem', 'cuda.shares')."""
   key: String!
-
-  """Minimum required amount."""
   min: String!
-
-  """Maximum allowed amount."""
   max: String!
 }
 
-"""
-Added in 26.2.0.
-
-Scope for querying aliases within a specific image.
-"""
+"""Added in 26.2.0. Scope for querying aliases within a specific image."""
 input ImageV2Scope {
   """UUID of the image to scope the query to."""
   imageId: UUID!
@@ -3289,21 +3295,32 @@ enum ImageV2Status {
 }
 
 """
-Added in 26.2.0.
+Added in 26.3.0. Filter for image status with equality and membership operators.
+"""
+input ImageV2StatusFilter {
+  """Matches images with this exact status."""
+  equals: ImageV2Status = null
 
-A key-value pair representing a parsed tag component.
-Tags are extracted from the image reference (e.g., py311, cuda12.1).
+  """Matches images whose status is in this list."""
+  in: [ImageV2Status!] = null
+
+  """Excludes images with this exact status."""
+  notEquals: ImageV2Status = null
+
+  """Excludes images whose status is in this list."""
+  notIn: [ImageV2Status!] = null
+}
+
+"""
+Added in 26.2.0. A key-value pair representing a parsed tag component. Tags are extracted from the image reference (e.g., py311, cuda12.1).
 """
 type ImageV2TagEntry {
-  """The tag key (e.g., 'python', 'cuda')."""
   key: String!
-
-  """The tag value (e.g., '3.11', '12.1')."""
   value: String!
 }
 
 """
-Added in 25.14.0.
+Added in 24.09.0. Added in 25.14.0.
 
 Input for importing scanned artifact revisions from external registries.
 
@@ -3311,19 +3328,18 @@ Downloads artifact files from the external source and transitions them through:
 SCANNED → PULLING → PULLED → AVAILABLE status progression.
 """
 input ImportArtifactsInput {
+  """List of artifact revision IDs to import."""
   artifactRevisionIds: [ID!]!
 
-  """Target vfolder ID to store the imported artifacts. Added in 26.1.0."""
+  """Optional vfolder ID to import artifacts directly into."""
   vfolderId: ID = null
 
-  """
-  Options controlling import behavior such as forcing re-download. Added in 26.1.0.
-  """
+  """Options controlling import behavior such as forcing re-download."""
   options: ImportArtifactsOptionsGQL = null
 }
 
 """
-Added in 26.1.0.
+Added in 24.09.0. Added in 26.1.0.
 
 Options for importing artifact revisions.
 
@@ -3335,29 +3351,38 @@ input ImportArtifactsOptionsGQL {
 }
 
 """
-Added in 25.14.0.
-
-Response payload for artifact import operations.
-
-Contains the imported artifact revisions and their associated background tasks.
-Tasks can be monitored to track the import progress from SCANNED to AVAILABLE status.
+Added in 25.14.0. Response payload for artifact import operations. Contains the imported artifact revisions and their associated background tasks. Tasks can be monitored to track the import progress from SCANNED to AVAILABLE status.
 """
 type ImportArtifactsPayload {
   artifactRevisions: ArtifactRevisionConnection!
   tasks: [ArtifactRevisionImportTask!]!
 }
 
+"""
+Added in 24.09.0. Filter for integer fields supporting equality and comparison operations.
+"""
 input IntFilter {
+  """Exact integer match"""
   equals: Int = null
+
+  """Not equal to this integer"""
   notEquals: Int = null
+
+  """Greater than this integer"""
   greaterThan: Int = null
+
+  """Greater than or equal to this integer"""
   greaterThanOrEqual: Int = null
+
+  """Less than this integer"""
   lessThan: Int = null
+
+  """Less than or equal to this integer"""
   lessThanOrEqual: Int = null
 }
 
 """
-Payload returned after issuing a new keypair. The secret_key is only shown once.
+Added in 26.2.0. Payload returned after issuing a new keypair. The secret_key is only shown once.
 """
 type IssueMyKeypairPayload {
   """The newly generated access key."""
@@ -3418,7 +3443,10 @@ input KernelResourceAllocationFilter {
 Added in 26.3.0. Ordering specification for kernel resource allocations.
 """
 input KernelResourceAllocationOrderBy {
+  """Field to order by."""
   field: KernelResourceAllocationOrderField!
+
+  """Order direction."""
   direction: OrderDirection! = ASC
 }
 
@@ -3529,19 +3557,16 @@ input KernelV2Filter {
 
 """Added in 26.2.0. Lifecycle and status information for a kernel."""
 type KernelV2LifecycleInfo {
-  """
-  Current status of the kernel (e.g., PENDING, RUNNING, TERMINATED).
-  Indicates the kernel's position in its lifecycle.
-  """
+  """Current status of the kernel."""
   status: KernelV2Status!
 
-  """The result of the kernel execution (UNDEFINED, SUCCESS, FAILURE)."""
+  """The result of the kernel execution."""
   result: SessionV2Result!
 
   """Timestamp when the kernel was created."""
   createdAt: DateTime
 
-  """Timestamp when the kernel was terminated. Null if still active."""
+  """Timestamp when the kernel was terminated."""
   terminatedAt: DateTime
 
   """Scheduled start time for the kernel, if applicable."""
@@ -3550,7 +3575,9 @@ type KernelV2LifecycleInfo {
 
 """Added in 26.2.0. Network configuration for a kernel."""
 type KernelV2NetworkInfo {
-  """Collection of service ports exposed by this kernel."""
+  """
+  Collection of service ports exposed by this kernel. Typed as Any because this field holds a nested GQL type (ServicePortsGQL).
+  """
   servicePorts: ServicePorts
 
   """List of ports that are pre-opened for this kernel."""
@@ -3559,7 +3586,10 @@ type KernelV2NetworkInfo {
 
 """Added in 26.2.0. Ordering specification for kernels."""
 input KernelV2OrderBy {
+  """Field to order by"""
   field: KernelV2OrderField!
+
+  """Order direction"""
   direction: OrderDirection! = DESC
 }
 
@@ -3583,18 +3613,22 @@ type KernelV2ResourceInfo {
   """The resource group (scaling group) this kernel is assigned to."""
   resourceGroupName: String
 
-  """
-  The container ID on the agent. Null if container not yet created or hidden.
-  """
+  """The container ID on the agent."""
   containerId: String
 
-  """Resource allocation with requested and used slots."""
+  """
+  Resource allocation with requested and used slots. Typed as Any because this field holds a nested GQL type (ResourceAllocationGQL).
+  """
   allocation: ResourceAllocation!
 
-  """The fractional resource shares occupied by this kernel."""
+  """
+  The fractional resource shares occupied by this kernel. Typed as Any because this field holds a nested GQL type (ResourceSlotGQL).
+  """
   shares: ResourceSlot!
 
-  """Additional resource options and configurations for this kernel."""
+  """
+  Additional resource options and configurations. Typed as Any because this field holds a nested GQL type (ResourceOptsGQL).
+  """
   resourceOpts: ResourceOpts
 }
 
@@ -3609,7 +3643,7 @@ type KernelV2SessionInfo {
   """The name of the session."""
   name: String
 
-  """The type of session (INTERACTIVE, BATCH, INFERENCE, SYSTEM)."""
+  """The type of session (interactive, batch, inference, system)."""
   sessionType: SessionTypes!
 }
 
@@ -3659,13 +3693,16 @@ enum LivenessStatus {
 
 """Added in 26.3.0. Key-value label entry for queries."""
 input MetricLabelEntryInput {
-  """Label key."""
+  """Label key"""
   key: String!
 
-  """Label value."""
+  """Label value"""
   value: String!
 }
 
+"""
+Added in 25.19.0. Represents a model deployment in Backend.AI. A deployment is a long-running inference service that exposes a trained model via HTTP endpoints. Deployments manage the lifecycle of model replicas, handle traffic routing, and provide auto-scaling capabilities based on configured rules.
+"""
 type ModelDeployment implements Node {
   """The Globally Unique ID of this object"""
   id: ID!
@@ -3682,7 +3719,7 @@ type ModelDeployment implements Node {
   revisionHistory(filter: ModelRevisionFilter = null, orderBy: [ModelRevisionOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ModelRevisionConnection!
 }
 
-"""Added in 25.19.0"""
+"""Added in 25.19.0. Connection for model deployments."""
 type ModelDeploymentConnection {
   """Pagination data for this connection"""
   pageInfo: PageInfo!
@@ -3701,6 +3738,9 @@ type ModelDeploymentEdge {
   node: ModelDeployment!
 }
 
+"""
+Added in 25.19.0. Contains metadata information for a model deployment including its name, status, tags, and timestamps. Also provides access to the associated project and domain.
+"""
 type ModelDeploymentMetadata {
   name: String!
   status: DeploymentStatus!
@@ -3711,14 +3751,24 @@ type ModelDeploymentMetadata {
   domain: DomainNode!
 }
 
-"""Added in 25.19.0"""
+"""Added in 25.19.0. """
 input ModelDeploymentMetadataInput {
+  """Project ID"""
   projectId: ID!
+
+  """Domain name"""
   domainName: String!
+
+  """Deployment name"""
   name: String = null
+
+  """Deployment tags"""
   tags: [String!] = null
 }
 
+"""
+Added in 25.19.0. Provides network access configuration for a model deployment, including the endpoint URL, preferred domain name, and public access settings. Also manages access tokens for authentication.
+"""
 type ModelDeploymentNetworkAccess {
   endpointUrl: String
   preferredDomainName: String
@@ -3726,12 +3776,18 @@ type ModelDeploymentNetworkAccess {
   accessTokens(filter: AccessTokenFilter = null, orderBy: [AccessTokenOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): AccessTokenConnection!
 }
 
-"""Added in 25.19.0"""
+"""Added in 25.19.0. """
 input ModelDeploymentNetworkAccessInput {
+  """Preferred domain name for URL"""
   preferredDomainName: String = null
+
+  """Whether the deployment is public"""
   openToPublic: Boolean! = false
 }
 
+"""
+Added in 25.19.0. Configuration for mounting the model data into the inference container. Specifies the virtual folder, mount destination, and model definition path.
+"""
 type ModelMountConfig {
   """Path inside the container where the model is mounted."""
   mountDestination: String!
@@ -3741,13 +3797,21 @@ type ModelMountConfig {
   vfolder: VirtualFolderNode!
 }
 
-"""Added in 25.19.0"""
+"""Added in 25.19.0. """
 input ModelMountConfigInput {
+  """VFolder ID for the model"""
   vfolderId: ID!
+
+  """Mount destination path inside container"""
   mountDestination: String!
+
+  """Path to model definition file"""
   definitionPath: String!
 }
 
+"""
+Added in 25.19.0. A single replica instance of a model deployment. Each replica runs in a separate compute session and serves inference requests. Replicas have health status indicators (readiness, liveness, activeness) and traffic weight for load balancing.
+"""
 type ModelReplica implements Node {
   """The Globally Unique ID of this object"""
   id: ID!
@@ -3774,6 +3838,9 @@ type ModelReplica implements Node {
   revision: ModelRevision!
 }
 
+"""
+Added in 25.19.0. A Relay-style connection for paginated access to model replicas. Includes total count for UI pagination display.
+"""
 type ModelReplicaConnection {
   """Pagination data for this connection"""
   pageInfo: PageInfo!
@@ -3792,6 +3859,9 @@ type ModelReplicaEdge {
   node: ModelReplica!
 }
 
+"""
+Added in 25.19.0. Represents a versioned configuration snapshot of a model deployment. Each revision captures the complete configuration including cluster settings, resource allocations, runtime configuration, and model mount settings. Revisions enable version control and rollback capabilities for deployments.
+"""
 type ModelRevision implements Node {
   """The Globally Unique ID of this object"""
   id: ID!
@@ -3819,7 +3889,7 @@ type ModelRevision implements Node {
   image: ImageNode!
 }
 
-"""Added in 25.19.0"""
+"""Added in 25.19.0. Connection for model revisions."""
 type ModelRevisionConnection {
   """Pagination data for this connection"""
   pageInfo: PageInfo!
@@ -3838,7 +3908,7 @@ type ModelRevisionEdge {
   node: ModelRevision!
 }
 
-"""Added in 25.19.0"""
+"""Added in 25.19.0."""
 input ModelRevisionFilter {
   name: StringFilter = null
   deploymentId: ID = null
@@ -3847,7 +3917,7 @@ input ModelRevisionFilter {
   NOT: [ModelRevisionFilter!] = null
 }
 
-"""Added in 25.19.0"""
+"""Added in 25.19.0. """
 input ModelRevisionOrderBy {
   field: ModelRevisionOrderField!
   direction: OrderDirection! = DESC
@@ -3858,6 +3928,9 @@ enum ModelRevisionOrderField {
   NAME
 }
 
+"""
+Added in 25.19.0. Runtime configuration for the inference framework. Includes the runtime variant, framework-specific configuration, and environment variables.
+"""
 type ModelRuntimeConfig {
   """The inference runtime variant (e.g., vllm, triton)."""
   runtimeVariant: String!
@@ -3869,17 +3942,20 @@ type ModelRuntimeConfig {
   environ: EnvironmentVariables
 }
 
-"""Added in 25.19.0"""
+"""Added in 25.19.0. """
 input ModelRuntimeConfigInput {
+  """Runtime variant identifier"""
   runtimeVariant: String!
+
+  """Framework-specific inference runtime configuration"""
   inferenceRuntimeConfig: JSON = null
 
-  """Environment variables for the service."""
+  """Environment variables for the service"""
   environ: EnvironmentVariablesInput = null
 }
 
 """
-Added in 25.14.0.
+Added in 24.09.0. Added in 25.14.0.
 
 Specifies a target model for scanning operations.
 
@@ -3887,30 +3963,38 @@ Used to identify specific models in external registries for detailed scanning.
 If revision is not specified, defaults to 'main' revision.
 """
 input ModelTarget {
+  """Model ID in the external registry."""
   modelId: String!
+
+  """
+  Specific revision (branch or tag). Defaults to 'main' if not specified.
+  """
   revision: String = null
 }
 
 """Added in 26.3.0. Input for modifying an existing query definition."""
 input ModifyQueryDefinitionInput {
-  """New name."""
-  name: String
+  """Updated human-readable name"""
+  name: String = null
 
-  """New metric name."""
-  metricName: String
+  """Updated Prometheus metric name"""
+  metricName: String = null
 
-  """New PromQL template."""
-  queryTemplate: String
+  """Updated PromQL template with placeholders"""
+  queryTemplate: String = null
 
-  """New default time window."""
-  timeWindow: String
+  """
+  Updated default time window. Pass SENTINEL (default) to leave unchanged; pass None to clear.
+  """
+  timeWindow: String = "Sentinel.TOKEN"
 
-  """New query definition options."""
-  options: QueryDefinitionOptionsInput
+  """Updated query definition options"""
+  options: QueryDefinitionOptionsInput = null
 }
 
 """Added in 26.3.0. Payload returned after modifying a query definition."""
 type ModifyQueryDefinitionPayload {
+  """Updated query definition."""
   preset: QueryDefinition!
 }
 
@@ -4459,7 +4543,7 @@ interface Node {
   id: ID!
 }
 
-"""Notification channel"""
+"""Added in 26.3.0. Notification channel."""
 type NotificationChannel implements Node {
   """The Globally Unique ID of this object"""
   id: ID!
@@ -4471,7 +4555,7 @@ type NotificationChannel implements Node {
   createdAt: DateTime!
 }
 
-"""Notification channel connection"""
+"""Added in 26.3.0. Notification channel connection."""
 type NotificationChannelConnection {
   """Pagination data for this connection"""
   pageInfo: PageInfo!
@@ -4490,20 +4574,23 @@ type NotificationChannelEdge {
   node: NotificationChannel!
 }
 
-"""Filter for notification channels"""
+"""Added in 24.09.0. Filter for notification channels"""
 input NotificationChannelFilter {
   name: StringFilter = null
-  channelType: [NotificationChannelType!] = null
+  channelType: NotificationChannelTypeFilter = null
   enabled: Boolean = null
   AND: [NotificationChannelFilter!] = null
   OR: [NotificationChannelFilter!] = null
   NOT: [NotificationChannelFilter!] = null
 }
 
-"""Order by specification for notification channels"""
+"""Added in 24.09.0. Order by specification for notification channels"""
 input NotificationChannelOrderBy {
+  """Field to order by"""
   field: NotificationChannelOrderField!
-  direction: OrderDirection! = ASC
+
+  """Order direction"""
+  direction: OrderDirection! = DESC
 }
 
 enum NotificationChannelOrderField {
@@ -4518,11 +4605,14 @@ interface NotificationChannelSpec {
 }
 
 """
-Input for notification channel configuration. Exactly one of webhook or email must be set.
+Added in 24.09.0. Input for notification channel configuration. Exactly one of webhook or email must be set.
 """
-input NotificationChannelSpecInput @oneOf {
-  webhook: WebhookSpecInput
-  email: EmailSpecInput
+input NotificationChannelSpecInput {
+  """Webhook specification."""
+  webhook: WebhookSpecInput = null
+
+  """Email specification."""
+  email: EmailSpecInput = null
 }
 
 """Notification channel types"""
@@ -4531,7 +4621,24 @@ enum NotificationChannelType {
   EMAIL
 }
 
-"""Notification rule"""
+"""
+Added in 26.3.0. Filter for notification channel type with equality and membership operators.
+"""
+input NotificationChannelTypeFilter {
+  """Matches channels with this exact type"""
+  equals: NotificationChannelType = null
+
+  """Matches channels whose type is in this list"""
+  in: [NotificationChannelType!] = null
+
+  """Excludes channels with this exact type"""
+  notEquals: NotificationChannelType = null
+
+  """Excludes channels whose type is in this list"""
+  notIn: [NotificationChannelType!] = null
+}
+
+"""Added in 26.3.0. Notification rule."""
 type NotificationRule implements Node {
   """The Globally Unique ID of this object"""
   id: ID!
@@ -4544,7 +4651,7 @@ type NotificationRule implements Node {
   createdAt: DateTime!
 }
 
-"""Notification rule connection"""
+"""Added in 26.3.0. Notification rule connection."""
 type NotificationRuleConnection {
   """Pagination data for this connection"""
   pageInfo: PageInfo!
@@ -4563,20 +4670,23 @@ type NotificationRuleEdge {
   node: NotificationRule!
 }
 
-"""Filter for notification rules"""
+"""Added in 24.09.0. Filter for notification rules"""
 input NotificationRuleFilter {
   name: StringFilter = null
-  ruleType: [NotificationRuleType!] = null
+  ruleType: NotificationRuleTypeFilter = null
   enabled: Boolean = null
   AND: [NotificationRuleFilter!] = null
   OR: [NotificationRuleFilter!] = null
   NOT: [NotificationRuleFilter!] = null
 }
 
-"""Order by specification for notification rules"""
+"""Added in 24.09.0. Order by specification for notification rules"""
 input NotificationRuleOrderBy {
+  """Field to order by"""
   field: NotificationRuleOrderField!
-  direction: OrderDirection! = ASC
+
+  """Order direction"""
+  direction: OrderDirection! = DESC
 }
 
 enum NotificationRuleOrderField {
@@ -4594,19 +4704,31 @@ enum NotificationRuleType {
 }
 
 """
+Added in 26.3.0. Filter for notification rule type with equality and membership operators.
+"""
+input NotificationRuleTypeFilter {
+  """Matches rules with this exact type"""
+  equals: NotificationRuleType = null
+
+  """Matches rules whose type is in this list"""
+  in: [NotificationRuleType!] = null
+
+  """Excludes rules with this exact type"""
+  notEquals: NotificationRuleType = null
+
+  """Excludes rules whose type is in this list"""
+  notIn: [NotificationRuleType!] = null
+}
+
+"""
 Added in 26.3.0. Display number format configuration for a resource slot type.
 """
 type NumberFormat {
-  """
-  Whether to use binary (1024-based) prefix instead of decimal (1000-based).
-  """
   binary: Boolean!
-
-  """Number of decimal places to display."""
   roundLength: Int!
 }
 
-"""Added in 25.14.0"""
+"""Added in 25.14.0. Object storage node."""
 type ObjectStorage implements Node {
   """The Globally Unique ID of this object"""
   id: ID!
@@ -4619,7 +4741,9 @@ type ObjectStorage implements Node {
   namespaces(before: String, after: String, first: Int, last: Int, limit: Int, offset: Int): StorageNamespaceConnection!
 }
 
-"""Added in 25.14.0"""
+"""
+Added in 25.14.0. Relay-style connection for paginated object storage queries.
+"""
 type ObjectStorageConnection {
   """Pagination data for this connection"""
   pageInfo: PageInfo!
@@ -4672,7 +4796,7 @@ type PageInfo @shareable {
   endCursor: String
 }
 
-"""Added in 26.3.0. RBAC scoped permission"""
+"""Added in 26.3.0. RBAC scoped permission."""
 type Permission implements Node {
   """The Globally Unique ID of this object"""
   id: ID!
@@ -4689,7 +4813,7 @@ type Permission implements Node {
   scope: EntityNode
 }
 
-"""Added in 26.3.0. Permission connection"""
+"""Added in 26.3.0. Permission connection."""
 type PermissionConnection {
   """Pagination data for this connection"""
   pageInfo: PageInfo!
@@ -4732,33 +4856,25 @@ enum PermissionOrderField {
 
 """Added in 26.3.0. Preemption configuration for a resource group."""
 type PreemptionConfig {
-  """
-  Sessions with priority <= this value are eligible for preemption. Default is 5.
-  """
+  """Sessions with priority <= this value are eligible for preemption."""
   preemptiblePriority: Int!
 
-  """
-  Tie-breaking order for sessions with the same priority during preemption. 'oldest' preempts the oldest session first, 'newest' preempts the newest. Default is 'oldest'.
-  """
+  """Tie-breaking order for same-priority sessions during preemption."""
   order: PreemptionOrder!
 
-  """
-  How to preempt a session when preemption is triggered. 'terminate' destroys the session, 'reschedule' queues it for rescheduling. Default is 'terminate'.
-  """
+  """How to preempt a session when preemption is triggered."""
   mode: PreemptionMode!
 }
 
 """Added in 26.3.0. Input for preemption configuration."""
 input PreemptionConfigInput {
-  """Sessions with priority <= this value are preemptible. Default is 5."""
+  """Sessions with priority <= this value are eligible for preemption."""
   preemptiblePriority: Int! = 5
 
-  """
-  Tie-breaking order for same-priority sessions (OLDEST, NEWEST). Default is OLDEST.
-  """
+  """Tie-breaking order for same-priority sessions (oldest/newest)."""
   order: PreemptionOrder! = OLDEST
 
-  """How to preempt sessions (TERMINATE, RESCHEDULE). Default is TERMINATE."""
+  """How to preempt sessions (terminate/reschedule)."""
   mode: PreemptionMode! = TERMINATE
 }
 
@@ -4788,7 +4904,7 @@ type ProjectBasicInfo {
   """Optional description of the project."""
   description: String
 
-  """Project type determining its purpose. See ProjectTypeV2 enum."""
+  """Project type determining its purpose. See ProjectType enum."""
   type: ProjectTypeV2!
 
   """External system integration identifier."""
@@ -4799,12 +4915,7 @@ type ProjectBasicInfo {
 Added in 26.2.0. Nested filter for the domain a project belongs to. Filters projects whose domain matches all specified conditions.
 """
 input ProjectDomainNestedFilter {
-  """
-  Filter by domain name. Supports equals, contains, startsWith, and endsWith.
-  """
   name: StringFilter = null
-
-  """Filter by domain active status."""
   isActive: Boolean = null
 }
 
@@ -4919,14 +5030,10 @@ input ProjectFairShareFilter {
 Added in 26.1.0. Specifies ordering for project fair share query results. Combine field selection with direction to sort results. Default direction is DESC (descending).
 """
 input ProjectFairShareOrderBy {
-  """
-  The field to order by. See ProjectFairShareOrderField for available options.
-  """
+  """Field to order by"""
   field: ProjectFairShareOrderField!
 
-  """
-  Sort direction. ASC for ascending (lowest first), DESC for descending (highest first). For fair_share_factor, ASC shows highest priority projects first.
-  """
+  """Order direction"""
   direction: OrderDirection! = DESC
 }
 
@@ -4949,13 +5056,14 @@ input ProjectFairShareProjectNestedFilter {
   """
   name: StringFilter = null
 
-  """Filter by project active status."""
-  isActive: Boolean = null
-
   """Filter by project type (GENERAL, MODEL_STORE)."""
   type: ProjectFairShareTypeEnumFilter = null
+
+  """Filter by project active status"""
+  isActive: Boolean = null
 }
 
+"""Added in 24.09.0. Scope parameters for filtering project fair shares."""
 input ProjectFairShareScope {
   """Resource group to filter fair shares by."""
   resourceGroupName: String!
@@ -4971,16 +5079,9 @@ enum ProjectFairShareTypeEnum {
 Added in 26.2.0. Filter for project type enum in fair share queries. Supports equals, in, not_equals, and not_in operations.
 """
 input ProjectFairShareTypeEnumFilter {
-  """Exact match for project type."""
   equals: ProjectFairShareTypeEnum = null
-
-  """Match any of the provided types."""
   in: [ProjectFairShareTypeEnum!] = null
-
-  """Exclude exact type match."""
   notEquals: ProjectFairShareTypeEnum = null
-
-  """Exclude any of the provided types."""
   notIn: [ProjectFairShareTypeEnum!] = null
 }
 
@@ -5033,16 +5134,9 @@ enum ProjectTypeV2 {
 Added in 26.2.0. Filter for ProjectTypeEnum fields. Supports equals, in, not_equals, and not_in operations.
 """
 input ProjectTypeV2EnumFilter {
-  """Exact match for project type."""
   equals: ProjectTypeV2 = null
-
-  """Match any of the provided types."""
-  in: [ProjectTypeV2!] = null
-
-  """Exclude exact type match."""
+  in_: [ProjectTypeV2!] = null
   notEquals: ProjectTypeV2 = null
-
-  """Exclude any of the provided types."""
   notIn: [ProjectTypeV2!] = null
 }
 
@@ -5159,17 +5253,16 @@ input ProjectUsageBucketFilter {
 Added in 26.1.0. Specifies ordering for project usage bucket query results. Combine field selection with direction to sort results. Default direction is DESC (most recent first).
 """
 input ProjectUsageBucketOrderBy {
-  """
-  The field to order by. See UsageBucketOrderField for available options.
-  """
+  """Field to order by"""
   field: UsageBucketOrderField!
 
-  """
-  Sort direction. ASC for chronological order (oldest first), DESC for reverse chronological order (most recent first).
-  """
+  """Order direction"""
   direction: OrderDirection! = DESC
 }
 
+"""
+Added in 24.09.0. Scope parameters for filtering project usage buckets.
+"""
 input ProjectUsageScope {
   """Resource group to filter usage buckets by."""
   resourceGroupName: String!
@@ -5179,17 +5272,8 @@ input ProjectUsageScope {
 Added in 26.2.0. Nested filter for users belonging to a project. Filters projects that have at least one user matching all specified conditions.
 """
 input ProjectUserNestedFilter {
-  """
-  Filter by username. Supports equals, contains, startsWith, and endsWith.
-  """
   username: StringFilter = null
-
-  """Filter by email. Supports equals, contains, startsWith, and endsWith."""
   email: StringFilter = null
-
-  """
-  Filter by user active status. True for active users (status=ACTIVE), False for inactive.
-  """
   isActive: Boolean = null
 }
 
@@ -5197,9 +5281,7 @@ input ProjectUserNestedFilter {
 Added in 26.2.0. Scope for querying users within a specific project. Used to restrict user queries to members of a particular project.
 """
 input ProjectUserV2Scope {
-  """
-  Project UUID to scope the user query. Only users who are members of this project will be returned.
-  """
+  """Project UUID to scope the user query."""
   projectId: UUID!
 }
 
@@ -5273,60 +5355,17 @@ type ProjectV2Edge {
 Added in 26.2.0. Filter input for querying projects. Supports filtering by ID, name, domain, type, active status, and timestamps. Multiple filters can be combined using AND, OR, and NOT logical operators.
 """
 input ProjectV2Filter {
-  """Filter by project ID (UUID). Supports equals and 'in' operations."""
   id: UUIDFilter = null
-
-  """
-  Filter by project name. Supports equals, contains, startsWith, and endsWith.
-  """
   name: StringFilter = null
-
-  """
-  Filter by domain name. Supports equals, contains, startsWith, and endsWith.
-  """
   domainName: StringFilter = null
-
-  """
-  Filter by project type. Supports equals, in, not_equals, and not_in operations.
-  """
   type: ProjectTypeV2EnumFilter = null
-
-  """
-  Filter by active status. True for active projects, False for inactive projects.
-  """
   isActive: Boolean = null
-
-  """
-  Filter by creation timestamp. Supports before, after, and between operations.
-  """
   createdAt: DateTimeFilter = null
-
-  """
-  Filter by last modification timestamp. Supports before, after, and between operations.
-  """
   modifiedAt: DateTimeFilter = null
-
-  """
-  Filter by nested domain conditions. Returns projects whose domain matches all specified conditions.
-  """
   domain: ProjectDomainNestedFilter = null
-
-  """
-  Filter by nested user conditions. Returns projects that have at least one user matching all specified conditions.
-  """
   user: ProjectUserNestedFilter = null
-
-  """Combine multiple filters with AND logic. All conditions must match."""
   AND: [ProjectV2Filter!] = null
-
-  """
-  Combine multiple filters with OR logic. At least one condition must match.
-  """
   OR: [ProjectV2Filter!] = null
-
-  """
-  Negate the specified filters. Records matching these conditions will be excluded.
-  """
   NOT: [ProjectV2Filter!] = null
 }
 
@@ -5334,11 +5373,11 @@ input ProjectV2Filter {
 Added in 26.2.0. Specifies ordering for project query results. Combine field selection with direction to sort results. Default direction is DESC (descending).
 """
 input ProjectV2OrderBy {
-  """The field to order by. See ProjectV2OrderField for available options."""
+  """Field to order by."""
   field: ProjectV2OrderField!
 
-  """Sort direction. ASC for ascending, DESC for descending."""
-  direction: OrderDirection! = DESC
+  """Order direction."""
+  direction: OrderDirection! = ASC
 }
 
 """
@@ -5359,26 +5398,26 @@ enum ProjectV2OrderField {
 Added in 26.1.0. Input item for a single project weight in bulk upsert. Represents one project's weight configuration.
 """
 input ProjectWeightInputItem {
-  """ID of the project to update weight for."""
+  """Project ID"""
   projectId: UUID!
 
-  """Name of the domain this project belongs to."""
+  """Domain name for context"""
   domainName: String!
 
-  """
-  Priority weight multiplier. Higher weight = higher priority allocation ratio. Set to null to use resource group's default_weight.
-  """
-  weight: Decimal = null
+  """Fair share weight (null for default)"""
+  weight: Decimal
 }
 
 """Added in 26.3.0. Input for purging a role"""
 input PurgeRoleInput {
+  """Role ID to purge"""
   id: UUID!
 }
 
-"""Added in 26.3.0. Payload for purge role mutation"""
+"""Added in 26.3.0. Payload for purge role mutation."""
 type PurgeRolePayload {
-  id: ID!
+  """ID of the purged role."""
+  id: UUID!
 }
 
 """
@@ -5616,7 +5655,7 @@ type Query {
   Use filters to narrow down results by status, name, or architecture.
   Supports both cursor-based and offset-based pagination.
   """
-  adminImagesV2(filter: ImageV2FilterGQL = null, orderBy: [ImageV2OrderByGQL!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ImageV2Connection
+  adminImagesV2(filter: ImageV2Filter = null, orderBy: [ImageV2OrderByGQL!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ImageV2Connection
 
   """
   Added in 26.2.0. Query kernels with pagination and filtering. (admin only)
@@ -5650,7 +5689,7 @@ type Query {
   Use filters to search by alias string.
   Supports both cursor-based and offset-based pagination.
   """
-  adminImageAliases(filter: ImageV2AliasFilterGQL = null, orderBy: [ImageV2AliasOrderByGQL!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ImageV2AliasConnection
+  adminImageAliases(filter: ImageV2AliasFilter = null, orderBy: [ImageV2AliasOrderByGQL!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ImageV2AliasConnection
 
   """Added in 26.3.0. Get a single query definition by ID (admin only)."""
   adminPrometheusQueryPreset(id: ID!): QueryDefinition
@@ -5658,7 +5697,7 @@ type Query {
   """
   Added in 26.3.0. List query definitions with filtering and pagination (admin only).
   """
-  adminPrometheusQueryPresets(filter: QueryDefinitionFilter = null, orderBy: [QueryDefinitionOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): QueryDefinitionConnection
+  adminPrometheusQueryPresets(filter: QueryDefinitionFilter = null, orderBy: [QueryDefinitionOrderBy!] = null, limit: Int = null, offset: Int = null): QueryDefinitionConnection
 
   """
   Added in 26.3.0. Execute a query definition by ID and return the result (admin only).
@@ -5746,7 +5785,7 @@ type Query {
   Use filters to narrow down results by status, name, or architecture.
   Supports both cursor-based and offset-based pagination.
   """
-  containerRegistryImagesV2(scope: ContainerRegistryScope!, filter: ImageV2FilterGQL = null, orderBy: [ImageV2OrderByGQL!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ImageV2Connection
+  containerRegistryImagesV2(scope: ContainerRegistryScope!, filter: ImageV2Filter = null, orderBy: [ImageV2OrderByGQL!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ImageV2Connection
 
   """
   Added in 26.2.0.
@@ -5757,7 +5796,7 @@ type Query {
   Returns image aliases that belong to the specified image.
   Supports both cursor-based and offset-based pagination.
   """
-  imageScopedAliases(scope: ImageV2Scope!, filter: ImageV2AliasFilterGQL = null, orderBy: [ImageV2AliasOrderByGQL!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ImageV2AliasConnection
+  imageScopedAliases(scope: ImageV2Scope!, filter: ImageV2AliasFilter = null, orderBy: [ImageV2AliasOrderByGQL!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ImageV2AliasConnection
 
   """Added in 26.2.0. Get scheduling history for a specific session."""
   sessionScopedSchedulingHistories(scope: SessionScope!, filter: SessionSchedulingHistoryFilter = null, orderBy: [SessionSchedulingHistoryOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): SessionSchedulingHistoryConnection
@@ -5970,22 +6009,16 @@ type QueryDefinitionExecuteResult {
 
 """Added in 26.3.0. Filter input for querying query definitions."""
 input QueryDefinitionFilter {
-  """Filter by name."""
+  """Filter by name"""
   name: StringFilter = null
-
-  """Combine multiple filters with AND logic."""
-  AND: [QueryDefinitionFilter!] = null
-
-  """Combine multiple filters with OR logic."""
-  OR: [QueryDefinitionFilter!] = null
-
-  """Negate the specified filters."""
-  NOT: [QueryDefinitionFilter!] = null
 }
 
 """Added in 26.3.0. Key-value label entry from Prometheus result."""
 type QueryDefinitionMetricLabelEntry {
+  """Label key."""
   key: String!
+
+  """Label value."""
   value: String!
 }
 
@@ -6000,7 +6033,10 @@ type QueryDefinitionMetricResult {
 
 """Added in 26.3.0. Single timestamp-value pair from Prometheus."""
 type QueryDefinitionMetricResultValue {
+  """Unix timestamp of the data point."""
   timestamp: Float!
+
+  """Metric value as a string to preserve precision."""
   value: String!
 }
 
@@ -6015,20 +6051,20 @@ type QueryDefinitionOptions {
 
 """Added in 26.3.0. Options for query definition labels."""
 input QueryDefinitionOptionsInput {
-  """Allowed filter label keys."""
+  """Allowed filter label keys"""
   filterLabels: [String!]!
 
-  """Allowed group-by label keys."""
+  """Allowed group-by label keys"""
   groupLabels: [String!]!
 }
 
 """Added in 26.3.0. Specifies ordering for query definition results."""
 input QueryDefinitionOrderBy {
-  """The field to order by."""
+  """Field to order by"""
   field: QueryDefinitionOrderField!
 
-  """Sort direction."""
-  direction: OrderDirection! = DESC
+  """Order direction"""
+  direction: OrderDirection! = ASC
 }
 
 """
@@ -6178,48 +6214,43 @@ enum ReadinessStatus {
   UNHEALTHY
 }
 
-"""
-Added in 25.15.0.
-
-Input type for registering a storage namespace.
-"""
+"""Added in 25.15.0. Input type for registering a storage namespace."""
 input RegisterStorageNamespaceInput {
+  """Storage ID to register namespace for"""
   storageId: UUID!
+
+  """Namespace bucket or path prefix"""
   namespace: String!
 }
 
 """
-Added in 25.15.0.
-
-Payload returned after storage namespace registration.
+Added in 25.15.0. Payload returned after storage namespace registration.
 """
 type RegisterStorageNamespacePayload {
+  """ID of the registered storage namespace"""
   id: UUID!
 }
 
 """
-Added in 25.14.0.
+Added in 24.09.0. Added in 25.14.0.
 
 Input for rejecting an artifact revision.
 
 Admin-only operation to reject artifact revisions, preventing their use.
 """
 input RejectArtifactInput {
+  """The artifact revision ID to reject."""
   artifactRevisionId: ID!
 }
 
 """
-Added in 25.14.0.
-
-Response payload for artifact revision rejection operations.
-
-Contains the rejected artifact revision. Admin-only operation.
+Added in 25.14.0. Response payload for artifact revision rejection operations. Contains the rejected artifact revision. Admin-only operation.
 """
 type RejectArtifactPayload {
   artifactRevision: ArtifactRevision!
 }
 
-"""Added in 25.19.0"""
+"""Added in 25.19.0."""
 input ReplicaFilter {
   status: ReplicaStatusFilter = null
   trafficStatus: TrafficStatusFilter = null
@@ -6228,7 +6259,7 @@ input ReplicaFilter {
   NOT: [ReplicaFilter!] = null
 }
 
-"""Added in 25.19.0"""
+"""Added in 25.19.0. """
 input ReplicaOrderBy {
   field: ReplicaOrderField!
   direction: OrderDirection! = DESC
@@ -6239,6 +6270,9 @@ enum ReplicaOrderField {
   ID
 }
 
+"""
+Added in 25.19.0. Represents the current replica state of a deployment, including the desired replica count and access to the list of active replicas.
+"""
 type ReplicaState {
   desiredReplicaCount: Int!
   replicas(filter: ReplicaFilter = null, orderBy: [ReplicaOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ModelReplicaConnection!
@@ -6257,18 +6291,22 @@ enum ReplicaStatus {
   FAILED_TO_START
 }
 
-"""Added in 25.19.0"""
+"""Added in 25.19.0. Payload for replica status changed event."""
 type ReplicaStatusChangedPayload {
+  """The replica whose status changed"""
   replica: ModelReplica!
 }
 
-"""Added in 25.19.0"""
+"""Added in 25.19.0. """
 input ReplicaStatusFilter {
-  in: [ReplicaStatus!] = null
+  """Exact status match"""
   equals: ReplicaStatus = null
+
+  """Status is in list"""
+  in: [ReplicaStatus!] = null
 }
 
-"""Added in 25.14.0"""
+"""Added in 25.14.0. Reservoir registry node."""
 type ReservoirRegistry implements Node {
   """The Globally Unique ID of this object"""
   id: ID!
@@ -6280,7 +6318,9 @@ type ReservoirRegistry implements Node {
   remoteArtifactRegistries: ArtifactRegistryMetaConnection!
 }
 
-"""Added in 25.14.0"""
+"""
+Added in 25.14.0. Relay-style connection for paginated reservoir registry queries.
+"""
 type ReservoirRegistryConnection {
   """Pagination data for this connection"""
   pageInfo: PageInfo!
@@ -6301,11 +6341,13 @@ type ReservoirRegistryEdge {
 
 """Added in 26.2.0. Resource allocation with requested and used slots."""
 type ResourceAllocation {
-  """The resource slots originally requested for this kernel."""
+  """
+  The resource slots originally requested. Typed as Any because this field holds a nested GQL type (ResourceSlotGQL).
+  """
   requested: ResourceSlot!
 
   """
-  The resource slots currently used by this kernel. May be null if not yet allocated.
+  The resource slots currently used. Typed as Any because this field holds a nested GQL type (ResourceSlotGQL).
   """
   used: ResourceSlot
 }
@@ -6322,6 +6364,9 @@ type ResourceAllocationConnection {
   count: Int!
 }
 
+"""
+Added in 25.19.0. Compute resource configuration for the deployment. Specifies CPU, memory, GPU allocations and additional resource options.
+"""
 type ResourceConfig {
   """
   Added in 26.1.0. Allocated compute resources including CPU, memory, and accelerators.
@@ -6333,16 +6378,15 @@ type ResourceConfig {
   resourceGroup: ScalingGroupNode!
 }
 
-"""Added in 25.19.0"""
+"""Added in 25.19.0. """
 input ResourceConfigInput {
+  """Resource group"""
   resourceGroup: ResourceGroupInput!
 
-  """Added in 26.1.0. Resources allocated for the deployment."""
+  """Resource slot allocations"""
   resourceSlots: ResourceSlotInput!
 
-  """
-  Added in 26.1.0. Additional options for the resources such as shared memory.
-  """
+  """Additional resource options"""
   resourceOpts: ResourceOptsInput = null
 }
 
@@ -6394,9 +6438,9 @@ type ResourceGroupConnection {
   count: Int!
 }
 
-"""Resource group scope for domain-level operations"""
+"""Added in 24.09.0. Resource group scope for domain-level operations"""
 input ResourceGroupDomainScope {
-  """Resource group name to scope the operation"""
+  """Resource group name to scope the operation."""
   resourceGroupName: String!
 }
 
@@ -6420,8 +6464,9 @@ input ResourceGroupFilter {
   NOT: [ResourceGroupFilter!] = null
 }
 
-"""Added in 25.19.0"""
+"""Added in 25.19.0. """
 input ResourceGroupInput {
+  """Resource group name"""
   name: String!
 }
 
@@ -6447,7 +6492,10 @@ type ResourceGroupNetworkConfig {
 
 """Added in 26.1.0. Order by specification for resource groups"""
 input ResourceGroupOrderBy {
+  """Field to order by."""
   field: ResourceGroupOrderField!
+
+  """Order direction."""
   direction: OrderDirection! = ASC
 }
 
@@ -6458,12 +6506,14 @@ enum ResourceGroupOrderField {
   IS_ACTIVE
 }
 
-"""Resource group + domain scope for project-level operations"""
+"""
+Added in 24.09.0. Resource group + domain scope for project-level operations
+"""
 input ResourceGroupProjectScope {
-  """Resource group name to scope the operation"""
+  """Resource group name to scope the operation."""
   resourceGroupName: String!
 
-  """Domain name to scope the operation"""
+  """Domain name to scope the operation."""
   domainName: String!
 }
 
@@ -6487,15 +6537,17 @@ type ResourceGroupStatus {
   isPublic: Boolean!
 }
 
-"""Resource group + domain + project scope for user-level operations"""
+"""
+Added in 24.09.0. Resource group + domain + project scope for user-level operations
+"""
 input ResourceGroupUserScope {
-  """Resource group name to scope the operation"""
+  """Resource group name to scope the operation."""
   resourceGroupName: String!
 
-  """Domain name to scope the operation"""
+  """Domain name to scope the operation."""
   domainName: String!
 
-  """Project ID to scope the operation"""
+  """Project ID to scope the operation."""
   projectId: String!
 }
 
@@ -6584,10 +6636,10 @@ type ResourceSlotEntry {
 Added in 26.1.0. A single entry representing one resource type and its allocated quantity.
 """
 input ResourceSlotEntryInput {
-  """Resource type identifier (e.g., 'cpu', 'mem', 'cuda.device')."""
+  """Resource type identifier (e.g., 'cpu', 'mem')"""
   resourceType: String!
 
-  """Quantity of the resource as a decimal string."""
+  """Quantity of the resource as a decimal string"""
   quantity: String!
 }
 
@@ -6595,7 +6647,7 @@ input ResourceSlotEntryInput {
 Added in 26.1.0. A collection of compute resource allocations for input.
 """
 input ResourceSlotInput {
-  """List of resource allocations."""
+  """List of resource allocations"""
   entries: [ResourceSlotEntryInput!]!
 }
 
@@ -6669,7 +6721,10 @@ input ResourceSlotTypeFilter {
 
 """Added in 26.3.0. Ordering specification for resource slot types."""
 input ResourceSlotTypeOrderBy {
+  """Field to order by."""
   field: ResourceSlotTypeOrderField!
+
+  """Order direction."""
   direction: OrderDirection! = ASC
 }
 
@@ -6704,46 +6759,41 @@ type ResourceWeightEntry {
 Added in 26.1.0. Input for a single resource weight entry. Specifies how much a resource type contributes to fair share calculations.
 """
 input ResourceWeightEntryInput {
-  """
-  Resource type identifier (e.g., 'cpu', 'mem', 'cuda.shares'). Must match the resource types used in the cluster.
-  """
+  """Resource type identifier."""
   resourceType: String!
 
-  """
-  Weight multiplier for this resource type in fair share calculations. Higher weight means this resource contributes more to the normalized usage. Set to null to remove this resource type (revert to default weight 1.0). Example: 0.001 for memory (bytes) to normalize against CPU cores.
-  """
+  """Weight multiplier. Set null to revert to default weight."""
   weight: Decimal = null
 }
 
 """
-Added in 25.15.0.
+Added in 24.09.0. Added in 25.15.0.
 
 Input for restoring previously deleted artifacts.
 
 Reverses the soft-delete operation, making the artifacts available again.
 """
 input RestoreArtifactsInput {
+  """List of artifact IDs to restore."""
   artifactIds: [ID!]!
 }
 
 """
-Added in 25.15.0.
-
-Response payload for artifact restoration operations.
-
-Contains the artifacts that were restored from soft-deleted state.
+Added in 25.15.0. Response payload for artifact restoration operations. Contains the artifacts that were restored from soft-deleted state.
 """
 type RestoreArtifactsPayload {
   artifacts: [Artifact!]!
 }
 
-"""Input for revoking a keypair owned by the current user."""
+"""
+Added in 24.09.0. Input for revoking a keypair owned by the current user.
+"""
 input RevokeMyKeypairInput {
   """Access key of the keypair to revoke. Must not be the main access key."""
   accessKey: String!
 }
 
-"""Payload returned after revoking a keypair."""
+"""Added in 26.2.0. Payload returned after revoking a keypair."""
 type RevokeMyKeypairPayload {
   """Whether the revocation was successful."""
   success: Boolean!
@@ -6751,11 +6801,14 @@ type RevokeMyKeypairPayload {
 
 """Added in 26.3.0. Input for revoking a role from a user"""
 input RevokeRoleInput {
+  """User ID to revoke the role from"""
   userId: UUID!
+
+  """Role ID to revoke"""
   roleId: UUID!
 }
 
-"""Added in 26.3.0. RBAC role"""
+"""Added in 26.3.0. RBAC role."""
 type Role implements Node {
   """The Globally Unique ID of this object"""
   id: ID!
@@ -6774,7 +6827,7 @@ type Role implements Node {
   users(filter: RoleAssignmentFilter = null, orderBy: [RoleAssignmentOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): RoleAssignmentConnection!
 }
 
-"""Added in 26.3.0. RBAC role assignment (user-role association)"""
+"""Added in 26.3.0. RBAC role assignment (user-role association)."""
 type RoleAssignment implements Node {
   """The Globally Unique ID of this object"""
   id: ID!
@@ -6796,7 +6849,7 @@ type RoleAssignment implements Node {
   user: UserV2
 }
 
-"""Added in 26.3.0. Role assignment connection"""
+"""Added in 26.3.0. Role assignment connection."""
 type RoleAssignmentConnection {
   """Pagination data for this connection"""
   pageInfo: PageInfo!
@@ -6844,14 +6897,14 @@ Added in 26.3.0. Nested filter for roles within a role assignment. Filters assig
 """
 input RoleAssignmentRoleNestedFilter {
   name: StringFilter = null
-  source: [RoleSource!] = null
-  status: [RoleStatus!] = null
+  source: RoleSourceFilter = null
+  status: RoleStatusFilter = null
   AND: [RoleAssignmentRoleNestedFilter!] = null
   OR: [RoleAssignmentRoleNestedFilter!] = null
   NOT: [RoleAssignmentRoleNestedFilter!] = null
 }
 
-"""Added in 26.3.0. Role connection"""
+"""Added in 26.3.0. Role connection."""
 type RoleConnection {
   """Pagination data for this connection"""
   pageInfo: PageInfo!
@@ -6873,8 +6926,8 @@ type RoleEdge {
 """Added in 26.3.0. Filter for roles"""
 input RoleFilter {
   name: StringFilter = null
-  source: [RoleSource!] = null
-  status: [RoleStatus!] = null
+  source: RoleSourceFilter = null
+  status: RoleStatusFilter = null
   AND: [RoleFilter!] = null
   OR: [RoleFilter!] = null
   NOT: [RoleFilter!] = null
@@ -6899,6 +6952,16 @@ enum RoleSource {
   CUSTOM
 }
 
+"""
+Added in 26.3.0. Filter for role source with equality and membership operators.
+"""
+input RoleSourceFilter {
+  equals: RoleSource = null
+  in: [RoleSource!] = null
+  notEquals: RoleSource = null
+  notIn: [RoleSource!] = null
+}
+
 """Added in 26.3.0. Role status"""
 enum RoleStatus {
   ACTIVE
@@ -6906,9 +6969,22 @@ enum RoleStatus {
   DELETED
 }
 
+"""
+Added in 26.3.0. Filter for role status with equality and membership operators.
+"""
+input RoleStatusFilter {
+  equals: RoleStatus = null
+  in: [RoleStatus!] = null
+  notEquals: RoleStatus = null
+  notIn: [RoleStatus!] = null
+}
+
 """Added in 25.19.0. Configuration for rolling update strategy."""
 input RollingUpdateConfigInput {
+  """Maximum number of extra replicas during update"""
   maxSurge: Int! = 1
+
+  """Maximum number of unavailable replicas during update"""
   maxUnavailable: Int! = 0
 }
 
@@ -6969,14 +7045,14 @@ type RouteEdge {
 
 """Added in 25.19.0. Filter for routes."""
 input RouteFilter {
-  status: [RouteStatus!] = null
-  trafficStatus: [RouteTrafficStatus!] = null
+  status: RouteStatusFilter = null
+  trafficStatus: RouteTrafficStatusFilter = null
   AND: [RouteFilter!] = null
   OR: [RouteFilter!] = null
   NOT: [RouteFilter!] = null
 }
 
-"""Route history record"""
+"""Added in 26.3.0. Route history record."""
 type RouteHistory implements Node {
   """The Globally Unique ID of this object"""
   id: ID!
@@ -6998,7 +7074,7 @@ type RouteHistory implements Node {
   deploymentId: ID!
 }
 
-"""Route history connection"""
+"""Added in 26.3.0. Route history connection."""
 type RouteHistoryConnection {
   """Pagination data for this connection"""
   pageInfo: PageInfo!
@@ -7017,7 +7093,7 @@ type RouteHistoryEdge {
   node: RouteHistory!
 }
 
-"""Filter for route history"""
+"""Added in 24.09.0. Filter for route history"""
 input RouteHistoryFilter {
   id: UUIDFilter = null
   routeId: UUIDFilter = null
@@ -7025,7 +7101,7 @@ input RouteHistoryFilter {
   phase: StringFilter = null
   fromStatus: [String!] = null
   toStatus: [String!] = null
-  result: [SchedulingResult!] = null
+  result: SchedulingResultFilter = null
   errorCode: StringFilter = null
   message: StringFilter = null
   createdAt: DateTimeFilter = null
@@ -7035,9 +7111,12 @@ input RouteHistoryFilter {
   NOT: [RouteHistoryFilter!] = null
 }
 
-"""Order by specification for route history"""
+"""Added in 24.09.0. Order by specification for route history"""
 input RouteHistoryOrderBy {
+  """Field to order by"""
   field: RouteHistoryOrderField!
+
+  """Order direction"""
   direction: OrderDirection! = DESC
 }
 
@@ -7049,7 +7128,7 @@ enum RouteHistoryOrderField {
 """Added in 25.19.0. Order by specification for routes."""
 input RouteOrderBy {
   field: RouteOrderField!
-  direction: OrderDirection! = ASC
+  direction: OrderDirection! = DESC
 }
 
 enum RouteOrderField {
@@ -7058,9 +7137,9 @@ enum RouteOrderField {
   TRAFFIC_RATIO
 }
 
-"""Scope for route scheduling history query"""
+"""Added in 24.09.0. Scope for route scheduling history query"""
 input RouteScope {
-  """Route ID to get history for"""
+  """Route ID to get history for."""
   routeId: UUID!
 }
 
@@ -7078,6 +7157,23 @@ enum RouteStatus {
 }
 
 """
+Added in 26.3.0. Filter for route status with equality and membership operators.
+"""
+input RouteStatusFilter {
+  """Exact status match"""
+  equals: RouteStatus = null
+
+  """Status is in list"""
+  in: [RouteStatus!] = null
+
+  """Excludes exact status match"""
+  notEquals: RouteStatus = null
+
+  """Status is not in list"""
+  notIn: [RouteStatus!] = null
+}
+
+"""
 Added in 25.19.0. Traffic routing status for a route. Controls whether traffic should be sent to this route.
 """
 enum RouteTrafficStatus {
@@ -7085,17 +7181,44 @@ enum RouteTrafficStatus {
   INACTIVE
 }
 
-"""Input for SMTP authentication credentials"""
+"""
+Added in 26.3.0. Filter for route traffic status with equality and membership operators.
+"""
+input RouteTrafficStatusFilter {
+  """Exact status match"""
+  equals: RouteTrafficStatus = null
+
+  """Status is in list"""
+  in: [RouteTrafficStatus!] = null
+
+  """Excludes exact status match"""
+  notEquals: RouteTrafficStatus = null
+
+  """Status is not in list"""
+  notIn: [RouteTrafficStatus!] = null
+}
+
+"""Added in 24.09.0. Input for SMTP authentication credentials"""
 input SMTPAuthInput {
+  """SMTP username."""
   username: String = null
+
+  """SMTP password."""
   password: String = null
 }
 
-"""Input for SMTP server connection settings"""
+"""Added in 24.09.0. Input for SMTP server connection settings"""
 input SMTPConnectionInput {
+  """SMTP host."""
   host: String!
+
+  """SMTP port."""
   port: Int!
+
+  """Use TLS."""
   useTls: Boolean! = true
+
+  """Connection timeout in seconds."""
   timeout: Int! = 30
 }
 
@@ -7103,12 +7226,15 @@ extend type ScalingGroupNode @key(fields: "id") {
   id: ID! @external
 }
 
+"""
+Added in 25.19.0. Provides access to auto-scaling rules configured for a deployment. Auto-scaling rules define conditions for automatically adjusting the number of replicas based on metrics.
+"""
 type ScalingRule {
   autoScalingRules(filter: AutoScalingRuleFilter = null, orderBy: [AutoScalingRuleOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): AutoScalingRuleConnection!
 }
 
 """
-Added in 25.14.0.
+Added in 24.09.0. Added in 25.14.0.
 
 Input for batch scanning of specific models from external registries.
 
@@ -7117,24 +7243,22 @@ README content and file sizes. This operation performs immediate detailed scanni
 unlike the general scan_artifacts which only retrieves basic metadata.
 """
 input ScanArtifactModelsInput {
+  """List of model targets to scan."""
   models: [ModelTarget!]!
+
+  """Optional registry ID to scan models from."""
   registryId: UUID = null
 }
 
 """
-Added in 25.14.0.
-
-Response payload for batch model scanning operations.
-
-Contains the artifact revisions discovered during detailed scanning of specific models,
-including README content and file size information.
+Added in 25.14.0. Response payload for batch model scanning operations. Contains the artifact revisions discovered during detailed scanning of specific models, including README content and file size information.
 """
 type ScanArtifactModelsPayload {
   artifactRevision: ArtifactRevisionConnection!
 }
 
 """
-Added in 25.14.0.
+Added in 24.09.0. Added in 25.14.0.
 
 Input for scanning artifacts from external registries (HuggingFace, Reservoir).
 
@@ -7142,21 +7266,21 @@ Discovers available artifacts and registers their metadata in the system.
 Artifacts remain in SCANNED status until explicitly imported via import_artifacts.
 """
 input ScanArtifactsInput {
+  """Optional registry ID to scan artifacts from."""
   registryId: ID = null
 
-  """Maximum number of artifacts to scan (max: 500)"""
+  """Maximum number of artifacts to scan."""
   limit: Int!
+
+  """Filter artifacts by type."""
   artifactType: ArtifactType = null
+
+  """Search term to filter artifacts by name or description."""
   search: String = null
 }
 
 """
-Added in 25.14.0.
-
-Response payload for artifact scanning operations.
-
-Contains the list of artifacts discovered during scanning of external registries.
-These artifacts are registered with SCANNED status and can be imported for actual use.
+Added in 25.14.0. Response payload for artifact scanning operations. Contains the list of artifacts discovered during scanning of external registries. These artifacts are registered with SCANNED status and can be imported for actual use.
 """
 type ScanArtifactsPayload {
   artifacts: [Artifact!]!
@@ -7172,7 +7296,7 @@ enum SchedulerType {
   FAIR_SHARE
 }
 
-"""Added in 25.15.0. Scheduling event broadcast payload"""
+"""Added in 25.15.0. Scheduling event broadcast payload."""
 type SchedulingBroadcastEventPayload {
   statusTransition: SchedulingStatus!
   reason: String!
@@ -7192,6 +7316,23 @@ enum SchedulingResult {
   EXPIRED
   GIVE_UP
   SKIPPED
+}
+
+"""
+Added in 26.3.0. Filter for scheduling result with equality and membership operators.
+"""
+input SchedulingResultFilter {
+  """Exact match."""
+  equals: SchedulingResult = null
+
+  """In list."""
+  in: [SchedulingResult!] = null
+
+  """Not equal."""
+  notEquals: SchedulingResult = null
+
+  """Not in list."""
+  notIn: [SchedulingResult!] = null
 }
 
 """Status of session scheduling transitions"""
@@ -7279,11 +7420,15 @@ type ServiceCatalogEndpoint {
 
 """Added in 26.3.0. Filter for service catalog queries."""
 input ServiceCatalogFilter {
-  """Filter by service group name (exact match)."""
-  serviceGroup: String = null
+  """
+  Filter by service group name. Supports equals, contains, startsWith, and endsWith.
+  """
+  serviceGroup: StringFilter = null
 
-  """Filter by health status."""
-  status: ServiceCatalogStatus = null
+  """
+  Filter by health status. Supports equals, in, not_equals, and not_in operations.
+  """
+  status: ServiceCatalogStatusFilter = null
   AND: [ServiceCatalogFilter!] = null
   OR: [ServiceCatalogFilter!] = null
   NOT: [ServiceCatalogFilter!] = null
@@ -7293,7 +7438,10 @@ input ServiceCatalogFilter {
 Added in 26.3.0. Specifies the field and direction for ordering service catalog queries.
 """
 input ServiceCatalogOrderBy {
+  """Field to order by."""
   field: ServiceCatalogOrderField!
+
+  """Order direction."""
   direction: OrderDirection! = ASC
 }
 
@@ -7310,6 +7458,16 @@ enum ServiceCatalogStatus {
   HEALTHY
   UNHEALTHY
   DEREGISTERED
+}
+
+"""
+Added in 26.3.0. Filter for ServiceCatalogStatus enum fields. Supports equals, in, not_equals, and not_in operations.
+"""
+input ServiceCatalogStatusFilter {
+  equals: ServiceCatalogStatus = null
+  in: [ServiceCatalogStatus!] = null
+  notEquals: ServiceCatalogStatus = null
+  notIn: [ServiceCatalogStatus!] = null
 }
 
 """
@@ -7350,7 +7508,7 @@ type ServicePorts {
   entries: [ServicePortEntry!]!
 }
 
-"""Session scheduling history record"""
+"""Added in 26.3.0. Session scheduling history record."""
 type SessionSchedulingHistory implements Node {
   """The Globally Unique ID of this object"""
   id: ID!
@@ -7369,7 +7527,7 @@ type SessionSchedulingHistory implements Node {
   sessionId: ID!
 }
 
-"""Session scheduling history connection"""
+"""Added in 26.3.0. Session scheduling history connection."""
 type SessionSchedulingHistoryConnection {
   """Pagination data for this connection"""
   pageInfo: PageInfo!
@@ -7388,14 +7546,14 @@ type SessionSchedulingHistoryEdge {
   node: SessionSchedulingHistory!
 }
 
-"""Filter for session scheduling history"""
+"""Added in 24.09.0. Filter for session scheduling history"""
 input SessionSchedulingHistoryFilter {
   id: UUIDFilter = null
   sessionId: UUIDFilter = null
   phase: StringFilter = null
   fromStatus: [String!] = null
   toStatus: [String!] = null
-  result: [SchedulingResult!] = null
+  result: SchedulingResultFilter = null
   errorCode: StringFilter = null
   message: StringFilter = null
   createdAt: DateTimeFilter = null
@@ -7405,9 +7563,14 @@ input SessionSchedulingHistoryFilter {
   NOT: [SessionSchedulingHistoryFilter!] = null
 }
 
-"""Order by specification for session scheduling history"""
+"""
+Added in 24.09.0. Order by specification for session scheduling history
+"""
 input SessionSchedulingHistoryOrderBy {
+  """Field to order by"""
   field: SessionSchedulingHistoryOrderField!
+
+  """Order direction"""
   direction: OrderDirection! = DESC
 }
 
@@ -7416,9 +7579,9 @@ enum SessionSchedulingHistoryOrderField {
   UPDATED_AT
 }
 
-"""Scope for session scheduling history query"""
+"""Added in 24.09.0. Scope for session scheduling history query"""
 input SessionScope {
-  """Session ID to get history for"""
+  """Session ID to get history for."""
   sessionId: UUID!
 }
 
@@ -7575,7 +7738,7 @@ type SessionV2NetworkInfo {
 """Added in 26.3.0. Ordering specification for sessions."""
 input SessionV2OrderBy {
   field: SessionV2OrderField!
-  direction: OrderDirection! = DESC
+  direction: OrderDirection!
 }
 
 """Added in 26.3.0. Fields available for ordering sessions."""
@@ -7589,7 +7752,9 @@ enum SessionV2OrderField {
 
 """Added in 26.3.0. Resource allocation information for a session."""
 type SessionV2ResourceInfo {
-  """Resource allocation with requested and occupied slots."""
+  """
+  Resource allocation with requested and occupied slots. Typed as Any because this field holds a nested GQL type (ResourceAllocationGQL).
+  """
   allocation: ResourceAllocation!
 
   """The resource group (scaling group) this session is assigned to."""
@@ -7610,7 +7775,9 @@ enum SessionV2Result {
 
 """Added in 26.3.0. Runtime execution configuration for a session."""
 type SessionV2RuntimeInfo {
-  """Environment variables for the session."""
+  """
+  Environment variables for the session. Typed as Any because this field holds a nested GQL type (EnvironmentVariablesGQL).
+  """
   environ: EnvironmentVariables
 
   """Bootstrap script to run before the main process."""
@@ -7654,21 +7821,18 @@ enum SessionV2Type {
 }
 
 """
-Added in 25.14.0.
-
-Information about the source or registry of an artifact.
-
-Contains the name and URL of the registry where the artifact is stored or originates from.
+Added in 25.14.0. Information about the source or registry of an artifact. Contains the name and URL of the registry where the artifact is stored or originates from.
 """
 type SourceInfo {
+  """Name of the registry or source."""
   name: String
+
+  """URL of the registry or source."""
   url: String
 }
 
 """
-Added in 25.15.0.
-
-Storage namespace provides logical separation of data within a single storage system
+Added in 25.15.0. Storage namespace provides logical separation of data within a single storage system
 to organize and isolate domain-specific concerns.
 
 Implementation varies by storage type:
@@ -7682,11 +7846,7 @@ type StorageNamespace implements Node {
   namespace: String!
 }
 
-"""
-Added in 25.15.0.
-
-Storage namespace connection for pagination.
-"""
+"""Added in 25.15.0. Storage namespace connection for pagination."""
 type StorageNamespaceConnection {
   """Pagination data for this connection"""
   pageInfo: PageInfo!
@@ -7705,26 +7865,60 @@ type StorageNamespaceEdge {
   node: StorageNamespace!
 }
 
+"""
+Added in 24.09.0. Filter for string fields supporting equality, containment, prefix/suffix, and case-insensitive variants.
+"""
 input StringFilter {
-  contains: String = null
-  startsWith: String = null
-  endsWith: String = null
+  """Exact match (case-sensitive)"""
   equals: String = null
-  notContains: String = null
-  notStartsWith: String = null
-  notEndsWith: String = null
+
+  """Contains (case-sensitive)"""
+  contains: String = null
+
+  """Starts with (case-sensitive)"""
+  startsWith: String = null
+
+  """Ends with (case-sensitive)"""
+  endsWith: String = null
+
+  """Not equals (case-sensitive)"""
   notEquals: String = null
-  iContains: String = null
-  iStartsWith: String = null
-  iEndsWith: String = null
+
+  """Not contains (case-sensitive)"""
+  notContains: String = null
+
+  """Not starts with (case-sensitive)"""
+  notStartsWith: String = null
+
+  """Not ends with (case-sensitive)"""
+  notEndsWith: String = null
+
+  """Exact match (case-insensitive)"""
   iEquals: String = null
-  iNotContains: String = null
-  iNotStartsWith: String = null
-  iNotEndsWith: String = null
+
+  """Contains (case-insensitive)"""
+  iContains: String = null
+
+  """Starts with (case-insensitive)"""
+  iStartsWith: String = null
+
+  """Ends with (case-insensitive)"""
+  iEndsWith: String = null
+
+  """Not equals (case-insensitive)"""
   iNotEquals: String = null
+
+  """Not contains (case-insensitive)"""
+  iNotContains: String = null
+
+  """Not starts with (case-insensitive)"""
+  iNotStartsWith: String = null
+
+  """Not ends with (case-insensitive)"""
+  iNotEndsWith: String = null
 }
 
-"""Sub-step result in scheduling history"""
+"""Added in 26.3.0. Sub-step result in scheduling history."""
 type SubStepResultGQL {
   step: String!
   result: SchedulingResult!
@@ -7774,7 +7968,9 @@ type Subscription {
   backgroundTaskEvents(taskId: ID!): BackgroundTaskEventPayload!
 }
 
-"""Input for switching the main access key of the current user."""
+"""
+Added in 24.09.0. Input for switching the main access key of the current user.
+"""
 input SwitchMyMainAccessKeyInput {
   """
   Access key to set as the new main access key. Must be active and owned by the user.
@@ -7782,19 +7978,21 @@ input SwitchMyMainAccessKeyInput {
   accessKey: String!
 }
 
-"""Payload returned after switching the main access key."""
+"""Added in 26.2.0. Payload returned after switching the main access key."""
 type SwitchMyMainAccessKeyPayload {
   """Whether the switch was successful."""
   success: Boolean!
 }
 
-"""Added in 25.19.0"""
+"""Added in 25.19.0. """
 input SyncReplicaInput {
+  """Deployment ID to sync replicas for"""
   modelDeploymentId: ID!
 }
 
-"""Added in 25.19.0"""
+"""Added in 25.19.0. Payload for replica sync mutation result."""
 type SyncReplicaPayload {
+  """Whether the sync succeeded"""
   success: Boolean!
 }
 
@@ -7806,43 +8004,51 @@ enum TrafficStatus {
   INACTIVE
 }
 
-"""Added in 25.19.0"""
+"""Added in 25.19.0. """
 input TrafficStatusFilter {
-  in: [TrafficStatus!] = null
+  """Exact traffic status match"""
   equals: TrafficStatus = null
+
+  """Traffic status is in list"""
+  in: [TrafficStatus!] = null
 }
 
 scalar UUID
 
 """Added in 26.1.0. Filter for UUID fields."""
 input UUIDFilter {
+  """Exact UUID match"""
   equals: UUID = null
+
+  """UUID is in list"""
   in: [UUID!] = null
+
+  """Not equals UUID"""
   notEquals: UUID = null
+
+  """UUID is not in list"""
   notIn: [UUID!] = null
 }
 
-"""
-Added in 25.15.0.
-
-Input type for unregistering a storage namespace.
-"""
+"""Added in 25.15.0. Input type for unregistering a storage namespace."""
 input UnregisterStorageNamespaceInput {
+  """Storage ID of the namespace to unregister"""
   storageId: UUID!
+
+  """Namespace bucket or path prefix to unregister"""
   namespace: String!
 }
 
 """
-Added in 25.15.0.
-
-Payload returned after storage namespace unregistration.
+Added in 25.15.0. Payload returned after storage namespace unregistration.
 """
 type UnregisterStorageNamespacePayload {
+  """ID of the unregistered storage namespace"""
   id: UUID!
 }
 
 """
-Added in 25.14.0.
+Added in 24.09.0. Added in 25.14.0.
 
 Input for updating artifact metadata properties.
 
@@ -7850,52 +8056,61 @@ Modifies artifact metadata such as readonly status and description.
 This operation does not affect the actual artifact files or revisions.
 """
 input UpdateArtifactInput {
+  """ID of the artifact to update."""
   artifactId: ID!
-  readonly: Boolean
-  description: String
+
+  """Whether the artifact should be readonly."""
+  readonly: Boolean = null
+
+  """Updated description."""
+  description: String = null
 }
 
 """
-Added in 25.14.0.
-
-Response payload for artifact update operations.
-
-Returns the updated artifact with modified metadata properties.
+Added in 25.14.0. Response payload for artifact update operations. Returns the updated artifact with modified metadata properties.
 """
 type UpdateArtifactPayload {
   artifact: Artifact!
 }
 
+"""Added in 25.19.0. Input for updating an auto-scaling rule."""
 input UpdateAutoScalingRuleInput {
   id: ID!
-  metricSource: AutoScalingMetricSource
-  metricName: String
-  minThreshold: Decimal
-  maxThreshold: Decimal
-  stepSize: Int
-  timeWindow: Int
-  minReplicas: Int
-  maxReplicas: Int
+  metricSource: AutoScalingMetricSource = null
+  metricName: String = null
+  minThreshold: Decimal = null
+  maxThreshold: Decimal = null
+  stepSize: Int = null
+  timeWindow: Int = null
+  minReplicas: Int = null
+  maxReplicas: Int = null
 }
 
+"""Added in 25.19.0. Payload for updating an auto-scaling rule."""
 type UpdateAutoScalingRulePayload {
-  autoScalingRule: AutoScalingRule!
+  """Updated auto-scaling rule"""
+  rule: AutoScalingRule!
 }
 
-"""Added in 25.19.0"""
+"""Added in 25.19.0. """
 input UpdateDeploymentInput {
   id: ID!
   openToPublic: Boolean = null
-  tags: [String!] = null
   defaultDeploymentStrategy: DeploymentStrategyInput = null
   activeRevisionId: ID = null
   desiredReplicaCount: Int = null
-  name: String = null
   preferredDomainName: String = null
+
+  """Updated deployment name"""
+  name: String = null
+
+  """Updated tags. Use SENTINEL to clear."""
+  tags: [String!] = "Sentinel.TOKEN"
 }
 
-"""Added in 25.19.0"""
+"""Added in 25.19.0. Payload for updating a model deployment."""
 type UpdateDeploymentPayload {
+  """Updated deployment"""
   deployment: ModelDeployment!
 }
 
@@ -7916,23 +8131,28 @@ input UpdateDeploymentPolicyInput {
 }
 
 """
-Added in 26.4.0.
-Result payload returned after creating or updating a deployment policy.
-Contains the full deployment_policy object reflecting the applied configuration.
+Added in 26.4.0. Result payload returned after creating or updating a deployment policy. Contains the full deployment_policy object reflecting the applied configuration.
 """
 type UpdateDeploymentPolicyPayload {
   deploymentPolicy: DeploymentPolicy!
 }
 
-"""Added in 25.14.0"""
+"""Added in 25.14.0. """
 input UpdateHuggingFaceRegistryInput {
+  """Registry ID to update"""
   id: ID!
-  url: String
-  name: String
-  token: String
+
+  """Updated registry name"""
+  name: String = null
+
+  """Updated HuggingFace Hub URL"""
+  url: String = null
+
+  """Updated access token"""
+  token: String = null
 }
 
-"""Added in 25.14.0"""
+"""Added in 25.14.0. Payload for updating a HuggingFace registry."""
 type UpdateHuggingFaceRegistryPayload {
   huggingfaceRegistry: HuggingFaceRegistry!
 }
@@ -7947,7 +8167,7 @@ input UpdateMyAllowedClientIPInput {
   allowedClientIp: [String!]
 
   """
-  If false (default), the operation will fail if the current request IP is not included in the new allowlist. Set to true to override this safety check.
+  If false (default), the operation will fail if the current request IP is not included in the new allowlist.
   """
   force: Boolean! = false
 }
@@ -7971,76 +8191,126 @@ input UpdateMyKeypairInput {
   isActive: Boolean!
 }
 
-"""Payload returned after updating a keypair."""
+"""Added in 26.2.0. Payload returned after updating a keypair."""
 type UpdateMyKeypairPayload {
   """Whether the update was successful."""
   success: Boolean!
 }
 
-"""Input for updating a notification channel"""
+"""Added in 24.09.0. Input for updating a notification channel"""
 input UpdateNotificationChannelInput {
   id: ID!
-  name: String
-  description: String
-  spec: NotificationChannelSpecInput
-  enabled: Boolean
+
+  """Updated channel name"""
+  name: String = null
+
+  """Updated channel description. Use SENTINEL to clear."""
+  description: String = "Sentinel.TOKEN"
+
+  """Updated channel specification"""
+  spec: NotificationChannelSpecInput = null
+
+  """Updated enabled status"""
+  enabled: Boolean = null
 }
 
-"""Payload for update notification channel mutation"""
+"""Added in 26.3.0. Payload for update notification channel mutation."""
 type UpdateNotificationChannelPayload {
   channel: NotificationChannel!
 }
 
-"""Input for updating a notification rule"""
+"""Added in 24.09.0. Input for updating a notification rule"""
 input UpdateNotificationRuleInput {
   id: ID!
-  name: String
-  description: String
-  messageTemplate: String
-  enabled: Boolean
+
+  """Updated rule name"""
+  name: String = null
+
+  """Updated rule description. Use SENTINEL to clear."""
+  description: String = "Sentinel.TOKEN"
+
+  """Updated message template (max 64KB)"""
+  messageTemplate: String = null
+
+  """Updated enabled status"""
+  enabled: Boolean = null
 }
 
-"""Payload for update notification rule mutation"""
+"""Added in 26.3.0. Payload for update notification rule mutation."""
 type UpdateNotificationRulePayload {
   rule: NotificationRule!
 }
 
-"""Added in 25.14.0"""
+"""Added in 25.14.0. """
 input UpdateObjectStorageInput {
+  """Object storage ID to update"""
   id: ID!
-  name: String
-  host: String
-  accessKey: String
-  secretKey: String
-  endpoint: String
-  region: String
+
+  """Updated name of the object storage"""
+  name: String = null
+
+  """Updated host address"""
+  host: String = null
+
+  """Updated access key"""
+  accessKey: String = null
+
+  """Updated secret key"""
+  secretKey: String = null
+
+  """Updated endpoint URL"""
+  endpoint: String = null
+
+  """Updated region. Use SENTINEL (default) for no change, None to clear."""
+  region: String = "Sentinel.TOKEN"
 }
 
-"""Added in 25.14.0"""
+"""Added in 25.14.0. Payload for updating an object storage."""
 type UpdateObjectStoragePayload {
+  """Updated object storage"""
   objectStorage: ObjectStorage!
 }
 
 """Added in 26.3.0. Input for updating a scoped permission"""
 input UpdatePermissionInput {
+  """Permission ID to update"""
   id: UUID!
+
+  """Updated scope element type"""
   scopeType: RBACElementType = null
+
+  """Updated scope element ID"""
   scopeId: String = null
+
+  """Updated entity element type"""
   entityType: RBACElementType = null
+
+  """Updated operation type"""
   operation: OperationType = null
 }
 
-"""Added in 25.14.0"""
+"""Added in 25.14.0. """
 input UpdateReservoirRegistryInput {
+  """Registry ID to update"""
   id: ID!
-  name: String
-  endpoint: String
-  accessKey: String
-  secretKey: String
-  apiVersion: String
+
+  """Updated registry name"""
+  name: String = null
+
+  """Updated endpoint URL"""
+  endpoint: String = null
+
+  """Updated access key"""
+  accessKey: String = null
+
+  """Updated secret key"""
+  secretKey: String = null
+
+  """Updated API version"""
+  apiVersion: String = null
 }
 
-"""Added in 25.14.0"""
+"""Added in 25.14.0. Payload for updating a reservoir registry."""
 type UpdateReservoirRegistryPayload {
   reservoir: ReservoirRegistry!
 }
@@ -8069,7 +8339,7 @@ input UpdateResourceGroupFairShareSpecInput {
   defaultWeight: Decimal = null
 
   """
-  Resource weights for fair share calculation. Each entry specifies a resource type and its weight multiplier. Only provided resource types are updated (partial update). Set weight to null to remove that resource type (revert to default). Leave the entire list null to keep all existing values.
+  Resource weights for fair share calculation. Leave null to keep existing values.
   """
   resourceWeights: [ResourceWeightEntryInput!] = null
 }
@@ -8112,13 +8382,11 @@ input UpdateResourceGroupInput {
   useHostNetwork: Boolean = null
 
   """
-  Scheduler type (FIFO, LIFO, DRF, FAIR_SHARE). Leave null to keep existing value.
+  Scheduler type value (fifo/lifo/drf/fair-share). Leave null to keep existing.
   """
   schedulerType: SchedulerType = null
 
-  """
-  Added in 26.3.0. Preemption configuration. When provided, replaces the entire preemption config. Leave null to keep existing value.
-  """
+  """Preemption configuration. Leave null to keep existing value."""
   preemption: PreemptionConfigInput = null
 }
 
@@ -8131,23 +8399,29 @@ type UpdateResourceGroupPayload {
 """Added in 26.3.0. Input for updating a role"""
 input UpdateRoleInput {
   id: UUID!
-  name: String
-  description: String
-  status: RoleStatus
+
+  """Updated role name"""
+  name: String = null
+
+  """Updated role description. Use SENTINEL to clear."""
+  description: String = "Sentinel.TOKEN"
+
+  """Updated role status"""
+  status: RoleStatus = null
 }
 
 """Added in 25.19.0. Input for updating route traffic status."""
 input UpdateRouteTrafficStatusInput {
-  """The ID of the route to update."""
+  """Route ID to update"""
   routeId: ID!
 
-  """The new traffic status (ACTIVE/INACTIVE)."""
+  """New traffic status (ACTIVE/INACTIVE)"""
   trafficStatus: RouteTrafficStatus!
 }
 
 """Added in 25.19.0. Result of updating route traffic status."""
 type UpdateRouteTrafficStatusPayload {
-  """The updated route."""
+  """The updated route"""
   route: Route!
 }
 
@@ -8212,33 +8486,44 @@ type UpdateUserV2Payload {
 
 """Added in 25.16.0. Input for updating VFS storage"""
 input UpdateVFSStorageInput {
+  """Storage ID to update"""
   id: ID!
-  name: String
-  host: String
-  basePath: String
+
+  """Updated storage name"""
+  name: String = null
+
+  """Updated host address"""
+  host: String = null
+
+  """Updated base path"""
+  basePath: String = null
 }
 
-"""Added in 25.16.0. Payload for updating VFS storage"""
+"""Added in 25.16.0. Payload for updating VFS storage."""
 type UpdateVFSStoragePayload {
+  """Updated VFS storage"""
   vfsStorage: VFSStorage!
 }
 
 """
-Added in 25.16.0.
+Added in 24.09.0. Added in 25.16.0.
 Input for creating or updating domain-level app configuration.
 The provided extra_config object will completely replace the existing configuration;
 existing keys not present in the new extra_config will be removed.
 All users in this domain will be affected by these settings when their configurations are merged.
 """
 input UpsertDomainConfigInput {
+  """Domain name whose configuration will be upserted."""
   domainName: String!
+
+  """
+  Configuration data to store. Completely replaces existing configuration.
+  """
   extraConfig: JSON!
 }
 
 """
-Added in 25.16.0.
-Payload returned after upserting domain-level app configuration.
-Contains the resulting configuration that was stored.
+Added in 25.16.0. Payload returned after upserting domain-level app configuration. Contains the resulting configuration that was stored.
 """
 type UpsertDomainConfigPayload {
   appConfig: AppConfig!
@@ -8248,14 +8533,14 @@ type UpsertDomainConfigPayload {
 Added in 26.1.0. Input for upserting domain fair share weight. The weight parameter affects scheduling priority - higher weight = higher priority. Set weight to null to use resource group's default_weight.
 """
 input UpsertDomainFairShareWeightInput {
-  """Name of the scaling group (resource group) for this fair share."""
+  """Scaling group name."""
   resourceGroupName: String!
 
   """Name of the domain to update weight for."""
   domainName: String!
 
   """
-  Priority weight multiplier. Higher weight = higher priority allocation ratio. Set to null to use resource group's default_weight.
+  Priority weight multiplier. Higher weight = higher priority. Set to null to use resource group's default_weight.
   """
   weight: Decimal = null
 }
@@ -8270,7 +8555,7 @@ type UpsertDomainFairShareWeightPayload {
 Added in 26.1.0. Input for upserting project fair share weight. The weight parameter affects scheduling priority - higher weight = higher priority. Set weight to null to use resource group's default_weight.
 """
 input UpsertProjectFairShareWeightInput {
-  """Name of the scaling group (resource group) for this fair share."""
+  """Scaling group name."""
   resourceGroupName: String!
 
   """UUID of the project to update weight for."""
@@ -8280,7 +8565,7 @@ input UpsertProjectFairShareWeightInput {
   domainName: String!
 
   """
-  Priority weight multiplier. Higher weight = higher priority allocation ratio. Set to null to use resource group's default_weight.
+  Priority weight multiplier. Higher weight = higher priority. Set to null to use resource group's default_weight.
   """
   weight: Decimal = null
 }
@@ -8294,7 +8579,7 @@ type UpsertProjectFairShareWeightPayload {
 }
 
 """
-Added in 25.16.0.
+Added in 24.09.0. Added in 25.16.0.
 Input for creating or updating user-level app configuration.
 The provided extra_config object will completely replace the existing configuration;
 existing keys not present in the new extra_config will be removed.
@@ -8302,14 +8587,19 @@ These settings will override domain-level settings when configurations are merge
 If user_id is not provided, the current user's configuration will be updated.
 """
 input UpsertUserConfigInput {
+  """
+  Configuration data to store. Completely replaces existing configuration.
+  """
   extraConfig: JSON!
+
+  """
+  User ID whose configuration will be upserted. Defaults to current user.
+  """
   userId: ID = null
 }
 
 """
-Added in 25.16.0.
-Payload returned after upserting user-level app configuration.
-Contains the resulting configuration that was stored.
+Added in 25.16.0. Payload returned after upserting user-level app configuration. Contains the resulting configuration that was stored.
 """
 type UpsertUserConfigPayload {
   appConfig: AppConfig!
@@ -8319,20 +8609,20 @@ type UpsertUserConfigPayload {
 Added in 26.1.0. Input for upserting user fair share weight. The weight parameter affects scheduling priority - higher weight = higher priority. Set weight to null to use resource group's default_weight.
 """
 input UpsertUserFairShareWeightInput {
-  """Name of the scaling group (resource group) for this fair share."""
+  """Scaling group name."""
   resourceGroupName: String!
 
-  """UUID of the project the user belongs to."""
-  projectId: UUID!
-
-  """UUID of the user to update weight for."""
+  """User UUID."""
   userUuid: UUID!
+
+  """Project ID."""
+  projectId: UUID!
 
   """Name of the domain the user belongs to."""
   domainName: String!
 
   """
-  Priority weight multiplier. Higher weight = higher priority allocation ratio. Set to null to use resource group's default_weight.
+  Priority weight multiplier. Higher weight = higher priority. Set to null to use resource group's default_weight.
   """
   weight: Decimal = null
 }
@@ -8374,9 +8664,7 @@ enum UsageBucketOrderField {
 Added in 26.2.0. Nested filter for the domain a user belongs to. Filters users whose domain matches all specified conditions.
 """
 input UserDomainNestedFilter {
-  """
-  Filter by domain name. Supports equals, contains, startsWith, and endsWith.
-  """
+  """Filter by domain name."""
   name: StringFilter = null
 
   """Filter by domain active status."""
@@ -8505,14 +8793,10 @@ input UserFairShareFilter {
 Added in 26.1.0. Specifies ordering for user fair share query results. Combine field selection with direction to sort results. Default direction is DESC (descending).
 """
 input UserFairShareOrderBy {
-  """
-  The field to order by. See UserFairShareOrderField for available options.
-  """
+  """Field to order by"""
   field: UserFairShareOrderField!
 
-  """
-  Sort direction. ASC for ascending (lowest first), DESC for descending (highest first). For fair_share_factor, ASC shows highest priority users first.
-  """
+  """Order direction"""
   direction: OrderDirection! = DESC
 }
 
@@ -8526,6 +8810,7 @@ enum UserFairShareOrderField {
   USER_EMAIL
 }
 
+"""Added in 24.09.0. Scope parameters for filtering user fair shares."""
 input UserFairShareScope {
   """Resource group to filter fair shares by."""
   resourceGroupName: String!
@@ -8548,7 +8833,7 @@ input UserFairShareUserNestedFilter {
   """Filter by email. Supports equals, contains, startsWith, and endsWith."""
   email: StringFilter = null
 
-  """Filter by user active status (based on user status field)."""
+  """Filter by user active status"""
   isActive: Boolean = null
 }
 
@@ -8560,9 +8845,7 @@ extend type UserNode @key(fields: "id") {
 Added in 26.2.0. Nested filter for projects a user belongs to. Filters users that belong to at least one project matching all specified conditions.
 """
 input UserProjectNestedFilter {
-  """
-  Filter by project name. Supports equals, contains, startsWith, and endsWith.
-  """
+  """Filter by project name."""
   name: StringFilter = null
 
   """Filter by project active status."""
@@ -8580,7 +8863,7 @@ enum UserRoleV2 {
 }
 
 """
-Added in 26.2.0. Filter for UserRoleV2 enum fields.Supports equals, in, not_equals, and not_in operations.
+Added in 26.2.0. Filter for UserRoleV2 enum fields. Supports equals, in, not_equals, and not_in operations.
 """
 input UserRoleV2EnumFilter {
   """Exact match for user role."""
@@ -8607,7 +8890,7 @@ enum UserStatusV2 {
 }
 
 """
-Added in 26.2.0. Filter for UserStatusV2 enum fields.Supports equals, in, not_equals, and not_in operations.
+Added in 26.2.0. Filter for UserStatusV2 enum fields. Supports equals, in, not_equals, and not_in operations.
 """
 input UserStatusV2EnumFilter {
   """Exact match for user status."""
@@ -8737,17 +9020,14 @@ input UserUsageBucketFilter {
 Added in 26.1.0. Specifies ordering for user usage bucket query results. Combine field selection with direction to sort results. Default direction is DESC (most recent first).
 """
 input UserUsageBucketOrderBy {
-  """
-  The field to order by. See UsageBucketOrderField for available options.
-  """
+  """Field to order by"""
   field: UsageBucketOrderField!
 
-  """
-  Sort direction. ASC for chronological order (oldest first), DESC for reverse chronological order (most recent first).
-  """
+  """Order direction"""
   direction: OrderDirection! = DESC
 }
 
+"""Added in 24.09.0. Scope parameters for filtering user usage buckets."""
 input UserUsageScope {
   """Resource group to filter usage buckets by."""
   resourceGroupName: String!
@@ -8862,60 +9142,17 @@ type UserV2Edge {
 Added in 26.2.0. Filter input for querying users. Supports filtering by UUID, username, email, status, domain, role, creation time, and nested domain/project filters. Multiple filters can be combined using AND, OR, and NOT logical operators.
 """
 input UserV2Filter {
-  """Filter by user UUID. Supports equals and 'in' operations."""
   uuid: UUIDFilter = null
-
-  """
-  Filter by username. Supports equals, contains, startsWith, and endsWith.
-  """
   username: StringFilter = null
-
-  """
-  Filter by email address. Supports equals, contains, startsWith, and endsWith.
-  """
   email: StringFilter = null
-
-  """
-  Filter by account status. Supports equals, in, not_equals, and not_in operations.
-  """
   status: UserStatusV2EnumFilter = null
-
-  """
-  Filter by domain name. Supports equals, contains, startsWith, and endsWith.
-  """
   domainName: StringFilter = null
-
-  """
-  Filter by user role. Supports equals, in, not_equals, and not_in operations.
-  """
   role: UserRoleV2EnumFilter = null
-
-  """
-  Filter by creation timestamp. Supports before, after, and between operations.
-  """
   createdAt: DateTimeFilter = null
-
-  """
-  Filter by nested domain conditions. Returns users whose domain matches all specified conditions.
-  """
   domain: UserDomainNestedFilter = null
-
-  """
-  Filter by nested project conditions. Returns users that belong to at least one project matching all specified conditions.
-  """
   project: UserProjectNestedFilter = null
-
-  """Combine multiple filters with AND logic. All conditions must match."""
   AND: [UserV2Filter!] = null
-
-  """
-  Combine multiple filters with OR logic. At least one condition must match.
-  """
   OR: [UserV2Filter!] = null
-
-  """
-  Negate the specified filters. Records matching these conditions will be excluded.
-  """
   NOT: [UserV2Filter!] = null
 }
 
@@ -8923,11 +9160,11 @@ input UserV2Filter {
 Added in 26.2.0. Specifies ordering for user query results. Combine field selection with direction to sort results. Default direction is DESC (descending).
 """
 input UserV2OrderBy {
-  """The field to order by. See UserOrderField for available options."""
+  """Field to order by."""
   field: UserV2OrderField!
 
-  """Sort direction. ASC for ascending, DESC for descending."""
-  direction: OrderDirection! = DESC
+  """Order direction."""
+  direction: OrderDirection! = ASC
 }
 
 """
@@ -8950,7 +9187,7 @@ type UserV2OrganizationInfo {
   """Name of the domain this user belongs to."""
   domainName: String
 
-  """User's role determining access permissions. See UserRoleV2 enum."""
+  """User's role determining access permissions. See UserRole enum."""
   role: UserRoleV2
 
   """Name of the user resource policy applied to this user."""
@@ -8986,7 +9223,7 @@ Added in 26.2.0. User account status information. Contains current status and pa
 """
 type UserV2StatusInfo {
   """
-  Current account status. See UserStatusV2 enum for possible values. Replaces the deprecated is_active field.
+  Current account status. See UserStatus enum for possible values. Replaces the deprecated is_active field.
   """
   status: UserStatusV2!
 
@@ -9003,22 +9240,20 @@ type UserV2StatusInfo {
 Added in 26.1.0. Input item for a single user weight in bulk upsert. Represents one user's weight configuration within a project.
 """
 input UserWeightInputItem {
-  """UUID of the user to update weight for."""
+  """User UUID"""
   userUuid: UUID!
 
-  """ID of the project this user's fair share belongs to."""
+  """Project ID"""
   projectId: UUID!
 
-  """Name of the domain this project belongs to."""
+  """Domain name for context"""
   domainName: String!
 
-  """
-  Priority weight multiplier. Higher weight = higher priority allocation ratio. Set to null to use resource group's default_weight.
-  """
-  weight: Decimal = null
+  """Fair share weight (null for default)"""
+  weight: Decimal
 }
 
-"""Added in 25.16.0. VFS Storage configuration"""
+"""Added in 25.16.0. VFS Storage configuration."""
 type VFSStorage implements Node {
   """The Globally Unique ID of this object"""
   id: ID!
@@ -9027,7 +9262,7 @@ type VFSStorage implements Node {
   basePath: String!
 }
 
-"""Added in 25.16.0. VFS Storage connection"""
+"""Added in 25.16.0. VFS Storage connection."""
 type VFSStorageConnection {
   """Pagination data for this connection"""
   pageInfo: PageInfo!
@@ -9054,7 +9289,7 @@ type VFolderHostPermissionEntry {
   host: String!
 
   """
-  List of permissions granted for this host. See VFolderHostPermissionV2 enum for available permissions.
+  List of permissions granted for this host. See VFolderHostPermission enum for available permissions.
   """
   permissions: [VFolderHostPermissionV2!]!
 }
@@ -9073,25 +9308,33 @@ enum VFolderHostPermissionV2 {
   SET_USER_PERM
 }
 
-"""Input for validate notification channel mutation"""
+"""Added in 24.09.0. Input for validate notification channel mutation"""
 input ValidateNotificationChannelInput {
+  """Channel ID to validate"""
   id: ID!
+
+  """Test message to send through the channel (max 5KB)"""
   testMessage: String!
 }
 
-"""Payload for validate notification channel mutation"""
+"""Added in 26.3.0. Payload for validate notification channel mutation."""
 type ValidateNotificationChannelPayload {
-  id: ID!
+  """ID of the validated notification channel."""
+  channelId: UUID!
 }
 
-"""Input for validate notification rule mutation"""
+"""Added in 24.09.0. Input for validate notification rule mutation"""
 input ValidateNotificationRuleInput {
+  """Rule ID to validate"""
   id: ID!
-  notificationData: JSON
+
+  """Test notification data to use in template rendering"""
+  notificationData: JSON = {}
 }
 
-"""Payload for validate notification rule mutation"""
+"""Added in 26.3.0. Payload for validate notification rule mutation."""
 type ValidateNotificationRulePayload {
+  """The rendered message from the template."""
   message: String!
 }
 
@@ -9099,8 +9342,9 @@ extend type VirtualFolderNode @key(fields: "id") {
   id: ID! @external
 }
 
-"""Input for webhook configuration"""
+"""Added in 24.09.0. Input for webhook configuration"""
 input WebhookSpecInput {
+  """Webhook URL."""
   url: String!
 }
 

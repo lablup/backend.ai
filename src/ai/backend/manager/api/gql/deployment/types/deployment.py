@@ -570,7 +570,11 @@ class DeploymentStatusFilter:
         )
 
 
-@strawberry.input(name="DeploymentFilter", description="Added in 25.19.0.")
+@gql_pydantic_input(
+    BackendAIGQLMeta(description="", added_version="25.19.0"),
+    model=DeploymentFilterDTO,
+    name="DeploymentFilter",
+)
 class DeploymentFilter:
     name: StringFilter | None = None
     status: DeploymentStatusFilter | None = None
@@ -611,7 +615,7 @@ class DeploymentOrderBy:
     def to_pydantic(self) -> DeploymentOrderDTO:
         return DeploymentOrderDTO(
             field=DTODeploymentOrderField(self.field.value.lower()),
-            direction=DTOOrderDirection(self.direction.value.lower()),
+            direction=DTOOrderDirection(self.direction.value),
         )
 
 

@@ -36,9 +36,12 @@ class AuditLogStatusFilterGQL:
         )
 
 
-@strawberry.input(
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description="Filter criteria for querying audit logs.", added_version="24.09.0"
+    ),
+    model=AuditLogFilter,
     name="AuditLogFilter",
-    description="Added in 24.09.0. Filter criteria for querying audit logs.",
 )
 class AuditLogFilterGQL:
     entity_type: StringFilter | None = None

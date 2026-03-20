@@ -537,9 +537,10 @@ class SchedulingResultFilterGQL:
         )
 
 
-@strawberry.input(
+@gql_pydantic_input(
+    BackendAIGQLMeta(description="Filter for session scheduling history", added_version="24.09.0"),
+    model=SessionHistoryFilterDTO,
     name="SessionSchedulingHistoryFilter",
-    description="Added in 24.09.0. Filter for session scheduling history",
 )
 class SessionSchedulingHistoryFilter:
     id: UUIDFilter | None = None
@@ -592,9 +593,10 @@ class SessionSchedulingHistoryOrderBy:
         )
 
 
-@strawberry.input(
+@gql_pydantic_input(
+    BackendAIGQLMeta(description="Filter for deployment history", added_version="24.09.0"),
+    model=DeploymentHistoryFilterDTO,
     name="DeploymentHistoryFilter",
-    description="Added in 24.09.0. Filter for deployment history",
 )
 class DeploymentHistoryFilter:
     id: UUIDFilter | None = None
@@ -647,9 +649,10 @@ class DeploymentHistoryOrderBy:
         )
 
 
-@strawberry.input(
+@gql_pydantic_input(
+    BackendAIGQLMeta(description="Filter for route history", added_version="24.09.0"),
+    model=RouteHistoryFilterDTO,
     name="RouteHistoryFilter",
-    description="Added in 24.09.0. Filter for route history",
 )
 class RouteHistoryFilter:
     id: UUIDFilter | None = None

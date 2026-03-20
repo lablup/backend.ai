@@ -71,9 +71,13 @@ class DomainUserNestedFilter:
         )
 
 
-@strawberry.input(
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description="Filter input for querying domains. Supports filtering by name, description, active status, timestamps, and nested project/user filters. Multiple filters can be combined using AND, OR, and NOT logical operators.",
+        added_version="26.2.0",
+    ),
+    model=DomainFilter,
     name="DomainV2Filter",
-    description="Added in 26.2.0. Filter input for querying domains. Supports filtering by name, description, active status, timestamps, and nested project/user filters. Multiple filters can be combined using AND, OR, and NOT logical operators.",
 )
 class DomainV2Filter:
     """Filter for domain queries."""
