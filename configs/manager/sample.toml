@@ -83,17 +83,17 @@ ipc-base-path = "/tmp/backend.ai/ipc"
 # Defaults to the number of CPU cores available.
 # For optimal performance, set this to match your CPU core count.
 # Examples: 1, 4
-num-proc = 12
+num-proc = 10
 # Unique identifier for this manager instance.
 # Used to distinguish between multiple manager instances in a cluster.
 # By default, uses the hostname with an 'i-' prefix.
 # Must be unique across all managers in the same Backend.AI cluster.
 # Examples: i-manager123
-id = "i-gimhyeogjin-ui-MacBookPro.local"
+id = "i-MacBook-Air.local"
 # User ID (UID) under which the manager process runs.
 # If not specified, defaults to the UID of the server.py file.
 # Important for proper file permissions when creating files/sockets.
-# Examples: 501
+# Examples: 502
 user = ""
 # Group ID (GID) under which the manager process runs.
 # If not specified, defaults to the GID of the server.py file.
