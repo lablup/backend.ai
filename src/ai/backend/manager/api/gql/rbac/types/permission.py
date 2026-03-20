@@ -5,7 +5,7 @@ from __future__ import annotations
 import uuid
 from collections.abc import Iterable
 from enum import StrEnum
-from typing import TYPE_CHECKING, Annotated, Any, Self, override
+from typing import TYPE_CHECKING, Annotated, Any, Self
 
 import strawberry
 from strawberry import ID, Info
@@ -45,14 +45,6 @@ from ai.backend.manager.api.gql.rbac.types.entity_node import EntityNode
 from ai.backend.manager.api.gql.types import GQLFilter, GQLOrderBy, StrawberryGQLContext
 from ai.backend.manager.data.permission.permission import PermissionData
 from ai.backend.manager.errors.api import InvalidAPIParameters
-from ai.backend.manager.models.rbac_models.conditions import ScopedPermissionConditions
-from ai.backend.manager.models.rbac_models.orders import ScopedPermissionOrders
-from ai.backend.manager.repositories.base import (
-    QueryCondition,
-    QueryOrder,
-    combine_conditions_or,
-    negate_conditions,
-)
 
 if TYPE_CHECKING:
     from ai.backend.manager.api.gql.rbac.types.role import RoleGQL
@@ -355,50 +347,6 @@ class PermissionFilter(GQLFilter):
             NOT=[f.to_pydantic() for f in self.NOT] if self.NOT else None,
         )
 
-    @override
-    def build_conditions(self) -> list[QueryCondition]:
-        conditions: list[QueryCondition] = []
-
-        if self.role_id is not None:
-            conditions.append(ScopedPermissionConditions.by_role_id(self.role_id))
-
-        if self.scope_type is not None:
-            conditions.append(
-                ScopedPermissionConditions.by_scope_type(
-                    self.scope_type.to_element().to_scope_type()
-                )
-            )
-
-        if self.entity_type is not None:
-            conditions.append(
-                ScopedPermissionConditions.by_entity_type(
-                    self.entity_type.to_element().to_entity_type()
-                )
-            )
-
-        # Handle AND logical operator
-        if self.AND:
-            for sub_filter in self.AND:
-                conditions.extend(sub_filter.build_conditions())
-
-        # Handle OR logical operator
-        if self.OR:
-            or_sub_conditions: list[QueryCondition] = []
-            for sub_filter in self.OR:
-                or_sub_conditions.extend(sub_filter.build_conditions())
-            if or_sub_conditions:
-                conditions.append(combine_conditions_or(or_sub_conditions))
-
-        # Handle NOT logical operator
-        if self.NOT:
-            not_sub_conditions: list[QueryCondition] = []
-            for sub_filter in self.NOT:
-                not_sub_conditions.extend(sub_filter.build_conditions())
-            if not_sub_conditions:
-                conditions.append(negate_conditions(not_sub_conditions))
-
-        return conditions
-
 
 # ==================== OrderBy Types ====================
 
@@ -417,15 +365,6 @@ class PermissionOrderBy(GQLOrderBy):
             field=PermissionOrderFieldDTO(self.field.value),
             direction=OrderDirectionDTO(self.direction.value),
         )
-
-    @override
-    def to_query_order(self) -> QueryOrder:
-        ascending = self.direction == OrderDirection.ASC
-        match self.field:
-            case PermissionOrderField.ID:
-                return ScopedPermissionOrders.id(ascending)
-            case PermissionOrderField.ENTITY_TYPE:
-                return ScopedPermissionOrders.entity_type(ascending)
 
 
 # ==================== Input Types ====================

@@ -16,13 +16,11 @@ from ai.backend.common.types import ReadableCIDR
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.api.gql.user.types import (
     BulkCreateUsersV2PayloadGQL,
-    BulkCreateUserV2ErrorGQL,
     BulkCreateUserV2InputGQL,
     BulkPurgeUsersV2InputGQL,
     BulkPurgeUsersV2PayloadGQL,
     BulkPurgeUserV2ErrorGQL,
     BulkUpdateUsersV2PayloadGQL,
-    BulkUpdateUserV2ErrorGQL,
     BulkUpdateUserV2InputGQL,
     CreateUserInputGQL,
     CreateUserPayloadGQL,
@@ -35,7 +33,6 @@ from ai.backend.manager.api.gql.user.types import (
     UpdateMyAllowedClientIPPayloadGQL,
     UpdateUserPayloadGQL,
     UpdateUserV2InputGQL,
-    UserV2GQL,
 )
 from ai.backend.manager.api.gql.utils import check_admin_only
 from ai.backend.manager.data.user.types import UserStatus
@@ -148,21 +145,7 @@ async def admin_bulk_create_users_v2(
     action = BulkCreateUserAction(items=items)
     payload = await ctx.adapters.user.bulk_create_users(action)
 
-    created_users = [UserV2GQL.from_pydantic(node) for node in payload.created_users]
-    failed = [
-        BulkCreateUserV2ErrorGQL(
-            index=error.index,
-            username=error.username,
-            email=error.email,
-            message=error.message,
-        )
-        for error in payload.failed
-    ]
-
-    return BulkCreateUsersV2PayloadGQL(
-        created_users=created_users,
-        failed=failed,
-    )
+    return BulkCreateUsersV2PayloadGQL.from_pydantic(payload)
 
 
 # Update Mutations
@@ -324,19 +307,7 @@ async def admin_bulk_update_users_v2(
     action = BulkModifyUserAction(items=items)
     payload = await ctx.adapters.user.bulk_modify_users(action)
 
-    updated_users = [UserV2GQL.from_pydantic(node) for node in payload.updated_users]
-    failed = [
-        BulkUpdateUserV2ErrorGQL(
-            user_id=error.user_id,
-            message=error.message,
-        )
-        for error in payload.failed
-    ]
-
-    return BulkUpdateUsersV2PayloadGQL(
-        updated_users=updated_users,
-        failed=failed,
-    )
+    return BulkUpdateUsersV2PayloadGQL.from_pydantic(payload)
 
 
 @strawberry.mutation(

@@ -163,9 +163,7 @@ async def admin_update_resource_group_fair_share_spec(
     dto = input.to_pydantic()
     scaling_group = await info.context.adapters.resource_group.update_fair_share_spec(dto)
 
-    return UpdateResourceGroupFairShareSpecPayload(
-        resource_group=ResourceGroupGQL.from_pydantic(scaling_group),
-    )
+    return UpdateResourceGroupFairShareSpecPayload.from_pydantic(scaling_group)
 
 
 @strawberry.mutation(  # type: ignore[misc]
@@ -188,9 +186,7 @@ async def update_resource_group_fair_share_spec(
     dto = input.to_pydantic()
     scaling_group = await info.context.adapters.resource_group.update_fair_share_spec(dto)
 
-    return UpdateResourceGroupFairShareSpecPayload(
-        resource_group=ResourceGroupGQL.from_pydantic(scaling_group),
-    )
+    return UpdateResourceGroupFairShareSpecPayload.from_pydantic(scaling_group)
 
 
 @strawberry.mutation(  # type: ignore[misc]
@@ -210,6 +206,4 @@ async def admin_update_resource_group(
     dto = input.to_pydantic()
     scaling_group = await info.context.adapters.resource_group.update_config(dto)
 
-    return UpdateResourceGroupPayload(
-        resource_group=ResourceGroupGQL.from_pydantic(scaling_group),
-    )
+    return UpdateResourceGroupPayload.from_pydantic(scaling_group)

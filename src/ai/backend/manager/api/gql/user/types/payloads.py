@@ -2,10 +2,14 @@
 
 from __future__ import annotations
 
+from typing import Self
 from uuid import UUID
 
 import strawberry
 
+from ai.backend.common.dto.manager.v2.user.response import (
+    BulkCreateUsersPayload as BulkCreateUsersPayloadDTO,
+)
 from ai.backend.common.dto.manager.v2.user.response import (
     BulkCreateUserV2Error as BulkCreateUserV2ErrorDTO,
 )
@@ -16,7 +20,13 @@ from ai.backend.common.dto.manager.v2.user.response import (
     BulkPurgeUserV2Error as BulkPurgeUserV2ErrorDTO,
 )
 from ai.backend.common.dto.manager.v2.user.response import (
+    BulkUpdateUsersPayload as BulkUpdateUsersPayloadDTO,
+)
+from ai.backend.common.dto.manager.v2.user.response import (
     BulkUpdateUserV2Error as BulkUpdateUserV2ErrorDTO,
+)
+from ai.backend.common.dto.manager.v2.user.response import (
+    CreateUserPayload as CreateUserPayloadDTO,
 )
 from ai.backend.common.dto.manager.v2.user.response import (
     DeleteUserPayload as DeleteUserPayloadDTO,
@@ -32,6 +42,9 @@ from ai.backend.common.dto.manager.v2.user.response import (
 )
 from ai.backend.common.dto.manager.v2.user.response import (
     UpdateMyAllowedClientIPPayload as UpdateMyAllowedClientIPPayloadDTO,
+)
+from ai.backend.common.dto.manager.v2.user.response import (
+    UpdateUserPayload as UpdateUserPayloadDTO,
 )
 from ai.backend.manager.api.gql.decorators import BackendAIGQLMeta, gql_node_type, gql_pydantic_type
 
@@ -55,6 +68,11 @@ class CreateUserPayloadGQL:
     # keypair: KeyPairGQL = strawberry.field(
     #     description="The automatically generated keypair for the user."
     # )
+
+    @classmethod
+    def from_pydantic(cls, dto: CreateUserPayloadDTO) -> Self:
+        """Convert CreateUserPayload DTO to GQL payload type."""
+        return cls(user=UserV2GQL.from_pydantic(dto.user))
 
 
 @gql_pydantic_type(
@@ -91,6 +109,22 @@ class BulkCreateUsersV2PayloadGQL:
         description="List of errors for users that failed to create."
     )
 
+    @classmethod
+    def from_pydantic(cls, dto: BulkCreateUsersPayloadDTO) -> Self:
+        """Convert BulkCreateUsersPayload DTO to GQL payload type."""
+        return cls(
+            created_users=[UserV2GQL.from_pydantic(node) for node in dto.created_users],
+            failed=[
+                BulkCreateUserV2ErrorGQL(
+                    index=error.index,
+                    username=error.username,
+                    email=error.email,
+                    message=error.message,
+                )
+                for error in dto.failed
+            ],
+        )
+
 
 # Update User Payloads
 
@@ -106,6 +140,11 @@ class UpdateUserPayloadGQL:
     """Payload for user update."""
 
     user: UserV2GQL = strawberry.field(description="The updated user.")
+
+    @classmethod
+    def from_pydantic(cls, dto: UpdateUserPayloadDTO) -> Self:
+        """Convert UpdateUserPayload DTO to GQL payload type."""
+        return cls(user=UserV2GQL.from_pydantic(dto.user))
 
 
 @gql_pydantic_type(
@@ -139,6 +178,20 @@ class BulkUpdateUsersV2PayloadGQL:
     failed: list[BulkUpdateUserV2ErrorGQL] = strawberry.field(
         description="List of errors for users that failed to update."
     )
+
+    @classmethod
+    def from_pydantic(cls, dto: BulkUpdateUsersPayloadDTO) -> Self:
+        """Convert BulkUpdateUsersPayload DTO to GQL payload type."""
+        return cls(
+            updated_users=[UserV2GQL.from_pydantic(node) for node in dto.updated_users],
+            failed=[
+                BulkUpdateUserV2ErrorGQL(
+                    user_id=error.user_id,
+                    message=error.message,
+                )
+                for error in dto.failed
+            ],
+        )
 
 
 # Delete User Payloads

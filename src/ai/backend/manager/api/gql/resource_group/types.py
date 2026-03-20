@@ -667,6 +667,11 @@ class UpdateResourceGroupFairShareSpecPayload:
         description="The updated resource group with new fair share configuration."
     )
 
+    @classmethod
+    def from_pydantic(cls, dto: ScalingGroupData) -> Self:
+        """Convert ScalingGroupData to GQL payload type."""
+        return cls(resource_group=ResourceGroupGQL.from_pydantic(dto))
+
 
 @gql_pydantic_input(
     BackendAIGQLMeta(
@@ -753,3 +758,8 @@ class UpdateResourceGroupPayload:
     resource_group: ResourceGroupGQL = strawberry.field(
         description="The updated resource group with new configuration."
     )
+
+    @classmethod
+    def from_pydantic(cls, dto: ScalingGroupData) -> Self:
+        """Convert ScalingGroupData to GQL payload type."""
+        return cls(resource_group=ResourceGroupGQL.from_pydantic(dto))

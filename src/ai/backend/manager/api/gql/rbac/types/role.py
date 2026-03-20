@@ -6,7 +6,7 @@ import uuid
 from collections.abc import Iterable
 from datetime import UTC, datetime
 from enum import StrEnum
-from typing import TYPE_CHECKING, Annotated, Any, Self, override
+from typing import TYPE_CHECKING, Annotated, Any, Self
 
 import strawberry
 from strawberry import ID, UNSET, Info
@@ -110,20 +110,6 @@ from ai.backend.manager.data.permission.role import (
     RoleDetailData,
     UserRoleAssignmentData,
     UserRoleRevocationData,
-)
-from ai.backend.manager.models.rbac_models.conditions import (
-    AssignedUserConditions,
-    RoleConditions,
-)
-from ai.backend.manager.models.rbac_models.orders import (
-    AssignedUserOrders,
-    RoleOrders,
-)
-from ai.backend.manager.repositories.base import (
-    QueryCondition,
-    QueryOrder,
-    combine_conditions_or,
-    negate_conditions,
 )
 
 if TYPE_CHECKING:
@@ -485,72 +471,6 @@ class RoleFilter(GQLFilter):
             NOT=[f.to_pydantic() for f in self.NOT] if self.NOT else None,
         )
 
-    @override
-    def build_conditions(self) -> list[QueryCondition]:
-        conditions: list[QueryCondition] = []
-
-        if self.name is not None:
-            condition = self.name.build_query_condition(
-                contains_factory=RoleConditions.by_name_contains,
-                equals_factory=RoleConditions.by_name_equals,
-                starts_with_factory=RoleConditions.by_name_starts_with,
-                ends_with_factory=RoleConditions.by_name_ends_with,
-            )
-            if condition:
-                conditions.append(condition)
-
-        if self.source is not None:
-            src = self.source
-            if src.equals is not None:
-                conditions.append(RoleConditions.by_source_equals(src.equals.to_internal()))
-            if src.in_ is not None and len(src.in_) > 0:
-                conditions.append(RoleConditions.by_sources([s.to_internal() for s in src.in_]))
-            if src.not_equals is not None:
-                conditions.append(RoleConditions.by_source_not_equals(src.not_equals.to_internal()))
-            if src.not_in is not None and len(src.not_in) > 0:
-                conditions.append(
-                    RoleConditions.by_source_not_in([s.to_internal() for s in src.not_in])
-                )
-
-        if self.status is not None:
-            st = self.status
-            if st.equals is not None:
-                conditions.append(RoleConditions.by_status_equals(st.equals.to_internal()))
-            if st.in_ is not None and len(st.in_) > 0:
-                conditions.append(RoleConditions.by_statuses([s.to_internal() for s in st.in_]))
-            if st.not_equals is not None:
-                conditions.append(RoleConditions.by_status_not_equals(st.not_equals.to_internal()))
-            if st.not_in is not None and len(st.not_in) > 0:
-                conditions.append(
-                    RoleConditions.by_status_not_in([s.to_internal() for s in st.not_in])
-                )
-
-        # Handle AND logical operator
-        if self.AND:
-            for sub_filter in self.AND:
-                conditions.extend(sub_filter.build_conditions())
-
-        # Handle OR logical operator
-        if self.OR:
-            or_sub_conditions: list[QueryCondition] = []
-            for sub_filter in self.OR:
-                or_sub_conditions.extend(sub_filter.build_conditions())
-            if or_sub_conditions:
-                conditions.append(combine_conditions_or(or_sub_conditions))
-
-        # Handle NOT logical operator
-        if self.NOT:
-            not_sub_conditions: list[QueryCondition] = []
-            for sub_filter in self.NOT:
-                not_sub_conditions.extend(sub_filter.build_conditions())
-            if not_sub_conditions:
-                conditions.append(negate_conditions(not_sub_conditions))
-
-        return conditions
-
-
-# TODO: Add user_id filter (requires AssignedUserConditions.by_user_id)
-
 
 @gql_pydantic_input(
     BackendAIGQLMeta(
@@ -579,72 +499,6 @@ class RoleAssignmentRoleNestedFilterGQL:
             NOT=[f.to_pydantic() for f in self.NOT] if self.NOT else None,
         )
 
-    def build_conditions(self) -> list[QueryCondition]:
-        raw_conditions: list[QueryCondition] = []
-        if self.name:
-            condition = self.name.build_query_condition(
-                contains_factory=RoleConditions.by_name_contains,
-                equals_factory=RoleConditions.by_name_equals,
-                starts_with_factory=RoleConditions.by_name_starts_with,
-                ends_with_factory=RoleConditions.by_name_ends_with,
-            )
-            if condition:
-                raw_conditions.append(condition)
-        if self.source is not None:
-            src = self.source
-            if src.equals is not None:
-                raw_conditions.append(RoleConditions.by_source_equals(src.equals.to_internal()))
-            if src.in_ is not None and len(src.in_) > 0:
-                raw_conditions.append(RoleConditions.by_sources([s.to_internal() for s in src.in_]))
-            if src.not_equals is not None:
-                raw_conditions.append(
-                    RoleConditions.by_source_not_equals(src.not_equals.to_internal())
-                )
-            if src.not_in is not None and len(src.not_in) > 0:
-                raw_conditions.append(
-                    RoleConditions.by_source_not_in([s.to_internal() for s in src.not_in])
-                )
-        if self.status is not None:
-            st = self.status
-            if st.equals is not None:
-                raw_conditions.append(RoleConditions.by_status_equals(st.equals.to_internal()))
-            if st.in_ is not None and len(st.in_) > 0:
-                raw_conditions.append(RoleConditions.by_statuses([s.to_internal() for s in st.in_]))
-            if st.not_equals is not None:
-                raw_conditions.append(
-                    RoleConditions.by_status_not_equals(st.not_equals.to_internal())
-                )
-            if st.not_in is not None and len(st.not_in) > 0:
-                raw_conditions.append(
-                    RoleConditions.by_status_not_in([s.to_internal() for s in st.not_in])
-                )
-        conditions: list[QueryCondition] = []
-        if raw_conditions:
-            conditions.append(AssignedUserConditions.exists_role_combined(raw_conditions))
-
-        # Handle AND logical operator
-        if self.AND:
-            for sub_filter in self.AND:
-                conditions.extend(sub_filter.build_conditions())
-
-        # Handle OR logical operator
-        if self.OR:
-            or_sub_conditions: list[QueryCondition] = []
-            for sub_filter in self.OR:
-                or_sub_conditions.extend(sub_filter.build_conditions())
-            if or_sub_conditions:
-                conditions.append(combine_conditions_or(or_sub_conditions))
-
-        # Handle NOT logical operator
-        if self.NOT:
-            not_sub_conditions: list[QueryCondition] = []
-            for sub_filter in self.NOT:
-                not_sub_conditions.extend(sub_filter.build_conditions())
-            if not_sub_conditions:
-                conditions.append(negate_conditions(not_sub_conditions))
-
-        return conditions
-
 
 @gql_pydantic_input(
     BackendAIGQLMeta(description="Filter for role assignments", added_version="26.3.0"),
@@ -672,59 +526,6 @@ class RoleAssignmentFilter(GQLFilter):
             NOT=[f.to_pydantic() for f in self.NOT] if self.NOT else None,
         )
 
-    @override
-    def build_conditions(self) -> list[QueryCondition]:
-        conditions: list[QueryCondition] = []
-
-        if self.role_id is not None:
-            conditions.append(AssignedUserConditions.by_role_id(self.role_id))
-
-        if self.role:
-            conditions.extend(self.role.build_conditions())
-
-        if self.username is not None:
-            condition = self.username.build_query_condition(
-                contains_factory=AssignedUserConditions.by_username_contains,
-                equals_factory=AssignedUserConditions.by_username_equals,
-                starts_with_factory=AssignedUserConditions.by_username_starts_with,
-                ends_with_factory=AssignedUserConditions.by_username_ends_with,
-            )
-            if condition:
-                conditions.append(condition)
-
-        if self.email is not None:
-            condition = self.email.build_query_condition(
-                contains_factory=AssignedUserConditions.by_email_contains,
-                equals_factory=AssignedUserConditions.by_email_equals,
-                starts_with_factory=AssignedUserConditions.by_email_starts_with,
-                ends_with_factory=AssignedUserConditions.by_email_ends_with,
-            )
-            if condition:
-                conditions.append(condition)
-
-        # Handle AND logical operator
-        if self.AND:
-            for sub_filter in self.AND:
-                conditions.extend(sub_filter.build_conditions())
-
-        # Handle OR logical operator
-        if self.OR:
-            or_sub_conditions: list[QueryCondition] = []
-            for sub_filter in self.OR:
-                or_sub_conditions.extend(sub_filter.build_conditions())
-            if or_sub_conditions:
-                conditions.append(combine_conditions_or(or_sub_conditions))
-
-        # Handle NOT logical operator
-        if self.NOT:
-            not_sub_conditions: list[QueryCondition] = []
-            for sub_filter in self.NOT:
-                not_sub_conditions.extend(sub_filter.build_conditions())
-            if not_sub_conditions:
-                conditions.append(negate_conditions(not_sub_conditions))
-
-        return conditions
-
 
 # ==================== OrderBy Types ====================
 
@@ -743,17 +544,6 @@ class RoleOrderBy(GQLOrderBy):
             field=RoleOrderFieldDTO(self.field.value),
             direction=OrderDirectionDTO(self.direction.value),
         )
-
-    @override
-    def to_query_order(self) -> QueryOrder:
-        ascending = self.direction == OrderDirection.ASC
-        match self.field:
-            case RoleOrderField.NAME:
-                return RoleOrders.name(ascending)
-            case RoleOrderField.CREATED_AT:
-                return RoleOrders.created_at(ascending)
-            case RoleOrderField.UPDATED_AT:
-                return RoleOrders.updated_at(ascending)
 
 
 @strawberry.enum(description="Added in 26.3.0. Role assignment ordering field")
@@ -779,17 +569,6 @@ class RoleAssignmentOrderBy(GQLOrderBy):
             field=RoleAssignmentOrderFieldDTO(self.field.value),
             direction=OrderDirectionDTO(self.direction.value),
         )
-
-    @override
-    def to_query_order(self) -> QueryOrder:
-        ascending = self.direction == OrderDirection.ASC
-        match self.field:
-            case RoleAssignmentOrderField.USERNAME:
-                return AssignedUserOrders.username(ascending)
-            case RoleAssignmentOrderField.EMAIL:
-                return AssignedUserOrders.email(ascending)
-            case RoleAssignmentOrderField.GRANTED_AT:
-                return AssignedUserOrders.granted_at(ascending)
 
 
 # ==================== Input Types ====================
