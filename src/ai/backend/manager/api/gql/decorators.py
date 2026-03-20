@@ -108,7 +108,6 @@ def gql_pydantic_input[PydanticModel: BaseModel](
     model: type[PydanticModel],
     fields: list[str] | None = None,
     name: str | None = None,
-    all_fields: bool = False,
     directives: Sequence[object] = (),
     use_pydantic_alias: bool = True,
     description: str | None = None,
@@ -124,9 +123,10 @@ def gql_pydantic_input[PydanticModel: BaseModel](
     class body. A user-defined to_pydantic() takes precedence over Strawberry's
     auto-generated one.
 
-    Use all_fields=True for scalar-only types where the pydantic model defines
-    all fields. Declare fields explicitly when adding descriptions or when only
-    a subset of pydantic fields are exposed.
+    Always declare fields explicitly in the class body. Using all_fields=True is
+    not supported because it prevents mypy from seeing the attributes and causes
+    strawberry to use pydantic field defaults (including SENTINEL) verbatim in the
+    GQL schema, which breaks schema printing for non-scalar default types.
 
     The description param is accepted for backward compatibility but the
     canonical description is always built from BackendAIGQLMeta.
@@ -146,7 +146,6 @@ def gql_pydantic_input[PydanticModel: BaseModel](
         name=name,
         description=desc,
         directives=directives,
-        all_fields=all_fields,
         use_pydantic_alias=use_pydantic_alias,
     )
 
