@@ -11,6 +11,7 @@ from strawberry.relay import PageInfo
 
 from ai.backend.common.contexts.user import current_user
 from ai.backend.common.dto.manager.v2.fair_share.request import (
+    GetProjectFairShareInput,
     SearchProjectFairSharesInput,
 )
 from ai.backend.manager.api.gql.base import encode_cursor
@@ -30,12 +31,6 @@ from ai.backend.manager.api.gql.types import ResourceGroupProjectScope, Strawber
 from ai.backend.manager.api.gql.utils import check_admin_only
 from ai.backend.manager.repositories.fair_share.types import (
     ProjectFairShareSearchScope,
-)
-from ai.backend.manager.services.fair_share.actions import (
-    BulkUpsertProjectFairShareWeightAction,
-    GetProjectFairShareAction,
-    ProjectWeightInput,
-    UpsertProjectFairShareWeightAction,
 )
 
 
@@ -138,15 +133,10 @@ async def admin_project_fair_share(
     """Get a single project fair share record (admin only)."""
     check_admin_only()
 
-    processors = info.context.processors
-    action_result = await processors.fair_share.get_project_fair_share.wait_for_complete(
-        GetProjectFairShareAction(
-            resource_group=resource_group_name,
-            project_id=project_id,
-        )
+    result = await info.context.adapters.fair_share.get_project(
+        GetProjectFairShareInput(resource_group=resource_group_name, project_id=project_id)
     )
-
-    return ProjectFairShareGQL.from_dataclass(action_result.data)
+    return ProjectFairShareGQL.from_pydantic(result.item)
 
 
 @strawberry.field(description="Added in 26.2.0. List project fair shares (admin only).")  # type: ignore[misc]
@@ -189,15 +179,10 @@ async def rg_project_fair_share(
     project_id: uuid.UUID,
 ) -> ProjectFairShareGQL | None:
     """Get a single project fair share record within resource group scope."""
-    processors = info.context.processors
-    action_result = await processors.fair_share.get_project_fair_share.wait_for_complete(
-        GetProjectFairShareAction(
-            resource_group=scope.resource_group_name,
-            project_id=project_id,
-        )
+    result = await info.context.adapters.fair_share.get_project(
+        GetProjectFairShareInput(resource_group=scope.resource_group_name, project_id=project_id)
     )
-
-    return ProjectFairShareGQL.from_dataclass(action_result.data)
+    return ProjectFairShareGQL.from_pydantic(result.item)
 
 
 @strawberry.field(  # type: ignore[misc]
@@ -254,15 +239,10 @@ async def project_fair_share(
     if me is None or not me.is_superadmin:
         raise web.HTTPForbidden(reason="Only superadmin can access fair share data.")
 
-    processors = info.context.processors
-    action_result = await processors.fair_share.get_project_fair_share.wait_for_complete(
-        GetProjectFairShareAction(
-            resource_group=resource_group_name,
-            project_id=project_id,
-        )
+    result = await info.context.adapters.fair_share.get_project(
+        GetProjectFairShareInput(resource_group=resource_group_name, project_id=project_id)
     )
-
-    return ProjectFairShareGQL.from_dataclass(action_result.data)
+    return ProjectFairShareGQL.from_pydantic(result.item)
 
 
 @strawberry.field(  # type: ignore[misc]
@@ -317,18 +297,9 @@ async def admin_upsert_project_fair_share_weight(
     """Upsert project fair share weight (admin only)."""
     check_admin_only()
 
-    processors = info.context.processors
-    action_result = await processors.fair_share.upsert_project_fair_share_weight.wait_for_complete(
-        UpsertProjectFairShareWeightAction(
-            resource_group=input.resource_group_name,
-            project_id=input.project_id,
-            domain_name=input.domain_name,
-            weight=input.weight,
-        )
-    )
-
+    result = await info.context.adapters.fair_share.upsert_project(input.to_pydantic())
     return UpsertProjectFairShareWeightPayload(
-        project_fair_share=ProjectFairShareGQL.from_dataclass(action_result.data)
+        project_fair_share=ProjectFairShareGQL.from_pydantic(result.item)
     )
 
 
@@ -345,24 +316,8 @@ async def admin_bulk_upsert_project_fair_share_weight(
     """Bulk upsert project fair share weights (admin only)."""
     check_admin_only()
 
-    processors = info.context.processors
-    action_result = (
-        await processors.fair_share.bulk_upsert_project_fair_share_weight.wait_for_complete(
-            BulkUpsertProjectFairShareWeightAction(
-                resource_group=input.resource_group_name,
-                inputs=[
-                    ProjectWeightInput(
-                        project_id=item.project_id,
-                        domain_name=item.domain_name,
-                        weight=item.weight,
-                    )
-                    for item in input.inputs
-                ],
-            )
-        )
-    )
-
-    return BulkUpsertProjectFairShareWeightPayload(upserted_count=action_result.upserted_count)
+    result = await info.context.adapters.fair_share.bulk_upsert_project(input.to_pydantic())
+    return BulkUpsertProjectFairShareWeightPayload.from_pydantic(result)
 
 
 # Legacy Mutations (deprecated)
@@ -387,18 +342,9 @@ async def upsert_project_fair_share_weight(
     if me is None or not me.is_superadmin:
         raise web.HTTPForbidden(reason="Only superadmin can modify fair share data.")
 
-    processors = info.context.processors
-    action_result = await processors.fair_share.upsert_project_fair_share_weight.wait_for_complete(
-        UpsertProjectFairShareWeightAction(
-            resource_group=input.resource_group_name,
-            project_id=input.project_id,
-            domain_name=input.domain_name,
-            weight=input.weight,
-        )
-    )
-
+    result = await info.context.adapters.fair_share.upsert_project(input.to_pydantic())
     return UpsertProjectFairShareWeightPayload(
-        project_fair_share=ProjectFairShareGQL.from_dataclass(action_result.data)
+        project_fair_share=ProjectFairShareGQL.from_pydantic(result.item)
     )
 
 
@@ -421,21 +367,5 @@ async def bulk_upsert_project_fair_share_weight(
     if me is None or not me.is_superadmin:
         raise web.HTTPForbidden(reason="Only superadmin can modify fair share data.")
 
-    processors = info.context.processors
-    action_result = (
-        await processors.fair_share.bulk_upsert_project_fair_share_weight.wait_for_complete(
-            BulkUpsertProjectFairShareWeightAction(
-                resource_group=input.resource_group_name,
-                inputs=[
-                    ProjectWeightInput(
-                        project_id=item.project_id,
-                        domain_name=item.domain_name,
-                        weight=item.weight,
-                    )
-                    for item in input.inputs
-                ],
-            )
-        )
-    )
-
-    return BulkUpsertProjectFairShareWeightPayload(upserted_count=action_result.upserted_count)
+    result = await info.context.adapters.fair_share.bulk_upsert_project(input.to_pydantic())
+    return BulkUpsertProjectFairShareWeightPayload.from_pydantic(result)

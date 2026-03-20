@@ -13,6 +13,7 @@ from strawberry import ID, Info
 from strawberry.relay import Connection, Edge, NodeID
 
 from ai.backend.common.contexts.user import current_user
+from ai.backend.common.dto.manager.v2.kernel.request import AdminSearchKernelsInput
 from ai.backend.common.dto.manager.v2.session.request import SessionFilter, SessionOrder
 from ai.backend.common.dto.manager.v2.session.response import (
     SessionLifecycleInfoGQLDTO,
@@ -68,12 +69,6 @@ from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.api.gql.user.types.node import UserV2GQL
 from ai.backend.manager.data.session.types import SessionData, SessionStatus
 from ai.backend.manager.errors.user import UserNotFound
-from ai.backend.manager.models.kernel.conditions import KernelConditions
-from ai.backend.manager.repositories.base import (
-    BatchQuerier,
-    NoPagination,
-)
-from ai.backend.manager.services.session.actions.search_kernel import SearchKernelsAction
 
 
 @strawberry.enum(
@@ -464,24 +459,20 @@ class SessionV2GQL(PydanticNodeMixin[SessionNode]):
             raise UserNotFound("User not found in context")
 
         session_id = SessionId(UUID(str(self.id)))
-        querier = BatchQuerier(
-            pagination=NoPagination(),
-            conditions=[KernelConditions.by_session_ids([session_id])],
+        payload = await info.context.adapters.session.search_kernels_by_session(
+            session_id, AdminSearchKernelsInput()
         )
-        action_result = await info.context.processors.session.search_kernels.wait_for_complete(
-            SearchKernelsAction(querier=querier, user_id=user.user_id)
-        )
-        nodes = [KernelV2GQL.from_kernel_info(kernel) for kernel in action_result.data]
+        nodes = [KernelV2GQL.from_pydantic(kernel) for kernel in payload.items]
         edges = [KernelV2EdgeGQL(node=node, cursor=encode_cursor(node.id)) for node in nodes]
         return KernelV2ConnectionGQL(
             edges=edges,
             page_info=strawberry.relay.PageInfo(
-                has_next_page=False,
-                has_previous_page=False,
+                has_next_page=payload.has_next_page,
+                has_previous_page=payload.has_previous_page,
                 start_cursor=edges[0].cursor if edges else None,
                 end_cursor=edges[-1].cursor if edges else None,
             ),
-            count=len(nodes),
+            count=payload.total_count,
         )
 
     # TODO: Add `vfolder_mounts` dynamic field (VFolderV2 connection type needed)

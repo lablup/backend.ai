@@ -9,6 +9,7 @@ from strawberry.relay import PageInfo
 
 from ai.backend.common.contexts.user import current_user
 from ai.backend.common.dto.manager.v2.fair_share.request import (
+    GetDomainFairShareInput,
     SearchDomainFairSharesInput,
 )
 from ai.backend.manager.api.gql.base import encode_cursor
@@ -28,12 +29,6 @@ from ai.backend.manager.api.gql.types import ResourceGroupDomainScope, Strawberr
 from ai.backend.manager.api.gql.utils import check_admin_only
 from ai.backend.manager.repositories.fair_share.types import (
     DomainFairShareSearchScope,
-)
-from ai.backend.manager.services.fair_share.actions import (
-    BulkUpsertDomainFairShareWeightAction,
-    DomainWeightInput,
-    GetDomainFairShareAction,
-    UpsertDomainFairShareWeightAction,
 )
 
 
@@ -135,15 +130,10 @@ async def admin_domain_fair_share(
     """Get a single domain fair share record (admin only)."""
     check_admin_only()
 
-    processors = info.context.processors
-    action_result = await processors.fair_share.get_domain_fair_share.wait_for_complete(
-        GetDomainFairShareAction(
-            resource_group=resource_group_name,
-            domain_name=domain_name,
-        )
+    result = await info.context.adapters.fair_share.get_domain(
+        GetDomainFairShareInput(resource_group=resource_group_name, domain_name=domain_name)
     )
-
-    return DomainFairShareGQL.from_dataclass(action_result.data)
+    return DomainFairShareGQL.from_pydantic(result.item)
 
 
 @strawberry.field(description="Added in 26.2.0. List domain fair shares (admin only).")  # type: ignore[misc]
@@ -186,15 +176,10 @@ async def rg_domain_fair_share(
     domain_name: str,
 ) -> DomainFairShareGQL | None:
     """Get a single domain fair share record within resource group scope."""
-    processors = info.context.processors
-    action_result = await processors.fair_share.get_domain_fair_share.wait_for_complete(
-        GetDomainFairShareAction(
-            resource_group=scope.resource_group_name,
-            domain_name=domain_name,
-        )
+    result = await info.context.adapters.fair_share.get_domain(
+        GetDomainFairShareInput(resource_group=scope.resource_group_name, domain_name=domain_name)
     )
-
-    return DomainFairShareGQL.from_dataclass(action_result.data)
+    return DomainFairShareGQL.from_pydantic(result.item)
 
 
 @strawberry.field(  # type: ignore[misc]
@@ -248,15 +233,10 @@ async def domain_fair_share(
     if me is None or not me.is_superadmin:
         raise web.HTTPForbidden(reason="Only superadmin can access fair share data.")
 
-    processors = info.context.processors
-    action_result = await processors.fair_share.get_domain_fair_share.wait_for_complete(
-        GetDomainFairShareAction(
-            resource_group=resource_group_name,
-            domain_name=domain_name,
-        )
+    result = await info.context.adapters.fair_share.get_domain(
+        GetDomainFairShareInput(resource_group=resource_group_name, domain_name=domain_name)
     )
-
-    return DomainFairShareGQL.from_dataclass(action_result.data)
+    return DomainFairShareGQL.from_pydantic(result.item)
 
 
 @strawberry.field(  # type: ignore[misc]
@@ -311,17 +291,9 @@ async def admin_upsert_domain_fair_share_weight(
     """Upsert domain fair share weight (admin only)."""
     check_admin_only()
 
-    processors = info.context.processors
-    action_result = await processors.fair_share.upsert_domain_fair_share_weight.wait_for_complete(
-        UpsertDomainFairShareWeightAction(
-            resource_group=input.resource_group_name,
-            domain_name=input.domain_name,
-            weight=input.weight,
-        )
-    )
-
+    result = await info.context.adapters.fair_share.upsert_domain(input.to_pydantic())
     return UpsertDomainFairShareWeightPayload(
-        domain_fair_share=DomainFairShareGQL.from_dataclass(action_result.data)
+        domain_fair_share=DomainFairShareGQL.from_pydantic(result.item)
     )
 
 
@@ -338,23 +310,8 @@ async def admin_bulk_upsert_domain_fair_share_weight(
     """Bulk upsert domain fair share weights (admin only)."""
     check_admin_only()
 
-    processors = info.context.processors
-    action_result = (
-        await processors.fair_share.bulk_upsert_domain_fair_share_weight.wait_for_complete(
-            BulkUpsertDomainFairShareWeightAction(
-                resource_group=input.resource_group_name,
-                inputs=[
-                    DomainWeightInput(
-                        domain_name=item.domain_name,
-                        weight=item.weight,
-                    )
-                    for item in input.inputs
-                ],
-            )
-        )
-    )
-
-    return BulkUpsertDomainFairShareWeightPayload(upserted_count=action_result.upserted_count)
+    result = await info.context.adapters.fair_share.bulk_upsert_domain(input.to_pydantic())
+    return BulkUpsertDomainFairShareWeightPayload.from_pydantic(result)
 
 
 # Legacy Mutations (deprecated)
@@ -379,17 +336,9 @@ async def upsert_domain_fair_share_weight(
     if me is None or not me.is_superadmin:
         raise web.HTTPForbidden(reason="Only superadmin can modify fair share data.")
 
-    processors = info.context.processors
-    action_result = await processors.fair_share.upsert_domain_fair_share_weight.wait_for_complete(
-        UpsertDomainFairShareWeightAction(
-            resource_group=input.resource_group_name,
-            domain_name=input.domain_name,
-            weight=input.weight,
-        )
-    )
-
+    result = await info.context.adapters.fair_share.upsert_domain(input.to_pydantic())
     return UpsertDomainFairShareWeightPayload(
-        domain_fair_share=DomainFairShareGQL.from_dataclass(action_result.data)
+        domain_fair_share=DomainFairShareGQL.from_pydantic(result.item)
     )
 
 
@@ -412,20 +361,5 @@ async def bulk_upsert_domain_fair_share_weight(
     if me is None or not me.is_superadmin:
         raise web.HTTPForbidden(reason="Only superadmin can modify fair share data.")
 
-    processors = info.context.processors
-    action_result = (
-        await processors.fair_share.bulk_upsert_domain_fair_share_weight.wait_for_complete(
-            BulkUpsertDomainFairShareWeightAction(
-                resource_group=input.resource_group_name,
-                inputs=[
-                    DomainWeightInput(
-                        domain_name=item.domain_name,
-                        weight=item.weight,
-                    )
-                    for item in input.inputs
-                ],
-            )
-        )
-    )
-
-    return BulkUpsertDomainFairShareWeightPayload(upserted_count=action_result.upserted_count)
+    result = await info.context.adapters.fair_share.bulk_upsert_domain(input.to_pydantic())
+    return BulkUpsertDomainFairShareWeightPayload.from_pydantic(result)

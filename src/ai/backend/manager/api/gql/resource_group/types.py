@@ -61,9 +61,6 @@ from ai.backend.manager.data.scaling_group.types import (
     SchedulerType,
 )
 from ai.backend.manager.models.scaling_group.types import FairShareScalingGroupSpec
-from ai.backend.manager.services.scaling_group.actions.get_resource_info import (
-    GetResourceInfoAction,
-)
 
 __all__ = (
     "FairShareScalingGroupSpecGQL",
@@ -470,9 +467,8 @@ class ResourceGroupGQL(PydanticNodeMixin[Any]):
         ctx = info.context
 
         # Get capacity from resource info
-        action = GetResourceInfoAction(scaling_group=self.name)
-        result = await ctx.processors.scaling_group.get_resource_info.wait_for_complete(action)
-        capacity = result.resource_info.capacity
+        resource_info = await ctx.adapters.resource_group.get_resource_info(self.name)
+        capacity = resource_info.capacity
 
         # Merge resource weights with capacity
         merged = {}
@@ -509,9 +505,8 @@ class ResourceGroupGQL(PydanticNodeMixin[Any]):
     async def resource_info(self, info: Info[StrawberryGQLContext, None]) -> ResourceInfoGQL:
         """Get resource information for this resource group."""
         ctx = info.context
-        action = GetResourceInfoAction(scaling_group=self.name)
-        result = await ctx.processors.scaling_group.get_resource_info.wait_for_complete(action)
-        return ResourceInfoGQL.from_resource_info(result.resource_info)
+        resource_info = await ctx.adapters.resource_group.get_resource_info(self.name)
+        return ResourceInfoGQL.from_resource_info(resource_info)
 
 
 # Filter and OrderBy types

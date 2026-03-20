@@ -13,6 +13,8 @@ from ai.backend.common.dto.manager.v2.resource_group.request import (
     CreateResourceGroupInput,
     ResourceGroupFilter,
     ResourceGroupOrder,
+    UpdateResourceGroupConfigInput,
+    UpdateResourceGroupFairShareSpecInput,
     UpdateResourceGroupInput,
 )
 from ai.backend.common.dto.manager.v2.resource_group.response import (
@@ -24,7 +26,15 @@ from ai.backend.common.dto.manager.v2.resource_group.types import (
     ResourceGroupOrderDirection,
     ResourceGroupOrderField,
 )
-from ai.backend.manager.data.scaling_group.types import ScalingGroupData
+from ai.backend.common.types import PreemptionMode, PreemptionOrder
+from ai.backend.manager.data.scaling_group.types import (
+    PreemptionConfig as DataPreemptionConfig,
+)
+from ai.backend.manager.data.scaling_group.types import (
+    ResourceInfo,
+    ScalingGroupData,
+    SchedulerType,
+)
 from ai.backend.manager.models.scaling_group import ScalingGroupRow
 from ai.backend.manager.models.scaling_group.conditions import ScalingGroupConditions
 from ai.backend.manager.models.scaling_group.orders import ScalingGroupOrders
@@ -39,16 +49,25 @@ from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.repositories.scaling_group.creators import ScalingGroupCreatorSpec
 from ai.backend.manager.repositories.scaling_group.updaters import (
     ScalingGroupMetadataUpdaterSpec,
+    ScalingGroupNetworkConfigUpdaterSpec,
+    ScalingGroupSchedulerConfigUpdaterSpec,
     ScalingGroupStatusUpdaterSpec,
     ScalingGroupUpdaterSpec,
 )
 from ai.backend.manager.services.scaling_group.actions.create import CreateScalingGroupAction
+from ai.backend.manager.services.scaling_group.actions.get_resource_info import (
+    GetResourceInfoAction,
+)
 from ai.backend.manager.services.scaling_group.actions.list_scaling_groups import (
     SearchScalingGroupsAction,
 )
 from ai.backend.manager.services.scaling_group.actions.modify import ModifyScalingGroupAction
 from ai.backend.manager.services.scaling_group.actions.purge_scaling_group import (
     PurgeScalingGroupAction,
+)
+from ai.backend.manager.services.scaling_group.actions.update_fair_share_spec import (
+    ResourceWeightInput,
+    UpdateFairShareSpecAction,
 )
 from ai.backend.manager.types import OptionalState, TriState
 
@@ -257,6 +276,143 @@ class ResourceGroupAdapter(BaseAdapter):
         return UpdateResourceGroupPayload(
             resource_group=self._data_to_node(action_result.scaling_group),
         )
+
+    async def get_resource_info(self, scaling_group: str) -> ResourceInfo:
+        """Get resource information for a scaling group.
+
+        Args:
+            scaling_group: Name of the scaling group.
+
+        Returns:
+            ResourceInfo with capacity, used, and free resource metrics.
+        """
+        action_result = await self._processors.scaling_group.get_resource_info.wait_for_complete(
+            GetResourceInfoAction(scaling_group=scaling_group)
+        )
+        return action_result.resource_info
+
+    async def update_fair_share_spec(
+        self,
+        input: UpdateResourceGroupFairShareSpecInput,
+    ) -> ScalingGroupData:
+        """Update fair share spec for a resource group.
+
+        Args:
+            input: Pydantic DTO with partial fair share spec update parameters.
+
+        Returns:
+            Updated ScalingGroupData.
+        """
+        resource_weights = None
+        if input.resource_weights is not None:
+            resource_weights = [
+                ResourceWeightInput(
+                    resource_type=entry.resource_type,
+                    weight=entry.weight,
+                )
+                for entry in input.resource_weights
+            ]
+
+        action_result = (
+            await self._processors.scaling_group.update_fair_share_spec.wait_for_complete(
+                UpdateFairShareSpecAction(
+                    resource_group=input.resource_group_name,
+                    half_life_days=input.half_life_days,
+                    lookback_days=input.lookback_days,
+                    decay_unit_days=input.decay_unit_days,
+                    default_weight=input.default_weight,
+                    resource_weights=resource_weights,
+                )
+            )
+        )
+        return action_result.scaling_group
+
+    async def update_config(
+        self,
+        input: UpdateResourceGroupConfigInput,
+    ) -> ScalingGroupData:
+        """Update resource group configuration (status, metadata, network, scheduler).
+
+        Args:
+            input: Pydantic DTO with partial configuration update parameters.
+
+        Returns:
+            Updated ScalingGroupData.
+        """
+        status_spec = ScalingGroupStatusUpdaterSpec(
+            is_active=(
+                OptionalState.update(input.is_active)
+                if input.is_active is not None
+                else OptionalState.nop()
+            ),
+            is_public=(
+                OptionalState.update(input.is_public)
+                if input.is_public is not None
+                else OptionalState.nop()
+            ),
+        )
+
+        metadata_spec = ScalingGroupMetadataUpdaterSpec(
+            description=(
+                TriState.update(input.description)
+                if input.description is not None
+                else TriState.nop()
+            ),
+        )
+
+        network_spec = ScalingGroupNetworkConfigUpdaterSpec(
+            wsproxy_addr=(
+                TriState.update(input.app_proxy_addr)
+                if input.app_proxy_addr is not None
+                else TriState.nop()
+            ),
+            wsproxy_api_token=(
+                TriState.update(input.appproxy_api_token)
+                if input.appproxy_api_token is not None
+                else TriState.nop()
+            ),
+            use_host_network=(
+                OptionalState.update(input.use_host_network)
+                if input.use_host_network is not None
+                else OptionalState.nop()
+            ),
+        )
+
+        scheduler_value: str | None = None
+        if input.scheduler_type is not None:
+            scheduler_value = SchedulerType(input.scheduler_type).value
+
+        preemption_config_state: OptionalState[DataPreemptionConfig] = OptionalState.nop()
+        if input.preemption is not None:
+            preemption_config_state = OptionalState.update(
+                DataPreemptionConfig(
+                    preemptible_priority=input.preemption.preemptible_priority,
+                    order=PreemptionOrder(input.preemption.order),
+                    mode=PreemptionMode(input.preemption.mode),
+                )
+            )
+
+        scheduler_spec = ScalingGroupSchedulerConfigUpdaterSpec(
+            scheduler=(
+                OptionalState.update(scheduler_value)
+                if scheduler_value is not None
+                else OptionalState.nop()
+            ),
+            preemption_config=preemption_config_state,
+        )
+
+        updater_spec = ScalingGroupUpdaterSpec(
+            status=status_spec,
+            metadata=metadata_spec,
+            network=network_spec,
+            scheduler=scheduler_spec,
+        )
+        updater = Updater(spec=updater_spec, pk_value=input.resource_group_name)
+
+        action_result = await self._processors.scaling_group.modify_scaling_group.wait_for_complete(
+            ModifyScalingGroupAction(updater=updater)
+        )
+        return action_result.scaling_group
 
     async def purge(
         self,
