@@ -17,9 +17,17 @@ from ai.backend.common.data.permission.types import (
 )
 from ai.backend.common.dto.manager.v2.rbac.request import (
     CreatePermissionInput as CreatePermissionInputDTO,
+)
+from ai.backend.common.dto.manager.v2.rbac.request import (
     DeletePermissionInput as DeletePermissionInputDTO,
+)
+from ai.backend.common.dto.manager.v2.rbac.request import (
     PermissionFilter as PermissionFilterDTO,
+)
+from ai.backend.common.dto.manager.v2.rbac.request import (
     PermissionOrderBy as PermissionOrderByDTO,
+)
+from ai.backend.common.dto.manager.v2.rbac.request import (
     UpdatePermissionInput as UpdatePermissionInputDTO,
 )
 from ai.backend.common.dto.manager.v2.rbac.response import (
@@ -30,6 +38,8 @@ from ai.backend.common.dto.manager.v2.rbac.response import (
 )
 from ai.backend.common.dto.manager.v2.rbac.types import (
     OrderDirection as OrderDirectionDTO,
+)
+from ai.backend.common.dto.manager.v2.rbac.types import (
     PermissionOrderField as PermissionOrderFieldDTO,
 )
 from ai.backend.common.types import SessionId
