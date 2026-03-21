@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Iterable
-from typing import TYPE_CHECKING, Annotated, Any, Self
+from typing import TYPE_CHECKING, Annotated, Any, Self, cast
 from uuid import UUID
 
 import strawberry
@@ -306,7 +306,7 @@ class ProjectV2GQL(PydanticNodeMixin[ProjectNode]):
         results = await info.context.data_loaders.project_loader.load_many([
             UUID(nid) for nid in node_ids
         ])
-        return [cls.from_data(data) if data is not None else None for data in results]
+        return cast(list[Self | None], results)
 
     @classmethod
     def from_pydantic(

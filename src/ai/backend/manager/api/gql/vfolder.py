@@ -1,5 +1,4 @@
 from typing import Any
-from uuid import UUID
 
 import strawberry
 from strawberry import ID, Info
@@ -33,11 +32,11 @@ class VFolder:
 class ExtraVFolderMount(PydanticNodeMixin[Any]):
     id: NodeID[str]
     mount_destination: str
-    _vfolder_id: strawberry.Private[UUID]
+    vfolder_id: ID
 
     @strawberry.field
     async def vfolder(self, info: Info[StrawberryGQLContext]) -> VFolder:
-        vfolder_global_id = AsyncNode.to_global_id("VirtualFolderNode", str(self._vfolder_id))
+        vfolder_global_id = AsyncNode.to_global_id("VirtualFolderNode", str(self.vfolder_id))
         return VFolder(id=ID(vfolder_global_id))
 
 

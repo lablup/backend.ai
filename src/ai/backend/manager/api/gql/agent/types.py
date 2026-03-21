@@ -3,7 +3,7 @@ from __future__ import annotations
 from collections.abc import Iterable, Mapping
 from datetime import datetime
 from enum import StrEnum
-from typing import TYPE_CHECKING, Annotated, Any, Self
+from typing import TYPE_CHECKING, Annotated, Any, Self, cast
 
 import strawberry
 from strawberry import ID, Info
@@ -370,7 +370,6 @@ class AgentNetworkInfoGQL:
     name="AgentV2",
 )
 class AgentV2GQL(PydanticNodeMixin[AgentNode]):
-    _agent_id: strawberry.Private[AgentId]
     id: NodeID[str]
     resource_info: AgentResourceGQL = strawberry.field(
         description=dedent_strip("""
@@ -422,7 +421,7 @@ class AgentV2GQL(PydanticNodeMixin[AgentNode]):
         """
         Get the container count for a specific agent.
         """
-        return await info.context.data_loaders.container_count_loader.load(self._agent_id)
+        return await info.context.data_loaders.container_count_loader.load(AgentId(self.id))
 
     @strawberry.field(  # type: ignore[misc]
         description="Added in 26.2.0. List of kernels running on this agent with pagination support."
@@ -455,7 +454,7 @@ class AgentV2GQL(PydanticNodeMixin[AgentNode]):
         from ai.backend.manager.api.gql.kernel.types import KernelV2ConnectionGQL, KernelV2EdgeGQL
 
         payload = await info.context.adapters.session.search_kernels_by_agent(
-            self._agent_id,
+            AgentId(self.id),
             AdminSearchKernelsInput(
                 filter=filter.to_pydantic() if filter else None,
                 order=[o.to_pydantic() for o in order_by] if order_by else None,
@@ -517,7 +516,7 @@ class AgentV2GQL(PydanticNodeMixin[AgentNode]):
         )
 
         payload = await info.context.adapters.session.search_sessions_by_agent(
-            self._agent_id,
+            AgentId(self.id),
             AdminSearchSessionsInput(
                 filter=filter.to_pydantic() if filter else None,
                 order=[o.to_pydantic() for o in order_by] if order_by else None,
@@ -592,7 +591,7 @@ class AgentV2GQL(PydanticNodeMixin[AgentNode]):
             AgentResourceSlotGQL,
         )
 
-        agent_id = str(self._agent_id)
+        agent_id = str(self.id)
         pydantic_filter: AgentResourceFilterDTO | None = None
         if filter is not None:
             pydantic_filter = filter.to_pydantic()
@@ -659,14 +658,13 @@ class AgentV2GQL(PydanticNodeMixin[AgentNode]):
         results = await info.context.data_loaders.agent_loader.load_many([
             AgentId(nid) for nid in node_ids
         ])
-        return [cls.from_agent_detail_data(data) if data is not None else None for data in results]
+        return cast(list[Self | None], results)
 
     @classmethod
     def from_agent_detail_data(cls, detail_data: AgentDetailData) -> Self:
         data = detail_data.agent
 
         return cls(
-            _agent_id=data.id,
             id=ID(data.id),
             resource_info=AgentResourceGQL(
                 capacity=data.available_slots.to_json(),
@@ -705,7 +703,6 @@ class AgentV2GQL(PydanticNodeMixin[AgentNode]):
         id_field: str = "id",
     ) -> Self:
         return cls(
-            _agent_id=AgentId(dto.id),
             id=ID(dto.id),
             resource_info=AgentResourceGQL(
                 capacity=dto.resource_info.capacity,

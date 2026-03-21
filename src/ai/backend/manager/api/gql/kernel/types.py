@@ -5,7 +5,7 @@ from __future__ import annotations
 from collections.abc import Iterable
 from datetime import datetime
 from enum import StrEnum
-from typing import TYPE_CHECKING, Annotated, Any, Self
+from typing import TYPE_CHECKING, Annotated, Any, Self, cast
 from uuid import UUID
 
 import strawberry
@@ -429,7 +429,7 @@ class KernelV2GQL(PydanticNodeMixin[KernelNode]):
         )
         if agent_data is None:
             return None
-        return AgentV2GQL.from_agent_detail_data(agent_data)
+        return agent_data
 
     @strawberry.field(  # type: ignore[misc]
         description="Added in 26.2.0. The user who owns this kernel."
@@ -440,7 +440,7 @@ class KernelV2GQL(PydanticNodeMixin[KernelNode]):
         user_data = await info.context.data_loaders.user_loader.load(self.user_info.user_id)
         if user_data is None:
             return None
-        return UserV2GQL.from_data(user_data)
+        return user_data
 
     @strawberry.field(  # type: ignore[misc]
         description="Added in 26.2.0. The project this kernel belongs to."
@@ -451,7 +451,7 @@ class KernelV2GQL(PydanticNodeMixin[KernelNode]):
         project_data = await info.context.data_loaders.project_loader.load(self.user_info.group_id)
         if project_data is None:
             return None
-        return ProjectV2GQL.from_data(project_data)
+        return project_data
 
     @strawberry.field(  # type: ignore[misc]
         description="Added in 26.2.0. The domain this kernel belongs to."
@@ -606,7 +606,7 @@ class KernelV2GQL(PydanticNodeMixin[KernelNode]):
         results = await info.context.data_loaders.kernel_loader.load_many([
             KernelId(UUID(nid)) for nid in node_ids
         ])
-        return [cls.from_kernel_info(data) if data is not None else None for data in results]
+        return cast(list[Self | None], results)
 
     @classmethod
     def from_pydantic(

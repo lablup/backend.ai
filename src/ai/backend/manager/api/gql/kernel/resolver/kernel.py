@@ -28,7 +28,7 @@ async def kernel_v2(
     kernel_info = await info.context.data_loaders.kernel_loader.load(KernelId(id))
     if kernel_info is None:
         return None
-    return KernelV2GQL.from_kernel_info(kernel_info)
+    return kernel_info
 
 
 @strawberry.field(

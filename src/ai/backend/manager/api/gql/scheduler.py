@@ -59,7 +59,7 @@ class SchedulingBroadcastEventPayload:
     Represents a status transition during session scheduling.
     """
 
-    _session_id: strawberry.Private[strawberry.ID]
+    session_id: strawberry.ID
     status_transition: SchedulingStatus
     reason: str
 
@@ -74,7 +74,7 @@ class SchedulingBroadcastEventPayload:
             status_enum = SchedulingStatus.ERROR
 
         return cls(
-            _session_id=strawberry.ID(str(event.session_id)),
+            session_id=strawberry.ID(str(event.session_id)),
             status_transition=status_enum,
             reason=event.reason,
         )
@@ -84,7 +84,7 @@ class SchedulingBroadcastEventPayload:
     )
     async def session(self, info: Info[StrawberryGQLContext]) -> Session:
         session_global_id = to_global_id(
-            ComputeSessionNode, self._session_id, is_target_graphene_object=True
+            ComputeSessionNode, self.session_id, is_target_graphene_object=True
         )
         return Session(id=strawberry.ID(session_global_id))
 

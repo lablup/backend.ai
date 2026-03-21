@@ -6,7 +6,7 @@ from collections.abc import Iterable
 from datetime import datetime
 from decimal import Decimal
 from enum import StrEnum
-from typing import Any, Self
+from typing import Any, Self, cast
 from uuid import UUID
 
 import strawberry
@@ -156,9 +156,10 @@ class AutoScalingRule(PydanticNodeMixin[AutoScalingRuleNodeDTO]):
         node_ids: Iterable[str],
         required: bool = False,
     ) -> Iterable[Self | None]:
-        return await info.context.data_loaders.auto_scaling_rule_loader.load_many([
+        results = await info.context.data_loaders.auto_scaling_rule_loader.load_many([
             UUID(nid) for nid in node_ids
         ])
+        return cast(list[Self | None], results)
 
     @classmethod
     def from_pydantic(

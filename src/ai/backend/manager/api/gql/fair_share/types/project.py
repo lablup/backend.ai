@@ -109,12 +109,10 @@ class ProjectFairShareGQL(PydanticNodeMixin[ProjectFairShareNode]):
         ]
         | None
     ):
-        from ai.backend.manager.api.gql.project_v2.types.node import ProjectV2GQL
-
         project_data = await info.context.data_loaders.project_loader.load(self.project_id)
         if project_data is None:
             return None
-        return ProjectV2GQL.from_data(project_data)
+        return project_data
 
     @strawberry.field(  # type: ignore[misc]
         description=("Added in 26.2.0. The domain entity associated with this fair share record."),

@@ -108,7 +108,7 @@ async def image_v2(id: ID, info: Info[StrawberryGQLContext]) -> ImageV2GQL | Non
     image_data = await info.context.data_loaders.image_loader.load(ImageID(UUID(id)))
     if image_data is None:
         return None
-    return ImageV2GQL.from_data(image_data)
+    return image_data
 
 
 @strawberry.field(  # type: ignore[misc]
@@ -234,7 +234,7 @@ async def image_alias(id: ID, info: Info[StrawberryGQLContext]) -> ImageV2AliasG
     alias_data = await info.context.data_loaders.image_alias_loader.load(uuid.UUID(id))
     if alias_data is None:
         return None
-    return ImageV2AliasGQL.from_data(alias_data)
+    return alias_data
 
 
 @strawberry.field(  # type: ignore[misc]

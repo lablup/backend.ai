@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Iterable
 from datetime import datetime
-from typing import Any, Self
+from typing import Any, Self, cast
 from uuid import UUID
 
 import strawberry
@@ -110,9 +110,10 @@ class AccessToken(PydanticNodeMixin[AccessTokenNodeDTO]):
         node_ids: Iterable[str],
         required: bool = False,
     ) -> Iterable[Self | None]:
-        return await info.context.data_loaders.access_token_loader.load_many([
+        results = await info.context.data_loaders.access_token_loader.load_many([
             UUID(nid) for nid in node_ids
         ])
+        return cast(list[Self | None], results)
 
     @classmethod
     def from_pydantic(

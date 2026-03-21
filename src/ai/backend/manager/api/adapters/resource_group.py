@@ -9,6 +9,7 @@ from typing import Any
 from uuid import UUID
 
 from ai.backend.common.api_handlers import SENTINEL
+from ai.backend.common.data.filter_specs import StringMatchSpec
 from ai.backend.common.dto.manager.v2.resource_group.request import (
     AdminSearchResourceGroupsInput,
     CreateResourceGroupInput,
@@ -27,7 +28,7 @@ from ai.backend.common.dto.manager.v2.resource_group.types import (
     ResourceGroupOrderDirection,
     ResourceGroupOrderField,
 )
-from ai.backend.common.types import PreemptionMode, PreemptionOrder
+from ai.backend.common.types import PreemptionMode, PreemptionOrder, ResourceSlot
 from ai.backend.manager.data.scaling_group.types import (
     PreemptionConfig as DataPreemptionConfig,
 )
@@ -36,11 +37,14 @@ from ai.backend.manager.data.scaling_group.types import (
     ScalingGroupData,
     SchedulerType,
 )
+from ai.backend.manager.errors.resource import ScalingGroupNotFound
 from ai.backend.manager.models.scaling_group import ScalingGroupRow
 from ai.backend.manager.models.scaling_group.conditions import ScalingGroupConditions
 from ai.backend.manager.models.scaling_group.orders import ScalingGroupOrders
+from ai.backend.manager.models.scaling_group.types import FairShareScalingGroupSpec
 from ai.backend.manager.repositories.base import (
     BatchQuerier,
+    NoPagination,
     OffsetPagination,
     QueryCondition,
     combine_conditions_or,
@@ -312,6 +316,62 @@ class ResourceGroupAdapter(BaseAdapter):
             GetResourceInfoAction(scaling_group=scaling_group)
         )
         return action_result.resource_info
+
+    async def get_fair_share_spec(
+        self,
+        resource_group: str,
+    ) -> tuple[FairShareScalingGroupSpec, frozenset[str]]:
+        """Get fair share spec merged with capacity resource weights for a resource group.
+
+        Merges the resource group's fair share spec with the current capacity
+        so that resource_weights contains entries for all available resource types.
+        Missing resource types use default_weight.
+
+        Returns:
+            Tuple of (merged_spec, uses_default_resources) where uses_default_resources
+            is a frozenset of resource types using the default weight.
+        """
+        name_spec = StringMatchSpec(
+            value=resource_group,
+            case_insensitive=False,
+            negated=False,
+        )
+        querier = BatchQuerier(
+            pagination=NoPagination(),
+            conditions=[ScalingGroupConditions.by_name_equals(name_spec)],
+        )
+        search_result = (
+            await self._processors.scaling_group.search_scaling_groups.wait_for_complete(
+                SearchScalingGroupsAction(querier=querier)
+            )
+        )
+        if not search_result.scaling_groups:
+            raise ScalingGroupNotFound(resource_group)
+        sg_data = search_result.scaling_groups[0]
+
+        resource_info = await self.get_resource_info(resource_group)
+        capacity = resource_info.capacity
+
+        spec = sg_data.fair_share_spec
+        merged: dict[str, Any] = {}
+        uses_default: list[str] = []
+
+        for sq in capacity:
+            resource_type = sq.slot_name
+            if resource_type in spec.resource_weights.data:
+                merged[resource_type] = spec.resource_weights.data[resource_type]
+            else:
+                merged[resource_type] = spec.default_weight
+                uses_default.append(resource_type)
+
+        merged_spec = FairShareScalingGroupSpec(
+            half_life_days=spec.half_life_days,
+            lookback_days=spec.lookback_days,
+            decay_unit_days=spec.decay_unit_days,
+            default_weight=spec.default_weight,
+            resource_weights=ResourceSlot(merged),
+        )
+        return merged_spec, frozenset(uses_default)
 
     async def update_fair_share_spec(
         self,

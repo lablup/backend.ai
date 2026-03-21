@@ -8,7 +8,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from ai.backend.common.types import ResourceSlot, SlotQuantity
+from ai.backend.common.types import SlotQuantity
 from ai.backend.manager.api.gql.fair_share.types.common import ResourceSlotGQL
 from ai.backend.manager.api.gql.resource_group.types import (
     PreemptionConfigGQL,
@@ -24,7 +24,6 @@ from ai.backend.manager.api.gql.resource_group.types import (
 )
 from ai.backend.manager.data.scaling_group.types import ResourceInfo
 from ai.backend.manager.errors.resource import ScalingGroupNotFound
-from ai.backend.manager.models.scaling_group.types import FairShareScalingGroupSpec
 
 
 class TestResourceSlotGQLNormalization:
@@ -227,13 +226,6 @@ class TestResourceGroupGQLResourceInfoResolver:
                     order=PreemptionOrderGQL.OLDEST,
                     mode=PreemptionModeGQL.TERMINATE,
                 ),
-            ),
-            _fair_share_spec_data=FairShareScalingGroupSpec(
-                half_life_days=7,
-                lookback_days=28,
-                decay_unit_days=1,
-                default_weight=Decimal("1.0"),
-                resource_weights=ResourceSlot({}),
             ),
         )
 

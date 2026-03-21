@@ -10,6 +10,17 @@ import uuid
 from datetime import UTC, datetime
 from decimal import Decimal
 
+from ai.backend.common.dto.manager.v2.fair_share.response import (
+    DomainFairShareNode,
+    ProjectFairShareNode,
+    UserFairShareNode,
+)
+from ai.backend.common.dto.manager.v2.fair_share.types import (
+    FairShareCalculationSnapshotInfo,
+    FairShareSpecInfo,
+    ResourceSlotEntryInfo,
+    ResourceSlotInfo,
+)
 from ai.backend.common.types import ResourceSlot
 from ai.backend.manager.api.gql.fair_share.types.common import (
     FairShareSpecGQL,
@@ -19,13 +30,7 @@ from ai.backend.manager.api.gql.fair_share.types.domain import DomainFairShareGQ
 from ai.backend.manager.api.gql.fair_share.types.project import ProjectFairShareGQL
 from ai.backend.manager.api.gql.fair_share.types.user import UserFairShareGQL
 from ai.backend.manager.data.fair_share import (
-    DomainFairShareData,
-    FairShareCalculationSnapshot,
-    FairShareData,
-    FairShareMetadata,
     FairShareSpec,
-    ProjectFairShareData,
-    UserFairShareData,
 )
 
 
@@ -123,43 +128,45 @@ class TestFairShareSpecGQLConversion:
 
 
 class TestDomainFairShareGQLConversion:
-    """Test DomainFairShareGQL.from_dataclass() with resource weight entries."""
+    """Test DomainFairShareGQL.from_pydantic() with resource weight entries."""
 
-    def test_from_dataclass_with_partial_defaults(self) -> None:
-        """Scenario 3.2: Convert DomainFairShareData to GQL."""
+    def test_from_pydantic_with_partial_defaults(self) -> None:
+        """Scenario 3.2: Convert DomainFairShareNode to GQL."""
         # Given
         now = datetime.now(UTC)
-        data = DomainFairShareData(
+        dto = DomainFairShareNode(
+            id=uuid.uuid4(),
             resource_group="default",
             domain_name="test-domain",
-            data=FairShareData(
-                spec=FairShareSpec(
-                    weight=Decimal("1.0"),
-                    half_life_days=7,
-                    lookback_days=28,
-                    decay_unit_days=1,
-                    resource_weights=ResourceSlot({
-                        "cpu": Decimal("1.0"),
-                        "mem": Decimal("0.001"),
-                        "cuda.device": Decimal("10.0"),
-                    }),
+            spec=FairShareSpecInfo(
+                weight=Decimal("1.0"),
+                uses_default_weight=True,
+                half_life_days=7,
+                lookback_days=28,
+                decay_unit_days=1,
+                resource_weights=ResourceSlotInfo(
+                    entries=[
+                        ResourceSlotEntryInfo(resource_type="cpu", quantity="1.0"),
+                        ResourceSlotEntryInfo(resource_type="mem", quantity="0.001"),
+                        ResourceSlotEntryInfo(resource_type="cuda.device", quantity="10.0"),
+                    ]
                 ),
-                calculation_snapshot=FairShareCalculationSnapshot(
-                    fair_share_factor=Decimal("1.0"),
-                    total_decayed_usage=[],
-                    normalized_usage=Decimal("0.0"),
-                    lookback_start=datetime.now(UTC).date(),
-                    lookback_end=datetime.now(UTC).date(),
-                    last_calculated_at=now,
-                ),
-                metadata=FairShareMetadata(created_at=now, updated_at=now),
-                use_default=True,
-                uses_default_resources=frozenset(["cpu", "mem"]),
+                uses_default_resource_types=["cpu", "mem"],
             ),
+            calculation_snapshot=FairShareCalculationSnapshotInfo(
+                fair_share_factor=Decimal("1.0"),
+                total_decayed_usage=ResourceSlotInfo(entries=[]),
+                normalized_usage=Decimal("0.0"),
+                lookback_start=datetime.now(UTC).date(),
+                lookback_end=datetime.now(UTC).date(),
+                last_calculated_at=now,
+            ),
+            created_at=now,
+            updated_at=now,
         )
 
         # When
-        gql = DomainFairShareGQL.from_dataclass(data)
+        gql = DomainFairShareGQL.from_pydantic(dto)
 
         # Then
         assert gql.resource_group_name == "default"
@@ -175,44 +182,46 @@ class TestDomainFairShareGQLConversion:
 
 
 class TestProjectFairShareGQLConversion:
-    """Test ProjectFairShareGQL.from_dataclass() with resource weight entries."""
+    """Test ProjectFairShareGQL.from_pydantic() with resource weight entries."""
 
-    def test_from_dataclass(self) -> None:
+    def test_from_pydantic(self) -> None:
         """Test Project fair share GQL conversion."""
         # Given
         now = datetime.now(UTC)
         project_id = uuid.uuid4()
-        data = ProjectFairShareData(
+        dto = ProjectFairShareNode(
+            id=uuid.uuid4(),
             resource_group="default",
             project_id=project_id,
             domain_name="test-domain",
-            data=FairShareData(
-                spec=FairShareSpec(
-                    weight=Decimal("1.5"),
-                    half_life_days=7,
-                    lookback_days=28,
-                    decay_unit_days=1,
-                    resource_weights=ResourceSlot({
-                        "cpu": Decimal("1.0"),
-                        "cuda.shares": Decimal("0.1"),
-                    }),
+            spec=FairShareSpecInfo(
+                weight=Decimal("1.5"),
+                uses_default_weight=False,
+                half_life_days=7,
+                lookback_days=28,
+                decay_unit_days=1,
+                resource_weights=ResourceSlotInfo(
+                    entries=[
+                        ResourceSlotEntryInfo(resource_type="cpu", quantity="1.0"),
+                        ResourceSlotEntryInfo(resource_type="cuda.shares", quantity="0.1"),
+                    ]
                 ),
-                calculation_snapshot=FairShareCalculationSnapshot(
-                    fair_share_factor=Decimal("1.0"),
-                    total_decayed_usage=[],
-                    normalized_usage=Decimal("0.0"),
-                    lookback_start=datetime.now(UTC).date(),
-                    lookback_end=datetime.now(UTC).date(),
-                    last_calculated_at=now,
-                ),
-                metadata=FairShareMetadata(created_at=now, updated_at=now),
-                use_default=False,
-                uses_default_resources=frozenset(["cpu"]),
+                uses_default_resource_types=["cpu"],
             ),
+            calculation_snapshot=FairShareCalculationSnapshotInfo(
+                fair_share_factor=Decimal("1.0"),
+                total_decayed_usage=ResourceSlotInfo(entries=[]),
+                normalized_usage=Decimal("0.0"),
+                lookback_start=datetime.now(UTC).date(),
+                lookback_end=datetime.now(UTC).date(),
+                last_calculated_at=now,
+            ),
+            created_at=now,
+            updated_at=now,
         )
 
         # When
-        gql = ProjectFairShareGQL.from_dataclass(data)
+        gql = ProjectFairShareGQL.from_pydantic(dto)
 
         # Then
         assert gql.project_id == project_id
@@ -224,47 +233,48 @@ class TestProjectFairShareGQLConversion:
 
 
 class TestUserFairShareGQLConversion:
-    """Test UserFairShareGQL.from_dataclass() with resource weight entries."""
+    """Test UserFairShareGQL.from_pydantic() with resource weight entries."""
 
-    def test_from_dataclass(self) -> None:
+    def test_from_pydantic(self) -> None:
         """Test User fair share GQL conversion."""
         # Given
         now = datetime.now(UTC)
         user_uuid = uuid.uuid4()
         project_id = uuid.uuid4()
-        data = UserFairShareData(
+        dto = UserFairShareNode(
+            id=uuid.uuid4(),
             resource_group="default",
             user_uuid=user_uuid,
             project_id=project_id,
             domain_name="test-domain",
-            data=FairShareData(
-                spec=FairShareSpec(
-                    weight=Decimal("1.0"),
-                    half_life_days=7,
-                    lookback_days=28,
-                    decay_unit_days=1,
-                    resource_weights=ResourceSlot({
-                        "cpu": Decimal("1.0"),
-                        "mem": Decimal("0.001"),
-                    }),
+            spec=FairShareSpecInfo(
+                weight=Decimal("1.0"),
+                uses_default_weight=True,
+                half_life_days=7,
+                lookback_days=28,
+                decay_unit_days=1,
+                resource_weights=ResourceSlotInfo(
+                    entries=[
+                        ResourceSlotEntryInfo(resource_type="cpu", quantity="1.0"),
+                        ResourceSlotEntryInfo(resource_type="mem", quantity="0.001"),
+                    ]
                 ),
-                calculation_snapshot=FairShareCalculationSnapshot(
-                    fair_share_factor=Decimal("1.0"),
-                    total_decayed_usage=[],
-                    normalized_usage=Decimal("0.0"),
-                    lookback_start=datetime.now(UTC).date(),
-                    lookback_end=datetime.now(UTC).date(),
-                    last_calculated_at=now,
-                ),
-                metadata=FairShareMetadata(created_at=now, updated_at=now),
-                use_default=True,
-                uses_default_resources=frozenset(["cpu", "mem"]),
+                uses_default_resource_types=["cpu", "mem"],
             ),
-            scheduling_rank=None,
+            calculation_snapshot=FairShareCalculationSnapshotInfo(
+                fair_share_factor=Decimal("1.0"),
+                total_decayed_usage=ResourceSlotInfo(entries=[]),
+                normalized_usage=Decimal("0.0"),
+                lookback_start=datetime.now(UTC).date(),
+                lookback_end=datetime.now(UTC).date(),
+                last_calculated_at=now,
+            ),
+            created_at=now,
+            updated_at=now,
         )
 
         # When
-        gql = UserFairShareGQL.from_dataclass(data)
+        gql = UserFairShareGQL.from_pydantic(dto)
 
         # Then
         assert gql.user_uuid == user_uuid

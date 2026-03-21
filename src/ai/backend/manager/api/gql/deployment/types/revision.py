@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Iterable
 from datetime import datetime
-from typing import TYPE_CHECKING, Annotated, Any, Self
+from typing import TYPE_CHECKING, Annotated, Any, Self, cast
 from uuid import UUID
 
 import strawberry
@@ -160,7 +160,7 @@ class EnvironmentVariablesGQL:
     )
 )
 class ModelMountConfig:
-    _vfolder_id: strawberry.Private[UUID]
+    vfolder_id: ID
     mount_destination: str = strawberry.field(
         description="Path inside the container where the model is mounted."
     )
@@ -171,7 +171,7 @@ class ModelMountConfig:
     @strawberry.field
     async def vfolder(self, info: Info[StrawberryGQLContext]) -> VFolder:
         vfolder_global_id = to_global_id(
-            VirtualFolderNode, self._vfolder_id, is_target_graphene_object=True
+            VirtualFolderNode, UUID(str(self.vfolder_id)), is_target_graphene_object=True
         )
         return VFolder(id=ID(vfolder_global_id))
 
@@ -203,7 +203,7 @@ class ModelRuntimeConfig:
     )
 )
 class ResourceConfig:
-    _resource_group_name: strawberry.Private[str]
+    resource_group_name: str
     resource_slots: ResourceSlotGQL = strawberry.field(
         description="Added in 26.1.0. Allocated compute resources including CPU, memory, and accelerators."
     )
@@ -216,7 +216,7 @@ class ResourceConfig:
     def resource_group(self) -> ResourceGroup:
         """Resolves the federated ResourceGroup."""
         global_id = to_global_id(
-            ScalingGroupNode, self._resource_group_name, is_target_graphene_object=True
+            ScalingGroupNode, self.resource_group_name, is_target_graphene_object=True
         )
         return ResourceGroup(id=ID(global_id))
 
@@ -239,7 +239,7 @@ class ClusterConfig:
     )
 )
 class ModelRevision(PydanticNodeMixin[RevisionNodeDTO]):
-    _image_id: strawberry.Private[UUID]
+    image_id: ID
     id: NodeID[str]
     name: str = strawberry.field(description="The name identifier for this revision.")
     cluster_config: ClusterConfig = strawberry.field(
@@ -261,7 +261,9 @@ class ModelRevision(PydanticNodeMixin[RevisionNodeDTO]):
 
     @strawberry.field
     async def image(self, info: Info[StrawberryGQLContext]) -> Image:
-        image_global_id = to_global_id(ImageNode, self._image_id, is_target_graphene_object=True)
+        image_global_id = to_global_id(
+            ImageNode, UUID(str(self.image_id)), is_target_graphene_object=True
+        )
         return Image(id=ID(image_global_id))
 
     @classmethod
@@ -272,9 +274,10 @@ class ModelRevision(PydanticNodeMixin[RevisionNodeDTO]):
         node_ids: Iterable[str],
         required: bool = False,
     ) -> Iterable[Self | None]:
-        return await info.context.data_loaders.revision_loader.load_many([
+        results = await info.context.data_loaders.revision_loader.load_many([
             UUID(nid) for nid in node_ids
         ])
+        return cast(list[Self | None], results)
 
     @classmethod
     def from_pydantic(
@@ -295,7 +298,7 @@ class ModelRevision(PydanticNodeMixin[RevisionNodeDTO]):
         model_mount_config: ModelMountConfig | None = None
         if info.model_vfolder_id and info.model_mount_destination:
             model_mount_config = ModelMountConfig(
-                _vfolder_id=info.model_vfolder_id,
+                vfolder_id=ID(str(info.model_vfolder_id)),
                 mount_destination=info.model_mount_destination,
                 definition_path=info.model_definition_path or "",
             )
@@ -303,7 +306,7 @@ class ModelRevision(PydanticNodeMixin[RevisionNodeDTO]):
             ExtraVFolderMount(
                 id=ID(f"{m.vfolder_id}:{m.mount_destination}"),
                 mount_destination=m.mount_destination or "",
-                _vfolder_id=m.vfolder_id,
+                vfolder_id=ID(str(m.vfolder_id)),
             )
             for m in dto.extra_mounts
         ]
@@ -328,7 +331,7 @@ class ModelRevision(PydanticNodeMixin[RevisionNodeDTO]):
                 size=info.cluster_size,
             ),
             resource_config=ResourceConfig(
-                _resource_group_name=info.resource_group,
+                resource_group_name=info.resource_group,
                 resource_slots=ResourceSlotGQL.from_resource_slot(info.resource_slots),
                 resource_opts=ResourceOptsGQL.from_mapping(info.resource_opts),
             ),
@@ -339,7 +342,7 @@ class ModelRevision(PydanticNodeMixin[RevisionNodeDTO]):
             ),
             model_mount_config=model_mount_config,
             extra_mounts=extra_mounts,
-            _image_id=info.image_id,
+            image_id=ID(str(info.image_id)),
             created_at=dto.created_at,
         )
 

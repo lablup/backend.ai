@@ -10,7 +10,7 @@ import enum
 import uuid
 from collections.abc import Iterable
 from datetime import datetime
-from typing import Any, Self
+from typing import Any, Self, cast
 
 import strawberry
 from strawberry import Info
@@ -181,7 +181,7 @@ class ImageV2AliasGQL(PydanticNodeMixin[ImageAliasNode]):
         results = await info.context.data_loaders.image_alias_loader.load_many([
             uuid.UUID(nid) for nid in node_ids
         ])
-        return [cls.from_data(data) if data is not None else None for data in results]
+        return cast(list[Self | None], results)
 
     @classmethod
     def from_data(cls, data: ImageAliasData) -> Self:
@@ -284,8 +284,6 @@ class ImageV2PermissionInfoGQL:
     name="ImageV2",
 )
 class ImageV2GQL(PydanticNodeMixin[ImageNode]):
-    _image_id: strawberry.Private[ImageID]
-
     id: NodeID[uuid.UUID]
 
     # Sub-info types
@@ -312,7 +310,7 @@ class ImageV2GQL(PydanticNodeMixin[ImageNode]):
     )
     async def last_used(self, info: Info[StrawberryGQLContext]) -> datetime | None:
         """Get the timestamp of the most recent session created with this image."""
-        return await info.context.data_loaders.image_last_used_loader.load(self._image_id)
+        return await info.context.data_loaders.image_last_used_loader.load(ImageID(self.id))
 
     @strawberry.field(description="Added in 26.2.0. Aliases for this image.")  # type: ignore[misc]
     async def aliases(
@@ -328,7 +326,7 @@ class ImageV2GQL(PydanticNodeMixin[ImageNode]):
         """Get the aliases for this image with pagination, filtering, and ordering."""
         pydantic_filter = filter.to_pydantic() if filter else None
         pydantic_orders = [o.to_pydantic() for o in order_by] if order_by else None
-        base_conditions = [ImageAliasConditions.by_image_ids([self._image_id])]
+        base_conditions = [ImageAliasConditions.by_image_ids([ImageID(self.id)])]
         payload = await info.context.adapters.image.admin_search_image_aliases(
             AdminSearchImageAliasesInput(
                 filter=pydantic_filter,
@@ -368,7 +366,7 @@ class ImageV2GQL(PydanticNodeMixin[ImageNode]):
         results = await info.context.data_loaders.image_loader.load_many([
             ImageID(uuid.UUID(nid)) for nid in node_ids
         ])
-        return [cls.from_data(data) if data is not None else None for data in results]
+        return cast(list[Self | None], results)
 
     @classmethod
     def from_pydantic(
@@ -387,10 +385,8 @@ class ImageV2GQL(PydanticNodeMixin[ImageNode]):
             ImageV2GQL instance.
         """
         accelerators = dto.accelerators.split(",") if dto.accelerators else []
-        image_id = ImageID(dto.id)
         return cls(
             id=dto.id,
-            _image_id=image_id,
             identity=ImageV2IdentityInfoGQL(
                 canonical_name=dto.name,
                 namespace=dto.image,
@@ -437,7 +433,6 @@ class ImageV2GQL(PydanticNodeMixin[ImageNode]):
         accelerators = data.accelerators.split(",") if data.accelerators else []
         return cls(
             id=data.id,
-            _image_id=data.id,
             identity=ImageV2IdentityInfoGQL(
                 canonical_name=str(data.name),
                 namespace=data.image,
@@ -489,7 +484,6 @@ class ImageV2GQL(PydanticNodeMixin[ImageNode]):
         """
         return cls(
             id=data.id,
-            _image_id=data.id,
             identity=ImageV2IdentityInfoGQL(
                 canonical_name=str(data.name),
                 namespace=data.namespace,

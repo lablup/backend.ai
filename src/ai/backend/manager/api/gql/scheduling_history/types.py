@@ -189,7 +189,7 @@ class SubStepResultGQL:
 )
 class SessionSchedulingHistory(PydanticNodeMixin[SessionHistoryNode]):
     id: NodeID[str]
-    _session_id: strawberry.Private[UUID]
+    session_id: ID
     phase: str
     from_status: str | None
     to_status: str | None
@@ -200,10 +200,6 @@ class SessionSchedulingHistory(PydanticNodeMixin[SessionHistoryNode]):
     attempts: int
     created_at: datetime
     updated_at: datetime
-
-    @strawberry.field(description="The session ID this history record belongs to.")  # type: ignore[misc]
-    def session_id(self) -> ID:
-        return ID(str(self._session_id))
 
     @classmethod
     async def resolve_nodes(  # type: ignore[override]  # Strawberry Node uses AwaitableOrValue overloads incompatible with async def
@@ -229,7 +225,7 @@ class SessionSchedulingHistory(PydanticNodeMixin[SessionHistoryNode]):
     ) -> Self:
         return cls(
             id=ID(str(dto.id)),
-            _session_id=dto.session_id,
+            session_id=ID(str(dto.session_id)),
             phase=dto.phase,
             from_status=dto.from_status,
             to_status=dto.to_status,
@@ -256,7 +252,7 @@ class SessionSchedulingHistory(PydanticNodeMixin[SessionHistoryNode]):
 @gql_node_type(BackendAIGQLMeta(added_version="26.3.0", description="Deployment history record."))
 class DeploymentHistory(PydanticNodeMixin[DeploymentHistoryNode]):
     id: NodeID[str]
-    _deployment_id: strawberry.Private[UUID]
+    deployment_id: ID
     phase: str
     from_status: str | None
     to_status: str | None
@@ -267,10 +263,6 @@ class DeploymentHistory(PydanticNodeMixin[DeploymentHistoryNode]):
     attempts: int
     created_at: datetime
     updated_at: datetime
-
-    @strawberry.field(description="The deployment ID this history record belongs to.")  # type: ignore[misc]
-    def deployment_id(self) -> ID:
-        return ID(str(self._deployment_id))
 
     @classmethod
     async def resolve_nodes(  # type: ignore[override]  # Strawberry Node uses AwaitableOrValue overloads incompatible with async def
@@ -296,7 +288,7 @@ class DeploymentHistory(PydanticNodeMixin[DeploymentHistoryNode]):
     ) -> Self:
         return cls(
             id=ID(str(dto.id)),
-            _deployment_id=dto.deployment_id,
+            deployment_id=ID(str(dto.deployment_id)),
             phase=dto.phase,
             from_status=dto.from_status,
             to_status=dto.to_status,
@@ -323,8 +315,8 @@ class DeploymentHistory(PydanticNodeMixin[DeploymentHistoryNode]):
 @gql_node_type(BackendAIGQLMeta(added_version="26.3.0", description="Route history record."))
 class RouteHistory(PydanticNodeMixin[RouteHistoryNode]):
     id: NodeID[str]
-    _route_id: strawberry.Private[UUID]
-    _deployment_id: strawberry.Private[UUID]
+    route_id: ID
+    deployment_id: ID
     phase: str
     from_status: str | None
     to_status: str | None
@@ -335,14 +327,6 @@ class RouteHistory(PydanticNodeMixin[RouteHistoryNode]):
     attempts: int
     created_at: datetime
     updated_at: datetime
-
-    @strawberry.field(description="The route ID this history record belongs to.")  # type: ignore[misc]
-    def route_id(self) -> ID:
-        return ID(str(self._route_id))
-
-    @strawberry.field(description="The deployment ID this route belongs to.")  # type: ignore[misc]
-    def deployment_id(self) -> ID:
-        return ID(str(self._deployment_id))
 
     @classmethod
     async def resolve_nodes(  # type: ignore[override]  # Strawberry Node uses AwaitableOrValue overloads incompatible with async def
@@ -368,8 +352,8 @@ class RouteHistory(PydanticNodeMixin[RouteHistoryNode]):
     ) -> Self:
         return cls(
             id=ID(str(dto.id)),
-            _route_id=dto.route_id,
-            _deployment_id=dto.deployment_id,
+            route_id=ID(str(dto.route_id)),
+            deployment_id=ID(str(dto.deployment_id)),
             phase=dto.phase,
             from_status=dto.from_status,
             to_status=dto.to_status,

@@ -6,7 +6,7 @@ from collections.abc import Iterable
 from datetime import datetime
 from enum import StrEnum
 from functools import lru_cache
-from typing import TYPE_CHECKING, Annotated, Any, Self
+from typing import TYPE_CHECKING, Annotated, Any, Self, cast
 from uuid import UUID
 
 import strawberry
@@ -77,13 +77,13 @@ if TYPE_CHECKING:
     from ai.backend.manager.api.gql.deployment.types.deployment import ModelDeployment
     from ai.backend.manager.api.gql.deployment.types.revision import ModelRevision
 
-RouteStatusGQL = strawberry.enum(
+RouteStatusGQL: type[RouteStatusEnum] = strawberry.enum(
     RouteStatusEnum,
     name="RouteStatus",
     description="Added in 25.19.0. Route status indicating the health and lifecycle state of a route.",
 )
 
-RouteTrafficStatusGQL = strawberry.enum(
+RouteTrafficStatusGQL: type[RouteTrafficStatusEnum] = strawberry.enum(
     RouteTrafficStatusEnum,
     name="RouteTrafficStatus",
     description="Added in 25.19.0. Traffic routing status for a route. Controls whether traffic should be sent to this route.",
@@ -98,9 +98,9 @@ RouteTrafficStatusGQL = strawberry.enum(
 )
 class Route(PydanticNodeMixin[RouteNodeDTO]):
     id: NodeID[str]
-    _deployment_id: strawberry.Private[UUID]
-    _session_id: strawberry.Private[UUID | None]
-    _revision_id: strawberry.Private[UUID | None]
+    deployment_id: ID
+    session_id: ID | None
+    revision_id: ID | None
     status: RouteStatusGQL = strawberry.field(
         description="The current status of the route indicating its health state.",
     )
@@ -122,11 +122,10 @@ class Route(PydanticNodeMixin[RouteNodeDTO]):
         self, info: Info[StrawberryGQLContext]
     ) -> Annotated[ModelDeployment, strawberry.lazy(".deployment")]:
         """Resolve deployment using dataloader."""
-        deployment_data = await info.context.data_loaders.deployment_loader.load(
-            self._deployment_id
-        )
+        deployment_id = UUID(str(self.deployment_id))
+        deployment_data = await info.context.data_loaders.deployment_loader.load(deployment_id)
         if deployment_data is None:
-            raise EndpointNotFound(extra_msg=f"id={self._deployment_id}")
+            raise EndpointNotFound(extra_msg=f"id={deployment_id}")
         return deployment_data
 
     @strawberry.field(  # type: ignore[misc]
@@ -134,10 +133,10 @@ class Route(PydanticNodeMixin[RouteNodeDTO]):
     )
     async def session(self, info: Info[StrawberryGQLContext]) -> ID | None:
         """Return session global ID if available."""
-        if self._session_id is None:
+        if self.session_id is None:
             return None
         session_global_id = to_global_id(
-            ComputeSessionNode, self._session_id, is_target_graphene_object=True
+            ComputeSessionNode, UUID(str(self.session_id)), is_target_graphene_object=True
         )
         return ID(session_global_id)
 
@@ -146,9 +145,9 @@ class Route(PydanticNodeMixin[RouteNodeDTO]):
         self, info: Info[StrawberryGQLContext]
     ) -> Annotated[ModelRevision, strawberry.lazy(".revision")] | None:
         """Resolve revision using dataloader."""
-        if self._revision_id is None:
+        if self.revision_id is None:
             return None
-        return await info.context.data_loaders.revision_loader.load(self._revision_id)
+        return await info.context.data_loaders.revision_loader.load(UUID(str(self.revision_id)))
 
     @classmethod
     async def resolve_nodes(  # type: ignore[override]  # Strawberry Node uses AwaitableOrValue overloads incompatible with async def
@@ -158,9 +157,10 @@ class Route(PydanticNodeMixin[RouteNodeDTO]):
         node_ids: Iterable[str],
         required: bool = False,
     ) -> Iterable[Self | None]:
-        return await info.context.data_loaders.route_loader.load_many([
+        results = await info.context.data_loaders.route_loader.load_many([
             UUID(nid) for nid in node_ids
         ])
+        return cast(list[Self | None], results)
 
     @classmethod
     def from_pydantic(
@@ -172,9 +172,9 @@ class Route(PydanticNodeMixin[RouteNodeDTO]):
     ) -> Self:
         return cls(
             id=ID(str(dto.id)),
-            _deployment_id=dto.endpoint_id,
-            _session_id=UUID(dto.session_id) if dto.session_id else None,
-            _revision_id=dto.revision_id,
+            deployment_id=ID(str(dto.endpoint_id)),
+            session_id=ID(str(dto.session_id)) if dto.session_id else None,
+            revision_id=ID(str(dto.revision_id)) if dto.revision_id else None,
             status=RouteStatusGQL(RouteStatusEnum(dto.status.value)),
             traffic_status=RouteTrafficStatusGQL(RouteTrafficStatusEnum(dto.traffic_status.value)),
             traffic_ratio=dto.traffic_ratio,

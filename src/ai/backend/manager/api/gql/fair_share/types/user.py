@@ -110,12 +110,10 @@ class UserFairShareGQL(PydanticNodeMixin[UserFairShareNode]):
         ]
         | None
     ):
-        from ai.backend.manager.api.gql.user.types.node import UserV2GQL
-
         user_data = await info.context.data_loaders.user_loader.load(self.user_uuid)
         if user_data is None:
             return None
-        return UserV2GQL.from_data(user_data)
+        return user_data
 
     @strawberry.field(  # type: ignore[misc]
         description=("Added in 26.2.0. The domain entity associated with this fair share record."),
@@ -145,12 +143,10 @@ class UserFairShareGQL(PydanticNodeMixin[UserFairShareNode]):
         ]
         | None
     ):
-        from ai.backend.manager.api.gql.project_v2.types.node import ProjectV2GQL
-
         project_data = await info.context.data_loaders.project_loader.load(self.project_id)
         if project_data is None:
             return None
-        return ProjectV2GQL.from_data(project_data)
+        return project_data
 
     @strawberry.field(  # type: ignore[misc]
         description=("Added in 26.2.0. The resource group associated with this fair share record."),

@@ -5,7 +5,7 @@ from __future__ import annotations
 from collections.abc import Iterable
 from datetime import datetime
 from enum import StrEnum
-from typing import TYPE_CHECKING, Annotated, Any, Self
+from typing import TYPE_CHECKING, Annotated, Any, Self, cast
 from uuid import UUID
 
 import strawberry
@@ -65,8 +65,6 @@ class AuditLogV2GQL(PydanticNodeMixin[AuditLogNode]):
         description="Unique identifier of the audit log entry (UUID)."
     )
 
-    _triggered_by: strawberry.Private[str | None]
-
     action_id: UUID = strawberry.field(description="UUID of the action that generated this log.")
     entity_type: str = strawberry.field(description="Type of entity this log relates to.")
     operation: str = strawberry.field(
@@ -101,18 +99,16 @@ class AuditLogV2GQL(PydanticNodeMixin[AuditLogNode]):
         ]
         | None
     ):
-        from ai.backend.manager.api.gql.user.types.node import UserV2GQL
-
-        if self._triggered_by is None:
+        if self.triggered_by is None:
             return None
         try:
-            user_uuid = UUID(self._triggered_by)
+            user_uuid = UUID(self.triggered_by)
         except ValueError:
             return None
         user_data = await info.context.data_loaders.user_loader.load(user_uuid)
         if user_data is None:
             return None
-        return UserV2GQL.from_data(user_data)
+        return user_data
 
     @classmethod
     async def resolve_nodes(  # type: ignore[override]
@@ -125,13 +121,12 @@ class AuditLogV2GQL(PydanticNodeMixin[AuditLogNode]):
         results = await info.context.data_loaders.audit_log_loader.load_many([
             UUID(nid) for nid in node_ids
         ])
-        return [cls.from_data(data) if data is not None else None for data in results]
+        return cast(list[Self | None], results)
 
     @classmethod
     def from_data(cls, data: AuditLogData) -> Self:
         return cls(
             id=ID(str(data.id)),
-            _triggered_by=data.triggered_by,
             action_id=data.action_id,
             entity_type=data.entity_type,
             operation=data.operation,
@@ -154,7 +149,6 @@ class AuditLogV2GQL(PydanticNodeMixin[AuditLogNode]):
     ) -> Self:
         return cls(
             id=ID(str(dto.id)),
-            _triggered_by=dto.triggered_by,
             action_id=dto.action_id,
             entity_type=dto.entity_type,
             operation=dto.operation,

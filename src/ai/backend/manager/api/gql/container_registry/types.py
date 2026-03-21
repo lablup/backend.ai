@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Iterable
 from enum import StrEnum
-from typing import Any, Self
+from typing import Any, Self, cast
 from uuid import UUID
 
 import strawberry
@@ -83,7 +83,7 @@ class ContainerRegistryGQL(PydanticNodeMixin[Any]):
         results = await info.context.data_loaders.container_registry_loader.load_many([
             UUID(nid) for nid in node_ids
         ])
-        return [cls.from_data(data) if data is not None else None for data in results]
+        return cast(list[Self | None], results)
 
     @classmethod
     def from_data(cls, data: ContainerRegistryData) -> Self:

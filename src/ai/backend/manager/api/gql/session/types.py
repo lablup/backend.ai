@@ -5,7 +5,7 @@ from __future__ import annotations
 from collections.abc import Iterable
 from datetime import datetime
 from enum import StrEnum
-from typing import Any, Self
+from typing import Any, Self, cast
 from uuid import UUID
 
 import strawberry
@@ -362,10 +362,10 @@ class SessionV2GQL(PydanticNodeMixin[SessionNode]):
 
     id: NodeID[str]
 
-    # Private fields for dynamic resolvers
-    _domain_name: strawberry.Private[str]
-    _user_uuid: strawberry.Private[UUID]
-    _group_id: strawberry.Private[UUID]
+    # Fields used as keys for dynamic resolvers
+    domain_name: str
+    user_id: ID
+    project_id: ID
 
     metadata: SessionV2MetadataInfoGQL = strawberry.field(
         description="Metadata including domain, project, and user information."
@@ -385,25 +385,27 @@ class SessionV2GQL(PydanticNodeMixin[SessionNode]):
         description="Added in 26.3.0. The domain this session belongs to."
     )
     async def domain(self, info: Info[StrawberryGQLContext]) -> DomainV2GQL | None:
-        return await info.context.data_loaders.domain_loader.load(self._domain_name)
+        return await info.context.data_loaders.domain_loader.load(self.domain_name)
 
     @strawberry.field(  # type: ignore[misc]
         description="Added in 26.3.0. The user who owns this session."
     )
     async def user(self, info: Info[StrawberryGQLContext]) -> UserV2GQL | None:
-        user_data = await info.context.data_loaders.user_loader.load(self._user_uuid)
+        user_data = await info.context.data_loaders.user_loader.load(UUID(str(self.user_id)))
         if user_data is None:
             return None
-        return UserV2GQL.from_data(user_data)
+        return user_data
 
     @strawberry.field(  # type: ignore[misc]
         description="Added in 26.3.0. The project this session belongs to."
     )
     async def project(self, info: Info[StrawberryGQLContext]) -> ProjectV2GQL | None:
-        project_data = await info.context.data_loaders.project_loader.load(self._group_id)
+        project_data = await info.context.data_loaders.project_loader.load(
+            UUID(str(self.project_id))
+        )
         if project_data is None:
             return None
-        return ProjectV2GQL.from_data(project_data)
+        return project_data
 
     @strawberry.field(  # type: ignore[misc]
         description="Added in 26.3.0. The resource group this session is assigned to."
@@ -485,7 +487,7 @@ class SessionV2GQL(PydanticNodeMixin[SessionNode]):
         results = await info.context.data_loaders.session_loader.load_many([
             SessionId(UUID(nid)) for nid in node_ids
         ])
-        return [cls.from_data(data) if data is not None else None for data in results]
+        return cast(list[Self | None], results)
 
     @classmethod
     def from_data(cls, data: SessionData) -> Self:
@@ -504,9 +506,9 @@ class SessionV2GQL(PydanticNodeMixin[SessionNode]):
 
         return cls(
             id=ID(str(data.id)),
-            _domain_name=data.domain_name,
-            _user_uuid=data.user_uuid,
-            _group_id=data.group_id,
+            domain_name=data.domain_name,
+            user_id=ID(str(data.user_uuid)),
+            project_id=ID(str(data.group_id)),
             metadata=SessionV2MetadataInfoGQL(
                 creation_id=data.creation_id or "",
                 name=data.name or "",
@@ -584,9 +586,9 @@ class SessionV2GQL(PydanticNodeMixin[SessionNode]):
 
         return cls(
             id=ID(str(dto.id)),
-            _domain_name=dto.domain_name,
-            _user_uuid=dto.user_uuid,
-            _group_id=dto.group_id,
+            domain_name=dto.domain_name,
+            user_id=ID(str(dto.user_uuid)),
+            project_id=ID(str(dto.group_id)),
             metadata=SessionV2MetadataInfoGQL(
                 creation_id=dto.metadata.creation_id or "",
                 name=dto.metadata.name or "",

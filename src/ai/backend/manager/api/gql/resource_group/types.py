@@ -387,9 +387,6 @@ class ResourceGroupGQL(PydanticNodeMixin[Any]):
         )
     )
 
-    # Private field to store original fair share spec for lazy loading
-    _fair_share_spec_data: strawberry.Private[FairShareScalingGroupSpec]
-
     @classmethod
     async def resolve_nodes(  # type: ignore[override]  # Strawberry Node uses AwaitableOrValue overloads incompatible with async def
         cls,
@@ -431,7 +428,6 @@ class ResourceGroupGQL(PydanticNodeMixin[Any]):
                     mode=PreemptionModeGQL(dto.scheduler.options.preemption.mode.value),
                 ),
             ),
-            _fair_share_spec_data=dto.fair_share_spec,
         )
 
     @strawberry.field(  # type: ignore[misc]
@@ -444,43 +440,10 @@ class ResourceGroupGQL(PydanticNodeMixin[Any]):
     async def fair_share_spec(
         self, info: Info[StrawberryGQLContext, None]
     ) -> FairShareScalingGroupSpecGQL:
-        """Get fair share spec with merged resource weights from capacity.
-
-        This is a lazy-loaded field that merges the resource group's fair share spec
-        with its current capacity to provide complete resource weight information.
-        """
-        from ai.backend.common.types import ResourceSlot
-
+        """Get fair share spec with merged resource weights from capacity."""
         ctx = info.context
-
-        # Get capacity from resource info
-        resource_info = await ctx.adapters.resource_group.get_resource_info(self.name)
-        capacity = resource_info.capacity
-
-        # Merge resource weights with capacity
-        merged = {}
-        uses_default = []
-
-        capacity_keys = {sq.slot_name for sq in capacity}
-        for resource_type in capacity_keys:
-            if resource_type in self._fair_share_spec_data.resource_weights.data:
-                merged[resource_type] = self._fair_share_spec_data.resource_weights.data[
-                    resource_type
-                ]
-            else:
-                merged[resource_type] = self._fair_share_spec_data.default_weight
-                uses_default.append(resource_type)
-
-        # Create merged spec
-        merged_spec = FairShareScalingGroupSpec(
-            half_life_days=self._fair_share_spec_data.half_life_days,
-            lookback_days=self._fair_share_spec_data.lookback_days,
-            decay_unit_days=self._fair_share_spec_data.decay_unit_days,
-            default_weight=self._fair_share_spec_data.default_weight,
-            resource_weights=ResourceSlot(merged),
-        )
-
-        return FairShareScalingGroupSpecGQL.from_model(merged_spec, frozenset(uses_default))
+        merged_spec, uses_default = await ctx.adapters.resource_group.get_fair_share_spec(self.name)
+        return FairShareScalingGroupSpecGQL.from_model(merged_spec, uses_default)
 
     @strawberry.field(  # type: ignore[misc]
         description=(

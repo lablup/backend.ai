@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Iterable
 from datetime import datetime
-from typing import Any, Self
+from typing import Any, Self, cast
 from uuid import UUID
 
 import strawberry
@@ -198,8 +198,8 @@ class ReplicaOrderBy:
 )
 class ModelReplica(PydanticNodeMixin[ReplicaNodeDTO]):
     id: NodeID[str]
-    _session_id: strawberry.Private[UUID]
-    _revision_id: strawberry.Private[UUID]
+    session_id: ID
+    revision_id: ID
     readiness_status: ReadinessStatus = strawberry.field(
         description="Whether the replica has been checked and its health state.",
     )
@@ -219,14 +219,14 @@ class ModelReplica(PydanticNodeMixin[ReplicaNodeDTO]):
     )
     async def session(self, info: Info[StrawberryGQLContext]) -> Session:
         session_global_id = to_global_id(
-            ComputeSessionNode, self._session_id, is_target_graphene_object=True
+            ComputeSessionNode, UUID(str(self.session_id)), is_target_graphene_object=True
         )
         return Session(id=ID(session_global_id))
 
     @strawberry.field
     async def revision(self, info: Info[StrawberryGQLContext]) -> ModelRevision:
         """Resolve revision by ID."""
-        node = await info.context.adapters.deployment.get_revision(self._revision_id)
+        node = await info.context.adapters.deployment.get_revision(UUID(str(self.revision_id)))
         return ModelRevision.from_pydantic(node)
 
     @classmethod
@@ -237,9 +237,10 @@ class ModelReplica(PydanticNodeMixin[ReplicaNodeDTO]):
         node_ids: Iterable[str],
         required: bool = False,
     ) -> Iterable[Self | None]:
-        return await info.context.data_loaders.replica_loader.load_many([
+        results = await info.context.data_loaders.replica_loader.load_many([
             UUID(nid) for nid in node_ids
         ])
+        return cast(list[Self | None], results)
 
     @classmethod
     def from_pydantic(
@@ -251,8 +252,8 @@ class ModelReplica(PydanticNodeMixin[ReplicaNodeDTO]):
     ) -> Self:
         return cls(
             id=ID(str(dto.id)),
-            _revision_id=dto.revision_id,
-            _session_id=dto.session_id,
+            revision_id=ID(str(dto.revision_id)),
+            session_id=ID(str(dto.session_id)),
             readiness_status=ReadinessStatus(dto.readiness_status),
             liveness_status=LivenessStatus(dto.liveness_status),
             activeness_status=ActivenessStatus(dto.activeness_status),
