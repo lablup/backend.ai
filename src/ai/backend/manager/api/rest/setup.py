@@ -1,16 +1,19 @@
 from __future__ import annotations
 
-from typing import Any
+from typing import TYPE_CHECKING
 
 from aiohttp import web
 
 from .app import _mount_registry_tree
 from .routing import RouteRegistry
 
+if TYPE_CHECKING:
+    from ai.backend.manager.dependencies import DependencyResources
+
 
 def setup_api(
     root_app: web.Application,
-    dep_resources: Any,
+    dep_resources: DependencyResources,
     pidx: int,
 ) -> None:
     """Build the full API module tree and mount it on *root_app*.
