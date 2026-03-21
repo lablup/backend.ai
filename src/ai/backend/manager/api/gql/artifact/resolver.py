@@ -278,7 +278,7 @@ async def scan_artifacts(
         source_url = await get_registry_url(
             data_loaders, item.source_registry_id, item.source_registry_type
         )
-        artifacts.append(Artifact.from_dataclass(item, registry_url, source_url))
+        artifacts.append(Artifact.from_artifact_node(item, registry_url, source_url))
     return ScanArtifactsPayload(artifacts=artifacts)
 
 
@@ -369,7 +369,7 @@ async def delegate_scan_artifacts(
 
     results = await info.context.adapters.artifact.delegate_scan(
         delegator_reservoir_id=delegator_reservoir_id,
-        delegatee_target=input.delegatee_target.to_dataclass() if input.delegatee_target else None,
+        delegatee_target=input.delegatee_target.to_pydantic() if input.delegatee_target else None,
         artifact_type=input.artifact_type,
         limit=input.limit,
         order=ModelSortKey.DOWNLOADS,
@@ -384,7 +384,7 @@ async def delegate_scan_artifacts(
         source_url = await get_registry_url(
             data_loaders, item.source_registry_id, item.source_registry_type
         )
-        artifacts.append(Artifact.from_dataclass(item, registry_url, source_url))
+        artifacts.append(Artifact.from_artifact_node(item, registry_url, source_url))
     return DelegateScanArtifactsPayload(artifacts=artifacts)
 
 
@@ -414,7 +414,7 @@ async def delegate_import_artifacts(
         delegator_reservoir_id=UUID(input.delegator_reservoir_id)
         if input.delegator_reservoir_id
         else None,
-        delegatee_target=input.delegatee_target.to_dataclass() if input.delegatee_target else None,
+        delegatee_target=input.delegatee_target.to_pydantic() if input.delegatee_target else None,
         artifact_type=input.artifact_type,
         artifact_revision_ids=[UUID(revision_id) for revision_id in input.artifact_revision_ids],
         force=force,
@@ -575,19 +575,19 @@ async def delete_artifacts(
 async def restore_artifacts(
     input: RestoreArtifactsInput, info: Info[StrawberryGQLContext]
 ) -> RestoreArtifactsPayload:
-    artifact_data_list = await info.context.adapters.artifact.restore(
+    artifact_node_list = await info.context.adapters.artifact.restore(
         artifact_ids=[UUID(id) for id in input.artifact_ids],
     )
 
     data_loaders = info.context.data_loaders
 
     artifacts = []
-    for item in artifact_data_list:
+    for item in artifact_node_list:
         registry_url = await get_registry_url(data_loaders, item.registry_id, item.registry_type)
         source_url = await get_registry_url(
             data_loaders, item.source_registry_id, item.source_registry_type
         )
-        artifacts.append(Artifact.from_dataclass(item, registry_url, source_url))
+        artifacts.append(Artifact.from_artifact_node(item, registry_url, source_url))
 
     return RestoreArtifactsPayload(artifacts=artifacts)
 
@@ -669,7 +669,7 @@ async def scan_artifact_models(
     input: ScanArtifactModelsInput, info: Info[StrawberryGQLContext]
 ) -> ScanArtifactModelsPayload:
     results = await info.context.adapters.artifact.retrieve_models(
-        models=[m.to_dataclass() for m in input.models],
+        models=[m.to_pydantic() for m in input.models],
         registry_id=input.registry_id,
     )
 
@@ -677,7 +677,7 @@ async def scan_artifact_models(
     for data in results:
         edges.extend([
             ArtifactRevisionEdge(
-                node=ArtifactRevision.from_dataclass(revision),
+                node=ArtifactRevision.from_pydantic(revision),
                 cursor=encode_cursor(revision.id),
             )
             for revision in data.revisions

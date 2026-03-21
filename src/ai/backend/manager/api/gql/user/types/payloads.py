@@ -46,14 +46,18 @@ from ai.backend.common.dto.manager.v2.user.response import (
 from ai.backend.common.dto.manager.v2.user.response import (
     UpdateUserPayload as UpdateUserPayloadDTO,
 )
-from ai.backend.manager.api.gql.decorators import BackendAIGQLMeta, gql_node_type, gql_pydantic_type
+from ai.backend.manager.api.gql.decorators import (
+    BackendAIGQLMeta,
+    gql_output_type,
+    gql_pydantic_type,
+)
 
 from .node import UserV2GQL
 
 # Create User Payloads
 
 
-@gql_node_type(
+@gql_output_type(
     BackendAIGQLMeta(
         added_version="26.2.0",
         description="Payload for user creation mutation.",
@@ -92,7 +96,7 @@ class BulkCreateUserV2ErrorGQL:
     message: str = strawberry.field(description="Error message describing the failure.")
 
 
-@gql_node_type(
+@gql_output_type(
     BackendAIGQLMeta(
         added_version="26.2.0",
         description="Payload for bulk user creation mutation.",
@@ -129,7 +133,7 @@ class BulkCreateUsersV2PayloadGQL:
 # Update User Payloads
 
 
-@gql_node_type(
+@gql_output_type(
     BackendAIGQLMeta(
         added_version="26.3.0",
         description="Payload for user update mutation.",
@@ -162,7 +166,7 @@ class BulkUpdateUserV2ErrorGQL:
     message: str = strawberry.field(description="Error message describing the failure.")
 
 
-@gql_node_type(
+@gql_output_type(
     BackendAIGQLMeta(
         added_version="26.3.0",
         description="Payload for bulk user update mutation.",

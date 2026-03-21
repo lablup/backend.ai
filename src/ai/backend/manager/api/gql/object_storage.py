@@ -50,6 +50,7 @@ from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     gql_connection_type,
     gql_node_type,
+    gql_output_type,
     gql_pydantic_input,
     gql_pydantic_type,
 )
@@ -287,7 +288,7 @@ class UpdateObjectStoragePayload:
     object_storage: ObjectStorage
 
 
-@gql_node_type(
+@gql_output_type(
     BackendAIGQLMeta(
         added_version="25.14.0",
         description="Payload for deleting an object storage.",

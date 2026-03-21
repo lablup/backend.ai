@@ -28,6 +28,7 @@ from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     gql_connection_type,
     gql_node_type,
+    gql_output_type,
     gql_pydantic_input,
 )
 from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin
@@ -174,7 +175,7 @@ class DeleteHuggingFaceRegistryInput:
         )
 
 
-@gql_node_type(
+@gql_output_type(
     BackendAIGQLMeta(
         added_version="25.14.0",
         description="Payload for creating a HuggingFace registry.",
@@ -184,7 +185,7 @@ class CreateHuggingFaceRegistryPayload:
     huggingface_registry: HuggingFaceRegistry
 
 
-@gql_node_type(
+@gql_output_type(
     BackendAIGQLMeta(
         added_version="25.14.0",
         description="Payload for updating a HuggingFace registry.",
@@ -194,7 +195,7 @@ class UpdateHuggingFaceRegistryPayload:
     huggingface_registry: HuggingFaceRegistry
 
 
-@gql_node_type(
+@gql_output_type(
     BackendAIGQLMeta(
         added_version="25.14.0",
         description="Payload for deleting a HuggingFace registry.",

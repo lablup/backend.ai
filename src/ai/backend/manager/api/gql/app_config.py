@@ -26,7 +26,7 @@ from ai.backend.common.dto.manager.v2.app_config.response import (
 )
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
-    gql_node_type,
+    gql_output_type,
     gql_pydantic_input,
     gql_pydantic_type,
 )
@@ -36,7 +36,7 @@ from ai.backend.manager.errors.auth import InsufficientPrivilege
 from .types import StrawberryGQLContext
 
 
-@gql_node_type(
+@gql_output_type(
     BackendAIGQLMeta(
         added_version="25.16.0",
         description="App configuration data.",
@@ -115,7 +115,7 @@ class DeleteUserConfigInput:
     user_id: ID | None = None
 
 
-@gql_node_type(
+@gql_output_type(
     BackendAIGQLMeta(
         added_version="25.16.0",
         description="Payload returned after upserting domain-level app configuration. Contains the resulting configuration that was stored.",
@@ -127,7 +127,7 @@ class UpsertDomainConfigPayload:
     app_config: AppConfig
 
 
-@gql_node_type(
+@gql_output_type(
     BackendAIGQLMeta(
         added_version="25.16.0",
         description="Payload returned after upserting user-level app configuration. Contains the resulting configuration that was stored.",

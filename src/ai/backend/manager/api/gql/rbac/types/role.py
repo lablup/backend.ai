@@ -106,6 +106,7 @@ from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     gql_connection_type,
     gql_node_type,
+    gql_output_type,
     gql_pydantic_input,
 )
 from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin
@@ -750,7 +751,7 @@ class PurgeRoleInput:
 # ==================== Payload Types ====================
 
 
-@gql_node_type(
+@gql_output_type(
     BackendAIGQLMeta(added_version="26.3.0", description="Payload for delete role mutation."),
     name="DeleteRolePayload",
 )
@@ -764,7 +765,7 @@ class DeleteRolePayload:
         return cls(id=ID(str(instance.id)))
 
 
-@gql_node_type(
+@gql_output_type(
     BackendAIGQLMeta(added_version="26.3.0", description="Payload for purge role mutation."),
     name="PurgeRolePayload",
 )
@@ -778,7 +779,7 @@ class PurgeRolePayload:
         return cls(id=ID(str(instance.id)))
 
 
-@gql_node_type(
+@gql_output_type(
     BackendAIGQLMeta(
         added_version="26.3.0",
         description="Error information for a failed user in bulk role assignment.",
@@ -796,7 +797,7 @@ class BulkAssignRoleErrorGQL:
         return cls(user_id=instance.user_id, message=instance.message)
 
 
-@gql_node_type(
+@gql_output_type(
     BackendAIGQLMeta(
         added_version="26.3.0", description="Payload for bulk role assignment mutation."
     ),
@@ -818,7 +819,7 @@ class BulkAssignRolePayloadGQL:
         )
 
 
-@gql_node_type(
+@gql_output_type(
     BackendAIGQLMeta(
         added_version="26.3.0",
         description="Error information for a failed user in bulk role revocation.",
@@ -836,7 +837,7 @@ class BulkRevokeRoleErrorGQL:
         return cls(user_id=instance.user_id, message=instance.message)
 
 
-@gql_node_type(
+@gql_output_type(
     BackendAIGQLMeta(
         added_version="26.3.0", description="Payload for bulk role revocation mutation."
     ),

@@ -15,7 +15,6 @@ from ai.backend.common.data.artifact.types import (
     VerificationStepResult,
     VerifierResult,
 )
-from ai.backend.common.data.storage.registries.types import ModelTarget as ModelTargetData
 from ai.backend.common.dto.manager.v2.artifact.request import (
     AdminSearchArtifactRevisionsInput,
     ArtifactGQLFilterInputDTO,
@@ -112,6 +111,7 @@ from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     gql_connection_type,
     gql_node_type,
+    gql_output_type,
     gql_pydantic_input,
     gql_pydantic_type,
 )
@@ -120,15 +120,12 @@ from ai.backend.manager.api.gql.types import GQLOrderBy, StrawberryGQLContext
 from ai.backend.manager.api.gql.utils import dedent_strip
 from ai.backend.manager.data.artifact.types import (
     ArtifactAvailability,
-    ArtifactData,
     ArtifactOrderField,
     ArtifactRemoteStatus,
-    ArtifactRevisionData,
     ArtifactRevisionOrderField,
     ArtifactStatus,
     ArtifactType,
 )
-from ai.backend.manager.data.artifact.types import DelegateeTarget as DelegateeTargetData
 from ai.backend.manager.defs import ARTIFACT_MAX_SCAN_LIMIT
 from ai.backend.manager.errors.artifact_registry import ArtifactRegistryNotFoundError
 from ai.backend.manager.models.artifact_revision.conditions import ArtifactRevisionConditions
@@ -167,7 +164,7 @@ class ArtifactVerifierMetadataEntryGQL:
     value: strawberry.auto
 
 
-@gql_node_type(
+@gql_output_type(
     BackendAIGQLMeta(
         added_version="26.1.0",
         description="A collection of metadata from an artifact verifier. Contains key-value pairs providing additional information about the verification.",
@@ -188,7 +185,7 @@ class ArtifactVerifierMetadataGQL:
         return cls(entries=entries)
 
 
-@gql_node_type(
+@gql_output_type(
     BackendAIGQLMeta(
         added_version="25.17.0",
         description="Result from a single malware verifier containing scan results and metadata. Each verifier scans the artifact for potential security issues and reports findings including infected file count, scan time, and any errors encountered.",
@@ -225,7 +222,7 @@ class ArtifactVerifierGQLResult:
         )
 
 
-@gql_node_type(
+@gql_output_type(
     BackendAIGQLMeta(
         added_version="25.17.0",
         description="Entry for a single verifier's result in the verification results. Associates a verifier name with its scan results.",
@@ -248,7 +245,7 @@ class ArtifactVerifierGQLResultEntry:
         )
 
 
-@gql_node_type(
+@gql_output_type(
     BackendAIGQLMeta(
         added_version="25.17.0",
         description="Complete verification result containing results from all configured verifiers. Artifacts undergo malware scanning through multiple verifiers after being imported. This type aggregates results from all verifiers that were run on the artifact.",
@@ -487,8 +484,8 @@ class DelegateeTarget:
     delegatee_reservoir_id: ID
     target_registry_id: ID
 
-    def to_dataclass(self) -> DelegateeTargetData:
-        return DelegateeTargetData(
+    def to_pydantic(self) -> DelegateeTargetInputDTO:
+        return DelegateeTargetInputDTO(
             delegatee_reservoir_id=uuid.UUID(self.delegatee_reservoir_id),
             target_registry_id=uuid.UUID(self.target_registry_id),
         )
@@ -697,8 +694,8 @@ class ModelTarget:
     model_id: str
     revision: str | None = None
 
-    def to_dataclass(self) -> ModelTargetData:
-        return ModelTargetData(model_id=self.model_id, revision=self.revision)
+    def to_pydantic(self) -> ModelTargetInputDTO:
+        return ModelTargetInputDTO(model_id=self.model_id, revision=self.revision)
 
 
 @gql_pydantic_input(
@@ -748,22 +745,6 @@ class Artifact(PydanticNodeMixin[ArtifactNode]):
     scanned_at: datetime
     updated_at: datetime
     availability: ArtifactAvailability
-
-    @classmethod
-    def from_dataclass(cls, data: ArtifactData, registry_url: str, source_url: str) -> Self:
-        return cls(
-            id=ID(str(data.id)),
-            name=data.name,
-            type=ArtifactType(data.type),
-            description=data.description,
-            registry=SourceInfo(name=data.registry_type.value, url=registry_url),
-            source=SourceInfo(name=data.source_registry_type.value, url=source_url),
-            readonly=data.readonly,
-            extra=data.extra,
-            scanned_at=data.scanned_at,
-            updated_at=data.updated_at,
-            availability=data.availability,
-        )
 
     @classmethod
     def from_artifact_node(cls, node: ArtifactNode, registry_url: str, source_url: str) -> Self:
@@ -894,7 +875,7 @@ class ArtifactRevision(PydanticNodeMixin[ArtifactRevisionNode]):
             status=ArtifactStatus(dto.status.value),
             remote_status=ArtifactRemoteStatus(dto.remote_status) if dto.remote_status else None,
             version=dto.version,
-            readme=None,
+            readme=dto.readme,
             size=ByteSize(dto.size) if dto.size is not None else None,
             created_at=dto.created_at,
             updated_at=dto.updated_at,
@@ -917,25 +898,6 @@ class ArtifactRevision(PydanticNodeMixin[ArtifactRevisionNode]):
             uuid.UUID(nid) for nid in node_ids
         ])
         return cast(list[Self | None], results)
-
-    @classmethod
-    def from_dataclass(cls, data: ArtifactRevisionData) -> Self:
-        return cls(
-            id=ID(str(data.id)),
-            status=ArtifactStatus(data.status),
-            remote_status=ArtifactRemoteStatus(data.remote_status) if data.remote_status else None,
-            readme=data.readme,
-            version=data.version,
-            size=ByteSize(data.size) if data.size is not None else None,
-            created_at=data.created_at,
-            updated_at=data.updated_at,
-            digest=data.digest,
-            verification_result=ArtifactVerificationGQLResult.from_pydantic(
-                data.verification_result
-            )
-            if data.verification_result
-            else None,
-        )
 
     @strawberry.field
     async def artifact(self, info: Info[StrawberryGQLContext]) -> Artifact:
@@ -1035,7 +997,7 @@ class ArtifactImportProgressUpdatedPayload:
     status: ArtifactStatus = strawberry.field(description="Current import status.")
 
 
-@gql_node_type(
+@gql_output_type(
     BackendAIGQLMeta(
         added_version="25.14.0",
         description="Response payload for artifact scanning operations. Contains the list of artifacts discovered during scanning of external registries. These artifacts are registered with SCANNED status and can be imported for actual use.",
@@ -1045,7 +1007,7 @@ class ScanArtifactsPayload:
     artifacts: list[Artifact]
 
 
-@gql_node_type(
+@gql_output_type(
     BackendAIGQLMeta(
         added_version="25.15.0",
         description="Response payload for delegated artifact scanning operation. Contains the list of artifacts discovered during the scan of a reservoir registry's remote registry. These artifacts are now available for import or direct use.",
@@ -1057,7 +1019,7 @@ class DelegateScanArtifactsPayload:
     )
 
 
-@gql_node_type(
+@gql_output_type(
     BackendAIGQLMeta(
         added_version="25.14.0",
         description="Represents a background task for importing an artifact revision. Contains the task ID for monitoring progress and the associated artifact revision being imported from external registries.",
@@ -1069,7 +1031,7 @@ class ArtifactRevisionImportTask:
 
 
 # Mutation Payloads
-@gql_node_type(
+@gql_output_type(
     BackendAIGQLMeta(
         added_version="25.14.0",
         description="Response payload for artifact import operations. Contains the imported artifact revisions and their associated background tasks. Tasks can be monitored to track the import progress from SCANNED to AVAILABLE status.",
@@ -1080,7 +1042,7 @@ class ImportArtifactsPayload:
     tasks: list[ArtifactRevisionImportTask]
 
 
-@gql_node_type(
+@gql_output_type(
     BackendAIGQLMeta(
         added_version="25.15.0",
         description="Response payload for delegated artifact import operation. Contains the imported artifact revisions and associated background tasks. The tasks can be monitored to track the progress of the import operation.",
@@ -1095,7 +1057,7 @@ class DelegateImportArtifactsPayload:
     )
 
 
-@gql_node_type(
+@gql_output_type(
     BackendAIGQLMeta(
         added_version="25.14.0",
         description="Response payload for artifact update operations. Returns the updated artifact with modified metadata properties.",
@@ -1105,7 +1067,7 @@ class UpdateArtifactPayload:
     artifact: Artifact
 
 
-@gql_node_type(
+@gql_output_type(
     BackendAIGQLMeta(
         added_version="25.14.0",
         description="Response payload for artifact revision cleanup operations. Contains the cleaned artifact revisions that have had their stored data removed, transitioning them back to SCANNED status to free storage space.",
@@ -1115,7 +1077,7 @@ class CleanupArtifactRevisionsPayload:
     artifact_revisions: ArtifactRevisionConnection
 
 
-@gql_node_type(
+@gql_output_type(
     BackendAIGQLMeta(
         added_version="25.14.0",
         description="Response payload for artifact revision approval operations. Contains the approved artifact revision. Admin-only operation.",
@@ -1125,7 +1087,7 @@ class ApproveArtifactPayload:
     artifact_revision: ArtifactRevision
 
 
-@gql_node_type(
+@gql_output_type(
     BackendAIGQLMeta(
         added_version="25.14.0",
         description="Response payload for artifact revision rejection operations. Contains the rejected artifact revision. Admin-only operation.",
@@ -1135,7 +1097,7 @@ class RejectArtifactPayload:
     artifact_revision: ArtifactRevision
 
 
-@gql_node_type(
+@gql_output_type(
     BackendAIGQLMeta(
         added_version="25.14.0",
         description="Response payload for canceling artifact import operations. Contains the artifact revision whose import was canceled, reverting its status back to SCANNED.",
@@ -1145,7 +1107,7 @@ class CancelImportArtifactPayload:
     artifact_revision: ArtifactRevision
 
 
-@gql_node_type(
+@gql_output_type(
     BackendAIGQLMeta(
         added_version="25.14.0",
         description="Payload for artifact status change subscription events. Provides real-time notifications when artifact revision statuses change during import, cleanup, or other operations.",
@@ -1155,7 +1117,7 @@ class ArtifactStatusChangedPayload:
     artifact_revision: ArtifactRevision
 
 
-@gql_node_type(
+@gql_output_type(
     BackendAIGQLMeta(
         added_version="25.14.0",
         description="Response payload for batch model scanning operations. Contains the artifact revisions discovered during detailed scanning of specific models, including README content and file size information.",
@@ -1165,7 +1127,7 @@ class ScanArtifactModelsPayload:
     artifact_revision: ArtifactRevisionConnection
 
 
-@gql_node_type(
+@gql_output_type(
     BackendAIGQLMeta(
         added_version="25.15.0",
         description="Response payload for artifact deletion operations. Contains the artifacts that were soft-deleted. These can be restored later.",
@@ -1175,7 +1137,7 @@ class DeleteArtifactsPayload:
     artifacts: list[Artifact]
 
 
-@gql_node_type(
+@gql_output_type(
     BackendAIGQLMeta(
         added_version="25.15.0",
         description="Response payload for artifact restoration operations. Contains the artifacts that were restored from soft-deleted state.",

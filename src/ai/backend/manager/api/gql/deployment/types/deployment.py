@@ -95,6 +95,7 @@ from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     gql_connection_type,
     gql_node_type,
+    gql_output_type,
     gql_pydantic_input,
     gql_pydantic_type,
 )
@@ -159,7 +160,7 @@ DeploymentStatusGQL: type[ModelDeploymentStatus] = strawberry.enum(
 )
 
 
-@gql_node_type(
+@gql_output_type(
     BackendAIGQLMeta(
         added_version="25.19.0",
         description="Represents the deployment strategy configuration that determines how updates are rolled out to replicas (e.g., rolling update, blue-green).",
@@ -169,7 +170,7 @@ class DeploymentStrategyGQL:
     type: DeploymentStrategyTypeGQL
 
 
-@gql_node_type(
+@gql_output_type(
     BackendAIGQLMeta(
         added_version="25.19.0",
         description="Represents the current replica state of a deployment, including the desired replica count and access to the list of active replicas.",
@@ -179,7 +180,7 @@ class ReplicaState:
     desired_replica_count: int
 
 
-@gql_node_type(
+@gql_output_type(
     BackendAIGQLMeta(
         added_version="25.19.0",
         description="Contains metadata information for a model deployment including its name, status, tags, and timestamps. Also provides access to the associated project and domain.",
@@ -209,7 +210,7 @@ class ModelDeploymentMetadata:
         return Domain(id=ID(domain_global_id))
 
 
-@gql_node_type(
+@gql_output_type(
     BackendAIGQLMeta(
         added_version="25.19.0",
         description="Provides network access configuration for a model deployment, including the endpoint URL, preferred domain name, and public access settings. Also manages access tokens for authentication.",

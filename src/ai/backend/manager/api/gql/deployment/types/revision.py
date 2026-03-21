@@ -92,6 +92,7 @@ from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     gql_connection_type,
     gql_node_type,
+    gql_output_type,
     gql_pydantic_input,
     gql_pydantic_type,
 )
@@ -123,7 +124,7 @@ MountPermission: type[CommonMountPermission] = strawberry.enum(
 )
 
 
-@gql_node_type(
+@gql_output_type(
     BackendAIGQLMeta(
         added_version="26.1.0",
         description="A single environment variable entry with name and value.",
@@ -139,7 +140,7 @@ class EnvironmentVariableEntryGQL:
     value: str = strawberry.field(description="Environment variable value.")
 
 
-@gql_node_type(
+@gql_output_type(
     BackendAIGQLMeta(
         added_version="26.1.0", description="A collection of environment variable entries."
     ),
@@ -153,7 +154,7 @@ class EnvironmentVariablesGQL:
     )
 
 
-@gql_node_type(
+@gql_output_type(
     BackendAIGQLMeta(
         added_version="25.19.0",
         description="Configuration for mounting the model data into the inference container. Specifies the virtual folder, mount destination, and model definition path.",
@@ -176,7 +177,7 @@ class ModelMountConfig:
         return VFolder(id=ID(vfolder_global_id))
 
 
-@gql_node_type(
+@gql_output_type(
     BackendAIGQLMeta(
         added_version="25.19.0",
         description="Runtime configuration for the inference framework. Includes the runtime variant, framework-specific configuration, and environment variables.",
@@ -196,7 +197,7 @@ class ModelRuntimeConfig:
     )
 
 
-@gql_node_type(
+@gql_output_type(
     BackendAIGQLMeta(
         added_version="25.19.0",
         description="Compute resource configuration for the deployment. Specifies CPU, memory, GPU allocations and additional resource options.",
@@ -221,7 +222,7 @@ class ResourceConfig:
         return ResourceGroup(id=ID(global_id))
 
 
-@gql_node_type(
+@gql_output_type(
     BackendAIGQLMeta(
         added_version="25.19.0",
         description="Cluster configuration for model deployment replicas. Defines the clustering mode and number of replicas.",

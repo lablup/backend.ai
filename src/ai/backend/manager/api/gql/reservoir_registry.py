@@ -25,6 +25,7 @@ from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     gql_connection_type,
     gql_node_type,
+    gql_output_type,
     gql_pydantic_input,
 )
 from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin
@@ -187,7 +188,7 @@ class DeleteReservoirRegistryInput:
         )
 
 
-@gql_node_type(
+@gql_output_type(
     BackendAIGQLMeta(
         added_version="25.14.0",
         description="Payload for creating a reservoir registry.",
@@ -197,7 +198,7 @@ class CreateReservoirRegistryPayload:
     reservoir: ReservoirRegistry
 
 
-@gql_node_type(
+@gql_output_type(
     BackendAIGQLMeta(
         added_version="25.14.0",
         description="Payload for updating a reservoir registry.",
@@ -207,7 +208,7 @@ class UpdateReservoirRegistryPayload:
     reservoir: ReservoirRegistry
 
 
-@gql_node_type(
+@gql_output_type(
     BackendAIGQLMeta(
         added_version="25.14.0",
         description="Payload for deleting a reservoir registry.",

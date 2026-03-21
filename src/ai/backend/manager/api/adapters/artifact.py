@@ -6,7 +6,8 @@ from collections.abc import Sequence
 from uuid import UUID
 
 from ai.backend.common.api_handlers import Sentinel
-from ai.backend.common.data.storage.registries.types import ModelSortKey, ModelTarget
+from ai.backend.common.data.storage.registries.types import ModelSortKey
+from ai.backend.common.data.storage.registries.types import ModelTarget as StorageModelTarget
 from ai.backend.common.dto.manager.v2.artifact.request import (
     AdminSearchArtifactRevisionsInput,
     AdminSearchArtifactsGQLInput,
@@ -19,7 +20,9 @@ from ai.backend.common.dto.manager.v2.artifact.request import (
     ArtifactRevisionGQLOrderByInputDTO,
     ArtifactRevisionRemoteStatusFilterDTO,
     ArtifactRevisionStatusFilterDTO,
+    DelegateeTargetInput,
     DeleteArtifactsInput,
+    ModelTargetInput,
     UpdateArtifactInput,
 )
 from ai.backend.common.dto.manager.v2.artifact.response import (
@@ -47,7 +50,6 @@ from ai.backend.manager.data.artifact.types import (
     ArtifactData,
     ArtifactDataWithRevisions,
     ArtifactRevisionData,
-    DelegateeTarget,
 )
 from ai.backend.manager.data.artifact.types import (
     ArtifactRemoteStatus as DataArtifactRemoteStatus,
@@ -57,6 +59,9 @@ from ai.backend.manager.data.artifact.types import (
 )
 from ai.backend.manager.data.artifact.types import (
     ArtifactType as DataArtifactType,
+)
+from ai.backend.manager.data.artifact.types import (
+    DelegateeTarget as ServiceDelegateeTarget,
 )
 from ai.backend.manager.models.artifact.conditions import ArtifactConditions
 from ai.backend.manager.models.artifact.orders import (
@@ -304,7 +309,7 @@ class ArtifactAdapter(BaseAdapter):
         limit: int | None,
         order: ModelSortKey | None,
         search: str | None,
-    ) -> list[ArtifactDataWithRevisions]:
+    ) -> list[ArtifactNode]:
         """Scan external registries to discover available artifacts."""
         action_result: ScanArtifactsActionResult = (
             await self._processors.artifact.scan.wait_for_complete(
@@ -317,7 +322,7 @@ class ArtifactAdapter(BaseAdapter):
                 )
             )
         )
-        return action_result.result
+        return [self._data_to_dto(item) for item in action_result.result]
 
     async def import_revision(
         self,
@@ -340,18 +345,26 @@ class ArtifactAdapter(BaseAdapter):
     async def delegate_scan(
         self,
         delegator_reservoir_id: UUID | None,
-        delegatee_target: DelegateeTarget | None,
+        delegatee_target: DelegateeTargetInput | None,
         artifact_type: DataArtifactType | None,
         limit: int | None,
         order: ModelSortKey | None,
         search: str | None,
-    ) -> list[ArtifactDataWithRevisions]:
+    ) -> list[ArtifactNode]:
         """Trigger artifact scanning on a remote reservoir registry."""
+        service_target = (
+            ServiceDelegateeTarget(
+                delegatee_reservoir_id=delegatee_target.delegatee_reservoir_id,
+                target_registry_id=delegatee_target.target_registry_id,
+            )
+            if delegatee_target is not None
+            else None
+        )
         action_result: DelegateScanArtifactsActionResult = (
             await self._processors.artifact.delegate_scan.wait_for_complete(
                 DelegateScanArtifactsAction(
                     delegator_reservoir_id=delegator_reservoir_id,
-                    delegatee_target=delegatee_target,
+                    delegatee_target=service_target,
                     artifact_type=artifact_type,
                     limit=limit,
                     order=order,
@@ -359,12 +372,12 @@ class ArtifactAdapter(BaseAdapter):
                 )
             )
         )
-        return action_result.result
+        return [self._data_to_dto(item) for item in action_result.result]
 
     async def delegate_import_batch(
         self,
         delegator_reservoir_id: UUID | None,
-        delegatee_target: DelegateeTarget | None,
+        delegatee_target: DelegateeTargetInput | None,
         artifact_type: DataArtifactType | None,
         artifact_revision_ids: list[UUID],
         force: bool,
@@ -373,10 +386,18 @@ class ArtifactAdapter(BaseAdapter):
 
         Returns a tuple of (revision_nodes, task_ids).
         """
+        service_target = (
+            ServiceDelegateeTarget(
+                delegatee_reservoir_id=delegatee_target.delegatee_reservoir_id,
+                target_registry_id=delegatee_target.target_registry_id,
+            )
+            if delegatee_target is not None
+            else None
+        )
         action_result = await self._processors.artifact_revision.delegate_import_revision_batch.wait_for_complete(
             DelegateImportArtifactRevisionBatchAction(
                 delegator_reservoir_id=delegator_reservoir_id,
-                delegatee_target=delegatee_target,
+                delegatee_target=service_target,
                 artifact_type=artifact_type,
                 artifact_revision_ids=artifact_revision_ids,
                 force=force,
@@ -392,14 +413,14 @@ class ArtifactAdapter(BaseAdapter):
         )
         return self._revision_data_to_dto(action_result.result)
 
-    async def restore(self, artifact_ids: list[UUID]) -> list[ArtifactData]:
+    async def restore(self, artifact_ids: list[UUID]) -> list[ArtifactNode]:
         """Restore previously deleted artifacts."""
         action_result: RestoreArtifactsActionResult = (
             await self._processors.artifact.restore_artifacts.wait_for_complete(
                 RestoreArtifactsAction(artifact_ids=artifact_ids)
             )
         )
-        return action_result.artifacts
+        return [self._data_to_dto(item) for item in action_result.artifacts]
 
     async def cancel_import(self, artifact_revision_id: UUID) -> ArtifactRevisionNode:
         """Cancel an in-progress artifact import and revert to SCANNED status."""
@@ -424,16 +445,19 @@ class ArtifactAdapter(BaseAdapter):
 
     async def retrieve_models(
         self,
-        models: list[ModelTarget],
+        models: list[ModelTargetInput],
         registry_id: UUID | None,
-    ) -> list[ArtifactDataWithRevisions]:
+    ) -> list[ArtifactNode]:
         """Perform detailed scanning of specific models from external registries."""
+        storage_models = [
+            StorageModelTarget(model_id=m.model_id, revision=m.revision) for m in models
+        ]
         action_result: RetrieveModelsActionResult = (
             await self._processors.artifact.retrieve_models.wait_for_complete(
-                RetrieveModelsAction(models=models, registry_id=registry_id)
+                RetrieveModelsAction(models=storage_models, registry_id=registry_id)
             )
         )
-        return action_result.result
+        return [self._data_with_revisions_to_dto(item) for item in action_result.result]
 
     def build_querier(self, input: AdminSearchArtifactsInput) -> BatchQuerier:
         """Build a BatchQuerier from the search input DTO."""
@@ -774,4 +798,24 @@ class ArtifactAdapter(BaseAdapter):
             remote_status=data.remote_status,
             created_at=data.created_at,
             updated_at=data.updated_at,
+            readme=data.readme,
+        )
+
+    @staticmethod
+    def _data_with_revisions_to_dto(data: ArtifactDataWithRevisions) -> ArtifactNode:
+        return ArtifactNode(
+            id=data.id,
+            name=data.name,
+            type=ArtifactType(data.type),
+            description=data.description,
+            registry_id=data.registry_id,
+            source_registry_id=data.source_registry_id,
+            registry_type=data.registry_type,
+            source_registry_type=data.source_registry_type,
+            availability=ArtifactAvailability(data.availability),
+            scanned_at=data.scanned_at,
+            updated_at=data.updated_at,
+            readonly=data.readonly,
+            extra=data.extra,
+            revisions=[ArtifactAdapter._revision_data_to_dto(r) for r in data.revisions],
         )

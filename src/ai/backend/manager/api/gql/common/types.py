@@ -20,7 +20,7 @@ from ai.backend.common.types import (
 )
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
-    gql_node_type,
+    gql_output_type,
     gql_pydantic_input,
 )
 
@@ -187,7 +187,7 @@ class ServicePortProtocolGQL(StrEnum):
 # ========== Resource Options Types ==========
 
 
-@gql_node_type(
+@gql_output_type(
     BackendAIGQLMeta(
         added_version="26.1.0",
         description=(
@@ -204,7 +204,7 @@ class ResourceOptsEntryGQL:
     value: str = strawberry.field(description="The value for this resource option. Example: '64m'.")
 
 
-@gql_node_type(
+@gql_output_type(
     BackendAIGQLMeta(
         added_version="26.1.0",
         description=(
@@ -271,7 +271,7 @@ class ResourceOptsInput:
 # ========== Service Port Types ==========
 
 
-@gql_node_type(
+@gql_output_type(
     BackendAIGQLMeta(
         added_version="26.2.0",
         description=(
@@ -310,7 +310,7 @@ class ServicePortEntryGQL:
         )
 
 
-@gql_node_type(
+@gql_output_type(
     BackendAIGQLMeta(
         added_version="26.2.0",
         description=(

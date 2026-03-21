@@ -58,6 +58,7 @@ from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     gql_connection_type,
     gql_node_type,
+    gql_output_type,
     gql_pydantic_input,
     gql_pydantic_type,
 )
@@ -243,7 +244,7 @@ class ImageV2RequirementsInfoGQL:
     )
 
 
-@gql_node_type(
+@gql_output_type(
     BackendAIGQLMeta(
         added_version="26.2.0",
         description="Permission information for an image. Contains the list of permissions the current user has on this image.",

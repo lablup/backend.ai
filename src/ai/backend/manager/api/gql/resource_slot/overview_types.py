@@ -6,12 +6,12 @@ from typing import Self
 
 import strawberry
 
-from ai.backend.manager.api.gql.decorators import BackendAIGQLMeta, gql_node_type
+from ai.backend.manager.api.gql.decorators import BackendAIGQLMeta, gql_output_type
 from ai.backend.manager.api.gql.fair_share.types.common import ResourceSlotGQL
 from ai.backend.manager.data.resource_slot.types import ResourceOccupancy
 
 
-@gql_node_type(
+@gql_output_type(
     BackendAIGQLMeta(
         added_version="26.4.0",
         description=(

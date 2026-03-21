@@ -48,6 +48,7 @@ from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     gql_connection_type,
     gql_node_type,
+    gql_output_type,
     gql_pydantic_input,
 )
 from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin
@@ -382,7 +383,7 @@ class DeletePermissionInput:
 # ==================== Payload Types ====================
 
 
-@gql_node_type(
+@gql_output_type(
     BackendAIGQLMeta(added_version="26.3.0", description="Payload for delete permission mutation."),
     name="DeletePermissionPayload",
 )
@@ -399,7 +400,7 @@ class DeletePermissionPayload:
 # ==================== Connection Types ====================
 
 
-@gql_node_type(
+@gql_output_type(
     BackendAIGQLMeta(
         added_version="26.3.0",
         description="Valid scope-entity type combination for RBAC permissions.",

@@ -75,6 +75,7 @@ class ArtifactRevisionNode(BaseResponseModel):
     verification_result: VerificationStepResult | None = Field(
         default=None, description="Verification result from all verifiers"
     )
+    readme: str | None = Field(default=None, description="README content of the revision")
 
 
 class ArtifactNode(BaseResponseModel):
