@@ -6,7 +6,11 @@ from collections.abc import Sequence
 from uuid import UUID
 
 from ai.backend.common.api_handlers import Sentinel
-from ai.backend.common.data.notification import NotificationChannelType, WebhookSpec
+from ai.backend.common.data.notification import (
+    NotificationChannelType,
+    NotificationRuleType,
+    WebhookSpec,
+)
 from ai.backend.common.data.notification.types import EmailSpec
 from ai.backend.common.data.permission.types import RBACElementType
 from ai.backend.common.dto.manager.v2.notification.request import (
@@ -44,7 +48,9 @@ from ai.backend.common.dto.manager.v2.notification.response import (
 from ai.backend.common.dto.manager.v2.notification.types import (
     EmailSpecInfo,
     NotificationChannelOrderField,
+    NotificationChannelTypeDTO,
     NotificationRuleOrderField,
+    NotificationRuleTypeDTO,
     OrderDirection,
     WebhookSpecInfo,
 )
@@ -171,7 +177,7 @@ class NotificationAdapter(BaseAdapter):
             spec=NotificationChannelCreatorSpec(
                 name=input.name,
                 description=input.description,
-                channel_type=input.channel_type,
+                channel_type=NotificationChannelType(input.channel_type.value),
                 spec=input.spec,
                 enabled=input.enabled,
                 created_by=created_by,
@@ -239,7 +245,7 @@ class NotificationAdapter(BaseAdapter):
             spec=NotificationRuleCreatorSpec(
                 name=input.name,
                 description=input.description,
-                rule_type=input.rule_type,
+                rule_type=NotificationRuleType(input.rule_type.value),
                 channel_id=input.channel_id,
                 message_template=input.message_template,
                 enabled=input.enabled,
@@ -400,7 +406,7 @@ class NotificationAdapter(BaseAdapter):
             id=data.id,
             name=data.name,
             description=data.description,
-            channel_type=data.channel_type,
+            channel_type=NotificationChannelTypeDTO(data.channel_type.value),
             spec=spec_info,
             enabled=data.enabled,
             created_at=data.created_at,
@@ -415,7 +421,7 @@ class NotificationAdapter(BaseAdapter):
             id=data.id,
             name=data.name,
             description=data.description,
-            rule_type=data.rule_type,
+            rule_type=NotificationRuleTypeDTO(data.rule_type.value),
             channel=cls._channel_data_to_dto(data.channel),
             message_template=data.message_template,
             enabled=data.enabled,
@@ -490,15 +496,29 @@ class NotificationAdapter(BaseAdapter):
         if f.channel_type is not None:
             ct = f.channel_type
             if ct.equals is not None:
-                conditions.append(NotificationChannelConditions.by_channel_type_equals(ct.equals))
+                conditions.append(
+                    NotificationChannelConditions.by_channel_type_equals(
+                        NotificationChannelType(ct.equals.value)
+                    )
+                )
             if ct.in_ is not None:
-                conditions.append(NotificationChannelConditions.by_channel_types(list(ct.in_)))
+                conditions.append(
+                    NotificationChannelConditions.by_channel_types([
+                        NotificationChannelType(t.value) for t in ct.in_
+                    ])
+                )
             if ct.not_equals is not None:
                 conditions.append(
-                    NotificationChannelConditions.by_channel_type_not_equals(ct.not_equals)
+                    NotificationChannelConditions.by_channel_type_not_equals(
+                        NotificationChannelType(ct.not_equals.value)
+                    )
                 )
             if ct.not_in is not None:
-                conditions.append(NotificationChannelConditions.by_channel_type_not_in(ct.not_in))
+                conditions.append(
+                    NotificationChannelConditions.by_channel_type_not_in([
+                        NotificationChannelType(t.value) for t in ct.not_in
+                    ])
+                )
 
         if f.enabled is not None:
             conditions.append(NotificationChannelConditions.by_enabled(f.enabled))
@@ -556,13 +576,29 @@ class NotificationAdapter(BaseAdapter):
         if f.rule_type is not None:
             rt = f.rule_type
             if rt.equals is not None:
-                conditions.append(NotificationRuleConditions.by_rule_type_equals(rt.equals))
+                conditions.append(
+                    NotificationRuleConditions.by_rule_type_equals(
+                        NotificationRuleType(rt.equals.value)
+                    )
+                )
             if rt.in_ is not None:
-                conditions.append(NotificationRuleConditions.by_rule_types(list(rt.in_)))
+                conditions.append(
+                    NotificationRuleConditions.by_rule_types([
+                        NotificationRuleType(t.value) for t in rt.in_
+                    ])
+                )
             if rt.not_equals is not None:
-                conditions.append(NotificationRuleConditions.by_rule_type_not_equals(rt.not_equals))
+                conditions.append(
+                    NotificationRuleConditions.by_rule_type_not_equals(
+                        NotificationRuleType(rt.not_equals.value)
+                    )
+                )
             if rt.not_in is not None:
-                conditions.append(NotificationRuleConditions.by_rule_type_not_in(rt.not_in))
+                conditions.append(
+                    NotificationRuleConditions.by_rule_type_not_in([
+                        NotificationRuleType(t.value) for t in rt.not_in
+                    ])
+                )
 
         if f.enabled is not None:
             conditions.append(NotificationRuleConditions.by_enabled(f.enabled))

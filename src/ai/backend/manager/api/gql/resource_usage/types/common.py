@@ -4,17 +4,17 @@ from __future__ import annotations
 
 from datetime import date, datetime
 from enum import StrEnum
-from typing import Self
 
 import strawberry
 
 from ai.backend.common.dto.manager.v2.resource_usage.response import (
     UsageBucketMetadataNode as UsageBucketMetadataNodeDTO,
 )
-from ai.backend.manager.api.gql.decorators import BackendAIGQLMeta, gql_output_type
+from ai.backend.manager.api.gql.decorators import BackendAIGQLMeta, gql_from_pydantic_type
+from ai.backend.manager.api.gql.pydantic_compat import PydanticOutputMixin
 
 
-@gql_output_type(
+@gql_from_pydantic_type(
     BackendAIGQLMeta(
         added_version="26.1.0",
         description=(
@@ -24,7 +24,7 @@ from ai.backend.manager.api.gql.decorators import BackendAIGQLMeta, gql_output_t
     ),
     name="UsageBucketMetadata",
 )
-class UsageBucketMetadataGQL:
+class UsageBucketMetadataGQL(PydanticOutputMixin[UsageBucketMetadataNodeDTO]):
     period_start: date = strawberry.field(
         description="Start date of the usage measurement period (inclusive)."
     )
@@ -38,16 +38,6 @@ class UsageBucketMetadataGQL:
     updated_at: datetime = strawberry.field(
         description="Timestamp when this record was last updated."
     )
-
-    @classmethod
-    def from_pydantic(cls, dto: UsageBucketMetadataNodeDTO) -> Self:
-        return cls(
-            period_start=dto.period_start,
-            period_end=dto.period_end,
-            decay_unit_days=dto.decay_unit_days,
-            created_at=dto.created_at,
-            updated_at=dto.updated_at,
-        )
 
 
 @strawberry.enum(

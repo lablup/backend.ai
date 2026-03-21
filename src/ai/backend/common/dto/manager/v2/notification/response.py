@@ -10,12 +10,13 @@ from uuid import UUID
 from pydantic import Field
 
 from ai.backend.common.api_handlers import BaseResponseModel
-from ai.backend.common.data.notification.types import (
-    NotificationChannelType,
-    NotificationRuleType,
-)
 
-from .types import EmailSpecInfo, WebhookSpecInfo
+from .types import (
+    EmailSpecInfo,
+    NotificationChannelTypeDTO,
+    NotificationRuleTypeDTO,
+    WebhookSpecInfo,
+)
 
 __all__ = (
     "CreateNotificationChannelPayload",
@@ -41,7 +42,7 @@ class NotificationChannelNode(BaseResponseModel):
     id: UUID = Field(description="Channel ID")
     name: str = Field(description="Channel name")
     description: str | None = Field(default=None, description="Channel description")
-    channel_type: NotificationChannelType = Field(description="Channel type")
+    channel_type: NotificationChannelTypeDTO = Field(description="Channel type")
     spec: WebhookSpecInfo | EmailSpecInfo = Field(description="Channel specification")
     enabled: bool = Field(description="Whether the channel is enabled")
     created_at: datetime = Field(description="Creation timestamp")
@@ -55,7 +56,7 @@ class NotificationRuleNode(BaseResponseModel):
     id: UUID = Field(description="Rule ID")
     name: str = Field(description="Rule name")
     description: str | None = Field(default=None, description="Rule description")
-    rule_type: NotificationRuleType = Field(description="Rule type")
+    rule_type: NotificationRuleTypeDTO = Field(description="Rule type")
     channel: NotificationChannelNode = Field(description="Associated notification channel")
     message_template: str = Field(description="Jinja2 template for notification message")
     enabled: bool = Field(description="Whether the rule is enabled")

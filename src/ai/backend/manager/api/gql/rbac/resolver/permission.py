@@ -81,9 +81,9 @@ async def rbac_scope_entity_combinations(
 ) -> list[ScopeEntityCombinationGQL]:
     return [
         ScopeEntityCombinationGQL(
-            scope_type=RBACElementTypeGQL.from_element(scope),
+            scope_type=RBACElementTypeGQL(scope.value),
             valid_entity_types=sorted(
-                [RBACElementTypeGQL.from_element(entity) for entity in entities],
+                [RBACElementTypeGQL(entity.value) for entity in entities],
                 key=lambda e: e.value,
             ),
         )

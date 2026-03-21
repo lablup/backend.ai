@@ -39,9 +39,9 @@ from ai.backend.common.dto.manager.v2.notification.response import (
 from ai.backend.common.dto.manager.v2.notification.types import (
     EmailSpecInfo,
     NotificationChannelOrderField,
-    NotificationChannelType,
+    NotificationChannelTypeDTO,
     NotificationRuleOrderField,
-    NotificationRuleType,
+    NotificationRuleTypeDTO,
     OrderDirection,
     WebhookSpecInfo,
 )
@@ -50,9 +50,9 @@ __all__ = (
     # Types
     "EmailSpecInfo",
     "NotificationChannelOrderField",
-    "NotificationChannelType",
+    "NotificationChannelTypeDTO",
     "NotificationRuleOrderField",
-    "NotificationRuleType",
+    "NotificationRuleTypeDTO",
     "OrderDirection",
     "WebhookSpecInfo",
     # Input models (request)

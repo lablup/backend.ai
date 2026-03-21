@@ -77,7 +77,7 @@ class EntityRefGQL(PydanticNodeMixin[AssociationScopesEntitiesNode]):
     ) -> EntityNode | None:
         from ai.backend.common.types import ImageID, SessionId
 
-        element_type = self.entity_type.to_element()
+        element_type = RBACElementType(self.entity_type.value)
         data_loaders = info.context.data_loaders
         match element_type:
             case RBACElementType.USER:
@@ -114,29 +114,7 @@ class EntityRefGQL(PydanticNodeMixin[AssociationScopesEntitiesNode]):
             case RBACElementType.SESSION:
                 # DataLoader already returns SessionV2GQL | None via from_pydantic conversion
                 return await data_loaders.session_loader.load(SessionId(uuid.UUID(self.entity_id)))
-            case (
-                RBACElementType.VFOLDER
-                | RBACElementType.KEYPAIR
-                | RBACElementType.NETWORK
-                | RBACElementType.STORAGE_HOST
-                | RBACElementType.ARTIFACT
-                | RBACElementType.ARTIFACT_REGISTRY
-                | RBACElementType.SESSION_TEMPLATE
-                | RBACElementType.APP_CONFIG
-                | RBACElementType.RESOURCE_PRESET
-                | RBACElementType.USER_RESOURCE_POLICY
-                | RBACElementType.KEYPAIR_RESOURCE_POLICY
-                | RBACElementType.PROJECT_RESOURCE_POLICY
-                | RBACElementType.AUDIT_LOG
-                | RBACElementType.EVENT_LOG
-                | RBACElementType.AGENT
-                | RBACElementType.KERNEL
-                | RBACElementType.ROUTING
-                | RBACElementType.DEPLOYMENT_TOKEN
-                | RBACElementType.DEPLOYMENT_POLICY
-                | RBACElementType.DEPLOYMENT_REVISION
-                | RBACElementType.IMAGE_ALIAS
-            ):
+            case _:
                 return None
 
     @classmethod

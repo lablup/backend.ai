@@ -10,15 +10,16 @@ from uuid import UUID
 from pydantic import Field, field_validator
 
 from ai.backend.common.api_handlers import SENTINEL, BaseRequestModel, Sentinel
-from ai.backend.common.data.notification.types import (
-    EmailSpec,
-    NotificationChannelType,
-    NotificationRuleType,
-    WebhookSpec,
-)
+from ai.backend.common.data.notification.types import EmailSpec, WebhookSpec
 from ai.backend.common.dto.manager.query import StringFilter
 
-from .types import NotificationChannelOrderField, NotificationRuleOrderField, OrderDirection
+from .types import (
+    NotificationChannelOrderField,
+    NotificationChannelTypeDTO,
+    NotificationRuleOrderField,
+    NotificationRuleTypeDTO,
+    OrderDirection,
+)
 
 __all__ = (
     "CreateNotificationChannelInput",
@@ -96,7 +97,7 @@ class CreateNotificationChannelInput(BaseRequestModel):
 
     name: str = Field(min_length=1, max_length=256, description="Channel name")
     description: str | None = Field(default=None, description="Channel description")
-    channel_type: NotificationChannelType = Field(description="Channel type")
+    channel_type: NotificationChannelTypeDTO = Field(description="Channel type")
     spec: WebhookSpec | EmailSpec = Field(description="Channel specification")
     enabled: bool = Field(default=True, description="Whether the channel is enabled")
 
@@ -144,7 +145,7 @@ class CreateNotificationRuleInput(BaseRequestModel):
 
     name: str = Field(min_length=1, max_length=256, description="Rule name")
     description: str | None = Field(default=None, description="Rule description")
-    rule_type: NotificationRuleType = Field(description="Rule type")
+    rule_type: NotificationRuleTypeDTO = Field(description="Rule type")
     channel_id: UUID = Field(description="ID of the channel to use")
     message_template: str = Field(
         max_length=65536,
@@ -219,16 +220,16 @@ class ValidateNotificationRuleInput(BaseRequestModel):
 class NotificationChannelTypeFilter(BaseRequestModel):
     """Filter for notification channel type field."""
 
-    equals: NotificationChannelType | None = Field(
+    equals: NotificationChannelTypeDTO | None = Field(
         default=None, description="Matches channels with this exact type"
     )
-    in_: list[NotificationChannelType] | None = Field(
+    in_: list[NotificationChannelTypeDTO] | None = Field(
         default=None, description="Matches channels whose type is in this list"
     )
-    not_equals: NotificationChannelType | None = Field(
+    not_equals: NotificationChannelTypeDTO | None = Field(
         default=None, description="Excludes channels with this exact type"
     )
-    not_in: list[NotificationChannelType] | None = Field(
+    not_in: list[NotificationChannelTypeDTO] | None = Field(
         default=None, description="Excludes channels whose type is in this list"
     )
 
@@ -276,16 +277,16 @@ class SearchNotificationChannelsInput(BaseRequestModel):
 class NotificationRuleTypeFilter(BaseRequestModel):
     """Filter for notification rule type field."""
 
-    equals: NotificationRuleType | None = Field(
+    equals: NotificationRuleTypeDTO | None = Field(
         default=None, description="Matches rules with this exact type"
     )
-    in_: list[NotificationRuleType] | None = Field(
+    in_: list[NotificationRuleTypeDTO] | None = Field(
         default=None, description="Matches rules whose type is in this list"
     )
-    not_equals: NotificationRuleType | None = Field(
+    not_equals: NotificationRuleTypeDTO | None = Field(
         default=None, description="Excludes rules with this exact type"
     )
-    not_in: list[NotificationRuleType] | None = Field(
+    not_in: list[NotificationRuleTypeDTO] | None = Field(
         default=None, description="Excludes rules whose type is in this list"
     )
 

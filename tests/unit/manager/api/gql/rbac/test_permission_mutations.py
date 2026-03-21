@@ -10,6 +10,7 @@ import pytest
 from aiohttp.web_exceptions import HTTPForbidden
 
 from ai.backend.common.dto.manager.v2.rbac.response import PermissionNode
+from ai.backend.common.dto.manager.v2.rbac.types import OperationTypeDTO, RBACElementTypeDTO
 from ai.backend.manager.api.gql.rbac.resolver import permission as permission_resolver
 from ai.backend.manager.api.gql.rbac.types import PermissionGQL, UpdatePermissionInput
 from ai.backend.manager.api.gql.rbac.types.permission import (
@@ -22,10 +23,10 @@ def _make_permission_node(
     *,
     permission_id: uuid.UUID | None = None,
     role_id: uuid.UUID | None = None,
-    scope_type: str = "domain",
+    scope_type: RBACElementTypeDTO = RBACElementTypeDTO.DOMAIN,
     scope_id: str = "default",
-    entity_type: str = "vfolder",
-    operation: str = "read",
+    entity_type: RBACElementTypeDTO = RBACElementTypeDTO.VFOLDER,
+    operation: OperationTypeDTO = OperationTypeDTO.READ,
 ) -> PermissionNode:
     return PermissionNode(
         id=permission_id or uuid.uuid4(),
@@ -60,7 +61,7 @@ class TestAdminUpdatePermission:
         permission_id = uuid.uuid4()
         perm_node = _make_permission_node(
             permission_id=permission_id,
-            operation="update",
+            operation=OperationTypeDTO.UPDATE,
         )
         mock_adapter_method.return_value = perm_node
         info = _create_mock_info(mock_adapter_method)
@@ -83,7 +84,7 @@ class TestAdminUpdatePermission:
         permission_id = uuid.uuid4()
         perm_node = _make_permission_node(
             permission_id=permission_id,
-            operation="update",
+            operation=OperationTypeDTO.UPDATE,
         )
         mock_adapter_method.return_value = perm_node
         info = _create_mock_info(mock_adapter_method)
@@ -111,10 +112,10 @@ class TestAdminUpdatePermission:
         permission_id = uuid.uuid4()
         perm_node = _make_permission_node(
             permission_id=permission_id,
-            scope_type="project",
+            scope_type=RBACElementTypeDTO.PROJECT,
             scope_id="project-1",
-            entity_type="session",
-            operation="create",
+            entity_type=RBACElementTypeDTO.SESSION,
+            operation=OperationTypeDTO.CREATE,
         )
         mock_adapter_method.return_value = perm_node
         info = _create_mock_info(mock_adapter_method)
@@ -166,10 +167,10 @@ class TestAdminUpdatePermission:
         perm_node = _make_permission_node(
             permission_id=permission_id,
             role_id=role_id,
-            scope_type="domain",
+            scope_type=RBACElementTypeDTO.DOMAIN,
             scope_id="default",
-            entity_type="vfolder",
-            operation="read",
+            entity_type=RBACElementTypeDTO.VFOLDER,
+            operation=OperationTypeDTO.READ,
         )
         mock_adapter_method.return_value = perm_node
         info = _create_mock_info(mock_adapter_method)

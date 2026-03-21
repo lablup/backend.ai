@@ -12,9 +12,9 @@ from ai.backend.common.dto.manager.v2.resource_slot.types import (
     ResourceOptsDTOInput,
     ResourceOptsEntryDTO,
 )
+from ai.backend.common.dto.manager.v2.streaming.types import ServiceProtocol
 from ai.backend.common.types import (
     ClusterMode,
-    ServicePortProtocols,
     SessionResult,
     SessionTypes,
 )
@@ -136,52 +136,11 @@ class SessionV2ResultGQL(StrEnum):
                 return SessionResult.FAILURE
 
 
-@strawberry.enum(
+ServicePortProtocolGQL: type[ServiceProtocol] = strawberry.enum(
+    ServiceProtocol,
     name="ServicePortProtocol",
     description="Added in 26.2.0. Protocol type for service ports.",
 )
-class ServicePortProtocolGQL(StrEnum):
-    """GraphQL enum for service port protocols."""
-
-    HTTP = "http"
-    TCP = "tcp"
-    PREOPEN = "preopen"
-    INTERNAL = "internal"
-    VNC = "vnc"
-    RDP = "rdp"
-
-    @classmethod
-    def from_internal(cls, internal: ServicePortProtocols) -> ServicePortProtocolGQL:
-        """Convert internal ServicePortProtocols to GraphQL enum."""
-        match internal:
-            case ServicePortProtocols.HTTP:
-                return cls.HTTP
-            case ServicePortProtocols.TCP:
-                return cls.TCP
-            case ServicePortProtocols.PREOPEN:
-                return cls.PREOPEN
-            case ServicePortProtocols.INTERNAL:
-                return cls.INTERNAL
-            case ServicePortProtocols.VNC:
-                return cls.VNC
-            case ServicePortProtocols.RDP:
-                return cls.RDP
-
-    def to_internal(self) -> ServicePortProtocols:
-        """Convert GraphQL enum to internal ServicePortProtocols."""
-        match self:
-            case ServicePortProtocolGQL.HTTP:
-                return ServicePortProtocols.HTTP
-            case ServicePortProtocolGQL.TCP:
-                return ServicePortProtocols.TCP
-            case ServicePortProtocolGQL.PREOPEN:
-                return ServicePortProtocols.PREOPEN
-            case ServicePortProtocolGQL.INTERNAL:
-                return ServicePortProtocols.INTERNAL
-            case ServicePortProtocolGQL.VNC:
-                return ServicePortProtocols.VNC
-            case ServicePortProtocolGQL.RDP:
-                return ServicePortProtocols.RDP
 
 
 # ========== Resource Options Types ==========
@@ -303,7 +262,7 @@ class ServicePortEntryGQL:
         """Convert a dict to ServicePortEntryGQL."""
         return cls(
             name=data["name"],
-            protocol=ServicePortProtocolGQL.from_internal(ServicePortProtocols(data["protocol"])),
+            protocol=ServicePortProtocolGQL(data["protocol"]),
             container_ports=list(data["container_ports"]),
             host_ports=list(data["host_ports"]),
             is_inference=data["is_inference"],

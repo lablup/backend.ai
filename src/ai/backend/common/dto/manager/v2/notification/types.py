@@ -9,21 +9,33 @@ from enum import StrEnum
 from pydantic import Field
 
 from ai.backend.common.api_handlers import BaseResponseModel
-from ai.backend.common.data.notification.types import (
-    NotificationChannelType,
-    NotificationRuleType,
-)
 from ai.backend.common.dto.manager.v2.common import OrderDirection
 
 __all__ = (
     "EmailSpecInfo",
     "NotificationChannelOrderField",
-    "NotificationChannelType",
+    "NotificationChannelTypeDTO",
     "NotificationRuleOrderField",
-    "NotificationRuleType",
+    "NotificationRuleTypeDTO",
     "OrderDirection",
     "WebhookSpecInfo",
 )
+
+
+class NotificationChannelTypeDTO(StrEnum):
+    """Notification channel type enum for DTO layer."""
+
+    WEBHOOK = "webhook"
+    EMAIL = "email"
+
+
+class NotificationRuleTypeDTO(StrEnum):
+    """Notification rule type enum for DTO layer."""
+
+    SESSION_STARTED = "session.started"
+    SESSION_TERMINATED = "session.terminated"
+    ARTIFACT_DOWNLOAD_COMPLETED = "artifact.download.completed"
+    ENDPOINT_LIFECYCLE_CHANGED = "endpoint.lifecycle.changed"
 
 
 class NotificationChannelOrderField(StrEnum):

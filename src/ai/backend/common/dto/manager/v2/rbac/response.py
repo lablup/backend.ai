@@ -11,7 +11,13 @@ from pydantic import Field
 
 from ai.backend.common.api_handlers import BaseResponseModel
 
-from .types import PermissionSummary, RoleSource, RoleStatus
+from .types import (
+    OperationTypeDTO,
+    PermissionSummary,
+    RBACElementTypeDTO,
+    RoleSourceDTO,
+    RoleStatusDTO,
+)
 
 __all__ = (
     "AssociationScopesEntitiesNode",
@@ -36,8 +42,8 @@ class RoleNode(BaseResponseModel):
     id: UUID = Field(description="Role ID")
     name: str = Field(description="Role name")
     description: str | None = Field(default=None, description="Role description")
-    source: RoleSource = Field(description="Role source")
-    status: RoleStatus = Field(description="Role status")
+    source: RoleSourceDTO = Field(description="Role source")
+    status: RoleStatusDTO = Field(description="Role status")
     created_at: datetime = Field(description="Creation timestamp")
     updated_at: datetime = Field(description="Last update timestamp")
     deleted_at: datetime | None = Field(default=None, description="Deletion timestamp")
@@ -120,10 +126,10 @@ class PermissionNode(BaseResponseModel):
 
     id: UUID = Field(description="Permission ID")
     role_id: UUID = Field(description="Role this permission belongs to")
-    scope_type: str = Field(description="Scope element type value (e.g. 'domain', 'project')")
+    scope_type: RBACElementTypeDTO = Field(description="Scope element type")
     scope_id: str = Field(description="Scope element ID")
-    entity_type: str = Field(description="Entity element type value (e.g. 'session', 'vfolder')")
-    operation: str = Field(description="Operation type value (e.g. 'read', 'create')")
+    entity_type: RBACElementTypeDTO = Field(description="Entity element type")
+    operation: OperationTypeDTO = Field(description="Operation type")
 
 
 class EntityNode(BaseResponseModel):

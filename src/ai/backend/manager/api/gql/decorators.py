@@ -17,7 +17,7 @@ Decorator roles:
 from __future__ import annotations
 
 from collections.abc import Callable, Sequence
-from typing import TypeVar, dataclass_transform
+from typing import Any, TypeVar, dataclass_transform
 
 import strawberry
 import strawberry.experimental.pydantic
@@ -28,11 +28,12 @@ from strawberry.types.field import StrawberryField
 from strawberry.types.field import field as strawberry_field
 
 from ai.backend.common.meta import BackendAIGQLMeta
-from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin
+from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin, PydanticOutputMixin
 
 __all__ = (
     "BackendAIGQLMeta",
     "gql_connection_type",
+    "gql_from_pydantic_type",
     "gql_node_type",
     "gql_output_type",
     "gql_pydantic_input",
@@ -40,7 +41,8 @@ __all__ = (
     "gql_pydantic_type",
 )
 
-T = TypeVar("T", bound=PydanticNodeMixin)
+T = TypeVar("T", bound="PydanticNodeMixin[Any]")
+T_pydantic_out = TypeVar("T_pydantic_out", bound="PydanticOutputMixin[Any]")
 T_out = TypeVar("T_out")
 
 
@@ -61,6 +63,41 @@ def gql_node_type(
     Use for types that inherit PydanticNodeMixin and implement the Relay Node interface.
     For non-node output types (payloads, nested structs, interface implementations),
     use gql_output_type instead.
+    """
+    description = f"Added in {meta.added_version}. {meta.description}"
+    if meta.deprecated_version is not None:
+        hint = f" Use {meta.deprecation_hint}." if meta.deprecation_hint else ""
+        description += f" Deprecated since {meta.deprecated_version}.{hint}"
+    return strawberry.type(
+        name=name,
+        description=description,
+        directives=directives,
+        extend=extend,
+    )
+
+
+@dataclass_transform(
+    order_default=True,
+    kw_only_default=True,
+    field_specifiers=(strawberry_field, StrawberryField),
+)
+def gql_from_pydantic_type(
+    meta: BackendAIGQLMeta,
+    *,
+    name: str | None = None,
+    directives: Sequence[object] = (),
+    extend: bool = False,
+) -> Callable[[type[T_pydantic_out]], type[T_pydantic_out]]:
+    """Decorator for non-Node GQL output types backed by a Pydantic DTO.
+
+    Use for types that inherit PydanticOutputMixin and represent mutation
+    payloads or nested output structs (NOT Relay Node types).
+    from_pydantic() is provided by PydanticOutputMixin inheritance; override
+    it in the class body only when field names differ from the DTO.
+
+    For Relay Node types use gql_node_type instead.
+    For scalar-only types with auto from_pydantic use gql_pydantic_type instead.
+    For DTO-less pure GQL structs use gql_output_type instead.
     """
     description = f"Added in {meta.added_version}. {meta.description}"
     if meta.deprecated_version is not None:

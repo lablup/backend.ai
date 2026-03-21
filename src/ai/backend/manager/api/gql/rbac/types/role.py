@@ -90,13 +90,11 @@ from ai.backend.common.dto.manager.v2.rbac.types import (
     RoleOrderField as RoleOrderFieldDTO,
 )
 from ai.backend.common.dto.manager.v2.rbac.types import (
-    RoleSource as RoleSourceV2,
+    RoleSourceDTO,
+    RoleStatusDTO,
 )
 from ai.backend.common.dto.manager.v2.rbac.types import (
     RoleSourceFilter as RoleSourceFilterDTO,
-)
-from ai.backend.common.dto.manager.v2.rbac.types import (
-    RoleStatus as RoleStatusV2,
 )
 from ai.backend.common.dto.manager.v2.rbac.types import (
     RoleStatusFilter as RoleStatusFilterDTO,
@@ -105,11 +103,11 @@ from ai.backend.manager.api.gql.base import OrderDirection, StringFilter, encode
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     gql_connection_type,
+    gql_from_pydantic_type,
     gql_node_type,
-    gql_output_type,
     gql_pydantic_input,
 )
-from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin
+from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin, PydanticOutputMixin
 from ai.backend.manager.api.gql.types import GQLFilter, GQLOrderBy, StrawberryGQLContext
 from ai.backend.manager.data.permission.role import (
     UserRoleAssignmentData,
@@ -127,39 +125,17 @@ if TYPE_CHECKING:
 # ==================== Enums ====================
 
 
-@strawberry.enum(name="RoleSource", description="Added in 26.3.0. Role definition source")
-class RoleSourceGQL(StrEnum):
-    SYSTEM = "system"
-    CUSTOM = "custom"
+RoleSourceGQL: type[RoleSourceDTO] = strawberry.enum(
+    RoleSourceDTO,
+    name="RoleSource",
+    description="Added in 26.3.0. Role definition source",
+)
 
-    @classmethod
-    def from_internal(cls, value: RoleSource) -> RoleSourceGQL:
-        return cls(value.value)
-
-    @classmethod
-    def from_enum(cls, value: Any) -> RoleSourceGQL:
-        return cls(value.value)
-
-    def to_internal(self) -> RoleSource:
-        return RoleSource(self.value)
-
-
-@strawberry.enum(name="RoleStatus", description="Added in 26.3.0. Role status")
-class RoleStatusGQL(StrEnum):
-    ACTIVE = "active"
-    INACTIVE = "inactive"
-    DELETED = "deleted"
-
-    @classmethod
-    def from_internal(cls, value: RoleStatus) -> RoleStatusGQL:
-        return cls(value.value)
-
-    @classmethod
-    def from_enum(cls, value: Any) -> RoleStatusGQL:
-        return cls(value.value)
-
-    def to_internal(self) -> RoleStatus:
-        return RoleStatus(self.value)
+RoleStatusGQL: type[RoleStatusDTO] = strawberry.enum(
+    RoleStatusDTO,
+    name="RoleStatus",
+    description="Added in 26.3.0. Role status",
+)
 
 
 @strawberry.enum(description="Added in 26.3.0. Role ordering field")
@@ -209,8 +185,8 @@ class RoleGQL(PydanticNodeMixin[Any]):
             id=ID(str(dto.id)),
             name=dto.name,
             description=dto.description,
-            source=RoleSourceGQL.from_enum(dto.source),
-            status=RoleStatusGQL.from_enum(dto.status),
+            source=dto.source,
+            status=dto.status,
             created_at=dto.created_at,
             updated_at=dto.updated_at,
             deleted_at=dto.deleted_at,
@@ -642,9 +618,7 @@ class CreateRoleInput:
         return CreateRoleInputDTO(
             name=self.name,
             description=self.description,
-            source=RoleSourceV2(self.source.value)
-            if self.source is not None
-            else RoleSourceV2.CUSTOM,
+            source=RoleSource(self.source.value) if self.source is not None else RoleSource.CUSTOM,
         )
 
 
@@ -662,7 +636,7 @@ class UpdateRoleInput:
         return UpdateRoleInputDTO(
             name=self.name,
             description=SENTINEL if self.description is None else self.description,
-            status=RoleStatusV2(self.status.value) if self.status is not None else None,
+            status=RoleStatus(self.status.value) if self.status is not None else None,
         )
 
 
@@ -751,59 +725,55 @@ class PurgeRoleInput:
 # ==================== Payload Types ====================
 
 
-@gql_output_type(
+@gql_from_pydantic_type(
     BackendAIGQLMeta(added_version="26.3.0", description="Payload for delete role mutation."),
     name="DeleteRolePayload",
 )
-class DeleteRolePayload:
+class DeleteRolePayload(PydanticOutputMixin[DeleteRolePayloadDTO]):
     """Payload for role soft-deletion mutation."""
 
     id: ID = strawberry.field(description="ID of the deleted role.")
 
     @classmethod
-    def from_pydantic(cls, instance: DeleteRolePayloadDTO) -> Self:
-        return cls(id=ID(str(instance.id)))
+    def from_pydantic(cls, dto: DeleteRolePayloadDTO, extra: dict[str, Any] | None = None) -> Self:
+        return cls(id=ID(str(dto.id)))
 
 
-@gql_output_type(
+@gql_from_pydantic_type(
     BackendAIGQLMeta(added_version="26.3.0", description="Payload for purge role mutation."),
     name="PurgeRolePayload",
 )
-class PurgeRolePayload:
+class PurgeRolePayload(PydanticOutputMixin[PurgeRolePayloadDTO]):
     """Payload for role purge mutation."""
 
     id: ID = strawberry.field(description="ID of the purged role.")
 
     @classmethod
-    def from_pydantic(cls, instance: PurgeRolePayloadDTO) -> Self:
-        return cls(id=ID(str(instance.id)))
+    def from_pydantic(cls, dto: PurgeRolePayloadDTO, extra: dict[str, Any] | None = None) -> Self:
+        return cls(id=ID(str(dto.id)))
 
 
-@gql_output_type(
+@gql_from_pydantic_type(
     BackendAIGQLMeta(
         added_version="26.3.0",
         description="Error information for a failed user in bulk role assignment.",
     ),
     name="BulkAssignRoleError",
 )
-class BulkAssignRoleErrorGQL:
+class BulkAssignRoleErrorGQL(PydanticOutputMixin[BulkRoleOperationFailureInfoDTO]):
     """Error information for a single user that failed during bulk role assignment."""
 
     user_id: uuid.UUID = strawberry.field(description="UUID of the user that failed.")
     message: str = strawberry.field(description="Error message describing the failure.")
 
-    @classmethod
-    def from_pydantic(cls, instance: BulkRoleOperationFailureInfoDTO) -> Self:
-        return cls(user_id=instance.user_id, message=instance.message)
 
-
-@gql_output_type(
+@gql_from_pydantic_type(
     BackendAIGQLMeta(
         added_version="26.3.0", description="Payload for bulk role assignment mutation."
     ),
     name="BulkAssignRolePayload",
 )
-class BulkAssignRolePayloadGQL:
+class BulkAssignRolePayloadGQL(PydanticOutputMixin[BulkAssignRoleResultPayloadDTO]):
     assigned: list[RoleAssignmentGQL] = strawberry.field(
         description="List of successfully created role assignments."
     )
@@ -812,38 +782,36 @@ class BulkAssignRolePayloadGQL:
     )
 
     @classmethod
-    def from_pydantic(cls, dto: BulkAssignRoleResultPayloadDTO) -> Self:
+    def from_pydantic(
+        cls, dto: BulkAssignRoleResultPayloadDTO, extra: dict[str, Any] | None = None
+    ) -> Self:
         return cls(
             assigned=[RoleAssignmentGQL.from_pydantic(s) for s in dto.successes],
             failed=[BulkAssignRoleErrorGQL.from_pydantic(f) for f in dto.failures],
         )
 
 
-@gql_output_type(
+@gql_from_pydantic_type(
     BackendAIGQLMeta(
         added_version="26.3.0",
         description="Error information for a failed user in bulk role revocation.",
     ),
     name="BulkRevokeRoleError",
 )
-class BulkRevokeRoleErrorGQL:
+class BulkRevokeRoleErrorGQL(PydanticOutputMixin[BulkRoleOperationFailureInfoDTO]):
     """Error information for a single user that failed during bulk role revocation."""
 
     user_id: uuid.UUID = strawberry.field(description="UUID of the user that failed.")
     message: str = strawberry.field(description="Error message describing the failure.")
 
-    @classmethod
-    def from_pydantic(cls, instance: BulkRoleOperationFailureInfoDTO) -> Self:
-        return cls(user_id=instance.user_id, message=instance.message)
 
-
-@gql_output_type(
+@gql_from_pydantic_type(
     BackendAIGQLMeta(
         added_version="26.3.0", description="Payload for bulk role revocation mutation."
     ),
     name="BulkRevokeRolePayload",
 )
-class BulkRevokeRolePayloadGQL:
+class BulkRevokeRolePayloadGQL(PydanticOutputMixin[BulkRevokeRoleResultPayloadDTO]):
     revoked: list[RoleAssignmentGQL] = strawberry.field(
         description="List of successfully revoked role assignments."
     )
@@ -852,7 +820,9 @@ class BulkRevokeRolePayloadGQL:
     )
 
     @classmethod
-    def from_pydantic(cls, dto: BulkRevokeRoleResultPayloadDTO) -> Self:
+    def from_pydantic(
+        cls, dto: BulkRevokeRoleResultPayloadDTO, extra: dict[str, Any] | None = None
+    ) -> Self:
         return cls(
             revoked=[RoleAssignmentGQL.from_pydantic(s) for s in dto.successes],
             failed=[BulkRevokeRoleErrorGQL.from_pydantic(f) for f in dto.failures],

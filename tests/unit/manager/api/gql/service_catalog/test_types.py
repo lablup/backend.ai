@@ -8,7 +8,11 @@ from datetime import UTC, datetime
 from ai.backend.common.dto.manager.v2.service_catalog.request import (
     ServiceCatalogFilter as ServiceCatalogFilterDTO,
 )
-from ai.backend.common.types import ServiceCatalogStatus
+from ai.backend.common.dto.manager.v2.service_catalog.response import ServiceCatalogNode
+from ai.backend.common.dto.manager.v2.service_catalog.types import (
+    EndpointInfo,
+    ServiceCatalogStatus,
+)
 from ai.backend.manager.api.gql.base import StringFilter
 from ai.backend.manager.api.gql.service_catalog.types import (
     ServiceCatalogEndpointGQL,
@@ -16,10 +20,6 @@ from ai.backend.manager.api.gql.service_catalog.types import (
     ServiceCatalogGQL,
     ServiceCatalogStatusFilterGQL,
     ServiceCatalogStatusGQL,
-)
-from ai.backend.manager.data.service_catalog.types import (
-    ServiceCatalogData,
-    ServiceCatalogEndpointData,
 )
 
 
@@ -42,11 +42,10 @@ class TestServiceCatalogStatusGQL:
 class TestServiceCatalogEndpointGQL:
     """Tests for ServiceCatalogEndpointGQL type."""
 
-    def test_from_data(self) -> None:
-        """from_data should correctly map all endpoint fields."""
-        data = ServiceCatalogEndpointData(
+    def test_from_pydantic(self) -> None:
+        """from_pydantic should correctly map all endpoint fields."""
+        info = EndpointInfo(
             id=uuid.uuid4(),
-            service_id=uuid.uuid4(),
             role="main",
             scope="private",
             address="10.0.0.1",
@@ -55,7 +54,7 @@ class TestServiceCatalogEndpointGQL:
             metadata={"key": "value"},
         )
 
-        endpoint = ServiceCatalogEndpointGQL.from_data(data)
+        endpoint = ServiceCatalogEndpointGQL.from_pydantic(info)
 
         assert endpoint.role == "main"
         assert endpoint.scope == "private"
@@ -64,11 +63,10 @@ class TestServiceCatalogEndpointGQL:
         assert endpoint.protocol == "grpc"
         assert endpoint.metadata == {"key": "value"}
 
-    def test_from_data_null_metadata(self) -> None:
-        """from_data should handle None metadata."""
-        data = ServiceCatalogEndpointData(
+    def test_from_pydantic_null_metadata(self) -> None:
+        """from_pydantic should handle None metadata."""
+        info = EndpointInfo(
             id=uuid.uuid4(),
-            service_id=uuid.uuid4(),
             role="health",
             scope="internal",
             address="127.0.0.1",
@@ -77,7 +75,7 @@ class TestServiceCatalogEndpointGQL:
             metadata=None,
         )
 
-        endpoint = ServiceCatalogEndpointGQL.from_data(data)
+        endpoint = ServiceCatalogEndpointGQL.from_pydantic(info)
 
         assert endpoint.metadata is None
 
@@ -85,14 +83,13 @@ class TestServiceCatalogEndpointGQL:
 class TestServiceCatalogGQL:
     """Tests for ServiceCatalogGQL type."""
 
-    def test_from_data(self) -> None:
-        """from_data should correctly map all catalog fields including nested endpoints."""
+    def test_from_pydantic(self) -> None:
+        """from_pydantic should correctly map all catalog fields including nested endpoints."""
         now = datetime.now(tz=UTC)
         row_id = uuid.uuid4()
 
-        ep_data = ServiceCatalogEndpointData(
+        ep_info = EndpointInfo(
             id=uuid.uuid4(),
-            service_id=row_id,
             role="main",
             scope="public",
             address="manager.example.com",
@@ -101,7 +98,7 @@ class TestServiceCatalogGQL:
             metadata={},
         )
 
-        data = ServiceCatalogData(
+        node = ServiceCatalogNode(
             id=row_id,
             service_group="manager",
             instance_id="mgr-001",
@@ -113,10 +110,10 @@ class TestServiceCatalogGQL:
             registered_at=now,
             last_heartbeat=now,
             config_hash="abc123",
-            endpoints=[ep_data],
+            endpoints=[ep_info],
         )
 
-        gql = ServiceCatalogGQL.from_data(data)
+        gql = ServiceCatalogGQL.from_pydantic(node)
 
         assert gql.id == str(row_id)
         assert gql.service_group == "manager"
@@ -132,11 +129,11 @@ class TestServiceCatalogGQL:
         assert len(gql.endpoints) == 1
         assert gql.endpoints[0].role == "main"
 
-    def test_from_data_no_endpoints(self) -> None:
-        """from_data should handle data with no endpoints."""
+    def test_from_pydantic_no_endpoints(self) -> None:
+        """from_pydantic should handle data with no endpoints."""
         now = datetime.now(tz=UTC)
 
-        data = ServiceCatalogData(
+        node = ServiceCatalogNode(
             id=uuid.uuid4(),
             service_group="agent",
             instance_id="agent-001",
@@ -151,7 +148,7 @@ class TestServiceCatalogGQL:
             endpoints=[],
         )
 
-        gql = ServiceCatalogGQL.from_data(data)
+        gql = ServiceCatalogGQL.from_pydantic(node)
 
         assert gql.endpoints == []
         assert gql.status == ServiceCatalogStatusGQL.UNHEALTHY

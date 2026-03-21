@@ -11,15 +11,11 @@ from ai.backend.common.data.notification.types import (
 from ai.backend.common.dto.manager.v2.notification.types import (
     EmailSpecInfo,
     NotificationChannelOrderField,
+    NotificationChannelTypeDTO,
     NotificationRuleOrderField,
+    NotificationRuleTypeDTO,
     OrderDirection,
     WebhookSpecInfo,
-)
-from ai.backend.common.dto.manager.v2.notification.types import (
-    NotificationChannelType as ExportedNotificationChannelType,
-)
-from ai.backend.common.dto.manager.v2.notification.types import (
-    NotificationRuleType as ExportedNotificationRuleType,
 )
 
 
@@ -108,38 +104,53 @@ class TestNotificationRuleOrderField:
         assert NotificationRuleOrderField("created_at") is NotificationRuleOrderField.CREATED_AT
 
 
-class TestReExportedEnums:
-    """Tests verifying that enums are properly re-exported from types module."""
+class TestNotificationChannelTypeDTO:
+    """Tests for NotificationChannelTypeDTO enum (DTO layer, distinct from data layer)."""
 
-    def test_notification_channel_type_is_same_object(self) -> None:
-        assert ExportedNotificationChannelType is NotificationChannelType
+    def test_webhook_value(self) -> None:
+        assert NotificationChannelTypeDTO.WEBHOOK.value == "webhook"
 
-    def test_notification_rule_type_is_same_object(self) -> None:
-        assert ExportedNotificationRuleType is NotificationRuleType
+    def test_email_value(self) -> None:
+        assert NotificationChannelTypeDTO.EMAIL.value == "email"
 
-    def test_channel_type_webhook_value(self) -> None:
-        assert ExportedNotificationChannelType.WEBHOOK.value == "webhook"
+    def test_enum_members_count(self) -> None:
+        assert len(list(NotificationChannelTypeDTO)) == 2
 
-    def test_channel_type_email_value(self) -> None:
-        assert ExportedNotificationChannelType.EMAIL.value == "email"
+    def test_matches_data_layer_values(self) -> None:
+        # Verifies adapter can convert DTO values to data layer values directly.
+        for dto_member in NotificationChannelTypeDTO:
+            data_member = NotificationChannelType(dto_member.value)
+            assert data_member.value == dto_member.value
 
-    def test_rule_type_session_started_value(self) -> None:
-        assert ExportedNotificationRuleType.SESSION_STARTED.value == "session.started"
 
-    def test_rule_type_session_terminated_value(self) -> None:
-        assert ExportedNotificationRuleType.SESSION_TERMINATED.value == "session.terminated"
+class TestNotificationRuleTypeDTO:
+    """Tests for NotificationRuleTypeDTO enum (DTO layer, distinct from data layer)."""
 
-    def test_rule_type_artifact_download_completed_value(self) -> None:
+    def test_session_started_value(self) -> None:
+        assert NotificationRuleTypeDTO.SESSION_STARTED.value == "session.started"
+
+    def test_session_terminated_value(self) -> None:
+        assert NotificationRuleTypeDTO.SESSION_TERMINATED.value == "session.terminated"
+
+    def test_artifact_download_completed_value(self) -> None:
         assert (
-            ExportedNotificationRuleType.ARTIFACT_DOWNLOAD_COMPLETED.value
+            NotificationRuleTypeDTO.ARTIFACT_DOWNLOAD_COMPLETED.value
             == "artifact.download.completed"
         )
 
-    def test_rule_type_endpoint_lifecycle_changed_value(self) -> None:
+    def test_endpoint_lifecycle_changed_value(self) -> None:
         assert (
-            ExportedNotificationRuleType.ENDPOINT_LIFECYCLE_CHANGED.value
-            == "endpoint.lifecycle.changed"
+            NotificationRuleTypeDTO.ENDPOINT_LIFECYCLE_CHANGED.value == "endpoint.lifecycle.changed"
         )
+
+    def test_enum_members_count(self) -> None:
+        assert len(list(NotificationRuleTypeDTO)) == 4
+
+    def test_matches_data_layer_values(self) -> None:
+        # Verifies adapter can convert DTO values to data layer values directly.
+        for dto_member in NotificationRuleTypeDTO:
+            data_member = NotificationRuleType(dto_member.value)
+            assert data_member.value == dto_member.value
 
 
 class TestWebhookSpecInfo:

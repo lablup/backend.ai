@@ -13,11 +13,19 @@ from ai.backend.common.dto.manager.query import StringFilter
 from ai.backend.common.dto.manager.v2.common import OrderDirection
 
 __all__ = (
+    "ClusterModeDTO",
     "ComputeSessionFilter",
     "ComputeSessionOrder",
     "ComputeSessionOrderField",
     "OrderDirection",
 )
+
+
+class ClusterModeDTO(StrEnum):
+    """Cluster mode enum for DTO layer (matches GQL schema values)."""
+
+    SINGLE_NODE = "SINGLE_NODE"
+    MULTI_NODE = "MULTI_NODE"
 
 
 class ComputeSessionOrderField(StrEnum):

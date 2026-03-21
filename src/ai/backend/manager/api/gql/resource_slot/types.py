@@ -316,7 +316,7 @@ class AgentResourceSlotGQL(PydanticNodeMixin[Any]):
         return results
 
     @classmethod
-    def from_pydantic(  # type: ignore[override]
+    def from_pydantic(
         cls,
         dto: AgentResourceNodeDTO,
         extra: dict[str, Any] | None = None,
@@ -457,7 +457,7 @@ class KernelResourceAllocationGQL(PydanticNodeMixin[Any]):
         return results
 
     @classmethod
-    def from_pydantic(  # type: ignore[override]
+    def from_pydantic(
         cls,
         dto: ResourceAllocationNodeDTO,
         extra: dict[str, Any] | None = None,

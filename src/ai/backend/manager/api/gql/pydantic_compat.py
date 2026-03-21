@@ -1,18 +1,27 @@
 """Strawberry-Pydantic compatibility utilities.
 
-Provides PydanticNodeMixin for converting Pydantic DTO v2 response models
-to Strawberry Relay Node types.  Concrete GQL types inherit only this mixin;
-it carries the Node interface through to the subclass.
+Provides two mixins for converting Pydantic DTO v2 response models to Strawberry types:
+
+- PydanticNodeMixin  — for Relay Node types (carries the Node interface, handles ``id`` field).
+- PydanticOutputMixin — for non-Node output types (payloads, nested structs, no id handling).
 
 Usage::
 
-    @strawberry.type(name="FooV2")
-    class FooGQL(PydanticNodeMixin[FooDTONode]):
+    # Relay Node type
+    @gql_node_type(meta)
+    class FooGQL(PydanticNodeMixin[FooNode]):
         id: NodeID[str]
+        name: str = strawberry.field(description="...")
+
+    # Non-Node output type (payload, nested struct)
+    @gql_from_pydantic_type(meta)
+    class FooPayloadGQL(PydanticOutputMixin[FooPayloadDTO]):
+        result_id: strawberry.ID
         name: str = strawberry.field(description="...")
 
     # Convert from DTO:
     node = FooGQL.from_pydantic(foo_dto, id_field="id")
+    payload = FooPayloadGQL.from_pydantic(foo_payload_dto)
 """
 
 from __future__ import annotations
@@ -25,7 +34,34 @@ from typing import Any, Self, Union, get_args, get_origin, get_type_hints
 from pydantic import BaseModel
 from strawberry.relay import Node
 from strawberry.types.base import StrawberryObjectDefinition
-from strawberry.types.private import StrawberryPrivate
+
+
+def _from_pydantic_kwargs(
+    cls: type,
+    dto: BaseModel,
+    extra: dict[str, Any],
+    skip_fields: frozenset[str] = frozenset(),
+) -> dict[str, Any]:
+    """Build constructor kwargs by mapping DTO fields to GQL class fields.
+
+    Shared by both PydanticNodeMixin and PydanticOutputMixin.
+    Recursively converts nested Pydantic models and enums via _convert_value.
+    """
+    resolved_hints = get_type_hints(cls, include_extras=True)
+    kwargs: dict[str, Any] = {}
+    for field in dataclasses.fields(cls):
+        field_name = field.name
+        if field_name in skip_fields:
+            continue
+        if field_name in extra:
+            kwargs[field_name] = extra[field_name]
+            continue
+        if not hasattr(dto, field_name):
+            continue
+        value = getattr(dto, field_name)
+        hint = resolved_hints.get(field_name)
+        kwargs[field_name] = _convert_value(value, hint)
+    return kwargs
 
 
 class PydanticNodeMixin[T_DTO: BaseModel](Node):
@@ -91,44 +127,53 @@ class PydanticNodeMixin[T_DTO: BaseModel](Node):
               Strawberry default, typically ``UNSET`` or resolver-provided).
         """
         extra = extra or {}
-
-        # Resolve string annotations (from `from __future__ import annotations`)
-        # into actual types. include_extras preserves Annotated wrappers.
-        resolved_hints = get_type_hints(cls, include_extras=True)
+        kwargs = _from_pydantic_kwargs(cls, dto, extra, skip_fields=frozenset({"id"}))
 
         # Always set the relay ``id`` first.  Strawberry's Node interface may
         # remove NodeID[str] from dataclasses.fields(), so we cannot rely on
-        # the field loop below to encounter it.
-        kwargs: dict[str, Any] = {}
+        # the field loop to encounter it.
         if "id" in extra:
             kwargs["id"] = extra["id"]
         else:
             kwargs["id"] = str(getattr(dto, id_field))
 
-        for field in dataclasses.fields(cls):
-            field_name = field.name
-            if field_name == "id":
-                # Already handled above
-                continue
+        return cls(**kwargs)
 
-            # Extra overrides take priority
-            if field_name in extra:
-                kwargs[field_name] = extra[field_name]
-                continue
 
-            # Skip strawberry.Private fields — they cannot be sourced from the DTO
-            # and must be set via extra or a custom from_pydantic override
-            if any(isinstance(a, StrawberryPrivate) for a in get_args(field.type)):
-                continue
+class PydanticOutputMixin[T_DTO: BaseModel]:
+    """Non-Node GQL output type mixin with ``from_pydantic()`` conversion.
 
-            # Skip fields that don't exist on the DTO
-            if not hasattr(dto, field_name):
-                continue
+    Use for non-Relay-Node output types (mutation payloads, nested structs)
+    that are backed by a v2 Pydantic DTO.  Unlike PydanticNodeMixin this class
+    does NOT inherit ``Node`` and does NOT handle the Relay ``id`` field.
 
-            value = getattr(dto, field_name)
-            hint = resolved_hints.get(field_name)
-            kwargs[field_name] = _convert_value(value, hint)
+    Concrete types only need::
 
+        @gql_from_pydantic_type(meta)
+        class DeleteRolePayload(PydanticOutputMixin[DeleteRolePayloadDTO]):
+            id: strawberry.ID
+            name: str
+
+    Mapping rules are identical to PydanticNodeMixin.from_pydantic() except
+    there is no ``id`` field bootstrapping.
+    """
+
+    @classmethod
+    def from_pydantic(
+        cls,
+        dto: T_DTO,
+        extra: dict[str, Any] | None = None,
+    ) -> Self:
+        """Convert a Pydantic DTO instance to this Strawberry output type.
+
+        Args:
+            dto: Pydantic model instance.
+            extra: Additional keyword arguments, overriding auto-mapped fields.
+
+        Returns:
+            An instance of the Strawberry type (``cls``).
+        """
+        kwargs = _from_pydantic_kwargs(cls, dto, extra or {})
         return cls(**kwargs)
 
 

@@ -13,11 +13,7 @@ from strawberry import ID, UNSET, Info
 from strawberry.relay import NodeID
 
 from ai.backend.common.api_handlers import SENTINEL
-from ai.backend.common.data.notification import (
-    NotificationChannelType,
-    NotificationRuleType,
-    WebhookSpec,
-)
+from ai.backend.common.data.notification import WebhookSpec
 from ai.backend.common.data.notification.types import (
     EmailMessage,
     EmailSpec,
@@ -104,6 +100,8 @@ from ai.backend.common.dto.manager.v2.notification.response import (
 )
 from ai.backend.common.dto.manager.v2.notification.types import (
     EmailSpecInfo,
+    NotificationChannelTypeDTO,
+    NotificationRuleTypeDTO,
     WebhookSpecInfo,
 )
 from ai.backend.common.dto.manager.v2.notification.types import (
@@ -119,70 +117,27 @@ from ai.backend.common.exception import InvalidNotificationChannelSpec
 from ai.backend.manager.api.gql.base import OrderDirection, StringFilter
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
+    gql_from_pydantic_type,
     gql_node_type,
     gql_output_type,
     gql_pydantic_input,
 )
-from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin
+from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin, PydanticOutputMixin
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 
 # GraphQL enum types
 
+NotificationChannelTypeGQL = strawberry.enum(
+    NotificationChannelTypeDTO,
+    name="NotificationChannelType",
+    description="Notification channel types",
+)
 
-@strawberry.enum(name="NotificationChannelType", description="Notification channel types")
-class NotificationChannelTypeGQL(StrEnum):
-    WEBHOOK = "webhook"
-    EMAIL = "email"
-
-    @classmethod
-    def from_internal(cls, internal_type: NotificationChannelType) -> NotificationChannelTypeGQL:
-        """Convert internal NotificationChannelType to GraphQL enum."""
-        match internal_type:
-            case NotificationChannelType.WEBHOOK:
-                return cls.WEBHOOK
-            case NotificationChannelType.EMAIL:
-                return cls.EMAIL
-
-    def to_internal(self) -> NotificationChannelType:
-        """Convert GraphQL enum to internal NotificationChannelType."""
-        match self:
-            case NotificationChannelTypeGQL.WEBHOOK:
-                return NotificationChannelType.WEBHOOK
-            case NotificationChannelTypeGQL.EMAIL:
-                return NotificationChannelType.EMAIL
-
-
-@strawberry.enum(name="NotificationRuleType", description="Notification rule types")
-class NotificationRuleTypeGQL(StrEnum):
-    SESSION_STARTED = "session.started"
-    SESSION_TERMINATED = "session.terminated"
-    ARTIFACT_DOWNLOAD_COMPLETED = "artifact.download.completed"
-    ENDPOINT_LIFECYCLE_CHANGED = "endpoint.lifecycle.changed"
-
-    @classmethod
-    def from_internal(cls, internal_type: NotificationRuleType) -> NotificationRuleTypeGQL:
-        """Convert internal NotificationRuleType to GraphQL enum."""
-        match internal_type:
-            case NotificationRuleType.SESSION_STARTED:
-                return cls.SESSION_STARTED
-            case NotificationRuleType.SESSION_TERMINATED:
-                return cls.SESSION_TERMINATED
-            case NotificationRuleType.ARTIFACT_DOWNLOAD_COMPLETED:
-                return cls.ARTIFACT_DOWNLOAD_COMPLETED
-            case NotificationRuleType.ENDPOINT_LIFECYCLE_CHANGED:
-                return cls.ENDPOINT_LIFECYCLE_CHANGED
-
-    def to_internal(self) -> NotificationRuleType:
-        """Convert GraphQL enum to internal NotificationRuleType."""
-        match self:
-            case NotificationRuleTypeGQL.SESSION_STARTED:
-                return NotificationRuleType.SESSION_STARTED
-            case NotificationRuleTypeGQL.SESSION_TERMINATED:
-                return NotificationRuleType.SESSION_TERMINATED
-            case NotificationRuleTypeGQL.ARTIFACT_DOWNLOAD_COMPLETED:
-                return NotificationRuleType.ARTIFACT_DOWNLOAD_COMPLETED
-            case NotificationRuleTypeGQL.ENDPOINT_LIFECYCLE_CHANGED:
-                return NotificationRuleType.ENDPOINT_LIFECYCLE_CHANGED
+NotificationRuleTypeGQL = strawberry.enum(
+    NotificationRuleTypeDTO,
+    name="NotificationRuleType",
+    description="Notification rule types",
+)
 
 
 # GraphQL object types
@@ -277,22 +232,22 @@ class NotificationChannel(PydanticNodeMixin[NotificationChannelNode]):
     ) -> Self:
         final_spec: NotificationChannelSpecGQL
         match dto.channel_type:
-            case NotificationChannelType.WEBHOOK:
+            case NotificationChannelTypeDTO.WEBHOOK:
                 if not isinstance(dto.spec, WebhookSpecInfo):
                     raise InvalidNotificationChannelSpec(
                         f"Expected WebhookSpecInfo for WEBHOOK channel, got {type(dto.spec).__name__}"
                     )
                 final_spec = WebhookSpecGQL(
-                    channel_type=NotificationChannelTypeGQL.WEBHOOK,
+                    channel_type=NotificationChannelTypeDTO.WEBHOOK,
                     url=dto.spec.url,
                 )
-            case NotificationChannelType.EMAIL:
+            case NotificationChannelTypeDTO.EMAIL:
                 if not isinstance(dto.spec, EmailSpecInfo):
                     raise InvalidNotificationChannelSpec(
                         f"Expected EmailSpecInfo for EMAIL channel, got {type(dto.spec).__name__}"
                     )
                 final_spec = EmailSpecGQL(
-                    channel_type=NotificationChannelTypeGQL.EMAIL,
+                    channel_type=NotificationChannelTypeDTO.EMAIL,
                     smtp=SMTPConnectionGQL(
                         host=dto.spec.smtp_host,
                         port=dto.spec.smtp_port,
@@ -314,7 +269,7 @@ class NotificationChannel(PydanticNodeMixin[NotificationChannelNode]):
             id=ID(str(dto.id)),
             name=dto.name,
             description=dto.description,
-            channel_type=NotificationChannelTypeGQL.from_internal(dto.channel_type),
+            channel_type=dto.channel_type,
             spec=final_spec,
             enabled=dto.enabled,
             created_at=dto.created_at,
@@ -356,7 +311,7 @@ class NotificationRule(PydanticNodeMixin[NotificationRuleNode]):
             id=ID(str(dto.id)),
             name=dto.name,
             description=dto.description,
-            rule_type=NotificationRuleTypeGQL.from_internal(dto.rule_type),
+            rule_type=dto.rule_type,
             channel=NotificationChannel.from_pydantic(dto.channel),
             message_template=dto.message_template,
             enabled=dto.enabled,
@@ -398,10 +353,10 @@ class NotificationChannelTypeFilterGQL:
 
     def to_pydantic(self) -> NotificationChannelTypeFilterDTO:
         return NotificationChannelTypeFilterDTO(
-            equals=self.equals.to_internal() if self.equals is not None else None,
-            in_=[t.to_internal() for t in self.in_] if self.in_ is not None else None,
-            not_equals=self.not_equals.to_internal() if self.not_equals is not None else None,
-            not_in=[t.to_internal() for t in self.not_in] if self.not_in is not None else None,
+            equals=self.equals if self.equals is not None else None,
+            in_=list(self.in_) if self.in_ is not None else None,
+            not_equals=self.not_equals if self.not_equals is not None else None,
+            not_in=list(self.not_in) if self.not_in is not None else None,
         )
 
 
@@ -481,10 +436,10 @@ class NotificationRuleTypeFilterGQL:
 
     def to_pydantic(self) -> NotificationRuleTypeFilterDTO:
         return NotificationRuleTypeFilterDTO(
-            equals=self.equals.to_internal() if self.equals is not None else None,
-            in_=[t.to_internal() for t in self.in_] if self.in_ is not None else None,
-            not_equals=self.not_equals.to_internal() if self.not_equals is not None else None,
-            not_in=[t.to_internal() for t in self.not_in] if self.not_in is not None else None,
+            equals=self.equals if self.equals is not None else None,
+            in_=list(self.in_) if self.in_ is not None else None,
+            not_equals=self.not_equals if self.not_equals is not None else None,
+            not_in=list(self.not_in) if self.not_in is not None else None,
         )
 
 
@@ -670,12 +625,12 @@ class NotificationChannelSpecInput:
             return self.email.to_dataclass()
         raise InvalidNotificationChannelSpec("Exactly one of webhook or email must be set")
 
-    def get_channel_type(self) -> NotificationChannelType:
+    def get_channel_type(self) -> NotificationChannelTypeDTO:
         """Get the channel type based on which field is set."""
         if self.webhook is not None and self.webhook is not UNSET:
-            return NotificationChannelType.WEBHOOK
+            return NotificationChannelTypeDTO.WEBHOOK
         if self.email is not None and self.email is not UNSET:
-            return NotificationChannelType.EMAIL
+            return NotificationChannelTypeDTO.EMAIL
         raise InvalidNotificationChannelSpec("Exactly one of webhook or email must be set")
 
     def to_pydantic(self) -> NotificationChannelSpecInputDTO:
@@ -706,7 +661,7 @@ class CreateNotificationChannelInput:
         return CreateNotificationChannelInputDTO(
             name=self.name,
             description=self.description,
-            channel_type=self.channel_type.to_internal(),
+            channel_type=self.channel_type,
             spec=self.spec.to_dataclass(),
             enabled=self.enabled,
         )
@@ -765,7 +720,7 @@ class CreateNotificationRuleInput:
         return CreateNotificationRuleInputDTO(
             name=self.name,
             description=self.description,
-            rule_type=self.rule_type.to_internal(),
+            rule_type=self.rule_type,
             channel_id=uuid.UUID(str(self.channel_id)),
             message_template=self.message_template,
             enabled=self.enabled,
@@ -808,30 +763,22 @@ class DeleteNotificationRuleInput:
 # Payload types for mutations
 
 
-@gql_output_type(
+@gql_from_pydantic_type(
     BackendAIGQLMeta(
         added_version="26.3.0", description="Payload for create notification channel mutation."
     ),
 )
-class CreateNotificationChannelPayload:
+class CreateNotificationChannelPayload(PydanticOutputMixin[CreateNotificationChannelPayloadDTO]):
     channel: NotificationChannel
 
-    @classmethod
-    def from_pydantic(cls, dto: CreateNotificationChannelPayloadDTO) -> Self:
-        return cls(channel=NotificationChannel.from_pydantic(dto.channel))
 
-
-@gql_output_type(
+@gql_from_pydantic_type(
     BackendAIGQLMeta(
         added_version="26.3.0", description="Payload for update notification channel mutation."
     ),
 )
-class UpdateNotificationChannelPayload:
+class UpdateNotificationChannelPayload(PydanticOutputMixin[UpdateNotificationChannelPayloadDTO]):
     channel: NotificationChannel
-
-    @classmethod
-    def from_pydantic(cls, dto: UpdateNotificationChannelPayloadDTO) -> Self:
-        return cls(channel=NotificationChannel.from_pydantic(dto.channel))
 
 
 @gql_output_type(
@@ -850,30 +797,22 @@ class DeleteNotificationChannelPayload:
         return cls(id=ID(str(instance.id)))
 
 
-@gql_output_type(
+@gql_from_pydantic_type(
     BackendAIGQLMeta(
         added_version="26.3.0", description="Payload for create notification rule mutation."
     ),
 )
-class CreateNotificationRulePayload:
+class CreateNotificationRulePayload(PydanticOutputMixin[CreateNotificationRulePayloadDTO]):
     rule: NotificationRule
 
-    @classmethod
-    def from_pydantic(cls, dto: CreateNotificationRulePayloadDTO) -> Self:
-        return cls(rule=NotificationRule.from_pydantic(dto.rule))
 
-
-@gql_output_type(
+@gql_from_pydantic_type(
     BackendAIGQLMeta(
         added_version="26.3.0", description="Payload for update notification rule mutation."
     ),
 )
-class UpdateNotificationRulePayload:
+class UpdateNotificationRulePayload(PydanticOutputMixin[UpdateNotificationRulePayloadDTO]):
     rule: NotificationRule
-
-    @classmethod
-    def from_pydantic(cls, dto: UpdateNotificationRulePayloadDTO) -> Self:
-        return cls(rule=NotificationRule.from_pydantic(dto.rule))
 
 
 @gql_output_type(
@@ -947,17 +886,13 @@ class ValidateNotificationRuleInput:
         )
 
 
-@gql_output_type(
+@gql_from_pydantic_type(
     BackendAIGQLMeta(
         added_version="26.3.0", description="Payload for validate notification rule mutation."
     ),
     name="ValidateNotificationRulePayload",
 )
-class ValidateNotificationRulePayload:
+class ValidateNotificationRulePayload(PydanticOutputMixin[ValidateNotificationRulePayloadDTO]):
     """Payload for notification rule validation mutation."""
 
     message: str = strawberry.field(description="The rendered message from the template.")
-
-    @classmethod
-    def from_pydantic(cls, instance: ValidateNotificationRulePayloadDTO) -> Self:
-        return cls(message=instance.message)

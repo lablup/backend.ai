@@ -314,9 +314,7 @@ async def notification_rules(
 @strawberry.field(description="List available notification rule types")  # type: ignore[misc]
 async def notification_rule_types() -> list[NotificationRuleTypeGQL] | None:
     """Return all available notification rule types."""
-    from ai.backend.common.data.notification import NotificationRuleType
-
-    return [NotificationRuleTypeGQL.from_internal(rt) for rt in NotificationRuleType]
+    return list(NotificationRuleTypeGQL)
 
 
 @strawberry.field(description="Get JSON schema for a notification rule type's message format")  # type: ignore[misc]
@@ -324,9 +322,9 @@ async def notification_rule_type_schema(
     rule_type: NotificationRuleTypeGQL,
 ) -> strawberry.scalars.JSON:
     """Return the JSON schema for a given notification rule type."""
-    from ai.backend.common.data.notification import NotifiableMessage
+    from ai.backend.common.data.notification import NotifiableMessage, NotificationRuleType
 
-    internal_type = rule_type.to_internal()
+    internal_type = NotificationRuleType(rule_type.value)
     return NotifiableMessage.get_message_schema(internal_type)
 
 

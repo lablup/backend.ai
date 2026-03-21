@@ -49,12 +49,12 @@ from ai.backend.manager.api.gql.base import encode_cursor
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     gql_connection_type,
+    gql_from_pydantic_type,
     gql_node_type,
-    gql_output_type,
     gql_pydantic_input,
     gql_pydantic_type,
 )
-from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin
+from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin, PydanticOutputMixin
 
 from .storage_namespace import StorageNamespace, StorageNamespaceConnection, StorageNamespaceEdge
 from .types import StrawberryGQLContext
@@ -288,18 +288,18 @@ class UpdateObjectStoragePayload:
     object_storage: ObjectStorage
 
 
-@gql_output_type(
+@gql_from_pydantic_type(
     BackendAIGQLMeta(
         added_version="25.14.0",
         description="Payload for deleting an object storage.",
     ),
     name="DeleteObjectStoragePayload",
 )
-class DeleteObjectStoragePayload:
+class DeleteObjectStoragePayload(PydanticOutputMixin[DeleteObjectStoragePayloadDTO]):
     id: ID = strawberry.field(description="ID of the deleted object storage.")
 
     @classmethod
-    def from_pydantic(cls, instance: DeleteObjectStoragePayloadDTO) -> Self:
+    def from_pydantic(cls, instance: DeleteObjectStoragePayloadDTO) -> Self:  # type: ignore[override]
         return cls(id=ID(str(instance.id)))
 
 

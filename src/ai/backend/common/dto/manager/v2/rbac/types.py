@@ -20,16 +20,98 @@ __all__ = (
     "EntityType",
     "EntityTypeFilter",
     "OperationType",
+    "OperationTypeDTO",
     "OrderDirection",
     "PermissionOrderField",
     "PermissionSummary",
+    "RBACElementTypeDTO",
     "RoleAssignmentOrderField",
     "RoleOrderField",
     "RoleSource",
+    "RoleSourceDTO",
     "RoleSourceFilter",
     "RoleStatus",
+    "RoleStatusDTO",
     "RoleStatusFilter",
 )
+
+
+class RoleSourceDTO(StrEnum):
+    """Role definition source enum for DTO layer."""
+
+    SYSTEM = "system"
+    CUSTOM = "custom"
+
+
+class RoleStatusDTO(StrEnum):
+    """Role status enum for DTO layer."""
+
+    ACTIVE = "active"
+    INACTIVE = "inactive"
+    DELETED = "deleted"
+
+
+class OperationTypeDTO(StrEnum):
+    """RBAC operation type enum for DTO layer."""
+
+    CREATE = "create"
+    READ = "read"
+    UPDATE = "update"
+    SOFT_DELETE = "soft-delete"
+    HARD_DELETE = "hard-delete"
+    GRANT_ALL = "grant:all"
+    GRANT_READ = "grant:read"
+    GRANT_UPDATE = "grant:update"
+    GRANT_SOFT_DELETE = "grant:soft-delete"
+    GRANT_HARD_DELETE = "grant:hard-delete"
+
+
+class RBACElementTypeDTO(StrEnum):
+    """Unified RBAC element type enum for DTO layer (matches GQL schema values)."""
+
+    # Scope hierarchy
+    DOMAIN = "domain"
+    PROJECT = "project"
+    USER = "user"
+
+    # Root-query-enabled entities (scoped)
+    SESSION = "session"
+    VFOLDER = "vfolder"
+    MODEL_DEPLOYMENT = "model_deployment"
+    KEYPAIR = "keypair"
+    NOTIFICATION_CHANNEL = "notification_channel"
+    NETWORK = "network"
+    RESOURCE_GROUP = "resource_group"
+    CONTAINER_REGISTRY = "container_registry"
+    STORAGE_HOST = "storage_host"
+    AGENT = "agent"
+    KERNEL = "kernel"
+    ROUTING = "routing"
+    IMAGE = "image"
+    ARTIFACT = "artifact"
+    ARTIFACT_REGISTRY = "artifact_registry"
+    SESSION_TEMPLATE = "session_template"
+    APP_CONFIG = "app_config"
+
+    # Root-query-enabled entities (superadmin-only)
+    RESOURCE_PRESET = "resource_preset"
+    USER_RESOURCE_POLICY = "user_resource_policy"
+    KEYPAIR_RESOURCE_POLICY = "keypair_resource_policy"
+    PROJECT_RESOURCE_POLICY = "project_resource_policy"
+    ROLE = "role"
+    AUDIT_LOG = "audit_log"
+    EVENT_LOG = "event_log"
+
+    # Auto-only entities used in permissions
+    NOTIFICATION_RULE = "notification_rule"
+
+    # Auto sub-entities with direct GET APIs
+    DEPLOYMENT_TOKEN = "deployment:token"
+    DEPLOYMENT_POLICY = "deployment:policy"
+    DEPLOYMENT_REVISION = "deployment:revision"
+
+    # Entity-level scopes
+    ARTIFACT_REVISION = "artifact_revision"
 
 
 class RoleOrderField(StrEnum):

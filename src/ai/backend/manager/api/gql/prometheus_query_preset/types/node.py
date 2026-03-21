@@ -21,9 +21,10 @@ from ai.backend.common.dto.manager.v2.prometheus_query_preset.response import (
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     gql_connection_type,
+    gql_from_pydantic_type,
     gql_node_type,
 )
-from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin
+from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin, PydanticOutputMixin
 
 from .payloads import QueryDefinitionOptionsGQL
 
@@ -97,35 +98,35 @@ class QueryDefinitionConnection(Connection[QueryDefinitionGQL]):
         self.count = count
 
 
-@gql_node_type(
+@gql_from_pydantic_type(
     BackendAIGQLMeta(
         added_version="26.3.0",
         description="Payload returned after creating a query definition.",
     ),
     name="CreateQueryDefinitionPayload",
 )
-class CreateQueryDefinitionPayload:
+class CreateQueryDefinitionPayload(PydanticOutputMixin[CreateQueryDefinitionGQLPayloadDTO]):
     """Payload for query definition creation mutation."""
 
     preset: QueryDefinitionGQL = strawberry.field(description="Created query definition.")
 
     @classmethod
-    def from_pydantic(cls, dto: CreateQueryDefinitionGQLPayloadDTO) -> Self:
+    def from_pydantic(cls, dto: CreateQueryDefinitionGQLPayloadDTO) -> Self:  # type: ignore[override]
         return cls(preset=QueryDefinitionGQL.from_pydantic(dto.preset))
 
 
-@gql_node_type(
+@gql_from_pydantic_type(
     BackendAIGQLMeta(
         added_version="26.3.0",
         description="Payload returned after modifying a query definition.",
     ),
     name="ModifyQueryDefinitionPayload",
 )
-class ModifyQueryDefinitionPayload:
+class ModifyQueryDefinitionPayload(PydanticOutputMixin[ModifyQueryDefinitionGQLPayloadDTO]):
     """Payload for query definition modification mutation."""
 
     preset: QueryDefinitionGQL = strawberry.field(description="Updated query definition.")
 
     @classmethod
-    def from_pydantic(cls, dto: ModifyQueryDefinitionGQLPayloadDTO) -> Self:
+    def from_pydantic(cls, dto: ModifyQueryDefinitionGQLPayloadDTO) -> Self:  # type: ignore[override]
         return cls(preset=QueryDefinitionGQL.from_pydantic(dto.preset))

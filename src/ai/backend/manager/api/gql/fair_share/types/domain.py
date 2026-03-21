@@ -45,12 +45,12 @@ from ai.backend.manager.api.gql.base import OrderDirection, StringFilter
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     gql_connection_type,
+    gql_from_pydantic_type,
     gql_node_type,
     gql_output_type,
     gql_pydantic_input,
-    gql_pydantic_type,
 )
-from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin
+from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin, PydanticOutputMixin
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 
 from .common import (
@@ -457,23 +457,16 @@ class BulkUpsertDomainFairShareWeightInput:
         )
 
 
-@gql_pydantic_type(
+@gql_from_pydantic_type(
     BackendAIGQLMeta(
         added_version="26.1.0",
         description="Payload for bulk domain fair share weight upsert mutation.",
     ),
-    model=BulkUpsertDomainFairShareWeightPayloadDTO,
     name="BulkUpsertDomainFairShareWeightPayload",
 )
-class BulkUpsertDomainFairShareWeightPayload:
+class BulkUpsertDomainFairShareWeightPayload(
+    PydanticOutputMixin[BulkUpsertDomainFairShareWeightPayloadDTO]
+):
     """Payload for bulk domain fair share weight upsert mutation."""
 
     upserted_count: int = strawberry.field(description="Number of records upserted")
-
-    @classmethod
-    def from_pydantic(
-        cls,
-        instance: BulkUpsertDomainFairShareWeightPayloadDTO,
-        extra: dict[str, Any] | None = None,
-    ) -> Self:
-        return cls(upserted_count=instance.upserted_count)

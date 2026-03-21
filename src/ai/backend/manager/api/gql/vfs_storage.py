@@ -33,12 +33,12 @@ from ai.backend.manager.api.gql.base import encode_cursor
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     gql_connection_type,
+    gql_from_pydantic_type,
     gql_node_type,
-    gql_output_type,
     gql_pydantic_input,
     gql_pydantic_type,
 )
-from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin
+from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin, PydanticOutputMixin
 
 from .types import StrawberryGQLContext
 
@@ -186,20 +186,20 @@ class UpdateVFSStoragePayload:
     vfs_storage: VFSStorage
 
 
-@gql_output_type(
+@gql_from_pydantic_type(
     BackendAIGQLMeta(
         added_version="25.16.0",
         description="Payload for deleting VFS storage.",
     ),
     name="DeleteVFSStoragePayload",
 )
-class DeleteVFSStoragePayload:
+class DeleteVFSStoragePayload(PydanticOutputMixin[DeleteVFSStoragePayloadDTO]):
     """Payload for VFS storage deletion mutation."""
 
     id: ID = strawberry.field(description="ID of the deleted VFS storage.")
 
     @classmethod
-    def from_pydantic(cls, instance: DeleteVFSStoragePayloadDTO) -> Self:
+    def from_pydantic(cls, instance: DeleteVFSStoragePayloadDTO) -> Self:  # type: ignore[override]
         return cls(id=ID(str(instance.id)))
 
 

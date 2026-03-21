@@ -95,19 +95,14 @@ from ai.backend.common.dto.manager.v2.rbac.request import (
     UpdatePermissionInput as UpdatePermissionInputDTO,
 )
 from ai.backend.common.dto.manager.v2.rbac.types import (
-    OperationType as OperationTypeDTO,
+    OperationTypeDTO,
+    PermissionSummary,
+    RBACElementTypeDTO,
+    RoleSourceDTO,
+    RoleStatusDTO,
 )
 from ai.backend.common.dto.manager.v2.rbac.types import (
     OrderDirection as OrderDirectionV2,
-)
-from ai.backend.common.dto.manager.v2.rbac.types import (
-    PermissionSummary,
-)
-from ai.backend.common.dto.manager.v2.rbac.types import (
-    RoleSource as RoleSourceV2,
-)
-from ai.backend.common.dto.manager.v2.rbac.types import (
-    RoleStatus as RoleStatusV2,
 )
 from ai.backend.manager.api.adapters.pagination import PaginationSpec
 from ai.backend.manager.data.common.types import SearchResult
@@ -1181,8 +1176,8 @@ class RBACAdapter(BaseAdapter):
             id=data.id,
             name=data.name,
             description=data.description,
-            source=RoleSourceV2(data.source.value),
-            status=RoleStatusV2(data.status.value),
+            source=RoleSourceDTO(data.source.value),
+            status=RoleStatusDTO(data.status.value),
             created_at=data.created_at,
             updated_at=data.updated_at,
             deleted_at=data.deleted_at,
@@ -1195,15 +1190,15 @@ class RBACAdapter(BaseAdapter):
             id=data.id,
             name=data.name,
             description=data.description,
-            source=RoleSourceV2(data.source.value),
-            status=RoleStatusV2(data.status.value),
+            source=RoleSourceDTO(data.source.value),
+            status=RoleStatusDTO(data.status.value),
             created_at=data.created_at,
             updated_at=data.updated_at,
             deleted_at=data.deleted_at,
             permissions=[
                 PermissionSummary(
                     entity_type=p.object_id.entity_type,
-                    operation=OperationTypeDTO(p.operation.value),
+                    operation=p.operation,
                 )
                 for p in data.object_permissions
             ],
@@ -1214,10 +1209,10 @@ class RBACAdapter(BaseAdapter):
         return PermissionNode(
             id=data.id,
             role_id=data.role_id,
-            scope_type=data.scope_type.to_element().value,
+            scope_type=RBACElementTypeDTO(data.scope_type.to_element().value),
             scope_id=data.scope_id,
-            entity_type=data.entity_type.to_element().value,
-            operation=data.operation.value,
+            entity_type=RBACElementTypeDTO(data.entity_type.to_element().value),
+            operation=OperationTypeDTO(data.operation.value),
         )
 
     @staticmethod

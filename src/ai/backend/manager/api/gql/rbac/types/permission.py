@@ -11,10 +11,7 @@ import strawberry
 from strawberry import ID, Info
 from strawberry.relay import Connection, Edge, NodeID
 
-from ai.backend.common.data.permission.types import (
-    OperationType,
-    RBACElementType,
-)
+from ai.backend.common.data.permission.types import RBACElementType
 from ai.backend.common.dto.manager.v2.rbac.request import (
     CreatePermissionInput as CreatePermissionInputDTO,
 )
@@ -37,6 +34,10 @@ from ai.backend.common.dto.manager.v2.rbac.response import (
     PermissionNode as PermissionNodeDTO,
 )
 from ai.backend.common.dto.manager.v2.rbac.types import (
+    OperationTypeDTO,
+    RBACElementTypeDTO,
+)
+from ai.backend.common.dto.manager.v2.rbac.types import (
     OrderDirection as OrderDirectionDTO,
 )
 from ai.backend.common.dto.manager.v2.rbac.types import (
@@ -47,14 +48,14 @@ from ai.backend.manager.api.gql.base import OrderDirection
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     gql_connection_type,
+    gql_from_pydantic_type,
     gql_node_type,
     gql_output_type,
     gql_pydantic_input,
 )
-from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin
+from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin, PydanticOutputMixin
 from ai.backend.manager.api.gql.rbac.types.entity_node import EntityNode
 from ai.backend.manager.api.gql.types import GQLFilter, GQLOrderBy, StrawberryGQLContext
-from ai.backend.manager.errors.api import InvalidAPIParameters
 
 if TYPE_CHECKING:
     from ai.backend.manager.api.gql.rbac.types.role import RoleGQL
@@ -62,93 +63,17 @@ if TYPE_CHECKING:
 # ==================== Enums ====================
 
 
-@strawberry.enum(
+RBACElementTypeGQL: type[RBACElementTypeDTO] = strawberry.enum(
+    RBACElementTypeDTO,
     name="RBACElementType",
     description="Added in 26.3.0. Unified RBAC element type for scope-entity relationships",
 )
-class RBACElementTypeGQL(StrEnum):
-    # Scope hierarchy
-    DOMAIN = "domain"
-    PROJECT = "project"
-    USER = "user"
 
-    # Root-query-enabled entities (scoped)
-    SESSION = "session"
-    VFOLDER = "vfolder"
-    MODEL_DEPLOYMENT = "model_deployment"
-    KEYPAIR = "keypair"
-    NOTIFICATION_CHANNEL = "notification_channel"
-    NETWORK = "network"
-    RESOURCE_GROUP = "resource_group"
-    CONTAINER_REGISTRY = "container_registry"
-    STORAGE_HOST = "storage_host"
-    AGENT = "agent"
-    KERNEL = "kernel"
-    ROUTING = "routing"
-    IMAGE = "image"
-    ARTIFACT = "artifact"
-    ARTIFACT_REGISTRY = "artifact_registry"
-    SESSION_TEMPLATE = "session_template"
-    APP_CONFIG = "app_config"
-
-    # Root-query-enabled entities (superadmin-only)
-    RESOURCE_PRESET = "resource_preset"
-    USER_RESOURCE_POLICY = "user_resource_policy"
-    KEYPAIR_RESOURCE_POLICY = "keypair_resource_policy"
-    PROJECT_RESOURCE_POLICY = "project_resource_policy"
-    ROLE = "role"
-    AUDIT_LOG = "audit_log"
-    EVENT_LOG = "event_log"
-
-    # Auto-only entities used in permissions
-    NOTIFICATION_RULE = "notification_rule"
-
-    # Auto sub-entities with direct GET APIs
-    DEPLOYMENT_TOKEN = "deployment:token"
-    DEPLOYMENT_POLICY = "deployment:policy"
-    DEPLOYMENT_REVISION = "deployment:revision"
-    IMAGE_ALIAS = "image:alias"
-
-    # Entity-level scopes
-    ARTIFACT_REVISION = "artifact_revision"
-
-    @classmethod
-    def from_element(cls, value: RBACElementType) -> RBACElementTypeGQL:
-        return cls(value.value)
-
-    def to_element(self) -> RBACElementType:
-        return RBACElementType(self.value)
-
-
-@strawberry.enum(name="OperationType", description="Added in 26.3.0. RBAC operation type")
-class OperationTypeGQL(StrEnum):
-    CREATE = "create"
-    READ = "read"
-    UPDATE = "update"
-    SOFT_DELETE = "soft-delete"
-    HARD_DELETE = "hard-delete"
-    GRANT_ALL = "grant:all"
-    GRANT_READ = "grant:read"
-    GRANT_UPDATE = "grant:update"
-    GRANT_SOFT_DELETE = "grant:soft-delete"
-    GRANT_HARD_DELETE = "grant:hard-delete"
-
-    @classmethod
-    def from_internal(cls, value: OperationType) -> OperationTypeGQL:
-        try:
-            return cls(value.value)
-        except ValueError:
-            raise InvalidAPIParameters(
-                extra_msg=f"{value.value!r} is not a valid OperationTypeGQL"
-            ) from None
-
-    def to_internal(self) -> OperationType:
-        try:
-            return OperationType(self.value)
-        except ValueError:
-            raise InvalidAPIParameters(
-                extra_msg=f"{self.value!r} is not a valid OperationType"
-            ) from None
+OperationTypeGQL: type[OperationTypeDTO] = strawberry.enum(
+    OperationTypeDTO,
+    name="OperationType",
+    description="Added in 26.3.0. RBAC operation type",
+)
 
 
 @strawberry.enum(description="Added in 26.3.0. Permission ordering field")
@@ -207,7 +132,7 @@ class PermissionGQL(PydanticNodeMixin[PermissionNodeDTO]):
         *,
         info: Info[StrawberryGQLContext],
     ) -> EntityNode | None:
-        element_type = self.scope_type.to_element()
+        element_type = RBACElementType(self.scope_type.value)
         data_loaders = info.context.data_loaders
         match element_type:
             case RBACElementType.USER:
@@ -274,10 +199,10 @@ class PermissionGQL(PydanticNodeMixin[PermissionNodeDTO]):
         return cls(
             id=ID(str(dto.id)),
             role_id=dto.role_id,
-            scope_type=RBACElementTypeGQL(dto.scope_type),
+            scope_type=dto.scope_type,
             scope_id=dto.scope_id,
-            entity_type=RBACElementTypeGQL(dto.entity_type),
-            operation=OperationTypeGQL(dto.operation),
+            entity_type=dto.entity_type,
+            operation=dto.operation,
         )
 
 
@@ -383,18 +308,20 @@ class DeletePermissionInput:
 # ==================== Payload Types ====================
 
 
-@gql_output_type(
+@gql_from_pydantic_type(
     BackendAIGQLMeta(added_version="26.3.0", description="Payload for delete permission mutation."),
     name="DeletePermissionPayload",
 )
-class DeletePermissionPayload:
+class DeletePermissionPayload(PydanticOutputMixin[DeletePermissionPayloadDTO]):
     """Payload for permission deletion mutation."""
 
     id: ID = strawberry.field(description="ID of the deleted permission.")
 
     @classmethod
-    def from_pydantic(cls, instance: DeletePermissionPayloadDTO) -> Self:
-        return cls(id=ID(str(instance.id)))
+    def from_pydantic(
+        cls, dto: DeletePermissionPayloadDTO, extra: dict[str, Any] | None = None
+    ) -> Self:
+        return cls(id=ID(str(dto.id)))
 
 
 # ==================== Connection Types ====================
