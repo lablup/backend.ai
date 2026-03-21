@@ -85,7 +85,6 @@ if TYPE_CHECKING:
     )
     from ai.backend.manager.api.gql.user.types.node import UserV2GQL  # pants: no-infer-dep
     from ai.backend.manager.api.gql.vfs_storage import VFSStorage  # pants: no-infer-dep
-    from ai.backend.manager.services.processors import Processors  # pants: no-infer-dep
 
 
 class DataLoaders:
@@ -97,11 +96,9 @@ class DataLoaders:
     its own loader instances initialized here.
     """
 
-    _processors: Processors
     _adapters: Adapters
 
-    def __init__(self, processors: Processors, adapters: Adapters) -> None:
-        self._processors = processors
+    def __init__(self, adapters: Adapters) -> None:
         self._adapters = adapters
 
     @cached_property
