@@ -16,8 +16,6 @@ from ai.backend.common.container_registry import ContainerRegistryType
 from ai.backend.manager.api.gql.decorators import BackendAIGQLMeta, gql_node_type
 from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
-from ai.backend.manager.data.container_registry.types import ContainerRegistryData
-from ai.backend.manager.defs import PASSWORD_PLACEHOLDER
 
 
 @strawberry.enum(
@@ -84,18 +82,3 @@ class ContainerRegistryGQL(PydanticNodeMixin[Any]):
             UUID(nid) for nid in node_ids
         ])
         return cast(list[Self | None], results)
-
-    @classmethod
-    def from_data(cls, data: ContainerRegistryData) -> Self:
-        return cls(
-            id=str(data.id),
-            url=data.url,
-            registry_name=data.registry_name,
-            type=ContainerRegistryTypeGQL.from_enum(data.type),
-            project=data.project,
-            username=data.username,
-            password=PASSWORD_PLACEHOLDER if data.password is not None else None,
-            ssl_verify=data.ssl_verify,
-            is_global=data.is_global,
-            extra=data.extra,
-        )

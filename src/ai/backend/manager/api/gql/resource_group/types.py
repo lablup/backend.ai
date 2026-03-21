@@ -41,6 +41,7 @@ from ai.backend.manager.api.gql.base import OrderDirection, StringFilter
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     gql_node_type,
+    gql_output_type,
     gql_pydantic_input,
     gql_pydantic_type,
 )
@@ -168,10 +169,9 @@ class PreemptionConfigGQL:
     mode: PreemptionModeGQL
 
 
-@gql_node_type(
+@gql_output_type(
     BackendAIGQLMeta(
-        added_version="26.2.0",
-        description="Status information for a resource group.",
+        added_version="26.2.0", description="Status information for a resource group."
     ),
     name="ResourceGroupStatus",
 )
@@ -186,11 +186,8 @@ class ResourceGroupStatusGQL:
     )
 
 
-@gql_node_type(
-    BackendAIGQLMeta(
-        added_version="26.2.0",
-        description="Metadata for a resource group.",
-    ),
+@gql_output_type(
+    BackendAIGQLMeta(added_version="26.2.0", description="Metadata for a resource group."),
     name="ResourceGroupMetadata",
 )
 class ResourceGroupMetadataGQL:
@@ -204,10 +201,9 @@ class ResourceGroupMetadataGQL:
     )
 
 
-@gql_node_type(
+@gql_output_type(
     BackendAIGQLMeta(
-        added_version="26.2.0",
-        description="Network configuration for a resource group.",
+        added_version="26.2.0", description="Network configuration for a resource group."
     ),
     name="ResourceGroupNetworkConfig",
 )
@@ -222,10 +218,9 @@ class ResourceGroupNetworkConfigGQL:
     )
 
 
-@gql_node_type(
+@gql_output_type(
     BackendAIGQLMeta(
-        added_version="26.2.0",
-        description="Scheduler configuration for a resource group.",
+        added_version="26.2.0", description="Scheduler configuration for a resource group."
     ),
     name="ResourceGroupSchedulerConfig",
 )
@@ -240,7 +235,7 @@ class ResourceGroupSchedulerConfigGQL:
     )
 
 
-@gql_node_type(
+@gql_output_type(
     BackendAIGQLMeta(
         added_version="26.1.0",
         description=(
@@ -319,7 +314,7 @@ class FairShareScalingGroupSpecGQL:
         )
 
 
-@gql_node_type(
+@gql_output_type(
     BackendAIGQLMeta(
         added_version="26.1.0",
         description=(
@@ -603,7 +598,7 @@ class UpdateResourceGroupFairShareSpecInput:
         )
 
 
-@gql_node_type(
+@gql_output_type(
     BackendAIGQLMeta(
         added_version="26.1.0",
         description="Payload for resource group fair share spec update mutation.",
@@ -695,10 +690,9 @@ class UpdateResourceGroupInput:
         )
 
 
-@gql_node_type(
+@gql_output_type(
     BackendAIGQLMeta(
-        added_version="26.2.0",
-        description="Payload for resource group update mutation.",
+        added_version="26.2.0", description="Payload for resource group update mutation."
     ),
     name="UpdateResourceGroupPayload",
 )

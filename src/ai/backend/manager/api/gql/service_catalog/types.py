@@ -38,10 +38,6 @@ from ai.backend.manager.api.gql.decorators import (
 )
 from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin
 from ai.backend.manager.api.gql.utils import dedent_strip
-from ai.backend.manager.data.service_catalog.types import (
-    ServiceCatalogData,
-    ServiceCatalogEndpointData,
-)
 
 __all__ = (
     "ServiceCatalogEndpointGQL",
@@ -96,17 +92,6 @@ class ServiceCatalogEndpointGQL:
     metadata: JSON | None = strawberry.field(description="Additional metadata.", default=None)
 
     @classmethod
-    def from_data(cls, data: ServiceCatalogEndpointData) -> Self:
-        return cls(
-            role=data.role,
-            scope=data.scope,
-            address=data.address,
-            port=data.port,
-            protocol=data.protocol,
-            metadata=data.metadata,
-        )
-
-    @classmethod
     def from_pydantic(cls, info: EndpointInfo) -> Self:
         """Convert an EndpointInfo Pydantic DTO to this GQL type."""
         return cls(
@@ -145,23 +130,6 @@ class ServiceCatalogGQL(PydanticNodeMixin[Any]):
     endpoints: list[ServiceCatalogEndpointGQL] = strawberry.field(
         description="Endpoints exposed by this service instance."
     )
-
-    @classmethod
-    def from_data(cls, data: ServiceCatalogData) -> Self:
-        return cls(
-            id=str(data.id),
-            service_group=data.service_group,
-            instance_id=data.instance_id,
-            display_name=data.display_name,
-            version=data.version,
-            labels=data.labels,
-            status=ServiceCatalogStatusGQL.from_status(data.status),
-            startup_time=data.startup_time,
-            registered_at=data.registered_at,
-            last_heartbeat=data.last_heartbeat,
-            config_hash=data.config_hash,
-            endpoints=[ServiceCatalogEndpointGQL.from_data(ep) for ep in data.endpoints],
-        )
 
 
 @strawberry.enum(

@@ -27,7 +27,6 @@ if TYPE_CHECKING:
     from ai.backend.common.metrics.metric import GraphQLMetricObserver
     from ai.backend.manager.api.adapters.registry import Adapters
     from ai.backend.manager.api.gql.adapter import BaseGQLAdapter
-    from ai.backend.manager.services.processors import Processors  # pants: no-infer-dep
 
 
 class GQLFilter(ABC):
@@ -40,7 +39,6 @@ class GQLOrderBy(ABC):
 
 @dataclass
 class StrawberryGQLContext:
-    processors: Processors
     config_provider: ManagerConfigProvider
     event_hub: EventHub
     event_fetcher: EventFetcher

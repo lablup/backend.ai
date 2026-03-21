@@ -63,22 +63,6 @@ class SchedulingBroadcastEventPayload:
     status_transition: SchedulingStatus
     reason: str
 
-    @classmethod
-    def from_event(cls, event: SchedulingBroadcastEvent) -> SchedulingBroadcastEventPayload:
-        """Create payload from SchedulingBroadcastEvent."""
-        # Parse status_transition string to SchedulingStatus enum
-        try:
-            status_enum = SchedulingStatus(event.status_transition)
-        except KeyError:
-            log.warning(f"Unknown status transition: {event.status_transition}")
-            status_enum = SchedulingStatus.ERROR
-
-        return cls(
-            session_id=strawberry.ID(str(event.session_id)),
-            status_transition=status_enum,
-            reason=event.reason,
-        )
-
     @strawberry.field(  # type: ignore[misc]
         description="The session ID associated with the replica. This can be null right after replica creation."
     )
@@ -132,8 +116,16 @@ async def scheduling_events_by_session(
         # Stream events from propagator
         async for event in propagator.receive():
             if isinstance(event, SchedulingBroadcastEvent):
-                payload = SchedulingBroadcastEventPayload.from_event(event)
-                yield payload
+                try:
+                    status_enum = SchedulingStatus(event.status_transition)
+                except KeyError:
+                    log.warning(f"Unknown status transition: {event.status_transition}")
+                    status_enum = SchedulingStatus.ERROR
+                yield SchedulingBroadcastEventPayload(
+                    session_id=strawberry.ID(str(event.session_id)),
+                    status_transition=status_enum,
+                    reason=event.reason,
+                )
     finally:
         # Unregister propagator when subscription ends
         event_hub.unregister_event_propagator(propagator.id())

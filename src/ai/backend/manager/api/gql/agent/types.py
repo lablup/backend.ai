@@ -41,7 +41,7 @@ from ai.backend.manager.api.gql.decorators import (
 from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.api.gql.utils import dedent_strip
-from ai.backend.manager.data.agent.types import AgentDetailData, AgentStatus
+from ai.backend.manager.data.agent.types import AgentStatus
 from ai.backend.manager.models.rbac.permission_defs import AgentPermission
 
 if TYPE_CHECKING:
@@ -659,40 +659,6 @@ class AgentV2GQL(PydanticNodeMixin[AgentNode]):
             AgentId(nid) for nid in node_ids
         ])
         return cast(list[Self | None], results)
-
-    @classmethod
-    def from_agent_detail_data(cls, detail_data: AgentDetailData) -> Self:
-        data = detail_data.agent
-
-        return cls(
-            id=ID(data.id),
-            resource_info=AgentResourceGQL(
-                capacity=data.available_slots.to_json(),
-                used=data.actual_occupied_slots.to_json(),
-                free=(data.available_slots - data.actual_occupied_slots).to_json(),
-            ),
-            status_info=AgentStatusInfoGQL(
-                status=data.status,
-                status_changed=data.status_changed,
-                first_contact=data.first_contact,
-                lost_at=data.lost_at,
-                schedulable=data.schedulable,
-            ),
-            system_info=AgentSystemInfoGQL(
-                architecture=data.architecture,
-                version=data.version,
-                auto_terminate_abusing_kernel=data.auto_terminate_abusing_kernel,
-                compute_plugins=ComputePluginsGQL.from_mapping(data.compute_plugins),
-            ),
-            network_info=AgentNetworkInfoGQL(
-                region=data.region,
-                addr=data.addr,
-            ),
-            permissions=[
-                AgentPermissionGQL.from_agent_permission(p) for p in detail_data.permissions
-            ],
-            scaling_group=data.scaling_group,
-        )
 
     @classmethod
     def from_pydantic(

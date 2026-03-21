@@ -44,7 +44,6 @@ if TYPE_CHECKING:
         ProjectV2OrderBy,
     )
     from ai.backend.manager.api.gql.project_v2.types.node import ProjectV2Connection
-    from ai.backend.manager.data.user.types import UserData
 
 
 @gql_pydantic_input(
@@ -363,52 +362,6 @@ class UserV2GQL(PydanticNodeMixin[UserNode]):
             timestamps=EntityTimestampsGQL(
                 created_at=dto.timestamps.created_at,
                 modified_at=dto.timestamps.modified_at,
-            ),
-        )
-
-    @classmethod
-    def from_data(cls, data: UserData) -> Self:
-        """Convert UserData to GraphQL type.
-
-        Args:
-            data: UserData instance from the data layer.
-
-        Returns:
-            UserV2GQL instance with structured field groups.
-        """
-        return cls(
-            id=ID(str(data.id)),
-            basic_info=UserBasicInfoGQL(
-                username=data.username,
-                email=data.email,
-                full_name=data.full_name,
-                description=data.description,
-            ),
-            status=UserStatusInfoGQL(
-                status=UserStatusEnumGQL(data.status),
-                status_info=data.status_info,
-                need_password_change=data.need_password_change,
-            ),
-            organization=UserOrganizationInfoGQL(
-                domain_name=data.domain_name,
-                role=UserRoleEnumGQL(data.role.value) if data.role else None,
-                resource_policy=data.resource_policy,
-                main_access_key=data.main_access_key,
-            ),
-            security=UserSecurityInfoGQL(
-                allowed_client_ip=data.allowed_client_ip,
-                totp_activated=data.totp_activated,
-                totp_activated_at=data.totp_activated_at,
-                sudo_session_enabled=data.sudo_session_enabled,
-            ),
-            container=UserContainerSettingsGQL(
-                container_uid=data.container_uid,
-                container_main_gid=data.container_main_gid,
-                container_gids=data.container_gids,
-            ),
-            timestamps=EntityTimestampsGQL(
-                created_at=data.created_at,
-                modified_at=data.modified_at,
             ),
         )
 

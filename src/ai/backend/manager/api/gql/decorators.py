@@ -4,10 +4,9 @@ Use these instead of @strawberry.type and @strawberry.experimental.pydantic.type
 so that every GQL type carries consistent version and description metadata.
 
 Decorator roles:
-    gql_node_type        — PydanticNodeMixin subclasses and complex output types
-                           that cannot use @strawberry.experimental.pydantic.type
-                           (e.g. types with strawberry.Private fields or interface
-                           implementations).
+    gql_node_type        — PydanticNodeMixin subclasses (Relay Node types with from_pydantic).
+    gql_output_type      — Non-node output types (payloads, nested structs, interface
+                           implementations) that are NOT PydanticNodeMixin subclasses.
     gql_connection_type  — Connection[T] and Edge[T] subclasses.
     gql_pydantic_type    — Output types backed by a v2 Pydantic DTO; Strawberry
                            auto-generates from_pydantic() / to_pydantic().
@@ -29,17 +28,20 @@ from strawberry.types.field import StrawberryField
 from strawberry.types.field import field as strawberry_field
 
 from ai.backend.common.meta import BackendAIGQLMeta
+from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin
 
 __all__ = (
     "BackendAIGQLMeta",
     "gql_connection_type",
     "gql_node_type",
+    "gql_output_type",
     "gql_pydantic_input",
     "gql_pydantic_interface",
     "gql_pydantic_type",
 )
 
-T = TypeVar("T")
+T = TypeVar("T", bound=PydanticNodeMixin)
+T_out = TypeVar("T_out")
 
 
 @dataclass_transform(
@@ -54,11 +56,11 @@ def gql_node_type(
     directives: Sequence[object] = (),
     extend: bool = False,
 ) -> Callable[[type[T]], type[T]]:
-    """Decorator for GQL node types.
+    """Decorator for GQL Relay Node types (PydanticNodeMixin subclasses).
 
-    Use for PydanticNodeMixin subclasses and any complex output type that
-    cannot use gql_pydantic_type (e.g. types with strawberry.Private fields,
-    interface implementations, or types requiring custom from_pydantic logic).
+    Use for types that inherit PydanticNodeMixin and implement the Relay Node interface.
+    For non-node output types (payloads, nested structs, interface implementations),
+    use gql_output_type instead.
     """
     description = f"Added in {meta.added_version}. {meta.description}"
     if meta.deprecated_version is not None:
@@ -83,7 +85,7 @@ def gql_connection_type(
     name: str | None = None,
     directives: Sequence[object] = (),
     extend: bool = False,
-) -> Callable[[type[T]], type[T]]:
+) -> Callable[[type[T_out]], type[T_out]]:
     """Decorator for GQL Connection and Edge types."""
     description = f"Added in {meta.added_version}. {meta.description}"
     if meta.deprecated_version is not None:
@@ -92,6 +94,41 @@ def gql_connection_type(
     return strawberry.type(
         name=name,
         description=description,
+        directives=directives,
+        extend=extend,
+    )
+
+
+@dataclass_transform(
+    order_default=True,
+    kw_only_default=True,
+    field_specifiers=(strawberry_field, StrawberryField),
+)
+def gql_output_type(
+    meta: BackendAIGQLMeta,
+    *,
+    name: str | None = None,
+    directives: Sequence[object] = (),
+    extend: bool = False,
+) -> Callable[[type[T_out]], type[T_out]]:
+    """Decorator for non-node GQL output types (payloads, nested structs, interface impls).
+
+    Use for output types that are NOT PydanticNodeMixin subclasses:
+    - Mutation result payloads (Create/Update/Delete/Validate payloads)
+    - Nested configuration or metadata structs (sub-fields of a Node)
+    - Interface implementations
+    - Subscription event payloads
+
+    For PydanticNodeMixin Relay Node types, use gql_node_type instead.
+    For Connection/Edge types, use gql_connection_type instead.
+    """
+    desc = f"Added in {meta.added_version}. {meta.description}"
+    if meta.deprecated_version is not None:
+        hint = f" Use {meta.deprecation_hint}." if meta.deprecation_hint else ""
+        desc += f" Deprecated since {meta.deprecated_version}.{hint}"
+    return strawberry.type(
+        name=name,
+        description=desc,
         directives=directives,
         extend=extend,
     )

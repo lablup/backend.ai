@@ -67,7 +67,7 @@ from ai.backend.manager.api.gql.resource_group.resolver import (
 from ai.backend.manager.api.gql.resource_group.types import ResourceGroupGQL
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.api.gql.user.types.node import UserV2GQL
-from ai.backend.manager.data.session.types import SessionData, SessionStatus
+from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.errors.user import UserNotFound
 
 
@@ -488,66 +488,6 @@ class SessionV2GQL(PydanticNodeMixin[SessionNode]):
             SessionId(UUID(nid)) for nid in node_ids
         ])
         return cast(list[Self | None], results)
-
-    @classmethod
-    def from_data(cls, data: SessionData) -> Self:
-        """Create SessionV2GQL from SessionData dataclass."""
-        requested_slots = ResourceSlotGQL.from_resource_slot(data.requested_slots)
-        occupying_slots = ResourceSlotGQL.from_resource_slot(data.occupying_slots)
-
-        environ_gql: EnvironmentVariablesGQL | None = None
-        if data.environ:
-            environ_gql = EnvironmentVariablesGQL(
-                entries=[
-                    EnvironmentVariableEntryGQL(name=k, value=str(v))
-                    for k, v in data.environ.items()
-                ]
-            )
-
-        return cls(
-            id=ID(str(data.id)),
-            domain_name=data.domain_name,
-            user_id=ID(str(data.user_uuid)),
-            project_id=ID(str(data.group_id)),
-            metadata=SessionV2MetadataInfoGQL(
-                creation_id=data.creation_id or "",
-                name=data.name or "",
-                session_type=SessionV2TypeGQL.from_internal(data.session_type),
-                access_key=str(data.access_key) if data.access_key else "",
-                cluster_mode=ClusterModeGQL.from_internal(data.cluster_mode),
-                cluster_size=data.cluster_size,
-                priority=data.priority,
-                is_preemptible=data.is_preemptible,
-                tag=data.tag,
-            ),
-            resource=SessionV2ResourceInfoGQL(
-                allocation=ResourceAllocationGQL(
-                    requested=requested_slots,
-                    used=occupying_slots,
-                ),
-                resource_group_name=data.scaling_group_name,
-                target_resource_group_names=data.target_sgroup_names,
-            ),
-            lifecycle=SessionV2LifecycleInfoGQL(
-                status=SessionV2StatusGQL.from_internal(data.status),
-                result=SessionV2ResultGQL.from_internal(data.result),
-                created_at=data.created_at,
-                terminated_at=data.terminated_at,
-                starts_at=data.starts_at,
-                batch_timeout=data.batch_timeout,
-            ),
-            runtime=SessionV2RuntimeInfoGQL(
-                environ=environ_gql,
-                bootstrap_script=data.bootstrap_script,
-                startup_command=data.startup_command,
-                callback_url=data.callback_url,
-            ),
-            network=SessionV2NetworkInfoGQL(
-                use_host_network=data.use_host_network,
-                network_type=str(data.network_type) if data.network_type else None,
-                network_id=data.network_id,
-            ),
-        )
 
     @classmethod
     def from_pydantic(

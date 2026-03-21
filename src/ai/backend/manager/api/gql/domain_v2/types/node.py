@@ -43,7 +43,6 @@ if TYPE_CHECKING:
     from ai.backend.manager.api.gql.project_v2.types.node import ProjectV2Connection
     from ai.backend.manager.api.gql.user.types.filters import UserFilterGQL, UserOrderByGQL
     from ai.backend.manager.api.gql.user.types.node import UserV2Connection
-    from ai.backend.manager.data.domain.types import DomainData
 
 
 @gql_pydantic_input(
@@ -369,43 +368,6 @@ class DomainV2GQL(PydanticNodeMixin[DomainNode]):
                 is_active=dto.lifecycle.is_active,
                 created_at=dto.lifecycle.created_at,
                 modified_at=dto.lifecycle.modified_at,
-            ),
-        )
-
-    @classmethod
-    def from_data(
-        cls,
-        data: DomainData,
-    ) -> Self:
-        """Convert DomainData to GraphQL type.
-
-        Args:
-            data: DomainData instance from the data layer.
-
-        Returns:
-            DomainV2GQL instance with structured field groups.
-
-        Note:
-            - All fields are directly from DomainRow (no external lookups)
-            - No JSON scalars are used in the output
-            - Primary key is domain name (string), not UUID
-            - ResourceSlot and storage permissions are excluded; use dedicated APIs
-            - Dotfiles (binary data) is excluded; use query_domain_dotfiles()
-        """
-        return cls(
-            id=ID(data.name),  # name is the primary key
-            basic_info=DomainBasicInfoGQL(
-                name=data.name,
-                description=data.description,
-                integration_id=data.integration_id,
-            ),
-            registry=DomainRegistryInfoGQL(
-                allowed_docker_registries=data.allowed_docker_registries,
-            ),
-            lifecycle=DomainLifecycleInfoGQL(
-                is_active=data.is_active,
-                created_at=data.created_at,
-                modified_at=data.modified_at,
             ),
         )
 

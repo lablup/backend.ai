@@ -52,7 +52,6 @@ if TYPE_CHECKING:
 from ai.backend.manager.api.gql.agent.types import AgentV2GQL
 from ai.backend.manager.api.gql.common.types import (
     ResourceOptsGQL,
-    ServicePortEntryGQL,
     ServicePortsGQL,
     SessionV2ResultGQL,
 )
@@ -64,7 +63,7 @@ from ai.backend.manager.api.gql.resource_group.types import ResourceGroupGQL
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.api.gql.user.types.node import UserV2GQL
 from ai.backend.manager.api.gql.utils import dedent_strip
-from ai.backend.manager.data.kernel.types import KernelInfo, KernelStatus
+from ai.backend.manager.data.kernel.types import KernelStatus
 
 
 @strawberry.enum(
@@ -669,78 +668,6 @@ class KernelV2GQL(PydanticNodeMixin[KernelNode]):
                 created_at=dto.lifecycle.created_at,
                 terminated_at=dto.lifecycle.terminated_at,
                 starts_at=dto.lifecycle.starts_at,
-            ),
-        )
-
-    @classmethod
-    def from_kernel_info(cls, kernel_info: KernelInfo, hide_agents: bool = False) -> Self:
-        """Create KernelGQL from KernelInfo dataclass."""
-        service_ports = (
-            ServicePortsGQL(
-                entries=[
-                    ServicePortEntryGQL.from_dict(p) for p in kernel_info.network.service_ports
-                ]
-            )
-            if kernel_info.network.service_ports
-            else None
-        )
-
-        used_slots = (
-            ResourceSlotGQL.from_resource_slot(kernel_info.resource.occupied_slots)
-            if kernel_info.resource.occupied_slots
-            else None
-        )
-
-        requested_slots = (
-            ResourceSlotGQL.from_resource_slot(kernel_info.resource.requested_slots)
-            if kernel_info.resource.requested_slots
-            else ResourceSlotGQL(entries=[])
-        )
-
-        shares = ResourceSlotGQL.from_resource_slot(kernel_info.resource.occupied_shares or {})
-
-        return cls(
-            id=ID(str(kernel_info.id)),
-            startup_command=kernel_info.runtime.startup_command,
-            session_info=KernelV2SessionInfoGQL(
-                session_id=UUID(kernel_info.session.session_id),
-                creation_id=kernel_info.session.creation_id,
-                name=kernel_info.session.name,
-                session_type=SessionTypes(kernel_info.session.session_type),
-            ),
-            user_info=KernelV2UserInfoGQL(
-                user_id=kernel_info.user_permission.user_uuid,
-                access_key=kernel_info.user_permission.access_key,
-                domain_name=kernel_info.user_permission.domain_name,
-                group_id=kernel_info.user_permission.group_id,
-            ),
-            network=KernelV2NetworkInfoGQL(
-                service_ports=service_ports,
-                preopen_ports=kernel_info.network.preopen_ports,
-            ),
-            cluster=KernelV2ClusterInfoGQL(
-                cluster_role=kernel_info.cluster.cluster_role,
-                cluster_idx=kernel_info.cluster.cluster_idx,
-                local_rank=kernel_info.cluster.local_rank,
-                cluster_hostname=kernel_info.cluster.cluster_hostname,
-            ),
-            resource=KernelV2ResourceInfoGQL(
-                agent_id=kernel_info.resource.agent if not hide_agents else None,
-                resource_group_name=kernel_info.resource.scaling_group,
-                container_id=kernel_info.resource.container_id if not hide_agents else None,
-                allocation=ResourceAllocationGQL(
-                    requested=requested_slots,
-                    used=used_slots,
-                ),
-                shares=shares,
-                resource_opts=ResourceOptsGQL.from_mapping(kernel_info.resource.resource_opts),
-            ),
-            lifecycle=KernelV2LifecycleInfoGQL(
-                status=KernelV2StatusGQL.from_internal(kernel_info.lifecycle.status),
-                result=SessionV2ResultGQL.from_internal(kernel_info.lifecycle.result),
-                created_at=kernel_info.lifecycle.created_at,
-                terminated_at=kernel_info.lifecycle.terminated_at,
-                starts_at=kernel_info.lifecycle.starts_at,
             ),
         )
 

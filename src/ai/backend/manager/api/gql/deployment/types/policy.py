@@ -26,15 +26,12 @@ from ai.backend.common.dto.manager.v2.deployment.response import (
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     gql_node_type,
+    gql_output_type,
     gql_pydantic_input,
 )
 from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin
 from ai.backend.manager.api.gql.utils import dedent_strip
-from ai.backend.manager.data.deployment.types import DeploymentPolicyData
-from ai.backend.manager.data.deployment.upserter import DeploymentPolicyUpserter
-from ai.backend.manager.errors.api import InvalidAPIParameters
 from ai.backend.manager.errors.deployment import InvalidDeploymentStrategySpec
-from ai.backend.manager.models.deployment_policy import BlueGreenSpec, RollingUpdateSpec
 
 # Enum defined here to avoid circular import with deployment.py
 DeploymentStrategyTypeGQL: type[DeploymentStrategy] = strawberry.enum(
@@ -54,8 +51,11 @@ class DeploymentStrategySpecGQL:
     strategy: DeploymentStrategyTypeGQL
 
 
-@gql_node_type(
-    BackendAIGQLMeta(added_version="25.19.0", description="Rolling update strategy specification."),
+@gql_output_type(
+    BackendAIGQLMeta(
+        added_version="25.19.0",
+        description="Rolling update strategy specification.",
+    ),
     name="RollingUpdateStrategySpec",
 )
 class RollingUpdateStrategySpecGQL(DeploymentStrategySpecGQL):
@@ -63,9 +63,10 @@ class RollingUpdateStrategySpecGQL(DeploymentStrategySpecGQL):
     max_unavailable: int
 
 
-@gql_node_type(
+@gql_output_type(
     BackendAIGQLMeta(
-        added_version="25.19.0", description="Blue-green deployment strategy specification."
+        added_version="25.19.0",
+        description="Blue-green deployment strategy specification.",
     ),
     name="BlueGreenStrategySpec",
 )
@@ -84,42 +85,6 @@ class DeploymentPolicyGQL(PydanticNodeMixin[Any]):
     rollback_on_failure: bool
     created_at: datetime
     updated_at: datetime
-
-    @classmethod
-    def from_data(cls, data: DeploymentPolicyData) -> Self:
-        match data.strategy:
-            case DeploymentStrategy.ROLLING:
-                if not isinstance(data.strategy_spec, RollingUpdateSpec):
-                    raise InvalidDeploymentStrategySpec(
-                        "Expected RollingUpdateSpec for ROLLING strategy"
-                    )
-                return cls(
-                    id=ID(str(data.id)),
-                    strategy_spec=RollingUpdateStrategySpecGQL(
-                        strategy=DeploymentStrategyTypeGQL.ROLLING,
-                        max_surge=data.strategy_spec.max_surge,
-                        max_unavailable=data.strategy_spec.max_unavailable,
-                    ),
-                    rollback_on_failure=data.rollback_on_failure,
-                    created_at=data.created_at,
-                    updated_at=data.updated_at,
-                )
-            case DeploymentStrategy.BLUE_GREEN:
-                if not isinstance(data.strategy_spec, BlueGreenSpec):
-                    raise InvalidDeploymentStrategySpec(
-                        "Expected BlueGreenSpec for BLUE_GREEN strategy"
-                    )
-                return cls(
-                    id=ID(str(data.id)),
-                    strategy_spec=BlueGreenStrategySpecGQL(
-                        strategy=DeploymentStrategyTypeGQL.BLUE_GREEN,
-                        auto_promote=data.strategy_spec.auto_promote,
-                        promote_delay_seconds=data.strategy_spec.promote_delay_seconds,
-                    ),
-                    rollback_on_failure=data.rollback_on_failure,
-                    created_at=data.created_at,
-                    updated_at=data.updated_at,
-                )
 
     @classmethod
     def from_pydantic(
@@ -229,40 +194,8 @@ class UpdateDeploymentPolicyInputGQL:
             blue_green=self.blue_green.to_pydantic() if self.blue_green else None,
         )
 
-    def to_upserter(self) -> DeploymentPolicyUpserter:
-        """Convert to DeploymentPolicyUpserter for the service layer."""
 
-        strategy = DeploymentStrategy(self.strategy.value)
-        strategy_spec: RollingUpdateSpec | BlueGreenSpec
-        match strategy:
-            case DeploymentStrategy.ROLLING:
-                if self.rolling_update is None:
-                    raise InvalidAPIParameters(
-                        "rolling_update config required for ROLLING strategy"
-                    )
-                strategy_spec = RollingUpdateSpec(
-                    max_surge=self.rolling_update.max_surge,
-                    max_unavailable=self.rolling_update.max_unavailable,
-                )
-            case DeploymentStrategy.BLUE_GREEN:
-                if self.blue_green is None:
-                    raise InvalidAPIParameters("blue_green config required for BLUE_GREEN strategy")
-                strategy_spec = BlueGreenSpec(
-                    auto_promote=self.blue_green.auto_promote,
-                    promote_delay_seconds=self.blue_green.promote_delay_seconds,
-                )
-            case _:
-                raise InvalidAPIParameters(f"Unsupported deployment strategy: {strategy}")
-
-        return DeploymentPolicyUpserter(
-            deployment_id=UUID(str(self.deployment_id)),
-            strategy=strategy,
-            strategy_spec=strategy_spec,
-            rollback_on_failure=self.rollback_on_failure,
-        )
-
-
-@gql_node_type(
+@gql_output_type(
     BackendAIGQLMeta(
         added_version="26.4.0",
         description="Result payload returned after creating or updating a deployment policy. Contains the full deployment_policy object reflecting the applied configuration.",

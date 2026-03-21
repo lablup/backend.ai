@@ -22,7 +22,6 @@ from ai.backend.manager.api.gql.decorators import (
 )
 from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
-from ai.backend.manager.data.audit_log.types import AuditLogData
 
 if TYPE_CHECKING:
     from ai.backend.manager.api.gql.user.types.node import UserV2GQL
@@ -122,22 +121,6 @@ class AuditLogV2GQL(PydanticNodeMixin[AuditLogNode]):
             UUID(nid) for nid in node_ids
         ])
         return cast(list[Self | None], results)
-
-    @classmethod
-    def from_data(cls, data: AuditLogData) -> Self:
-        return cls(
-            id=ID(str(data.id)),
-            action_id=data.action_id,
-            entity_type=data.entity_type,
-            operation=data.operation,
-            entity_id=data.entity_id,
-            created_at=data.created_at,
-            request_id=data.request_id,
-            triggered_by=data.triggered_by,
-            description=data.description,
-            duration=str(data.duration) if data.duration is not None else None,
-            status=AuditLogStatusGQL.from_internal(data.status),
-        )
 
     @classmethod
     def from_pydantic(

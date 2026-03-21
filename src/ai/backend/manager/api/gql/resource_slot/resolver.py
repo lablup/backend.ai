@@ -8,38 +8,16 @@ from strawberry import Info
 from ai.backend.common.dto.manager.v2.resource_slot.request import (
     AdminSearchResourceSlotTypesInput,
 )
-from ai.backend.common.dto.manager.v2.resource_slot.response import ResourceSlotTypeNode
 from ai.backend.manager.api.gql.base import encode_cursor
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 
 from .types import (
-    NumberFormatGQL,
     ResourceSlotTypeConnectionGQL,
     ResourceSlotTypeEdgeGQL,
     ResourceSlotTypeFilterGQL,
     ResourceSlotTypeGQL,
     ResourceSlotTypeOrderByGQL,
 )
-
-
-def _slot_type_node_to_gql(node: ResourceSlotTypeNode) -> ResourceSlotTypeGQL:
-    """Convert ResourceSlotTypeNode DTO to ResourceSlotTypeGQL."""
-    from strawberry import ID
-
-    return ResourceSlotTypeGQL(
-        id=ID(node.slot_name),
-        slot_name=node.slot_name,
-        slot_type=node.slot_type,
-        display_name=node.display_name,
-        description=node.description,
-        display_unit=node.display_unit,
-        display_icon=node.display_icon,
-        number_format=NumberFormatGQL(
-            binary=node.number_format.binary,
-            round_length=node.number_format.round_length,
-        ),
-        rank=node.rank,
-    )
 
 
 @strawberry.field(
@@ -49,8 +27,8 @@ async def resource_slot_type(
     info: Info[StrawberryGQLContext],
     slot_name: str,
 ) -> ResourceSlotTypeGQL | None:
-    data = await info.context.adapters.resource_slot.get_slot_type(slot_name)
-    return ResourceSlotTypeGQL.from_data(data)
+    node = await info.context.adapters.resource_slot.get_slot_type(slot_name)
+    return ResourceSlotTypeGQL.from_pydantic(node)
 
 
 @strawberry.field(
@@ -79,7 +57,7 @@ async def resource_slot_types(
     )
     payload = await info.context.adapters.resource_slot.search_slot_types(search_input)
 
-    nodes = [_slot_type_node_to_gql(item) for item in payload.items]
+    nodes = [ResourceSlotTypeGQL.from_pydantic(item) for item in payload.items]
     edges = [ResourceSlotTypeEdgeGQL(node=node, cursor=encode_cursor(node.id)) for node in nodes]
 
     return ResourceSlotTypeConnectionGQL(

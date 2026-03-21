@@ -15,7 +15,7 @@ from ai.backend.common.dto.manager.v2.resource_group.request import (
 from ai.backend.common.types import SlotQuantity
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
-    gql_node_type,
+    gql_output_type,
     gql_pydantic_input,
 )
 from ai.backend.manager.data.fair_share.types import FairShareSpec
@@ -44,7 +44,7 @@ def _normalize_quantity(value: Decimal) -> Decimal:
     return normalized
 
 
-@gql_node_type(
+@gql_output_type(
     BackendAIGQLMeta(
         added_version="26.1.0",
         description=(
@@ -110,7 +110,7 @@ class ResourceWeightEntryInputGQL:
         )
 
 
-@gql_node_type(
+@gql_output_type(
     BackendAIGQLMeta(
         added_version="26.1.0",
         description=(
@@ -155,7 +155,7 @@ class ResourceSlotGQL:
         return cls(entries=entries)
 
 
-@gql_node_type(
+@gql_output_type(
     BackendAIGQLMeta(
         added_version="26.2.0",
         description=(
@@ -190,7 +190,7 @@ class ResourceWeightEntryGQL:
     )
 
 
-@gql_node_type(
+@gql_output_type(
     BackendAIGQLMeta(
         added_version="26.1.0",
         description=(
@@ -287,7 +287,7 @@ class FairShareSpecGQL:
         )
 
 
-@gql_node_type(
+@gql_output_type(
     BackendAIGQLMeta(
         added_version="26.1.0",
         description=(

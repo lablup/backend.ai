@@ -213,7 +213,7 @@ class ArtifactVerifierGQLResult:
     )
 
     @classmethod
-    def from_dataclass(cls, data: VerifierResult) -> ArtifactVerifierGQLResult:
+    def from_pydantic(cls, data: VerifierResult) -> ArtifactVerifierGQLResult:
         return cls(
             success=data.success,
             infected_count=data.infected_count,
@@ -244,7 +244,7 @@ class ArtifactVerifierGQLResultEntry:
     ) -> ArtifactVerifierGQLResultEntry:
         return cls(
             name=name,
-            result=ArtifactVerifierGQLResult.from_dataclass(result),
+            result=ArtifactVerifierGQLResult.from_pydantic(result),
         )
 
 
@@ -261,7 +261,7 @@ class ArtifactVerificationGQLResult:
     )
 
     @classmethod
-    def from_dataclass(cls, data: VerificationStepResult) -> ArtifactVerificationGQLResult:
+    def from_pydantic(cls, data: VerificationStepResult) -> ArtifactVerificationGQLResult:
         verifier_entries = [
             ArtifactVerifierGQLResultEntry.from_verifier_result(verifier_name, verifier_result)
             for verifier_name, verifier_result in data.verifiers.items()
@@ -886,7 +886,7 @@ class ArtifactRevision(PydanticNodeMixin[ArtifactRevisionNode]):
         """
         verification_result: ArtifactVerificationGQLResult | None = None
         if dto.verification_result is not None:
-            verification_result = ArtifactVerificationGQLResult.from_dataclass(
+            verification_result = ArtifactVerificationGQLResult.from_pydantic(
                 dto.verification_result
             )
         return cls(
@@ -930,7 +930,7 @@ class ArtifactRevision(PydanticNodeMixin[ArtifactRevisionNode]):
             created_at=data.created_at,
             updated_at=data.updated_at,
             digest=data.digest,
-            verification_result=ArtifactVerificationGQLResult.from_dataclass(
+            verification_result=ArtifactVerificationGQLResult.from_pydantic(
                 data.verification_result
             )
             if data.verification_result

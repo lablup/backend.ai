@@ -43,7 +43,6 @@ if TYPE_CHECKING:
     from ai.backend.manager.api.gql.domain_v2.types.node import DomainV2GQL
     from ai.backend.manager.api.gql.user.types.filters import UserFilterGQL, UserOrderByGQL
     from ai.backend.manager.api.gql.user.types.node import UserV2Connection
-    from ai.backend.manager.data.group.types import GroupData
 
 
 @gql_pydantic_input(
@@ -343,56 +342,6 @@ class ProjectV2GQL(PydanticNodeMixin[ProjectNode]):
                 is_active=dto.lifecycle.is_active,
                 created_at=dto.lifecycle.created_at,
                 modified_at=dto.lifecycle.modified_at,
-            ),
-        )
-
-    @classmethod
-    def from_data(
-        cls,
-        data: GroupData,
-    ) -> Self:
-        """Convert GroupData to GraphQL type.
-
-        Args:
-            data: GroupData instance from the data layer.
-
-        Returns:
-            ProjectV2GQL instance with structured field groups.
-
-        Note:
-            - All fields are directly from GroupRow (no external lookups)
-            - VFolderHostPermissionMap (dict) is converted to list[VFolderHostPermissionEntryGQL]
-            - No JSON scalars are used in the output
-            - ResourceSlot and container_registry are excluded; use dedicated APIs
-        """
-        # Convert VFolderHostPermissionMap (dict[str, set[VFolderHostPermission]]) to list of entries
-        vfolder_host_entries = [
-            VFolderHostPermissionEntryGQL(
-                host=host,
-                permissions=[VFolderHostPermissionEnum(perm.value) for perm in perms],
-            )
-            for host, perms in data.allowed_vfolder_hosts.items()
-        ]
-
-        return cls(
-            id=ID(str(data.id)),
-            basic_info=ProjectBasicInfoGQL(
-                name=data.name,
-                description=data.description,
-                type=ProjectTypeEnum(data.type.value),
-                integration_id=data.integration_id,
-            ),
-            organization=ProjectOrganizationInfoGQL(
-                domain_name=data.domain_name,
-                resource_policy=data.resource_policy,
-            ),
-            storage=ProjectStorageInfoGQL(
-                allowed_vfolder_hosts=vfolder_host_entries,
-            ),
-            lifecycle=ProjectLifecycleInfoGQL(
-                is_active=data.is_active,
-                created_at=data.created_at,
-                modified_at=data.modified_at,
             ),
         )
 

@@ -120,6 +120,7 @@ from ai.backend.manager.api.gql.base import OrderDirection, StringFilter
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     gql_node_type,
+    gql_output_type,
     gql_pydantic_input,
 )
 from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin
@@ -193,7 +194,7 @@ class NotificationChannelSpecGQL:
     channel_type: NotificationChannelTypeGQL
 
 
-@gql_node_type(
+@gql_output_type(
     BackendAIGQLMeta(
         added_version="26.3.0", description="Specification for webhook notification channel."
     ),
@@ -203,7 +204,7 @@ class WebhookSpecGQL(NotificationChannelSpecGQL):
     url: str
 
 
-@gql_node_type(
+@gql_output_type(
     BackendAIGQLMeta(added_version="26.3.0", description="SMTP authentication credentials."),
     name="SMTPAuth",
 )
@@ -211,7 +212,7 @@ class SMTPAuthGQL:
     username: str | None
 
 
-@gql_node_type(
+@gql_output_type(
     BackendAIGQLMeta(added_version="26.3.0", description="SMTP server connection settings."),
     name="SMTPConnection",
 )
@@ -222,7 +223,7 @@ class SMTPConnectionGQL:
     timeout: int
 
 
-@gql_node_type(
+@gql_output_type(
     BackendAIGQLMeta(added_version="26.3.0", description="Email message settings."),
     name="EmailMessage",
 )
@@ -232,7 +233,7 @@ class EmailMessageGQL:
     subject_template: str | None
 
 
-@gql_node_type(
+@gql_output_type(
     BackendAIGQLMeta(
         added_version="26.3.0", description="Specification for email notification channel."
     ),
@@ -807,10 +808,10 @@ class DeleteNotificationRuleInput:
 # Payload types for mutations
 
 
-@gql_node_type(
+@gql_output_type(
     BackendAIGQLMeta(
         added_version="26.3.0", description="Payload for create notification channel mutation."
-    )
+    ),
 )
 class CreateNotificationChannelPayload:
     channel: NotificationChannel
@@ -820,10 +821,10 @@ class CreateNotificationChannelPayload:
         return cls(channel=NotificationChannel.from_pydantic(dto.channel))
 
 
-@gql_node_type(
+@gql_output_type(
     BackendAIGQLMeta(
         added_version="26.3.0", description="Payload for update notification channel mutation."
-    )
+    ),
 )
 class UpdateNotificationChannelPayload:
     channel: NotificationChannel
@@ -833,7 +834,7 @@ class UpdateNotificationChannelPayload:
         return cls(channel=NotificationChannel.from_pydantic(dto.channel))
 
 
-@gql_node_type(
+@gql_output_type(
     BackendAIGQLMeta(
         added_version="26.3.0", description="Payload for delete notification channel mutation."
     ),
@@ -849,10 +850,10 @@ class DeleteNotificationChannelPayload:
         return cls(id=ID(str(instance.id)))
 
 
-@gql_node_type(
+@gql_output_type(
     BackendAIGQLMeta(
         added_version="26.3.0", description="Payload for create notification rule mutation."
-    )
+    ),
 )
 class CreateNotificationRulePayload:
     rule: NotificationRule
@@ -862,10 +863,10 @@ class CreateNotificationRulePayload:
         return cls(rule=NotificationRule.from_pydantic(dto.rule))
 
 
-@gql_node_type(
+@gql_output_type(
     BackendAIGQLMeta(
         added_version="26.3.0", description="Payload for update notification rule mutation."
-    )
+    ),
 )
 class UpdateNotificationRulePayload:
     rule: NotificationRule
@@ -875,7 +876,7 @@ class UpdateNotificationRulePayload:
         return cls(rule=NotificationRule.from_pydantic(dto.rule))
 
 
-@gql_node_type(
+@gql_output_type(
     BackendAIGQLMeta(
         added_version="26.3.0", description="Payload for delete notification rule mutation."
     ),
@@ -911,7 +912,7 @@ class ValidateNotificationChannelInput:
         )
 
 
-@gql_node_type(
+@gql_output_type(
     BackendAIGQLMeta(
         added_version="26.3.0", description="Payload for validate notification channel mutation."
     ),
@@ -946,7 +947,7 @@ class ValidateNotificationRuleInput:
         )
 
 
-@gql_node_type(
+@gql_output_type(
     BackendAIGQLMeta(
         added_version="26.3.0", description="Payload for validate notification rule mutation."
     ),

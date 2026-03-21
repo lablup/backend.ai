@@ -11,10 +11,10 @@ import strawberry
 from ai.backend.common.dto.manager.v2.resource_usage.response import (
     UsageBucketMetadataNode as UsageBucketMetadataNodeDTO,
 )
-from ai.backend.manager.api.gql.decorators import BackendAIGQLMeta, gql_node_type
+from ai.backend.manager.api.gql.decorators import BackendAIGQLMeta, gql_output_type
 
 
-@gql_node_type(
+@gql_output_type(
     BackendAIGQLMeta(
         added_version="26.1.0",
         description=(

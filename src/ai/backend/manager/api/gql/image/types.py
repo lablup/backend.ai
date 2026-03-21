@@ -65,10 +65,7 @@ from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin
 from ai.backend.manager.api.gql.types import GQLFilter, GQLOrderBy, StrawberryGQLContext
 from ai.backend.manager.api.gql.utils import dedent_strip
 from ai.backend.manager.data.image.types import (
-    ImageAliasData,
-    ImageData,
     ImageDataWithDetails,
-    ImageStatus,
 )
 from ai.backend.manager.models.image.conditions import ImageAliasConditions
 from ai.backend.manager.models.rbac.permission_defs import ImagePermission
@@ -90,10 +87,6 @@ class ImageV2StatusGQL(enum.Enum):
     ALIVE = "ALIVE"
     DELETED = "DELETED"
 
-    @classmethod
-    def from_data(cls, status: ImageStatus) -> ImageV2StatusGQL:
-        return cls(status.value)
-
 
 @strawberry.enum(
     name="ImageV2Permission",
@@ -108,10 +101,6 @@ class ImageV2PermissionGQL(enum.Enum):
     UPDATE_ATTRIBUTE = "UPDATE_ATTRIBUTE"
     CREATE_CONTAINER = "CREATE_CONTAINER"
     FORGET_IMAGE = "FORGET_IMAGE"
-
-    @classmethod
-    def from_data(cls, permission: ImagePermission) -> ImageV2PermissionGQL:
-        return cls(permission.value)
 
 
 # =============================================================================
@@ -182,10 +171,6 @@ class ImageV2AliasGQL(PydanticNodeMixin[ImageAliasNode]):
             uuid.UUID(nid) for nid in node_ids
         ])
         return cast(list[Self | None], results)
-
-    @classmethod
-    def from_data(cls, data: ImageAliasData) -> Self:
-        return cls(id=data.id, alias=data.alias)
 
     @classmethod
     def from_pydantic(
@@ -416,58 +401,6 @@ class ImageV2GQL(PydanticNodeMixin[ImageNode]):
         )
 
     @classmethod
-    def from_data(
-        cls,
-        data: ImageData,
-        permissions: list[ImagePermission] | None = None,
-    ) -> Self:
-        """Create ImageV2GQL from ImageData.
-
-        Args:
-            data: The image data.
-            permissions: Optional list of permissions the user has on this image.
-
-        Returns:
-            ImageV2GQL instance.
-        """
-        accelerators = data.accelerators.split(",") if data.accelerators else []
-        return cls(
-            id=data.id,
-            identity=ImageV2IdentityInfoGQL(
-                canonical_name=str(data.name),
-                namespace=data.image,
-                architecture=data.architecture,
-            ),
-            metadata=ImageV2MetadataInfoGQL(
-                digest=data.config_digest,
-                size_bytes=data.size_bytes,
-                created_at=data.created_at,
-                tags=[ImageV2TagEntryGQL(key=entry.key, value=entry.value) for entry in data.tags],
-                labels=[
-                    ImageV2LabelEntryGQL(key=k, value=v) for k, v in data.labels.label_data.items()
-                ],
-                status=ImageV2StatusGQL.from_data(data.status),
-            ),
-            requirements=ImageV2RequirementsInfoGQL(
-                supported_accelerators=[a.strip() for a in accelerators if a.strip()],
-                resource_limits=[
-                    ImageV2ResourceLimitGQL(
-                        key=rl.key,
-                        min=str(rl.min),
-                        max=str(rl.max),
-                    )
-                    for rl in data.resource_limits
-                ],
-            ),
-            permission=ImageV2PermissionInfoGQL(
-                permissions=[ImageV2PermissionGQL.from_data(p) for p in permissions],
-            )
-            if permissions
-            else None,
-            registry_id=data.registry_id,
-        )
-
-    @classmethod
     def from_detailed_data(
         cls,
         data: ImageDataWithDetails,
@@ -495,7 +428,7 @@ class ImageV2GQL(PydanticNodeMixin[ImageNode]):
                 created_at=data.created_at,
                 tags=[ImageV2TagEntryGQL(key=kv.key, value=kv.value) for kv in data.tags],
                 labels=[ImageV2LabelEntryGQL(key=kv.key, value=kv.value) for kv in data.labels],
-                status=ImageV2StatusGQL.from_data(data.status),
+                status=ImageV2StatusGQL(data.status.value),
             ),
             requirements=ImageV2RequirementsInfoGQL(
                 supported_accelerators=[
@@ -511,7 +444,7 @@ class ImageV2GQL(PydanticNodeMixin[ImageNode]):
                 ],
             ),
             permission=ImageV2PermissionInfoGQL(
-                permissions=[ImageV2PermissionGQL.from_data(p) for p in permissions],
+                permissions=[ImageV2PermissionGQL(p.value) for p in permissions],
             )
             if permissions
             else None,

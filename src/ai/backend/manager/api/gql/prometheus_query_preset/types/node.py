@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import TYPE_CHECKING, Any, Self
+from typing import Any, Self
 
 import strawberry
 from strawberry import ID
@@ -27,9 +27,6 @@ from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin
 
 from .payloads import QueryDefinitionOptionsGQL
 
-if TYPE_CHECKING:
-    from ai.backend.manager.data.prometheus_query_preset import PrometheusQueryPresetData
-
 
 @gql_node_type(
     BackendAIGQLMeta(
@@ -51,28 +48,6 @@ class QueryDefinitionGQL(PydanticNodeMixin[QueryDefinitionNode]):
     )
     created_at: datetime = strawberry.field(description="Creation timestamp.")
     updated_at: datetime = strawberry.field(description="Last update timestamp.")
-
-    @classmethod
-    def from_data(cls, data: PrometheusQueryPresetData) -> Self:
-        from ai.backend.common.dto.manager.v2.prometheus_query_preset.types import (
-            QueryDefinitionOptionsInfo,
-        )
-
-        return cls(
-            id=ID(str(data.id)),
-            name=data.name,
-            metric_name=data.metric_name,
-            query_template=data.query_template,
-            time_window=data.time_window,
-            options=QueryDefinitionOptionsGQL.from_pydantic(
-                QueryDefinitionOptionsInfo(
-                    filter_labels=data.filter_labels,
-                    group_labels=data.group_labels,
-                )
-            ),
-            created_at=data.created_at,
-            updated_at=data.updated_at,
-        )
 
     @classmethod
     def from_pydantic(

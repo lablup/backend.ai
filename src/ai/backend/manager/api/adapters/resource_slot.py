@@ -381,34 +381,34 @@ class ResourceSlotAdapter(BaseAdapter):
     # Single-item getters
     # -------------------------------------------------------------------------
 
-    async def get_slot_type(self, slot_name: str) -> ResourceSlotTypeData:
+    async def get_slot_type(self, slot_name: str) -> ResourceSlotTypeNode:
         """Retrieve a single resource slot type by slot name."""
         action_result = (
             await self._processors.resource_slot.get_resource_slot_type.wait_for_complete(
                 GetResourceSlotTypeAction(slot_name=slot_name)
             )
         )
-        return action_result.item
+        return self._slot_type_data_to_node(action_result.item)
 
-    async def get_agent_resource(self, agent_id: str, slot_name: str) -> AgentResourceData:
+    async def get_agent_resource(self, agent_id: str, slot_name: str) -> AgentResourceNode:
         """Retrieve a single agent resource by agent ID and slot name."""
         action_result = (
             await self._processors.resource_slot.get_agent_resource_by_slot.wait_for_complete(
                 GetAgentResourceBySlotAction(agent_id=agent_id, slot_name=slot_name)
             )
         )
-        return action_result.item
+        return self._agent_resource_data_to_node(action_result.item)
 
     async def get_kernel_allocation(
         self, kernel_id: uuid.UUID, slot_name: str
-    ) -> ResourceAllocationData:
+    ) -> ResourceAllocationNode:
         """Retrieve a single kernel resource allocation by kernel ID and slot name."""
         action_result = (
             await self._processors.resource_slot.get_kernel_allocation_by_slot.wait_for_complete(
                 GetKernelAllocationBySlotAction(kernel_id=kernel_id, slot_name=slot_name)
             )
         )
-        return action_result.item
+        return self._resource_allocation_data_to_node(action_result.item)
 
     # -------------------------------------------------------------------------
     # Resource overview

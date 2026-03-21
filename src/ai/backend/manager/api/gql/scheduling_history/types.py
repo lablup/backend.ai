@@ -67,6 +67,7 @@ from ai.backend.manager.api.gql.base import (
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     gql_node_type,
+    gql_output_type,
     gql_pydantic_input,
 )
 from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin
@@ -172,8 +173,12 @@ class RouteHistoryOrderField(StrEnum):
 # Types
 
 
-@gql_node_type(
-    BackendAIGQLMeta(added_version="26.3.0", description="Sub-step result in scheduling history.")
+@gql_output_type(
+    BackendAIGQLMeta(
+        added_version="26.3.0",
+        description="Sub-step result in scheduling history.",
+    ),
+    name="SubStepResult",
 )
 class SubStepResultGQL:
     step: str

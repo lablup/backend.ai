@@ -36,6 +36,15 @@ from ai.backend.common.dto.manager.v2.resource_slot.request import (
 from ai.backend.common.dto.manager.v2.resource_slot.request import (
     ResourceSlotTypeOrder as ResourceSlotTypeOrderDTO,
 )
+from ai.backend.common.dto.manager.v2.resource_slot.response import (
+    AgentResourceNode as AgentResourceNodeDTO,
+)
+from ai.backend.common.dto.manager.v2.resource_slot.response import (
+    ResourceAllocationNode as ResourceAllocationNodeDTO,
+)
+from ai.backend.common.dto.manager.v2.resource_slot.response import (
+    ResourceSlotTypeNode as ResourceSlotTypeNodeDTO,
+)
 from ai.backend.common.dto.manager.v2.resource_slot.types import (
     AgentResourceOrderField as AgentResourceOrderFieldDTO,
 )
@@ -62,43 +71,36 @@ from ai.backend.manager.api.gql.decorators import (
 from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.api.gql.utils import dedent_strip
-from ai.backend.manager.data.resource_slot.types import (
-    AgentResourceData,
-    ResourceAllocationData,
-    ResourceSlotTypeData,
-)
 
-# ========== Raw data helpers for Node.resolve_nodes ==========
-# These return raw data types so that resolve_nodes can call cls.from_data(),
-# which enables mypy to correctly infer the return type as Iterable[Self | None].
+# ========== DTO helpers for Node.resolve_nodes ==========
 
 
-async def load_resource_slot_type_data(
+async def load_resource_slot_type_node(
     info: Info[StrawberryGQLContext],
     slot_name: str,
-) -> ResourceSlotTypeData:
-    """Load raw ResourceSlotTypeData for a single slot_name (used by Node.resolve_nodes)."""
+) -> ResourceSlotTypeNodeDTO:
+    """Load a ResourceSlotTypeNode DTO for a single slot_name (used by Node.resolve_nodes)."""
     return await info.context.adapters.resource_slot.get_slot_type(slot_name)
 
 
-async def load_agent_resource_data(
+async def load_agent_resource_node(
     info: Info[StrawberryGQLContext],
     agent_id: str,
     slot_name: str,
-) -> AgentResourceData:
-    """Load raw AgentResourceData for a single agent+slot (used by Node.resolve_nodes).
+) -> AgentResourceNodeDTO:
+    """Load an AgentResourceNode DTO for a single agent+slot (used by Node.resolve_nodes).
 
     Raises AgentResourceNotFound if the entry does not exist.
     """
     return await info.context.adapters.resource_slot.get_agent_resource(agent_id, slot_name)
 
 
-async def load_kernel_allocation_data(
+async def load_kernel_allocation_node(
     info: Info[StrawberryGQLContext],
     kernel_id_str: str,
     slot_name: str,
-) -> ResourceAllocationData:
-    """Load raw ResourceAllocationData for a single kernel+slot (used by Node.resolve_nodes).
+) -> ResourceAllocationNodeDTO:
+    """Load a ResourceAllocationNode DTO for a single kernel+slot (used by Node.resolve_nodes).
 
     Raises ResourceAllocationNotFound if the entry does not exist.
     """
@@ -176,31 +178,14 @@ class ResourceSlotTypeGQL(PydanticNodeMixin[Any]):
         results: list[Self | None] = []
         for slot_name in node_ids:
             try:
-                data = await load_resource_slot_type_data(info, slot_name)
+                node = await load_resource_slot_type_node(info, slot_name)
             except ResourceSlotTypeNotFound:
                 if required:
                     raise
                 results.append(None)
             else:
-                results.append(cls.from_data(data))
+                results.append(cls.from_pydantic(node))
         return results
-
-    @classmethod
-    def from_data(cls, data: ResourceSlotTypeData) -> Self:
-        return cls(
-            id=ID(data.slot_name),
-            slot_name=data.slot_name,
-            slot_type=data.slot_type,
-            display_name=data.display_name,
-            description=data.description,
-            display_unit=data.display_unit,
-            display_icon=data.display_icon,
-            number_format=NumberFormatGQL(
-                binary=data.number_format.binary,
-                round_length=data.number_format.round_length,
-            ),
-            rank=data.rank,
-        )
 
 
 ResourceSlotTypeEdgeGQL = Edge[ResourceSlotTypeGQL]
@@ -321,23 +306,28 @@ class AgentResourceSlotGQL(PydanticNodeMixin[Any]):
         for node_id in node_ids:
             agent_id, _, slot_name = node_id.partition(":")
             try:
-                data = await load_agent_resource_data(info, agent_id, slot_name)
+                node = await load_agent_resource_node(info, agent_id, slot_name)
             except AgentResourceNotFound:
                 if required:
                     raise
                 results.append(None)
             else:
-                results.append(cls.from_data(data))
+                results.append(cls.from_pydantic(node))
         return results
 
     @classmethod
-    def from_data(cls, data: AgentResourceData) -> Self:
-        node_id = f"{data.agent_id}:{data.slot_name}"
+    def from_pydantic(  # type: ignore[override]
+        cls,
+        dto: AgentResourceNodeDTO,
+        extra: dict[str, Any] | None = None,
+        *,
+        id_field: str = "id",
+    ) -> Self:
         return cls(
-            id=ID(node_id),
-            slot_name=data.slot_name,
-            capacity=data.capacity,
-            used=data.used,
+            id=ID(dto.id),
+            slot_name=dto.slot_name,
+            capacity=Decimal(dto.capacity),
+            used=Decimal(dto.occupied),
         )
 
 
@@ -457,23 +447,28 @@ class KernelResourceAllocationGQL(PydanticNodeMixin[Any]):
         for node_id in node_ids:
             kernel_id_str, _, slot_name = node_id.partition(":")
             try:
-                data = await load_kernel_allocation_data(info, kernel_id_str, slot_name)
+                node = await load_kernel_allocation_node(info, kernel_id_str, slot_name)
             except ResourceAllocationNotFound:
                 if required:
                     raise
                 results.append(None)
             else:
-                results.append(cls.from_data(data))
+                results.append(cls.from_pydantic(node))
         return results
 
     @classmethod
-    def from_data(cls, data: ResourceAllocationData) -> Self:
-        node_id = f"{data.kernel_id}:{data.slot_name}"
+    def from_pydantic(  # type: ignore[override]
+        cls,
+        dto: ResourceAllocationNodeDTO,
+        extra: dict[str, Any] | None = None,
+        *,
+        id_field: str = "id",
+    ) -> Self:
         return cls(
-            id=ID(node_id),
-            slot_name=data.slot_name,
-            requested=data.requested,
-            used=data.used,
+            id=ID(dto.id),
+            slot_name=dto.slot_name,
+            requested=Decimal(dto.requested),
+            used=Decimal(dto.used) if dto.used is not None else None,
         )
 
 
