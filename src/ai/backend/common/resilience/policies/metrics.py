@@ -60,8 +60,7 @@ class MetricPolicy(Policy):
         self._domain = args.domain
         self._layer = args.layer
         self._observer = LayerMetricObserver.instance()
-
-    _metric_error_logged: bool = False
+        self._metric_error_logged = False
 
     def _safe_observe(self, fn: Callable[[], None]) -> None:
         """Call a metric-recording function, suppressing any errors."""

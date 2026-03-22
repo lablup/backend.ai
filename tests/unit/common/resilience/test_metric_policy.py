@@ -278,3 +278,53 @@ class TestMetricPolicy:
 
         # Warning should be logged only once despite 3 calls (3 trigger + 3 completion)
         assert mock_log_warning.call_count == 1
+
+    async def test_operation_error_propagates_when_trigger_metric_fails(
+        self, mocker: MockerFixture
+    ) -> None:
+        """Test that when trigger metric fails and the operation also fails,
+        the original operation exception propagates."""
+        mock_observer = MagicMock()
+        mock_observer.observe_layer_operation_triggered.side_effect = ValueError(
+            "mmap slice assignment is wrong size"
+        )
+        mocker.patch(
+            "ai.backend.common.resilience.policies.metrics.LayerMetricObserver.instance",
+            return_value=mock_observer,
+        )
+
+        metric_policy = MetricPolicy(
+            MetricArgs(domain=DomainType.CLIENT, layer=LayerType.AGENT_CLIENT)
+        )
+
+        @Resilience(policies=[metric_policy]).apply()
+        async def failing_operation() -> str:
+            raise RuntimeError("connection lost")
+
+        with pytest.raises(RuntimeError, match="connection lost"):
+            await failing_operation()
+
+    async def test_operation_error_propagates_when_all_metrics_fail(
+        self, mocker: MockerFixture
+    ) -> None:
+        """Test that when both metrics fail and the operation also fails,
+        the original operation exception propagates."""
+        mock_observer = MagicMock()
+        mmap_error = ValueError("mmap slice assignment is wrong size")
+        mock_observer.observe_layer_operation_triggered.side_effect = mmap_error
+        mock_observer.observe_layer_operation.side_effect = mmap_error
+        mocker.patch(
+            "ai.backend.common.resilience.policies.metrics.LayerMetricObserver.instance",
+            return_value=mock_observer,
+        )
+
+        metric_policy = MetricPolicy(
+            MetricArgs(domain=DomainType.CLIENT, layer=LayerType.AGENT_CLIENT)
+        )
+
+        @Resilience(policies=[metric_policy]).apply()
+        async def failing_operation() -> str:
+            raise RuntimeError("connection lost")
+
+        with pytest.raises(RuntimeError, match="connection lost"):
+            await failing_operation()
