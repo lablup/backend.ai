@@ -27,6 +27,7 @@ from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     gql_pydantic_input,
 )
+from ai.backend.manager.api.gql.pydantic_compat import PydanticInputMixin
 
 from .enums import ProjectTypeEnum
 
@@ -36,20 +37,13 @@ from .enums import ProjectTypeEnum
         description="Nested filter for the domain a project belongs to. Filters projects whose domain matches all specified conditions.",
         added_version="26.2.0",
     ),
-    model=GroupDomainFilter,
     name="ProjectDomainNestedFilter",
 )
-class ProjectDomainNestedFilter:
+class ProjectDomainNestedFilter(PydanticInputMixin[GroupDomainFilter]):
     """Nested filter for domain of a project."""
 
     name: StringFilter | None = None
     is_active: bool | None = None
-
-    def to_pydantic(self) -> GroupDomainFilter:
-        return GroupDomainFilter(
-            name=self.name.to_pydantic() if self.name else None,
-            is_active=self.is_active,
-        )
 
 
 @gql_pydantic_input(
@@ -57,22 +51,14 @@ class ProjectDomainNestedFilter:
         description="Nested filter for users belonging to a project. Filters projects that have at least one user matching all specified conditions.",
         added_version="26.2.0",
     ),
-    model=GroupUserFilter,
     name="ProjectUserNestedFilter",
 )
-class ProjectUserNestedFilter:
+class ProjectUserNestedFilter(PydanticInputMixin[GroupUserFilter]):
     """Nested filter for users within a project."""
 
     username: StringFilter | None = None
     email: StringFilter | None = None
     is_active: bool | None = None
-
-    def to_pydantic(self) -> GroupUserFilter:
-        return GroupUserFilter(
-            username=self.username.to_pydantic() if self.username else None,
-            email=self.email.to_pydantic() if self.email else None,
-            is_active=self.is_active,
-        )
 
 
 @gql_pydantic_input(
@@ -80,10 +66,9 @@ class ProjectUserNestedFilter:
         description="Filter for ProjectTypeEnum fields. Supports equals, in, not_equals, and not_in operations.",
         added_version="26.2.0",
     ),
-    model=ProjectTypeFilter,
     name="ProjectTypeV2EnumFilter",
 )
-class ProjectTypeEnumFilter:
+class ProjectTypeEnumFilter(PydanticInputMixin[ProjectTypeFilter]):
     """Filter for project type enum fields."""
 
     equals: ProjectTypeEnum | None = None
@@ -91,26 +76,15 @@ class ProjectTypeEnumFilter:
     not_equals: ProjectTypeEnum | None = None
     not_in: list[ProjectTypeEnum] | None = None
 
-    def to_pydantic(self) -> ProjectTypeFilter:
-        from ai.backend.common.dto.manager.v2.group.types import ProjectType
-
-        return ProjectTypeFilter(
-            equals=ProjectType(self.equals.value) if self.equals else None,
-            in_=[ProjectType(t.value) for t in self.in_] if self.in_ else None,
-            not_equals=ProjectType(self.not_equals.value) if self.not_equals else None,
-            not_in=[ProjectType(t.value) for t in self.not_in] if self.not_in else None,
-        )
-
 
 @gql_pydantic_input(
     BackendAIGQLMeta(
         description="Filter input for querying projects. Supports filtering by ID, name, domain, type, active status, and timestamps. Multiple filters can be combined using AND, OR, and NOT logical operators.",
         added_version="26.2.0",
     ),
-    model=GroupFilter,
     name="ProjectV2Filter",
 )
-class ProjectV2Filter:
+class ProjectV2Filter(PydanticInputMixin[GroupFilter]):
     """Filter for project queries."""
 
     id: UUIDFilter | None = None
@@ -125,22 +99,6 @@ class ProjectV2Filter:
     AND: list[Self] | None = None
     OR: list[Self] | None = None
     NOT: list[Self] | None = None
-
-    def to_pydantic(self) -> GroupFilter:
-        return GroupFilter(
-            id=self.id.to_pydantic() if self.id else None,
-            name=self.name.to_pydantic() if self.name else None,
-            domain_name=self.domain_name.to_pydantic() if self.domain_name else None,
-            type=self.type.to_pydantic() if self.type else None,
-            is_active=self.is_active,
-            created_at=self.created_at.to_pydantic() if self.created_at else None,
-            modified_at=self.modified_at.to_pydantic() if self.modified_at else None,
-            domain=self.domain.to_pydantic() if self.domain else None,
-            user=self.user.to_pydantic() if self.user else None,
-            AND=[f.to_pydantic() for f in self.AND] if self.AND else None,
-            OR=[f.to_pydantic() for f in self.OR] if self.OR else None,
-            NOT=[f.to_pydantic() for f in self.NOT] if self.NOT else None,
-        )
 
 
 @strawberry.enum(
@@ -173,7 +131,6 @@ class ProjectV2OrderField(StrEnum):
         description="Specifies ordering for project query results. Combine field selection with direction to sort results. Default direction is DESC (descending).",
         added_version="26.2.0",
     ),
-    model=GroupOrder,
     name="ProjectV2OrderBy",
 )
 class ProjectV2OrderBy:

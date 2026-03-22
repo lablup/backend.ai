@@ -33,12 +33,15 @@ from ai.backend.manager.api.gql.base import encode_cursor
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     gql_connection_type,
-    gql_from_pydantic_type,
     gql_node_type,
     gql_pydantic_input,
     gql_pydantic_type,
 )
-from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin, PydanticOutputMixin
+from ai.backend.manager.api.gql.pydantic_compat import (
+    PydanticInputMixin,
+    PydanticNodeMixin,
+    PydanticOutputMixin,
+)
 
 from .types import StrawberryGQLContext
 
@@ -117,51 +120,28 @@ async def vfs_storages(
 
 @gql_pydantic_input(
     BackendAIGQLMeta(description="Input for creating VFS storage", added_version="25.16.0"),
-    model=CreateVFSStorageInputDTO,
 )
-class CreateVFSStorageInput:
+class CreateVFSStorageInput(PydanticInputMixin[CreateVFSStorageInputDTO]):
     name: str
     host: str
     base_path: str
 
-    def to_pydantic(self) -> CreateVFSStorageInputDTO:
-        """Convert to pydantic DTO for adapter layer processing."""
-        return CreateVFSStorageInputDTO(
-            name=self.name,
-            host=self.host,
-            base_path=self.base_path,
-        )
-
 
 @gql_pydantic_input(
     BackendAIGQLMeta(description="Input for updating VFS storage", added_version="25.16.0"),
-    model=UpdateVFSStorageInputDTO,
 )
-class UpdateVFSStorageInput:
+class UpdateVFSStorageInput(PydanticInputMixin[UpdateVFSStorageInputDTO]):
     id: ID
     name: str | None = UNSET
     host: str | None = UNSET
     base_path: str | None = UNSET
 
-    def to_pydantic(self) -> UpdateVFSStorageInputDTO:
-        return UpdateVFSStorageInputDTO(
-            id=uuid.UUID(self.id),
-            name=None if self.name is UNSET else self.name,
-            host=None if self.host is UNSET else self.host,
-            base_path=None if self.base_path is UNSET else self.base_path,
-        )
-
 
 @gql_pydantic_input(
     BackendAIGQLMeta(description="Input for deleting VFS storage", added_version="25.16.0"),
-    model=DeleteVFSStorageInputDTO,
 )
-class DeleteVFSStorageInput:
+class DeleteVFSStorageInput(PydanticInputMixin[DeleteVFSStorageInputDTO]):
     id: ID
-
-    def to_pydantic(self) -> DeleteVFSStorageInputDTO:
-        """Convert to pydantic DTO for adapter layer processing."""
-        return DeleteVFSStorageInputDTO(id=uuid.UUID(self.id))
 
 
 @gql_pydantic_type(
@@ -186,21 +166,19 @@ class UpdateVFSStoragePayload:
     vfs_storage: VFSStorage
 
 
-@gql_from_pydantic_type(
+@gql_pydantic_type(
     BackendAIGQLMeta(
         added_version="25.16.0",
         description="Payload for deleting VFS storage.",
     ),
+    model=DeleteVFSStoragePayloadDTO,
+    fields=["id"],
     name="DeleteVFSStoragePayload",
 )
 class DeleteVFSStoragePayload(PydanticOutputMixin[DeleteVFSStoragePayloadDTO]):
     """Payload for VFS storage deletion mutation."""
 
     id: ID = strawberry.field(description="ID of the deleted VFS storage.")
-
-    @classmethod
-    def from_pydantic(cls, instance: DeleteVFSStoragePayloadDTO) -> Self:  # type: ignore[override]
-        return cls(id=ID(str(instance.id)))
 
 
 @strawberry.mutation(  # type: ignore[misc]

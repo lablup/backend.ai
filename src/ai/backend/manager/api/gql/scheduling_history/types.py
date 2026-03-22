@@ -5,7 +5,7 @@ from __future__ import annotations
 from collections.abc import Iterable
 from datetime import datetime
 from enum import StrEnum
-from typing import Any, Self, cast
+from typing import Self, cast
 from uuid import UUID
 
 import strawberry
@@ -39,24 +39,10 @@ from ai.backend.common.dto.manager.v2.scheduling_history.response import (
     SessionHistoryNode,
 )
 from ai.backend.common.dto.manager.v2.scheduling_history.types import (
-    DeploymentHistoryOrderField as DeploymentHistoryOrderFieldEnum,
-)
-from ai.backend.common.dto.manager.v2.scheduling_history.types import (
     DeploymentHistoryScopeDTO,
     RouteHistoryScopeDTO,
     SessionHistoryScopeDTO,
-)
-from ai.backend.common.dto.manager.v2.scheduling_history.types import (
-    OrderDirection as OrderDirectionEnum,
-)
-from ai.backend.common.dto.manager.v2.scheduling_history.types import (
-    RouteHistoryOrderField as RouteHistoryOrderFieldEnum,
-)
-from ai.backend.common.dto.manager.v2.scheduling_history.types import (
-    SchedulingResultType as SchedulingResultTypeEnum,
-)
-from ai.backend.common.dto.manager.v2.scheduling_history.types import (
-    SessionHistoryOrderField as SessionHistoryOrderFieldEnum,
+    SubStepResultInfo,
 )
 from ai.backend.manager.api.gql.base import (
     DateTimeFilter,
@@ -66,11 +52,15 @@ from ai.backend.manager.api.gql.base import (
 )
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
+    gql_from_pydantic_type,
     gql_node_type,
-    gql_output_type,
     gql_pydantic_input,
 )
-from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin
+from ai.backend.manager.api.gql.pydantic_compat import (
+    PydanticInputMixin,
+    PydanticNodeMixin,
+    PydanticOutputMixin,
+)
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.data.session.types import SchedulingResult
 
@@ -173,14 +163,14 @@ class RouteHistoryOrderField(StrEnum):
 # Types
 
 
-@gql_output_type(
+@gql_from_pydantic_type(
     BackendAIGQLMeta(
         added_version="26.3.0",
         description="Sub-step result in scheduling history.",
     ),
     name="SubStepResult",
 )
-class SubStepResultGQL:
+class SubStepResultGQL(PydanticOutputMixin[SubStepResultInfo]):
     step: str
     result: SchedulingResultGQL
     error_code: str | None
@@ -220,39 +210,6 @@ class SessionSchedulingHistory(PydanticNodeMixin[SessionHistoryNode]):
         ])
         return cast(list[Self | None], results)
 
-    @classmethod
-    def from_pydantic(
-        cls,
-        dto: SessionHistoryNode,
-        extra: dict[str, Any] | None = None,
-        *,
-        id_field: str = "id",
-    ) -> Self:
-        return cls(
-            id=ID(str(dto.id)),
-            session_id=ID(str(dto.session_id)),
-            phase=dto.phase,
-            from_status=dto.from_status,
-            to_status=dto.to_status,
-            result=SchedulingResultGQL(dto.result),
-            error_code=dto.error_code,
-            message=dto.message,
-            sub_steps=[
-                SubStepResultGQL(
-                    step=s.step,
-                    result=SchedulingResultGQL(s.result),
-                    error_code=s.error_code,
-                    message=s.message,
-                    started_at=s.started_at,
-                    ended_at=s.ended_at,
-                )
-                for s in dto.sub_steps
-            ],
-            attempts=dto.attempts,
-            created_at=dto.created_at,
-            updated_at=dto.updated_at,
-        )
-
 
 @gql_node_type(BackendAIGQLMeta(added_version="26.3.0", description="Deployment history record."))
 class DeploymentHistory(PydanticNodeMixin[DeploymentHistoryNode]):
@@ -282,39 +239,6 @@ class DeploymentHistory(PydanticNodeMixin[DeploymentHistoryNode]):
             UUID(nid) for nid in node_ids
         ])
         return cast(list[Self | None], results)
-
-    @classmethod
-    def from_pydantic(
-        cls,
-        dto: DeploymentHistoryNode,
-        extra: dict[str, Any] | None = None,
-        *,
-        id_field: str = "id",
-    ) -> Self:
-        return cls(
-            id=ID(str(dto.id)),
-            deployment_id=ID(str(dto.deployment_id)),
-            phase=dto.phase,
-            from_status=dto.from_status,
-            to_status=dto.to_status,
-            result=SchedulingResultGQL(dto.result),
-            error_code=dto.error_code,
-            message=dto.message,
-            sub_steps=[
-                SubStepResultGQL(
-                    step=s.step,
-                    result=SchedulingResultGQL(s.result),
-                    error_code=s.error_code,
-                    message=s.message,
-                    started_at=s.started_at,
-                    ended_at=s.ended_at,
-                )
-                for s in dto.sub_steps
-            ],
-            attempts=dto.attempts,
-            created_at=dto.created_at,
-            updated_at=dto.updated_at,
-        )
 
 
 @gql_node_type(BackendAIGQLMeta(added_version="26.3.0", description="Route history record."))
@@ -347,40 +271,6 @@ class RouteHistory(PydanticNodeMixin[RouteHistoryNode]):
         ])
         return cast(list[Self | None], results)
 
-    @classmethod
-    def from_pydantic(
-        cls,
-        dto: RouteHistoryNode,
-        extra: dict[str, Any] | None = None,
-        *,
-        id_field: str = "id",
-    ) -> Self:
-        return cls(
-            id=ID(str(dto.id)),
-            route_id=ID(str(dto.route_id)),
-            deployment_id=ID(str(dto.deployment_id)),
-            phase=dto.phase,
-            from_status=dto.from_status,
-            to_status=dto.to_status,
-            result=SchedulingResultGQL(dto.result),
-            error_code=dto.error_code,
-            message=dto.message,
-            sub_steps=[
-                SubStepResultGQL(
-                    step=s.step,
-                    result=SchedulingResultGQL(s.result),
-                    error_code=s.error_code,
-                    message=s.message,
-                    started_at=s.started_at,
-                    ended_at=s.ended_at,
-                )
-                for s in dto.sub_steps
-            ],
-            attempts=dto.attempts,
-            created_at=dto.created_at,
-            updated_at=dto.updated_at,
-        )
-
 
 # Scope input types (added in 26.2.0)
 
@@ -389,48 +279,36 @@ class RouteHistory(PydanticNodeMixin[RouteHistoryNode]):
     BackendAIGQLMeta(
         description="Scope for session scheduling history query", added_version="24.09.0"
     ),
-    model=SessionHistoryScopeDTO,
     name="SessionScope",
 )
-class SessionScope:
+class SessionScope(PydanticInputMixin[SessionHistoryScopeDTO]):
     """Scope for session-level scheduling history queries."""
 
     session_id: UUID = strawberry.field(description="Session ID to get history for")
-
-    def to_pydantic(self) -> SessionHistoryScopeDTO:
-        return SessionHistoryScopeDTO(session_id=self.session_id)
 
 
 @gql_pydantic_input(
     BackendAIGQLMeta(
         description="Scope for deployment scheduling history query", added_version="24.09.0"
     ),
-    model=DeploymentHistoryScopeDTO,
     name="DeploymentScope",
 )
-class DeploymentScope:
+class DeploymentScope(PydanticInputMixin[DeploymentHistoryScopeDTO]):
     """Scope for deployment-level scheduling history queries."""
 
     deployment_id: UUID = strawberry.field(description="Deployment ID to get history for")
-
-    def to_pydantic(self) -> DeploymentHistoryScopeDTO:
-        return DeploymentHistoryScopeDTO(deployment_id=self.deployment_id)
 
 
 @gql_pydantic_input(
     BackendAIGQLMeta(
         description="Scope for route scheduling history query", added_version="24.09.0"
     ),
-    model=RouteHistoryScopeDTO,
     name="RouteScope",
 )
-class RouteScope:
+class RouteScope(PydanticInputMixin[RouteHistoryScopeDTO]):
     """Scope for route-level scheduling history queries."""
 
     route_id: UUID = strawberry.field(description="Route ID to get history for")
-
-    def to_pydantic(self) -> RouteHistoryScopeDTO:
-        return RouteHistoryScopeDTO(route_id=self.route_id)
 
 
 # Filters and orders (pydantic-backed inputs)
@@ -441,32 +319,20 @@ class RouteScope:
         description="Filter for scheduling result with equality and membership operators.",
         added_version="26.3.0",
     ),
-    model=SchedulingResultFilterDTO,
     name="SchedulingResultFilter",
 )
-class SchedulingResultFilterGQL:
+class SchedulingResultFilterGQL(PydanticInputMixin[SchedulingResultFilterDTO]):
     equals: SchedulingResultGQL | None = None
     in_: list[SchedulingResultGQL] | None = strawberry.field(name="in", default=None)
     not_equals: SchedulingResultGQL | None = None
     not_in: list[SchedulingResultGQL] | None = None
 
-    def to_pydantic(self) -> SchedulingResultFilterDTO:
-        return SchedulingResultFilterDTO(
-            equals=SchedulingResultTypeEnum(self.equals.value) if self.equals else None,
-            in_=[SchedulingResultTypeEnum(v.value) for v in self.in_] if self.in_ else None,
-            not_equals=SchedulingResultTypeEnum(self.not_equals.value) if self.not_equals else None,
-            not_in=[SchedulingResultTypeEnum(v.value) for v in self.not_in]
-            if self.not_in
-            else None,
-        )
-
 
 @gql_pydantic_input(
     BackendAIGQLMeta(description="Filter for session scheduling history", added_version="24.09.0"),
-    model=SessionHistoryFilterDTO,
     name="SessionSchedulingHistoryFilter",
 )
-class SessionSchedulingHistoryFilter:
+class SessionSchedulingHistoryFilter(PydanticInputMixin[SessionHistoryFilterDTO]):
     id: UUIDFilter | None = None
     session_id: UUIDFilter | None = None
     phase: StringFilter | None = None
@@ -481,48 +347,23 @@ class SessionSchedulingHistoryFilter:
     OR: list[Self] | None = None
     NOT: list[Self] | None = None
 
-    def to_pydantic(self) -> SessionHistoryFilterDTO:
-        return SessionHistoryFilterDTO(
-            id=self.id.to_pydantic() if self.id else None,
-            session_id=self.session_id.to_pydantic() if self.session_id else None,
-            phase=self.phase.to_pydantic() if self.phase else None,
-            from_status=self.from_status,
-            to_status=self.to_status,
-            result=self.result.to_pydantic() if self.result else None,
-            error_code=self.error_code.to_pydantic() if self.error_code else None,
-            message=self.message.to_pydantic() if self.message else None,
-            created_at=self.created_at.to_pydantic() if self.created_at else None,
-            updated_at=self.updated_at.to_pydantic() if self.updated_at else None,
-            AND=[f.to_pydantic() for f in self.AND] if self.AND else None,
-            OR=[f.to_pydantic() for f in self.OR] if self.OR else None,
-            NOT=[f.to_pydantic() for f in self.NOT] if self.NOT else None,
-        )
-
 
 @gql_pydantic_input(
     BackendAIGQLMeta(
         description="Order by specification for session scheduling history", added_version="24.09.0"
     ),
-    model=SessionHistoryOrderDTO,
     name="SessionSchedulingHistoryOrderBy",
 )
-class SessionSchedulingHistoryOrderBy:
+class SessionSchedulingHistoryOrderBy(PydanticInputMixin[SessionHistoryOrderDTO]):
     field: SessionSchedulingHistoryOrderField
     direction: OrderDirection = OrderDirection.DESC
-
-    def to_pydantic(self) -> SessionHistoryOrderDTO:
-        return SessionHistoryOrderDTO(
-            field=SessionHistoryOrderFieldEnum(self.field.value),
-            direction=OrderDirectionEnum(self.direction.value),
-        )
 
 
 @gql_pydantic_input(
     BackendAIGQLMeta(description="Filter for deployment history", added_version="24.09.0"),
-    model=DeploymentHistoryFilterDTO,
     name="DeploymentHistoryFilter",
 )
-class DeploymentHistoryFilter:
+class DeploymentHistoryFilter(PydanticInputMixin[DeploymentHistoryFilterDTO]):
     id: UUIDFilter | None = None
     deployment_id: UUIDFilter | None = None
     phase: StringFilter | None = None
@@ -537,48 +378,23 @@ class DeploymentHistoryFilter:
     OR: list[Self] | None = None
     NOT: list[Self] | None = None
 
-    def to_pydantic(self) -> DeploymentHistoryFilterDTO:
-        return DeploymentHistoryFilterDTO(
-            id=self.id.to_pydantic() if self.id else None,
-            deployment_id=self.deployment_id.to_pydantic() if self.deployment_id else None,
-            phase=self.phase.to_pydantic() if self.phase else None,
-            from_status=self.from_status,
-            to_status=self.to_status,
-            result=self.result.to_pydantic() if self.result else None,
-            error_code=self.error_code.to_pydantic() if self.error_code else None,
-            message=self.message.to_pydantic() if self.message else None,
-            created_at=self.created_at.to_pydantic() if self.created_at else None,
-            updated_at=self.updated_at.to_pydantic() if self.updated_at else None,
-            AND=[f.to_pydantic() for f in self.AND] if self.AND else None,
-            OR=[f.to_pydantic() for f in self.OR] if self.OR else None,
-            NOT=[f.to_pydantic() for f in self.NOT] if self.NOT else None,
-        )
-
 
 @gql_pydantic_input(
     BackendAIGQLMeta(
         description="Order by specification for deployment history", added_version="24.09.0"
     ),
-    model=DeploymentHistoryOrderDTO,
     name="DeploymentHistoryOrderBy",
 )
-class DeploymentHistoryOrderBy:
+class DeploymentHistoryOrderBy(PydanticInputMixin[DeploymentHistoryOrderDTO]):
     field: DeploymentHistoryOrderField
     direction: OrderDirection = OrderDirection.DESC
-
-    def to_pydantic(self) -> DeploymentHistoryOrderDTO:
-        return DeploymentHistoryOrderDTO(
-            field=DeploymentHistoryOrderFieldEnum(self.field.value),
-            direction=OrderDirectionEnum(self.direction.value),
-        )
 
 
 @gql_pydantic_input(
     BackendAIGQLMeta(description="Filter for route history", added_version="24.09.0"),
-    model=RouteHistoryFilterDTO,
     name="RouteHistoryFilter",
 )
-class RouteHistoryFilter:
+class RouteHistoryFilter(PydanticInputMixin[RouteHistoryFilterDTO]):
     id: UUIDFilter | None = None
     route_id: UUIDFilter | None = None
     deployment_id: UUIDFilter | None = None
@@ -594,38 +410,13 @@ class RouteHistoryFilter:
     OR: list[Self] | None = None
     NOT: list[Self] | None = None
 
-    def to_pydantic(self) -> RouteHistoryFilterDTO:
-        return RouteHistoryFilterDTO(
-            id=self.id.to_pydantic() if self.id else None,
-            route_id=self.route_id.to_pydantic() if self.route_id else None,
-            deployment_id=self.deployment_id.to_pydantic() if self.deployment_id else None,
-            phase=self.phase.to_pydantic() if self.phase else None,
-            from_status=self.from_status,
-            to_status=self.to_status,
-            result=self.result.to_pydantic() if self.result else None,
-            error_code=self.error_code.to_pydantic() if self.error_code else None,
-            message=self.message.to_pydantic() if self.message else None,
-            created_at=self.created_at.to_pydantic() if self.created_at else None,
-            updated_at=self.updated_at.to_pydantic() if self.updated_at else None,
-            AND=[f.to_pydantic() for f in self.AND] if self.AND else None,
-            OR=[f.to_pydantic() for f in self.OR] if self.OR else None,
-            NOT=[f.to_pydantic() for f in self.NOT] if self.NOT else None,
-        )
-
 
 @gql_pydantic_input(
     BackendAIGQLMeta(
         description="Order by specification for route history", added_version="24.09.0"
     ),
-    model=RouteHistoryOrderDTO,
     name="RouteHistoryOrderBy",
 )
-class RouteHistoryOrderBy:
+class RouteHistoryOrderBy(PydanticInputMixin[RouteHistoryOrderDTO]):
     field: RouteHistoryOrderField
     direction: OrderDirection = OrderDirection.DESC
-
-    def to_pydantic(self) -> RouteHistoryOrderDTO:
-        return RouteHistoryOrderDTO(
-            field=RouteHistoryOrderFieldEnum(self.field.value),
-            direction=OrderDirectionEnum(self.direction.value),
-        )

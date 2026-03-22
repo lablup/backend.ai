@@ -40,17 +40,14 @@ from ai.backend.manager.api.gql.common.types import (
 )
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
+    PydanticInputMixin,
     gql_connection_type,
     gql_node_type,
     gql_pydantic_input,
     gql_pydantic_type,
 )
-from ai.backend.manager.api.gql.deployment.types.revision import (
-    EnvironmentVariableEntryGQL,
-    EnvironmentVariablesGQL,
-)
+from ai.backend.manager.api.gql.deployment.types.revision import EnvironmentVariablesGQL
 from ai.backend.manager.api.gql.domain_v2.types.node import DomainV2GQL
-from ai.backend.manager.api.gql.fair_share.types.common import ResourceSlotGQL
 from ai.backend.manager.api.gql.image.types import ImageV2ConnectionGQL
 from ai.backend.manager.api.gql.kernel.types import (
     KernelV2ConnectionGQL,
@@ -159,7 +156,6 @@ class SessionV2OrderFieldGQL(StrEnum):
 
 @gql_pydantic_input(
     BackendAIGQLMeta(description="Filter for session status.", added_version="26.3.0"),
-    model=SessionStatusFilter,
     name="SessionV2StatusFilter",
 )
 class SessionV2StatusFilterGQL:
@@ -178,10 +174,9 @@ class SessionV2StatusFilterGQL:
         description="Filter criteria for querying sessions.",
         added_version="26.3.0",
     ),
-    model=SessionFilter,
     name="SessionV2Filter",
 )
-class SessionV2FilterGQL:
+class SessionV2FilterGQL(PydanticInputMixin[SessionFilter]):
     id: UUIDFilter | None = None
     status: SessionV2StatusFilterGQL | None = None
     name: StringFilter | None = None
@@ -193,23 +188,9 @@ class SessionV2FilterGQL:
     OR: list[Self] | None = None
     NOT: list[Self] | None = None
 
-    def to_pydantic(self) -> SessionFilter:
-        return SessionFilter(
-            id=self.id.to_pydantic() if self.id else None,
-            status=self.status.to_pydantic() if self.status else None,
-            name=self.name.to_pydantic() if self.name else None,
-            domain_name=self.domain_name.to_pydantic() if self.domain_name else None,
-            project_id=self.project_id.to_pydantic() if self.project_id else None,
-            user_uuid=self.user_uuid.to_pydantic() if self.user_uuid else None,
-            AND=[f.to_pydantic() for f in self.AND] if self.AND else None,
-            OR=[f.to_pydantic() for f in self.OR] if self.OR else None,
-            NOT=[f.to_pydantic() for f in self.NOT] if self.NOT else None,
-        )
-
 
 @gql_pydantic_input(
     BackendAIGQLMeta(description="Ordering specification for sessions.", added_version="26.3.0"),
-    model=SessionOrder,
     name="SessionV2OrderBy",
 )
 class SessionV2OrderByGQL:
@@ -488,88 +469,6 @@ class SessionV2GQL(PydanticNodeMixin[SessionNode]):
             SessionId(UUID(nid)) for nid in node_ids
         ])
         return cast(list[Self | None], results)
-
-    @classmethod
-    def from_pydantic(
-        cls,
-        dto: SessionNode,
-        extra: dict[str, Any] | None = None,
-        *,
-        id_field: str = "id",
-    ) -> Self:
-        """Create SessionV2GQL from SessionNode DTO (adapter search results)."""
-        from ai.backend.common.types import ClusterMode, ResourceSlot, SessionResult, SessionTypes
-        from ai.backend.manager.data.session.types import SessionStatus as SessionStatusInternal
-
-        requested_slots = ResourceSlotGQL.from_resource_slot(
-            ResourceSlot.from_json(dto.resource.requested_slots)
-            if dto.resource.requested_slots
-            else {}
-        )
-        occupying_slots = ResourceSlotGQL.from_resource_slot(
-            ResourceSlot.from_json(dto.resource.occupying_slots)
-            if dto.resource.occupying_slots
-            else {}
-        )
-
-        status = SessionV2StatusGQL.from_internal(SessionStatusInternal(dto.lifecycle.status))
-        result = SessionV2ResultGQL.from_internal(SessionResult(dto.lifecycle.result))
-
-        environ_gql: EnvironmentVariablesGQL | None = None
-        if dto.runtime.environ:
-            environ_gql = EnvironmentVariablesGQL(
-                entries=[
-                    EnvironmentVariableEntryGQL(name=k, value=v)
-                    for k, v in dto.runtime.environ.items()
-                ]
-            )
-
-        return cls(
-            id=ID(str(dto.id)),
-            domain_name=dto.domain_name,
-            user_id=ID(str(dto.user_uuid)),
-            project_id=ID(str(dto.group_id)),
-            metadata=SessionV2MetadataInfoGQL(
-                creation_id=dto.metadata.creation_id or "",
-                name=dto.metadata.name or "",
-                session_type=SessionV2TypeGQL.from_internal(
-                    SessionTypes(dto.metadata.session_type)
-                ),
-                access_key=dto.metadata.access_key or "",
-                cluster_mode=ClusterModeGQL.from_internal(ClusterMode(dto.metadata.cluster_mode)),
-                cluster_size=dto.metadata.cluster_size,
-                priority=dto.metadata.priority,
-                is_preemptible=dto.metadata.is_preemptible,
-                tag=dto.metadata.tag,
-            ),
-            resource=SessionV2ResourceInfoGQL(
-                allocation=ResourceAllocationGQL(
-                    requested=requested_slots,
-                    used=occupying_slots,
-                ),
-                resource_group_name=dto.resource.scaling_group_name,
-                target_resource_group_names=dto.resource.target_sgroup_names,
-            ),
-            lifecycle=SessionV2LifecycleInfoGQL(
-                status=status,
-                result=result,
-                created_at=dto.lifecycle.created_at,
-                terminated_at=dto.lifecycle.terminated_at,
-                starts_at=dto.lifecycle.starts_at,
-                batch_timeout=dto.lifecycle.batch_timeout,
-            ),
-            runtime=SessionV2RuntimeInfoGQL(
-                environ=environ_gql,
-                bootstrap_script=dto.runtime.bootstrap_script,
-                startup_command=dto.runtime.startup_command,
-                callback_url=dto.runtime.callback_url,
-            ),
-            network=SessionV2NetworkInfoGQL(
-                use_host_network=dto.network.use_host_network,
-                network_type=dto.network.network_type,
-                network_id=dto.network.network_id,
-            ),
-        )
 
 
 # ========== Connection Types ==========

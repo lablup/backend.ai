@@ -25,6 +25,7 @@ __all__ = (
     # Sub-models
     "ResourceSlotEntryInfo",
     "ResourceSlotInfo",
+    "ResourceWeightEntryInfo",
     "FairShareSpecInfo",
     "FairShareCalculationSnapshotInfo",
     "UsageBucketMetadataInfo",
@@ -93,13 +94,23 @@ class ResourceSlotEntryInfo(BaseResponseModel):
     """A single resource slot entry with resource type and quantity."""
 
     resource_type: str = Field(description="Resource type identifier (e.g., cpu, mem, cuda.shares)")
-    quantity: str = Field(description="Quantity as a decimal string to preserve precision")
+    quantity: Decimal = Field(description="Quantity of the resource")
 
 
 class ResourceSlotInfo(BaseResponseModel):
     """Collection of compute resource allocations."""
 
     entries: list[ResourceSlotEntryInfo] = Field(description="List of resource allocations")
+
+
+class ResourceWeightEntryInfo(BaseResponseModel):
+    """A single resource weight entry with default indicator."""
+
+    resource_type: str = Field(description="Resource type identifier")
+    weight: Decimal = Field(description="Weight multiplier for this resource type")
+    uses_default: bool = Field(
+        description="Whether this resource uses the resource group's default weight"
+    )
 
 
 class FairShareSpecInfo(BaseResponseModel):
@@ -111,7 +122,7 @@ class FairShareSpecInfo(BaseResponseModel):
             "(either the explicitly set weight or the resource group's default_weight)."
         ),
     )
-    uses_default_weight: bool = Field(
+    uses_default: bool = Field(
         default=False,
         description=(
             "Whether this entity uses the resource group's default_weight. "
@@ -121,10 +132,8 @@ class FairShareSpecInfo(BaseResponseModel):
     half_life_days: int = Field(description="Half-life for exponential decay in days")
     lookback_days: int = Field(description="Total lookback period in days")
     decay_unit_days: int = Field(description="Granularity of decay buckets in days")
-    resource_weights: ResourceSlotInfo = Field(description="Weights for each resource type")
-    uses_default_resource_types: list[str] = Field(
-        default_factory=list,
-        description="Resource types using the resource group's default weight",
+    resource_weights: list[ResourceWeightEntryInfo] = Field(
+        description="Weights for each resource type with default indicators"
     )
 
 

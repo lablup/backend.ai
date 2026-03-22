@@ -37,21 +37,16 @@ from ai.backend.common.dto.manager.v2.rbac.types import (
     OperationTypeDTO,
     RBACElementTypeDTO,
 )
-from ai.backend.common.dto.manager.v2.rbac.types import (
-    OrderDirection as OrderDirectionDTO,
-)
-from ai.backend.common.dto.manager.v2.rbac.types import (
-    PermissionOrderField as PermissionOrderFieldDTO,
-)
 from ai.backend.common.types import SessionId
 from ai.backend.manager.api.gql.base import OrderDirection
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
+    PydanticInputMixin,
     gql_connection_type,
-    gql_from_pydantic_type,
     gql_node_type,
     gql_output_type,
     gql_pydantic_input,
+    gql_pydantic_type,
 )
 from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin, PydanticOutputMixin
 from ai.backend.manager.api.gql.rbac.types.entity_node import EntityNode
@@ -188,33 +183,15 @@ class PermissionGQL(PydanticNodeMixin[PermissionNodeDTO]):
             ):
                 return None
 
-    @classmethod
-    def from_pydantic(
-        cls,
-        dto: PermissionNodeDTO,
-        extra: dict[str, Any] | None = None,
-        *,
-        id_field: str = "id",
-    ) -> Self:
-        return cls(
-            id=ID(str(dto.id)),
-            role_id=dto.role_id,
-            scope_type=dto.scope_type,
-            scope_id=dto.scope_id,
-            entity_type=dto.entity_type,
-            operation=dto.operation,
-        )
-
 
 # ==================== Filter Types ====================
 
 
 @gql_pydantic_input(
     BackendAIGQLMeta(description="Filter for scoped permissions", added_version="26.3.0"),
-    model=PermissionFilterDTO,
     name="PermissionFilter",
 )
-class PermissionFilter(GQLFilter):
+class PermissionFilter(PydanticInputMixin[PermissionFilterDTO], GQLFilter):
     role_id: uuid.UUID | None = None
     scope_type: RBACElementTypeGQL | None = None
     entity_type: RBACElementTypeGQL | None = None
@@ -222,34 +199,17 @@ class PermissionFilter(GQLFilter):
     OR: list[Self] | None = None
     NOT: list[Self] | None = None
 
-    def to_pydantic(self) -> PermissionFilterDTO:
-        return PermissionFilterDTO(
-            role_id=self.role_id,
-            scope_type=self.scope_type.value if self.scope_type is not None else None,
-            entity_type=self.entity_type.value if self.entity_type is not None else None,
-            AND=[f.to_pydantic() for f in self.AND] if self.AND else None,
-            OR=[f.to_pydantic() for f in self.OR] if self.OR else None,
-            NOT=[f.to_pydantic() for f in self.NOT] if self.NOT else None,
-        )
-
 
 # ==================== OrderBy Types ====================
 
 
 @gql_pydantic_input(
     BackendAIGQLMeta(description="Order by specification for permissions", added_version="26.3.0"),
-    model=PermissionOrderByDTO,
     name="PermissionOrderBy",
 )
-class PermissionOrderBy(GQLOrderBy):
+class PermissionOrderBy(PydanticInputMixin[PermissionOrderByDTO], GQLOrderBy):
     field: PermissionOrderField
     direction: OrderDirection = OrderDirection.DESC
-
-    def to_pydantic(self) -> PermissionOrderByDTO:
-        return PermissionOrderByDTO(
-            field=PermissionOrderFieldDTO(self.field.value),
-            direction=OrderDirectionDTO(self.direction.value),
-        )
 
 
 # ==================== Input Types ====================
@@ -257,71 +217,44 @@ class PermissionOrderBy(GQLOrderBy):
 
 @gql_pydantic_input(
     BackendAIGQLMeta(description="Input for creating a scoped permission", added_version="26.3.0"),
-    model=CreatePermissionInputDTO,
 )
-class CreatePermissionInput:
+class CreatePermissionInput(PydanticInputMixin[CreatePermissionInputDTO]):
     role_id: uuid.UUID
     scope_type: RBACElementTypeGQL
     scope_id: str
     entity_type: RBACElementTypeGQL
     operation: OperationTypeGQL
 
-    def to_pydantic(self) -> CreatePermissionInputDTO:
-        return CreatePermissionInputDTO(
-            role_id=self.role_id,
-            scope_type=self.scope_type.value,
-            scope_id=self.scope_id,
-            entity_type=self.entity_type.value,
-            operation=self.operation.value,
-        )
-
 
 @gql_pydantic_input(
     BackendAIGQLMeta(description="Input for updating a scoped permission", added_version="26.3.0"),
-    model=UpdatePermissionInputDTO,
 )
-class UpdatePermissionInput:
+class UpdatePermissionInput(PydanticInputMixin[UpdatePermissionInputDTO]):
     id: uuid.UUID
     scope_type: RBACElementTypeGQL | None = None
     scope_id: str | None = None
     entity_type: RBACElementTypeGQL | None = None
     operation: OperationTypeGQL | None = None
 
-    def to_pydantic(self) -> UpdatePermissionInputDTO:
-        return UpdatePermissionInputDTO(
-            id=self.id,
-            scope_type=None if self.scope_type is None else self.scope_type.value,
-            scope_id=self.scope_id,
-            entity_type=None if self.entity_type is None else self.entity_type.value,
-            operation=None if self.operation is None else self.operation.value,
-        )
-
 
 @gql_pydantic_input(
     BackendAIGQLMeta(description="Input for deleting a scoped permission", added_version="26.3.0"),
-    model=DeletePermissionInputDTO,
 )
-class DeletePermissionInput:
+class DeletePermissionInput(PydanticInputMixin[DeletePermissionInputDTO]):
     id: uuid.UUID
 
 
 # ==================== Payload Types ====================
 
 
-@gql_from_pydantic_type(
+@gql_pydantic_type(
     BackendAIGQLMeta(added_version="26.3.0", description="Payload for delete permission mutation."),
+    model=DeletePermissionPayloadDTO,
+    fields=["id"],
     name="DeletePermissionPayload",
 )
 class DeletePermissionPayload(PydanticOutputMixin[DeletePermissionPayloadDTO]):
-    """Payload for permission deletion mutation."""
-
     id: ID = strawberry.field(description="ID of the deleted permission.")
-
-    @classmethod
-    def from_pydantic(
-        cls, dto: DeletePermissionPayloadDTO, extra: dict[str, Any] | None = None
-    ) -> Self:
-        return cls(id=ID(str(dto.id)))
 
 
 # ==================== Connection Types ====================

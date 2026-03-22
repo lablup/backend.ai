@@ -9,7 +9,7 @@ from typing import TYPE_CHECKING, Annotated, Any, Self
 from uuid import UUID
 
 import strawberry
-from strawberry import ID, Info
+from strawberry import Info
 from strawberry.relay import Connection, Edge, NodeID
 
 from ai.backend.common.dto.manager.v2.fair_share.request import (
@@ -36,21 +36,16 @@ from ai.backend.common.dto.manager.v2.fair_share.response import (
 from ai.backend.common.dto.manager.v2.fair_share.response import (
     ProjectFairShareNode,
 )
-from ai.backend.common.dto.manager.v2.fair_share.types import (
-    OrderDirection as OrderDirectionDTO,
-)
-from ai.backend.common.dto.manager.v2.fair_share.types import (
-    ProjectFairShareOrderField as ProjectFairShareOrderFieldDTO,
-)
-from ai.backend.common.dto.manager.v2.group.types import ProjectType, ProjectTypeFilter
+from ai.backend.common.dto.manager.v2.group.types import ProjectTypeFilter
 from ai.backend.manager.api.gql.base import OrderDirection, StringFilter, UUIDFilter
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
+    PydanticInputMixin,
     gql_connection_type,
-    gql_from_pydantic_type,
     gql_node_type,
     gql_output_type,
     gql_pydantic_input,
+    gql_pydantic_type,
 )
 from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin, PydanticOutputMixin
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
@@ -58,8 +53,6 @@ from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from .common import (
     FairShareCalculationSnapshotGQL,
     FairShareSpecGQL,
-    ResourceSlotGQL,
-    ResourceWeightEntryGQL,
 )
 
 if TYPE_CHECKING:
@@ -145,53 +138,6 @@ class ProjectFairShareGQL(PydanticNodeMixin[ProjectFairShareNode]):
     ):
         return await info.context.data_loaders.resource_group_loader.load(self.resource_group_name)
 
-    @classmethod
-    def from_pydantic(
-        cls,
-        dto: ProjectFairShareNode,
-        extra: dict[str, Any] | None = None,
-        *,
-        id_field: str = "id",
-    ) -> ProjectFairShareGQL:
-        """Convert ProjectFairShareNode pydantic DTO to GraphQL type."""
-        resource_weights = [
-            ResourceWeightEntryGQL(
-                resource_type=entry.resource_type,
-                weight=Decimal(entry.quantity),
-                uses_default=entry.resource_type in dto.spec.uses_default_resource_types,
-            )
-            for entry in dto.spec.resource_weights.entries
-        ]
-        spec = FairShareSpecGQL(
-            weight=dto.spec.weight,
-            uses_default=dto.spec.uses_default_weight,
-            half_life_days=dto.spec.half_life_days,
-            lookback_days=dto.spec.lookback_days,
-            decay_unit_days=dto.spec.decay_unit_days,
-            resource_weights=resource_weights,
-        )
-        snapshot = FairShareCalculationSnapshotGQL(
-            fair_share_factor=dto.calculation_snapshot.fair_share_factor,
-            total_decayed_usage=ResourceSlotGQL.from_resource_slot({
-                e.resource_type: e.quantity
-                for e in dto.calculation_snapshot.total_decayed_usage.entries
-            }),
-            normalized_usage=dto.calculation_snapshot.normalized_usage,
-            lookback_start=dto.calculation_snapshot.lookback_start,
-            lookback_end=dto.calculation_snapshot.lookback_end,
-            last_calculated_at=dto.calculation_snapshot.last_calculated_at,
-        )
-        return cls(
-            id=ID(f"{dto.resource_group}:{dto.project_id}"),
-            resource_group_name=dto.resource_group,
-            project_id=dto.project_id,
-            domain_name=dto.domain_name,
-            spec=spec,
-            calculation_snapshot=snapshot,
-            created_at=dto.created_at,
-            updated_at=dto.updated_at,
-        )
-
 
 ProjectFairShareEdge = Edge[ProjectFairShareGQL]
 
@@ -232,10 +178,9 @@ class ProjectFairShareTypeEnum(StrEnum):
         description="Filter for project type enum in fair share queries. Supports equals, in, not_equals, and not_in operations.",
         added_version="26.2.0",
     ),
-    model=ProjectTypeFilter,
     name="ProjectFairShareTypeEnumFilter",
 )
-class ProjectFairShareTypeEnumFilter:
+class ProjectFairShareTypeEnumFilter(PydanticInputMixin[ProjectTypeFilter]):
     """Filter for project type enum fields in fair share context."""
 
     equals: ProjectFairShareTypeEnum | None = strawberry.field(
@@ -256,24 +201,17 @@ class ProjectFairShareTypeEnumFilter:
         description="Exclude any of the provided types.",
     )
 
-    def to_pydantic(self) -> ProjectTypeFilter:
-        return ProjectTypeFilter(
-            equals=ProjectType(self.equals.value) if self.equals else None,
-            in_=[ProjectType(t.value) for t in self.in_] if self.in_ else None,
-            not_equals=ProjectType(self.not_equals.value) if self.not_equals else None,
-            not_in=[ProjectType(t.value) for t in self.not_in] if self.not_in else None,
-        )
-
 
 @gql_pydantic_input(
     BackendAIGQLMeta(
         description="Nested filter for project entity fields in project fair share queries. Allows filtering by project properties such as name, active status, and type.",
         added_version="26.2.0",
     ),
-    model=ProjectFairShareProjectNestedFilterDTO,
     name="ProjectFairShareProjectNestedFilter",
 )
-class ProjectFairShareProjectNestedFilter:
+class ProjectFairShareProjectNestedFilter(
+    PydanticInputMixin[ProjectFairShareProjectNestedFilterDTO]
+):
     """Nested filter for project entity within project fair share."""
 
     name: StringFilter | None = strawberry.field(
@@ -289,19 +227,15 @@ class ProjectFairShareProjectNestedFilter:
         description="Filter by project type (GENERAL, MODEL_STORE).",
     )
 
-    def to_pydantic(self) -> ProjectFairShareProjectNestedFilterDTO:
-        return ProjectFairShareProjectNestedFilterDTO(is_active=self.is_active)
-
 
 @gql_pydantic_input(
     BackendAIGQLMeta(
         description="Filter input for querying project fair shares. Supports filtering by scaling group, project ID, and domain name. Multiple filters can be combined using AND, OR, and NOT logical operators.",
         added_version="26.1.0",
     ),
-    model=ProjectFairShareFilterDTO,
     name="ProjectFairShareFilter",
 )
-class ProjectFairShareFilter:
+class ProjectFairShareFilter(PydanticInputMixin[ProjectFairShareFilterDTO]):
     """Filter for project fair shares."""
 
     resource_group: StringFilter | None = strawberry.field(
@@ -347,27 +281,15 @@ class ProjectFairShareFilter:
         description="Negate the specified filters. Records matching these conditions will be excluded.",
     )
 
-    def to_pydantic(self) -> ProjectFairShareFilterDTO:
-        return ProjectFairShareFilterDTO(
-            resource_group=self.resource_group.to_pydantic() if self.resource_group else None,
-            project_id=self.project_id.to_pydantic() if self.project_id else None,
-            domain_name=self.domain_name.to_pydantic() if self.domain_name else None,
-            project=self.project.to_pydantic() if self.project else None,
-            AND=[f.to_pydantic() for f in self.AND] if self.AND else None,
-            OR=[f.to_pydantic() for f in self.OR] if self.OR else None,
-            NOT=[f.to_pydantic() for f in self.NOT] if self.NOT else None,
-        )
-
 
 @gql_pydantic_input(
     BackendAIGQLMeta(
         description="Filter for project fair shares within a resource group scope. References resource group membership columns to avoid excluding projects without fair share records.",
         added_version="26.2.0",
     ),
-    model=ProjectFairShareFilterDTO,
     name="RGProjectFairShareFilter",
 )
-class RGProjectFairShareFilter:
+class RGProjectFairShareFilter(PydanticInputMixin[ProjectFairShareFilterDTO]):
     """Filter for project fair shares in RG context (uses INNER JOIN'd columns)."""
 
     resource_group: StringFilter | None = strawberry.field(
@@ -386,17 +308,6 @@ class RGProjectFairShareFilter:
     AND: list[Self] | None = strawberry.field(default=None, description="Combine with AND logic.")
     OR: list[Self] | None = strawberry.field(default=None, description="Combine with OR logic.")
     NOT: list[Self] | None = strawberry.field(default=None, description="Negate filters.")
-
-    def to_pydantic(self) -> ProjectFairShareFilterDTO:
-        return ProjectFairShareFilterDTO(
-            resource_group=self.resource_group.to_pydantic() if self.resource_group else None,
-            project_id=self.project_id.to_pydantic() if self.project_id else None,
-            domain_name=self.domain_name.to_pydantic() if self.domain_name else None,
-            project=self.project.to_pydantic() if self.project else None,
-            AND=[f.to_pydantic() for f in self.AND] if self.AND else None,
-            OR=[f.to_pydantic() for f in self.OR] if self.OR else None,
-            NOT=[f.to_pydantic() for f in self.NOT] if self.NOT else None,
-        )
 
 
 @strawberry.enum(
@@ -421,10 +332,9 @@ class ProjectFairShareOrderField(StrEnum):
         description="Specifies ordering for project fair share query results. Combine field selection with direction to sort results. Default direction is DESC (descending).",
         added_version="26.1.0",
     ),
-    model=ProjectFairShareOrderDTO,
     name="ProjectFairShareOrderBy",
 )
-class ProjectFairShareOrderBy:
+class ProjectFairShareOrderBy(PydanticInputMixin[ProjectFairShareOrderDTO]):
     """OrderBy for project fair shares."""
 
     field: ProjectFairShareOrderField = strawberry.field(
@@ -438,13 +348,6 @@ class ProjectFairShareOrderBy:
         ),
     )
 
-    def to_pydantic(self) -> ProjectFairShareOrderDTO:
-        ascending = self.direction == OrderDirection.ASC
-        return ProjectFairShareOrderDTO(
-            field=ProjectFairShareOrderFieldDTO(self.field),
-            direction=OrderDirectionDTO.ASC if ascending else OrderDirectionDTO.DESC,
-        )
-
 
 # Mutation Input/Payload Types
 
@@ -454,10 +357,9 @@ class ProjectFairShareOrderBy:
         description="Input for upserting project fair share weight. The weight parameter affects scheduling priority - higher weight = higher priority. Set weight to null to use resource group's default_weight.",
         added_version="26.1.0",
     ),
-    model=UpsertProjectFairShareWeightInputDTO,
     name="UpsertProjectFairShareWeightInput",
 )
-class UpsertProjectFairShareWeightInput:
+class UpsertProjectFairShareWeightInput(PydanticInputMixin[UpsertProjectFairShareWeightInputDTO]):
     """Input for upserting project fair share weight."""
 
     resource_group_name: str = strawberry.field(
@@ -472,14 +374,6 @@ class UpsertProjectFairShareWeightInput:
             "Set to null to use resource group's default_weight."
         ),
     )
-
-    def to_pydantic(self) -> UpsertProjectFairShareWeightInputDTO:
-        return UpsertProjectFairShareWeightInputDTO(
-            resource_group_name=self.resource_group_name,
-            project_id=self.project_id,
-            domain_name=self.domain_name,
-            weight=self.weight,
-        )
 
 
 @gql_output_type(
@@ -505,10 +399,9 @@ class UpsertProjectFairShareWeightPayload:
         description="Input item for a single project weight in bulk upsert. Represents one project's weight configuration.",
         added_version="26.1.0",
     ),
-    model=ProjectWeightEntryInputDTO,
     name="ProjectWeightInputItem",
 )
-class ProjectWeightInputItem:
+class ProjectWeightInputItem(PydanticInputMixin[ProjectWeightEntryInputDTO]):
     """Input item for a single project weight in bulk upsert."""
 
     project_id: UUID = strawberry.field(description="ID of the project to update weight for.")
@@ -527,10 +420,11 @@ class ProjectWeightInputItem:
         description="Input for bulk upserting project fair share weights. Allows updating multiple projects in a single transaction.",
         added_version="26.1.0",
     ),
-    model=BulkUpsertProjectFairShareWeightInputDTO,
     name="BulkUpsertProjectFairShareWeightInput",
 )
-class BulkUpsertProjectFairShareWeightInput:
+class BulkUpsertProjectFairShareWeightInput(
+    PydanticInputMixin[BulkUpsertProjectFairShareWeightInputDTO]
+):
     """Input for bulk upserting project fair share weights."""
 
     resource_group_name: str = strawberry.field(
@@ -540,30 +434,17 @@ class BulkUpsertProjectFairShareWeightInput:
         description="List of project weight updates to apply."
     )
 
-    def to_pydantic(self) -> BulkUpsertProjectFairShareWeightInputDTO:
-        return BulkUpsertProjectFairShareWeightInputDTO(
-            resource_group_name=self.resource_group_name,
-            inputs=[
-                ProjectWeightEntryInputDTO(
-                    project_id=item.project_id,
-                    domain_name=item.domain_name,
-                    weight=item.weight,
-                )
-                for item in self.inputs
-            ],
-        )
 
-
-@gql_from_pydantic_type(
+@gql_pydantic_type(
     BackendAIGQLMeta(
         added_version="26.1.0",
         description="Payload for bulk project fair share weight upsert mutation.",
     ),
+    model=BulkUpsertProjectFairShareWeightPayloadDTO,
+    all_fields=True,
     name="BulkUpsertProjectFairShareWeightPayload",
 )
 class BulkUpsertProjectFairShareWeightPayload(
     PydanticOutputMixin[BulkUpsertProjectFairShareWeightPayloadDTO]
 ):
-    """Payload for bulk project fair share weight upsert mutation."""
-
-    upserted_count: int = strawberry.field(description="Number of records upserted")
+    pass

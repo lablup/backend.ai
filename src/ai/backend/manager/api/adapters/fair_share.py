@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import uuid
 from collections.abc import Sequence
 from uuid import UUID
 
@@ -51,9 +50,10 @@ from ai.backend.common.dto.manager.v2.fair_share.types import (
     ProjectFairShareOrderField,
     ResourceSlotEntryInfo,
     ResourceSlotInfo,
+    ResourceWeightEntryInfo,
     UserFairShareOrderField,
 )
-from ai.backend.common.types import ResourceSlot, SlotQuantity
+from ai.backend.common.types import SlotQuantity
 from ai.backend.manager.api.adapters.pagination import PaginationSpec
 from ai.backend.manager.data.fair_share.types import (
     DomainFairShareData,
@@ -873,8 +873,8 @@ class FairShareAdapter(BaseAdapter):
     def _domain_data_to_dto(data: DomainFairShareData) -> DomainFairShareNode:
         id_str = f"{data.resource_group}:{data.domain_name}"
         return DomainFairShareNode(
-            id=uuid.uuid5(uuid.NAMESPACE_DNS, id_str),
-            resource_group=data.resource_group,
+            id=id_str,
+            resource_group_name=data.resource_group,
             domain_name=data.domain_name,
             spec=FairShareAdapter._convert_spec(
                 data.data.spec, data.data.use_default, data.data.uses_default_resources
@@ -896,8 +896,8 @@ class FairShareAdapter(BaseAdapter):
     def _project_data_to_dto(data: ProjectFairShareData) -> ProjectFairShareNode:
         id_str = f"{data.resource_group}:{data.project_id}"
         return ProjectFairShareNode(
-            id=uuid.uuid5(uuid.NAMESPACE_DNS, id_str),
-            resource_group=data.resource_group,
+            id=id_str,
+            resource_group_name=data.resource_group,
             project_id=data.project_id,
             domain_name=data.domain_name,
             spec=FairShareAdapter._convert_spec(
@@ -920,8 +920,8 @@ class FairShareAdapter(BaseAdapter):
     def _user_data_to_dto(data: UserFairShareData) -> UserFairShareNode:
         id_str = f"{data.resource_group}:{data.user_uuid}:{data.project_id}"
         return UserFairShareNode(
-            id=uuid.uuid5(uuid.NAMESPACE_DNS, id_str),
-            resource_group=data.resource_group,
+            id=id_str,
+            resource_group_name=data.resource_group,
             user_uuid=data.user_uuid,
             project_id=data.project_id,
             domain_name=data.domain_name,
@@ -949,12 +949,18 @@ class FairShareAdapter(BaseAdapter):
     ) -> FairShareSpecInfo:
         return FairShareSpecInfo(
             weight=spec.weight,
-            uses_default_weight=use_default,
+            uses_default=use_default,
             half_life_days=spec.half_life_days,
             lookback_days=spec.lookback_days,
             decay_unit_days=spec.decay_unit_days,
-            resource_weights=FairShareAdapter._convert_resource_slot(spec.resource_weights),
-            uses_default_resource_types=sorted(uses_default_resources),
+            resource_weights=[
+                ResourceWeightEntryInfo(
+                    resource_type=k,
+                    weight=v,
+                    uses_default=k in uses_default_resources,
+                )
+                for k, v in spec.resource_weights.items()
+            ],
         )
 
     @staticmethod
@@ -973,19 +979,10 @@ class FairShareAdapter(BaseAdapter):
         )
 
     @staticmethod
-    def _convert_resource_slot(slot: ResourceSlot) -> ResourceSlotInfo:
-        return ResourceSlotInfo(
-            entries=[
-                ResourceSlotEntryInfo(resource_type=key, quantity=str(value))
-                for key, value in slot.items()
-            ]
-        )
-
-    @staticmethod
     def _convert_slot_quantities(quantities: Sequence[SlotQuantity]) -> ResourceSlotInfo:
         return ResourceSlotInfo(
             entries=[
-                ResourceSlotEntryInfo(resource_type=sq.slot_name, quantity=str(sq.quantity))
+                ResourceSlotEntryInfo(resource_type=sq.slot_name, quantity=sq.quantity)
                 for sq in quantities
             ]
         )

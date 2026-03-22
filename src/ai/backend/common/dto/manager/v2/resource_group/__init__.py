@@ -18,20 +18,34 @@ from ai.backend.common.dto.manager.v2.resource_group.response import (
     AdminSearchResourceGroupsPayload,
     CreateResourceGroupPayload,
     DeleteResourceGroupPayload,
+    PreemptionConfigInfo,
+    ResourceGroupDetailNode,
+    ResourceGroupMetadataInfo,
+    ResourceGroupNetworkConfigInfo,
     ResourceGroupNode,
+    ResourceGroupSchedulerConfigInfo,
+    ResourceGroupStatusInfo,
+    UpdateResourceGroupConfigPayloadNode,
+    UpdateResourceGroupFairShareSpecPayloadNode,
     UpdateResourceGroupPayload,
 )
 from ai.backend.common.dto.manager.v2.resource_group.types import (
     OrderDirection,
+    PreemptionModeDTO,
+    PreemptionOrderDTO,
     ResourceGroupOrderDirection,
     ResourceGroupOrderField,
+    SchedulerTypeDTO,
 )
 
 __all__ = (
     # Types
     "OrderDirection",
+    "PreemptionModeDTO",
+    "PreemptionOrderDTO",
     "ResourceGroupOrderDirection",
     "ResourceGroupOrderField",
+    "SchedulerTypeDTO",
     # Input models (request)
     "AdminSearchResourceGroupsInput",
     "CreateResourceGroupInput",
@@ -47,6 +61,14 @@ __all__ = (
     "AdminSearchResourceGroupsPayload",
     "CreateResourceGroupPayload",
     "DeleteResourceGroupPayload",
+    "PreemptionConfigInfo",
+    "ResourceGroupDetailNode",
+    "ResourceGroupMetadataInfo",
+    "ResourceGroupNetworkConfigInfo",
     "ResourceGroupNode",
+    "ResourceGroupSchedulerConfigInfo",
+    "ResourceGroupStatusInfo",
+    "UpdateResourceGroupConfigPayloadNode",
+    "UpdateResourceGroupFairShareSpecPayloadNode",
     "UpdateResourceGroupPayload",
 )

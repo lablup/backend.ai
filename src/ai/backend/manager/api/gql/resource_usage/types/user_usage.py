@@ -6,7 +6,6 @@ from typing import Any, Self
 from uuid import UUID
 
 import strawberry
-from strawberry import ID
 from strawberry.relay import Connection, Edge, NodeID
 
 from ai.backend.common.dto.manager.v2.resource_usage.request import (
@@ -16,16 +15,7 @@ from ai.backend.common.dto.manager.v2.resource_usage.request import (
     UserUsageBucketOrderBy as UserUsageBucketOrderByDTO,
 )
 from ai.backend.common.dto.manager.v2.resource_usage.response import (
-    UsageBucketMetadataNode as UsageBucketMetadataNodeDTO,
-)
-from ai.backend.common.dto.manager.v2.resource_usage.response import (
     UserUsageBucketNode,
-)
-from ai.backend.common.dto.manager.v2.resource_usage.types import (
-    OrderDirection as OrderDirectionDTO,
-)
-from ai.backend.common.dto.manager.v2.resource_usage.types import (
-    UsageBucketOrderField as UsageBucketOrderFieldDTO,
 )
 from ai.backend.manager.api.gql.base import (
     DateFilter,
@@ -40,7 +30,7 @@ from ai.backend.manager.api.gql.decorators import (
     gql_pydantic_input,
 )
 from ai.backend.manager.api.gql.fair_share.types import ResourceSlotGQL
-from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin
+from ai.backend.manager.api.gql.pydantic_compat import PydanticInputMixin, PydanticNodeMixin
 from ai.backend.manager.api.gql.types import GQLFilter, GQLOrderBy
 
 from .common import UsageBucketMetadataGQL, UsageBucketOrderField
@@ -117,34 +107,6 @@ class UserUsageBucketGQL(PydanticNodeMixin[UserUsageBucketNode]):
             self.capacity_snapshot,
         )
 
-    @classmethod
-    def from_pydantic(
-        cls,
-        dto: UserUsageBucketNode,
-        extra: dict[str, Any] | None = None,
-        *,
-        id_field: str = "id",
-    ) -> Self:
-        """Create UserUsageBucketGQL from UserUsageBucketNode DTO (adapter search results)."""
-        return cls(
-            id=ID(str(dto.id)),
-            user_uuid=dto.user_uuid,
-            project_id=dto.project_id,
-            domain_name=dto.domain_name,
-            resource_group_name=dto.resource_group,
-            metadata=UsageBucketMetadataGQL.from_pydantic(
-                UsageBucketMetadataNodeDTO(
-                    period_start=dto.period_start,
-                    period_end=dto.period_end,
-                    decay_unit_days=dto.decay_unit_days,
-                    created_at=dto.created_at,
-                    updated_at=dto.updated_at,
-                )
-            ),
-            resource_usage=ResourceSlotGQL.from_resource_slot(dto.resource_usage),
-            capacity_snapshot=ResourceSlotGQL.from_resource_slot(dto.capacity_snapshot),
-        )
-
 
 UserUsageBucketEdge = Edge[UserUsageBucketGQL]
 
@@ -174,10 +136,9 @@ class UserUsageBucketConnection(Connection[UserUsageBucketGQL]):
         description="Filter input for querying user usage bucket records. Usage buckets contain historical resource consumption data aggregated by time period for users. This is the most granular level of usage bucket filtering. Multiple filters can be combined using AND, OR, and NOT logical operators.",
         added_version="26.1.0",
     ),
-    model=UserUsageBucketFilterDTO,
     name="UserUsageBucketFilter",
 )
-class UserUsageBucketFilter(GQLFilter):
+class UserUsageBucketFilter(PydanticInputMixin[UserUsageBucketFilterDTO], GQLFilter):
     """Filter for user usage buckets."""
 
     resource_group: StringFilter | None = strawberry.field(
@@ -228,29 +189,15 @@ class UserUsageBucketFilter(GQLFilter):
         description="Negate the specified filters. Records matching these conditions will be excluded.",
     )
 
-    def to_pydantic(self) -> UserUsageBucketFilterDTO:
-        return UserUsageBucketFilterDTO(
-            resource_group=self.resource_group.to_pydantic() if self.resource_group else None,
-            user_uuid=self.user_uuid.to_pydantic() if self.user_uuid else None,
-            project_id=self.project_id.to_pydantic() if self.project_id else None,
-            domain_name=self.domain_name.to_pydantic() if self.domain_name else None,
-            period_start=self.period_start.to_pydantic() if self.period_start else None,
-            period_end=self.period_end.to_pydantic() if self.period_end else None,
-            AND=[f.to_pydantic() for f in self.AND] if self.AND else None,
-            OR=[f.to_pydantic() for f in self.OR] if self.OR else None,
-            NOT=[f.to_pydantic() for f in self.NOT] if self.NOT else None,
-        )
-
 
 @gql_pydantic_input(
     BackendAIGQLMeta(
         description="Specifies ordering for user usage bucket query results. Combine field selection with direction to sort results. Default direction is DESC (most recent first).",
         added_version="26.1.0",
     ),
-    model=UserUsageBucketOrderByDTO,
     name="UserUsageBucketOrderBy",
 )
-class UserUsageBucketOrderBy(GQLOrderBy):
+class UserUsageBucketOrderBy(PydanticInputMixin[UserUsageBucketOrderByDTO], GQLOrderBy):
     """OrderBy for user usage buckets."""
 
     field: UsageBucketOrderField = strawberry.field(
@@ -263,12 +210,6 @@ class UserUsageBucketOrderBy(GQLOrderBy):
             "DESC for reverse chronological order (most recent first)."
         ),
     )
-
-    def to_pydantic(self) -> UserUsageBucketOrderByDTO:
-        return UserUsageBucketOrderByDTO(
-            field=UsageBucketOrderFieldDTO(self.field.value),
-            direction=OrderDirectionDTO(self.direction.value),
-        )
 
 
 __all__ = [

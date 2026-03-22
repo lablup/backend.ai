@@ -20,10 +20,14 @@ from ai.backend.common.dto.manager.v2.image.response import (
     AdminSearchImageAliasesPayload,
     AdminSearchImagesPayload,
     ImageAliasNode,
+    ImageIdentityInfoDTO,
+    ImageMetadataInfoDTO,
     ImageNode,
+    ImageRequirementsInfoDTO,
 )
 from ai.backend.common.dto.manager.v2.image.types import (
     ImageLabelInfo,
+    ImageResourceLimitGQLInfo,
     ImageResourceLimitInfo,
     ImageStatusType,
     ImageTagInfo,
@@ -402,6 +406,29 @@ class ImageAdapter(BaseAdapter):
 
     def _data_to_dto(self, data: ImageData) -> ImageNode:
         """Convert data layer type to Pydantic DTO."""
+        status = ImageStatusType(data.status.value)
+        labels = [ImageLabelInfo(key=k, value=v) for k, v in data.labels.label_data.items()]
+        tags = [ImageTagInfo(key=e.key, value=e.value) for e in data.tags]
+        resource_limits_flat = [
+            ImageResourceLimitInfo(
+                key=rl.key,
+                min=rl.min,
+                max=self._convert_max(rl.max),
+            )
+            for rl in data.resource_limits
+        ]
+        accelerators = data.accelerators
+        accelerator_list = (
+            [a.strip() for a in accelerators.split(",") if a.strip()] if accelerators else []
+        )
+        resource_limits_gql = [
+            ImageResourceLimitGQLInfo(
+                key=rl.key,
+                min=str(rl.min),
+                max=str(rl.max) if rl.max is not None else "Infinity",
+            )
+            for rl in data.resource_limits
+        ]
         return ImageNode(
             id=data.id,
             name=str(data.name),
@@ -413,21 +440,31 @@ class ImageAdapter(BaseAdapter):
             architecture=data.architecture,
             size_bytes=data.size_bytes,
             type=ImageTypeEnum(data.type.value),
-            status=ImageStatusType(data.status.value),
-            labels=[ImageLabelInfo(key=k, value=v) for k, v in data.labels.label_data.items()],
-            tags=[ImageTagInfo(key=e.key, value=e.value) for e in data.tags],
-            resource_limits=[
-                ImageResourceLimitInfo(
-                    key=rl.key,
-                    min=rl.min,
-                    max=self._convert_max(rl.max),
-                )
-                for rl in data.resource_limits
-            ],
-            accelerators=data.accelerators,
+            status=status,
+            labels=labels,
+            tags=tags,
+            resource_limits=resource_limits_flat,
+            accelerators=accelerators,
             config_digest=data.config_digest,
             is_local=data.is_local,
             created_at=data.created_at,
+            identity=ImageIdentityInfoDTO(
+                canonical_name=str(data.name),
+                namespace=data.image,
+                architecture=data.architecture,
+            ),
+            metadata=ImageMetadataInfoDTO(
+                digest=data.config_digest,
+                size_bytes=data.size_bytes,
+                created_at=data.created_at,
+                tags=tags,
+                labels=labels,
+                status=status,
+            ),
+            requirements=ImageRequirementsInfoDTO(
+                supported_accelerators=accelerator_list,
+                resource_limits=resource_limits_gql,
+            ),
         )
 
     @staticmethod

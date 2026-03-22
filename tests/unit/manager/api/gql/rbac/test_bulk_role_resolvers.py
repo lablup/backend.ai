@@ -52,7 +52,7 @@ class TestAdminBulkAssignRole:
         user_id_fail = uuid.uuid4()
 
         mock_adapter.bulk_assign_role.return_value = BulkAssignRoleResultPayload(
-            successes=[
+            assigned=[
                 RoleAssignmentNode(
                     id=uuid.uuid4(),
                     user_id=user_id_success,
@@ -61,7 +61,7 @@ class TestAdminBulkAssignRole:
                     granted_at=datetime(2025, 1, 1, tzinfo=UTC),
                 )
             ],
-            failures=[
+            failed=[
                 BulkRoleOperationFailureInfo(user_id=user_id_fail, message="Role already assigned")
             ],
         )
@@ -89,7 +89,7 @@ class TestAdminBulkAssignRole:
         user_ids = [uuid.uuid4(), uuid.uuid4()]
 
         mock_adapter.bulk_assign_role.return_value = BulkAssignRoleResultPayload(
-            successes=[], failures=[]
+            assigned=[], failed=[]
         )
 
         input_data = BulkAssignRoleInputGQL(role_id=role_id, user_ids=user_ids)
@@ -128,7 +128,7 @@ class TestAdminBulkRevokeRole:
         user_id_fail = uuid.uuid4()
 
         mock_adapter.bulk_revoke_role.return_value = BulkRevokeRoleResultPayload(
-            successes=[
+            revoked=[
                 RoleAssignmentNode(
                     id=uuid.uuid4(),
                     user_id=user_id_success,
@@ -137,7 +137,7 @@ class TestAdminBulkRevokeRole:
                     granted_at=datetime(2025, 1, 1, tzinfo=UTC),
                 )
             ],
-            failures=[
+            failed=[
                 BulkRoleOperationFailureInfo(user_id=user_id_fail, message="Role not assigned")
             ],
         )
@@ -165,7 +165,7 @@ class TestAdminBulkRevokeRole:
         user_ids = [uuid.uuid4(), uuid.uuid4()]
 
         mock_adapter.bulk_revoke_role.return_value = BulkRevokeRoleResultPayload(
-            successes=[], failures=[]
+            revoked=[], failed=[]
         )
 
         input_data = BulkRevokeRoleInputGQL(role_id=role_id, user_ids=user_ids)

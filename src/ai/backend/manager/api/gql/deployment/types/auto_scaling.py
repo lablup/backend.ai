@@ -41,16 +41,11 @@ from ai.backend.common.dto.manager.v2.deployment.response import (
 from ai.backend.common.dto.manager.v2.deployment.response import (
     UpdateAutoScalingRulePayload as UpdateAutoScalingRulePayloadDTO,
 )
-from ai.backend.common.dto.manager.v2.deployment.types import (
-    AutoScalingRuleOrderField as DTOAutoScalingRuleOrderField,
-)
-from ai.backend.common.dto.manager.v2.deployment.types import (
-    OrderDirection as DTOOrderDirection,
-)
 from ai.backend.common.types import AutoScalingMetricSource as CommonAutoScalingMetricSource
 from ai.backend.manager.api.gql.base import DateTimeFilter, OrderDirection
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
+    PydanticInputMixin,
     gql_connection_type,
     gql_node_type,
     gql_pydantic_input,
@@ -71,10 +66,9 @@ class AutoScalingMetricSource(StrEnum):
 
 @gql_pydantic_input(
     BackendAIGQLMeta(description="", added_version="25.19.0"),
-    model=AutoScalingRuleFilterDTO,
     name="AutoScalingRuleFilter",
 )
-class AutoScalingRuleFilter:
+class AutoScalingRuleFilter(PydanticInputMixin[AutoScalingRuleFilterDTO]):
     """Filter for auto-scaling rules."""
 
     created_at: DateTimeFilter | None = None
@@ -84,31 +78,13 @@ class AutoScalingRuleFilter:
     OR: list[Self] | None = None
     NOT: list[Self] | None = None
 
-    def to_pydantic(self) -> AutoScalingRuleFilterDTO:
-        return AutoScalingRuleFilterDTO(
-            created_at=self.created_at.to_pydantic() if self.created_at else None,
-            last_triggered_at=self.last_triggered_at.to_pydantic()
-            if self.last_triggered_at
-            else None,
-            AND=[f.to_pydantic() for f in self.AND] if self.AND else None,
-            OR=[f.to_pydantic() for f in self.OR] if self.OR else None,
-            NOT=[f.to_pydantic() for f in self.NOT] if self.NOT else None,
-        )
-
 
 @gql_pydantic_input(
     BackendAIGQLMeta(description="", added_version="25.19.0"),
-    model=AutoScalingRuleOrderDTO,
 )
-class AutoScalingRuleOrderBy:
+class AutoScalingRuleOrderBy(PydanticInputMixin[AutoScalingRuleOrderDTO]):
     field: AutoScalingRuleOrderField
     direction: OrderDirection = OrderDirection.DESC
-
-    def to_pydantic(self) -> AutoScalingRuleOrderDTO:
-        return AutoScalingRuleOrderDTO(
-            field=DTOAutoScalingRuleOrderField(self.field.value.lower()),
-            direction=DTOOrderDirection(self.direction.value),
-        )
 
 
 @gql_node_type(
@@ -161,28 +137,6 @@ class AutoScalingRule(PydanticNodeMixin[AutoScalingRuleNodeDTO]):
         ])
         return cast(list[Self | None], results)
 
-    @classmethod
-    def from_pydantic(
-        cls,
-        dto: AutoScalingRuleNodeDTO,
-        extra: dict[str, Any] | None = None,
-        *,
-        id_field: str = "id",
-    ) -> Self:
-        return cls(
-            id=ID(str(dto.id)),
-            metric_source=AutoScalingMetricSource(dto.metric_source.name),
-            metric_name=dto.metric_name,
-            min_threshold=dto.min_threshold,
-            max_threshold=dto.max_threshold,
-            step_size=dto.step_size,
-            time_window=dto.time_window,
-            min_replicas=dto.min_replicas,
-            max_replicas=dto.max_replicas,
-            created_at=dto.created_at,
-            last_triggered_at=dto.last_triggered_at,
-        )
-
 
 AutoScalingRuleEdge = Edge[AutoScalingRule]
 
@@ -203,9 +157,8 @@ class AutoScalingRuleConnection(Connection[AutoScalingRule]):
     BackendAIGQLMeta(
         description="Input for creating an auto-scaling rule.", added_version="25.19.0"
     ),
-    model=CreateAutoScalingRuleInputDTO,
 )
-class CreateAutoScalingRuleInput:
+class CreateAutoScalingRuleInput(PydanticInputMixin[CreateAutoScalingRuleInputDTO]):
     model_deployment_id: ID
     metric_source: AutoScalingMetricSource
     metric_name: str
@@ -216,26 +169,12 @@ class CreateAutoScalingRuleInput:
     min_replicas: int | None
     max_replicas: int | None
 
-    def to_pydantic(self) -> CreateAutoScalingRuleInputDTO:
-        return CreateAutoScalingRuleInputDTO(
-            model_deployment_id=UUID(self.model_deployment_id),
-            metric_source=CommonAutoScalingMetricSource(self.metric_source.lower()),
-            metric_name=self.metric_name,
-            min_threshold=self.min_threshold,
-            max_threshold=self.max_threshold,
-            step_size=self.step_size,
-            time_window=self.time_window,
-            min_replicas=self.min_replicas,
-            max_replicas=self.max_replicas,
-        )
-
 
 @gql_pydantic_input(
     BackendAIGQLMeta(
         description="Input for updating an auto-scaling rule.",
         added_version="25.19.0",
     ),
-    model=UpdateAutoScalingRuleInputDTO,
     name="UpdateAutoScalingRuleInput",
 )
 class UpdateAutoScalingRuleInput:
@@ -269,15 +208,9 @@ class UpdateAutoScalingRuleInput:
     BackendAIGQLMeta(
         description="Input for deleting an auto-scaling rule", added_version="25.16.0"
     ),
-    model=DeleteAutoScalingRuleInputDTO,
 )
-class DeleteAutoScalingRuleInput:
+class DeleteAutoScalingRuleInput(PydanticInputMixin[DeleteAutoScalingRuleInputDTO]):
     id: ID
-
-    def to_pydantic(self) -> DeleteAutoScalingRuleInputDTO:
-        return DeleteAutoScalingRuleInputDTO(
-            id=UUID(str(self.id)),
-        )
 
 
 # Payload Types

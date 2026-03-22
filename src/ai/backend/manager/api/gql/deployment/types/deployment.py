@@ -23,9 +23,6 @@ from ai.backend.common.dto.manager.v2.deployment.request import (
     SearchReplicasInput,
 )
 from ai.backend.common.dto.manager.v2.deployment.request import (
-    BlueGreenConfigInput as BlueGreenConfigInputDTO,
-)
-from ai.backend.common.dto.manager.v2.deployment.request import (
     CreateDeploymentInput as CreateDeploymentInputDTO,
 )
 from ai.backend.common.dto.manager.v2.deployment.request import (
@@ -48,9 +45,6 @@ from ai.backend.common.dto.manager.v2.deployment.request import (
 )
 from ai.backend.common.dto.manager.v2.deployment.request import (
     ModelDeploymentNetworkAccessInput as ModelDeploymentNetworkAccessInputDTO,
-)
-from ai.backend.common.dto.manager.v2.deployment.request import (
-    RollingUpdateConfigInput as RollingUpdateConfigInputDTO,
 )
 from ai.backend.common.dto.manager.v2.deployment.request import (
     SyncReplicaInput as SyncReplicaInputDTO,
@@ -77,10 +71,10 @@ from ai.backend.common.dto.manager.v2.deployment.response import (
     UpdateDeploymentPayload as UpdateDeploymentPayloadDTO,
 )
 from ai.backend.common.dto.manager.v2.deployment.types import (
-    DeploymentOrderField as DTODeploymentOrderField,
-)
-from ai.backend.common.dto.manager.v2.deployment.types import (
-    OrderDirection as DTOOrderDirection,
+    DeploymentMetadataInfoDTO,
+    DeploymentNetworkAccessInfoDTO,
+    DeploymentStrategyInfoDTO,
+    ReplicaStateInfo,
 )
 from ai.backend.common.exception import (
     InvalidAPIParameters,
@@ -93,9 +87,9 @@ from ai.backend.manager.api.gql.base import (
 )
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
+    PydanticInputMixin,
     gql_connection_type,
     gql_node_type,
-    gql_output_type,
     gql_pydantic_input,
     gql_pydantic_type,
 )
@@ -160,31 +154,34 @@ DeploymentStatusGQL: type[ModelDeploymentStatus] = strawberry.enum(
 )
 
 
-@gql_output_type(
+@gql_pydantic_type(
     BackendAIGQLMeta(
         added_version="25.19.0",
         description="Represents the deployment strategy configuration that determines how updates are rolled out to replicas (e.g., rolling update, blue-green).",
-    )
+    ),
+    model=DeploymentStrategyInfoDTO,
 )
 class DeploymentStrategyGQL:
     type: DeploymentStrategyTypeGQL
 
 
-@gql_output_type(
+@gql_pydantic_type(
     BackendAIGQLMeta(
         added_version="25.19.0",
         description="Represents the current replica state of a deployment, including the desired replica count and access to the list of active replicas.",
-    )
+    ),
+    model=ReplicaStateInfo,
 )
 class ReplicaState:
     desired_replica_count: int
 
 
-@gql_output_type(
+@gql_pydantic_type(
     BackendAIGQLMeta(
         added_version="25.19.0",
         description="Contains metadata information for a model deployment including its name, status, tags, and timestamps. Also provides access to the associated project and domain.",
-    )
+    ),
+    model=DeploymentMetadataInfoDTO,
 )
 class ModelDeploymentMetadata:
     project_id: ID
@@ -210,11 +207,12 @@ class ModelDeploymentMetadata:
         return Domain(id=ID(domain_global_id))
 
 
-@gql_output_type(
+@gql_pydantic_type(
     BackendAIGQLMeta(
         added_version="25.19.0",
         description="Provides network access configuration for a model deployment, including the endpoint URL, preferred domain name, and public access settings. Also manages access tokens for authentication.",
-    )
+    ),
+    model=DeploymentNetworkAccessInfoDTO,
 )
 class ModelDeploymentNetworkAccess:
     endpoint_url: str | None = None
@@ -436,66 +434,21 @@ class ModelDeployment(PydanticNodeMixin[DeploymentNodeDTO]):
         ])
         return cast(list[Self | None], results)
 
-    @classmethod
-    def from_pydantic(
-        cls,
-        dto: DeploymentNodeDTO,
-        extra: dict[str, Any] | None = None,
-        *,
-        id_field: str = "id",
-    ) -> Self:
-        metadata = ModelDeploymentMetadata(
-            name=dto.basic.name,
-            status=DeploymentStatusGQL(dto.basic.status),
-            tags=dto.basic.tags,
-            project_id=ID(str(dto.basic.project_id)),
-            domain_name=dto.basic.domain_name,
-            created_at=dto.created_at,
-            updated_at=dto.updated_at,
-        )
-        return cls(
-            id=ID(str(dto.id)),
-            metadata=metadata,
-            network_access=ModelDeploymentNetworkAccess(
-                endpoint_url=dto.network.url,
-                preferred_domain_name=dto.network.preferred_domain_name,
-                open_to_public=dto.network.open_to_public,
-            ),
-            revision=ModelRevision.from_pydantic(dto.current_revision)
-            if dto.current_revision
-            else None,
-            default_deployment_strategy=DeploymentStrategyGQL(
-                type=DeploymentStrategyTypeGQL(dto.default_deployment_strategy)
-            ),
-            replica_state=ReplicaState(
-                desired_replica_count=dto.replica_state.desired_replica_count,
-            ),
-            created_user_id=ID(str(dto.basic.created_user_id)),
-        )
-
 
 # Filter Types
 @gql_pydantic_input(
     BackendAIGQLMeta(description="", added_version="25.19.0"),
-    model=DeploymentStatusFilterDTO,
 )
-class DeploymentStatusFilter:
+class DeploymentStatusFilter(PydanticInputMixin[DeploymentStatusFilterDTO]):
     in_: list[DeploymentStatusGQL] | None = strawberry.field(name="in", default=None)
     equals: DeploymentStatusGQL | None = None
-
-    def to_pydantic(self) -> DeploymentStatusFilterDTO:
-        return DeploymentStatusFilterDTO(
-            equals=self.equals.value if self.equals else None,
-            in_=[s.value for s in self.in_] if self.in_ else None,
-        )
 
 
 @gql_pydantic_input(
     BackendAIGQLMeta(description="", added_version="25.19.0"),
-    model=DeploymentFilterDTO,
     name="DeploymentFilter",
 )
-class DeploymentFilter:
+class DeploymentFilter(PydanticInputMixin[DeploymentFilterDTO]):
     name: StringFilter | None = None
     status: DeploymentStatusFilter | None = None
     open_to_public: bool | None = None
@@ -506,37 +459,13 @@ class DeploymentFilter:
     OR: list[Self] | None = None
     NOT: list[Self] | None = None
 
-    def to_pydantic(self) -> DeploymentFilterDTO:
-        return DeploymentFilterDTO(
-            name=self.name.to_pydantic() if self.name else None,
-            status=DeploymentStatusFilterDTO(
-                equals=self.status.equals.value if self.status.equals else None,
-                in_=[s.value for s in self.status.in_] if self.status.in_ else None,
-            )
-            if self.status
-            else None,
-            open_to_public=self.open_to_public,
-            tags=self.tags.to_pydantic() if self.tags else None,
-            endpoint_url=self.endpoint_url.to_pydantic() if self.endpoint_url else None,
-            AND=[f.to_pydantic() for f in self.AND] if self.AND else None,
-            OR=[f.to_pydantic() for f in self.OR] if self.OR else None,
-            NOT=[f.to_pydantic() for f in self.NOT] if self.NOT else None,
-        )
-
 
 @gql_pydantic_input(
     BackendAIGQLMeta(description="", added_version="25.19.0"),
-    model=DeploymentOrderDTO,
 )
-class DeploymentOrderBy:
+class DeploymentOrderBy(PydanticInputMixin[DeploymentOrderDTO]):
     field: DeploymentOrderField
     direction: OrderDirection = OrderDirection.DESC
-
-    def to_pydantic(self) -> DeploymentOrderDTO:
-        return DeploymentOrderDTO(
-            field=DTODeploymentOrderField(self.field.value.lower()),
-            direction=DTOOrderDirection(self.direction.value),
-        )
 
 
 # Payload Types
@@ -583,28 +512,18 @@ class DeploymentStatusChangedPayload:
 # Input Types
 @gql_pydantic_input(
     BackendAIGQLMeta(description="", added_version="25.19.0"),
-    model=ModelDeploymentMetadataInputDTO,
 )
-class ModelDeploymentMetadataInput:
+class ModelDeploymentMetadataInput(PydanticInputMixin[ModelDeploymentMetadataInputDTO]):
     project_id: ID
     domain_name: str
     name: str | None = None
     tags: list[str] | None = None
 
-    def to_pydantic(self) -> ModelDeploymentMetadataInputDTO:
-        return ModelDeploymentMetadataInputDTO(
-            project_id=UUID(str(self.project_id)),
-            domain_name=self.domain_name,
-            name=self.name,
-            tags=self.tags,
-        )
-
 
 @gql_pydantic_input(
     BackendAIGQLMeta(description="", added_version="25.19.0"),
-    model=ModelDeploymentNetworkAccessInputDTO,
 )
-class ModelDeploymentNetworkAccessInput:
+class ModelDeploymentNetworkAccessInput(PydanticInputMixin[ModelDeploymentNetworkAccessInputDTO]):
     preferred_domain_name: str | None = None
     open_to_public: bool = False
 
@@ -614,22 +533,15 @@ class ModelDeploymentNetworkAccessInput:
             preferred_domain_name=self.preferred_domain_name,
         )
 
-    def to_pydantic(self) -> ModelDeploymentNetworkAccessInputDTO:
-        return ModelDeploymentNetworkAccessInputDTO(
-            preferred_domain_name=self.preferred_domain_name,
-            open_to_public=self.open_to_public,
-        )
-
 
 @gql_pydantic_input(
     BackendAIGQLMeta(
         description="Deployment strategy configuration with discriminator pattern.",
         added_version="25.19.0",
     ),
-    model=DeploymentStrategyInputDTO,
     name="DeploymentStrategyInput",
 )
-class DeploymentStrategyInputGQL:
+class DeploymentStrategyInputGQL(PydanticInputMixin[DeploymentStrategyInputDTO]):
     """Deployment strategy input with type discriminator and optional config fields.
 
     The `type` field determines which config field should be provided:
@@ -677,69 +589,20 @@ class DeploymentStrategyInputGQL:
                     rollback_on_failure=self.rollback_on_failure,
                 )
 
-    def to_pydantic(self) -> DeploymentStrategyInputDTO:
-        return DeploymentStrategyInputDTO(
-            type=DeploymentStrategy(self.type.value),
-            rollback_on_failure=self.rollback_on_failure,
-            rolling_update=RollingUpdateConfigInputDTO(
-                max_surge=self.rolling_update.max_surge,
-                max_unavailable=self.rolling_update.max_unavailable,
-            )
-            if self.rolling_update
-            else None,
-            blue_green=BlueGreenConfigInputDTO(
-                auto_promote=self.blue_green.auto_promote,
-                promote_delay_seconds=self.blue_green.promote_delay_seconds,
-            )
-            if self.blue_green
-            else None,
-        )
-
 
 @gql_pydantic_input(
     BackendAIGQLMeta(description="", added_version="25.19.0"),
-    model=CreateDeploymentInputDTO,
 )
-class CreateDeploymentInput:
+class CreateDeploymentInput(PydanticInputMixin[CreateDeploymentInputDTO]):
     metadata: ModelDeploymentMetadataInput
     network_access: ModelDeploymentNetworkAccessInput
     default_deployment_strategy: DeploymentStrategyInputGQL
     desired_replica_count: int
     initial_revision: CreateRevisionInput
 
-    def to_pydantic(self) -> CreateDeploymentInputDTO:
-        rolling_update_dto: RollingUpdateConfigInputDTO | None = None
-        if self.default_deployment_strategy.rolling_update is not None:
-            rolling_update_dto = RollingUpdateConfigInputDTO(
-                max_surge=self.default_deployment_strategy.rolling_update.max_surge,
-                max_unavailable=self.default_deployment_strategy.rolling_update.max_unavailable,
-            )
-        blue_green_dto: BlueGreenConfigInputDTO | None = None
-        if self.default_deployment_strategy.blue_green is not None:
-            blue_green_dto = BlueGreenConfigInputDTO(
-                auto_promote=self.default_deployment_strategy.blue_green.auto_promote,
-                promote_delay_seconds=self.default_deployment_strategy.blue_green.promote_delay_seconds,
-            )
-        revision_dto = self.initial_revision.to_pydantic()
-        return CreateDeploymentInputDTO(
-            project_id=UUID(str(self.metadata.project_id)),
-            domain_name=self.metadata.domain_name,
-            name=self.metadata.name,
-            tags=self.metadata.tags,
-            open_to_public=self.network_access.open_to_public,
-            preferred_domain_name=self.network_access.preferred_domain_name,
-            strategy=DeploymentStrategy(self.default_deployment_strategy.type.value),
-            rollback_on_failure=self.default_deployment_strategy.rollback_on_failure,
-            desired_replica_count=self.desired_replica_count,
-            initial_revision=revision_dto,
-            rolling_update=rolling_update_dto,
-            blue_green=blue_green_dto,
-        )
-
 
 @gql_pydantic_input(
     BackendAIGQLMeta(description="", added_version="25.19.0"),
-    model=UpdateDeploymentInputDTO,
 )
 class UpdateDeploymentInput:
     id: ID
@@ -770,9 +633,8 @@ class UpdateDeploymentInput:
 
 @gql_pydantic_input(
     BackendAIGQLMeta(description="", added_version="25.19.0"),
-    model=DeleteDeploymentInputDTO,
 )
-class DeleteDeploymentInput:
+class DeleteDeploymentInput(PydanticInputMixin[DeleteDeploymentInputDTO]):
     id: ID
 
 
@@ -794,9 +656,8 @@ class ModelDeploymentConnection(Connection[ModelDeployment]):
 # Sync replica types
 @gql_pydantic_input(
     BackendAIGQLMeta(description="", added_version="25.19.0"),
-    model=SyncReplicaInputDTO,
 )
-class SyncReplicaInput:
+class SyncReplicaInput(PydanticInputMixin[SyncReplicaInputDTO]):
     model_deployment_id: ID
 
 

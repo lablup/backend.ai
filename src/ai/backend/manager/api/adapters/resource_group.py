@@ -21,12 +21,23 @@ from ai.backend.common.dto.manager.v2.resource_group.request import (
 )
 from ai.backend.common.dto.manager.v2.resource_group.response import (
     CreateResourceGroupPayload,
+    PreemptionConfigInfo,
+    ResourceGroupDetailNode,
+    ResourceGroupMetadataInfo,
+    ResourceGroupNetworkConfigInfo,
     ResourceGroupNode,
+    ResourceGroupSchedulerConfigInfo,
+    ResourceGroupStatusInfo,
+    UpdateResourceGroupConfigPayloadNode,
+    UpdateResourceGroupFairShareSpecPayloadNode,
     UpdateResourceGroupPayload,
 )
 from ai.backend.common.dto.manager.v2.resource_group.types import (
+    PreemptionModeDTO,
+    PreemptionOrderDTO,
     ResourceGroupOrderDirection,
     ResourceGroupOrderField,
+    SchedulerTypeDTO,
 )
 from ai.backend.common.types import PreemptionMode, PreemptionOrder, ResourceSlot
 from ai.backend.manager.data.scaling_group.types import (
@@ -94,9 +105,9 @@ def _resource_group_pagination_spec() -> PaginationSpec:
 
 @dataclass
 class ResourceGroupSearchPayload:
-    """Result of a resource group search containing paginated ScalingGroupData items."""
+    """Result of a resource group search containing paginated ResourceGroupDetailNode items."""
 
-    items: list[ScalingGroupData]
+    items: list[ResourceGroupDetailNode]
     total_count: int
     has_next_page: bool
     has_previous_page: bool
@@ -122,10 +133,12 @@ class ResourceGroupAdapter(BaseAdapter):
         need an opaque identifier should use the ``name`` field instead.
     """
 
-    async def batch_load_by_names(self, names: Sequence[str]) -> list[ScalingGroupData | None]:
+    async def batch_load_by_names(
+        self, names: Sequence[str]
+    ) -> list[ResourceGroupDetailNode | None]:
         """Batch load resource groups by name for DataLoader use.
 
-        Returns ScalingGroupData items in the same order as the input names list.
+        Returns ResourceGroupDetailNode items in the same order as the input names list.
         """
         if not names:
             return []
@@ -139,7 +152,9 @@ class ResourceGroupAdapter(BaseAdapter):
             )
         )
         rg_map = {sg.name: sg for sg in action_result.scaling_groups}
-        return [rg_map.get(name) for name in names]
+        return [
+            self._data_to_detail_node(rg_map[name]) if name in rg_map else None for name in names
+        ]
 
     async def search(self, input: AdminSearchResourceGroupsInput) -> ResourceGroupSearchPayload:
         """Search resource groups with filters, ordering, and pagination."""
@@ -163,7 +178,7 @@ class ResourceGroupAdapter(BaseAdapter):
             )
         )
         return ResourceGroupSearchPayload(
-            items=action_result.scaling_groups,
+            items=[self._data_to_detail_node(sg) for sg in action_result.scaling_groups],
             total_count=action_result.total_count,
             has_next_page=action_result.has_next_page,
             has_previous_page=action_result.has_previous_page,
@@ -376,14 +391,14 @@ class ResourceGroupAdapter(BaseAdapter):
     async def update_fair_share_spec(
         self,
         input: UpdateResourceGroupFairShareSpecInput,
-    ) -> ScalingGroupData:
+    ) -> UpdateResourceGroupFairShareSpecPayloadNode:
         """Update fair share spec for a resource group.
 
         Args:
             input: Pydantic DTO with partial fair share spec update parameters.
 
         Returns:
-            Updated ScalingGroupData.
+            Payload DTO containing the updated resource group.
         """
         resource_weights = None
         if input.resource_weights is not None:
@@ -407,19 +422,21 @@ class ResourceGroupAdapter(BaseAdapter):
                 )
             )
         )
-        return action_result.scaling_group
+        return UpdateResourceGroupFairShareSpecPayloadNode(
+            resource_group=self._data_to_detail_node(action_result.scaling_group),
+        )
 
     async def update_config(
         self,
         input: UpdateResourceGroupConfigInput,
-    ) -> ScalingGroupData:
+    ) -> UpdateResourceGroupConfigPayloadNode:
         """Update resource group configuration (status, metadata, network, scheduler).
 
         Args:
             input: Pydantic DTO with partial configuration update parameters.
 
         Returns:
-            Updated ScalingGroupData.
+            Payload DTO containing the updated resource group.
         """
         status_spec = ScalingGroupStatusUpdaterSpec(
             is_active=(
@@ -494,7 +511,9 @@ class ResourceGroupAdapter(BaseAdapter):
         action_result = await self._processors.scaling_group.modify_scaling_group.wait_for_complete(
             ModifyScalingGroupAction(updater=updater)
         )
-        return action_result.scaling_group
+        return UpdateResourceGroupConfigPayloadNode(
+            resource_group=self._data_to_detail_node(action_result.scaling_group),
+        )
 
     async def purge(
         self,
@@ -514,6 +533,34 @@ class ResourceGroupAdapter(BaseAdapter):
         )
 
         return self._data_to_node(action_result.data)
+
+    @staticmethod
+    def _data_to_detail_node(data: ScalingGroupData) -> ResourceGroupDetailNode:
+        """Convert ScalingGroupData to ResourceGroupDetailNode DTO for GQL layer."""
+        return ResourceGroupDetailNode(
+            id=data.name,
+            name=data.name,
+            status=ResourceGroupStatusInfo(
+                is_active=data.status.is_active,
+                is_public=data.status.is_public,
+            ),
+            metadata=ResourceGroupMetadataInfo(
+                description=data.metadata.description or None,
+                created_at=data.metadata.created_at,
+            ),
+            network=ResourceGroupNetworkConfigInfo(
+                wsproxy_addr=data.network.wsproxy_addr or None,
+                use_host_network=data.network.use_host_network,
+            ),
+            scheduler=ResourceGroupSchedulerConfigInfo(
+                type=SchedulerTypeDTO(data.scheduler.name.value),
+                preemption=PreemptionConfigInfo(
+                    preemptible_priority=data.scheduler.options.preemption.preemptible_priority,
+                    order=PreemptionOrderDTO(data.scheduler.options.preemption.order.value),
+                    mode=PreemptionModeDTO(data.scheduler.options.preemption.mode.value),
+                ),
+            ),
+        )
 
     @staticmethod
     def _data_to_node(data: ScalingGroupData) -> ResourceGroupNode:

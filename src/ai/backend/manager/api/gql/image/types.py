@@ -37,7 +37,6 @@ from ai.backend.common.dto.manager.v2.image.response import (
 from ai.backend.common.dto.manager.v2.image.types import (
     ImageLabelInfo,
     ImageResourceLimitGQLInfo,
-    ImageStatusType,
     ImageTagInfo,
 )
 from ai.backend.common.dto.manager.v2.image.types import (
@@ -62,7 +61,7 @@ from ai.backend.manager.api.gql.decorators import (
     gql_pydantic_input,
     gql_pydantic_type,
 )
-from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin
+from ai.backend.manager.api.gql.pydantic_compat import PydanticInputMixin, PydanticNodeMixin
 from ai.backend.manager.api.gql.types import GQLFilter, GQLOrderBy, StrawberryGQLContext
 from ai.backend.manager.api.gql.utils import dedent_strip
 from ai.backend.manager.data.image.types import (
@@ -172,17 +171,6 @@ class ImageV2AliasGQL(PydanticNodeMixin[ImageAliasNode]):
             uuid.UUID(nid) for nid in node_ids
         ])
         return cast(list[Self | None], results)
-
-    @classmethod
-    def from_pydantic(
-        cls,
-        dto: ImageAliasNode,
-        extra: dict[str, Any] | None = None,
-        *,
-        id_field: str = "id",
-    ) -> Self:
-        """Create ImageV2AliasGQL from ImageAliasNode DTO."""
-        return cls(id=dto.id, alias=dto.alias)
 
 
 # =============================================================================
@@ -355,53 +343,6 @@ class ImageV2GQL(PydanticNodeMixin[ImageNode]):
         return cast(list[Self | None], results)
 
     @classmethod
-    def from_pydantic(
-        cls,
-        dto: ImageNode,
-        extra: dict[str, Any] | None = None,
-        *,
-        id_field: str = "id",
-    ) -> Self:
-        """Create ImageV2GQL from ImageNode DTO.
-
-        Args:
-            dto: The image node DTO from the adapter layer.
-
-        Returns:
-            ImageV2GQL instance.
-        """
-        accelerators = dto.accelerators.split(",") if dto.accelerators else []
-        return cls(
-            id=dto.id,
-            identity=ImageV2IdentityInfoGQL(
-                canonical_name=dto.name,
-                namespace=dto.image,
-                architecture=dto.architecture,
-            ),
-            metadata=ImageV2MetadataInfoGQL(
-                digest=dto.config_digest,
-                size_bytes=dto.size_bytes,
-                created_at=dto.created_at,
-                tags=[ImageV2TagEntryGQL(key=t.key, value=t.value) for t in dto.tags],
-                labels=[ImageV2LabelEntryGQL(key=lb.key, value=lb.value) for lb in dto.labels],
-                status=ImageV2StatusGQL(dto.status.value),
-            ),
-            requirements=ImageV2RequirementsInfoGQL(
-                supported_accelerators=[a.strip() for a in accelerators if a.strip()],
-                resource_limits=[
-                    ImageV2ResourceLimitGQL(
-                        key=rl.key,
-                        min=str(rl.min),
-                        max=str(rl.max) if rl.max is not None else "Infinity",
-                    )
-                    for rl in dto.resource_limits
-                ],
-            ),
-            permission=None,
-            registry_id=dto.registry_id,
-        )
-
-    @classmethod
     def from_detailed_data(
         cls,
         data: ImageDataWithDetails,
@@ -482,17 +423,12 @@ class ImageV2ConnectionGQL(Connection[ImageV2GQL]):
         description="Scope for querying images within a specific container registry.",
         added_version="26.2.0",
     ),
-    model=ContainerRegistryScopeInputDTO,
     name="ContainerRegistryScope",
 )
-class ContainerRegistryScopeGQL:
+class ContainerRegistryScopeGQL(PydanticInputMixin[ContainerRegistryScopeInputDTO]):
     registry_id: uuid.UUID = strawberry.field(
         description="UUID of the container registry to scope the query to."
     )
-
-    def to_pydantic(self) -> ContainerRegistryScopeInputDTO:
-        """Convert to pydantic DTO for adapter layer processing."""
-        return ContainerRegistryScopeInputDTO(registry_id=self.registry_id)
 
 
 @gql_pydantic_input(
@@ -500,15 +436,10 @@ class ContainerRegistryScopeGQL:
         description="Scope for querying aliases within a specific image.",
         added_version="26.2.0",
     ),
-    model=ImageScopeInputDTO,
     name="ImageV2Scope",
 )
-class ImageV2ScopeGQL:
+class ImageV2ScopeGQL(PydanticInputMixin[ImageScopeInputDTO]):
     image_id: uuid.UUID = strawberry.field(description="UUID of the image to scope the query to.")
-
-    def to_pydantic(self) -> ImageScopeInputDTO:
-        """Convert to pydantic DTO for adapter layer processing."""
-        return ImageScopeInputDTO(image_id=self.image_id)
 
 
 @gql_pydantic_input(
@@ -516,10 +447,9 @@ class ImageV2ScopeGQL:
         description="Nested filter for aliases belonging to an image. Filters images that have at least one alias matching all specified conditions.",
         added_version="26.3.0",
     ),
-    model=ImageAliasNestedFilterInputDTO,
     name="ImageAliasNestedFilter",
 )
-class ImageAliasNestedFilterGQL:
+class ImageAliasNestedFilterGQL(PydanticInputMixin[ImageAliasNestedFilterInputDTO]):
     """Nested filter for image aliases within an image."""
 
     alias: StringFilter | None = strawberry.field(
@@ -527,22 +457,15 @@ class ImageAliasNestedFilterGQL:
         description="Filter by alias string. Supports equals, contains, startsWith, and endsWith.",
     )
 
-    def to_pydantic(self) -> ImageAliasNestedFilterInputDTO:
-        """Convert to pydantic DTO for adapter layer processing."""
-        return ImageAliasNestedFilterInputDTO(
-            alias=self.alias.to_pydantic() if self.alias else None,
-        )
-
 
 @gql_pydantic_input(
     BackendAIGQLMeta(
         description="Filter for image status with equality and membership operators.",
         added_version="26.3.0",
     ),
-    model=ImageStatusFilterInputDTO,
     name="ImageV2StatusFilter",
 )
-class ImageV2StatusFilterGQL:
+class ImageV2StatusFilterGQL(PydanticInputMixin[ImageStatusFilterInputDTO]):
     equals: ImageV2StatusGQL | None = strawberry.field(
         default=None, description="Matches images with this exact status."
     )
@@ -556,25 +479,15 @@ class ImageV2StatusFilterGQL:
         default=None, description="Excludes images whose status is in this list."
     )
 
-    def to_pydantic(self) -> ImageStatusFilterInputDTO:
-        """Convert to pydantic DTO for adapter layer processing."""
-        return ImageStatusFilterInputDTO(
-            equals=ImageStatusType(self.equals.value) if self.equals else None,
-            in_=[ImageStatusType(s.value) for s in self.in_] if self.in_ else None,
-            not_equals=ImageStatusType(self.not_equals.value) if self.not_equals else None,
-            not_in=[ImageStatusType(s.value) for s in self.not_in] if self.not_in else None,
-        )
-
 
 @gql_pydantic_input(
     BackendAIGQLMeta(
         description="Filter options for images based on various criteria such as status, name, and architecture. Supports logical operations (AND, OR, NOT) for complex filtering scenarios.",
         added_version="26.2.0",
     ),
-    model=ImageFilterInputDTO,
     name="ImageV2Filter",
 )
-class ImageV2FilterGQL(GQLFilter):
+class ImageV2FilterGQL(PydanticInputMixin[ImageFilterInputDTO], GQLFilter):
     status: ImageV2StatusFilterGQL | None = None
     name: StringFilter | None = None
     architecture: StringFilter | None = None
@@ -593,20 +506,6 @@ class ImageV2FilterGQL(GQLFilter):
     AND: list[Self] | None = None
     OR: list[Self] | None = None
     NOT: list[Self] | None = None
-
-    def to_pydantic(self) -> ImageFilterInputDTO:
-        """Convert to pydantic DTO for adapter layer processing."""
-        return ImageFilterInputDTO(
-            status=self.status.to_pydantic() if self.status else None,
-            name=self.name.to_pydantic() if self.name else None,
-            architecture=self.architecture.to_pydantic() if self.architecture else None,
-            registry_id=self.registry_id.to_pydantic() if self.registry_id else None,
-            alias=self.alias.to_pydantic() if self.alias else None,
-            last_used=self.last_used.to_pydantic() if self.last_used else None,
-            AND=[f.to_pydantic() for f in self.AND] if self.AND else None,
-            OR=[f.to_pydantic() for f in self.OR] if self.OR else None,
-            NOT=[f.to_pydantic() for f in self.NOT] if self.NOT else None,
-        )
 
 
 @strawberry.enum(
@@ -628,7 +527,6 @@ class ImageV2OrderFieldGQL(enum.Enum):
         description="Specifies the field and direction for ordering images in queries.",
         added_version="26.2.0",
     ),
-    model=ImageOrderByInputDTO,
 )
 class ImageV2OrderByGQL(GQLOrderBy):
     field: ImageV2OrderFieldGQL
@@ -670,10 +568,9 @@ class ImageV2AliasConnectionGQL(Connection[ImageV2AliasGQL]):
         description="Filter options for image aliases. Supports filtering by alias string and image ID.",
         added_version="26.2.0",
     ),
-    model=ImageAliasFilterInputDTO,
     name="ImageV2AliasFilter",
 )
-class ImageV2AliasFilterGQL(GQLFilter):
+class ImageV2AliasFilterGQL(PydanticInputMixin[ImageAliasFilterInputDTO], GQLFilter):
     alias: StringFilter | None = None
     image_id: UUIDFilter | None = strawberry.field(
         default=None,
@@ -683,16 +580,6 @@ class ImageV2AliasFilterGQL(GQLFilter):
     AND: list[Self] | None = None
     OR: list[Self] | None = None
     NOT: list[Self] | None = None
-
-    def to_pydantic(self) -> ImageAliasFilterInputDTO:
-        """Convert to pydantic DTO for adapter layer processing."""
-        return ImageAliasFilterInputDTO(
-            alias=self.alias.to_pydantic() if self.alias else None,
-            image_id=self.image_id.to_pydantic() if self.image_id else None,
-            AND=[f.to_pydantic() for f in self.AND] if self.AND else None,
-            OR=[f.to_pydantic() for f in self.OR] if self.OR else None,
-            NOT=[f.to_pydantic() for f in self.NOT] if self.NOT else None,
-        )
 
 
 @strawberry.enum(
@@ -712,7 +599,6 @@ class ImageV2AliasOrderFieldGQL(enum.Enum):
         description="Specifies the field and direction for ordering image aliases in queries.",
         added_version="26.2.0",
     ),
-    model=ImageAliasOrderByInputDTO,
 )
 class ImageV2AliasOrderByGQL(GQLOrderBy):
     field: ImageV2AliasOrderFieldGQL

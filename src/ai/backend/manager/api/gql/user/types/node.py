@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING, Annotated, Any, Self, cast
 from uuid import UUID
 
 import strawberry
-from strawberry import ID, Info
+from strawberry import Info
 from strawberry.relay import Connection, Edge, NodeID
 
 from ai.backend.common.dto.manager.v2.user.response import UserNode
@@ -19,7 +19,7 @@ from ai.backend.manager.api.gql.decorators import (
     gql_pydantic_input,
 )
 from ai.backend.manager.api.gql.fair_share.types import UserFairShareGQL
-from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin
+from ai.backend.manager.api.gql.pydantic_compat import PydanticInputMixin, PydanticNodeMixin
 from ai.backend.manager.api.gql.resource_usage.types import (
     UserUsageBucketConnection,
     UserUsageBucketFilter,
@@ -27,7 +27,6 @@ from ai.backend.manager.api.gql.resource_usage.types import (
 )
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 
-from .enums import UserRoleEnumGQL, UserStatusEnumGQL
 from .nested import (
     EntityTimestampsGQL,
     UserBasicInfoGQL,
@@ -50,10 +49,9 @@ if TYPE_CHECKING:
     BackendAIGQLMeta(
         description="Scope parameters for filtering user fair shares.", added_version="24.09.0"
     ),
-    model=UserFairShareScope,
     name="UserFairShareScope",
 )
-class UserFairShareScopeGQL:
+class UserFairShareScopeGQL(PydanticInputMixin[UserFairShareScope]):
     """Scope parameters for filtering user fair shares."""
 
     resource_group_name: str = strawberry.field(
@@ -63,21 +61,14 @@ class UserFairShareScopeGQL:
         description="Project ID that the user belongs to (required for user-level fair shares)."
     )
 
-    def to_pydantic(self) -> UserFairShareScope:
-        return UserFairShareScope(
-            resource_group_name=self.resource_group_name,
-            project_id=self.project_id,
-        )
-
 
 @gql_pydantic_input(
     BackendAIGQLMeta(
         description="Scope parameters for filtering user usage buckets.", added_version="24.09.0"
     ),
-    model=UserUsageScope,
     name="UserUsageScope",
 )
-class UserUsageScopeGQL:
+class UserUsageScopeGQL(PydanticInputMixin[UserUsageScope]):
     """Scope parameters for filtering user usage buckets."""
 
     resource_group_name: str = strawberry.field(
@@ -86,12 +77,6 @@ class UserUsageScopeGQL:
     project_id: UUID = strawberry.field(
         description="Project ID that the user belongs to (required for user-level usage)."
     )
-
-    def to_pydantic(self) -> UserUsageScope:
-        return UserUsageScope(
-            resource_group_name=self.resource_group_name,
-            project_id=self.project_id,
-        )
 
 
 @strawberry.federation.type(
@@ -317,53 +302,6 @@ class UserV2GQL(PydanticNodeMixin[UserNode]):
             UUID(nid) for nid in node_ids
         ])
         return cast(list[Self | None], results)
-
-    @classmethod
-    def from_pydantic(
-        cls,
-        dto: UserNode,
-        extra: dict[str, Any] | None = None,
-        *,
-        id_field: str = "id",
-    ) -> Self:
-        """Convert UserNode DTO to GraphQL type."""
-        return cls(
-            id=ID(str(dto.id)),
-            basic_info=UserBasicInfoGQL(
-                username=dto.basic_info.username,
-                email=dto.basic_info.email,
-                full_name=dto.basic_info.full_name,
-                description=dto.basic_info.description,
-            ),
-            status=UserStatusInfoGQL(
-                status=UserStatusEnumGQL(dto.status.status.value),
-                status_info=dto.status.status_info,
-                need_password_change=dto.status.need_password_change,
-            ),
-            organization=UserOrganizationInfoGQL(
-                domain_name=dto.organization.domain_name,
-                role=UserRoleEnumGQL(dto.organization.role.value)
-                if dto.organization.role
-                else None,
-                resource_policy=dto.organization.resource_policy,
-                main_access_key=dto.organization.main_access_key,
-            ),
-            security=UserSecurityInfoGQL(
-                allowed_client_ip=dto.security.allowed_client_ip,
-                totp_activated=dto.security.totp_activated,
-                totp_activated_at=dto.security.totp_activated_at,
-                sudo_session_enabled=dto.security.sudo_session_enabled,
-            ),
-            container=UserContainerSettingsGQL(
-                container_uid=dto.container.container_uid,
-                container_main_gid=dto.container.container_main_gid,
-                container_gids=dto.container.container_gids,
-            ),
-            timestamps=EntityTimestampsGQL(
-                created_at=dto.timestamps.created_at,
-                modified_at=dto.timestamps.modified_at,
-            ),
-        )
 
 
 UserV2Edge = Edge[UserV2GQL]

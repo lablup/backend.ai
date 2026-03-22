@@ -17,7 +17,9 @@ __all__ = (
     "OrderDirection",
     "ResourceAllocationOrderField",
     "ResourceOptsEntryDTO",
+    "ResourceOptsEntryInfoDTO",
     "ResourceOptsDTOInput",
+    "ResourceOptsInfoDTO",
     "ResourceSlotTypeOrderField",
 )
 
@@ -66,3 +68,16 @@ class ResourceOptsDTOInput(BaseRequestModel):
     """Resource options input containing multiple key-value entries."""
 
     entries: list[ResourceOptsEntryDTO] = Field(description="List of resource option entries.")
+
+
+class ResourceOptsEntryInfoDTO(BaseResponseModel):
+    """Single resource option entry with name and value."""
+
+    name: str = Field(description="The name of this resource option (e.g., 'shmem').")
+    value: str = Field(description="The value for this resource option (e.g., '64m').")
+
+
+class ResourceOptsInfoDTO(BaseResponseModel):
+    """Resource options containing multiple key-value entries."""
+
+    entries: list[ResourceOptsEntryInfoDTO] = Field(description="List of resource option entries.")

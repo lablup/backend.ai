@@ -26,6 +26,7 @@ from ai.backend.common.dto.manager.v2.huggingface_registry.response import (
 from ai.backend.manager.api.gql.base import encode_cursor
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
+    PydanticInputMixin,
     gql_connection_type,
     gql_node_type,
     gql_output_type,
@@ -128,51 +129,28 @@ async def huggingface_registries(
 
 @gql_pydantic_input(
     BackendAIGQLMeta(description="", added_version="25.14.0"),
-    model=CreateHuggingFaceRegistryInputDTO,
 )
-class CreateHuggingFaceRegistryInput:
+class CreateHuggingFaceRegistryInput(PydanticInputMixin[CreateHuggingFaceRegistryInputDTO]):
     name: str
     url: str
     token: str | None = None
 
-    def to_pydantic(self) -> CreateHuggingFaceRegistryInputDTO:
-        return CreateHuggingFaceRegistryInputDTO(
-            name=self.name,
-            url=self.url,
-            token=self.token,
-        )
-
 
 @gql_pydantic_input(
     BackendAIGQLMeta(description="", added_version="25.14.0"),
-    model=UpdateHuggingFaceRegistryInputDTO,
 )
-class UpdateHuggingFaceRegistryInput:
+class UpdateHuggingFaceRegistryInput(PydanticInputMixin[UpdateHuggingFaceRegistryInputDTO]):
     id: ID
     url: str | None = UNSET
     name: str | None = UNSET
     token: str | None = UNSET
 
-    def to_pydantic(self) -> UpdateHuggingFaceRegistryInputDTO:
-        return UpdateHuggingFaceRegistryInputDTO(
-            id=uuid.UUID(self.id),
-            name=None if self.name is UNSET else self.name,
-            url=None if self.url is UNSET else self.url,
-            token=None if self.token is UNSET else self.token,
-        )
-
 
 @gql_pydantic_input(
     BackendAIGQLMeta(description="", added_version="25.14.0"),
-    model=DeleteHuggingFaceRegistryInputDTO,
 )
-class DeleteHuggingFaceRegistryInput:
+class DeleteHuggingFaceRegistryInput(PydanticInputMixin[DeleteHuggingFaceRegistryInputDTO]):
     id: ID
-
-    def to_pydantic(self) -> DeleteHuggingFaceRegistryInputDTO:
-        return DeleteHuggingFaceRegistryInputDTO(
-            id=uuid.UUID(str(self.id)),
-        )
 
 
 @gql_output_type(

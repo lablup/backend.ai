@@ -9,7 +9,7 @@ from typing import TYPE_CHECKING, Annotated, Any, Self, cast
 from uuid import UUID
 
 import strawberry
-from strawberry import ID, Info
+from strawberry import Info
 from strawberry.relay import Connection, Edge, NodeID
 
 from ai.backend.common.dto.manager.v2.kernel.request import KernelFilter, KernelOrder
@@ -35,6 +35,7 @@ from ai.backend.common.types import AgentId, KernelId, SessionTypes
 from ai.backend.manager.api.gql.base import OrderDirection, UUIDFilter
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
+    PydanticInputMixin,
     gql_connection_type,
     gql_node_type,
     gql_pydantic_input,
@@ -150,7 +151,6 @@ class KernelV2OrderFieldGQL(StrEnum):
 
 @gql_pydantic_input(
     BackendAIGQLMeta(description="Filter for kernel status.", added_version="26.2.0"),
-    model=KernelStatusFilter,
     name="KernelV2StatusFilter",
 )
 class KernelV2StatusFilterGQL:
@@ -169,10 +169,9 @@ class KernelV2StatusFilterGQL:
         description="Filter criteria for querying kernels.",
         added_version="26.2.0",
     ),
-    model=KernelFilter,
     name="KernelV2Filter",
 )
-class KernelV2FilterGQL:
+class KernelV2FilterGQL(PydanticInputMixin[KernelFilter]):
     id: UUIDFilter | None = None
     status: KernelV2StatusFilterGQL | None = None
     session_id: UUIDFilter | None = None
@@ -181,20 +180,9 @@ class KernelV2FilterGQL:
     OR: list[Self] | None = None
     NOT: list[Self] | None = None
 
-    def to_pydantic(self) -> KernelFilter:
-        return KernelFilter(
-            id=self.id.to_pydantic() if self.id else None,
-            status=self.status.to_pydantic() if self.status else None,
-            session_id=self.session_id.to_pydantic() if self.session_id else None,
-            AND=[f.to_pydantic() for f in self.AND] if self.AND else None,
-            OR=[f.to_pydantic() for f in self.OR] if self.OR else None,
-            NOT=[f.to_pydantic() for f in self.NOT] if self.NOT else None,
-        )
-
 
 @gql_pydantic_input(
     BackendAIGQLMeta(description="Ordering specification for kernels.", added_version="26.2.0"),
-    model=KernelOrder,
     name="KernelV2OrderBy",
 )
 class KernelV2OrderByGQL:
@@ -606,70 +594,6 @@ class KernelV2GQL(PydanticNodeMixin[KernelNode]):
             KernelId(UUID(nid)) for nid in node_ids
         ])
         return cast(list[Self | None], results)
-
-    @classmethod
-    def from_pydantic(
-        cls,
-        dto: KernelNode,
-        extra: dict[str, Any] | None = None,
-        *,
-        id_field: str = "id",
-    ) -> Self:
-        """Create KernelV2GQL from KernelNode DTO (adapter search results)."""
-        from ai.backend.common.types import SessionResult
-        from ai.backend.manager.data.kernel.types import KernelStatus as KernelStatusInternal
-
-        occupied_slots = ResourceSlotGQL.from_resource_slot(dto.resource.occupied_slots or {})
-        requested_slots = ResourceSlotGQL.from_resource_slot(dto.resource.requested_slots or {})
-        shares = ResourceSlotGQL.from_resource_slot(dto.resource.occupied_shares or {})
-
-        status = KernelV2StatusGQL.from_internal(KernelStatusInternal(dto.lifecycle.status))
-        result = SessionV2ResultGQL.from_internal(SessionResult(dto.lifecycle.result))
-
-        return cls(
-            id=ID(str(dto.id)),
-            startup_command=dto.startup_command,
-            session_info=KernelV2SessionInfoGQL(
-                session_id=dto.session.session_id,
-                creation_id=dto.session.creation_id,
-                name=dto.session.name,
-                session_type=SessionTypes(dto.session.session_type),
-            ),
-            user_info=KernelV2UserInfoGQL(
-                user_id=dto.user.user_uuid,
-                access_key=dto.user.access_key,
-                domain_name=dto.user.domain_name,
-                group_id=dto.user.group_id,
-            ),
-            network=KernelV2NetworkInfoGQL(
-                service_ports=None,
-                preopen_ports=None,
-            ),
-            cluster=KernelV2ClusterInfoGQL(
-                cluster_role=dto.cluster.cluster_role,
-                cluster_idx=dto.cluster.cluster_idx,
-                local_rank=dto.cluster.local_rank,
-                cluster_hostname=dto.cluster.cluster_hostname,
-            ),
-            resource=KernelV2ResourceInfoGQL(
-                agent_id=dto.resource.agent,
-                resource_group_name=dto.resource.scaling_group,
-                container_id=dto.resource.container_id,
-                allocation=ResourceAllocationGQL(
-                    requested=requested_slots,
-                    used=occupied_slots,
-                ),
-                shares=shares,
-                resource_opts=ResourceOptsGQL.from_mapping(dto.resource.resource_opts or {}),
-            ),
-            lifecycle=KernelV2LifecycleInfoGQL(
-                status=status,
-                result=result,
-                created_at=dto.lifecycle.created_at,
-                terminated_at=dto.lifecycle.terminated_at,
-                starts_at=dto.lifecycle.starts_at,
-            ),
-        )
 
 
 KernelV2EdgeGQL = Edge[KernelV2GQL]

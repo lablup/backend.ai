@@ -102,10 +102,10 @@ class BulkRoleOperationFailureInfo(BaseResponseModel):
 class BulkAssignRoleResultPayload(BaseResponseModel):
     """Result payload for bulk role assignment."""
 
-    successes: list[RoleAssignmentNode] = Field(
+    assigned: list[RoleAssignmentNode] = Field(
         default_factory=list, description="Successfully created role assignments"
     )
-    failures: list[BulkRoleOperationFailureInfo] = Field(
+    failed: list[BulkRoleOperationFailureInfo] = Field(
         default_factory=list, description="Users that failed to be assigned"
     )
 
@@ -113,10 +113,10 @@ class BulkAssignRoleResultPayload(BaseResponseModel):
 class BulkRevokeRoleResultPayload(BaseResponseModel):
     """Result payload for bulk role revocation."""
 
-    successes: list[RoleAssignmentNode] = Field(
+    revoked: list[RoleAssignmentNode] = Field(
         default_factory=list, description="Successfully revoked role assignments"
     )
-    failures: list[BulkRoleOperationFailureInfo] = Field(
+    failed: list[BulkRoleOperationFailureInfo] = Field(
         default_factory=list, description="Users that failed to be revoked"
     )
 

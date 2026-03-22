@@ -21,7 +21,12 @@ from ai.backend.common.dto.manager.v2.group.response import (
 from ai.backend.common.dto.manager.v2.group.response import (
     VFolderHostPermissionEntry as VFolderHostPermissionEntryDTO,
 )
-from ai.backend.manager.api.gql.decorators import BackendAIGQLMeta, gql_pydantic_type
+from ai.backend.manager.api.gql.decorators import (
+    BackendAIGQLMeta,
+    gql_from_pydantic_type,
+    gql_pydantic_type,
+)
+from ai.backend.manager.api.gql.pydantic_compat import PydanticOutputMixin
 
 from .enums import ProjectTypeEnum, VFolderHostPermissionEnum
 
@@ -83,7 +88,7 @@ class ProjectOrganizationInfoGQL:
 # ============================================================================
 
 
-@gql_pydantic_type(
+@gql_from_pydantic_type(
     BackendAIGQLMeta(
         added_version="26.2.0",
         description=(
@@ -91,10 +96,9 @@ class ProjectOrganizationInfoGQL:
             "Defines what operations are allowed for a specific storage host."
         ),
     ),
-    model=VFolderHostPermissionEntryDTO,
     name="VFolderHostPermissionEntry",
 )
-class VFolderHostPermissionEntryGQL:
+class VFolderHostPermissionEntryGQL(PydanticOutputMixin[VFolderHostPermissionEntryDTO]):
     """Storage host permission entry."""
 
     host: str = strawberry.field(
@@ -108,7 +112,7 @@ class VFolderHostPermissionEntryGQL:
     )
 
 
-@gql_pydantic_type(
+@gql_from_pydantic_type(
     BackendAIGQLMeta(
         added_version="26.2.0",
         description=(
@@ -116,10 +120,9 @@ class VFolderHostPermissionEntryGQL:
             "Contains allowed virtual folder hosts and their permissions."
         ),
     ),
-    model=ProjectStorageInfoDTO,
     name="ProjectStorageInfo",
 )
-class ProjectStorageInfoGQL:
+class ProjectStorageInfoGQL(PydanticOutputMixin[ProjectStorageInfoDTO]):
     """Project storage configuration."""
 
     allowed_vfolder_hosts: list[VFolderHostPermissionEntryGQL] = strawberry.field(

@@ -66,7 +66,7 @@ class ArtifactRevisionNode(BaseResponseModel):
     id: UUID = Field(description="Artifact revision ID")
     artifact_id: UUID = Field(description="Parent artifact ID")
     version: str = Field(description="Revision version string")
-    size: int | None = Field(default=None, description="Revision size in bytes")
+    size: str | None = Field(default=None, description="Revision size in bytes")
     status: ArtifactStatus = Field(description="Revision status")
     remote_status: str | None = Field(default=None, description="Remote status of the revision")
     created_at: datetime | None = Field(default=None, description="Creation timestamp")

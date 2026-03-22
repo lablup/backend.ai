@@ -25,7 +25,9 @@ from ai.backend.common.dto.manager.v2.deployment.response import (
 )
 from ai.backend.common.dto.manager.v2.deployment.types import (
     BlueGreenConfigInfo,
+    BlueGreenStrategySpecInfo,
     RollingUpdateConfigInfo,
+    RollingUpdateStrategySpecInfo,
 )
 from ai.backend.manager.api.gql import utils as gql_utils
 from ai.backend.manager.api.gql.deployment.resolver import policy as policy_resolver
@@ -103,15 +105,29 @@ def _make_policy_node_dto(
     blue_green: BlueGreenConfigInfo | None = None,
 ) -> DeploymentPolicyNodeDTO:
     """Create a DeploymentPolicyNode DTO for mock results."""
-    if rolling_update is None and strategy == DeploymentStrategy.ROLLING:
-        rolling_update = RollingUpdateConfigInfo(max_surge=1, max_unavailable=0)
+    if strategy == DeploymentStrategy.ROLLING:
+        surge = rolling_update.max_surge if rolling_update is not None else 1
+        unavailable = rolling_update.max_unavailable if rolling_update is not None else 0
+        strategy_spec: RollingUpdateStrategySpecInfo | BlueGreenStrategySpecInfo = (
+            RollingUpdateStrategySpecInfo(
+                strategy=strategy,
+                max_surge=surge,
+                max_unavailable=unavailable,
+            )
+        )
+    else:
+        promote = blue_green.auto_promote if blue_green is not None else False
+        delay = blue_green.promote_delay_seconds if blue_green is not None else 0
+        strategy_spec = BlueGreenStrategySpecInfo(
+            strategy=strategy,
+            auto_promote=promote,
+            promote_delay_seconds=delay,
+        )
     return DeploymentPolicyNodeDTO(
         id=uuid.uuid4(),
         deployment_id=uuid.UUID(SAMPLE_DEPLOYMENT_ID),
-        strategy=strategy,
+        strategy_spec=strategy_spec,
         rollback_on_failure=False,
-        rolling_update=rolling_update,
-        blue_green=blue_green,
         created_at=datetime(2026, 1, 1, tzinfo=UTC),
         updated_at=datetime(2026, 1, 1, tzinfo=UTC),
     )

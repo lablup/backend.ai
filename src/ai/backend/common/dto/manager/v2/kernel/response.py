@@ -144,15 +144,18 @@ class KernelNode(BaseResponseModel):
     startup_command: str | None = Field(
         default=None, description="Startup command executed when the kernel starts."
     )
-    session: KernelSessionInfo = Field(
+    session_info: KernelSessionInfoGQLDTO = Field(
         description="Information about the session this kernel belongs to."
     )
-    user: KernelUserInfo = Field(description="User and ownership information.")
-    cluster: KernelClusterInfo = Field(
+    user_info: KernelUserInfoGQLDTO = Field(description="User and ownership information.")
+    network: KernelNetworkInfoGQLDTO = Field(description="Network configuration and exposed ports.")
+    cluster: KernelClusterInfoGQLDTO = Field(
         description="Cluster configuration for distributed computing."
     )
-    resource: KernelResourceInfo = Field(description="Resource allocation and agent information.")
-    lifecycle: KernelLifecycleInfo = Field(description="Lifecycle status and timestamps.")
+    resource: KernelResourceInfoGQLDTO = Field(
+        description="Resource allocation and agent information."
+    )
+    lifecycle: KernelLifecycleInfoGQLDTO = Field(description="Lifecycle status and timestamps.")
 
 
 # ---------------------------------------------------------------------------

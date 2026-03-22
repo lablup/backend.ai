@@ -11,6 +11,7 @@ from ai.backend.common.types import AgentId, ImageID, KernelId, SessionId
 from ai.backend.manager.data.permission.id import ObjectId
 
 if TYPE_CHECKING:
+    from ai.backend.common.dto.manager.v2.rbac.response import EntityNode  # pants: no-infer-dep
     from ai.backend.manager.api.adapters.registry import Adapters  # pants: no-infer-dep
     from ai.backend.manager.api.gql.agent.types import AgentV2GQL  # pants: no-infer-dep
     from ai.backend.manager.api.gql.artifact.types import (  # pants: no-infer-dep
@@ -736,16 +737,11 @@ class DataLoaders:
     @cached_property
     def entity_loader(
         self,
-    ) -> DataLoader[ObjectId, EntityRefGQL | None]:
+    ) -> DataLoader[ObjectId, EntityNode | None]:
         adapter = self._adapters.rbac
 
-        async def load_fn(object_ids: list[ObjectId]) -> list[EntityRefGQL | None]:
-            from ai.backend.manager.api.gql.rbac.types.entity import (  # pants: no-infer-dep
-                EntityRefGQL as ERG,
-            )
-
-            dtos = await adapter.batch_load_entities_by_type_and_ids(object_ids)
-            return [ERG.from_pydantic(dto) if dto is not None else None for dto in dtos]
+        async def load_fn(object_ids: list[ObjectId]) -> list[EntityNode | None]:
+            return await adapter.batch_load_entities_by_type_and_ids(object_ids)
 
         return DataLoader(load_fn=load_fn)
 

@@ -110,12 +110,15 @@ class AgentSystemInfo(BaseResponseModel):
             'Follows semantic versioning (e.g., "26.1.0").'
         )
     )
-    compute_plugins: dict[str, Any] | None = Field(
+    auto_terminate_abusing_kernel: bool = Field(
+        default=False,
+        description="Legacy configuration flag, no longer actively used in the system.",
+    )
+    compute_plugins: ComputePluginsGQLDTO | None = Field(
         default=None,
         description=(
             "Compute plugin metadata supported by this agent. "
-            "Each key is a plugin name (e.g., 'cuda', 'rocm') and the value contains "
-            "plugin-specific configuration and capabilities."
+            "Each entry contains a plugin name and associated metadata."
         ),
     )
 

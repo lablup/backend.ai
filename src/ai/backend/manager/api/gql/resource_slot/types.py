@@ -15,7 +15,7 @@ from enum import StrEnum
 from typing import Any, Self
 
 import strawberry
-from strawberry import ID, Info
+from strawberry import Info
 from strawberry.relay import Connection, Edge, NodeID
 
 from ai.backend.common.dto.manager.v2.resource_slot.request import (
@@ -46,19 +46,7 @@ from ai.backend.common.dto.manager.v2.resource_slot.response import (
     ResourceSlotTypeNode as ResourceSlotTypeNodeDTO,
 )
 from ai.backend.common.dto.manager.v2.resource_slot.types import (
-    AgentResourceOrderField as AgentResourceOrderFieldDTO,
-)
-from ai.backend.common.dto.manager.v2.resource_slot.types import (
     NumberFormatInfo as NumberFormatInfoDTO,
-)
-from ai.backend.common.dto.manager.v2.resource_slot.types import (
-    OrderDirection as DtoOrderDirection,
-)
-from ai.backend.common.dto.manager.v2.resource_slot.types import (
-    ResourceAllocationOrderField as ResourceAllocationOrderFieldDTO,
-)
-from ai.backend.common.dto.manager.v2.resource_slot.types import (
-    ResourceSlotTypeOrderField as ResourceSlotTypeOrderFieldDTO,
 )
 from ai.backend.manager.api.gql.base import OrderDirection, StringFilter
 from ai.backend.manager.api.gql.decorators import (
@@ -68,7 +56,7 @@ from ai.backend.manager.api.gql.decorators import (
     gql_pydantic_input,
     gql_pydantic_type,
 )
-from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin
+from ai.backend.manager.api.gql.pydantic_compat import PydanticInputMixin, PydanticNodeMixin
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.api.gql.utils import dedent_strip
 
@@ -223,10 +211,9 @@ class ResourceSlotTypeOrderFieldGQL(StrEnum):
     BackendAIGQLMeta(
         description="Filter criteria for querying resource slot types.", added_version="26.3.0"
     ),
-    model=ResourceSlotTypeFilterDTO,
     name="ResourceSlotTypeFilter",
 )
-class ResourceSlotTypeFilterGQL:
+class ResourceSlotTypeFilterGQL(PydanticInputMixin[ResourceSlotTypeFilterDTO]):
     slot_name: StringFilter | None = None
     slot_type: StringFilter | None = None
     display_name: StringFilter | None = None
@@ -235,33 +222,16 @@ class ResourceSlotTypeFilterGQL:
     OR: list[Self] | None = None
     NOT: list[Self] | None = None
 
-    def to_pydantic(self) -> ResourceSlotTypeFilterDTO:
-        return ResourceSlotTypeFilterDTO(
-            slot_name=self.slot_name.to_pydantic() if self.slot_name is not None else None,
-            slot_type=self.slot_type.to_pydantic() if self.slot_type is not None else None,
-            display_name=self.display_name.to_pydantic() if self.display_name is not None else None,
-            AND=[f.to_pydantic() for f in self.AND] if self.AND is not None else None,
-            OR=[f.to_pydantic() for f in self.OR] if self.OR is not None else None,
-            NOT=[f.to_pydantic() for f in self.NOT] if self.NOT is not None else None,
-        )
-
 
 @gql_pydantic_input(
     BackendAIGQLMeta(
         description="Ordering specification for resource slot types.", added_version="26.3.0"
     ),
-    model=ResourceSlotTypeOrderDTO,
     name="ResourceSlotTypeOrderBy",
 )
-class ResourceSlotTypeOrderByGQL:
+class ResourceSlotTypeOrderByGQL(PydanticInputMixin[ResourceSlotTypeOrderDTO]):
     field: ResourceSlotTypeOrderFieldGQL
     direction: OrderDirection = OrderDirection.ASC
-
-    def to_pydantic(self) -> ResourceSlotTypeOrderDTO:
-        return ResourceSlotTypeOrderDTO(
-            field=ResourceSlotTypeOrderFieldDTO(self.field.value),
-            direction=DtoOrderDirection(self.direction.value),
-        )
 
 
 # ========== AgentResourceSlotGQL (Node) ==========
@@ -277,7 +247,7 @@ class ResourceSlotTypeOrderByGQL:
     ),
     name="AgentResourceSlot",
 )
-class AgentResourceSlotGQL(PydanticNodeMixin[Any]):
+class AgentResourceSlotGQL(PydanticNodeMixin[AgentResourceNodeDTO]):
     """Per-agent, per-slot resource capacity and usage."""
 
     id: NodeID[str]
@@ -315,21 +285,6 @@ class AgentResourceSlotGQL(PydanticNodeMixin[Any]):
                 results.append(cls.from_pydantic(node))
         return results
 
-    @classmethod
-    def from_pydantic(
-        cls,
-        dto: AgentResourceNodeDTO,
-        extra: dict[str, Any] | None = None,
-        *,
-        id_field: str = "id",
-    ) -> Self:
-        return cls(
-            id=ID(dto.id),
-            slot_name=dto.slot_name,
-            capacity=Decimal(dto.capacity),
-            used=Decimal(dto.occupied),
-        )
-
 
 AgentResourceSlotEdgeGQL = Edge[AgentResourceSlotGQL]
 
@@ -366,10 +321,9 @@ class AgentResourceSlotOrderFieldGQL(StrEnum):
     BackendAIGQLMeta(
         description="Filter criteria for querying agent resource slots.", added_version="26.3.0"
     ),
-    model=AgentResourceFilterDTO,
     name="AgentResourceSlotFilter",
 )
-class AgentResourceSlotFilterGQL:
+class AgentResourceSlotFilterGQL(PydanticInputMixin[AgentResourceFilterDTO]):
     slot_name: StringFilter | None = None
     agent_id: StringFilter | None = None
 
@@ -377,32 +331,16 @@ class AgentResourceSlotFilterGQL:
     OR: list[Self] | None = None
     NOT: list[Self] | None = None
 
-    def to_pydantic(self) -> AgentResourceFilterDTO:
-        return AgentResourceFilterDTO(
-            slot_name=self.slot_name.to_pydantic() if self.slot_name is not None else None,
-            agent_id=self.agent_id.to_pydantic() if self.agent_id is not None else None,
-            AND=[f.to_pydantic() for f in self.AND] if self.AND is not None else None,
-            OR=[f.to_pydantic() for f in self.OR] if self.OR is not None else None,
-            NOT=[f.to_pydantic() for f in self.NOT] if self.NOT is not None else None,
-        )
-
 
 @gql_pydantic_input(
     BackendAIGQLMeta(
         description="Ordering specification for agent resource slots.", added_version="26.3.0"
     ),
-    model=AgentResourceOrderDTO,
     name="AgentResourceSlotOrderBy",
 )
-class AgentResourceSlotOrderByGQL:
+class AgentResourceSlotOrderByGQL(PydanticInputMixin[AgentResourceOrderDTO]):
     field: AgentResourceSlotOrderFieldGQL
     direction: OrderDirection = OrderDirection.ASC
-
-    def to_pydantic(self) -> AgentResourceOrderDTO:
-        return AgentResourceOrderDTO(
-            field=AgentResourceOrderFieldDTO(self.field.value),
-            direction=DtoOrderDirection(self.direction.value),
-        )
 
 
 # ========== KernelResourceAllocationGQL (Node) ==========
@@ -456,21 +394,6 @@ class KernelResourceAllocationGQL(PydanticNodeMixin[Any]):
                 results.append(cls.from_pydantic(node))
         return results
 
-    @classmethod
-    def from_pydantic(
-        cls,
-        dto: ResourceAllocationNodeDTO,
-        extra: dict[str, Any] | None = None,
-        *,
-        id_field: str = "id",
-    ) -> Self:
-        return cls(
-            id=ID(dto.id),
-            slot_name=dto.slot_name,
-            requested=Decimal(dto.requested),
-            used=Decimal(dto.used) if dto.used is not None else None,
-        )
-
 
 # ========== KernelResourceAllocation Filter/OrderBy ==========
 
@@ -490,23 +413,14 @@ class KernelResourceAllocationOrderFieldGQL(StrEnum):
         description="Filter criteria for querying kernel resource allocations.",
         added_version="26.3.0",
     ),
-    model=ResourceAllocationFilterDTO,
     name="KernelResourceAllocationFilter",
 )
-class KernelResourceAllocationFilterGQL:
+class KernelResourceAllocationFilterGQL(PydanticInputMixin[ResourceAllocationFilterDTO]):
     slot_name: StringFilter | None = None
 
     AND: list[Self] | None = None
     OR: list[Self] | None = None
     NOT: list[Self] | None = None
-
-    def to_pydantic(self) -> ResourceAllocationFilterDTO:
-        return ResourceAllocationFilterDTO(
-            slot_name=self.slot_name.to_pydantic() if self.slot_name is not None else None,
-            AND=[f.to_pydantic() for f in self.AND] if self.AND is not None else None,
-            OR=[f.to_pydantic() for f in self.OR] if self.OR is not None else None,
-            NOT=[f.to_pydantic() for f in self.NOT] if self.NOT is not None else None,
-        )
 
 
 @gql_pydantic_input(
@@ -514,18 +428,11 @@ class KernelResourceAllocationFilterGQL:
         description="Ordering specification for kernel resource allocations.",
         added_version="26.3.0",
     ),
-    model=ResourceAllocationOrderDTO,
     name="KernelResourceAllocationOrderBy",
 )
-class KernelResourceAllocationOrderByGQL:
+class KernelResourceAllocationOrderByGQL(PydanticInputMixin[ResourceAllocationOrderDTO]):
     field: KernelResourceAllocationOrderFieldGQL
     direction: OrderDirection = OrderDirection.ASC
-
-    def to_pydantic(self) -> ResourceAllocationOrderDTO:
-        return ResourceAllocationOrderDTO(
-            field=ResourceAllocationOrderFieldDTO(self.field.value),
-            direction=DtoOrderDirection(self.direction.value),
-        )
 
 
 KernelResourceAllocationEdgeGQL = Edge[KernelResourceAllocationGQL]

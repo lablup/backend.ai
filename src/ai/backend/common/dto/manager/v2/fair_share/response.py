@@ -66,8 +66,10 @@ class DomainFairShareNode(BaseResponseModel):
     other domains within the same scaling group. A lower factor indicates higher priority.
     """
 
-    id: UUID = Field(description="Unique identifier for this fair share record")
-    resource_group: str = Field(description="Name of the scaling group this fair share belongs to")
+    id: str = Field(description="Unique identifier for this fair share record")
+    resource_group_name: str = Field(
+        description="Name of the scaling group this fair share belongs to"
+    )
     domain_name: str = Field(description="Name of the domain this fair share is calculated for")
     spec: FairShareSpecInfo = Field(
         description="Fair share specification parameters used for calculation"
@@ -88,8 +90,10 @@ class ProjectFairShareNode(BaseResponseModel):
     higher priority.
     """
 
-    id: UUID = Field(description="Unique identifier for this fair share record")
-    resource_group: str = Field(description="Name of the scaling group this fair share belongs to")
+    id: str = Field(description="Unique identifier for this fair share record")
+    resource_group_name: str = Field(
+        description="Name of the scaling group this fair share belongs to"
+    )
     project_id: UUID = Field(description="UUID of the project this fair share is calculated for")
     domain_name: str = Field(description="Name of the domain the project belongs to")
     spec: FairShareSpecInfo = Field(
@@ -111,8 +115,10 @@ class UserFairShareNode(BaseResponseModel):
     higher priority. This is the most granular level of fair share calculation.
     """
 
-    id: UUID = Field(description="Unique identifier for this fair share record")
-    resource_group: str = Field(description="Name of the scaling group this fair share belongs to")
+    id: str = Field(description="Unique identifier for this fair share record")
+    resource_group_name: str = Field(
+        description="Name of the scaling group this fair share belongs to"
+    )
     user_uuid: UUID = Field(description="UUID of the user this fair share is calculated for")
     project_id: UUID = Field(description="UUID of the project the user belongs to")
     domain_name: str = Field(description="Name of the domain the user belongs to")

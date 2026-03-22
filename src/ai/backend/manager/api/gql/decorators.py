@@ -28,10 +28,15 @@ from strawberry.types.field import StrawberryField
 from strawberry.types.field import field as strawberry_field
 
 from ai.backend.common.meta import BackendAIGQLMeta
-from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin, PydanticOutputMixin
+from ai.backend.manager.api.gql.pydantic_compat import (
+    PydanticInputMixin,
+    PydanticNodeMixin,
+    PydanticOutputMixin,
+)
 
 __all__ = (
     "BackendAIGQLMeta",
+    "PydanticInputMixin",
     "gql_connection_type",
     "gql_from_pydantic_type",
     "gql_node_type",
@@ -90,14 +95,12 @@ def gql_from_pydantic_type(
 ) -> Callable[[type[T_pydantic_out]], type[T_pydantic_out]]:
     """Decorator for non-Node GQL output types backed by a Pydantic DTO.
 
+    DEPRECATED: Do not use in new code.
+    Use ``@gql_pydantic_type(model=...)`` or ``@gql_node_type`` instead.
+
     Use for types that inherit PydanticOutputMixin and represent mutation
     payloads or nested output structs (NOT Relay Node types).
-    from_pydantic() is provided by PydanticOutputMixin inheritance; override
-    it in the class body only when field names differ from the DTO.
-
-    For Relay Node types use gql_node_type instead.
-    For scalar-only types with auto from_pydantic use gql_pydantic_type instead.
-    For DTO-less pure GQL structs use gql_output_type instead.
+    from_pydantic() is provided by PydanticOutputMixin inheritance.
     """
     description = f"Added in {meta.added_version}. {meta.description}"
     if meta.deprecated_version is not None:
@@ -150,6 +153,9 @@ def gql_output_type(
 ) -> Callable[[type[T_out]], type[T_out]]:
     """Decorator for non-node GQL output types (payloads, nested structs, interface impls).
 
+    DEPRECATED: Do not use in new code.
+    Use ``@gql_pydantic_type(model=...)`` instead.
+
     Use for output types that are NOT PydanticNodeMixin subclasses:
     - Mutation result payloads (Create/Update/Delete/Validate payloads)
     - Nested configuration or metadata structs (sub-fields of a Node)
@@ -176,37 +182,52 @@ def gql_output_type(
     kw_only_default=True,
     field_specifiers=(strawberry_field, StrawberryField),
 )
-def gql_pydantic_input[PydanticModel: BaseModel](
+def gql_pydantic_input(
     meta: BackendAIGQLMeta,
     *,
-    model: type[PydanticModel],
+    model: type[BaseModel] | None = None,
     fields: list[str] | None = None,
     name: str | None = None,
     directives: Sequence[object] = (),
     use_pydantic_alias: bool = True,
     description: str | None = None,
     one_of: bool = False,
-) -> Callable[..., type[StrawberryTypeFromPydantic[PydanticModel]]]:
-    """Decorator for GQL input types backed by a v2 Pydantic DTO.
+) -> Callable[..., Any]:
+    """Decorator for GQL input types.
 
-    Strawberry auto-generates to_pydantic() for simple types where all GQL field
-    types map directly to the pydantic model fields (same scalar types).
+    Two usage modes:
 
-    When explicit conversion is required — e.g., strawberry.ID → uuid.UUID,
-    UNSET/SENTINEL mapping, or enum type coercion — define to_pydantic() in the
-    class body. A user-defined to_pydantic() takes precedence over Strawberry's
-    auto-generated one.
+    **New pattern** (``model=None``, default): Wrap the class with
+    ``@strawberry.input`` and rely on ``PydanticInputMixin[DTO]`` inheritance
+    for automatic ``to_pydantic()`` conversion.  Strawberry does not touch
+    inherited methods on plain ``@strawberry.input`` types, so the mixin's
+    ``to_pydantic()`` is preserved.
 
-    Always declare fields explicitly in the class body. Using all_fields=True is
-    not supported because it prevents mypy from seeing the attributes and causes
-    strawberry to use pydantic field defaults (including SENTINEL) verbatim in the
-    GQL schema, which breaks schema printing for non-scalar default types.
+    Example::
 
-    The description param is accepted for backward compatibility but the
-    canonical description is always built from BackendAIGQLMeta.
+        @gql_pydantic_input(meta)
+        class CreateFooInputGQL(PydanticInputMixin[CreateFooInputDTO]):
+            name: str
 
-    When one_of=True, injects the @oneOf directive so exactly one field must
-    be provided (mirrors @strawberry.input(one_of=True) behaviour).
+    **Legacy pattern** (``model=SomeDTO``): Wrap with
+    ``@strawberry.experimental.pydantic.input``.  Strawberry auto-generates
+    ``to_pydantic()`` for simple types; define it manually in the class body
+    when custom conversion is needed (``strawberry.ID → uuid.UUID``,
+    UNSET/SENTINEL mapping, enum coercion).
+
+    DEPRECATED: The legacy ``model=SomeDTO`` pattern is deprecated.
+    Migrate to ``PydanticInputMixin[DTO]`` with ``model=None``.
+
+    Always declare fields explicitly in the class body. Using ``all_fields=True``
+    is not supported because it prevents mypy from seeing the attributes and
+    causes strawberry to use pydantic field defaults (including SENTINEL) verbatim
+    in the GQL schema, which breaks schema printing for non-scalar default types.
+
+    The ``description`` param is accepted for backward compatibility but the
+    canonical description is always built from ``BackendAIGQLMeta``.
+
+    When ``one_of=True``, injects the ``@oneOf`` directive so exactly one field
+    must be provided (mirrors ``@strawberry.input(one_of=True)`` behaviour).
     """
     desc = f"Added in {meta.added_version}. {meta.description or (description or '')}"
     if meta.deprecated_version is not None:
@@ -214,6 +235,12 @@ def gql_pydantic_input[PydanticModel: BaseModel](
         desc += f" Deprecated since {meta.deprecated_version}.{hint}"
     if one_of:
         directives = (*directives, OneOf())
+    if model is None:
+        return strawberry.input(
+            name=name,
+            description=desc,
+            directives=directives,
+        )
     return strawberry.experimental.pydantic.input(
         model=model,
         fields=fields,

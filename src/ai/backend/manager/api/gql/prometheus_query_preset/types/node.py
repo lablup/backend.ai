@@ -3,10 +3,9 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Any, Self
+from typing import Any
 
 import strawberry
-from strawberry import ID
 from strawberry.relay import Connection, Edge, NodeID
 
 from ai.backend.common.dto.manager.v2.prometheus_query_preset.response import (
@@ -50,34 +49,6 @@ class QueryDefinitionGQL(PydanticNodeMixin[QueryDefinitionNode]):
     created_at: datetime = strawberry.field(description="Creation timestamp.")
     updated_at: datetime = strawberry.field(description="Last update timestamp.")
 
-    @classmethod
-    def from_pydantic(
-        cls,
-        dto: QueryDefinitionNode,
-        extra: dict[str, Any] | None = None,
-        *,
-        id_field: str = "id",
-    ) -> Self:
-        from ai.backend.common.dto.manager.v2.prometheus_query_preset.types import (
-            QueryDefinitionOptionsInfo,
-        )
-
-        return cls(
-            id=ID(str(dto.id)),
-            name=dto.name,
-            metric_name=dto.metric_name,
-            query_template=dto.query_template,
-            time_window=dto.time_window,
-            options=QueryDefinitionOptionsGQL.from_pydantic(
-                QueryDefinitionOptionsInfo(
-                    filter_labels=dto.options.filter_labels,
-                    group_labels=dto.options.group_labels,
-                )
-            ),
-            created_at=dto.created_at,
-            updated_at=dto.updated_at,
-        )
-
 
 QueryDefinitionEdge = Edge[QueryDefinitionGQL]
 
@@ -110,10 +81,6 @@ class CreateQueryDefinitionPayload(PydanticOutputMixin[CreateQueryDefinitionGQLP
 
     preset: QueryDefinitionGQL = strawberry.field(description="Created query definition.")
 
-    @classmethod
-    def from_pydantic(cls, dto: CreateQueryDefinitionGQLPayloadDTO) -> Self:  # type: ignore[override]
-        return cls(preset=QueryDefinitionGQL.from_pydantic(dto.preset))
-
 
 @gql_from_pydantic_type(
     BackendAIGQLMeta(
@@ -126,7 +93,3 @@ class ModifyQueryDefinitionPayload(PydanticOutputMixin[ModifyQueryDefinitionGQLP
     """Payload for query definition modification mutation."""
 
     preset: QueryDefinitionGQL = strawberry.field(description="Updated query definition.")
-
-    @classmethod
-    def from_pydantic(cls, dto: ModifyQueryDefinitionGQLPayloadDTO) -> Self:  # type: ignore[override]
-        return cls(preset=QueryDefinitionGQL.from_pydantic(dto.preset))

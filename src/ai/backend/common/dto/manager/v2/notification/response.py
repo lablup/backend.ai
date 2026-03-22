@@ -116,7 +116,7 @@ class DeleteNotificationRulePayload(BaseResponseModel):
 class ValidateNotificationChannelPayload(BaseResponseModel):
     """Payload for notification channel validation result."""
 
-    channel_id: UUID = Field(description="ID of the validated notification channel")
+    id: UUID = Field(description="ID of the validated notification channel")
 
 
 class ValidateNotificationRulePayload(BaseResponseModel):

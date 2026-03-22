@@ -5,25 +5,32 @@ Response DTOs for resource group DTO v2.
 from __future__ import annotations
 
 from datetime import datetime
-from enum import StrEnum
 from typing import Any
 from uuid import UUID
 
 from pydantic import Field
 
 from ai.backend.common.api_handlers import BaseResponseModel
+from ai.backend.common.dto.manager.v2.resource_group.types import (
+    PreemptionModeDTO,
+    PreemptionOrderDTO,
+    SchedulerTypeDTO,
+)
 
 __all__ = (
     "AdminSearchResourceGroupsPayload",
     "CreateResourceGroupPayload",
     "DeleteResourceGroupPayload",
-    "ResourceGroupNode",
-    "UpdateResourceGroupPayload",
-    # GQL-layer sub-models
     "PreemptionConfigInfo",
-    "ResourceGroupStatusInfo",
+    "ResourceGroupDetailNode",
     "ResourceGroupMetadataInfo",
     "ResourceGroupNetworkConfigInfo",
+    "ResourceGroupNode",
+    "ResourceGroupSchedulerConfigInfo",
+    "ResourceGroupStatusInfo",
+    "UpdateResourceGroupConfigPayloadNode",
+    "UpdateResourceGroupFairShareSpecPayloadNode",
+    "UpdateResourceGroupPayload",
 )
 
 
@@ -92,26 +99,16 @@ class AdminSearchResourceGroupsPayload(BaseResponseModel):
 # GQL-layer sub-model DTOs
 
 
-class _PreemptionOrderEnum(StrEnum):
-    OLDEST = "oldest"
-    NEWEST = "newest"
-
-
-class _PreemptionModeEnum(StrEnum):
-    TERMINATE = "terminate"
-    RESCHEDULE = "reschedule"
-
-
 class PreemptionConfigInfo(BaseResponseModel):
-    """GQL-layer preemption configuration DTO."""
+    """Preemption configuration DTO."""
 
     preemptible_priority: int = Field(
         description="Sessions with priority <= this value are eligible for preemption."
     )
-    order: _PreemptionOrderEnum = Field(
+    order: PreemptionOrderDTO = Field(
         description="Tie-breaking order for same-priority sessions during preemption."
     )
-    mode: _PreemptionModeEnum = Field(
+    mode: PreemptionModeDTO = Field(
         description="How to preempt a session when preemption is triggered."
     )
 
@@ -146,4 +143,50 @@ class ResourceGroupNetworkConfigInfo(BaseResponseModel):
     )
     use_host_network: bool = Field(
         description="Whether to use host network mode for containers in this resource group."
+    )
+
+
+class ResourceGroupSchedulerConfigInfo(BaseResponseModel):
+    """Scheduler configuration DTO for a resource group."""
+
+    type: SchedulerTypeDTO = Field(
+        description="Type of scheduler used for session scheduling (fifo, lifo, drf, fair-share)."
+    )
+    preemption: PreemptionConfigInfo = Field(
+        description="Preemption configuration for this resource group."
+    )
+
+
+class ResourceGroupDetailNode(BaseResponseModel):
+    """Detail node DTO for a resource group (GQL-layer representation)."""
+
+    id: str = Field(description="Resource group name used as the relay node ID.")
+    name: str = Field(description="Unique name of the resource group.")
+    status: ResourceGroupStatusInfo = Field(
+        description="Status information including active and public flags."
+    )
+    metadata: ResourceGroupMetadataInfo = Field(
+        description="Metadata including description and creation timestamp."
+    )
+    network: ResourceGroupNetworkConfigInfo = Field(
+        description="Network configuration for the resource group."
+    )
+    scheduler: ResourceGroupSchedulerConfigInfo = Field(
+        description="Scheduler configuration for the resource group."
+    )
+
+
+class UpdateResourceGroupFairShareSpecPayloadNode(BaseResponseModel):
+    """Payload DTO for resource group fair share spec update mutation."""
+
+    resource_group: ResourceGroupDetailNode = Field(
+        description="The updated resource group with new fair share configuration."
+    )
+
+
+class UpdateResourceGroupConfigPayloadNode(BaseResponseModel):
+    """Payload DTO for resource group configuration update mutation."""
+
+    resource_group: ResourceGroupDetailNode = Field(
+        description="The updated resource group with new configuration."
     )

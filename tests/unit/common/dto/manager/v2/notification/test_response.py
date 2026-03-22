@@ -25,21 +25,35 @@ from ai.backend.common.dto.manager.v2.notification.response import (
     ValidateNotificationChannelPayload,
     ValidateNotificationRulePayload,
 )
-from ai.backend.common.dto.manager.v2.notification.types import EmailSpecInfo, WebhookSpecInfo
+from ai.backend.common.dto.manager.v2.notification.types import (
+    EmailMessageInfo,
+    EmailSpecInfo,
+    NotificationChannelTypeDTO,
+    SMTPConnectionInfo,
+    WebhookSpecInfo,
+)
 
 
 def _make_webhook_spec_info() -> WebhookSpecInfo:
-    return WebhookSpecInfo(url="https://example.com/webhook")
+    return WebhookSpecInfo(
+        channel_type=NotificationChannelTypeDTO.WEBHOOK,
+        url="https://example.com/webhook",
+    )
 
 
 def _make_email_spec_info() -> EmailSpecInfo:
     return EmailSpecInfo(
-        smtp_host="smtp.example.com",
-        smtp_port=587,
-        smtp_use_tls=True,
-        smtp_timeout=30,
-        from_email="noreply@example.com",
-        to_emails=["admin@example.com"],
+        channel_type=NotificationChannelTypeDTO.EMAIL,
+        smtp=SMTPConnectionInfo(
+            host="smtp.example.com",
+            port=587,
+            use_tls=True,
+            timeout=30,
+        ),
+        message=EmailMessageInfo(
+            from_email="noreply@example.com",
+            to_emails=["admin@example.com"],
+        ),
     )
 
 
@@ -120,7 +134,11 @@ class TestNotificationChannelNodeCreation:
         assert node.description is None
 
     def test_spec_webhook_url_accessible(self) -> None:
-        node = _make_channel_node(spec=WebhookSpecInfo(url="https://hooks.example.com"))
+        spec = WebhookSpecInfo(
+            channel_type=NotificationChannelTypeDTO.WEBHOOK,
+            url="https://hooks.example.com",
+        )
+        node = _make_channel_node(spec=spec)
         assert isinstance(node.spec, WebhookSpecInfo)
         assert node.spec.url == "https://hooks.example.com"
 
@@ -130,7 +148,7 @@ class TestNotificationChannelNodeCreation:
             channel_type=NotificationChannelType.EMAIL,
         )
         assert isinstance(node.spec, EmailSpecInfo)
-        assert node.spec.smtp_host == "smtp.example.com"
+        assert node.spec.smtp.host == "smtp.example.com"
 
 
 class TestNotificationChannelNodeSerialization:
@@ -168,7 +186,10 @@ class TestNotificationChannelNodeSerialization:
         assert restored.channel_type == NotificationChannelType.EMAIL
 
     def test_nested_spec_preserved_in_round_trip(self) -> None:
-        spec = WebhookSpecInfo(url="https://test.example.com/hook")
+        spec = WebhookSpecInfo(
+            channel_type=NotificationChannelTypeDTO.WEBHOOK,
+            url="https://test.example.com/hook",
+        )
         node = _make_channel_node(spec=spec)
         json_str = node.model_dump_json()
         restored = NotificationChannelNode.model_validate_json(json_str)
@@ -464,27 +485,27 @@ class TestDeleteNotificationRulePayload:
 class TestValidateNotificationChannelPayload:
     """Tests for ValidateNotificationChannelPayload model."""
 
-    def test_creation_with_channel_id(self) -> None:
+    def test_creation_with_id(self) -> None:
         channel_id = uuid.uuid4()
-        payload = ValidateNotificationChannelPayload(channel_id=channel_id)
-        assert payload.channel_id == channel_id
+        payload = ValidateNotificationChannelPayload(id=channel_id)
+        assert payload.id == channel_id
 
-    def test_channel_id_is_uuid_instance(self) -> None:
+    def test_id_is_uuid_instance(self) -> None:
         channel_id = uuid.uuid4()
-        payload = ValidateNotificationChannelPayload(channel_id=channel_id)
-        assert isinstance(payload.channel_id, uuid.UUID)
+        payload = ValidateNotificationChannelPayload(id=channel_id)
+        assert isinstance(payload.id, uuid.UUID)
 
     def test_creation_from_uuid_string(self) -> None:
         channel_id = uuid.uuid4()
-        payload = ValidateNotificationChannelPayload.model_validate({"channel_id": str(channel_id)})
-        assert payload.channel_id == channel_id
+        payload = ValidateNotificationChannelPayload.model_validate({"id": str(channel_id)})
+        assert payload.id == channel_id
 
     def test_round_trip_serialization(self) -> None:
         channel_id = uuid.uuid4()
-        payload = ValidateNotificationChannelPayload(channel_id=channel_id)
+        payload = ValidateNotificationChannelPayload(id=channel_id)
         json_str = payload.model_dump_json()
         restored = ValidateNotificationChannelPayload.model_validate_json(json_str)
-        assert restored.channel_id == channel_id
+        assert restored.id == channel_id
 
 
 class TestValidateNotificationRulePayload:

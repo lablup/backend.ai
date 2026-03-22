@@ -27,7 +27,7 @@ from ai.backend.manager.api.gql.decorators import (
     gql_pydantic_input,
     gql_pydantic_type,
 )
-from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin
+from ai.backend.manager.api.gql.pydantic_compat import PydanticInputMixin, PydanticNodeMixin
 from ai.backend.manager.api.gql.utils import dedent_strip
 
 from .types import StrawberryGQLContext
@@ -85,18 +85,10 @@ class StorageNamespaceConnection(Connection[StorageNamespace]):
         description="Input type for registering a storage namespace.",
         added_version="25.15.0",
     ),
-    model=RegisterStorageNamespaceInputDTO,
 )
-class RegisterStorageNamespaceInput:
+class RegisterStorageNamespaceInput(PydanticInputMixin[RegisterStorageNamespaceInputDTO]):
     storage_id: uuid.UUID
     namespace: str
-
-    def to_pydantic(self) -> RegisterStorageNamespaceInputDTO:
-        """Convert to pydantic DTO for adapter layer processing."""
-        return RegisterStorageNamespaceInputDTO(
-            storage_id=self.storage_id,
-            namespace=self.namespace,
-        )
 
 
 @gql_pydantic_input(
@@ -104,18 +96,10 @@ class RegisterStorageNamespaceInput:
         description="Input type for unregistering a storage namespace.",
         added_version="25.15.0",
     ),
-    model=UnregisterStorageNamespaceInputDTO,
 )
-class UnregisterStorageNamespaceInput:
+class UnregisterStorageNamespaceInput(PydanticInputMixin[UnregisterStorageNamespaceInputDTO]):
     storage_id: uuid.UUID
     namespace: str
-
-    def to_pydantic(self) -> UnregisterStorageNamespaceInputDTO:
-        """Convert to pydantic DTO for adapter layer processing."""
-        return UnregisterStorageNamespaceInputDTO(
-            storage_id=self.storage_id,
-            namespace=self.namespace,
-        )
 
 
 @gql_pydantic_type(

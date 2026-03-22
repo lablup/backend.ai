@@ -9,6 +9,7 @@ from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     gql_pydantic_input,
 )
+from ai.backend.manager.api.gql.pydantic_compat import PydanticInputMixin
 
 
 @gql_pydantic_input(
@@ -16,15 +17,11 @@ from ai.backend.manager.api.gql.decorators import (
         description="Scope for querying projects within a specific domain. Used to restrict project queries to a particular domain context.",
         added_version="26.2.0",
     ),
-    model=DomainProjectScopeDTO,
     name="DomainProjectV2Scope",
 )
-class DomainProjectScope:
+class DomainProjectScope(PydanticInputMixin[DomainProjectScopeDTO]):
     """Scope for domain-level project queries."""
 
     domain_name: str = strawberry.field(
         description="Domain name to scope the query. Only projects belonging to this domain will be returned."
     )
-
-    def to_pydantic(self) -> DomainProjectScopeDTO:
-        return DomainProjectScopeDTO(domain_name=self.domain_name)

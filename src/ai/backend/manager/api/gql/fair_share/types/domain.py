@@ -8,7 +8,7 @@ from enum import StrEnum
 from typing import TYPE_CHECKING, Annotated, Any, Self
 
 import strawberry
-from strawberry import ID, Info
+from strawberry import Info
 from strawberry.relay import Connection, Edge, NodeID
 
 from ai.backend.common.dto.manager.v2.fair_share.request import (
@@ -35,20 +35,15 @@ from ai.backend.common.dto.manager.v2.fair_share.response import (
 from ai.backend.common.dto.manager.v2.fair_share.response import (
     DomainFairShareNode,
 )
-from ai.backend.common.dto.manager.v2.fair_share.types import (
-    DomainFairShareOrderField as DomainFairShareOrderFieldDTO,
-)
-from ai.backend.common.dto.manager.v2.fair_share.types import (
-    OrderDirection as OrderDirectionDTO,
-)
 from ai.backend.manager.api.gql.base import OrderDirection, StringFilter
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
+    PydanticInputMixin,
     gql_connection_type,
-    gql_from_pydantic_type,
     gql_node_type,
     gql_output_type,
     gql_pydantic_input,
+    gql_pydantic_type,
 )
 from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin, PydanticOutputMixin
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
@@ -56,8 +51,6 @@ from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from .common import (
     FairShareCalculationSnapshotGQL,
     FairShareSpecGQL,
-    ResourceSlotGQL,
-    ResourceWeightEntryGQL,
 )
 
 if TYPE_CHECKING:
@@ -123,52 +116,6 @@ class DomainFairShareGQL(PydanticNodeMixin[DomainFairShareNode]):
     ):
         return await info.context.data_loaders.resource_group_loader.load(self.resource_group_name)
 
-    @classmethod
-    def from_pydantic(
-        cls,
-        dto: DomainFairShareNode,
-        extra: dict[str, Any] | None = None,
-        *,
-        id_field: str = "id",
-    ) -> DomainFairShareGQL:
-        """Convert DomainFairShareNode pydantic DTO to GraphQL type."""
-        resource_weights = [
-            ResourceWeightEntryGQL(
-                resource_type=entry.resource_type,
-                weight=Decimal(entry.quantity),
-                uses_default=entry.resource_type in dto.spec.uses_default_resource_types,
-            )
-            for entry in dto.spec.resource_weights.entries
-        ]
-        spec = FairShareSpecGQL(
-            weight=dto.spec.weight,
-            uses_default=dto.spec.uses_default_weight,
-            half_life_days=dto.spec.half_life_days,
-            lookback_days=dto.spec.lookback_days,
-            decay_unit_days=dto.spec.decay_unit_days,
-            resource_weights=resource_weights,
-        )
-        snapshot = FairShareCalculationSnapshotGQL(
-            fair_share_factor=dto.calculation_snapshot.fair_share_factor,
-            total_decayed_usage=ResourceSlotGQL.from_resource_slot({
-                e.resource_type: e.quantity
-                for e in dto.calculation_snapshot.total_decayed_usage.entries
-            }),
-            normalized_usage=dto.calculation_snapshot.normalized_usage,
-            lookback_start=dto.calculation_snapshot.lookback_start,
-            lookback_end=dto.calculation_snapshot.lookback_end,
-            last_calculated_at=dto.calculation_snapshot.last_calculated_at,
-        )
-        return cls(
-            id=ID(f"{dto.resource_group}:{dto.domain_name}"),
-            resource_group_name=dto.resource_group,
-            domain_name=dto.domain_name,
-            spec=spec,
-            calculation_snapshot=snapshot,
-            created_at=dto.created_at,
-            updated_at=dto.updated_at,
-        )
-
 
 DomainFairShareEdge = Edge[DomainFairShareGQL]
 
@@ -198,10 +145,9 @@ class DomainFairShareConnection(Connection[DomainFairShareGQL]):
         description="Nested filter for domain entity fields in domain fair share queries. Allows filtering by domain properties such as active status.",
         added_version="26.2.0",
     ),
-    model=DomainFairShareDomainNestedFilterDTO,
     name="DomainFairShareDomainNestedFilter",
 )
-class DomainFairShareDomainNestedFilter:
+class DomainFairShareDomainNestedFilter(PydanticInputMixin[DomainFairShareDomainNestedFilterDTO]):
     """Nested filter for domain entity within domain fair share."""
 
     is_active: bool | None = strawberry.field(
@@ -209,19 +155,15 @@ class DomainFairShareDomainNestedFilter:
         description="Filter by domain active status.",
     )
 
-    def to_pydantic(self) -> DomainFairShareDomainNestedFilterDTO:
-        return DomainFairShareDomainNestedFilterDTO(is_active=self.is_active)
-
 
 @gql_pydantic_input(
     BackendAIGQLMeta(
         description="Filter input for querying domain fair shares. Supports filtering by scaling group and domain name with various string matching operations. Multiple filters can be combined using AND, OR, and NOT logical operators.",
         added_version="26.1.0",
     ),
-    model=DomainFairShareFilterDTO,
     name="DomainFairShareFilter",
 )
-class DomainFairShareFilter:
+class DomainFairShareFilter(PydanticInputMixin[DomainFairShareFilterDTO]):
     """Filter for domain fair shares."""
 
     resource_group: StringFilter | None = strawberry.field(
@@ -259,26 +201,15 @@ class DomainFairShareFilter:
         description="Negate the specified filters. Records matching these conditions will be excluded.",
     )
 
-    def to_pydantic(self) -> DomainFairShareFilterDTO:
-        return DomainFairShareFilterDTO(
-            resource_group=self.resource_group.to_pydantic() if self.resource_group else None,
-            domain_name=self.domain_name.to_pydantic() if self.domain_name else None,
-            domain=self.domain.to_pydantic() if self.domain else None,
-            AND=[f.to_pydantic() for f in self.AND] if self.AND else None,
-            OR=[f.to_pydantic() for f in self.OR] if self.OR else None,
-            NOT=[f.to_pydantic() for f in self.NOT] if self.NOT else None,
-        )
-
 
 @gql_pydantic_input(
     BackendAIGQLMeta(
         description="Filter for domain fair shares within a resource group scope. References resource group membership columns to avoid excluding domains without fair share records.",
         added_version="26.2.0",
     ),
-    model=DomainFairShareFilterDTO,
     name="RGDomainFairShareFilter",
 )
-class RGDomainFairShareFilter:
+class RGDomainFairShareFilter(PydanticInputMixin[DomainFairShareFilterDTO]):
     """Filter for domain fair shares in RG context (uses INNER JOIN'd columns)."""
 
     resource_group: StringFilter | None = strawberry.field(
@@ -294,16 +225,6 @@ class RGDomainFairShareFilter:
     AND: list[Self] | None = strawberry.field(default=None, description="Combine with AND logic.")
     OR: list[Self] | None = strawberry.field(default=None, description="Combine with OR logic.")
     NOT: list[Self] | None = strawberry.field(default=None, description="Negate filters.")
-
-    def to_pydantic(self) -> DomainFairShareFilterDTO:
-        return DomainFairShareFilterDTO(
-            resource_group=self.resource_group.to_pydantic() if self.resource_group else None,
-            domain_name=self.domain_name.to_pydantic() if self.domain_name else None,
-            domain=self.domain.to_pydantic() if self.domain else None,
-            AND=[f.to_pydantic() for f in self.AND] if self.AND else None,
-            OR=[f.to_pydantic() for f in self.OR] if self.OR else None,
-            NOT=[f.to_pydantic() for f in self.NOT] if self.NOT else None,
-        )
 
 
 @strawberry.enum(
@@ -328,10 +249,9 @@ class DomainFairShareOrderField(StrEnum):
         description="Specifies ordering for domain fair share query results. Combine field selection with direction to sort results. Default direction is DESC (descending).",
         added_version="26.1.0",
     ),
-    model=DomainFairShareOrderDTO,
     name="DomainFairShareOrderBy",
 )
-class DomainFairShareOrderBy:
+class DomainFairShareOrderBy(PydanticInputMixin[DomainFairShareOrderDTO]):
     """OrderBy for domain fair shares."""
 
     field: DomainFairShareOrderField = strawberry.field(
@@ -345,13 +265,6 @@ class DomainFairShareOrderBy:
         ),
     )
 
-    def to_pydantic(self) -> DomainFairShareOrderDTO:
-        ascending = self.direction == OrderDirection.ASC
-        return DomainFairShareOrderDTO(
-            field=DomainFairShareOrderFieldDTO(self.field),
-            direction=OrderDirectionDTO.ASC if ascending else OrderDirectionDTO.DESC,
-        )
-
 
 # Mutation Input/Payload Types
 
@@ -361,10 +274,9 @@ class DomainFairShareOrderBy:
         description="Input for upserting domain fair share weight. The weight parameter affects scheduling priority - higher weight = higher priority. Set weight to null to use resource group's default_weight.",
         added_version="26.1.0",
     ),
-    model=UpsertDomainFairShareWeightInputDTO,
     name="UpsertDomainFairShareWeightInput",
 )
-class UpsertDomainFairShareWeightInput:
+class UpsertDomainFairShareWeightInput(PydanticInputMixin[UpsertDomainFairShareWeightInputDTO]):
     """Input for upserting domain fair share weight."""
 
     resource_group_name: str = strawberry.field(
@@ -378,13 +290,6 @@ class UpsertDomainFairShareWeightInput:
             "Set to null to use resource group's default_weight."
         ),
     )
-
-    def to_pydantic(self) -> UpsertDomainFairShareWeightInputDTO:
-        return UpsertDomainFairShareWeightInputDTO(
-            resource_group_name=self.resource_group_name,
-            domain_name=self.domain_name,
-            weight=self.weight,
-        )
 
 
 @gql_output_type(
@@ -410,10 +315,9 @@ class UpsertDomainFairShareWeightPayload:
         description="Input item for a single domain weight in bulk upsert. Represents one domain's weight configuration.",
         added_version="26.1.0",
     ),
-    model=DomainWeightEntryInputDTO,
     name="DomainWeightInputItem",
 )
-class DomainWeightInputItem:
+class DomainWeightInputItem(PydanticInputMixin[DomainWeightEntryInputDTO]):
     """Input item for a single domain weight in bulk upsert."""
 
     domain_name: str = strawberry.field(description="Name of the domain to update weight for.")
@@ -431,10 +335,11 @@ class DomainWeightInputItem:
         description="Input for bulk upserting domain fair share weights. Allows updating multiple domains in a single transaction.",
         added_version="26.1.0",
     ),
-    model=BulkUpsertDomainFairShareWeightInputDTO,
     name="BulkUpsertDomainFairShareWeightInput",
 )
-class BulkUpsertDomainFairShareWeightInput:
+class BulkUpsertDomainFairShareWeightInput(
+    PydanticInputMixin[BulkUpsertDomainFairShareWeightInputDTO]
+):
     """Input for bulk upserting domain fair share weights."""
 
     resource_group_name: str = strawberry.field(
@@ -444,29 +349,17 @@ class BulkUpsertDomainFairShareWeightInput:
         description="List of domain weight updates to apply."
     )
 
-    def to_pydantic(self) -> BulkUpsertDomainFairShareWeightInputDTO:
-        return BulkUpsertDomainFairShareWeightInputDTO(
-            resource_group_name=self.resource_group_name,
-            inputs=[
-                DomainWeightEntryInputDTO(
-                    domain_name=item.domain_name,
-                    weight=item.weight,
-                )
-                for item in self.inputs
-            ],
-        )
 
-
-@gql_from_pydantic_type(
+@gql_pydantic_type(
     BackendAIGQLMeta(
         added_version="26.1.0",
         description="Payload for bulk domain fair share weight upsert mutation.",
     ),
+    model=BulkUpsertDomainFairShareWeightPayloadDTO,
+    all_fields=True,
     name="BulkUpsertDomainFairShareWeightPayload",
 )
 class BulkUpsertDomainFairShareWeightPayload(
     PydanticOutputMixin[BulkUpsertDomainFairShareWeightPayloadDTO]
 ):
-    """Payload for bulk domain fair share weight upsert mutation."""
-
-    upserted_count: int = strawberry.field(description="Number of records upserted")
+    pass

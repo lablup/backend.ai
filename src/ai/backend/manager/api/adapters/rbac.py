@@ -781,7 +781,7 @@ class RBACAdapter(BaseAdapter):
         result: BulkRoleAssignmentResultData = action_result.data
         now = datetime.now(tz=UTC)
         return BulkAssignRoleResultPayload(
-            successes=[
+            assigned=[
                 RoleAssignmentNode(
                     id=s.id,
                     user_id=s.user_id,
@@ -791,7 +791,7 @@ class RBACAdapter(BaseAdapter):
                 )
                 for s in result.successes
             ],
-            failures=[
+            failed=[
                 BulkRoleOperationFailureInfo(user_id=f.user_id, message=f.message)
                 for f in result.failures
             ],
@@ -811,7 +811,7 @@ class RBACAdapter(BaseAdapter):
         result: BulkRoleRevocationResultData = action_result.data
         now = datetime.now(tz=UTC)
         return BulkRevokeRoleResultPayload(
-            successes=[
+            revoked=[
                 RoleAssignmentNode(
                     id=s.user_role_id,
                     user_id=s.user_id,
@@ -821,7 +821,7 @@ class RBACAdapter(BaseAdapter):
                 )
                 for s in result.successes
             ],
-            failures=[
+            failed=[
                 BulkRoleOperationFailureInfo(user_id=f.user_id, message=f.message)
                 for f in result.failures
             ],

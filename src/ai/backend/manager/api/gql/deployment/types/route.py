@@ -15,9 +15,6 @@ from strawberry.relay import Connection, Edge, NodeID
 from strawberry.scalars import JSON
 
 from ai.backend.common.data.model_deployment.types import (
-    RouteStatus as RouteStatusCommon,
-)
-from ai.backend.common.data.model_deployment.types import (
     RouteTrafficStatus as RouteTrafficStatusCommon,
 )
 from ai.backend.common.dto.manager.v2.deployment.request import (
@@ -41,12 +38,6 @@ from ai.backend.common.dto.manager.v2.deployment.response import (
 from ai.backend.common.dto.manager.v2.deployment.response import (
     UpdateRouteTrafficStatusPayload as UpdateRouteTrafficStatusPayloadDTO,
 )
-from ai.backend.common.dto.manager.v2.deployment.types import (
-    OrderDirection as DTOOrderDirection,
-)
-from ai.backend.common.dto.manager.v2.deployment.types import (
-    RouteOrderField as DTORouteOrderField,
-)
 from ai.backend.manager.api.gql.adapter import PaginationSpec
 from ai.backend.manager.api.gql.base import (
     OrderDirection,
@@ -54,6 +45,7 @@ from ai.backend.manager.api.gql.base import (
 )
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
+    PydanticInputMixin,
     gql_connection_type,
     gql_node_type,
     gql_pydantic_input,
@@ -162,26 +154,6 @@ class Route(PydanticNodeMixin[RouteNodeDTO]):
         ])
         return cast(list[Self | None], results)
 
-    @classmethod
-    def from_pydantic(
-        cls,
-        dto: RouteNodeDTO,
-        extra: dict[str, Any] | None = None,
-        *,
-        id_field: str = "id",
-    ) -> Self:
-        return cls(
-            id=ID(str(dto.id)),
-            deployment_id=ID(str(dto.endpoint_id)),
-            session_id=ID(str(dto.session_id)) if dto.session_id else None,
-            revision_id=ID(str(dto.revision_id)) if dto.revision_id else None,
-            status=RouteStatusGQL(RouteStatusEnum(dto.status.value)),
-            traffic_status=RouteTrafficStatusGQL(RouteTrafficStatusEnum(dto.traffic_status.value)),
-            traffic_ratio=dto.traffic_ratio,
-            created_at=dto.created_at,
-            error_data=dto.error_data,
-        )
-
 
 RouteEdge = Edge[Route]
 
@@ -209,10 +181,9 @@ class RouteConnection(Connection[Route]):
         description="Filter for route status with equality and membership operators.",
         added_version="26.3.0",
     ),
-    model=RouteStatusFilterDTO,
     name="RouteStatusFilter",
 )
-class RouteStatusFilterGQL:
+class RouteStatusFilterGQL(PydanticInputMixin[RouteStatusFilterDTO]):
     equals: RouteStatusGQL | None = strawberry.field(
         default=None, description="Matches routes with this exact status."
     )
@@ -226,24 +197,15 @@ class RouteStatusFilterGQL:
         default=None, description="Excludes routes whose status is in this list."
     )
 
-    def to_pydantic(self) -> RouteStatusFilterDTO:
-        return RouteStatusFilterDTO(
-            equals=RouteStatusCommon(self.equals.value) if self.equals else None,
-            in_=[RouteStatusCommon(s.value) for s in self.in_] if self.in_ else None,
-            not_equals=RouteStatusCommon(self.not_equals.value) if self.not_equals else None,
-            not_in=[RouteStatusCommon(s.value) for s in self.not_in] if self.not_in else None,
-        )
-
 
 @gql_pydantic_input(
     BackendAIGQLMeta(
         description="Filter for route traffic status with equality and membership operators.",
         added_version="26.3.0",
     ),
-    model=RouteTrafficStatusFilterDTO,
     name="RouteTrafficStatusFilter",
 )
-class RouteTrafficStatusFilterGQL:
+class RouteTrafficStatusFilterGQL(PydanticInputMixin[RouteTrafficStatusFilterDTO]):
     equals: RouteTrafficStatusGQL | None = strawberry.field(
         default=None, description="Matches routes with this exact traffic status."
     )
@@ -257,16 +219,6 @@ class RouteTrafficStatusFilterGQL:
         default=None, description="Excludes routes whose traffic status is in this list."
     )
 
-    def to_pydantic(self) -> RouteTrafficStatusFilterDTO:
-        return RouteTrafficStatusFilterDTO(
-            equals=RouteTrafficStatusCommon(self.equals.value) if self.equals else None,
-            in_=[RouteTrafficStatusCommon(s.value) for s in self.in_] if self.in_ else None,
-            not_equals=RouteTrafficStatusCommon(self.not_equals.value) if self.not_equals else None,
-            not_in=[RouteTrafficStatusCommon(s.value) for s in self.not_in]
-            if self.not_in
-            else None,
-        )
-
 
 @strawberry.enum
 class RouteOrderField(StrEnum):
@@ -277,10 +229,9 @@ class RouteOrderField(StrEnum):
 
 @gql_pydantic_input(
     BackendAIGQLMeta(description="Filter for routes.", added_version="25.19.0"),
-    model=RouteFilterDTO,
     name="RouteFilter",
 )
-class RouteFilter:
+class RouteFilter(PydanticInputMixin[RouteFilterDTO]):
     status: RouteStatusFilterGQL | None = None
     traffic_status: RouteTrafficStatusFilterGQL | None = None
 
@@ -288,57 +239,13 @@ class RouteFilter:
     OR: list[Self] | None = None
     NOT: list[Self] | None = None
 
-    def to_pydantic(self) -> RouteFilterDTO:
-        return RouteFilterDTO(
-            status=RouteStatusFilterDTO(
-                equals=RouteStatusCommon(self.status.equals.value) if self.status.equals else None,
-                in_=[RouteStatusCommon(s.value) for s in self.status.in_]
-                if self.status.in_
-                else None,
-                not_equals=RouteStatusCommon(self.status.not_equals.value)
-                if self.status.not_equals
-                else None,
-                not_in=[RouteStatusCommon(s.value) for s in self.status.not_in]
-                if self.status.not_in
-                else None,
-            )
-            if self.status
-            else None,
-            traffic_status=RouteTrafficStatusFilterDTO(
-                equals=RouteTrafficStatusCommon(self.traffic_status.equals.value)
-                if self.traffic_status.equals
-                else None,
-                in_=[RouteTrafficStatusCommon(s.value) for s in self.traffic_status.in_]
-                if self.traffic_status.in_
-                else None,
-                not_equals=RouteTrafficStatusCommon(self.traffic_status.not_equals.value)
-                if self.traffic_status.not_equals
-                else None,
-                not_in=[RouteTrafficStatusCommon(s.value) for s in self.traffic_status.not_in]
-                if self.traffic_status.not_in
-                else None,
-            )
-            if self.traffic_status
-            else None,
-            AND=[f.to_pydantic() for f in self.AND] if self.AND else None,
-            OR=[f.to_pydantic() for f in self.OR] if self.OR else None,
-            NOT=[f.to_pydantic() for f in self.NOT] if self.NOT else None,
-        )
-
 
 @gql_pydantic_input(
     BackendAIGQLMeta(description="Order by specification for routes.", added_version="25.19.0"),
-    model=RouteOrderDTO,
 )
-class RouteOrderBy:
+class RouteOrderBy(PydanticInputMixin[RouteOrderDTO]):
     field: RouteOrderField
     direction: OrderDirection = OrderDirection.ASC
-
-    def to_pydantic(self) -> RouteOrderDTO:
-        return RouteOrderDTO(
-            field=DTORouteOrderField(self.field.value),
-            direction=DTOOrderDirection(self.direction.value),
-        )
 
 
 # Pagination spec
@@ -362,7 +269,6 @@ def get_route_pagination_spec() -> PaginationSpec:
     BackendAIGQLMeta(
         description="Input for updating route traffic status.", added_version="25.19.0"
     ),
-    model=UpdateRouteTrafficStatusInputDTO,
     name="UpdateRouteTrafficStatusInput",
 )
 class UpdateRouteTrafficStatusInputGQL:

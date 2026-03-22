@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING, Annotated, Any, Self, cast
 from uuid import UUID
 
 import strawberry
-from strawberry import ID, Info
+from strawberry import Info
 from strawberry.relay import Connection, Edge, NodeID
 
 from ai.backend.common.dto.manager.v2.fair_share.types import (
@@ -21,7 +21,7 @@ from ai.backend.manager.api.gql.decorators import (
     gql_pydantic_input,
 )
 from ai.backend.manager.api.gql.fair_share.types import ProjectFairShareGQL
-from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin
+from ai.backend.manager.api.gql.pydantic_compat import PydanticInputMixin, PydanticNodeMixin
 from ai.backend.manager.api.gql.resource_slot.overview_types import ActiveResourceOverviewGQL
 from ai.backend.manager.api.gql.resource_usage.types import (
     ProjectUsageBucketConnection,
@@ -30,13 +30,11 @@ from ai.backend.manager.api.gql.resource_usage.types import (
 )
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 
-from .enums import ProjectTypeEnum, VFolderHostPermissionEnum
 from .nested import (
     ProjectBasicInfoGQL,
     ProjectLifecycleInfoGQL,
     ProjectOrganizationInfoGQL,
     ProjectStorageInfoGQL,
-    VFolderHostPermissionEntryGQL,
 )
 
 if TYPE_CHECKING:
@@ -49,36 +47,28 @@ if TYPE_CHECKING:
     BackendAIGQLMeta(
         description="Scope parameters for filtering project fair shares.", added_version="24.09.0"
     ),
-    model=ProjectFairShareScopeDTO,
     name="ProjectFairShareScope",
 )
-class ProjectFairShareScopeGQL:
+class ProjectFairShareScopeGQL(PydanticInputMixin[ProjectFairShareScopeDTO]):
     """Scope parameters for filtering project fair shares."""
 
     resource_group_name: str = strawberry.field(
         description="Resource group to filter fair shares by."
     )
 
-    def to_pydantic(self) -> ProjectFairShareScopeDTO:
-        return ProjectFairShareScopeDTO(resource_group_name=self.resource_group_name)
-
 
 @gql_pydantic_input(
     BackendAIGQLMeta(
         description="Scope parameters for filtering project usage buckets.", added_version="24.09.0"
     ),
-    model=ProjectUsageScopeDTO,
     name="ProjectUsageScope",
 )
-class ProjectUsageScopeGQL:
+class ProjectUsageScopeGQL(PydanticInputMixin[ProjectUsageScopeDTO]):
     """Scope parameters for filtering project usage buckets."""
 
     resource_group_name: str = strawberry.field(
         description="Resource group to filter usage buckets by."
     )
-
-    def to_pydantic(self) -> ProjectUsageScopeDTO:
-        return ProjectUsageScopeDTO(resource_group_name=self.resource_group_name)
 
 
 @strawberry.federation.type(
@@ -306,44 +296,6 @@ class ProjectV2GQL(PydanticNodeMixin[ProjectNode]):
             UUID(nid) for nid in node_ids
         ])
         return cast(list[Self | None], results)
-
-    @classmethod
-    def from_pydantic(
-        cls,
-        dto: ProjectNode,
-        extra: dict[str, Any] | None = None,
-        *,
-        id_field: str = "id",
-    ) -> Self:
-        """Create ProjectV2GQL from ProjectNode DTO (adapter search results)."""
-        vfolder_host_entries = [
-            VFolderHostPermissionEntryGQL(
-                host=entry.host,
-                permissions=[VFolderHostPermissionEnum(perm) for perm in entry.permissions],
-            )
-            for entry in dto.storage.allowed_vfolder_hosts
-        ]
-        return cls(
-            id=ID(str(dto.id)),
-            basic_info=ProjectBasicInfoGQL(
-                name=dto.basic_info.name,
-                description=dto.basic_info.description,
-                type=ProjectTypeEnum(dto.basic_info.type.value),
-                integration_id=dto.basic_info.integration_id,
-            ),
-            organization=ProjectOrganizationInfoGQL(
-                domain_name=dto.organization.domain_name,
-                resource_policy=dto.organization.resource_policy,
-            ),
-            storage=ProjectStorageInfoGQL(
-                allowed_vfolder_hosts=vfolder_host_entries,
-            ),
-            lifecycle=ProjectLifecycleInfoGQL(
-                is_active=dto.lifecycle.is_active,
-                created_at=dto.lifecycle.created_at,
-                modified_at=dto.lifecycle.modified_at,
-            ),
-        )
 
 
 ProjectV2Edge = Edge[ProjectV2GQL]

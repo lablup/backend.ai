@@ -161,9 +161,9 @@ async def admin_update_resource_group_fair_share_spec(
     check_admin_only()
 
     dto = input.to_pydantic()
-    scaling_group = await info.context.adapters.resource_group.update_fair_share_spec(dto)
+    payload_dto = await info.context.adapters.resource_group.update_fair_share_spec(dto)
 
-    return UpdateResourceGroupFairShareSpecPayload.from_pydantic(scaling_group)
+    return UpdateResourceGroupFairShareSpecPayload.from_pydantic(payload_dto)
 
 
 @strawberry.mutation(  # type: ignore[misc]
@@ -184,9 +184,9 @@ async def update_resource_group_fair_share_spec(
 ) -> UpdateResourceGroupFairShareSpecPayload:
     """Update fair share spec with partial update and validation."""
     dto = input.to_pydantic()
-    scaling_group = await info.context.adapters.resource_group.update_fair_share_spec(dto)
+    payload_dto = await info.context.adapters.resource_group.update_fair_share_spec(dto)
 
-    return UpdateResourceGroupFairShareSpecPayload.from_pydantic(scaling_group)
+    return UpdateResourceGroupFairShareSpecPayload.from_pydantic(payload_dto)
 
 
 @strawberry.mutation(  # type: ignore[misc]
@@ -204,6 +204,6 @@ async def admin_update_resource_group(
     check_admin_only()
 
     dto = input.to_pydantic()
-    scaling_group = await info.context.adapters.resource_group.update_config(dto)
+    payload_dto = await info.context.adapters.resource_group.update_config(dto)
 
-    return UpdateResourceGroupPayload.from_pydantic(scaling_group)
+    return UpdateResourceGroupPayload.from_pydantic(payload_dto)

@@ -793,7 +793,7 @@ class ArtifactAdapter(BaseAdapter):
             id=data.id,
             artifact_id=data.artifact_id,
             version=data.version,
-            size=data.size,
+            size=str(data.size) if data.size is not None else None,
             status=ArtifactStatus(data.status),
             remote_status=data.remote_status,
             created_at=data.created_at,

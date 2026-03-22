@@ -14,22 +14,25 @@ from pydantic import Field
 from ai.backend.common.api_handlers import BaseResponseModel
 from ai.backend.common.data.model_deployment.types import (
     ActivenessStatus,
-    DeploymentStrategy,
     LivenessStatus,
     ReadinessStatus,
     RouteStatus,
     RouteTrafficStatus,
 )
 from ai.backend.common.dto.manager.v2.deployment.types import (
-    BlueGreenConfigInfo,
-    DeploymentBasicInfo,
+    BlueGreenStrategySpecInfo,
+    ClusterConfigInfoDTO,
+    DeploymentMetadataInfoDTO,
+    DeploymentNetworkAccessInfoDTO,
     DeploymentPolicyInfo,
-    DeploymentRevisionInfo,
-    NetworkConfigInfo,
+    DeploymentStrategyInfoDTO,
+    ExtraVFolderMountGQLDTO,
+    ModelMountConfigInfoDTO,
+    ModelRuntimeConfigInfoDTO,
     ReplicaStateInfo,
-    RollingUpdateConfigInfo,
+    ResourceConfigInfoDTO,
+    RollingUpdateStrategySpecInfo,
 )
-from ai.backend.common.types import AutoScalingMetricSource
 
 __all__ = (
     "AccessTokenNode",
@@ -80,9 +83,15 @@ class RevisionNode(BaseResponseModel):
 
     id: UUID = Field(description="Revision ID")
     name: str = Field(description="Revision name")
-    revision_info: DeploymentRevisionInfo = Field(description="Revision configuration details")
+    image_id: UUID = Field(description="Image ID for this revision")
+    cluster_config: ClusterConfigInfoDTO = Field(description="Cluster configuration")
+    resource_config: ResourceConfigInfoDTO = Field(description="Resource configuration")
+    model_runtime_config: ModelRuntimeConfigInfoDTO = Field(description="Runtime configuration")
+    model_mount_config: ModelMountConfigInfoDTO | None = Field(
+        default=None, description="Model mount configuration"
+    )
     created_at: datetime = Field(description="Creation timestamp")
-    extra_mounts: list[ExtraVFolderMountNode] = Field(
+    extra_mounts: list[ExtraVFolderMountGQLDTO] = Field(
         default_factory=list, description="Extra vfolder mounts"
     )
 
@@ -91,27 +100,26 @@ class DeploymentNode(BaseResponseModel):
     """Node model representing a deployment entity."""
 
     id: UUID = Field(description="Deployment ID")
-    basic: DeploymentBasicInfo = Field(description="Basic deployment information")
-    network: NetworkConfigInfo = Field(description="Network configuration")
+    metadata: DeploymentMetadataInfoDTO = Field(description="Deployment metadata")
+    network_access: DeploymentNetworkAccessInfoDTO = Field(
+        description="Network access configuration"
+    )
     replica_state: ReplicaStateInfo = Field(description="Current replica state")
-    default_deployment_strategy: DeploymentStrategy = Field(
+    default_deployment_strategy: DeploymentStrategyInfoDTO = Field(
         description="Default deployment update strategy"
     )
-    current_revision: RevisionNode | None = Field(
-        default=None, description="Currently active revision"
-    )
+    created_user_id: UUID = Field(description="ID of the user who created this deployment")
+    revision: RevisionNode | None = Field(default=None, description="Currently active revision")
     policy: DeploymentPolicyInfo | None = Field(
         default=None, description="Deployment update policy"
     )
-    created_at: datetime = Field(description="Creation timestamp")
-    updated_at: datetime = Field(description="Last update timestamp")
 
 
 class RouteNode(BaseResponseModel):
     """Node model representing a deployment route."""
 
     id: UUID = Field(description="Route ID")
-    endpoint_id: UUID = Field(description="Endpoint ID")
+    deployment_id: UUID = Field(description="Deployment ID")
     session_id: str | None = Field(default=None, description="Session ID")
     status: RouteStatus = Field(description="Route status")
     traffic_ratio: float = Field(description="Traffic ratio assigned to this route")
@@ -182,7 +190,7 @@ class AutoScalingRuleNode(BaseResponseModel):
 
     id: UUID = Field(description="Auto-scaling rule ID")
     deployment_id: UUID = Field(description="Parent deployment ID")
-    metric_source: AutoScalingMetricSource = Field(description="Metric source")
+    metric_source: str = Field(description="Metric source")
     metric_name: str = Field(description="Metric name")
     min_threshold: Decimal | None = Field(default=None, description="Minimum threshold")
     max_threshold: Decimal | None = Field(default=None, description="Maximum threshold")
@@ -199,14 +207,10 @@ class DeploymentPolicyNode(BaseResponseModel):
 
     id: UUID = Field(description="Policy ID")
     deployment_id: UUID = Field(description="Parent deployment ID")
-    strategy: DeploymentStrategy = Field(description="Deployment strategy")
+    strategy_spec: RollingUpdateStrategySpecInfo | BlueGreenStrategySpecInfo = Field(
+        description="Deployment strategy specification"
+    )
     rollback_on_failure: bool = Field(description="Roll back on failure")
-    rolling_update: RollingUpdateConfigInfo | None = Field(
-        default=None, description="Rolling update configuration"
-    )
-    blue_green: BlueGreenConfigInfo | None = Field(
-        default=None, description="Blue/green configuration"
-    )
     created_at: datetime = Field(description="Creation timestamp")
     updated_at: datetime = Field(description="Last update timestamp")
 

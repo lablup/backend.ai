@@ -17,6 +17,8 @@ from ai.backend.common.dto.manager.v2.agent.response import (
     AgentResourceInfo,
     AgentStatusInfo,
     AgentSystemInfo,
+    ComputePluginEntryDTO,
+    ComputePluginsGQLDTO,
 )
 from ai.backend.common.dto.manager.v2.agent.types import AgentStatusFilter
 from ai.backend.common.resource.types import TotalResourceData
@@ -225,7 +227,17 @@ class AgentAdapter(BaseAdapter):
             system_info=AgentSystemInfo(
                 architecture=data.architecture,
                 version=data.version,
-                compute_plugins=dict(data.compute_plugins) if data.compute_plugins else None,
+                auto_terminate_abusing_kernel=False,
+                compute_plugins=(
+                    ComputePluginsGQLDTO(
+                        entries=[
+                            ComputePluginEntryDTO(plugin_name=k, value=v)
+                            for k, v in data.compute_plugins.items()
+                        ]
+                    )
+                    if data.compute_plugins
+                    else None
+                ),
             ),
             network_info=AgentNetworkInfo(
                 region=data.region,

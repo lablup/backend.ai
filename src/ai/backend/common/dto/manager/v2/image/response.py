@@ -14,6 +14,7 @@ from ai.backend.common.dto.manager.pagination import PaginationInfo
 
 from .types import (
     ImageLabelInfo,
+    ImageResourceLimitGQLInfo,
     ImageResourceLimitInfo,
     ImageStatusType,
     ImageTagInfo,
@@ -63,6 +64,15 @@ class ImageNode(BaseResponseModel):
     config_digest: str = Field(description="Image config digest")
     is_local: bool = Field(description="Whether the image is local-only")
     created_at: datetime | None = Field(default=None, description="Image creation timestamp")
+    identity: ImageIdentityInfoDTO | None = Field(
+        default=None, description="Identity information (name, architecture)."
+    )
+    metadata: ImageMetadataInfoDTO | None = Field(
+        default=None, description="Metadata information (labels, digest, size, status)."
+    )
+    requirements: ImageRequirementsInfoDTO | None = Field(
+        default=None, description="Runtime requirements (accelerators, resource limits)."
+    )
 
 
 class SearchImagesPayload(BaseResponseModel):
@@ -144,6 +154,9 @@ class ImageMetadataInfoDTO(BaseResponseModel):
     digest: str | None = Field(default=None, description="Config digest for verification.")
     size_bytes: int = Field(description="Image size in bytes.")
     created_at: datetime | None = Field(default=None, description="Image creation timestamp.")
+    tags: list[ImageTagInfo] = Field(default_factory=list, description="Parsed tag components.")
+    labels: list[ImageLabelInfo] = Field(default_factory=list, description="Docker labels.")
+    status: ImageStatusType = Field(description="Image status (ALIVE or DELETED).")
 
 
 class ImageRequirementsInfoDTO(BaseResponseModel):
@@ -151,6 +164,9 @@ class ImageRequirementsInfoDTO(BaseResponseModel):
 
     supported_accelerators: list[str] = Field(
         default_factory=list, description="List of supported accelerator types."
+    )
+    resource_limits: list[ImageResourceLimitGQLInfo] = Field(
+        default_factory=list, description="Resource slot limits with string min/max values."
     )
 
 

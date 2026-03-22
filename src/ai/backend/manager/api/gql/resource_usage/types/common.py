@@ -10,11 +10,11 @@ import strawberry
 from ai.backend.common.dto.manager.v2.resource_usage.response import (
     UsageBucketMetadataNode as UsageBucketMetadataNodeDTO,
 )
-from ai.backend.manager.api.gql.decorators import BackendAIGQLMeta, gql_from_pydantic_type
+from ai.backend.manager.api.gql.decorators import BackendAIGQLMeta, gql_pydantic_type
 from ai.backend.manager.api.gql.pydantic_compat import PydanticOutputMixin
 
 
-@gql_from_pydantic_type(
+@gql_pydantic_type(
     BackendAIGQLMeta(
         added_version="26.1.0",
         description=(
@@ -22,6 +22,7 @@ from ai.backend.manager.api.gql.pydantic_compat import PydanticOutputMixin
             "the measurement period and timestamps."
         ),
     ),
+    model=UsageBucketMetadataNodeDTO,
     name="UsageBucketMetadata",
 )
 class UsageBucketMetadataGQL(PydanticOutputMixin[UsageBucketMetadataNodeDTO]):

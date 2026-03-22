@@ -26,6 +26,7 @@ from ai.backend.common.dto.manager.v2.app_config.response import (
 )
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
+    PydanticInputMixin,
     gql_output_type,
     gql_pydantic_input,
     gql_pydantic_type,
@@ -50,7 +51,6 @@ class AppConfig:
 
 @gql_pydantic_input(
     BackendAIGQLMeta(description="", added_version="24.09.0"),
-    model=UpsertDomainConfigInputDTO,
     description=dedent_strip(
         """\
         Input for creating or updating domain-level app configuration.
@@ -60,7 +60,7 @@ class AppConfig:
         """
     ),
 )
-class UpsertDomainConfigInput:
+class UpsertDomainConfigInput(PydanticInputMixin[UpsertDomainConfigInputDTO]):
     """Input type for upserting domain-level app configuration."""
 
     domain_name: str
@@ -69,7 +69,6 @@ class UpsertDomainConfigInput:
 
 @gql_pydantic_input(
     BackendAIGQLMeta(description="", added_version="24.09.0"),
-    model=UpsertUserConfigInputDTO,
     description=dedent_strip(
         """\
         Input for creating or updating user-level app configuration.
@@ -80,7 +79,7 @@ class UpsertDomainConfigInput:
         """
     ),
 )
-class UpsertUserConfigInput:
+class UpsertUserConfigInput(PydanticInputMixin[UpsertUserConfigInputDTO]):
     """Input type for upserting user-level app configuration."""
 
     extra_config: strawberry.scalars.JSON
@@ -91,9 +90,8 @@ class UpsertUserConfigInput:
     BackendAIGQLMeta(
         description="Input for deleting domain-level app configuration", added_version="25.16.0"
     ),
-    model=DeleteDomainConfigInputDTO,
 )
-class DeleteDomainConfigInput:
+class DeleteDomainConfigInput(PydanticInputMixin[DeleteDomainConfigInputDTO]):
     """Input type for deleting domain-level app configuration."""
 
     domain_name: str
@@ -101,7 +99,6 @@ class DeleteDomainConfigInput:
 
 @gql_pydantic_input(
     BackendAIGQLMeta(description="", added_version="24.09.0"),
-    model=DeleteUserConfigInputDTO,
     description=dedent_strip(
         """\
         Input for deleting user-level app configuration.
@@ -109,7 +106,7 @@ class DeleteDomainConfigInput:
         """
     ),
 )
-class DeleteUserConfigInput:
+class DeleteUserConfigInput(PydanticInputMixin[DeleteUserConfigInputDTO]):
     """Input type for deleting user-level app configuration."""
 
     user_id: ID | None = None

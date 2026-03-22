@@ -66,7 +66,7 @@ class AgentResourceNode(BaseResponseModel):
     capacity: str = Field(
         description="Total hardware resource capacity for this slot on the agent."
     )
-    occupied: str = Field(
+    used: str = Field(
         description="Amount of this slot currently consumed by running and scheduled sessions."
     )
 

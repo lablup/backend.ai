@@ -14,10 +14,6 @@ from strawberry.relay import Connection, Edge, NodeID
 from ai.backend.common.data.model_deployment.types import ActivenessStatus as CommonActivenessStatus
 from ai.backend.common.data.model_deployment.types import LivenessStatus as CommonLivenessStatus
 from ai.backend.common.data.model_deployment.types import ReadinessStatus as CommonReadinessStatus
-from ai.backend.common.data.model_deployment.types import RouteStatus as CommonRouteStatus
-from ai.backend.common.data.model_deployment.types import (
-    RouteTrafficStatus as CommonRouteTrafficStatus,
-)
 from ai.backend.common.dto.manager.v2.deployment.request import (
     ReplicaFilter as ReplicaFilterDTO,
 )
@@ -36,18 +32,13 @@ from ai.backend.common.dto.manager.v2.deployment.response import (
 from ai.backend.common.dto.manager.v2.deployment.response import (
     ReplicaStatusChangedPayload as ReplicaStatusChangedPayloadDTO,
 )
-from ai.backend.common.dto.manager.v2.deployment.types import (
-    OrderDirection as DTOOrderDirection,
-)
-from ai.backend.common.dto.manager.v2.deployment.types import (
-    ReplicaOrderField as DTOReplicaOrderField,
-)
 from ai.backend.manager.api.gql.base import (
     OrderDirection,
     to_global_id,
 )
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
+    PydanticInputMixin,
     gql_connection_type,
     gql_node_type,
     gql_pydantic_input,
@@ -103,32 +94,18 @@ TrafficStatus: type[RouteTrafficStatus] = strawberry.enum(
 
 @gql_pydantic_input(
     BackendAIGQLMeta(description="", added_version="25.19.0"),
-    model=ReplicaStatusFilterDTO,
 )
-class ReplicaStatusFilter:
+class ReplicaStatusFilter(PydanticInputMixin[ReplicaStatusFilterDTO]):
     in_: list[ReplicaStatus] | None = strawberry.field(name="in", default=None)
     equals: ReplicaStatus | None = None
-
-    def to_pydantic(self) -> ReplicaStatusFilterDTO:
-        return ReplicaStatusFilterDTO(
-            equals=CommonRouteStatus(self.equals.value) if self.equals else None,
-            in_=[CommonRouteStatus(s.value) for s in self.in_] if self.in_ else None,
-        )
 
 
 @gql_pydantic_input(
     BackendAIGQLMeta(description="", added_version="25.19.0"),
-    model=ReplicaTrafficStatusFilterDTO,
 )
-class TrafficStatusFilter:
+class TrafficStatusFilter(PydanticInputMixin[ReplicaTrafficStatusFilterDTO]):
     in_: list[TrafficStatus] | None = strawberry.field(name="in", default=None)
     equals: TrafficStatus | None = None
-
-    def to_pydantic(self) -> ReplicaTrafficStatusFilterDTO:
-        return ReplicaTrafficStatusFilterDTO(
-            equals=CommonRouteTrafficStatus(self.equals.value) if self.equals else None,
-            in_=[CommonRouteTrafficStatus(s.value) for s in self.in_] if self.in_ else None,
-        )
 
 
 # ========== ModelReplica Types ==========
@@ -136,10 +113,9 @@ class TrafficStatusFilter:
 
 @gql_pydantic_input(
     BackendAIGQLMeta(description="", added_version="25.19.0"),
-    model=ReplicaFilterDTO,
     name="ReplicaFilter",
 )
-class ReplicaFilter:
+class ReplicaFilter(PydanticInputMixin[ReplicaFilterDTO]):
     status: ReplicaStatusFilter | None = None
     traffic_status: TrafficStatusFilter | None = None
 
@@ -147,47 +123,13 @@ class ReplicaFilter:
     OR: list[Self] | None = None
     NOT: list[Self] | None = None
 
-    def to_pydantic(self) -> ReplicaFilterDTO:
-        return ReplicaFilterDTO(
-            status=ReplicaStatusFilterDTO(
-                equals=CommonRouteStatus(self.status.equals.value)
-                if self.status and self.status.equals
-                else None,
-                in_=[CommonRouteStatus(s.value) for s in self.status.in_]
-                if self.status and self.status.in_
-                else None,
-            )
-            if self.status
-            else None,
-            traffic_status=ReplicaTrafficStatusFilterDTO(
-                equals=CommonRouteTrafficStatus(self.traffic_status.equals.value)
-                if self.traffic_status and self.traffic_status.equals
-                else None,
-                in_=[CommonRouteTrafficStatus(s.value) for s in self.traffic_status.in_]
-                if self.traffic_status and self.traffic_status.in_
-                else None,
-            )
-            if self.traffic_status
-            else None,
-            AND=[f.to_pydantic() for f in self.AND] if self.AND else None,
-            OR=[f.to_pydantic() for f in self.OR] if self.OR else None,
-            NOT=[f.to_pydantic() for f in self.NOT] if self.NOT else None,
-        )
-
 
 @gql_pydantic_input(
     BackendAIGQLMeta(description="", added_version="25.19.0"),
-    model=ReplicaOrderDTO,
 )
-class ReplicaOrderBy:
+class ReplicaOrderBy(PydanticInputMixin[ReplicaOrderDTO]):
     field: ReplicaOrderField
     direction: OrderDirection = OrderDirection.DESC
-
-    def to_pydantic(self) -> ReplicaOrderDTO:
-        return ReplicaOrderDTO(
-            field=DTOReplicaOrderField(self.field.value.lower()),
-            direction=DTOOrderDirection(self.direction.value),
-        )
 
 
 @gql_node_type(
@@ -241,25 +183,6 @@ class ModelReplica(PydanticNodeMixin[ReplicaNodeDTO]):
             UUID(nid) for nid in node_ids
         ])
         return cast(list[Self | None], results)
-
-    @classmethod
-    def from_pydantic(
-        cls,
-        dto: ReplicaNodeDTO,
-        extra: dict[str, Any] | None = None,
-        *,
-        id_field: str = "id",
-    ) -> Self:
-        return cls(
-            id=ID(str(dto.id)),
-            revision_id=ID(str(dto.revision_id)),
-            session_id=ID(str(dto.session_id)),
-            readiness_status=ReadinessStatus(dto.readiness_status),
-            liveness_status=LivenessStatus(dto.liveness_status),
-            activeness_status=ActivenessStatus(dto.activeness_status),
-            weight=dto.weight,
-            created_at=dto.created_at,
-        )
 
 
 ModelReplicaEdge = Edge[ModelReplica]

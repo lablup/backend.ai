@@ -18,8 +18,8 @@ from ai.backend.common.dto.manager.v2.fair_share.response import (
 from ai.backend.common.dto.manager.v2.fair_share.types import (
     FairShareCalculationSnapshotInfo,
     FairShareSpecInfo,
-    ResourceSlotEntryInfo,
     ResourceSlotInfo,
+    ResourceWeightEntryInfo,
 )
 from ai.backend.common.types import ResourceSlot
 from ai.backend.manager.api.gql.fair_share.types.common import (
@@ -135,23 +135,26 @@ class TestDomainFairShareGQLConversion:
         # Given
         now = datetime.now(UTC)
         dto = DomainFairShareNode(
-            id=uuid.uuid4(),
-            resource_group="default",
+            id=str(uuid.uuid4()),
+            resource_group_name="default",
             domain_name="test-domain",
             spec=FairShareSpecInfo(
                 weight=Decimal("1.0"),
-                uses_default_weight=True,
+                uses_default=True,
                 half_life_days=7,
                 lookback_days=28,
                 decay_unit_days=1,
-                resource_weights=ResourceSlotInfo(
-                    entries=[
-                        ResourceSlotEntryInfo(resource_type="cpu", quantity="1.0"),
-                        ResourceSlotEntryInfo(resource_type="mem", quantity="0.001"),
-                        ResourceSlotEntryInfo(resource_type="cuda.device", quantity="10.0"),
-                    ]
-                ),
-                uses_default_resource_types=["cpu", "mem"],
+                resource_weights=[
+                    ResourceWeightEntryInfo(
+                        resource_type="cpu", weight=Decimal("1.0"), uses_default=True
+                    ),
+                    ResourceWeightEntryInfo(
+                        resource_type="mem", weight=Decimal("0.001"), uses_default=True
+                    ),
+                    ResourceWeightEntryInfo(
+                        resource_type="cuda.device", weight=Decimal("10.0"), uses_default=False
+                    ),
+                ],
             ),
             calculation_snapshot=FairShareCalculationSnapshotInfo(
                 fair_share_factor=Decimal("1.0"),
@@ -190,23 +193,24 @@ class TestProjectFairShareGQLConversion:
         now = datetime.now(UTC)
         project_id = uuid.uuid4()
         dto = ProjectFairShareNode(
-            id=uuid.uuid4(),
-            resource_group="default",
+            id=str(uuid.uuid4()),
+            resource_group_name="default",
             project_id=project_id,
             domain_name="test-domain",
             spec=FairShareSpecInfo(
                 weight=Decimal("1.5"),
-                uses_default_weight=False,
+                uses_default=False,
                 half_life_days=7,
                 lookback_days=28,
                 decay_unit_days=1,
-                resource_weights=ResourceSlotInfo(
-                    entries=[
-                        ResourceSlotEntryInfo(resource_type="cpu", quantity="1.0"),
-                        ResourceSlotEntryInfo(resource_type="cuda.shares", quantity="0.1"),
-                    ]
-                ),
-                uses_default_resource_types=["cpu"],
+                resource_weights=[
+                    ResourceWeightEntryInfo(
+                        resource_type="cpu", weight=Decimal("1.0"), uses_default=True
+                    ),
+                    ResourceWeightEntryInfo(
+                        resource_type="cuda.shares", weight=Decimal("0.1"), uses_default=False
+                    ),
+                ],
             ),
             calculation_snapshot=FairShareCalculationSnapshotInfo(
                 fair_share_factor=Decimal("1.0"),
@@ -242,24 +246,25 @@ class TestUserFairShareGQLConversion:
         user_uuid = uuid.uuid4()
         project_id = uuid.uuid4()
         dto = UserFairShareNode(
-            id=uuid.uuid4(),
-            resource_group="default",
+            id=str(uuid.uuid4()),
+            resource_group_name="default",
             user_uuid=user_uuid,
             project_id=project_id,
             domain_name="test-domain",
             spec=FairShareSpecInfo(
                 weight=Decimal("1.0"),
-                uses_default_weight=True,
+                uses_default=True,
                 half_life_days=7,
                 lookback_days=28,
                 decay_unit_days=1,
-                resource_weights=ResourceSlotInfo(
-                    entries=[
-                        ResourceSlotEntryInfo(resource_type="cpu", quantity="1.0"),
-                        ResourceSlotEntryInfo(resource_type="mem", quantity="0.001"),
-                    ]
-                ),
-                uses_default_resource_types=["cpu", "mem"],
+                resource_weights=[
+                    ResourceWeightEntryInfo(
+                        resource_type="cpu", weight=Decimal("1.0"), uses_default=True
+                    ),
+                    ResourceWeightEntryInfo(
+                        resource_type="mem", weight=Decimal("0.001"), uses_default=True
+                    ),
+                ],
             ),
             calculation_snapshot=FairShareCalculationSnapshotInfo(
                 fair_share_factor=Decimal("1.0"),

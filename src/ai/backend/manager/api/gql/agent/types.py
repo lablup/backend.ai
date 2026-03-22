@@ -6,7 +6,7 @@ from enum import StrEnum
 from typing import TYPE_CHECKING, Annotated, Any, Self, cast
 
 import strawberry
-from strawberry import ID, Info
+from strawberry import Info
 from strawberry.relay import Connection, Edge, NodeID
 from strawberry.scalars import JSON
 
@@ -99,7 +99,6 @@ class AgentOrderFieldGQL(StrEnum):
 
 @gql_pydantic_input(
     BackendAIGQLMeta(description="", added_version="24.09.0"),
-    model=AgentStatusFilter,
     name="AgentStatusFilter",
     description=dedent_strip("""
         Filter options for agent status within AgentFilter.
@@ -119,7 +118,6 @@ class AgentStatusFilterGQL:
 
 @gql_pydantic_input(
     BackendAIGQLMeta(description="Filter options for querying agents", added_version="26.1.0"),
-    model=AgentFilter,
     name="AgentFilter",
 )
 class AgentFilterGQL:
@@ -146,7 +144,6 @@ class AgentFilterGQL:
 
 @gql_pydantic_input(
     BackendAIGQLMeta(description="Options for ordering agents", added_version="26.1.0"),
-    model=AgentOrder,
     name="AgentOrderBy",
 )
 class AgentOrderByGQL:
@@ -631,7 +628,7 @@ class AgentV2GQL(PydanticNodeMixin[AgentNode]):
                 id=_strawberry.ID(item.id),
                 slot_name=slot_name,
                 capacity=Decimal(item.capacity),
-                used=Decimal(item.occupied),
+                used=Decimal(item.used),
             )
             cursor = encode_cursor(slot_name)
             edges.append(AgentResourceSlotEdgeGQL(node=node, cursor=cursor))
@@ -659,46 +656,6 @@ class AgentV2GQL(PydanticNodeMixin[AgentNode]):
             AgentId(nid) for nid in node_ids
         ])
         return cast(list[Self | None], results)
-
-    @classmethod
-    def from_pydantic(
-        cls,
-        dto: AgentNode,
-        extra: dict[str, Any] | None = None,
-        *,
-        id_field: str = "id",
-    ) -> Self:
-        return cls(
-            id=ID(dto.id),
-            resource_info=AgentResourceGQL(
-                capacity=dto.resource_info.capacity,
-                used=dto.resource_info.used,
-                free=dto.resource_info.free,
-            ),
-            status_info=AgentStatusInfoGQL(
-                status=AgentStatus(dto.status_info.status),
-                status_changed=dto.status_info.status_changed,
-                first_contact=dto.status_info.first_contact,
-                lost_at=dto.status_info.lost_at,
-                schedulable=dto.status_info.schedulable,
-            ),
-            system_info=AgentSystemInfoGQL(
-                architecture=dto.system_info.architecture,
-                version=dto.system_info.version,
-                auto_terminate_abusing_kernel=False,
-                compute_plugins=(
-                    ComputePluginsGQL.from_mapping(dto.system_info.compute_plugins)
-                    if dto.system_info.compute_plugins is not None
-                    else ComputePluginsGQL(entries=[])
-                ),
-            ),
-            network_info=AgentNetworkInfoGQL(
-                region=dto.network_info.region,
-                addr=dto.network_info.addr,
-            ),
-            permissions=[AgentPermissionGQL(p) for p in dto.permissions],
-            scaling_group=dto.scaling_group,
-        )
 
 
 AgentV2Edge = Edge[AgentV2GQL]

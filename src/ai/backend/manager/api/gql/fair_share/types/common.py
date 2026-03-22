@@ -9,12 +9,20 @@ from typing import Self
 
 import strawberry
 
+from ai.backend.common.dto.manager.v2.fair_share.types import (
+    FairShareCalculationSnapshotInfo,
+    FairShareSpecInfo,
+    ResourceSlotEntryInfo,
+    ResourceSlotInfo,
+    ResourceWeightEntryInfo,
+)
 from ai.backend.common.dto.manager.v2.resource_group.request import (
     ResourceWeightEntryInput as ResourceWeightEntryInputDTO,
 )
 from ai.backend.common.types import SlotQuantity
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
+    PydanticInputMixin,
     gql_output_type,
     gql_pydantic_input,
 )
@@ -75,16 +83,20 @@ class ResourceSlotEntryGQL:
         )
     )
 
+    @classmethod
+    def from_pydantic(cls, dto: ResourceSlotEntryInfo) -> ResourceSlotEntryGQL:
+        """Convert a ResourceSlotEntryInfo DTO to GQL type."""
+        return cls(resource_type=dto.resource_type, quantity=dto.quantity)
+
 
 @gql_pydantic_input(
     BackendAIGQLMeta(
         description="Input for a single resource weight entry. Specifies how much a resource type contributes to fair share calculations.",
         added_version="26.1.0",
     ),
-    model=ResourceWeightEntryInputDTO,
     name="ResourceWeightEntryInput",
 )
-class ResourceWeightEntryInputGQL:
+class ResourceWeightEntryInputGQL(PydanticInputMixin[ResourceWeightEntryInputDTO]):
     """Input for single resource weight entry."""
 
     resource_type: str = strawberry.field(
@@ -102,12 +114,6 @@ class ResourceWeightEntryInputGQL:
             "Example: 0.001 for memory (bytes) to normalize against CPU cores."
         ),
     )
-
-    def to_pydantic(self) -> ResourceWeightEntryInputDTO:
-        return ResourceWeightEntryInputDTO(
-            resource_type=self.resource_type,
-            weight=self.weight,
-        )
 
 
 @gql_output_type(
@@ -154,6 +160,11 @@ class ResourceSlotGQL:
         ]
         return cls(entries=entries)
 
+    @classmethod
+    def from_pydantic(cls, dto: ResourceSlotInfo) -> ResourceSlotGQL:
+        """Convert a ResourceSlotInfo DTO to GQL type."""
+        return cls(entries=[ResourceSlotEntryGQL.from_pydantic(e) for e in dto.entries])
+
 
 @gql_output_type(
     BackendAIGQLMeta(
@@ -188,6 +199,15 @@ class ResourceWeightEntryGQL:
             "True means no explicit weight was configured for this type."
         )
     )
+
+    @classmethod
+    def from_pydantic(cls, dto: ResourceWeightEntryInfo) -> ResourceWeightEntryGQL:
+        """Convert a ResourceWeightEntryInfo DTO to GQL type."""
+        return cls(
+            resource_type=dto.resource_type,
+            weight=dto.weight,
+            uses_default=dto.uses_default,
+        )
 
 
 @gql_output_type(
@@ -286,6 +306,20 @@ class FairShareSpecGQL:
             resource_weights=weight_entries,
         )
 
+    @classmethod
+    def from_pydantic(cls, dto: FairShareSpecInfo) -> FairShareSpecGQL:
+        """Convert a FairShareSpecInfo DTO to GQL type."""
+        return cls(
+            weight=dto.weight,
+            uses_default=dto.uses_default,
+            half_life_days=dto.half_life_days,
+            lookback_days=dto.lookback_days,
+            decay_unit_days=dto.decay_unit_days,
+            resource_weights=[
+                ResourceWeightEntryGQL.from_pydantic(e) for e in dto.resource_weights
+            ],
+        )
+
 
 @gql_output_type(
     BackendAIGQLMeta(
@@ -357,4 +391,18 @@ class FairShareCalculationSnapshotGQL:
             self.total_decayed_usage,
             self.lookback_start,
             self.lookback_end,
+        )
+
+    @classmethod
+    def from_pydantic(
+        cls, dto: FairShareCalculationSnapshotInfo
+    ) -> FairShareCalculationSnapshotGQL:
+        """Convert a FairShareCalculationSnapshotInfo DTO to GQL type."""
+        return cls(
+            fair_share_factor=dto.fair_share_factor,
+            total_decayed_usage=ResourceSlotGQL.from_pydantic(dto.total_decayed_usage),
+            normalized_usage=dto.normalized_usage,
+            lookback_start=dto.lookback_start,
+            lookback_end=dto.lookback_end,
+            last_calculated_at=dto.last_calculated_at,
         )

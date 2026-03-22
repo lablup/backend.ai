@@ -9,11 +9,10 @@ from typing import TYPE_CHECKING, Annotated, Any, Self, cast
 from uuid import UUID
 
 import strawberry
-from strawberry import ID, Info
+from strawberry import Info
 from strawberry.relay import Connection, Edge, NodeID
 
 from ai.backend.common.dto.manager.v2.audit_log.response import AuditLogNode
-from ai.backend.common.dto.manager.v2.audit_log.types import AuditLogStatus as AuditLogStatusDTO
 from ai.backend.manager.actions.types import OperationStatus
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
@@ -121,28 +120,6 @@ class AuditLogV2GQL(PydanticNodeMixin[AuditLogNode]):
             UUID(nid) for nid in node_ids
         ])
         return cast(list[Self | None], results)
-
-    @classmethod
-    def from_pydantic(
-        cls,
-        dto: AuditLogNode,
-        extra: dict[str, Any] | None = None,
-        *,
-        id_field: str = "id",
-    ) -> Self:
-        return cls(
-            id=ID(str(dto.id)),
-            action_id=dto.action_id,
-            entity_type=dto.entity_type,
-            operation=dto.operation,
-            entity_id=dto.entity_id,
-            created_at=dto.created_at,
-            request_id=dto.request_id,
-            triggered_by=dto.triggered_by,
-            description=dto.description,
-            duration=dto.duration,
-            status=AuditLogStatusGQL(AuditLogStatusDTO(dto.status).value),
-        )
 
 
 AuditLogV2EdgeGQL = Edge[AuditLogV2GQL]

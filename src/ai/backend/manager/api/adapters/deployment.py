@@ -54,7 +54,6 @@ from ai.backend.common.dto.manager.v2.deployment.response import (
     DeleteDeploymentPayload,
     DeploymentNode,
     DeploymentPolicyNode,
-    ExtraVFolderMountNode,
     GetAutoScalingRulePayload,
     GetDeploymentPolicyPayload,
     ReplicaNode,
@@ -72,17 +71,34 @@ from ai.backend.common.dto.manager.v2.deployment.response import (
 )
 from ai.backend.common.dto.manager.v2.deployment.types import (
     BlueGreenConfigInfo,
-    DeploymentBasicInfo,
+    BlueGreenStrategySpecInfo,
+    ClusterConfigInfoDTO,
+    DeploymentMetadataInfoDTO,
+    DeploymentNetworkAccessInfoDTO,
     DeploymentOrderField,
     DeploymentPolicyInfo,
-    DeploymentRevisionInfo,
-    NetworkConfigInfo,
+    DeploymentStrategyInfoDTO,
+    EnvironmentVariableEntryInfoDTO,
+    EnvironmentVariablesInfoDTO,
+    ExtraVFolderMountGQLDTO,
+    ModelMountConfigInfoDTO,
+    ModelRuntimeConfigInfoDTO,
     OrderDirection,
     ReplicaOrderField,
     ReplicaStateInfo,
+    ResourceConfigInfoDTO,
     RevisionOrderField,
     RollingUpdateConfigInfo,
+    RollingUpdateStrategySpecInfo,
     RouteOrderField,
+)
+from ai.backend.common.dto.manager.v2.fair_share.types import (
+    ResourceSlotEntryInfo,
+    ResourceSlotInfo,
+)
+from ai.backend.common.dto.manager.v2.resource_slot.types import (
+    ResourceOptsEntryInfoDTO,
+    ResourceOptsInfoDTO,
 )
 from ai.backend.manager.data.deployment.access_token import ModelDeploymentAccessTokenCreator
 from ai.backend.manager.data.deployment.creator import (
@@ -1385,69 +1401,94 @@ class DeploymentAdapter(BaseAdapter):
             )
         return DeploymentNode(
             id=data.id,
-            basic=DeploymentBasicInfo(
+            metadata=DeploymentMetadataInfoDTO(
+                project_id=str(data.metadata.project_id),
+                domain_name=data.metadata.domain_name,
                 name=data.metadata.name,
                 status=data.metadata.status,
                 tags=data.metadata.tags,
-                project_id=data.metadata.project_id,
-                domain_name=data.metadata.domain_name,
-                created_user_id=data.created_user_id,
+                created_at=data.metadata.created_at,
+                updated_at=data.metadata.updated_at,
             ),
-            network=NetworkConfigInfo(
-                open_to_public=data.network_access.open_to_public,
-                url=data.network_access.url,
+            network_access=DeploymentNetworkAccessInfoDTO(
+                endpoint_url=data.network_access.url,
                 preferred_domain_name=data.network_access.preferred_domain_name,
+                open_to_public=data.network_access.open_to_public,
             ),
             replica_state=ReplicaStateInfo(
                 desired_replica_count=data.replica_state.desired_replica_count,
                 replica_ids=data.replica_state.replica_ids,
             ),
-            default_deployment_strategy=data.default_deployment_strategy,
-            current_revision=(
+            default_deployment_strategy=DeploymentStrategyInfoDTO(
+                type=data.default_deployment_strategy,
+            ),
+            created_user_id=data.created_user_id,
+            revision=(
                 DeploymentAdapter._revision_data_to_dto(data.revision)
                 if data.revision is not None
                 else None
             ),
             policy=policy_info,
-            created_at=data.metadata.created_at,
-            updated_at=data.metadata.updated_at,
         )
 
     @staticmethod
     def _revision_data_to_dto(data: ModelRevisionData) -> RevisionNode:
+        environ_dto: EnvironmentVariablesInfoDTO | None = None
+        if data.model_runtime_config.environ:
+            environ_dto = EnvironmentVariablesInfoDTO(
+                entries=[
+                    EnvironmentVariableEntryInfoDTO(name=k, value=str(v))
+                    for k, v in data.model_runtime_config.environ.items()
+                ]
+            )
+        model_mount_config_dto: ModelMountConfigInfoDTO | None = None
+        if data.model_mount_config.vfolder_id and data.model_mount_config.mount_destination:
+            model_mount_config_dto = ModelMountConfigInfoDTO(
+                vfolder_id=str(data.model_mount_config.vfolder_id),
+                mount_destination=data.model_mount_config.mount_destination,
+                definition_path=data.model_mount_config.definition_path,
+            )
         return RevisionNode(
             id=data.id,
             name=data.name,
-            revision_info=DeploymentRevisionInfo(
-                cluster_mode=data.cluster_config.mode,
-                cluster_size=data.cluster_config.size,
-                resource_group=data.resource_config.resource_group_name,
-                resource_slots=dict(data.resource_config.resource_slot),
+            image_id=data.image_id,
+            cluster_config=ClusterConfigInfoDTO(
+                mode=data.cluster_config.mode.name,
+                size=data.cluster_config.size,
+            ),
+            resource_config=ResourceConfigInfoDTO(
+                resource_group_name=data.resource_config.resource_group_name,
+                resource_slots=ResourceSlotInfo(
+                    entries=[
+                        ResourceSlotEntryInfo(resource_type=k, quantity=v)
+                        for k, v in data.resource_config.resource_slot.items()
+                    ]
+                ),
                 resource_opts=(
-                    dict(data.resource_config.resource_opts)
+                    ResourceOptsInfoDTO(
+                        entries=[
+                            ResourceOptsEntryInfoDTO(name=k, value=str(v))
+                            for k, v in data.resource_config.resource_opts.items()
+                        ]
+                    )
                     if data.resource_config.resource_opts
                     else None
                 ),
-                image_id=data.image_id,
-                runtime_variant=data.model_runtime_config.runtime_variant,
+            ),
+            model_runtime_config=ModelRuntimeConfigInfoDTO(
+                runtime_variant=str(data.model_runtime_config.runtime_variant),
                 inference_runtime_config=(
                     dict(data.model_runtime_config.inference_runtime_config)
                     if data.model_runtime_config.inference_runtime_config
                     else None
                 ),
-                environ=(
-                    dict(data.model_runtime_config.environ)
-                    if data.model_runtime_config.environ
-                    else None
-                ),
-                model_vfolder_id=data.model_mount_config.vfolder_id,
-                model_mount_destination=data.model_mount_config.mount_destination,
-                model_definition_path=data.model_mount_config.definition_path,
+                environ=environ_dto,
             ),
+            model_mount_config=model_mount_config_dto,
             created_at=data.created_at,
             extra_mounts=[
-                ExtraVFolderMountNode(
-                    vfolder_id=m.vfolder_id,
+                ExtraVFolderMountGQLDTO(
+                    vfolder_id=str(m.vfolder_id),
                     mount_destination=m.mount_destination,
                 )
                 for m in data.extra_vfolder_mounts
@@ -1458,7 +1499,7 @@ class DeploymentAdapter(BaseAdapter):
     def _route_info_to_dto(data: RouteInfo) -> RouteNode:
         return RouteNode(
             id=data.route_id,
-            endpoint_id=data.endpoint_id,
+            deployment_id=data.endpoint_id,
             session_id=str(data.session_id) if data.session_id is not None else None,
             status=RouteStatus(data.status.value),
             traffic_ratio=data.traffic_ratio,
@@ -1484,7 +1525,7 @@ class DeploymentAdapter(BaseAdapter):
         return AutoScalingRuleNode(
             id=data.id,
             deployment_id=data.model_deployment_id,
-            metric_source=data.metric_source,
+            metric_source=data.metric_source.name,
             metric_name=data.metric_name,
             min_threshold=data.min_threshold,
             max_threshold=data.max_threshold,
@@ -1498,25 +1539,24 @@ class DeploymentAdapter(BaseAdapter):
 
     @staticmethod
     def _policy_data_to_dto(data: DeploymentPolicyData) -> DeploymentPolicyNode:
-        rolling: RollingUpdateConfigInfo | None = None
-        blue_green: BlueGreenConfigInfo | None = None
+        strategy_spec: RollingUpdateStrategySpecInfo | BlueGreenStrategySpecInfo
         if isinstance(data.strategy_spec, RollingUpdateSpec):
-            rolling = RollingUpdateConfigInfo(
+            strategy_spec = RollingUpdateStrategySpecInfo(
+                strategy=data.strategy,
                 max_surge=data.strategy_spec.max_surge,
                 max_unavailable=data.strategy_spec.max_unavailable,
             )
-        elif isinstance(data.strategy_spec, BlueGreenSpec):
-            blue_green = BlueGreenConfigInfo(
+        else:
+            strategy_spec = BlueGreenStrategySpecInfo(
+                strategy=data.strategy,
                 auto_promote=data.strategy_spec.auto_promote,
                 promote_delay_seconds=data.strategy_spec.promote_delay_seconds,
             )
         return DeploymentPolicyNode(
             id=data.id,
             deployment_id=data.endpoint,
-            strategy=data.strategy,
+            strategy_spec=strategy_spec,
             rollback_on_failure=data.rollback_on_failure,
-            rolling_update=rolling,
-            blue_green=blue_green,
             created_at=data.created_at,
             updated_at=data.updated_at,
         )

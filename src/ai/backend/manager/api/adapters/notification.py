@@ -46,12 +46,15 @@ from ai.backend.common.dto.manager.v2.notification.response import (
     ValidateNotificationRulePayload,
 )
 from ai.backend.common.dto.manager.v2.notification.types import (
+    EmailMessageInfo,
     EmailSpecInfo,
     NotificationChannelOrderField,
     NotificationChannelTypeDTO,
     NotificationRuleOrderField,
     NotificationRuleTypeDTO,
     OrderDirection,
+    SMTPAuthInfo,
+    SMTPConnectionInfo,
     WebhookSpecInfo,
 )
 from ai.backend.manager.api.adapters.pagination import PaginationSpec
@@ -303,7 +306,7 @@ class NotificationAdapter(BaseAdapter):
         await self._processors.notification.validate_channel.wait_for_complete(
             ValidateChannelAction(channel_id=input.id, test_message=input.test_message)
         )
-        return ValidateNotificationChannelPayload(channel_id=input.id)
+        return ValidateNotificationChannelPayload(id=input.id)
 
     async def validate_rule(
         self, input: ValidateNotificationRuleInput
@@ -384,21 +387,33 @@ class NotificationAdapter(BaseAdapter):
                     raise InvalidNotificationSpec(
                         f"Expected WebhookSpec for WEBHOOK channel, got {type(data.spec).__name__}"
                     )
-                spec_info = WebhookSpecInfo(url=data.spec.url)
+                spec_info = WebhookSpecInfo(
+                    channel_type=NotificationChannelTypeDTO.WEBHOOK,
+                    url=data.spec.url,
+                )
             case NotificationChannelType.EMAIL:
                 if not isinstance(data.spec, EmailSpec):
                     raise InvalidNotificationSpec(
                         f"Expected EmailSpec for EMAIL channel, got {type(data.spec).__name__}"
                     )
                 spec_info = EmailSpecInfo(
-                    smtp_host=data.spec.smtp.host,
-                    smtp_port=data.spec.smtp.port,
-                    smtp_use_tls=data.spec.smtp.use_tls,
-                    smtp_timeout=data.spec.smtp.timeout,
-                    from_email=data.spec.message.from_email,
-                    to_emails=data.spec.message.to_emails,
-                    subject_template=data.spec.message.subject_template,
-                    auth_username=data.spec.auth.username if data.spec.auth is not None else None,
+                    channel_type=NotificationChannelTypeDTO.EMAIL,
+                    smtp=SMTPConnectionInfo(
+                        host=data.spec.smtp.host,
+                        port=data.spec.smtp.port,
+                        use_tls=data.spec.smtp.use_tls,
+                        timeout=data.spec.smtp.timeout,
+                    ),
+                    message=EmailMessageInfo(
+                        from_email=data.spec.message.from_email,
+                        to_emails=data.spec.message.to_emails,
+                        subject_template=data.spec.message.subject_template,
+                    ),
+                    auth=(
+                        SMTPAuthInfo(username=data.spec.auth.username)
+                        if data.spec.auth is not None
+                        else None
+                    ),
                 )
             case _:
                 raise InvalidNotificationSpec(f"Unsupported channel type: {data.channel_type}")

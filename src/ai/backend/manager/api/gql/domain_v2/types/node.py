@@ -3,10 +3,10 @@
 from __future__ import annotations
 
 from collections.abc import Iterable
-from typing import TYPE_CHECKING, Annotated, Any, Self
+from typing import TYPE_CHECKING, Annotated, Any
 
 import strawberry
-from strawberry import ID, Info
+from strawberry import Info
 from strawberry.relay import Connection, Edge, NodeID
 
 from ai.backend.common.dto.manager.v2.domain.response import DomainNode
@@ -20,7 +20,7 @@ from ai.backend.manager.api.gql.decorators import (
     gql_pydantic_input,
 )
 from ai.backend.manager.api.gql.fair_share.types import DomainFairShareGQL
-from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin
+from ai.backend.manager.api.gql.pydantic_compat import PydanticInputMixin, PydanticNodeMixin
 from ai.backend.manager.api.gql.resource_slot.overview_types import ActiveResourceOverviewGQL
 from ai.backend.manager.api.gql.resource_usage.types import (
     DomainUsageBucketConnection,
@@ -47,34 +47,26 @@ if TYPE_CHECKING:
 
 @gql_pydantic_input(
     BackendAIGQLMeta(description="", added_version="24.09.0"),
-    model=DomainFairShareScopeDTO,
     name="DomainFairShareScope",
 )
-class DomainFairShareScopeGQL:
+class DomainFairShareScopeGQL(PydanticInputMixin[DomainFairShareScopeDTO]):
     """Scope parameters for filtering domain fair shares."""
 
     resource_group_name: str = strawberry.field(
         description="Resource group to filter fair shares by."
     )
 
-    def to_pydantic(self) -> DomainFairShareScopeDTO:
-        return DomainFairShareScopeDTO(resource_group_name=self.resource_group_name)
-
 
 @gql_pydantic_input(
     BackendAIGQLMeta(description="", added_version="24.09.0"),
-    model=DomainUsageScopeDTO,
     name="DomainUsageScope",
 )
-class DomainUsageScopeGQL:
+class DomainUsageScopeGQL(PydanticInputMixin[DomainUsageScopeDTO]):
     """Scope parameters for filtering domain usage buckets."""
 
     resource_group_name: str = strawberry.field(
         description="Resource group to filter usage buckets by."
     )
-
-    def to_pydantic(self) -> DomainUsageScopeDTO:
-        return DomainUsageScopeDTO(resource_group_name=self.resource_group_name)
 
 
 @strawberry.federation.type(
@@ -344,32 +336,6 @@ class DomainV2GQL(PydanticNodeMixin[DomainNode]):
         required: bool = False,
     ) -> Iterable[DomainV2GQL | None]:
         return await info.context.data_loaders.domain_loader.load_many(node_ids)
-
-    @classmethod
-    def from_pydantic(
-        cls,
-        dto: DomainNode,
-        extra: dict[str, Any] | None = None,
-        *,
-        id_field: str = "id",
-    ) -> Self:
-        """Create DomainV2GQL from DomainNode DTO (adapter search results)."""
-        return cls(
-            id=ID(dto.id),
-            basic_info=DomainBasicInfoGQL(
-                name=dto.basic_info.name,
-                description=dto.basic_info.description,
-                integration_id=dto.basic_info.integration_id,
-            ),
-            registry=DomainRegistryInfoGQL(
-                allowed_docker_registries=dto.registry.allowed_docker_registries,
-            ),
-            lifecycle=DomainLifecycleInfoGQL(
-                is_active=dto.lifecycle.is_active,
-                created_at=dto.lifecycle.created_at,
-                modified_at=dto.lifecycle.modified_at,
-            ),
-        )
 
 
 DomainV2Edge = Edge[DomainV2GQL]

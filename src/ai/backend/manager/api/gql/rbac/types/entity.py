@@ -6,10 +6,10 @@ import uuid
 from collections.abc import Iterable
 from datetime import datetime
 from enum import StrEnum
-from typing import Any, Self, cast
+from typing import Self, cast
 
 import strawberry
-from strawberry import ID, Info
+from strawberry import Info
 from strawberry.relay import NodeID
 
 from ai.backend.common.data.permission.types import RBACElementType
@@ -22,15 +22,10 @@ from ai.backend.common.dto.manager.v2.rbac.request import (
 from ai.backend.common.dto.manager.v2.rbac.response import (
     AssociationScopesEntitiesNode,
 )
-from ai.backend.common.dto.manager.v2.rbac.types import (
-    EntityOrderField as EntityOrderFieldDTO,
-)
-from ai.backend.common.dto.manager.v2.rbac.types import (
-    OrderDirection as OrderDirectionDTO,
-)
 from ai.backend.manager.api.gql.base import OrderDirection, StringFilter
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
+    PydanticInputMixin,
     gql_connection_type,
     gql_node_type,
     gql_pydantic_input,
@@ -131,51 +126,20 @@ class EntityRefGQL(PydanticNodeMixin[AssociationScopesEntitiesNode]):
         ])
         return cast(list[Self | None], results)
 
-    @classmethod
-    def from_pydantic(
-        cls,
-        dto: Any,
-        extra: dict[str, Any] | None = None,
-        *,
-        id_field: str = "id",
-    ) -> Self:
-        """Convert a DTO to EntityRefGQL.
-
-        Accepts AssociationScopesEntitiesNode (the primary type for this GQL node).
-        """
-        return cls(
-            id=ID(str(dto.id)),
-            scope_type=RBACElementTypeGQL(dto.scope_type),
-            scope_id=dto.scope_id,
-            entity_type=RBACElementTypeGQL(dto.entity_type),
-            entity_id=dto.entity_id,
-            registered_at=dto.registered_at,
-        )
-
 
 # ==================== Filter Types ====================
 
 
 @gql_pydantic_input(
     BackendAIGQLMeta(description="Filter for entity associations", added_version="26.3.0"),
-    model=EntityFilterDTO,
     name="EntityFilter",
 )
-class EntityFilter(GQLFilter):
+class EntityFilter(PydanticInputMixin[EntityFilterDTO], GQLFilter):
     entity_type: RBACElementTypeGQL | None = None
     entity_id: StringFilter | None = None
     AND: list[Self] | None = None
     OR: list[Self] | None = None
     NOT: list[Self] | None = None
-
-    def to_pydantic(self) -> EntityFilterDTO:
-        return EntityFilterDTO(
-            entity_type=self.entity_type.value if self.entity_type is not None else None,
-            entity_id=self.entity_id.to_pydantic() if self.entity_id is not None else None,
-            AND=[f.to_pydantic() for f in self.AND] if self.AND else None,
-            OR=[f.to_pydantic() for f in self.OR] if self.OR else None,
-            NOT=[f.to_pydantic() for f in self.NOT] if self.NOT else None,
-        )
 
 
 # ==================== OrderBy Types ====================
@@ -185,18 +149,11 @@ class EntityFilter(GQLFilter):
     BackendAIGQLMeta(
         description="Order by specification for entity associations", added_version="26.3.0"
     ),
-    model=EntityOrderByDTO,
     name="EntityOrderBy",
 )
-class EntityOrderBy(GQLOrderBy):
+class EntityOrderBy(PydanticInputMixin[EntityOrderByDTO], GQLOrderBy):
     field: EntityOrderField
     direction: OrderDirection = OrderDirection.DESC
-
-    def to_pydantic(self) -> EntityOrderByDTO:
-        return EntityOrderByDTO(
-            field=EntityOrderFieldDTO(self.field.value),
-            direction=OrderDirectionDTO(self.direction.value),
-        )
 
 
 # ==================== Connection Types ====================

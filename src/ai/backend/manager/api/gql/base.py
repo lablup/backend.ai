@@ -25,6 +25,7 @@ from ai.backend.manager.api.adapters.cursor import decode_cursor as decode_curso
 from ai.backend.manager.api.adapters.cursor import encode_cursor as encode_cursor
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
+    PydanticInputMixin,
     gql_pydantic_input,
 )
 from ai.backend.manager.data.common.types import SearchResult
@@ -58,10 +59,9 @@ class ByteSize(str):
         description="Filter for string fields supporting equality, containment, prefix/suffix, and case-insensitive variants.",
         added_version="24.09.0",
     ),
-    model=StringFilterDTO,
     name="StringFilter",
 )
-class StringFilter:
+class StringFilter(PydanticInputMixin[StringFilterDTO]):
     # Basic operations
     contains: str | None = None
     starts_with: str | None = None
@@ -85,26 +85,6 @@ class StringFilter:
     i_not_starts_with: str | None = strawberry.field(name="iNotStartsWith", default=None)
     i_not_ends_with: str | None = strawberry.field(name="iNotEndsWith", default=None)
     i_not_equals: str | None = strawberry.field(name="iNotEquals", default=None)
-
-    def to_pydantic(self) -> StringFilterDTO:
-        return StringFilterDTO(
-            equals=self.equals,
-            contains=self.contains,
-            starts_with=self.starts_with,
-            ends_with=self.ends_with,
-            not_equals=self.not_equals,
-            not_contains=self.not_contains,
-            not_starts_with=self.not_starts_with,
-            not_ends_with=self.not_ends_with,
-            i_equals=self.i_equals,
-            i_contains=self.i_contains,
-            i_starts_with=self.i_starts_with,
-            i_ends_with=self.i_ends_with,
-            i_not_equals=self.i_not_equals,
-            i_not_contains=self.i_not_contains,
-            i_not_starts_with=self.i_not_starts_with,
-            i_not_ends_with=self.i_not_ends_with,
-        )
 
     def build_query_condition(
         self,
@@ -204,10 +184,9 @@ class StringFilter:
         description="Filter for integer fields supporting equality and comparison operations.",
         added_version="24.09.0",
     ),
-    model=IntFilterDTO,
     name="IntFilter",
 )
-class IntFilter:
+class IntFilter(PydanticInputMixin[IntFilterDTO]):
     equals: int | None = None
     not_equals: int | None = None
     greater_than: int | None = None
@@ -215,23 +194,12 @@ class IntFilter:
     less_than: int | None = None
     less_than_or_equal: int | None = None
 
-    def to_pydantic(self) -> IntFilterDTO:
-        return IntFilterDTO(
-            equals=self.equals,
-            not_equals=self.not_equals,
-            greater_than=self.greater_than,
-            greater_than_or_equal=self.greater_than_or_equal,
-            less_than=self.less_than,
-            less_than_or_equal=self.less_than_or_equal,
-        )
-
 
 @gql_pydantic_input(
     BackendAIGQLMeta(description="Filter for UUID fields.", added_version="26.1.0"),
-    model=UUIDFilterDTO,
     name="UUIDFilter",
 )
-class UUIDFilter:
+class UUIDFilter(PydanticInputMixin[UUIDFilterDTO]):
     # Basic operations
     equals: uuid.UUID | None = None
     in_: list[uuid.UUID] | None = strawberry.field(name="in", default=None)
@@ -288,36 +256,19 @@ class UUIDFilter:
 
         return None
 
-    def to_pydantic(self) -> UUIDFilterDTO:
-        return UUIDFilterDTO(
-            equals=self.equals,
-            not_equals=self.not_equals,
-            in_=self.in_,
-            not_in=self.not_in,
-        )
-
 
 @gql_pydantic_input(
     BackendAIGQLMeta(
         description="Filter for datetime fields supporting range and equality operations.",
         added_version="24.09.0",
     ),
-    model=DateTimeFilterDTO,
     name="DateTimeFilter",
 )
-class DateTimeFilter:
+class DateTimeFilter(PydanticInputMixin[DateTimeFilterDTO]):
     before: datetime | None = None
     after: datetime | None = None
     equals: datetime | None = None
     not_equals: datetime | None = None
-
-    def to_pydantic(self) -> DateTimeFilterDTO:
-        return DateTimeFilterDTO(
-            before=self.before,
-            after=self.after,
-            equals=self.equals,
-            not_equals=self.not_equals,
-        )
 
     def build_query_condition(
         self,
@@ -349,22 +300,13 @@ class DateTimeFilter:
         description="Filter for date fields (not datetime) supporting range and equality operations.",
         added_version="24.09.0",
     ),
-    model=DateFilterDTO,
     name="DateFilter",
 )
-class DateFilter:
+class DateFilter(PydanticInputMixin[DateFilterDTO]):
     before: date | None = None
     after: date | None = None
     equals: date | None = None
     not_equals: date | None = None
-
-    def to_pydantic(self) -> DateFilterDTO:
-        return DateFilterDTO(
-            before=self.before,
-            after=self.after,
-            equals=self.equals,
-            not_equals=self.not_equals,
-        )
 
     def build_query_condition(
         self,

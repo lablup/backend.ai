@@ -146,7 +146,6 @@ class ServiceCatalogOrderFieldGQL(enum.Enum):
         description="Specifies the field and direction for ordering service catalog queries.",
         added_version="26.3.0",
     ),
-    model=ServiceCatalogOrderDTO,
     name="ServiceCatalogOrderBy",
 )
 class ServiceCatalogOrderByGQL:
@@ -165,7 +164,6 @@ class ServiceCatalogOrderByGQL:
         description="Filter for ServiceCatalogStatus enum fields. Supports equals, in, not_equals, and not_in operations.",
         added_version="26.3.0",
     ),
-    model=ServiceCatalogStatusFilterDTO,
     name="ServiceCatalogStatusFilter",
 )
 class ServiceCatalogStatusFilterGQL:
@@ -208,7 +206,6 @@ class ServiceCatalogStatusFilterGQL:
 
 @gql_pydantic_input(
     BackendAIGQLMeta(description="Filter for service catalog queries.", added_version="26.3.0"),
-    model=ServiceCatalogFilterDTO,
     name="ServiceCatalogFilter",
 )
 class ServiceCatalogFilterGQL:

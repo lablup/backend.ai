@@ -26,15 +26,10 @@ from ai.backend.common.dto.manager.v2.deployment.response import (
 from ai.backend.common.dto.manager.v2.deployment.response import (
     CreateAccessTokenPayload as CreateAccessTokenPayloadDTO,
 )
-from ai.backend.common.dto.manager.v2.deployment.types import (
-    AccessTokenOrderField as DTOAccessTokenOrderField,
-)
-from ai.backend.common.dto.manager.v2.deployment.types import (
-    OrderDirection as DTOOrderDirection,
-)
 from ai.backend.manager.api.gql.base import DateTimeFilter, OrderDirection, StringFilter
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
+    PydanticInputMixin,
     gql_connection_type,
     gql_node_type,
     gql_pydantic_input,
@@ -49,10 +44,9 @@ from ai.backend.manager.data.deployment.types import (
 
 @gql_pydantic_input(
     BackendAIGQLMeta(description="", added_version="25.16.0"),
-    model=AccessTokenFilterDTO,
     name="AccessTokenFilter",
 )
-class AccessTokenFilter:
+class AccessTokenFilter(PydanticInputMixin[AccessTokenFilterDTO]):
     """Filter for access tokens."""
 
     token: StringFilter | None = None
@@ -63,30 +57,13 @@ class AccessTokenFilter:
     OR: list[Self] | None = None
     NOT: list[Self] | None = None
 
-    def to_pydantic(self) -> AccessTokenFilterDTO:
-        return AccessTokenFilterDTO(
-            token=self.token.to_pydantic() if self.token else None,
-            valid_until=self.valid_until.to_pydantic() if self.valid_until else None,
-            created_at=self.created_at.to_pydantic() if self.created_at else None,
-            AND=[f.to_pydantic() for f in self.AND] if self.AND else None,
-            OR=[f.to_pydantic() for f in self.OR] if self.OR else None,
-            NOT=[f.to_pydantic() for f in self.NOT] if self.NOT else None,
-        )
-
 
 @gql_pydantic_input(
     BackendAIGQLMeta(description="", added_version="25.16.0"),
-    model=AccessTokenOrderDTO,
 )
-class AccessTokenOrderBy:
+class AccessTokenOrderBy(PydanticInputMixin[AccessTokenOrderDTO]):
     field: AccessTokenOrderField
     direction: OrderDirection = OrderDirection.DESC
-
-    def to_pydantic(self) -> AccessTokenOrderDTO:
-        return AccessTokenOrderDTO(
-            field=DTOAccessTokenOrderField(self.field.value.lower()),
-            direction=DTOOrderDirection(self.direction.value),
-        )
 
 
 @gql_node_type(
@@ -115,21 +92,6 @@ class AccessToken(PydanticNodeMixin[AccessTokenNodeDTO]):
         ])
         return cast(list[Self | None], results)
 
-    @classmethod
-    def from_pydantic(
-        cls,
-        dto: AccessTokenNodeDTO,
-        extra: dict[str, Any] | None = None,
-        *,
-        id_field: str = "id",
-    ) -> Self:
-        return cls(
-            id=ID(str(dto.id)),
-            token=dto.token,
-            created_at=dto.created_at,
-            valid_until=dto.valid_until,
-        )
-
 
 AccessTokenEdge = Edge[AccessToken]
 
@@ -150,21 +112,14 @@ class AccessTokenConnection(Connection[AccessToken]):
         description="Input for creating an access token for a model deployment.",
         added_version="25.16.0",
     ),
-    model=CreateAccessTokenInputDTO,
 )
-class CreateAccessTokenInput:
+class CreateAccessTokenInput(PydanticInputMixin[CreateAccessTokenInputDTO]):
     model_deployment_id: ID = strawberry.field(
         description="Added in 25.16.0: The ID of the model deployment for which the access token is created."
     )
     valid_until: datetime = strawberry.field(
         description="Added in 25.16.0: The expiration timestamp of the access token."
     )
-
-    def to_pydantic(self) -> CreateAccessTokenInputDTO:
-        return CreateAccessTokenInputDTO(
-            deployment_id=UUID(self.model_deployment_id),
-            valid_until=self.valid_until,
-        )
 
 
 @gql_pydantic_type(

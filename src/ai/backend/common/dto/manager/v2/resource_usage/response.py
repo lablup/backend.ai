@@ -3,12 +3,12 @@
 from __future__ import annotations
 
 from datetime import date, datetime
-from typing import Any
 from uuid import UUID
 
 from pydantic import Field
 
 from ai.backend.common.api_handlers import BaseResponseModel
+from ai.backend.common.dto.manager.v2.fair_share.types import ResourceSlotInfo
 
 __all__ = (
     "UsageBucketMetadataNode",
@@ -41,14 +41,10 @@ class DomainUsageBucketNode(BaseResponseModel):
 
     id: UUID = Field(description="Usage bucket ID")
     domain_name: str = Field(description="Domain name")
-    resource_group: str = Field(description="Resource group name")
-    period_start: date = Field(description="Period start date")
-    period_end: date = Field(description="Period end date")
-    decay_unit_days: int = Field(description="Decay unit in days")
-    resource_usage: dict[str, Any] = Field(description="Resource usage snapshot")
-    capacity_snapshot: dict[str, Any] = Field(description="Capacity snapshot at period start")
-    created_at: datetime = Field(description="Record creation timestamp")
-    updated_at: datetime = Field(description="Record last update timestamp")
+    resource_group_name: str = Field(description="Resource group name")
+    metadata: UsageBucketMetadataNode = Field(description="Usage measurement period metadata")
+    resource_usage: ResourceSlotInfo = Field(description="Resource usage snapshot")
+    capacity_snapshot: ResourceSlotInfo = Field(description="Capacity snapshot at period end")
 
 
 class ProjectUsageBucketNode(BaseResponseModel):
@@ -57,14 +53,10 @@ class ProjectUsageBucketNode(BaseResponseModel):
     id: UUID = Field(description="Usage bucket ID")
     project_id: UUID = Field(description="Project ID")
     domain_name: str = Field(description="Domain name")
-    resource_group: str = Field(description="Resource group name")
-    period_start: date = Field(description="Period start date")
-    period_end: date = Field(description="Period end date")
-    decay_unit_days: int = Field(description="Decay unit in days")
-    resource_usage: dict[str, Any] = Field(description="Resource usage snapshot")
-    capacity_snapshot: dict[str, Any] = Field(description="Capacity snapshot at period start")
-    created_at: datetime = Field(description="Record creation timestamp")
-    updated_at: datetime = Field(description="Record last update timestamp")
+    resource_group_name: str = Field(description="Resource group name")
+    metadata: UsageBucketMetadataNode = Field(description="Usage measurement period metadata")
+    resource_usage: ResourceSlotInfo = Field(description="Resource usage snapshot")
+    capacity_snapshot: ResourceSlotInfo = Field(description="Capacity snapshot at period end")
 
 
 class UserUsageBucketNode(BaseResponseModel):
@@ -74,14 +66,10 @@ class UserUsageBucketNode(BaseResponseModel):
     user_uuid: UUID = Field(description="User UUID")
     project_id: UUID = Field(description="Project ID")
     domain_name: str = Field(description="Domain name")
-    resource_group: str = Field(description="Resource group name")
-    period_start: date = Field(description="Period start date")
-    period_end: date = Field(description="Period end date")
-    decay_unit_days: int = Field(description="Decay unit in days")
-    resource_usage: dict[str, Any] = Field(description="Resource usage snapshot")
-    capacity_snapshot: dict[str, Any] = Field(description="Capacity snapshot at period start")
-    created_at: datetime = Field(description="Record creation timestamp")
-    updated_at: datetime = Field(description="Record last update timestamp")
+    resource_group_name: str = Field(description="Resource group name")
+    metadata: UsageBucketMetadataNode = Field(description="Usage measurement period metadata")
+    resource_usage: ResourceSlotInfo = Field(description="Resource usage snapshot")
+    capacity_snapshot: ResourceSlotInfo = Field(description="Capacity snapshot at period end")
 
 
 class AdminSearchDomainUsageBucketsPayload(BaseResponseModel):

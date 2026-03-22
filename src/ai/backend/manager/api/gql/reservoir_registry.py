@@ -23,6 +23,7 @@ from ai.backend.manager.api.gql.artifact_registry_meta import ArtifactRegistryMe
 from ai.backend.manager.api.gql.base import encode_cursor
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
+    PydanticInputMixin,
     gql_connection_type,
     gql_node_type,
     gql_output_type,
@@ -133,30 +134,19 @@ async def reservoir_registries(
 
 @gql_pydantic_input(
     BackendAIGQLMeta(description="", added_version="25.14.0"),
-    model=CreateReservoirRegistryInputDTO,
 )
-class CreateReservoirRegistryInput:
+class CreateReservoirRegistryInput(PydanticInputMixin[CreateReservoirRegistryInputDTO]):
     name: str
     endpoint: str
     access_key: str
     secret_key: str
     api_version: str
 
-    def to_pydantic(self) -> CreateReservoirRegistryInputDTO:
-        return CreateReservoirRegistryInputDTO(
-            name=self.name,
-            endpoint=self.endpoint,
-            access_key=self.access_key,
-            secret_key=self.secret_key,
-            api_version=self.api_version,
-        )
-
 
 @gql_pydantic_input(
     BackendAIGQLMeta(description="", added_version="25.14.0"),
-    model=UpdateReservoirRegistryInputDTO,
 )
-class UpdateReservoirRegistryInput:
+class UpdateReservoirRegistryInput(PydanticInputMixin[UpdateReservoirRegistryInputDTO]):
     id: ID
     name: str | None = UNSET
     endpoint: str | None = UNSET
@@ -164,28 +154,12 @@ class UpdateReservoirRegistryInput:
     secret_key: str | None = UNSET
     api_version: str | None = UNSET
 
-    def to_pydantic(self) -> UpdateReservoirRegistryInputDTO:
-        return UpdateReservoirRegistryInputDTO(
-            id=uuid.UUID(self.id),
-            name=None if self.name is UNSET else self.name,
-            endpoint=None if self.endpoint is UNSET else self.endpoint,
-            access_key=None if self.access_key is UNSET else self.access_key,
-            secret_key=None if self.secret_key is UNSET else self.secret_key,
-            api_version=None if self.api_version is UNSET else self.api_version,
-        )
-
 
 @gql_pydantic_input(
     BackendAIGQLMeta(description="", added_version="25.14.0"),
-    model=DeleteReservoirRegistryInputDTO,
 )
-class DeleteReservoirRegistryInput:
+class DeleteReservoirRegistryInput(PydanticInputMixin[DeleteReservoirRegistryInputDTO]):
     id: ID
-
-    def to_pydantic(self) -> DeleteReservoirRegistryInputDTO:
-        return DeleteReservoirRegistryInputDTO(
-            id=uuid.UUID(str(self.id)),
-        )
 
 
 @gql_output_type(

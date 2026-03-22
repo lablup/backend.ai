@@ -37,23 +37,31 @@ from ai.backend.common.dto.manager.v2.notification.response import (
     ValidateNotificationRulePayload,
 )
 from ai.backend.common.dto.manager.v2.notification.types import (
+    EmailMessageInfo,
     EmailSpecInfo,
     NotificationChannelOrderField,
+    NotificationChannelSpecInfo,
     NotificationChannelTypeDTO,
     NotificationRuleOrderField,
     NotificationRuleTypeDTO,
     OrderDirection,
+    SMTPAuthInfo,
+    SMTPConnectionInfo,
     WebhookSpecInfo,
 )
 
 __all__ = (
     # Types
+    "EmailMessageInfo",
     "EmailSpecInfo",
     "NotificationChannelOrderField",
+    "NotificationChannelSpecInfo",
     "NotificationChannelTypeDTO",
     "NotificationRuleOrderField",
     "NotificationRuleTypeDTO",
     "OrderDirection",
+    "SMTPAuthInfo",
+    "SMTPConnectionInfo",
     "WebhookSpecInfo",
     # Input models (request)
     "CreateNotificationChannelInput",

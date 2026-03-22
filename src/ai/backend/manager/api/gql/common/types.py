@@ -11,6 +11,7 @@ import strawberry
 from ai.backend.common.dto.manager.v2.resource_slot.types import (
     ResourceOptsDTOInput,
     ResourceOptsEntryDTO,
+    ResourceOptsInfoDTO,
 )
 from ai.backend.common.dto.manager.v2.streaming.types import ServiceProtocol
 from ai.backend.common.types import (
@@ -23,6 +24,7 @@ from ai.backend.manager.api.gql.decorators import (
     gql_output_type,
     gql_pydantic_input,
 )
+from ai.backend.manager.api.gql.pydantic_compat import PydanticInputMixin
 
 # ========== Common Enums ==========
 
@@ -188,43 +190,38 @@ class ResourceOptsGQL:
         entries = [ResourceOptsEntryGQL(name=k, value=str(v)) for k, v in data.items()]
         return cls(entries=entries)
 
+    @classmethod
+    def from_pydantic(cls, dto: ResourceOptsInfoDTO) -> ResourceOptsGQL:
+        """Convert a ResourceOptsInfoDTO to GQL type."""
+        return cls(entries=[ResourceOptsEntryGQL(name=e.name, value=e.value) for e in dto.entries])
+
 
 @gql_pydantic_input(
     BackendAIGQLMeta(
         description="A single key-value entry representing a resource option.",
         added_version="26.1.0",
     ),
-    model=ResourceOptsEntryDTO,
     name="ResourceOptsEntryInput",
 )
-class ResourceOptsEntryInput:
+class ResourceOptsEntryInput(PydanticInputMixin[ResourceOptsEntryDTO]):
     """Single resource option entry input with name and value."""
 
     name: str = strawberry.field(description="The name of this resource option (e.g., 'shmem').")
     value: str = strawberry.field(description="The value for this resource option (e.g., '64m').")
-
-    def to_pydantic(self) -> ResourceOptsEntryDTO:
-        return ResourceOptsEntryDTO(name=self.name, value=self.value)
 
 
 @gql_pydantic_input(
     BackendAIGQLMeta(
         description="A collection of additional resource options for input.", added_version="26.1.0"
     ),
-    model=ResourceOptsDTOInput,
     name="ResourceOptsInput",
 )
-class ResourceOptsInput:
+class ResourceOptsInput(PydanticInputMixin[ResourceOptsDTOInput]):
     """Resource options input containing multiple key-value entries."""
 
     entries: list[ResourceOptsEntryInput] = strawberry.field(
         description="List of resource option entries."
     )
-
-    def to_pydantic(self) -> ResourceOptsDTOInput:
-        return ResourceOptsDTOInput(
-            entries=[e.to_pydantic() for e in self.entries],
-        )
 
 
 # ========== Service Port Types ==========

@@ -49,12 +49,15 @@ from ai.backend.manager.api.gql.base import encode_cursor
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     gql_connection_type,
-    gql_from_pydantic_type,
     gql_node_type,
     gql_pydantic_input,
     gql_pydantic_type,
 )
-from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin, PydanticOutputMixin
+from ai.backend.manager.api.gql.pydantic_compat import (
+    PydanticInputMixin,
+    PydanticNodeMixin,
+    PydanticOutputMixin,
+)
 
 from .storage_namespace import StorageNamespace, StorageNamespaceConnection, StorageNamespaceEdge
 from .types import StrawberryGQLContext
@@ -175,9 +178,8 @@ async def object_storages(
 
 @gql_pydantic_input(
     BackendAIGQLMeta(description="", added_version="25.14.0"),
-    model=CreateObjectStorageInputDTO,
 )
-class CreateObjectStorageInput:
+class CreateObjectStorageInput(PydanticInputMixin[CreateObjectStorageInputDTO]):
     name: str
     host: str
     access_key: str
@@ -185,20 +187,9 @@ class CreateObjectStorageInput:
     endpoint: str
     region: str
 
-    def to_pydantic(self) -> CreateObjectStorageInputDTO:
-        return CreateObjectStorageInputDTO(
-            name=self.name,
-            host=self.host,
-            access_key=self.access_key,
-            secret_key=self.secret_key,
-            endpoint=self.endpoint,
-            region=self.region,
-        )
-
 
 @gql_pydantic_input(
     BackendAIGQLMeta(description="", added_version="25.14.0"),
-    model=UpdateObjectStorageInputDTO,
 )
 class UpdateObjectStorageInput:
     id: ID
@@ -223,47 +214,26 @@ class UpdateObjectStorageInput:
 
 @gql_pydantic_input(
     BackendAIGQLMeta(description="", added_version="25.14.0"),
-    model=DeleteObjectStorageInputDTO,
 )
-class DeleteObjectStorageInput:
+class DeleteObjectStorageInput(PydanticInputMixin[DeleteObjectStorageInputDTO]):
     id: ID
-
-    def to_pydantic(self) -> DeleteObjectStorageInputDTO:
-        return DeleteObjectStorageInputDTO(
-            id=uuid.UUID(str(self.id)),
-        )
 
 
 @gql_pydantic_input(
     BackendAIGQLMeta(description="", added_version="25.14.0"),
-    model=GetPresignedDownloadURLInputDTO,
 )
-class GetPresignedDownloadURLInput:
+class GetPresignedDownloadURLInput(PydanticInputMixin[GetPresignedDownloadURLInputDTO]):
     artifact_revision_id: ID
     key: str
     expiration: int | None = None
 
-    def to_pydantic(self) -> GetPresignedDownloadURLInputDTO:
-        return GetPresignedDownloadURLInputDTO(
-            artifact_revision_id=uuid.UUID(str(self.artifact_revision_id)),
-            key=self.key,
-            expiration=self.expiration,
-        )
-
 
 @gql_pydantic_input(
     BackendAIGQLMeta(description="", added_version="25.14.0"),
-    model=GetPresignedUploadURLInputDTO,
 )
-class GetPresignedUploadURLInput:
+class GetPresignedUploadURLInput(PydanticInputMixin[GetPresignedUploadURLInputDTO]):
     artifact_revision_id: ID
     key: str
-
-    def to_pydantic(self) -> GetPresignedUploadURLInputDTO:
-        return GetPresignedUploadURLInputDTO(
-            artifact_revision_id=uuid.UUID(str(self.artifact_revision_id)),
-            key=self.key,
-        )
 
 
 @gql_pydantic_type(
@@ -288,19 +258,17 @@ class UpdateObjectStoragePayload:
     object_storage: ObjectStorage
 
 
-@gql_from_pydantic_type(
+@gql_pydantic_type(
     BackendAIGQLMeta(
         added_version="25.14.0",
         description="Payload for deleting an object storage.",
     ),
+    model=DeleteObjectStoragePayloadDTO,
+    fields=["id"],
     name="DeleteObjectStoragePayload",
 )
 class DeleteObjectStoragePayload(PydanticOutputMixin[DeleteObjectStoragePayloadDTO]):
     id: ID = strawberry.field(description="ID of the deleted object storage.")
-
-    @classmethod
-    def from_pydantic(cls, instance: DeleteObjectStoragePayloadDTO) -> Self:  # type: ignore[override]
-        return cls(id=ID(str(instance.id)))
 
 
 @gql_pydantic_type(

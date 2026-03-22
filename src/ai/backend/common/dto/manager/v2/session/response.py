@@ -153,16 +153,16 @@ class SessionNode(BaseResponseModel):
 
     id: UUID = Field(description="Session ID.")
     domain_name: str = Field(description="Domain name the session belongs to.")
-    user_uuid: UUID = Field(description="UUID of the user who owns this session.")
-    group_id: UUID = Field(description="Group (project) ID the session belongs to.")
-    metadata: SessionMetadataInfo = Field(
+    user_id: UUID = Field(description="UUID of the user who owns this session.")
+    project_id: UUID = Field(description="Group (project) ID the session belongs to.")
+    metadata: SessionMetadataInfoGQLDTO = Field(
         description="Metadata including name, type, and cluster information."
     )
-    resource: SessionResourceInfo = Field(
+    resource: SessionResourceInfoGQLDTO = Field(
         description="Resource allocation and cluster information."
     )
-    lifecycle: SessionLifecycleInfo = Field(description="Lifecycle status and timestamps.")
-    runtime: SessionRuntimeInfo = Field(description="Runtime execution configuration.")
+    lifecycle: SessionLifecycleInfoGQLDTO = Field(description="Lifecycle status and timestamps.")
+    runtime: SessionRuntimeInfoGQLDTO = Field(description="Runtime execution configuration.")
     network: SessionNetworkInfo = Field(description="Network configuration.")
 
 

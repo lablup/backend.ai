@@ -273,7 +273,7 @@ class ResourceSlotAdapter(BaseAdapter):
             agent_id=data.agent_id,
             slot_name=data.slot_name,
             capacity=str(data.capacity),
-            occupied=str(data.used),
+            used=str(data.used),
         )
 
     # -------------------------------------------------------------------------

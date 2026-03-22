@@ -4,6 +4,7 @@ Common types for Deployment DTO v2.
 
 from __future__ import annotations
 
+from datetime import datetime
 from enum import StrEnum
 from typing import Any
 from uuid import UUID
@@ -17,26 +18,41 @@ from ai.backend.common.data.model_deployment.types import (
     RouteTrafficStatus,
 )
 from ai.backend.common.dto.manager.v2.common import OrderDirection
+from ai.backend.common.dto.manager.v2.fair_share.types import ResourceSlotInfo
+from ai.backend.common.dto.manager.v2.resource_slot.types import ResourceOptsInfoDTO
 from ai.backend.common.types import ClusterMode, RuntimeVariant
 
 __all__ = (
     "AccessTokenOrderField",
     "AutoScalingRuleOrderField",
     "BlueGreenConfigInfo",
+    "BlueGreenStrategySpecInfo",
+    "ClusterConfigInfoDTO",
     "ClusterMode",
     "DeploymentBasicInfo",
+    "DeploymentMetadataInfoDTO",
+    "DeploymentNetworkAccessInfoDTO",
     "DeploymentOrderField",
     "DeploymentPolicyInfo",
     "DeploymentRevisionInfo",
     "DeploymentStrategy",
+    "DeploymentStrategyInfoDTO",
+    "DeploymentStrategySpecInfo",
     "EndpointLifecycle",
+    "EnvironmentVariableEntryInfoDTO",
+    "EnvironmentVariablesInfoDTO",
+    "ExtraVFolderMountGQLDTO",
     "ModelDeploymentStatus",
+    "ModelMountConfigInfoDTO",
+    "ModelRuntimeConfigInfoDTO",
     "NetworkConfigInfo",
     "OrderDirection",
     "ReplicaOrderField",
     "ReplicaStateInfo",
+    "ResourceConfigInfoDTO",
     "RevisionOrderField",
     "RollingUpdateConfigInfo",
+    "RollingUpdateStrategySpecInfo",
     "RouteOrderField",
     "RouteStatus",
     "RouteTrafficStatus",
@@ -133,6 +149,31 @@ class DeploymentPolicyInfo(BaseResponseModel):
     blue_green: BlueGreenConfigInfo | None
 
 
+class DeploymentStrategySpecInfo(BaseResponseModel):
+    """Base class for deployment strategy spec sub-types.
+
+    Subclassed by RollingUpdateStrategySpecInfo and BlueGreenStrategySpecInfo so
+    that Strawberry's pydantic interface dispatch can resolve the concrete GQL
+    type from the concrete DTO type via DeploymentStrategySpecGQL.from_pydantic().
+    """
+
+    strategy: DeploymentStrategy
+
+
+class RollingUpdateStrategySpecInfo(DeploymentStrategySpecInfo):
+    """Rolling update strategy spec — matches RollingUpdateStrategySpecGQL structure."""
+
+    max_surge: int
+    max_unavailable: int
+
+
+class BlueGreenStrategySpecInfo(DeploymentStrategySpecInfo):
+    """Blue-green strategy spec — matches BlueGreenStrategySpecGQL structure."""
+
+    auto_promote: bool
+    promote_delay_seconds: int
+
+
 class AccessTokenOrderField(StrEnum):
     """Fields available for ordering access tokens."""
 
@@ -150,3 +191,102 @@ class ReplicaOrderField(StrEnum):
 
     CREATED_AT = "created_at"
     ID = "id"
+
+
+class EnvironmentVariableEntryInfoDTO(BaseResponseModel):
+    """A single environment variable entry with name and value."""
+
+    name: str
+    value: str
+
+
+class EnvironmentVariablesInfoDTO(BaseResponseModel):
+    """A collection of environment variable entries."""
+
+    entries: list[EnvironmentVariableEntryInfoDTO]
+
+
+class ClusterConfigInfoDTO(BaseResponseModel):
+    """Cluster configuration backing DTO for ClusterConfig GQL type.
+
+    mode stores the GQL-compatible string value (e.g. "SINGLE_NODE", "MULTI_NODE")
+    matching ClusterModeGQL enum values so Strawberry can auto-convert str→enum.
+    """
+
+    mode: str
+    size: int
+
+
+class ResourceConfigInfoDTO(BaseResponseModel):
+    """Resource configuration backing DTO for ResourceConfig GQL type."""
+
+    resource_group_name: str
+    resource_slots: ResourceSlotInfo
+    resource_opts: ResourceOptsInfoDTO | None = None
+
+
+class ModelRuntimeConfigInfoDTO(BaseResponseModel):
+    """Runtime configuration backing DTO for ModelRuntimeConfig GQL type."""
+
+    runtime_variant: str
+    inference_runtime_config: dict[str, Any] | None = None
+    environ: EnvironmentVariablesInfoDTO | None = None
+
+
+class ModelMountConfigInfoDTO(BaseResponseModel):
+    """Model mount configuration backing DTO for ModelMountConfig GQL type.
+
+    vfolder_id is stored as str (UUID serialised to string) for Strawberry ID
+    scalar compatibility so Strawberry can store the value in an ID-typed field
+    without additional conversion.
+    """
+
+    vfolder_id: str
+    mount_destination: str
+    definition_path: str
+
+
+class ExtraVFolderMountGQLDTO(BaseResponseModel):
+    """Backing DTO for ExtraVFolderMountInfoGQL type.
+
+    vfolder_id is stored as str (UUID serialised to string) for Strawberry ID
+    scalar compatibility.
+    """
+
+    vfolder_id: str
+    mount_destination: str | None = None
+
+
+class DeploymentMetadataInfoDTO(BaseResponseModel):
+    """Metadata backing DTO for ModelDeploymentMetadata GQL type.
+
+    project_id is stored as str (UUID serialised to string) for Strawberry ID
+    scalar compatibility.  status uses ModelDeploymentStatus directly since
+    DeploymentStatusGQL is the same object after strawberry.enum registration.
+    """
+
+    project_id: str
+    domain_name: str
+    name: str
+    status: ModelDeploymentStatus
+    tags: list[str]
+    created_at: datetime
+    updated_at: datetime
+
+
+class DeploymentNetworkAccessInfoDTO(BaseResponseModel):
+    """Network access backing DTO for ModelDeploymentNetworkAccess GQL type."""
+
+    endpoint_url: str | None = None
+    preferred_domain_name: str | None = None
+    open_to_public: bool = False
+
+
+class DeploymentStrategyInfoDTO(BaseResponseModel):
+    """Deployment strategy backing DTO for DeploymentStrategyGQL type.
+
+    type uses DeploymentStrategy directly since DeploymentStrategyTypeGQL is the
+    same object after strawberry.enum registration.
+    """
+
+    type: DeploymentStrategy

@@ -2,11 +2,16 @@
 
 from __future__ import annotations
 
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from datetime import date
+from decimal import Decimal
 
 from ai.backend.common.data.filter_specs import UUIDEqualMatchSpec
 from ai.backend.common.dto.manager.query import DateFilter as DateFilterDTO
+from ai.backend.common.dto.manager.v2.fair_share.types import (
+    ResourceSlotEntryInfo,
+    ResourceSlotInfo,
+)
 from ai.backend.common.dto.manager.v2.resource_usage.request import (
     AdminSearchDomainUsageBucketsInput,
     AdminSearchProjectUsageBucketsInput,
@@ -30,6 +35,7 @@ from ai.backend.common.dto.manager.v2.resource_usage.response import (
     DomainSearchUserUsageBucketsPayload,
     DomainUsageBucketNode,
     ProjectUsageBucketNode,
+    UsageBucketMetadataNode,
     UserUsageBucketNode,
 )
 from ai.backend.common.dto.manager.v2.resource_usage.types import (
@@ -915,18 +921,26 @@ class ResourceUsageAdapter(BaseAdapter):
         return result
 
     @staticmethod
+    def _resource_slot_to_info(slot: Mapping[str, Decimal]) -> ResourceSlotInfo:
+        return ResourceSlotInfo(
+            entries=[ResourceSlotEntryInfo(resource_type=k, quantity=v) for k, v in slot.items()]
+        )
+
+    @staticmethod
     def _domain_bucket_to_dto(data: DomainUsageBucketData) -> DomainUsageBucketNode:
         return DomainUsageBucketNode(
             id=data.id,
             domain_name=data.domain_name,
-            resource_group=data.resource_group,
-            period_start=data.period_start,
-            period_end=data.period_end,
-            decay_unit_days=data.decay_unit_days,
-            resource_usage=dict(data.resource_usage),
-            capacity_snapshot=dict(data.capacity_snapshot),
-            created_at=data.created_at,
-            updated_at=data.updated_at,
+            resource_group_name=data.resource_group,
+            metadata=UsageBucketMetadataNode(
+                period_start=data.period_start,
+                period_end=data.period_end,
+                decay_unit_days=data.decay_unit_days,
+                created_at=data.created_at,
+                updated_at=data.updated_at,
+            ),
+            resource_usage=ResourceUsageAdapter._resource_slot_to_info(data.resource_usage),
+            capacity_snapshot=ResourceUsageAdapter._resource_slot_to_info(data.capacity_snapshot),
         )
 
     @staticmethod
@@ -935,14 +949,16 @@ class ResourceUsageAdapter(BaseAdapter):
             id=data.id,
             project_id=data.project_id,
             domain_name=data.domain_name,
-            resource_group=data.resource_group,
-            period_start=data.period_start,
-            period_end=data.period_end,
-            decay_unit_days=data.decay_unit_days,
-            resource_usage=dict(data.resource_usage),
-            capacity_snapshot=dict(data.capacity_snapshot),
-            created_at=data.created_at,
-            updated_at=data.updated_at,
+            resource_group_name=data.resource_group,
+            metadata=UsageBucketMetadataNode(
+                period_start=data.period_start,
+                period_end=data.period_end,
+                decay_unit_days=data.decay_unit_days,
+                created_at=data.created_at,
+                updated_at=data.updated_at,
+            ),
+            resource_usage=ResourceUsageAdapter._resource_slot_to_info(data.resource_usage),
+            capacity_snapshot=ResourceUsageAdapter._resource_slot_to_info(data.capacity_snapshot),
         )
 
     @staticmethod
@@ -952,12 +968,14 @@ class ResourceUsageAdapter(BaseAdapter):
             user_uuid=data.user_uuid,
             project_id=data.project_id,
             domain_name=data.domain_name,
-            resource_group=data.resource_group,
-            period_start=data.period_start,
-            period_end=data.period_end,
-            decay_unit_days=data.decay_unit_days,
-            resource_usage=dict(data.resource_usage),
-            capacity_snapshot=dict(data.capacity_snapshot),
-            created_at=data.created_at,
-            updated_at=data.updated_at,
+            resource_group_name=data.resource_group,
+            metadata=UsageBucketMetadataNode(
+                period_start=data.period_start,
+                period_end=data.period_end,
+                decay_unit_days=data.decay_unit_days,
+                created_at=data.created_at,
+                updated_at=data.updated_at,
+            ),
+            resource_usage=ResourceUsageAdapter._resource_slot_to_info(data.resource_usage),
+            capacity_snapshot=ResourceUsageAdapter._resource_slot_to_info(data.capacity_snapshot),
         )
