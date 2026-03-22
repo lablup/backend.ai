@@ -68,22 +68,11 @@ type AccessTokenEdge
 input AccessTokenFilter
   @join__type(graph: STRAWBERRY)
 {
-  """Token value filter"""
   token: StringFilter = null
-
-  """Expiration datetime filter"""
   validUntil: DateTimeFilter = null
-
-  """Creation datetime filter"""
   createdAt: DateTimeFilter = null
-
-  """AND conjunction"""
   AND: [AccessTokenFilter!] = null
-
-  """OR conjunction"""
   OR: [AccessTokenFilter!] = null
-
-  """NOT negation"""
   NOT: [AccessTokenFilter!] = null
 }
 
@@ -107,10 +96,7 @@ Added in 25.19.0. Input for activating a revision to be the current revision.
 input ActivateRevisionInput
   @join__type(graph: STRAWBERRY)
 {
-  """Deployment ID"""
   deploymentId: ID!
-
-  """Revision ID to activate"""
   revisionId: ID!
 }
 
@@ -144,14 +130,10 @@ Added in 26.4.0. Active resource usage overview for a domain or project. Shows t
 type ActiveResourceOverview
   @join__type(graph: STRAWBERRY)
 {
-  """
-  Resource slots currently occupied by active sessions. Each entry represents a resource type and the total quantity in use.
-  """
+  """Resource slots currently occupied"""
   slots: ResourceSlot!
 
-  """
-  Number of active sessions contributing to the current resource occupancy.
-  """
+  """Number of active sessions"""
   sessionCount: Int!
 }
 
@@ -160,15 +142,13 @@ input AddRevisionInput
   @join__type(graph: STRAWBERRY)
 {
   name: String = null
+  deploymentId: ID!
   clusterConfig: ClusterConfigInput!
   resourceConfig: ResourceConfigInput!
   image: ImageInput!
   modelRuntimeConfig: ModelRuntimeConfigInput!
   modelMountConfig: ModelMountConfigInput!
   extraMounts: [ExtraVFolderMountInput!]
-
-  """Deployment ID"""
-  deploymentId: ID!
 }
 
 """Added in 25.19.0. Payload for adding a revision."""
@@ -247,26 +227,12 @@ type AgentEdge
 input AgentFilter
   @join__type(graph: STRAWBERRY)
 {
-  scalingGroup: StringFilter = null
-
-  """Filter by agent ID. Supports string match operations."""
   id: StringFilter = null
-
-  """
-  Filter by agent status. Supports equals, in, not_equals, and not_in operations.
-  """
   status: AgentStatusFilter = null
-
-  """Filter by schedulable flag."""
   schedulable: Boolean = null
-
-  """All sub-conditions must match."""
+  scalingGroup: StringFilter = null
   AND: [AgentFilter!] = null
-
-  """At least one sub-condition must match."""
   OR: [AgentFilter!] = null
-
-  """None of the sub-conditions must match."""
   NOT: [AgentFilter!] = null
 }
 
@@ -334,10 +300,7 @@ type AgentNode implements Node
 input AgentOrderBy
   @join__type(graph: STRAWBERRY)
 {
-  """Field to order by"""
   field: AgentOrderField!
-
-  """Order direction"""
   direction: OrderDirection! = ASC
 }
 
@@ -440,19 +403,10 @@ type AgentResourceSlotEdge
 input AgentResourceSlotFilter
   @join__type(graph: STRAWBERRY)
 {
-  """Filter by slot name."""
   slotName: StringFilter = null
-
-  """Filter by agent ID."""
   agentId: StringFilter = null
-
-  """Logical AND of multiple filter conditions."""
   AND: [AgentResourceSlotFilter!] = null
-
-  """Logical OR of multiple filter conditions."""
   OR: [AgentResourceSlotFilter!] = null
-
-  """Logical NOT of filter conditions."""
   NOT: [AgentResourceSlotFilter!] = null
 }
 
@@ -460,10 +414,7 @@ input AgentResourceSlotFilter
 input AgentResourceSlotOrderBy
   @join__type(graph: STRAWBERRY)
 {
-  """Field to order by."""
   field: AgentResourceSlotOrderField!
-
-  """Order direction."""
   direction: OrderDirection! = ASC
 }
 
@@ -495,6 +446,15 @@ enum AgentStatus
   TERMINATED @join__enumValue(graph: STRAWBERRY)
 }
 
+enum AgentStatusEnum
+  @join__type(graph: STRAWBERRY)
+{
+  ALIVE @join__enumValue(graph: STRAWBERRY)
+  LOST @join__enumValue(graph: STRAWBERRY)
+  RESTARTING @join__enumValue(graph: STRAWBERRY)
+  TERMINATED @join__enumValue(graph: STRAWBERRY)
+}
+
 """
 Added in 24.09.0. Filter options for agent status within AgentFilter.
 It includes options to filter whether agent status is in a specific list or equals a specific value.
@@ -502,11 +462,8 @@ It includes options to filter whether agent status is in a specific list or equa
 input AgentStatusFilter
   @join__type(graph: STRAWBERRY)
 {
-  """Exact match for agent status."""
-  equals: AgentStatus = null
-
-  """Match any of the provided statuses."""
-  in: [AgentStatus!] = null
+  in: [AgentStatusEnum!] = null
+  equals: AgentStatusEnum = null
 }
 
 """Added in 26.1.0. Status and lifecycle information for an agent."""
@@ -693,6 +650,7 @@ input AllowedGroups
 type AppConfig
   @join__type(graph: STRAWBERRY)
 {
+  """Additional configuration data."""
   extraConfig: JSON!
 }
 
@@ -704,7 +662,6 @@ Admin-only operation to approve artifact revisions for general use.
 input ApproveArtifactInput
   @join__type(graph: STRAWBERRY)
 {
-  """The artifact revision ID to approve."""
   artifactRevisionId: ID!
 }
 
@@ -714,6 +671,7 @@ Added in 25.14.0. Response payload for artifact revision approval operations. Co
 type ApproveArtifactPayload
   @join__type(graph: STRAWBERRY)
 {
+  """Approved artifact revision."""
   artifactRevision: ArtifactRevision!
 }
 
@@ -812,7 +770,6 @@ Added in 24.09.0. Specifies the field and direction for ordering artifacts in qu
 input ArtifactOrderBy
   @join__type(graph: STRAWBERRY)
 {
-  """Field to order by."""
   field: ArtifactOrderField!
   direction: OrderDirection! = ASC
 }
@@ -964,6 +921,8 @@ input ArtifactRevisionFilter
   @join__type(graph: STRAWBERRY)
 {
   status: ArtifactRevisionStatusFilter = null
+
+  """Added in 25.16.0"""
   remoteStatus: ArtifactRevisionRemoteStatusFilter = null
   version: StringFilter = null
   artifactId: UUIDFilter = null
@@ -979,7 +938,10 @@ Added in 25.14.0. Represents a background task for importing an artifact revisio
 type ArtifactRevisionImportTask
   @join__type(graph: STRAWBERRY)
 {
+  """Background task ID."""
   taskId: ID
+
+  """Artifact revision data."""
   artifactRevision: ArtifactRevision!
 }
 
@@ -989,7 +951,6 @@ Added in 24.09.0. Specifies the field and direction for ordering artifact revisi
 input ArtifactRevisionOrderBy
   @join__type(graph: STRAWBERRY)
 {
-  """Field to order by."""
   field: ArtifactRevisionOrderField!
   direction: OrderDirection! = ASC
 }
@@ -1044,7 +1005,6 @@ when artifact revision statuses change.
 input ArtifactStatusChangedInput
   @join__type(graph: STRAWBERRY)
 {
-  """List of artifact revision IDs to watch."""
   artifactRevisionIds: [ID!]!
 }
 
@@ -1054,6 +1014,7 @@ Added in 25.14.0. Payload for artifact status change subscription events. Provid
 type ArtifactStatusChangedPayload
   @join__type(graph: STRAWBERRY)
 {
+  """Updated artifact revision."""
   artifactRevision: ArtifactRevision!
 }
 
@@ -1071,7 +1032,7 @@ Added in 25.17.0. Complete verification result containing results from all confi
 type ArtifactVerificationResult
   @join__type(graph: STRAWBERRY)
 {
-  """Results from each verifier that scanned the artifact"""
+  """Results from each verifier that scanned the artifact."""
   verifiers: [ArtifactVerifierResultEntry!]!
 }
 
@@ -1081,7 +1042,7 @@ Added in 26.1.0. A collection of metadata from an artifact verifier. Contains ke
 type ArtifactVerifierMetadata
   @join__type(graph: STRAWBERRY)
 {
-  """List of metadata entries. Each entry contains a key-value pair."""
+  """List of metadata entries."""
   entries: [ArtifactVerifierMetadataEntry!]!
 }
 
@@ -1104,25 +1065,25 @@ Added in 25.17.0. Result from a single malware verifier containing scan results 
 type ArtifactVerifierResult
   @join__type(graph: STRAWBERRY)
 {
-  """Whether the verification completed successfully"""
+  """Whether the verification completed successfully."""
   success: Boolean!
 
-  """Number of infected or suspicious files detected"""
+  """Number of infected or suspicious files detected."""
   infectedCount: Int!
 
-  """Timestamp when verification started"""
+  """Timestamp when verification started."""
   scannedAt: DateTime!
 
-  """Time taken to complete verification in seconds"""
+  """Time taken to complete verification in seconds."""
   scanTime: Float!
 
-  """Total number of files scanned"""
+  """Total number of files scanned."""
   scannedCount: Int!
 
-  """Added in 26.1.0. Additional metadata from the verifier."""
+  """Additional metadata from the verifier."""
   metadata: ArtifactVerifierMetadata!
 
-  """Fatal error message if the verifier failed to complete"""
+  """Fatal error message if the verifier failed to complete."""
   error: String
 }
 
@@ -1132,10 +1093,10 @@ Added in 25.17.0. Entry for a single verifier's result in the verification resul
 type ArtifactVerifierResultEntry
   @join__type(graph: STRAWBERRY)
 {
-  """Name of the verifier (e.g., 'clamav', 'custom')"""
+  """Name of the verifier."""
   name: String!
 
-  """Scan result from this verifier"""
+  """Scan result from this verifier."""
   result: ArtifactVerifierResult!
 }
 
@@ -1143,10 +1104,7 @@ type ArtifactVerifierResultEntry
 input AssignRoleInput
   @join__type(graph: STRAWBERRY)
 {
-  """User ID to assign the role to"""
   userId: UUID!
-
-  """Role ID to assign"""
   roleId: UUID!
 }
 
@@ -1224,28 +1182,13 @@ type AuditLogEdge
 input AuditLogFilter
   @join__type(graph: STRAWBERRY)
 {
-  """Entity type filter"""
   entityType: StringFilter = null
-
-  """Operation filter"""
   operation: StringFilter = null
-
-  """Status filter"""
   status: AuditLogStatusFilter = null
-
-  """Triggered-by filter"""
-  triggeredBy: StringFilter = null
-
-  """Filter logs by created_at datetime"""
   createdAt: DateTimeFilter = null
-
-  """All conditions must match"""
+  triggeredBy: StringFilter = null
   AND: [AuditLogFilter!] = null
-
-  """At least one condition must match"""
   OR: [AuditLogFilter!] = null
-
-  """None of the conditions must match"""
   NOT: [AuditLogFilter!] = null
 }
 
@@ -1343,10 +1286,7 @@ enum AuditLogStatus
 input AuditLogStatusFilter
   @join__type(graph: STRAWBERRY)
 {
-  """Status is in list"""
   in: [AuditLogStatus!] = null
-
-  """Status is not in list"""
   notIn: [AuditLogStatus!] = null
 }
 
@@ -1502,19 +1442,10 @@ type AutoScalingRuleEdge
 input AutoScalingRuleFilter
   @join__type(graph: STRAWBERRY)
 {
-  """Creation datetime filter"""
   createdAt: DateTimeFilter = null
-
-  """Last triggered datetime filter"""
   lastTriggeredAt: DateTimeFilter = null
-
-  """AND conjunction"""
   AND: [AutoScalingRuleFilter!] = null
-
-  """OR conjunction"""
   OR: [AutoScalingRuleFilter!] = null
-
-  """NOT negation"""
   NOT: [AutoScalingRuleFilter!] = null
 }
 
@@ -1603,10 +1534,7 @@ scalar BigInt
 input BlueGreenConfigInput
   @join__type(graph: STRAWBERRY)
 {
-  """Automatically promote new revision"""
   autoPromote: Boolean! = false
-
-  """Delay in seconds before promotion"""
   promoteDelaySeconds: Int! = 0
 }
 
@@ -1616,10 +1544,10 @@ Added in 26.3.0. Error information for a failed user in bulk role assignment.
 type BulkAssignRoleError
   @join__type(graph: STRAWBERRY)
 {
-  """UUID of the user that failed."""
+  """UUID of the user that failed"""
   userId: UUID!
 
-  """Error message describing the failure."""
+  """Error message describing the failure"""
   message: String!
 }
 
@@ -1627,10 +1555,7 @@ type BulkAssignRoleError
 input BulkAssignRoleInput
   @join__type(graph: STRAWBERRY)
 {
-  """Role ID to assign"""
   roleId: UUID!
-
-  """List of user IDs to assign the role to"""
   userIds: [UUID!]!
 }
 
@@ -1638,10 +1563,10 @@ input BulkAssignRoleInput
 type BulkAssignRolePayload
   @join__type(graph: STRAWBERRY)
 {
-  """List of successfully created role assignments."""
+  """Successfully created role assignments"""
   assigned: [RoleAssignment!]!
 
-  """List of errors for users that failed to be assigned."""
+  """Users that failed to be assigned"""
   failed: [BulkAssignRoleError!]!
 }
 
@@ -1737,10 +1662,10 @@ Added in 26.3.0. Error information for a failed user in bulk role revocation.
 type BulkRevokeRoleError
   @join__type(graph: STRAWBERRY)
 {
-  """UUID of the user that failed."""
+  """UUID of the user that failed"""
   userId: UUID!
 
-  """Error message describing the failure."""
+  """Error message describing the failure"""
   message: String!
 }
 
@@ -1748,10 +1673,7 @@ type BulkRevokeRoleError
 input BulkRevokeRoleInput
   @join__type(graph: STRAWBERRY)
 {
-  """Role ID to revoke"""
   roleId: UUID!
-
-  """List of user IDs to revoke the role from"""
   userIds: [UUID!]!
 }
 
@@ -1759,10 +1681,10 @@ input BulkRevokeRoleInput
 type BulkRevokeRolePayload
   @join__type(graph: STRAWBERRY)
 {
-  """List of successfully revoked role assignments."""
+  """Successfully revoked role assignments"""
   revoked: [RoleAssignment!]!
 
-  """List of errors for users that failed to be revoked."""
+  """Users that failed to be revoked"""
   failed: [BulkRevokeRoleError!]!
 }
 
@@ -1817,10 +1739,10 @@ Added in 26.1.0. Input for bulk upserting domain fair share weights. Allows upda
 input BulkUpsertDomainFairShareWeightInput
   @join__type(graph: STRAWBERRY)
 {
-  """Scaling group name."""
+  """Name of the scaling group (resource group) for all fair shares."""
   resourceGroupName: String!
 
-  """List of domain weights to upsert."""
+  """List of domain weight updates to apply."""
   inputs: [DomainWeightInputItem!]!
 }
 
@@ -1840,10 +1762,10 @@ Added in 26.1.0. Input for bulk upserting project fair share weights. Allows upd
 input BulkUpsertProjectFairShareWeightInput
   @join__type(graph: STRAWBERRY)
 {
-  """Scaling group name."""
+  """Name of the scaling group (resource group) for all fair shares."""
   resourceGroupName: String!
 
-  """List of project weights to upsert."""
+  """List of project weight updates to apply."""
   inputs: [ProjectWeightInputItem!]!
 }
 
@@ -1863,10 +1785,10 @@ Added in 26.1.0. Input for bulk upserting user fair share weights. Allows updati
 input BulkUpsertUserFairShareWeightInput
   @join__type(graph: STRAWBERRY)
 {
-  """Scaling group name."""
+  """Name of the scaling group (resource group) for all fair shares."""
   resourceGroupName: String!
 
-  """List of user weights to upsert."""
+  """List of user weight updates to apply."""
   inputs: [UserWeightInputItem!]!
 }
 
@@ -1895,7 +1817,6 @@ Stops the download process and reverts the artifact revision status back to SCAN
 input CancelArtifactInput
   @join__type(graph: STRAWBERRY)
 {
-  """The artifact revision ID whose import task should be cancelled."""
   artifactRevisionId: ID!
 }
 
@@ -1905,6 +1826,7 @@ Added in 25.14.0. Response payload for canceling artifact import operations. Con
 type CancelImportArtifactPayload
   @join__type(graph: STRAWBERRY)
 {
+  """Artifact revision with cancelled import."""
   artifactRevision: ArtifactRevision!
 }
 
@@ -1933,7 +1855,6 @@ back to SCANNED status, freeing up storage space.
 input CleanupArtifactRevisionsInput
   @join__type(graph: STRAWBERRY)
 {
-  """List of artifact revision IDs to cleanup."""
   artifactRevisionIds: [ID!]!
 }
 
@@ -1943,6 +1864,7 @@ Added in 25.14.0. Response payload for artifact revision cleanup operations. Con
 type CleanupArtifactRevisionsPayload
   @join__type(graph: STRAWBERRY)
 {
+  """Cleaned up artifact revisions."""
   artifactRevisions: ArtifactRevisionConnection!
 }
 
@@ -1978,10 +1900,7 @@ Added in 25.19.0. Cluster configuration for model deployment replicas. Defines t
 type ClusterConfig
   @join__type(graph: STRAWBERRY)
 {
-  """The clustering mode (e.g., SINGLE_NODE)."""
   mode: ClusterMode!
-
-  """Number of replicas in the cluster."""
   size: Int!
 }
 
@@ -1989,10 +1908,7 @@ type ClusterConfig
 input ClusterConfigInput
   @join__type(graph: STRAWBERRY)
 {
-  """Cluster mode"""
   mode: ClusterMode!
-
-  """Cluster size (number of nodes)"""
   size: Int!
 }
 
@@ -2455,7 +2371,7 @@ input CreateAccessTokenInput
   """
   modelDeploymentId: ID!
 
-  """Token expiration timestamp"""
+  """Added in 25.16.0: The expiration timestamp of the access token."""
   validUntil: DateTime!
 }
 
@@ -2471,32 +2387,15 @@ type CreateAccessTokenPayload
 input CreateAutoScalingRuleInput
   @join__type(graph: STRAWBERRY)
 {
-  """ID of the deployment to attach the rule to"""
   modelDeploymentId: ID!
-
-  """Source of the metric (e.g. KERNEL, INFERENCE_FRAMEWORK)"""
   metricSource: AutoScalingMetricSource!
-
-  """Name of the metric to monitor"""
   metricName: String!
-
-  """Minimum threshold for scaling"""
-  minThreshold: Decimal = null
-
-  """Maximum threshold for scaling"""
-  maxThreshold: Decimal = null
-
-  """Step size for scaling"""
+  minThreshold: Decimal
+  maxThreshold: Decimal
   stepSize: Int!
-
-  """Time window in seconds for scaling evaluation"""
   timeWindow: Int!
-
-  """Minimum number of replicas"""
-  minReplicas: Int = null
-
-  """Maximum number of replicas"""
-  maxReplicas: Int = null
+  minReplicas: Int
+  maxReplicas: Int
 }
 
 """Added in 25.19.0. Payload for creating an auto-scaling rule."""
@@ -2593,11 +2492,7 @@ input CreateDeploymentInput
   metadata: ModelDeploymentMetadataInput!
   networkAccess: ModelDeploymentNetworkAccessInput!
   defaultDeploymentStrategy: DeploymentStrategyInput!
-
-  """Desired number of replicas"""
   desiredReplicaCount: Int!
-
-  """Initial revision configuration"""
   initialRevision: CreateRevisionInput!
 }
 
@@ -2662,13 +2557,8 @@ type CreateGroup
 input CreateHuggingFaceRegistryInput
   @join__type(graph: STRAWBERRY)
 {
-  """Registry name"""
   name: String!
-
-  """HuggingFace Hub URL"""
   url: String!
-
-  """Access token for the registry"""
   token: String = null
 }
 
@@ -2676,6 +2566,7 @@ input CreateHuggingFaceRegistryInput
 type CreateHuggingFaceRegistryPayload
   @join__type(graph: STRAWBERRY)
 {
+  """Created HuggingFace registry"""
   huggingfaceRegistry: HuggingFaceRegistry!
 }
 
@@ -2730,19 +2621,10 @@ type CreateNetwork
 input CreateNotificationChannelInput
   @join__type(graph: STRAWBERRY)
 {
-  """Channel name"""
   name: String!
-
-  """Channel description"""
   description: String = null
-
-  """Channel type"""
   channelType: NotificationChannelType!
-
-  """Channel specification"""
   spec: NotificationChannelSpecInput!
-
-  """Whether the channel is enabled"""
   enabled: Boolean! = true
 }
 
@@ -2750,6 +2632,7 @@ input CreateNotificationChannelInput
 type CreateNotificationChannelPayload
   @join__type(graph: STRAWBERRY)
 {
+  """Created notification channel"""
   channel: NotificationChannel!
 }
 
@@ -2757,22 +2640,11 @@ type CreateNotificationChannelPayload
 input CreateNotificationRuleInput
   @join__type(graph: STRAWBERRY)
 {
-  """Rule name"""
   name: String!
-
-  """Rule description"""
   description: String = null
-
-  """Rule type"""
   ruleType: NotificationRuleType!
-
-  """ID of the channel to use"""
   channelId: ID!
-
-  """Jinja2 template for notification message (max 64KB)"""
   messageTemplate: String!
-
-  """Whether the rule is enabled"""
   enabled: Boolean! = true
 }
 
@@ -2780,6 +2652,7 @@ input CreateNotificationRuleInput
 type CreateNotificationRulePayload
   @join__type(graph: STRAWBERRY)
 {
+  """Created notification rule"""
   rule: NotificationRule!
 }
 
@@ -2787,22 +2660,11 @@ type CreateNotificationRulePayload
 input CreateObjectStorageInput
   @join__type(graph: STRAWBERRY)
 {
-  """Object storage name"""
   name: String!
-
-  """Host address of the object storage"""
   host: String!
-
-  """Access key for authentication"""
   accessKey: String!
-
-  """Secret key for authentication"""
   secretKey: String!
-
-  """Endpoint URL of the object storage"""
   endpoint: String!
-
-  """Region of the object storage"""
   region: String!
 }
 
@@ -2818,19 +2680,10 @@ type CreateObjectStoragePayload
 input CreatePermissionInput
   @join__type(graph: STRAWBERRY)
 {
-  """Role ID to assign this permission to"""
   roleId: UUID!
-
-  """Scope element type (e.g. 'domain', 'project')"""
   scopeType: RBACElementType!
-
-  """Scope element ID"""
   scopeId: String!
-
-  """Entity element type (e.g. 'session', 'vfolder')"""
   entityType: RBACElementType!
-
-  """Operation type (e.g. 'read', 'create')"""
   operation: OperationType!
 }
 
@@ -2866,19 +2719,19 @@ input CreateProjectResourcePolicyInput
 input CreateQueryDefinitionInput
   @join__type(graph: STRAWBERRY)
 {
-  """Human-readable name"""
+  """Human-readable identifier (must be unique)."""
   name: String!
 
-  """Prometheus metric name"""
+  """Prometheus metric name."""
   metricName: String!
 
-  """PromQL template with placeholders"""
+  """PromQL template with {labels}, {window}, {group_by} placeholders."""
   queryTemplate: String!
 
-  """Default time window (e.g. '5m', '1h')"""
+  """Default time window."""
   timeWindow: String = null
 
-  """Query definition options"""
+  """Query definition options including filter and group labels."""
   options: QueryDefinitionOptionsInput!
 }
 
@@ -2894,19 +2747,10 @@ type CreateQueryDefinitionPayload
 input CreateReservoirRegistryInput
   @join__type(graph: STRAWBERRY)
 {
-  """Registry name"""
   name: String!
-
-  """Reservoir endpoint URL"""
   endpoint: String!
-
-  """Access key for authentication"""
   accessKey: String!
-
-  """Secret key for authentication"""
   secretKey: String!
-
-  """API version string"""
   apiVersion: String!
 }
 
@@ -2914,6 +2758,7 @@ input CreateReservoirRegistryInput
 type CreateReservoirRegistryPayload
   @join__type(graph: STRAWBERRY)
 {
+  """Created Reservoir registry"""
   reservoir: ReservoirRegistry!
 }
 
@@ -2943,31 +2788,22 @@ Added in 25.19.0. Input for specifying revision configuration within a deploymen
 input CreateRevisionInput
   @join__type(graph: STRAWBERRY)
 {
+  name: String = null
   clusterConfig: ClusterConfigInput!
   resourceConfig: ResourceConfigInput!
   image: ImageInput!
   modelRuntimeConfig: ModelRuntimeConfigInput!
   modelMountConfig: ModelMountConfigInput!
-
-  """Revision name"""
-  name: String = null
-
-  """Additional vfolder mounts"""
-  extraMounts: [ExtraVFolderMountInput!] = null
+  extraMounts: [ExtraVFolderMountInput!]
 }
 
 """Added in 26.3.0. Input for creating a role"""
 input CreateRoleInput
   @join__type(graph: STRAWBERRY)
 {
-  """Role name"""
   name: String!
-
-  """Role description"""
   description: String = null
-
-  """Role source"""
-  source: RoleSource = CUSTOM
+  source: RoleSource = null
 }
 
 type CreateScalingGroup
@@ -3056,7 +2892,7 @@ input CreateUserV2Input
   domainName: String!
 
   """If true, user must change password on first login."""
-  needPasswordChange: Boolean! = false
+  needPasswordChange: Boolean!
 
   """Initial account status."""
   status: UserStatusV2!
@@ -3107,13 +2943,8 @@ type CreateUserV2Payload
 input CreateVFSStorageInput
   @join__type(graph: STRAWBERRY)
 {
-  """Storage name"""
   name: String!
-
-  """Storage host address"""
   host: String!
-
-  """Base path on the storage host"""
   basePath: String!
 }
 
@@ -3135,16 +2966,9 @@ Added in 24.09.0. Filter for date fields (not datetime) supporting range and equ
 input DateFilter
   @join__type(graph: STRAWBERRY)
 {
-  """Before this date (inclusive)"""
   before: Date = null
-
-  """After this date (inclusive)"""
   after: Date = null
-
-  """Exact date match"""
   equals: Date = null
-
-  """Not equal to this date"""
   notEquals: Date = null
 }
 
@@ -3163,16 +2987,9 @@ Added in 24.09.0. Filter for datetime fields supporting range and equality opera
 input DateTimeFilter
   @join__type(graph: STRAWBERRY)
 {
-  """Before this datetime (inclusive)"""
   before: DateTime = null
-
-  """After this datetime (inclusive)"""
   after: DateTime = null
-
-  """Exact datetime match"""
   equals: DateTime = null
-
-  """Not equal to this datetime"""
   notEquals: DateTime = null
 }
 
@@ -3191,10 +3008,7 @@ scalar Decimal
 input DelegateeTarget
   @join__type(graph: STRAWBERRY)
 {
-  """ID of the delegatee reservoir registry."""
   delegateeReservoirId: ID!
-
-  """ID of the target registry within the delegatee reservoir."""
   targetRegistryId: ID!
 }
 
@@ -3206,19 +3020,17 @@ into the local reservoir registry storage.
 input DelegateImportArtifactsInput
   @join__type(graph: STRAWBERRY)
 {
-  """List of artifact revision IDs of delegatee artifact registry."""
+  """List of artifact revision IDs of delegatee artifact registry"""
   artifactRevisionIds: [ID!]!
 
-  """ID of the reservoir registry to delegate the import request to."""
+  """ID of the reservoir registry to delegate the import request to"""
   delegatorReservoirId: ID = null
-
-  """Filter artifacts by type."""
   artifactType: ArtifactType = null
-
-  """Target delegatee reservoir registry."""
   delegateeTarget: DelegateeTarget = null
 
-  """Options controlling import behavior."""
+  """
+  Options controlling import behavior such as forcing re-download. Added in 26.1.0.
+  """
   options: ImportArtifactsOptionsGQL = null
 }
 
@@ -3229,11 +3041,11 @@ type DelegateImportArtifactsPayload
   @join__type(graph: STRAWBERRY)
 {
   """
-  Connection of artifact revisions that were imported from the reservoir registry's remote registry
+  List of imported artifact revisions from the reservoir registry's remote registry.
   """
   artifactRevisions: ArtifactRevisionConnection!
 
-  """List of background tasks created for importing the artifact revisions"""
+  """List of background tasks created for importing the artifact revisions."""
   tasks: [ArtifactRevisionImportTask!]!
 }
 
@@ -3243,19 +3055,19 @@ Added in 24.09.0. Input type for delegated scanning of artifacts from a delegate
 input DelegateScanArtifactsInput
   @join__type(graph: STRAWBERRY)
 {
-  """ID of the reservoir registry to delegate the scan request to."""
+  """ID of the reservoir registry to delegate the scan request to"""
   delegatorReservoirId: ID = null
 
-  """Target delegatee reservoir registry and its remote registry to scan."""
+  """Target delegatee reservoir registry and its remote registry to scan"""
   delegateeTarget: DelegateeTarget = null
 
-  """Maximum number of artifacts to scan."""
+  """Maximum number of artifacts to scan (max: 500)"""
   limit: Int!
 
-  """Filter artifacts by type."""
+  """Filter artifacts by type (e.g., model, image, package)"""
   artifactType: ArtifactType = null
 
-  """Search term to filter artifacts by name or description."""
+  """Search term to filter artifacts by name or description"""
   search: String = null
 }
 
@@ -3265,9 +3077,7 @@ Added in 25.15.0. Response payload for delegated artifact scanning operation. Co
 type DelegateScanArtifactsPayload
   @join__type(graph: STRAWBERRY)
 {
-  """
-  List of artifacts discovered during the delegated scan from the reservoir registry's remote registry
-  """
+  """List of artifacts discovered during the delegated scan."""
   artifacts: [Artifact!]!
 }
 
@@ -3280,7 +3090,6 @@ Deleted artifacts can be restored using restore_artifacts.
 input DeleteArtifactsInput
   @join__type(graph: STRAWBERRY)
 {
-  """List of artifact IDs to delete."""
   artifactIds: [ID!]!
 }
 
@@ -3290,6 +3099,7 @@ Added in 25.15.0. Response payload for artifact deletion operations. Contains th
 type DeleteArtifactsPayload
   @join__type(graph: STRAWBERRY)
 {
+  """List of soft-deleted artifacts."""
   artifacts: [Artifact!]!
 }
 
@@ -3297,7 +3107,6 @@ type DeleteArtifactsPayload
 input DeleteAutoScalingRuleInput
   @join__type(graph: STRAWBERRY)
 {
-  """ID of the auto-scaling rule to delete"""
   id: ID!
 }
 
@@ -3342,7 +3151,6 @@ type DeleteContainerRegistryQuota
 input DeleteDeploymentInput
   @join__type(graph: STRAWBERRY)
 {
-  """Deployment ID to delete"""
   id: ID!
 }
 
@@ -3366,7 +3174,6 @@ type DeleteDomain
 input DeleteDomainConfigInput
   @join__type(graph: STRAWBERRY)
 {
-  """Domain name whose configuration will be deleted."""
   domainName: String!
 }
 
@@ -3400,7 +3207,6 @@ type DeleteGroup
 input DeleteHuggingFaceRegistryInput
   @join__type(graph: STRAWBERRY)
 {
-  """Registry ID to delete"""
   id: ID!
 }
 
@@ -3408,7 +3214,8 @@ input DeleteHuggingFaceRegistryInput
 type DeleteHuggingFaceRegistryPayload
   @join__type(graph: STRAWBERRY)
 {
-  id: ID!
+  """ID of the deleted HuggingFace registry"""
+  id: UUID!
 }
 
 type DeleteKeyPair
@@ -3437,7 +3244,6 @@ type DeleteNetwork
 input DeleteNotificationChannelInput
   @join__type(graph: STRAWBERRY)
 {
-  """Channel ID to delete"""
   id: ID!
 }
 
@@ -3445,15 +3251,14 @@ input DeleteNotificationChannelInput
 type DeleteNotificationChannelPayload
   @join__type(graph: STRAWBERRY)
 {
-  """ID of the deleted notification channel."""
-  id: ID!
+  """ID of the deleted notification channel"""
+  id: UUID!
 }
 
 """Added in 24.09.0. Input for deleting a notification rule"""
 input DeleteNotificationRuleInput
   @join__type(graph: STRAWBERRY)
 {
-  """Rule ID to delete"""
   id: ID!
 }
 
@@ -3461,15 +3266,14 @@ input DeleteNotificationRuleInput
 type DeleteNotificationRulePayload
   @join__type(graph: STRAWBERRY)
 {
-  """ID of the deleted notification rule."""
-  id: ID!
+  """ID of the deleted notification rule"""
+  id: UUID!
 }
 
 """Added in 25.14.0. """
 input DeleteObjectStorageInput
   @join__type(graph: STRAWBERRY)
 {
-  """Object storage ID to delete"""
   id: ID!
 }
 
@@ -3477,15 +3281,14 @@ input DeleteObjectStorageInput
 type DeleteObjectStoragePayload
   @join__type(graph: STRAWBERRY)
 {
-  """ID of the deleted object storage."""
-  id: ID!
+  """ID of the deleted object storage"""
+  id: UUID!
 }
 
 """Added in 26.3.0. Input for deleting a scoped permission"""
 input DeletePermissionInput
   @join__type(graph: STRAWBERRY)
 {
-  """Permission ID to delete"""
   id: UUID!
 }
 
@@ -3493,8 +3296,8 @@ input DeletePermissionInput
 type DeletePermissionPayload
   @join__type(graph: STRAWBERRY)
 {
-  """ID of the deleted permission."""
-  id: ID!
+  """ID of the deleted permission"""
+  id: UUID!
 }
 
 type DeleteProjectResourcePolicy
@@ -3508,15 +3311,14 @@ type DeleteProjectResourcePolicy
 type DeleteQueryDefinitionPayload
   @join__type(graph: STRAWBERRY)
 {
-  """Deleted query definition ID."""
-  id: ID!
+  """Deleted query definition ID"""
+  id: UUID!
 }
 
 """Added in 25.14.0. """
 input DeleteReservoirRegistryInput
   @join__type(graph: STRAWBERRY)
 {
-  """Registry ID to delete"""
   id: ID!
 }
 
@@ -3524,7 +3326,8 @@ input DeleteReservoirRegistryInput
 type DeleteReservoirRegistryPayload
   @join__type(graph: STRAWBERRY)
 {
-  id: ID!
+  """ID of the deleted Reservoir registry"""
+  id: UUID!
 }
 
 type DeleteResourcePreset
@@ -3538,7 +3341,6 @@ type DeleteResourcePreset
 input DeleteRoleInput
   @join__type(graph: STRAWBERRY)
 {
-  """Role ID to delete"""
   id: UUID!
 }
 
@@ -3546,8 +3348,8 @@ input DeleteRoleInput
 type DeleteRolePayload
   @join__type(graph: STRAWBERRY)
 {
-  """ID of the deleted role."""
-  id: ID!
+  """ID of the deleted role"""
+  id: UUID!
 }
 
 type DeleteScalingGroup
@@ -3576,7 +3378,6 @@ If user_id is not provided, the current user's configuration will be deleted.
 input DeleteUserConfigInput
   @join__type(graph: STRAWBERRY)
 {
-  """User ID whose configuration will be deleted. Defaults to current user."""
   userId: ID = null
 }
 
@@ -3627,7 +3428,6 @@ type DeleteUserV2Payload
 input DeleteVFSStorageInput
   @join__type(graph: STRAWBERRY)
 {
-  """Storage ID to delete"""
   id: ID!
 }
 
@@ -3635,36 +3435,21 @@ input DeleteVFSStorageInput
 type DeleteVFSStoragePayload
   @join__type(graph: STRAWBERRY)
 {
-  """ID of the deleted VFS storage."""
-  id: ID!
+  """ID of the deleted VFS storage"""
+  id: UUID!
 }
 
 """Added in 25.19.0. """
 input DeploymentFilter
   @join__type(graph: STRAWBERRY)
 {
-  """Name filter"""
   name: StringFilter = null
-
-  """Status filter"""
   status: DeploymentStatusFilter = null
-
-  """Public access filter"""
   openToPublic: Boolean = null
-
-  """Tags filter"""
   tags: StringFilter = null
-
-  """Endpoint URL filter"""
   endpointUrl: StringFilter = null
-
-  """AND conjunction"""
   AND: [DeploymentFilter!] = null
-
-  """OR conjunction"""
   OR: [DeploymentFilter!] = null
-
-  """NOT negation"""
   NOT: [DeploymentFilter!] = null
 }
 
@@ -3675,19 +3460,17 @@ type DeploymentHistory implements Node
 {
   """The Globally Unique ID of this object"""
   id: ID!
+  deploymentId: ID!
   phase: String!
   fromStatus: String
   toStatus: String
   result: SchedulingResult!
   errorCode: String
   message: String
-  subSteps: [SubStepResultGQL!]!
+  subSteps: [SubStepResult!]!
   attempts: Int!
   createdAt: DateTime!
   updatedAt: DateTime!
-
-  """The deployment ID this history record belongs to."""
-  deploymentId: ID!
 }
 
 """Added in 26.3.0. Deployment history connection."""
@@ -3717,43 +3500,18 @@ type DeploymentHistoryEdge
 input DeploymentHistoryFilter
   @join__type(graph: STRAWBERRY)
 {
-  """Filter by history record ID"""
   id: UUIDFilter = null
-
-  """Filter by deployment ID"""
   deploymentId: UUIDFilter = null
-
-  """Filter by scheduling phase"""
   phase: StringFilter = null
-
-  """Filter by from_status values"""
   fromStatus: [String!] = null
-
-  """Filter by to_status values"""
   toStatus: [String!] = null
-
-  """Filter by scheduling result"""
   result: SchedulingResultFilter = null
-
-  """Filter by error code"""
   errorCode: StringFilter = null
-
-  """Filter by message"""
   message: StringFilter = null
-
-  """Filter by created_at"""
   createdAt: DateTimeFilter = null
-
-  """Filter by updated_at"""
   updatedAt: DateTimeFilter = null
-
-  """AND conjunction."""
   AND: [DeploymentHistoryFilter!] = null
-
-  """OR conjunction."""
   OR: [DeploymentHistoryFilter!] = null
-
-  """NOT negation."""
   NOT: [DeploymentHistoryFilter!] = null
 }
 
@@ -3761,10 +3519,7 @@ input DeploymentHistoryFilter
 input DeploymentHistoryOrderBy
   @join__type(graph: STRAWBERRY)
 {
-  """Field to order by"""
   field: DeploymentHistoryOrderField!
-
-  """Order direction"""
   direction: OrderDirection! = DESC
 }
 
@@ -3808,7 +3563,7 @@ type DeploymentPolicy implements Node
 input DeploymentScope
   @join__type(graph: STRAWBERRY)
 {
-  """Deployment ID to get history for."""
+  """Deployment ID to get history for"""
   deploymentId: UUID!
 }
 
@@ -3840,11 +3595,8 @@ type DeploymentStatusChangedPayload
 input DeploymentStatusFilter
   @join__type(graph: STRAWBERRY)
 {
-  """Exact status match"""
-  equals: DeploymentStatus = null
-
-  """Status is in list"""
   in: [DeploymentStatus!] = null
+  equals: DeploymentStatus = null
 }
 
 """
@@ -3862,16 +3614,9 @@ Added in 25.19.0. Deployment strategy configuration with discriminator pattern.
 input DeploymentStrategyInput
   @join__type(graph: STRAWBERRY)
 {
-  """Deployment strategy type"""
   type: DeploymentStrategyType!
-
-  """Roll back automatically on failure"""
   rollbackOnFailure: Boolean! = false
-
-  """Rolling update config (required for ROLLING strategy)"""
   rollingUpdate: RollingUpdateConfigInput = null
-
-  """Blue/green config (required for BLUE_GREEN strategy)"""
   blueGreen: BlueGreenConfigInput = null
 }
 
@@ -4070,7 +3815,7 @@ Added in 26.2.0. Nested filter for domain entity fields in domain fair share que
 input DomainFairShareDomainNestedFilter
   @join__type(graph: STRAWBERRY)
 {
-  """Filter by domain active status"""
+  """Filter by domain active status."""
   isActive: Boolean = null
 }
 
@@ -4091,22 +3836,32 @@ Added in 26.1.0. Filter input for querying domain fair shares. Supports filterin
 input DomainFairShareFilter
   @join__type(graph: STRAWBERRY)
 {
-  """Filter by scaling group"""
+  """
+  Filter by scaling group name. Scaling groups define resource pool boundaries where domains compete for resources. Supports equals, contains, startsWith, and endsWith operations.
+  """
   resourceGroup: StringFilter = null
 
-  """Filter by domain name"""
+  """
+  Filter by domain name. Domains are organizational units containing projects and users. Supports equals, contains, startsWith, and endsWith operations.
+  """
   domainName: StringFilter = null
 
-  """Filter by domain entity properties"""
+  """
+  Added in 26.2.0. Nested filter for domain entity properties. Allows filtering by domain active status.
+  """
   domain: DomainFairShareDomainNestedFilter = null
 
-  """Combine with AND logic"""
+  """Combine multiple filters with AND logic. All conditions must match."""
   AND: [DomainFairShareFilter!] = null
 
-  """Combine with OR logic"""
+  """
+  Combine multiple filters with OR logic. At least one condition must match.
+  """
   OR: [DomainFairShareFilter!] = null
 
-  """Negate filters"""
+  """
+  Negate the specified filters. Records matching these conditions will be excluded.
+  """
   NOT: [DomainFairShareFilter!] = null
 }
 
@@ -4116,10 +3871,14 @@ Added in 26.1.0. Specifies ordering for domain fair share query results. Combine
 input DomainFairShareOrderBy
   @join__type(graph: STRAWBERRY)
 {
-  """Field to order by"""
+  """
+  The field to order by. See DomainFairShareOrderField for available options.
+  """
   field: DomainFairShareOrderField!
 
-  """Order direction"""
+  """
+  Sort direction. ASC for ascending (lowest first), DESC for descending (highest first). For fair_share_factor, ASC shows highest priority domains first.
+  """
   direction: OrderDirection! = DESC
 }
 
@@ -4215,7 +3974,9 @@ Added in 26.2.0. Scope for querying projects within a specific domain. Used to r
 input DomainProjectV2Scope
   @join__type(graph: STRAWBERRY)
 {
-  """Domain name to scope the query."""
+  """
+  Domain name to scope the query. Only projects belonging to this domain will be returned.
+  """
   domainName: String!
 }
 
@@ -4311,25 +4072,33 @@ Added in 26.1.0. Filter input for querying domain usage bucket records. Usage bu
 input DomainUsageBucketFilter
   @join__type(graph: STRAWBERRY)
 {
-  """Filter by resource group name"""
+  """
+  Filter by scaling group name. Scaling groups define where usage was recorded. Supports equals, contains, startsWith, and endsWith operations.
+  """
   resourceGroup: StringFilter = null
 
-  """Filter by domain name"""
+  """
+  Filter by domain name. This filters usage buckets for a specific domain. Supports equals, contains, startsWith, and endsWith operations.
+  """
   domainName: StringFilter = null
 
-  """Filter by period start date"""
+  """Filter by usage measurement period start date."""
   periodStart: DateFilter = null
 
-  """Filter by period end date"""
+  """Filter by usage measurement period end date."""
   periodEnd: DateFilter = null
 
-  """Combine with AND logic"""
+  """Combine multiple filters with AND logic. All conditions must match."""
   AND: [DomainUsageBucketFilter!] = null
 
-  """Combine with OR logic"""
+  """
+  Combine multiple filters with OR logic. At least one condition must match.
+  """
   OR: [DomainUsageBucketFilter!] = null
 
-  """Negate filters"""
+  """
+  Negate the specified filters. Records matching these conditions will be excluded.
+  """
   NOT: [DomainUsageBucketFilter!] = null
 }
 
@@ -4339,10 +4108,14 @@ Added in 26.1.0. Specifies ordering for domain usage bucket query results. Combi
 input DomainUsageBucketOrderBy
   @join__type(graph: STRAWBERRY)
 {
-  """Field to order by"""
+  """
+  The field to order by. See UsageBucketOrderField for available options.
+  """
   field: UsageBucketOrderField!
 
-  """Order direction"""
+  """
+  Sort direction. ASC for chronological order (oldest first), DESC for reverse chronological order (most recent first).
+  """
   direction: OrderDirection! = DESC
 }
 
@@ -4371,7 +4144,9 @@ Added in 26.2.0. Scope for querying users within a specific domain. Used to rest
 input DomainUserV2Scope
   @join__type(graph: STRAWBERRY)
 {
-  """Domain name to scope the user query."""
+  """
+  Domain name to scope the user query. Only users belonging to this domain will be returned.
+  """
   domainName: String!
 }
 
@@ -4449,34 +4224,15 @@ Added in 26.2.0. Filter input for querying domains. Supports filtering by name, 
 input DomainV2Filter
   @join__type(graph: STRAWBERRY)
 {
-  """Filter by domain name."""
   name: StringFilter = null
-
-  """Filter by description."""
   description: StringFilter = null
-
-  """Filter by active status."""
   isActive: Boolean = null
-
-  """Filter by creation time."""
   createdAt: DateTimeFilter = null
-
-  """Filter by last modification time."""
   modifiedAt: DateTimeFilter = null
-
-  """Filter by nested project conditions."""
   project: DomainProjectNestedFilter = null
-
-  """Filter by nested user conditions."""
   user: DomainUserNestedFilter = null
-
-  """AND logical combinator."""
   AND: [DomainV2Filter!] = null
-
-  """OR logical combinator."""
   OR: [DomainV2Filter!] = null
-
-  """NOT logical combinator."""
   NOT: [DomainV2Filter!] = null
 }
 
@@ -4486,11 +4242,8 @@ Added in 26.2.0. Specifies ordering for domain query results. Combine field sele
 input DomainV2OrderBy
   @join__type(graph: STRAWBERRY)
 {
-  """Field to order by."""
-  field: DomainV2OrderField!
-
-  """Order direction."""
-  direction: OrderDirection! = ASC
+  field: DomainV2OrderField! = CREATED_AT
+  direction: OrderDirection! = DESC
 }
 
 """
@@ -4514,24 +4267,21 @@ Added in 26.1.0. Input item for a single domain weight in bulk upsert. Represent
 input DomainWeightInputItem
   @join__type(graph: STRAWBERRY)
 {
-  """Domain name"""
+  """Name of the domain to update weight for."""
   domainName: String!
 
-  """Fair share weight (null for default)"""
-  weight: Decimal
+  """
+  Priority weight multiplier. Higher weight = higher priority allocation ratio. Set to null to use resource group's default_weight.
+  """
+  weight: Decimal = null
 }
 
 """Added in 24.09.0. Input for email message settings"""
 input EmailMessageInput
   @join__type(graph: STRAWBERRY)
 {
-  """Sender email address."""
   fromEmail: String!
-
-  """Recipient email addresses."""
   toEmails: [String!]!
-
-  """Email subject template."""
   subjectTemplate: String = null
 }
 
@@ -4539,13 +4289,8 @@ input EmailMessageInput
 input EmailSpecInput
   @join__type(graph: STRAWBERRY)
 {
-  """SMTP connection settings."""
   smtp: SMTPConnectionInput!
-
-  """Email message settings."""
   message: EmailMessageInput!
-
-  """SMTP authentication."""
   auth: SMTPAuthInput = null
 }
 
@@ -4714,17 +4459,12 @@ type EndpointTokenList implements PaginatedList
 type EntityConnection
   @join__type(graph: STRAWBERRY)
 {
-  edges: [EntityEdge!]!
+  """Pagination data for this connection"""
   pageInfo: PageInfo!
-  count: Int!
-}
 
-"""Added in 26.3.0. Entity edge."""
-type EntityEdge
-  @join__type(graph: STRAWBERRY)
-{
-  node: EntityRef!
-  cursor: String!
+  """Contains the nodes in this connection"""
+  edges: [EntityRefEdge!]!
+  count: Int!
 }
 
 """Added in 26.3.0. Filter for entity associations"""
@@ -4794,6 +4534,17 @@ type EntityRef implements Node
   entity: EntityNode
 }
 
+"""An edge in a connection."""
+type EntityRefEdge
+  @join__type(graph: STRAWBERRY)
+{
+  """A cursor for use in pagination"""
+  cursor: String!
+
+  """The item at the end of the edge"""
+  node: EntityRef!
+}
+
 """
 Added in 26.2.0. Common timestamp fields for entity lifecycle tracking. Reusable across different entity types.
 """
@@ -4813,10 +4564,7 @@ Added in 26.1.0. A single environment variable entry with name and value.
 type EnvironmentVariableEntry
   @join__type(graph: STRAWBERRY)
 {
-  """Environment variable name (e.g., CUDA_VISIBLE_DEVICES)."""
   name: String!
-
-  """Environment variable value."""
   value: String!
 }
 
@@ -4826,10 +4574,10 @@ Added in 26.1.0. A single environment variable entry with name and value.
 input EnvironmentVariableEntryInput
   @join__type(graph: STRAWBERRY)
 {
-  """Environment variable name"""
+  """Environment variable name (e.g., CUDA_VISIBLE_DEVICES)."""
   name: String!
 
-  """Environment variable value"""
+  """Environment variable value."""
   value: String!
 }
 
@@ -4837,7 +4585,6 @@ input EnvironmentVariableEntryInput
 type EnvironmentVariables
   @join__type(graph: STRAWBERRY)
 {
-  """List of environment variable entries."""
   entries: [EnvironmentVariableEntry!]!
 }
 
@@ -4845,7 +4592,7 @@ type EnvironmentVariables
 input EnvironmentVariablesInput
   @join__type(graph: STRAWBERRY)
 {
-  """List of environment variable entries"""
+  """List of environment variable entries."""
   entries: [EnvironmentVariableEntryInput!]!
 }
 
@@ -4853,11 +4600,11 @@ input EnvironmentVariablesInput
 input ExecuteQueryDefinitionOptionsInput
   @join__type(graph: STRAWBERRY)
 {
-  """Filter labels as key-value pairs"""
-  filterLabels: [MetricLabelEntryInput!] = []
+  """Label key-value pairs to filter by."""
+  filterLabels: [MetricLabelEntryInput!] = null
 
-  """Group-by labels"""
-  groupLabels: [String!] = []
+  """Label keys to group results by."""
+  groupLabels: [String!] = null
 }
 
 """Added in 24.03.4."""
@@ -4878,51 +4625,23 @@ input ExtraMountInput
   permission: String
 }
 
-"""Added in 24.3.0. Represents a virtual folder mount in a deployment."""
-type ExtraVFolderMount implements Node
-  @join__implements(graph: STRAWBERRY, interface: "Node")
+"""
+Added in 25.19.0. An extra virtual folder mount attached to a model revision.
+"""
+type ExtraVFolderMountInfoGQL
   @join__type(graph: STRAWBERRY)
 {
-  """The Globally Unique ID of this object"""
-  id: ID!
-  mountDestination: String!
   vfolder: VirtualFolderNode!
-}
-
-"""
-Added in 25.16.0. Connection type for paginated virtual folder mount results.
-"""
-type ExtraVFolderMountConnection
-  @join__type(graph: STRAWBERRY)
-{
-  """Pagination data for this connection"""
-  pageInfo: PageInfo!
-
-  """Contains the nodes in this connection"""
-  edges: [ExtraVFolderMountEdge!]!
-  count: Int!
-}
-
-"""An edge in a connection."""
-type ExtraVFolderMountEdge
-  @join__type(graph: STRAWBERRY)
-{
-  """A cursor for use in pagination"""
-  cursor: String!
-
-  """The item at the end of the edge"""
-  node: ExtraVFolderMount!
+  vfolderId: ID!
+  mountDestination: String
 }
 
 """Added in 25.19.0. """
 input ExtraVFolderMountInput
   @join__type(graph: STRAWBERRY)
 {
-  """VFolder ID to mount"""
   vfolderId: ID!
-
-  """Mount destination path"""
-  mountDestination: String = null
+  mountDestination: String
 }
 
 """
@@ -4932,39 +4651,27 @@ type FairShareCalculationSnapshot
   @join__type(graph: STRAWBERRY)
 {
   """
-  Computed fair share factor ranging from 0 to 1. Higher values indicate more entitlement to resources (less historical usage relative to others). Used by the scheduler to prioritize workloads - entities with higher factors get scheduled first.
-  """
-  fairShareFactor: Decimal!
-
-  """
-  Sum of exponentially decayed historical usage across the lookback period. Recent usage contributes more than older usage based on the half-life decay function. This is the raw usage data before normalization.
-  """
-  totalDecayedUsage: ResourceSlot!
-
-  """
-  Single scalar value representing weighted resource consumption. Computed by applying resource weights to the decayed usage and summing. Used to compare usage across entities with different resource consumption patterns.
-  """
-  normalizedUsage: Decimal!
-
-  """
-  Start date of the lookback window used in this calculation (inclusive). Usage before this date is not considered in the fair share factor computation.
-  """
-  lookbackStart: Date!
-
-  """
-  End date of the lookback window used in this calculation (inclusive). Typically the current date or the date of the last calculation.
-  """
-  lookbackEnd: Date!
-
-  """
-  Timestamp when this fair share calculation was performed. Fair share factors are recalculated periodically by the scheduler.
-  """
-  lastCalculatedAt: DateTime!
-
-  """
   Added in 26.2.0. Average daily decayed resource usage during the lookback period. Calculated as total_decayed_usage divided by lookback duration in days. For each resource type, this represents the average decayed amount consumed per day. Units match the resource type (e.g., CPU cores, memory bytes).
   """
   averageDailyDecayedUsage: ResourceSlot!
+
+  """Computed fair share factor (0-1 range)"""
+  fairShareFactor: Decimal!
+
+  """Sum of decayed historical usage"""
+  totalDecayedUsage: ResourceSlot!
+
+  """Single scalar representing weighted consumption"""
+  normalizedUsage: Decimal!
+
+  """Start date of the lookback window"""
+  lookbackStart: Date!
+
+  """End date of the lookback window"""
+  lookbackEnd: Date!
+
+  """Timestamp when calculation was performed"""
+  lastCalculatedAt: DateTime!
 }
 
 """
@@ -4973,29 +4680,19 @@ Added in 26.1.0. Fair share calculation configuration for a resource group. Defi
 type FairShareScalingGroupSpec
   @join__type(graph: STRAWBERRY)
 {
-  """
-  Half-life for exponential decay in days. Determines how quickly historical usage loses significance. Default is 7 days.
-  """
+  """Half-life for exponential decay in days"""
   halfLifeDays: Int!
 
-  """
-  Total lookback period in days for usage aggregation. Only usage within this window is considered. Default is 28 days.
-  """
+  """Total lookback period in days"""
   lookbackDays: Int!
 
-  """
-  Granularity of decay buckets in days. Usage is aggregated into buckets of this size. Default is 1 day.
-  """
+  """Granularity of decay buckets in days"""
   decayUnitDays: Int!
 
-  """
-  Default weight for entities without explicit weight in this resource group. Default is 1.0.
-  """
+  """Default weight for entities without explicit weight"""
   defaultWeight: Decimal!
 
-  """
-  Added in 26.2.0. Weights for each resource type with default indicators. All resource types from capacity are included. Shows which resources use explicit vs default weights.
-  """
+  """Weights for each resource type"""
   resourceWeights: [ResourceWeightEntry!]!
 }
 
@@ -5006,33 +4703,25 @@ type FairShareSpec
   @join__type(graph: STRAWBERRY)
 {
   """
-  Base weight multiplier for this entity. Higher weight values result in higher scheduling priority. This is the effective weight - either the explicitly set value or the resource group's default_weight.
+  Effective weight for this entity. Always the resolved value (either the explicitly set weight or the resource group's default_weight).
   """
   weight: Decimal!
 
   """
-  Added in 26.1.0. Whether this entity uses the resource group's default_weight. True means no explicit weight was set and the default is being used. False means an explicit weight value was configured for this entity.
+  Whether this entity uses the resource group's default_weight. True means no explicit weight was set.
   """
   usesDefault: Boolean!
 
-  """
-  Half-life for exponential decay in days. Determines how quickly historical usage loses significance. For example, with half_life_days=7, usage from 7 days ago contributes half as much as today's usage.
-  """
+  """Half-life for exponential decay in days"""
   halfLifeDays: Int!
 
-  """
-  Total lookback period in days for usage aggregation. Only usage within this window is considered. Typical values range from 7 to 30 days depending on scheduling policy.
-  """
+  """Total lookback period in days"""
   lookbackDays: Int!
 
-  """
-  Granularity of decay buckets in days. Usage is aggregated into buckets of this size. Smaller values provide more precision but require more storage. Typically 1 day.
-  """
+  """Granularity of decay buckets in days"""
   decayUnitDays: Int!
 
-  """
-  Added in 26.2.0. Weights for each resource type with default indicators. Shows which resources use explicit vs default weights. Allows different resources to contribute differently to the fair share calculation. For example, GPU usage might be weighted higher than CPU usage.
-  """
+  """Weights for each resource type with default indicators"""
   resourceWeights: [ResourceWeightEntry!]!
 }
 
@@ -5068,13 +4757,8 @@ type ForgetImageById
 input GetPresignedDownloadURLInput
   @join__type(graph: STRAWBERRY)
 {
-  """The unique identifier of the artifact revision"""
   artifactRevisionId: ID!
-
-  """Object key"""
   key: String!
-
-  """URL expiration time in seconds"""
   expiration: Int = null
 }
 
@@ -5092,10 +4776,7 @@ type GetPresignedDownloadURLPayload
 input GetPresignedUploadURLInput
   @join__type(graph: STRAWBERRY)
 {
-  """The unique identifier of the artifact revision"""
   artifactRevisionId: ID!
-
-  """Object key"""
   key: String!
 }
 
@@ -5302,7 +4983,9 @@ Added in 26.3.0. Nested filter for aliases belonging to an image. Filters images
 input ImageAliasNestedFilter
   @join__type(graph: STRAWBERRY)
 {
-  """Filter by alias string."""
+  """
+  Filter by alias string. Supports equals, contains, startsWith, and endsWith.
+  """
   alias: StringFilter = null
 }
 
@@ -5335,7 +5018,6 @@ type ImageEdge
 input ImageInput
   @join__type(graph: STRAWBERRY)
 {
-  """Container image ID"""
   id: ID!
 }
 
@@ -5506,19 +5188,12 @@ Added in 26.2.0. Filter options for image aliases. Supports filtering by alias s
 input ImageV2AliasFilter
   @join__type(graph: STRAWBERRY)
 {
-  """Filter by alias string."""
   alias: StringFilter = null
 
-  """Filter by image ID."""
+  """Added in 26.4.0. Filter by image ID."""
   imageId: UUIDFilter = null
-
-  """Combine with AND logic."""
   AND: [ImageV2AliasFilter!] = null
-
-  """Combine with OR logic."""
   OR: [ImageV2AliasFilter!] = null
-
-  """Negate filters."""
   NOT: [ImageV2AliasFilter!] = null
 }
 
@@ -5528,10 +5203,7 @@ Added in 26.2.0. Specifies the field and direction for ordering image aliases in
 input ImageV2AliasOrderByGQL
   @join__type(graph: STRAWBERRY)
 {
-  """Field to order by."""
   field: ImageV2AliasOrderField!
-
-  """Order direction."""
   direction: OrderDirection! = ASC
 }
 
@@ -5579,31 +5251,20 @@ Added in 26.2.0. Filter options for images based on various criteria such as sta
 input ImageV2Filter
   @join__type(graph: STRAWBERRY)
 {
-  """Filter by status."""
   status: ImageV2StatusFilter = null
-
-  """Filter by name."""
   name: StringFilter = null
-
-  """Filter by architecture."""
   architecture: StringFilter = null
 
-  """Filter by container registry ID."""
+  """Added in 26.4.0. Filter by container registry ID."""
   registryId: UUIDFilter = null
 
-  """Filter by nested alias conditions."""
+  """Added in 26.3.0. Filter by nested alias conditions."""
   alias: ImageAliasNestedFilter = null
 
-  """Filter by last used datetime (before/after)."""
+  """Added in 26.3.0. Filter by last used datetime (before/after)."""
   lastUsed: DateTimeFilter = null
-
-  """Combine with AND logic."""
   AND: [ImageV2Filter!] = null
-
-  """Combine with OR logic."""
   OR: [ImageV2Filter!] = null
-
-  """Negate filters."""
   NOT: [ImageV2Filter!] = null
 }
 
@@ -5639,17 +5300,6 @@ Added in 26.2.0. Metadata information for an image. Contains tags, labels, diges
 type ImageV2MetadataInfo
   @join__type(graph: STRAWBERRY)
 {
-  """
-  Parsed tag components from the image reference (e.g., python=3.11, cuda=12.1).
-  """
-  tags: [ImageV2TagEntry!]!
-
-  """Docker labels."""
-  labels: [ImageV2LabelEntry!]!
-
-  """Image status (ALIVE or DELETED)."""
-  status: ImageV2Status!
-
   """Config digest for verification."""
   digest: String
 
@@ -5658,6 +5308,15 @@ type ImageV2MetadataInfo
 
   """Image creation timestamp."""
   createdAt: DateTime
+
+  """Parsed tag components."""
+  tags: [ImageV2TagEntry!]!
+
+  """Docker labels."""
+  labels: [ImageV2LabelEntry!]!
+
+  """Image status (ALIVE or DELETED)."""
+  status: ImageV2Status!
 }
 
 """
@@ -5666,10 +5325,7 @@ Added in 26.2.0. Specifies the field and direction for ordering images in querie
 input ImageV2OrderByGQL
   @join__type(graph: STRAWBERRY)
 {
-  """Field to order by."""
   field: ImageV2OrderField!
-
-  """Order direction."""
   direction: OrderDirection! = ASC
 }
 
@@ -5706,7 +5362,7 @@ Added in 26.2.0. Permission information for an image. Contains the list of permi
 type ImageV2PermissionInfo
   @join__type(graph: STRAWBERRY)
 {
-  """List of permissions the user has on this image."""
+  """List of permissions the user has on this image"""
   permissions: [ImageV2Permission!]!
 }
 
@@ -5716,11 +5372,11 @@ Added in 26.2.0. Runtime requirements information for an image. Contains resourc
 type ImageV2RequirementsInfo
   @join__type(graph: STRAWBERRY)
 {
-  """Resource slot limits (cpu, memory, accelerators, etc.)."""
-  resourceLimits: [ImageV2ResourceLimit!]!
-
   """List of supported accelerator types."""
   supportedAccelerators: [String!]!
+
+  """Resource slot limits with string min/max values."""
+  resourceLimits: [ImageV2ResourceLimit!]!
 }
 
 """
@@ -5792,13 +5448,14 @@ SCANNED → PULLING → PULLED → AVAILABLE status progression.
 input ImportArtifactsInput
   @join__type(graph: STRAWBERRY)
 {
-  """List of artifact revision IDs to import."""
   artifactRevisionIds: [ID!]!
 
-  """Optional vfolder ID to import artifacts directly into."""
+  """Target vfolder ID to store the imported artifacts. Added in 26.1.0."""
   vfolderId: ID = null
 
-  """Options controlling import behavior such as forcing re-download."""
+  """
+  Options controlling import behavior such as forcing re-download. Added in 26.1.0.
+  """
   options: ImportArtifactsOptionsGQL = null
 }
 
@@ -5820,7 +5477,10 @@ Added in 25.14.0. Response payload for artifact import operations. Contains the 
 type ImportArtifactsPayload
   @join__type(graph: STRAWBERRY)
 {
+  """List of imported artifact revisions."""
   artifactRevisions: ArtifactRevisionConnection!
+
+  """List of import tasks created."""
   tasks: [ArtifactRevisionImportTask!]!
 }
 
@@ -5845,22 +5505,11 @@ Added in 24.09.0. Filter for integer fields supporting equality and comparison o
 input IntFilter
   @join__type(graph: STRAWBERRY)
 {
-  """Exact integer match"""
   equals: Int = null
-
-  """Not equal to this integer"""
   notEquals: Int = null
-
-  """Greater than this integer"""
   greaterThan: Int = null
-
-  """Greater than or equal to this integer"""
   greaterThanOrEqual: Int = null
-
-  """Less than this integer"""
   lessThan: Int = null
-
-  """Less than or equal to this integer"""
   lessThanOrEqual: Int = null
 }
 
@@ -6018,16 +5667,9 @@ Added in 26.3.0. Filter criteria for querying kernel resource allocations.
 input KernelResourceAllocationFilter
   @join__type(graph: STRAWBERRY)
 {
-  """Filter by slot name."""
   slotName: StringFilter = null
-
-  """Logical AND of multiple filter conditions."""
   AND: [KernelResourceAllocationFilter!] = null
-
-  """Logical OR of multiple filter conditions."""
   OR: [KernelResourceAllocationFilter!] = null
-
-  """Logical NOT of filter conditions."""
   NOT: [KernelResourceAllocationFilter!] = null
 }
 
@@ -6037,10 +5679,7 @@ Added in 26.3.0. Ordering specification for kernel resource allocations.
 input KernelResourceAllocationOrderBy
   @join__type(graph: STRAWBERRY)
 {
-  """Field to order by."""
   field: KernelResourceAllocationOrderField!
-
-  """Order direction."""
   direction: OrderDirection! = ASC
 }
 
@@ -6154,22 +5793,11 @@ type KernelV2Edge
 input KernelV2Filter
   @join__type(graph: STRAWBERRY)
 {
-  """Filter by kernel ID"""
   id: UUIDFilter = null
-
-  """Filter by session ID"""
-  sessionId: UUIDFilter = null
-
-  """Filter by status"""
   status: KernelV2StatusFilter = null
-
-  """AND logical operator"""
+  sessionId: UUIDFilter = null
   AND: [KernelV2Filter!] = null
-
-  """OR logical operator"""
   OR: [KernelV2Filter!] = null
-
-  """NOT logical operator"""
   NOT: [KernelV2Filter!] = null
 }
 
@@ -6210,10 +5838,7 @@ type KernelV2NetworkInfo
 input KernelV2OrderBy
   @join__type(graph: STRAWBERRY)
 {
-  """Field to order by"""
   field: KernelV2OrderField!
-
-  """Order direction"""
   direction: OrderDirection! = DESC
 }
 
@@ -6494,14 +6119,25 @@ enum LivenessStatus
   DEGRADED @join__enumValue(graph: STRAWBERRY)
 }
 
-"""Added in 26.3.0. Key-value label entry for queries."""
-input MetricLabelEntryInput
+"""Added in 26.3.0. Key-value label entry from Prometheus result."""
+type MetricLabelEntry
   @join__type(graph: STRAWBERRY)
 {
   """Label key"""
   key: String!
 
   """Label value"""
+  value: String!
+}
+
+"""Added in 26.3.0. Key-value label entry for queries."""
+input MetricLabelEntryInput
+  @join__type(graph: STRAWBERRY)
+{
+  """Label key."""
+  key: String!
+
+  """Label value."""
   value: String!
 }
 
@@ -6596,12 +6232,15 @@ type ModelDeployment implements Node
   revision: ModelRevision
   defaultDeploymentStrategy: DeploymentStrategyGQL!
   replicaState: ReplicaState!
+  createdUserId: ID!
   createdUser: UserNode!
-  scalingRule: ScalingRule!
 
   """Added in 25.19.0. Deployment policy configuration."""
   deploymentPolicy: DeploymentPolicy
   revisionHistory(filter: ModelRevisionFilter = null, orderBy: [ModelRevisionOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ModelRevisionConnection!
+  replicas(filter: ReplicaFilter = null, orderBy: [ReplicaOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ModelReplicaConnection!
+  autoScalingRules(filter: AutoScalingRuleFilter = null, orderBy: [AutoScalingRuleOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): AutoScalingRuleConnection!
+  accessTokens(filter: AccessTokenFilter = null, orderBy: [AccessTokenOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): AccessTokenConnection!
 }
 
 """Added in 25.19.0. Connection for model deployments."""
@@ -6633,29 +6272,24 @@ Added in 25.19.0. Contains metadata information for a model deployment including
 type ModelDeploymentMetadata
   @join__type(graph: STRAWBERRY)
 {
+  project: GroupNode!
+  domain: DomainNode!
+  projectId: ID!
+  domainName: String!
   name: String!
   status: DeploymentStatus!
   tags: [String!]!
   createdAt: DateTime!
   updatedAt: DateTime!
-  project: GroupNode!
-  domain: DomainNode!
 }
 
 """Added in 25.19.0. """
 input ModelDeploymentMetadataInput
   @join__type(graph: STRAWBERRY)
 {
-  """Project ID"""
   projectId: ID!
-
-  """Domain name"""
   domainName: String!
-
-  """Deployment name"""
   name: String = null
-
-  """Deployment tags"""
   tags: [String!] = null
 }
 
@@ -6668,17 +6302,13 @@ type ModelDeploymentNetworkAccess
   endpointUrl: String
   preferredDomainName: String
   openToPublic: Boolean!
-  accessTokens(filter: AccessTokenFilter = null, orderBy: [AccessTokenOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): AccessTokenConnection!
 }
 
 """Added in 25.19.0. """
 input ModelDeploymentNetworkAccessInput
   @join__type(graph: STRAWBERRY)
 {
-  """Preferred domain name for URL"""
   preferredDomainName: String = null
-
-  """Whether the deployment is public"""
   openToPublic: Boolean! = false
 }
 
@@ -6688,25 +6318,18 @@ Added in 25.19.0. Configuration for mounting the model data into the inference c
 type ModelMountConfig
   @join__type(graph: STRAWBERRY)
 {
-  """Path inside the container where the model is mounted."""
-  mountDestination: String!
-
-  """Path to the model definition file within the mounted folder."""
-  definitionPath: String!
   vfolder: VirtualFolderNode!
+  vfolderId: ID!
+  mountDestination: String!
+  definitionPath: String!
 }
 
 """Added in 25.19.0. """
 input ModelMountConfigInput
   @join__type(graph: STRAWBERRY)
 {
-  """VFolder ID for the model"""
   vfolderId: ID!
-
-  """Mount destination path inside container"""
   mountDestination: String!
-
-  """Path to model definition file"""
   definitionPath: String!
 }
 
@@ -6719,6 +6342,8 @@ type ModelReplica implements Node
 {
   """The Globally Unique ID of this object"""
   id: ID!
+  sessionId: ID!
+  revisionId: ID!
 
   """Whether the replica has been checked and its health state."""
   readinessStatus: ReadinessStatus!
@@ -6776,6 +6401,7 @@ type ModelRevision implements Node
 {
   """The Globally Unique ID of this object"""
   id: ID!
+  imageId: ID!
 
   """The name identifier for this revision."""
   name: String!
@@ -6793,7 +6419,7 @@ type ModelRevision implements Node
   modelMountConfig: ModelMountConfig
 
   """Additional volume folder mounts."""
-  extraMounts: ExtraVFolderMountConnection!
+  extraMounts: [ExtraVFolderMountInfoGQL!]!
 
   """Timestamp when the revision was created."""
   createdAt: DateTime!
@@ -6827,19 +6453,10 @@ type ModelRevisionEdge
 input ModelRevisionFilter
   @join__type(graph: STRAWBERRY)
 {
-  """Name filter"""
   name: StringFilter = null
-
-  """Filter by deployment ID"""
   deploymentId: ID = null
-
-  """AND conjunction"""
   AND: [ModelRevisionFilter!] = null
-
-  """OR conjunction"""
   OR: [ModelRevisionFilter!] = null
-
-  """NOT negation"""
   NOT: [ModelRevisionFilter!] = null
 }
 
@@ -6851,11 +6468,12 @@ input ModelRevisionOrderBy
   direction: OrderDirection! = DESC
 }
 
+"""Added in 25.19.0. Fields available for ordering model revisions."""
 enum ModelRevisionOrderField
   @join__type(graph: STRAWBERRY)
 {
-  CREATED_AT @join__enumValue(graph: STRAWBERRY)
   NAME @join__enumValue(graph: STRAWBERRY)
+  CREATED_AT @join__enumValue(graph: STRAWBERRY)
 }
 
 """
@@ -6864,13 +6482,8 @@ Added in 25.19.0. Runtime configuration for the inference framework. Includes th
 type ModelRuntimeConfig
   @join__type(graph: STRAWBERRY)
 {
-  """The inference runtime variant (e.g., vllm, triton)."""
   runtimeVariant: String!
-
-  """Framework-specific configuration in JSON format."""
   inferenceRuntimeConfig: JSON
-
-  """Environment variables for the service, e.g. CUDA_VISIBLE_DEVICES=0."""
   environ: EnvironmentVariables
 }
 
@@ -6878,13 +6491,10 @@ type ModelRuntimeConfig
 input ModelRuntimeConfigInput
   @join__type(graph: STRAWBERRY)
 {
-  """Runtime variant identifier"""
   runtimeVariant: String!
-
-  """Framework-specific inference runtime configuration"""
   inferenceRuntimeConfig: JSON = null
 
-  """Environment variables for the service"""
+  """Environment variables for the service."""
   environ: EnvironmentVariablesInput = null
 }
 
@@ -6897,12 +6507,7 @@ If revision is not specified, defaults to 'main' revision.
 input ModelTarget
   @join__type(graph: STRAWBERRY)
 {
-  """Model ID in the external registry."""
   modelId: String!
-
-  """
-  Specific revision (branch or tag). Defaults to 'main' if not specified.
-  """
   revision: String = null
 }
 
@@ -7262,22 +6867,31 @@ input ModifyProjectResourcePolicyInput
 input ModifyQueryDefinitionInput
   @join__type(graph: STRAWBERRY)
 {
-  """Updated human-readable name"""
-  name: String = null
+  """New name."""
+  name: String
 
-  """Updated Prometheus metric name"""
-  metricName: String = null
+  """New metric name."""
+  metricName: String
 
-  """Updated PromQL template with placeholders"""
-  queryTemplate: String = null
+  """New PromQL template."""
+  queryTemplate: String
 
-  """
-  Updated default time window. Pass SENTINEL (default) to leave unchanged; pass None to clear.
-  """
+  """New default time window."""
   timeWindow: String
 
-  """Updated query definition options"""
-  options: QueryDefinitionOptionsInput = null
+  """New query definition options."""
+  options: ModifyQueryDefinitionOptionsInput
+}
+
+"""Added in 26.3.0. Options for modifying an existing query definition."""
+input ModifyQueryDefinitionOptionsInput
+  @join__type(graph: STRAWBERRY)
+{
+  """Allowed filter label keys."""
+  filterLabels: [String!] = null
+
+  """Allowed group-by label keys."""
+  groupLabels: [String!] = null
 }
 
 """Added in 26.3.0. Payload returned after modifying a query definition."""
@@ -8394,22 +8008,11 @@ type NotificationChannelEdge
 input NotificationChannelFilter
   @join__type(graph: STRAWBERRY)
 {
-  """Filter by channel name"""
   name: StringFilter = null
-
-  """Filter by channel type"""
   channelType: NotificationChannelTypeFilter = null
-
-  """Filter by enabled status"""
   enabled: Boolean = null
-
-  """Combine with AND logic"""
   AND: [NotificationChannelFilter!] = null
-
-  """Combine with OR logic"""
   OR: [NotificationChannelFilter!] = null
-
-  """Negate filters"""
   NOT: [NotificationChannelFilter!] = null
 }
 
@@ -8417,11 +8020,8 @@ input NotificationChannelFilter
 input NotificationChannelOrderBy
   @join__type(graph: STRAWBERRY)
 {
-  """Field to order by"""
   field: NotificationChannelOrderField!
-
-  """Order direction"""
-  direction: OrderDirection! = DESC
+  direction: OrderDirection! = ASC
 }
 
 enum NotificationChannelOrderField
@@ -8432,10 +8032,11 @@ enum NotificationChannelOrderField
   UPDATED_AT @join__enumValue(graph: STRAWBERRY)
 }
 
-"""Interface for notification channel specifications"""
+"""Added in 26.3.0. Interface for notification channel specifications."""
 interface NotificationChannelSpec
   @join__type(graph: STRAWBERRY)
 {
+  """Channel type discriminator"""
   channelType: NotificationChannelType!
 }
 
@@ -8445,11 +8046,8 @@ Added in 24.09.0. Input for notification channel configuration. Exactly one of w
 input NotificationChannelSpecInput
   @join__type(graph: STRAWBERRY)
 {
-  """Webhook specification."""
-  webhook: WebhookSpecInput = null
-
-  """Email specification."""
-  email: EmailSpecInput = null
+  webhook: WebhookSpecInput
+  email: EmailSpecInput
 }
 
 """Notification channel types"""
@@ -8466,16 +8064,16 @@ Added in 26.3.0. Filter for notification channel type with equality and membersh
 input NotificationChannelTypeFilter
   @join__type(graph: STRAWBERRY)
 {
-  """Matches channels with this exact type"""
+  """Matches channels with this exact type."""
   equals: NotificationChannelType = null
 
-  """Matches channels whose type is in this list"""
+  """Matches channels whose type is in this list."""
   in: [NotificationChannelType!] = null
 
-  """Excludes channels with this exact type"""
+  """Excludes channels with this exact type."""
   notEquals: NotificationChannelType = null
 
-  """Excludes channels whose type is in this list"""
+  """Excludes channels whose type is in this list."""
   notIn: [NotificationChannelType!] = null
 }
 
@@ -8522,22 +8120,11 @@ type NotificationRuleEdge
 input NotificationRuleFilter
   @join__type(graph: STRAWBERRY)
 {
-  """Filter by rule name"""
   name: StringFilter = null
-
-  """Filter by rule type"""
   ruleType: NotificationRuleTypeFilter = null
-
-  """Filter by enabled status"""
   enabled: Boolean = null
-
-  """Combine with AND logic"""
   AND: [NotificationRuleFilter!] = null
-
-  """Combine with OR logic"""
   OR: [NotificationRuleFilter!] = null
-
-  """Negate filters"""
   NOT: [NotificationRuleFilter!] = null
 }
 
@@ -8545,11 +8132,8 @@ input NotificationRuleFilter
 input NotificationRuleOrderBy
   @join__type(graph: STRAWBERRY)
 {
-  """Field to order by"""
   field: NotificationRuleOrderField!
-
-  """Order direction"""
-  direction: OrderDirection! = DESC
+  direction: OrderDirection! = ASC
 }
 
 enum NotificationRuleOrderField
@@ -8576,16 +8160,16 @@ Added in 26.3.0. Filter for notification rule type with equality and membership 
 input NotificationRuleTypeFilter
   @join__type(graph: STRAWBERRY)
 {
-  """Matches rules with this exact type"""
+  """Matches rules with this exact type."""
   equals: NotificationRuleType = null
 
-  """Matches rules whose type is in this list"""
+  """Matches rules whose type is in this list."""
   in: [NotificationRuleType!] = null
 
-  """Excludes rules with this exact type"""
+  """Excludes rules with this exact type."""
   notEquals: NotificationRuleType = null
 
-  """Excludes rules whose type is in this list"""
+  """Excludes rules whose type is in this list."""
   notIn: [NotificationRuleType!] = null
 }
 
@@ -8785,13 +8369,15 @@ type PreemptionConfig
 input PreemptionConfigInput
   @join__type(graph: STRAWBERRY)
 {
-  """Sessions with priority <= this value are eligible for preemption."""
+  """Sessions with priority <= this value are preemptible. Default is 5."""
   preemptiblePriority: Int! = 5
 
-  """Tie-breaking order for same-priority sessions (oldest/newest)."""
+  """
+  Tie-breaking order for same-priority sessions (OLDEST, NEWEST). Default is OLDEST.
+  """
   order: PreemptionOrder! = OLDEST
 
-  """How to preempt sessions (terminate/reschedule)."""
+  """How to preempt sessions (TERMINATE, RESCHEDULE). Default is TERMINATE."""
   mode: PreemptionMode! = TERMINATE
 }
 
@@ -8934,25 +8520,37 @@ Added in 26.1.0. Filter input for querying project fair shares. Supports filteri
 input ProjectFairShareFilter
   @join__type(graph: STRAWBERRY)
 {
-  """Filter by scaling group"""
+  """
+  Filter by scaling group name. Scaling groups define resource pool boundaries where projects compete for resources within their domain. Supports equals, contains, startsWith, and endsWith operations.
+  """
   resourceGroup: StringFilter = null
 
-  """Filter by project ID"""
+  """
+  Filter by project UUID. Projects are containers for sessions and user activities. Supports equals operation for exact match or 'in' operation for multiple UUIDs.
+  """
   projectId: UUIDFilter = null
 
-  """Filter by domain name"""
+  """
+  Filter by domain name. This filters projects belonging to a specific domain. Supports equals, contains, startsWith, and endsWith operations.
+  """
   domainName: StringFilter = null
 
-  """Filter by project entity properties"""
+  """
+  Added in 26.2.0. Nested filter for project entity properties. Allows filtering by project name, active status, and type.
+  """
   project: ProjectFairShareProjectNestedFilter = null
 
-  """Combine with AND logic"""
+  """Combine multiple filters with AND logic. All conditions must match."""
   AND: [ProjectFairShareFilter!] = null
 
-  """Combine with OR logic"""
+  """
+  Combine multiple filters with OR logic. At least one condition must match.
+  """
   OR: [ProjectFairShareFilter!] = null
 
-  """Negate filters"""
+  """
+  Negate the specified filters. Records matching these conditions will be excluded.
+  """
   NOT: [ProjectFairShareFilter!] = null
 }
 
@@ -8962,10 +8560,14 @@ Added in 26.1.0. Specifies ordering for project fair share query results. Combin
 input ProjectFairShareOrderBy
   @join__type(graph: STRAWBERRY)
 {
-  """Field to order by"""
+  """
+  The field to order by. See ProjectFairShareOrderField for available options.
+  """
   field: ProjectFairShareOrderField!
 
-  """Order direction"""
+  """
+  Sort direction. ASC for ascending (lowest first), DESC for descending (highest first). For fair_share_factor, ASC shows highest priority projects first.
+  """
   direction: OrderDirection! = DESC
 }
 
@@ -8992,11 +8594,11 @@ input ProjectFairShareProjectNestedFilter
   """
   name: StringFilter = null
 
+  """Filter by project active status."""
+  isActive: Boolean = null
+
   """Filter by project type (GENERAL, MODEL_STORE)."""
   type: ProjectFairShareTypeEnumFilter = null
-
-  """Filter by project active status"""
-  isActive: Boolean = null
 }
 
 """Added in 24.09.0. Scope parameters for filtering project fair shares."""
@@ -9021,9 +8623,16 @@ Added in 26.2.0. Filter for project type enum in fair share queries. Supports eq
 input ProjectFairShareTypeEnumFilter
   @join__type(graph: STRAWBERRY)
 {
+  """Exact match for project type."""
   equals: ProjectFairShareTypeEnum = null
+
+  """Match any of the provided types."""
   in: [ProjectFairShareTypeEnum!] = null
+
+  """Exclude exact type match."""
   notEquals: ProjectFairShareTypeEnum = null
+
+  """Exclude any of the provided types."""
   notIn: [ProjectFairShareTypeEnum!] = null
 }
 
@@ -9199,28 +8808,38 @@ Added in 26.1.0. Filter input for querying project usage bucket records. Usage b
 input ProjectUsageBucketFilter
   @join__type(graph: STRAWBERRY)
 {
-  """Filter by resource group name"""
+  """
+  Filter by scaling group name. Scaling groups define where usage was recorded. Supports equals, contains, startsWith, and endsWith operations.
+  """
   resourceGroup: StringFilter = null
 
-  """Filter by project UUID"""
+  """
+  Filter by project UUID. This filters usage buckets for a specific project. Supports equals operation for exact match.
+  """
   projectId: UUIDFilter = null
 
-  """Filter by domain name"""
+  """
+  Filter by domain name. This filters usage buckets for projects within a specific domain. Supports equals, contains, startsWith, and endsWith operations.
+  """
   domainName: StringFilter = null
 
-  """Filter by period start date"""
+  """Filter by usage measurement period start date."""
   periodStart: DateFilter = null
 
-  """Filter by period end date"""
+  """Filter by usage measurement period end date."""
   periodEnd: DateFilter = null
 
-  """Combine with AND logic"""
+  """Combine multiple filters with AND logic. All conditions must match."""
   AND: [ProjectUsageBucketFilter!] = null
 
-  """Combine with OR logic"""
+  """
+  Combine multiple filters with OR logic. At least one condition must match.
+  """
   OR: [ProjectUsageBucketFilter!] = null
 
-  """Negate filters"""
+  """
+  Negate the specified filters. Records matching these conditions will be excluded.
+  """
   NOT: [ProjectUsageBucketFilter!] = null
 }
 
@@ -9230,10 +8849,14 @@ Added in 26.1.0. Specifies ordering for project usage bucket query results. Comb
 input ProjectUsageBucketOrderBy
   @join__type(graph: STRAWBERRY)
 {
-  """Field to order by"""
+  """
+  The field to order by. See UsageBucketOrderField for available options.
+  """
   field: UsageBucketOrderField!
 
-  """Order direction"""
+  """
+  Sort direction. ASC for chronological order (oldest first), DESC for reverse chronological order (most recent first).
+  """
   direction: OrderDirection! = DESC
 }
 
@@ -9264,7 +8887,9 @@ Added in 26.2.0. Scope for querying users within a specific project. Used to res
 input ProjectUserV2Scope
   @join__type(graph: STRAWBERRY)
 {
-  """Project UUID to scope the user query."""
+  """
+  Project UUID to scope the user query. Only users who are members of this project will be returned.
+  """
   projectId: UUID!
 }
 
@@ -9347,40 +8972,17 @@ Added in 26.2.0. Filter input for querying projects. Supports filtering by ID, n
 input ProjectV2Filter
   @join__type(graph: STRAWBERRY)
 {
-  """Filter by project ID (UUID)."""
   id: UUIDFilter = null
-
-  """Filter by group name."""
   name: StringFilter = null
-
-  """Filter by domain name."""
   domainName: StringFilter = null
-
-  """Filter by project type."""
   type: ProjectTypeV2EnumFilter = null
-
-  """Filter by active status."""
   isActive: Boolean = null
-
-  """Filter by creation timestamp."""
   createdAt: DateTimeFilter = null
-
-  """Filter by last modification timestamp."""
   modifiedAt: DateTimeFilter = null
-
-  """Nested filter for domain conditions."""
   domain: ProjectDomainNestedFilter = null
-
-  """Nested filter for user conditions."""
   user: ProjectUserNestedFilter = null
-
-  """Combine filters with AND logic."""
   AND: [ProjectV2Filter!] = null
-
-  """Combine filters with OR logic."""
   OR: [ProjectV2Filter!] = null
-
-  """Negate the specified filters."""
   NOT: [ProjectV2Filter!] = null
 }
 
@@ -9390,11 +8992,8 @@ Added in 26.2.0. Specifies ordering for project query results. Combine field sel
 input ProjectV2OrderBy
   @join__type(graph: STRAWBERRY)
 {
-  """Field to order by."""
-  field: ProjectV2OrderField!
-
-  """Order direction."""
-  direction: OrderDirection! = ASC
+  field: ProjectV2OrderField! = CREATED_AT
+  direction: OrderDirection! = DESC
 }
 
 """
@@ -9419,14 +9018,16 @@ Added in 26.1.0. Input item for a single project weight in bulk upsert. Represen
 input ProjectWeightInputItem
   @join__type(graph: STRAWBERRY)
 {
-  """Project ID"""
+  """ID of the project to update weight for."""
   projectId: UUID!
 
-  """Domain name for context"""
+  """Name of the domain this project belongs to."""
   domainName: String!
 
-  """Fair share weight (null for default)"""
-  weight: Decimal
+  """
+  Priority weight multiplier. Higher weight = higher priority allocation ratio. Set to null to use resource group's default_weight.
+  """
+  weight: Decimal = null
 }
 
 """
@@ -9505,7 +9106,6 @@ type PurgeImagesPayload
 input PurgeRoleInput
   @join__type(graph: STRAWBERRY)
 {
-  """Role ID to purge"""
   id: UUID!
 }
 
@@ -9513,8 +9113,8 @@ input PurgeRoleInput
 type PurgeRolePayload
   @join__type(graph: STRAWBERRY)
 {
-  """ID of the purged role."""
-  id: ID!
+  """ID of the purged role"""
+  id: UUID!
 }
 
 """
@@ -10523,29 +10123,18 @@ type QueryDefinitionExecuteResult
 input QueryDefinitionFilter
   @join__type(graph: STRAWBERRY)
 {
-  """Filter by name"""
+  """Filter by name."""
   name: StringFilter = null
-}
-
-"""Added in 26.3.0. Key-value label entry from Prometheus result."""
-type QueryDefinitionMetricLabelEntry
-  @join__type(graph: STRAWBERRY)
-{
-  """Label key."""
-  key: String!
-
-  """Label value."""
-  value: String!
 }
 
 """Added in 26.3.0. Single metric result from Prometheus query."""
 type QueryDefinitionMetricResult
   @join__type(graph: STRAWBERRY)
 {
-  """Metric labels as key-value entries."""
-  metric: [QueryDefinitionMetricLabelEntry!]!
+  """Label key-value pairs for this series"""
+  metric: [MetricLabelEntry!]!
 
-  """Time-series values."""
+  """Data points (timestamp, value) for this series"""
   values: [QueryDefinitionMetricResultValue!]!
 }
 
@@ -10553,26 +10142,15 @@ type QueryDefinitionMetricResult
 type QueryDefinitionMetricResultValue
   @join__type(graph: STRAWBERRY)
 {
-  """Unix timestamp of the data point."""
+  """Unix timestamp of the data point"""
   timestamp: Float!
 
-  """Metric value as a string to preserve precision."""
+  """Metric value as a string to preserve precision"""
   value: String!
 }
 
 """Added in 26.3.0. Options for query definition label governance."""
 type QueryDefinitionOptions
-  @join__type(graph: STRAWBERRY)
-{
-  """Allowed filter label keys."""
-  filterLabels: [String!]!
-
-  """Allowed group-by label keys."""
-  groupLabels: [String!]!
-}
-
-"""Added in 26.3.0. Options for query definition labels."""
-input QueryDefinitionOptionsInput
   @join__type(graph: STRAWBERRY)
 {
   """Allowed filter label keys"""
@@ -10582,15 +10160,26 @@ input QueryDefinitionOptionsInput
   groupLabels: [String!]!
 }
 
+"""Added in 26.3.0. Options for query definition labels."""
+input QueryDefinitionOptionsInput
+  @join__type(graph: STRAWBERRY)
+{
+  """Allowed filter label keys."""
+  filterLabels: [String!]!
+
+  """Allowed group-by label keys."""
+  groupLabels: [String!]!
+}
+
 """Added in 26.3.0. Specifies ordering for query definition results."""
 input QueryDefinitionOrderBy
   @join__type(graph: STRAWBERRY)
 {
-  """Field to order by"""
+  """The field to order by."""
   field: QueryDefinitionOrderField!
 
-  """Order direction"""
-  direction: OrderDirection! = ASC
+  """Sort direction."""
+  direction: OrderDirection! = DESC
 }
 
 """
@@ -10698,10 +10287,7 @@ enum ReadinessStatus
 input RegisterStorageNamespaceInput
   @join__type(graph: STRAWBERRY)
 {
-  """Storage ID to register namespace for"""
   storageId: UUID!
-
-  """Namespace bucket or path prefix"""
   namespace: String!
 }
 
@@ -10723,7 +10309,6 @@ Admin-only operation to reject artifact revisions, preventing their use.
 input RejectArtifactInput
   @join__type(graph: STRAWBERRY)
 {
-  """The artifact revision ID to reject."""
   artifactRevisionId: ID!
 }
 
@@ -10733,6 +10318,7 @@ Added in 25.14.0. Response payload for artifact revision rejection operations. C
 type RejectArtifactPayload
   @join__type(graph: STRAWBERRY)
 {
+  """Rejected artifact revision."""
   artifactRevision: ArtifactRevision!
 }
 
@@ -10740,19 +10326,10 @@ type RejectArtifactPayload
 input ReplicaFilter
   @join__type(graph: STRAWBERRY)
 {
-  """Replica status filter"""
   status: ReplicaStatusFilter = null
-
-  """Replica traffic status filter"""
   trafficStatus: TrafficStatusFilter = null
-
-  """AND conjunction"""
   AND: [ReplicaFilter!] = null
-
-  """OR conjunction"""
   OR: [ReplicaFilter!] = null
-
-  """NOT negation"""
   NOT: [ReplicaFilter!] = null
 }
 
@@ -10778,7 +10355,6 @@ type ReplicaState
   @join__type(graph: STRAWBERRY)
 {
   desiredReplicaCount: Int!
-  replicas(filter: ReplicaFilter = null, orderBy: [ReplicaOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ModelReplicaConnection!
 }
 
 """
@@ -10808,11 +10384,8 @@ type ReplicaStatusChangedPayload
 input ReplicaStatusFilter
   @join__type(graph: STRAWBERRY)
 {
-  """Exact status match"""
-  equals: ReplicaStatus = null
-
-  """Status is in list"""
   in: [ReplicaStatus!] = null
+  equals: ReplicaStatus = null
 }
 
 """Added in 25.4.0."""
@@ -10905,27 +10478,24 @@ Added in 25.19.0. Compute resource configuration for the deployment. Specifies C
 type ResourceConfig
   @join__type(graph: STRAWBERRY)
 {
-  """
-  Added in 26.1.0. Allocated compute resources including CPU, memory, and accelerators.
-  """
-  resourceSlots: ResourceSlot!
-
-  """Added in 26.1.0. Additional resource options such as shared memory."""
-  resourceOpts: ResourceOpts
   resourceGroup: ScalingGroupNode!
+  resourceGroupName: String!
+  resourceSlots: ResourceSlot!
+  resourceOpts: ResourceOpts
 }
 
 """Added in 25.19.0. """
 input ResourceConfigInput
   @join__type(graph: STRAWBERRY)
 {
-  """Resource group"""
   resourceGroup: ResourceGroupInput!
 
-  """Resource slot allocations"""
+  """Added in 26.1.0. Resources allocated for the deployment."""
   resourceSlots: ResourceSlotInput!
 
-  """Additional resource options"""
+  """
+  Added in 26.1.0. Additional options for the resources such as shared memory.
+  """
   resourceOpts: ResourceOptsInput = null
 }
 
@@ -10986,7 +10556,7 @@ type ResourceGroupConnection
 input ResourceGroupDomainScope
   @join__type(graph: STRAWBERRY)
 {
-  """Resource group name to scope the operation."""
+  """Resource group name to scope the operation"""
   resourceGroupName: String!
 }
 
@@ -11005,25 +10575,12 @@ type ResourceGroupEdge
 input ResourceGroupFilter
   @join__type(graph: STRAWBERRY)
 {
-  """Filter by name."""
   name: StringFilter = null
-
-  """Filter by description."""
   description: StringFilter = null
-
-  """Filter by active status."""
   isActive: Boolean = null
-
-  """Filter by public status."""
   isPublic: Boolean = null
-
-  """AND conjunction."""
   AND: [ResourceGroupFilter!] = null
-
-  """OR conjunction."""
   OR: [ResourceGroupFilter!] = null
-
-  """NOT negation."""
   NOT: [ResourceGroupFilter!] = null
 }
 
@@ -11031,7 +10588,6 @@ input ResourceGroupFilter
 input ResourceGroupInput
   @join__type(graph: STRAWBERRY)
 {
-  """Resource group name"""
   name: String!
 }
 
@@ -11063,10 +10619,7 @@ type ResourceGroupNetworkConfig
 input ResourceGroupOrderBy
   @join__type(graph: STRAWBERRY)
 {
-  """Field to order by."""
   field: ResourceGroupOrderField!
-
-  """Order direction."""
   direction: OrderDirection! = ASC
 }
 
@@ -11085,10 +10638,10 @@ Added in 24.09.0. Resource group + domain scope for project-level operations
 input ResourceGroupProjectScope
   @join__type(graph: STRAWBERRY)
 {
-  """Resource group name to scope the operation."""
+  """Resource group name to scope the operation"""
   resourceGroupName: String!
 
-  """Domain name to scope the operation."""
+  """Domain name to scope the operation"""
   domainName: String!
 }
 
@@ -11101,7 +10654,7 @@ type ResourceGroupSchedulerConfig
   """
   type: SchedulerType!
 
-  """Added in 26.3.0. Preemption configuration for this resource group."""
+  """Preemption configuration for this resource group."""
   preemption: PreemptionConfig!
 }
 
@@ -11122,13 +10675,13 @@ Added in 24.09.0. Resource group + domain + project scope for user-level operati
 input ResourceGroupUserScope
   @join__type(graph: STRAWBERRY)
 {
-  """Resource group name to scope the operation."""
+  """Resource group name to scope the operation"""
   resourceGroupName: String!
 
-  """Domain name to scope the operation."""
+  """Domain name to scope the operation"""
   domainName: String!
 
-  """Project ID to scope the operation."""
+  """Project ID to scope the operation"""
   projectId: String!
 }
 
@@ -11138,17 +10691,13 @@ Added in 26.1.0. Resource information for a resource group. Provides aggregated 
 type ResourceInfo
   @join__type(graph: STRAWBERRY)
 {
-  """
-  Total available resources from ALIVE, schedulable agents in this resource group.
-  """
+  """Total available resources"""
   capacity: ResourceSlot!
 
-  """
-  Currently occupied resources from active kernels (RUNNING/TERMINATING status).
-  """
+  """Currently occupied resources"""
   used: ResourceSlot!
 
-  """Available resources (capacity - used)."""
+  """Available resources (capacity - used)"""
   free: ResourceSlot!
 }
 
@@ -11174,7 +10723,7 @@ Added in 26.1.0. A collection of additional resource options for a deployment. C
 type ResourceOpts
   @join__type(graph: STRAWBERRY)
 {
-  """List of resource option entries. Each entry contains a key-value pair."""
+  """List of resource option entries."""
   entries: [ResourceOptsEntry!]!
 }
 
@@ -11184,10 +10733,10 @@ Added in 26.1.0. A single key-value entry representing a resource option. Contai
 type ResourceOptsEntry
   @join__type(graph: STRAWBERRY)
 {
-  """The name of this resource option. Example: 'shmem'."""
+  """The name of this resource option (e.g., 'shmem')."""
   name: String!
 
-  """The value for this resource option. Example: '64m'."""
+  """The value for this resource option (e.g., '64m')."""
   value: String!
 }
 
@@ -11235,9 +10784,7 @@ Added in 26.1.0. A collection of compute resource allocations. Represents the re
 type ResourceSlot
   @join__type(graph: STRAWBERRY)
 {
-  """
-  List of resource allocations. Each entry contains a resource type and quantity pair. The list may include cpu, mem, and various accelerator types depending on the cluster configuration.
-  """
+  """List of resource allocations"""
   entries: [ResourceSlotEntry!]!
 }
 
@@ -11247,14 +10794,10 @@ Added in 26.1.0. A single entry representing one resource type and its allocated
 type ResourceSlotEntry
   @join__type(graph: STRAWBERRY)
 {
-  """
-  Resource type identifier. Common types include: 'cpu' (CPU cores), 'mem' (memory in bytes), 'cuda.shares' (fractional GPU), 'cuda.device' (whole GPU devices), 'rocm.device' (AMD GPU devices). Custom accelerator plugins may define additional types.
-  """
+  """Resource type identifier (e.g., cpu, mem, cuda.shares)"""
   resourceType: String!
 
-  """
-  Quantity of the resource. For 'cpu': number of cores (e.g., 2.0, 0.5). For 'mem': bytes (e.g., 4294967296 for 4GB). For accelerators: device count or share fraction.
-  """
+  """Quantity of the resource"""
   quantity: Decimal!
 }
 
@@ -11264,10 +10807,10 @@ Added in 26.1.0. A single entry representing one resource type and its allocated
 input ResourceSlotEntryInput
   @join__type(graph: STRAWBERRY)
 {
-  """Resource type identifier (e.g., 'cpu', 'mem')"""
+  """Resource type identifier (e.g., 'cpu', 'mem', 'cuda.device')."""
   resourceType: String!
 
-  """Quantity of the resource as a decimal string"""
+  """Quantity of the resource as a decimal string."""
   quantity: String!
 }
 
@@ -11277,7 +10820,7 @@ Added in 26.1.0. A collection of compute resource allocations for input.
 input ResourceSlotInput
   @join__type(graph: STRAWBERRY)
 {
-  """List of resource allocations"""
+  """List of resource allocations."""
   entries: [ResourceSlotEntryInput!]!
 }
 
@@ -11350,22 +10893,11 @@ type ResourceSlotTypeEdge
 input ResourceSlotTypeFilter
   @join__type(graph: STRAWBERRY)
 {
-  """Filter by slot name."""
   slotName: StringFilter = null
-
-  """Filter by slot type."""
   slotType: StringFilter = null
-
-  """Filter by display name."""
   displayName: StringFilter = null
-
-  """Logical AND of multiple filter conditions."""
   AND: [ResourceSlotTypeFilter!] = null
-
-  """Logical OR of multiple filter conditions."""
   OR: [ResourceSlotTypeFilter!] = null
-
-  """Logical NOT of filter conditions."""
   NOT: [ResourceSlotTypeFilter!] = null
 }
 
@@ -11373,10 +10905,7 @@ input ResourceSlotTypeFilter
 input ResourceSlotTypeOrderBy
   @join__type(graph: STRAWBERRY)
 {
-  """Field to order by."""
   field: ResourceSlotTypeOrderField!
-
-  """Order direction."""
   direction: OrderDirection! = ASC
 }
 
@@ -11395,19 +10924,13 @@ Added in 26.2.0. Resource weight with default indicator. Shows whether this reso
 type ResourceWeightEntry
   @join__type(graph: STRAWBERRY)
 {
-  """
-  Resource type identifier (e.g., 'cpu', 'mem', 'cuda.device'). Matches the resource types available in the scaling group.
-  """
+  """Resource type identifier"""
   resourceType: String!
 
-  """
-  Weight multiplier for this resource type in fair share calculations. Higher weight means more contribution to normalized usage.
-  """
+  """Weight multiplier for this resource type"""
   weight: Decimal!
 
-  """
-  Whether this resource uses the resource group's default weight. True means no explicit weight was configured for this type.
-  """
+  """Whether this resource uses the resource group's default weight"""
   usesDefault: Boolean!
 }
 
@@ -11417,10 +10940,14 @@ Added in 26.1.0. Input for a single resource weight entry. Specifies how much a 
 input ResourceWeightEntryInput
   @join__type(graph: STRAWBERRY)
 {
-  """Resource type identifier."""
+  """
+  Resource type identifier (e.g., 'cpu', 'mem', 'cuda.shares'). Must match the resource types used in the cluster.
+  """
   resourceType: String!
 
-  """Weight multiplier. Set null to revert to default weight."""
+  """
+  Weight multiplier for this resource type in fair share calculations. Higher weight means this resource contributes more to the normalized usage. Set to null to remove this resource type (revert to default weight 1.0). Example: 0.001 for memory (bytes) to normalize against CPU cores.
+  """
   weight: Decimal = null
 }
 
@@ -11432,7 +10959,6 @@ Reverses the soft-delete operation, making the artifacts available again.
 input RestoreArtifactsInput
   @join__type(graph: STRAWBERRY)
 {
-  """List of artifact IDs to restore."""
   artifactIds: [ID!]!
 }
 
@@ -11442,6 +10968,7 @@ Added in 25.15.0. Response payload for artifact restoration operations. Contains
 type RestoreArtifactsPayload
   @join__type(graph: STRAWBERRY)
 {
+  """List of restored artifacts."""
   artifacts: [Artifact!]!
 }
 
@@ -11467,10 +10994,7 @@ type RevokeMyKeypairPayload
 input RevokeRoleInput
   @join__type(graph: STRAWBERRY)
 {
-  """User ID to revoke the role from"""
   userId: UUID!
-
-  """Role ID to revoke"""
   roleId: UUID!
 }
 
@@ -11480,22 +11004,22 @@ Added in 26.2.0. Filter for domain fair shares within a resource group scope. Re
 input RGDomainFairShareFilter
   @join__type(graph: STRAWBERRY)
 {
-  """Filter by scaling group"""
+  """Filter by scaling group name."""
   resourceGroup: StringFilter = null
 
-  """Filter by domain name"""
+  """Filter by domain name."""
   domainName: StringFilter = null
 
-  """Filter by domain entity properties"""
+  """Filter by domain properties."""
   domain: DomainFairShareDomainNestedFilter = null
 
-  """Combine with AND logic"""
+  """Combine with AND logic."""
   AND: [RGDomainFairShareFilter!] = null
 
-  """Combine with OR logic"""
+  """Combine with OR logic."""
   OR: [RGDomainFairShareFilter!] = null
 
-  """Negate filters"""
+  """Negate filters."""
   NOT: [RGDomainFairShareFilter!] = null
 }
 
@@ -11505,25 +11029,25 @@ Added in 26.2.0. Filter for project fair shares within a resource group scope. R
 input RGProjectFairShareFilter
   @join__type(graph: STRAWBERRY)
 {
-  """Filter by scaling group"""
+  """Filter by scaling group name."""
   resourceGroup: StringFilter = null
 
-  """Filter by project ID"""
+  """Filter by project UUID."""
   projectId: UUIDFilter = null
 
-  """Filter by domain name"""
+  """Filter by domain name."""
   domainName: StringFilter = null
 
-  """Filter by project entity properties"""
+  """Filter by project properties."""
   project: ProjectFairShareProjectNestedFilter = null
 
-  """Combine with AND logic"""
+  """Combine with AND logic."""
   AND: [RGProjectFairShareFilter!] = null
 
-  """Combine with OR logic"""
+  """Combine with OR logic."""
   OR: [RGProjectFairShareFilter!] = null
 
-  """Negate filters"""
+  """Negate filters."""
   NOT: [RGProjectFairShareFilter!] = null
 }
 
@@ -11533,28 +11057,28 @@ Added in 26.2.0. Filter for user fair shares within a resource group scope. Refe
 input RGUserFairShareFilter
   @join__type(graph: STRAWBERRY)
 {
-  """Filter by scaling group"""
+  """Filter by scaling group name."""
   resourceGroup: StringFilter = null
 
-  """Filter by user UUID"""
+  """Filter by user UUID."""
   userUuid: UUIDFilter = null
 
-  """Filter by project ID"""
+  """Filter by project UUID."""
   projectId: UUIDFilter = null
 
-  """Filter by domain name"""
+  """Filter by domain name."""
   domainName: StringFilter = null
 
-  """Filter by user entity properties"""
+  """Filter by user properties."""
   user: UserFairShareUserNestedFilter = null
 
-  """Combine with AND logic"""
+  """Combine with AND logic."""
   AND: [RGUserFairShareFilter!] = null
 
-  """Combine with OR logic"""
+  """Combine with OR logic."""
   OR: [RGUserFairShareFilter!] = null
 
-  """Negate filters"""
+  """Negate filters."""
   NOT: [RGUserFairShareFilter!] = null
 }
 
@@ -11738,9 +11262,16 @@ Added in 26.3.0. Filter for role source with equality and membership operators.
 input RoleSourceFilter
   @join__type(graph: STRAWBERRY)
 {
+  """Matches roles with this exact source."""
   equals: RoleSource = null
+
+  """Matches roles whose source is in this list."""
   in: [RoleSource!] = null
+
+  """Excludes roles with this exact source."""
   notEquals: RoleSource = null
+
+  """Excludes roles whose source is in this list."""
   notIn: [RoleSource!] = null
 }
 
@@ -11759,9 +11290,16 @@ Added in 26.3.0. Filter for role status with equality and membership operators.
 input RoleStatusFilter
   @join__type(graph: STRAWBERRY)
 {
+  """Matches roles with this exact status."""
   equals: RoleStatus = null
+
+  """Matches roles whose status is in this list."""
   in: [RoleStatus!] = null
+
+  """Excludes roles with this exact status."""
   notEquals: RoleStatus = null
+
+  """Excludes roles whose status is in this list."""
   notIn: [RoleStatus!] = null
 }
 
@@ -11769,10 +11307,7 @@ input RoleStatusFilter
 input RollingUpdateConfigInput
   @join__type(graph: STRAWBERRY)
 {
-  """Maximum number of extra replicas during update"""
   maxSurge: Int! = 1
-
-  """Maximum number of unavailable replicas during update"""
   maxUnavailable: Int! = 0
 }
 
@@ -11783,6 +11318,9 @@ type Route implements Node
 {
   """The Globally Unique ID of this object"""
   id: ID!
+  deploymentId: ID!
+  sessionId: ID
+  revisionId: ID
 
   """The current status of the route indicating its health state."""
   status: RouteStatus!
@@ -11842,19 +11380,10 @@ type RouteEdge
 input RouteFilter
   @join__type(graph: STRAWBERRY)
 {
-  """Route status filter"""
   status: RouteStatusFilter = null
-
-  """Traffic status filter"""
   trafficStatus: RouteTrafficStatusFilter = null
-
-  """AND conjunction"""
   AND: [RouteFilter!] = null
-
-  """OR conjunction"""
   OR: [RouteFilter!] = null
-
-  """NOT negation"""
   NOT: [RouteFilter!] = null
 }
 
@@ -11865,22 +11394,18 @@ type RouteHistory implements Node
 {
   """The Globally Unique ID of this object"""
   id: ID!
+  routeId: ID!
+  deploymentId: ID!
   phase: String!
   fromStatus: String
   toStatus: String
   result: SchedulingResult!
   errorCode: String
   message: String
-  subSteps: [SubStepResultGQL!]!
+  subSteps: [SubStepResult!]!
   attempts: Int!
   createdAt: DateTime!
   updatedAt: DateTime!
-
-  """The route ID this history record belongs to."""
-  routeId: ID!
-
-  """The deployment ID this route belongs to."""
-  deploymentId: ID!
 }
 
 """Added in 26.3.0. Route history connection."""
@@ -11910,46 +11435,19 @@ type RouteHistoryEdge
 input RouteHistoryFilter
   @join__type(graph: STRAWBERRY)
 {
-  """Filter by history record ID"""
   id: UUIDFilter = null
-
-  """Filter by route ID"""
   routeId: UUIDFilter = null
-
-  """Filter by deployment ID"""
   deploymentId: UUIDFilter = null
-
-  """Filter by scheduling phase"""
   phase: StringFilter = null
-
-  """Filter by from_status values"""
   fromStatus: [String!] = null
-
-  """Filter by to_status values"""
   toStatus: [String!] = null
-
-  """Filter by scheduling result"""
   result: SchedulingResultFilter = null
-
-  """Filter by error code"""
   errorCode: StringFilter = null
-
-  """Filter by message"""
   message: StringFilter = null
-
-  """Filter by created_at"""
   createdAt: DateTimeFilter = null
-
-  """Filter by updated_at"""
   updatedAt: DateTimeFilter = null
-
-  """AND conjunction."""
   AND: [RouteHistoryFilter!] = null
-
-  """OR conjunction."""
   OR: [RouteHistoryFilter!] = null
-
-  """NOT negation."""
   NOT: [RouteHistoryFilter!] = null
 }
 
@@ -11957,10 +11455,7 @@ input RouteHistoryFilter
 input RouteHistoryOrderBy
   @join__type(graph: STRAWBERRY)
 {
-  """Field to order by"""
   field: RouteHistoryOrderField!
-
-  """Order direction"""
   direction: OrderDirection! = DESC
 }
 
@@ -11976,7 +11471,7 @@ input RouteOrderBy
   @join__type(graph: STRAWBERRY)
 {
   field: RouteOrderField!
-  direction: OrderDirection! = DESC
+  direction: OrderDirection! = ASC
 }
 
 enum RouteOrderField
@@ -11991,7 +11486,7 @@ enum RouteOrderField
 input RouteScope
   @join__type(graph: STRAWBERRY)
 {
-  """Route ID to get history for."""
+  """Route ID to get history for"""
   routeId: UUID!
 }
 
@@ -12016,16 +11511,16 @@ Added in 26.3.0. Filter for route status with equality and membership operators.
 input RouteStatusFilter
   @join__type(graph: STRAWBERRY)
 {
-  """Exact status match"""
+  """Matches routes with this exact status."""
   equals: RouteStatus = null
 
-  """Status is in list"""
+  """Matches routes whose status is in this list."""
   in: [RouteStatus!] = null
 
-  """Excludes exact status match"""
+  """Excludes routes with this exact status."""
   notEquals: RouteStatus = null
 
-  """Status is not in list"""
+  """Excludes routes whose status is in this list."""
   notIn: [RouteStatus!] = null
 }
 
@@ -12045,16 +11540,16 @@ Added in 26.3.0. Filter for route traffic status with equality and membership op
 input RouteTrafficStatusFilter
   @join__type(graph: STRAWBERRY)
 {
-  """Exact status match"""
+  """Matches routes with this exact traffic status."""
   equals: RouteTrafficStatus = null
 
-  """Status is in list"""
+  """Matches routes whose traffic status is in this list."""
   in: [RouteTrafficStatus!] = null
 
-  """Excludes exact status match"""
+  """Excludes routes with this exact traffic status."""
   notEquals: RouteTrafficStatus = null
 
-  """Status is not in list"""
+  """Excludes routes whose traffic status is in this list."""
   notIn: [RouteTrafficStatus!] = null
 }
 
@@ -12187,15 +11682,6 @@ type ScalingGroupNode implements Node
 }
 
 """
-Added in 25.19.0. Provides access to auto-scaling rules configured for a deployment. Auto-scaling rules define conditions for automatically adjusting the number of replicas based on metrics.
-"""
-type ScalingRule
-  @join__type(graph: STRAWBERRY)
-{
-  autoScalingRules(filter: AutoScalingRuleFilter = null, orderBy: [AutoScalingRuleOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): AutoScalingRuleConnection!
-}
-
-"""
 Added in 24.09.0. Input for batch scanning of specific models from external registries.
 
 Scans multiple specified models and retrieves detailed information including
@@ -12205,10 +11691,7 @@ unlike the general scan_artifacts which only retrieves basic metadata.
 input ScanArtifactModelsInput
   @join__type(graph: STRAWBERRY)
 {
-  """List of model targets to scan."""
   models: [ModelTarget!]!
-
-  """Optional registry ID to scan models from."""
   registryId: UUID = null
 }
 
@@ -12218,7 +11701,8 @@ Added in 25.14.0. Response payload for batch model scanning operations. Contains
 type ScanArtifactModelsPayload
   @join__type(graph: STRAWBERRY)
 {
-  artifactRevision: ArtifactRevisionConnection!
+  """Artifact revisions discovered during model scanning."""
+  artifactRevisions: ArtifactRevisionConnection!
 }
 
 """
@@ -12230,16 +11714,11 @@ Artifacts remain in SCANNED status until explicitly imported via import_artifact
 input ScanArtifactsInput
   @join__type(graph: STRAWBERRY)
 {
-  """Optional registry ID to scan artifacts from."""
   registryId: ID = null
 
-  """Maximum number of artifacts to scan."""
+  """Maximum number of artifacts to scan (max: 500)"""
   limit: Int!
-
-  """Filter artifacts by type."""
   artifactType: ArtifactType = null
-
-  """Search term to filter artifacts by name or description."""
   search: String = null
 }
 
@@ -12249,6 +11728,7 @@ Added in 25.14.0. Response payload for artifact scanning operations. Contains th
 type ScanArtifactsPayload
   @join__type(graph: STRAWBERRY)
 {
+  """List of scanned artifacts."""
   artifacts: [Artifact!]!
 }
 
@@ -12268,6 +11748,7 @@ enum SchedulerType
 type SchedulingBroadcastEventPayload
   @join__type(graph: STRAWBERRY)
 {
+  sessionId: ID!
   statusTransition: SchedulingStatus!
   reason: String!
 
@@ -12296,16 +11777,9 @@ Added in 26.3.0. Filter for scheduling result with equality and membership opera
 input SchedulingResultFilter
   @join__type(graph: STRAWBERRY)
 {
-  """Exact match."""
   equals: SchedulingResult = null
-
-  """In list."""
   in: [SchedulingResult!] = null
-
-  """Not equal."""
   notEquals: SchedulingResult = null
-
-  """Not in list."""
   notIn: [SchedulingResult!] = null
 }
 
@@ -12332,7 +11806,10 @@ Added in 26.3.0. Valid scope-entity type combination for RBAC permissions.
 type ScopeEntityCombination
   @join__type(graph: STRAWBERRY)
 {
+  """Scope element type"""
   scopeType: RBACElementType!
+
+  """Valid entity types for this scope type"""
   validEntityTypes: [RBACElementType!]!
 }
 
@@ -12388,22 +11865,11 @@ type ServiceCatalog implements Node
 type ServiceCatalogEndpoint
   @join__type(graph: STRAWBERRY)
 {
-  """Role of this endpoint (e.g., 'main', 'health')."""
   role: String!
-
-  """Network scope (e.g., 'public', 'private', 'internal')."""
   scope: String!
-
-  """Hostname or IP address."""
   address: String!
-
-  """Port number."""
   port: Int!
-
-  """Protocol (e.g., 'grpc', 'http', 'https')."""
   protocol: String!
-
-  """Additional metadata."""
   metadata: JSON
 }
 
@@ -12411,19 +11877,17 @@ type ServiceCatalogEndpoint
 input ServiceCatalogFilter
   @join__type(graph: STRAWBERRY)
 {
-  """Filter by service group name."""
+  """
+  Filter by service group name. Supports equals, contains, startsWith, and endsWith.
+  """
   serviceGroup: StringFilter = null
 
-  """Filter by health status."""
+  """
+  Filter by health status. Supports equals, in, not_equals, and not_in operations.
+  """
   status: ServiceCatalogStatusFilter = null
-
-  """Logical AND of multiple filter conditions."""
   AND: [ServiceCatalogFilter!] = null
-
-  """Logical OR of multiple filter conditions."""
   OR: [ServiceCatalogFilter!] = null
-
-  """Logical NOT of filter conditions."""
   NOT: [ServiceCatalogFilter!] = null
 }
 
@@ -12433,10 +11897,7 @@ Added in 26.3.0. Specifies the field and direction for ordering service catalog 
 input ServiceCatalogOrderBy
   @join__type(graph: STRAWBERRY)
 {
-  """Field to order by."""
   field: ServiceCatalogOrderField!
-
-  """Order direction."""
   direction: OrderDirection! = ASC
 }
 
@@ -12465,9 +11926,16 @@ Added in 26.3.0. Filter for ServiceCatalogStatus enum fields. Supports equals, i
 input ServiceCatalogStatusFilter
   @join__type(graph: STRAWBERRY)
 {
+  """Exact match for service catalog status."""
   equals: ServiceCatalogStatus = null
+
+  """Match any of the provided statuses."""
   in: [ServiceCatalogStatus!] = null
+
+  """Exclude exact status match."""
   notEquals: ServiceCatalogStatus = null
+
+  """Exclude any of the provided statuses."""
   notIn: [ServiceCatalogStatus!] = null
 }
 
@@ -12524,19 +11992,19 @@ Added in 26.2.0. A single service port entry representing an exposed service. Co
 type ServicePortEntry
   @join__type(graph: STRAWBERRY)
 {
-  """Name of the service (e.g., 'jupyter', 'tensorboard', 'ssh')."""
+  """Name of the service"""
   name: String!
 
-  """Protocol type for this service port (http, tcp, preopen, internal)."""
+  """Protocol type (http, tcp, preopen, internal)"""
   protocol: ServicePortProtocol!
 
-  """Port numbers inside the container."""
+  """Port numbers inside the container"""
   containerPorts: [Int!]!
 
-  """Mapped port numbers on the host. May be null if not yet assigned."""
+  """Mapped port numbers on the host"""
   hostPorts: [Int]!
 
-  """Whether this port is used for inference endpoints."""
+  """Whether this port is used for inference endpoints"""
   isInference: Boolean!
 }
 
@@ -12558,7 +12026,7 @@ Added in 26.2.0. A collection of exposed service ports. Each entry defines a ser
 type ServicePorts
   @join__type(graph: STRAWBERRY)
 {
-  """List of service port entries."""
+  """List of service port entries"""
   entries: [ServicePortEntry!]!
 }
 
@@ -12602,19 +12070,17 @@ type SessionSchedulingHistory implements Node
 {
   """The Globally Unique ID of this object"""
   id: ID!
+  sessionId: ID!
   phase: String!
   fromStatus: String
   toStatus: String
   result: SchedulingResult!
   errorCode: String
   message: String
-  subSteps: [SubStepResultGQL!]!
+  subSteps: [SubStepResult!]!
   attempts: Int!
   createdAt: DateTime!
   updatedAt: DateTime!
-
-  """The session ID this history record belongs to."""
-  sessionId: ID!
 }
 
 """Added in 26.3.0. Session scheduling history connection."""
@@ -12644,43 +12110,18 @@ type SessionSchedulingHistoryEdge
 input SessionSchedulingHistoryFilter
   @join__type(graph: STRAWBERRY)
 {
-  """Filter by history record ID"""
   id: UUIDFilter = null
-
-  """Filter by session ID"""
   sessionId: UUIDFilter = null
-
-  """Filter by scheduling phase"""
   phase: StringFilter = null
-
-  """Filter by from_status values"""
   fromStatus: [String!] = null
-
-  """Filter by to_status values"""
   toStatus: [String!] = null
-
-  """Filter by scheduling result"""
   result: SchedulingResultFilter = null
-
-  """Filter by error code"""
   errorCode: StringFilter = null
-
-  """Filter by message"""
   message: StringFilter = null
-
-  """Filter by created_at"""
   createdAt: DateTimeFilter = null
-
-  """Filter by updated_at"""
   updatedAt: DateTimeFilter = null
-
-  """AND conjunction."""
   AND: [SessionSchedulingHistoryFilter!] = null
-
-  """OR conjunction."""
   OR: [SessionSchedulingHistoryFilter!] = null
-
-  """NOT negation."""
   NOT: [SessionSchedulingHistoryFilter!] = null
 }
 
@@ -12690,10 +12131,7 @@ Added in 24.09.0. Order by specification for session scheduling history
 input SessionSchedulingHistoryOrderBy
   @join__type(graph: STRAWBERRY)
 {
-  """Field to order by"""
   field: SessionSchedulingHistoryOrderField!
-
-  """Order direction"""
   direction: OrderDirection! = DESC
 }
 
@@ -12708,7 +12146,7 @@ enum SessionSchedulingHistoryOrderField
 input SessionScope
   @join__type(graph: STRAWBERRY)
 {
-  """Session ID to get history for."""
+  """Session ID to get history for"""
   sessionId: UUID!
 }
 
@@ -12728,6 +12166,9 @@ type SessionV2 implements Node
 {
   """The Globally Unique ID of this object"""
   id: ID!
+  domainName: String!
+  userId: ID!
+  projectId: ID!
 
   """Metadata including domain, project, and user information."""
   metadata: SessionV2MetadataInfo!
@@ -12884,7 +12325,7 @@ input SessionV2OrderBy
   @join__type(graph: STRAWBERRY)
 {
   field: SessionV2OrderField!
-  direction: OrderDirection!
+  direction: OrderDirection! = DESC
 }
 
 """Added in 26.3.0. Fields available for ordering sessions."""
@@ -12990,10 +12431,7 @@ type SetQuotaScope
 input SMTPAuthInput
   @join__type(graph: STRAWBERRY)
 {
-  """SMTP username."""
   username: String = null
-
-  """SMTP password."""
   password: String = null
 }
 
@@ -13001,16 +12439,9 @@ input SMTPAuthInput
 input SMTPConnectionInput
   @join__type(graph: STRAWBERRY)
 {
-  """SMTP host."""
   host: String!
-
-  """SMTP port."""
   port: Int!
-
-  """Use TLS."""
   useTls: Boolean! = true
-
-  """Connection timeout in seconds."""
   timeout: Int! = 30
 }
 
@@ -13102,53 +12533,22 @@ Added in 24.09.0. Filter for string fields supporting equality, containment, pre
 input StringFilter
   @join__type(graph: STRAWBERRY)
 {
-  """Exact match (case-sensitive)"""
-  equals: String = null
-
-  """Contains (case-sensitive)"""
   contains: String = null
-
-  """Starts with (case-sensitive)"""
   startsWith: String = null
-
-  """Ends with (case-sensitive)"""
   endsWith: String = null
-
-  """Not equals (case-sensitive)"""
-  notEquals: String = null
-
-  """Not contains (case-sensitive)"""
+  equals: String = null
   notContains: String = null
-
-  """Not starts with (case-sensitive)"""
   notStartsWith: String = null
-
-  """Not ends with (case-sensitive)"""
   notEndsWith: String = null
-
-  """Exact match (case-insensitive)"""
-  iEquals: String = null
-
-  """Contains (case-insensitive)"""
+  notEquals: String = null
   iContains: String = null
-
-  """Starts with (case-insensitive)"""
   iStartsWith: String = null
-
-  """Ends with (case-insensitive)"""
   iEndsWith: String = null
-
-  """Not equals (case-insensitive)"""
-  iNotEquals: String = null
-
-  """Not contains (case-insensitive)"""
+  iEquals: String = null
   iNotContains: String = null
-
-  """Not starts with (case-insensitive)"""
   iNotStartsWith: String = null
-
-  """Not ends with (case-insensitive)"""
   iNotEndsWith: String = null
+  iNotEquals: String = null
 }
 
 type Subscription
@@ -13194,7 +12594,7 @@ type Subscription
 }
 
 """Added in 26.3.0. Sub-step result in scheduling history."""
-type SubStepResultGQL
+type SubStepResult
   @join__type(graph: STRAWBERRY)
 {
   step: String!
@@ -13229,7 +12629,6 @@ type SwitchMyMainAccessKeyPayload
 input SyncReplicaInput
   @join__type(graph: STRAWBERRY)
 {
-  """Deployment ID to sync replicas for"""
   modelDeploymentId: ID!
 }
 
@@ -13265,11 +12664,8 @@ enum TrafficStatus
 input TrafficStatusFilter
   @join__type(graph: STRAWBERRY)
 {
-  """Exact traffic status match"""
-  equals: TrafficStatus = null
-
-  """Traffic status is in list"""
   in: [TrafficStatus!] = null
+  equals: TrafficStatus = null
 }
 
 type UnloadImage
@@ -13284,10 +12680,7 @@ type UnloadImage
 input UnregisterStorageNamespaceInput
   @join__type(graph: STRAWBERRY)
 {
-  """Storage ID of the namespace to unregister"""
   storageId: UUID!
-
-  """Namespace bucket or path prefix to unregister"""
   namespace: String!
 }
 
@@ -13329,14 +12722,9 @@ This operation does not affect the actual artifact files or revisions.
 input UpdateArtifactInput
   @join__type(graph: STRAWBERRY)
 {
-  """ID of the artifact to update."""
   artifactId: ID!
-
-  """Whether the artifact should be readonly."""
-  readonly: Boolean = null
-
-  """Updated description."""
-  description: String = null
+  readonly: Boolean
+  description: String
 }
 
 """
@@ -13345,6 +12733,7 @@ Added in 25.14.0. Response payload for artifact update operations. Returns the u
 type UpdateArtifactPayload
   @join__type(graph: STRAWBERRY)
 {
+  """Updated artifact."""
   artifact: Artifact!
 }
 
@@ -13352,31 +12741,14 @@ type UpdateArtifactPayload
 input UpdateAutoScalingRuleInput
   @join__type(graph: STRAWBERRY)
 {
-  """ID of the auto-scaling rule to update"""
   id: ID!
-
-  """Updated metric source. None means no change."""
-  metricSource: AutoScalingMetricSource = null
-
-  """Updated metric name. None means no change."""
-  metricName: String = null
-
-  """Updated minimum threshold. SENTINEL = no change, None = clear."""
+  metricSource: AutoScalingMetricSource
+  metricName: String
   minThreshold: Decimal
-
-  """Updated maximum threshold. SENTINEL = no change, None = clear."""
   maxThreshold: Decimal
-
-  """Updated step size. None means no change."""
-  stepSize: Int = null
-
-  """Updated time window in seconds. None means no change."""
-  timeWindow: Int = null
-
-  """Updated minimum replicas. SENTINEL = no change, None = clear."""
+  stepSize: Int
+  timeWindow: Int
   minReplicas: Int
-
-  """Updated maximum replicas. SENTINEL = no change, None = clear."""
   maxReplicas: Int
 }
 
@@ -13401,25 +12773,13 @@ input UpdateDeploymentInput
   @join__type(graph: STRAWBERRY)
 {
   id: ID!
-  desiredReplicaCount: Int = null
-
-  """Updated deployment name"""
-  name: String = null
-
-  """Updated tags. Use SENTINEL to clear."""
+  openToPublic: Boolean
   tags: [String!]
-
-  """Updated network visibility. None means no change."""
-  openToPublic: Boolean = null
-
-  """Updated preferred domain name. None means no change."""
-  preferredDomainName: String = null
-
-  """ID of the revision to activate. None means no change."""
-  activeRevisionId: ID = null
-
-  """Updated deployment strategy. None means no change."""
-  defaultDeploymentStrategy: DeploymentStrategyInput = null
+  defaultDeploymentStrategy: DeploymentStrategyInput
+  activeRevisionId: ID
+  desiredReplicaCount: Int
+  name: String
+  preferredDomainName: String
 }
 
 """Added in 25.19.0. Payload for updating a model deployment."""
@@ -13440,19 +12800,10 @@ If a policy already exists for the deployment, it is replaced entirely.
 input UpdateDeploymentPolicyInput
   @join__type(graph: STRAWBERRY)
 {
-  """Deployment ID"""
   deploymentId: ID!
-
-  """Deployment strategy"""
   strategy: DeploymentStrategyType!
-
-  """Roll back on failure"""
   rollbackOnFailure: Boolean! = false
-
-  """Rolling update config (required for ROLLING strategy)"""
   rollingUpdate: RollingUpdateConfigInput = null
-
-  """Blue/green config (required for BLUE_GREEN strategy)"""
   blueGreen: BlueGreenConfigInput = null
 }
 
@@ -13462,6 +12813,7 @@ Added in 26.4.0. Result payload returned after creating or updating a deployment
 type UpdateDeploymentPolicyPayload
   @join__type(graph: STRAWBERRY)
 {
+  """The updated deployment policy"""
   deploymentPolicy: DeploymentPolicy!
 }
 
@@ -13469,23 +12821,17 @@ type UpdateDeploymentPolicyPayload
 input UpdateHuggingFaceRegistryInput
   @join__type(graph: STRAWBERRY)
 {
-  """Registry ID to update"""
   id: ID!
-
-  """Updated registry name"""
-  name: String = null
-
-  """Updated HuggingFace Hub URL"""
-  url: String = null
-
-  """Updated access token"""
-  token: String = null
+  url: String
+  name: String
+  token: String
 }
 
 """Added in 25.14.0. Payload for updating a HuggingFace registry."""
 type UpdateHuggingFaceRegistryPayload
   @join__type(graph: STRAWBERRY)
 {
+  """Updated HuggingFace registry"""
   huggingfaceRegistry: HuggingFaceRegistry!
 }
 
@@ -13501,7 +12847,7 @@ input UpdateMyAllowedClientIPInput
   allowedClientIp: [String!]
 
   """
-  If false (default), the operation will fail if the current request IP is not included in the new allowlist.
+  If false (default), the operation will fail if the current request IP is not included in the new allowlist. Set to true to override this safety check.
   """
   force: Boolean! = false
 }
@@ -13544,24 +12890,17 @@ input UpdateNotificationChannelInput
   @join__type(graph: STRAWBERRY)
 {
   id: ID!
-
-  """Updated channel name"""
-  name: String = null
-
-  """Updated channel description. Use SENTINEL to clear."""
+  name: String
   description: String
-
-  """Updated channel specification"""
-  spec: NotificationChannelSpecInput = null
-
-  """Updated enabled status"""
-  enabled: Boolean = null
+  spec: NotificationChannelSpecInput
+  enabled: Boolean
 }
 
 """Added in 26.3.0. Payload for update notification channel mutation."""
 type UpdateNotificationChannelPayload
   @join__type(graph: STRAWBERRY)
 {
+  """Updated notification channel"""
   channel: NotificationChannel!
 }
 
@@ -13570,24 +12909,17 @@ input UpdateNotificationRuleInput
   @join__type(graph: STRAWBERRY)
 {
   id: ID!
-
-  """Updated rule name"""
-  name: String = null
-
-  """Updated rule description. Use SENTINEL to clear."""
+  name: String
   description: String
-
-  """Updated message template (max 64KB)"""
-  messageTemplate: String = null
-
-  """Updated enabled status"""
-  enabled: Boolean = null
+  messageTemplate: String
+  enabled: Boolean
 }
 
 """Added in 26.3.0. Payload for update notification rule mutation."""
 type UpdateNotificationRulePayload
   @join__type(graph: STRAWBERRY)
 {
+  """Updated notification rule"""
   rule: NotificationRule!
 }
 
@@ -13595,25 +12927,12 @@ type UpdateNotificationRulePayload
 input UpdateObjectStorageInput
   @join__type(graph: STRAWBERRY)
 {
-  """Object storage ID to update"""
   id: ID!
-
-  """Updated name of the object storage"""
-  name: String = null
-
-  """Updated host address"""
-  host: String = null
-
-  """Updated access key"""
-  accessKey: String = null
-
-  """Updated secret key"""
-  secretKey: String = null
-
-  """Updated endpoint URL"""
-  endpoint: String = null
-
-  """Updated region. Use SENTINEL (default) for no change, None to clear."""
+  name: String
+  host: String
+  accessKey: String
+  secretKey: String
+  endpoint: String
   region: String
 }
 
@@ -13629,19 +12948,10 @@ type UpdateObjectStoragePayload
 input UpdatePermissionInput
   @join__type(graph: STRAWBERRY)
 {
-  """Permission ID to update"""
   id: UUID!
-
-  """Updated scope element type"""
   scopeType: RBACElementType = null
-
-  """Updated scope element ID"""
   scopeId: String = null
-
-  """Updated entity element type"""
   entityType: RBACElementType = null
-
-  """Updated operation type"""
   operation: OperationType = null
 }
 
@@ -13649,29 +12959,19 @@ input UpdatePermissionInput
 input UpdateReservoirRegistryInput
   @join__type(graph: STRAWBERRY)
 {
-  """Registry ID to update"""
   id: ID!
-
-  """Updated registry name"""
-  name: String = null
-
-  """Updated endpoint URL"""
-  endpoint: String = null
-
-  """Updated access key"""
-  accessKey: String = null
-
-  """Updated secret key"""
-  secretKey: String = null
-
-  """Updated API version"""
-  apiVersion: String = null
+  name: String
+  endpoint: String
+  accessKey: String
+  secretKey: String
+  apiVersion: String
 }
 
 """Added in 25.14.0. Payload for updating a reservoir registry."""
 type UpdateReservoirRegistryPayload
   @join__type(graph: STRAWBERRY)
 {
+  """Updated Reservoir registry"""
   reservoir: ReservoirRegistry!
 }
 
@@ -13701,7 +13001,7 @@ input UpdateResourceGroupFairShareSpecInput
   defaultWeight: Decimal = null
 
   """
-  Resource weights for fair share calculation. Leave null to keep existing values.
+  Resource weights for fair share calculation. Each entry specifies a resource type and its weight multiplier. Only provided resource types are updated (partial update). Set weight to null to remove that resource type (revert to default). Leave the entire list null to keep all existing values.
   """
   resourceWeights: [ResourceWeightEntryInput!] = null
 }
@@ -13748,11 +13048,13 @@ input UpdateResourceGroupInput
   useHostNetwork: Boolean = null
 
   """
-  Scheduler type value (fifo/lifo/drf/fair-share). Leave null to keep existing.
+  Scheduler type (FIFO, LIFO, DRF, FAIR_SHARE). Leave null to keep existing value.
   """
   schedulerType: SchedulerType = null
 
-  """Preemption configuration. Leave null to keep existing value."""
+  """
+  Added in 26.3.0. Preemption configuration. When provided, replaces the entire preemption config. Leave null to keep existing value.
+  """
   preemption: PreemptionConfigInput = null
 }
 
@@ -13769,25 +13071,19 @@ input UpdateRoleInput
   @join__type(graph: STRAWBERRY)
 {
   id: UUID!
-
-  """Updated role name"""
-  name: String = null
-
-  """Updated role description. Use SENTINEL to clear."""
+  name: String
   description: String
-
-  """Updated role status"""
-  status: RoleStatus = null
+  status: RoleStatus
 }
 
 """Added in 25.19.0. Input for updating route traffic status."""
 input UpdateRouteTrafficStatusInput
   @join__type(graph: STRAWBERRY)
 {
-  """Route ID to update"""
+  """The ID of the route to update."""
   routeId: ID!
 
-  """New traffic status (ACTIVE/INACTIVE)"""
+  """The new traffic status (ACTIVE/INACTIVE)."""
   trafficStatus: RouteTrafficStatus!
 }
 
@@ -13806,55 +13102,51 @@ input UpdateUserV2Input
   @join__type(graph: STRAWBERRY)
 {
   """New username."""
-  username: String = null
+  username: String
 
   """New password."""
-  password: String = null
+  password: String
 
-  """New full display name. Set to null to clear."""
+  """New full display name."""
   fullName: String
 
-  """New description. Set to null to clear."""
+  """New description."""
   description: String
 
   """New account status."""
-  status: UserStatusV2 = null
+  status: UserStatusV2
 
   """New user role."""
-  role: UserRoleV2 = null
+  role: UserRoleV2
 
   """New domain assignment."""
-  domainName: String = null
+  domainName: String
 
-  """
-  New project (group) assignments. Replaces existing assignments. Set to null to clear.
-  """
+  """New project (group) assignments. Replaces existing assignments."""
   groupIds: [UUID!]
 
-  """
-  New allowed client IP addresses or CIDR ranges. Set to null to allow all.
-  """
+  """New allowed client IP addresses or CIDR ranges."""
   allowedClientIp: [String!]
 
   """Set password change requirement."""
-  needPasswordChange: Boolean = null
+  needPasswordChange: Boolean
 
   """New user resource policy name."""
-  resourcePolicy: String = null
+  resourcePolicy: String
 
   """Enable or disable sudo session capability."""
-  sudoSessionEnabled: Boolean = null
+  sudoSessionEnabled: Boolean
 
-  """Set the primary API access key. Set to null to clear."""
+  """Set the primary API access key."""
   mainAccessKey: String
 
-  """New container user ID. Set to null to clear."""
+  """New container user ID."""
   containerUid: Int
 
-  """New container primary group ID. Set to null to clear."""
+  """New container primary group ID."""
   containerMainGid: Int
 
-  """New container supplementary group IDs. Set to null to clear."""
+  """New container supplementary group IDs."""
   containerGids: [Int!]
 }
 
@@ -13870,17 +13162,10 @@ type UpdateUserV2Payload
 input UpdateVFSStorageInput
   @join__type(graph: STRAWBERRY)
 {
-  """Storage ID to update"""
   id: ID!
-
-  """Updated storage name"""
-  name: String = null
-
-  """Updated host address"""
-  host: String = null
-
-  """Updated base path"""
-  basePath: String = null
+  name: String
+  host: String
+  basePath: String
 }
 
 """Added in 25.16.0. Payload for updating VFS storage."""
@@ -13900,12 +13185,7 @@ All users in this domain will be affected by these settings when their configura
 input UpsertDomainConfigInput
   @join__type(graph: STRAWBERRY)
 {
-  """Domain name whose configuration will be upserted."""
   domainName: String!
-
-  """
-  Configuration data to store. Completely replaces existing configuration.
-  """
   extraConfig: JSON!
 }
 
@@ -13915,6 +13195,7 @@ Added in 25.16.0. Payload returned after upserting domain-level app configuratio
 type UpsertDomainConfigPayload
   @join__type(graph: STRAWBERRY)
 {
+  """The resulting app configuration"""
   appConfig: AppConfig!
 }
 
@@ -13924,14 +13205,14 @@ Added in 26.1.0. Input for upserting domain fair share weight. The weight parame
 input UpsertDomainFairShareWeightInput
   @join__type(graph: STRAWBERRY)
 {
-  """Scaling group name."""
+  """Name of the scaling group (resource group) for this fair share."""
   resourceGroupName: String!
 
   """Name of the domain to update weight for."""
   domainName: String!
 
   """
-  Priority weight multiplier. Higher weight = higher priority. Set to null to use resource group's default_weight.
+  Priority weight multiplier. Higher weight = higher priority allocation ratio. Set to null to use resource group's default_weight.
   """
   weight: Decimal = null
 }
@@ -13940,7 +13221,7 @@ input UpsertDomainFairShareWeightInput
 type UpsertDomainFairShareWeightPayload
   @join__type(graph: STRAWBERRY)
 {
-  """The updated or created domain fair share record."""
+  """Updated domain fair share data"""
   domainFairShare: DomainFairShare!
 }
 
@@ -13950,7 +13231,7 @@ Added in 26.1.0. Input for upserting project fair share weight. The weight param
 input UpsertProjectFairShareWeightInput
   @join__type(graph: STRAWBERRY)
 {
-  """Scaling group name."""
+  """Name of the scaling group (resource group) for this fair share."""
   resourceGroupName: String!
 
   """UUID of the project to update weight for."""
@@ -13960,7 +13241,7 @@ input UpsertProjectFairShareWeightInput
   domainName: String!
 
   """
-  Priority weight multiplier. Higher weight = higher priority. Set to null to use resource group's default_weight.
+  Priority weight multiplier. Higher weight = higher priority allocation ratio. Set to null to use resource group's default_weight.
   """
   weight: Decimal = null
 }
@@ -13971,7 +13252,7 @@ Added in 26.1.0. Payload for project fair share weight upsert mutation.
 type UpsertProjectFairShareWeightPayload
   @join__type(graph: STRAWBERRY)
 {
-  """The updated or created project fair share record."""
+  """Updated project fair share data"""
   projectFairShare: ProjectFairShare!
 }
 
@@ -13985,14 +13266,7 @@ If user_id is not provided, the current user's configuration will be updated.
 input UpsertUserConfigInput
   @join__type(graph: STRAWBERRY)
 {
-  """
-  Configuration data to store. Completely replaces existing configuration.
-  """
   extraConfig: JSON!
-
-  """
-  User ID whose configuration will be upserted. Defaults to current user.
-  """
   userId: ID = null
 }
 
@@ -14002,6 +13276,7 @@ Added in 25.16.0. Payload returned after upserting user-level app configuration.
 type UpsertUserConfigPayload
   @join__type(graph: STRAWBERRY)
 {
+  """The resulting app configuration"""
   appConfig: AppConfig!
 }
 
@@ -14011,20 +13286,20 @@ Added in 26.1.0. Input for upserting user fair share weight. The weight paramete
 input UpsertUserFairShareWeightInput
   @join__type(graph: STRAWBERRY)
 {
-  """Scaling group name."""
+  """Name of the scaling group (resource group) for this fair share."""
   resourceGroupName: String!
 
-  """User UUID."""
-  userUuid: UUID!
-
-  """Project ID."""
+  """UUID of the project the user belongs to."""
   projectId: UUID!
+
+  """UUID of the user to update weight for."""
+  userUuid: UUID!
 
   """Name of the domain the user belongs to."""
   domainName: String!
 
   """
-  Priority weight multiplier. Higher weight = higher priority. Set to null to use resource group's default_weight.
+  Priority weight multiplier. Higher weight = higher priority allocation ratio. Set to null to use resource group's default_weight.
   """
   weight: Decimal = null
 }
@@ -14033,7 +13308,7 @@ input UpsertUserFairShareWeightInput
 type UpsertUserFairShareWeightPayload
   @join__type(graph: STRAWBERRY)
 {
-  """The updated or created user fair share record."""
+  """Updated user fair share data"""
   userFairShare: UserFairShare!
 }
 
@@ -14134,10 +13409,7 @@ Added in 26.2.0. Nested filter for the domain a user belongs to. Filters users w
 input UserDomainNestedFilter
   @join__type(graph: STRAWBERRY)
 {
-  """Filter by domain name."""
   name: StringFilter = null
-
-  """Filter by domain active status."""
   isActive: Boolean = null
 }
 
@@ -14240,28 +13512,42 @@ Added in 26.1.0. Filter input for querying user fair shares. Supports filtering 
 input UserFairShareFilter
   @join__type(graph: STRAWBERRY)
 {
-  """Filter by scaling group"""
+  """
+  Filter by scaling group name. Scaling groups define resource pool boundaries where users compete for resources within their project. Supports equals, contains, startsWith, and endsWith operations.
+  """
   resourceGroup: StringFilter = null
 
-  """Filter by user UUID"""
+  """
+  Filter by user UUID. Users are individual accounts that create and run sessions. Supports equals operation for exact match or 'in' operation for multiple UUIDs.
+  """
   userUuid: UUIDFilter = null
 
-  """Filter by project ID"""
+  """
+  Filter by project UUID. This filters users by their project membership. Supports equals operation for exact match or 'in' operation for multiple UUIDs.
+  """
   projectId: UUIDFilter = null
 
-  """Filter by domain name"""
+  """
+  Filter by domain name. This filters users belonging to a specific domain. Supports equals, contains, startsWith, and endsWith operations.
+  """
   domainName: StringFilter = null
 
-  """Filter by user entity properties"""
+  """
+  Added in 26.2.0. Nested filter for user entity properties. Allows filtering by username, email, and active status.
+  """
   user: UserFairShareUserNestedFilter = null
 
-  """Combine with AND logic"""
+  """Combine multiple filters with AND logic. All conditions must match."""
   AND: [UserFairShareFilter!] = null
 
-  """Combine with OR logic"""
+  """
+  Combine multiple filters with OR logic. At least one condition must match.
+  """
   OR: [UserFairShareFilter!] = null
 
-  """Negate filters"""
+  """
+  Negate the specified filters. Records matching these conditions will be excluded.
+  """
   NOT: [UserFairShareFilter!] = null
 }
 
@@ -14271,10 +13557,14 @@ Added in 26.1.0. Specifies ordering for user fair share query results. Combine f
 input UserFairShareOrderBy
   @join__type(graph: STRAWBERRY)
 {
-  """Field to order by"""
+  """
+  The field to order by. See UserFairShareOrderField for available options.
+  """
   field: UserFairShareOrderField!
 
-  """Order direction"""
+  """
+  Sort direction. ASC for ascending (lowest first), DESC for descending (highest first). For fair_share_factor, ASC shows highest priority users first.
+  """
   direction: OrderDirection! = DESC
 }
 
@@ -14317,7 +13607,7 @@ input UserFairShareUserNestedFilter
   """Filter by email. Supports equals, contains, startsWith, and endsWith."""
   email: StringFilter = null
 
-  """Filter by user active status"""
+  """Filter by user active status (based on user status field)."""
   isActive: Boolean = null
 }
 
@@ -14439,10 +13729,7 @@ Added in 26.2.0. Nested filter for projects a user belongs to. Filters users tha
 input UserProjectNestedFilter
   @join__type(graph: STRAWBERRY)
 {
-  """Filter by project name."""
   name: StringFilter = null
-
-  """Filter by project active status."""
   isActive: Boolean = null
 }
 
@@ -14493,16 +13780,9 @@ Added in 26.2.0. Filter for UserRoleV2 enum fields. Supports equals, in, not_equ
 input UserRoleV2EnumFilter
   @join__type(graph: STRAWBERRY)
 {
-  """Exact match for user role."""
   equals: UserRoleV2 = null
-
-  """Match any of the provided roles."""
   in: [UserRoleV2!] = null
-
-  """Exclude exact role match."""
   notEquals: UserRoleV2 = null
-
-  """Exclude any of the provided roles."""
   notIn: [UserRoleV2!] = null
 }
 
@@ -14524,16 +13804,9 @@ Added in 26.2.0. Filter for UserStatusV2 enum fields. Supports equals, in, not_e
 input UserStatusV2EnumFilter
   @join__type(graph: STRAWBERRY)
 {
-  """Exact match for user status."""
   equals: UserStatusV2 = null
-
-  """Match any of the provided statuses."""
   in: [UserStatusV2!] = null
-
-  """Exclude exact status match."""
   notEquals: UserStatusV2 = null
-
-  """Exclude any of the provided statuses."""
   notIn: [UserStatusV2!] = null
 }
 
@@ -14616,31 +13889,43 @@ Added in 26.1.0. Filter input for querying user usage bucket records. Usage buck
 input UserUsageBucketFilter
   @join__type(graph: STRAWBERRY)
 {
-  """Filter by resource group name"""
+  """
+  Filter by scaling group name. Scaling groups define where usage was recorded. Supports equals, contains, startsWith, and endsWith operations.
+  """
   resourceGroup: StringFilter = null
 
-  """Filter by user UUID"""
+  """
+  Filter by user UUID. This filters usage buckets for a specific user. Supports equals operation for exact match.
+  """
   userUuid: UUIDFilter = null
 
-  """Filter by project UUID"""
+  """
+  Filter by project UUID. This filters usage buckets for users within a specific project. Supports equals operation for exact match.
+  """
   projectId: UUIDFilter = null
 
-  """Filter by domain name"""
+  """
+  Filter by domain name. This filters usage buckets for users within a specific domain. Supports equals, contains, startsWith, and endsWith operations.
+  """
   domainName: StringFilter = null
 
-  """Filter by period start date"""
+  """Filter by usage measurement period start date."""
   periodStart: DateFilter = null
 
-  """Filter by period end date"""
+  """Filter by usage measurement period end date."""
   periodEnd: DateFilter = null
 
-  """Combine with AND logic"""
+  """Combine multiple filters with AND logic. All conditions must match."""
   AND: [UserUsageBucketFilter!] = null
 
-  """Combine with OR logic"""
+  """
+  Combine multiple filters with OR logic. At least one condition must match.
+  """
   OR: [UserUsageBucketFilter!] = null
 
-  """Negate filters"""
+  """
+  Negate the specified filters. Records matching these conditions will be excluded.
+  """
   NOT: [UserUsageBucketFilter!] = null
 }
 
@@ -14650,10 +13935,14 @@ Added in 26.1.0. Specifies ordering for user usage bucket query results. Combine
 input UserUsageBucketOrderBy
   @join__type(graph: STRAWBERRY)
 {
-  """Field to order by"""
+  """
+  The field to order by. See UsageBucketOrderField for available options.
+  """
   field: UsageBucketOrderField!
 
-  """Order direction"""
+  """
+  Sort direction. ASC for chronological order (oldest first), DESC for reverse chronological order (most recent first).
+  """
   direction: OrderDirection! = DESC
 }
 
@@ -14817,40 +14106,17 @@ Added in 26.2.0. Filter input for querying users. Supports filtering by UUID, us
 input UserV2Filter
   @join__type(graph: STRAWBERRY)
 {
-  """Filter by user UUID."""
   uuid: UUIDFilter = null
-
-  """Filter by username."""
   username: StringFilter = null
-
-  """Filter by email."""
   email: StringFilter = null
-
-  """Filter by account status."""
   status: UserStatusV2EnumFilter = null
-
-  """Filter by domain name."""
   domainName: StringFilter = null
-
-  """Filter by user role."""
   role: UserRoleV2EnumFilter = null
-
-  """Filter by creation timestamp."""
   createdAt: DateTimeFilter = null
-
-  """Nested filter for the domain a user belongs to."""
   domain: UserDomainNestedFilter = null
-
-  """Nested filter for projects a user belongs to."""
   project: UserProjectNestedFilter = null
-
-  """Combine multiple filters with AND logic."""
   AND: [UserV2Filter!] = null
-
-  """Combine multiple filters with OR logic."""
   OR: [UserV2Filter!] = null
-
-  """Negate the specified filters."""
   NOT: [UserV2Filter!] = null
 }
 
@@ -14860,11 +14126,8 @@ Added in 26.2.0. Specifies ordering for user query results. Combine field select
 input UserV2OrderBy
   @join__type(graph: STRAWBERRY)
 {
-  """Field to order by."""
-  field: UserV2OrderField!
-
-  """Order direction."""
-  direction: OrderDirection! = ASC
+  field: UserV2OrderField! = CREATED_AT
+  direction: OrderDirection! = DESC
 }
 
 """
@@ -14950,17 +14213,19 @@ Added in 26.1.0. Input item for a single user weight in bulk upsert. Represents 
 input UserWeightInputItem
   @join__type(graph: STRAWBERRY)
 {
-  """User UUID"""
+  """UUID of the user to update weight for."""
   userUuid: UUID!
 
-  """Project ID"""
+  """ID of the project this user's fair share belongs to."""
   projectId: UUID!
 
-  """Domain name for context"""
+  """Name of the domain this project belongs to."""
   domainName: String!
 
-  """Fair share weight (null for default)"""
-  weight: Decimal
+  """
+  Priority weight multiplier. Higher weight = higher priority allocation ratio. Set to null to use resource group's default_weight.
+  """
+  weight: Decimal = null
 }
 
 """
@@ -14975,16 +14240,9 @@ scalar UUID
 input UUIDFilter
   @join__type(graph: STRAWBERRY)
 {
-  """Exact UUID match"""
   equals: UUID = null
-
-  """UUID is in list"""
   in: [UUID!] = null
-
-  """Not equals UUID"""
   notEquals: UUID = null
-
-  """UUID is not in list"""
   notIn: [UUID!] = null
 }
 
@@ -14999,10 +14257,7 @@ scalar UUIDFloatMap
 input ValidateNotificationChannelInput
   @join__type(graph: STRAWBERRY)
 {
-  """Channel ID to validate"""
   id: ID!
-
-  """Test message to send through the channel (max 5KB)"""
   testMessage: String!
 }
 
@@ -15010,26 +14265,23 @@ input ValidateNotificationChannelInput
 type ValidateNotificationChannelPayload
   @join__type(graph: STRAWBERRY)
 {
-  """ID of the validated notification channel."""
-  id: ID!
+  """ID of the validated notification channel"""
+  id: UUID!
 }
 
 """Added in 24.09.0. Input for validate notification rule mutation"""
 input ValidateNotificationRuleInput
   @join__type(graph: STRAWBERRY)
 {
-  """Rule ID to validate"""
   id: ID!
-
-  """Test notification data to use in template rendering"""
-  notificationData: JSON = {}
+  notificationData: JSON
 }
 
 """Added in 26.3.0. Payload for validate notification rule mutation."""
 type ValidateNotificationRulePayload
   @join__type(graph: STRAWBERRY)
 {
-  """The rendered message from the template."""
+  """The rendered message from the template"""
   message: String!
 }
 
@@ -15244,6 +14496,5 @@ type VirtualFolderPermissionList implements PaginatedList
 input WebhookSpecInput
   @join__type(graph: STRAWBERRY)
 {
-  """Webhook URL."""
   url: String!
 }
