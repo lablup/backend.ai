@@ -2,9 +2,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Mapping
 from enum import StrEnum
-from typing import Any
 
 import strawberry
 
@@ -17,11 +15,6 @@ from ai.backend.common.dto.manager.v2.resource_slot.types import (
     ServicePortsInfoDTO,
 )
 from ai.backend.common.dto.manager.v2.streaming.types import ServiceProtocol
-from ai.backend.common.types import (
-    ClusterMode,
-    SessionResult,
-    SessionTypes,
-)
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     gql_pydantic_input,
@@ -42,23 +35,6 @@ class ClusterModeGQL(StrEnum):
     SINGLE_NODE = "SINGLE_NODE"
     MULTI_NODE = "MULTI_NODE"
 
-    @classmethod
-    def from_internal(cls, internal: ClusterMode) -> ClusterModeGQL:
-        """Convert internal ClusterMode to GraphQL enum."""
-        match internal:
-            case ClusterMode.SINGLE_NODE:
-                return cls.SINGLE_NODE
-            case ClusterMode.MULTI_NODE:
-                return cls.MULTI_NODE
-
-    def to_internal(self) -> ClusterMode:
-        """Convert GraphQL enum to internal ClusterMode."""
-        match self:
-            case ClusterModeGQL.SINGLE_NODE:
-                return ClusterMode.SINGLE_NODE
-            case ClusterModeGQL.MULTI_NODE:
-                return ClusterMode.MULTI_NODE
-
 
 @strawberry.enum(
     name="SessionV2Type",
@@ -71,31 +47,6 @@ class SessionV2TypeGQL(StrEnum):
     BATCH = "batch"
     INFERENCE = "inference"
     SYSTEM = "system"
-
-    @classmethod
-    def from_internal(cls, internal: SessionTypes) -> SessionV2TypeGQL:
-        """Convert internal SessionTypes to GraphQL enum."""
-        match internal:
-            case SessionTypes.INTERACTIVE:
-                return cls.INTERACTIVE
-            case SessionTypes.BATCH:
-                return cls.BATCH
-            case SessionTypes.INFERENCE:
-                return cls.INFERENCE
-            case SessionTypes.SYSTEM:
-                return cls.SYSTEM
-
-    def to_internal(self) -> SessionTypes:
-        """Convert GraphQL enum to internal SessionTypes."""
-        match self:
-            case SessionV2TypeGQL.INTERACTIVE:
-                return SessionTypes.INTERACTIVE
-            case SessionV2TypeGQL.BATCH:
-                return SessionTypes.BATCH
-            case SessionV2TypeGQL.INFERENCE:
-                return SessionTypes.INFERENCE
-            case SessionV2TypeGQL.SYSTEM:
-                return SessionTypes.SYSTEM
 
 
 @strawberry.enum(
@@ -118,27 +69,6 @@ class SessionV2ResultGQL(StrEnum):
     UNDEFINED = "undefined"
     SUCCESS = "success"
     FAILURE = "failure"
-
-    @classmethod
-    def from_internal(cls, internal: SessionResult) -> SessionV2ResultGQL:
-        """Convert internal SessionResult to GraphQL enum."""
-        match internal:
-            case SessionResult.UNDEFINED:
-                return cls.UNDEFINED
-            case SessionResult.SUCCESS:
-                return cls.SUCCESS
-            case SessionResult.FAILURE:
-                return cls.FAILURE
-
-    def to_internal(self) -> SessionResult:
-        """Convert GraphQL enum to internal SessionResult."""
-        match self:
-            case SessionV2ResultGQL.UNDEFINED:
-                return SessionResult.UNDEFINED
-            case SessionV2ResultGQL.SUCCESS:
-                return SessionResult.SUCCESS
-            case SessionV2ResultGQL.FAILURE:
-                return SessionResult.FAILURE
 
 
 ServicePortProtocolGQL: type[ServiceProtocol] = strawberry.enum(
@@ -186,14 +116,6 @@ class ResourceOptsGQL(PydanticOutputMixin[ResourceOptsInfoDTO]):
     entries: list[ResourceOptsEntryGQL] = strawberry.field(
         description="List of resource option entries. Each entry contains a key-value pair."
     )
-
-    @classmethod
-    def from_mapping(cls, data: Mapping[str, Any] | None) -> ResourceOptsGQL | None:
-        """Convert a Mapping to GraphQL type."""
-        if data is None:
-            return None
-        entries = [ResourceOptsEntryGQL(name=k, value=str(v)) for k, v in data.items()]
-        return cls(entries=entries)
 
 
 @gql_pydantic_input(
@@ -254,17 +176,6 @@ class ServicePortEntryGQL(PydanticOutputMixin[ServicePortEntryInfoDTO]):
     is_inference: bool = strawberry.field(
         description="Whether this port is used for inference endpoints."
     )
-
-    @classmethod
-    def from_dict(cls, data: dict[str, Any]) -> ServicePortEntryGQL:
-        """Convert a dict to ServicePortEntryGQL."""
-        return cls(
-            name=data["name"],
-            protocol=ServicePortProtocolGQL(data["protocol"]),
-            container_ports=list(data["container_ports"]),
-            host_ports=list(data["host_ports"]),
-            is_inference=data["is_inference"],
-        )
 
 
 @gql_pydantic_type(

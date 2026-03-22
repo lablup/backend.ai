@@ -17,7 +17,8 @@ from ai.backend.common.dto.manager.v2.deployment.request import (
     ActivateRevisionInput as ActivateRevisionInputDTO,
 )
 from ai.backend.common.dto.manager.v2.deployment.request import (
-    AddRevisionInput as AddRevisionInputDTO,
+    AddRevisionGQLInputDTO,
+    CreateRevisionInputDTO,
 )
 from ai.backend.common.dto.manager.v2.deployment.request import (
     ClusterConfigInput as ClusterConfigInputDTO,
@@ -56,9 +57,6 @@ from ai.backend.common.dto.manager.v2.deployment.request import (
     RevisionFilter as RevisionFilterDTO,
 )
 from ai.backend.common.dto.manager.v2.deployment.request import (
-    RevisionInput as RevisionInputDTO,
-)
-from ai.backend.common.dto.manager.v2.deployment.request import (
     RevisionOrder as RevisionOrderDTO,
 )
 from ai.backend.common.dto.manager.v2.deployment.response import (
@@ -79,9 +77,7 @@ from ai.backend.common.dto.manager.v2.deployment.types import (
     ModelRuntimeConfigInfoDTO,
     ResourceConfigInfoDTO,
 )
-from ai.backend.common.types import ClusterMode as CommonClusterMode
 from ai.backend.common.types import MountPermission as CommonMountPermission
-from ai.backend.common.types import RuntimeVariant
 from ai.backend.manager.api.gql.base import (
     OrderDirection,
     StringFilter,
@@ -426,16 +422,6 @@ class ResourceConfigInput(PydanticInputMixin[ResourceConfigInputDTO]):
         default=None,
     )
 
-    def to_pydantic(self) -> ResourceConfigInputDTO:
-        resource_opts_dict: dict[str, str] | None = None
-        if self.resource_opts is not None:
-            resource_opts_dict = {e.name: e.value for e in self.resource_opts.entries}
-        return ResourceConfigInputDTO(
-            resource_group=self.resource_group.to_pydantic(),
-            resource_slots=self.resource_slots.to_pydantic(),
-            resource_opts=resource_opts_dict,
-        )
-
 
 @gql_pydantic_input(
     BackendAIGQLMeta(description="", added_version="25.19.0"),
@@ -509,7 +495,7 @@ class ExtraVFolderMountInput(PydanticInputMixin[ExtraVFolderMountInputDTO]):
         added_version="25.19.0",
     ),
 )
-class CreateRevisionInput(PydanticInputMixin[RevisionInputDTO]):
+class CreateRevisionInput(PydanticInputMixin[CreateRevisionInputDTO]):
     name: str | None = None
     cluster_config: ClusterConfigInput
     resource_config: ResourceConfigInput
@@ -518,50 +504,11 @@ class CreateRevisionInput(PydanticInputMixin[RevisionInputDTO]):
     model_mount_config: ModelMountConfigInput
     extra_mounts: list[ExtraVFolderMountInput] | None
 
-    def to_pydantic(self) -> RevisionInputDTO:
-        resource_slots_dict = {
-            e.resource_type: e.quantity for e in self.resource_config.resource_slots.entries
-        }
-        resource_opts_dict: dict[str, str] | None = None
-        if self.resource_config.resource_opts is not None:
-            resource_opts_dict = {
-                e.name: e.value for e in self.resource_config.resource_opts.entries
-            }
-        environ_dict: dict[str, str] | None = None
-        if self.model_runtime_config.environ is not None:
-            environ_dict = {e.name: e.value for e in self.model_runtime_config.environ.entries}
-        return RevisionInputDTO(
-            name=self.name,
-            image_id=UUID(str(self.image.id)),
-            cluster_mode=CommonClusterMode(self.cluster_config.mode),
-            cluster_size=self.cluster_config.size,
-            resource_group=self.resource_config.resource_group.name,
-            resource_slots=resource_slots_dict,
-            resource_opts=resource_opts_dict,
-            runtime_variant=RuntimeVariant(self.model_runtime_config.runtime_variant),
-            inference_runtime_config=dict(self.model_runtime_config.inference_runtime_config)
-            if self.model_runtime_config.inference_runtime_config is not None
-            else None,
-            model_vfolder_id=UUID(str(self.model_mount_config.vfolder_id)),
-            model_mount_destination=self.model_mount_config.mount_destination,
-            model_definition_path=self.model_mount_config.definition_path,
-            extra_mounts=[
-                ExtraVFolderMountInputDTO(
-                    vfolder_id=UUID(str(m.vfolder_id)),
-                    mount_destination=m.mount_destination,
-                )
-                for m in self.extra_mounts
-            ]
-            if self.extra_mounts is not None
-            else None,
-            environ=environ_dict,
-        )
-
 
 @gql_pydantic_input(
     BackendAIGQLMeta(description="", added_version="25.19.0"),
 )
-class AddRevisionInput(PydanticInputMixin[AddRevisionInputDTO]):
+class AddRevisionInput(PydanticInputMixin[AddRevisionGQLInputDTO]):
     name: str | None = None
     deployment_id: ID
     cluster_config: ClusterConfigInput
@@ -570,48 +517,6 @@ class AddRevisionInput(PydanticInputMixin[AddRevisionInputDTO]):
     model_runtime_config: ModelRuntimeConfigInput
     model_mount_config: ModelMountConfigInput
     extra_mounts: list[ExtraVFolderMountInput] | None
-
-    def to_pydantic(self) -> AddRevisionInputDTO:
-        resource_slots_dict = {
-            e.resource_type: e.quantity for e in self.resource_config.resource_slots.entries
-        }
-        resource_opts_dict: dict[str, str] | None = None
-        if self.resource_config.resource_opts is not None:
-            resource_opts_dict = {
-                e.name: e.value for e in self.resource_config.resource_opts.entries
-            }
-        environ_dict: dict[str, str] | None = None
-        if self.model_runtime_config.environ is not None:
-            environ_dict = {e.name: e.value for e in self.model_runtime_config.environ.entries}
-        return AddRevisionInputDTO(
-            deployment_id=UUID(self.deployment_id),
-            revision=RevisionInputDTO(
-                name=self.name,
-                image_id=UUID(str(self.image.id)),
-                cluster_mode=CommonClusterMode(self.cluster_config.mode),
-                cluster_size=self.cluster_config.size,
-                resource_group=self.resource_config.resource_group.name,
-                resource_slots=resource_slots_dict,
-                resource_opts=resource_opts_dict,
-                runtime_variant=RuntimeVariant(self.model_runtime_config.runtime_variant),
-                inference_runtime_config=dict(self.model_runtime_config.inference_runtime_config)
-                if self.model_runtime_config.inference_runtime_config is not None
-                else None,
-                model_vfolder_id=UUID(str(self.model_mount_config.vfolder_id)),
-                model_mount_destination=self.model_mount_config.mount_destination,
-                model_definition_path=self.model_mount_config.definition_path,
-                extra_mounts=[
-                    ExtraVFolderMountInputDTO(
-                        vfolder_id=UUID(str(m.vfolder_id)),
-                        mount_destination=m.mount_destination,
-                    )
-                    for m in self.extra_mounts
-                ]
-                if self.extra_mounts is not None
-                else None,
-                environ=environ_dict,
-            ),
-        )
 
 
 ModelRevisionEdge = Edge[ModelRevision]

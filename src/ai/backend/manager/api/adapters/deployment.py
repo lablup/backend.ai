@@ -21,7 +21,7 @@ from ai.backend.common.dto.manager.v2.auto_scaling_rule.request import (
 )
 from ai.backend.common.dto.manager.v2.deployment.request import (
     ActivateRevisionInput,
-    AddRevisionInput,
+    AddRevisionGQLInputDTO,
     AdminSearchDeploymentsInput,
     AdminSearchRevisionsInput,
     CreateAccessTokenInput,
@@ -100,6 +100,7 @@ from ai.backend.common.dto.manager.v2.resource_slot.types import (
     ResourceOptsEntryInfoDTO,
     ResourceOptsInfoDTO,
 )
+from ai.backend.common.types import RuntimeVariant
 from ai.backend.manager.data.deployment.access_token import ModelDeploymentAccessTokenCreator
 from ai.backend.manager.data.deployment.creator import (
     DeploymentPolicyConfig,
@@ -325,31 +326,36 @@ class DeploymentAdapter(BaseAdapter):
         created_user_id: UUID,
     ) -> CreateDeploymentPayload:
         """Create a new deployment."""
+        ir = input.initial_revision
         mounts_creator = VFolderMountsCreator(
-            model_vfolder_id=input.initial_revision.model_vfolder_id,
-            model_definition_path=input.initial_revision.model_definition_path,
-            model_mount_destination=input.initial_revision.model_mount_destination,
+            model_vfolder_id=ir.model_mount_config.vfolder_id,
+            model_definition_path=ir.model_mount_config.definition_path,
+            model_mount_destination=ir.model_mount_config.mount_destination,
             extra_mounts=[
                 MountInfo(
                     vfolder_id=m.vfolder_id,
                     kernel_path=PurePosixPath(m.mount_destination) if m.mount_destination else None,
                 )
-                for m in (input.initial_revision.extra_mounts or [])
+                for m in (ir.extra_mounts or [])
             ],
         )
         model_revision_creator = ModelRevisionCreator(
-            image_id=input.initial_revision.image_id,
+            image_id=ir.image.id,
             resource_spec=ResourceSpec(
-                cluster_mode=input.initial_revision.cluster_mode,
-                cluster_size=input.initial_revision.cluster_size,
-                resource_slots=input.initial_revision.resource_slots,
-                resource_opts=input.initial_revision.resource_opts,
+                cluster_mode=ir.cluster_config.mode,
+                cluster_size=ir.cluster_config.size,
+                resource_slots={
+                    e.resource_type: e.quantity for e in ir.resource_config.resource_slots.entries
+                },
+                resource_opts={e.name: e.value for e in ir.resource_config.resource_opts.entries}
+                if ir.resource_config.resource_opts
+                else None,
             ),
             mounts=mounts_creator,
             execution=ExecutionSpec(
-                runtime_variant=input.initial_revision.runtime_variant,
-                environ=dict(input.initial_revision.environ)
-                if input.initial_revision.environ
+                runtime_variant=RuntimeVariant(ir.model_runtime_config.runtime_variant),
+                environ={e.name: e.value for e in ir.model_runtime_config.environ.entries}
+                if ir.model_runtime_config.environ
                 else None,
             ),
         )
@@ -383,7 +389,7 @@ class DeploymentAdapter(BaseAdapter):
                 name=input.name or f"deployment-{created_user_id.hex[:8]}",
                 domain=input.domain_name,
                 project=input.project_id,
-                resource_group=input.initial_revision.resource_group,
+                resource_group=ir.resource_config.resource_group.name,
                 created_user=created_user_id,
                 session_owner=created_user_id,
                 created_at=None,
@@ -733,36 +739,41 @@ class DeploymentAdapter(BaseAdapter):
 
     async def add_revision(
         self,
-        input: AddRevisionInput,
+        input: AddRevisionGQLInputDTO,
     ) -> AddRevisionPayload:
         """Add a new model revision to a deployment."""
         mounts_creator = VFolderMountsCreator(
-            model_vfolder_id=input.revision.model_vfolder_id,
-            model_definition_path=input.revision.model_definition_path,
-            model_mount_destination=input.revision.model_mount_destination,
+            model_vfolder_id=input.model_mount_config.vfolder_id,
+            model_definition_path=input.model_mount_config.definition_path,
+            model_mount_destination=input.model_mount_config.mount_destination,
             extra_mounts=[
                 MountInfo(
                     vfolder_id=m.vfolder_id,
                     kernel_path=PurePosixPath(m.mount_destination) if m.mount_destination else None,
                 )
-                for m in (input.revision.extra_mounts or [])
+                for m in (input.extra_mounts or [])
             ],
         )
         adder = ModelRevisionCreator(
-            image_id=input.revision.image_id,
+            image_id=input.image.id,
             resource_spec=ResourceSpec(
-                cluster_mode=input.revision.cluster_mode,
-                cluster_size=input.revision.cluster_size,
-                resource_slots=input.revision.resource_slots,
-                resource_opts=input.revision.resource_opts,
+                cluster_mode=input.cluster_config.mode,
+                cluster_size=input.cluster_config.size,
+                resource_slots={
+                    e.resource_type: e.quantity
+                    for e in input.resource_config.resource_slots.entries
+                },
+                resource_opts={e.name: e.value for e in input.resource_config.resource_opts.entries}
+                if input.resource_config.resource_opts
+                else None,
             ),
             mounts=mounts_creator,
             execution=ExecutionSpec(
-                runtime_variant=input.revision.runtime_variant,
-                environ=dict(input.revision.environ) if input.revision.environ else None,
-                inference_runtime_config=dict(input.revision.inference_runtime_config)
-                if input.revision.inference_runtime_config
+                runtime_variant=RuntimeVariant(input.model_runtime_config.runtime_variant),
+                environ={e.name: e.value for e in input.model_runtime_config.environ.entries}
+                if input.model_runtime_config.environ
                 else None,
+                inference_runtime_config=input.model_runtime_config.inference_runtime_config,
             ),
         )
         action_result = await self._processors.deployment.add_model_revision.wait_for_complete(

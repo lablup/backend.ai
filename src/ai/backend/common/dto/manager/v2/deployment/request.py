@@ -28,6 +28,7 @@ from ai.backend.common.dto.manager.v2.deployment.types import (
     RevisionOrderField,
     RouteOrderField,
 )
+from ai.backend.common.dto.manager.v2.resource_slot.types import ResourceOptsDTOInput
 from ai.backend.common.types import AutoScalingMetricSource, ClusterMode, RuntimeVariant
 
 __all__ = (
@@ -35,6 +36,7 @@ __all__ = (
     "AccessTokenOrder",
     "ActivateDeploymentInput",
     "ActivateRevisionInput",
+    "AddRevisionGQLInputDTO",
     "AddRevisionInput",
     "AdminSearchDeploymentsInput",
     "AdminSearchRevisionsInput",
@@ -42,6 +44,7 @@ __all__ = (
     "AutoScalingRuleOrder",
     "BlueGreenConfigInput",
     "ClusterConfigInput",
+    "CreateRevisionInputDTO",
     "CreateAccessTokenInput",
     "CreateAutoScalingRuleInput",
     "CreateDeploymentInput",
@@ -121,7 +124,7 @@ class ResourceConfigInput(BaseRequestModel):
 
     resource_group: ResourceGroupInput = Field(description="Resource group")
     resource_slots: ResourceSlotInput = Field(description="Resource slot allocations")
-    resource_opts: dict[str, str] | None = Field(
+    resource_opts: ResourceOptsDTOInput | None = Field(
         default=None, description="Additional resource options"
     )
 
@@ -172,6 +175,35 @@ class ExtraVFolderMountInput(BaseRequestModel):
 
     vfolder_id: UUID = Field(description="VFolder ID to mount")
     mount_destination: str | None = Field(default=None, description="Mount destination path")
+
+
+class CreateRevisionInputDTO(BaseRequestModel):
+    """Input for a deployment revision (nested structure matching GQL CreateRevisionInput)."""
+
+    name: str | None = Field(default=None, description="Revision name")
+    cluster_config: ClusterConfigInput = Field(description="Cluster configuration")
+    resource_config: ResourceConfigInput = Field(description="Resource configuration")
+    image: ImageInput = Field(description="Container image")
+    model_runtime_config: ModelRuntimeConfigInput = Field(description="Runtime configuration")
+    model_mount_config: ModelMountConfigInput = Field(description="Model mount configuration")
+    extra_mounts: list[ExtraVFolderMountInput] | None = Field(
+        default=None, description="Additional vfolder mounts"
+    )
+
+
+class AddRevisionGQLInputDTO(BaseRequestModel):
+    """Input for adding a revision via GQL (flat structure matching GQL AddRevisionInput)."""
+
+    name: str | None = Field(default=None, description="Revision name")
+    deployment_id: UUID = Field(description="Deployment ID")
+    cluster_config: ClusterConfigInput = Field(description="Cluster configuration")
+    resource_config: ResourceConfigInput = Field(description="Resource configuration")
+    image: ImageInput = Field(description="Container image")
+    model_runtime_config: ModelRuntimeConfigInput = Field(description="Runtime configuration")
+    model_mount_config: ModelMountConfigInput = Field(description="Model mount configuration")
+    extra_mounts: list[ExtraVFolderMountInput] | None = Field(
+        default=None, description="Additional vfolder mounts"
+    )
 
 
 class ModelDeploymentMetadataInput(BaseRequestModel):
@@ -277,7 +309,7 @@ class CreateDeploymentInput(BaseRequestModel):
         default=False, description="Roll back automatically on failure"
     )
     desired_replica_count: int = Field(ge=0, description="Desired number of replicas")
-    initial_revision: RevisionInput = Field(description="Initial revision configuration")
+    initial_revision: CreateRevisionInputDTO = Field(description="Initial revision configuration")
     rolling_update: RollingUpdateConfigInput | None = Field(
         default=None, description="Rolling update config"
     )

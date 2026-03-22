@@ -14,6 +14,7 @@ from ai.backend.common.data.filter_specs import StringMatchSpec
 from ai.backend.common.dto.manager.v2.fair_share.types import (
     ResourceSlotEntryInfo,
     ResourceSlotInfo,
+    ResourceWeightEntryInfo,
 )
 from ai.backend.common.dto.manager.v2.resource_group.request import (
     AdminSearchResourceGroupsInput,
@@ -26,6 +27,7 @@ from ai.backend.common.dto.manager.v2.resource_group.request import (
 )
 from ai.backend.common.dto.manager.v2.resource_group.response import (
     CreateResourceGroupPayload,
+    FairShareScalingGroupSpecInfo,
     PreemptionConfigInfo,
     ResourceGroupDetailNode,
     ResourceGroupMetadataInfo,
@@ -45,7 +47,7 @@ from ai.backend.common.dto.manager.v2.resource_group.types import (
     ResourceGroupOrderField,
     SchedulerTypeDTO,
 )
-from ai.backend.common.types import PreemptionMode, PreemptionOrder, ResourceSlot, SlotQuantity
+from ai.backend.common.types import PreemptionMode, PreemptionOrder, SlotQuantity
 from ai.backend.manager.data.scaling_group.types import (
     PreemptionConfig as DataPreemptionConfig,
 )
@@ -57,7 +59,6 @@ from ai.backend.manager.errors.resource import ScalingGroupNotFound
 from ai.backend.manager.models.scaling_group import ScalingGroupRow
 from ai.backend.manager.models.scaling_group.conditions import ScalingGroupConditions
 from ai.backend.manager.models.scaling_group.orders import ScalingGroupOrders
-from ai.backend.manager.models.scaling_group.types import FairShareScalingGroupSpec
 from ai.backend.manager.repositories.base import (
     BatchQuerier,
     NoPagination,
@@ -383,7 +384,7 @@ class ResourceGroupAdapter(BaseAdapter):
     async def get_fair_share_spec(
         self,
         resource_group: str,
-    ) -> tuple[FairShareScalingGroupSpec, frozenset[str]]:
+    ) -> FairShareScalingGroupSpecInfo:
         """Get fair share spec merged with capacity resource weights for a resource group.
 
         Merges the resource group's fair share spec with the current capacity
@@ -391,8 +392,8 @@ class ResourceGroupAdapter(BaseAdapter):
         Missing resource types use default_weight.
 
         Returns:
-            Tuple of (merged_spec, uses_default_resources) where uses_default_resources
-            is a frozenset of resource types using the default weight.
+            FairShareScalingGroupSpecInfo DTO with merged resource weights and
+            uses_default indicators per resource type.
         """
         name_spec = StringMatchSpec(
             value=resource_group,
@@ -416,25 +417,31 @@ class ResourceGroupAdapter(BaseAdapter):
         capacity = resource_info.capacity
 
         spec = sg_data.fair_share_spec
-        merged: dict[str, Any] = {}
-        uses_default: list[str] = []
+        weight_entries: list[ResourceWeightEntryInfo] = []
 
         for entry in capacity.entries:
             resource_type = entry.resource_type
             if resource_type in spec.resource_weights.data:
-                merged[resource_type] = spec.resource_weights.data[resource_type]
+                weight = spec.resource_weights.data[resource_type]
+                uses_default = False
             else:
-                merged[resource_type] = spec.default_weight
-                uses_default.append(resource_type)
+                weight = spec.default_weight
+                uses_default = True
+            weight_entries.append(
+                ResourceWeightEntryInfo(
+                    resource_type=resource_type,
+                    weight=weight,
+                    uses_default=uses_default,
+                )
+            )
 
-        merged_spec = FairShareScalingGroupSpec(
+        return FairShareScalingGroupSpecInfo(
             half_life_days=spec.half_life_days,
             lookback_days=spec.lookback_days,
             decay_unit_days=spec.decay_unit_days,
             default_weight=spec.default_weight,
-            resource_weights=ResourceSlot(merged),
+            resource_weights=weight_entries,
         )
-        return merged_spec, frozenset(uses_default)
 
     async def update_fair_share_spec(
         self,

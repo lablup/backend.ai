@@ -10,7 +10,6 @@ from uuid import UUID
 from pydantic import Field, field_validator
 
 from ai.backend.common.api_handlers import SENTINEL, BaseRequestModel, Sentinel
-from ai.backend.common.data.notification.types import EmailSpec, WebhookSpec
 from ai.backend.common.dto.manager.query import StringFilter
 
 from .types import (
@@ -98,7 +97,7 @@ class CreateNotificationChannelInput(BaseRequestModel):
     name: str = Field(min_length=1, max_length=256, description="Channel name")
     description: str | None = Field(default=None, description="Channel description")
     channel_type: NotificationChannelTypeDTO = Field(description="Channel type")
-    spec: WebhookSpec | EmailSpec = Field(description="Channel specification")
+    spec: NotificationChannelSpecInputDTO = Field(description="Channel specification")
     enabled: bool = Field(default=True, description="Whether the channel is enabled")
 
     @field_validator("name")
@@ -118,7 +117,7 @@ class UpdateNotificationChannelInput(BaseRequestModel):
         default=SENTINEL,
         description="Updated channel description. Use SENTINEL to clear.",
     )
-    spec: WebhookSpec | EmailSpec | None = Field(
+    spec: NotificationChannelSpecInputDTO | None = Field(
         default=None, description="Updated channel specification"
     )
     enabled: bool | None = Field(default=None, description="Updated enabled status")
@@ -208,8 +207,8 @@ class ValidateNotificationRuleInput(BaseRequestModel):
     """Input for validating a notification rule by rendering its message template."""
 
     id: UUID = Field(description="Rule ID to validate")
-    notification_data: dict[str, Any] = Field(
-        default_factory=dict,
+    notification_data: dict[str, Any] | None = Field(
+        default=None,
         description="Test notification data to use in template rendering",
     )
 

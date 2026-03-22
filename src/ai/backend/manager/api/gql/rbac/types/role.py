@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import uuid
 from collections.abc import Iterable
-from datetime import UTC, datetime
+from datetime import datetime
 from enum import StrEnum
 from typing import TYPE_CHECKING, Annotated, Any, Self, cast
 
@@ -95,10 +95,6 @@ from ai.backend.manager.api.gql.decorators import (
 )
 from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin, PydanticOutputMixin
 from ai.backend.manager.api.gql.types import GQLFilter, GQLOrderBy, StrawberryGQLContext
-from ai.backend.manager.data.permission.role import (
-    UserRoleAssignmentData,
-    UserRoleRevocationData,
-)
 
 if TYPE_CHECKING:
     from ai.backend.manager.api.gql.rbac.types.permission import (
@@ -342,26 +338,6 @@ class RoleAssignmentGQL(PydanticNodeMixin[RoleAssignmentNode]):
     ):
         # DataLoader already returns UserV2GQL | None via from_pydantic conversion
         return await info.context.data_loaders.user_loader.load(self.user_id)
-
-    @classmethod
-    def from_assignment_data(cls, data: UserRoleAssignmentData) -> Self:
-        return cls(
-            id=ID(str(data.id)),
-            user_id=data.user_id,
-            role_id=data.role_id,
-            granted_by=data.granted_by,
-            granted_at=datetime.now(tz=UTC),
-        )
-
-    @classmethod
-    def from_revocation_data(cls, data: UserRoleRevocationData) -> Self:
-        return cls(
-            id=ID(str(data.user_role_id)),
-            user_id=data.user_id,
-            role_id=data.role_id,
-            granted_by=None,
-            granted_at=datetime.now(tz=UTC),
-        )
 
 
 # ==================== Filter Types ====================

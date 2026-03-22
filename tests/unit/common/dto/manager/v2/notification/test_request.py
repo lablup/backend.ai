@@ -8,37 +8,44 @@ import pytest
 from pydantic import ValidationError
 
 from ai.backend.common.api_handlers import SENTINEL, Sentinel
-from ai.backend.common.data.notification.types import (
-    EmailMessage,
-    EmailSpec,
-    NotificationChannelType,
-    NotificationRuleType,
-    SMTPConnection,
-    WebhookSpec,
-)
 from ai.backend.common.dto.manager.v2.notification.request import (
     CreateNotificationChannelInput,
     CreateNotificationRuleInput,
     DeleteNotificationChannelInput,
     DeleteNotificationRuleInput,
+    EmailMessageInputDTO,
+    EmailSpecInputDTO,
+    NotificationChannelSpecInputDTO,
+    SMTPConnectionInputDTO,
     UpdateNotificationChannelInput,
     UpdateNotificationRuleInput,
     ValidateNotificationChannelInput,
     ValidateNotificationRuleInput,
+    WebhookSpecInputDTO,
+)
+from ai.backend.common.dto.manager.v2.notification.types import (
+    NotificationChannelTypeDTO as NotificationChannelType,
+)
+from ai.backend.common.dto.manager.v2.notification.types import (
+    NotificationRuleTypeDTO as NotificationRuleType,
 )
 
 
-def _make_webhook_spec() -> WebhookSpec:
-    return WebhookSpec(url="https://example.com/webhook")
+def _make_webhook_spec() -> NotificationChannelSpecInputDTO:
+    return NotificationChannelSpecInputDTO(
+        webhook=WebhookSpecInputDTO(url="https://example.com/webhook")
+    )
 
 
-def _make_email_spec() -> EmailSpec:
-    return EmailSpec(
-        smtp=SMTPConnection(host="smtp.example.com", port=587),
-        message=EmailMessage(
-            from_email="noreply@example.com",
-            to_emails=["admin@example.com"],
-        ),
+def _make_email_spec() -> NotificationChannelSpecInputDTO:
+    return NotificationChannelSpecInputDTO(
+        email=EmailSpecInputDTO(
+            smtp=SMTPConnectionInputDTO(host="smtp.example.com", port=587),
+            message=EmailMessageInputDTO(
+                from_email="noreply@example.com",
+                to_emails=["admin@example.com"],
+            ),
+        )
     )
 
 
@@ -447,16 +454,17 @@ class TestValidateNotificationChannelInput:
 class TestValidateNotificationRuleInput:
     """Tests for ValidateNotificationRuleInput model."""
 
-    def test_default_notification_data_is_empty_dict(self) -> None:
+    def test_default_notification_data_is_none(self) -> None:
         rule_id = uuid.uuid4()
         inp = ValidateNotificationRuleInput(id=rule_id)
-        assert inp.notification_data == {}
+        assert inp.notification_data is None
 
     def test_notification_data_can_be_set(self) -> None:
         inp = ValidateNotificationRuleInput(
             id=uuid.uuid4(),
             notification_data={"session_id": "abc123", "user": "admin"},
         )
+        assert inp.notification_data is not None
         assert inp.notification_data["session_id"] == "abc123"
         assert inp.notification_data["user"] == "admin"
 
@@ -466,6 +474,7 @@ class TestValidateNotificationRuleInput:
             "id": str(rule_id),
             "notification_data": {"key": "value"},
         })
+        assert inp.notification_data is not None
         assert inp.notification_data["key"] == "value"
 
     def test_round_trip_serialization(self) -> None:
@@ -475,5 +484,6 @@ class TestValidateNotificationRuleInput:
         )
         json_str = inp.model_dump_json()
         restored = ValidateNotificationRuleInput.model_validate_json(json_str)
+        assert restored.notification_data is not None
         assert restored.notification_data["event"] == "session.started"
         assert restored.notification_data["count"] == 5

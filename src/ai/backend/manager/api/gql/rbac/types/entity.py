@@ -6,7 +6,7 @@ import uuid
 from collections.abc import Iterable
 from datetime import datetime
 from enum import StrEnum
-from typing import Self, cast
+from typing import Any, Self, cast
 
 import strawberry
 from strawberry import Info
@@ -165,6 +165,6 @@ EntityEdge = Edge[EntityRefGQL]
 class EntityConnection(Connection[EntityRefGQL]):
     count: int
 
-    def __init__(self, *args: object, count: int, **kwargs: object) -> None:
+    def __init__(self, *args: Any, count: int, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
         self.count = count

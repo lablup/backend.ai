@@ -16,14 +16,6 @@ from strawberry.relay import NodeID
 # dispatches from_pydantic() to the concrete implementor (WebhookSpecGQL /
 # EmailSpecGQL) based on the runtime DTO type.  No _pydantic_extra needed in
 # NotificationChannel.
-from ai.backend.common.api_handlers import SENTINEL
-from ai.backend.common.data.notification import WebhookSpec
-from ai.backend.common.data.notification.types import (
-    EmailMessage,
-    EmailSpec,
-    SMTPAuth,
-    SMTPConnection,
-)
 from ai.backend.common.dto.manager.v2.notification.request import (
     CreateNotificationChannelInput as CreateNotificationChannelInputDTO,
 )
@@ -112,7 +104,6 @@ from ai.backend.common.dto.manager.v2.notification.types import (
     SMTPConnectionInfo,
     WebhookSpecInfo,
 )
-from ai.backend.common.exception import InvalidNotificationChannelSpec
 from ai.backend.manager.api.gql.base import OrderDirection, StringFilter
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
@@ -379,9 +370,6 @@ class NotificationRuleOrderBy(PydanticInputMixin[NotificationRuleOrderDTO]):
 class WebhookSpecInput(PydanticInputMixin[WebhookSpecInputDTO]):
     url: str
 
-    def to_dataclass(self) -> WebhookSpec:
-        return WebhookSpec(url=self.url)
-
 
 @gql_pydantic_input(
     BackendAIGQLMeta(
@@ -392,9 +380,6 @@ class WebhookSpecInput(PydanticInputMixin[WebhookSpecInputDTO]):
 class SMTPAuthInput(PydanticInputMixin[SMTPAuthInputDTO]):
     username: str | None = None
     password: str | None = None
-
-    def to_dataclass(self) -> SMTPAuth:
-        return SMTPAuth(username=self.username, password=self.password)
 
 
 @gql_pydantic_input(
@@ -409,14 +394,6 @@ class SMTPConnectionInput(PydanticInputMixin[SMTPConnectionInputDTO]):
     use_tls: bool = True
     timeout: int = 30
 
-    def to_dataclass(self) -> SMTPConnection:
-        return SMTPConnection(
-            host=self.host,
-            port=self.port,
-            use_tls=self.use_tls,
-            timeout=self.timeout,
-        )
-
 
 @gql_pydantic_input(
     BackendAIGQLMeta(description="Input for email message settings", added_version="24.09.0"),
@@ -426,13 +403,6 @@ class EmailMessageInput(PydanticInputMixin[EmailMessageInputDTO]):
     from_email: str
     to_emails: list[str]
     subject_template: str | None = None
-
-    def to_dataclass(self) -> EmailMessage:
-        return EmailMessage(
-            from_email=self.from_email,
-            to_emails=self.to_emails,
-            subject_template=self.subject_template,
-        )
 
 
 @gql_pydantic_input(
@@ -445,13 +415,6 @@ class EmailSpecInput(PydanticInputMixin[EmailSpecInputDTO]):
     smtp: SMTPConnectionInput
     message: EmailMessageInput
     auth: SMTPAuthInput | None = None
-
-    def to_dataclass(self) -> EmailSpec:
-        return EmailSpec(
-            smtp=self.smtp.to_dataclass(),
-            message=self.message.to_dataclass(),
-            auth=self.auth.to_dataclass() if self.auth else None,
-        )
 
 
 @gql_pydantic_input(
@@ -466,43 +429,18 @@ class NotificationChannelSpecInput(PydanticInputMixin[NotificationChannelSpecInp
     webhook: WebhookSpecInput | None = UNSET
     email: EmailSpecInput | None = UNSET
 
-    def to_dataclass(self) -> WebhookSpec | EmailSpec:
-        """Convert to the appropriate dataclass based on which field is set."""
-        if self.webhook is not None and self.webhook is not UNSET:
-            return self.webhook.to_dataclass()
-        if self.email is not None and self.email is not UNSET:
-            return self.email.to_dataclass()
-        raise InvalidNotificationChannelSpec("Exactly one of webhook or email must be set")
-
-    def get_channel_type(self) -> NotificationChannelTypeDTO:
-        """Get the channel type based on which field is set."""
-        if self.webhook is not None and self.webhook is not UNSET:
-            return NotificationChannelTypeDTO.WEBHOOK
-        if self.email is not None and self.email is not UNSET:
-            return NotificationChannelTypeDTO.EMAIL
-        raise InvalidNotificationChannelSpec("Exactly one of webhook or email must be set")
-
 
 @gql_pydantic_input(
     BackendAIGQLMeta(
         description="Input for creating a notification channel", added_version="24.09.0"
     ),
 )
-class CreateNotificationChannelInput:
+class CreateNotificationChannelInput(PydanticInputMixin[CreateNotificationChannelInputDTO]):
     name: str
     description: str | None = None
     channel_type: NotificationChannelTypeGQL
     spec: NotificationChannelSpecInput
     enabled: bool = True
-
-    def to_pydantic(self) -> CreateNotificationChannelInputDTO:
-        return CreateNotificationChannelInputDTO(
-            name=self.name,
-            description=self.description,
-            channel_type=self.channel_type,
-            spec=self.spec.to_dataclass(),
-            enabled=self.enabled,
-        )
 
 
 @gql_pydantic_input(
@@ -510,20 +448,12 @@ class CreateNotificationChannelInput:
         description="Input for updating a notification channel", added_version="24.09.0"
     ),
 )
-class UpdateNotificationChannelInput:
+class UpdateNotificationChannelInput(PydanticInputMixin[UpdateNotificationChannelInputDTO]):
     id: ID
     name: str | None = UNSET
     description: str | None = UNSET
     spec: NotificationChannelSpecInput | None = UNSET
     enabled: bool | None = UNSET
-
-    def to_pydantic(self) -> UpdateNotificationChannelInputDTO:
-        return UpdateNotificationChannelInputDTO(
-            name=None if self.name is UNSET else self.name,
-            description=SENTINEL if self.description is UNSET else self.description,
-            spec=(None if (self.spec is UNSET or self.spec is None) else self.spec.to_dataclass()),
-            enabled=None if self.enabled is UNSET else self.enabled,
-        )
 
 
 @gql_pydantic_input(
@@ -661,17 +591,9 @@ class ValidateNotificationChannelPayload(
         description="Input for validate notification rule mutation", added_version="24.09.0"
     ),
 )
-class ValidateNotificationRuleInput:
+class ValidateNotificationRuleInput(PydanticInputMixin[ValidateNotificationRuleInputDTO]):
     id: ID
     notification_data: strawberry.scalars.JSON | None = UNSET
-
-    def to_pydantic(self) -> ValidateNotificationRuleInputDTO:
-        return ValidateNotificationRuleInputDTO(
-            id=uuid.UUID(self.id),
-            notification_data={}
-            if (self.notification_data is UNSET or self.notification_data is None)
-            else dict(self.notification_data),
-        )
 
 
 @gql_pydantic_type(

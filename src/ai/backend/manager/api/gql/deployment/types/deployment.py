@@ -12,7 +12,6 @@ from strawberry import ID, UNSET, Info
 from strawberry.relay import Connection, Edge, NodeID, PageInfo
 
 from ai.backend.common.data.model_deployment.types import (
-    DeploymentStrategy,
     ModelDeploymentStatus,
 )
 from ai.backend.common.dto.manager.v2.deployment.request import (
@@ -75,9 +74,6 @@ from ai.backend.common.dto.manager.v2.deployment.types import (
     DeploymentStrategyInfoDTO,
     ReplicaStateInfo,
 )
-from ai.backend.common.exception import (
-    InvalidAPIParameters,
-)
 from ai.backend.manager.api.gql.base import (
     OrderDirection,
     StringFilter,
@@ -135,16 +131,13 @@ from ai.backend.manager.api.gql.user_federation import User
 from ai.backend.manager.api.gql_legacy.domain import DomainNode
 from ai.backend.manager.api.gql_legacy.group import GroupNode
 from ai.backend.manager.api.gql_legacy.user import UserNode
-from ai.backend.manager.data.deployment.creator import DeploymentPolicyConfig
 from ai.backend.manager.data.deployment.types import (
     AccessTokenSearchScope,
     AutoScalingRuleSearchScope,
-    DeploymentNetworkSpec,
     DeploymentOrderField,
     ReplicaSearchScope,
     RevisionSearchScope,
 )
-from ai.backend.manager.models.deployment_policy import BlueGreenSpec, RollingUpdateSpec
 
 DeploymentStatusGQL: type[ModelDeploymentStatus] = strawberry.enum(
     ModelDeploymentStatus,
@@ -526,12 +519,6 @@ class ModelDeploymentNetworkAccessInput(PydanticInputMixin[ModelDeploymentNetwor
     preferred_domain_name: str | None = None
     open_to_public: bool = False
 
-    def to_network_spec(self) -> DeploymentNetworkSpec:
-        return DeploymentNetworkSpec(
-            open_to_public=self.open_to_public,
-            preferred_domain_name=self.preferred_domain_name,
-        )
-
 
 @gql_pydantic_input(
     BackendAIGQLMeta(
@@ -552,41 +539,6 @@ class DeploymentStrategyInputGQL(PydanticInputMixin[DeploymentStrategyInputDTO])
     rollback_on_failure: bool = False
     rolling_update: RollingUpdateConfigInputGQL | None = None
     blue_green: BlueGreenConfigInputGQL | None = None
-
-    def validate(self) -> None:
-        """Validate that the appropriate config is provided for the strategy type."""
-        if self.type == DeploymentStrategy.ROLLING and not self.rolling_update:
-            raise InvalidAPIParameters("rolling_update config required for ROLLING strategy")
-        if self.type == DeploymentStrategy.BLUE_GREEN and not self.blue_green:
-            raise InvalidAPIParameters("blue_green config required for BLUE_GREEN strategy")
-
-    def to_policy_config(self) -> DeploymentPolicyConfig:
-        """Convert to DeploymentPolicyConfig for service layer."""
-        self.validate()
-        strategy = DeploymentStrategy(self.type.value)
-        match strategy:
-            case DeploymentStrategy.ROLLING:
-                if self.rolling_update is None:
-                    raise InvalidAPIParameters("rolling_update config required but not provided")
-                return DeploymentPolicyConfig(
-                    strategy=strategy,
-                    strategy_spec=RollingUpdateSpec(
-                        max_surge=self.rolling_update.max_surge,
-                        max_unavailable=self.rolling_update.max_unavailable,
-                    ),
-                    rollback_on_failure=self.rollback_on_failure,
-                )
-            case DeploymentStrategy.BLUE_GREEN:
-                if self.blue_green is None:
-                    raise InvalidAPIParameters("blue_green config required but not provided")
-                return DeploymentPolicyConfig(
-                    strategy=strategy,
-                    strategy_spec=BlueGreenSpec(
-                        auto_promote=self.blue_green.auto_promote,
-                        promote_delay_seconds=self.blue_green.promote_delay_seconds,
-                    ),
-                    rollback_on_failure=self.rollback_on_failure,
-                )
 
 
 @gql_pydantic_input(

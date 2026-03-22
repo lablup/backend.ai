@@ -59,7 +59,6 @@ from ai.backend.manager.api.gql.resource_group.resolver import (
 from ai.backend.manager.api.gql.resource_group.types import ResourceGroupGQL
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.api.gql.user.types.node import UserV2GQL
-from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.errors.user import UserNotFound
 
 
@@ -80,58 +79,6 @@ class SessionV2StatusGQL(StrEnum):
     TERMINATING = "TERMINATING"
     TERMINATED = "TERMINATED"
     CANCELLED = "CANCELLED"
-
-    @classmethod
-    def from_internal(cls, internal_status: SessionStatus) -> SessionV2StatusGQL:
-        """Convert internal SessionStatus to GraphQL enum."""
-        match internal_status:
-            case SessionStatus.PENDING:
-                return cls.PENDING
-            case SessionStatus.SCHEDULED:
-                return cls.SCHEDULED
-            case SessionStatus.PREPARING | SessionStatus.PULLING:
-                return cls.PREPARING
-            case SessionStatus.PREPARED:
-                return cls.PREPARED
-            case SessionStatus.CREATING:
-                return cls.CREATING
-            case SessionStatus.RUNNING:
-                return cls.RUNNING
-            case SessionStatus.DEPRIORITIZING:
-                return cls.DEPRIORITIZING
-            case SessionStatus.TERMINATING:
-                return cls.TERMINATING
-            case SessionStatus.TERMINATED:
-                return cls.TERMINATED
-            case SessionStatus.CANCELLED:
-                return cls.CANCELLED
-            case _:
-                # RESTARTING, RUNNING_DEGRADED, ERROR are not exposed via GQL
-                return cls.CANCELLED
-
-    def to_internal(self) -> SessionStatus:
-        """Convert GraphQL enum to internal SessionStatus."""
-        match self:
-            case SessionV2StatusGQL.PENDING:
-                return SessionStatus.PENDING
-            case SessionV2StatusGQL.SCHEDULED:
-                return SessionStatus.SCHEDULED
-            case SessionV2StatusGQL.PREPARING:
-                return SessionStatus.PREPARING
-            case SessionV2StatusGQL.PREPARED:
-                return SessionStatus.PREPARED
-            case SessionV2StatusGQL.CREATING:
-                return SessionStatus.CREATING
-            case SessionV2StatusGQL.RUNNING:
-                return SessionStatus.RUNNING
-            case SessionV2StatusGQL.DEPRIORITIZING:
-                return SessionStatus.DEPRIORITIZING
-            case SessionV2StatusGQL.TERMINATING:
-                return SessionStatus.TERMINATING
-            case SessionV2StatusGQL.TERMINATED:
-                return SessionStatus.TERMINATED
-            case SessionV2StatusGQL.CANCELLED:
-                return SessionStatus.CANCELLED
 
 
 # ========== Order and Filter Types ==========

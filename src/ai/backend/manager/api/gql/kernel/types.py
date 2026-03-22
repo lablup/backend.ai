@@ -59,7 +59,6 @@ from ai.backend.manager.api.gql.resource_group.types import ResourceGroupGQL
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.api.gql.user.types.node import UserV2GQL
 from ai.backend.manager.api.gql.utils import dedent_strip
-from ai.backend.manager.data.kernel.types import KernelStatus
 
 
 @strawberry.enum(
@@ -78,58 +77,6 @@ class KernelV2StatusGQL(StrEnum):
     TERMINATING = "TERMINATING"
     TERMINATED = "TERMINATED"
     CANCELLED = "CANCELLED"
-
-    @classmethod
-    def from_internal(cls, internal_status: KernelStatus) -> KernelV2StatusGQL:
-        """Convert internal KernelStatus to GraphQL enum."""
-        match internal_status:
-            case KernelStatus.PENDING:
-                return cls.PENDING
-            case KernelStatus.SCHEDULED:
-                return cls.SCHEDULED
-            case KernelStatus.PREPARING | KernelStatus.PULLING:
-                return cls.PREPARING
-            case KernelStatus.PREPARED:
-                return cls.PREPARED
-            case KernelStatus.CREATING:
-                return cls.CREATING
-            case KernelStatus.RUNNING:
-                return cls.RUNNING
-            case KernelStatus.TERMINATING:
-                return cls.TERMINATING
-            case KernelStatus.TERMINATED:
-                return cls.TERMINATED
-            case (
-                KernelStatus.CANCELLED
-                | KernelStatus.BUILDING
-                | KernelStatus.RESTARTING
-                | KernelStatus.RESIZING
-                | KernelStatus.SUSPENDED
-                | KernelStatus.ERROR
-            ):
-                return cls.CANCELLED
-
-    def to_internal(self) -> KernelStatus:
-        """Convert GraphQL enum to internal KernelStatus."""
-        match self:
-            case KernelV2StatusGQL.PENDING:
-                return KernelStatus.PENDING
-            case KernelV2StatusGQL.SCHEDULED:
-                return KernelStatus.SCHEDULED
-            case KernelV2StatusGQL.PREPARING:
-                return KernelStatus.PREPARING
-            case KernelV2StatusGQL.PREPARED:
-                return KernelStatus.PREPARED
-            case KernelV2StatusGQL.CREATING:
-                return KernelStatus.CREATING
-            case KernelV2StatusGQL.RUNNING:
-                return KernelStatus.RUNNING
-            case KernelV2StatusGQL.TERMINATING:
-                return KernelStatus.TERMINATING
-            case KernelV2StatusGQL.TERMINATED:
-                return KernelStatus.TERMINATED
-            case KernelV2StatusGQL.CANCELLED:
-                return KernelStatus.CANCELLED
 
 
 @strawberry.enum(

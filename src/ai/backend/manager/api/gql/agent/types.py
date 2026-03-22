@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from collections.abc import Iterable, Mapping
+from collections.abc import Iterable
 from datetime import datetime
 from enum import StrEnum
 from typing import TYPE_CHECKING, Annotated, Any, Self, cast
@@ -38,7 +38,6 @@ from ai.backend.manager.api.gql.pydantic_compat import PydanticInputMixin, Pydan
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.api.gql.utils import dedent_strip
 from ai.backend.manager.data.agent.types import AgentStatus
-from ai.backend.manager.models.rbac.permission_defs import AgentPermission
 
 if TYPE_CHECKING:
     from ai.backend.manager.api.gql.kernel.types import (
@@ -67,18 +66,6 @@ class AgentPermissionGQL(StrEnum):
     UPDATE_ATTRIBUTE = "update_attribute"
     CREATE_COMPUTE_SESSION = "create_compute_session"
     CREATE_SERVICE = "create_service"
-
-    @classmethod
-    def from_agent_permission(cls, permission: AgentPermission) -> AgentPermissionGQL:
-        match permission:
-            case AgentPermission.READ_ATTRIBUTE:
-                return AgentPermissionGQL.READ_ATTRIBUTE
-            case AgentPermission.UPDATE_ATTRIBUTE:
-                return AgentPermissionGQL.UPDATE_ATTRIBUTE
-            case AgentPermission.CREATE_COMPUTE_SESSION:
-                return AgentPermissionGQL.CREATE_COMPUTE_SESSION
-            case AgentPermission.CREATE_SERVICE:
-                return AgentPermissionGQL.CREATE_SERVICE
 
 
 @strawberry.enum(
@@ -259,14 +246,6 @@ class ComputePluginsGQL:
             "The list includes all accelerator and resource type plugins installed on the agent."
         )
     )
-
-    @classmethod
-    def from_mapping(cls, plugins: Mapping[str, str]) -> ComputePluginsGQL:
-        """Convert a mapping of plugin name to value to GraphQL type."""
-        entries = [
-            ComputePluginEntryGQL(plugin_name=name, value=value) for name, value in plugins.items()
-        ]
-        return cls(entries=entries)
 
 
 @gql_pydantic_type(

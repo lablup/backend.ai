@@ -63,11 +63,7 @@ from ai.backend.manager.api.gql.pydantic_compat import (
 )
 from ai.backend.manager.api.gql.types import GQLFilter, GQLOrderBy, StrawberryGQLContext
 from ai.backend.manager.api.gql.utils import dedent_strip
-from ai.backend.manager.data.image.types import (
-    ImageDataWithDetails,
-)
 from ai.backend.manager.models.image.conditions import ImageAliasConditions
-from ai.backend.manager.models.rbac.permission_defs import ImagePermission
 
 # =============================================================================
 # Enums
@@ -341,57 +337,6 @@ class ImageV2GQL(PydanticNodeMixin[ImageNode]):
             ImageID(uuid.UUID(nid)) for nid in node_ids
         ])
         return cast(list[Self | None], results)
-
-    @classmethod
-    def from_detailed_data(
-        cls,
-        data: ImageDataWithDetails,
-        permissions: list[ImagePermission] | None = None,
-    ) -> Self:
-        """Create ImageV2GQL from ImageDataWithDetails.
-
-        Args:
-            data: The detailed image data.
-            permissions: Optional list of permissions the user has on this image.
-
-        Returns:
-            ImageV2GQL instance.
-        """
-        return cls(
-            id=data.id,
-            identity=ImageV2IdentityInfoGQL(
-                canonical_name=str(data.name),
-                namespace=data.namespace,
-                architecture=data.architecture,
-            ),
-            metadata=ImageV2MetadataInfoGQL(
-                digest=data.digest,
-                size_bytes=data.size_bytes,
-                created_at=data.created_at,
-                tags=[ImageV2TagEntryGQL(key=kv.key, value=kv.value) for kv in data.tags],
-                labels=[ImageV2LabelEntryGQL(key=kv.key, value=kv.value) for kv in data.labels],
-                status=ImageV2StatusGQL(data.status.value),
-            ),
-            requirements=ImageV2RequirementsInfoGQL(
-                supported_accelerators=[
-                    a.strip() for a in data.supported_accelerators if a.strip()
-                ],
-                resource_limits=[
-                    ImageV2ResourceLimitGQL(
-                        key=rl.key,
-                        min=str(rl.min),
-                        max=str(rl.max),
-                    )
-                    for rl in data.resource_limits
-                ],
-            ),
-            permission=ImageV2PermissionInfoGQL(
-                permissions=[ImageV2PermissionGQL(p.value) for p in permissions],
-            )
-            if permissions
-            else None,
-            registry_id=data.registry_id,
-        )
 
 
 # Edge type using strawberry.relay.Edge

@@ -7,7 +7,6 @@ from datetime import datetime
 import strawberry
 from strawberry import UNSET
 
-from ai.backend.common.dto.clients.prometheus.request import QueryTimeRange
 from ai.backend.common.dto.manager.v2.prometheus_query_preset.request import (
     CreateQueryDefinitionInput as CreateQueryDefinitionInputDTO,
 )
@@ -34,7 +33,6 @@ from ai.backend.manager.api.gql.decorators import (
     gql_pydantic_input,
 )
 from ai.backend.manager.api.gql.pydantic_compat import PydanticInputMixin
-from ai.backend.manager.data.prometheus_query_preset import ExecutePresetOptions
 
 
 @gql_pydantic_input(
@@ -108,13 +106,6 @@ class QueryTimeRangeInput(PydanticInputMixin[QueryTimeRangeInputDTO]):
     end: datetime = strawberry.field(description="End of the time range.")
     step: str = strawberry.field(description="Query resolution step (e.g., '60s').")
 
-    def to_internal(self) -> QueryTimeRange:
-        return QueryTimeRange(
-            start=self.start.isoformat(),
-            end=self.end.isoformat(),
-            step=self.step,
-        )
-
 
 @gql_pydantic_input(
     BackendAIGQLMeta(description="Key-value label entry for queries.", added_version="26.3.0"),
@@ -138,13 +129,3 @@ class ExecuteQueryDefinitionOptionsInput(PydanticInputMixin[ExecuteQueryDefiniti
     group_labels: list[str] | None = strawberry.field(
         default=None, description="Label keys to group results by."
     )
-
-    def to_internal(self) -> ExecutePresetOptions:
-        filter_labels: dict[str, str] = {}
-        if self.filter_labels:
-            for entry in self.filter_labels:
-                filter_labels[entry.key] = entry.value
-        return ExecutePresetOptions(
-            filter_labels=filter_labels,
-            group_labels=self.group_labels or [],
-        )

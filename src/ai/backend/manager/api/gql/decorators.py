@@ -8,8 +8,9 @@ Decorator roles:
     gql_connection_type  — Connection[T] and Edge[T] subclasses.
     gql_pydantic_type    — Output types backed by a v2 Pydantic DTO; Strawberry
                            auto-generates from_pydantic() / to_pydantic().
-    gql_pydantic_input   — Input types backed by a v2 Pydantic DTO; Strawberry
-                           auto-generates from_pydantic() / to_pydantic().
+    gql_pydantic_input   — Input types backed by a v2 Pydantic DTO via PydanticInputMixin.
+    gql_type             — Plain output types not backed by Pydantic DTOs (e.g. subscription
+                           event payloads). Use only when no suitable Pydantic DTO exists.
 """
 
 from __future__ import annotations
@@ -40,9 +41,11 @@ __all__ = (
     "gql_pydantic_input",
     "gql_pydantic_interface",
     "gql_pydantic_type",
+    "gql_type",
 )
 
 T = TypeVar("T", bound="PydanticNodeMixin[Any]")
+T_any = TypeVar("T_any")
 T_conn = TypeVar("T_conn", bound="Connection[Any]")
 T_input = TypeVar("T_input", bound="PydanticInputMixin[Any]")
 
@@ -109,21 +112,15 @@ def gql_connection_type(
 def gql_pydantic_input(
     meta: BackendAIGQLMeta,
     *,
-    model: type[BaseModel] | None = None,
-    fields: list[str] | None = None,
     name: str | None = None,
     directives: Sequence[object] = (),
-    use_pydantic_alias: bool = True,
     description: str | None = None,
     one_of: bool = False,
 ) -> Callable[[type[T_input]], type[T_input]]:
-    """Decorator for GQL input types.
+    """Decorator for GQL input types backed by a Pydantic DTO via PydanticInputMixin.
 
-    Two usage modes:
-
-    **New pattern** (``model=None``, default): Wrap the class with
-    ``@strawberry.input`` and rely on ``PydanticInputMixin[DTO]`` inheritance
-    for automatic ``to_pydantic()`` conversion.  Strawberry does not touch
+    Wraps the class with ``@strawberry.input`` and relies on ``PydanticInputMixin[DTO]``
+    inheritance for automatic ``to_pydantic()`` conversion.  Strawberry does not touch
     inherited methods on plain ``@strawberry.input`` types, so the mixin's
     ``to_pydantic()`` is preserved.
 
@@ -133,21 +130,9 @@ def gql_pydantic_input(
         class CreateFooInputGQL(PydanticInputMixin[CreateFooInputDTO]):
             name: str
 
-    **Legacy pattern** (``model=SomeDTO``): Wrap with
-    ``@strawberry.experimental.pydantic.input``.  Strawberry auto-generates
-    ``to_pydantic()`` for simple types; define it manually in the class body
-    when custom conversion is needed (``strawberry.ID → uuid.UUID``,
-    UNSET/SENTINEL mapping, enum coercion).
+    Always declare fields explicitly in the class body.
 
-    DEPRECATED: The legacy ``model=SomeDTO`` pattern is deprecated.
-    Migrate to ``PydanticInputMixin[DTO]`` with ``model=None``.
-
-    Always declare fields explicitly in the class body. Using ``all_fields=True``
-    is not supported because it prevents mypy from seeing the attributes and
-    causes strawberry to use pydantic field defaults (including SENTINEL) verbatim
-    in the GQL schema, which breaks schema printing for non-scalar default types.
-
-    The ``description`` param is accepted for backward compatibility but the
+    The ``description`` param is accepted for additional context but the
     canonical description is always built from ``BackendAIGQLMeta``.
 
     When ``one_of=True``, injects the ``@oneOf`` directive so exactly one field
@@ -159,19 +144,10 @@ def gql_pydantic_input(
         desc += f" Deprecated since {meta.deprecated_version}.{hint}"
     if one_of:
         directives = (*directives, OneOf())
-    if model is None:
-        return strawberry.input(
-            name=name,
-            description=desc,
-            directives=directives,
-        )
-    return strawberry.experimental.pydantic.input(
-        model=model,
-        fields=fields,
+    return strawberry.input(
         name=name,
         description=desc,
         directives=directives,
-        use_pydantic_alias=use_pydantic_alias,
     )
 
 
@@ -243,4 +219,34 @@ def gql_pydantic_type[PydanticModel: BaseModel](
         directives=directives,
         all_fields=all_fields,
         use_pydantic_alias=use_pydantic_alias,
+    )
+
+
+@dataclass_transform(
+    order_default=True,
+    kw_only_default=True,
+    field_specifiers=(strawberry_field, StrawberryField),
+)
+def gql_type(
+    meta: BackendAIGQLMeta,
+    *,
+    name: str | None = None,
+    directives: Sequence[object] = (),
+    extend: bool = False,
+) -> Callable[[type[T_any]], type[T_any]]:
+    """Decorator for plain GQL output types not backed by Pydantic DTOs.
+
+    Use only for types that cannot use gql_node_type or gql_pydantic_type,
+    such as subscription event payloads that are constructed directly from
+    event objects rather than from Pydantic DTOs.
+    """
+    description = f"Added in {meta.added_version}. {meta.description}"
+    if meta.deprecated_version is not None:
+        hint = f" Use {meta.deprecation_hint}." if meta.deprecation_hint else ""
+        description += f" Deprecated since {meta.deprecated_version}.{hint}"
+    return strawberry.type(
+        name=name,
+        description=description,
+        directives=directives,
+        extend=extend,
     )

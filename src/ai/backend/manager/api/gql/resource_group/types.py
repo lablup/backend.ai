@@ -5,7 +5,7 @@ from __future__ import annotations
 from collections.abc import Iterable
 from decimal import Decimal
 from enum import StrEnum
-from typing import Self, assert_never
+from typing import Self
 
 import strawberry
 from strawberry import Info
@@ -38,7 +38,6 @@ from ai.backend.common.dto.manager.v2.resource_group.response import (
     UpdateResourceGroupConfigPayloadNode,
     UpdateResourceGroupFairShareSpecPayloadNode,
 )
-from ai.backend.common.types import PreemptionMode, PreemptionOrder
 from ai.backend.manager.api.gql.base import OrderDirection, StringFilter
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
@@ -55,10 +54,6 @@ from ai.backend.manager.api.gql.fair_share.types.common import (
 from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin, PydanticOutputMixin
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.api.gql.utils import dedent_strip
-from ai.backend.manager.data.scaling_group.types import (
-    SchedulerType,
-)
-from ai.backend.manager.models.scaling_group.types import FairShareScalingGroupSpec
 
 __all__ = (
     "FairShareScalingGroupSpecGQL",
@@ -95,19 +90,6 @@ class SchedulerTypeGQL(StrEnum):
     DRF = "drf"
     FAIR_SHARE = "fair-share"
 
-    @classmethod
-    def from_scheduler_type(cls, scheduler_type: SchedulerType) -> SchedulerTypeGQL:
-        """Convert from data layer SchedulerType to GQL type."""
-        match scheduler_type:
-            case SchedulerType.FIFO:
-                return cls.FIFO
-            case SchedulerType.LIFO:
-                return cls.LIFO
-            case SchedulerType.DRF:
-                return cls.DRF
-            case SchedulerType.FAIR_SHARE:
-                return cls.FAIR_SHARE
-
 
 @strawberry.enum(
     name="PreemptionMode",
@@ -119,17 +101,6 @@ class PreemptionModeGQL(StrEnum):
     TERMINATE = "terminate"
     RESCHEDULE = "reschedule"
 
-    @classmethod
-    def from_preemption_mode(cls, mode: PreemptionMode) -> PreemptionModeGQL:
-        """Convert from internal PreemptionMode to GQL type."""
-        match mode:
-            case PreemptionMode.TERMINATE:
-                return cls.TERMINATE
-            case PreemptionMode.RESCHEDULE:
-                return cls.RESCHEDULE
-            case _:
-                assert_never(mode)
-
 
 @strawberry.enum(
     name="PreemptionOrder",
@@ -140,17 +111,6 @@ class PreemptionOrderGQL(StrEnum):
 
     OLDEST = "oldest"
     NEWEST = "newest"
-
-    @classmethod
-    def from_preemption_order(cls, order: PreemptionOrder) -> PreemptionOrderGQL:
-        """Convert from internal PreemptionOrder to GQL type."""
-        match order:
-            case PreemptionOrder.OLDEST:
-                return cls.OLDEST
-            case PreemptionOrder.NEWEST:
-                return cls.NEWEST
-            case _:
-                assert_never(order)
 
 
 @gql_pydantic_type(
@@ -276,36 +236,6 @@ class FairShareScalingGroupSpecGQL(PydanticOutputMixin[FairShareScalingGroupSpec
         )
     )
 
-    @classmethod
-    def from_model(
-        cls,
-        spec: FairShareScalingGroupSpec,
-        uses_default_resources: frozenset[str],
-    ) -> Self:
-        """Convert from Pydantic model to GQL type.
-
-        Args:
-            spec: FairShareScalingGroupSpec with merged resource_weights
-            uses_default_resources: Set of resource types using default weight
-        """
-        # Convert ResourceSlot to list[ResourceWeightEntryGQL]
-        weight_entries = [
-            ResourceWeightEntryGQL(
-                resource_type=resource_type,
-                weight=weight,
-                uses_default=resource_type in uses_default_resources,
-            )
-            for resource_type, weight in spec.resource_weights.items()
-        ]
-
-        return cls(
-            half_life_days=spec.half_life_days,
-            lookback_days=spec.lookback_days,
-            decay_unit_days=spec.decay_unit_days,
-            default_weight=spec.default_weight,
-            resource_weights=weight_entries,
-        )
-
 
 @gql_pydantic_type(
     BackendAIGQLMeta(
@@ -389,8 +319,8 @@ class ResourceGroupGQL(PydanticNodeMixin[ResourceGroupDetailNode]):
     ) -> FairShareScalingGroupSpecGQL:
         """Get fair share spec with merged resource weights from capacity."""
         ctx = info.context
-        merged_spec, uses_default = await ctx.adapters.resource_group.get_fair_share_spec(self.name)
-        return FairShareScalingGroupSpecGQL.from_model(merged_spec, uses_default)
+        dto = await ctx.adapters.resource_group.get_fair_share_spec(self.name)
+        return FairShareScalingGroupSpecGQL.from_pydantic(dto)
 
     @strawberry.field(  # type: ignore[misc]
         description=(

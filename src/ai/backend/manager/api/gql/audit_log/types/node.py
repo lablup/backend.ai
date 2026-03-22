@@ -13,7 +13,6 @@ from strawberry import Info
 from strawberry.relay import Connection, Edge, NodeID
 
 from ai.backend.common.dto.manager.v2.audit_log.response import AuditLogNode
-from ai.backend.manager.actions.types import OperationStatus
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     gql_connection_type,
@@ -35,20 +34,6 @@ class AuditLogStatusGQL(StrEnum):
     ERROR = "error"
     UNKNOWN = "unknown"
     RUNNING = "running"
-
-    @classmethod
-    def from_internal(cls, status: OperationStatus) -> AuditLogStatusGQL:
-        match status:
-            case OperationStatus.SUCCESS:
-                return cls.SUCCESS
-            case OperationStatus.ERROR:
-                return cls.ERROR
-            case OperationStatus.UNKNOWN:
-                return cls.UNKNOWN
-            case OperationStatus.RUNNING:
-                return cls.RUNNING
-            case _:
-                raise ValueError(f"Unhandled OperationStatus: {status!r}")
 
 
 @gql_node_type(
