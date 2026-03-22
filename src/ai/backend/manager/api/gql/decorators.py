@@ -44,6 +44,7 @@ __all__ = (
 
 T = TypeVar("T", bound="PydanticNodeMixin[Any]")
 T_conn = TypeVar("T_conn", bound="Connection[Any]")
+T_input = TypeVar("T_input", bound="PydanticInputMixin[Any]")
 
 
 @dataclass_transform(
@@ -115,7 +116,7 @@ def gql_pydantic_input(
     use_pydantic_alias: bool = True,
     description: str | None = None,
     one_of: bool = False,
-) -> Callable[..., Any]:
+) -> Callable[[type[T_input]], type[T_input]]:
     """Decorator for GQL input types.
 
     Two usage modes:
