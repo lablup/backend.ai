@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from datetime import datetime
 from enum import StrEnum
-from typing import Any, Self
+from typing import Self
 
 import strawberry
 from strawberry.relay import NodeID
@@ -16,6 +16,7 @@ from ai.backend.common.dto.manager.v2.service_catalog.request import (
 from ai.backend.common.dto.manager.v2.service_catalog.request import (
     ServiceCatalogOrder as ServiceCatalogOrderDTO,
 )
+from ai.backend.common.dto.manager.v2.service_catalog.response import ServiceCatalogNode
 from ai.backend.common.dto.manager.v2.service_catalog.types import (
     EndpointInfo,
 )
@@ -28,8 +29,13 @@ from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     gql_node_type,
     gql_pydantic_input,
+    gql_pydantic_type,
 )
-from ai.backend.manager.api.gql.pydantic_compat import PydanticInputMixin, PydanticNodeMixin
+from ai.backend.manager.api.gql.pydantic_compat import (
+    PydanticInputMixin,
+    PydanticNodeMixin,
+    PydanticOutputMixin,
+)
 from ai.backend.manager.api.gql.utils import dedent_strip
 
 __all__ = (
@@ -67,14 +73,15 @@ class ServiceCatalogStatusGQL(StrEnum):
         return cls.from_status(value)
 
 
-@gql_node_type(
+@gql_pydantic_type(
     BackendAIGQLMeta(
         added_version="26.3.0",
         description="An endpoint exposed by a service instance.",
     ),
+    model=EndpointInfo,
     name="ServiceCatalogEndpoint",
 )
-class ServiceCatalogEndpointGQL:
+class ServiceCatalogEndpointGQL(PydanticOutputMixin[EndpointInfo]):
     role: str = strawberry.field(description="Role of this endpoint (e.g., 'main', 'health').")
     scope: str = strawberry.field(
         description="Network scope (e.g., 'public', 'private', 'internal')."
@@ -84,18 +91,6 @@ class ServiceCatalogEndpointGQL:
     protocol: str = strawberry.field(description="Protocol (e.g., 'grpc', 'http', 'https').")
     metadata: JSON | None = strawberry.field(description="Additional metadata.", default=None)
 
-    @classmethod
-    def from_pydantic(cls, info: EndpointInfo) -> Self:
-        """Convert an EndpointInfo Pydantic DTO to this GQL type."""
-        return cls(
-            role=info.role,
-            scope=info.scope,
-            address=info.address,
-            port=info.port,
-            protocol=info.protocol,
-            metadata=info.metadata,
-        )
-
 
 @gql_node_type(
     BackendAIGQLMeta(
@@ -104,7 +99,7 @@ class ServiceCatalogEndpointGQL:
     ),
     name="ServiceCatalog",
 )
-class ServiceCatalogGQL(PydanticNodeMixin[Any]):
+class ServiceCatalogGQL(PydanticNodeMixin[ServiceCatalogNode]):
     id: NodeID[str] = strawberry.field(description="Relay-style global node ID.")
     service_group: str = strawberry.field(
         description=dedent_strip("""
