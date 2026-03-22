@@ -141,8 +141,8 @@ class PydanticNodeMixin[T_DTO: BaseModel](Node):
               ``strawberry.ID``.
             * Pydantic sub-models → recursively converted via ``from_pydantic``
               on the corresponding GQL field type.
-            * Enums → mapped via GQL enum's ``from_enum()`` if available,
-              otherwise passed through (Strawberry handles stdlib enums).
+            * Enums → converted via ``GQLEnumType(dto_enum.value)`` when types differ,
+              or passed through when the types match.
             * Fields not present on the DTO are skipped (left to their
               Strawberry default, typically ``UNSET`` or resolver-provided).
         """
@@ -239,12 +239,12 @@ class PydanticInputMixin[T_DTO: BaseModel]:
                     cls.__dto_type__ = args[0]
                     return
 
+    @final
     def to_pydantic(self) -> T_DTO:
         """Convert this GQL input to the corresponding Pydantic DTO.
 
+        This method is ``@final``: subclasses must NOT override it.
         The DTO type is inferred from the generic parameter ``T_DTO``.
-        Subclasses may override this method for custom conversion logic
-        (e.g., when the GQL field structure differs from the DTO structure).
         """
         dto_cls = self.__class__.__dto_type__
         kwargs = _to_pydantic_kwargs(self, dto_cls)
@@ -263,15 +263,13 @@ def _convert_value(value: Any, type_hint: Any) -> Any:
             return StrawberryID(str(value))
         return value
 
-    # Enum → GQL enum: handles same-type, from_enum(), cross-type Enum, and str/int → Enum.
+    # Enum → GQL enum: handles same-type, cross-type Enum, and str/int → Enum.
     field_type = _unwrap_optional(type_hint)
     if field_type is not None and isinstance(field_type, type) and issubclass(field_type, Enum):
         if isinstance(value, field_type):
             return value  # already the correct enum type
         if isinstance(value, Enum):
-            # Different Enum types (e.g. ProjectTypeDTO → ProjectTypeEnum)
-            if hasattr(field_type, "from_enum"):
-                return field_type.from_enum(value)
+            # Different Enum types (e.g. ProjectTypeDTO → ProjectTypeEnum) — convert by value.
             try:
                 return field_type(value.value)
             except (ValueError, KeyError):
@@ -314,8 +312,6 @@ def _convert_value(value: Any, type_hint: Any) -> Any:
             def _to_enum(item: Any) -> Any:
                 if isinstance(item, item_type):
                     return item
-                if isinstance(item, Enum) and hasattr(item_type, "from_enum"):
-                    return item_type.from_enum(item)
                 raw = item.value if isinstance(item, Enum) else item
                 try:
                     return item_type(raw)

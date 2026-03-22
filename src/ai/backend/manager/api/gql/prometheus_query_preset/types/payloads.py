@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Self
-
 import strawberry
 from strawberry import ID
 
@@ -26,9 +24,6 @@ from ai.backend.manager.api.gql.decorators import (
     gql_pydantic_type,
 )
 from ai.backend.manager.api.gql.pydantic_compat import PydanticOutputMixin
-
-if TYPE_CHECKING:
-    from ai.backend.common.dto.clients.prometheus.response import MetricResponse
 
 
 @gql_pydantic_type(
@@ -54,9 +49,7 @@ class QueryDefinitionOptionsGQL(PydanticOutputMixin[QueryDefinitionOptionsInfo])
     name="MetricLabelEntry",
 )
 class MetricLabelEntryGQL(PydanticOutputMixin[MetricLabelEntryInfo]):
-    @classmethod
-    def from_metric_dict(cls, data: dict[str, str]) -> list[Self]:
-        return [cls.from_pydantic(MetricLabelEntryInfo(key=k, value=v)) for k, v in data.items()]
+    pass
 
 
 @gql_pydantic_type(
@@ -85,18 +78,6 @@ class MetricResultGQL(PydanticOutputMixin[QueryDefinitionMetricResultInfo]):
         description="Metric labels as key-value entries."
     )
     values: list[MetricResultValueGQL] = strawberry.field(description="Time-series values.")
-
-    @classmethod
-    def from_metric_response(cls, metric_response: MetricResponse) -> Self:
-        return cls(
-            metric=MetricLabelEntryGQL.from_metric_dict(
-                metric_response.metric.model_dump(exclude_none=True)
-            ),
-            values=[
-                MetricResultValueGQL.from_pydantic(MetricValueInfo(timestamp=ts, value=val))
-                for ts, val in metric_response.values
-            ],
-        )
 
 
 @gql_pydantic_type(

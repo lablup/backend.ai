@@ -68,8 +68,8 @@ from .types import (
     UpdateArtifactInput,
     UpdateArtifactPayload,
     get_registry_url,
-    make_artifact_from_node,
     make_artifact_revision_from_node,
+    to_artifact_gql_node,
 )
 
 
@@ -123,7 +123,7 @@ async def artifacts(
         source_url = await get_registry_url(
             data_loaders, item.source_registry_id, item.source_registry_type
         )
-        artifact = make_artifact_from_node(item, registry_url=registry_url, source_url=source_url)
+        artifact = Artifact.from_pydantic(to_artifact_gql_node(item, registry_url, source_url))
         cursor = encode_cursor(item.id)
         edges.append(ArtifactEdge(node=artifact, cursor=cursor))
 
@@ -165,7 +165,7 @@ async def artifact(id: ID, info: Info[StrawberryGQLContext]) -> Artifact | None:
         artifact_node.source_registry_type,
     )
 
-    return Artifact.from_artifact_node(artifact_node, registry_url, source_url)
+    return Artifact.from_pydantic(to_artifact_gql_node(artifact_node, registry_url, source_url))
 
 
 @strawberry.field(  # type: ignore[misc]
@@ -278,7 +278,9 @@ async def scan_artifacts(
         source_url = await get_registry_url(
             data_loaders, item.source_registry_id, item.source_registry_type
         )
-        artifacts.append(Artifact.from_artifact_node(item, registry_url, source_url))
+        artifacts.append(
+            Artifact.from_pydantic(to_artifact_gql_node(item, registry_url, source_url))
+        )
     return ScanArtifactsPayload(artifacts=artifacts)
 
 
@@ -384,7 +386,9 @@ async def delegate_scan_artifacts(
         source_url = await get_registry_url(
             data_loaders, item.source_registry_id, item.source_registry_type
         )
-        artifacts.append(Artifact.from_artifact_node(item, registry_url, source_url))
+        artifacts.append(
+            Artifact.from_pydantic(to_artifact_gql_node(item, registry_url, source_url))
+        )
     return DelegateScanArtifactsPayload(artifacts=artifacts)
 
 
@@ -485,8 +489,8 @@ async def update_artifact(
     )
 
     return UpdateArtifactPayload(
-        artifact=Artifact.from_artifact_node(
-            artifact_node, registry_url=registry_url, source_url=source_url
+        artifact=Artifact.from_pydantic(
+            to_artifact_gql_node(artifact_node, registry_url, source_url)
         )
     )
 
@@ -557,7 +561,9 @@ async def delete_artifacts(
         source_url = await get_registry_url(
             data_loaders, item.source_registry_id, item.source_registry_type
         )
-        artifacts.append(Artifact.from_artifact_node(item, registry_url, source_url))
+        artifacts.append(
+            Artifact.from_pydantic(to_artifact_gql_node(item, registry_url, source_url))
+        )
 
     return DeleteArtifactsPayload(artifacts=artifacts)
 
@@ -587,7 +593,9 @@ async def restore_artifacts(
         source_url = await get_registry_url(
             data_loaders, item.source_registry_id, item.source_registry_type
         )
-        artifacts.append(Artifact.from_artifact_node(item, registry_url, source_url))
+        artifacts.append(
+            Artifact.from_pydantic(to_artifact_gql_node(item, registry_url, source_url))
+        )
 
     return RestoreArtifactsPayload(artifacts=artifacts)
 

@@ -6,14 +6,17 @@ from uuid import UUID
 
 from ai.backend.common.api_handlers import Sentinel
 from ai.backend.common.dto.clients.prometheus.request import QueryTimeRange
-from ai.backend.common.dto.clients.prometheus.response import PrometheusResponse
 from ai.backend.common.dto.manager.v2.prometheus_query_preset.request import (
     CreateQueryDefinitionInput,
     DeleteQueryDefinitionInput,
     ModifyQueryDefinitionInput,
     QueryDefinitionFilter,
     QueryDefinitionOrder,
+    QueryTimeRangeInputDTO,
     SearchQueryDefinitionsInput,
+)
+from ai.backend.common.dto.manager.v2.prometheus_query_preset.request import (
+    ExecuteQueryDefinitionOptionsInput as ExecuteQueryDefinitionOptionsInputDTO,
 )
 from ai.backend.common.dto.manager.v2.prometheus_query_preset.response import (
     AdminSearchQueryDefinitionsPayload,
@@ -21,9 +24,13 @@ from ai.backend.common.dto.manager.v2.prometheus_query_preset.response import (
     DeleteQueryDefinitionPayload,
     GetQueryDefinitionPayload,
     ModifyQueryDefinitionPayload,
+    QueryDefinitionMetricResultInfo,
     QueryDefinitionNode,
+    QueryDefinitionResultInfo,
 )
 from ai.backend.common.dto.manager.v2.prometheus_query_preset.types import (
+    MetricLabelEntryInfo,
+    MetricValueInfo,
     OrderDirection,
     QueryDefinitionOptionsInfo,
 )
@@ -136,22 +143,51 @@ class PrometheusQueryPresetAdapter(BaseAdapter):
     async def execute_preset(
         self,
         preset_id: UUID,
-        options: ExecutePresetOptions,
+        options: ExecuteQueryDefinitionOptionsInputDTO | None,
         time_window: str | None,
-        time_range: QueryTimeRange | None,
-    ) -> PrometheusResponse:
-        """Execute a query definition and return the Prometheus response."""
+        time_range: QueryTimeRangeInputDTO | None,
+    ) -> QueryDefinitionResultInfo:
+        """Execute a query definition and return the result as a manager DTO."""
+        execute_options = ExecutePresetOptions(
+            filter_labels={e.key: e.value for e in (options.filter_labels or [])}
+            if options is not None
+            else {},
+            group_labels=(options.group_labels or []) if options is not None else [],
+        )
+        qtr = (
+            QueryTimeRange(
+                start=time_range.start.isoformat(),
+                end=time_range.end.isoformat(),
+                step=time_range.step,
+            )
+            if time_range is not None
+            else None
+        )
         action_result = (
             await self._processors.prometheus_query_preset.execute_preset.wait_for_complete(
                 ExecutePresetAction(
                     preset_id=preset_id,
-                    options=options,
+                    options=execute_options,
                     time_window=time_window,
-                    time_range=time_range,
+                    time_range=qtr,
                 )
             )
         )
-        return action_result.response
+        response = action_result.response
+        return QueryDefinitionResultInfo(
+            status=response.status,
+            result_type=response.data.result_type,
+            result=[
+                QueryDefinitionMetricResultInfo(
+                    metric=[
+                        MetricLabelEntryInfo(key=k, value=v)
+                        for k, v in mr.metric.model_dump(exclude_none=True).items()
+                    ],
+                    values=[MetricValueInfo(timestamp=ts, value=val) for ts, val in mr.values],
+                )
+                for mr in response.data.result
+            ],
+        )
 
     async def delete(self, input: DeleteQueryDefinitionInput) -> DeleteQueryDefinitionPayload:
         """Delete a query definition by ID."""

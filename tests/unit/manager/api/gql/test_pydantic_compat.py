@@ -2,7 +2,7 @@
 
 Verifies:
 - PydanticNodeMixin converts Pydantic DTOs to Strawberry types correctly
-- Enum mapping via from_enum()
+- Enum mapping via value-based conversion
 - Nested Pydantic model recursive conversion
 - PASSWORD_PLACEHOLDER-style extra overrides
 - Sentinel/UNSET bridging for experimental.pydantic.input
@@ -60,10 +60,6 @@ class ItemNode(BaseModel):
 class ItemTypeGQL(StrEnum):
     BOOK = "book"
     TOOL = "tool"
-
-    @classmethod
-    def from_enum(cls, value: ItemType) -> ItemTypeGQL:
-        return cls(value.value)
 
 
 @strawberry.type(name="SubInfo")

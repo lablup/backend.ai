@@ -12,7 +12,6 @@ from strawberry import Info
 from strawberry.relay import NodeID
 from strawberry.scalars import JSON
 
-from ai.backend.common.container_registry import ContainerRegistryType
 from ai.backend.manager.api.gql.decorators import BackendAIGQLMeta, gql_node_type
 from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
@@ -31,10 +30,6 @@ class ContainerRegistryTypeGQL(StrEnum):
     ECR_PUB = "ecr-public"
     LOCAL = "local"
     OCP = "ocp"
-
-    @classmethod
-    def from_enum(cls, value: ContainerRegistryType) -> ContainerRegistryTypeGQL:
-        return cls(value.value)
 
 
 @gql_node_type(

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import uuid
-from collections.abc import Iterable, Mapping
+from collections.abc import Iterable
 from datetime import datetime
 from typing import Any, Self, cast
 
@@ -12,8 +12,6 @@ from strawberry.scalars import JSON
 
 from ai.backend.common.data.artifact.types import (
     ArtifactRegistryType,
-    VerificationStepResult,
-    VerifierResult,
 )
 from ai.backend.common.dto.manager.v2.artifact.request import (
     AdminSearchArtifactRevisionsInput,
@@ -72,6 +70,7 @@ from ai.backend.common.dto.manager.v2.artifact.request import (
 )
 from ai.backend.common.dto.manager.v2.artifact.response import (
     ApproveArtifactGQLPayload,
+    ArtifactGQLNode,
     ArtifactImportProgressUpdatedGQLPayload,
     ArtifactNode,
     ArtifactRevisionImportTaskInfoGQL,
@@ -179,12 +178,6 @@ class ArtifactVerifierMetadataGQL(PydanticOutputMixin[ArtifactVerifierMetadataDT
         description="List of metadata entries. Each entry contains a key-value pair."
     )
 
-    @classmethod
-    def from_mapping(cls, data: Mapping[str, str]) -> ArtifactVerifierMetadataGQL:
-        """Convert a Mapping to GraphQL type."""
-        entries = [ArtifactVerifierMetadataEntryGQL(key=k, value=v) for k, v in data.items()]
-        return cls(entries=entries)
-
 
 @gql_pydantic_type(
     BackendAIGQLMeta(
@@ -211,18 +204,6 @@ class ArtifactVerifierGQLResult(PydanticOutputMixin[ArtifactVerifierGQLResultDTO
         description="Fatal error message if the verifier failed to complete"
     )
 
-    @classmethod
-    def from_verifier_result(cls, data: VerifierResult) -> ArtifactVerifierGQLResult:
-        return cls(
-            success=data.success,
-            infected_count=data.infected_count,
-            scanned_at=data.scanned_at,
-            scan_time=data.scan_time,
-            scanned_count=data.scanned_count,
-            metadata=ArtifactVerifierMetadataGQL.from_mapping(data.metadata),
-            error=data.error,
-        )
-
 
 @gql_pydantic_type(
     BackendAIGQLMeta(
@@ -238,15 +219,6 @@ class ArtifactVerifierGQLResultEntry(PydanticOutputMixin[ArtifactVerifierGQLResu
         description="Scan result from this verifier"
     )
 
-    @classmethod
-    def from_verifier_result(
-        cls, name: str, result: VerifierResult
-    ) -> ArtifactVerifierGQLResultEntry:
-        return cls(
-            name=name,
-            result=ArtifactVerifierGQLResult.from_verifier_result(result),
-        )
-
 
 @gql_pydantic_type(
     BackendAIGQLMeta(
@@ -260,16 +232,6 @@ class ArtifactVerificationGQLResult(PydanticOutputMixin[ArtifactVerificationGQLR
     verifiers: list[ArtifactVerifierGQLResultEntry] = strawberry.field(
         description="Results from each verifier that scanned the artifact"
     )
-
-    @classmethod
-    def from_verification_step_result(
-        cls, data: VerificationStepResult
-    ) -> ArtifactVerificationGQLResult:
-        verifier_entries = [
-            ArtifactVerifierGQLResultEntry.from_verifier_result(verifier_name, verifier_result)
-            for verifier_name, verifier_result in data.verifiers.items()
-        ]
-        return cls(verifiers=verifier_entries)
 
 
 @gql_pydantic_input(
@@ -622,7 +584,7 @@ class SourceInfo:
         description="An artifact represents AI models, packages, images, or other resources that can be stored, managed, and used within Backend.AI. Artifacts are discovered through scanning external registries and can have multiple revisions. Each artifact contains metadata and references to its source registry. Key concepts: Type (MODEL, PACKAGE, or IMAGE), Availability (ALIVE or DELETED), Source (original external registry where it was discovered).",
     ),
 )
-class Artifact(PydanticNodeMixin[ArtifactNode]):
+class Artifact(PydanticNodeMixin[ArtifactGQLNode]):
     id: NodeID[str]
     name: str
     type: ArtifactType
@@ -634,23 +596,6 @@ class Artifact(PydanticNodeMixin[ArtifactNode]):
     scanned_at: datetime
     updated_at: datetime
     availability: ArtifactAvailability
-
-    @classmethod
-    def from_artifact_node(cls, node: ArtifactNode, registry_url: str, source_url: str) -> Self:
-        """Create from an ArtifactNode DTO (search result from adapter)."""
-        return cls(
-            id=ID(str(node.id)),
-            name=node.name,
-            type=ArtifactType(node.type.value),
-            description=node.description,
-            registry=SourceInfo(name=node.registry_type.value, url=registry_url),
-            source=SourceInfo(name=node.source_registry_type.value, url=source_url),
-            readonly=node.readonly,
-            extra=node.extra,
-            scanned_at=node.scanned_at,
-            updated_at=node.updated_at,
-            availability=ArtifactAvailability(node.availability.value),
-        )
 
     @strawberry.field
     async def revisions(
@@ -773,23 +718,23 @@ class ArtifactRevision(PydanticNodeMixin[ArtifactRevisionNode]):
             artifact_node.source_registry_type,
         )
 
-        return Artifact.from_artifact_node(artifact_node, registry_url, source_url)
+        return Artifact.from_pydantic(to_artifact_gql_node(artifact_node, registry_url, source_url))
 
 
-def make_artifact_from_node(node: ArtifactNode, registry_url: str, source_url: str) -> Artifact:
-    """Create an Artifact GQL type from an ArtifactNode DTO (search result)."""
-    return Artifact(
-        id=ID(str(node.id)),
+def to_artifact_gql_node(node: ArtifactNode, registry_url: str, source_url: str) -> ArtifactGQLNode:
+    """Build an ArtifactGQLNode DTO from an ArtifactNode and resolved registry URLs."""
+    return ArtifactGQLNode(
+        id=node.id,
         name=node.name,
-        type=ArtifactType(node.type.value),
+        type=node.type,
         description=node.description,
-        registry=SourceInfo(name=node.registry_type.value, url=registry_url),
-        source=SourceInfo(name=node.source_registry_type.value, url=source_url),
+        registry=SourceInfoDTO(name=node.registry_type.value, url=registry_url),
+        source=SourceInfoDTO(name=node.source_registry_type.value, url=source_url),
         readonly=node.readonly,
         extra=node.extra,
         scanned_at=node.scanned_at,
         updated_at=node.updated_at,
-        availability=ArtifactAvailability(node.availability.value),
+        availability=node.availability,
     )
 
 

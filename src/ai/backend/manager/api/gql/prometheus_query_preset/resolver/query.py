@@ -22,10 +22,8 @@ from ai.backend.manager.api.gql.prometheus_query_preset.types import (
     QueryDefinitionResultGQL,
     QueryTimeRangeInput,
 )
-from ai.backend.manager.api.gql.prometheus_query_preset.types.payloads import MetricResultGQL
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.api.gql.utils import check_admin_only
-from ai.backend.manager.data.prometheus_query_preset import ExecutePresetOptions
 
 
 @strawberry.field(description="Added in 26.3.0. Get a single query definition by ID (admin only).")  # type: ignore[misc]
@@ -91,24 +89,11 @@ async def admin_prometheus_query_preset_result(
 ) -> QueryDefinitionResultGQL:
     check_admin_only()
 
-    execute_options = (
-        options.to_internal()
-        if options is not None
-        else ExecutePresetOptions(filter_labels={}, group_labels=[])
-    )
-
-    response = await info.context.adapters.prometheus_query_preset.execute_preset(
+    dto = await info.context.adapters.prometheus_query_preset.execute_preset(
         preset_id=UUID(id),
-        options=execute_options,
+        options=options.to_pydantic() if options is not None else None,
         time_window=time_window,
-        time_range=time_range.to_internal() if time_range is not None else None,
+        time_range=time_range.to_pydantic() if time_range is not None else None,
     )
 
-    return QueryDefinitionResultGQL(
-        status=response.status,
-        result_type=response.data.result_type,
-        result=[
-            MetricResultGQL.from_metric_response(metric_response)
-            for metric_response in response.data.result
-        ],
-    )
+    return QueryDefinitionResultGQL.from_pydantic(dto)

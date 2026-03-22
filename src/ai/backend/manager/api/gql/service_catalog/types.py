@@ -23,7 +23,6 @@ from ai.backend.common.dto.manager.v2.service_catalog.types import (
 from ai.backend.common.dto.manager.v2.service_catalog.types import (
     ServiceCatalogStatusFilter as ServiceCatalogStatusFilterDTO,
 )
-from ai.backend.common.types import ServiceCatalogStatus
 from ai.backend.manager.api.gql.base import OrderDirection, StringFilter
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
@@ -57,20 +56,6 @@ class ServiceCatalogStatusGQL(StrEnum):
     HEALTHY = "healthy"
     UNHEALTHY = "unhealthy"
     DEREGISTERED = "deregistered"
-
-    @classmethod
-    def from_status(cls, status: ServiceCatalogStatus) -> ServiceCatalogStatusGQL:
-        match status:
-            case ServiceCatalogStatus.HEALTHY:
-                return cls.HEALTHY
-            case ServiceCatalogStatus.UNHEALTHY:
-                return cls.UNHEALTHY
-            case ServiceCatalogStatus.DEREGISTERED:
-                return cls.DEREGISTERED
-
-    @classmethod
-    def from_enum(cls, value: ServiceCatalogStatus) -> ServiceCatalogStatusGQL:
-        return cls.from_status(value)
 
 
 @gql_pydantic_type(

@@ -24,6 +24,7 @@ from .types import (
 __all__ = (
     "AdminSearchArtifactRevisionsPayload",
     "AdminSearchArtifactsPayload",
+    "ArtifactGQLNode",
     "ArtifactImportProgressUpdatedGQLPayload",
     "ArtifactNode",
     "ArtifactRevisionImportTaskInfo",
@@ -205,6 +206,22 @@ class SourceInfoDTO(BaseResponseModel):
 
     name: str | None = Field(default=None, description="Name of the registry or source.")
     url: str | None = Field(default=None, description="URL of the registry or source.")
+
+
+class ArtifactGQLNode(BaseResponseModel):
+    """GQL-layer node DTO with resolved registry and source URLs."""
+
+    id: UUID = Field(description="Artifact ID")
+    name: str = Field(description="Artifact name")
+    type: ArtifactType = Field(description="Artifact type")
+    description: str | None = Field(default=None, description="Artifact description")
+    registry: SourceInfoDTO = Field(description="Registry info with resolved URL")
+    source: SourceInfoDTO = Field(description="Source registry info with resolved URL")
+    readonly: bool = Field(description="Whether the artifact is readonly")
+    extra: dict[str, Any] | None = Field(default=None, description="Extra metadata")
+    scanned_at: datetime = Field(description="Last scanned timestamp")
+    updated_at: datetime = Field(description="Last update timestamp")
+    availability: ArtifactAvailability = Field(description="Artifact availability status")
 
 
 class ArtifactVerifierMetadataEntryDTO(BaseResponseModel):

@@ -15,7 +15,6 @@ if TYPE_CHECKING:
     from ai.backend.manager.api.adapters.registry import Adapters  # pants: no-infer-dep
     from ai.backend.manager.api.gql.agent.types import AgentV2GQL  # pants: no-infer-dep
     from ai.backend.manager.api.gql.artifact.types import (  # pants: no-infer-dep
-        Artifact,
         ArtifactRevision,
     )
     from ai.backend.manager.api.gql.artifact_registry import ArtifactRegistry  # pants: no-infer-dep
@@ -287,22 +286,6 @@ class DataLoaders:
 
             dtos = await adapter.batch_load_by_ids(ids)
             return [VS.from_pydantic(dto) if dto is not None else None for dto in dtos]
-
-        return DataLoader(load_fn=load_fn)
-
-    @cached_property
-    def artifact_loader(
-        self,
-    ) -> DataLoader[uuid.UUID, Artifact | None]:
-        adapter = self._adapters.artifact
-
-        async def load_fn(ids: list[uuid.UUID]) -> list[Artifact | None]:
-            from ai.backend.manager.api.gql.artifact.types import (  # pants: no-infer-dep
-                Artifact as A,
-            )
-
-            dtos = await adapter.batch_load_by_ids(ids)
-            return [A.from_pydantic(dto) if dto is not None else None for dto in dtos]
 
         return DataLoader(load_fn=load_fn)
 
