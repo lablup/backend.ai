@@ -239,12 +239,12 @@ class PydanticInputMixin[T_DTO: BaseModel]:
                     cls.__dto_type__ = args[0]
                     return
 
-    @final
     def to_pydantic(self) -> T_DTO:
         """Convert this GQL input to the corresponding Pydantic DTO.
 
-        This method is ``@final``: subclasses must NOT override it.
         The DTO type is inferred from the generic parameter ``T_DTO``.
+        Subclasses may override this method for custom conversion logic
+        (e.g., when the GQL field structure differs from the DTO structure).
         """
         dto_cls = self.__class__.__dto_type__
         kwargs = _to_pydantic_kwargs(self, dto_cls)

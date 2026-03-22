@@ -416,7 +416,7 @@ class ResourceSlotInput(PydanticInputMixin[ResourceSlotInputDTO]):
 @gql_pydantic_input(
     BackendAIGQLMeta(description="", added_version="25.19.0"),
 )
-class ResourceConfigInput:
+class ResourceConfigInput(PydanticInputMixin[ResourceConfigInputDTO]):
     resource_group: ResourceGroupInput
     resource_slots: ResourceSlotInput = strawberry.field(
         description="Added in 26.1.0. Resources allocated for the deployment."
@@ -509,7 +509,7 @@ class ExtraVFolderMountInput(PydanticInputMixin[ExtraVFolderMountInputDTO]):
         added_version="25.19.0",
     ),
 )
-class CreateRevisionInput:
+class CreateRevisionInput(PydanticInputMixin[RevisionInputDTO]):
     name: str | None = None
     cluster_config: ClusterConfigInput
     resource_config: ResourceConfigInput
@@ -561,7 +561,7 @@ class CreateRevisionInput:
 @gql_pydantic_input(
     BackendAIGQLMeta(description="", added_version="25.19.0"),
 )
-class AddRevisionInput:
+class AddRevisionInput(PydanticInputMixin[AddRevisionInputDTO]):
     name: str | None = None
     deployment_id: ID
     cluster_config: ClusterConfigInput
