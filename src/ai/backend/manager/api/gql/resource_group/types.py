@@ -34,7 +34,6 @@ from ai.backend.common.dto.manager.v2.resource_group.response import (
     ResourceGroupNetworkConfigInfo,
     ResourceGroupSchedulerConfigInfo,
     ResourceGroupStatusInfo,
-    ResourceInfoNode,
     UpdateResourceGroupConfigPayloadNode,
     UpdateResourceGroupFairShareSpecPayloadNode,
 )
@@ -44,6 +43,7 @@ from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     PydanticInputMixin,
     gql_node_type,
+    gql_output_type,
     gql_pydantic_input,
     gql_pydantic_type,
 )
@@ -308,7 +308,7 @@ class FairShareScalingGroupSpecGQL(PydanticOutputMixin[FairShareScalingGroupSpec
         )
 
 
-@gql_pydantic_type(
+@gql_output_type(
     BackendAIGQLMeta(
         added_version="26.1.0",
         description=(
@@ -316,10 +316,9 @@ class FairShareScalingGroupSpecGQL(PydanticOutputMixin[FairShareScalingGroupSpec
             "Provides aggregated resource metrics including capacity, used, and free resources."
         ),
     ),
-    model=ResourceInfoNode,
     name="ResourceInfo",
 )
-class ResourceInfoGQL(PydanticOutputMixin[ResourceInfoNode]):
+class ResourceInfoGQL:
     """Resource information containing capacity, used, and free resource metrics."""
 
     capacity: ResourceSlotGQL = strawberry.field(

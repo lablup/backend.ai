@@ -45,8 +45,8 @@ class TestAgentOrderField:
     def test_status_value(self) -> None:
         assert AgentOrderField.STATUS.value == "status"
 
-    def test_resource_group_value(self) -> None:
-        assert AgentOrderField.RESOURCE_GROUP.value == "resource_group"
+    def test_scaling_group_value(self) -> None:
+        assert AgentOrderField.SCALING_GROUP.value == "scaling_group"
 
     def test_all_members_count(self) -> None:
         assert len(list(AgentOrderField)) == 5
@@ -57,8 +57,8 @@ class TestAgentOrderField:
     def test_from_string_status(self) -> None:
         assert AgentOrderField("status") is AgentOrderField.STATUS
 
-    def test_from_string_resource_group(self) -> None:
-        assert AgentOrderField("resource_group") is AgentOrderField.RESOURCE_GROUP
+    def test_from_string_scaling_group(self) -> None:
+        assert AgentOrderField("scaling_group") is AgentOrderField.SCALING_GROUP
 
 
 class TestOrderDirection:

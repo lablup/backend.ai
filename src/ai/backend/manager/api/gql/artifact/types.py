@@ -90,7 +90,6 @@ from ai.backend.common.dto.manager.v2.artifact.response import (
     ImportArtifactsGQLPayload,
     RejectArtifactGQLPayload,
     RestoreArtifactsGQLPayload,
-    ScanArtifactModelsGQLPayload,
     ScanArtifactsGQLPayload,
     SourceInfoDTO,
     UpdateArtifactGQLPayload,
@@ -108,6 +107,7 @@ from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     gql_connection_type,
     gql_node_type,
+    gql_output_type,
     gql_pydantic_input,
     gql_pydantic_type,
 )
@@ -985,14 +985,13 @@ class ArtifactStatusChangedPayload(PydanticOutputMixin[ArtifactStatusChangedGQLP
     artifact_revision: ArtifactRevision
 
 
-@gql_pydantic_type(
+@gql_output_type(
     BackendAIGQLMeta(
         added_version="25.14.0",
         description="Response payload for batch model scanning operations. Contains the artifact revisions discovered during detailed scanning of specific models, including README content and file size information.",
     ),
-    model=ScanArtifactModelsGQLPayload,
 )
-class ScanArtifactModelsPayload(PydanticOutputMixin[ScanArtifactModelsGQLPayload]):
+class ScanArtifactModelsPayload:
     artifact_revision: ArtifactRevisionConnection
 
 

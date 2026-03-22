@@ -55,7 +55,7 @@ class TestSessionStatusEnum:
         assert SessionStatusEnum.CANCELLED.value == "CANCELLED"
 
     def test_all_members_count(self) -> None:
-        assert len(list(SessionStatusEnum)) == 13
+        assert len(list(SessionStatusEnum)) == 14
 
     def test_from_string(self) -> None:
         assert SessionStatusEnum("RUNNING") is SessionStatusEnum.RUNNING

@@ -11,9 +11,7 @@ import strawberry
 
 from ai.backend.common.dto.manager.v2.fair_share.types import (
     FairShareCalculationSnapshotInfo,
-    FairShareSpecInfo,
     ResourceSlotEntryInfo,
-    ResourceSlotInfo,
     ResourceWeightEntryInfo,
 )
 from ai.backend.common.dto.manager.v2.resource_group.request import (
@@ -23,6 +21,7 @@ from ai.backend.common.types import SlotQuantity
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     PydanticInputMixin,
+    gql_output_type,
     gql_pydantic_input,
     gql_pydantic_type,
 )
@@ -113,7 +112,7 @@ class ResourceWeightEntryInputGQL(PydanticInputMixin[ResourceWeightEntryInputDTO
     )
 
 
-@gql_pydantic_type(
+@gql_output_type(
     BackendAIGQLMeta(
         added_version="26.1.0",
         description=(
@@ -122,10 +121,9 @@ class ResourceWeightEntryInputGQL(PydanticInputMixin[ResourceWeightEntryInputDTO
             "Each entry specifies a resource type and its quantity."
         ),
     ),
-    model=ResourceSlotInfo,
     name="ResourceSlot",
 )
-class ResourceSlotGQL(PydanticOutputMixin[ResourceSlotInfo]):
+class ResourceSlotGQL:
     """Resource slot containing multiple resource type entries."""
 
     entries: list[ResourceSlotEntryGQL] = strawberry.field(
@@ -195,7 +193,7 @@ class ResourceWeightEntryGQL(PydanticOutputMixin[ResourceWeightEntryInfo]):
     )
 
 
-@gql_pydantic_type(
+@gql_output_type(
     BackendAIGQLMeta(
         added_version="26.1.0",
         description=(
@@ -203,10 +201,9 @@ class ResourceWeightEntryGQL(PydanticOutputMixin[ResourceWeightEntryInfo]):
             "These parameters determine the decay rate, lookback period, and resource weighting for usage aggregation."
         ),
     ),
-    model=FairShareSpecInfo,
     name="FairShareSpec",
 )
-class FairShareSpecGQL(PydanticOutputMixin[FairShareSpecInfo]):
+class FairShareSpecGQL:
     """Specification parameters for fair share calculation."""
 
     weight: Decimal = strawberry.field(

@@ -17,7 +17,6 @@ from ai.backend.manager.api.gql.agent.types import (
 )
 from ai.backend.manager.api.gql.base import OrderDirection as GQLOrderDirection
 from ai.backend.manager.api.gql.base import StringFilter
-from ai.backend.manager.data.agent.types import AgentStatus
 
 
 class TestAgentFilter:
@@ -32,7 +31,7 @@ class TestAgentFilter:
 
     def test_status_in_filter(self) -> None:
         f = AgentFilterGQL(
-            status=AgentStatusFilterGQL(in_=[AgentStatus.ALIVE, AgentStatus.LOST]),
+            status=AgentStatusFilterGQL(in_=[AgentStatusEnum.ALIVE, AgentStatusEnum.LOST]),
         )
         result = f.to_pydantic()
         assert isinstance(result, AgentFilter)
@@ -44,7 +43,7 @@ class TestAgentFilter:
 
     def test_status_equals_filter(self) -> None:
         f = AgentFilterGQL(
-            status=AgentStatusFilterGQL(equals=AgentStatus.ALIVE),
+            status=AgentStatusFilterGQL(equals=AgentStatusEnum.ALIVE),
         )
         result = f.to_pydantic()
         assert isinstance(result, AgentFilter)
@@ -61,8 +60,8 @@ class TestAgentFilter:
         f = AgentFilterGQL(scaling_group=StringFilter(equals="default"))
         result = f.to_pydantic()
         assert isinstance(result, AgentFilter)
-        assert result.resource_group is not None
-        assert result.resource_group.equals == "default"
+        assert result.scaling_group is not None
+        assert result.scaling_group.equals == "default"
 
     def test_combined_filters(self) -> None:
         f = AgentFilterGQL(
@@ -74,7 +73,7 @@ class TestAgentFilter:
         assert isinstance(result, AgentFilter)
         assert result.id is not None
         assert result.schedulable is True
-        assert result.resource_group is not None
+        assert result.scaling_group is not None
 
     def test_empty_filter(self) -> None:
         f = AgentFilterGQL()
@@ -83,7 +82,7 @@ class TestAgentFilter:
         assert result.id is None
         assert result.status is None
         assert result.schedulable is None
-        assert result.resource_group is None
+        assert result.scaling_group is None
 
     def test_and_filter(self) -> None:
         f = AgentFilterGQL(
@@ -171,7 +170,7 @@ class TestAgentOrderBy:
         )
         result = order.to_pydantic()
         assert isinstance(result, AgentOrder)
-        assert result.field == AgentOrderField.RESOURCE_GROUP
+        assert result.field == AgentOrderField.SCALING_GROUP
         assert result.direction == OrderDirection.DESC
 
     def test_schedulable_ascending(self) -> None:

@@ -250,9 +250,9 @@ class TestUpdateDeploymentInput:
     """Tests for UpdateDeploymentInput model creation and validation."""
 
     def test_all_none_fields_is_valid(self) -> None:
-        inp = UpdateDeploymentInput(name=None, desired_replicas=None, tags=None)
+        inp = UpdateDeploymentInput(name=None, desired_replica_count=None, tags=None)
         assert inp.name is None
-        assert inp.desired_replicas is None
+        assert inp.desired_replica_count is None
         assert inp.tags is None
 
     def test_default_tags_is_sentinel(self) -> None:
@@ -286,17 +286,17 @@ class TestUpdateDeploymentInput:
             UpdateDeploymentInput(name="")
 
     def test_desired_replicas_zero_is_valid(self) -> None:
-        inp = UpdateDeploymentInput(desired_replicas=0)
-        assert inp.desired_replicas == 0
+        inp = UpdateDeploymentInput(desired_replica_count=0)
+        assert inp.desired_replica_count == 0
 
     def test_negative_replicas_raises_validation_error(self) -> None:
         with pytest.raises(ValidationError):
-            UpdateDeploymentInput(desired_replicas=-1)
+            UpdateDeploymentInput(desired_replica_count=-1)
 
     def test_partial_update_name_only(self) -> None:
         inp = UpdateDeploymentInput(name="updated-name")
         assert inp.name == "updated-name"
-        assert inp.desired_replicas is None
+        assert inp.desired_replica_count is None
 
 
 class TestDeleteDeploymentInput:

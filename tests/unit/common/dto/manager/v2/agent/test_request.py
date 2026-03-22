@@ -43,7 +43,7 @@ class TestAgentFilter:
     def test_all_none_defaults(self) -> None:
         f = AgentFilter()
         assert f.status is None
-        assert f.resource_group is None
+        assert f.scaling_group is None
 
     def test_with_status_filter(self) -> None:
         status_filter = AgentStatusFilter(equals=AgentStatusEnum.ALIVE)
@@ -80,10 +80,10 @@ class TestAgentOrder:
         assert order.direction == OrderDirection.DESC
 
     def test_round_trip(self) -> None:
-        order = AgentOrder(field=AgentOrderField.RESOURCE_GROUP, direction=OrderDirection.ASC)
+        order = AgentOrder(field=AgentOrderField.SCALING_GROUP, direction=OrderDirection.ASC)
         json_str = order.model_dump_json()
         restored = AgentOrder.model_validate_json(json_str)
-        assert restored.field == AgentOrderField.RESOURCE_GROUP
+        assert restored.field == AgentOrderField.SCALING_GROUP
         assert restored.direction == OrderDirection.ASC
 
 
