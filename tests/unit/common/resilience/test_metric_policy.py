@@ -130,3 +130,35 @@ class TestMetricPolicy:
         )
         call_kwargs = mock_observer.observe_layer_operation.call_args.kwargs
         assert call_kwargs["operation"] == "my_valkey_operation"
+
+    @pytest.mark.asyncio
+    async def test_safe_observe_suppresses_metric_errors(self, mocker: MockerFixture) -> None:
+        """Test that _safe_observe suppresses exceptions from the observer.
+
+        When prometheus mmap files become corrupted (e.g., after OS sleep/wake),
+        metric recording may raise ValueError. MetricPolicy should suppress these
+        errors so they never interfere with the actual operation or trigger retries.
+        """
+        mock_observer = MagicMock()
+        mock_observer.observe_layer_operation_triggered.side_effect = ValueError(
+            "mmap slice assignment is wrong size"
+        )
+        mocker.patch(
+            "ai.backend.common.resilience.policies.metrics.LayerMetricObserver.instance",
+            return_value=mock_observer,
+        )
+
+        metric_policy = MetricPolicy(
+            MetricArgs(domain=DomainType.CLIENT, layer=LayerType.AGENT_CLIENT)
+        )
+
+        @Resilience(policies=[metric_policy]).apply()
+        async def successful_operation() -> str:
+            return "success"
+
+        # The operation should succeed despite the metric error
+        result = await successful_operation()
+        assert result == "success"
+
+        # The observer was called (and raised), but the error was suppressed
+        mock_observer.observe_layer_operation_triggered.assert_called_once()

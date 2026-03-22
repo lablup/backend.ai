@@ -36,6 +36,10 @@ class MetricPolicy(Policy):
 
     The operation name is automatically retrieved from the resilience context
     set by the Resilience.apply() decorator.
+
+    All metric recording is best-effort: failures (e.g., corrupted prometheus
+    mmap files after OS sleep/wake) are logged and suppressed so they never
+    interfere with the actual operation or trigger retries.
     """
 
     _domain: DomainType
@@ -56,6 +60,13 @@ class MetricPolicy(Policy):
         self._domain = args.domain
         self._layer = args.layer
         self._observer = LayerMetricObserver.instance()
+
+    def _safe_observe(self, fn: Callable[[], None]) -> None:
+        """Call a metric-recording function, suppressing any errors."""
+        try:
+            fn()
+        except Exception:
+            log.debug("Failed to record metric (domain={}, layer={})", self._domain, self._layer)
 
     async def execute(
         self,
@@ -78,31 +89,35 @@ class MetricPolicy(Policy):
         log.trace("Metric tracking for operation: {}", operation)
         start = time.perf_counter()
 
-        # Record operation triggered
-        self._observer.observe_layer_operation_triggered(
-            domain=self._domain,
-            layer=self._layer,
-            operation=operation,
+        self._safe_observe(
+            lambda: self._observer.observe_layer_operation_triggered(
+                domain=self._domain,
+                layer=self._layer,
+                operation=operation,
+            )
         )
 
         try:
             result = await next_call(*args, **kwargs)
-            # Record success
-            self._observer.observe_layer_operation(
-                domain=self._domain,
-                layer=self._layer,
-                operation=operation,
-                duration=time.perf_counter() - start,
-                exception=None,
+            self._safe_observe(
+                lambda: self._observer.observe_layer_operation(
+                    domain=self._domain,
+                    layer=self._layer,
+                    operation=operation,
+                    duration=time.perf_counter() - start,
+                    exception=None,
+                )
             )
             return result
-        except BaseException as e:
-            # Record failure
-            self._observer.observe_layer_operation(
-                domain=self._domain,
-                layer=self._layer,
-                operation=operation,
-                duration=time.perf_counter() - start,
-                exception=e,
+        except BaseException as exc:
+            caught = exc
+            self._safe_observe(
+                lambda: self._observer.observe_layer_operation(
+                    domain=self._domain,
+                    layer=self._layer,
+                    operation=operation,
+                    duration=time.perf_counter() - start,
+                    exception=caught,
+                )
             )
             raise
