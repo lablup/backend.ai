@@ -61,12 +61,21 @@ class MetricPolicy(Policy):
         self._layer = args.layer
         self._observer = LayerMetricObserver.instance()
 
+    _metric_error_logged: bool = False
+
     def _safe_observe(self, fn: Callable[[], None]) -> None:
         """Call a metric-recording function, suppressing any errors."""
         try:
             fn()
         except Exception:
-            log.debug("Failed to record metric (domain={}, layer={})", self._domain, self._layer)
+            if not self._metric_error_logged:
+                log.warning(
+                    "Failed to record metric (domain={}, layer={})",
+                    self._domain,
+                    self._layer,
+                    exc_info=True,
+                )
+                self._metric_error_logged = True
 
     async def execute(
         self,
