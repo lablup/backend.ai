@@ -274,7 +274,7 @@ async def admin_upsert_user_fair_share_weight(
 
     result = await info.context.adapters.fair_share.upsert_user(input.to_pydantic())
     return UpsertUserFairShareWeightPayload(
-        user_fair_share=UserFairShareGQL.from_pydantic(result.item)
+        user_fair_share=UserFairShareGQL.from_pydantic(result.user_fair_share)
     )
 
 
@@ -319,7 +319,7 @@ async def upsert_user_fair_share_weight(
 
     result = await info.context.adapters.fair_share.upsert_user(input.to_pydantic())
     return UpsertUserFairShareWeightPayload(
-        user_fair_share=UserFairShareGQL.from_pydantic(result.item)
+        user_fair_share=UserFairShareGQL.from_pydantic(result.user_fair_share)
     )
 
 

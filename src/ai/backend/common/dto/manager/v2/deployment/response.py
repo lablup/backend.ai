@@ -66,6 +66,7 @@ __all__ = (
     "SyncReplicaPayload",
     "UpdateAutoScalingRulePayload",
     "UpdateDeploymentPayload",
+    "UpdateDeploymentPolicyPayloadDTO",
     "UpdateRouteTrafficStatusPayload",
     "UpsertDeploymentPolicyPayload",
 )
@@ -364,3 +365,9 @@ class UpdateRouteTrafficStatusPayload(BaseResponseModel):
     """Payload for update route traffic status mutation result."""
 
     route: RouteNode = Field(description="The updated route")
+
+
+class UpdateDeploymentPolicyPayloadDTO(BaseResponseModel):
+    """Payload returned after updating a deployment policy."""
+
+    deployment_policy: DeploymentPolicyNode = Field(description="The updated deployment policy")

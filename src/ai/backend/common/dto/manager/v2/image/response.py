@@ -173,4 +173,4 @@ class ImageRequirementsInfoDTO(BaseResponseModel):
 class ImagePermissionInfoDTO(BaseResponseModel):
     """DTO for ImageV2PermissionInfoGQL: permission information for an image."""
 
-    pass
+    permissions: list[str] = Field(description="List of permissions the user has on this image")

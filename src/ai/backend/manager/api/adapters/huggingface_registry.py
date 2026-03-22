@@ -76,7 +76,7 @@ class HuggingFaceRegistryAdapter(BaseAdapter):
             )
         )
         return CreateHuggingFaceRegistryPayload(
-            registry=self._huggingface_registry_data_to_dto(action_result.result)
+            huggingface_registry=self._huggingface_registry_data_to_dto(action_result.result)
         )
 
     async def search(
@@ -135,7 +135,7 @@ class HuggingFaceRegistryAdapter(BaseAdapter):
             )
         )
         return UpdateHuggingFaceRegistryPayload(
-            registry=self._huggingface_registry_data_to_dto(action_result.result)
+            huggingface_registry=self._huggingface_registry_data_to_dto(action_result.result)
         )
 
     async def get_many(self, registry_ids: list[UUID]) -> list[HuggingFaceRegistryNode]:

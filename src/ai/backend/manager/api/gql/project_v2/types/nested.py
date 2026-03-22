@@ -23,7 +23,6 @@ from ai.backend.common.dto.manager.v2.group.response import (
 )
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
-    gql_from_pydantic_type,
     gql_pydantic_type,
 )
 from ai.backend.manager.api.gql.pydantic_compat import PydanticOutputMixin
@@ -88,7 +87,7 @@ class ProjectOrganizationInfoGQL:
 # ============================================================================
 
 
-@gql_from_pydantic_type(
+@gql_pydantic_type(
     BackendAIGQLMeta(
         added_version="26.2.0",
         description=(
@@ -96,6 +95,7 @@ class ProjectOrganizationInfoGQL:
             "Defines what operations are allowed for a specific storage host."
         ),
     ),
+    model=VFolderHostPermissionEntryDTO,
     name="VFolderHostPermissionEntry",
 )
 class VFolderHostPermissionEntryGQL(PydanticOutputMixin[VFolderHostPermissionEntryDTO]):
@@ -112,7 +112,7 @@ class VFolderHostPermissionEntryGQL(PydanticOutputMixin[VFolderHostPermissionEnt
     )
 
 
-@gql_from_pydantic_type(
+@gql_pydantic_type(
     BackendAIGQLMeta(
         added_version="26.2.0",
         description=(
@@ -120,6 +120,7 @@ class VFolderHostPermissionEntryGQL(PydanticOutputMixin[VFolderHostPermissionEnt
             "Contains allowed virtual folder hosts and their permissions."
         ),
     ),
+    model=ProjectStorageInfoDTO,
     name="ProjectStorageInfo",
 )
 class ProjectStorageInfoGQL(PydanticOutputMixin[ProjectStorageInfoDTO]):

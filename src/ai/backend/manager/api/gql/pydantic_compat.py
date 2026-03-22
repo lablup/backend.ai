@@ -15,8 +15,8 @@ Usage::
         id: NodeID[str]
         name: str = strawberry.field(description="...")
 
-    # Non-Node output type (payload, nested struct) — DEPRECATED
-    @gql_from_pydantic_type(meta)
+    # Non-Node output type (payload, nested struct)
+    @gql_pydantic_type(meta, model=FooPayloadDTO)
     class FooPayloadGQL(PydanticOutputMixin[FooPayloadDTO]):
         result_id: strawberry.ID
         name: str = strawberry.field(description="...")

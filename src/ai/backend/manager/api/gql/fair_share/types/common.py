@@ -23,9 +23,10 @@ from ai.backend.common.types import SlotQuantity
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     PydanticInputMixin,
-    gql_output_type,
     gql_pydantic_input,
+    gql_pydantic_type,
 )
+from ai.backend.manager.api.gql.pydantic_compat import PydanticOutputMixin
 from ai.backend.manager.data.fair_share.types import FairShareSpec
 from ai.backend.manager.errors.fair_share import FairShareError
 
@@ -52,7 +53,7 @@ def _normalize_quantity(value: Decimal) -> Decimal:
     return normalized
 
 
-@gql_output_type(
+@gql_pydantic_type(
     BackendAIGQLMeta(
         added_version="26.1.0",
         description=(
@@ -61,9 +62,10 @@ def _normalize_quantity(value: Decimal) -> Decimal:
             "rocm.device), and custom resources defined by plugins."
         ),
     ),
+    model=ResourceSlotEntryInfo,
     name="ResourceSlotEntry",
 )
-class ResourceSlotEntryGQL:
+class ResourceSlotEntryGQL(PydanticOutputMixin[ResourceSlotEntryInfo]):
     """Single resource slot entry with resource type and quantity."""
 
     resource_type: str = strawberry.field(
@@ -82,11 +84,6 @@ class ResourceSlotEntryGQL:
             "For accelerators: device count or share fraction."
         )
     )
-
-    @classmethod
-    def from_pydantic(cls, dto: ResourceSlotEntryInfo) -> ResourceSlotEntryGQL:
-        """Convert a ResourceSlotEntryInfo DTO to GQL type."""
-        return cls(resource_type=dto.resource_type, quantity=dto.quantity)
 
 
 @gql_pydantic_input(
@@ -116,7 +113,7 @@ class ResourceWeightEntryInputGQL(PydanticInputMixin[ResourceWeightEntryInputDTO
     )
 
 
-@gql_output_type(
+@gql_pydantic_type(
     BackendAIGQLMeta(
         added_version="26.1.0",
         description=(
@@ -125,9 +122,10 @@ class ResourceWeightEntryInputGQL(PydanticInputMixin[ResourceWeightEntryInputDTO
             "Each entry specifies a resource type and its quantity."
         ),
     ),
+    model=ResourceSlotInfo,
     name="ResourceSlot",
 )
-class ResourceSlotGQL:
+class ResourceSlotGQL(PydanticOutputMixin[ResourceSlotInfo]):
     """Resource slot containing multiple resource type entries."""
 
     entries: list[ResourceSlotEntryGQL] = strawberry.field(
@@ -160,13 +158,8 @@ class ResourceSlotGQL:
         ]
         return cls(entries=entries)
 
-    @classmethod
-    def from_pydantic(cls, dto: ResourceSlotInfo) -> ResourceSlotGQL:
-        """Convert a ResourceSlotInfo DTO to GQL type."""
-        return cls(entries=[ResourceSlotEntryGQL.from_pydantic(e) for e in dto.entries])
 
-
-@gql_output_type(
+@gql_pydantic_type(
     BackendAIGQLMeta(
         added_version="26.2.0",
         description=(
@@ -174,9 +167,10 @@ class ResourceSlotGQL:
             "Shows whether this resource type's weight was explicitly set or uses default."
         ),
     ),
+    model=ResourceWeightEntryInfo,
     name="ResourceWeightEntry",
 )
-class ResourceWeightEntryGQL:
+class ResourceWeightEntryGQL(PydanticOutputMixin[ResourceWeightEntryInfo]):
     """Individual resource type weight with default usage flag."""
 
     resource_type: str = strawberry.field(
@@ -200,17 +194,8 @@ class ResourceWeightEntryGQL:
         )
     )
 
-    @classmethod
-    def from_pydantic(cls, dto: ResourceWeightEntryInfo) -> ResourceWeightEntryGQL:
-        """Convert a ResourceWeightEntryInfo DTO to GQL type."""
-        return cls(
-            resource_type=dto.resource_type,
-            weight=dto.weight,
-            uses_default=dto.uses_default,
-        )
 
-
-@gql_output_type(
+@gql_pydantic_type(
     BackendAIGQLMeta(
         added_version="26.1.0",
         description=(
@@ -218,9 +203,10 @@ class ResourceWeightEntryGQL:
             "These parameters determine the decay rate, lookback period, and resource weighting for usage aggregation."
         ),
     ),
+    model=FairShareSpecInfo,
     name="FairShareSpec",
 )
-class FairShareSpecGQL:
+class FairShareSpecGQL(PydanticOutputMixin[FairShareSpecInfo]):
     """Specification parameters for fair share calculation."""
 
     weight: Decimal = strawberry.field(
@@ -306,22 +292,8 @@ class FairShareSpecGQL:
             resource_weights=weight_entries,
         )
 
-    @classmethod
-    def from_pydantic(cls, dto: FairShareSpecInfo) -> FairShareSpecGQL:
-        """Convert a FairShareSpecInfo DTO to GQL type."""
-        return cls(
-            weight=dto.weight,
-            uses_default=dto.uses_default,
-            half_life_days=dto.half_life_days,
-            lookback_days=dto.lookback_days,
-            decay_unit_days=dto.decay_unit_days,
-            resource_weights=[
-                ResourceWeightEntryGQL.from_pydantic(e) for e in dto.resource_weights
-            ],
-        )
 
-
-@gql_output_type(
+@gql_pydantic_type(
     BackendAIGQLMeta(
         added_version="26.1.0",
         description=(
@@ -329,9 +301,10 @@ class FairShareSpecGQL:
             "Contains the computed fair share factor and the intermediate values used in the calculation."
         ),
     ),
+    model=FairShareCalculationSnapshotInfo,
     name="FairShareCalculationSnapshot",
 )
-class FairShareCalculationSnapshotGQL:
+class FairShareCalculationSnapshotGQL(PydanticOutputMixin[FairShareCalculationSnapshotInfo]):
     """Contains the computed values and the time window used for calculation."""
 
     fair_share_factor: Decimal = strawberry.field(
@@ -391,18 +364,4 @@ class FairShareCalculationSnapshotGQL:
             self.total_decayed_usage,
             self.lookback_start,
             self.lookback_end,
-        )
-
-    @classmethod
-    def from_pydantic(
-        cls, dto: FairShareCalculationSnapshotInfo
-    ) -> FairShareCalculationSnapshotGQL:
-        """Convert a FairShareCalculationSnapshotInfo DTO to GQL type."""
-        return cls(
-            fair_share_factor=dto.fair_share_factor,
-            total_decayed_usage=ResourceSlotGQL.from_pydantic(dto.total_decayed_usage),
-            normalized_usage=dto.normalized_usage,
-            lookback_start=dto.lookback_start,
-            lookback_end=dto.lookback_end,
-            last_calculated_at=dto.last_calculated_at,
         )

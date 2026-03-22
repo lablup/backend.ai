@@ -256,7 +256,7 @@ async def admin_upsert_domain_fair_share_weight(
 
     result = await info.context.adapters.fair_share.upsert_domain(input.to_pydantic())
     return UpsertDomainFairShareWeightPayload(
-        domain_fair_share=DomainFairShareGQL.from_pydantic(result.item)
+        domain_fair_share=DomainFairShareGQL.from_pydantic(result.domain_fair_share)
     )
 
 
@@ -301,7 +301,7 @@ async def upsert_domain_fair_share_weight(
 
     result = await info.context.adapters.fair_share.upsert_domain(input.to_pydantic())
     return UpsertDomainFairShareWeightPayload(
-        domain_fair_share=DomainFairShareGQL.from_pydantic(result.item)
+        domain_fair_share=DomainFairShareGQL.from_pydantic(result.domain_fair_share)
     )
 
 

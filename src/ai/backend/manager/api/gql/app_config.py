@@ -19,6 +19,11 @@ from ai.backend.common.dto.manager.v2.app_config.request import (
     UpsertUserConfigInput as UpsertUserConfigInputDTO,
 )
 from ai.backend.common.dto.manager.v2.app_config.response import (
+    AppConfigNode,
+    UpsertDomainConfigPayloadDTO,
+    UpsertUserConfigPayloadDTO,
+)
+from ai.backend.common.dto.manager.v2.app_config.response import (
     DeleteDomainConfigPayload as DeleteDomainConfigPayloadDTO,
 )
 from ai.backend.common.dto.manager.v2.app_config.response import (
@@ -27,23 +32,24 @@ from ai.backend.common.dto.manager.v2.app_config.response import (
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     PydanticInputMixin,
-    gql_output_type,
     gql_pydantic_input,
     gql_pydantic_type,
 )
+from ai.backend.manager.api.gql.pydantic_compat import PydanticOutputMixin
 from ai.backend.manager.api.gql.utils import check_admin_only, dedent_strip
 from ai.backend.manager.errors.auth import InsufficientPrivilege
 
 from .types import StrawberryGQLContext
 
 
-@gql_output_type(
+@gql_pydantic_type(
     BackendAIGQLMeta(
         added_version="25.16.0",
         description="App configuration data.",
     ),
+    model=AppConfigNode,
 )
-class AppConfig:
+class AppConfig(PydanticOutputMixin[AppConfigNode]):
     """GraphQL type for app configuration."""
 
     extra_config: strawberry.scalars.JSON
@@ -112,25 +118,27 @@ class DeleteUserConfigInput(PydanticInputMixin[DeleteUserConfigInputDTO]):
     user_id: ID | None = None
 
 
-@gql_output_type(
+@gql_pydantic_type(
     BackendAIGQLMeta(
         added_version="25.16.0",
         description="Payload returned after upserting domain-level app configuration. Contains the resulting configuration that was stored.",
     ),
+    model=UpsertDomainConfigPayloadDTO,
 )
-class UpsertDomainConfigPayload:
+class UpsertDomainConfigPayload(PydanticOutputMixin[UpsertDomainConfigPayloadDTO]):
     """Payload returned after upserting domain-level app configuration."""
 
     app_config: AppConfig
 
 
-@gql_output_type(
+@gql_pydantic_type(
     BackendAIGQLMeta(
         added_version="25.16.0",
         description="Payload returned after upserting user-level app configuration. Contains the resulting configuration that was stored.",
     ),
+    model=UpsertUserConfigPayloadDTO,
 )
-class UpsertUserConfigPayload:
+class UpsertUserConfigPayload(PydanticOutputMixin[UpsertUserConfigPayloadDTO]):
     """Payload returned after upserting user-level app configuration."""
 
     app_config: AppConfig
@@ -183,7 +191,7 @@ async def admin_domain_app_config(
     result = await info.context.adapters.app_config.get_domain_config(domain_name)
     if result is None:
         return None
-    return AppConfig(extra_config=result.extra_config)
+    return AppConfig.from_pydantic(result)
 
 
 @strawberry.field(  # type: ignore[misc]
@@ -215,7 +223,7 @@ async def domain_app_config(
     result = await info.context.adapters.app_config.get_domain_config(domain_name)
     if result is None:
         return None
-    return AppConfig(extra_config=result.extra_config)
+    return AppConfig.from_pydantic(result)
 
 
 @strawberry.field(  # type: ignore[misc]
@@ -250,7 +258,7 @@ async def user_app_config(
     result = await info.context.adapters.app_config.get_user_config(target_user_id)
     if result is None:
         return None
-    return AppConfig(extra_config=result.extra_config)
+    return AppConfig.from_pydantic(result)
 
 
 @strawberry.field(  # type: ignore[misc]
@@ -274,7 +282,7 @@ async def merged_app_config(
         raise InsufficientPrivilege("Authentication required")
 
     result = await info.context.adapters.app_config.get_merged_config(str(me.user_id))
-    return AppConfig(extra_config=result.extra_config)
+    return AppConfig.from_pydantic(result)
 
 
 @strawberry.mutation(  # type: ignore[misc]
@@ -299,7 +307,7 @@ async def admin_upsert_domain_app_config(
     result = await info.context.adapters.app_config.upsert_domain_config(
         input.domain_name, input.extra_config
     )
-    return UpsertDomainConfigPayload(app_config=AppConfig(extra_config=result.extra_config))
+    return UpsertDomainConfigPayload(app_config=AppConfig.from_pydantic(result))
 
 
 @strawberry.mutation(  # type: ignore[misc]
@@ -332,7 +340,7 @@ async def upsert_domain_app_config(
     result = await info.context.adapters.app_config.upsert_domain_config(
         input.domain_name, input.extra_config
     )
-    return UpsertDomainConfigPayload(app_config=AppConfig(extra_config=result.extra_config))
+    return UpsertDomainConfigPayload(app_config=AppConfig.from_pydantic(result))
 
 
 @strawberry.mutation(  # type: ignore[misc]
@@ -367,7 +375,7 @@ async def upsert_user_app_config(
     result = await info.context.adapters.app_config.upsert_user_config(
         target_user_id, input.extra_config
     )
-    return UpsertUserConfigPayload(app_config=AppConfig(extra_config=result.extra_config))
+    return UpsertUserConfigPayload(app_config=AppConfig.from_pydantic(result))
 
 
 @strawberry.mutation(  # type: ignore[misc]

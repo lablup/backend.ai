@@ -21,7 +21,16 @@ from ai.backend.common.dto.manager.v2.huggingface_registry.request import (
     UpdateHuggingFaceRegistryInput as UpdateHuggingFaceRegistryInputDTO,
 )
 from ai.backend.common.dto.manager.v2.huggingface_registry.response import (
+    CreateHuggingFaceRegistryPayload as CreateHuggingFaceRegistryPayloadDTO,
+)
+from ai.backend.common.dto.manager.v2.huggingface_registry.response import (
+    DeleteHuggingFaceRegistryPayload as DeleteHuggingFaceRegistryPayloadDTO,
+)
+from ai.backend.common.dto.manager.v2.huggingface_registry.response import (
     HuggingFaceRegistryNode,
+)
+from ai.backend.common.dto.manager.v2.huggingface_registry.response import (
+    UpdateHuggingFaceRegistryPayload as UpdateHuggingFaceRegistryPayloadDTO,
 )
 from ai.backend.manager.api.gql.base import encode_cursor
 from ai.backend.manager.api.gql.decorators import (
@@ -29,10 +38,10 @@ from ai.backend.manager.api.gql.decorators import (
     PydanticInputMixin,
     gql_connection_type,
     gql_node_type,
-    gql_output_type,
     gql_pydantic_input,
+    gql_pydantic_type,
 )
-from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin
+from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin, PydanticOutputMixin
 
 from .types import StrawberryGQLContext
 
@@ -153,33 +162,37 @@ class DeleteHuggingFaceRegistryInput(PydanticInputMixin[DeleteHuggingFaceRegistr
     id: ID
 
 
-@gql_output_type(
+@gql_pydantic_type(
     BackendAIGQLMeta(
         added_version="25.14.0",
         description="Payload for creating a HuggingFace registry.",
     ),
+    model=CreateHuggingFaceRegistryPayloadDTO,
 )
-class CreateHuggingFaceRegistryPayload:
+class CreateHuggingFaceRegistryPayload(PydanticOutputMixin[CreateHuggingFaceRegistryPayloadDTO]):
     huggingface_registry: HuggingFaceRegistry
 
 
-@gql_output_type(
+@gql_pydantic_type(
     BackendAIGQLMeta(
         added_version="25.14.0",
         description="Payload for updating a HuggingFace registry.",
     ),
+    model=UpdateHuggingFaceRegistryPayloadDTO,
 )
-class UpdateHuggingFaceRegistryPayload:
+class UpdateHuggingFaceRegistryPayload(PydanticOutputMixin[UpdateHuggingFaceRegistryPayloadDTO]):
     huggingface_registry: HuggingFaceRegistry
 
 
-@gql_output_type(
+@gql_pydantic_type(
     BackendAIGQLMeta(
         added_version="25.14.0",
         description="Payload for deleting a HuggingFace registry.",
     ),
+    model=DeleteHuggingFaceRegistryPayloadDTO,
+    fields=["id"],
 )
-class DeleteHuggingFaceRegistryPayload:
+class DeleteHuggingFaceRegistryPayload(PydanticOutputMixin[DeleteHuggingFaceRegistryPayloadDTO]):
     id: ID
 
 
@@ -189,7 +202,7 @@ async def create_huggingface_registry(
 ) -> CreateHuggingFaceRegistryPayload:
     result = await info.context.adapters.huggingface_registry.create(input.to_pydantic())
     return CreateHuggingFaceRegistryPayload(
-        huggingface_registry=HuggingFaceRegistry.from_pydantic(result.registry)
+        huggingface_registry=HuggingFaceRegistry.from_pydantic(result.huggingface_registry)
     )
 
 
@@ -199,7 +212,7 @@ async def update_huggingface_registry(
 ) -> UpdateHuggingFaceRegistryPayload:
     result = await info.context.adapters.huggingface_registry.update(input.to_pydantic())
     return UpdateHuggingFaceRegistryPayload(
-        huggingface_registry=HuggingFaceRegistry.from_pydantic(result.registry)
+        huggingface_registry=HuggingFaceRegistry.from_pydantic(result.huggingface_registry)
     )
 
 

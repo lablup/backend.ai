@@ -34,6 +34,9 @@ from ai.backend.common.dto.manager.v2.fair_share.response import (
     BulkUpsertUserFairShareWeightPayload as BulkUpsertUserFairShareWeightPayloadDTO,
 )
 from ai.backend.common.dto.manager.v2.fair_share.response import (
+    UpsertUserFairShareWeightPayload as UpsertUserFairShareWeightPayloadDTO,
+)
+from ai.backend.common.dto.manager.v2.fair_share.response import (
     UserFairShareNode,
 )
 from ai.backend.manager.api.gql.base import OrderDirection, StringFilter, UUIDFilter
@@ -42,7 +45,6 @@ from ai.backend.manager.api.gql.decorators import (
     PydanticInputMixin,
     gql_connection_type,
     gql_node_type,
-    gql_output_type,
     gql_pydantic_input,
     gql_pydantic_type,
 )
@@ -364,14 +366,15 @@ class UpsertUserFairShareWeightInput(PydanticInputMixin[UpsertUserFairShareWeigh
     )
 
 
-@gql_output_type(
+@gql_pydantic_type(
     BackendAIGQLMeta(
         added_version="26.1.0",
         description="Payload for user fair share weight upsert mutation.",
     ),
+    model=UpsertUserFairShareWeightPayloadDTO,
     name="UpsertUserFairShareWeightPayload",
 )
-class UpsertUserFairShareWeightPayload:
+class UpsertUserFairShareWeightPayload(PydanticOutputMixin[UpsertUserFairShareWeightPayloadDTO]):
     """Payload for user fair share weight upsert mutation."""
 
     user_fair_share: UserFairShareGQL = strawberry.field(

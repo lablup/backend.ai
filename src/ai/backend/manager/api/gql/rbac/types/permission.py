@@ -33,6 +33,9 @@ from ai.backend.common.dto.manager.v2.rbac.response import (
 from ai.backend.common.dto.manager.v2.rbac.response import (
     PermissionNode as PermissionNodeDTO,
 )
+from ai.backend.common.dto.manager.v2.rbac.response import (
+    ScopeEntityCombinationInfo,
+)
 from ai.backend.common.dto.manager.v2.rbac.types import (
     OperationTypeDTO,
     RBACElementTypeDTO,
@@ -44,7 +47,6 @@ from ai.backend.manager.api.gql.decorators import (
     PydanticInputMixin,
     gql_connection_type,
     gql_node_type,
-    gql_output_type,
     gql_pydantic_input,
     gql_pydantic_type,
 )
@@ -260,14 +262,15 @@ class DeletePermissionPayload(PydanticOutputMixin[DeletePermissionPayloadDTO]):
 # ==================== Connection Types ====================
 
 
-@gql_output_type(
+@gql_pydantic_type(
     BackendAIGQLMeta(
         added_version="26.3.0",
         description="Valid scope-entity type combination for RBAC permissions.",
     ),
+    model=ScopeEntityCombinationInfo,
     name="ScopeEntityCombination",
 )
-class ScopeEntityCombinationGQL:
+class ScopeEntityCombinationGQL(PydanticOutputMixin[ScopeEntityCombinationInfo]):
     scope_type: RBACElementTypeGQL
     valid_entity_types: list[RBACElementTypeGQL]
 

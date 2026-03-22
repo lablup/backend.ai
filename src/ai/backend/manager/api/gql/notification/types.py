@@ -117,7 +117,6 @@ from ai.backend.manager.api.gql.base import OrderDirection, StringFilter
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     PydanticInputMixin,
-    gql_from_pydantic_type,
     gql_node_type,
     gql_pydantic_input,
     gql_pydantic_interface,
@@ -587,19 +586,21 @@ class DeleteNotificationRuleInput(PydanticInputMixin[DeleteNotificationRuleInput
 # Payload types for mutations
 
 
-@gql_from_pydantic_type(
+@gql_pydantic_type(
     BackendAIGQLMeta(
         added_version="26.3.0", description="Payload for create notification channel mutation."
     ),
+    model=CreateNotificationChannelPayloadDTO,
 )
 class CreateNotificationChannelPayload(PydanticOutputMixin[CreateNotificationChannelPayloadDTO]):
     channel: NotificationChannel
 
 
-@gql_from_pydantic_type(
+@gql_pydantic_type(
     BackendAIGQLMeta(
         added_version="26.3.0", description="Payload for update notification channel mutation."
     ),
+    model=UpdateNotificationChannelPayloadDTO,
 )
 class UpdateNotificationChannelPayload(PydanticOutputMixin[UpdateNotificationChannelPayloadDTO]):
     channel: NotificationChannel
@@ -616,19 +617,21 @@ class DeleteNotificationChannelPayload(PydanticOutputMixin[DeleteNotificationCha
     id: ID = strawberry.field(description="ID of the deleted notification channel.")
 
 
-@gql_from_pydantic_type(
+@gql_pydantic_type(
     BackendAIGQLMeta(
         added_version="26.3.0", description="Payload for create notification rule mutation."
     ),
+    model=CreateNotificationRulePayloadDTO,
 )
 class CreateNotificationRulePayload(PydanticOutputMixin[CreateNotificationRulePayloadDTO]):
     rule: NotificationRule
 
 
-@gql_from_pydantic_type(
+@gql_pydantic_type(
     BackendAIGQLMeta(
         added_version="26.3.0", description="Payload for update notification rule mutation."
     ),
+    model=UpdateNotificationRulePayloadDTO,
 )
 class UpdateNotificationRulePayload(PydanticOutputMixin[UpdateNotificationRulePayloadDTO]):
     rule: NotificationRule

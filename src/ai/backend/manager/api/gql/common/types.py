@@ -11,7 +11,10 @@ import strawberry
 from ai.backend.common.dto.manager.v2.resource_slot.types import (
     ResourceOptsDTOInput,
     ResourceOptsEntryDTO,
+    ResourceOptsEntryInfoDTO,
     ResourceOptsInfoDTO,
+    ServicePortEntryInfoDTO,
+    ServicePortsInfoDTO,
 )
 from ai.backend.common.dto.manager.v2.streaming.types import ServiceProtocol
 from ai.backend.common.types import (
@@ -21,10 +24,10 @@ from ai.backend.common.types import (
 )
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
-    gql_output_type,
     gql_pydantic_input,
+    gql_pydantic_type,
 )
-from ai.backend.manager.api.gql.pydantic_compat import PydanticInputMixin
+from ai.backend.manager.api.gql.pydantic_compat import PydanticInputMixin, PydanticOutputMixin
 
 # ========== Common Enums ==========
 
@@ -148,7 +151,7 @@ ServicePortProtocolGQL: type[ServiceProtocol] = strawberry.enum(
 # ========== Resource Options Types ==========
 
 
-@gql_output_type(
+@gql_pydantic_type(
     BackendAIGQLMeta(
         added_version="26.1.0",
         description=(
@@ -156,16 +159,17 @@ ServicePortProtocolGQL: type[ServiceProtocol] = strawberry.enum(
             "Contains additional resource configuration such as shared memory settings."
         ),
     ),
+    model=ResourceOptsEntryInfoDTO,
     name="ResourceOptsEntry",
 )
-class ResourceOptsEntryGQL:
+class ResourceOptsEntryGQL(PydanticOutputMixin[ResourceOptsEntryInfoDTO]):
     """Single resource option entry with name and value."""
 
     name: str = strawberry.field(description="The name of this resource option. Example: 'shmem'.")
     value: str = strawberry.field(description="The value for this resource option. Example: '64m'.")
 
 
-@gql_output_type(
+@gql_pydantic_type(
     BackendAIGQLMeta(
         added_version="26.1.0",
         description=(
@@ -173,9 +177,10 @@ class ResourceOptsEntryGQL:
             "Contains key-value pairs for resource configuration like shared memory."
         ),
     ),
+    model=ResourceOptsInfoDTO,
     name="ResourceOpts",
 )
-class ResourceOptsGQL:
+class ResourceOptsGQL(PydanticOutputMixin[ResourceOptsInfoDTO]):
     """Resource options containing multiple key-value entries."""
 
     entries: list[ResourceOptsEntryGQL] = strawberry.field(
@@ -189,11 +194,6 @@ class ResourceOptsGQL:
             return None
         entries = [ResourceOptsEntryGQL(name=k, value=str(v)) for k, v in data.items()]
         return cls(entries=entries)
-
-    @classmethod
-    def from_pydantic(cls, dto: ResourceOptsInfoDTO) -> ResourceOptsGQL:
-        """Convert a ResourceOptsInfoDTO to GQL type."""
-        return cls(entries=[ResourceOptsEntryGQL(name=e.name, value=e.value) for e in dto.entries])
 
 
 @gql_pydantic_input(
@@ -227,7 +227,7 @@ class ResourceOptsInput(PydanticInputMixin[ResourceOptsDTOInput]):
 # ========== Service Port Types ==========
 
 
-@gql_output_type(
+@gql_pydantic_type(
     BackendAIGQLMeta(
         added_version="26.2.0",
         description=(
@@ -235,9 +235,10 @@ class ResourceOptsInput(PydanticInputMixin[ResourceOptsDTOInput]):
             "Contains port mapping and protocol information for accessing services."
         ),
     ),
+    model=ServicePortEntryInfoDTO,
     name="ServicePortEntry",
 )
-class ServicePortEntryGQL:
+class ServicePortEntryGQL(PydanticOutputMixin[ServicePortEntryInfoDTO]):
     """Single service port entry with name, protocol, and port mappings."""
 
     name: str = strawberry.field(
@@ -266,7 +267,7 @@ class ServicePortEntryGQL:
         )
 
 
-@gql_output_type(
+@gql_pydantic_type(
     BackendAIGQLMeta(
         added_version="26.2.0",
         description=(
@@ -274,9 +275,10 @@ class ServicePortEntryGQL:
             "Each entry defines a service accessible through the compute session."
         ),
     ),
+    model=ServicePortsInfoDTO,
     name="ServicePorts",
 )
-class ServicePortsGQL:
+class ServicePortsGQL(PydanticOutputMixin[ServicePortsInfoDTO]):
     """Service ports containing multiple port entries."""
 
     entries: list[ServicePortEntryGQL] = strawberry.field(

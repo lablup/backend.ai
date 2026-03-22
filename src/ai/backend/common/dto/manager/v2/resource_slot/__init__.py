@@ -14,6 +14,7 @@ from ai.backend.common.dto.manager.v2.resource_slot.request import (
     ResourceSlotTypeOrder,
 )
 from ai.backend.common.dto.manager.v2.resource_slot.response import (
+    ActiveResourceOverviewInfoDTO,
     AdminSearchAgentResourcesPayload,
     AdminSearchResourceAllocationsPayload,
     AdminSearchResourceSlotTypesPayload,
@@ -29,6 +30,8 @@ from ai.backend.common.dto.manager.v2.resource_slot.types import (
     ResourceOptsDTOInput,
     ResourceOptsEntryDTO,
     ResourceSlotTypeOrderField,
+    ServicePortEntryInfoDTO,
+    ServicePortsInfoDTO,
 )
 
 __all__ = (
@@ -40,6 +43,8 @@ __all__ = (
     "ResourceOptsEntryDTO",
     "ResourceOptsDTOInput",
     "ResourceSlotTypeOrderField",
+    "ServicePortEntryInfoDTO",
+    "ServicePortsInfoDTO",
     # Request models
     "AdminSearchAgentResourcesInput",
     "AdminSearchResourceAllocationsInput",
@@ -51,6 +56,7 @@ __all__ = (
     "ResourceSlotTypeFilter",
     "ResourceSlotTypeOrder",
     # Response models
+    "ActiveResourceOverviewInfoDTO",
     "AdminSearchAgentResourcesPayload",
     "AdminSearchResourceAllocationsPayload",
     "AdminSearchResourceSlotTypesPayload",

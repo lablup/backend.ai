@@ -20,8 +20,8 @@ from ai.backend.common.dto.manager.v2.prometheus_query_preset.response import (
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     gql_connection_type,
-    gql_from_pydantic_type,
     gql_node_type,
+    gql_pydantic_type,
 )
 from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin, PydanticOutputMixin
 
@@ -69,11 +69,12 @@ class QueryDefinitionConnection(Connection[QueryDefinitionGQL]):
         self.count = count
 
 
-@gql_from_pydantic_type(
+@gql_pydantic_type(
     BackendAIGQLMeta(
         added_version="26.3.0",
         description="Payload returned after creating a query definition.",
     ),
+    model=CreateQueryDefinitionGQLPayloadDTO,
     name="CreateQueryDefinitionPayload",
 )
 class CreateQueryDefinitionPayload(PydanticOutputMixin[CreateQueryDefinitionGQLPayloadDTO]):
@@ -82,11 +83,12 @@ class CreateQueryDefinitionPayload(PydanticOutputMixin[CreateQueryDefinitionGQLP
     preset: QueryDefinitionGQL = strawberry.field(description="Created query definition.")
 
 
-@gql_from_pydantic_type(
+@gql_pydantic_type(
     BackendAIGQLMeta(
         added_version="26.3.0",
         description="Payload returned after modifying a query definition.",
     ),
+    model=ModifyQueryDefinitionGQLPayloadDTO,
     name="ModifyQueryDefinitionPayload",
 )
 class ModifyQueryDefinitionPayload(PydanticOutputMixin[ModifyQueryDefinitionGQLPayloadDTO]):

@@ -463,15 +463,15 @@ class TestUpsertDomainFairShareWeightPayload:
 
     def test_creation_with_node(self) -> None:
         node = _make_domain_fair_share_node()
-        payload = UpsertDomainFairShareWeightPayload(item=node)
-        assert isinstance(payload.item, DomainFairShareNode)
+        payload = UpsertDomainFairShareWeightPayload(domain_fair_share=node)
+        assert isinstance(payload.domain_fair_share, DomainFairShareNode)
 
     def test_round_trip_serialization(self) -> None:
         node = _make_domain_fair_share_node()
-        payload = UpsertDomainFairShareWeightPayload(item=node)
+        payload = UpsertDomainFairShareWeightPayload(domain_fair_share=node)
         json_str = payload.model_dump_json()
         restored = UpsertDomainFairShareWeightPayload.model_validate_json(json_str)
-        assert restored.item.domain_name == "test-domain"
+        assert restored.domain_fair_share.domain_name == "test-domain"
 
 
 class TestUpsertProjectFairShareWeightPayload:
@@ -479,8 +479,8 @@ class TestUpsertProjectFairShareWeightPayload:
 
     def test_creation_with_node(self) -> None:
         node = _make_project_fair_share_node()
-        payload = UpsertProjectFairShareWeightPayload(item=node)
-        assert isinstance(payload.item, ProjectFairShareNode)
+        payload = UpsertProjectFairShareWeightPayload(project_fair_share=node)
+        assert isinstance(payload.project_fair_share, ProjectFairShareNode)
 
 
 class TestUpsertUserFairShareWeightPayload:
@@ -488,8 +488,8 @@ class TestUpsertUserFairShareWeightPayload:
 
     def test_creation_with_node(self) -> None:
         node = _make_user_fair_share_node()
-        payload = UpsertUserFairShareWeightPayload(item=node)
-        assert isinstance(payload.item, UserFairShareNode)
+        payload = UpsertUserFairShareWeightPayload(user_fair_share=node)
+        assert isinstance(payload.user_fair_share, UserFairShareNode)
 
 
 class TestBulkUpsertDomainFairShareWeightPayload:

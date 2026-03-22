@@ -240,7 +240,9 @@ class FairShareAdapter(BaseAdapter):
                 )
             )
         )
-        return UpsertDomainFairShareWeightPayload(item=self._domain_data_to_dto(result.data))
+        return UpsertDomainFairShareWeightPayload(
+            domain_fair_share=self._domain_data_to_dto(result.data)
+        )
 
     async def bulk_upsert_domain(
         self,
@@ -350,7 +352,9 @@ class FairShareAdapter(BaseAdapter):
                 )
             )
         )
-        return UpsertProjectFairShareWeightPayload(item=self._project_data_to_dto(result.data))
+        return UpsertProjectFairShareWeightPayload(
+            project_fair_share=self._project_data_to_dto(result.data)
+        )
 
     async def bulk_upsert_project(
         self,
@@ -464,7 +468,7 @@ class FairShareAdapter(BaseAdapter):
                 weight=input.weight,
             )
         )
-        return UpsertUserFairShareWeightPayload(item=self._user_data_to_dto(result.data))
+        return UpsertUserFairShareWeightPayload(user_fair_share=self._user_data_to_dto(result.data))
 
     async def bulk_upsert_user(
         self,

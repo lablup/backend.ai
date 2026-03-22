@@ -91,7 +91,6 @@ from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     PydanticInputMixin,
     gql_connection_type,
-    gql_from_pydantic_type,
     gql_node_type,
     gql_pydantic_input,
     gql_pydantic_type,
@@ -607,10 +606,11 @@ class BulkAssignRoleErrorGQL(PydanticOutputMixin[BulkRoleOperationFailureInfoDTO
     message: str = strawberry.field(description="Error message describing the failure.")
 
 
-@gql_from_pydantic_type(
+@gql_pydantic_type(
     BackendAIGQLMeta(
         added_version="26.3.0", description="Payload for bulk role assignment mutation."
     ),
+    model=BulkAssignRoleResultPayloadDTO,
     name="BulkAssignRolePayload",
 )
 class BulkAssignRolePayloadGQL(PydanticOutputMixin[BulkAssignRoleResultPayloadDTO]):
@@ -635,10 +635,11 @@ class BulkRevokeRoleErrorGQL(PydanticOutputMixin[BulkRoleOperationFailureInfoDTO
     message: str = strawberry.field(description="Error message describing the failure.")
 
 
-@gql_from_pydantic_type(
+@gql_pydantic_type(
     BackendAIGQLMeta(
         added_version="26.3.0", description="Payload for bulk role revocation mutation."
     ),
+    model=BulkRevokeRoleResultPayloadDTO,
     name="BulkRevokeRolePayload",
 )
 class BulkRevokeRolePayloadGQL(PydanticOutputMixin[BulkRevokeRoleResultPayloadDTO]):

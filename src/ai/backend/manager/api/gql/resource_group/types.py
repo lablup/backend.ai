@@ -27,12 +27,14 @@ from ai.backend.common.dto.manager.v2.resource_group.request import (
     UpdateResourceGroupFairShareSpecInput as UpdateResourceGroupFairShareSpecInputDTO,
 )
 from ai.backend.common.dto.manager.v2.resource_group.response import (
+    FairShareScalingGroupSpecInfo,
     PreemptionConfigInfo,
     ResourceGroupDetailNode,
     ResourceGroupMetadataInfo,
     ResourceGroupNetworkConfigInfo,
     ResourceGroupSchedulerConfigInfo,
     ResourceGroupStatusInfo,
+    ResourceInfoNode,
     UpdateResourceGroupConfigPayloadNode,
     UpdateResourceGroupFairShareSpecPayloadNode,
 )
@@ -41,9 +43,7 @@ from ai.backend.manager.api.gql.base import OrderDirection, StringFilter
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     PydanticInputMixin,
-    gql_from_pydantic_type,
     gql_node_type,
-    gql_output_type,
     gql_pydantic_input,
     gql_pydantic_type,
 )
@@ -154,11 +154,12 @@ class PreemptionOrderGQL(StrEnum):
                 assert_never(order)
 
 
-@gql_from_pydantic_type(
+@gql_pydantic_type(
     BackendAIGQLMeta(
         added_version="26.3.0",
         description="Preemption configuration for a resource group.",
     ),
+    model=PreemptionConfigInfo,
     name="PreemptionConfig",
 )
 class PreemptionConfigGQL(PydanticOutputMixin[PreemptionConfigInfo]):
@@ -209,10 +210,11 @@ class ResourceGroupNetworkConfigGQL(PydanticOutputMixin[ResourceGroupNetworkConf
     pass
 
 
-@gql_from_pydantic_type(
+@gql_pydantic_type(
     BackendAIGQLMeta(
         added_version="26.2.0", description="Scheduler configuration for a resource group."
     ),
+    model=ResourceGroupSchedulerConfigInfo,
     name="ResourceGroupSchedulerConfig",
 )
 class ResourceGroupSchedulerConfigGQL(PydanticOutputMixin[ResourceGroupSchedulerConfigInfo]):
@@ -226,7 +228,7 @@ class ResourceGroupSchedulerConfigGQL(PydanticOutputMixin[ResourceGroupScheduler
     )
 
 
-@gql_output_type(
+@gql_pydantic_type(
     BackendAIGQLMeta(
         added_version="26.1.0",
         description=(
@@ -234,9 +236,10 @@ class ResourceGroupSchedulerConfigGQL(PydanticOutputMixin[ResourceGroupScheduler
             "Defines parameters for computing fair share factors across domains, projects, and users."
         ),
     ),
+    model=FairShareScalingGroupSpecInfo,
     name="FairShareScalingGroupSpec",
 )
-class FairShareScalingGroupSpecGQL:
+class FairShareScalingGroupSpecGQL(PydanticOutputMixin[FairShareScalingGroupSpecInfo]):
     """Fair share configuration for a resource group."""
 
     half_life_days: int = strawberry.field(
@@ -305,7 +308,7 @@ class FairShareScalingGroupSpecGQL:
         )
 
 
-@gql_output_type(
+@gql_pydantic_type(
     BackendAIGQLMeta(
         added_version="26.1.0",
         description=(
@@ -313,9 +316,10 @@ class FairShareScalingGroupSpecGQL:
             "Provides aggregated resource metrics including capacity, used, and free resources."
         ),
     ),
+    model=ResourceInfoNode,
     name="ResourceInfo",
 )
-class ResourceInfoGQL:
+class ResourceInfoGQL(PydanticOutputMixin[ResourceInfoNode]):
     """Resource information containing capacity, used, and free resource metrics."""
 
     capacity: ResourceSlotGQL = strawberry.field(
@@ -518,11 +522,12 @@ class UpdateResourceGroupFairShareSpecInput(
     )
 
 
-@gql_from_pydantic_type(
+@gql_pydantic_type(
     BackendAIGQLMeta(
         added_version="26.1.0",
         description="Payload for resource group fair share spec update mutation.",
     ),
+    model=UpdateResourceGroupFairShareSpecPayloadNode,
     name="UpdateResourceGroupFairShareSpecPayload",
 )
 class UpdateResourceGroupFairShareSpecPayload(
@@ -593,10 +598,11 @@ class UpdateResourceGroupInput(PydanticInputMixin[UpdateResourceGroupConfigInput
     )
 
 
-@gql_from_pydantic_type(
+@gql_pydantic_type(
     BackendAIGQLMeta(
         added_version="26.2.0", description="Payload for resource group update mutation."
     ),
+    model=UpdateResourceGroupConfigPayloadNode,
     name="UpdateResourceGroupPayload",
 )
 class UpdateResourceGroupPayload(PydanticOutputMixin[UpdateResourceGroupConfigPayloadNode]):

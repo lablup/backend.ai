@@ -86,6 +86,7 @@ from ai.backend.common.dto.manager.v2.deployment.response import (
     SyncReplicaPayload,
     UpdateAutoScalingRulePayload,
     UpdateDeploymentPayload,
+    UpdateDeploymentPolicyPayloadDTO,
     UpsertDeploymentPolicyPayload,
 )
 from ai.backend.common.dto.manager.v2.deployment.types import (
@@ -240,5 +241,6 @@ __all__ = (
     "SyncReplicaPayload",
     "UpdateAutoScalingRulePayload",
     "UpdateDeploymentPayload",
+    "UpdateDeploymentPolicyPayloadDTO",
     "UpsertDeploymentPolicyPayload",
 )

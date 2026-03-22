@@ -76,7 +76,7 @@ class ReservoirRegistryAdapter(BaseAdapter):
             )
         )
         return CreateReservoirRegistryPayload(
-            registry=self._reservoir_registry_data_to_dto(action_result.result)
+            reservoir=self._reservoir_registry_data_to_dto(action_result.result)
         )
 
     async def search(
@@ -147,7 +147,7 @@ class ReservoirRegistryAdapter(BaseAdapter):
             )
         )
         return UpdateReservoirRegistryPayload(
-            registry=self._reservoir_registry_data_to_dto(action_result.result)
+            reservoir=self._reservoir_registry_data_to_dto(action_result.result)
         )
 
     async def get_many(self, registry_ids: list[UUID]) -> list[ReservoirRegistryNode]:

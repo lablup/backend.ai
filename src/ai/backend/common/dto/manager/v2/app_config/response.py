@@ -14,6 +14,8 @@ __all__ = (
     "AppConfigNode",
     "DeleteDomainConfigPayload",
     "DeleteUserConfigPayload",
+    "UpsertDomainConfigPayloadDTO",
+    "UpsertUserConfigPayloadDTO",
 )
 
 
@@ -33,3 +35,15 @@ class DeleteUserConfigPayload(BaseResponseModel):
     """Payload for user-level app config deletion mutation result."""
 
     deleted: bool = Field(description="Whether the deletion was successful.")
+
+
+class UpsertDomainConfigPayloadDTO(BaseResponseModel):
+    """Payload returned after upserting domain-level app configuration."""
+
+    app_config: AppConfigNode = Field(description="The resulting app configuration")
+
+
+class UpsertUserConfigPayloadDTO(BaseResponseModel):
+    """Payload returned after upserting user-level app configuration."""
+
+    app_config: AppConfigNode = Field(description="The resulting app configuration")

@@ -32,6 +32,7 @@ __all__ = (
     "PurgeRolePayload",
     "RoleAssignmentNode",
     "RoleNode",
+    "ScopeEntityCombinationInfo",
     "UpdateRolePayload",
 )
 
@@ -149,3 +150,12 @@ class AssociationScopesEntitiesNode(BaseResponseModel):
     entity_id: str = Field(description="Entity identifier")
     relation_type: str = Field(description="Relation type value")
     registered_at: datetime = Field(description="Registration timestamp")
+
+
+class ScopeEntityCombinationInfo(BaseResponseModel):
+    """Valid scope-entity type combination for RBAC permissions."""
+
+    scope_type: RBACElementTypeDTO = Field(description="Scope element type")
+    valid_entity_types: list[RBACElementTypeDTO] = Field(
+        description="Valid entity types for this scope type"
+    )

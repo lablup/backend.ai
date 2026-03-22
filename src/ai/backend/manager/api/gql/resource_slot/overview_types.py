@@ -6,12 +6,14 @@ from typing import Self
 
 import strawberry
 
-from ai.backend.manager.api.gql.decorators import BackendAIGQLMeta, gql_output_type
+from ai.backend.common.dto.manager.v2.resource_slot.response import ActiveResourceOverviewInfoDTO
+from ai.backend.manager.api.gql.decorators import BackendAIGQLMeta, gql_pydantic_type
 from ai.backend.manager.api.gql.fair_share.types.common import ResourceSlotGQL
+from ai.backend.manager.api.gql.pydantic_compat import PydanticOutputMixin
 from ai.backend.manager.data.resource_slot.types import ResourceOccupancy
 
 
-@gql_output_type(
+@gql_pydantic_type(
     BackendAIGQLMeta(
         added_version="26.4.0",
         description=(
@@ -19,9 +21,10 @@ from ai.backend.manager.data.resource_slot.types import ResourceOccupancy
             "Shows the currently occupied resource slots and the number of active sessions."
         ),
     ),
+    model=ActiveResourceOverviewInfoDTO,
     name="ActiveResourceOverview",
 )
-class ActiveResourceOverviewGQL:
+class ActiveResourceOverviewGQL(PydanticOutputMixin[ActiveResourceOverviewInfoDTO]):
     """Active resource occupancy for a domain or project."""
 
     slots: ResourceSlotGQL = strawberry.field(

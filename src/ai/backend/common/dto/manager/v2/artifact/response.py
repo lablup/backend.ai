@@ -27,6 +27,7 @@ __all__ = (
     "ArtifactImportProgressUpdatedGQLPayload",
     "ArtifactNode",
     "ArtifactRevisionImportTaskInfo",
+    "ArtifactRevisionImportTaskInfoGQL",
     "ArtifactRevisionNode",
     "ArtifactStatusChangedGQLPayload",
     "ArtifactVerificationGQLResultDTO",
@@ -227,6 +228,9 @@ class ArtifactVerifierGQLResultDTO(BaseResponseModel):
     scanned_at: datetime = Field(description="Timestamp when verification started.")
     scan_time: float = Field(description="Time taken to complete verification in seconds.")
     scanned_count: int = Field(description="Total number of files scanned.")
+    metadata: ArtifactVerifierMetadataDTO = Field(
+        description="Additional metadata from the verifier."
+    )
     error: str | None = Field(
         default=None, description="Fatal error message if the verifier failed to complete."
     )
@@ -236,12 +240,15 @@ class ArtifactVerifierGQLResultEntryDTO(BaseResponseModel):
     """DTO for associating a verifier name with its scan result."""
 
     name: str = Field(description="Name of the verifier.")
+    result: ArtifactVerifierGQLResultDTO = Field(description="Scan result from this verifier.")
 
 
 class ArtifactVerificationGQLResultDTO(BaseResponseModel):
     """DTO for the complete verification result from all verifiers."""
 
-    pass
+    verifiers: list[ArtifactVerifierGQLResultEntryDTO] = Field(
+        description="Results from each verifier that scanned the artifact."
+    )
 
 
 class ArtifactImportProgressUpdatedGQLPayload(BaseResponseModel):
@@ -252,79 +259,104 @@ class ArtifactImportProgressUpdatedGQLPayload(BaseResponseModel):
     status: str = Field(description="Current import status.")
 
 
+class ArtifactRevisionImportTaskInfoGQL(BaseResponseModel):
+    """GQL-level DTO for an artifact revision import task."""
+
+    task_id: str | None = Field(default=None, description="Background task ID.")
+    artifact_revision: ArtifactRevisionNode = Field(description="Artifact revision data.")
+
+
 class ArtifactStatusChangedGQLPayload(BaseResponseModel):
     """GQL payload for artifact status change subscription events."""
 
-    pass
+    artifact_revision: ArtifactRevisionNode = Field(description="Updated artifact revision.")
 
 
 class ScanArtifactsGQLPayload(BaseResponseModel):
     """GQL payload for artifact scanning operations."""
 
-    pass
+    artifacts: list[ArtifactNode] = Field(description="List of scanned artifacts.")
 
 
 class DelegateScanArtifactsGQLPayload(BaseResponseModel):
     """GQL payload for delegated artifact scanning operations."""
 
-    pass
+    artifacts: list[ArtifactNode] = Field(
+        description="List of artifacts discovered during the delegated scan."
+    )
 
 
 class ImportArtifactsGQLPayload(BaseResponseModel):
     """GQL payload for artifact import operations."""
 
-    pass
+    artifact_revisions: list[ArtifactRevisionNode] = Field(
+        description="List of imported artifact revisions."
+    )
+    tasks: list[ArtifactRevisionImportTaskInfoGQL] = Field(
+        description="List of import tasks created."
+    )
 
 
 class DelegateImportArtifactsGQLPayload(BaseResponseModel):
     """GQL payload for delegated artifact import operations."""
 
-    pass
+    artifact_revisions: list[ArtifactRevisionNode] = Field(
+        description="List of imported artifact revisions from the reservoir registry's remote registry."
+    )
+    tasks: list[ArtifactRevisionImportTaskInfoGQL] = Field(
+        description="List of background tasks created for importing the artifact revisions."
+    )
 
 
 class UpdateArtifactGQLPayload(BaseResponseModel):
     """GQL payload for artifact update operations."""
 
-    pass
+    artifact: ArtifactNode = Field(description="Updated artifact.")
 
 
 class CleanupArtifactRevisionsGQLPayload(BaseResponseModel):
     """GQL payload for artifact revision cleanup operations."""
 
-    pass
+    artifact_revisions: list[ArtifactRevisionNode] = Field(
+        description="Cleaned up artifact revisions."
+    )
 
 
 class ApproveArtifactGQLPayload(BaseResponseModel):
     """GQL payload for artifact revision approval operations."""
 
-    pass
+    artifact_revision: ArtifactRevisionNode = Field(description="Approved artifact revision.")
 
 
 class RejectArtifactGQLPayload(BaseResponseModel):
     """GQL payload for artifact revision rejection operations."""
 
-    pass
+    artifact_revision: ArtifactRevisionNode = Field(description="Rejected artifact revision.")
 
 
 class CancelImportArtifactGQLPayload(BaseResponseModel):
     """GQL payload for canceling artifact import operations."""
 
-    pass
+    artifact_revision: ArtifactRevisionNode = Field(
+        description="Artifact revision with cancelled import."
+    )
 
 
 class ScanArtifactModelsGQLPayload(BaseResponseModel):
     """GQL payload for batch model scanning operations."""
 
-    pass
+    artifact_revisions: list[ArtifactRevisionNode] = Field(
+        description="Artifact revisions discovered during model scanning."
+    )
 
 
 class DeleteArtifactsGQLPayload(BaseResponseModel):
     """GQL payload for artifact deletion operations."""
 
-    pass
+    artifacts: list[ArtifactNode] = Field(description="List of soft-deleted artifacts.")
 
 
 class RestoreArtifactsGQLPayload(BaseResponseModel):
     """GQL payload for artifact restoration operations."""
 
-    pass
+    artifacts: list[ArtifactNode] = Field(description="List of restored artifacts.")

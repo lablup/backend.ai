@@ -35,13 +35,15 @@ from ai.backend.common.dto.manager.v2.fair_share.response import (
 from ai.backend.common.dto.manager.v2.fair_share.response import (
     DomainFairShareNode,
 )
+from ai.backend.common.dto.manager.v2.fair_share.response import (
+    UpsertDomainFairShareWeightPayload as UpsertDomainFairShareWeightPayloadDTO,
+)
 from ai.backend.manager.api.gql.base import OrderDirection, StringFilter
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     PydanticInputMixin,
     gql_connection_type,
     gql_node_type,
-    gql_output_type,
     gql_pydantic_input,
     gql_pydantic_type,
 )
@@ -292,14 +294,17 @@ class UpsertDomainFairShareWeightInput(PydanticInputMixin[UpsertDomainFairShareW
     )
 
 
-@gql_output_type(
+@gql_pydantic_type(
     BackendAIGQLMeta(
         added_version="26.1.0",
         description="Payload for domain fair share weight upsert mutation.",
     ),
+    model=UpsertDomainFairShareWeightPayloadDTO,
     name="UpsertDomainFairShareWeightPayload",
 )
-class UpsertDomainFairShareWeightPayload:
+class UpsertDomainFairShareWeightPayload(
+    PydanticOutputMixin[UpsertDomainFairShareWeightPayloadDTO]
+):
     """Payload for domain fair share weight upsert mutation."""
 
     domain_fair_share: DomainFairShareGQL = strawberry.field(

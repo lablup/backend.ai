@@ -41,6 +41,7 @@ from ai.backend.common.dto.manager.v2.rbac.response import (
     PurgeRolePayload,
     RoleAssignmentNode,
     RoleNode,
+    ScopeEntityCombinationInfo,
     UpdateRolePayload,
 )
 from ai.backend.common.dto.manager.v2.rbac.types import (
@@ -120,5 +121,6 @@ __all__ = (
     "PurgeRolePayload",
     "RoleAssignmentNode",
     "RoleNode",
+    "ScopeEntityCombinationInfo",
     "UpdateRolePayload",
 )

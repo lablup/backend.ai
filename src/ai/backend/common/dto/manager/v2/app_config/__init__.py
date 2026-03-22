@@ -9,8 +9,11 @@ from ai.backend.common.dto.manager.v2.app_config.request import (
     UpsertUserConfigInput,
 )
 from ai.backend.common.dto.manager.v2.app_config.response import (
+    AppConfigNode,
     DeleteDomainConfigPayload,
     DeleteUserConfigPayload,
+    UpsertDomainConfigPayloadDTO,
+    UpsertUserConfigPayloadDTO,
 )
 
 __all__ = (
@@ -18,6 +21,9 @@ __all__ = (
     "DeleteUserConfigInput",
     "UpsertDomainConfigInput",
     "UpsertUserConfigInput",
+    "AppConfigNode",
     "DeleteDomainConfigPayload",
     "DeleteUserConfigPayload",
+    "UpsertDomainConfigPayloadDTO",
+    "UpsertUserConfigPayloadDTO",
 )

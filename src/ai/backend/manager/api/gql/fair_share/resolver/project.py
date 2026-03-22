@@ -259,7 +259,7 @@ async def admin_upsert_project_fair_share_weight(
 
     result = await info.context.adapters.fair_share.upsert_project(input.to_pydantic())
     return UpsertProjectFairShareWeightPayload(
-        project_fair_share=ProjectFairShareGQL.from_pydantic(result.item)
+        project_fair_share=ProjectFairShareGQL.from_pydantic(result.project_fair_share)
     )
 
 
@@ -304,7 +304,7 @@ async def upsert_project_fair_share_weight(
 
     result = await info.context.adapters.fair_share.upsert_project(input.to_pydantic())
     return UpsertProjectFairShareWeightPayload(
-        project_fair_share=ProjectFairShareGQL.from_pydantic(result.item)
+        project_fair_share=ProjectFairShareGQL.from_pydantic(result.project_fair_share)
     )
 
 

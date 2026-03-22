@@ -296,19 +296,19 @@ class SearchUserUsageBucketsPayload(BaseResponseModel):
 class UpsertDomainFairShareWeightPayload(BaseResponseModel):
     """Payload for upserting domain fair share weight."""
 
-    item: DomainFairShareNode = Field(description="Updated domain fair share data")
+    domain_fair_share: DomainFairShareNode = Field(description="Updated domain fair share data")
 
 
 class UpsertProjectFairShareWeightPayload(BaseResponseModel):
     """Payload for upserting project fair share weight."""
 
-    item: ProjectFairShareNode = Field(description="Updated project fair share data")
+    project_fair_share: ProjectFairShareNode = Field(description="Updated project fair share data")
 
 
 class UpsertUserFairShareWeightPayload(BaseResponseModel):
     """Payload for upserting user fair share weight."""
 
-    item: UserFairShareNode = Field(description="Updated user fair share data")
+    user_fair_share: UserFairShareNode = Field(description="Updated user fair share data")
 
 
 # Bulk upsert weight payloads

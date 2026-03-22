@@ -71,11 +71,29 @@ from ai.backend.common.dto.manager.v2.artifact.request import (
     UpdateArtifactGQLInput as UpdateArtifactGQLInputDTO,
 )
 from ai.backend.common.dto.manager.v2.artifact.response import (
+    ApproveArtifactGQLPayload,
     ArtifactImportProgressUpdatedGQLPayload,
     ArtifactNode,
+    ArtifactRevisionImportTaskInfoGQL,
     ArtifactRevisionNode,
+    ArtifactStatusChangedGQLPayload,
+    ArtifactVerificationGQLResultDTO,
+    ArtifactVerifierGQLResultDTO,
+    ArtifactVerifierGQLResultEntryDTO,
+    ArtifactVerifierMetadataDTO,
     ArtifactVerifierMetadataEntryDTO,
+    CancelImportArtifactGQLPayload,
+    CleanupArtifactRevisionsGQLPayload,
+    DelegateImportArtifactsGQLPayload,
+    DelegateScanArtifactsGQLPayload,
+    DeleteArtifactsGQLPayload,
+    ImportArtifactsGQLPayload,
+    RejectArtifactGQLPayload,
+    RestoreArtifactsGQLPayload,
+    ScanArtifactModelsGQLPayload,
+    ScanArtifactsGQLPayload,
     SourceInfoDTO,
+    UpdateArtifactGQLPayload,
 )
 from ai.backend.common.dto.manager.v2.artifact.types import (
     ArtifactAvailability as ArtifactAvailabilityDTO,
@@ -111,11 +129,14 @@ from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     gql_connection_type,
     gql_node_type,
-    gql_output_type,
     gql_pydantic_input,
     gql_pydantic_type,
 )
-from ai.backend.manager.api.gql.pydantic_compat import PydanticInputMixin, PydanticNodeMixin
+from ai.backend.manager.api.gql.pydantic_compat import (
+    PydanticInputMixin,
+    PydanticNodeMixin,
+    PydanticOutputMixin,
+)
 from ai.backend.manager.api.gql.types import GQLOrderBy, StrawberryGQLContext
 from ai.backend.manager.api.gql.utils import dedent_strip
 from ai.backend.manager.data.artifact.types import (
@@ -164,14 +185,15 @@ class ArtifactVerifierMetadataEntryGQL:
     value: strawberry.auto
 
 
-@gql_output_type(
+@gql_pydantic_type(
     BackendAIGQLMeta(
         added_version="26.1.0",
         description="A collection of metadata from an artifact verifier. Contains key-value pairs providing additional information about the verification.",
     ),
+    model=ArtifactVerifierMetadataDTO,
     name="ArtifactVerifierMetadata",
 )
-class ArtifactVerifierMetadataGQL:
+class ArtifactVerifierMetadataGQL(PydanticOutputMixin[ArtifactVerifierMetadataDTO]):
     """Metadata containing multiple key-value entries."""
 
     entries: list[ArtifactVerifierMetadataEntryGQL] = strawberry.field(
@@ -185,14 +207,15 @@ class ArtifactVerifierMetadataGQL:
         return cls(entries=entries)
 
 
-@gql_output_type(
+@gql_pydantic_type(
     BackendAIGQLMeta(
         added_version="25.17.0",
         description="Result from a single malware verifier containing scan results and metadata. Each verifier scans the artifact for potential security issues and reports findings including infected file count, scan time, and any errors encountered.",
     ),
+    model=ArtifactVerifierGQLResultDTO,
     name="ArtifactVerifierResult",
 )
-class ArtifactVerifierGQLResult:
+class ArtifactVerifierGQLResult(PydanticOutputMixin[ArtifactVerifierGQLResultDTO]):
     success: bool = strawberry.field(description="Whether the verification completed successfully")
     infected_count: int = strawberry.field(
         description="Number of infected or suspicious files detected"
@@ -210,7 +233,7 @@ class ArtifactVerifierGQLResult:
     )
 
     @classmethod
-    def from_pydantic(cls, data: VerifierResult) -> ArtifactVerifierGQLResult:
+    def from_verifier_result(cls, data: VerifierResult) -> ArtifactVerifierGQLResult:
         return cls(
             success=data.success,
             infected_count=data.infected_count,
@@ -222,14 +245,15 @@ class ArtifactVerifierGQLResult:
         )
 
 
-@gql_output_type(
+@gql_pydantic_type(
     BackendAIGQLMeta(
         added_version="25.17.0",
         description="Entry for a single verifier's result in the verification results. Associates a verifier name with its scan results.",
     ),
+    model=ArtifactVerifierGQLResultEntryDTO,
     name="ArtifactVerifierResultEntry",
 )
-class ArtifactVerifierGQLResultEntry:
+class ArtifactVerifierGQLResultEntry(PydanticOutputMixin[ArtifactVerifierGQLResultEntryDTO]):
     name: str = strawberry.field(description="Name of the verifier (e.g., 'clamav', 'custom')")
     result: ArtifactVerifierGQLResult = strawberry.field(
         description="Scan result from this verifier"
@@ -241,24 +265,27 @@ class ArtifactVerifierGQLResultEntry:
     ) -> ArtifactVerifierGQLResultEntry:
         return cls(
             name=name,
-            result=ArtifactVerifierGQLResult.from_pydantic(result),
+            result=ArtifactVerifierGQLResult.from_verifier_result(result),
         )
 
 
-@gql_output_type(
+@gql_pydantic_type(
     BackendAIGQLMeta(
         added_version="25.17.0",
         description="Complete verification result containing results from all configured verifiers. Artifacts undergo malware scanning through multiple verifiers after being imported. This type aggregates results from all verifiers that were run on the artifact.",
     ),
+    model=ArtifactVerificationGQLResultDTO,
     name="ArtifactVerificationResult",
 )
-class ArtifactVerificationGQLResult:
+class ArtifactVerificationGQLResult(PydanticOutputMixin[ArtifactVerificationGQLResultDTO]):
     verifiers: list[ArtifactVerifierGQLResultEntry] = strawberry.field(
         description="Results from each verifier that scanned the artifact"
     )
 
     @classmethod
-    def from_pydantic(cls, data: VerificationStepResult) -> ArtifactVerificationGQLResult:
+    def from_verification_step_result(
+        cls, data: VerificationStepResult
+    ) -> ArtifactVerificationGQLResult:
         verifier_entries = [
             ArtifactVerifierGQLResultEntry.from_verifier_result(verifier_name, verifier_result)
             for verifier_name, verifier_result in data.verifiers.items()
@@ -905,58 +932,63 @@ class ArtifactImportProgressUpdatedPayload:
     status: ArtifactStatus = strawberry.field(description="Current import status.")
 
 
-@gql_output_type(
+@gql_pydantic_type(
     BackendAIGQLMeta(
         added_version="25.14.0",
         description="Response payload for artifact scanning operations. Contains the list of artifacts discovered during scanning of external registries. These artifacts are registered with SCANNED status and can be imported for actual use.",
     ),
+    model=ScanArtifactsGQLPayload,
 )
-class ScanArtifactsPayload:
+class ScanArtifactsPayload(PydanticOutputMixin[ScanArtifactsGQLPayload]):
     artifacts: list[Artifact]
 
 
-@gql_output_type(
+@gql_pydantic_type(
     BackendAIGQLMeta(
         added_version="25.15.0",
         description="Response payload for delegated artifact scanning operation. Contains the list of artifacts discovered during the scan of a reservoir registry's remote registry. These artifacts are now available for import or direct use.",
     ),
+    model=DelegateScanArtifactsGQLPayload,
 )
-class DelegateScanArtifactsPayload:
+class DelegateScanArtifactsPayload(PydanticOutputMixin[DelegateScanArtifactsGQLPayload]):
     artifacts: list[Artifact] = strawberry.field(
         description="List of artifacts discovered during the delegated scan from the reservoir registry's remote registry"
     )
 
 
-@gql_output_type(
+@gql_pydantic_type(
     BackendAIGQLMeta(
         added_version="25.14.0",
         description="Represents a background task for importing an artifact revision. Contains the task ID for monitoring progress and the associated artifact revision being imported from external registries.",
     ),
+    model=ArtifactRevisionImportTaskInfoGQL,
 )
-class ArtifactRevisionImportTask:
+class ArtifactRevisionImportTask(PydanticOutputMixin[ArtifactRevisionImportTaskInfoGQL]):
     task_id: ID | None
     artifact_revision: ArtifactRevision
 
 
 # Mutation Payloads
-@gql_output_type(
+@gql_pydantic_type(
     BackendAIGQLMeta(
         added_version="25.14.0",
         description="Response payload for artifact import operations. Contains the imported artifact revisions and their associated background tasks. Tasks can be monitored to track the import progress from SCANNED to AVAILABLE status.",
     ),
+    model=ImportArtifactsGQLPayload,
 )
-class ImportArtifactsPayload:
+class ImportArtifactsPayload(PydanticOutputMixin[ImportArtifactsGQLPayload]):
     artifact_revisions: ArtifactRevisionConnection
     tasks: list[ArtifactRevisionImportTask]
 
 
-@gql_output_type(
+@gql_pydantic_type(
     BackendAIGQLMeta(
         added_version="25.15.0",
         description="Response payload for delegated artifact import operation. Contains the imported artifact revisions and associated background tasks. The tasks can be monitored to track the progress of the import operation.",
     ),
+    model=DelegateImportArtifactsGQLPayload,
 )
-class DelegateImportArtifactsPayload:
+class DelegateImportArtifactsPayload(PydanticOutputMixin[DelegateImportArtifactsGQLPayload]):
     artifact_revisions: ArtifactRevisionConnection = strawberry.field(
         description="Connection of artifact revisions that were imported from the reservoir registry's remote registry"
     )
@@ -965,91 +997,100 @@ class DelegateImportArtifactsPayload:
     )
 
 
-@gql_output_type(
+@gql_pydantic_type(
     BackendAIGQLMeta(
         added_version="25.14.0",
         description="Response payload for artifact update operations. Returns the updated artifact with modified metadata properties.",
     ),
+    model=UpdateArtifactGQLPayload,
 )
-class UpdateArtifactPayload:
+class UpdateArtifactPayload(PydanticOutputMixin[UpdateArtifactGQLPayload]):
     artifact: Artifact
 
 
-@gql_output_type(
+@gql_pydantic_type(
     BackendAIGQLMeta(
         added_version="25.14.0",
         description="Response payload for artifact revision cleanup operations. Contains the cleaned artifact revisions that have had their stored data removed, transitioning them back to SCANNED status to free storage space.",
     ),
+    model=CleanupArtifactRevisionsGQLPayload,
 )
-class CleanupArtifactRevisionsPayload:
+class CleanupArtifactRevisionsPayload(PydanticOutputMixin[CleanupArtifactRevisionsGQLPayload]):
     artifact_revisions: ArtifactRevisionConnection
 
 
-@gql_output_type(
+@gql_pydantic_type(
     BackendAIGQLMeta(
         added_version="25.14.0",
         description="Response payload for artifact revision approval operations. Contains the approved artifact revision. Admin-only operation.",
     ),
+    model=ApproveArtifactGQLPayload,
 )
-class ApproveArtifactPayload:
+class ApproveArtifactPayload(PydanticOutputMixin[ApproveArtifactGQLPayload]):
     artifact_revision: ArtifactRevision
 
 
-@gql_output_type(
+@gql_pydantic_type(
     BackendAIGQLMeta(
         added_version="25.14.0",
         description="Response payload for artifact revision rejection operations. Contains the rejected artifact revision. Admin-only operation.",
     ),
+    model=RejectArtifactGQLPayload,
 )
-class RejectArtifactPayload:
+class RejectArtifactPayload(PydanticOutputMixin[RejectArtifactGQLPayload]):
     artifact_revision: ArtifactRevision
 
 
-@gql_output_type(
+@gql_pydantic_type(
     BackendAIGQLMeta(
         added_version="25.14.0",
         description="Response payload for canceling artifact import operations. Contains the artifact revision whose import was canceled, reverting its status back to SCANNED.",
     ),
+    model=CancelImportArtifactGQLPayload,
 )
-class CancelImportArtifactPayload:
+class CancelImportArtifactPayload(PydanticOutputMixin[CancelImportArtifactGQLPayload]):
     artifact_revision: ArtifactRevision
 
 
-@gql_output_type(
+@gql_pydantic_type(
     BackendAIGQLMeta(
         added_version="25.14.0",
         description="Payload for artifact status change subscription events. Provides real-time notifications when artifact revision statuses change during import, cleanup, or other operations.",
     ),
+    model=ArtifactStatusChangedGQLPayload,
 )
-class ArtifactStatusChangedPayload:
+class ArtifactStatusChangedPayload(PydanticOutputMixin[ArtifactStatusChangedGQLPayload]):
     artifact_revision: ArtifactRevision
 
 
-@gql_output_type(
+@gql_pydantic_type(
     BackendAIGQLMeta(
         added_version="25.14.0",
         description="Response payload for batch model scanning operations. Contains the artifact revisions discovered during detailed scanning of specific models, including README content and file size information.",
     ),
+    model=ScanArtifactModelsGQLPayload,
 )
-class ScanArtifactModelsPayload:
+class ScanArtifactModelsPayload(PydanticOutputMixin[ScanArtifactModelsGQLPayload]):
     artifact_revision: ArtifactRevisionConnection
 
 
-@gql_output_type(
+@gql_pydantic_type(
     BackendAIGQLMeta(
         added_version="25.15.0",
         description="Response payload for artifact deletion operations. Contains the artifacts that were soft-deleted. These can be restored later.",
     ),
+    model=DeleteArtifactsGQLPayload,
 )
-class DeleteArtifactsPayload:
+class DeleteArtifactsPayload(PydanticOutputMixin[DeleteArtifactsGQLPayload]):
     artifacts: list[Artifact]
 
 
-@gql_output_type(
+@gql_pydantic_type(
     BackendAIGQLMeta(
         added_version="25.15.0",
         description="Response payload for artifact restoration operations. Contains the artifacts that were restored from soft-deleted state.",
     ),
+    model=RestoreArtifactsGQLPayload,
 )
-class RestoreArtifactsPayload:
+class RestoreArtifactsPayload(PydanticOutputMixin[RestoreArtifactsGQLPayload]):
     artifacts: list[Artifact]

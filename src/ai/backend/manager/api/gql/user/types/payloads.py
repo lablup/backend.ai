@@ -47,7 +47,6 @@ from ai.backend.common.dto.manager.v2.user.response import (
 )
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
-    gql_from_pydantic_type,
     gql_pydantic_type,
 )
 from ai.backend.manager.api.gql.pydantic_compat import PydanticOutputMixin
@@ -57,11 +56,12 @@ from .node import UserV2GQL
 # Create User Payloads
 
 
-@gql_from_pydantic_type(
+@gql_pydantic_type(
     BackendAIGQLMeta(
         added_version="26.2.0",
         description="Payload for user creation mutation.",
     ),
+    model=CreateUserPayloadDTO,
     name="CreateUserV2Payload",
 )
 class CreateUserPayloadGQL(PydanticOutputMixin[CreateUserPayloadDTO]):
@@ -91,11 +91,12 @@ class BulkCreateUserV2ErrorGQL:
     message: str = strawberry.field(description="Error message describing the failure.")
 
 
-@gql_from_pydantic_type(
+@gql_pydantic_type(
     BackendAIGQLMeta(
         added_version="26.2.0",
         description="Payload for bulk user creation mutation.",
     ),
+    model=BulkCreateUsersPayloadDTO,
     name="BulkCreateUsersV2Payload",
 )
 class BulkCreateUsersV2PayloadGQL(PydanticOutputMixin[BulkCreateUsersPayloadDTO]):
@@ -112,11 +113,12 @@ class BulkCreateUsersV2PayloadGQL(PydanticOutputMixin[BulkCreateUsersPayloadDTO]
 # Update User Payloads
 
 
-@gql_from_pydantic_type(
+@gql_pydantic_type(
     BackendAIGQLMeta(
         added_version="26.3.0",
         description="Payload for user update mutation.",
     ),
+    model=UpdateUserPayloadDTO,
     name="UpdateUserV2Payload",
 )
 class UpdateUserPayloadGQL(PydanticOutputMixin[UpdateUserPayloadDTO]):
@@ -140,11 +142,12 @@ class BulkUpdateUserV2ErrorGQL:
     message: str = strawberry.field(description="Error message describing the failure.")
 
 
-@gql_from_pydantic_type(
+@gql_pydantic_type(
     BackendAIGQLMeta(
         added_version="26.3.0",
         description="Payload for bulk user update mutation.",
     ),
+    model=BulkUpdateUsersPayloadDTO,
     name="BulkUpdateUsersV2Payload",
 )
 class BulkUpdateUsersV2PayloadGQL(PydanticOutputMixin[BulkUpdateUsersPayloadDTO]):

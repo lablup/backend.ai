@@ -22,6 +22,9 @@ from ai.backend.common.dto.manager.v2.deployment.request import (
 from ai.backend.common.dto.manager.v2.deployment.response import (
     DeploymentPolicyNode as DeploymentPolicyNodeDTO,
 )
+from ai.backend.common.dto.manager.v2.deployment.response import (
+    UpdateDeploymentPolicyPayloadDTO,
+)
 from ai.backend.common.dto.manager.v2.deployment.types import (
     BlueGreenStrategySpecInfo,
     DeploymentStrategySpecInfo,
@@ -31,12 +34,11 @@ from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     PydanticInputMixin,
     gql_node_type,
-    gql_output_type,
     gql_pydantic_input,
     gql_pydantic_interface,
     gql_pydantic_type,
 )
-from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin
+from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin, PydanticOutputMixin
 from ai.backend.manager.api.gql.utils import dedent_strip
 
 # Enum defined here to avoid circular import with deployment.py
@@ -159,12 +161,13 @@ class UpdateDeploymentPolicyInputGQL:
         )
 
 
-@gql_output_type(
+@gql_pydantic_type(
     BackendAIGQLMeta(
         added_version="26.4.0",
         description="Result payload returned after creating or updating a deployment policy. Contains the full deployment_policy object reflecting the applied configuration.",
     ),
+    model=UpdateDeploymentPolicyPayloadDTO,
     name="UpdateDeploymentPolicyPayload",
 )
-class UpdateDeploymentPolicyPayloadGQL:
+class UpdateDeploymentPolicyPayloadGQL(PydanticOutputMixin[UpdateDeploymentPolicyPayloadDTO]):
     deployment_policy: DeploymentPolicyGQL

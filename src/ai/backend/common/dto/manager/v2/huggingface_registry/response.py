@@ -29,13 +29,17 @@ class HuggingFaceRegistryNode(BaseResponseModel):
 class CreateHuggingFaceRegistryPayload(BaseResponseModel):
     """Payload for HuggingFace registry creation mutation result."""
 
-    registry: HuggingFaceRegistryNode = Field(description="Created HuggingFace registry")
+    huggingface_registry: HuggingFaceRegistryNode = Field(
+        description="Created HuggingFace registry"
+    )
 
 
 class UpdateHuggingFaceRegistryPayload(BaseResponseModel):
     """Payload for HuggingFace registry update mutation result."""
 
-    registry: HuggingFaceRegistryNode = Field(description="Updated HuggingFace registry")
+    huggingface_registry: HuggingFaceRegistryNode = Field(
+        description="Updated HuggingFace registry"
+    )
 
 
 class DeleteHuggingFaceRegistryPayload(BaseResponseModel):

@@ -7,10 +7,12 @@ from __future__ import annotations
 from pydantic import Field
 
 from ai.backend.common.api_handlers import BaseResponseModel
+from ai.backend.common.dto.manager.v2.fair_share.types import ResourceSlotInfo
 
 from .types import NumberFormatInfo
 
 __all__ = (
+    "ActiveResourceOverviewInfoDTO",
     "AdminSearchAgentResourcesPayload",
     "AdminSearchResourceAllocationsPayload",
     "AdminSearchResourceSlotTypesPayload",
@@ -106,3 +108,10 @@ class AdminSearchResourceAllocationsPayload(BaseResponseModel):
     )
     has_next_page: bool = Field(description="Whether there is a next page.")
     has_previous_page: bool = Field(description="Whether there is a previous page.")
+
+
+class ActiveResourceOverviewInfoDTO(BaseResponseModel):
+    """Active resource usage overview for a domain or project."""
+
+    slots: ResourceSlotInfo = Field(description="Resource slots currently occupied")
+    session_count: int = Field(description="Number of active sessions")

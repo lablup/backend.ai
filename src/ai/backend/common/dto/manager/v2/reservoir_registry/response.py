@@ -31,13 +31,13 @@ class ReservoirRegistryNode(BaseResponseModel):
 class CreateReservoirRegistryPayload(BaseResponseModel):
     """Payload for Reservoir registry creation mutation result."""
 
-    registry: ReservoirRegistryNode = Field(description="Created Reservoir registry")
+    reservoir: ReservoirRegistryNode = Field(description="Created Reservoir registry")
 
 
 class UpdateReservoirRegistryPayload(BaseResponseModel):
     """Payload for Reservoir registry update mutation result."""
 
-    registry: ReservoirRegistryNode = Field(description="Updated Reservoir registry")
+    reservoir: ReservoirRegistryNode = Field(description="Updated Reservoir registry")
 
 
 class DeleteReservoirRegistryPayload(BaseResponseModel):

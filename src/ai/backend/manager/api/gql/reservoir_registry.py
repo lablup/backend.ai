@@ -18,7 +18,16 @@ from ai.backend.common.dto.manager.v2.reservoir_registry.request import (
 from ai.backend.common.dto.manager.v2.reservoir_registry.request import (
     UpdateReservoirRegistryInput as UpdateReservoirRegistryInputDTO,
 )
+from ai.backend.common.dto.manager.v2.reservoir_registry.response import (
+    CreateReservoirRegistryPayload as CreateReservoirRegistryPayloadDTO,
+)
+from ai.backend.common.dto.manager.v2.reservoir_registry.response import (
+    DeleteReservoirRegistryPayload as DeleteReservoirRegistryPayloadDTO,
+)
 from ai.backend.common.dto.manager.v2.reservoir_registry.response import ReservoirRegistryNode
+from ai.backend.common.dto.manager.v2.reservoir_registry.response import (
+    UpdateReservoirRegistryPayload as UpdateReservoirRegistryPayloadDTO,
+)
 from ai.backend.manager.api.gql.artifact_registry_meta import ArtifactRegistryMetaConnection
 from ai.backend.manager.api.gql.base import encode_cursor
 from ai.backend.manager.api.gql.decorators import (
@@ -26,10 +35,10 @@ from ai.backend.manager.api.gql.decorators import (
     PydanticInputMixin,
     gql_connection_type,
     gql_node_type,
-    gql_output_type,
     gql_pydantic_input,
+    gql_pydantic_type,
 )
-from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin
+from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin, PydanticOutputMixin
 from ai.backend.manager.errors.api import NotImplementedAPI
 
 from .types import StrawberryGQLContext
@@ -162,33 +171,37 @@ class DeleteReservoirRegistryInput(PydanticInputMixin[DeleteReservoirRegistryInp
     id: ID
 
 
-@gql_output_type(
+@gql_pydantic_type(
     BackendAIGQLMeta(
         added_version="25.14.0",
         description="Payload for creating a reservoir registry.",
     ),
+    model=CreateReservoirRegistryPayloadDTO,
 )
-class CreateReservoirRegistryPayload:
+class CreateReservoirRegistryPayload(PydanticOutputMixin[CreateReservoirRegistryPayloadDTO]):
     reservoir: ReservoirRegistry
 
 
-@gql_output_type(
+@gql_pydantic_type(
     BackendAIGQLMeta(
         added_version="25.14.0",
         description="Payload for updating a reservoir registry.",
     ),
+    model=UpdateReservoirRegistryPayloadDTO,
 )
-class UpdateReservoirRegistryPayload:
+class UpdateReservoirRegistryPayload(PydanticOutputMixin[UpdateReservoirRegistryPayloadDTO]):
     reservoir: ReservoirRegistry
 
 
-@gql_output_type(
+@gql_pydantic_type(
     BackendAIGQLMeta(
         added_version="25.14.0",
         description="Payload for deleting a reservoir registry.",
     ),
+    model=DeleteReservoirRegistryPayloadDTO,
+    fields=["id"],
 )
-class DeleteReservoirRegistryPayload:
+class DeleteReservoirRegistryPayload(PydanticOutputMixin[DeleteReservoirRegistryPayloadDTO]):
     id: ID
 
 
@@ -198,7 +211,7 @@ async def create_reservoir_registry(
 ) -> CreateReservoirRegistryPayload:
     result = await info.context.adapters.reservoir_registry.create(input.to_pydantic())
     return CreateReservoirRegistryPayload(
-        reservoir=ReservoirRegistry.from_pydantic(result.registry)
+        reservoir=ReservoirRegistry.from_pydantic(result.reservoir)
     )
 
 
@@ -208,7 +221,7 @@ async def update_reservoir_registry(
 ) -> UpdateReservoirRegistryPayload:
     result = await info.context.adapters.reservoir_registry.update(input.to_pydantic())
     return UpdateReservoirRegistryPayload(
-        reservoir=ReservoirRegistry.from_pydantic(result.registry)
+        reservoir=ReservoirRegistry.from_pydantic(result.reservoir)
     )
 
 

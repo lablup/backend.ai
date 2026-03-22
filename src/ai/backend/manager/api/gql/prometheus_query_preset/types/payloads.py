@@ -23,7 +23,6 @@ from ai.backend.common.dto.manager.v2.prometheus_query_preset.types import (
 )
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
-    gql_from_pydantic_type,
     gql_pydantic_type,
 )
 from ai.backend.manager.api.gql.pydantic_compat import PydanticOutputMixin
@@ -73,11 +72,12 @@ class MetricResultValueGQL(PydanticOutputMixin[MetricValueInfo]):
     pass
 
 
-@gql_from_pydantic_type(
+@gql_pydantic_type(
     BackendAIGQLMeta(
         added_version="26.3.0",
         description="Single metric result from Prometheus query.",
     ),
+    model=QueryDefinitionMetricResultInfo,
     name="QueryDefinitionMetricResult",
 )
 class MetricResultGQL(PydanticOutputMixin[QueryDefinitionMetricResultInfo]):
@@ -99,11 +99,12 @@ class MetricResultGQL(PydanticOutputMixin[QueryDefinitionMetricResultInfo]):
         )
 
 
-@gql_from_pydantic_type(
+@gql_pydantic_type(
     BackendAIGQLMeta(
         added_version="26.3.0",
         description="Result from executing a query definition.",
     ),
+    model=QueryDefinitionResultInfoDTO,
     name="QueryDefinitionExecuteResult",
 )
 class QueryDefinitionResultGQL(PydanticOutputMixin[QueryDefinitionResultInfoDTO]):

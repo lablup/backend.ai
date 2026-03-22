@@ -21,6 +21,8 @@ __all__ = (
     "ResourceOptsDTOInput",
     "ResourceOptsInfoDTO",
     "ResourceSlotTypeOrderField",
+    "ServicePortEntryInfoDTO",
+    "ServicePortsInfoDTO",
 )
 
 
@@ -81,3 +83,19 @@ class ResourceOptsInfoDTO(BaseResponseModel):
     """Resource options containing multiple key-value entries."""
 
     entries: list[ResourceOptsEntryInfoDTO] = Field(description="List of resource option entries.")
+
+
+class ServicePortEntryInfoDTO(BaseResponseModel):
+    """A single service port entry."""
+
+    name: str = Field(description="Name of the service")
+    protocol: str = Field(description="Protocol type (http, tcp, preopen, internal)")
+    container_ports: list[int] = Field(description="Port numbers inside the container")
+    host_ports: list[int | None] = Field(description="Mapped port numbers on the host")
+    is_inference: bool = Field(description="Whether this port is used for inference endpoints")
+
+
+class ServicePortsInfoDTO(BaseResponseModel):
+    """A collection of exposed service ports."""
+
+    entries: list[ServicePortEntryInfoDTO] = Field(description="List of service port entries")

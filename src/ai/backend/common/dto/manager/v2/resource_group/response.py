@@ -5,12 +5,17 @@ Response DTOs for resource group DTO v2.
 from __future__ import annotations
 
 from datetime import datetime
+from decimal import Decimal
 from typing import Any
 from uuid import UUID
 
 from pydantic import Field
 
 from ai.backend.common.api_handlers import BaseResponseModel
+from ai.backend.common.dto.manager.v2.fair_share.types import (
+    ResourceSlotInfo,
+    ResourceWeightEntryInfo,
+)
 from ai.backend.common.dto.manager.v2.resource_group.types import (
     PreemptionModeDTO,
     PreemptionOrderDTO,
@@ -21,6 +26,7 @@ __all__ = (
     "AdminSearchResourceGroupsPayload",
     "CreateResourceGroupPayload",
     "DeleteResourceGroupPayload",
+    "FairShareScalingGroupSpecInfo",
     "PreemptionConfigInfo",
     "ResourceGroupDetailNode",
     "ResourceGroupMetadataInfo",
@@ -28,6 +34,7 @@ __all__ = (
     "ResourceGroupNode",
     "ResourceGroupSchedulerConfigInfo",
     "ResourceGroupStatusInfo",
+    "ResourceInfoNode",
     "UpdateResourceGroupConfigPayloadNode",
     "UpdateResourceGroupFairShareSpecPayloadNode",
     "UpdateResourceGroupPayload",
@@ -190,3 +197,25 @@ class UpdateResourceGroupConfigPayloadNode(BaseResponseModel):
     resource_group: ResourceGroupDetailNode = Field(
         description="The updated resource group with new configuration."
     )
+
+
+class FairShareScalingGroupSpecInfo(BaseResponseModel):
+    """Fair share configuration for a resource group."""
+
+    half_life_days: int = Field(description="Half-life for exponential decay in days")
+    lookback_days: int = Field(description="Total lookback period in days")
+    decay_unit_days: int = Field(description="Granularity of decay buckets in days")
+    default_weight: Decimal = Field(
+        description="Default weight for entities without explicit weight"
+    )
+    resource_weights: list[ResourceWeightEntryInfo] = Field(
+        description="Weights for each resource type"
+    )
+
+
+class ResourceInfoNode(BaseResponseModel):
+    """Resource information for a resource group."""
+
+    capacity: ResourceSlotInfo = Field(description="Total available resources")
+    used: ResourceSlotInfo = Field(description="Currently occupied resources")
+    free: ResourceSlotInfo = Field(description="Available resources (capacity - used)")

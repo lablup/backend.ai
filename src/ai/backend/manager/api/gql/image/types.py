@@ -32,6 +32,7 @@ from ai.backend.common.dto.manager.v2.image.response import (
     ImageIdentityInfoDTO,
     ImageMetadataInfoDTO,
     ImageNode,
+    ImagePermissionInfoDTO,
     ImageRequirementsInfoDTO,
 )
 from ai.backend.common.dto.manager.v2.image.types import (
@@ -57,11 +58,14 @@ from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     gql_connection_type,
     gql_node_type,
-    gql_output_type,
     gql_pydantic_input,
     gql_pydantic_type,
 )
-from ai.backend.manager.api.gql.pydantic_compat import PydanticInputMixin, PydanticNodeMixin
+from ai.backend.manager.api.gql.pydantic_compat import (
+    PydanticInputMixin,
+    PydanticNodeMixin,
+    PydanticOutputMixin,
+)
 from ai.backend.manager.api.gql.types import GQLFilter, GQLOrderBy, StrawberryGQLContext
 from ai.backend.manager.api.gql.utils import dedent_strip
 from ai.backend.manager.data.image.types import (
@@ -232,14 +236,15 @@ class ImageV2RequirementsInfoGQL:
     )
 
 
-@gql_output_type(
+@gql_pydantic_type(
     BackendAIGQLMeta(
         added_version="26.2.0",
         description="Permission information for an image. Contains the list of permissions the current user has on this image.",
     ),
+    model=ImagePermissionInfoDTO,
     name="ImageV2PermissionInfo",
 )
-class ImageV2PermissionInfoGQL:
+class ImageV2PermissionInfoGQL(PydanticOutputMixin[ImagePermissionInfoDTO]):
     permissions: list[ImageV2PermissionGQL] = strawberry.field(
         description="List of permissions the user has on this image."
     )
