@@ -298,7 +298,7 @@ class UpdateDeploymentInput(BaseRequestModel):
     """Input for updating a deployment."""
 
     name: str | None = Field(default=None, description="Updated deployment name")
-    desired_replicas: int | None = Field(
+    desired_replica_count: int | None = Field(
         default=None, ge=0, description="Updated desired replica count"
     )
     tags: list[str] | Sentinel | None = Field(

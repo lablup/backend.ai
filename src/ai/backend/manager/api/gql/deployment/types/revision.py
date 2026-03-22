@@ -372,15 +372,9 @@ class ActivateRevisionPayloadGQL:
 @gql_pydantic_input(
     BackendAIGQLMeta(description="", added_version="25.19.0"),
 )
-class ClusterConfigInput:
+class ClusterConfigInput(PydanticInputMixin[ClusterConfigInputDTO]):
     mode: ClusterModeGQL
     size: int
-
-    def to_pydantic(self) -> ClusterConfigInputDTO:
-        return ClusterConfigInputDTO(
-            mode=CommonClusterMode(self.mode.value),
-            size=self.size,
-        )
 
 
 @gql_pydantic_input(
@@ -446,11 +440,8 @@ class ResourceConfigInput:
 @gql_pydantic_input(
     BackendAIGQLMeta(description="", added_version="25.19.0"),
 )
-class ImageInput:
+class ImageInput(PydanticInputMixin[ImageInputDTO]):
     id: ID
-
-    def to_pydantic(self) -> ImageInputDTO:
-        return ImageInputDTO(id=UUID(str(self.id)))
 
 
 @gql_pydantic_input(
@@ -486,7 +477,7 @@ class EnvironmentVariablesInputGQL(PydanticInputMixin[EnvironmentVariablesInputD
 @gql_pydantic_input(
     BackendAIGQLMeta(description="", added_version="25.19.0"),
 )
-class ModelRuntimeConfigInput:
+class ModelRuntimeConfigInput(PydanticInputMixin[ModelRuntimeConfigInputDTO]):
     runtime_variant: str
     inference_runtime_config: JSON | None = None
     environ: EnvironmentVariablesInputGQL | None = strawberry.field(
@@ -494,44 +485,22 @@ class ModelRuntimeConfigInput:
         default=None,
     )
 
-    def to_pydantic(self) -> ModelRuntimeConfigInputDTO:
-        return ModelRuntimeConfigInputDTO(
-            runtime_variant=self.runtime_variant,
-            inference_runtime_config=dict(self.inference_runtime_config)
-            if self.inference_runtime_config is not None
-            else None,
-            environ=self.environ.to_pydantic() if self.environ is not None else None,
-        )
-
 
 @gql_pydantic_input(
     BackendAIGQLMeta(description="", added_version="25.19.0"),
 )
-class ModelMountConfigInput:
+class ModelMountConfigInput(PydanticInputMixin[ModelMountConfigInputDTO]):
     vfolder_id: ID
     mount_destination: str
     definition_path: str
 
-    def to_pydantic(self) -> ModelMountConfigInputDTO:
-        return ModelMountConfigInputDTO(
-            vfolder_id=UUID(str(self.vfolder_id)),
-            mount_destination=self.mount_destination,
-            definition_path=self.definition_path,
-        )
-
 
 @gql_pydantic_input(
     BackendAIGQLMeta(description="", added_version="25.19.0"),
 )
-class ExtraVFolderMountInput:
+class ExtraVFolderMountInput(PydanticInputMixin[ExtraVFolderMountInputDTO]):
     vfolder_id: ID
     mount_destination: str | None
-
-    def to_pydantic(self) -> ExtraVFolderMountInputDTO:
-        return ExtraVFolderMountInputDTO(
-            vfolder_id=UUID(str(self.vfolder_id)),
-            mount_destination=self.mount_destination,
-        )
 
 
 @gql_pydantic_input(

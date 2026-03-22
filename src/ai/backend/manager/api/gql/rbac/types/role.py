@@ -13,8 +13,6 @@ import strawberry.relay
 from strawberry import ID, UNSET, Info
 from strawberry.relay import Connection, Edge, NodeID
 
-from ai.backend.common.api_handlers import SENTINEL
-from ai.backend.common.data.permission.types import RoleStatus
 from ai.backend.common.dto.manager.v2.rbac.request import (
     AdminSearchPermissionsGQLInput,
     AdminSearchRoleAssignmentsGQLInput,
@@ -504,18 +502,11 @@ class CreateRoleInput(PydanticInputMixin[CreateRoleInputDTO]):
 @gql_pydantic_input(
     BackendAIGQLMeta(description="Input for updating a role", added_version="26.3.0"),
 )
-class UpdateRoleInput:
+class UpdateRoleInput(PydanticInputMixin[UpdateRoleInputDTO]):
     id: uuid.UUID
     name: str | None = UNSET
     description: str | None = UNSET
     status: RoleStatusGQL | None = UNSET
-
-    def to_pydantic(self) -> UpdateRoleInputDTO:
-        return UpdateRoleInputDTO(
-            name=self.name,
-            description=SENTINEL if self.description is None else self.description,
-            status=RoleStatus(self.status.value) if self.status is not None else None,
-        )
 
 
 @gql_pydantic_input(

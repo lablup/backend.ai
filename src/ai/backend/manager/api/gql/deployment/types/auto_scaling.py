@@ -10,10 +10,9 @@ from typing import Any, Self, cast
 from uuid import UUID
 
 import strawberry
-from strawberry import ID, Info
+from strawberry import ID, UNSET, Info
 from strawberry.relay import Connection, Edge, NodeID
 
-from ai.backend.common.api_handlers import SENTINEL
 from ai.backend.common.dto.manager.v2.auto_scaling_rule.request import (
     CreateAutoScalingRuleInput as CreateAutoScalingRuleInputDTO,
 )
@@ -41,7 +40,6 @@ from ai.backend.common.dto.manager.v2.deployment.response import (
 from ai.backend.common.dto.manager.v2.deployment.response import (
     UpdateAutoScalingRulePayload as UpdateAutoScalingRulePayloadDTO,
 )
-from ai.backend.common.types import AutoScalingMetricSource as CommonAutoScalingMetricSource
 from ai.backend.manager.api.gql.base import DateTimeFilter, OrderDirection
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
@@ -177,31 +175,16 @@ class CreateAutoScalingRuleInput(PydanticInputMixin[CreateAutoScalingRuleInputDT
     ),
     name="UpdateAutoScalingRuleInput",
 )
-class UpdateAutoScalingRuleInput:
+class UpdateAutoScalingRuleInput(PydanticInputMixin[UpdateAutoScalingRuleInputDTO]):
     id: ID
-    metric_source: AutoScalingMetricSource | None = None
-    metric_name: str | None = None
-    min_threshold: Decimal | None = None
-    max_threshold: Decimal | None = None
-    step_size: int | None = None
-    time_window: int | None = None
-    min_replicas: int | None = None
-    max_replicas: int | None = None
-
-    def to_pydantic(self) -> UpdateAutoScalingRuleInputDTO:
-        return UpdateAutoScalingRuleInputDTO(
-            id=UUID(str(self.id)),
-            metric_source=None
-            if self.metric_source is None
-            else CommonAutoScalingMetricSource(self.metric_source.lower()),
-            metric_name=self.metric_name,
-            min_threshold=SENTINEL if self.min_threshold is None else self.min_threshold,
-            max_threshold=SENTINEL if self.max_threshold is None else self.max_threshold,
-            step_size=self.step_size,
-            time_window=self.time_window,
-            min_replicas=SENTINEL if self.min_replicas is None else self.min_replicas,
-            max_replicas=SENTINEL if self.max_replicas is None else self.max_replicas,
-        )
+    metric_source: AutoScalingMetricSource | None = UNSET
+    metric_name: str | None = UNSET
+    min_threshold: Decimal | None = UNSET
+    max_threshold: Decimal | None = UNSET
+    step_size: int | None = UNSET
+    time_window: int | None = UNSET
+    min_replicas: int | None = UNSET
+    max_replicas: int | None = UNSET
 
 
 @gql_pydantic_input(

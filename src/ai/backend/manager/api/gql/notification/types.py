@@ -462,7 +462,7 @@ class EmailSpecInput(PydanticInputMixin[EmailSpecInputDTO]):
     name="NotificationChannelSpecInput",
     one_of=True,
 )
-class NotificationChannelSpecInput:
+class NotificationChannelSpecInput(PydanticInputMixin[NotificationChannelSpecInputDTO]):
     webhook: WebhookSpecInput | None = UNSET
     email: EmailSpecInput | None = UNSET
 
@@ -481,16 +481,6 @@ class NotificationChannelSpecInput:
         if self.email is not None and self.email is not UNSET:
             return NotificationChannelTypeDTO.EMAIL
         raise InvalidNotificationChannelSpec("Exactly one of webhook or email must be set")
-
-    def to_pydantic(self) -> NotificationChannelSpecInputDTO:
-        return NotificationChannelSpecInputDTO(
-            webhook=self.webhook.to_pydantic()
-            if (self.webhook is not None and self.webhook is not UNSET)
-            else None,
-            email=self.email.to_pydantic()
-            if (self.email is not None and self.email is not UNSET)
-            else None,
-        )
 
 
 @gql_pydantic_input(
@@ -560,20 +550,12 @@ class CreateNotificationRuleInput(PydanticInputMixin[CreateNotificationRuleInput
 @gql_pydantic_input(
     BackendAIGQLMeta(description="Input for updating a notification rule", added_version="24.09.0"),
 )
-class UpdateNotificationRuleInput:
+class UpdateNotificationRuleInput(PydanticInputMixin[UpdateNotificationRuleInputDTO]):
     id: ID
     name: str | None = UNSET
     description: str | None = UNSET
     message_template: str | None = UNSET
     enabled: bool | None = UNSET
-
-    def to_pydantic(self) -> UpdateNotificationRuleInputDTO:
-        return UpdateNotificationRuleInputDTO(
-            name=None if self.name is UNSET else self.name,
-            description=SENTINEL if self.description is UNSET else self.description,
-            message_template=None if self.message_template is UNSET else self.message_template,
-            enabled=None if self.enabled is UNSET else self.enabled,
-        )
 
 
 @gql_pydantic_input(

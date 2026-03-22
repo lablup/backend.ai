@@ -8,10 +8,9 @@ from typing import Any, Self, cast
 from uuid import UUID
 
 import strawberry
-from strawberry import ID, Info
+from strawberry import ID, UNSET, Info
 from strawberry.relay import Connection, Edge, NodeID, PageInfo
 
-from ai.backend.common.api_handlers import SENTINEL
 from ai.backend.common.data.model_deployment.types import (
     DeploymentStrategy,
     ModelDeploymentStatus,
@@ -604,31 +603,15 @@ class CreateDeploymentInput(PydanticInputMixin[CreateDeploymentInputDTO]):
 @gql_pydantic_input(
     BackendAIGQLMeta(description="", added_version="25.19.0"),
 )
-class UpdateDeploymentInput:
+class UpdateDeploymentInput(PydanticInputMixin[UpdateDeploymentInputDTO]):
     id: ID
-    open_to_public: bool | None = None
-    tags: list[str] | None = None
-    default_deployment_strategy: DeploymentStrategyInputGQL | None = None
-    active_revision_id: ID | None = None
-    desired_replica_count: int | None = None
-    name: str | None = None
-    preferred_domain_name: str | None = None
-
-    def to_pydantic(self) -> UpdateDeploymentInputDTO:
-        strategy_dto: DeploymentStrategyInputDTO | None = None
-        if self.default_deployment_strategy is not None:
-            strategy_dto = self.default_deployment_strategy.to_pydantic()
-        return UpdateDeploymentInputDTO(
-            name=self.name,
-            desired_replicas=self.desired_replica_count,
-            tags=SENTINEL if self.tags is None else self.tags,
-            open_to_public=self.open_to_public,
-            preferred_domain_name=self.preferred_domain_name,
-            active_revision_id=UUID(str(self.active_revision_id))
-            if self.active_revision_id is not None
-            else None,
-            default_deployment_strategy=strategy_dto,
-        )
+    open_to_public: bool | None = UNSET
+    tags: list[str] | None = UNSET
+    default_deployment_strategy: DeploymentStrategyInputGQL | None = UNSET
+    active_revision_id: ID | None = UNSET
+    desired_replica_count: int | None = UNSET
+    name: str | None = UNSET
+    preferred_domain_name: str | None = UNSET
 
 
 @gql_pydantic_input(

@@ -330,8 +330,9 @@ def _convert_value(value: Any, type_hint: Any) -> Any:
 def _to_pydantic_kwargs(gql_instance: Any, dto_cls: type) -> dict[str, Any]:
     """Build DTO constructor kwargs from a GQL input instance.
 
-    Skips UNSET values, converts strawberry.ID → UUID, enums, and nested
-    PydanticInputMixin instances recursively.
+    Skips UNSET values and GQL-only fields not present in the DTO.
+    Converts strawberry.ID → UUID, enums, and nested PydanticInputMixin
+    instances recursively.
     """
     dto_hints = get_type_hints(dto_cls, include_extras=True)
     kwargs: dict[str, Any] = {}
@@ -339,6 +340,8 @@ def _to_pydantic_kwargs(gql_instance: Any, dto_cls: type) -> dict[str, Any]:
         field_name = field.name
         value = getattr(gql_instance, field_name)
         if value is UNSET:
+            continue
+        if field_name not in dto_hints:
             continue
         dto_hint = dto_hints.get(field_name)
         kwargs[field_name] = _convert_input_value(value, dto_hint)

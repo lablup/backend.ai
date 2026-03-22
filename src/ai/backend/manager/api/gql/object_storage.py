@@ -8,7 +8,6 @@ import strawberry
 from strawberry import ID, UNSET, Info
 from strawberry.relay import Connection, Edge, NodeID
 
-from ai.backend.common.api_handlers import SENTINEL
 from ai.backend.common.dto.manager.v2.object_storage.request import (
     AdminSearchObjectStoragesInput,
 )
@@ -191,7 +190,7 @@ class CreateObjectStorageInput(PydanticInputMixin[CreateObjectStorageInputDTO]):
 @gql_pydantic_input(
     BackendAIGQLMeta(description="", added_version="25.14.0"),
 )
-class UpdateObjectStorageInput:
+class UpdateObjectStorageInput(PydanticInputMixin[UpdateObjectStorageInputDTO]):
     id: ID
     name: str | None = UNSET
     host: str | None = UNSET
@@ -199,17 +198,6 @@ class UpdateObjectStorageInput:
     secret_key: str | None = UNSET
     endpoint: str | None = UNSET
     region: str | None = UNSET
-
-    def to_pydantic(self) -> UpdateObjectStorageInputDTO:
-        return UpdateObjectStorageInputDTO(
-            id=uuid.UUID(self.id),
-            name=None if self.name is UNSET else self.name,
-            host=None if self.host is UNSET else self.host,
-            access_key=None if self.access_key is UNSET else self.access_key,
-            secret_key=None if self.secret_key is UNSET else self.secret_key,
-            endpoint=None if self.endpoint is UNSET else self.endpoint,
-            region=SENTINEL if self.region is UNSET else self.region,
-        )
 
 
 @gql_pydantic_input(

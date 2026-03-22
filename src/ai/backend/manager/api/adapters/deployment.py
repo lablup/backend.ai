@@ -455,9 +455,9 @@ class DeploymentAdapter(BaseAdapter):
                 tag=TriState[str].from_graphql(tag_str),
             )
         replica_spec: ReplicaSpecUpdaterSpec | None = None
-        if input.desired_replicas is not None:
+        if input.desired_replica_count is not None:
             replica_spec = ReplicaSpecUpdaterSpec(
-                desired_replica_count=OptionalState.update(input.desired_replicas),
+                desired_replica_count=OptionalState.update(input.desired_replica_count),
             )
         network_spec: DeploymentNetworkSpecUpdaterSpec | None = None
         if input.open_to_public is not None:

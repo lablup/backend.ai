@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from datetime import datetime
-from uuid import UUID
 
 import strawberry
 from strawberry import ID
@@ -144,21 +143,12 @@ class BlueGreenConfigInputGQL(PydanticInputMixin[BlueGreenConfigInputDTO]):
     ),
     name="UpdateDeploymentPolicyInput",
 )
-class UpdateDeploymentPolicyInputGQL:
+class UpdateDeploymentPolicyInputGQL(PydanticInputMixin[UpsertDeploymentPolicyInputDTO]):
     deployment_id: ID
     strategy: DeploymentStrategyTypeGQL
     rollback_on_failure: bool = False
     rolling_update: RollingUpdateConfigInputGQL | None = None
     blue_green: BlueGreenConfigInputGQL | None = None
-
-    def to_pydantic(self) -> UpsertDeploymentPolicyInputDTO:
-        return UpsertDeploymentPolicyInputDTO(
-            deployment_id=UUID(str(self.deployment_id)),
-            strategy=self.strategy,
-            rollback_on_failure=self.rollback_on_failure,
-            rolling_update=self.rolling_update.to_pydantic() if self.rolling_update else None,
-            blue_green=self.blue_green.to_pydantic() if self.blue_green else None,
-        )
 
 
 @gql_pydantic_type(
