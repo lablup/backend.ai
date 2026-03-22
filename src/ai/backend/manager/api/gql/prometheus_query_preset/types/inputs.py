@@ -7,7 +7,6 @@ from datetime import datetime
 import strawberry
 from strawberry import UNSET
 
-from ai.backend.common.api_handlers import SENTINEL
 from ai.backend.common.dto.clients.prometheus.request import QueryTimeRange
 from ai.backend.common.dto.manager.v2.prometheus_query_preset.request import (
     CreateQueryDefinitionInput as CreateQueryDefinitionInputDTO,
@@ -67,34 +66,37 @@ class CreateQueryDefinitionInput(PydanticInputMixin[CreateQueryDefinitionInputDT
 
 @gql_pydantic_input(
     BackendAIGQLMeta(
+        description="Options for modifying an existing query definition.", added_version="26.3.0"
+    ),
+    name="ModifyQueryDefinitionOptionsInput",
+)
+class ModifyQueryDefinitionOptionsInputGQL(
+    PydanticInputMixin[ModifyQueryDefinitionOptionsInputDTO]
+):
+    filter_labels: list[str] | None = strawberry.field(
+        default=None, description="Allowed filter label keys."
+    )
+    group_labels: list[str] | None = strawberry.field(
+        default=None, description="Allowed group-by label keys."
+    )
+
+
+@gql_pydantic_input(
+    BackendAIGQLMeta(
         description="Input for modifying an existing query definition.", added_version="26.3.0"
     ),
     name="ModifyQueryDefinitionInput",
 )
-class ModifyQueryDefinitionInput:
+class ModifyQueryDefinitionInput(PydanticInputMixin[ModifyQueryDefinitionInputDTO]):
     name: str | None = strawberry.field(default=UNSET, description="New name.")
     metric_name: str | None = strawberry.field(default=UNSET, description="New metric name.")
     query_template: str | None = strawberry.field(default=UNSET, description="New PromQL template.")
     time_window: str | None = strawberry.field(
         default=UNSET, description="New default time window."
     )
-    options: QueryDefinitionOptionsInput | None = strawberry.field(
+    options: ModifyQueryDefinitionOptionsInputGQL | None = strawberry.field(
         default=UNSET, description="New query definition options."
     )
-
-    def to_pydantic(self) -> ModifyQueryDefinitionInputDTO:
-        return ModifyQueryDefinitionInputDTO(
-            name=None if self.name is UNSET else self.name,
-            metric_name=None if self.metric_name is UNSET else self.metric_name,
-            query_template=None if self.query_template is UNSET else self.query_template,
-            time_window=SENTINEL if self.time_window is UNSET else self.time_window,
-            options=None
-            if (self.options is UNSET or self.options is None)
-            else ModifyQueryDefinitionOptionsInputDTO(
-                filter_labels=self.options.filter_labels,
-                group_labels=self.options.group_labels,
-            ),
-        )
 
 
 @gql_pydantic_input(
