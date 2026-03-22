@@ -14,9 +14,6 @@ from strawberry import ID, Info
 from strawberry.relay import Connection, Edge, NodeID
 from strawberry.scalars import JSON
 
-from ai.backend.common.data.model_deployment.types import (
-    RouteTrafficStatus as RouteTrafficStatusCommon,
-)
 from ai.backend.common.dto.manager.v2.deployment.request import (
     RouteFilter as RouteFilterDTO,
 )
@@ -271,17 +268,11 @@ def get_route_pagination_spec() -> PaginationSpec:
     ),
     name="UpdateRouteTrafficStatusInput",
 )
-class UpdateRouteTrafficStatusInputGQL:
+class UpdateRouteTrafficStatusInputGQL(PydanticInputMixin[UpdateRouteTrafficStatusInputDTO]):
     route_id: ID = strawberry.field(description="The ID of the route to update.")
     traffic_status: RouteTrafficStatusGQL = strawberry.field(
         description="The new traffic status (ACTIVE/INACTIVE)."
     )
-
-    def to_pydantic(self) -> UpdateRouteTrafficStatusInputDTO:
-        return UpdateRouteTrafficStatusInputDTO(
-            route_id=UUID(self.route_id),
-            traffic_status=RouteTrafficStatusCommon(self.traffic_status.value),
-        )
 
 
 @gql_pydantic_type(

@@ -95,27 +95,6 @@ from ai.backend.common.dto.manager.v2.artifact.response import (
     SourceInfoDTO,
     UpdateArtifactGQLPayload,
 )
-from ai.backend.common.dto.manager.v2.artifact.types import (
-    ArtifactAvailability as ArtifactAvailabilityDTO,
-)
-from ai.backend.common.dto.manager.v2.artifact.types import (
-    ArtifactOrderField as ArtifactOrderFieldDTO,
-)
-from ai.backend.common.dto.manager.v2.artifact.types import (
-    ArtifactRemoteStatus as ArtifactRemoteStatusDTO,
-)
-from ai.backend.common.dto.manager.v2.artifact.types import (
-    ArtifactRevisionOrderField as ArtifactRevisionOrderFieldDTO,
-)
-from ai.backend.common.dto.manager.v2.artifact.types import (
-    ArtifactStatus as ArtifactStatusDTO,
-)
-from ai.backend.common.dto.manager.v2.artifact.types import (
-    ArtifactType as ArtifactTypeDTO,
-)
-from ai.backend.common.dto.manager.v2.artifact.types import (
-    OrderDirection as OrderDirectionDTO,
-)
 from ai.backend.manager.api.gql.base import (
     ByteSize,
     IntFilter,
@@ -305,7 +284,7 @@ class ArtifactVerificationGQLResult(PydanticOutputMixin[ArtifactVerificationGQLR
     ),
     name="ArtifactFilter",
 )
-class ArtifactFilter:
+class ArtifactFilter(PydanticInputMixin[ArtifactGQLFilterInputDTO]):
     type: list[ArtifactType] | None = None
     name: StringFilter | None = None
     registry: StringFilter | None = None
@@ -316,23 +295,6 @@ class ArtifactFilter:
     OR: list[Self] | None = None
     NOT: list[Self] | None = None
 
-    def to_pydantic(self) -> ArtifactGQLFilterInputDTO:
-        """Convert to pydantic DTO for adapter layer processing."""
-        return ArtifactGQLFilterInputDTO(
-            type=[ArtifactTypeDTO(t.value) for t in self.type] if self.type else None,
-            name=self.name.to_pydantic() if self.name else None,
-            registry=self.registry.to_pydantic() if self.registry else None,
-            source=self.source.to_pydantic() if self.source else None,
-            availability=(
-                [ArtifactAvailabilityDTO(a.value) for a in self.availability]
-                if self.availability
-                else None
-            ),
-            AND=[f.to_pydantic() for f in self.AND] if self.AND else None,
-            OR=[f.to_pydantic() for f in self.OR] if self.OR else None,
-            NOT=[f.to_pydantic() for f in self.NOT] if self.NOT else None,
-        )
-
 
 @gql_pydantic_input(
     BackendAIGQLMeta(description="", added_version="24.09.0"),
@@ -340,16 +302,9 @@ class ArtifactFilter:
     Specifies the field and direction for ordering artifacts in queries.
     """),
 )
-class ArtifactOrderBy(GQLOrderBy):
+class ArtifactOrderBy(PydanticInputMixin[ArtifactGQLOrderByInputDTO], GQLOrderBy):
     field: ArtifactOrderField
     direction: OrderDirection = OrderDirection.ASC
-
-    def to_pydantic(self) -> ArtifactGQLOrderByInputDTO:
-        """Convert to pydantic DTO for adapter layer processing."""
-        return ArtifactGQLOrderByInputDTO(
-            field=ArtifactOrderFieldDTO(self.field.value),
-            direction=OrderDirectionDTO(self.direction.value),
-        )
 
 
 @gql_pydantic_input(
@@ -358,31 +313,17 @@ class ArtifactOrderBy(GQLOrderBy):
     Filter for artifact revision status. Supports exact match or inclusion in a list of statuses.
     """),
 )
-class ArtifactRevisionStatusFilter:
+class ArtifactRevisionStatusFilter(PydanticInputMixin[ArtifactRevisionStatusFilterDTO]):
     in_: list[ArtifactStatus] | None = strawberry.field(name="in", default=None)
     equals: ArtifactStatus | None = None
-
-    def to_pydantic(self) -> ArtifactRevisionStatusFilterDTO:
-        """Convert to pydantic DTO for adapter layer processing."""
-        return ArtifactRevisionStatusFilterDTO(
-            in_=[ArtifactStatusDTO(s.value) for s in self.in_] if self.in_ else None,
-            equals=ArtifactStatusDTO(self.equals.value) if self.equals else None,
-        )
 
 
 @gql_pydantic_input(
     BackendAIGQLMeta(description="", added_version="25.16.0"),
 )
-class ArtifactRevisionRemoteStatusFilter:
+class ArtifactRevisionRemoteStatusFilter(PydanticInputMixin[ArtifactRevisionRemoteStatusFilterDTO]):
     in_: list[ArtifactRemoteStatus] | None = strawberry.field(name="in", default=None)
     equals: ArtifactRemoteStatus | None = None
-
-    def to_pydantic(self) -> ArtifactRevisionRemoteStatusFilterDTO:
-        """Convert to pydantic DTO for adapter layer processing."""
-        return ArtifactRevisionRemoteStatusFilterDTO(
-            in_=[ArtifactRemoteStatusDTO(s.value) for s in self.in_] if self.in_ else None,
-            equals=ArtifactRemoteStatusDTO(self.equals.value) if self.equals else None,
-        )
 
 
 @gql_pydantic_input(
@@ -396,7 +337,7 @@ class ArtifactRevisionRemoteStatusFilter:
     ),
     name="ArtifactRevisionFilter",
 )
-class ArtifactRevisionFilter:
+class ArtifactRevisionFilter(PydanticInputMixin[ArtifactRevisionGQLFilterInputDTO]):
     status: ArtifactRevisionStatusFilter | None = None
     remote_status: ArtifactRevisionRemoteStatusFilter | None = strawberry.field(
         default=None, description="Added in 25.16.0"
@@ -409,18 +350,6 @@ class ArtifactRevisionFilter:
     OR: list[Self] | None = None
     NOT: list[Self] | None = None
 
-    def to_pydantic(self) -> ArtifactRevisionGQLFilterInputDTO:
-        return ArtifactRevisionGQLFilterInputDTO(
-            status=self.status.to_pydantic() if self.status else None,
-            remote_status=self.remote_status.to_pydantic() if self.remote_status else None,
-            version=self.version.to_pydantic() if self.version else None,
-            artifact_id=self.artifact_id.to_pydantic() if self.artifact_id else None,
-            size=self.size.to_pydantic() if self.size else None,
-            AND=[f.to_pydantic() for f in self.AND] if self.AND else None,
-            OR=[f.to_pydantic() for f in self.OR] if self.OR else None,
-            NOT=[f.to_pydantic() for f in self.NOT] if self.NOT else None,
-        )
-
 
 @gql_pydantic_input(
     BackendAIGQLMeta(description="", added_version="24.09.0"),
@@ -428,16 +357,9 @@ class ArtifactRevisionFilter:
     Specifies the field and direction for ordering artifact revisions in queries.
     """),
 )
-class ArtifactRevisionOrderBy(GQLOrderBy):
+class ArtifactRevisionOrderBy(PydanticInputMixin[ArtifactRevisionGQLOrderByInputDTO], GQLOrderBy):
     field: ArtifactRevisionOrderField
     direction: OrderDirection = OrderDirection.ASC
-
-    def to_pydantic(self) -> ArtifactRevisionGQLOrderByInputDTO:
-        """Convert to pydantic DTO for adapter layer processing."""
-        return ArtifactRevisionGQLOrderByInputDTO(
-            field=ArtifactRevisionOrderFieldDTO(self.field.value),
-            direction=OrderDirectionDTO(self.direction.value),
-        )
 
 
 @gql_pydantic_input(

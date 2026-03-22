@@ -9,11 +9,7 @@ import strawberry
 
 from ai.backend.common.dto.manager.v2.user.request import UserFilter, UserOrder
 from ai.backend.common.dto.manager.v2.user.types import (
-    OrderDirection as OrderDirectionDTO,
-)
-from ai.backend.common.dto.manager.v2.user.types import (
     UserDomainFilter,
-    UserOrderField,
     UserProjectFilter,
     UserRoleFilter,
     UserStatusFilter,
@@ -147,30 +143,8 @@ class UserOrderFieldGQL(StrEnum):
     ),
     name="UserV2OrderBy",
 )
-class UserOrderByGQL:
+class UserOrderByGQL(PydanticInputMixin[UserOrder]):
     """OrderBy for user queries."""
 
     field: UserOrderFieldGQL = UserOrderFieldGQL.CREATED_AT
     direction: OrderDirection = OrderDirection.DESC
-
-    def to_pydantic(self) -> UserOrder:
-        direction = (
-            OrderDirectionDTO.ASC
-            if self.direction == OrderDirection.ASC
-            else OrderDirectionDTO.DESC
-        )
-        match self.field:
-            case UserOrderFieldGQL.CREATED_AT:
-                return UserOrder(field=UserOrderField.CREATED_AT, direction=direction)
-            case UserOrderFieldGQL.MODIFIED_AT:
-                return UserOrder(field=UserOrderField.MODIFIED_AT, direction=direction)
-            case UserOrderFieldGQL.USERNAME:
-                return UserOrder(field=UserOrderField.USERNAME, direction=direction)
-            case UserOrderFieldGQL.EMAIL:
-                return UserOrder(field=UserOrderField.EMAIL, direction=direction)
-            case UserOrderFieldGQL.STATUS:
-                return UserOrder(field=UserOrderField.STATUS, direction=direction)
-            case UserOrderFieldGQL.DOMAIN_NAME:
-                return UserOrder(field=UserOrderField.DOMAIN_NAME, direction=direction)
-            case UserOrderFieldGQL.PROJECT_NAME:
-                return UserOrder(field=UserOrderField.PROJECT_NAME, direction=direction)

@@ -135,8 +135,8 @@ class AgentAdapter(BaseAdapter):
             conditions.extend(self._convert_status_filter(f.status))
         if f.schedulable is not None:
             conditions.append(AgentConditions.by_schedulable(f.schedulable))
-        if f.resource_group is not None:
-            condition = self._convert_scaling_group_filter(f.resource_group)
+        if f.scaling_group is not None:
+            condition = self._convert_scaling_group_filter(f.scaling_group)
             if condition is not None:
                 conditions.append(condition)
         if f.AND:

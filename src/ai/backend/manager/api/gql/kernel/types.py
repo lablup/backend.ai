@@ -24,12 +24,7 @@ from ai.backend.common.dto.manager.v2.kernel.response import (
     ResourceAllocationGQLDTO,
 )
 from ai.backend.common.dto.manager.v2.kernel.types import (
-    KernelOrderField,
-    KernelStatusEnum,
     KernelStatusFilter,
-)
-from ai.backend.common.dto.manager.v2.kernel.types import (
-    OrderDirection as OrderDirectionDTO,
 )
 from ai.backend.common.types import AgentId, KernelId, SessionTypes
 from ai.backend.manager.api.gql.base import OrderDirection, UUIDFilter
@@ -153,15 +148,9 @@ class KernelV2OrderFieldGQL(StrEnum):
     BackendAIGQLMeta(description="Filter for kernel status.", added_version="26.2.0"),
     name="KernelV2StatusFilter",
 )
-class KernelV2StatusFilterGQL:
+class KernelV2StatusFilterGQL(PydanticInputMixin[KernelStatusFilter]):
     in_: list[KernelV2StatusGQL] | None = strawberry.field(name="in", default=None)
     not_in: list[KernelV2StatusGQL] | None = None
-
-    def to_pydantic(self) -> KernelStatusFilter:
-        return KernelStatusFilter(
-            in_=[KernelStatusEnum(s) for s in self.in_] if self.in_ else None,
-            not_in=[KernelStatusEnum(s) for s in self.not_in] if self.not_in else None,
-        )
 
 
 @gql_pydantic_input(
@@ -185,26 +174,9 @@ class KernelV2FilterGQL(PydanticInputMixin[KernelFilter]):
     BackendAIGQLMeta(description="Ordering specification for kernels.", added_version="26.2.0"),
     name="KernelV2OrderBy",
 )
-class KernelV2OrderByGQL:
+class KernelV2OrderByGQL(PydanticInputMixin[KernelOrder]):
     field: KernelV2OrderFieldGQL
     direction: OrderDirection = OrderDirection.DESC
-
-    def to_pydantic(self) -> KernelOrder:
-        ascending = self.direction == OrderDirection.ASC
-        direction = OrderDirectionDTO.ASC if ascending else OrderDirectionDTO.DESC
-        match self.field:
-            case KernelV2OrderFieldGQL.CREATED_AT:
-                return KernelOrder(field=KernelOrderField.CREATED_AT, direction=direction)
-            case KernelV2OrderFieldGQL.TERMINATED_AT:
-                return KernelOrder(field=KernelOrderField.TERMINATED_AT, direction=direction)
-            case KernelV2OrderFieldGQL.STATUS:
-                return KernelOrder(field=KernelOrderField.STATUS, direction=direction)
-            case KernelV2OrderFieldGQL.CLUSTER_MODE:
-                return KernelOrder(field=KernelOrderField.CLUSTER_MODE, direction=direction)
-            case KernelV2OrderFieldGQL.CLUSTER_HOSTNAME:
-                return KernelOrder(field=KernelOrderField.CLUSTER_HOSTNAME, direction=direction)
-            case KernelV2OrderFieldGQL.CLUSTER_IDX:
-                return KernelOrder(field=KernelOrderField.CLUSTER_IDX, direction=direction)
 
 
 # ========== Kernel Sub-Info Types ==========

@@ -17,7 +17,7 @@ _OrderColumn = sa.ColumnElement[Any] | InstrumentedAttribute[Any]
 ORDER_FIELD_MAP: dict[AgentOrderField, _OrderColumn] = {
     AgentOrderField.ID: AgentRow.id,
     AgentOrderField.STATUS: AgentRow.status,
-    AgentOrderField.RESOURCE_GROUP: AgentRow.scaling_group,
+    AgentOrderField.SCALING_GROUP: AgentRow.scaling_group,
     AgentOrderField.FIRST_CONTACT: AgentRow.first_contact,
     AgentOrderField.SCHEDULABLE: AgentRow.schedulable,
 }

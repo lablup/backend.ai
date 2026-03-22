@@ -10,6 +10,7 @@ import enum
 import uuid
 from collections.abc import Iterable
 from datetime import datetime
+from enum import StrEnum
 from typing import Any, Self, cast
 
 import strawberry
@@ -39,12 +40,6 @@ from ai.backend.common.dto.manager.v2.image.types import (
     ImageLabelInfo,
     ImageResourceLimitGQLInfo,
     ImageTagInfo,
-)
-from ai.backend.common.dto.manager.v2.image.types import (
-    ImageOrderField as ImageOrderFieldDTO,
-)
-from ai.backend.common.dto.manager.v2.image.types import (
-    OrderDirection as OrderDirectionDTO,
 )
 from ai.backend.common.types import ImageID
 from ai.backend.manager.api.gql.base import (
@@ -521,10 +516,10 @@ class ImageV2FilterGQL(PydanticInputMixin[ImageFilterInputDTO], GQLFilter):
     Fields available for ordering image queries.
     """),
 )
-class ImageV2OrderFieldGQL(enum.Enum):
-    NAME = "NAME"
-    CREATED_AT = "CREATED_AT"
-    LAST_USED = "LAST_USED"
+class ImageV2OrderFieldGQL(StrEnum):
+    NAME = "name"
+    CREATED_AT = "created_at"
+    LAST_USED = "last_used"
 
 
 @gql_pydantic_input(
@@ -533,16 +528,9 @@ class ImageV2OrderFieldGQL(enum.Enum):
         added_version="26.2.0",
     ),
 )
-class ImageV2OrderByGQL(GQLOrderBy):
+class ImageV2OrderByGQL(PydanticInputMixin[ImageOrderByInputDTO], GQLOrderBy):
     field: ImageV2OrderFieldGQL
     direction: OrderDirection = OrderDirection.ASC
-
-    def to_pydantic(self) -> ImageOrderByInputDTO:
-        """Convert to pydantic DTO for adapter layer processing."""
-        return ImageOrderByInputDTO(
-            field=ImageOrderFieldDTO(self.field.value.lower()),
-            direction=OrderDirectionDTO(self.direction.value),
-        )
 
 
 # =============================================================================
@@ -595,8 +583,8 @@ class ImageV2AliasFilterGQL(PydanticInputMixin[ImageAliasFilterInputDTO], GQLFil
     Fields available for ordering image alias queries.
     """),
 )
-class ImageV2AliasOrderFieldGQL(enum.Enum):
-    ALIAS = "ALIAS"
+class ImageV2AliasOrderFieldGQL(StrEnum):
+    ALIAS = "alias"
 
 
 @gql_pydantic_input(
@@ -605,13 +593,6 @@ class ImageV2AliasOrderFieldGQL(enum.Enum):
         added_version="26.2.0",
     ),
 )
-class ImageV2AliasOrderByGQL(GQLOrderBy):
+class ImageV2AliasOrderByGQL(PydanticInputMixin[ImageAliasOrderByInputDTO], GQLOrderBy):
     field: ImageV2AliasOrderFieldGQL
     direction: OrderDirection = OrderDirection.ASC
-
-    def to_pydantic(self) -> ImageAliasOrderByInputDTO:
-        """Convert to pydantic DTO for adapter layer processing."""
-        return ImageAliasOrderByInputDTO(
-            field=self.field.value.lower(),
-            direction=OrderDirectionDTO(self.direction.value),
-        )

@@ -10,12 +10,8 @@ import strawberry
 from ai.backend.common.dto.manager.v2.group.request import GroupFilter, GroupOrder
 from ai.backend.common.dto.manager.v2.group.types import (
     GroupDomainFilter,
-    GroupOrderField,
     GroupUserFilter,
     ProjectTypeFilter,
-)
-from ai.backend.common.dto.manager.v2.group.types import (
-    OrderDirection as OrderDirectionDTO,
 )
 from ai.backend.manager.api.gql.base import (
     DateTimeFilter,
@@ -133,32 +129,8 @@ class ProjectV2OrderField(StrEnum):
     ),
     name="ProjectV2OrderBy",
 )
-class ProjectV2OrderBy:
+class ProjectV2OrderBy(PydanticInputMixin[GroupOrder]):
     """OrderBy for project queries."""
 
     field: ProjectV2OrderField = ProjectV2OrderField.CREATED_AT
     direction: OrderDirection = OrderDirection.DESC
-
-    def to_pydantic(self) -> GroupOrder:
-        direction = (
-            OrderDirectionDTO.ASC
-            if self.direction == OrderDirection.ASC
-            else OrderDirectionDTO.DESC
-        )
-        match self.field:
-            case ProjectV2OrderField.CREATED_AT:
-                return GroupOrder(field=GroupOrderField.CREATED_AT, direction=direction)
-            case ProjectV2OrderField.MODIFIED_AT:
-                return GroupOrder(field=GroupOrderField.MODIFIED_AT, direction=direction)
-            case ProjectV2OrderField.NAME:
-                return GroupOrder(field=GroupOrderField.NAME, direction=direction)
-            case ProjectV2OrderField.IS_ACTIVE:
-                return GroupOrder(field=GroupOrderField.IS_ACTIVE, direction=direction)
-            case ProjectV2OrderField.TYPE:
-                return GroupOrder(field=GroupOrderField.TYPE, direction=direction)
-            case ProjectV2OrderField.DOMAIN_NAME:
-                return GroupOrder(field=GroupOrderField.DOMAIN_NAME, direction=direction)
-            case ProjectV2OrderField.USER_USERNAME:
-                return GroupOrder(field=GroupOrderField.USER_USERNAME, direction=direction)
-            case ProjectV2OrderField.USER_EMAIL:
-                return GroupOrder(field=GroupOrderField.USER_EMAIL, direction=direction)

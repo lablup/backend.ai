@@ -22,12 +22,8 @@ from ai.backend.common.dto.manager.v2.agent.response import (
     ComputePluginsGQLDTO,
 )
 from ai.backend.common.dto.manager.v2.agent.types import (
-    AgentOrderField,
     AgentStatusEnum,
     AgentStatusFilter,
-)
-from ai.backend.common.dto.manager.v2.agent.types import (
-    OrderDirection as OrderDirectionDTO,
 )
 from ai.backend.common.types import AgentId
 from ai.backend.manager.api.gql.base import OrderDirection, StringFilter
@@ -38,7 +34,7 @@ from ai.backend.manager.api.gql.decorators import (
     gql_pydantic_input,
     gql_pydantic_type,
 )
-from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin
+from ai.backend.manager.api.gql.pydantic_compat import PydanticInputMixin, PydanticNodeMixin
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.api.gql.utils import dedent_strip
 from ai.backend.manager.data.agent.types import AgentStatus
@@ -105,22 +101,16 @@ class AgentOrderFieldGQL(StrEnum):
         It includes options to filter whether agent status is in a specific list or equals a specific value.
     """),
 )
-class AgentStatusFilterGQL:
-    in_: list[AgentStatus] | None = strawberry.field(name="in", default=None)
-    equals: AgentStatus | None = None
-
-    def to_pydantic(self) -> AgentStatusFilter:
-        return AgentStatusFilter(
-            in_=[AgentStatusEnum(s.name) for s in self.in_] if self.in_ else None,
-            equals=AgentStatusEnum(self.equals.name) if self.equals else None,
-        )
+class AgentStatusFilterGQL(PydanticInputMixin[AgentStatusFilter]):
+    in_: list[AgentStatusEnum] | None = strawberry.field(name="in", default=None)
+    equals: AgentStatusEnum | None = None
 
 
 @gql_pydantic_input(
     BackendAIGQLMeta(description="Filter options for querying agents", added_version="26.1.0"),
     name="AgentFilter",
 )
-class AgentFilterGQL:
+class AgentFilterGQL(PydanticInputMixin[AgentFilter]):
     id: StringFilter | None = None
     status: AgentStatusFilterGQL | None = None
     schedulable: bool | None = None
@@ -130,40 +120,14 @@ class AgentFilterGQL:
     OR: list[Self] | None = None
     NOT: list[Self] | None = None
 
-    def to_pydantic(self) -> AgentFilter:
-        return AgentFilter(
-            id=self.id.to_pydantic() if self.id else None,
-            status=self.status.to_pydantic() if self.status else None,
-            schedulable=self.schedulable,
-            resource_group=self.scaling_group.to_pydantic() if self.scaling_group else None,
-            AND=[f.to_pydantic() for f in self.AND] if self.AND else None,
-            OR=[f.to_pydantic() for f in self.OR] if self.OR else None,
-            NOT=[f.to_pydantic() for f in self.NOT] if self.NOT else None,
-        )
-
 
 @gql_pydantic_input(
     BackendAIGQLMeta(description="Options for ordering agents", added_version="26.1.0"),
     name="AgentOrderBy",
 )
-class AgentOrderByGQL:
+class AgentOrderByGQL(PydanticInputMixin[AgentOrder]):
     field: AgentOrderFieldGQL
     direction: OrderDirection = OrderDirection.ASC
-
-    def to_pydantic(self) -> AgentOrder:
-        ascending = self.direction == OrderDirection.ASC
-        dto_direction = OrderDirectionDTO.ASC if ascending else OrderDirectionDTO.DESC
-        match self.field:
-            case AgentOrderFieldGQL.ID:
-                return AgentOrder(field=AgentOrderField.ID, direction=dto_direction)
-            case AgentOrderFieldGQL.STATUS:
-                return AgentOrder(field=AgentOrderField.STATUS, direction=dto_direction)
-            case AgentOrderFieldGQL.FIRST_CONTACT:
-                return AgentOrder(field=AgentOrderField.FIRST_CONTACT, direction=dto_direction)
-            case AgentOrderFieldGQL.SCALING_GROUP:
-                return AgentOrder(field=AgentOrderField.RESOURCE_GROUP, direction=dto_direction)
-            case AgentOrderFieldGQL.SCHEDULABLE:
-                return AgentOrder(field=AgentOrderField.SCHEDULABLE, direction=dto_direction)
 
 
 @gql_pydantic_type(

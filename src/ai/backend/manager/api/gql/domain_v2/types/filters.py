@@ -9,12 +9,8 @@ import strawberry
 
 from ai.backend.common.dto.manager.v2.domain.request import DomainFilter, DomainOrder
 from ai.backend.common.dto.manager.v2.domain.types import (
-    DomainOrderField,
     DomainProjectFilter,
     DomainUserFilter,
-)
-from ai.backend.common.dto.manager.v2.domain.types import (
-    OrderDirection as OrderDirectionDTO,
 )
 from ai.backend.manager.api.gql.base import (
     DateTimeFilter,
@@ -109,27 +105,8 @@ class DomainV2OrderField(StrEnum):
     ),
     name="DomainV2OrderBy",
 )
-class DomainV2OrderBy:
+class DomainV2OrderBy(PydanticInputMixin[DomainOrder]):
     """OrderBy for domain queries."""
 
     field: DomainV2OrderField = DomainV2OrderField.CREATED_AT
     direction: OrderDirection = OrderDirection.DESC
-
-    def to_pydantic(self) -> DomainOrder:
-        ascending = self.direction == OrderDirection.ASC
-        direction = OrderDirectionDTO.ASC if ascending else OrderDirectionDTO.DESC
-        match self.field:
-            case DomainV2OrderField.CREATED_AT:
-                return DomainOrder(field=DomainOrderField.CREATED_AT, direction=direction)
-            case DomainV2OrderField.MODIFIED_AT:
-                return DomainOrder(field=DomainOrderField.MODIFIED_AT, direction=direction)
-            case DomainV2OrderField.NAME:
-                return DomainOrder(field=DomainOrderField.NAME, direction=direction)
-            case DomainV2OrderField.IS_ACTIVE:
-                return DomainOrder(field=DomainOrderField.IS_ACTIVE, direction=direction)
-            case DomainV2OrderField.PROJECT_NAME:
-                return DomainOrder(field=DomainOrderField.PROJECT_NAME, direction=direction)
-            case DomainV2OrderField.USER_USERNAME:
-                return DomainOrder(field=DomainOrderField.USER_USERNAME, direction=direction)
-            case DomainV2OrderField.USER_EMAIL:
-                return DomainOrder(field=DomainOrderField.USER_EMAIL, direction=direction)

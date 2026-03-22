@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import enum
 from datetime import datetime
 from enum import StrEnum
 from typing import Any, Self
@@ -21,12 +20,6 @@ from ai.backend.common.dto.manager.v2.service_catalog.types import (
     EndpointInfo,
 )
 from ai.backend.common.dto.manager.v2.service_catalog.types import (
-    OrderDirection as DtoOrderDirection,
-)
-from ai.backend.common.dto.manager.v2.service_catalog.types import (
-    ServiceCatalogOrderField as ServiceCatalogOrderFieldDTO,
-)
-from ai.backend.common.dto.manager.v2.service_catalog.types import (
     ServiceCatalogStatusFilter as ServiceCatalogStatusFilterDTO,
 )
 from ai.backend.common.types import ServiceCatalogStatus
@@ -36,7 +29,7 @@ from ai.backend.manager.api.gql.decorators import (
     gql_node_type,
     gql_pydantic_input,
 )
-from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin
+from ai.backend.manager.api.gql.pydantic_compat import PydanticInputMixin, PydanticNodeMixin
 from ai.backend.manager.api.gql.utils import dedent_strip
 
 __all__ = (
@@ -136,9 +129,9 @@ class ServiceCatalogGQL(PydanticNodeMixin[Any]):
     name="ServiceCatalogOrderField",
     description="Added in 26.3.0. Fields available for ordering service catalog queries.",
 )
-class ServiceCatalogOrderFieldGQL(enum.Enum):
-    SERVICE_GROUP = "SERVICE_GROUP"
-    REGISTERED_AT = "REGISTERED_AT"
+class ServiceCatalogOrderFieldGQL(StrEnum):
+    SERVICE_GROUP = "service_group"
+    REGISTERED_AT = "registered_at"
 
 
 @gql_pydantic_input(
@@ -148,15 +141,9 @@ class ServiceCatalogOrderFieldGQL(enum.Enum):
     ),
     name="ServiceCatalogOrderBy",
 )
-class ServiceCatalogOrderByGQL:
+class ServiceCatalogOrderByGQL(PydanticInputMixin[ServiceCatalogOrderDTO]):
     field: ServiceCatalogOrderFieldGQL
     direction: OrderDirection = OrderDirection.ASC
-
-    def to_pydantic(self) -> ServiceCatalogOrderDTO:
-        return ServiceCatalogOrderDTO(
-            field=ServiceCatalogOrderFieldDTO[self.field.name],
-            direction=DtoOrderDirection(self.direction.value),
-        )
 
 
 @gql_pydantic_input(
@@ -166,7 +153,7 @@ class ServiceCatalogOrderByGQL:
     ),
     name="ServiceCatalogStatusFilter",
 )
-class ServiceCatalogStatusFilterGQL:
+class ServiceCatalogStatusFilterGQL(PydanticInputMixin[ServiceCatalogStatusFilterDTO]):
     """Filter for service catalog status enum fields."""
 
     equals: ServiceCatalogStatusGQL | None = strawberry.field(
@@ -187,28 +174,12 @@ class ServiceCatalogStatusFilterGQL:
         description="Exclude any of the provided statuses.",
     )
 
-    def to_pydantic(self) -> ServiceCatalogStatusFilterDTO:
-        return ServiceCatalogStatusFilterDTO(
-            equals=ServiceCatalogStatus(self.equals.value) if self.equals is not None else None,
-            in_=(
-                [ServiceCatalogStatus(s.value) for s in self.in_] if self.in_ is not None else None
-            ),
-            not_equals=(
-                ServiceCatalogStatus(self.not_equals.value) if self.not_equals is not None else None
-            ),
-            not_in=(
-                [ServiceCatalogStatus(s.value) for s in self.not_in]
-                if self.not_in is not None
-                else None
-            ),
-        )
-
 
 @gql_pydantic_input(
     BackendAIGQLMeta(description="Filter for service catalog queries.", added_version="26.3.0"),
     name="ServiceCatalogFilter",
 )
-class ServiceCatalogFilterGQL:
+class ServiceCatalogFilterGQL(PydanticInputMixin[ServiceCatalogFilterDTO]):
     service_group: StringFilter | None = strawberry.field(
         default=None,
         description="Filter by service group name. Supports equals, contains, startsWith, and endsWith.",
@@ -220,14 +191,3 @@ class ServiceCatalogFilterGQL:
     AND: list[Self] | None = None
     OR: list[Self] | None = None
     NOT: list[Self] | None = None
-
-    def to_pydantic(self) -> ServiceCatalogFilterDTO:
-        return ServiceCatalogFilterDTO(
-            service_group=(
-                self.service_group.to_pydantic() if self.service_group is not None else None
-            ),
-            status=self.status.to_pydantic() if self.status is not None else None,
-            AND=[f.to_pydantic() for f in self.AND] if self.AND is not None else None,
-            OR=[f.to_pydantic() for f in self.OR] if self.OR is not None else None,
-            NOT=[f.to_pydantic() for f in self.NOT] if self.NOT is not None else None,
-        )

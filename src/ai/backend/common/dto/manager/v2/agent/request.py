@@ -57,10 +57,10 @@ class AgentFilter(BaseRequestModel):
         default=None,
         description="Filter by schedulable flag.",
     )
-    resource_group: StringFilter | None = Field(
+    scaling_group: StringFilter | None = Field(
         default=None,
         description=(
-            "Filter by resource group name. "
+            "Filter by scaling group name. "
             "Supports equals, contains, starts_with, ends_with, "
             "and their case-insensitive and negated variants."
         ),

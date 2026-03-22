@@ -24,11 +24,6 @@ from ai.backend.common.dto.manager.v2.session.response import (
     SessionRuntimeInfoGQLDTO,
 )
 from ai.backend.common.dto.manager.v2.session.types import (
-    OrderDirection as OrderDirectionDTO,
-)
-from ai.backend.common.dto.manager.v2.session.types import (
-    SessionOrderField,
-    SessionStatusEnum,
     SessionStatusFilter,
 )
 from ai.backend.common.types import SessionId
@@ -158,15 +153,9 @@ class SessionV2OrderFieldGQL(StrEnum):
     BackendAIGQLMeta(description="Filter for session status.", added_version="26.3.0"),
     name="SessionV2StatusFilter",
 )
-class SessionV2StatusFilterGQL:
+class SessionV2StatusFilterGQL(PydanticInputMixin[SessionStatusFilter]):
     in_: list[SessionV2StatusGQL] | None = strawberry.field(name="in", default=None)
     not_in: list[SessionV2StatusGQL] | None = None
-
-    def to_pydantic(self) -> SessionStatusFilter:
-        return SessionStatusFilter(
-            in_=[SessionStatusEnum(s) for s in self.in_] if self.in_ else None,
-            not_in=[SessionStatusEnum(s) for s in self.not_in] if self.not_in else None,
-        )
 
 
 @gql_pydantic_input(
@@ -193,24 +182,9 @@ class SessionV2FilterGQL(PydanticInputMixin[SessionFilter]):
     BackendAIGQLMeta(description="Ordering specification for sessions.", added_version="26.3.0"),
     name="SessionV2OrderBy",
 )
-class SessionV2OrderByGQL:
+class SessionV2OrderByGQL(PydanticInputMixin[SessionOrder]):
     field: SessionV2OrderFieldGQL
     direction: OrderDirection = OrderDirection.DESC
-
-    def to_pydantic(self) -> SessionOrder:
-        ascending = self.direction == OrderDirection.ASC
-        direction = OrderDirectionDTO.ASC if ascending else OrderDirectionDTO.DESC
-        match self.field:
-            case SessionV2OrderFieldGQL.CREATED_AT:
-                return SessionOrder(field=SessionOrderField.CREATED_AT, direction=direction)
-            case SessionV2OrderFieldGQL.TERMINATED_AT:
-                return SessionOrder(field=SessionOrderField.TERMINATED_AT, direction=direction)
-            case SessionV2OrderFieldGQL.STATUS:
-                return SessionOrder(field=SessionOrderField.STATUS, direction=direction)
-            case SessionV2OrderFieldGQL.ID:
-                return SessionOrder(field=SessionOrderField.ID, direction=direction)
-            case SessionV2OrderFieldGQL.NAME:
-                return SessionOrder(field=SessionOrderField.NAME, direction=direction)
 
 
 # ========== Session Info Sub-Types ==========

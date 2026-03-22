@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Iterable
 from datetime import datetime
+from enum import StrEnum
 from typing import TYPE_CHECKING, Annotated, Any, Self, cast
 from uuid import UUID
 
@@ -78,12 +79,6 @@ from ai.backend.common.dto.manager.v2.deployment.types import (
     ModelRuntimeConfigInfoDTO,
     ResourceConfigInfoDTO,
 )
-from ai.backend.common.dto.manager.v2.deployment.types import (
-    OrderDirection as DTOOrderDirection,
-)
-from ai.backend.common.dto.manager.v2.deployment.types import (
-    RevisionOrderField as DTORevisionOrderField,
-)
 from ai.backend.common.types import ClusterMode as CommonClusterMode
 from ai.backend.common.types import MountPermission as CommonMountPermission
 from ai.backend.common.types import RuntimeVariant
@@ -114,9 +109,6 @@ from ai.backend.manager.api.gql.vfolder import VFolder
 from ai.backend.manager.api.gql_legacy.image import ImageNode
 from ai.backend.manager.api.gql_legacy.scaling_group import ScalingGroupNode
 from ai.backend.manager.api.gql_legacy.vfolder import VirtualFolderNode
-from ai.backend.manager.data.deployment.types import (
-    ModelRevisionOrderField,
-)
 
 if TYPE_CHECKING:
     from .deployment import ModelDeployment
@@ -313,12 +305,21 @@ class ModelRevision(PydanticNodeMixin[RevisionNodeDTO]):
         return cast(list[Self | None], results)
 
 
+@strawberry.enum(
+    name="ModelRevisionOrderField",
+    description="Added in 25.19.0. Fields available for ordering model revisions.",
+)
+class ModelRevisionOrderFieldGQL(StrEnum):
+    NAME = "name"
+    CREATED_AT = "created_at"
+
+
 # Filter and Order Types
 @gql_pydantic_input(
     BackendAIGQLMeta(description="", added_version="25.19.0"),
     name="ModelRevisionFilter",
 )
-class ModelRevisionFilter:
+class ModelRevisionFilter(PydanticInputMixin[RevisionFilterDTO]):
     name: StringFilter | None = None
     deployment_id: ID | None = None
 
@@ -326,28 +327,13 @@ class ModelRevisionFilter:
     OR: list[Self] | None = None
     NOT: list[Self] | None = None
 
-    def to_pydantic(self) -> RevisionFilterDTO:
-        return RevisionFilterDTO(
-            name=self.name.to_pydantic() if self.name else None,
-            deployment_id=UUID(self.deployment_id) if self.deployment_id else None,
-            AND=[f.to_pydantic() for f in self.AND] if self.AND else None,
-            OR=[f.to_pydantic() for f in self.OR] if self.OR else None,
-            NOT=[f.to_pydantic() for f in self.NOT] if self.NOT else None,
-        )
-
 
 @gql_pydantic_input(
     BackendAIGQLMeta(description="", added_version="25.19.0"),
 )
-class ModelRevisionOrderBy:
-    field: ModelRevisionOrderField
+class ModelRevisionOrderBy(PydanticInputMixin[RevisionOrderDTO]):
+    field: ModelRevisionOrderFieldGQL
     direction: OrderDirection = OrderDirection.DESC
-
-    def to_pydantic(self) -> RevisionOrderDTO:
-        return RevisionOrderDTO(
-            field=DTORevisionOrderField(self.field.value.lower()),
-            direction=DTOOrderDirection(self.direction.value),
-        )
 
 
 # Payload Types
