@@ -10,7 +10,7 @@ from typing import Self, cast
 
 import strawberry
 from strawberry import Info
-from strawberry.relay import NodeID
+from strawberry.relay import Connection, Edge, NodeID
 
 from ai.backend.common.data.permission.types import RBACElementType
 from ai.backend.common.dto.manager.v2.rbac.request import (
@@ -158,15 +158,13 @@ class EntityOrderBy(PydanticInputMixin[EntityOrderByDTO], GQLOrderBy):
 
 # ==================== Connection Types ====================
 
-
-@gql_connection_type(BackendAIGQLMeta(added_version="26.3.0", description="Entity edge."))
-class EntityEdge:
-    node: EntityRefGQL
-    cursor: str
+EntityEdge = Edge[EntityRefGQL]
 
 
 @gql_connection_type(BackendAIGQLMeta(added_version="26.3.0", description="Entity connection."))
-class EntityConnection:
-    edges: list[EntityEdge]
-    page_info: strawberry.relay.PageInfo
+class EntityConnection(Connection[EntityRefGQL]):
     count: int
+
+    def __init__(self, *args: object, count: int, **kwargs: object) -> None:
+        super().__init__(*args, **kwargs)
+        self.count = count

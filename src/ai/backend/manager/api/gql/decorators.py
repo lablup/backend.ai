@@ -21,6 +21,7 @@ import strawberry
 import strawberry.experimental.pydantic
 from pydantic import BaseModel
 from strawberry.experimental.pydantic.conversion_types import StrawberryTypeFromPydantic
+from strawberry.relay import Connection
 from strawberry.schema_directives import OneOf
 from strawberry.types.field import StrawberryField
 from strawberry.types.field import field as strawberry_field
@@ -42,7 +43,7 @@ __all__ = (
 )
 
 T = TypeVar("T", bound="PydanticNodeMixin[Any]")
-T_out = TypeVar("T_out")
+T_conn = TypeVar("T_conn", bound="Connection[Any]")
 
 
 @dataclass_transform(
@@ -85,8 +86,8 @@ def gql_connection_type(
     name: str | None = None,
     directives: Sequence[object] = (),
     extend: bool = False,
-) -> Callable[[type[T_out]], type[T_out]]:
-    """Decorator for GQL Connection and Edge types."""
+) -> Callable[[type[T_conn]], type[T_conn]]:
+    """Decorator for GQL Connection types (Connection[T] subclasses)."""
     description = f"Added in {meta.added_version}. {meta.description}"
     if meta.deprecated_version is not None:
         hint = f" Use {meta.deprecation_hint}." if meta.deprecation_hint else ""
