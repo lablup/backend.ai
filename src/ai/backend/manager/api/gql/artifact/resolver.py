@@ -694,7 +694,7 @@ async def scan_artifact_models(
         ),
     )
 
-    return ScanArtifactModelsPayload(artifact_revision=artifacts_connection)
+    return ScanArtifactModelsPayload(artifact_revisions=artifacts_connection)
 
 
 # Subscriptions
