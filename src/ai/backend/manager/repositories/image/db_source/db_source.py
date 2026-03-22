@@ -1,7 +1,8 @@
 from __future__ import annotations
 
 import logging
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
+from datetime import datetime
 from typing import cast
 from uuid import UUID
 
@@ -11,6 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession as SASession
 from sqlalchemy.orm import selectinload
 
 from ai.backend.common.bgtask.reporter import ProgressReporter
+from ai.backend.common.data.permission.types import RBACElementType
 from ai.backend.common.docker import ImageRef
 from ai.backend.common.exception import UnknownImageReference
 from ai.backend.common.types import ImageAlias, ImageID
@@ -25,6 +27,7 @@ from ai.backend.manager.data.image.types import (
     RescanImagesResult,
     ResourceLimitInput,
 )
+from ai.backend.manager.data.permission.types import RBACElementRef
 from ai.backend.manager.errors.image import (
     AliasImageActionDBError,
     AliasImageActionValueError,
@@ -42,9 +45,13 @@ from ai.backend.manager.models.image import (
     rescan_images,
     scan_single_image,
 )
+from ai.backend.manager.models.kernel.row import KernelRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.manager.repositories.base import BatchQuerier, Creator, execute_batch_querier
-from ai.backend.manager.repositories.base.creator import execute_creator
+from ai.backend.manager.repositories.base import BatchQuerier, execute_batch_querier
+from ai.backend.manager.repositories.base.rbac.entity_creator import (
+    RBACEntityCreator,
+    execute_rbac_entity_creator,
+)
 from ai.backend.manager.repositories.base.updater import Updater, execute_updater
 from ai.backend.manager.repositories.image.creators import ImageAliasCreatorSpec
 
@@ -242,10 +249,20 @@ class ImageDBSource:
                 image_row = await ImageRow.resolve(
                     session, [ImageIdentifier(image_canonical, architecture)]
                 )
-                image_alias = ImageAliasRow(alias=alias, image_id=image_row.id)
-                image_row.aliases.append(image_alias)
+                rbac_creator = RBACEntityCreator(
+                    spec=ImageAliasCreatorSpec(
+                        alias=alias,
+                        image_id=image_row.id,
+                    ),
+                    element_type=RBACElementType.IMAGE_ALIAS,
+                    scope_ref=RBACElementRef(
+                        element_type=RBACElementType.IMAGE,
+                        element_id=str(image_row.id),
+                    ),
+                )
+                result = await execute_rbac_entity_creator(session, rbac_creator)
                 row_id = image_row.id
-                alias_data = ImageAliasData(id=image_alias.id, alias=image_alias.alias or "")
+                alias_data = ImageAliasData(id=result.row.id, alias=result.row.alias or "")
             return row_id, alias_data
         except ValueError as e:
             raise AliasImageActionValueError from e
@@ -325,16 +342,18 @@ class ImageDBSource:
             image_row._resources = {}
             return image_row.to_dataclass()
 
-    async def insert_image_alias_by_id(self, creator: Creator[ImageAliasRow]) -> ImageAliasData:
+    async def insert_image_alias_by_id(
+        self, creator: RBACEntityCreator[ImageAliasRow]
+    ) -> ImageAliasData:
         """
-        Creates an image alias using the Creator pattern.
+        Creates an image alias using the RBACEntityCreator pattern.
         """
-        spec = cast(ImageAliasCreatorSpec, creator.spec)
         try:
             async with self._db.begin_session() as session:
+                spec = cast(ImageAliasCreatorSpec, creator.spec)
                 # Validate that the image exists
                 await self._get_image_by_id(session, spec.image_id)
-                result = await execute_creator(session, creator)
+                result = await execute_rbac_entity_creator(session, creator)
                 return ImageAliasData(id=result.row.id, alias=result.row.alias or "")
         except ValueError as e:
             raise AliasImageActionValueError from e
@@ -467,3 +486,34 @@ class ImageDBSource:
             project,
             reporter=reporter,
         )
+
+    async def load_image_last_used(
+        self,
+        image_ids: Sequence[ImageID],
+    ) -> Mapping[ImageID, datetime]:
+        """Load the most recent session creation timestamp for each image.
+
+        Queries the kernels table to find the latest created_at for sessions
+        that used each image (matched by canonical name and architecture).
+
+        Returns a mapping of ImageID to the most recent session created_at.
+        Images that have never been used will not appear in the mapping.
+        """
+        async with self._db.begin_readonly_session_read_committed() as session:
+            stmt = (
+                sa.select(
+                    ImageRow.id,
+                    sa.func.max(KernelRow.created_at).label("last_used"),
+                )
+                .join(
+                    KernelRow,
+                    sa.and_(
+                        KernelRow.image == ImageRow.name,
+                        KernelRow.architecture == ImageRow.architecture,
+                    ),
+                )
+                .where(ImageRow.id.in_(image_ids))
+                .group_by(ImageRow.id)
+            )
+            result = await session.execute(stmt)
+            return {ImageID(row.id): row.last_used for row in result if row.last_used is not None}

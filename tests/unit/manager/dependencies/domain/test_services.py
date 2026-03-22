@@ -2,8 +2,6 @@ from __future__ import annotations
 
 from unittest.mock import MagicMock, patch
 
-import pytest
-
 from ai.backend.manager.dependencies.domain.services import (
     ServicesContextDependency,
     ServicesInput,
@@ -13,7 +11,6 @@ from ai.backend.manager.dependencies.domain.services import (
 class TestServicesContextDependency:
     """Test ServicesContextDependency lifecycle."""
 
-    @pytest.mark.asyncio
     @patch(
         "ai.backend.manager.dependencies.domain.services.PerProjectContainerRegistryQuotaClientPool"
     )

@@ -9,7 +9,7 @@ from uuid import UUID
 
 import sqlalchemy as sa
 
-from ai.backend.manager.api.gql.base import StringMatchSpec, UUIDEqualMatchSpec, UUIDInMatchSpec
+from ai.backend.common.data.filter_specs import StringMatchSpec, UUIDEqualMatchSpec, UUIDInMatchSpec
 from ai.backend.manager.data.group.types import ProjectType
 from ai.backend.manager.data.user.types import UserStatus
 from ai.backend.manager.models.domain import DomainRow

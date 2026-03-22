@@ -11,6 +11,9 @@ import pytest
 from ai.backend.common.types import ResourceSlot, SlotQuantity
 from ai.backend.manager.api.gql.fair_share.types.common import ResourceSlotGQL
 from ai.backend.manager.api.gql.resource_group.types import (
+    PreemptionConfigGQL,
+    PreemptionModeGQL,
+    PreemptionOrderGQL,
     ResourceGroupGQL,
     ResourceGroupMetadataGQL,
     ResourceGroupNetworkConfigGQL,
@@ -25,6 +28,74 @@ from ai.backend.manager.models.scaling_group.types import FairShareScalingGroupS
 from ai.backend.manager.services.scaling_group.actions.get_resource_info import (
     GetResourceInfoActionResult,
 )
+
+
+class TestResourceSlotGQLNormalization:
+    """Regression tests for BA-4636: ResourceSlotGQL quantity decimal normalization."""
+
+    def test_from_slot_quantities_strips_trailing_zeros(self) -> None:
+        """Values from DB (NUMERIC scale=6) should not have trailing zeros in GQL output."""
+        # Given: DB-sourced values with scale=6 (e.g., result of SUM() on NUMERIC(24,6))
+        quantities = [
+            SlotQuantity("cpu", Decimal("7.000000")),
+            SlotQuantity("mem", Decimal("4294967296.000000")),
+            SlotQuantity("cuda.shares", Decimal("0.500000")),
+        ]
+
+        # When
+        result = ResourceSlotGQL.from_slot_quantities(quantities)
+
+        # Then: trailing zeros are stripped
+        entries = {e.resource_type: e.quantity for e in result.entries}
+        assert str(entries["cpu"]) == "7"
+        assert str(entries["mem"]) == "4294967296"
+        assert str(entries["cuda.shares"]) == "0.5"
+
+    def test_from_slot_quantities_no_scientific_notation_for_large_integers(self) -> None:
+        """Large integer quantities must not be serialized in scientific notation."""
+        # Given: large memory value (bytes) with trailing zeros
+        quantities = [
+            SlotQuantity("mem", Decimal("17179869184.000000")),
+        ]
+
+        # When
+        result = ResourceSlotGQL.from_slot_quantities(quantities)
+
+        # Then: no scientific notation (e.g., not '1.7179869184E+10')
+        entries = {e.resource_type: e.quantity for e in result.entries}
+        assert str(entries["mem"]) == "17179869184"
+
+    def test_from_slot_quantities_preserves_fractional_precision(self) -> None:
+        """Fractional values should keep meaningful decimal places."""
+        # Given
+        quantities = [
+            SlotQuantity("cuda.shares", Decimal("0.250000")),
+            SlotQuantity("cpu", Decimal("1.500000")),
+        ]
+
+        # When
+        result = ResourceSlotGQL.from_slot_quantities(quantities)
+
+        # Then
+        entries = {e.resource_type: e.quantity for e in result.entries}
+        assert str(entries["cuda.shares"]) == "0.25"
+        assert str(entries["cpu"]) == "1.5"
+
+    def test_from_slot_quantities_already_normalized_values_unchanged(self) -> None:
+        """Values already without trailing zeros should pass through unchanged."""
+        # Given
+        quantities = [
+            SlotQuantity("cpu", Decimal("4")),
+            SlotQuantity("mem", Decimal("8589934592")),
+        ]
+
+        # When
+        result = ResourceSlotGQL.from_slot_quantities(quantities)
+
+        # Then: equality holds (value unchanged)
+        entries = {e.resource_type: e.quantity for e in result.entries}
+        assert entries["cpu"] == Decimal("4")
+        assert entries["mem"] == Decimal("8589934592")
 
 
 class TestResourceInfoGQL:
@@ -159,7 +230,14 @@ class TestResourceGroupGQLResourceInfoResolver:
                 wsproxy_addr=None,
                 use_host_network=False,
             ),
-            scheduler=ResourceGroupSchedulerConfigGQL(type=SchedulerTypeGQL.FIFO),
+            scheduler=ResourceGroupSchedulerConfigGQL(
+                type=SchedulerTypeGQL.FIFO,
+                preemption=PreemptionConfigGQL(
+                    preemptible_priority=5,
+                    order=PreemptionOrderGQL.OLDEST,
+                    mode=PreemptionModeGQL.TERMINATE,
+                ),
+            ),
             _fair_share_spec_data=FairShareScalingGroupSpec(
                 half_life_days=7,
                 lookback_days=28,
@@ -181,7 +259,6 @@ class TestResourceGroupGQLResourceInfoResolver:
             free=[SlotQuantity("cpu", Decimal("3")), SlotQuantity("mem", Decimal("6442450944"))],
         )
 
-    @pytest.mark.asyncio
     async def test_resolver_calls_processor_with_correct_action(
         self,
         resource_group_gql: ResourceGroupGQL,
@@ -205,7 +282,6 @@ class TestResourceGroupGQLResourceInfoResolver:
         assert action.scaling_group == "test-group"
         assert isinstance(result, ResourceInfoGQL)
 
-    @pytest.mark.asyncio
     async def test_resolver_returns_converted_gql_type(
         self,
         resource_group_gql: ResourceGroupGQL,
@@ -237,7 +313,6 @@ class TestResourceGroupGQLResourceInfoResolver:
         assert free_entries["cpu"] == Decimal("3")
         assert free_entries["mem"] == Decimal("6442450944")
 
-    @pytest.mark.asyncio
     async def test_resolver_propagates_scaling_group_not_found(
         self,
         resource_group_gql: ResourceGroupGQL,

@@ -140,7 +140,6 @@ class TestSelectorIntegration:
         # Legacy also prefers fewer unutilized capabilities
         assert legacy_choice.original_agent.agent_id == AgentId("cpu-generalist")
 
-    # @pytest.mark.asyncio
     # async def test_with_agent_selector_wrapper(self, criteria, config, resource_priority):
     #     """Test selectors through the AgentSelector wrapper."""
     #     # This test needs to be rewritten for the new batch selection API

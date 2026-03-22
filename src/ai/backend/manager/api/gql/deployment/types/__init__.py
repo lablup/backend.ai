@@ -57,6 +57,8 @@ from .policy import (
     DeploymentStrategyTypeGQL,
     RollingUpdateConfigInputGQL,
     RollingUpdateStrategySpecGQL,
+    UpdateDeploymentPolicyInputGQL,
+    UpdateDeploymentPolicyPayloadGQL,
 )
 from .replica import (
     ActivenessStatus,
@@ -80,9 +82,7 @@ from .revision import (
     AddRevisionPayload,
     ClusterConfig,
     ClusterConfigInput,
-    ClusterMode,
     CreateRevisionInput,
-    CreateRevisionPayload,
     ExtraVFolderMountInput,
     ImageInput,
     ModelMountConfig,
@@ -168,6 +168,8 @@ __all__ = [
     "DeploymentStrategyTypeGQL",
     "RollingUpdateConfigInputGQL",
     "RollingUpdateStrategySpecGQL",
+    "UpdateDeploymentPolicyInputGQL",
+    "UpdateDeploymentPolicyPayloadGQL",
     # Replica
     "ActivenessStatus",
     "LivenessStatus",
@@ -189,9 +191,7 @@ __all__ = [
     "AddRevisionPayload",
     "ClusterConfig",
     "ClusterConfigInput",
-    "ClusterMode",
     "CreateRevisionInput",
-    "CreateRevisionPayload",
     "ExtraVFolderMountInput",
     "ImageInput",
     "ModelMountConfig",

@@ -115,6 +115,7 @@ from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.models.endpoint import ModelServiceHelper
 from ai.backend.manager.models.resource_slot import AgentResourceRow, ResourceAllocationRow
 from ai.backend.manager.plugin.network import NetworkPluginContext
+from ai.backend.manager.repositories.resource_slot import ResourceSlotRepository
 from ai.backend.manager.repositories.scheduler.types.session_creation import SessionCreationSpec
 from ai.backend.manager.sokovan.scheduling_controller import SchedulingController
 
@@ -160,7 +161,6 @@ from .models.session import (
     USER_RESOURCE_OCCUPYING_SESSION_STATUSES,
     ConcurrencyUsed,
     KernelLoadingStrategy,
-    SessionLifecycleManager,
     SessionRow,
     handle_session_exception,
 )
@@ -175,6 +175,7 @@ from .models.utils import (
 )
 from .models.vfolder import VFolderRow, verify_vfolder_name
 from .scheduler.types import KernelAgentBinding
+from .services.session.lifecycle import SessionLifecycleManager
 from .types import UserScope
 
 type MSetType = Mapping[str | bytes, bytes | float | int | str]
@@ -203,8 +204,6 @@ class AgentRegistry:
     pending_waits: set[asyncio.Task[None]]
     database_ptask_group: aiotools.PersistentTaskGroup
     webhook_ptask_group: aiotools.PersistentTaskGroup
-    # TODO: Migrate to use root_ctx.appproxy_client_pool instead.
-    # After migration, remove _client_pool and _load_app_proxy_client.
     _client_pool: ClientPool
     _agent_client_pool: AgentClientPool
 
@@ -269,7 +268,6 @@ class AgentRegistry:
         await self.database_ptask_group.shutdown()
         await self.webhook_ptask_group.shutdown()
 
-    # TODO: Migrate callers to use root_ctx.appproxy_client_pool.load_client() instead.
     def _load_app_proxy_client(self, address: str, token: str) -> AppProxyClient:
         client_session = self._client_pool.load_client_session(
             ClientKey(
@@ -374,6 +372,7 @@ class AgentRegistry:
         enqueue_only: bool = False,
         max_wait_seconds: int = 0,
         priority: int = SESSION_PRIORITY_DEFAULT,
+        is_preemptible: bool = True,
         bootstrap_script: str | None = None,
         dependencies: list[uuid.UUID] | None = None,
         startup_command: str | None = None,
@@ -579,6 +578,7 @@ class AgentRegistry:
                         resource_policy,
                         user_scope=user_scope,
                         priority=priority,
+                        is_preemptible=is_preemptible,
                         cluster_mode=cluster_mode,
                         cluster_size=cluster_size,
                         session_tag=tag,
@@ -926,6 +926,7 @@ class AgentRegistry:
         sudo_session_enabled: bool,
         network: NetworkRow | None,
         startup_command: str | None,
+        is_preemptible: bool,
     ) -> SessionId:
         """Enqueue session using Sokovan scheduling controller."""
         kernel_enqueue_configs: list[KernelEnqueueingConfig] = session_enqueue_configs[
@@ -958,6 +959,7 @@ class AgentRegistry:
             internal_data=internal_data,
             public_sgroup_only=public_sgroup_only,
             startup_command=startup_command,
+            is_preemptible=is_preemptible,
         )
 
         # Delegate to scheduling controller
@@ -975,6 +977,7 @@ class AgentRegistry:
         *,
         user_scope: UserScope,
         priority: int = SESSION_PRIORITY_DEFAULT,
+        is_preemptible: bool = True,
         public_sgroup_only: bool = True,
         cluster_mode: ClusterMode = ClusterMode.SINGLE_NODE,
         cluster_size: int = 1,
@@ -1000,6 +1003,7 @@ class AgentRegistry:
             resource_policy=resource_policy,
             user_scope=user_scope,
             priority=priority,
+            is_preemptible=is_preemptible,
             public_sgroup_only=public_sgroup_only,
             cluster_mode=cluster_mode,
             cluster_size=cluster_size,
@@ -1254,6 +1258,23 @@ class AgentRegistry:
 
         access_key_to_concurrency_used = await execute_with_retry(_recalc)
         await self._update_concurrency(access_key_to_concurrency_used, do_fullscan)
+        await self._reconcile_agent_resources()
+
+    async def _reconcile_agent_resources(self) -> None:
+        """Reconcile agent_resources.used against actual resource_allocations.
+
+        Delegates to ResourceSlotRepository for DB operations and logs any drift found.
+        """
+        repo = ResourceSlotRepository(self.db)
+        drifts = await repo.reconcile_agent_resources()
+        for d in drifts:
+            log.warning(
+                "agent_resources drift detected for {}:{}: tracked={}, actual={}",
+                d.agent_id,
+                d.slot_name,
+                d.tracked,
+                d.actual,
+            )
 
     async def _update_concurrency(
         self,

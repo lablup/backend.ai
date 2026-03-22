@@ -62,7 +62,6 @@ class TestRedisProvider:
             yield etcd
 
     @pytest.mark.integration
-    @pytest.mark.asyncio
     async def test_provide_valkey_clients(
         self,
         etcd_client: AsyncEtcd,
@@ -77,7 +76,6 @@ class TestRedisProvider:
             assert clients.artifact is not None
 
     @pytest.mark.integration
-    @pytest.mark.asyncio
     async def test_cleanup_on_exception(
         self,
         etcd_client: AsyncEtcd,

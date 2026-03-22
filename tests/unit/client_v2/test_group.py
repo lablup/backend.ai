@@ -4,10 +4,9 @@ from typing import Any
 from unittest.mock import AsyncMock, MagicMock
 from uuid import uuid4
 
-import pytest
 from yarl import URL
 
-from ai.backend.client.v2.base_client import BackendAIClient
+from ai.backend.client.v2.base_client import BackendAIAuthClient
 from ai.backend.client.v2.config import ClientConfig
 from ai.backend.client.v2.domains.group import GroupClient
 from ai.backend.common.dto.manager.group import (
@@ -64,7 +63,7 @@ def _no_content_response() -> AsyncMock:
 
 
 def _make_group_client(mock_session: MagicMock) -> GroupClient:
-    client = BackendAIClient(_DEFAULT_CONFIG, MockAuth(), mock_session)
+    client = BackendAIAuthClient(_DEFAULT_CONFIG, MockAuth(), mock_session)
     return GroupClient(client)
 
 
@@ -113,7 +112,6 @@ _SAMPLE_MEMBER_DTO_2: dict[str, Any] = {
 
 
 class TestCreateRegistryQuota:
-    @pytest.mark.asyncio
     async def test_sends_post_with_body(self) -> None:
         resp = _no_content_response()
         mock_session = _make_request_session(resp)
@@ -131,7 +129,6 @@ class TestCreateRegistryQuota:
 
 
 class TestReadRegistryQuota:
-    @pytest.mark.asyncio
     async def test_sends_get_with_params(self) -> None:
         resp = _json_response({"result": 100})
         mock_session = _make_request_session(resp)
@@ -149,7 +146,6 @@ class TestReadRegistryQuota:
 
 
 class TestUpdateRegistryQuota:
-    @pytest.mark.asyncio
     async def test_sends_patch_with_body(self) -> None:
         resp = _no_content_response()
         mock_session = _make_request_session(resp)
@@ -167,7 +163,6 @@ class TestUpdateRegistryQuota:
 
 
 class TestDeleteRegistryQuota:
-    @pytest.mark.asyncio
     async def test_sends_delete_with_body(self) -> None:
         resp = _no_content_response()
         mock_session = _make_request_session(resp)
@@ -189,7 +184,6 @@ class TestDeleteRegistryQuota:
 
 
 class TestGroupCRUD:
-    @pytest.mark.asyncio
     async def test_create_group(self) -> None:
         resp = _json_response({"group": _SAMPLE_GROUP_DTO})
         mock_session = _make_request_session(resp)
@@ -211,7 +205,6 @@ class TestGroupCRUD:
         assert body["name"] == "test-group"
         assert body["domain_name"] == "default"
 
-    @pytest.mark.asyncio
     async def test_search_groups(self) -> None:
         resp = _json_response({
             "groups": [_SAMPLE_GROUP_DTO],
@@ -230,7 +223,6 @@ class TestGroupCRUD:
         assert url.endswith("/groups/search")
         assert body is not None
 
-    @pytest.mark.asyncio
     async def test_search_groups_with_filter(self) -> None:
         resp = _json_response({
             "groups": [_SAMPLE_GROUP_DTO],
@@ -257,7 +249,6 @@ class TestGroupCRUD:
         assert body["filter"]["is_active"] is True
         assert body["limit"] == 10
 
-    @pytest.mark.asyncio
     async def test_get_group(self) -> None:
         resp = _json_response({"group": _SAMPLE_GROUP_DTO})
         mock_session = _make_request_session(resp)
@@ -271,7 +262,6 @@ class TestGroupCRUD:
         assert method == "GET"
         assert str(_SAMPLE_GROUP_ID) in url
 
-    @pytest.mark.asyncio
     async def test_update_group(self) -> None:
         updated_dto = {**_SAMPLE_GROUP_DTO, "name": "updated-group"}
         resp = _json_response({"group": updated_dto})
@@ -291,7 +281,6 @@ class TestGroupCRUD:
         assert body is not None
         assert body["name"] == "updated-group"
 
-    @pytest.mark.asyncio
     async def test_delete_group(self) -> None:
         resp = _json_response({"deleted": True})
         mock_session = _make_request_session(resp)
@@ -312,7 +301,6 @@ class TestGroupCRUD:
 
 
 class TestGroupMembers:
-    @pytest.mark.asyncio
     async def test_add_members(self) -> None:
         resp = _json_response({"members": [_SAMPLE_MEMBER_DTO_1, _SAMPLE_MEMBER_DTO_2]})
         mock_session = _make_request_session(resp)
@@ -329,7 +317,6 @@ class TestGroupMembers:
         assert body is not None
         assert len(body["user_ids"]) == 2
 
-    @pytest.mark.asyncio
     async def test_remove_members(self) -> None:
         resp = _json_response({"removed_count": 1})
         mock_session = _make_request_session(resp)
@@ -346,7 +333,6 @@ class TestGroupMembers:
         assert body is not None
         assert len(body["user_ids"]) == 1
 
-    @pytest.mark.asyncio
     async def test_list_members(self) -> None:
         resp = _json_response({
             "members": [_SAMPLE_MEMBER_DTO_1, _SAMPLE_MEMBER_DTO_2],

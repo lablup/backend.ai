@@ -44,6 +44,9 @@ input AccessTokenFilter {
   token: StringFilter = null
   validUntil: DateTimeFilter = null
   createdAt: DateTimeFilter = null
+  AND: [AccessTokenFilter!] = null
+  OR: [AccessTokenFilter!] = null
+  NOT: [AccessTokenFilter!] = null
 }
 
 """Added in 25.16.0"""
@@ -69,6 +72,21 @@ type ActivateRevisionPayload {
   deployment: ModelDeployment!
   previousRevisionId: ID
   activatedRevisionId: ID!
+}
+
+"""
+Added in 26.4.0. Active resource usage overview for a domain or project. Shows the currently occupied resource slots and the number of active sessions.
+"""
+type ActiveResourceOverview {
+  """
+  Resource slots currently occupied by active sessions. Each entry represents a resource type and the total quantity in use.
+  """
+  slots: ResourceSlot!
+
+  """
+  Number of active sessions contributing to the current resource occupancy.
+  """
+  sessionCount: Int!
 }
 
 """
@@ -168,6 +186,66 @@ type AgentResource {
   the same structure as capacity.
   """
   free: JSON!
+}
+
+"""Added in 26.3.0. Relay-style connection for per-slot agent resources."""
+type AgentResourceConnection {
+  """Pagination data for this connection"""
+  pageInfo: PageInfo!
+
+  """Contains the nodes in this connection"""
+  edges: [AgentResourceSlotEdge!]!
+  count: Int!
+}
+
+"""
+Added in 26.3.0. Per-slot resource capacity and usage entry for an agent.
+Represents one row from the agent_resources table.
+"""
+type AgentResourceSlot implements Node {
+  """The Globally Unique ID of this object"""
+  id: ID!
+
+  """Resource slot identifier (e.g., 'cpu', 'mem', 'cuda.device')."""
+  slotName: String!
+
+  """Total hardware resource capacity for this slot on the agent."""
+  capacity: Decimal!
+
+  """
+  Amount of this slot currently consumed by running and scheduled sessions.
+  """
+  used: Decimal!
+}
+
+"""An edge in a connection."""
+type AgentResourceSlotEdge {
+  """A cursor for use in pagination"""
+  cursor: String!
+
+  """The item at the end of the edge"""
+  node: AgentResourceSlot!
+}
+
+"""Added in 26.3.0. Filter criteria for querying agent resource slots."""
+input AgentResourceSlotFilter {
+  slotName: StringFilter = null
+  AND: [AgentResourceSlotFilter!] = null
+  OR: [AgentResourceSlotFilter!] = null
+  NOT: [AgentResourceSlotFilter!] = null
+}
+
+"""Added in 26.3.0. Ordering specification for agent resource slots."""
+input AgentResourceSlotOrderBy {
+  field: AgentResourceSlotOrderField!
+  direction: OrderDirection! = ASC
+}
+
+"""Added in 26.3.0. Fields available for ordering agent resource slots."""
+enum AgentResourceSlotOrderField {
+  SLOT_NAME
+  CAPACITY
+  USED
 }
 
 """Added in 25.15.0"""
@@ -316,6 +394,14 @@ type AgentV2 implements Node {
   Added in 26.2.0. List of kernels running on this agent with pagination support.
   """
   kernels(filter: KernelV2Filter = null, orderBy: [KernelV2OrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): KernelV2Connection!
+
+  """
+  Added in 26.3.0. List of sessions running on this agent with pagination support.
+  """
+  sessions(filter: SessionV2Filter = null, orderBy: [SessionV2OrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): SessionV2Connection!
+
+  """Added in 26.3.0. Per-slot resource capacity and usage for this agent."""
+  resourceSlots(filter: AgentResourceSlotFilter = null, orderBy: [AgentResourceSlotOrderBy!] = null, first: Int = null, after: String = null, last: Int = null, before: String = null, limit: Int = null, offset: Int = null): AgentResourceConnection!
 }
 
 """
@@ -805,6 +891,108 @@ input AssignRoleInput {
   roleId: UUID!
 }
 
+"""Filter criteria for querying audit logs."""
+input AuditLogFilter {
+  entityType: StringFilter = null
+  operation: StringFilter = null
+  status: AuditLogStatusFilter = null
+  createdAt: DateTimeFilter = null
+  triggeredBy: StringFilter = null
+  AND: [AuditLogFilter!] = null
+  OR: [AuditLogFilter!] = null
+  NOT: [AuditLogFilter!] = null
+}
+
+"""Ordering specification for audit logs."""
+input AuditLogOrderBy {
+  field: AuditLogOrderField!
+  direction: OrderDirection! = DESC
+}
+
+"""Fields available for ordering audit logs."""
+enum AuditLogOrderField {
+  CREATED_AT
+  ENTITY_TYPE
+  OPERATION
+  STATUS
+}
+
+"""Status of an audit log entry."""
+enum AuditLogStatus {
+  SUCCESS
+  ERROR
+  UNKNOWN
+  RUNNING
+}
+
+"""Filter for audit log status field."""
+input AuditLogStatusFilter {
+  in: [AuditLogStatus!] = null
+  notIn: [AuditLogStatus!] = null
+}
+
+"""Represents an audit log entry tracking system operations."""
+type AuditLogV2 implements Node {
+  """The Globally Unique ID of this object"""
+  id: ID!
+
+  """UUID of the action that generated this log."""
+  actionId: UUID!
+
+  """Type of entity this log relates to."""
+  entityType: String!
+
+  """Operation performed (create, update, delete, etc.)."""
+  operation: String!
+
+  """ID of the affected entity, if applicable."""
+  entityId: String
+
+  """Timestamp when the audit log was created."""
+  createdAt: DateTime!
+
+  """Request ID that triggered this operation."""
+  requestId: String
+
+  """UUID string of the user who triggered the action."""
+  triggeredBy: String
+
+  """Human-readable description of the operation."""
+  description: String!
+
+  """Duration of the operation as a string representation."""
+  duration: String
+
+  """Status of the operation."""
+  status: AuditLogStatus!
+
+  """
+  The user who triggered this audit log entry, resolved from triggered_by UUID.
+  """
+  user: UserV2
+}
+
+"""Connection type for paginated audit log results."""
+type AuditLogV2Connection {
+  """Pagination data for this connection"""
+  pageInfo: PageInfo!
+
+  """Contains the nodes in this connection"""
+  edges: [AuditLogV2Edge!]!
+
+  """Total number of audit log entries matching the query."""
+  count: Int!
+}
+
+"""An edge in a connection."""
+type AuditLogV2Edge {
+  """A cursor for use in pagination"""
+  cursor: String!
+
+  """The item at the end of the edge"""
+  node: AuditLogV2!
+}
+
 """Added in 25.1.0"""
 enum AutoScalingMetricSource {
   KERNEL
@@ -863,6 +1051,9 @@ type AutoScalingRuleEdge {
 input AutoScalingRuleFilter {
   createdAt: DateTimeFilter = null
   lastTriggeredAt: DateTimeFilter = null
+  AND: [AutoScalingRuleFilter!] = null
+  OR: [AutoScalingRuleFilter!] = null
+  NOT: [AutoScalingRuleFilter!] = null
 }
 
 """Added in 25.19.0"""
@@ -898,8 +1089,34 @@ input BlueGreenConfigInput {
   promoteDelaySeconds: Int! = 0
 }
 
+"""
+Added in 26.3.0. Error information for a failed user in bulk role assignment.
+"""
+type BulkAssignRoleError {
+  """UUID of the user that failed."""
+  userId: UUID!
+
+  """Error message describing the failure."""
+  message: String!
+}
+
+"""Added in 26.3.0. Input for bulk assigning a role to multiple users"""
+input BulkAssignRoleInput {
+  roleId: UUID!
+  userIds: [UUID!]!
+}
+
+"""Added in 26.3.0. Payload for bulk role assignment mutation."""
+type BulkAssignRolePayload {
+  """List of successfully created role assignments."""
+  assigned: [RoleAssignment!]!
+
+  """List of errors for users that failed to be assigned."""
+  failed: [BulkAssignRoleError!]!
+}
+
 """Added in 26.2.0. Error information for a failed user in bulk creation."""
-type BulkCreateUserError {
+type BulkCreateUserV2Error {
   """Original position in the input list."""
   index: Int!
 
@@ -927,7 +1144,110 @@ type BulkCreateUsersV2Payload {
   createdUsers: [UserV2!]!
 
   """List of errors for users that failed to create."""
-  failed: [BulkCreateUserError!]!
+  failed: [BulkCreateUserV2Error!]!
+}
+
+"""Added in 26.3.0. Error information for a failed user in bulk purge."""
+type BulkPurgeUserV2Error {
+  """UUID of the user that failed to purge."""
+  userId: UUID!
+
+  """Error message describing the failure."""
+  message: String!
+}
+
+"""
+Added in 26.3.0. Input for permanently deleting multiple users. This action is irreversible.
+"""
+input BulkPurgeUsersV2Input {
+  """List of user UUIDs to purge."""
+  userIds: [UUID!]!
+
+  """Options for the purge operation."""
+  options: BulkPurgeUsersV2Options = null
+}
+
+"""Added in 26.3.0. Options for bulk user purge operation."""
+input BulkPurgeUsersV2Options {
+  """
+  If true, migrate shared virtual folders to the admin user before purging.
+  """
+  purgeSharedVfolders: Boolean! = false
+
+  """If true, delegate endpoint ownership to the admin user before purging."""
+  delegateEndpointOwnership: Boolean! = false
+}
+
+"""Added in 26.3.0. Payload for bulk user permanent deletion mutation."""
+type BulkPurgeUsersV2Payload {
+  """Number of users successfully purged."""
+  purgedCount: Int!
+
+  """List of errors for users that failed to purge."""
+  failed: [BulkPurgeUserV2Error!]!
+}
+
+"""
+Added in 26.3.0. Error information for a failed user in bulk role revocation.
+"""
+type BulkRevokeRoleError {
+  """UUID of the user that failed."""
+  userId: UUID!
+
+  """Error message describing the failure."""
+  message: String!
+}
+
+"""Added in 26.3.0. Input for bulk revoking a role from multiple users"""
+input BulkRevokeRoleInput {
+  roleId: UUID!
+  userIds: [UUID!]!
+}
+
+"""Added in 26.3.0. Payload for bulk role revocation mutation."""
+type BulkRevokeRolePayload {
+  """List of successfully revoked role assignments."""
+  revoked: [RoleAssignment!]!
+
+  """List of errors for users that failed to be revoked."""
+  failed: [BulkRevokeRoleError!]!
+}
+
+"""Added in 26.3.0. Error information for a failed user in bulk update."""
+type BulkUpdateUserV2Error {
+  """UUID of the user that failed to update."""
+  userId: UUID!
+
+  """Error message describing the failure."""
+  message: String!
+}
+
+"""
+Added in 26.3.0. Input for bulk updating multiple users. Each user has individual update specifications.
+"""
+input BulkUpdateUserV2Input {
+  """List of user update inputs."""
+  users: [BulkUpdateUserV2ItemInput!]!
+}
+
+"""
+Added in 26.3.0. Input for a single user update within a bulk operation. Pairs a user ID with the fields to update.
+"""
+input BulkUpdateUserV2ItemInput {
+  """UUID of the user to update."""
+  userId: UUID!
+
+  """Fields to update for this user."""
+  input: UpdateUserV2Input!
+}
+
+"""Added in 26.3.0. Payload for bulk user update mutation."""
+type BulkUpdateUsersV2Payload {
+  """List of successfully updated users."""
+  updatedUsers: [UserV2!]!
+
+  """List of errors for users that failed to update."""
+  failed: [BulkUpdateUserV2Error!]!
 }
 
 """
@@ -1050,7 +1370,7 @@ input ClusterConfigInput {
   size: Int!
 }
 
-"""Added in 25.19.0"""
+"""Added in 25.19.0. Cluster mode for compute sessions and deployments."""
 enum ClusterMode {
   SINGLE_NODE
   MULTI_NODE
@@ -1093,6 +1413,52 @@ Scope for querying images within a specific container registry.
 input ContainerRegistryScope {
   """UUID of the container registry to scope the query to."""
   registryId: UUID!
+}
+
+"""Added in 26.4.0. Container registry type."""
+enum ContainerRegistryType {
+  DOCKER
+  HARBOR
+  HARBOR2
+  GITHUB
+  GITLAB
+  ECR
+  ECR_PUB
+  LOCAL
+  OCP
+}
+
+"""Added in 26.4.0. Container registry node."""
+type ContainerRegistryV2 implements Node {
+  """The Globally Unique ID of this object"""
+  id: ID!
+
+  """URL of the container registry"""
+  url: String!
+
+  """Name of the container registry"""
+  registryName: String!
+
+  """Type of the container registry"""
+  type: ContainerRegistryType!
+
+  """Project or namespace within the registry"""
+  project: String
+
+  """Username for registry authentication"""
+  username: String
+
+  """Masked password for registry authentication"""
+  password: String
+
+  """Whether SSL verification is enabled"""
+  sslVerify: Boolean
+
+  """Whether this registry is globally accessible"""
+  isGlobal: Boolean
+
+  """Extra metadata for the container registry"""
+  extra: JSON
 }
 
 input CreateAccessTokenInput {
@@ -1198,10 +1564,33 @@ type CreateObjectStoragePayload {
 """Added in 26.3.0. Input for creating a scoped permission"""
 input CreatePermissionInput {
   roleId: UUID!
-  scopeType: EntityType!
+  scopeType: RBACElementType!
   scopeId: String!
-  entityType: EntityType!
+  entityType: RBACElementType!
   operation: OperationType!
+}
+
+"""Added in 26.3.0. Input for creating a new query definition."""
+input CreateQueryDefinitionInput {
+  """Human-readable identifier (must be unique)."""
+  name: String!
+
+  """Prometheus metric name."""
+  metricName: String!
+
+  """PromQL template with {labels}, {window}, {group_by} placeholders."""
+  queryTemplate: String!
+
+  """Default time window."""
+  timeWindow: String = null
+
+  """Query definition options including filter and group labels."""
+  options: QueryDefinitionOptionsInput!
+}
+
+"""Added in 26.3.0. Payload returned after creating a query definition."""
+type CreateQueryDefinitionPayload {
+  preset: QueryDefinition!
 }
 
 """Added in 25.14.0"""
@@ -1219,7 +1608,7 @@ type CreateReservoirRegistryPayload {
 }
 
 """
-Added in 25.19.0. Input for creating a revision without attaching to a deployment.
+Added in 25.19.0. Input for specifying revision configuration within a deployment.
 """
 input CreateRevisionInput {
   name: String = null
@@ -1229,11 +1618,6 @@ input CreateRevisionInput {
   modelRuntimeConfig: ModelRuntimeConfigInput!
   modelMountConfig: ModelMountConfigInput!
   extraMounts: [ExtraVFolderMountInput!]
-}
-
-"""Added in 25.16.0"""
-type CreateRevisionPayload {
-  revision: ModelRevision!
 }
 
 """Added in 26.3.0. Input for creating a role"""
@@ -1526,6 +1910,12 @@ type DeletePermissionPayload {
   id: ID!
 }
 
+"""Added in 26.3.0. Payload returned after deleting a query definition."""
+type DeleteQueryDefinitionPayload {
+  """ID of the deleted query definition."""
+  id: ID!
+}
+
 """Added in 25.14.0"""
 input DeleteReservoirRegistryInput {
   id: ID!
@@ -1656,6 +2046,9 @@ input DeploymentHistoryFilter {
   message: StringFilter = null
   createdAt: DateTimeFilter = null
   updatedAt: DateTimeFilter = null
+  AND: [DeploymentHistoryFilter!] = null
+  OR: [DeploymentHistoryFilter!] = null
+  NOT: [DeploymentHistoryFilter!] = null
 }
 
 """Order by specification for deployment history"""
@@ -2119,6 +2512,11 @@ type DomainV2 implements Node @key(fields: "id") {
   fairShare(scope: DomainFairShareScope!): DomainFairShare!
 
   """
+  Added in 26.4.0. Active resource usage overview for this domain. Returns the currently occupied resource slots and the number of active sessions.
+  """
+  activeResourceOverview: ActiveResourceOverview!
+
+  """
   Usage buckets for this domain, filtered by resource group. Returns aggregated resource usage statistics over time.
   """
   usageBuckets(scope: DomainUsageScope!, filter: DomainUsageBucketFilter = null, orderBy: [DomainUsageBucketOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): DomainUsageBucketConnection!
@@ -2272,11 +2670,14 @@ type EntityEdge {
 
 """Added in 26.3.0. Filter for entity associations"""
 input EntityFilter {
-  entityType: EntityType = null
+  entityType: RBACElementType = null
   entityId: StringFilter = null
+  AND: [EntityFilter!] = null
+  OR: [EntityFilter!] = null
+  NOT: [EntityFilter!] = null
 }
 
-union EntityNode = UserV2 | ProjectV2 | DomainV2 | VirtualFolderNode | ImageV2 | ComputeSessionNode | Artifact | ArtifactRegistry | AppConfig | NotificationChannel | NotificationRule | ModelDeployment | ResourceGroup | ArtifactRevision | Role
+union EntityNode = UserV2 | ProjectV2 | DomainV2 | VirtualFolderNode | ImageV2 | ComputeSessionNode | SessionV2 | Artifact | ArtifactRegistry | AppConfig | NotificationChannel | NotificationRule | ModelDeployment | ResourceGroup | ContainerRegistryV2 | ArtifactRevision | Role
 
 """Added in 26.3.0. Order by specification for entity associations"""
 input EntityOrderBy {
@@ -2296,9 +2697,9 @@ Added in 26.3.0. Entity reference from the association_scopes_entities table
 type EntityRef implements Node {
   """The Globally Unique ID of this object"""
   id: ID!
-  scopeType: EntityType!
+  scopeType: RBACElementType!
   scopeId: String!
-  entityType: EntityType!
+  entityType: RBACElementType!
   entityId: String!
   registeredAt: DateTime!
 
@@ -2315,28 +2716,6 @@ type EntityTimestamps {
 
   """Timestamp when this entity was last modified."""
   modifiedAt: DateTime
-}
-
-"""Added in 26.3.0. RBAC entity type"""
-enum EntityType {
-  USER
-  PROJECT
-  DOMAIN
-  VFOLDER
-  IMAGE
-  SESSION
-  ARTIFACT
-  ARTIFACT_REGISTRY
-  ARTIFACT_REVISION
-  APP_CONFIG
-  NOTIFICATION_CHANNEL
-  NOTIFICATION_RULE
-  MODEL_DEPLOYMENT
-  RESOURCE_GROUP
-  CONTAINER_REGISTRY
-  STORAGE_HOST
-  DEPLOYMENT
-  ROLE
 }
 
 """
@@ -2371,6 +2750,15 @@ type EnvironmentVariables {
 input EnvironmentVariablesInput {
   """List of environment variable entries."""
   entries: [EnvironmentVariableEntryInput!]!
+}
+
+"""Added in 26.3.0. Options for executing a query definition."""
+input ExecuteQueryDefinitionOptionsInput {
+  """Label key-value pairs to filter by."""
+  filterLabels: [MetricLabelEntryInput!] = null
+
+  """Label keys to group results by."""
+  groupLabels: [String!] = null
 }
 
 type ExtraVFolderMount implements Node {
@@ -2566,6 +2954,16 @@ type HuggingFaceRegistryEdge {
   node: HuggingFaceRegistry!
 }
 
+"""
+Added in 26.3.0. Nested filter for aliases belonging to an image. Filters images that have at least one alias matching all specified conditions.
+"""
+input ImageAliasNestedFilter {
+  """
+  Filter by alias string. Supports equals, contains, startsWith, and endsWith.
+  """
+  alias: StringFilter = null
+}
+
 """Added in 25.19.0"""
 input ImageInput {
   id: ID!
@@ -2605,6 +3003,11 @@ type ImageV2 implements Node {
 
   """UUID of the container registry where this image is stored."""
   registryId: UUID!
+
+  """
+  Added in 26.3.0. Timestamp of the most recent session created with this image. Returns null if the image has never been used.
+  """
+  lastUsed: DateTime
 
   """Added in 26.2.0. Aliases for this image."""
   aliases(filter: ImageV2AliasFilterGQL = null, orderBy: [ImageV2AliasOrderByGQL!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null): ImageV2AliasConnection!
@@ -2658,6 +3061,9 @@ Supports filtering by alias string.
 """
 input ImageV2AliasFilterGQL {
   alias: StringFilter = null
+  AND: [ImageV2AliasFilterGQL!] = null
+  OR: [ImageV2AliasFilterGQL!] = null
+  NOT: [ImageV2AliasFilterGQL!] = null
 }
 
 """
@@ -2717,6 +3123,12 @@ input ImageV2FilterGQL {
   status: [ImageV2Status!] = null
   name: StringFilter = null
   architecture: StringFilter = null
+
+  """Added in 26.3.0. Filter by nested alias conditions."""
+  alias: ImageAliasNestedFilter = null
+
+  """Added in 26.3.0. Filter by last used datetime (before/after)."""
+  lastUsed: DateTimeFilter = null
   AND: [ImageV2FilterGQL!] = null
   OR: [ImageV2FilterGQL!] = null
   NOT: [ImageV2FilterGQL!] = null
@@ -2799,6 +3211,7 @@ Fields available for ordering image queries.
 enum ImageV2OrderField {
   NAME
   CREATED_AT
+  LAST_USED
 }
 
 """
@@ -2944,9 +3357,79 @@ input IntFilter {
 }
 
 """
+Payload returned after issuing a new keypair. The secret_key is only shown once.
+"""
+type IssueMyKeypairPayload {
+  """The newly generated access key."""
+  accessKey: String!
+
+  """
+  The newly generated secret key. This value is only returned at creation time.
+  """
+  secretKey: String!
+
+  """The generated SSH public key."""
+  sshPublicKey: String!
+}
+
+"""
 The `JSON` scalar type represents JSON values as specified by [ECMA-404](https://ecma-international.org/wp-content/uploads/ECMA-404_2nd_edition_december_2017.pdf).
 """
 scalar JSON @specifiedBy(url: "https://ecma-international.org/wp-content/uploads/ECMA-404_2nd_edition_december_2017.pdf")
+
+"""
+Added in 26.3.0. Per-slot resource allocation entry for a kernel.
+Represents one row from the resource_allocations table.
+"""
+type KernelResourceAllocation implements Node {
+  """The Globally Unique ID of this object"""
+  id: ID!
+
+  """Resource slot identifier (e.g., 'cpu', 'mem', 'cuda.device')."""
+  slotName: String!
+
+  """Amount of this resource slot originally requested for the kernel."""
+  requested: Decimal!
+
+  """Amount currently used. May be null if not yet measured."""
+  used: Decimal
+}
+
+"""An edge in a connection."""
+type KernelResourceAllocationEdge {
+  """A cursor for use in pagination"""
+  cursor: String!
+
+  """The item at the end of the edge"""
+  node: KernelResourceAllocation!
+}
+
+"""
+Added in 26.3.0. Filter criteria for querying kernel resource allocations.
+"""
+input KernelResourceAllocationFilter {
+  slotName: StringFilter = null
+  AND: [KernelResourceAllocationFilter!] = null
+  OR: [KernelResourceAllocationFilter!] = null
+  NOT: [KernelResourceAllocationFilter!] = null
+}
+
+"""
+Added in 26.3.0. Ordering specification for kernel resource allocations.
+"""
+input KernelResourceAllocationOrderBy {
+  field: KernelResourceAllocationOrderField!
+  direction: OrderDirection! = ASC
+}
+
+"""
+Added in 26.3.0. Fields available for ordering kernel resource allocations.
+"""
+enum KernelResourceAllocationOrderField {
+  SLOT_NAME
+  REQUESTED
+  USED
+}
 
 """
 Added in 26.2.0. Represents a kernel (compute container) in Backend.AI.
@@ -2959,7 +3442,7 @@ type KernelV2 implements Node {
   startupCommand: String
 
   """Information about the session this kernel belongs to."""
-  session: KernelV2SessionInfo!
+  sessionInfo: KernelV2SessionInfo!
 
   """User and ownership information."""
   userInfo: KernelV2UserInfo!
@@ -2990,6 +3473,12 @@ type KernelV2 implements Node {
 
   """Added in 26.2.0. The resource group this kernel is assigned to."""
   resourceGroup: ResourceGroup
+
+  """Added in 26.3.0. The session this kernel belongs to."""
+  session: SessionV2
+
+  """Added in 26.3.0. Per-slot resource allocation for this kernel."""
+  resourceAllocations(filter: KernelResourceAllocationFilter = null, orderBy: [KernelResourceAllocationOrderBy!] = null, first: Int = null, after: String = null, last: Int = null, before: String = null, limit: Int = null, offset: Int = null): ResourceAllocationConnection!
 }
 
 """
@@ -3033,6 +3522,9 @@ input KernelV2Filter {
   id: UUIDFilter = null
   status: KernelV2StatusFilter = null
   sessionId: UUIDFilter = null
+  AND: [KernelV2Filter!] = null
+  OR: [KernelV2Filter!] = null
+  NOT: [KernelV2Filter!] = null
 }
 
 """Added in 26.2.0. Lifecycle and status information for a kernel."""
@@ -3044,7 +3536,7 @@ type KernelV2LifecycleInfo {
   status: KernelV2Status!
 
   """The result of the kernel execution (UNDEFINED, SUCCESS, FAILURE)."""
-  result: SessionResult!
+  result: SessionV2Result!
 
   """Timestamp when the kernel was created."""
   createdAt: DateTime
@@ -3163,6 +3655,15 @@ enum LivenessStatus {
   HEALTHY
   UNHEALTHY
   DEGRADED
+}
+
+"""Added in 26.3.0. Key-value label entry for queries."""
+input MetricLabelEntryInput {
+  """Label key."""
+  key: String!
+
+  """Label value."""
+  value: String!
 }
 
 type ModelDeployment implements Node {
@@ -3390,6 +3891,29 @@ input ModelTarget {
   revision: String = null
 }
 
+"""Added in 26.3.0. Input for modifying an existing query definition."""
+input ModifyQueryDefinitionInput {
+  """New name."""
+  name: String
+
+  """New metric name."""
+  metricName: String
+
+  """New PromQL template."""
+  queryTemplate: String
+
+  """New default time window."""
+  timeWindow: String
+
+  """New query definition options."""
+  options: QueryDefinitionOptionsInput
+}
+
+"""Added in 26.3.0. Payload returned after modifying a query definition."""
+type ModifyQueryDefinitionPayload {
+  preset: QueryDefinition!
+}
+
 type Mutation {
   """
   Added in 25.14.0.
@@ -3551,9 +4075,11 @@ type Mutation {
   addModelRevision(input: AddRevisionInput!): AddRevisionPayload!
 
   """
-  Added in 25.16.0. Create model revision which is not attached to any deployment.
+  Added in 26.4.0.
+  Create or update the deployment policy for a given deployment (upsert semantics).
+  If the deployment already has a policy, it is replaced entirely with the new configuration.
   """
-  createModelRevision(input: CreateRevisionInput!): CreateRevisionPayload!
+  updateDeploymentPolicy(input: UpdateDeploymentPolicyInput!): UpdateDeploymentPolicyPayload!
 
   """Create a new notification channel (admin only)"""
   adminCreateNotificationChannel(input: CreateNotificationChannelInput!): CreateNotificationChannelPayload!
@@ -3817,42 +4343,81 @@ type Mutation {
   """
   Added in 26.2.0. Create a new user (admin only). Requires superadmin privileges. Automatically creates a default keypair for the user.
   """
-  adminCreateUser(input: CreateUserV2Input!): CreateUserV2Payload!
+  adminCreateUserV2(input: CreateUserV2Input!): CreateUserV2Payload!
 
   """
   Added in 26.2.0. Create multiple users in bulk (admin only). Requires superadmin privileges. Each user has individual specifications.
   """
-  adminBulkCreateUsers(input: BulkCreateUserV2Input!): BulkCreateUsersV2Payload!
+  adminBulkCreateUsersV2(input: BulkCreateUserV2Input!): BulkCreateUsersV2Payload!
 
   """
-  Added in 26.2.0. Update a user's information (admin only). Requires superadmin privileges. Only provided fields will be updated.
+  Added in 26.3.0. Update multiple users in bulk (admin only). Requires superadmin privileges. Each user has individual update specifications.
   """
-  adminUpdateUser(userId: UUID!, input: UpdateUserV2Input!): UpdateUserV2Payload!
+  adminBulkUpdateUsersV2(input: BulkUpdateUserV2Input!): BulkUpdateUsersV2Payload!
+
+  """
+  Added in 26.3.0. Update a user's information (admin only). Requires superadmin privileges. Only provided fields will be updated.
+  """
+  adminUpdateUserV2(userId: UUID!, input: UpdateUserV2Input!): UpdateUserV2Payload!
 
   """
   Added in 26.2.0. Update the current user's information. Users can only update their own profile. Some fields may be restricted based on user role.
   """
-  updateUser(input: UpdateUserV2Input!): UpdateUserV2Payload!
+  updateUserV2(input: UpdateUserV2Input!): UpdateUserV2Payload!
 
   """
   Added in 26.2.0. Soft-delete a user (admin only). Requires superadmin privileges. Sets the user status to DELETED but preserves data.
   """
-  adminDeleteUser(userId: UUID!): DeleteUserV2Payload!
+  adminDeleteUserV2(userId: UUID!): DeleteUserV2Payload!
 
   """
   Added in 26.2.0. Soft-delete multiple users (admin only). Requires superadmin privileges. Sets user status to DELETED but preserves data.
   """
-  adminDeleteUsers(input: DeleteUsersV2Input!): DeleteUsersV2Payload!
+  adminDeleteUsersV2(input: DeleteUsersV2Input!): DeleteUsersV2Payload!
 
   """
   Added in 26.2.0. Permanently delete a user and all associated data (admin only). Requires superadmin privileges. This action is IRREVERSIBLE. All user data, sessions, and resources will be deleted.
   """
-  adminPurgeUser(input: PurgeUserV2Input!): PurgeUserV2Payload!
+  adminPurgeUserV2(input: PurgeUserV2Input!): PurgeUserV2Payload!
 
   """
-  Added in 26.2.0. Permanently delete multiple users (admin only). Requires superadmin privileges. This action is IRREVERSIBLE. All user data will be deleted.
+  Added in 26.3.0. Permanently delete multiple users in bulk (admin only). Requires superadmin privileges. This action is IRREVERSIBLE. All user data will be deleted.
   """
-  adminPurgeUsers(input: PurgeUsersV2Input!): PurgeUsersV2Payload!
+  adminBulkPurgeUsersV2(input: BulkPurgeUsersV2Input!): BulkPurgeUsersV2Payload!
+
+  """
+  Issue a new keypair for the current user. Settings (resource_policy, rate_limit, is_admin) are inherited from the main keypair. The secret_key is only returned at creation time.
+  """
+  issueMyKeypair: IssueMyKeypairPayload!
+
+  """
+  Revoke a keypair owned by the current user. The main access key cannot be revoked — switch it first.
+  """
+  revokeMyKeypair(input: RevokeMyKeypairInput!): RevokeMyKeypairPayload!
+
+  """
+  Switch the main access key for the current user. The target keypair must be active and owned by the user.
+  """
+  switchMyMainAccessKey(input: SwitchMyMainAccessKeyInput!): SwitchMyMainAccessKeyPayload!
+
+  """
+  Update a keypair owned by the current user (e.g. toggle active state). The keypair must be owned by the current user.
+  """
+  updateMyKeypair(input: UpdateMyKeypairInput!): UpdateMyKeypairPayload!
+
+  """
+  Added in 26.4.0. Update the current user's allowed client IP list. Set allowed_client_ip to null to remove all IP restrictions. When force is false, the operation fails if the current request IP would be excluded by the new allowlist (lockout prevention).
+  """
+  updateMyAllowedClientIp(input: UpdateMyAllowedClientIPInput!): UpdateMyAllowedClientIPPayload!
+
+  """Added in 26.3.0. Create a new query definition (admin only)."""
+  adminCreatePrometheusQueryPreset(input: CreateQueryDefinitionInput!): CreateQueryDefinitionPayload!
+
+  """Added in 26.3.0. Modify an existing query definition (admin only)."""
+  adminModifyPrometheusQueryPreset(id: ID!, input: ModifyQueryDefinitionInput!): ModifyQueryDefinitionPayload!
+
+  """Added in 26.3.0. Delete a query definition (admin only)."""
+  adminDeletePrometheusQueryPreset(id: ID!): DeleteQueryDefinitionPayload!
 
   """Added in 26.3.0. Create a new role (admin only)."""
   adminCreateRole(input: CreateRoleInput!): Role!
@@ -3869,6 +4434,9 @@ type Mutation {
   """Added in 26.3.0. Create a scoped permission (admin only)."""
   adminCreatePermission(input: CreatePermissionInput!): Permission!
 
+  """Added in 26.3.0. Update a scoped permission (admin only)."""
+  adminUpdatePermission(input: UpdatePermissionInput!): Permission!
+
   """Added in 26.3.0. Delete a scoped permission (admin only)."""
   adminDeletePermission(input: DeletePermissionInput!): DeletePermissionPayload!
 
@@ -3877,6 +4445,12 @@ type Mutation {
 
   """Added in 26.3.0. Revoke a role from a user (admin only)."""
   adminRevokeRole(input: RevokeRoleInput!): RoleAssignment!
+
+  """Added in 26.3.0. Bulk assign a role to multiple users (admin only)."""
+  adminBulkAssignRole(input: BulkAssignRoleInput!): BulkAssignRolePayload!
+
+  """Added in 26.3.0. Bulk revoke a role from multiple users (admin only)."""
+  adminBulkRevokeRole(input: BulkRevokeRoleInput!): BulkRevokeRolePayload!
 }
 
 """An object with a Globally Unique ID"""
@@ -4019,6 +4593,19 @@ enum NotificationRuleType {
   ENDPOINT_LIFECYCLE_CHANGED
 }
 
+"""
+Added in 26.3.0. Display number format configuration for a resource slot type.
+"""
+type NumberFormat {
+  """
+  Whether to use binary (1024-based) prefix instead of decimal (1000-based).
+  """
+  binary: Boolean!
+
+  """Number of decimal places to display."""
+  roundLength: Int!
+}
+
 """Added in 25.14.0"""
 type ObjectStorage implements Node {
   """The Globally Unique ID of this object"""
@@ -4090,9 +4677,9 @@ type Permission implements Node {
   """The Globally Unique ID of this object"""
   id: ID!
   roleId: UUID!
-  scopeType: EntityType!
+  scopeType: RBACElementType!
   scopeId: String!
-  entityType: EntityType!
+  entityType: RBACElementType!
   operation: OperationType!
 
   """The role this permission belongs to."""
@@ -4124,8 +4711,11 @@ type PermissionEdge {
 """Added in 26.3.0. Filter for scoped permissions"""
 input PermissionFilter {
   roleId: UUID = null
-  scopeType: EntityType = null
-  entityType: EntityType = null
+  scopeType: RBACElementType = null
+  entityType: RBACElementType = null
+  AND: [PermissionFilter!] = null
+  OR: [PermissionFilter!] = null
+  NOT: [PermissionFilter!] = null
 }
 
 """Added in 26.3.0. Order by specification for permissions"""
@@ -4138,6 +4728,54 @@ input PermissionOrderBy {
 enum PermissionOrderField {
   ID
   ENTITY_TYPE
+}
+
+"""Added in 26.3.0. Preemption configuration for a resource group."""
+type PreemptionConfig {
+  """
+  Sessions with priority <= this value are eligible for preemption. Default is 5.
+  """
+  preemptiblePriority: Int!
+
+  """
+  Tie-breaking order for sessions with the same priority during preemption. 'oldest' preempts the oldest session first, 'newest' preempts the newest. Default is 'oldest'.
+  """
+  order: PreemptionOrder!
+
+  """
+  How to preempt a session when preemption is triggered. 'terminate' destroys the session, 'reschedule' queues it for rescheduling. Default is 'terminate'.
+  """
+  mode: PreemptionMode!
+}
+
+"""Added in 26.3.0. Input for preemption configuration."""
+input PreemptionConfigInput {
+  """Sessions with priority <= this value are preemptible. Default is 5."""
+  preemptiblePriority: Int! = 5
+
+  """
+  Tie-breaking order for same-priority sessions (OLDEST, NEWEST). Default is OLDEST.
+  """
+  order: PreemptionOrder! = OLDEST
+
+  """How to preempt sessions (TERMINATE, RESCHEDULE). Default is TERMINATE."""
+  mode: PreemptionMode! = TERMINATE
+}
+
+"""
+Added in 26.3.0. How to preempt a session when preemption is triggered.
+"""
+enum PreemptionMode {
+  TERMINATE
+  RESCHEDULE
+}
+
+"""
+Added in 26.3.0. Tie-breaking order for same-priority sessions during preemption.
+"""
+enum PreemptionOrder {
+  OLDEST
+  NEWEST
 }
 
 """
@@ -4592,6 +5230,11 @@ type ProjectV2 implements Node @key(fields: "id") {
   fairShare(scope: ProjectFairShareScope!): ProjectFairShare!
 
   """
+  Added in 26.4.0. Active resource usage overview for this project. Returns the currently occupied resource slots and the number of active sessions.
+  """
+  activeResourceOverview: ActiveResourceOverview!
+
+  """
   Usage buckets for this project, filtered by resource group. Returns aggregated resource usage statistics over time.
   """
   usageBuckets(scope: ProjectUsageScope!, filter: ProjectUsageBucketFilter = null, orderBy: [ProjectUsageBucketOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ProjectUsageBucketConnection!
@@ -4752,23 +5395,6 @@ type PurgeUserV2Payload {
   success: Boolean!
 }
 
-"""
-Added in 26.2.0. Input for permanently deleting multiple users. This action is irreversible.
-"""
-input PurgeUsersV2Input {
-  """List of user UUIDs to purge."""
-  userIds: [UUID!]!
-}
-
-"""Added in 26.2.0. Payload for bulk user permanent deletion mutation."""
-type PurgeUsersV2Payload {
-  """Number of users successfully purged."""
-  purgedCount: Int!
-
-  """List of user UUIDs that failed to purge, if any."""
-  failedUserIds: [UUID!]!
-}
-
 type Query {
   _entities(representations: [_Any!]!): [_Entity]!
   _service: _Service!
@@ -4919,7 +5545,7 @@ type Query {
   adminResourceGroups(filter: ResourceGroupFilter = null, orderBy: [ResourceGroupOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ResourceGroupConnection
 
   """Added in 26.3.0. Query service catalog entries. Admin only."""
-  adminServiceCatalogs(filter: ServiceCatalogFilter = null, first: Int = null, offset: Int = null): [ServiceCatalog!]!
+  adminServiceCatalogs(filter: ServiceCatalogFilter = null, orderBy: [ServiceCatalogOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): [ServiceCatalog!]!
 
   """List session scheduling history (admin only)"""
   adminSessionSchedulingHistories(filter: SessionSchedulingHistoryFilter = null, orderBy: [SessionSchedulingHistoryOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): SessionSchedulingHistoryConnection
@@ -4997,6 +5623,24 @@ type Query {
   """
   adminKernelsV2(filter: KernelV2Filter = null, orderBy: [KernelV2OrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): KernelV2Connection
 
+  """Query audit logs with pagination and filtering. (admin only)"""
+  adminAuditLogsV2(filter: AuditLogFilter = null, orderBy: [AuditLogOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): AuditLogV2Connection!
+
+  """
+  Added in 26.3.0. Query sessions with pagination and filtering. (admin only)
+  """
+  adminSessionsV2(filter: SessionV2Filter = null, orderBy: [SessionV2OrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): SessionV2Connection!
+
+  """
+  Added in 26.3.0. Returns a single resource slot type by slot_name, or null.
+  """
+  resourceSlotType(slotName: String!): ResourceSlotType
+
+  """
+  Added in 26.3.0. Returns resource slot types with pagination and filtering.
+  """
+  resourceSlotTypes(filter: ResourceSlotTypeFilter = null, orderBy: [ResourceSlotTypeOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ResourceSlotTypeConnection!
+
   """
   Added in 26.2.0.
   
@@ -5007,6 +5651,19 @@ type Query {
   Supports both cursor-based and offset-based pagination.
   """
   adminImageAliases(filter: ImageV2AliasFilterGQL = null, orderBy: [ImageV2AliasOrderByGQL!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ImageV2AliasConnection
+
+  """Added in 26.3.0. Get a single query definition by ID (admin only)."""
+  adminPrometheusQueryPreset(id: ID!): QueryDefinition
+
+  """
+  Added in 26.3.0. List query definitions with filtering and pagination (admin only).
+  """
+  adminPrometheusQueryPresets(filter: QueryDefinitionFilter = null, orderBy: [QueryDefinitionOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): QueryDefinitionConnection
+
+  """
+  Added in 26.3.0. Execute a query definition by ID and return the result (admin only).
+  """
+  adminPrometheusQueryPresetResult(id: ID!, timeRange: QueryTimeRangeInput = null, options: ExecuteQueryDefinitionOptionsInput = null, timeWindow: String = null): QueryDefinitionExecuteResult!
 
   """Added in 26.3.0. Get a single role by ID (admin only)."""
   adminRole(id: UUID!): Role
@@ -5024,18 +5681,20 @@ type Query {
   """
   Added in 26.3.0. List role assignments with filtering and pagination (admin only).
   """
-  adminRoleAssignments(filter: RoleAssignmentFilter = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): RoleAssignmentConnection!
+  adminRoleAssignments(filter: RoleAssignmentFilter = null, orderBy: [RoleAssignmentOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): RoleAssignmentConnection!
 
   """
   Added in 26.3.0. Search entity associations (admin only). Optionally filter by entity_type and entity_id.
   """
   adminEntities(filter: EntityFilter = null, orderBy: [EntityOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): EntityConnection!
 
-  """Added in 26.3.0. List available scope types."""
-  scopeTypes: [EntityType!]!
+  """
+  Added in 26.3.0. List roles assigned to the current authenticated user.
+  """
+  myRoles(filter: RoleAssignmentFilter = null, orderBy: [RoleAssignmentOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): RoleAssignmentConnection!
 
-  """Added in 26.3.0. List available entity types."""
-  entityTypes: [EntityType!]!
+  """Added in 26.3.0. List valid RBAC scope-entity type combinations."""
+  rbacScopeEntityCombinations: [ScopeEntityCombination!]!
 
   """Added in 26.2.0. Query kernels within a specific session."""
   sessionKernelsV2(scope: SessionScope!, filter: KernelV2Filter = null, orderBy: [KernelV2OrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): KernelV2Connection
@@ -5046,7 +5705,7 @@ type Query {
   rgDomainFairShare(scope: ResourceGroupDomainScope!, domainName: String!): DomainFairShare
 
   """Added in 26.2.0. List domain fair shares within resource group scope."""
-  rgDomainFairShares(scope: ResourceGroupDomainScope!, filter: DomainFairShareFilter = null, orderBy: [DomainFairShareOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): DomainFairShareConnection
+  rgDomainFairShares(scope: ResourceGroupDomainScope!, filter: RGDomainFairShareFilter = null, orderBy: [DomainFairShareOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): DomainFairShareConnection
 
   """
   Added in 26.2.0. Get project fair share data within resource group scope.
@@ -5054,13 +5713,13 @@ type Query {
   rgProjectFairShare(scope: ResourceGroupProjectScope!, projectId: UUID!): ProjectFairShare
 
   """Added in 26.2.0. List project fair shares within resource group scope."""
-  rgProjectFairShares(scope: ResourceGroupProjectScope!, filter: ProjectFairShareFilter = null, orderBy: [ProjectFairShareOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ProjectFairShareConnection
+  rgProjectFairShares(scope: ResourceGroupProjectScope!, filter: RGProjectFairShareFilter = null, orderBy: [ProjectFairShareOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ProjectFairShareConnection
 
   """Added in 26.2.0. Get user fair share data within resource group scope."""
   rgUserFairShare(scope: ResourceGroupUserScope!, userUuid: UUID!): UserFairShare
 
   """Added in 26.2.0. List user fair shares within resource group scope."""
-  rgUserFairShares(scope: ResourceGroupUserScope!, filter: UserFairShareFilter = null, orderBy: [UserFairShareOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): UserFairShareConnection
+  rgUserFairShares(scope: ResourceGroupUserScope!, filter: RGUserFairShareFilter = null, orderBy: [UserFairShareOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): UserFairShareConnection
 
   """
   Added in 26.2.0. List domain usage buckets within resource group scope. This API is not yet implemented.
@@ -5248,6 +5907,269 @@ type Query {
 }
 
 """
+Added in 26.3.0. Prometheus query definition entity implementing Relay Node pattern.
+"""
+type QueryDefinition implements Node {
+  """The Globally Unique ID of this object"""
+  id: ID!
+
+  """Human-readable query definition identifier."""
+  name: String!
+
+  """Prometheus metric name."""
+  metricName: String!
+
+  """PromQL template with placeholders."""
+  queryTemplate: String!
+
+  """Default time window. Falls back to server config if null."""
+  timeWindow: String
+
+  """Query definition options including filter and group labels."""
+  options: QueryDefinitionOptions!
+
+  """Creation timestamp."""
+  createdAt: DateTime!
+
+  """Last update timestamp."""
+  updatedAt: DateTime!
+}
+
+"""Added in 26.3.0. Paginated connection for query definition records."""
+type QueryDefinitionConnection {
+  """Pagination data for this connection"""
+  pageInfo: PageInfo!
+
+  """Contains the nodes in this connection"""
+  edges: [QueryDefinitionEdge!]!
+
+  """Total number of query definition records matching the query criteria."""
+  count: Int!
+}
+
+"""An edge in a connection."""
+type QueryDefinitionEdge {
+  """A cursor for use in pagination"""
+  cursor: String!
+
+  """The item at the end of the edge"""
+  node: QueryDefinition!
+}
+
+"""Added in 26.3.0. Result from executing a query definition."""
+type QueryDefinitionExecuteResult {
+  """Prometheus response status."""
+  status: String!
+
+  """Result type (e.g., matrix)."""
+  resultType: String!
+
+  """Metric result entries."""
+  result: [QueryDefinitionMetricResult!]!
+}
+
+"""Added in 26.3.0. Filter input for querying query definitions."""
+input QueryDefinitionFilter {
+  """Filter by name."""
+  name: StringFilter = null
+
+  """Combine multiple filters with AND logic."""
+  AND: [QueryDefinitionFilter!] = null
+
+  """Combine multiple filters with OR logic."""
+  OR: [QueryDefinitionFilter!] = null
+
+  """Negate the specified filters."""
+  NOT: [QueryDefinitionFilter!] = null
+}
+
+"""Added in 26.3.0. Key-value label entry from Prometheus result."""
+type QueryDefinitionMetricLabelEntry {
+  key: String!
+  value: String!
+}
+
+"""Added in 26.3.0. Single metric result from Prometheus query."""
+type QueryDefinitionMetricResult {
+  """Metric labels as key-value entries."""
+  metric: [QueryDefinitionMetricLabelEntry!]!
+
+  """Time-series values."""
+  values: [QueryDefinitionMetricResultValue!]!
+}
+
+"""Added in 26.3.0. Single timestamp-value pair from Prometheus."""
+type QueryDefinitionMetricResultValue {
+  timestamp: Float!
+  value: String!
+}
+
+"""Added in 26.3.0. Options for query definition label governance."""
+type QueryDefinitionOptions {
+  """Allowed filter label keys."""
+  filterLabels: [String!]!
+
+  """Allowed group-by label keys."""
+  groupLabels: [String!]!
+}
+
+"""Added in 26.3.0. Options for query definition labels."""
+input QueryDefinitionOptionsInput {
+  """Allowed filter label keys."""
+  filterLabels: [String!]!
+
+  """Allowed group-by label keys."""
+  groupLabels: [String!]!
+}
+
+"""Added in 26.3.0. Specifies ordering for query definition results."""
+input QueryDefinitionOrderBy {
+  """The field to order by."""
+  field: QueryDefinitionOrderField!
+
+  """Sort direction."""
+  direction: OrderDirection! = DESC
+}
+
+"""
+Added in 26.3.0. Fields available for ordering query definition results.
+"""
+enum QueryDefinitionOrderField {
+  CREATED_AT
+  UPDATED_AT
+  NAME
+}
+
+"""Added in 26.3.0. Time range for Prometheus query."""
+input QueryTimeRangeInput {
+  """Start of the time range."""
+  start: DateTime!
+
+  """End of the time range."""
+  end: DateTime!
+
+  """Query resolution step (e.g., '60s')."""
+  step: String!
+}
+
+"""
+Added in 26.3.0. Unified RBAC element type for scope-entity relationships
+"""
+enum RBACElementType {
+  DOMAIN
+  PROJECT
+  USER
+  SESSION
+  VFOLDER
+  MODEL_DEPLOYMENT
+  KEYPAIR
+  NOTIFICATION_CHANNEL
+  NETWORK
+  RESOURCE_GROUP
+  CONTAINER_REGISTRY
+  STORAGE_HOST
+  AGENT
+  KERNEL
+  ROUTING
+  IMAGE
+  ARTIFACT
+  ARTIFACT_REGISTRY
+  SESSION_TEMPLATE
+  APP_CONFIG
+  RESOURCE_PRESET
+  USER_RESOURCE_POLICY
+  KEYPAIR_RESOURCE_POLICY
+  PROJECT_RESOURCE_POLICY
+  ROLE
+  AUDIT_LOG
+  EVENT_LOG
+  NOTIFICATION_RULE
+  DEPLOYMENT_TOKEN
+  DEPLOYMENT_POLICY
+  DEPLOYMENT_REVISION
+  IMAGE_ALIAS
+  ARTIFACT_REVISION
+}
+
+"""
+Added in 26.2.0. Filter for domain fair shares within a resource group scope. References resource group membership columns to avoid excluding domains without fair share records.
+"""
+input RGDomainFairShareFilter {
+  """Filter by scaling group name."""
+  resourceGroup: StringFilter = null
+
+  """Filter by domain name."""
+  domainName: StringFilter = null
+
+  """Filter by domain properties."""
+  domain: DomainFairShareDomainNestedFilter = null
+
+  """Combine with AND logic."""
+  AND: [RGDomainFairShareFilter!] = null
+
+  """Combine with OR logic."""
+  OR: [RGDomainFairShareFilter!] = null
+
+  """Negate filters."""
+  NOT: [RGDomainFairShareFilter!] = null
+}
+
+"""
+Added in 26.2.0. Filter for project fair shares within a resource group scope. References resource group membership columns to avoid excluding projects without fair share records.
+"""
+input RGProjectFairShareFilter {
+  """Filter by scaling group name."""
+  resourceGroup: StringFilter = null
+
+  """Filter by project UUID."""
+  projectId: UUIDFilter = null
+
+  """Filter by domain name."""
+  domainName: StringFilter = null
+
+  """Filter by project properties."""
+  project: ProjectFairShareProjectNestedFilter = null
+
+  """Combine with AND logic."""
+  AND: [RGProjectFairShareFilter!] = null
+
+  """Combine with OR logic."""
+  OR: [RGProjectFairShareFilter!] = null
+
+  """Negate filters."""
+  NOT: [RGProjectFairShareFilter!] = null
+}
+
+"""
+Added in 26.2.0. Filter for user fair shares within a resource group scope. References resource group membership columns to avoid excluding users without fair share records.
+"""
+input RGUserFairShareFilter {
+  """Filter by scaling group name."""
+  resourceGroup: StringFilter = null
+
+  """Filter by user UUID."""
+  userUuid: UUIDFilter = null
+
+  """Filter by project UUID."""
+  projectId: UUIDFilter = null
+
+  """Filter by domain name."""
+  domainName: StringFilter = null
+
+  """Filter by user properties."""
+  user: UserFairShareUserNestedFilter = null
+
+  """Combine with AND logic."""
+  AND: [RGUserFairShareFilter!] = null
+
+  """Combine with OR logic."""
+  OR: [RGUserFairShareFilter!] = null
+
+  """Negate filters."""
+  NOT: [RGUserFairShareFilter!] = null
+}
+
+"""
 Added in 25.19.0. This enum represents the readiness status of a replica, indicating whether the deployment has been checked and its health state.
 """
 enum ReadinessStatus {
@@ -5386,6 +6308,18 @@ type ResourceAllocation {
   The resource slots currently used by this kernel. May be null if not yet allocated.
   """
   used: ResourceSlot
+}
+
+"""
+Added in 26.3.0. Relay-style connection for per-slot kernel resource allocations.
+"""
+type ResourceAllocationConnection {
+  """Pagination data for this connection"""
+  pageInfo: PageInfo!
+
+  """Contains the nodes in this connection"""
+  edges: [KernelResourceAllocationEdge!]!
+  count: Int!
 }
 
 type ResourceConfig {
@@ -5539,6 +6473,9 @@ type ResourceGroupSchedulerConfig {
   Type of scheduler used for session scheduling (fifo, lifo, drf, fair-share).
   """
   type: SchedulerType!
+
+  """Added in 26.3.0. Preemption configuration for this resource group."""
+  preemption: PreemptionConfig!
 }
 
 """Added in 26.2.0. Status information for a resource group."""
@@ -5663,6 +6600,87 @@ input ResourceSlotInput {
 }
 
 """
+Added in 26.3.0. A registered resource slot type describing display metadata
+and formatting rules for a specific resource (e.g., cpu, mem, cuda.device).
+"""
+type ResourceSlotType implements Node {
+  """The Globally Unique ID of this object"""
+  id: ID!
+
+  """
+  Unique identifier for the resource slot (e.g., 'cpu', 'mem', 'cuda.device').
+  """
+  slotName: String!
+
+  """Category of the slot type (e.g., 'count', 'bytes', 'unique-count')."""
+  slotType: String!
+
+  """Human-readable name for display in UIs."""
+  displayName: String!
+
+  """Longer description of what this resource slot represents."""
+  description: String!
+
+  """
+  Unit label used when displaying resource amounts (e.g., 'GiB', 'cores').
+  """
+  displayUnit: String!
+
+  """Icon identifier for UI rendering (e.g., 'cpu', 'memory', 'gpu')."""
+  displayIcon: String!
+
+  """Number formatting rules (binary vs decimal prefix, rounding)."""
+  numberFormat: NumberFormat!
+
+  """Display ordering rank. Lower values appear first."""
+  rank: Int!
+}
+
+"""
+Added in 26.3.0. Relay-style connection for paginated resource slot types.
+"""
+type ResourceSlotTypeConnection {
+  """Pagination data for this connection"""
+  pageInfo: PageInfo!
+
+  """Contains the nodes in this connection"""
+  edges: [ResourceSlotTypeEdge!]!
+  count: Int!
+}
+
+"""An edge in a connection."""
+type ResourceSlotTypeEdge {
+  """A cursor for use in pagination"""
+  cursor: String!
+
+  """The item at the end of the edge"""
+  node: ResourceSlotType!
+}
+
+"""Added in 26.3.0. Filter criteria for querying resource slot types."""
+input ResourceSlotTypeFilter {
+  slotName: StringFilter = null
+  slotType: StringFilter = null
+  displayName: StringFilter = null
+  AND: [ResourceSlotTypeFilter!] = null
+  OR: [ResourceSlotTypeFilter!] = null
+  NOT: [ResourceSlotTypeFilter!] = null
+}
+
+"""Added in 26.3.0. Ordering specification for resource slot types."""
+input ResourceSlotTypeOrderBy {
+  field: ResourceSlotTypeOrderField!
+  direction: OrderDirection! = ASC
+}
+
+"""Added in 26.3.0. Fields available for ordering resource slot types."""
+enum ResourceSlotTypeOrderField {
+  SLOT_NAME
+  RANK
+  DISPLAY_NAME
+}
+
+"""
 Added in 26.2.0. Resource weight with default indicator. Shows whether this resource type's weight was explicitly set or uses default.
 """
 type ResourceWeightEntry {
@@ -5719,6 +6737,18 @@ type RestoreArtifactsPayload {
   artifacts: [Artifact!]!
 }
 
+"""Input for revoking a keypair owned by the current user."""
+input RevokeMyKeypairInput {
+  """Access key of the keypair to revoke. Must not be the main access key."""
+  accessKey: String!
+}
+
+"""Payload returned after revoking a keypair."""
+type RevokeMyKeypairPayload {
+  """Whether the revocation was successful."""
+  success: Boolean!
+}
+
 """Added in 26.3.0. Input for revoking a role from a user"""
 input RevokeRoleInput {
   userId: UUID!
@@ -5736,6 +6766,12 @@ type Role implements Node {
   createdAt: DateTime!
   updatedAt: DateTime!
   deletedAt: DateTime
+
+  """Added in 26.3.0. Permissions associated with this role."""
+  permissions(filter: PermissionFilter = null, orderBy: [PermissionOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): PermissionConnection!
+
+  """Added in 26.3.0. Users assigned to this role."""
+  users(filter: RoleAssignmentFilter = null, orderBy: [RoleAssignmentOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): RoleAssignmentConnection!
 }
 
 """Added in 26.3.0. RBAC role assignment (user-role association)"""
@@ -5782,6 +6818,37 @@ type RoleAssignmentEdge {
 """Added in 26.3.0. Filter for role assignments"""
 input RoleAssignmentFilter {
   roleId: UUID = null
+  role: RoleAssignmentRoleNestedFilter = null
+  username: StringFilter = null
+  email: StringFilter = null
+  AND: [RoleAssignmentFilter!] = null
+  OR: [RoleAssignmentFilter!] = null
+  NOT: [RoleAssignmentFilter!] = null
+}
+
+"""Added in 26.3.0. Order by specification for role assignments"""
+input RoleAssignmentOrderBy {
+  field: RoleAssignmentOrderField!
+  direction: OrderDirection! = DESC
+}
+
+"""Added in 26.3.0. Role assignment ordering field"""
+enum RoleAssignmentOrderField {
+  USERNAME
+  EMAIL
+  GRANTED_AT
+}
+
+"""
+Added in 26.3.0. Nested filter for roles within a role assignment. Filters assignments that have a role matching all specified conditions.
+"""
+input RoleAssignmentRoleNestedFilter {
+  name: StringFilter = null
+  source: [RoleSource!] = null
+  status: [RoleStatus!] = null
+  AND: [RoleAssignmentRoleNestedFilter!] = null
+  OR: [RoleAssignmentRoleNestedFilter!] = null
+  NOT: [RoleAssignmentRoleNestedFilter!] = null
 }
 
 """Added in 26.3.0. Role connection"""
@@ -5810,7 +6877,7 @@ input RoleFilter {
   status: [RoleStatus!] = null
   AND: [RoleFilter!] = null
   OR: [RoleFilter!] = null
-  NOT: RoleFilter = null
+  NOT: [RoleFilter!] = null
 }
 
 """Added in 26.3.0. Order by specification for roles"""
@@ -5904,6 +6971,9 @@ type RouteEdge {
 input RouteFilter {
   status: [RouteStatus!] = null
   trafficStatus: [RouteTrafficStatus!] = null
+  AND: [RouteFilter!] = null
+  OR: [RouteFilter!] = null
+  NOT: [RouteFilter!] = null
 }
 
 """Route history record"""
@@ -5960,6 +7030,9 @@ input RouteHistoryFilter {
   message: StringFilter = null
   createdAt: DateTimeFilter = null
   updatedAt: DateTimeFilter = null
+  AND: [RouteHistoryFilter!] = null
+  OR: [RouteHistoryFilter!] = null
+  NOT: [RouteHistoryFilter!] = null
 }
 
 """Order by specification for route history"""
@@ -6136,6 +7209,14 @@ enum SchedulingStatus {
   ERROR
 }
 
+"""
+Added in 26.3.0. Valid scope-entity type combination for RBAC permissions.
+"""
+type ScopeEntityCombination {
+  scopeType: RBACElementType!
+  validEntityTypes: [RBACElementType!]!
+}
+
 """Added in 26.3.0. A registered service instance in the catalog."""
 type ServiceCatalog implements Node {
   """The Globally Unique ID of this object"""
@@ -6203,6 +7284,25 @@ input ServiceCatalogFilter {
 
   """Filter by health status."""
   status: ServiceCatalogStatus = null
+  AND: [ServiceCatalogFilter!] = null
+  OR: [ServiceCatalogFilter!] = null
+  NOT: [ServiceCatalogFilter!] = null
+}
+
+"""
+Added in 26.3.0. Specifies the field and direction for ordering service catalog queries.
+"""
+input ServiceCatalogOrderBy {
+  field: ServiceCatalogOrderField!
+  direction: OrderDirection! = ASC
+}
+
+"""
+Added in 26.3.0. Fields available for ordering service catalog queries.
+"""
+enum ServiceCatalogOrderField {
+  SERVICE_GROUP
+  REGISTERED_AT
 }
 
 """Added in 26.3.0. Health status of a service in the catalog."""
@@ -6248,12 +7348,6 @@ Added in 26.2.0. A collection of exposed service ports. Each entry defines a ser
 type ServicePorts {
   """List of service port entries."""
   entries: [ServicePortEntry!]!
-}
-
-enum SessionResult {
-  UNDEFINED
-  SUCCESS
-  FAILURE
 }
 
 """Session scheduling history record"""
@@ -6306,6 +7400,9 @@ input SessionSchedulingHistoryFilter {
   message: StringFilter = null
   createdAt: DateTimeFilter = null
   updatedAt: DateTimeFilter = null
+  AND: [SessionSchedulingHistoryFilter!] = null
+  OR: [SessionSchedulingHistoryFilter!] = null
+  NOT: [SessionSchedulingHistoryFilter!] = null
 }
 
 """Order by specification for session scheduling history"""
@@ -6326,6 +7423,230 @@ input SessionScope {
 }
 
 enum SessionTypes {
+  INTERACTIVE
+  BATCH
+  INFERENCE
+  SYSTEM
+}
+
+"""Added in 26.3.0. Represents a compute session in Backend.AI."""
+type SessionV2 implements Node {
+  """The Globally Unique ID of this object"""
+  id: ID!
+
+  """Metadata including domain, project, and user information."""
+  metadata: SessionV2MetadataInfo!
+
+  """Resource allocation and cluster information."""
+  resource: SessionV2ResourceInfo!
+
+  """Lifecycle status and timestamps."""
+  lifecycle: SessionV2LifecycleInfo!
+
+  """Runtime execution configuration."""
+  runtime: SessionV2RuntimeInfo!
+
+  """Network configuration."""
+  network: SessionV2NetworkInfo!
+
+  """Added in 26.3.0. The domain this session belongs to."""
+  domain: DomainV2
+
+  """Added in 26.3.0. The user who owns this session."""
+  user: UserV2
+
+  """Added in 26.3.0. The project this session belongs to."""
+  project: ProjectV2
+
+  """Added in 26.3.0. The resource group this session is assigned to."""
+  resourceGroup: ResourceGroup
+
+  """
+  Added in 26.3.0. The candidate resource groups considered during scheduling.
+  """
+  targetResourceGroups: ResourceGroupConnection
+
+  """
+  Added in 26.3.0. The images used by this session. Multiple images are possible in multi-kernel (cluster) sessions.
+  """
+  images: ImageV2Connection!
+
+  """Added in 26.3.0. The kernels belonging to this session."""
+  kernels: KernelV2Connection!
+}
+
+"""Added in 26.3.0. Connection type for paginated session results."""
+type SessionV2Connection {
+  """Pagination data for this connection"""
+  pageInfo: PageInfo!
+
+  """Contains the nodes in this connection"""
+  edges: [SessionV2Edge!]!
+  count: Int!
+}
+
+"""An edge in a connection."""
+type SessionV2Edge {
+  """A cursor for use in pagination"""
+  cursor: String!
+
+  """The item at the end of the edge"""
+  node: SessionV2!
+}
+
+"""Added in 26.3.0. Filter criteria for querying sessions."""
+input SessionV2Filter {
+  id: UUIDFilter = null
+  status: SessionV2StatusFilter = null
+  name: StringFilter = null
+  domainName: StringFilter = null
+  projectId: UUIDFilter = null
+  userUuid: UUIDFilter = null
+  AND: [SessionV2Filter!] = null
+  OR: [SessionV2Filter!] = null
+  NOT: [SessionV2Filter!] = null
+}
+
+"""Added in 26.3.0. Lifecycle status and timestamps for a session."""
+type SessionV2LifecycleInfo {
+  """Current status of the session."""
+  status: SessionV2Status!
+
+  """Result of the session execution (success, failure, etc.)."""
+  result: SessionV2Result!
+
+  """Timestamp when the session was created."""
+  createdAt: DateTime
+
+  """Timestamp when the session was terminated. Null if still active."""
+  terminatedAt: DateTime
+
+  """Scheduled start time for the session, if applicable."""
+  startsAt: DateTime
+
+  """Batch execution timeout in seconds. Applicable to batch sessions."""
+  batchTimeout: Int
+}
+
+"""Added in 26.3.0. Metadata information for a session."""
+type SessionV2MetadataInfo {
+  """Server-generated unique token for tracking session creation."""
+  creationId: String!
+
+  """Human-readable name of the session."""
+  name: String!
+
+  """Type of the session (interactive, batch, inference)."""
+  sessionType: SessionV2Type!
+
+  """Access key used to create this session."""
+  accessKey: String!
+
+  """Cluster mode for distributed sessions (single-node, multi-node)."""
+  clusterMode: ClusterMode!
+
+  """Number of nodes in the cluster."""
+  clusterSize: Int!
+
+  """Scheduling priority of the session."""
+  priority: Int!
+
+  """
+  Whether this session is eligible for preemption by higher-priority sessions.
+  """
+  isPreemptible: Boolean!
+
+  """Optional user-provided tag for the session."""
+  tag: String
+}
+
+"""Added in 26.3.0. Network configuration for a session."""
+type SessionV2NetworkInfo {
+  """Whether the session uses the host network directly."""
+  useHostNetwork: Boolean!
+
+  """Type of network used by the session."""
+  networkType: String
+
+  """ID of the network if applicable."""
+  networkId: String
+}
+
+"""Added in 26.3.0. Ordering specification for sessions."""
+input SessionV2OrderBy {
+  field: SessionV2OrderField!
+  direction: OrderDirection! = DESC
+}
+
+"""Added in 26.3.0. Fields available for ordering sessions."""
+enum SessionV2OrderField {
+  CREATED_AT
+  TERMINATED_AT
+  STATUS
+  ID
+  NAME
+}
+
+"""Added in 26.3.0. Resource allocation information for a session."""
+type SessionV2ResourceInfo {
+  """Resource allocation with requested and occupied slots."""
+  allocation: ResourceAllocation!
+
+  """The resource group (scaling group) this session is assigned to."""
+  resourceGroupName: String
+
+  """Candidate resource group names considered during scheduling."""
+  targetResourceGroupNames: [String!]
+}
+
+"""
+Added in 26.3.0. Result status of a session or kernel execution. Indicates the final outcome after the session/kernel has terminated. UNDEFINED: The session has not yet finished or its result is unknown. SUCCESS: The session completed normally without errors. FAILURE: The session terminated abnormally due to an error or user cancellation.
+"""
+enum SessionV2Result {
+  UNDEFINED
+  SUCCESS
+  FAILURE
+}
+
+"""Added in 26.3.0. Runtime execution configuration for a session."""
+type SessionV2RuntimeInfo {
+  """Environment variables for the session."""
+  environ: EnvironmentVariables
+
+  """Bootstrap script to run before the main process."""
+  bootstrapScript: String
+
+  """Startup command to execute when the session starts."""
+  startupCommand: String
+
+  """
+  URL to call back when the session completes (e.g., for batch sessions).
+  """
+  callbackUrl: String
+}
+
+"""Added in 26.3.0. Status of a session in its lifecycle."""
+enum SessionV2Status {
+  PENDING
+  SCHEDULED
+  PREPARING
+  PREPARED
+  CREATING
+  RUNNING
+  DEPRIORITIZING
+  TERMINATING
+  TERMINATED
+  CANCELLED
+}
+
+"""Added in 26.3.0. Filter for session status."""
+input SessionV2StatusFilter {
+  in: [SessionV2Status!] = null
+  notIn: [SessionV2Status!] = null
+}
+
+"""Added in 26.3.0. Type of compute session."""
+enum SessionV2Type {
   INTERACTIVE
   BATCH
   INFERENCE
@@ -6453,6 +7774,20 @@ type Subscription {
   backgroundTaskEvents(taskId: ID!): BackgroundTaskEventPayload!
 }
 
+"""Input for switching the main access key of the current user."""
+input SwitchMyMainAccessKeyInput {
+  """
+  Access key to set as the new main access key. Must be active and owned by the user.
+  """
+  accessKey: String!
+}
+
+"""Payload returned after switching the main access key."""
+type SwitchMyMainAccessKeyPayload {
+  """Whether the switch was successful."""
+  success: Boolean!
+}
+
 """Added in 25.19.0"""
 input SyncReplicaInput {
   modelDeploymentId: ID!
@@ -6564,6 +7899,31 @@ type UpdateDeploymentPayload {
   deployment: ModelDeployment!
 }
 
+"""
+Added in 26.4.0.
+Input for creating or updating a deployment policy (upsert semantics).
+Specify the target deployment_id and the desired strategy type.
+Exactly one of rolling_update or blue_green must be provided,
+matching the chosen strategy type.
+If a policy already exists for the deployment, it is replaced entirely.
+"""
+input UpdateDeploymentPolicyInput {
+  deploymentId: ID!
+  strategy: DeploymentStrategyType!
+  rollbackOnFailure: Boolean! = false
+  rollingUpdate: RollingUpdateConfigInput = null
+  blueGreen: BlueGreenConfigInput = null
+}
+
+"""
+Added in 26.4.0.
+Result payload returned after creating or updating a deployment policy.
+Contains the full deployment_policy object reflecting the applied configuration.
+"""
+type UpdateDeploymentPolicyPayload {
+  deploymentPolicy: DeploymentPolicy!
+}
+
 """Added in 25.14.0"""
 input UpdateHuggingFaceRegistryInput {
   id: ID!
@@ -6575,6 +7935,46 @@ input UpdateHuggingFaceRegistryInput {
 """Added in 25.14.0"""
 type UpdateHuggingFaceRegistryPayload {
   huggingfaceRegistry: HuggingFaceRegistry!
+}
+
+"""
+Added in 26.4.0. Input for updating the current user's allowed client IP list. Set allowed_client_ip to null to remove all restrictions. Use force=true to bypass the lockout safety check.
+"""
+input UpdateMyAllowedClientIPInput {
+  """
+  New allowed client IP addresses or CIDR ranges. Set to null to remove all IP restrictions.
+  """
+  allowedClientIp: [String!]
+
+  """
+  If false (default), the operation will fail if the current request IP is not included in the new allowlist. Set to true to override this safety check.
+  """
+  force: Boolean! = false
+}
+
+"""
+Added in 26.4.0. Payload for updating the current user's allowed client IP list.
+"""
+type UpdateMyAllowedClientIPPayload {
+  """Whether the update was successful."""
+  success: Boolean!
+}
+
+"""Input for updating a keypair owned by the current user."""
+input UpdateMyKeypairInput {
+  """
+  Access key of the keypair to update. Must be owned by the current user.
+  """
+  accessKey: String!
+
+  """Target active state for the keypair."""
+  isActive: Boolean!
+}
+
+"""Payload returned after updating a keypair."""
+type UpdateMyKeypairPayload {
+  """Whether the update was successful."""
+  success: Boolean!
 }
 
 """Input for updating a notification channel"""
@@ -6619,6 +8019,15 @@ input UpdateObjectStorageInput {
 """Added in 25.14.0"""
 type UpdateObjectStoragePayload {
   objectStorage: ObjectStorage!
+}
+
+"""Added in 26.3.0. Input for updating a scoped permission"""
+input UpdatePermissionInput {
+  id: UUID!
+  scopeType: RBACElementType = null
+  scopeId: String = null
+  entityType: RBACElementType = null
+  operation: OperationType = null
 }
 
 """Added in 25.14.0"""
@@ -6706,6 +8115,11 @@ input UpdateResourceGroupInput {
   Scheduler type (FIFO, LIFO, DRF, FAIR_SHARE). Leave null to keep existing value.
   """
   schedulerType: SchedulerType = null
+
+  """
+  Added in 26.3.0. Preemption configuration. When provided, replaces the entire preemption config. Leave null to keep existing value.
+  """
+  preemption: PreemptionConfigInput = null
 }
 
 """Added in 26.2.0. Payload for resource group update mutation."""
@@ -6717,8 +8131,9 @@ type UpdateResourceGroupPayload {
 """Added in 26.3.0. Input for updating a role"""
 input UpdateRoleInput {
   id: UUID!
-  name: String = null
-  description: String = null
+  name: String
+  description: String
+  status: RoleStatus
 }
 
 """Added in 25.19.0. Input for updating route traffic status."""
@@ -6737,59 +8152,59 @@ type UpdateRouteTrafficStatusPayload {
 }
 
 """
-Added in 26.2.0. Input for updating user information. All fields are optional - only provided fields will be updated.
+Added in 26.3.0. Input for updating user information. All fields are optional - only provided fields will be updated.
 """
 input UpdateUserV2Input {
   """New username."""
-  username: String = null
+  username: String
 
   """New password."""
-  password: String = null
+  password: String
 
   """New full display name."""
-  fullName: String = null
+  fullName: String
 
   """New description."""
-  description: String = null
+  description: String
 
   """New account status."""
-  status: UserStatusV2 = null
+  status: UserStatusV2
 
   """New user role."""
-  role: UserRoleV2 = null
+  role: UserRoleV2
 
   """New domain assignment."""
-  domainName: String = null
+  domainName: String
 
   """New project (group) assignments. Replaces existing assignments."""
-  groupIds: [UUID!] = null
+  groupIds: [UUID!]
 
   """New allowed client IP addresses or CIDR ranges."""
-  allowedClientIp: [String!] = null
+  allowedClientIp: [String!]
 
   """Set password change requirement."""
-  needPasswordChange: Boolean = null
+  needPasswordChange: Boolean
 
   """New user resource policy name."""
-  resourcePolicy: String = null
+  resourcePolicy: String
 
   """Enable or disable sudo session capability."""
-  sudoSessionEnabled: Boolean = null
+  sudoSessionEnabled: Boolean
 
   """Set the primary API access key."""
-  mainAccessKey: String = null
+  mainAccessKey: String
 
   """New container user ID."""
-  containerUid: Int = null
+  containerUid: Int
 
   """New container primary group ID."""
-  containerMainGid: Int = null
+  containerMainGid: Int
 
   """New container supplementary group IDs."""
-  containerGids: [Int!] = null
+  containerGids: [Int!]
 }
 
-"""Added in 26.2.0. Payload for user update mutation."""
+"""Added in 26.3.0. Payload for user update mutation."""
 type UpdateUserV2Payload {
   """The updated user."""
   user: UserV2!

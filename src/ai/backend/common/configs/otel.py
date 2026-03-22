@@ -58,3 +58,36 @@ class OTELConfig(BaseConfigSchema):
             example=ConfigExample(local="http://localhost:4317", prod="http://otel-collector:4317"),
         ),
     ]
+    max_queue_size: Annotated[
+        int,
+        Field(
+            default=65536,
+            validation_alias=AliasChoices("max-queue-size", "max_queue_size"),
+            serialization_alias="max-queue-size",
+        ),
+        BackendAIConfigMeta(
+            description=(
+                "Maximum number of spans queued for export. "
+                "Spans are dropped when the queue is full. "
+                "The default (65536) accommodates burst traffic from GraphQL workloads."
+            ),
+            added_version="26.2.0",
+            example=ConfigExample(local="2048", prod="65536"),
+        ),
+    ]
+    max_export_batch_size: Annotated[
+        int,
+        Field(
+            default=4096,
+            validation_alias=AliasChoices("max-export-batch-size", "max_export_batch_size"),
+            serialization_alias="max-export-batch-size",
+        ),
+        BackendAIConfigMeta(
+            description=(
+                "Maximum number of spans exported in a single batch. "
+                "Larger batches reduce export overhead but increase memory usage."
+            ),
+            added_version="26.2.0",
+            example=ConfigExample(local="512", prod="4096"),
+        ),
+    ]

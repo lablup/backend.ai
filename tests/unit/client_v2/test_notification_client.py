@@ -1,10 +1,9 @@
 import uuid
 from unittest.mock import AsyncMock, MagicMock
 
-import pytest
 from yarl import URL
 
-from ai.backend.client.v2.base_client import BackendAIClient
+from ai.backend.client.v2.base_client import BackendAIAuthClient
 from ai.backend.client.v2.config import ClientConfig
 from ai.backend.client.v2.domains.notification import NotificationClient
 from ai.backend.common.data.notification.types import (
@@ -46,8 +45,8 @@ _RULE_ID = uuid.UUID("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb")
 _USER_ID = uuid.UUID("cccccccc-cccc-cccc-cccc-cccccccccccc")
 
 
-def _make_client(mock_session: MagicMock | None = None) -> BackendAIClient:
-    return BackendAIClient(
+def _make_client(mock_session: MagicMock | None = None) -> BackendAIAuthClient:
+    return BackendAIAuthClient(
         _DEFAULT_CONFIG,
         MockAuth(),
         mock_session or MagicMock(),
@@ -100,7 +99,6 @@ def _rule_dto_data() -> dict[str, object]:
 
 
 class TestNotificationClientChannels:
-    @pytest.mark.asyncio
     async def test_create_channel(self) -> None:
         mock_resp = _ok_response({"channel": _channel_dto_data()})
         mock_session = _make_request_session(mock_resp)
@@ -121,7 +119,6 @@ class TestNotificationClientChannels:
         assert call_args.kwargs["json"]["name"] == "test-channel"
         assert call_args.kwargs["json"]["channel_type"] == "webhook"
 
-    @pytest.mark.asyncio
     async def test_search_channels(self) -> None:
         mock_resp = _ok_response({
             "channels": [_channel_dto_data()],
@@ -140,7 +137,6 @@ class TestNotificationClientChannels:
         assert call_args[0][0] == "POST"
         assert "/notifications/channels/search" in str(call_args[0][1])
 
-    @pytest.mark.asyncio
     async def test_get_channel(self) -> None:
         mock_resp = _ok_response({"channel": _channel_dto_data()})
         mock_session = _make_request_session(mock_resp)
@@ -156,7 +152,6 @@ class TestNotificationClientChannels:
         assert f"/notifications/channels/{_CHANNEL_ID}" in str(call_args[0][1])
         assert call_args.kwargs["json"] is None
 
-    @pytest.mark.asyncio
     async def test_update_channel(self) -> None:
         mock_resp = _ok_response({"channel": _channel_dto_data()})
         mock_session = _make_request_session(mock_resp)
@@ -172,7 +167,6 @@ class TestNotificationClientChannels:
         assert f"/notifications/channels/{_CHANNEL_ID}" in str(call_args[0][1])
         assert call_args.kwargs["json"]["name"] == "updated-channel"
 
-    @pytest.mark.asyncio
     async def test_delete_channel(self) -> None:
         mock_resp = _ok_response({"deleted": True})
         mock_session = _make_request_session(mock_resp)
@@ -187,7 +181,6 @@ class TestNotificationClientChannels:
         assert call_args[0][0] == "DELETE"
         assert f"/notifications/channels/{_CHANNEL_ID}" in str(call_args[0][1])
 
-    @pytest.mark.asyncio
     async def test_validate_channel(self) -> None:
         mock_resp = _ok_response({"channel_id": str(_CHANNEL_ID)})
         mock_session = _make_request_session(mock_resp)
@@ -206,7 +199,6 @@ class TestNotificationClientChannels:
 
 
 class TestNotificationClientRules:
-    @pytest.mark.asyncio
     async def test_list_rule_types(self) -> None:
         mock_resp = _ok_response({
             "rule_types": ["session.started", "session.terminated"],
@@ -224,7 +216,6 @@ class TestNotificationClientRules:
         assert "/notifications/rule-types" in str(call_args[0][1])
         assert call_args.kwargs["json"] is None
 
-    @pytest.mark.asyncio
     async def test_get_rule_type_schema(self) -> None:
         mock_resp = _ok_response({
             "rule_type": "session.started",
@@ -245,7 +236,6 @@ class TestNotificationClientRules:
         assert call_args[0][0] == "GET"
         assert "/notifications/rule-types/session.started/schema" in str(call_args[0][1])
 
-    @pytest.mark.asyncio
     async def test_create_rule(self) -> None:
         mock_resp = _ok_response({"rule": _rule_dto_data()})
         mock_session = _make_request_session(mock_resp)
@@ -267,7 +257,6 @@ class TestNotificationClientRules:
         assert call_args.kwargs["json"]["name"] == "test-rule"
         assert call_args.kwargs["json"]["rule_type"] == "session.started"
 
-    @pytest.mark.asyncio
     async def test_search_rules(self) -> None:
         mock_resp = _ok_response({
             "rules": [_rule_dto_data()],
@@ -286,7 +275,6 @@ class TestNotificationClientRules:
         assert call_args[0][0] == "POST"
         assert "/notifications/rules/search" in str(call_args[0][1])
 
-    @pytest.mark.asyncio
     async def test_get_rule(self) -> None:
         mock_resp = _ok_response({"rule": _rule_dto_data()})
         mock_session = _make_request_session(mock_resp)
@@ -302,7 +290,6 @@ class TestNotificationClientRules:
         assert f"/notifications/rules/{_RULE_ID}" in str(call_args[0][1])
         assert call_args.kwargs["json"] is None
 
-    @pytest.mark.asyncio
     async def test_update_rule(self) -> None:
         mock_resp = _ok_response({"rule": _rule_dto_data()})
         mock_session = _make_request_session(mock_resp)
@@ -318,7 +305,6 @@ class TestNotificationClientRules:
         assert f"/notifications/rules/{_RULE_ID}" in str(call_args[0][1])
         assert call_args.kwargs["json"]["name"] == "updated-rule"
 
-    @pytest.mark.asyncio
     async def test_delete_rule(self) -> None:
         mock_resp = _ok_response({"deleted": True})
         mock_session = _make_request_session(mock_resp)
@@ -333,7 +319,6 @@ class TestNotificationClientRules:
         assert call_args[0][0] == "DELETE"
         assert f"/notifications/rules/{_RULE_ID}" in str(call_args[0][1])
 
-    @pytest.mark.asyncio
     async def test_validate_rule(self) -> None:
         mock_resp = _ok_response({"message": "Session abc123 started"})
         mock_session = _make_request_session(mock_resp)

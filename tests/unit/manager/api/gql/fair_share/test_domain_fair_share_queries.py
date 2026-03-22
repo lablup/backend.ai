@@ -127,7 +127,6 @@ def create_mock_info(context: MagicMock) -> MagicMock:
 
 
 class TestAdminDomainFairShareSingleQuery:
-    @pytest.mark.asyncio
     async def test_admin_domain_fair_share_calls_processor_with_correct_action(
         self,
         mock_superadmin_user: UserData,
@@ -161,7 +160,6 @@ class TestAdminDomainFairShareSingleQuery:
         assert result.resource_group_name == "default"
         assert result.domain_name == "test-domain"
 
-    @pytest.mark.asyncio
     async def test_admin_domain_fair_share_propagates_entity_not_found(
         self,
         mock_superadmin_user: UserData,
@@ -182,7 +180,6 @@ class TestAdminDomainFairShareSingleQuery:
                     domain_name="nonexistent-domain",
                 )
 
-    @pytest.mark.asyncio
     async def test_admin_domain_fair_share_requires_admin(
         self,
         mock_regular_user: UserData,
@@ -203,7 +200,6 @@ class TestAdminDomainFairShareSingleQuery:
         # Should not call processor
         mock_get_domain_processor.wait_for_complete.assert_not_called()
 
-    @pytest.mark.asyncio
     async def test_admin_domain_fair_share_returns_correct_gql_type(
         self,
         mock_superadmin_user: UserData,
@@ -238,7 +234,6 @@ class TestAdminDomainFairShareSingleQuery:
 
 
 class TestAdminDomainFairSharesListQuery:
-    @pytest.mark.asyncio
     async def test_admin_domain_fair_shares_calls_fetcher_with_parameters(
         self,
         mock_superadmin_user: UserData,
@@ -275,7 +270,6 @@ class TestAdminDomainFairSharesListQuery:
                 assert call_kwargs["limit"] == 10
                 assert call_kwargs["offset"] == 0
 
-    @pytest.mark.asyncio
     async def test_admin_domain_fair_shares_returns_connection_type(
         self,
         mock_superadmin_user: UserData,
@@ -306,7 +300,6 @@ class TestAdminDomainFairSharesListQuery:
 
                 assert isinstance(result, DomainFairShareConnection)
 
-    @pytest.mark.asyncio
     async def test_admin_domain_fair_shares_requires_admin(
         self,
         mock_regular_user: UserData,
@@ -333,7 +326,6 @@ class TestAdminDomainFairSharesListQuery:
                 # Should not call fetcher
                 mock_fetcher.assert_not_called()
 
-    @pytest.mark.asyncio
     async def test_admin_domain_fair_shares_handles_empty_results(
         self,
         mock_superadmin_user: UserData,

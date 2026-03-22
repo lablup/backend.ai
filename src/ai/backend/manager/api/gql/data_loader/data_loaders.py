@@ -1,16 +1,21 @@
 from __future__ import annotations
 
 import uuid
+from datetime import datetime
 from functools import cached_property, partial
+from typing import TYPE_CHECKING
 
 from strawberry.dataloader import DataLoader
 
-from ai.backend.common.types import AgentId, ImageID, KernelId
+from ai.backend.common.types import AgentId, ImageID, KernelId, SessionId
 from ai.backend.manager.data.agent.types import AgentDetailData
 from ai.backend.manager.data.artifact.types import ArtifactData, ArtifactRevisionData
 from ai.backend.manager.data.artifact_registries.types import ArtifactRegistryData
+from ai.backend.manager.data.audit_log.types import AuditLogData
+from ai.backend.manager.data.container_registry.types import ContainerRegistryData
 from ai.backend.manager.data.deployment.types import (
     DeploymentHistoryData,
+    DeploymentPolicyData,
     ModelDeploymentAccessTokenData,
     ModelDeploymentAutoScalingRuleData,
     ModelDeploymentData,
@@ -26,25 +31,33 @@ from ai.backend.manager.data.image.types import ImageAliasData, ImageData
 from ai.backend.manager.data.kernel.types import KernelInfo
 from ai.backend.manager.data.notification import NotificationChannelData, NotificationRuleData
 from ai.backend.manager.data.object_storage.types import ObjectStorageData
+from ai.backend.manager.data.permission.association_scopes_entities import (
+    AssociationScopesEntitiesData,
+)
 from ai.backend.manager.data.permission.entity import EntityData
 from ai.backend.manager.data.permission.id import ObjectId
 from ai.backend.manager.data.permission.permission import PermissionData
 from ai.backend.manager.data.permission.role import AssignedUserData, RoleData
 from ai.backend.manager.data.reservoir_registry.types import ReservoirRegistryData
 from ai.backend.manager.data.scaling_group.types import ScalingGroupData
-from ai.backend.manager.data.session.types import SessionSchedulingHistoryData
+from ai.backend.manager.data.session.types import SessionData, SessionSchedulingHistoryData
 from ai.backend.manager.data.storage_namespace.types import StorageNamespaceData
 from ai.backend.manager.data.user.types import UserData
 from ai.backend.manager.data.vfs_storage.types import VFSStorageData
-from ai.backend.manager.services.processors import Processors
+
+if TYPE_CHECKING:
+    from ai.backend.manager.services.processors import Processors  # pants: no-infer-dep
 
 from .agent import load_agents_by_ids, load_container_counts
 from .artifact import load_artifacts_by_ids
 from .artifact_registry import load_artifact_registries_by_ids
 from .artifact_revision import load_artifact_revisions_by_ids
+from .audit_log import load_audit_logs_by_ids
+from .container_registry import load_container_registries_by_ids
 from .deployment import (
     load_access_tokens_by_ids,
     load_auto_scaling_rules_by_ids,
+    load_deployment_policies_by_endpoint_ids,
     load_deployments_by_ids,
     load_replicas_by_ids,
     load_revisions_by_ids,
@@ -52,16 +65,20 @@ from .deployment import (
 )
 from .domain import load_domains_by_names
 from .huggingface_registry import load_huggingface_registries_by_ids
-from .image import load_alias_by_ids, load_images_by_ids
+from .image import load_alias_by_ids, load_image_last_used_by_ids, load_images_by_ids
 from .kernel import load_kernels_by_ids
 from .notification import load_channels_by_ids, load_rules_by_ids
 from .object_storage import load_object_storages_by_ids
 from .project import load_projects_by_ids
 from .rbac import (
+    load_assignments_by_role_ids,
+    load_element_associations_by_ids,
     load_entities_by_type_and_ids,
     load_permissions_by_ids,
+    load_permissions_by_role_ids,
     load_role_assignments_by_ids,
     load_role_assignments_by_role_and_user_ids,
+    load_role_assignments_by_user_ids,
     load_roles_by_ids,
 )
 from .reservoir_registry import load_reservoir_registries_by_ids
@@ -71,6 +88,7 @@ from .scheduling_history import (
     load_route_histories_by_ids,
     load_session_histories_by_ids,
 )
+from .session import load_sessions_by_ids
 from .storage_namespace import load_storage_namespaces_by_ids
 from .user import load_users_by_ids
 from .vfs_storage import load_vfs_storages_by_ids
@@ -89,6 +107,12 @@ class DataLoaders:
 
     def __init__(self, processors: Processors) -> None:
         self._processors = processors
+
+    @cached_property
+    def audit_log_loader(
+        self,
+    ) -> DataLoader[uuid.UUID, AuditLogData | None]:
+        return DataLoader(load_fn=partial(load_audit_logs_by_ids, self._processors.audit_log))
 
     @cached_property
     def resource_group_loader(
@@ -116,6 +140,14 @@ class DataLoaders:
     ) -> DataLoader[uuid.UUID, ArtifactRegistryData | None]:
         return DataLoader(
             load_fn=partial(load_artifact_registries_by_ids, self._processors.artifact_registry)
+        )
+
+    @cached_property
+    def container_registry_loader(
+        self,
+    ) -> DataLoader[uuid.UUID, ContainerRegistryData | None]:
+        return DataLoader(
+            load_fn=partial(load_container_registries_by_ids, self._processors.container_registry)
         )
 
     @cached_property
@@ -213,6 +245,19 @@ class DataLoaders:
         return DataLoader(load_fn=partial(load_kernels_by_ids, self._processors.session))
 
     @cached_property
+    def session_loader(
+        self,
+    ) -> DataLoader[SessionId, SessionData | None]:
+        return DataLoader(load_fn=partial(load_sessions_by_ids, self._processors.session))
+
+    @cached_property
+    def image_last_used_loader(
+        self,
+    ) -> DataLoader[ImageID, datetime | None]:
+        """Load the most recent session creation timestamp for an image."""
+        return DataLoader(load_fn=partial(load_image_last_used_by_ids, self._processors.image))
+
+    @cached_property
     def image_alias_loader(
         self,
     ) -> DataLoader[uuid.UUID, ImageAliasData | None]:
@@ -258,6 +303,14 @@ class DataLoaders:
         return DataLoader(load_fn=partial(load_access_tokens_by_ids, self._processors.deployment))
 
     @cached_property
+    def deployment_policy_by_endpoint_loader(
+        self,
+    ) -> DataLoader[uuid.UUID, DeploymentPolicyData | None]:
+        return DataLoader(
+            load_fn=partial(load_deployment_policies_by_endpoint_ids, self._processors.deployment)
+        )
+
+    @cached_property
     def session_history_loader(
         self,
     ) -> DataLoader[uuid.UUID, SessionSchedulingHistoryData | None]:
@@ -298,6 +351,14 @@ class DataLoaders:
         )
 
     @cached_property
+    def permissions_by_role_loader(
+        self,
+    ) -> DataLoader[uuid.UUID, list[PermissionData]]:
+        return DataLoader(
+            load_fn=partial(load_permissions_by_role_ids, self._processors.permission_controller)
+        )
+
+    @cached_property
     def role_assignment_loader(
         self,
     ) -> DataLoader[uuid.UUID, AssignedUserData | None]:
@@ -317,12 +378,45 @@ class DataLoaders:
         )
 
     @cached_property
+    def role_assignments_by_user_loader(
+        self,
+    ) -> DataLoader[uuid.UUID, list[AssignedUserData]]:
+        return DataLoader(
+            load_fn=partial(
+                load_role_assignments_by_user_ids,
+                self._processors.permission_controller,
+            )
+        )
+
+    @cached_property
     def entity_loader(
         self,
     ) -> DataLoader[ObjectId, EntityData | None]:
         return DataLoader(
             load_fn=partial(
                 load_entities_by_type_and_ids,
+                self._processors.permission_controller,
+            )
+        )
+
+    @cached_property
+    def element_association_loader(
+        self,
+    ) -> DataLoader[uuid.UUID, AssociationScopesEntitiesData | None]:
+        return DataLoader(
+            load_fn=partial(
+                load_element_associations_by_ids,
+                self._processors.permission_controller,
+            )
+        )
+
+    @cached_property
+    def assignments_by_role_loader(
+        self,
+    ) -> DataLoader[uuid.UUID, list[AssignedUserData]]:
+        return DataLoader(
+            load_fn=partial(
+                load_assignments_by_role_ids,
                 self._processors.permission_controller,
             )
         )

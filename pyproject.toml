@@ -106,6 +106,7 @@ select = [
     "A",      # flake8-builtins: prevents shadowing Python builtins
     "RET",    # flake8-return: enforces consistent return statement usage
     "T20",    # flake8-print: detects print statements (should use logging)
+    "TID251", # flake8-tidy-imports: enforce banned imports (pytest.mark.asyncio)
     "TID252", # flake8-tidy-imports: prefer absolute imports over parent relative imports
     "PLC0415", # pylint-convention: import-outside-toplevel - enforce imports at module level
     "ANN",    # flake8-annotations: enforces type annotations
@@ -182,6 +183,9 @@ ignore = [
     # ASYNC (async best practices) - exceptions
 ]
 
+[tool.ruff.lint.flake8-tidy-imports.banned-api]
+"pytest.mark.asyncio" = {msg = "asyncio_mode = 'auto' is set; @pytest.mark.asyncio is unnecessary."}
+
 [tool.ruff.lint.isort]
 known-first-party = ["ai.backend"]
 known-local-folder = ["src"]
@@ -213,6 +217,8 @@ split-on-trailing-comma = true
 "src/ai/backend/client/utils.py" = ["PLC0415"]
 # - Client v2 registry uses lazy imports to avoid circular dependencies with domain clients
 "src/ai/backend/client/v2/registry.py" = ["PLC0415"]
+# - vfolder shim uses lazy imports to avoid circular dependency with api/rest/vfolder
+"src/ai/backend/manager/api/vfolder.py" = ["PLC0415"]
 # - Client func vfolder has progress printing
 "src/ai/backend/client/func/vfolder.py" = ["T20"]
 # - Alembic migrations may print progress and have standard signatures
@@ -271,6 +277,18 @@ split-on-trailing-comma = true
 "src/ai/backend/*/api/gql_legacy/**/*.py" = ["PLC0415"]
 # - Container registry factory uses lazy imports to avoid circular dependencies with models
 "src/ai/backend/manager/container_registry/factory.py" = ["PLC0415"]
+# - Session API shim uses lazy import to break circular dependency with rest/session
+"src/ai/backend/manager/api/session.py" = ["PLC0415"]
+# - REST handler shims use lazy imports to break circular dependencies with handler modules
+"src/ai/backend/manager/api/manager.py" = ["PLC0415"]
+"src/ai/backend/manager/api/resource.py" = ["PLC0415"]
+# - server.py and setup.py use lazy imports to decouple test dependency graph from tree.py
+"src/ai/backend/manager/server.py" = ["PLC0415"]
+"src/ai/backend/manager/api/rest/setup.py" = ["PLC0415"]
+# - REST API module registries use lazy imports to avoid circular dependencies
+"src/ai/backend/manager/api/rest/tree.py" = ["PLC0415"]
+"src/ai/backend/manager/api/rest/*/registry.py" = ["PLC0415"]
+"src/ai/backend/manager/api/rest/*/__init__.py" = ["PLC0415"]
 
 [tool.ruff.format]
 preview = true  # enable the black's preview style

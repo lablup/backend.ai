@@ -1,25 +1,25 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, cast, override
+from typing import TYPE_CHECKING, override
 
-from ai.backend.manager.actions.action import BaseActionResult
+from ai.backend.common.data.permission.types import RBACElementType, ScopeType
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.notification import NotificationChannelData
-from ai.backend.manager.repositories.base import Creator
-from ai.backend.manager.repositories.notification.creators import NotificationChannelCreatorSpec
+from ai.backend.manager.data.permission.types import RBACElementRef
+from ai.backend.manager.repositories.base.rbac.entity_creator import RBACEntityCreator
 
-from .base import NotificationAction
+from .base import NotificationChannelScopeAction, NotificationChannelScopeActionResult
 
 if TYPE_CHECKING:
     from ai.backend.manager.models.notification import NotificationChannelRow
 
 
 @dataclass
-class CreateChannelAction(NotificationAction):
+class CreateChannelAction(NotificationChannelScopeAction):
     """Action to create a notification channel."""
 
-    creator: Creator[NotificationChannelRow]
+    creator: RBACEntityCreator[NotificationChannelRow]
 
     @override
     @classmethod
@@ -27,17 +27,28 @@ class CreateChannelAction(NotificationAction):
         return ActionOperationType.CREATE
 
     @override
-    def entity_id(self) -> str | None:
-        spec = cast(NotificationChannelCreatorSpec, self.creator.spec)
-        return spec.name
+    def scope_type(self) -> ScopeType:
+        return ScopeType.GLOBAL
+
+    @override
+    def scope_id(self) -> str:
+        return ""
+
+    @override
+    def target_element(self) -> RBACElementRef:
+        return RBACElementRef(RBACElementType.NOTIFICATION_CHANNEL, "")
 
 
 @dataclass
-class CreateChannelActionResult(BaseActionResult):
+class CreateChannelActionResult(NotificationChannelScopeActionResult):
     """Result of creating a notification channel."""
 
     channel_data: NotificationChannelData
 
     @override
-    def entity_id(self) -> str | None:
-        return str(self.channel_data.id)
+    def scope_type(self) -> ScopeType:
+        return ScopeType.GLOBAL
+
+    @override
+    def scope_id(self) -> str:
+        return ""

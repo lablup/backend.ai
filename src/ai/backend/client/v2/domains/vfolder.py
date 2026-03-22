@@ -96,12 +96,8 @@ class VFolderClient(BaseDomainClient):
             if request is not None
             else None
         )
-        return await self._client.typed_request(
-            "GET",
-            "/folders",
-            params=params,
-            response_model=VFolderListResponse,
-        )
+        data = await self._client._request("GET", "/folders", params=params)
+        return VFolderListResponse.model_validate(data or [])
 
     async def get_info(self, name: str) -> VFolderGetInfoResponse:
         return await self._client.typed_request(

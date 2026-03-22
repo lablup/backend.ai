@@ -78,7 +78,6 @@ class TestRGProjectFairShare:
         )
         return info
 
-    @pytest.mark.asyncio
     async def test_returns_project_fair_share_when_exists(
         self,
         info_with_project_fair_share_exists: MagicMock,
@@ -99,7 +98,6 @@ class TestRGProjectFairShare:
         assert result.resource_group_name == "default"
         assert result.domain_name == "test-domain"
 
-    @pytest.mark.asyncio
     async def test_calls_action_with_correct_params(
         self,
         info_with_project_fair_share_exists: MagicMock,
@@ -130,7 +128,6 @@ class TestRGProjectFairShare:
         )
         return info
 
-    @pytest.mark.asyncio
     async def test_raises_project_not_found_when_project_does_not_exist(
         self,
         info_with_project_not_found: MagicMock,
@@ -151,7 +148,6 @@ class TestRGProjectFairShare:
 class TestRGProjectFairShares:
     """Tests for rg_project_fair_shares resolver."""
 
-    @pytest.mark.asyncio
     async def test_calls_fetch_rg_project_fair_shares(self) -> None:
         """Should call fetch_rg_project_fair_shares with correct scope."""
         info = MagicMock()

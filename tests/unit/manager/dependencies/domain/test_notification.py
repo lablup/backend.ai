@@ -10,7 +10,6 @@ from ai.backend.manager.dependencies.domain.notification import NotificationCent
 class TestNotificationCenterDependency:
     """Test NotificationCenterDependency lifecycle."""
 
-    @pytest.mark.asyncio
     @patch("ai.backend.manager.dependencies.domain.notification.NotificationCenter")
     async def test_provide_notification_center(self, mock_nc_class: MagicMock) -> None:
         """Dependency should create and close NotificationCenter."""
@@ -26,7 +25,6 @@ class TestNotificationCenterDependency:
 
         mock_nc.close.assert_called_once()
 
-    @pytest.mark.asyncio
     @patch("ai.backend.manager.dependencies.domain.notification.NotificationCenter")
     async def test_cleanup_on_exception(self, mock_nc_class: MagicMock) -> None:
         """Dependency should cleanup NotificationCenter even on exception."""

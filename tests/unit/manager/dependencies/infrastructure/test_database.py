@@ -26,7 +26,6 @@ class TestDatabaseDependency:
         mock.db = MagicMock()
         return mock
 
-    @pytest.mark.asyncio
     @patch("ai.backend.manager.dependencies.infrastructure.database.connect_database")
     async def test_provide_database_engine(
         self, mock_connect_db: MagicMock, mock_config: ManagerUnifiedConfig
@@ -49,7 +48,6 @@ class TestDatabaseDependency:
             assert db is mock_engine
             mock_connect_db.assert_called_once()
 
-    @pytest.mark.asyncio
     @patch("ai.backend.manager.dependencies.infrastructure.database.connect_database")
     async def test_cleanup_on_exception(
         self, mock_connect_db: MagicMock, mock_config: ManagerUnifiedConfig

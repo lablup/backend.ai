@@ -3,8 +3,6 @@ from __future__ import annotations
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock
 
-import pytest
-
 from ai.backend.manager.dependencies.messaging.composer import (
     MessagingComposer,
     MessagingInput,
@@ -23,7 +21,6 @@ def _make_mock_config() -> Any:
 class TestMessagingComposer:
     """Test MessagingComposer lifecycle."""
 
-    @pytest.mark.asyncio
     async def test_compose_creates_all_resources(self) -> None:
         """Composer should create all messaging resources in correct order."""
         mock_event_hub = MagicMock()
@@ -75,7 +72,6 @@ class TestMessagingComposer:
             "event-producer",
         ]
 
-    @pytest.mark.asyncio
     async def test_compose_passes_config_correctly(self) -> None:
         """Composer should pass config to message queue and event producer."""
         config = _make_mock_config()

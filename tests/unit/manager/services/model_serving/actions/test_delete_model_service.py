@@ -13,6 +13,7 @@ from ai.backend.common.data.user.types import UserData, UserRole
 from ai.backend.common.events.dispatcher import EventDispatcher
 from ai.backend.common.events.hub import EventHub
 from ai.backend.manager.actions.monitors.monitor import ActionMonitor
+from ai.backend.manager.actions.validators import ActionValidators
 from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.errors.service import ModelServiceNotFound
@@ -157,10 +158,12 @@ class TestDeleteModelService:
         self,
         mock_action_monitor: MagicMock,
         model_serving_service: ModelServingService,
+        mock_action_validators: ActionValidators,
     ) -> ModelServingProcessors:
         return ModelServingProcessors(
             service=model_serving_service,
             action_monitors=[mock_action_monitor],
+            validators=mock_action_validators,
         )
 
     @pytest.fixture
@@ -220,7 +223,7 @@ class TestDeleteModelService:
                     service_id=uuid.UUID("cccccccc-dddd-eeee-ffff-111111111111"),
                 ),
                 DeleteModelServiceActionResult(
-                    success=True,
+                    service_id=uuid.UUID("cccccccc-dddd-eeee-ffff-111111111111"),
                 ),
             ),
             ScenarioBase.failure(
@@ -232,7 +235,6 @@ class TestDeleteModelService:
             ),
         ],
     )
-    @pytest.mark.asyncio
     async def test_delete_model_service(
         self,
         scenario: ScenarioBase[DeleteModelServiceAction, DeleteModelServiceActionResult],

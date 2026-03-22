@@ -8,6 +8,7 @@ from dataclasses import dataclass
 
 from ai.backend.manager.data.common.types import SearchResult
 
+from .association_scopes_entities import AssociationScopesEntitiesData
 from .types import EntityType
 
 
@@ -22,5 +23,12 @@ class EntityData:
 @dataclass(frozen=True)
 class EntityListResult(SearchResult[EntityData]):
     """Result of entity search with pagination info."""
+
+    pass
+
+
+@dataclass(frozen=True)
+class ElementAssociationListResult(SearchResult[AssociationScopesEntitiesData]):
+    """Result of element association search with full association row data."""
 
     pass

@@ -21,6 +21,16 @@ class ContainerRegistryData:
 
 
 @dataclass
+class ContainerRegistrySearchResult:
+    """Search result with pagination for container registries."""
+
+    items: list[ContainerRegistryData]
+    total_count: int
+    has_next_page: bool
+    has_previous_page: bool
+
+
+@dataclass
 class PerProjectContainerRegistryInfo:
     """Container registry info resolved from a project's container_registry config.
 

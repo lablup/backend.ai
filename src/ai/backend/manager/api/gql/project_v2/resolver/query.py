@@ -22,6 +22,7 @@ from ai.backend.manager.api.gql.project_v2.types import (
     ProjectV2OrderBy,
 )
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
+from ai.backend.manager.api.gql.utils import check_admin_only
 
 
 @strawberry.field(
@@ -81,6 +82,7 @@ async def admin_projects_v2(
     Returns:
         ProjectV2Connection with paginated project records.
     """
+    check_admin_only()
     return await fetch_admin_projects(
         info,
         filter=filter,

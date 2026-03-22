@@ -382,7 +382,7 @@ class TestManagerNodeInfo:
             active_sessions=5,
             status="running",
             version="24.09.0",
-            api_version=8,
+            api_version=[9, "20250722"],
         )
         assert node.id == "manager-01"
         assert node.num_proc == 4
@@ -392,7 +392,7 @@ class TestManagerNodeInfo:
         assert node.active_sessions == 5
         assert node.status == "running"
         assert node.version == "24.09.0"
-        assert node.api_version == 8
+        assert node.api_version == [9, "20250722"]
 
 
 class TestFetchManagerStatusResponse:
@@ -406,7 +406,7 @@ class TestFetchManagerStatusResponse:
             active_sessions=5,
             status="running",
             version="24.09.0",
-            api_version=8,
+            api_version=[9, "20250722"],
         )
         resp = FetchManagerStatusResponse(
             nodes=[node],
@@ -427,7 +427,7 @@ class TestFetchManagerStatusResponse:
             active_sessions=0,
             status="frozen",
             version="24.09.0",
-            api_version=8,
+            api_version=[9, "20250722"],
         )
         resp = FetchManagerStatusResponse(
             nodes=[node],

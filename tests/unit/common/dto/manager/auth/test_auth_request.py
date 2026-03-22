@@ -43,6 +43,18 @@ def test_authorize_request_stoken_alias() -> None:
     assert req.stoken == "from_alias"
 
 
+def test_authorize_request_otp_field() -> None:
+    req = AuthorizeRequest.model_validate({
+        "type": "keypair",
+        "domain": "default",
+        "username": "user@example.com",
+        "password": "secret",
+        "otp": "123456",
+    })
+    assert req.otp == "123456"
+    assert req.stoken is None
+
+
 def test_authorize_request_stoken_default_none() -> None:
     req = AuthorizeRequest(
         type=AuthTokenType.JWT,

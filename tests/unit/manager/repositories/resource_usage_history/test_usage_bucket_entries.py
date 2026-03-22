@@ -111,7 +111,6 @@ class TestUsageBucketEntries:
     ) -> ResourceUsageHistoryDBSource:
         return ResourceUsageHistoryDBSource(db_with_cleanup)
 
-    @pytest.mark.asyncio
     async def test_increment_domain_buckets_creates_entries(
         self,
         db_source: ResourceUsageHistoryDBSource,
@@ -160,7 +159,6 @@ class TestUsageBucketEntries:
             assert slot_map["cpu"].duration_seconds == 300
             assert slot_map["mem"].duration_seconds == 300
 
-    @pytest.mark.asyncio
     async def test_increment_accumulates_entries(
         self,
         db_source: ResourceUsageHistoryDBSource,
@@ -220,7 +218,6 @@ class TestUsageBucketEntries:
             assert entry_rows[0].amount == Decimal("5")
             assert entry_rows[0].duration_seconds == 600
 
-    @pytest.mark.asyncio
     async def test_increment_user_buckets_creates_entries(
         self,
         db_source: ResourceUsageHistoryDBSource,
@@ -270,7 +267,6 @@ class TestUsageBucketEntries:
             assert slot_map["cuda.device"].amount == Decimal("2")
             assert slot_map["cpu"].duration_seconds == 300
 
-    @pytest.mark.asyncio
     async def test_aggregated_usage_reads_from_entries(
         self,
         db_source: ResourceUsageHistoryDBSource,

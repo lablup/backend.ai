@@ -112,7 +112,6 @@ class TestAgentHeartbeatEvent:
         ],
         ids=["old_agent_string_keys", "new_agent_slotname_keys", "mixed_keys"],
     )
-    @pytest.mark.asyncio
     async def test_serialization_deserialization_round_trip_with_different_key_formats(
         self,
         agent_info_dict: dict[str, Any],

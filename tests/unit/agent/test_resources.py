@@ -87,7 +87,6 @@ def test_num_nodes() -> None:
 
 
 @pytest.mark.skip(reason="aioresponses 0.7 is incompatible with aiohttp 3.7+")
-@pytest.mark.asyncio
 async def test_get_available_cores_without_docker(monkeypatch: Any) -> None:
     def mock_sched_getaffinity(pid: Any) -> None:
         raise AttributeError
@@ -114,7 +113,6 @@ async def test_get_available_cores_without_docker(monkeypatch: Any) -> None:
         assert (await numa.get_available_cores()) == {0, 1}
 
 
-@pytest.mark.asyncio
 async def test_get_core_topology(mocker: MockerFixture) -> None:
     mocker.patch.object(linux.libnuma, "num_nodes", return_value=2)
     mocker.patch.object(
@@ -126,7 +124,6 @@ async def test_get_core_topology(mocker: MockerFixture) -> None:
     assert (await numa.get_core_topology()) == ([0, 2], [1, 3])
 
 
-@pytest.mark.asyncio
 async def test_scan_resource_usage_per_slot() -> None:
     with tempfile.TemporaryDirectory() as tmpdir_name:
         tmpdir = Path(tmpdir_name)
@@ -194,7 +191,6 @@ async def test_scan_resource_usage_per_slot() -> None:
                 await scan_resource_usage_per_slot(kernel_ids, tmpdir)
 
 
-@pytest.mark.asyncio
 async def test_allow_fractional_resource_fragmentation(monkeypatch: Any) -> None:
     def mock_read_from_file(path: Any, daemon_name: Any) -> tuple[dict[str, Any], Path]:
         return {
@@ -382,7 +378,6 @@ async def test_allow_fractional_resource_fragmentation(monkeypatch: Any) -> None
     ] == Decimal("1.0")
 
 
-@pytest.mark.asyncio
 async def test_allocate_rollback(monkeypatch: Any) -> None:
     local_config: dict[str, Any] = {}
     cpu_plugin = CPUPlugin(

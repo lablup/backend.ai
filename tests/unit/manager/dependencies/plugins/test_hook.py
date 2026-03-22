@@ -24,7 +24,6 @@ class TestHookPluginDependency:
         dep = HookPluginDependency()
         assert dep.stage_name == "hook-plugin"
 
-    @pytest.mark.asyncio
     @patch("ai.backend.manager.dependencies.plugins.hook.HookPluginContext")
     async def test_provide_initializes_and_dispatches_activate(
         self, mock_ctx_class: MagicMock
@@ -56,7 +55,6 @@ class TestHookPluginDependency:
 
         mock_ctx.cleanup.assert_called_once()
 
-    @pytest.mark.asyncio
     @patch("ai.backend.manager.dependencies.plugins.hook.HookPluginContext")
     async def test_raises_on_activate_failure(self, mock_ctx_class: MagicMock) -> None:
         plugins_input = _make_plugins_input()
@@ -74,7 +72,6 @@ class TestHookPluginDependency:
             async with dep.provide(plugins_input):
                 pass
 
-    @pytest.mark.asyncio
     @patch("ai.backend.manager.dependencies.plugins.hook.HookPluginContext")
     async def test_cleanup_on_exception(self, mock_ctx_class: MagicMock) -> None:
         plugins_input = _make_plugins_input()

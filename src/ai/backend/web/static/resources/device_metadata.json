@@ -41,7 +41,7 @@
       "display_unit": "fGPU",
       "number_format": {
         "binary": false,
-        "round_length": 2
+        "round_length": 1
       },
       "display_icon": "nvidia"
     },
@@ -154,6 +154,17 @@
         "round_length": 0
       },
       "display_icon": "lpu"
+    },
+    "tt-n300.device": {
+      "slot_name": "tt-n300.device",
+      "description": "Tenstorrent Wormhole™ n300",
+      "human_readable_name": "Tenstorrent Wormhole™ n300 Device",
+      "display_unit": "n300",
+      "number_format": {
+        "binary": false,
+        "round_length": 0
+      },
+      "display_icon": "tenstorrent"
     }
   }
 }

@@ -193,7 +193,6 @@ def mock_info(mock_graph_ctx: MagicMock) -> MagicMock:
 class TestCreateUserMutationValidation:
     """Tests for CreateUser.mutate() validation behavior."""
 
-    @pytest.mark.asyncio
     async def test_create_user_with_negative_uid_raises_before_processor(
         self,
         mock_info: MagicMock,
@@ -216,7 +215,6 @@ class TestCreateUserMutationValidation:
         # Verify processor was NOT called
         mock_graph_ctx.processors.user.create_user.wait_for_complete.assert_not_called()
 
-    @pytest.mark.asyncio
     async def test_create_user_with_negative_gid_raises_before_processor(
         self,
         mock_info: MagicMock,
@@ -239,7 +237,6 @@ class TestCreateUserMutationValidation:
         # Verify processor was NOT called
         mock_graph_ctx.processors.user.create_user.wait_for_complete.assert_not_called()
 
-    @pytest.mark.asyncio
     async def test_create_user_with_negative_supplementary_gid_raises_before_processor(
         self,
         mock_info: MagicMock,
@@ -267,7 +264,6 @@ class TestCreateUserMutationValidation:
 class TestModifyUserMutationValidation:
     """Tests for ModifyUser.mutate() validation behavior."""
 
-    @pytest.mark.asyncio
     async def test_modify_user_with_negative_uid_raises_before_processor(
         self,
         mock_info: MagicMock,
@@ -284,7 +280,6 @@ class TestModifyUserMutationValidation:
         # Verify processor was NOT called
         mock_graph_ctx.processors.user.modify_user.wait_for_complete.assert_not_called()
 
-    @pytest.mark.asyncio
     async def test_modify_user_with_negative_gid_raises_before_processor(
         self,
         mock_info: MagicMock,

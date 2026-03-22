@@ -10,6 +10,7 @@ from strawberry import ID, Info
 from strawberry.relay import Connection, Edge, Node, NodeID
 
 from ai.backend.manager.api.gql.fair_share.types import DomainFairShareGQL
+from ai.backend.manager.api.gql.resource_slot.overview_types import ActiveResourceOverviewGQL
 from ai.backend.manager.api.gql.resource_usage.types import (
     DomainUsageBucketConnection,
     DomainUsageBucketFilter,
@@ -100,6 +101,25 @@ class DomainV2GQL(Node):
             resource_group_name=scope.resource_group_name,
             domain_name=str(self.id),
         )
+
+    @strawberry.field(  # type: ignore[misc]
+        description=(
+            "Added in 26.4.0. Active resource usage overview for this domain. "
+            "Returns the currently occupied resource slots and the number of active sessions."
+        )
+    )
+    async def active_resource_overview(
+        self,
+        info: Info,
+    ) -> ActiveResourceOverviewGQL:
+        from ai.backend.manager.services.resource_slot.actions.get_domain_resource_overview import (
+            GetDomainResourceOverviewAction,
+        )
+
+        result = await info.context.processors.resource_slot.get_domain_resource_overview.wait_for_complete(
+            GetDomainResourceOverviewAction(domain_name=str(self.id))
+        )
+        return ActiveResourceOverviewGQL.from_occupancy(result.item)
 
     @strawberry.field(  # type: ignore[misc]
         description=(

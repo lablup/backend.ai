@@ -27,7 +27,7 @@ from .export import (
     execute_streaming_export,
 )
 from .integrity import (
-    _match_integrity_error,
+    match_integrity_error,
     parse_integrity_error,
 )
 from .pagination import (
@@ -67,6 +67,7 @@ from .updater import (
     BatchUpdater,
     BatchUpdaterResult,
     BatchUpdaterSpec,
+    BulkUpdaterError,
     Updater,
     UpdaterResult,
     UpdaterSpec,
@@ -97,7 +98,7 @@ __all__ = [
     "SearchScope",
     # Integrity
     "parse_integrity_error",
-    "_match_integrity_error",
+    "match_integrity_error",
     # Export
     "ExportDataStream",
     "ExportFieldDef",
@@ -145,6 +146,8 @@ __all__ = [
     "BatchUpdater",
     "BatchUpdaterResult",
     "execute_batch_updater",
+    # BulkUpdater
+    "BulkUpdaterError",
     # Upserter
     "UpserterSpec",
     "Upserter",

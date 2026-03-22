@@ -15,7 +15,7 @@ from ai.backend.manager.errors.repository import (
     UniqueConstraintViolationError,
 )
 from ai.backend.manager.repositories.base.integrity import (
-    _match_integrity_error,
+    match_integrity_error,
     parse_integrity_error,
 )
 from ai.backend.manager.repositories.base.types import IntegrityErrorCheck
@@ -189,7 +189,7 @@ class TestParseIntegrityErrorWithoutDiag:
 
 
 class TestMatchIntegrityError:
-    """Test _match_integrity_error matching logic."""
+    """Test match_integrity_error matching logic."""
 
     def _make_domain_error(self, msg: str = "domain error") -> RepositoryIntegrityError:
         """Create a simple domain error for use in checks."""
@@ -208,7 +208,7 @@ class TestMatchIntegrityError:
             ),
         ]
         with pytest.raises(UniqueConstraintViolationError, match="name already exists") as exc_info:
-            _match_integrity_error(parsed, checks)
+            match_integrity_error(parsed, checks)
         assert exc_info.value is domain_error
         assert exc_info.value.__cause__ is parsed
 
@@ -232,7 +232,7 @@ class TestMatchIntegrityError:
             ),
         ]
         with pytest.raises(UniqueConstraintViolationError) as exc_info:
-            _match_integrity_error(parsed, checks)
+            match_integrity_error(parsed, checks)
         assert exc_info.value is email_error
 
     def test_no_match_raises_parsed_error(self) -> None:
@@ -247,13 +247,13 @@ class TestMatchIntegrityError:
             ),
         ]
         with pytest.raises(ForeignKeyViolationError) as exc_info:
-            _match_integrity_error(parsed, checks)
+            match_integrity_error(parsed, checks)
         assert exc_info.value is parsed
 
     def test_empty_checks_raises_parsed_error(self) -> None:
         parsed = UniqueConstraintViolationError(extra_msg="dup")
         with pytest.raises(UniqueConstraintViolationError) as exc_info:
-            _match_integrity_error(parsed, [])
+            match_integrity_error(parsed, [])
         assert exc_info.value is parsed
 
     def test_constraint_name_mismatch_skips_check(self) -> None:
@@ -269,7 +269,7 @@ class TestMatchIntegrityError:
             ),
         ]
         with pytest.raises(UniqueConstraintViolationError) as exc_info:
-            _match_integrity_error(parsed, checks)
+            match_integrity_error(parsed, checks)
         # Falls through to parsed error since constraint name doesn't match
         assert exc_info.value is parsed
 
@@ -287,5 +287,5 @@ class TestMatchIntegrityError:
             ),
         ]
         with pytest.raises(UniqueConstraintViolationError) as exc_info:
-            _match_integrity_error(parsed, checks)
+            match_integrity_error(parsed, checks)
         assert exc_info.value is domain_error

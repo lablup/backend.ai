@@ -3,8 +3,6 @@ from __future__ import annotations
 from typing import Any, cast
 from unittest.mock import AsyncMock, MagicMock, patch
 
-import pytest
-
 from ai.backend.common.dependencies.stacks.builder import DependencyBuilderStack
 from ai.backend.manager.dependencies.processing.composer import (
     ProcessingComposer,
@@ -18,6 +16,12 @@ def _make_processing_input() -> ProcessingInput:
     mock_config_provider = MagicMock()
     mock_config_provider.config.reporter.smtp = []
     mock_config_provider.config.reporter.action_monitors = []
+    # Required by lifecycle background tasks (agent_lost_checker, manager_status_watcher)
+    mock_config_provider.config.manager.heartbeat_timeout = 60
+    mock_config_provider.config.manager.status_update_interval = None
+
+    mock_stats_monitor = MagicMock()
+    mock_stats_monitor.report_metric = AsyncMock()
 
     return ProcessingInput(
         message_queue=MagicMock(),
@@ -54,13 +58,15 @@ def _make_processing_input() -> ProcessingInput:
         appproxy_client_pool=MagicMock(),
         prometheus_client=MagicMock(),
         agent_client_pool=MagicMock(),
+        distributed_lock_factory=MagicMock(),
+        stats_monitor=mock_stats_monitor,
+        pidx=0,
     )
 
 
 class TestProcessingComposer:
     """Test ProcessingComposer integration."""
 
-    @pytest.mark.asyncio
     @patch(
         "ai.backend.manager.dependencies.processing.bgtask_registry.BackgroundTaskHandlerRegistry"
     )
@@ -69,12 +75,12 @@ class TestProcessingComposer:
     @patch("ai.backend.manager.dependencies.processing.bgtask_registry.PurgeImagesHandler")
     @patch("ai.backend.manager.dependencies.processing.bgtask_registry.RescanImagesHandler")
     @patch("ai.backend.manager.dependencies.processing.composer.Dispatchers")
-    @patch("ai.backend.manager.dependencies.processing.processors.Processors")
+    @patch("ai.backend.manager.dependencies.processing.processors.create_processors")
     @patch("ai.backend.manager.dependencies.processing.event_dispatcher.EventDispatcher")
     async def test_compose_produces_resources(
         self,
         mock_dispatcher_class: MagicMock,
-        mock_processors_class: MagicMock,
+        mock_create_processors: MagicMock,
         mock_dispatchers_class: MagicMock,
         mock_rescan_images: MagicMock,
         mock_purge_images: MagicMock,
@@ -89,7 +95,7 @@ class TestProcessingComposer:
         mock_dispatcher_class.return_value = mock_event_dispatcher
 
         mock_processors = MagicMock()
-        mock_processors_class.create.return_value = mock_processors
+        mock_create_processors.return_value = mock_processors
 
         mock_dispatchers = MagicMock()
         mock_dispatchers_class.return_value = mock_dispatchers
@@ -118,7 +124,6 @@ class TestProcessingComposer:
                 mock_bgtask_mgr = cast(MagicMock, setup_input.background_task_manager)
                 mock_bgtask_mgr.set_registry.assert_called_once_with(mock_registry)
 
-    @pytest.mark.asyncio
     @patch(
         "ai.backend.manager.dependencies.processing.bgtask_registry.BackgroundTaskHandlerRegistry"
     )
@@ -127,12 +132,12 @@ class TestProcessingComposer:
     @patch("ai.backend.manager.dependencies.processing.bgtask_registry.PurgeImagesHandler")
     @patch("ai.backend.manager.dependencies.processing.bgtask_registry.RescanImagesHandler")
     @patch("ai.backend.manager.dependencies.processing.composer.Dispatchers")
-    @patch("ai.backend.manager.dependencies.processing.processors.Processors")
+    @patch("ai.backend.manager.dependencies.processing.processors.create_processors")
     @patch("ai.backend.manager.dependencies.processing.event_dispatcher.EventDispatcher")
     async def test_compose_initialization_order(
         self,
         mock_dispatcher_class: MagicMock,
-        mock_processors_class: MagicMock,
+        mock_create_processors: MagicMock,
         mock_dispatchers_class: MagicMock,
         mock_rescan_images: MagicMock,
         mock_purge_images: MagicMock,
@@ -161,7 +166,7 @@ class TestProcessingComposer:
         )
 
         mock_processors = MagicMock()
-        mock_processors_class.create.side_effect = lambda *a, **kw: _track(
+        mock_create_processors.side_effect = lambda *a, **kw: _track(
             "Processors.create", mock_processors
         )
 

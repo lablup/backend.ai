@@ -23,8 +23,10 @@ from ai.backend.common.types import (
     VFolderMount,
     VFolderUsageMode,
 )
+from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.models.network import NetworkType
 from ai.backend.manager.models.scaling_group import ScalingGroupOpts
+from ai.backend.manager.repositories.scheduler import MarkTerminatingResult
 from ai.backend.manager.repositories.scheduler.types.session_creation import (
     AllowedScalingGroup,
     ContainerUserInfo,
@@ -457,7 +459,17 @@ class TestMultiContainerSession:
                     },
                 ),
             },
-            vfolder_mounts=[],
+            vfolder_mounts=[
+                VFolderMount(
+                    name="my-model",
+                    vfid=VFolderID(quota_scope_id=None, folder_id=uuid.uuid4()),
+                    vfsubpath=PurePosixPath("."),
+                    host_path=PurePosixPath("/data/vfolders/model"),
+                    kernel_path=PurePosixPath("/home/work/model"),
+                    mount_perm=MountPermission.READ_ONLY,
+                    usage_mode=VFolderUsageMode.MODEL,
+                ),
+            ],
             dotfile_data={},
             container_user_info=ContainerUserInfo(),
         )
@@ -1000,7 +1012,17 @@ class TestMultiClusterScenarios:
                     },
                 )
             },
-            vfolder_mounts=[],
+            vfolder_mounts=[
+                VFolderMount(
+                    name="llm-weights",
+                    vfid=VFolderID(quota_scope_id=None, folder_id=uuid.uuid4()),
+                    vfsubpath=PurePosixPath("."),
+                    host_path=PurePosixPath("/data/vfolders/llm-weights"),
+                    kernel_path=PurePosixPath("/home/work/model"),
+                    mount_perm=MountPermission.READ_ONLY,
+                    usage_mode=VFolderUsageMode.MODEL,
+                ),
+            ],
             dotfile_data={},
             container_user_info=ContainerUserInfo(),
         )
@@ -1022,3 +1044,66 @@ class TestMultiClusterScenarios:
         # All should have same image
         for kernel in session_data.kernels:
             assert kernel.image == "llm:server"
+
+
+class TestMarkSessionsForTermination:
+    """Test cases for SchedulingController.mark_sessions_for_termination"""
+
+    async def test_force_terminate_broadcasts_terminated_event(
+        self, scheduling_controller: Any, mock_repository: AsyncMock
+    ) -> None:
+        """Test that forced=True results in TERMINATED broadcast events."""
+        session_id = SessionId(uuid.uuid4())
+        mock_repository.mark_sessions_terminating = AsyncMock(
+            return_value=MarkTerminatingResult(
+                cancelled_sessions=[],
+                terminating_sessions=[],
+                force_terminated_sessions=[session_id],
+                skipped_sessions=[],
+            )
+        )
+
+        result = await scheduling_controller.mark_sessions_for_termination(
+            [session_id], reason="FORCE_TERMINATED", forced=True
+        )
+
+        assert result.force_terminated_sessions == [session_id]
+        assert result.terminating_sessions == []
+        mock_repository.mark_sessions_terminating.assert_called_once_with(
+            [session_id], "FORCE_TERMINATED", forced=True
+        )
+
+        # Verify TERMINATED event was broadcast
+        event_producer = scheduling_controller._event_producer
+        event_producer.broadcast_events_batch.assert_called_once()
+        broadcast_events = event_producer.broadcast_events_batch.call_args[0][0]
+        assert len(broadcast_events) == 1
+        assert broadcast_events[0].status_transition == str(SessionStatus.TERMINATED)
+
+    async def test_normal_terminate_broadcasts_terminating_event(
+        self, scheduling_controller: Any, mock_repository: AsyncMock
+    ) -> None:
+        """Test that forced=False results in TERMINATING broadcast events."""
+        session_id = SessionId(uuid.uuid4())
+        mock_repository.mark_sessions_terminating = AsyncMock(
+            return_value=MarkTerminatingResult(
+                cancelled_sessions=[],
+                terminating_sessions=[session_id],
+                force_terminated_sessions=[],
+                skipped_sessions=[],
+            )
+        )
+
+        result = await scheduling_controller.mark_sessions_for_termination(
+            [session_id], reason="USER_REQUESTED", forced=False
+        )
+
+        assert result.terminating_sessions == [session_id]
+        assert result.force_terminated_sessions == []
+
+        # Verify TERMINATING event was broadcast
+        event_producer = scheduling_controller._event_producer
+        event_producer.broadcast_events_batch.assert_called_once()
+        broadcast_events = event_producer.broadcast_events_batch.call_args[0][0]
+        assert len(broadcast_events) == 1
+        assert broadcast_events[0].status_transition == str(SessionStatus.TERMINATING)

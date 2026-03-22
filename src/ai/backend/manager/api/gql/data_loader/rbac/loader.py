@@ -1,8 +1,12 @@
 from __future__ import annotations
 
 import uuid
+from collections import defaultdict
 from collections.abc import Sequence
 
+from ai.backend.manager.data.permission.association_scopes_entities import (
+    AssociationScopesEntitiesData,
+)
 from ai.backend.manager.data.permission.entity import EntityData
 from ai.backend.manager.data.permission.id import ObjectId
 from ai.backend.manager.data.permission.permission import PermissionData
@@ -13,6 +17,9 @@ from ai.backend.manager.repositories.permission_controller.options import (
     EntityScopeConditions,
     RoleConditions,
     ScopedPermissionConditions,
+)
+from ai.backend.manager.services.permission_contoller.actions.search_element_associations import (
+    SearchElementAssociationsAction,
 )
 from ai.backend.manager.services.permission_contoller.actions.search_entities import (
     SearchEntitiesAction,
@@ -71,6 +78,37 @@ async def load_permissions_by_ids(
     return [permission_map.get(pid) for pid in permission_ids]
 
 
+async def load_permissions_by_role_ids(
+    processor: PermissionControllerProcessors,
+    role_ids: Sequence[uuid.UUID],
+) -> list[list[PermissionData]]:
+    """
+    Batch load permissions by role_ids.
+
+    Returns a list of permission lists, one for each role_id.
+    Each inner list contains all permissions for that role.
+    """
+    if not role_ids:
+        return []
+
+    querier = BatchQuerier(
+        pagination=NoPagination(),
+        conditions=[ScopedPermissionConditions.by_role_ids(role_ids)],
+    )
+
+    action_result = await processor.search_permissions.wait_for_complete(
+        SearchPermissionsAction(querier=querier)
+    )
+
+    # Group permissions by role_id
+    permission_map: dict[uuid.UUID, list[PermissionData]] = defaultdict(list)
+    for permission in action_result.result.items:
+        permission_map[permission.role_id].append(permission)
+
+    # Return in the same order as role_ids, with empty lists for roles with no permissions
+    return [permission_map.get(role_id, []) for role_id in role_ids]
+
+
 async def load_role_assignments_by_ids(
     processor: PermissionControllerProcessors,
     assignment_ids: Sequence[uuid.UUID],
@@ -111,6 +149,37 @@ async def load_role_assignments_by_role_and_user_ids(
     return [assignment_map.get(key) for key in keys]
 
 
+async def load_assignments_by_role_ids(
+    processor: PermissionControllerProcessors,
+    role_ids: Sequence[uuid.UUID],
+) -> list[list[AssignedUserData]]:
+    """
+    Batch load role assignments by role_ids.
+
+    Returns a list of assignment lists, one for each role_id.
+    Each inner list contains all users assigned to that role.
+    """
+    if not role_ids:
+        return []
+
+    querier = BatchQuerier(
+        pagination=NoPagination(),
+        conditions=[AssignedUserConditions.by_role_ids(role_ids)],
+    )
+
+    action_result = await processor.search_users_assigned_to_role.wait_for_complete(
+        SearchUsersAssignedToRoleAction(querier=querier)
+    )
+
+    # Group assignments by role_id
+    assignment_map: dict[uuid.UUID, list[AssignedUserData]] = defaultdict(list)
+    for assignment in action_result.result.items:
+        assignment_map[assignment.role_id].append(assignment)
+
+    # Return in the same order as role_ids, with empty lists for roles with no assignments
+    return [assignment_map.get(role_id, []) for role_id in role_ids]
+
+
 async def load_entities_by_type_and_ids(
     processor: PermissionControllerProcessors,
     keys: Sequence[ObjectId],
@@ -132,3 +201,45 @@ async def load_entities_by_type_and_ids(
         for e in action_result.result.items
     }
     return [entity_map.get(key) for key in keys]
+
+
+async def load_element_associations_by_ids(
+    processor: PermissionControllerProcessors,
+    ids: Sequence[uuid.UUID],
+) -> list[AssociationScopesEntitiesData | None]:
+    if not ids:
+        return []
+
+    querier = BatchQuerier(
+        pagination=NoPagination(),
+        conditions=[EntityScopeConditions.by_ids(ids)],
+    )
+
+    action_result = await processor.search_element_associations.wait_for_complete(
+        SearchElementAssociationsAction(querier=querier)
+    )
+
+    association_map = {a.id: a for a in action_result.result.items}
+    return [association_map.get(aid) for aid in ids]
+
+
+async def load_role_assignments_by_user_ids(
+    processor: PermissionControllerProcessors,
+    user_ids: Sequence[uuid.UUID],
+) -> list[list[AssignedUserData]]:
+    if not user_ids:
+        return []
+
+    querier = BatchQuerier(
+        pagination=NoPagination(),
+        conditions=[AssignedUserConditions.by_user_ids(user_ids)],
+    )
+
+    action_result = await processor.search_users_assigned_to_role.wait_for_complete(
+        SearchUsersAssignedToRoleAction(querier=querier)
+    )
+
+    assignments_by_user: defaultdict[uuid.UUID, list[AssignedUserData]] = defaultdict(list)
+    for assignment in action_result.result.items:
+        assignments_by_user[assignment.user_id].append(assignment)
+    return [assignments_by_user.get(user_id, []) for user_id in user_ids]

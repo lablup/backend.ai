@@ -2,8 +2,6 @@ from __future__ import annotations
 
 from unittest.mock import MagicMock, patch
 
-import pytest
-
 from ai.backend.manager.dependencies.orchestration.sokovan import (
     SokovanOrchestratorDependency,
     SokovanOrchestratorInput,
@@ -18,7 +16,6 @@ class TestSokovanOrchestratorDependency:
         dependency = SokovanOrchestratorDependency()
         assert dependency.stage_name == "sokovan-orchestrator"
 
-    @pytest.mark.asyncio
     @patch("ai.backend.manager.dependencies.orchestration.sokovan.create_coordinator_handlers")
     @patch(
         "ai.backend.manager.dependencies.orchestration.sokovan.create_default_scheduler_components"
@@ -73,7 +70,6 @@ class TestSokovanOrchestratorDependency:
             mock_create_handlers.assert_called_once()
             mock_orchestrator_class.assert_called_once()
 
-    @pytest.mark.asyncio
     @patch("ai.backend.manager.dependencies.orchestration.sokovan.create_coordinator_handlers")
     @patch(
         "ai.backend.manager.dependencies.orchestration.sokovan.create_default_scheduler_components"

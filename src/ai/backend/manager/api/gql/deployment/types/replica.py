@@ -18,7 +18,7 @@ from ai.backend.manager.api.gql.base import (
     OrderDirection,
     to_global_id,
 )
-from ai.backend.manager.api.gql.session import Session
+from ai.backend.manager.api.gql.session_federation import Session
 from ai.backend.manager.api.gql.types import GQLFilter, GQLOrderBy, StrawberryGQLContext
 from ai.backend.manager.api.gql_legacy.session import ComputeSessionNode
 from ai.backend.manager.data.deployment.types import (

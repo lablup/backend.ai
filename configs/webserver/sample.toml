@@ -641,6 +641,15 @@
   # OTLP receiver.
   # Added in 25.7.0
   endpoint = "http://otel-collector:4317"
+  # Maximum number of spans queued for export. Spans are dropped when the queue
+  # is full. The default (65536) accommodates burst traffic from GraphQL
+  # workloads.
+  # Added in 26.2.0
+  max-queue-size = 65536
+  # Maximum number of spans exported in a single batch. Larger batches reduce
+  # export overhead but increase memory usage.
+  # Added in 26.2.0
+  max-export-batch-size = 4096
 
 # etcd connection settings for distributed configuration and coordination with
 # other Backend.AI components.

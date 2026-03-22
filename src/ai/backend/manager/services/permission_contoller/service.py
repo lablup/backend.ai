@@ -12,6 +12,14 @@ from ai.backend.manager.services.permission_contoller.actions.assign_role import
     AssignRoleAction,
     AssignRoleActionResult,
 )
+from ai.backend.manager.services.permission_contoller.actions.bulk_assign_role import (
+    BulkAssignRoleAction,
+    BulkAssignRoleActionResult,
+)
+from ai.backend.manager.services.permission_contoller.actions.bulk_revoke_role import (
+    BulkRevokeRoleAction,
+    BulkRevokeRoleActionResult,
+)
 from ai.backend.manager.services.permission_contoller.actions.create_role import (
     CreateRoleAction,
     CreateRoleActionResult,
@@ -52,6 +60,10 @@ from ai.backend.manager.services.permission_contoller.actions.revoke_role import
     RevokeRoleAction,
     RevokeRoleActionResult,
 )
+from ai.backend.manager.services.permission_contoller.actions.search_element_associations import (
+    SearchElementAssociationsAction,
+    SearchElementAssociationsActionResult,
+)
 from ai.backend.manager.services.permission_contoller.actions.search_entities import (
     SearchEntitiesAction,
     SearchEntitiesActionResult,
@@ -75,6 +87,10 @@ from ai.backend.manager.services.permission_contoller.actions.search_scopes impo
 from ai.backend.manager.services.permission_contoller.actions.search_users_assigned_to_role import (
     SearchUsersAssignedToRoleAction,
     SearchUsersAssignedToRoleActionResult,
+)
+from ai.backend.manager.services.permission_contoller.actions.update_permission import (
+    UpdatePermissionAction,
+    UpdatePermissionActionResult,
 )
 from ai.backend.manager.services.permission_contoller.actions.update_role import (
     UpdateRoleAction,
@@ -124,6 +140,15 @@ class PermissionControllerService:
         """
         result = await self._repository.delete_permission(action.purger)
         return DeletePermissionActionResult(data=result)
+
+    async def update_permission(
+        self, action: UpdatePermissionAction
+    ) -> UpdatePermissionActionResult:
+        """
+        Updates an existing permission in the repository.
+        """
+        result = await self._repository.update_permission(action.updater)
+        return UpdatePermissionActionResult(data=result)
 
     async def create_object_permission(
         self, action: CreateObjectPermissionAction
@@ -181,6 +206,16 @@ class PermissionControllerService:
         data = await self._repository.revoke_role(action.input)
 
         return RevokeRoleActionResult(data=data)
+
+    async def bulk_assign_role(self, action: BulkAssignRoleAction) -> BulkAssignRoleActionResult:
+        """Assigns a role to multiple users with partial failure support."""
+        data = await self._repository.bulk_assign_role(action.bulk_creator)
+        return BulkAssignRoleActionResult(data=data)
+
+    async def bulk_revoke_role(self, action: BulkRevokeRoleAction) -> BulkRevokeRoleActionResult:
+        """Revokes a role from multiple users with partial failure support."""
+        data = await self._repository.bulk_revoke_role(action.input)
+        return BulkRevokeRoleActionResult(data=data)
 
     async def get_role_detail(self, action: GetRoleDetailAction) -> GetRoleDetailActionResult:
         """Get role with all permission details and assigned users."""
@@ -241,3 +276,10 @@ class PermissionControllerService:
         """Search entities within a scope."""
         result = await self._repository.search_entities(action.querier)
         return SearchEntitiesActionResult(result=result)
+
+    async def search_element_associations(
+        self, action: SearchElementAssociationsAction
+    ) -> SearchElementAssociationsActionResult:
+        """Search element associations (full association rows) within a scope."""
+        result = await self._repository.search_element_associations(action.querier)
+        return SearchElementAssociationsActionResult(result=result)

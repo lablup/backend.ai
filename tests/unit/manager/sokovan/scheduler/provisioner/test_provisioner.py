@@ -75,6 +75,7 @@ def _create_scheduling_data_with_strategy(
         session_type=SessionTypes.INTERACTIVE,
         cluster_mode=ClusterMode.SINGLE_NODE,
         priority=0,
+        is_preemptible=True,
         starts_at=None,
         is_private=False,
         kernels=[],
@@ -227,6 +228,9 @@ def test_provisioner(
     """Create SessionProvisioner with mock dependencies."""
     valkey_schedule = MagicMock()
     valkey_schedule.set_pending_queue = AsyncMock(return_value=None)
+    valkey_schedule.get_multiple_session_failed_agents = AsyncMock(
+        side_effect=lambda session_ids: [frozenset() for _ in session_ids]
+    )
 
     return SessionProvisioner(
         SessionProvisionerArgs(

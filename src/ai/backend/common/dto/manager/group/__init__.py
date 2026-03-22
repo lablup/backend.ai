@@ -9,6 +9,8 @@ from .request import (
     CreateGroupRequest,
     GroupFilter,
     ListGroupMembersRequest,
+    RegistryQuotaModifyRequest,
+    RegistryQuotaRequest,
     RemoveGroupMembersRequest,
     SearchGroupsRequest,
     UpdateGroupRequest,
@@ -22,6 +24,8 @@ from .response import (
     GroupMemberDTO,
     ListGroupMembersResponse,
     PaginationInfo,
+    PurgeGroupResponse,
+    ReadRegistryQuotaResponse,
     RemoveGroupMembersResponse,
     SearchGroupsResponse,
     UpdateGroupResponse,
@@ -46,6 +50,9 @@ __all__ = (
     "AddGroupMembersRequest",
     "RemoveGroupMembersRequest",
     "ListGroupMembersRequest",
+    # Request DTOs - Registry quota
+    "RegistryQuotaRequest",
+    "RegistryQuotaModifyRequest",
     # Response DTOs - Data
     "GroupDTO",
     "GroupMemberDTO",
@@ -55,10 +62,13 @@ __all__ = (
     "SearchGroupsResponse",
     "UpdateGroupResponse",
     "DeleteGroupResponse",
+    "PurgeGroupResponse",
     # Response DTOs - Member management
     "AddGroupMembersResponse",
     "RemoveGroupMembersResponse",
     "ListGroupMembersResponse",
+    # Response DTOs - Registry quota
+    "ReadRegistryQuotaResponse",
     # Response DTOs - Pagination
     "PaginationInfo",
 )

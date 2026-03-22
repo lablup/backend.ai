@@ -291,7 +291,6 @@ class TestKeypairResourcePolicyRepository:
             ),
         ],
     )
-    @pytest.mark.asyncio
     async def test_create_keypair_resource_policy(
         self,
         repository: KeypairResourcePolicyRepository,
@@ -362,7 +361,6 @@ class TestKeypairResourcePolicyRepository:
             ),
         ],
     )
-    @pytest.mark.asyncio
     async def test_update_keypair_resource_policy(
         self,
         repository: KeypairResourcePolicyRepository,
@@ -382,7 +380,6 @@ class TestKeypairResourcePolicyRepository:
                 f"Field {field_name}: expected {expected_value}, got {actual_value}"
             )
 
-    @pytest.mark.asyncio
     async def test_update_nonexistent_policy_raises_error(
         self,
         repository: KeypairResourcePolicyRepository,
@@ -398,7 +395,6 @@ class TestKeypairResourcePolicyRepository:
         with pytest.raises(KeypairResourcePolicyNotFound):
             await repository.update_keypair_resource_policy(updater)
 
-    @pytest.mark.asyncio
     async def test_remove_keypair_resource_policy(
         self,
         repository: KeypairResourcePolicyRepository,
@@ -418,7 +414,6 @@ class TestKeypairResourcePolicyRepository:
             deleted_policy = await db_sess.scalar(query)
             assert deleted_policy is None
 
-    @pytest.mark.asyncio
     async def test_remove_nonexistent_policy_raises_error(
         self,
         repository: KeypairResourcePolicyRepository,
@@ -437,7 +432,6 @@ class TestKeypairResourcePolicyRepository:
             allowed_vfolder_hosts=OptionalState.update(sample_allowed_vfolder_hosts),
         )
 
-    @pytest.mark.asyncio
     async def test_update_allowed_vfolder_hosts(
         self,
         repository: KeypairResourcePolicyRepository,

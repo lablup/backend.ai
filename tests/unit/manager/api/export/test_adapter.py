@@ -8,7 +8,7 @@ import pytest
 import sqlalchemy as sa
 from sqlalchemy.orm import Mapped, mapped_column
 
-from ai.backend.manager.api.export.adapter import ExportAdapter
+from ai.backend.manager.api.rest.export.adapter import ExportAdapter
 from ai.backend.manager.models.base import GUID, Base
 from ai.backend.manager.repositories.base.export import (
     ExportFieldDef,

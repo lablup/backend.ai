@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import enum
+import errno
 import logging
 import pickle
 import re
@@ -800,7 +801,21 @@ def _observe_stat_task(
                 await func(self, *args, **kwargs)
             except asyncio.CancelledError:
                 pass
+            except OSError as e:
+                if e.errno == errno.EMFILE:
+                    log.warning("skipping {} due to FD exhaustion", func.__name__)
+                    stat_task_observer.observe_stat_task_failure(
+                        agent_id=self.id, stat_scope=stat_scope, exception=e
+                    )
+                    return
+                log.exception("unhandled exception in {}", func.__name__)
+                await self.produce_error_event()
+                stat_task_observer.observe_stat_task_failure(
+                    agent_id=self.id, stat_scope=stat_scope, exception=e
+                )
             except Exception as e:
+                log.exception("unhandled exception in {}", func.__name__)
+                await self.produce_error_event()
                 stat_task_observer.observe_stat_task_failure(
                     agent_id=self.id, stat_scope=stat_scope, exception=e
                 )
@@ -1030,10 +1045,18 @@ class AbstractAgent[
 
         # Prepare stat collector tasks.
         self.timer_tasks.append(
-            aiotools.create_timer(self.collect_container_stat, UTILIZATION_METRIC_INTERVAL)
+            aiotools.create_timer(
+                self.collect_container_stat,
+                UTILIZATION_METRIC_INTERVAL,
+                delay_policy=aiotools.TimerDelayPolicy.CANCEL,
+            )
         )
         self.timer_tasks.append(
-            aiotools.create_timer(self.collect_process_stat, UTILIZATION_METRIC_INTERVAL)
+            aiotools.create_timer(
+                self.collect_process_stat,
+                UTILIZATION_METRIC_INTERVAL,
+                delay_policy=aiotools.TimerDelayPolicy.CANCEL,
+            )
         )
 
         # Prepare heartbeats.
@@ -1224,19 +1247,33 @@ class AbstractAgent[
         commit_kernels: set[str] = set()
 
         def _map_commit_status() -> None:
-            for subdir in base_commit_path.iterdir():
-                for commit_path in subdir.glob("./**/lock/*"):
+            if not base_commit_path.exists():
+                return
+            for subdir in list(base_commit_path.iterdir()):
+                for commit_path in list(subdir.glob("./**/lock/*")):
                     kern = commit_path.name
                     if kern not in commit_kernels:
                         commit_kernels.add(kern)
 
-        await loop.run_in_executor(None, _map_commit_status)
+        try:
+            await loop.run_in_executor(None, _map_commit_status)
+            # Update kernel commit statuses using ValkeyStatClient
+            await self.valkey_stat_client.update_kernel_commit_statuses(
+                list(commit_kernels),
+                COMMIT_STATUS_EXPIRE,
+            )
+        except OSError as e:
+            if e.errno == errno.EMFILE:
+                log.warning(
+                    "skipping commit status report due to FD exhaustion",
+                )
+                return
 
-        # Update kernel commit statuses using ValkeyStatClient
-        await self.valkey_stat_client.update_kernel_commit_statuses(
-            list(commit_kernels),
-            COMMIT_STATUS_EXPIRE,
-        )
+            log.exception("error while scanning kernel commit statuses")
+            return
+        except Exception:
+            log.exception("unexpected error in commit status reporting")
+            return
 
     async def heartbeat(self, interval: float) -> None:
         """
@@ -1344,49 +1381,32 @@ class AbstractAgent[
     async def collect_node_stat(self, resource_scaling_factors: Mapping[SlotName, Decimal]) -> None:
         if self.local_config.debug.log_stats:
             log.debug("collecting node statistics")
-        try:
-            async with asyncio.timeout(STAT_COLLECTION_TIMEOUT):
-                await self.stat_ctx.collect_node_stat(resource_scaling_factors)
-        except Exception:
-            log.exception("unhandled exception while syncing node stats")
-            await self.produce_error_event()
-            raise
+        async with asyncio.timeout(STAT_COLLECTION_TIMEOUT):
+            await self.stat_ctx.collect_node_stat(resource_scaling_factors)
 
     @_observe_stat_task(stat_scope=StatScope.CONTAINER)
     async def collect_container_stat(self, interval: float) -> None:
         if self.local_config.debug.log_stats:
             log.debug("collecting container statistics")
-        try:
-            container_ids: list[ContainerId] = []
-            for kernel_obj in [*self.kernel_registry.values()]:
-                if not kernel_obj.stats_enabled or kernel_obj.container_id is None:
-                    continue
-                container_ids.append(ContainerId(kernel_obj.container_id))
-            async with asyncio.timeout(STAT_COLLECTION_TIMEOUT):
-                await self.stat_ctx.collect_container_stat(container_ids)
-        except asyncio.CancelledError:
-            pass
-        except Exception:
-            log.exception("unhandled exception while syncing container stats")
-            await self.produce_error_event()
-            raise
+        container_ids: set[ContainerId] = set()
+        for kernel_obj in [*self.kernel_registry.values()]:
+            if not kernel_obj.stats_enabled or kernel_obj.container_id is None:
+                continue
+            container_ids.add(ContainerId(kernel_obj.container_id))
+        async with asyncio.timeout(STAT_COLLECTION_TIMEOUT):
+            await self.stat_ctx.collect_container_stat(list(container_ids))
 
     @_observe_stat_task(stat_scope=StatScope.PROCESS)
     async def collect_process_stat(self, interval: float) -> None:
         if self.local_config.debug.log_stats:
             log.debug("collecting process statistics in container")
-        try:
-            container_ids = []
-            for kernel_obj in [*self.kernel_registry.values()]:
-                if not kernel_obj.stats_enabled or kernel_obj.container_id is None:
-                    continue
-                container_ids.append(ContainerId(kernel_obj.container_id))
-            async with asyncio.timeout(STAT_COLLECTION_TIMEOUT):
-                await self.stat_ctx.collect_per_container_process_stat(container_ids)
-        except Exception:
-            log.exception("unhandled exception while syncing process stats")
-            await self.produce_error_event()
-            raise
+        container_ids: set[ContainerId] = set()
+        for kernel_obj in [*self.kernel_registry.values()]:
+            if not kernel_obj.stats_enabled or kernel_obj.container_id is None:
+                continue
+            container_ids.add(ContainerId(kernel_obj.container_id))
+        async with asyncio.timeout(STAT_COLLECTION_TIMEOUT):
+            await self.stat_ctx.collect_per_container_process_stat(list(container_ids))
 
     def _get_public_host(self) -> str:
         agent_config = self.local_config.agent
@@ -1405,6 +1425,8 @@ class AbstractAgent[
             kernel_obj = self.kernel_registry.get(ev.kernel_id)
             if kernel_obj is not None:
                 kernel_obj.state = KernelLifecycleStatus.RUNNING
+                if ev.container_id is not None:
+                    kernel_obj.set_container_id(ev.container_id)
         log.info("Kernel {0} started", ev.kernel_id)
 
     async def _handle_destroy_event(self, ev: ContainerLifecycleEvent) -> None:
@@ -1752,7 +1774,7 @@ class AbstractAgent[
                     # This will be overwritten by create_kernel() soon, but
                     # updating here improves consistency of kernel_id to container_id
                     # mapping earlier.
-                    kernel_obj["container_id"] = container_id
+                    kernel_obj.set_container_id(container_id)
                 elif container_id != kernel_obj["container_id"]:
                     # This should not happen!
                     log.warning(
@@ -3007,7 +3029,7 @@ class AbstractAgent[
                         )
                         cid = e.container_id
                         async with self.registry_lock:
-                            self.kernel_registry[ctx.kernel_id]["container_id"] = cid
+                            self.kernel_registry[ctx.kernel_id].set_container_id(ContainerId(cid))
                         await self.inject_container_lifecycle_event(
                             kernel_id,
                             session_id,
@@ -3044,6 +3066,10 @@ class AbstractAgent[
                     )
                     async with self.registry_lock:
                         self.kernel_registry[kernel_id].data.update(container_data)
+                        if "container_id" in container_data:
+                            self.kernel_registry[kernel_id].set_container_id(
+                                container_data["container_id"]
+                            )
                     await kernel_obj.init(self.event_producer)
                     log.info(
                         "create_kernel(kernel:{}, session:{}, container:{}) kernel object initialized",

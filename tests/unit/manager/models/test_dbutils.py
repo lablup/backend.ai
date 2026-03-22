@@ -17,7 +17,6 @@ from ai.backend.manager.models.utils import (
 )
 
 
-@pytest.mark.asyncio
 async def test_execute_with_retry() -> None:
     class DummyDBError(Exception):
         def __init__(self, pgcode: str) -> None:
@@ -57,7 +56,6 @@ async def test_execute_with_retry() -> None:
         assert ret == 1234
 
 
-@pytest.mark.asyncio
 async def test_execute_with_trx_retry(
     database_connection: ExtendedAsyncSAEngine,
 ) -> None:
@@ -109,7 +107,6 @@ async def test_execute_with_trx_retry(
     assert ret == 1234
 
 
-@pytest.mark.asyncio
 async def test_retry_txn_as_code_block() -> None:
     orig = MagicMock()
     orig.pgcode = "40001"

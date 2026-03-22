@@ -35,7 +35,6 @@ class TestValkeyDependency:
         # Create minimal ManagerUnifiedConfig with just redis settings
         return ManagerUnifiedConfig(redis=redis_config)  # type: ignore[call-arg]
 
-    @pytest.mark.asyncio
     async def test_provide_valkey_clients(
         self,
         manager_config: ManagerUnifiedConfig,
@@ -59,7 +58,6 @@ class TestValkeyDependency:
             server_time = await clients.live.get_server_time()
             assert server_time > 0
 
-    @pytest.mark.asyncio
     async def test_cleanup_on_exception(
         self,
         manager_config: ManagerUnifiedConfig,

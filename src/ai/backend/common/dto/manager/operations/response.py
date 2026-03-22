@@ -127,8 +127,8 @@ class ManagerNodeInfo(BaseFieldModel):
     version: str = Field(
         description="Manager software version string",
     )
-    api_version: int = Field(
-        description="Current API version served by the manager",
+    api_version: list[int | str] = Field(
+        description="Current API version as [major, revision_date] (e.g. [9, '20250722'])",
     )
 
 

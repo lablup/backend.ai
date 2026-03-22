@@ -6,10 +6,13 @@ from typing import Any
 import pytest
 import sqlalchemy as sa
 
+from ai.backend.common.data.permission.types import RBACElementType
 from ai.backend.common.exception import ScalingGroupConflict
 from ai.backend.common.types import AccessKey, DefaultForUnspecified, ResourceSlot, SessionTypes
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
+from ai.backend.manager.data.permission.types import RBACElementRef
 from ai.backend.manager.data.user.types import UserStatus
+from ai.backend.manager.defs import DEFAULT_ROLE
 from ai.backend.manager.errors.resource import ScalingGroupNotFound
 from ai.backend.manager.models.agent import AgentRow
 from ai.backend.manager.models.deployment_auto_scaling_policy import DeploymentAutoScalingPolicyRow
@@ -22,7 +25,7 @@ from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.image import ImageRow
 from ai.backend.manager.models.kernel import KernelRow
 from ai.backend.manager.models.keypair import KeyPairRow
-from ai.backend.manager.models.rbac_models import UserRoleRow
+from ai.backend.manager.models.rbac_models import AssociationScopesEntitiesRow, UserRoleRow
 from ai.backend.manager.models.resource_policy import (
     KeyPairResourcePolicyRow,
     ProjectResourcePolicyRow,
@@ -44,6 +47,10 @@ from ai.backend.manager.models.vfolder import VFolderRow
 from ai.backend.manager.repositories.base import BatchQuerier, OffsetPagination
 from ai.backend.manager.repositories.base.creator import BulkCreator, Creator
 from ai.backend.manager.repositories.base.purger import Purger
+from ai.backend.manager.repositories.base.rbac.scope_binder import (
+    RBACScopeBinder,
+    RBACScopeBindingPair,
+)
 from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.repositories.scaling_group import ScalingGroupRepository
 from ai.backend.manager.repositories.scaling_group.creators import (
@@ -53,9 +60,11 @@ from ai.backend.manager.repositories.scaling_group.creators import (
     ScalingGroupForProjectCreatorSpec,
 )
 from ai.backend.manager.repositories.scaling_group.purgers import (
-    create_scaling_group_for_domain_purger,
     create_scaling_group_for_keypairs_purger,
-    create_scaling_group_for_project_purger,
+)
+from ai.backend.manager.repositories.scaling_group.scope_binders import (
+    ResourceGroupDomainEntityUnbinder,
+    ResourceGroupProjectEntityUnbinder,
 )
 from ai.backend.manager.repositories.scaling_group.updaters import (
     ScalingGroupDriverConfigUpdaterSpec,
@@ -84,6 +93,7 @@ class TestScalingGroupRepositoryDB:
                 # FK dependency order: parents before children
                 DomainRow,
                 ScalingGroupRow,
+                AssociationScopesEntitiesRow,
                 ScalingGroupForDomainRow,
                 ScalingGroupForProjectRow,
                 UserResourcePolicyRow,
@@ -137,7 +147,9 @@ class TestScalingGroupRepositoryDB:
             scheduler_opts=scheduler_opts,
             use_host_network=use_host_network,
         )
-        return Creator(spec=spec)
+        return Creator(
+            spec=spec,
+        )
 
     async def _create_scaling_groups(
         self,
@@ -777,15 +789,25 @@ class TestScalingGroupRepositoryDB:
         sample_domain: str,
     ) -> None:
         """Test associating a scaling group with domains"""
-        bulk_creator = BulkCreator(
-            specs=[
-                ScalingGroupForDomainCreatorSpec(
-                    scaling_group=sample_scaling_group_for_association,
-                    domain=sample_domain,
+        binder = RBACScopeBinder(
+            pairs=[
+                RBACScopeBindingPair(
+                    spec=ScalingGroupForDomainCreatorSpec(
+                        scaling_group=sample_scaling_group_for_association,
+                        domain=sample_domain,
+                    ),
+                    entity_ref=RBACElementRef(
+                        RBACElementType.RESOURCE_GROUP,
+                        sample_scaling_group_for_association,
+                    ),
+                    scope_ref=RBACElementRef(
+                        RBACElementType.DOMAIN,
+                        sample_domain,
+                    ),
                 )
             ]
         )
-        await scaling_group_repository.associate_scaling_group_with_domains(bulk_creator)
+        await scaling_group_repository.associate_scaling_group_with_domains(binder)
 
         # Verify association using repository method
         association_exists = (
@@ -823,11 +845,8 @@ class TestScalingGroupRepositoryDB:
         scaling_group, domain = sample_scaling_group_with_domain_association
 
         # Disassociate the scaling group from the domain
-        purger = create_scaling_group_for_domain_purger(
-            scaling_group=scaling_group,
-            domain=domain,
-        )
-        await scaling_group_repository.disassociate_scaling_group_with_domains(purger)
+        unbinder = ResourceGroupDomainEntityUnbinder(scaling_groups=[scaling_group], domain=domain)
+        await scaling_group_repository.disassociate_scaling_group_with_domains(unbinder)
 
         # Verify association is removed
         association_exists = (
@@ -846,11 +865,11 @@ class TestScalingGroupRepositoryDB:
     ) -> None:
         """Test disassociating a non-existent association (should not raise error)"""
         # Disassociate without prior association should succeed without error
-        purger = create_scaling_group_for_domain_purger(
-            scaling_group=sample_scaling_group_for_association,
+        unbinder = ResourceGroupDomainEntityUnbinder(
+            scaling_groups=[sample_scaling_group_for_association],
             domain=sample_domain,
         )
-        await scaling_group_repository.disassociate_scaling_group_with_domains(purger)
+        await scaling_group_repository.disassociate_scaling_group_with_domains(unbinder)
 
     # Multiple Domains Tests
 
@@ -898,16 +917,26 @@ class TestScalingGroupRepositoryDB:
         sample_multiple_domains: list[str],
     ) -> None:
         """Test associating a scaling group with multiple domains at once"""
-        bulk_creator = BulkCreator(
-            specs=[
-                ScalingGroupForDomainCreatorSpec(
-                    scaling_group=sample_scaling_group_for_association,
-                    domain=domain,
+        binder = RBACScopeBinder(
+            pairs=[
+                RBACScopeBindingPair(
+                    spec=ScalingGroupForDomainCreatorSpec(
+                        scaling_group=sample_scaling_group_for_association,
+                        domain=domain,
+                    ),
+                    entity_ref=RBACElementRef(
+                        RBACElementType.RESOURCE_GROUP,
+                        sample_scaling_group_for_association,
+                    ),
+                    scope_ref=RBACElementRef(
+                        RBACElementType.DOMAIN,
+                        domain,
+                    ),
                 )
                 for domain in sample_multiple_domains
             ]
         )
-        await scaling_group_repository.associate_scaling_group_with_domains(bulk_creator)
+        await scaling_group_repository.associate_scaling_group_with_domains(binder)
 
         # Verify all associations exist
         for domain in sample_multiple_domains:
@@ -929,11 +958,10 @@ class TestScalingGroupRepositoryDB:
 
         # Disassociate all domains one by one
         for domain in domains:
-            purger = create_scaling_group_for_domain_purger(
-                scaling_group=scaling_group,
-                domain=domain,
+            unbinder = ResourceGroupDomainEntityUnbinder(
+                scaling_groups=[scaling_group], domain=domain
             )
-            await scaling_group_repository.disassociate_scaling_group_with_domains(purger)
+            await scaling_group_repository.disassociate_scaling_group_with_domains(unbinder)
 
         # Verify all associations are removed
         for domain in domains:
@@ -1104,15 +1132,25 @@ class TestScalingGroupRepositoryDB:
         _, _, project_id = test_user_domain_group
 
         # When: Associate the scaling group with the project
-        bulk_creator = BulkCreator(
-            specs=[
-                ScalingGroupForProjectCreatorSpec(
-                    scaling_group=sgroup_name,
-                    project=project_id,
+        binder = RBACScopeBinder(
+            pairs=[
+                RBACScopeBindingPair(
+                    spec=ScalingGroupForProjectCreatorSpec(
+                        scaling_group=sgroup_name,
+                        project=project_id,
+                    ),
+                    entity_ref=RBACElementRef(
+                        RBACElementType.RESOURCE_GROUP,
+                        sgroup_name,
+                    ),
+                    scope_ref=RBACElementRef(
+                        RBACElementType.PROJECT,
+                        str(project_id),
+                    ),
                 )
             ]
         )
-        await scaling_group_repository.associate_scaling_group_with_user_groups(bulk_creator)
+        await scaling_group_repository.associate_scaling_group_with_user_groups(binder)
 
         # Then: Association should exist
         association_exists = (
@@ -1135,15 +1173,25 @@ class TestScalingGroupRepositoryDB:
         _, _, project_id = test_user_domain_group
 
         # First, associate the scaling group with the project using repository
-        bulk_creator = BulkCreator(
-            specs=[
-                ScalingGroupForProjectCreatorSpec(
-                    scaling_group=sgroup_name,
-                    project=project_id,
+        binder = RBACScopeBinder(
+            pairs=[
+                RBACScopeBindingPair(
+                    spec=ScalingGroupForProjectCreatorSpec(
+                        scaling_group=sgroup_name,
+                        project=project_id,
+                    ),
+                    entity_ref=RBACElementRef(
+                        RBACElementType.RESOURCE_GROUP,
+                        sgroup_name,
+                    ),
+                    scope_ref=RBACElementRef(
+                        RBACElementType.PROJECT,
+                        str(project_id),
+                    ),
                 )
             ]
         )
-        await scaling_group_repository.associate_scaling_group_with_user_groups(bulk_creator)
+        await scaling_group_repository.associate_scaling_group_with_user_groups(binder)
 
         # Verify association exists
         association_exists = (
@@ -1155,11 +1203,10 @@ class TestScalingGroupRepositoryDB:
         assert association_exists is True
 
         # When: Disassociate the scaling group from the project
-        purger = create_scaling_group_for_project_purger(
-            scaling_group=sgroup_name,
-            project=project_id,
+        unbinder = ResourceGroupProjectEntityUnbinder(
+            scaling_groups=[sgroup_name], project=project_id
         )
-        await scaling_group_repository.disassociate_scaling_group_with_user_groups(purger)
+        await scaling_group_repository.disassociate_scaling_group_with_user_groups(unbinder)
 
         # Then: Association should no longer exist
         association_exists = (
@@ -1182,9 +1229,199 @@ class TestScalingGroupRepositoryDB:
         _, _, project_id = test_user_domain_group
 
         # When: Disassociate (even though no association exists)
-        purger = create_scaling_group_for_project_purger(
-            scaling_group=sgroup_name,
-            project=project_id,
+        unbinder = ResourceGroupProjectEntityUnbinder(
+            scaling_groups=[sgroup_name], project=project_id
         )
-        # Then: Should not raise any error (BatchPurger deletes 0 rows silently)
-        await scaling_group_repository.disassociate_scaling_group_with_user_groups(purger)
+        # Then: Should not raise any error (unbinder deletes 0 rows silently)
+        await scaling_group_repository.disassociate_scaling_group_with_user_groups(unbinder)
+
+    @pytest.fixture
+    async def sample_scaling_group_for_hierarchy(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+    ) -> AsyncGenerator[str, None]:
+        sgroup_name = f"test-{uuid.uuid4().hex[:8]}"
+        async with db_with_cleanup.begin_session() as db_sess:
+            sgroup = ScalingGroupRow(
+                name=sgroup_name,
+                description="Test scaling group for full hierarchy cascade delete",
+                is_active=True,
+                is_public=True,
+                created_at=datetime.now(tz=UTC),
+                wsproxy_addr=None,
+                wsproxy_api_token=None,
+                driver="static",
+                driver_opts={},
+                scheduler="fifo",
+                scheduler_opts=ScalingGroupOpts(),
+                use_host_network=False,
+            )
+            db_sess.add(sgroup)
+            await db_sess.flush()
+        yield sgroup_name
+
+    @pytest.fixture
+    async def sample_session(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        sample_scaling_group_for_hierarchy: str,
+        test_user_domain_group: tuple[uuid.UUID, str, uuid.UUID],
+    ) -> AsyncGenerator[SessionId, None]:
+        """Create a session referencing the scaling group."""
+        test_user_uuid, test_domain, test_group_id = test_user_domain_group
+        session_id = SessionId(uuid.uuid4())
+        async with db_with_cleanup.begin_session() as db_sess:
+            db_sess.add(
+                SessionRow(
+                    id=session_id,
+                    domain_name=test_domain,
+                    group_id=test_group_id,
+                    user_uuid=test_user_uuid,
+                    scaling_group_name=sample_scaling_group_for_hierarchy,
+                    cluster_size=1,
+                    vfolder_mounts={},
+                )
+            )
+            await db_sess.flush()
+        yield session_id
+
+    @pytest.fixture
+    async def sample_kernel(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        sample_session: SessionId,
+        test_user_domain_group: tuple[uuid.UUID, str, uuid.UUID],
+    ) -> AsyncGenerator[uuid.UUID, None]:
+        """Create a kernel for the session."""
+        test_user_uuid, test_domain, test_group_id = test_user_domain_group
+        kernel_id = uuid.uuid4()
+        async with db_with_cleanup.begin_session() as db_sess:
+            db_sess.add(
+                KernelRow(
+                    id=kernel_id,
+                    session_id=sample_session,
+                    domain_name=test_domain,
+                    group_id=test_group_id,
+                    user_uuid=test_user_uuid,
+                    cluster_role=DEFAULT_ROLE,
+                    occupied_slots=ResourceSlot(),
+                    repl_in_port=0,
+                    repl_out_port=0,
+                    stdin_port=0,
+                    stdout_port=0,
+                    vfolder_mounts=None,
+                )
+            )
+            await db_sess.flush()
+        yield kernel_id
+
+    @pytest.fixture
+    async def sample_endpoint(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        sample_scaling_group_for_hierarchy: str,
+        test_user_domain_group: tuple[uuid.UUID, str, uuid.UUID],
+    ) -> AsyncGenerator[uuid.UUID, None]:
+        """Create an endpoint referencing the scaling group."""
+        test_user_uuid, test_domain, test_group_id = test_user_domain_group
+        endpoint_id = uuid.uuid4()
+        async with db_with_cleanup.begin_session() as db_sess:
+            db_sess.add(
+                EndpointRow(
+                    id=endpoint_id,
+                    name="test-endpoint-hierarchy",
+                    domain=test_domain,
+                    project=test_group_id,
+                    resource_group=sample_scaling_group_for_hierarchy,
+                    image=None,
+                    lifecycle_stage=EndpointLifecycle.DESTROYED,
+                    session_owner=test_user_uuid,
+                    created_user=test_user_uuid,
+                )
+            )
+            await db_sess.flush()
+        yield endpoint_id
+
+    @pytest.fixture
+    async def sample_route(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        sample_session: SessionId,
+        sample_endpoint: uuid.UUID,
+        test_user_domain_group: tuple[uuid.UUID, str, uuid.UUID],
+    ) -> AsyncGenerator[uuid.UUID, None]:
+        """Create a route connecting the session to the endpoint."""
+        test_user_uuid, test_domain, test_group_id = test_user_domain_group
+        route_id = uuid.uuid4()
+        async with db_with_cleanup.begin_session() as db_sess:
+            db_sess.add(
+                RoutingRow(
+                    id=route_id,
+                    endpoint=sample_endpoint,
+                    session=sample_session,
+                    session_owner=test_user_uuid,
+                    domain=test_domain,
+                    project=test_group_id,
+                    traffic_ratio=1.0,
+                )
+            )
+            await db_sess.flush()
+        yield route_id
+
+    async def test_purge_scaling_group_with_full_hierarchy(
+        self,
+        scaling_group_repository: ScalingGroupRepository,
+        sample_scaling_group_for_hierarchy: str,
+        sample_session: SessionId,
+        sample_kernel: uuid.UUID,
+        sample_endpoint: uuid.UUID,
+        sample_route: uuid.UUID,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+    ) -> None:
+        """Test purging a scaling group with the full FK hierarchy.
+
+        Hierarchy: ScalingGroup → Session → Kernel + Endpoint → Route
+        """
+        sgroup_name = sample_scaling_group_for_hierarchy
+        session_id = sample_session
+        kernel_id = sample_kernel
+        endpoint_id = sample_endpoint
+        route_id = sample_route
+
+        purger = Purger(row_class=ScalingGroupRow, pk_value=sgroup_name)
+        # FK Error should not occur, and all related records should be deleted
+        result = await scaling_group_repository.purge_scaling_group(purger)
+
+        assert result.name == sgroup_name
+
+        # Verify all records in the hierarchy are deleted
+        async with db_with_cleanup.begin_readonly_session() as db_sess:
+            # Verify scaling group is deleted
+            sg_result = await db_sess.execute(
+                sa.select(ScalingGroupRow).where(ScalingGroupRow.name == sgroup_name)
+            )
+            assert sg_result.scalar_one_or_none() is None
+
+            # Verify session is deleted
+            session_result = await db_sess.execute(
+                sa.select(SessionRow).where(SessionRow.id == session_id)
+            )
+            assert session_result.scalar_one_or_none() is None
+
+            # Verify kernel is deleted
+            kernel_result = await db_sess.execute(
+                sa.select(KernelRow).where(KernelRow.id == kernel_id)
+            )
+            assert kernel_result.scalar_one_or_none() is None
+
+            # Verify endpoint is deleted
+            endpoint_result = await db_sess.execute(
+                sa.select(EndpointRow).where(EndpointRow.id == endpoint_id)
+            )
+            assert endpoint_result.scalar_one_or_none() is None
+
+            # Verify route is deleted
+            route_result = await db_sess.execute(
+                sa.select(RoutingRow).where(RoutingRow.id == route_id)
+            )
+            assert route_result.scalar_one_or_none() is None

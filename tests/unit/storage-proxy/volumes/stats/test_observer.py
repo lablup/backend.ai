@@ -86,7 +86,6 @@ class TestVolumeStatsObserver:
     def test_timeout(self) -> None:
         assert VolumeStatsObserver.timeout() == 30.0
 
-    @pytest.mark.asyncio
     async def test_observe_with_empty_pool_does_nothing(
         self,
         observer_with_empty_pool: VolumeStatsObserver,
@@ -96,7 +95,6 @@ class TestVolumeStatsObserver:
 
         mock_valkey_client.set_volume_stats.assert_not_called()
 
-    @pytest.mark.asyncio
     @patch("ai.backend.storage.volumes.stats.observer.VolumeStatsMetricObserver")
     @patch("ai.backend.storage.volumes.stats.observer.VolumePerfMetricObserver")
     async def test_observe_single_volume_success(
@@ -121,7 +119,6 @@ class TestVolumeStatsObserver:
         mock_stats_observer.observe.assert_called_once()
         mock_perf_observer.update.assert_called_once()
 
-    @pytest.mark.asyncio
     @patch("ai.backend.storage.volumes.stats.observer.VolumeStatsMetricObserver")
     @patch("ai.backend.storage.volumes.stats.observer.VolumePerfMetricObserver")
     async def test_observe_timeout_records_failure(
@@ -146,7 +143,6 @@ class TestVolumeStatsObserver:
         call_kwargs = mock_stats_observer.observe.call_args.kwargs
         assert call_kwargs["status"] == "failure"
 
-    @pytest.mark.asyncio
     @patch("ai.backend.storage.volumes.stats.observer.VolumeStatsMetricObserver")
     @patch("ai.backend.storage.volumes.stats.observer.VolumePerfMetricObserver")
     async def test_observe_error_records_failure(
@@ -171,7 +167,6 @@ class TestVolumeStatsObserver:
         call_kwargs = mock_stats_observer.observe.call_args.kwargs
         assert call_kwargs["status"] == "failure"
 
-    @pytest.mark.asyncio
     async def test_cleanup_does_nothing(
         self,
         observer_with_single_volume: VolumeStatsObserver,

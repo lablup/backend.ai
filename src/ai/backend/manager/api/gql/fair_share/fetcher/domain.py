@@ -15,6 +15,7 @@ from ai.backend.manager.api.gql.fair_share.types import (
     DomainFairShareFilter,
     DomainFairShareGQL,
     DomainFairShareOrderBy,
+    RGDomainFairShareFilter,
 )
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.models.fair_share.row import DomainFairShareRow
@@ -107,7 +108,7 @@ async def fetch_domain_fair_shares(
 async def fetch_rg_domain_fair_shares(
     info: Info[StrawberryGQLContext],
     scope: DomainFairShareSearchScope,
-    filter: DomainFairShareFilter | None = None,
+    filter: RGDomainFairShareFilter | None = None,
     order_by: list[DomainFairShareOrderBy] | None = None,
     before: str | None = None,
     after: str | None = None,
@@ -120,6 +121,8 @@ async def fetch_rg_domain_fair_shares(
     """Fetch domain fair shares using resource group scope.
 
     Returns all domains in the scope, including those without records (with defaults).
+    Uses RGDomainFairShareFilter whose build_conditions() references INNER JOIN'd
+    columns to avoid NULL exclusion.
     """
     processors = info.context.processors
 

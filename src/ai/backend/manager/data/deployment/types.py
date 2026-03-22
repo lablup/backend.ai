@@ -24,6 +24,7 @@ from ai.backend.common.data.model_deployment.types import (
 
 if TYPE_CHECKING:
     from ai.backend.manager.data.session.types import SchedulingResult, SubStepResult
+    from ai.backend.manager.models.deployment_policy import BlueGreenSpec, RollingUpdateSpec
 
 from ai.backend.common.types import (
     AutoScalingMetricSource,
@@ -147,19 +148,66 @@ class RouteTrafficStatus(enum.StrEnum):
 # ========== Status Transition Types (BEP-1030) ==========
 
 
+class DeploymentSubStatus(enum.StrEnum):
+    """Base class for deployment lifecycle sub-statuses.
+
+    Each lifecycle type can define its own sub-status enum by
+    inheriting from this class.  For example, DEPLOYING handlers
+    use ``DeploymentSubStep`` (provisioning, rolling_back, …).
+    """
+
+
+class DeploymentSubStep(DeploymentSubStatus):
+    """Sub-steps for the DEPLOYING lifecycle phase.
+
+    - PROVISIONING: New revision routes are being provisioned and old routes
+      are being drained.  The main handler for rolling updates.
+    - ROLLING_BACK: Clearing deploying_revision and transitioning to READY.
+    - COMPLETED: All strategy conditions satisfied; triggers revision swap.
+    """
+
+    PROVISIONING = "provisioning"
+    ROLLING_BACK = "rolling_back"
+    COMPLETED = "completed"
+
+
+@dataclass(frozen=True)
+class DeploymentLifecycleStatus:
+    """Target lifecycle state for a deployment status transition.
+
+    Pairs an EndpointLifecycle with an optional sub-status to provide
+    context about which sub-step led to this transition.
+
+    Attributes:
+        lifecycle: The target endpoint lifecycle state
+        sub_status: Optional sub-status indicating what determined this
+            transition. Concrete values come from DeploymentSubStatus
+            subclasses (e.g. DeploymentSubStep for DEPLOYING handlers).
+    """
+
+    lifecycle: EndpointLifecycle
+    sub_status: DeploymentSubStatus | None = None
+
+
 @dataclass(frozen=True)
 class DeploymentStatusTransitions:
     """Status transitions for deployment handlers.
 
-    Deployment handlers only have success/failure outcomes (no expired/give_up).
-
     Attributes:
         success: Target lifecycle when handler succeeds, None means no change
-        failure: Target lifecycle when handler fails, None means no change
+        need_retry: Target lifecycle when handler fails but can retry, or when
+            route mutations were executed but the deployment stays in the same
+            sub-step (e.g. PROVISIONING → PROVISIONING after create/drain).
+            Items explicitly returned as need_retry by handlers are never
+            escalated to give_up — they represent normal progress.
+        expired: Target lifecycle when time elapsed in current state
+        give_up: Target lifecycle when retry count exceeded
     """
 
-    success: EndpointLifecycle | None = None
-    failure: EndpointLifecycle | None = None
+    success: DeploymentLifecycleStatus | None = None
+    need_retry: DeploymentLifecycleStatus | None = None
+    expired: DeploymentLifecycleStatus | None = None
+    give_up: DeploymentLifecycleStatus | None = None
 
 
 @dataclass(frozen=True)
@@ -216,7 +264,7 @@ class MountSpec:
 @dataclass
 class MountInfo:
     vfolder_id: UUID
-    kernel_path: PurePosixPath
+    kernel_path: PurePosixPath | None = None
 
 
 @dataclass
@@ -272,6 +320,7 @@ class ExecutionSpec(ConfiguredModel):
 
 
 class ModelRevisionSpec(ConfiguredModel):
+    revision_id: UUID | None = None
     image_identifier: ImageIdentifier
     resource_spec: ResourceSpec
     mounts: MountMetadata
@@ -325,11 +374,36 @@ class DeploymentInfo:
     network: DeploymentNetworkSpec
     model_revisions: list[ModelRevisionSpec]
     current_revision_id: UUID | None = None
+    policy: DeploymentPolicyData | None = None
+    deploying_revision_id: UUID | None = None
+    sub_step: DeploymentSubStep | None = None
 
-    def target_revision(self) -> ModelRevisionSpec | None:
-        if self.model_revisions:
-            return self.model_revisions[0]
-        return None
+    def resolve_revision_spec(self, revision_id: UUID) -> ModelRevisionSpec | None:
+        """Find a ModelRevisionSpec by revision_id from model_revisions."""
+        return next(
+            (r for r in self.model_revisions if r.revision_id == revision_id),
+            None,
+        )
+
+
+@dataclass
+class DeploymentWithHistory:
+    """Bundles a deployment with its scheduling history context.
+
+    This is the primary data unit for deployment coordinator operations,
+    analogous to SessionWithKernels for session scheduling.
+
+    Attributes:
+        deployment_info: Deployment information including lifecycle data
+        phase_attempts: Number of attempts for current phase from scheduling history
+                       (used for failure classification: give_up when >= max_retries)
+        phase_started_at: When the current phase started from scheduling history
+                         (used for failure classification: expired when timeout exceeded)
+    """
+
+    deployment_info: DeploymentInfo
+    phase_attempts: int = 0
+    phase_started_at: datetime | None = None
 
 
 @dataclass
@@ -360,7 +434,7 @@ class RouteInfo:
     session_id: SessionId | None
     status: RouteStatus
     traffic_ratio: float
-    created_at: datetime | None
+    created_at: datetime
     revision_id: UUID | None
     traffic_status: RouteTrafficStatus
     error_data: dict[str, Any] = field(default_factory=dict)
@@ -493,7 +567,8 @@ class ModelDeploymentData:
     replica_state: ReplicaStateData
     default_deployment_strategy: DeploymentStrategy
     created_user_id: UUID
-    access_token_ids: UUID | None = None
+    policy: DeploymentPolicyData | None = None
+    access_token_ids: list[UUID] | None = None
 
 
 class DeploymentOrderField(enum.StrEnum):
@@ -633,6 +708,37 @@ class AutoScalingRuleSearchResult:
     """Search result with pagination for auto-scaling rules."""
 
     items: list[ModelDeploymentAutoScalingRuleData]
+    total_count: int
+    has_next_page: bool
+    has_previous_page: bool
+
+
+@dataclass
+class DeploymentPolicyData:
+    """Data class for DeploymentPolicyRow."""
+
+    id: UUID
+    endpoint: UUID
+    strategy: DeploymentStrategy
+    strategy_spec: RollingUpdateSpec | BlueGreenSpec
+    rollback_on_failure: bool
+    created_at: datetime
+    updated_at: datetime
+
+
+@dataclass
+class DeploymentPolicyUpsertResult:
+    """Result of upserting a deployment policy."""
+
+    data: DeploymentPolicyData
+    created: bool
+
+
+@dataclass
+class DeploymentPolicySearchResult:
+    """Search result with pagination for deployment policies."""
+
+    items: list[DeploymentPolicyData]
     total_count: int
     has_next_page: bool
     has_previous_page: bool

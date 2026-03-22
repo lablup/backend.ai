@@ -13,7 +13,7 @@ from sqlalchemy.engine import CursorResult
 
 from ai.backend.manager.models.base import Base
 
-from .integrity import _match_integrity_error, parse_integrity_error
+from .integrity import match_integrity_error, parse_integrity_error
 from .types import IntegrityErrorCheck, QueryCondition
 
 if TYPE_CHECKING:
@@ -143,6 +143,24 @@ class BatchUpdaterResult:
     updated_count: int
 
 
+@dataclass
+class BulkUpdaterError[TRow: Base]:
+    """Error information for a failed bulk update operation.
+
+    Contains the spec that failed and the exception for debugging.
+    Follows the same pattern as BulkCreatorError.
+
+    Attributes:
+        spec: The UpdaterSpec that failed
+        exception: The exception that occurred
+        index: Original position in specs list for traceability
+    """
+
+    spec: UpdaterSpec[TRow]
+    exception: Exception
+    index: int
+
+
 async def execute_updater[TRow: Base](
     db_sess: SASession,
     updater: Updater[TRow],
@@ -203,7 +221,7 @@ async def execute_updater[TRow: Base](
         result = await db_sess.execute(select_stmt)
     except sa.exc.IntegrityError as e:
         parsed = parse_integrity_error(e)
-        _match_integrity_error(parsed, updater.spec.integrity_error_checks)
+        match_integrity_error(parsed, updater.spec.integrity_error_checks)
     updated_row = result.scalar_one_or_none()
 
     if updated_row is None:
@@ -257,5 +275,5 @@ async def execute_batch_updater[TRow: Base](
         result = await db_sess.execute(stmt)
     except sa.exc.IntegrityError as e:
         parsed = parse_integrity_error(e)
-        _match_integrity_error(parsed, updater.spec.integrity_error_checks)
+        match_integrity_error(parsed, updater.spec.integrity_error_checks)
     return BatchUpdaterResult(updated_count=cast(CursorResult[Any], result).rowcount)

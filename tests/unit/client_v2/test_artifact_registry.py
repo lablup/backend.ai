@@ -6,10 +6,9 @@ from typing import Any
 from unittest.mock import AsyncMock, MagicMock
 from uuid import uuid4
 
-import pytest
 from yarl import URL
 
-from ai.backend.client.v2.base_client import BackendAIClient
+from ai.backend.client.v2.base_client import BackendAIAuthClient
 from ai.backend.client.v2.config import ClientConfig
 from ai.backend.client.v2.domains.artifact_registry import ArtifactRegistryClient
 from ai.backend.common.data.storage.registries.types import ModelTarget
@@ -55,7 +54,7 @@ def _json_response(data: dict[str, Any], *, status: int = 200) -> AsyncMock:
 
 
 def _make_artifact_registry_client(mock_session: MagicMock) -> ArtifactRegistryClient:
-    client = BackendAIClient(_DEFAULT_CONFIG, MockAuth(), mock_session)
+    client = BackendAIAuthClient(_DEFAULT_CONFIG, MockAuth(), mock_session)
     return ArtifactRegistryClient(client)
 
 
@@ -118,7 +117,6 @@ _SAMPLE_ARTIFACT_WITH_REVISIONS_DTO = {
 
 
 class TestScanOperations:
-    @pytest.mark.asyncio
     async def test_scan_artifacts(self) -> None:
         resp = _json_response({"artifacts": [_SAMPLE_ARTIFACT_DTO]})
         mock_session = _make_request_session(resp)
@@ -142,7 +140,6 @@ class TestScanOperations:
         assert body["limit"] == 50
         assert body["search"] == "DialoGPT"
 
-    @pytest.mark.asyncio
     async def test_delegate_scan_artifacts(self) -> None:
         resp = _json_response({
             "artifacts": [_SAMPLE_ARTIFACT_DTO],
@@ -171,9 +168,10 @@ class TestScanOperations:
         assert method == "POST"
         assert url.endswith("/artifact-registries/delegation/scan")
         assert body is not None
-        assert body["delegatee_target"]["delegatee_reservoir_id"] == _SAMPLE_DELEGATEE_RESERVOIR_ID
+        assert body["delegatee_target"]["delegatee_reservoir_id"] == str(
+            _SAMPLE_DELEGATEE_RESERVOIR_ID
+        )
 
-    @pytest.mark.asyncio
     async def test_delegate_import_artifacts(self) -> None:
         resp = _json_response({
             "tasks": [
@@ -201,12 +199,11 @@ class TestScanOperations:
         assert method == "POST"
         assert url.endswith("/artifact-registries/delegation/import")
         assert body is not None
-        assert body["artifact_revision_ids"] == [_SAMPLE_REVISION_ID]
+        assert body["artifact_revision_ids"] == [str(_SAMPLE_REVISION_ID)]
         assert body["options"]["force"] is True
 
 
 class TestSearchOperations:
-    @pytest.mark.asyncio
     async def test_search_artifacts(self) -> None:
         resp = _json_response({"artifacts": [_SAMPLE_ARTIFACT_DTO]})
         mock_session = _make_request_session(resp)
@@ -229,7 +226,6 @@ class TestSearchOperations:
 
 
 class TestModelScanning:
-    @pytest.mark.asyncio
     async def test_scan_single_model(self) -> None:
         resp = _json_response({"artifact": _SAMPLE_ARTIFACT_WITH_REVISIONS_DTO})
         mock_session = _make_request_session(resp)
@@ -249,7 +245,6 @@ class TestModelScanning:
         assert "/artifact-registries/model/microsoft/DialoGPT-medium" in url
         assert body is None
 
-    @pytest.mark.asyncio
     async def test_scan_single_model_minimal(self) -> None:
         resp = _json_response({"artifact": _SAMPLE_ARTIFACT_WITH_REVISIONS_DTO})
         mock_session = _make_request_session(resp)
@@ -265,7 +260,6 @@ class TestModelScanning:
         _, kwargs = mock_session.request.call_args
         assert kwargs.get("params") == {}
 
-    @pytest.mark.asyncio
     async def test_scan_models_batch(self) -> None:
         resp = _json_response({"artifacts": [_SAMPLE_ARTIFACT_DTO]})
         mock_session = _make_request_session(resp)

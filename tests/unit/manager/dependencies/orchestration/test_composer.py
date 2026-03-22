@@ -4,8 +4,6 @@ from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from unittest.mock import MagicMock, patch
 
-import pytest
-
 from ai.backend.common.dependencies.stacks.builder import DependencyBuilderStack
 from ai.backend.manager.dependencies.orchestration.composer import (
     OrchestrationComposer,
@@ -21,7 +19,6 @@ class TestOrchestrationComposer:
         composer = OrchestrationComposer()
         assert composer.stage_name == "orchestration"
 
-    @pytest.mark.asyncio
     @patch("ai.backend.manager.dependencies.orchestration.composer.LeaderElectionDependency")
     @patch("ai.backend.manager.dependencies.orchestration.composer.SokovanOrchestratorDependency")
     @patch("ai.backend.manager.dependencies.orchestration.composer.IdleCheckerHostDependency")
@@ -64,7 +61,6 @@ class TestOrchestrationComposer:
                 assert resources.sokovan_orchestrator is not None
                 assert resources.leader_election is not None
 
-    @pytest.mark.asyncio
     @patch("ai.backend.manager.dependencies.orchestration.composer.LeaderElectionDependency")
     @patch("ai.backend.manager.dependencies.orchestration.composer.SokovanOrchestratorDependency")
     @patch("ai.backend.manager.dependencies.orchestration.composer.IdleCheckerHostDependency")

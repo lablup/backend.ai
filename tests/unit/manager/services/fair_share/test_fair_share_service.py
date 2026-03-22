@@ -47,6 +47,11 @@ from ai.backend.manager.services.fair_share import (
     SearchRGUserFairSharesAction,
     SearchUserFairSharesAction,
 )
+from ai.backend.manager.services.fair_share.actions import (
+    UpsertDomainFairShareWeightAction,
+    UpsertProjectFairShareWeightAction,
+    UpsertUserFairShareWeightAction,
+)
 
 
 @pytest.fixture
@@ -63,7 +68,6 @@ def service(mock_repository: MagicMock) -> FairShareService:
 
 
 class TestGetDomainFairShare:
-    @pytest.mark.asyncio
     async def test_get_domain_fair_share_calls_repository(
         self,
         service: FairShareService,
@@ -86,7 +90,6 @@ class TestGetDomainFairShare:
         )
         assert result.data == expected_data
 
-    @pytest.mark.asyncio
     async def test_get_domain_fair_share_returns_default_when_not_found_but_exists(
         self,
         service: FairShareService,
@@ -136,7 +139,6 @@ class TestGetDomainFairShare:
         assert result.data.data.spec.weight == Decimal("2.0")  # Repository sets default_weight
         assert result.data.data.use_default is True
 
-    @pytest.mark.asyncio
     async def test_get_domain_fair_share_raises_entity_not_found_when_entity_missing(
         self,
         service: FairShareService,
@@ -156,7 +158,6 @@ class TestGetDomainFairShare:
         with pytest.raises(DomainNotFound):
             await service.get_domain_fair_share(action)
 
-    @pytest.mark.asyncio
     async def test_get_domain_fair_share_uses_scaling_group_spec_for_default(
         self,
         service: FairShareService,
@@ -221,7 +222,6 @@ class TestGetDomainFairShare:
 
 
 class TestSearchDomainFairShares:
-    @pytest.mark.asyncio
     async def test_search_domain_fair_shares_returns_result(
         self,
         service: FairShareService,
@@ -249,7 +249,6 @@ class TestSearchDomainFairShares:
         assert result.items == [mock_fair_share]
         assert result.total_count == 1
 
-    @pytest.mark.asyncio
     async def test_search_domain_fair_shares_passes_querier(
         self,
         service: FairShareService,
@@ -285,7 +284,6 @@ class TestSearchDomainFairShares:
 
 
 class TestGetProjectFairShare:
-    @pytest.mark.asyncio
     async def test_get_project_fair_share_calls_repository(
         self,
         service: FairShareService,
@@ -309,7 +307,6 @@ class TestGetProjectFairShare:
         )
         assert result.data == expected_data
 
-    @pytest.mark.asyncio
     async def test_get_project_fair_share_returns_default_when_not_found_but_exists(
         self,
         service: FairShareService,
@@ -362,7 +359,6 @@ class TestGetProjectFairShare:
         assert result.data.data.use_default is True
         assert result.data.domain_name == "test-domain"
 
-    @pytest.mark.asyncio
     async def test_get_project_fair_share_raises_entity_not_found_when_entity_missing(
         self,
         service: FairShareService,
@@ -383,7 +379,6 @@ class TestGetProjectFairShare:
         with pytest.raises(ProjectNotFound):
             await service.get_project_fair_share(action)
 
-    @pytest.mark.asyncio
     async def test_get_project_fair_share_uses_scaling_group_spec_for_default(
         self,
         service: FairShareService,
@@ -450,7 +445,6 @@ class TestGetProjectFairShare:
 
 
 class TestSearchProjectFairShares:
-    @pytest.mark.asyncio
     async def test_search_project_fair_shares_returns_result(
         self,
         service: FairShareService,
@@ -478,7 +472,6 @@ class TestSearchProjectFairShares:
         assert result.items == [mock_fair_share]
         assert result.total_count == 1
 
-    @pytest.mark.asyncio
     async def test_search_project_fair_shares_passes_querier(
         self,
         service: FairShareService,
@@ -514,7 +507,6 @@ class TestSearchProjectFairShares:
 
 
 class TestGetUserFairShare:
-    @pytest.mark.asyncio
     async def test_get_user_fair_share_calls_repository(
         self,
         service: FairShareService,
@@ -541,7 +533,6 @@ class TestGetUserFairShare:
         )
         assert result.data == expected_data
 
-    @pytest.mark.asyncio
     async def test_get_user_fair_share_returns_default_when_not_found_but_exists(
         self,
         service: FairShareService,
@@ -599,7 +590,6 @@ class TestGetUserFairShare:
         assert result.data.domain_name == "test-domain"
         assert result.data.scheduling_rank is None
 
-    @pytest.mark.asyncio
     async def test_get_user_fair_share_raises_entity_not_found_when_entity_missing(
         self,
         service: FairShareService,
@@ -622,7 +612,6 @@ class TestGetUserFairShare:
         with pytest.raises(UserNotFound):
             await service.get_user_fair_share(action)
 
-    @pytest.mark.asyncio
     async def test_get_user_fair_share_uses_scaling_group_spec_for_default(
         self,
         service: FairShareService,
@@ -693,7 +682,6 @@ class TestGetUserFairShare:
 
 
 class TestSearchUserFairShares:
-    @pytest.mark.asyncio
     async def test_search_user_fair_shares_returns_result(
         self,
         service: FairShareService,
@@ -721,7 +709,6 @@ class TestSearchUserFairShares:
         assert result.items == [mock_fair_share]
         assert result.total_count == 1
 
-    @pytest.mark.asyncio
     async def test_search_user_fair_shares_passes_querier(
         self,
         service: FairShareService,
@@ -757,7 +744,6 @@ class TestSearchUserFairShares:
 
 
 class TestSearchDomainFairShareEntities:
-    @pytest.mark.asyncio
     async def test_includes_entities_with_and_without_records(
         self,
         service: FairShareService,
@@ -829,7 +815,6 @@ class TestSearchDomainFairShareEntities:
         # One with default (use_default=True)
         assert any(item.data.use_default is True for item in result.items)
 
-    @pytest.mark.asyncio
     async def test_default_uses_scaling_group_default_weight(
         self,
         service: FairShareService,
@@ -877,7 +862,6 @@ class TestSearchDomainFairShareEntities:
         assert default.data.spec.weight == Decimal("1.0")
         assert default.data.use_default is True
 
-    @pytest.mark.asyncio
     async def test_default_matches_scaling_group_spec(
         self,
         service: FairShareService,
@@ -941,7 +925,6 @@ class TestSearchDomainFairShareEntities:
 
 
 class TestSearchProjectFairShareEntities:
-    @pytest.mark.asyncio
     async def test_includes_entities_with_and_without_records(
         self,
         service: FairShareService,
@@ -1016,7 +999,6 @@ class TestSearchProjectFairShareEntities:
 
 
 class TestSearchUserFairShareEntities:
-    @pytest.mark.asyncio
     async def test_includes_entities_with_and_without_records(
         self,
         service: FairShareService,
@@ -1097,3 +1079,155 @@ class TestSearchUserFairShareEntities:
         assert len(result.items) == 2
         assert any(item.data.use_default is False for item in result.items)
         assert any(item.data.use_default is True for item in result.items)
+
+
+# Upsert Fair Share Weight Tests (BA-4683)
+
+
+class TestUpsertFairShareWeightWithoutResourceGroup:
+    """Regression tests for BA-4683: upsert should succeed without resource group membership."""
+
+    async def test_upsert_domain_fair_share_weight_passes_through(
+        self,
+        service: FairShareService,
+        mock_repository: MagicMock,
+    ) -> None:
+        """Service should pass through upsert to repository regardless of resource group."""
+        now = datetime.now(UTC)
+        today = now.date()
+        expected_data = DomainFairShareData(
+            resource_group="non-existent-sg",
+            domain_name="test-domain",
+            data=FairShareData(
+                spec=FairShareSpec(
+                    weight=Decimal("2.5"),
+                    half_life_days=7,
+                    lookback_days=28,
+                    decay_unit_days=1,
+                    resource_weights=ResourceSlot(),
+                ),
+                calculation_snapshot=FairShareCalculationSnapshot(
+                    fair_share_factor=Decimal("1.0"),
+                    total_decayed_usage=[],
+                    normalized_usage=Decimal("0.0"),
+                    lookback_start=today,
+                    lookback_end=today,
+                    last_calculated_at=now,
+                ),
+                metadata=None,
+                use_default=False,
+            ),
+        )
+        mock_repository.upsert_domain_fair_share = AsyncMock(return_value=expected_data)
+
+        action = UpsertDomainFairShareWeightAction(
+            resource_group="non-existent-sg",
+            domain_name="test-domain",
+            weight=Decimal("2.5"),
+        )
+
+        result = await service.upsert_domain_fair_share_weight(action)
+
+        mock_repository.upsert_domain_fair_share.assert_called_once()
+        assert result.data == expected_data
+        assert result.data.data.spec.weight == Decimal("2.5")
+
+    async def test_upsert_project_fair_share_weight_passes_through(
+        self,
+        service: FairShareService,
+        mock_repository: MagicMock,
+    ) -> None:
+        """Service should pass through upsert to repository regardless of resource group."""
+        project_id = uuid.uuid4()
+        now = datetime.now(UTC)
+        today = now.date()
+        expected_data = ProjectFairShareData(
+            resource_group="non-existent-sg",
+            project_id=project_id,
+            domain_name="test-domain",
+            data=FairShareData(
+                spec=FairShareSpec(
+                    weight=Decimal("3.0"),
+                    half_life_days=7,
+                    lookback_days=28,
+                    decay_unit_days=1,
+                    resource_weights=ResourceSlot(),
+                ),
+                calculation_snapshot=FairShareCalculationSnapshot(
+                    fair_share_factor=Decimal("1.0"),
+                    total_decayed_usage=[],
+                    normalized_usage=Decimal("0.0"),
+                    lookback_start=today,
+                    lookback_end=today,
+                    last_calculated_at=now,
+                ),
+                metadata=None,
+                use_default=False,
+            ),
+        )
+        mock_repository.upsert_project_fair_share = AsyncMock(return_value=expected_data)
+
+        action = UpsertProjectFairShareWeightAction(
+            resource_group="non-existent-sg",
+            project_id=project_id,
+            domain_name="test-domain",
+            weight=Decimal("3.0"),
+        )
+
+        result = await service.upsert_project_fair_share_weight(action)
+
+        mock_repository.upsert_project_fair_share.assert_called_once()
+        assert result.data == expected_data
+        assert result.data.data.spec.weight == Decimal("3.0")
+
+    async def test_upsert_user_fair_share_weight_passes_through(
+        self,
+        service: FairShareService,
+        mock_repository: MagicMock,
+    ) -> None:
+        """Service should pass through upsert to repository regardless of resource group."""
+        project_id = uuid.uuid4()
+        user_uuid = uuid.uuid4()
+        now = datetime.now(UTC)
+        today = now.date()
+        expected_data = UserFairShareData(
+            resource_group="non-existent-sg",
+            user_uuid=user_uuid,
+            project_id=project_id,
+            domain_name="test-domain",
+            data=FairShareData(
+                spec=FairShareSpec(
+                    weight=Decimal("1.8"),
+                    half_life_days=7,
+                    lookback_days=28,
+                    decay_unit_days=1,
+                    resource_weights=ResourceSlot(),
+                ),
+                calculation_snapshot=FairShareCalculationSnapshot(
+                    fair_share_factor=Decimal("1.0"),
+                    total_decayed_usage=[],
+                    normalized_usage=Decimal("0.0"),
+                    lookback_start=today,
+                    lookback_end=today,
+                    last_calculated_at=now,
+                ),
+                metadata=None,
+                use_default=False,
+            ),
+            scheduling_rank=None,
+        )
+        mock_repository.upsert_user_fair_share = AsyncMock(return_value=expected_data)
+
+        action = UpsertUserFairShareWeightAction(
+            resource_group="non-existent-sg",
+            project_id=project_id,
+            user_uuid=user_uuid,
+            domain_name="test-domain",
+            weight=Decimal("1.8"),
+        )
+
+        result = await service.upsert_user_fair_share_weight(action)
+
+        mock_repository.upsert_user_fair_share.assert_called_once()
+        assert result.data == expected_data
+        assert result.data.data.spec.weight == Decimal("1.8")

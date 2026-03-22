@@ -18,7 +18,7 @@ class ManagerConfigProvider:
     _loader: LoaderChain
     _config: ManagerUnifiedConfig
     _etcd_watcher: EtcdConfigWatcher
-    _etcd_watcher_task: asyncio.Task[None]
+    _etcd_watcher_task: asyncio.Task[None] | None
     # TODO: Remove `_legacy_etcd_config_loader` when legacy etcd methods are removed
     _legacy_etcd_config_loader: LegacyEtcdLoader
 

@@ -13,7 +13,6 @@ from ai.backend.common.types import HostPortPair, RedisConnectionInfo
 
 
 @pytest.mark.redis
-@pytest.mark.asyncio
 async def test_pipeline_single_instance(redis_container: tuple[str, HostPortPair]) -> None:
     addr = redis_container[1]
     rconn = RedisConnectionInfo(
@@ -39,7 +38,6 @@ async def test_pipeline_single_instance(redis_container: tuple[str, HostPortPair
 
 
 @pytest.mark.redis
-@pytest.mark.asyncio
 async def test_pipeline_single_instance_retries(redis_container: tuple[str, HostPortPair]) -> None:
     addr = redis_container[1]
     rconn = RedisConnectionInfo(

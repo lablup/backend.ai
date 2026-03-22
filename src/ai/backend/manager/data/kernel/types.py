@@ -163,6 +163,14 @@ class KernelStatus(CIStrEnum):
         )
 
 
+@dataclass(frozen=True)
+class KernelStatusInMatchSpec:
+    """Specification for KernelStatus IN operations (IN, NOT IN)."""
+
+    values: list[KernelStatus]
+    negated: bool
+
+
 @dataclass
 class RelatedSessionInfo:
     session_id: str  # Session UUID

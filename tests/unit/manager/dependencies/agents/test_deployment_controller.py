@@ -2,8 +2,6 @@ from __future__ import annotations
 
 from unittest.mock import MagicMock, patch
 
-import pytest
-
 from ai.backend.manager.dependencies.agents.deployment_controller import (
     DeploymentControllerDependency,
     DeploymentControllerInput,
@@ -13,7 +11,6 @@ from ai.backend.manager.dependencies.agents.deployment_controller import (
 class TestDeploymentControllerDependency:
     """Test DeploymentControllerDependency lifecycle."""
 
-    @pytest.mark.asyncio
     @patch(
         "ai.backend.manager.dependencies.agents.deployment_controller.DeploymentController",
     )

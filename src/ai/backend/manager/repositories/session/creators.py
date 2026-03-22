@@ -5,7 +5,6 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import override
 
-from ai.backend.manager.models.kernel import KernelRow
 from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.repositories.base.creator import CreatorSpec
 
@@ -25,22 +24,4 @@ class SessionRowCreatorSpec(CreatorSpec[SessionRow]):
 
     @override
     def build_row(self) -> SessionRow:
-        return self.row
-
-
-@dataclass
-class KernelRowCreatorSpec(CreatorSpec[KernelRow]):
-    """CreatorSpec that wraps a pre-built KernelRow.
-
-    This spec is designed for retrofitting existing code that already builds
-    KernelRow instances. It simply returns the provided row in build_row().
-
-    For field information needed by RBACFieldCreator, the kernel's session_id
-    identifies the parent entity (Session) with EntityType.SESSION.
-    """
-
-    row: KernelRow
-
-    @override
-    def build_row(self) -> KernelRow:
         return self.row

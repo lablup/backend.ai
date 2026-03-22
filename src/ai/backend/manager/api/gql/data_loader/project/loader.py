@@ -3,7 +3,7 @@ from __future__ import annotations
 import uuid
 from collections.abc import Sequence
 
-from ai.backend.manager.api.gql.base import UUIDInMatchSpec
+from ai.backend.common.data.filter_specs import UUIDInMatchSpec
 from ai.backend.manager.data.group.types import GroupData
 from ai.backend.manager.repositories.base import BatchQuerier, NoPagination
 from ai.backend.manager.repositories.group.options import GroupConditions

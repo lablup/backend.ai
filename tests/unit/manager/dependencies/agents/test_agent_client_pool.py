@@ -2,8 +2,6 @@ from __future__ import annotations
 
 from unittest.mock import AsyncMock, MagicMock, patch
 
-import pytest
-
 from ai.backend.manager.dependencies.agents.agent_client_pool import (
     AgentClientPoolDependency,
     AgentClientPoolInput,
@@ -13,7 +11,6 @@ from ai.backend.manager.dependencies.agents.agent_client_pool import (
 class TestAgentClientPoolDependency:
     """Test AgentClientPoolDependency lifecycle."""
 
-    @pytest.mark.asyncio
     @patch("ai.backend.manager.dependencies.agents.agent_client_pool.AgentClientPool")
     async def test_provide_agent_client_pool(
         self,

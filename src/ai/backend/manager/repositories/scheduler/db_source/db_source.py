@@ -21,7 +21,9 @@ from sqlalchemy.ext.asyncio import AsyncSession as SASession
 from sqlalchemy.ext.asyncio import async_sessionmaker
 from sqlalchemy.orm import load_only, selectinload
 
-from ai.backend.common.data.permission.types import EntityType, FieldType, ScopeType
+from ai.backend.common.data.permission.types import (
+    RBACElementType,
+)
 from ai.backend.common.docker import ImageRef
 from ai.backend.common.resource.types import TotalResourceData
 from ai.backend.common.types import (
@@ -40,8 +42,8 @@ from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.data.agent.types import AgentStatus
 from ai.backend.manager.data.image.types import ImageIdentifier
 from ai.backend.manager.data.kernel.types import KernelListResult, KernelStatus
-from ai.backend.manager.data.permission.id import ScopeId
-from ai.backend.manager.data.session.types import SessionInfo, SessionStatus
+from ai.backend.manager.data.permission.types import RBACElementRef
+from ai.backend.manager.data.session.types import SchedulingResult, SessionInfo, SessionStatus
 from ai.backend.manager.errors.api import InvalidAPIParameters
 from ai.backend.manager.errors.image import ImageNotFound
 from ai.backend.manager.errors.kernel import SessionNotFound
@@ -86,10 +88,6 @@ from ai.backend.manager.repositories.base.rbac.entity_creator import (
     RBACEntityCreator,
     execute_rbac_entity_creator,
 )
-from ai.backend.manager.repositories.base.rbac.field_creator import (
-    RBACBulkFieldCreator,
-    execute_rbac_bulk_field_creator,
-)
 from ai.backend.manager.repositories.base.updater import BatchUpdater, execute_batch_updater
 from ai.backend.manager.repositories.resource_slot.types import (
     accumulate_to_quantities,
@@ -127,8 +125,10 @@ from ai.backend.manager.repositories.scheduler.types.session_creation import (
     SessionEnqueueData,
 )
 from ai.backend.manager.repositories.scheduler.types.snapshot import ResourcePolicies, SnapshotData
+from ai.backend.manager.repositories.scheduling_history import (
+    SessionSchedulingHistoryCreatorSpec,
+)
 from ai.backend.manager.repositories.session.creators import (
-    KernelRowCreatorSpec,
     SessionRowCreatorSpec,
 )
 from ai.backend.manager.sokovan.data import (
@@ -315,6 +315,7 @@ class ScheduleDBSource:
                 SessionRow.domain_name,
                 SessionRow.scaling_group_name,
                 SessionRow.priority,
+                SessionRow.is_preemptible,
                 SessionRow.session_type,
                 SessionRow.cluster_mode,
                 SessionRow.designated_agent_ids,
@@ -351,6 +352,7 @@ class ScheduleDBSource:
                     domain_name=row.domain_name,
                     scaling_group_name=row.scaling_group_name,
                     priority=row.priority,
+                    is_preemptible=row.is_preemptible,
                     session_type=row.session_type,
                     cluster_mode=row.cluster_mode,
                     starts_at=row.starts_at,
@@ -759,10 +761,14 @@ class ScheduleDBSource:
         return dict(dependencies_by_session)
 
     async def mark_sessions_terminating(
-        self, session_ids: list[SessionId], reason: str = "USER_REQUESTED"
+        self,
+        session_ids: list[SessionId],
+        reason: str = "USER_REQUESTED",
+        *,
+        forced: bool = False,
     ) -> MarkTerminatingResult:
         """
-        Mark sessions and their kernels as TERMINATING.
+        Mark sessions and their kernels as TERMINATING (or directly TERMINATED when forced).
         Uses UPDATE ... WHERE ... RETURNING for atomic status transitions.
         Returns categorized session IDs based on their current status.
         """
@@ -773,18 +779,29 @@ class ScheduleDBSource:
                 db_sess, session_ids, reason, now
             )
 
-            # 2. Mark resource-occupying sessions as terminating
-            terminating_sessions = await self._mark_sessions_as_terminating(
-                db_sess, session_ids, reason, now
-            )
+            if forced:
+                # 2a. Force-terminate: set sessions directly to TERMINATED
+                force_terminated_sessions = await self._mark_sessions_as_force_terminated(
+                    db_sess, session_ids, reason, now
+                )
+                terminating_sessions: list[SessionId] = []
+            else:
+                # 2b. Normal: mark sessions as TERMINATING
+                force_terminated_sessions = []
+                terminating_sessions = await self._mark_sessions_as_terminating(
+                    db_sess, session_ids, reason, now
+                )
 
             # 3. Mark unprocessed sessions as skipped
-            processed_ids = set(cancelled_sessions) | set(terminating_sessions)
+            processed_ids = (
+                set(cancelled_sessions) | set(terminating_sessions) | set(force_terminated_sessions)
+            )
             skipped_sessions = [sid for sid in session_ids if sid not in processed_ids]
 
             return MarkTerminatingResult(
                 cancelled_sessions=cancelled_sessions,
                 terminating_sessions=terminating_sessions,
+                force_terminated_sessions=force_terminated_sessions,
                 skipped_sessions=skipped_sessions,
             )
 
@@ -837,6 +854,18 @@ class ScheduleDBSource:
         self, db_sess: SASession, session_ids: list[SessionId], reason: str, now: datetime
     ) -> list[SessionId]:
         """Mark terminatable sessions and their kernels as terminating."""
+        # Capture from_statuses before update
+        status_query = sa.select(SessionRow.id, SessionRow.status).where(
+            sa.and_(
+                SessionRow.id.in_(session_ids),
+                SessionRow.status.in_(SessionStatus.terminatable_statuses()),
+            )
+        )
+        status_result = await db_sess.execute(status_query)
+        from_statuses: dict[SessionId, SessionStatus] = {
+            cast(SessionId, row.id): SessionStatus(row.status) for row in status_result
+        }
+
         # Mark sessions as terminating
         terminating_stmt = (
             sa.update(SessionRow)
@@ -881,7 +910,140 @@ class ScheduleDBSource:
                 )
             )
 
+            # Record scheduling history for terminating transition
+            history_specs = [
+                SessionSchedulingHistoryCreatorSpec(
+                    session_id=sid,
+                    phase="mark_terminating",
+                    result=SchedulingResult.SUCCESS,
+                    message="mark_terminating success",
+                    from_status=from_statuses.get(sid),
+                    to_status=SessionStatus.TERMINATING,
+                )
+                for sid in terminating_sessions
+            ]
+            await self._record_scheduling_history(db_sess, BulkCreator(specs=history_specs))
+
         return terminating_sessions
+
+    async def _mark_sessions_as_force_terminated(
+        self, db_sess: SASession, session_ids: list[SessionId], reason: str, now: datetime
+    ) -> list[SessionId]:
+        """Directly mark terminatable sessions and their kernels as TERMINATED (force-terminate)."""
+        now_iso = now.isoformat()
+        # Capture from_statuses before update
+        status_query = sa.select(SessionRow.id, SessionRow.status).where(
+            sa.and_(
+                SessionRow.id.in_(session_ids),
+                SessionRow.status.in_(SessionStatus.terminatable_statuses()),
+            )
+        )
+        status_result = await db_sess.execute(status_query)
+        from_statuses: dict[SessionId, SessionStatus] = {
+            cast(SessionId, row.id): SessionStatus(row.status) for row in status_result
+        }
+        # Mark sessions as TERMINATED directly, recording both TERMINATING and TERMINATED timestamps
+        terminated_stmt = (
+            sa.update(SessionRow)
+            .values(
+                status=SessionStatus.TERMINATED,
+                status_info=reason,
+                terminated_at=now,
+                status_history=sql_json_merge(
+                    SessionRow.__table__.c.status_history,
+                    (),
+                    {
+                        SessionStatus.TERMINATING.name: now_iso,
+                        SessionStatus.TERMINATED.name: now_iso,
+                    },
+                ),
+            )
+            .where(
+                sa.and_(
+                    SessionRow.id.in_(session_ids),
+                    SessionRow.status.in_(SessionStatus.terminatable_statuses()),
+                )
+            )
+            .returning(SessionRow.id)
+        )
+        terminated_result = await db_sess.execute(terminated_stmt)
+        force_terminated_sessions = [cast(SessionId, row.id) for row in terminated_result]
+
+        # Mark kernels as TERMINATED directly
+        if force_terminated_sessions:
+            # Fetch kernel_id and agent_id before updating status
+            kernel_agent_query = sa.select(KernelRow.id, KernelRow.agent).where(
+                sa.and_(
+                    KernelRow.session_id.in_(force_terminated_sessions),
+                    KernelRow.status.in_(KernelStatus.terminatable_statuses()),
+                )
+            )
+            kernel_agent_rows = (await db_sess.execute(kernel_agent_query)).all()
+
+            await db_sess.execute(
+                sa.update(KernelRow)
+                .values(
+                    status=KernelStatus.TERMINATED,
+                    status_info=reason,
+                    status_changed=now,
+                    terminated_at=now,
+                    status_history=sql_json_merge(
+                        KernelRow.__table__.c.status_history,
+                        (),
+                        {
+                            KernelStatus.TERMINATING.name: now_iso,
+                            KernelStatus.TERMINATED.name: now_iso,
+                        },
+                    ),
+                )
+                .where(
+                    sa.and_(
+                        KernelRow.session_id.in_(force_terminated_sessions),
+                        KernelRow.status.in_(KernelStatus.terminatable_statuses()),
+                    )
+                )
+            )
+
+            # Free resource allocations and decrement agent_resources for each kernel
+            ar = AgentResourceRow.__table__
+            for kernel_id, agent_id in kernel_agent_rows:
+                released = (
+                    await db_sess.execute(
+                        sa.update(ResourceAllocationRow)
+                        .where(
+                            ResourceAllocationRow.kernel_id == kernel_id,
+                            ResourceAllocationRow.free_at.is_(None),
+                        )
+                        .values(free_at=sa.func.now())
+                        .returning(ResourceAllocationRow.slot_name, ResourceAllocationRow.used)
+                    )
+                ).all()
+                if agent_id and released:
+                    for r in released:
+                        if r.used is None:
+                            continue
+                        new_used = sa.func.greatest(ar.c.used - r.used, 0)
+                        await db_sess.execute(
+                            sa.update(ar)
+                            .where(ar.c.agent_id == agent_id, ar.c.slot_name == r.slot_name)
+                            .values(used=new_used)
+                        )
+
+            # Record scheduling history for force-terminate transition
+            history_specs = [
+                SessionSchedulingHistoryCreatorSpec(
+                    session_id=sid,
+                    phase="force_terminate",
+                    result=SchedulingResult.SUCCESS,
+                    message="force_terminate success",
+                    from_status=from_statuses.get(sid),
+                    to_status=SessionStatus.TERMINATED,
+                )
+                for sid in force_terminated_sessions
+            ]
+            await self._record_scheduling_history(db_sess, BulkCreator(specs=history_specs))
+
+        return force_terminated_sessions
 
     async def get_schedulable_scaling_groups(self) -> list[str]:
         """Get list of scaling groups that have schedulable agents."""
@@ -1184,23 +1346,21 @@ class ScheduleDBSource:
             # Use RBACEntityCreator to create session with RBAC scope association
             rbac_creator = RBACEntityCreator(
                 spec=SessionRowCreatorSpec(row=session),
-                scope_ref=ScopeId(
-                    scope_type=ScopeType.USER,
-                    scope_id=str(session_data.user_uuid),
+                element_type=RBACElementType.SESSION,
+                scope_ref=RBACElementRef(
+                    element_type=RBACElementType.USER,
+                    element_id=str(session_data.user_uuid),
                 ),
-                additional_scope_refs=[],
-                entity_type=EntityType.SESSION,
+                additional_scope_refs=[
+                    RBACElementRef(
+                        element_type=RBACElementType.PROJECT,
+                        element_id=str(session_data.group_id),
+                    )
+                ],
             )
             await execute_rbac_entity_creator(db_sess, rbac_creator)
 
-            # Use RBACBulkFieldCreator to create kernels with RBAC field association
-            kernel_field_creator = RBACBulkFieldCreator(
-                specs=[KernelRowCreatorSpec(row=k) for k in kernels],
-                entity_type=EntityType.SESSION,
-                entity_id=str(session_data.id),
-                field_type=FieldType.KERNEL,
-            )
-            await execute_rbac_bulk_field_creator(db_sess, kernel_field_creator)
+            db_sess.add_all(kernels)
             await db_sess.flush()
 
             # Record requested resources in normalized resource_allocations table
@@ -1229,6 +1389,17 @@ class ScheduleDBSource:
                     for depend_id in matched_dependency_ids
                 ]
                 db_sess.add_all(dependency_rows)
+
+            # Record scheduling history for enqueue
+            history_spec = SessionSchedulingHistoryCreatorSpec(
+                session_id=session_data.id,
+                phase="enqueue",
+                result=SchedulingResult.SUCCESS,
+                message="enqueue success",
+                from_status=None,
+                to_status=SessionStatus.PENDING,
+            )
+            await self._record_scheduling_history(db_sess, BulkCreator(specs=[history_spec]))
 
             await db_sess.commit()
 
@@ -2099,7 +2270,7 @@ class ScheduleDBSource:
                 for r in released:
                     if r.used is None:
                         continue
-                    new_used = ar.c.used - r.used
+                    new_used = sa.func.greatest(ar.c.used - r.used, 0)
                     await db_sess.execute(
                         sa.update(ar)
                         .where(ar.c.agent_id == agent_id, ar.c.slot_name == r.slot_name)
@@ -2156,6 +2327,39 @@ class ScheduleDBSource:
             result = await db_sess.execute(stmt)
             return cast(CursorResult[Any], result).rowcount
 
+    async def get_agent_ids_for_sessions(
+        self, session_ids: list[SessionId]
+    ) -> dict[SessionId, list[AgentId]]:
+        """
+        Get agent IDs assigned to kernels for the given sessions.
+
+        This is used before resetting kernels to PENDING to record
+        which agents failed, so the scheduler can deprioritize them on retry.
+
+        :param session_ids: List of session IDs to look up
+        :return: Mapping of session ID to list of assigned agent IDs
+        """
+        if not session_ids:
+            return {}
+
+        async with self._begin_readonly_read_committed() as db_conn:
+            stmt = sa.select(
+                KernelRow.session_id,
+                KernelRow.agent,
+            ).where(
+                sa.and_(
+                    KernelRow.session_id.in_(session_ids),
+                    KernelRow.agent.isnot(None),
+                    KernelRow.status.in_(KernelStatus.retriable_statuses()),
+                )
+            )
+            rows = (await db_conn.execute(stmt)).fetchall()
+
+        result: dict[SessionId, list[AgentId]] = defaultdict(list)
+        for row in rows:
+            result[row.session_id].append(AgentId(row.agent))
+        return dict(result)
+
     async def update_kernels_to_creating_for_sessions(
         self, session_ids: list[SessionId], reason: str
     ) -> int:
@@ -2211,6 +2415,13 @@ class ScheduleDBSource:
 
         async with self._begin_session_read_committed() as db_sess:
             now = await self._get_db_now_in_session(db_sess)
+
+            # Fetch kernel_id and agent_id before updating status
+            kernel_agent_query = sa.select(KernelRow.id, KernelRow.agent).where(
+                KernelRow.id.in_(kernel_uuids),
+            )
+            kernel_agent_rows = (await db_sess.execute(kernel_agent_query)).all()
+
             stmt = (
                 sa.update(KernelRow)
                 .where(KernelRow.id.in_(kernel_uuids))
@@ -2227,6 +2438,32 @@ class ScheduleDBSource:
                 )
             )
             result = await db_sess.execute(stmt)
+
+            # Free resource allocations and decrement agent_resources for each kernel
+            ar = AgentResourceRow.__table__
+            for kernel_id, agent_id in kernel_agent_rows:
+                released = (
+                    await db_sess.execute(
+                        sa.update(ResourceAllocationRow)
+                        .where(
+                            ResourceAllocationRow.kernel_id == kernel_id,
+                            ResourceAllocationRow.free_at.is_(None),
+                        )
+                        .values(free_at=sa.func.now())
+                        .returning(ResourceAllocationRow.slot_name, ResourceAllocationRow.used)
+                    )
+                ).all()
+                if agent_id and released:
+                    for r in released:
+                        if r.used is None:
+                            continue
+                        new_used = sa.func.greatest(ar.c.used - r.used, 0)
+                        await db_sess.execute(
+                            sa.update(ar)
+                            .where(ar.c.agent_id == agent_id, ar.c.slot_name == r.slot_name)
+                            .values(used=new_used)
+                        )
+
             return cast(CursorResult[Any], result).rowcount
 
     async def update_kernels_to_pulling_for_image(

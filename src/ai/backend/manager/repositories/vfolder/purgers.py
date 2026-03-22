@@ -7,12 +7,11 @@ from uuid import UUID
 
 import sqlalchemy as sa
 
-from ai.backend.manager.data.permission.id import ObjectId
-from ai.backend.manager.data.permission.types import EntityType
+from ai.backend.common.data.permission.types import RBACElementType
+from ai.backend.manager.data.permission.types import RBACElementRef
 from ai.backend.manager.models.vfolder.row import VFolderInvitationRow, VFolderPermissionRow
 from ai.backend.manager.repositories.base.purger import BatchPurgerSpec
 from ai.backend.manager.repositories.base.rbac.entity_purger import (
-    RBACEntity,
     RBACEntityPurgerSpec,
 )
 
@@ -48,10 +47,12 @@ class VFolderPurgerSpec(RBACEntityPurgerSpec):
     vfolder_id: UUID
 
     @override
-    def entity(self) -> RBACEntity:
-        return RBACEntity(
-            entity=ObjectId(
-                entity_type=EntityType.VFOLDER,
-                entity_id=str(self.vfolder_id),
-            )
+    def element_type(self) -> RBACElementType:
+        return RBACElementType.VFOLDER
+
+    @override
+    def entity_ref(self) -> RBACElementRef:
+        return RBACElementRef(
+            element_type=self.element_type(),
+            element_id=str(self.vfolder_id),
         )

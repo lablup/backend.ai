@@ -1,0 +1,82 @@
+"""
+Session DTOs v2 for Manager API.
+"""
+
+from ai.backend.common.dto.manager.v2.session.request import (
+    CommitSessionInput,
+    DestroySessionInput,
+    DownloadFilesInput,
+    ExecuteInput,
+    GetContainerLogsInput,
+    ListFilesInput,
+    RenameSessionInput,
+    RestartSessionInput,
+    SearchSessionsInput,
+    SessionFilter,
+    SessionOrder,
+    SessionPathParam,
+    ShutdownServiceInput,
+    StartServiceInput,
+    UploadFilesInput,
+)
+from ai.backend.common.dto.manager.v2.session.response import (
+    CommitSessionPayload,
+    DestroySessionPayload,
+    ExecutePayload,
+    RestartSessionPayload,
+    SearchSessionsPayload,
+    SessionLifecycleInfo,
+    SessionMetadataInfo,
+    SessionNetworkInfo,
+    SessionNode,
+    SessionResourceInfo,
+    SessionRuntimeInfo,
+    StartServicePayload,
+)
+from ai.backend.common.dto.manager.v2.session.types import (
+    OrderDirection,
+    SessionOrderField,
+    SessionResultEnum,
+    SessionStatusEnum,
+    SessionStatusFilter,
+    SessionTypeEnum,
+)
+
+__all__ = (
+    # Types
+    "OrderDirection",
+    "SessionOrderField",
+    "SessionResultEnum",
+    "SessionStatusEnum",
+    "SessionStatusFilter",
+    "SessionTypeEnum",
+    # Input models (request)
+    "CommitSessionInput",
+    "DestroySessionInput",
+    "DownloadFilesInput",
+    "ExecuteInput",
+    "GetContainerLogsInput",
+    "ListFilesInput",
+    "RenameSessionInput",
+    "RestartSessionInput",
+    "SearchSessionsInput",
+    "SessionFilter",
+    "SessionOrder",
+    "SessionPathParam",
+    "ShutdownServiceInput",
+    "StartServiceInput",
+    "UploadFilesInput",
+    # Node and Payload models (response)
+    "CommitSessionPayload",
+    "DestroySessionPayload",
+    "ExecutePayload",
+    "RestartSessionPayload",
+    "SearchSessionsPayload",
+    "SessionLifecycleInfo",
+    "SessionMetadataInfo",
+    "SessionNetworkInfo",
+    "SessionNode",
+    "SessionResourceInfo",
+    "SessionRuntimeInfo",
+    "StartServicePayload",
+)

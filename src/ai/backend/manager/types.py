@@ -3,6 +3,7 @@ from __future__ import annotations
 import enum
 import uuid
 from abc import ABC, abstractmethod
+from collections.abc import Callable
 from dataclasses import dataclass
 from typing import (
     TYPE_CHECKING,
@@ -148,6 +149,13 @@ class TriState[TVal]:
             return self._value
         return None
 
+    def map[TNew](self, fn: Callable[[TVal], TNew]) -> TriState[TNew]:
+        if self._state == _TriStateEnum.UPDATE:
+            return TriState.update(fn(self.value()))
+        if self._state == _TriStateEnum.NULLIFY:
+            return TriState.nullify()
+        return TriState.nop()
+
     def update_dict(self, dict: dict[str, Any], attr_name: str) -> None:
         match self._state:
             case _TriStateEnum.UPDATE:
@@ -214,6 +222,11 @@ class OptionalState[TVal]:
         if self._state == _TriStateEnum.UPDATE:
             return self._value
         return None
+
+    def map[TNew](self, fn: Callable[[TVal], TNew]) -> OptionalState[TNew]:
+        if self._state == _TriStateEnum.UPDATE:
+            return OptionalState.update(fn(self.value()))
+        return OptionalState.nop()
 
     def update_dict(self, dict: dict[str, Any], attr_name: str) -> None:
         match self._state:

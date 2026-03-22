@@ -1,9 +1,8 @@
 from unittest.mock import AsyncMock, MagicMock
 
-import pytest
 from yarl import URL
 
-from ai.backend.client.v2.base_client import BackendAIClient
+from ai.backend.client.v2.base_client import BackendAIAuthClient
 from ai.backend.client.v2.config import ClientConfig
 from ai.backend.client.v2.domains.resource_policy import ResourcePolicyClient
 from ai.backend.common.dto.manager.resource_policy.request import (
@@ -79,8 +78,8 @@ _PROJECT_POLICY_PAYLOAD = {
 def _make_client(
     mock_session: MagicMock | None = None,
     config: ClientConfig | None = None,
-) -> BackendAIClient:
-    return BackendAIClient(
+) -> BackendAIAuthClient:
+    return BackendAIAuthClient(
         config or _DEFAULT_CONFIG,
         MockAuth(),
         mock_session or MagicMock(),
@@ -99,7 +98,6 @@ def _make_request_session(resp: AsyncMock) -> MagicMock:
 
 
 class TestKeypairResourcePolicy:
-    @pytest.mark.asyncio
     async def test_create_keypair_policy(self) -> None:
         mock_resp = AsyncMock()
         mock_resp.status = 201
@@ -127,7 +125,6 @@ class TestKeypairResourcePolicy:
         assert "/admin/resource-policies/keypair" in str(call_args.args[1])
         assert call_args.kwargs["json"]["name"] == "default"
 
-    @pytest.mark.asyncio
     async def test_get_keypair_policy(self) -> None:
         mock_resp = AsyncMock()
         mock_resp.status = 200
@@ -147,7 +144,6 @@ class TestKeypairResourcePolicy:
         assert "/admin/resource-policies/keypair/default" in str(call_args.args[1])
         assert call_args.kwargs["json"] is None
 
-    @pytest.mark.asyncio
     async def test_search_keypair_policies(self) -> None:
         mock_resp = AsyncMock()
         mock_resp.status = 200
@@ -173,7 +169,6 @@ class TestKeypairResourcePolicy:
         assert call_args.args[0] == "POST"
         assert "/admin/resource-policies/keypair/search" in str(call_args.args[1])
 
-    @pytest.mark.asyncio
     async def test_update_keypair_policy(self) -> None:
         updated = {**_KEYPAIR_POLICY_PAYLOAD, "max_concurrent_sessions": 10}
         mock_resp = AsyncMock()
@@ -194,7 +189,6 @@ class TestKeypairResourcePolicy:
         assert call_args.args[0] == "PATCH"
         assert "/admin/resource-policies/keypair/default" in str(call_args.args[1])
 
-    @pytest.mark.asyncio
     async def test_delete_keypair_policy(self) -> None:
         mock_resp = AsyncMock()
         mock_resp.status = 200
@@ -217,7 +211,6 @@ class TestKeypairResourcePolicy:
 
 
 class TestUserResourcePolicy:
-    @pytest.mark.asyncio
     async def test_create_user_policy(self) -> None:
         mock_resp = AsyncMock()
         mock_resp.status = 201
@@ -245,7 +238,6 @@ class TestUserResourcePolicy:
         assert "/admin/resource-policies/user" in str(call_args.args[1])
         assert call_args.kwargs["json"]["name"] == "default-user"
 
-    @pytest.mark.asyncio
     async def test_get_user_policy(self) -> None:
         mock_resp = AsyncMock()
         mock_resp.status = 200
@@ -265,7 +257,6 @@ class TestUserResourcePolicy:
         assert "/admin/resource-policies/user/default-user" in str(call_args.args[1])
         assert call_args.kwargs["json"] is None
 
-    @pytest.mark.asyncio
     async def test_search_user_policies(self) -> None:
         mock_resp = AsyncMock()
         mock_resp.status = 200
@@ -291,7 +282,6 @@ class TestUserResourcePolicy:
         assert call_args.args[0] == "POST"
         assert "/admin/resource-policies/user/search" in str(call_args.args[1])
 
-    @pytest.mark.asyncio
     async def test_update_user_policy(self) -> None:
         updated = {**_USER_POLICY_PAYLOAD, "max_vfolder_count": 20}
         mock_resp = AsyncMock()
@@ -312,7 +302,6 @@ class TestUserResourcePolicy:
         assert call_args.args[0] == "PATCH"
         assert "/admin/resource-policies/user/default-user" in str(call_args.args[1])
 
-    @pytest.mark.asyncio
     async def test_delete_user_policy(self) -> None:
         mock_resp = AsyncMock()
         mock_resp.status = 200
@@ -335,7 +324,6 @@ class TestUserResourcePolicy:
 
 
 class TestProjectResourcePolicy:
-    @pytest.mark.asyncio
     async def test_create_project_policy(self) -> None:
         mock_resp = AsyncMock()
         mock_resp.status = 201
@@ -362,7 +350,6 @@ class TestProjectResourcePolicy:
         assert "/admin/resource-policies/project" in str(call_args.args[1])
         assert call_args.kwargs["json"]["name"] == "default-project"
 
-    @pytest.mark.asyncio
     async def test_get_project_policy(self) -> None:
         mock_resp = AsyncMock()
         mock_resp.status = 200
@@ -382,7 +369,6 @@ class TestProjectResourcePolicy:
         assert "/admin/resource-policies/project/default-project" in str(call_args.args[1])
         assert call_args.kwargs["json"] is None
 
-    @pytest.mark.asyncio
     async def test_search_project_policies(self) -> None:
         mock_resp = AsyncMock()
         mock_resp.status = 200
@@ -408,7 +394,6 @@ class TestProjectResourcePolicy:
         assert call_args.args[0] == "POST"
         assert "/admin/resource-policies/project/search" in str(call_args.args[1])
 
-    @pytest.mark.asyncio
     async def test_update_project_policy(self) -> None:
         updated = {**_PROJECT_POLICY_PAYLOAD, "max_network_count": 20}
         mock_resp = AsyncMock()
@@ -429,7 +414,6 @@ class TestProjectResourcePolicy:
         assert call_args.args[0] == "PATCH"
         assert "/admin/resource-policies/project/default-project" in str(call_args.args[1])
 
-    @pytest.mark.asyncio
     async def test_delete_project_policy(self) -> None:
         mock_resp = AsyncMock()
         mock_resp.status = 200

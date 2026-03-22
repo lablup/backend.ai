@@ -2,14 +2,15 @@ from __future__ import annotations
 
 import uuid
 from collections.abc import Mapping
+from typing import cast
 
-from ai.backend.common.data.permission.types import GLOBAL_SCOPE_ID
+from ai.backend.common.data.permission.types import GLOBAL_SCOPE_ID, OperationType
 from ai.backend.common.exception import BackendAIError
 from ai.backend.common.metrics.metric import DomainType, LayerType
 from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPolicy
 from ai.backend.common.resilience.policies.retry import BackoffStrategy, RetryArgs, RetryPolicy
 from ai.backend.common.resilience.resilience import Resilience
-from ai.backend.manager.data.permission.entity import EntityListResult
+from ai.backend.manager.data.permission.entity import ElementAssociationListResult, EntityListResult
 from ai.backend.manager.data.permission.id import ObjectId, ScopeId
 from ai.backend.manager.data.permission.object_permission import (
     ObjectPermissionData,
@@ -22,6 +23,10 @@ from ai.backend.manager.data.permission.permission import (
 from ai.backend.manager.data.permission.role import (
     AssignedUserListResult,
     BatchEntityPermissionCheckInput,
+    BulkRoleAssignmentFailure,
+    BulkRoleAssignmentResultData,
+    BulkRoleRevocationResultData,
+    BulkUserRoleRevocationInput,
     RoleData,
     RoleDetailData,
     RoleListResult,
@@ -34,6 +39,7 @@ from ai.backend.manager.data.permission.role import (
     UserRoleRevocationInput,
 )
 from ai.backend.manager.data.permission.types import (
+    RBACElementRef,
     ScopeData,
     ScopeListResult,
     ScopeType,
@@ -41,11 +47,13 @@ from ai.backend.manager.data.permission.types import (
 from ai.backend.manager.models.rbac_models.permission.object_permission import ObjectPermissionRow
 from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
 from ai.backend.manager.models.rbac_models.role import RoleRow
+from ai.backend.manager.models.rbac_models.user_role import UserRoleRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.manager.repositories.base.creator import Creator
+from ai.backend.manager.repositories.base.creator import BulkCreator, Creator
 from ai.backend.manager.repositories.base.purger import Purger
 from ai.backend.manager.repositories.base.querier import BatchQuerier
 from ai.backend.manager.repositories.base.updater import Updater
+from ai.backend.manager.repositories.permission_controller.creators import UserRoleCreatorSpec
 from ai.backend.manager.repositories.permission_controller.types import (
     ObjectPermissionSearchScope,
     PermissionSearchScope,
@@ -118,6 +126,22 @@ class PermissionControllerRepository:
         return row.to_data()
 
     @permission_controller_repository_resilience.apply()
+    async def update_permission(
+        self,
+        updater: Updater[PermissionRow],
+    ) -> PermissionData:
+        """
+        Update a permission in the database.
+
+        Returns the updated permission data.
+
+        Raises:
+            ObjectNotFound: If permission does not exist.
+        """
+        row = await self._db_source.update_permission(updater)
+        return row.to_data()
+
+    @permission_controller_repository_resilience.apply()
     async def create_object_permission(
         self,
         creator: Creator[ObjectPermissionRow],
@@ -177,6 +201,29 @@ class PermissionControllerRepository:
         return UserRoleRevocationData(
             user_role_id=user_role_id, user_id=data.user_id, role_id=data.role_id
         )
+
+    @permission_controller_repository_resilience.apply()
+    async def bulk_assign_role(
+        self, bulk_creator: BulkCreator[UserRoleRow]
+    ) -> BulkRoleAssignmentResultData:
+        result = await self._db_source.bulk_assign_role(bulk_creator)
+        failures = [
+            BulkRoleAssignmentFailure(
+                user_id=cast(UserRoleCreatorSpec, error.spec).user_id,
+                message=str(error.exception),
+            )
+            for error in result.errors
+        ]
+        return BulkRoleAssignmentResultData(
+            successes=[row.to_data() for row in result.successes],
+            failures=failures,
+        )
+
+    @permission_controller_repository_resilience.apply()
+    async def bulk_revoke_role(
+        self, data: BulkUserRoleRevocationInput
+    ) -> BulkRoleRevocationResultData:
+        return await self._db_source.bulk_revoke_role(data)
 
     @permission_controller_repository_resilience.apply()
     async def get_role(self, role_id: uuid.UUID) -> RoleData | None:
@@ -313,3 +360,37 @@ class PermissionControllerRepository:
             EntityListResult with matching entities.
         """
         return await self._db_source.search_entities_in_scope(querier)
+
+    @permission_controller_repository_resilience.apply()
+    async def search_element_associations(
+        self,
+        querier: BatchQuerier,
+    ) -> ElementAssociationListResult:
+        """Search element associations (full association rows) within a scope.
+
+        Args:
+            querier: BatchQuerier with scope conditions and pagination settings.
+
+        Returns:
+            ElementAssociationListResult with full association row data.
+        """
+        return await self._db_source.search_element_associations_in_scope(querier)
+
+    @permission_controller_repository_resilience.apply()
+    async def check_permission_with_scope_chain(
+        self,
+        user_id: uuid.UUID,
+        target_element_ref: RBACElementRef,
+        operation: OperationType,
+    ) -> bool:
+        """Permission check that traverses the scope chain via AUTO edges only.
+
+        Walks the association_scopes_entities hierarchy upward from the target
+        entity, checking if the user has the requested operation at any ancestor
+        scope. REF edges are not traversed.
+        """
+        return await self._db_source.check_permission_with_scope_chain(
+            user_id=user_id,
+            target_element_ref=target_element_ref,
+            operation=operation,
+        )

@@ -21,6 +21,7 @@ class ImageStatus(enum.StrEnum):
 class ImageOrderField(enum.StrEnum):
     NAME = "NAME"
     CREATED_AT = "CREATED_AT"
+    LAST_USED = "LAST_USED"
 
 
 class ImageType(CIStrEnum):

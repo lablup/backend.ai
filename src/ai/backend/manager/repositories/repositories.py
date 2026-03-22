@@ -14,7 +14,10 @@ from ai.backend.manager.repositories.container_registry.repositories import (
 )
 from ai.backend.manager.repositories.deployment.repositories import DeploymentRepositories
 from ai.backend.manager.repositories.domain.repositories import DomainRepositories
+from ai.backend.manager.repositories.dotfile.repositories import DotfileRepositories
 from ai.backend.manager.repositories.error_log.repositories import ErrorLogRepositories
+from ai.backend.manager.repositories.etcd_config.repositories import EtcdConfigRepositories
+from ai.backend.manager.repositories.events.repositories import EventsRepositories
 from ai.backend.manager.repositories.export.repositories import ExportRepositories
 from ai.backend.manager.repositories.fair_share.repositories import FairShareRepositories
 from ai.backend.manager.repositories.group.repositories import GroupRepositories
@@ -25,6 +28,7 @@ from ai.backend.manager.repositories.image.repositories import ImageRepositories
 from ai.backend.manager.repositories.keypair_resource_policy.repositories import (
     KeypairResourcePolicyRepositories,
 )
+from ai.backend.manager.repositories.manager_admin.repositories import ManagerAdminRepositories
 from ai.backend.manager.repositories.metric.repositories import MetricRepositories
 from ai.backend.manager.repositories.model_serving.repositories import ModelServingRepositories
 from ai.backend.manager.repositories.notification.repositories import NotificationRepositories
@@ -34,6 +38,9 @@ from ai.backend.manager.repositories.permission_controller.repositories import (
 )
 from ai.backend.manager.repositories.project_resource_policy.repositories import (
     ProjectResourcePolicyRepositories,
+)
+from ai.backend.manager.repositories.prometheus_query_preset import (
+    PrometheusQueryPresetRepositories,
 )
 from ai.backend.manager.repositories.reservoir_registry.repositories import (
     ReservoirRegistryRepositories,
@@ -52,6 +59,8 @@ from ai.backend.manager.repositories.session.repositories import SessionReposito
 from ai.backend.manager.repositories.storage_namespace.repositories import (
     StorageNamespaceRepositories,
 )
+from ai.backend.manager.repositories.stream.repositories import StreamRepositories
+from ai.backend.manager.repositories.template.repositories import TemplateRepositories
 from ai.backend.manager.repositories.types import RepositoryArgs
 from ai.backend.manager.repositories.user.repositories import UserRepositories
 from ai.backend.manager.repositories.user_resource_policy.repositories import (
@@ -69,17 +78,21 @@ class Repositories:
     container_registry: ContainerRegistryRepositories
     deployment: DeploymentRepositories
     domain: DomainRepositories
+    dotfile: DotfileRepositories
     error_log: ErrorLogRepositories
+    etcd_config: EtcdConfigRepositories
     export: ExportRepositories
     fair_share: FairShareRepositories
     group: GroupRepositories
     image: ImageRepositories
     keypair_resource_policy: KeypairResourcePolicyRepositories
+    manager_admin: ManagerAdminRepositories
     metric: MetricRepositories
     model_serving: ModelServingRepositories
     notification: NotificationRepositories
     permission_controller: PermissionControllerRepositories
     project_resource_policy: ProjectResourcePolicyRepositories
+    prometheus_query_preset: PrometheusQueryPresetRepositories
     reservoir_registry: ReservoirRegistryRepositories
     resource_preset: ResourcePresetRepositories
     resource_slot: ResourceSlotRepositories
@@ -88,6 +101,7 @@ class Repositories:
     scheduler: SchedulerRepositories
     scheduling_history: SchedulingHistoryRepositories
     session: SessionRepositories
+    template: TemplateRepositories
     user: UserRepositories
     user_resource_policy: UserResourcePolicyRepositories
     vfolder: VfolderRepositories
@@ -96,6 +110,8 @@ class Repositories:
     huggingface_registry: HuggingFaceRegistryRepositories
     artifact: ArtifactRepositories
     artifact_registry: ArtifactRegistryRepositories
+    stream: StreamRepositories
+    events: EventsRepositories
     storage_namespace: StorageNamespaceRepositories
     audit_log: AuditLogRepositories
 
@@ -107,17 +123,21 @@ class Repositories:
         container_registry_repositories = ContainerRegistryRepositories.create(args)
         deployment_repositories = DeploymentRepositories.create(args)
         domain_repositories = DomainRepositories.create(args)
+        dotfile_repositories = DotfileRepositories.create(args)
         error_log_repositories = ErrorLogRepositories.create(args)
+        etcd_config_repositories = EtcdConfigRepositories.create(args)
         export_repositories = ExportRepositories.create(args)
         fair_share_repositories = FairShareRepositories.create(args)
         group_repositories = GroupRepositories.create(args)
         image_repositories = ImageRepositories.create(args)
         keypair_resource_policy_repositories = KeypairResourcePolicyRepositories.create(args)
+        manager_admin_repositories = ManagerAdminRepositories.create(args)
         metric_repositories = MetricRepositories.create(args)
         model_serving_repositories = ModelServingRepositories.create(args)
         notification_repositories = NotificationRepositories.create(args)
         permission_controller_repositories = PermissionControllerRepositories.create(args)
         project_resource_policy_repositories = ProjectResourcePolicyRepositories.create(args)
+        prometheus_query_preset_repositories = PrometheusQueryPresetRepositories.create(args)
         reservoir_registry_repositories = ReservoirRegistryRepositories.create(args)
         resource_preset_repositories = ResourcePresetRepositories.create(args)
         resource_slot_repositories = ResourceSlotRepositories.create(args)
@@ -126,6 +146,7 @@ class Repositories:
         scheduler_repositories = SchedulerRepositories.create(args)
         scheduling_history_repositories = SchedulingHistoryRepositories.create(args)
         session_repositories = SessionRepositories.create(args)
+        template_repositories = TemplateRepositories.create(args)
         user_repositories = UserRepositories.create(args)
         user_resource_policy_repositories = UserResourcePolicyRepositories.create(args)
         vfolder_repositories = VfolderRepositories.create(args)
@@ -134,6 +155,8 @@ class Repositories:
         artifact_repositories = ArtifactRepositories.create(args)
         huggingface_registry_repositories = HuggingFaceRegistryRepositories.create(args)
         artifact_registries = ArtifactRegistryRepositories.create(args)
+        stream_repositories = StreamRepositories.create(args)
+        events_repositories = EventsRepositories.create(args)
         storage_namespace_repositories = StorageNamespaceRepositories.create(args)
         audit_log_repositories = AuditLogRepositories.create(args)
 
@@ -144,17 +167,21 @@ class Repositories:
             container_registry=container_registry_repositories,
             deployment=deployment_repositories,
             domain=domain_repositories,
+            dotfile=dotfile_repositories,
             error_log=error_log_repositories,
+            etcd_config=etcd_config_repositories,
             export=export_repositories,
             fair_share=fair_share_repositories,
             group=group_repositories,
             image=image_repositories,
             keypair_resource_policy=keypair_resource_policy_repositories,
+            manager_admin=manager_admin_repositories,
             metric=metric_repositories,
             model_serving=model_serving_repositories,
             notification=notification_repositories,
             permission_controller=permission_controller_repositories,
             project_resource_policy=project_resource_policy_repositories,
+            prometheus_query_preset=prometheus_query_preset_repositories,
             reservoir_registry=reservoir_registry_repositories,
             resource_preset=resource_preset_repositories,
             resource_slot=resource_slot_repositories,
@@ -163,6 +190,7 @@ class Repositories:
             scheduler=scheduler_repositories,
             scheduling_history=scheduling_history_repositories,
             session=session_repositories,
+            template=template_repositories,
             user=user_repositories,
             user_resource_policy=user_resource_policy_repositories,
             vfolder=vfolder_repositories,
@@ -171,6 +199,8 @@ class Repositories:
             huggingface_registry=huggingface_registry_repositories,
             artifact=artifact_repositories,
             artifact_registry=artifact_registries,
+            stream=stream_repositories,
+            events=events_repositories,
             storage_namespace=storage_namespace_repositories,
             audit_log=audit_log_repositories,
         )

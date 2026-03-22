@@ -2,8 +2,6 @@ from __future__ import annotations
 
 from unittest.mock import AsyncMock, MagicMock, patch
 
-import pytest
-
 from ai.backend.manager.dependencies.agents.appproxy_client_pool import (
     AppProxyClientPoolDependency,
 )
@@ -12,7 +10,6 @@ from ai.backend.manager.dependencies.agents.appproxy_client_pool import (
 class TestAppProxyClientPoolDependency:
     """Test AppProxyClientPoolDependency lifecycle."""
 
-    @pytest.mark.asyncio
     @patch("ai.backend.manager.dependencies.agents.appproxy_client_pool.AppProxyClientPool")
     async def test_provide_appproxy_client_pool(
         self,

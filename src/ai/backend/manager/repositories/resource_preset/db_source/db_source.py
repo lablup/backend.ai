@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 from collections.abc import Mapping
+from decimal import Decimal
 from typing import Any, cast
 from uuid import UUID
 
@@ -20,6 +21,7 @@ from ai.backend.common.types import (
 )
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.data.agent.types import AgentStatus
+from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.data.resource_preset.types import ResourcePresetData
 from ai.backend.manager.errors.resource import (
     DomainNotFound,
@@ -313,16 +315,25 @@ class ResourcePresetDBSource:
             .join(SessionRow, KernelRow.session_id == SessionRow.id)
             .join(rst, ResourceAllocationRow.slot_name == rst.c.slot_name)
         )
+        effective_amount = sa.func.coalesce(
+            ResourceAllocationRow.used, ResourceAllocationRow.requested
+        )
         query = (
             sa.select(
                 SessionRow.scaling_group_name,
                 ResourceAllocationRow.slot_name,
-                sa.func.sum(ResourceAllocationRow.used).label("total"),
+                sa.func.sum(effective_amount).label("total"),
             )
             .select_from(j)
             .where(
                 (KernelRow.user_uuid == user_id)
                 & (ResourceAllocationRow.free_at.is_(None))
+                & (
+                    KernelRow.status.in_(
+                        KernelStatus.resource_occupied_statuses()
+                        | KernelStatus.resource_requested_statuses()
+                    )
+                )
                 & (SessionRow.scaling_group_name.in_(sgroup_names))
             )
             .group_by(SessionRow.scaling_group_name, ResourceAllocationRow.slot_name, rst.c.rank)
@@ -336,6 +347,14 @@ class ResourcePresetDBSource:
                 per_sgroup_occupancy[row.scaling_group_name].append(
                     SlotQuantity(row.slot_name, row.total)
                 )
+
+        # Fill missing slot types with zero for each scaling group so callers always
+        # receive a complete list of known slots (not an empty list when no sessions exist).
+        for sg in sgroup_names:
+            existing_slots = {sq.slot_name for sq in per_sgroup_occupancy[sg]}
+            for slot_name in known_slot_types.keys():
+                if str(slot_name) not in existing_slots:
+                    per_sgroup_occupancy[sg].append(SlotQuantity(str(slot_name), Decimal(0)))
 
         return per_sgroup_occupancy
 
@@ -425,7 +444,13 @@ class ResourcePresetDBSource:
         :param filters: List of filter objects to apply
         :return: Total occupied resources, rank-ordered
         """
-        conditions: list[Any] = [ResourceAllocationRow.free_at.is_(None)]
+        all_resource_statuses = (
+            KernelStatus.resource_occupied_statuses() | KernelStatus.resource_requested_statuses()
+        )
+        conditions: list[Any] = [
+            ResourceAllocationRow.free_at.is_(None),
+            KernelRow.status.in_(all_resource_statuses),
+        ]
 
         if filters:
             for filter_obj in filters:
@@ -435,10 +460,13 @@ class ResourcePresetDBSource:
         j = sa.join(
             ResourceAllocationRow, KernelRow, ResourceAllocationRow.kernel_id == KernelRow.id
         ).join(rst, ResourceAllocationRow.slot_name == rst.c.slot_name)
+        effective_amount = sa.func.coalesce(
+            ResourceAllocationRow.used, ResourceAllocationRow.requested
+        )
         query = (
             sa.select(
                 ResourceAllocationRow.slot_name,
-                sa.func.sum(ResourceAllocationRow.used).label("total"),
+                sa.func.sum(effective_amount).label("total"),
             )
             .select_from(j)
             .where(sa.and_(*conditions))
@@ -447,7 +475,14 @@ class ResourcePresetDBSource:
         )
 
         result = await db_sess.execute(query)
-        return [SlotQuantity(row.slot_name, row.total) for row in result if row.total is not None]
+        quantities = [
+            SlotQuantity(row.slot_name, row.total) for row in result if row.total is not None
+        ]
+        if not quantities:
+            return [
+                SlotQuantity(str(slot_name), Decimal(0)) for slot_name in known_slot_types.keys()
+            ]
+        return quantities
 
     async def _get_keypair_resource_usage(
         self,

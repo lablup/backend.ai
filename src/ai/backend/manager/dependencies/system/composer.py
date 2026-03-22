@@ -18,7 +18,7 @@ from ai.backend.common.service_discovery.service_discovery import (
 )
 from ai.backend.common.types import ValkeyProfileTarget
 from ai.backend.manager.api.gql.adapter import BaseGQLAdapter
-from ai.backend.manager.api.types import CORSOptions
+from ai.backend.manager.api.rest.types import CORSOptions
 from ai.backend.manager.config.unified import ManagerUnifiedConfig
 from ai.backend.manager.dependencies.infrastructure.redis import ValkeyClients
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine

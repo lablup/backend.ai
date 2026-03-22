@@ -17,6 +17,7 @@ from ai.backend.manager.data.scaling_group.types import (
 from ai.backend.manager.errors.resource import ScalingGroupNotFound
 from ai.backend.manager.models.agent import AgentRow
 from ai.backend.manager.models.endpoint import EndpointRow
+from ai.backend.manager.models.kernel.row import KernelRow
 from ai.backend.manager.models.resource_slot import AgentResourceRow, ResourceSlotTypeRow
 from ai.backend.manager.models.routing import RoutingRow
 from ai.backend.manager.models.scaling_group import (
@@ -24,6 +25,7 @@ from ai.backend.manager.models.scaling_group import (
     ScalingGroupForKeypairsRow,
     ScalingGroupForProjectRow,
     ScalingGroupRow,
+    query_allowed_sgroups,
 )
 from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.repositories.base import BatchQuerier, execute_batch_querier
@@ -38,6 +40,14 @@ from ai.backend.manager.repositories.base.purger import (
     Purger,
     execute_batch_purger,
     execute_purger,
+)
+from ai.backend.manager.repositories.base.rbac.scope_binder import (
+    RBACScopeBinder,
+    execute_rbac_scope_binder,
+)
+from ai.backend.manager.repositories.base.rbac.scope_unbinder import (
+    RBACScopeEntityUnbinder,
+    execute_rbac_scope_entity_unbinder,
 )
 from ai.backend.manager.repositories.base.updater import Updater, execute_updater
 from ai.backend.manager.repositories.resource_slot.types import subtract_quantities
@@ -126,13 +136,7 @@ class ScalingGroupDBSource:
         self,
         purger: Purger[ScalingGroupRow],
     ) -> ScalingGroupData:
-        """Purges a scaling group and all related sessions and routes using a purger.
-
-        Cascade delete order:
-        1. RoutingRow (session FK with RESTRICT)
-        2. EndpointRow (resource_group FK with RESTRICT, has CASCADE to routing)
-        3. SessionRow (scaling_group FK)
-        4. ScalingGroupRow
+        """Purges a scaling group and all related sessions, routes, endpoints, and kernels.
 
         Raises ScalingGroupNotFound if scaling group doesn't exist.
         """
@@ -159,13 +163,20 @@ class ScalingGroupDBSource:
             )
             await session.execute(delete_endpoints_stmt)
 
-            # Step 4: Delete all sessions belonging to this scaling group
+            # Step 4: Delete all kernels belonging to these sessions
+            if session_ids:
+                delete_kernels_stmt = sa.delete(KernelRow).where(
+                    KernelRow.session_id.in_(session_ids)
+                )
+                await session.execute(delete_kernels_stmt)
+
+            # Step 5: Delete all sessions belonging to this scaling group
             delete_sessions_stmt = sa.delete(SessionRow).where(
                 SessionRow.scaling_group_name == scaling_group_name
             )
             await session.execute(delete_sessions_stmt)
 
-            # Step 5: Delete the scaling group itself using purger
+            # Step 6: Delete the scaling group itself using purger
             result = await execute_purger(session, purger)
 
             if result is None:
@@ -189,19 +200,19 @@ class ScalingGroupDBSource:
 
     async def associate_scaling_group_with_domains(
         self,
-        bulk_creator: BulkCreator[ScalingGroupForDomainRow],
+        binder: RBACScopeBinder[ScalingGroupForDomainRow],
     ) -> None:
         """Associates a scaling group with multiple domains."""
         async with self._db.begin_session() as session:
-            await execute_bulk_creator(session, bulk_creator)
+            await execute_rbac_scope_binder(session, binder)
 
     async def disassociate_scaling_group_with_domains(
         self,
-        purger: BatchPurger[ScalingGroupForDomainRow],
+        unbinder: RBACScopeEntityUnbinder[ScalingGroupForDomainRow],
     ) -> None:
-        """Disassociates a scaling group from multiple domains."""
+        """Disassociates scaling groups from a domain."""
         async with self._db.begin_session() as session:
-            await execute_batch_purger(session, purger)
+            await execute_rbac_scope_entity_unbinder(session, unbinder)
 
     async def check_scaling_group_domain_association_exists(
         self,
@@ -259,19 +270,19 @@ class ScalingGroupDBSource:
 
     async def associate_scaling_group_with_user_groups(
         self,
-        bulk_creator: BulkCreator[ScalingGroupForProjectRow],
+        binder: RBACScopeBinder[ScalingGroupForProjectRow],
     ) -> None:
         """Associates a scaling group with multiple user groups (projects)."""
         async with self._db.begin_session() as session:
-            await execute_bulk_creator(session, bulk_creator)
+            await execute_rbac_scope_binder(session, binder)
 
     async def disassociate_scaling_group_with_user_groups(
         self,
-        purger: BatchPurger[ScalingGroupForProjectRow],
+        unbinder: RBACScopeEntityUnbinder[ScalingGroupForProjectRow],
     ) -> None:
-        """Disassociates a single scaling group from a user group (project)."""
+        """Disassociates scaling groups from a project."""
         async with self._db.begin_session() as session:
-            await execute_batch_purger(session, purger)
+            await execute_rbac_scope_entity_unbinder(session, unbinder)
 
     async def check_scaling_group_user_group_association_exists(
         self,
@@ -292,6 +303,34 @@ class ScalingGroupDBSource:
             )
             result = await session.scalar(query)
             return (result or 0) > 0
+
+    async def list_allowed_sgroups(
+        self,
+        *,
+        domain_name: str,
+        group: str,
+        access_key: str,
+    ) -> list[ScalingGroupData]:
+        """List allowed scaling groups for a user using the legacy query_allowed_sgroups function.
+
+        Returns ScalingGroupData for each allowed scaling group.
+        """
+        async with self._db.begin_readonly() as conn:
+            rows = await query_allowed_sgroups(conn, domain_name, group, access_key)
+            # Convert raw rows to ScalingGroupData via ORM
+            sg_names = [row.name for row in rows]
+
+        if not sg_names:
+            return []
+
+        async with self._db.begin_readonly_session() as db_sess:
+            query = (
+                sa.select(ScalingGroupRow)
+                .where(ScalingGroupRow.name.in_(sg_names))
+                .order_by(ScalingGroupRow.name)
+            )
+            result = await db_sess.execute(query)
+            return [row.to_dataclass() for row in result.scalars()]
 
     async def get_resource_info(
         self,

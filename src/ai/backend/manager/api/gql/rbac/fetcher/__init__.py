@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from .entity import fetch_entities
+from .entity import fetch_entities, get_entity_pagination_spec
 from .permission import (
     fetch_permissions,
     get_permission_pagination_spec,
@@ -27,4 +27,5 @@ __all__ = [
     "get_role_assignment_pagination_spec",
     # Entity
     "fetch_entities",
+    "get_entity_pagination_spec",
 ]

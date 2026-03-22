@@ -8,7 +8,7 @@ from __future__ import annotations
 from typing import Any
 from uuid import UUID
 
-from pydantic import Field
+from pydantic import AliasChoices, Field
 
 from ai.backend.common.api_handlers import BaseRequestModel
 from ai.backend.common.dto.manager.query import StringFilter
@@ -27,6 +27,9 @@ __all__ = (
     "AddGroupMembersRequest",
     "RemoveGroupMembersRequest",
     "ListGroupMembersRequest",
+    # Registry quota requests
+    "RegistryQuotaRequest",
+    "RegistryQuotaModifyRequest",
 )
 
 
@@ -96,3 +99,22 @@ class ListGroupMembersRequest(BaseRequestModel):
 
     limit: int = Field(default=50, ge=1, le=1000, description="Maximum items to return")
     offset: int = Field(default=0, ge=0, description="Number of items to skip")
+
+
+class RegistryQuotaRequest(BaseRequestModel):
+    """Request for registry quota operations (create/update/read/delete)."""
+
+    group_id: str = Field(
+        description="Group (project) ID",
+        validation_alias=AliasChoices("group_id", "group"),
+    )
+
+
+class RegistryQuotaModifyRequest(BaseRequestModel):
+    """Request to create or update a registry quota."""
+
+    group_id: str = Field(
+        description="Group (project) ID",
+        validation_alias=AliasChoices("group_id", "group"),
+    )
+    quota: int = Field(description="Quota value")

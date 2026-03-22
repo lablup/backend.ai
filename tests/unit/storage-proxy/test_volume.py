@@ -8,7 +8,6 @@ from ai.backend.storage.types import VFolderID
 from ai.backend.storage.volumes.abc import AbstractVolume
 
 
-@pytest.mark.asyncio
 async def test_volume_vfolder_prefix_handling(volume: AbstractVolume) -> None:
     qsid = QuotaScopeID(QuotaScopeType.USER, uuid.uuid4())
     vfid = VFolderID(qsid, uuid.uuid4())
@@ -63,7 +62,6 @@ async def test_volume_vfolder_prefix_handling(volume: AbstractVolume) -> None:
     assert not volume.quota_model.mangle_qspath(qsid).exists()
 
 
-@pytest.mark.asyncio
 async def test_volume_get_usage(volume: AbstractVolume, empty_vfolder: VFolderID) -> None:
     vfpath = volume.mangle_vfpath(empty_vfolder)
     (vfpath / "test.txt").write_bytes(b"12345")
@@ -79,7 +77,6 @@ async def test_volume_get_usage(volume: AbstractVolume, empty_vfolder: VFolderID
     assert 11 <= usage.used_bytes <= 4096 * 4
 
 
-@pytest.mark.asyncio
 async def test_volume_scandir(volume: AbstractVolume, empty_vfolder: VFolderID) -> None:
     vfpath = volume.mangle_vfpath(empty_vfolder)
     (vfpath / "test.txt").write_bytes(b"12345")
@@ -101,7 +98,6 @@ async def test_volume_scandir(volume: AbstractVolume, empty_vfolder: VFolderID) 
     assert "inner2" in merged_output
 
 
-@pytest.mark.asyncio
 async def test_volume_clone(volume: AbstractVolume) -> None:
     qsid1 = QuotaScopeID(QuotaScopeType.USER, uuid.uuid4())
     qsid2 = QuotaScopeID(QuotaScopeType.USER, uuid.uuid4())
@@ -131,7 +127,6 @@ async def test_volume_clone(volume: AbstractVolume) -> None:
     assert not volume.quota_model.mangle_qspath(qsid2).exists()
 
 
-@pytest.mark.asyncio
 async def test_volume_fsop(volume: AbstractVolume, empty_vfolder: VFolderID) -> None:
     vfpath = volume.mangle_vfpath(empty_vfolder)
     (vfpath / "test0").mkdir()

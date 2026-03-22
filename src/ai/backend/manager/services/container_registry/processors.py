@@ -3,6 +3,7 @@ from typing import override
 from ai.backend.manager.actions.monitors.monitor import ActionMonitor
 from ai.backend.manager.actions.processor import ActionProcessor
 from ai.backend.manager.actions.types import AbstractProcessorPackage, ActionSpec
+from ai.backend.manager.actions.validators import ActionValidators
 from ai.backend.manager.services.container_registry.actions.clear_images import (
     ClearImagesAction,
     ClearImagesActionResult,
@@ -11,13 +12,25 @@ from ai.backend.manager.services.container_registry.actions.create_container_reg
     CreateContainerRegistryAction,
     CreateContainerRegistryActionResult,
 )
+from ai.backend.manager.services.container_registry.actions.create_registry_quota import (
+    CreateRegistryQuotaAction,
+    CreateRegistryQuotaActionResult,
+)
 from ai.backend.manager.services.container_registry.actions.delete_container_registry import (
     DeleteContainerRegistryAction,
     DeleteContainerRegistryActionResult,
 )
+from ai.backend.manager.services.container_registry.actions.delete_registry_quota import (
+    DeleteRegistryQuotaAction,
+    DeleteRegistryQuotaActionResult,
+)
 from ai.backend.manager.services.container_registry.actions.get_container_registries import (
     GetContainerRegistriesAction,
     GetContainerRegistriesActionResult,
+)
+from ai.backend.manager.services.container_registry.actions.handle_harbor_webhook import (
+    HandleHarborWebhookAction,
+    HandleHarborWebhookActionResult,
 )
 from ai.backend.manager.services.container_registry.actions.load_all_container_registries import (
     LoadAllContainerRegistriesAction,
@@ -31,9 +44,21 @@ from ai.backend.manager.services.container_registry.actions.modify_container_reg
     ModifyContainerRegistryAction,
     ModifyContainerRegistryActionResult,
 )
+from ai.backend.manager.services.container_registry.actions.read_registry_quota import (
+    ReadRegistryQuotaAction,
+    ReadRegistryQuotaActionResult,
+)
 from ai.backend.manager.services.container_registry.actions.rescan_images import (
     RescanImagesAction,
     RescanImagesActionResult,
+)
+from ai.backend.manager.services.container_registry.actions.search_container_registries import (
+    SearchContainerRegistriesAction,
+    SearchContainerRegistriesActionResult,
+)
+from ai.backend.manager.services.container_registry.actions.update_registry_quota import (
+    UpdateRegistryQuotaAction,
+    UpdateRegistryQuotaActionResult,
 )
 from ai.backend.manager.services.container_registry.service import ContainerRegistryService
 
@@ -59,9 +84,28 @@ class ContainerRegistryProcessors(AbstractProcessorPackage):
     delete_container_registry: ActionProcessor[
         DeleteContainerRegistryAction, DeleteContainerRegistryActionResult
     ]
+    search_container_registries: ActionProcessor[
+        SearchContainerRegistriesAction, SearchContainerRegistriesActionResult
+    ]
+    handle_harbor_webhook: ActionProcessor[
+        HandleHarborWebhookAction, HandleHarborWebhookActionResult
+    ]
+    create_registry_quota: ActionProcessor[
+        CreateRegistryQuotaAction, CreateRegistryQuotaActionResult
+    ]
+    read_registry_quota: ActionProcessor[ReadRegistryQuotaAction, ReadRegistryQuotaActionResult]
+    update_registry_quota: ActionProcessor[
+        UpdateRegistryQuotaAction, UpdateRegistryQuotaActionResult
+    ]
+    delete_registry_quota: ActionProcessor[
+        DeleteRegistryQuotaAction, DeleteRegistryQuotaActionResult
+    ]
 
     def __init__(
-        self, service: ContainerRegistryService, action_monitors: list[ActionMonitor]
+        self,
+        service: ContainerRegistryService,
+        action_monitors: list[ActionMonitor],
+        validators: ActionValidators,
     ) -> None:
         self.rescan_images = ActionProcessor(service.rescan_images, action_monitors)
         self.clear_images = ActionProcessor(service.clear_images, action_monitors)
@@ -83,6 +127,14 @@ class ContainerRegistryProcessors(AbstractProcessorPackage):
         self.delete_container_registry = ActionProcessor(
             service.delete_container_registry, action_monitors
         )
+        self.search_container_registries = ActionProcessor(
+            service.search_container_registries, action_monitors
+        )
+        self.handle_harbor_webhook = ActionProcessor(service.handle_harbor_webhook, action_monitors)
+        self.create_registry_quota = ActionProcessor(service.create_registry_quota, action_monitors)
+        self.read_registry_quota = ActionProcessor(service.read_registry_quota, action_monitors)
+        self.update_registry_quota = ActionProcessor(service.update_registry_quota, action_monitors)
+        self.delete_registry_quota = ActionProcessor(service.delete_registry_quota, action_monitors)
 
     @override
     def supported_actions(self) -> list[ActionSpec]:
@@ -95,4 +147,10 @@ class ContainerRegistryProcessors(AbstractProcessorPackage):
             CreateContainerRegistryAction.spec(),
             ModifyContainerRegistryAction.spec(),
             DeleteContainerRegistryAction.spec(),
+            SearchContainerRegistriesAction.spec(),
+            HandleHarborWebhookAction.spec(),
+            CreateRegistryQuotaAction.spec(),
+            ReadRegistryQuotaAction.spec(),
+            UpdateRegistryQuotaAction.spec(),
+            DeleteRegistryQuotaAction.spec(),
         ]

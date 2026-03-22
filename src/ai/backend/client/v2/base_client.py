@@ -1,17 +1,18 @@
 from __future__ import annotations
 
-import ssl
 from collections.abc import AsyncIterator, Iterable, Mapping
 from contextlib import asynccontextmanager
 from datetime import UTC, datetime
-from typing import Any, TypeVar
+from typing import Any, TypeVar, cast
 
 import aiohttp
+from multidict import CIMultiDict
 
 from ai.backend.client.exceptions import BackendAPIError
 from ai.backend.common.api_handlers import (
     BaseRequestModel,
     BaseResponseModel,
+    BaseRootResponseModel,
 )
 
 from .auth import AuthStrategy
@@ -19,10 +20,23 @@ from .config import ClientConfig
 from .exceptions import SSEError, WebSocketError, map_status_to_exception
 from .streaming_types import SSEConnection, WebSocketSession
 
-ResponseT = TypeVar("ResponseT", bound=BaseResponseModel)
+ResponseT = TypeVar("ResponseT", bound=BaseResponseModel | BaseRootResponseModel[Any])
 
 
-class BackendAIClient:
+def _create_aiohttp_session(config: ClientConfig) -> aiohttp.ClientSession:
+    ssl_context: bool = not config.skip_ssl_verification
+    connector = aiohttp.TCPConnector(ssl=ssl_context)
+    timeout = aiohttp.ClientTimeout(
+        sock_connect=config.connection_timeout or None,
+        sock_read=config.read_timeout or None,
+    )
+    return aiohttp.ClientSession(
+        connector=connector,
+        timeout=timeout,
+    )
+
+
+class BackendAIAuthClient:
     """Async HTTP client for Backend.AI REST API.
 
     All public request methods accept and return Pydantic models only.
@@ -51,17 +65,8 @@ class BackendAIClient:
         cls,
         config: ClientConfig,
         auth: AuthStrategy,
-    ) -> BackendAIClient:
-        ssl_context: ssl.SSLContext | bool = not config.skip_ssl_verification
-        connector = aiohttp.TCPConnector(ssl=ssl_context)
-        timeout = aiohttp.ClientTimeout(
-            sock_connect=config.connection_timeout or None,
-            sock_read=config.read_timeout or None,
-        )
-        session = aiohttp.ClientSession(
-            connector=connector,
-            timeout=timeout,
-        )
+    ) -> BackendAIAuthClient:
+        session = _create_aiohttp_session(config)
         return cls(config, auth, session)
 
     async def close(self) -> None:
@@ -96,11 +101,17 @@ class BackendAIClient:
         *,
         json: Any | None = None,
         params: dict[str, str] | None = None,
-    ) -> dict[str, Any] | None:
+        extra_headers: Mapping[str, str] | None = None,
+    ) -> dict[str, Any] | list[Any] | None:
         session = self._session
         content_type = "application/json"
         rel_url = "/" + path.lstrip("/")
-        headers = self._sign(method, rel_url, content_type)
+        if params:
+            qs = "&".join(f"{k}={v}" for k, v in params.items())
+            rel_url = f"{rel_url}?{qs}"
+        headers = {**self._sign(method, rel_url, content_type)}
+        if extra_headers:
+            headers.update(extra_headers)
         url = self._build_url(path)
         async with session.request(
             method,
@@ -117,7 +128,7 @@ class BackendAIClient:
                 raise map_status_to_exception(resp.status, resp.reason or "", data)
             if resp.status == 204:
                 return None
-            result: dict[str, Any] = await resp.json()
+            result: dict[str, Any] | list[Any] = await resp.json()
             return result
 
     async def typed_request(
@@ -128,9 +139,14 @@ class BackendAIClient:
         request: BaseRequestModel | None = None,
         response_model: type[ResponseT],
         params: dict[str, str] | None = None,
+        extra_headers: Mapping[str, str] | None = None,
     ) -> ResponseT:
-        json_body = request.model_dump(exclude_none=True) if request is not None else None
-        data = await self._request(method, path, json=json_body, params=params)
+        json_body = (
+            request.model_dump(mode="json", exclude_none=True) if request is not None else None
+        )
+        data = await self._request(
+            method, path, json=json_body, params=params, extra_headers=extra_headers
+        )
         if data is None:
             raise BackendAPIError(
                 204,
@@ -140,7 +156,7 @@ class BackendAIClient:
                     "title": f"Expected a JSON response from {method} {path}, but got 204 No Content",
                 },
             )
-        return response_model.model_validate(data)
+        return cast(ResponseT, response_model.model_validate(data))
 
     async def typed_request_no_content(
         self,
@@ -150,7 +166,9 @@ class BackendAIClient:
         request: BaseRequestModel | None = None,
         params: dict[str, str] | None = None,
     ) -> None:
-        json_body = request.model_dump(exclude_none=True) if request is not None else None
+        json_body = (
+            request.model_dump(mode="json", exclude_none=True) if request is not None else None
+        )
         await self._request(method, path, json=json_body, params=params)
 
     async def upload(
@@ -297,3 +315,109 @@ class BackendAIClient:
         finally:
             if resp is not None:
                 resp.close()
+
+
+class BackendAIAnonymousClient:
+    """Unauthenticated HTTP client for anonymous Backend.AI endpoints.
+
+    Sends only ``Date``, ``Content-Type``, and ``X-BackendAI-Version``
+    headers — no ``Authorization`` header is attached.
+
+    Provides convenience methods for the three auth endpoints that do
+    not require authentication: ``authorize``, ``signup``, and
+    ``update_password_no_auth``.
+    """
+
+    _config: ClientConfig
+    _session: aiohttp.ClientSession
+
+    def __init__(
+        self,
+        config: ClientConfig,
+        session: aiohttp.ClientSession,
+    ) -> None:
+        self._config = config
+        self._session = session
+
+    @classmethod
+    async def create(
+        cls,
+        config: ClientConfig,
+    ) -> BackendAIAnonymousClient:
+        session = _create_aiohttp_session(config)
+        return cls(config, session)
+
+    async def close(self) -> None:
+        await self._session.close()
+
+    def _build_url(self, path: str) -> str:
+        base = str(self._config.endpoint).rstrip("/")
+        path = path.lstrip("/")
+        return f"{base}/{path}"
+
+    def _build_headers(self, method: str, rel_url: str, content_type: str) -> CIMultiDict[str]:
+        return CIMultiDict({
+            "Date": datetime.now(UTC).isoformat(),
+            "Content-Type": content_type,
+            "X-BackendAI-Version": self._config.api_version,
+        })
+
+    async def _request(
+        self,
+        method: str,
+        path: str,
+        *,
+        json: Any | None = None,
+        params: dict[str, str] | None = None,
+        extra_headers: Mapping[str, str] | None = None,
+    ) -> dict[str, Any] | list[Any] | None:
+        content_type = "application/json"
+        rel_url = "/" + path.lstrip("/")
+        headers = self._build_headers(method, rel_url, content_type)
+        if extra_headers:
+            headers.update(extra_headers)
+        url = self._build_url(path)
+        async with self._session.request(
+            method,
+            url,
+            headers=headers,
+            json=json,
+            params=params,
+        ) as resp:
+            if resp.status >= 400:
+                try:
+                    data = await resp.json()
+                except Exception:
+                    data = await resp.text()
+                raise map_status_to_exception(resp.status, resp.reason or "", data)
+            if resp.status == 204:
+                return None
+            result: dict[str, Any] | list[Any] = await resp.json()
+            return result
+
+    async def typed_request(
+        self,
+        method: str,
+        path: str,
+        *,
+        request: BaseRequestModel | None = None,
+        response_model: type[ResponseT],
+        params: dict[str, str] | None = None,
+        extra_headers: Mapping[str, str] | None = None,
+    ) -> ResponseT:
+        json_body = (
+            request.model_dump(mode="json", exclude_none=True) if request is not None else None
+        )
+        data = await self._request(
+            method, path, json=json_body, params=params, extra_headers=extra_headers
+        )
+        if data is None:
+            raise BackendAPIError(
+                204,
+                "No Content",
+                {
+                    "type": "https://api.backend.ai/probs/unexpected-no-content",
+                    "title": f"Expected a JSON response from {method} {path}, but got 204 No Content",
+                },
+            )
+        return cast(ResponseT, response_model.model_validate(data))

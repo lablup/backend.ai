@@ -14,12 +14,16 @@ from .filters import (
     UserStatusEnumFilterGQL,
 )
 from .inputs import (
-    BulkCreateUserInputGQL,
+    BulkCreateUserV2InputGQL,
+    BulkPurgeUsersV2InputGQL,
+    BulkPurgeUsersV2OptionsGQL,
+    BulkUpdateUserV2InputGQL,
+    BulkUpdateUserV2ItemInputGQL,
     CreateUserInputGQL,
     DeleteUsersInputGQL,
     PurgeUserInputGQL,
-    PurgeUsersInputGQL,
-    UpdateUserInputGQL,
+    UpdateMyAllowedClientIPInputGQL,
+    UpdateUserV2InputGQL,
 )
 from .nested import (
     EntityTimestampsGQL,
@@ -35,13 +39,18 @@ from .node import (
     UserV2GQL,
 )
 from .payloads import (
-    BulkCreateUserErrorGQL,
-    BulkCreateUsersPayloadGQL,
+    BulkCreateUsersV2PayloadGQL,
+    BulkCreateUserV2ErrorGQL,
+    BulkPurgeUsersV2PayloadGQL,
+    BulkPurgeUserV2ErrorGQL,
+    BulkUpdateUsersV2PayloadGQL,
+    BulkUpdateUserV2ErrorGQL,
     CreateUserPayloadGQL,
     DeleteUserPayloadGQL,
     DeleteUsersPayloadGQL,
     PurgeUserPayloadGQL,
     PurgeUsersPayloadGQL,
+    UpdateMyAllowedClientIPPayloadGQL,
     UpdateUserPayloadGQL,
 )
 from .scopes import (
@@ -77,18 +86,27 @@ __all__ = [
     "ProjectUserScopeGQL",
     # Inputs
     "CreateUserInputGQL",
-    "BulkCreateUserInputGQL",
-    "UpdateUserInputGQL",
+    "BulkCreateUserV2InputGQL",
+    "BulkUpdateUserV2ItemInputGQL",
+    "BulkUpdateUserV2InputGQL",
+    "UpdateUserV2InputGQL",
+    "UpdateMyAllowedClientIPInputGQL",
     "DeleteUsersInputGQL",
     "PurgeUserInputGQL",
-    "PurgeUsersInputGQL",
+    "BulkPurgeUsersV2InputGQL",
+    "BulkPurgeUsersV2OptionsGQL",
     # Payloads
     "CreateUserPayloadGQL",
-    "BulkCreateUserErrorGQL",
-    "BulkCreateUsersPayloadGQL",
+    "BulkCreateUserV2ErrorGQL",
+    "BulkCreateUsersV2PayloadGQL",
+    "BulkUpdateUserV2ErrorGQL",
+    "BulkUpdateUsersV2PayloadGQL",
     "UpdateUserPayloadGQL",
+    "UpdateMyAllowedClientIPPayloadGQL",
     "DeleteUserPayloadGQL",
     "DeleteUsersPayloadGQL",
     "PurgeUserPayloadGQL",
     "PurgeUsersPayloadGQL",
+    "BulkPurgeUserV2ErrorGQL",
+    "BulkPurgeUsersV2PayloadGQL",
 ]

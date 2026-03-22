@@ -85,7 +85,6 @@ class TestRGUserFairShare:
         )
         return info
 
-    @pytest.mark.asyncio
     async def test_returns_user_fair_share_when_exists(
         self,
         info_with_user_fair_share_exists: MagicMock,
@@ -110,7 +109,6 @@ class TestRGUserFairShare:
         assert result.resource_group_name == "default"
         assert result.domain_name == "test-domain"
 
-    @pytest.mark.asyncio
     async def test_calls_action_with_correct_params(
         self,
         info_with_user_fair_share_exists: MagicMock,
@@ -148,7 +146,6 @@ class TestRGUserFairShare:
         )
         return info
 
-    @pytest.mark.asyncio
     async def test_raises_user_not_found_when_user_does_not_exist(
         self,
         info_with_user_not_found: MagicMock,
@@ -173,7 +170,6 @@ class TestRGUserFairShare:
 class TestRGUserFairShares:
     """Tests for rg_user_fair_shares resolver."""
 
-    @pytest.mark.asyncio
     async def test_calls_fetch_rg_user_fair_shares(self) -> None:
         """Should call fetch_rg_user_fair_shares with correct scope."""
         info = MagicMock()

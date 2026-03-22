@@ -6,20 +6,22 @@ replacing JSON scalars and organized into logical field groups.
 
 from .resolver import (
     # Mutations
-    admin_bulk_create_users,
-    admin_create_user,
-    admin_delete_user,
-    admin_delete_users,
-    admin_purge_user,
-    admin_purge_users,
-    admin_update_user,
+    admin_bulk_create_users_v2,
+    admin_bulk_purge_users_v2,
+    admin_bulk_update_users_v2,
+    admin_create_user_v2,
+    admin_delete_user_v2,
+    admin_delete_users_v2,
+    admin_purge_user_v2,
+    admin_update_user_v2,
     # Queries
     admin_user_v2,
     admin_users_v2,
     domain_users_v2,
     my_user_v2,
     project_users_v2,
-    update_user,
+    update_my_allowed_client_ip,
+    update_user_v2,
 )
 
 __all__ = [
@@ -30,12 +32,14 @@ __all__ = [
     "my_user_v2",
     "project_users_v2",
     # Mutations
-    "admin_create_user",
-    "admin_bulk_create_users",
-    "admin_update_user",
-    "update_user",
-    "admin_delete_user",
-    "admin_delete_users",
-    "admin_purge_user",
-    "admin_purge_users",
+    "admin_create_user_v2",
+    "admin_bulk_create_users_v2",
+    "admin_bulk_update_users_v2",
+    "admin_update_user_v2",
+    "update_user_v2",
+    "update_my_allowed_client_ip",
+    "admin_delete_user_v2",
+    "admin_delete_users_v2",
+    "admin_purge_user_v2",
+    "admin_bulk_purge_users_v2",
 ]

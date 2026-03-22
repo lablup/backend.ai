@@ -9,10 +9,9 @@ from ai.backend.common.dto.manager.deployment import (
     ActivateRevisionResponse,
     CreateDeploymentRequest,
     CreateDeploymentResponse,
-    CreateRevisionRequest,
-    CreateRevisionResponse,
     DeactivateRevisionResponse,
     DestroyDeploymentResponse,
+    GetDeploymentPolicyResponse,
     GetDeploymentResponse,
     GetRevisionResponse,
     ListDeploymentsResponse,
@@ -25,6 +24,8 @@ from ai.backend.common.dto.manager.deployment import (
     UpdateDeploymentResponse,
     UpdateRouteTrafficStatusRequest,
     UpdateRouteTrafficStatusResponse,
+    UpsertDeploymentPolicyRequest,
+    UpsertDeploymentPolicyResponse,
 )
 
 from .base import BaseFunction, api_function
@@ -105,20 +106,6 @@ class Deployment(BaseFunction):
             return DestroyDeploymentResponse.model_validate(data)
 
     # Revision operations
-
-    @api_function
-    @classmethod
-    async def create_revision(
-        cls,
-        deployment_id: UUID,
-        request: CreateRevisionRequest,
-    ) -> CreateRevisionResponse:
-        """Create a new revision for a deployment."""
-        rqst = Request("POST", f"/deployments/{deployment_id}/revisions")
-        rqst.set_json(request.model_dump(mode="json"))
-        async with rqst.fetch() as resp:
-            data = await resp.json()
-            return CreateRevisionResponse.model_validate(data)
 
     @api_function
     @classmethod
@@ -203,3 +190,31 @@ class Deployment(BaseFunction):
         async with rqst.fetch() as resp:
             data = await resp.json()
             return UpdateRouteTrafficStatusResponse.model_validate(data)
+
+    # Policy operations
+
+    @api_function
+    @classmethod
+    async def get_policy(
+        cls,
+        deployment_id: UUID,
+    ) -> GetDeploymentPolicyResponse:
+        """Get the deployment policy."""
+        rqst = Request("GET", f"/deployments/{deployment_id}/policy")
+        async with rqst.fetch() as resp:
+            data = await resp.json()
+            return GetDeploymentPolicyResponse.model_validate(data)
+
+    @api_function
+    @classmethod
+    async def upsert_policy(
+        cls,
+        deployment_id: UUID,
+        request: UpsertDeploymentPolicyRequest,
+    ) -> UpsertDeploymentPolicyResponse:
+        """Create or update a deployment policy."""
+        rqst = Request("PUT", f"/deployments/{deployment_id}/policy")
+        rqst.set_json(request.model_dump(mode="json"))
+        async with rqst.fetch() as resp:
+            data = await resp.json()
+            return UpsertDeploymentPolicyResponse.model_validate(data)

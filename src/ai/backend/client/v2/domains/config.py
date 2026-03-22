@@ -42,10 +42,11 @@ class ConfigClient(BaseDomainClient):
         )
 
     async def get_user_dotfile(self, request: GetUserDotfileRequest) -> GetDotfileResponse:
+        params = request.model_dump(mode="json", exclude_none=True)
         return await self._client.typed_request(
             "GET",
             "/user-config/dotfiles",
-            request=request,
+            params={k: str(v) for k, v in params.items()},
             response_model=GetDotfileResponse,
         )
 
@@ -65,10 +66,11 @@ class ConfigClient(BaseDomainClient):
         )
 
     async def delete_user_dotfile(self, request: DeleteUserDotfileRequest) -> DeleteDotfileResponse:
+        params = request.model_dump(mode="json", exclude_none=True)
         return await self._client.typed_request(
             "DELETE",
             "/user-config/dotfiles",
-            request=request,
+            params={k: str(v) for k, v in params.items()},
             response_model=DeleteDotfileResponse,
         )
 
@@ -102,18 +104,20 @@ class ConfigClient(BaseDomainClient):
         )
 
     async def get_group_dotfile(self, request: GetGroupDotfileRequest) -> GetDotfileResponse:
+        params = request.model_dump(mode="json", exclude_none=True)
         return await self._client.typed_request(
             "GET",
             "/group-config/dotfiles",
-            request=request,
+            params={k: str(v) for k, v in params.items()},
             response_model=GetDotfileResponse,
         )
 
     async def list_group_dotfiles(self, request: GetGroupDotfileRequest) -> ListDotfilesResponse:
+        params = request.model_dump(mode="json", exclude_none=True)
         return await self._client.typed_request(
             "GET",
             "/group-config/dotfiles",
-            request=request,
+            params={k: str(v) for k, v in params.items()},
             response_model=ListDotfilesResponse,
         )
 
@@ -130,10 +134,11 @@ class ConfigClient(BaseDomainClient):
     async def delete_group_dotfile(
         self, request: DeleteGroupDotfileRequest
     ) -> DeleteDotfileResponse:
+        params = request.model_dump(mode="json", exclude_none=True)
         return await self._client.typed_request(
             "DELETE",
             "/group-config/dotfiles",
-            request=request,
+            params={k: str(v) for k, v in params.items()},
             response_model=DeleteDotfileResponse,
         )
 
@@ -150,18 +155,20 @@ class ConfigClient(BaseDomainClient):
         )
 
     async def get_domain_dotfile(self, request: GetDomainDotfileRequest) -> GetDotfileResponse:
+        params = request.model_dump(mode="json", exclude_none=True)
         return await self._client.typed_request(
             "GET",
             "/domain-config/dotfiles",
-            request=request,
+            params={k: str(v) for k, v in params.items()},
             response_model=GetDotfileResponse,
         )
 
     async def list_domain_dotfiles(self, request: GetDomainDotfileRequest) -> ListDotfilesResponse:
+        params = request.model_dump(mode="json", exclude_none=True)
         return await self._client.typed_request(
             "GET",
             "/domain-config/dotfiles",
-            request=request,
+            params={k: str(v) for k, v in params.items()},
             response_model=ListDotfilesResponse,
         )
 
@@ -178,9 +185,10 @@ class ConfigClient(BaseDomainClient):
     async def delete_domain_dotfile(
         self, request: DeleteDomainDotfileRequest
     ) -> DeleteDotfileResponse:
+        params = request.model_dump(mode="json", exclude_none=True)
         return await self._client.typed_request(
             "DELETE",
             "/domain-config/dotfiles",
-            request=request,
+            params={k: str(v) for k, v in params.items()},
             response_model=DeleteDotfileResponse,
         )

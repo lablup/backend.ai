@@ -155,13 +155,17 @@ class SchedulerRepository:
 
     @scheduler_repository_resilience.apply()
     async def mark_sessions_terminating(
-        self, session_ids: list[SessionId], reason: str = "USER_REQUESTED"
+        self,
+        session_ids: list[SessionId],
+        reason: str = "USER_REQUESTED",
+        *,
+        forced: bool = False,
     ) -> MarkTerminatingResult:
         """
         Mark sessions for termination.
         """
         # Delegate to DB source
-        return await self._db_source.mark_sessions_terminating(session_ids, reason)
+        return await self._db_source.mark_sessions_terminating(session_ids, reason, forced=forced)
 
     @scheduler_repository_resilience.apply()
     async def get_schedulable_scaling_groups(self) -> list[str]:
@@ -496,6 +500,13 @@ class SchedulerRepository:
     ) -> bool:
         """Update kernel status to TERMINATED."""
         return await self._db_source.update_kernel_status_terminated(kernel_id, reason, exit_code)
+
+    @scheduler_repository_resilience.apply()
+    async def get_agent_ids_for_sessions(
+        self, session_ids: list[SessionId]
+    ) -> dict[SessionId, list[AgentId]]:
+        """Get agent IDs assigned to kernels for the given sessions."""
+        return await self._db_source.get_agent_ids_for_sessions(session_ids)
 
     @scheduler_repository_resilience.apply()
     async def reset_kernels_to_pending_for_sessions(

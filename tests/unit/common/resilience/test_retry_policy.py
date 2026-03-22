@@ -14,7 +14,6 @@ from ai.backend.common.resilience.resilience import Resilience
 
 
 class TestRetryPolicy:
-    @pytest.mark.asyncio
     async def test_success_without_retry(self) -> None:
         """Test that successful operations don't trigger retries."""
         call_count = 0
@@ -30,7 +29,6 @@ class TestRetryPolicy:
         assert result == "success"
         assert call_count == 1
 
-    @pytest.mark.asyncio
     async def test_retry_on_transient_failure(self) -> None:
         """Test that transient failures trigger retries until success."""
         call_count = 0
@@ -48,7 +46,6 @@ class TestRetryPolicy:
         assert result == "success"
         assert call_count == 3
 
-    @pytest.mark.asyncio
     async def test_retry_exhaustion(self) -> None:
         """Test that retries are exhausted and final exception is raised."""
         call_count = 0
@@ -64,7 +61,6 @@ class TestRetryPolicy:
 
         assert call_count == 3
 
-    @pytest.mark.asyncio
     async def test_non_retryable_exception(self) -> None:
         """Test that non-retryable exceptions are not retried."""
         call_count = 0
@@ -86,7 +82,6 @@ class TestRetryPolicy:
 
         assert call_count == 1
 
-    @pytest.mark.asyncio
     async def test_fixed_backoff_strategy(self) -> None:
         """Test that fixed backoff strategy uses consistent delay."""
         call_count = 0
@@ -116,7 +111,6 @@ class TestRetryPolicy:
         # 2 retries with 0.1s fixed delay each = ~0.2s minimum
         assert elapsed_time >= 0.2
 
-    @pytest.mark.asyncio
     async def test_exponential_backoff_strategy(self) -> None:
         """Test that exponential backoff strategy increases delay."""
         call_count = 0
@@ -149,7 +143,6 @@ class TestRetryPolicy:
         # First retry: 0.1s, second retry: 0.2s = ~0.3s minimum
         assert elapsed_time >= 0.3
 
-    @pytest.mark.asyncio
     async def test_max_delay_cap(self) -> None:
         """Test that exponential backoff respects max_delay."""
         call_count = 0

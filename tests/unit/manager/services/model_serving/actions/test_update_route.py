@@ -14,6 +14,7 @@ from ai.backend.common.data.user.types import UserData, UserRole
 from ai.backend.common.events.dispatcher import EventDispatcher
 from ai.backend.common.events.hub import EventHub
 from ai.backend.manager.actions.monitors.monitor import ActionMonitor
+from ai.backend.manager.actions.validators import ActionValidators
 from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.errors.service import ModelServiceNotFound
@@ -158,10 +159,12 @@ class TestUpdateRoute:
         self,
         mock_action_monitor: MagicMock,
         model_serving_service: ModelServingService,
+        mock_action_validators: ActionValidators,
     ) -> ModelServingProcessors:
         return ModelServingProcessors(
             service=model_serving_service,
             action_monitors=[mock_action_monitor],
+            validators=mock_action_validators,
         )
 
     @pytest.fixture
@@ -241,11 +244,10 @@ class TestUpdateRoute:
                     route_id=uuid.UUID("11111111-1111-1111-1111-111111111111"),
                     traffic_ratio=0.7,
                 ),
-                UpdateRouteActionResult(success=True),
+                UpdateRouteActionResult(route_id=uuid.UUID("11111111-1111-1111-1111-111111111111")),
             ),
         ],
     )
-    @pytest.mark.asyncio
     async def test_update_route(
         self,
         scenario: ScenarioBase[UpdateRouteAction, UpdateRouteActionResult],
@@ -310,7 +312,6 @@ class TestUpdateRoute:
             ),
         ],
     )
-    @pytest.mark.asyncio
     async def test_update_route_failure(
         self,
         scenario: ScenarioBase[UpdateRouteAction, Exception],
@@ -336,7 +337,6 @@ class TestUpdateRoute:
 
         await scenario.test(update_route)
 
-    @pytest.mark.asyncio
     async def test_update_route_appproxy_failure(
         self,
         user_data: UserData,

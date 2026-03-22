@@ -111,18 +111,15 @@ class TestDRFSequencer:
             known_slot_types={},
         )
 
-    @pytest.mark.asyncio
     async def test_name(self, sequencer: DRFSequencer) -> None:
         assert sequencer.name == "DRFSequencer"
 
-    @pytest.mark.asyncio
     async def test_empty_workload(
         self, scaling_group: str, sequencer: DRFSequencer, empty_system_snapshot: SystemSnapshot
     ) -> None:
         result = await sequencer.sequence(scaling_group, empty_system_snapshot, [])
         assert result == []
 
-    @pytest.mark.asyncio
     async def test_single_user_workloads(
         self, scaling_group: str, sequencer: DRFSequencer, empty_system_snapshot: SystemSnapshot
     ) -> None:
@@ -156,7 +153,6 @@ class TestDRFSequencer:
         assert result[0] == workloads[0]
         assert result[1] == workloads[1]
 
-    @pytest.mark.asyncio
     async def test_multiple_users_different_dominant_shares(
         self,
         scaling_group: str,
@@ -206,7 +202,6 @@ class TestDRFSequencer:
         assert result[1].access_key == AccessKey("user1")
         assert result[2].access_key == AccessKey("user2")
 
-    @pytest.mark.asyncio
     async def test_multiple_users_same_dominant_share(
         self, scaling_group: str, sequencer: DRFSequencer, empty_system_snapshot: SystemSnapshot
     ) -> None:
@@ -252,7 +247,6 @@ class TestDRFSequencer:
         assert result[1] == workloads[1]
         assert result[2] == workloads[2]
 
-    @pytest.mark.asyncio
     async def test_new_user_gets_priority(
         self,
         scaling_group: str,
@@ -291,7 +285,6 @@ class TestDRFSequencer:
         assert result[0].access_key == AccessKey("new_user")
         assert result[1].access_key == AccessKey("user2")
 
-    @pytest.mark.asyncio
     async def test_dominant_share_calculation_with_zero_capacity(
         self, scaling_group: str, sequencer: DRFSequencer
     ) -> None:

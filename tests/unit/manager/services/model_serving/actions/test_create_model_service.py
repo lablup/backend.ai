@@ -14,6 +14,7 @@ from ai.backend.common.events.dispatcher import EventDispatcher
 from ai.backend.common.events.hub import EventHub
 from ai.backend.common.types import AccessKey, ClusterMode, ResourceSlot, RuntimeVariant
 from ai.backend.manager.actions.monitors.monitor import ActionMonitor
+from ai.backend.manager.actions.validators import ActionValidators
 from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.deployment.types import (
@@ -233,10 +234,12 @@ class TestCreateModelService:
         self,
         mock_action_monitor: MagicMock,
         model_serving_service: ModelServingService,
+        mock_action_validators: ActionValidators,
     ) -> ModelServingProcessors:
         return ModelServingProcessors(
             service=model_serving_service,
             action_monitors=[mock_action_monitor],
+            validators=mock_action_validators,
         )
 
     @pytest.fixture
@@ -377,6 +380,7 @@ class TestCreateModelService:
                             extra_mounts=[],
                         ),
                     ),
+                    _project_id=uuid.UUID("00000000-0000-0000-0000-000000000002"),
                 ),
                 CreateModelServiceActionResult(
                     data=ServiceInfo(
@@ -392,6 +396,7 @@ class TestCreateModelService:
                         is_public=False,
                         runtime_variant=RuntimeVariant.CUSTOM,
                     ),
+                    _project_id=uuid.UUID("00000000-0000-0000-0000-000000000002"),
                 ),
             ),
             ScenarioBase.failure(
@@ -434,6 +439,7 @@ class TestCreateModelService:
                             extra_mounts=[],
                         ),
                     ),
+                    _project_id=uuid.UUID("00000000-0000-0000-0000-000000000002"),
                 ),
                 Exception,  # insufficient resources
             ),
@@ -477,6 +483,7 @@ class TestCreateModelService:
                             extra_mounts=[],
                         ),
                     ),
+                    _project_id=uuid.UUID("00000000-0000-0000-0000-000000000002"),
                 ),
                 InvalidAPIParameters,
             ),
@@ -520,6 +527,7 @@ class TestCreateModelService:
                             extra_mounts=[],
                         ),
                     ),
+                    _project_id=uuid.UUID("00000000-0000-0000-0000-000000000002"),
                 ),
                 CreateModelServiceActionResult(
                     data=ServiceInfo(
@@ -535,11 +543,11 @@ class TestCreateModelService:
                         is_public=True,
                         runtime_variant=RuntimeVariant.CUSTOM,
                     ),
+                    _project_id=uuid.UUID("00000000-0000-0000-0000-000000000002"),
                 ),
             ),
         ],
     )
-    @pytest.mark.asyncio
     async def test_create_model_service(
         self,
         scenario: ScenarioBase[CreateModelServiceAction, CreateModelServiceActionResult],
@@ -734,10 +742,12 @@ class TestCreateWithServiceDefinitionOverrides:
         self,
         mock_action_monitor: MagicMock,
         model_serving_service: ModelServingService,
+        mock_action_validators: ActionValidators,
     ) -> ModelServingProcessors:
         return ModelServingProcessors(
             service=model_serving_service,
             action_monitors=[mock_action_monitor],
+            validators=mock_action_validators,
         )
 
     @pytest.fixture
@@ -839,9 +849,9 @@ class TestCreateWithServiceDefinitionOverrides:
                     extra_mounts=[],
                 ),
             ),
+            _project_id=uuid.UUID("00000000-0000-0000-0000-000000000002"),
         )
 
-    @pytest.mark.asyncio
     async def test_service_definition_overrides_applied(
         self,
         model_serving_processors: ModelServingProcessors,

@@ -18,7 +18,6 @@ class TestIdleCheckerHostDependency:
         dependency = IdleCheckerHostDependency()
         assert dependency.stage_name == "idle-checker-host"
 
-    @pytest.mark.asyncio
     @patch("ai.backend.manager.dependencies.orchestration.idle_checker.init_idle_checkers")
     async def test_provide_starts_and_yields_checker_host(
         self,
@@ -48,7 +47,6 @@ class TestIdleCheckerHostDependency:
 
         mock_checker_host.shutdown.assert_awaited_once()
 
-    @pytest.mark.asyncio
     @patch("ai.backend.manager.dependencies.orchestration.idle_checker.init_idle_checkers")
     async def test_provide_shuts_down_on_error(
         self,

@@ -23,6 +23,7 @@ from ai.backend.manager.errors.resource import DataTransformationFailed
 if TYPE_CHECKING:
     from ai.backend.manager.models.user import UserRow
     from ai.backend.manager.repositories.base.creator import BulkCreatorError
+    from ai.backend.manager.repositories.base.updater import BulkUpdaterError
 
 
 class UserStatus(enum.StrEnum):
@@ -177,4 +178,59 @@ class BulkUserCreateResultData:
 
     def failure_count(self) -> int:
         """Get count of failed user creations."""
+        return len(self.failures)
+
+
+@dataclass
+class BulkUserUpdateResultData:
+    """Result of bulk user update operation.
+
+    Attributes:
+        successes: Successfully updated users
+        failures: Failed user update attempts with error info
+    """
+
+    successes: list[UserData] = field(default_factory=list)
+    failures: list[BulkUpdaterError[UserRow]] = field(default_factory=list)
+
+    def success_count(self) -> int:
+        """Get count of successfully updated users."""
+        return len(self.successes)
+
+    def failure_count(self) -> int:
+        """Get count of failed user updates."""
+        return len(self.failures)
+
+
+@dataclass
+class BulkPurgeError:
+    """Error information for a failed bulk purge operation.
+
+    Attributes:
+        user_id: UUID of the user that failed to purge
+        exception: The exception that occurred
+    """
+
+    user_id: UUID
+    exception: Exception
+
+
+@dataclass
+class BulkUserPurgeResultData:
+    """Result of bulk user purge operation.
+
+    Attributes:
+        purged_user_ids: UUIDs of successfully purged users
+        failures: Failed user purge attempts with error info
+    """
+
+    purged_user_ids: list[UUID] = field(default_factory=list)
+    failures: list[BulkPurgeError] = field(default_factory=list)
+
+    def purged_count(self) -> int:
+        """Get count of successfully purged users."""
+        return len(self.purged_user_ids)
+
+    def failure_count(self) -> int:
+        """Get count of failed user purges."""
         return len(self.failures)

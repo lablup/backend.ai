@@ -17,6 +17,7 @@ from ai.backend.common.types import (
     RuleId,
 )
 from ai.backend.manager.actions.monitors.monitor import ActionMonitor
+from ai.backend.manager.actions.validators import ActionValidators
 from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.repositories.model_serving.repositories import ModelServingRepositories
 from ai.backend.manager.repositories.model_serving.repository import ModelServingRepository
@@ -79,10 +80,12 @@ class TestModifyAutoScalingRule:
         self,
         mock_action_monitor: MagicMock,
         auto_scaling_service: AutoScalingService,
+        mock_action_validators: ActionValidators,
     ) -> ModelServingAutoScalingProcessors:
         return ModelServingAutoScalingProcessors(
             service=auto_scaling_service,
             action_monitors=[mock_action_monitor],
+            validators=mock_action_validators,
         )
 
     @pytest.fixture
@@ -198,7 +201,6 @@ class TestModifyAutoScalingRule:
             ),
         ],
     )
-    @pytest.mark.asyncio
     async def test_modify_auto_scaling_rule(
         self,
         scenario: ScenarioBase[

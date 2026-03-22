@@ -4,8 +4,8 @@ from typing import Any
 
 from aiohttp import web
 
+from ai.backend.manager.api.rest.app import api_middleware
 from ai.backend.manager.api.utils import method_placeholder
-from ai.backend.manager.server import api_middleware
 
 
 async def test_api_method_override(aiohttp_client: Any) -> None:

@@ -1,12 +1,19 @@
 from __future__ import annotations
 
+import dataclasses
 from collections.abc import Mapping
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from enum import StrEnum
 from typing import TYPE_CHECKING, Any
 
-from ai.backend.common.types import AgentSelectionStrategy, SessionTypes, SlotQuantity
+from ai.backend.common.types import (
+    AgentSelectionStrategy,
+    PreemptionMode,
+    PreemptionOrder,
+    SessionTypes,
+    SlotQuantity,
+)
 
 if TYPE_CHECKING:
     from ai.backend.manager.models.scaling_group.types import FairShareScalingGroupSpec
@@ -54,6 +61,15 @@ class ScalingGroupDriverConfig:
     options: Mapping[str, Any]
 
 
+@dataclass(frozen=True)
+class PreemptionConfig:
+    """Preemption configuration for a scaling group."""
+
+    preemptible_priority: int = 5
+    order: PreemptionOrder = PreemptionOrder.OLDEST
+    mode: PreemptionMode = PreemptionMode.TERMINATE
+
+
 @dataclass
 class ScalingGroupSchedulerOptions:
     """Scheduler options for a scaling group."""
@@ -66,6 +82,7 @@ class ScalingGroupSchedulerOptions:
     enforce_spreading_endpoint_replica: bool
     allow_fractional_resource_fragmentation: bool
     route_cleanup_target_statuses: list[str]
+    preemption: PreemptionConfig = dataclasses.field(default_factory=PreemptionConfig)
 
     def to_json(self) -> dict[str, Any]:
         """Convert scheduler options to JSON-serializable dict."""
@@ -78,6 +95,11 @@ class ScalingGroupSchedulerOptions:
             "enforce_spreading_endpoint_replica": self.enforce_spreading_endpoint_replica,
             "allow_fractional_resource_fragmentation": self.allow_fractional_resource_fragmentation,
             "route_cleanup_target_statuses": self.route_cleanup_target_statuses,
+            "preemption": {
+                "preemptible_priority": self.preemption.preemptible_priority,
+                "order": self.preemption.order.value,
+                "mode": self.preemption.mode.value,
+            },
         }
 
 

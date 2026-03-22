@@ -37,17 +37,27 @@ Skills are in `.claude/skills/{name}/SKILL.md`. See `.claude/skills/README.md` f
 
 ## Before Committing
 
-Always run these commands and fix all errors:
+Before committing, run these commands and fix all errors:
 
 ```bash
-pants fmt ::
-pants fix ::
+pants fmt --changed-since=HEAD~1
+pants fix --changed-since=HEAD~1
 pants lint --changed-since=HEAD~1
 pants check --changed-since=HEAD~1
-pants test --changed-since=HEAD~1 --changed-dependents=transitive
+pants test --changed-since=HEAD~1
 ```
 
-**Fix all errors - never suppress or skip.**
+**Fix all lint, type, and test errors — never suppress or skip.**
+
+## Layer Architecture
+
+API Handler → Processor → Service → Repository → DB
+
+- API handlers MUST call Processors, NEVER Services directly
+- Services accept Actions (frozen dataclasses), return ActionResults
+- Repositories handle all DB access via `begin_session()` / `begin_readonly_session()`
+- NEVER import from a lower layer to a higher layer
+- For detailed patterns, read skill files: `/repository-guide`, `/service-guide`, `/api-guide`
 
 ## Development Guidelines
 

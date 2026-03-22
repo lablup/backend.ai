@@ -4,14 +4,20 @@ import logging
 from collections.abc import Sequence
 
 from ai.backend.logging import BraceStyleAdapter
-from ai.backend.manager.data.deployment.types import DeploymentInfo, DeploymentStatusTransitions
+from ai.backend.manager.data.deployment.types import (
+    DeploymentLifecycleStatus,
+    DeploymentStatusTransitions,
+)
 from ai.backend.manager.data.model_serving.types import EndpointLifecycle
 from ai.backend.manager.defs import LockID
 from ai.backend.manager.sokovan.deployment.deployment_controller import DeploymentController
 from ai.backend.manager.sokovan.deployment.executor import DeploymentExecutor
 from ai.backend.manager.sokovan.deployment.route.route_controller import RouteController
 from ai.backend.manager.sokovan.deployment.route.types import RouteLifecycleType
-from ai.backend.manager.sokovan.deployment.types import DeploymentExecutionResult
+from ai.backend.manager.sokovan.deployment.types import (
+    DeploymentExecutionResult,
+    DeploymentWithHistory,
+)
 
 from .base import DeploymentHandler
 
@@ -42,32 +48,24 @@ class ScalingDeploymentHandler(DeploymentHandler):
         return LockID.LOCKID_DEPLOYMENT_AUTO_SCALER
 
     @classmethod
-    def target_statuses(cls) -> list[EndpointLifecycle]:
+    def target_statuses(cls) -> list[DeploymentLifecycleStatus]:
         """Get the target deployment statuses for this handler."""
-        return [EndpointLifecycle.SCALING]
-
-    @classmethod
-    def next_status(cls) -> EndpointLifecycle | None:
-        """Get the next deployment status after this handler's operation."""
-        return EndpointLifecycle.READY
-
-    @classmethod
-    def failure_status(cls) -> EndpointLifecycle | None:
-        return None
+        return [DeploymentLifecycleStatus(lifecycle=EndpointLifecycle.SCALING)]
 
     @classmethod
     def status_transitions(cls) -> DeploymentStatusTransitions:
         """Define state transitions for scaling deployment handler (BEP-1030).
 
         - success: Deployment → READY
-        - failure: None (stays in current state)
+        - failure: None (stays in current state for all failure categories)
         """
         return DeploymentStatusTransitions(
-            success=EndpointLifecycle.READY,
-            failure=None,
+            success=DeploymentLifecycleStatus(lifecycle=EndpointLifecycle.READY),
         )
 
-    async def execute(self, deployments: Sequence[DeploymentInfo]) -> DeploymentExecutionResult:
+    async def execute(
+        self, deployments: Sequence[DeploymentWithHistory]
+    ) -> DeploymentExecutionResult:
         """Check and execute deployment scaling operations."""
         log.debug("Checking for deployment scaling requirements")
 

@@ -2,8 +2,6 @@ from __future__ import annotations
 
 from unittest.mock import MagicMock, patch
 
-import pytest
-
 from ai.backend.manager.dependencies.agents.route_controller import (
     RouteControllerDependency,
     RouteControllerInput,
@@ -13,7 +11,6 @@ from ai.backend.manager.dependencies.agents.route_controller import (
 class TestRouteControllerDependency:
     """Test RouteControllerDependency lifecycle."""
 
-    @pytest.mark.asyncio
     @patch(
         "ai.backend.manager.dependencies.agents.route_controller.RouteController",
     )

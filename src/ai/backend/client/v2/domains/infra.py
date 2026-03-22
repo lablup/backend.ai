@@ -92,10 +92,11 @@ class InfraClient(BaseDomainClient):
     async def list_scaling_groups(
         self, request: ListScalingGroupsRequest
     ) -> ListScalingGroupsResponse:
+        params = request.model_dump(mode="json", exclude_none=True)
         return await self._client.typed_request(
             "GET",
             "/scaling-groups",
-            request=request,
+            params={k: str(v) for k, v in params.items()},
             response_model=ListScalingGroupsResponse,
         )
 

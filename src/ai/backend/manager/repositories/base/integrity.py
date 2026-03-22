@@ -95,7 +95,7 @@ def parse_integrity_error(e: sa.exc.IntegrityError) -> RepositoryIntegrityError:
     return RepositoryIntegrityError(extra_msg=error_msg, **kwargs)
 
 
-def _match_integrity_error(
+def match_integrity_error(
     parsed: RepositoryIntegrityError,
     checks: Sequence[IntegrityErrorCheck],
 ) -> NoReturn:

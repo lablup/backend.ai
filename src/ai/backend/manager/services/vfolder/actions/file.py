@@ -80,6 +80,36 @@ class CreateDownloadSessionActionResult(BaseActionResult):
 
 
 @dataclass
+class CreateArchiveDownloadSessionAction(VFolderFileAction):
+    keypair_resource_policy: Mapping[str, Any]
+
+    vfolder_uuid: uuid.UUID
+
+    files: list[str]
+
+    @override
+    def entity_id(self) -> str | None:
+        return str(self.vfolder_uuid)
+
+    @override
+    @classmethod
+    def operation_type(cls) -> ActionOperationType:
+        return ActionOperationType.GET
+
+
+@dataclass
+class CreateArchiveDownloadSessionActionResult(BaseActionResult):
+    vfolder_uuid: uuid.UUID
+
+    token: str
+    url: str
+
+    @override
+    def entity_id(self) -> str | None:
+        return str(self.vfolder_uuid)
+
+
+@dataclass
 class ListFilesAction(VFolderFileAction):
     user_uuid: uuid.UUID
     vfolder_uuid: uuid.UUID
@@ -184,6 +214,33 @@ class DeleteFilesAsyncAction(VFolderFileAction):
 class DeleteFilesAsyncActionResult(BaseActionResult):
     vfolder_uuid: uuid.UUID
     task_id: TaskID
+
+    @override
+    def entity_id(self) -> str | None:
+        return str(self.vfolder_uuid)
+
+
+@dataclass
+class MoveFileAction(VFolderFileAction):
+    user_uuid: uuid.UUID
+    vfolder_uuid: uuid.UUID
+
+    src: str
+    dst: str
+
+    @override
+    def entity_id(self) -> str | None:
+        return str(self.vfolder_uuid)
+
+    @override
+    @classmethod
+    def operation_type(cls) -> ActionOperationType:
+        return ActionOperationType.UPDATE
+
+
+@dataclass
+class MoveFileActionResult(BaseActionResult):
+    vfolder_uuid: uuid.UUID
 
     @override
     def entity_id(self) -> str | None:

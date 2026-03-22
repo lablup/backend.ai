@@ -11,7 +11,6 @@ import numbers
 import re
 import time
 import traceback
-import uuid
 from collections import defaultdict
 from collections.abc import (
     Awaitable,
@@ -23,7 +22,6 @@ from collections.abc import (
     MutableMapping,
 )
 from typing import (
-    TYPE_CHECKING,
     Annotated,
     Any,
     Concatenate,
@@ -34,7 +32,6 @@ from typing import (
     cast,
 )
 
-import sqlalchemy as sa
 import trafaret as t
 import yaml
 from aiohttp import web
@@ -43,22 +40,12 @@ from pydantic import Field, TypeAdapter, ValidationError
 
 from ai.backend.common.api_handlers import BaseRequestModel, BaseResponseModel
 from ai.backend.common.json import load_json
-from ai.backend.common.types import AccessKey
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.errors.api import (
     DeprecatedAPI,
     InvalidAPIParameters,
     NotImplementedAPI,
 )
-from ai.backend.manager.errors.common import GenericForbidden
-from ai.backend.manager.models.user import UserRole, users
-from ai.backend.manager.utils import (
-    check_if_requester_is_eligible_to_act_as_target_access_key,
-    check_if_requester_is_eligible_to_act_as_target_user_uuid,
-)
-
-if TYPE_CHECKING:
-    from .context import RootContext
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -70,102 +57,6 @@ def method_placeholder(orig_method: str) -> Callable[[web.Request], Awaitable[we
         raise web.HTTPMethodNotAllowed(request.method, [orig_method])
 
     return _handler
-
-
-async def get_access_key_scopes(
-    request: web.Request, params: Any | None = None
-) -> tuple[AccessKey, AccessKey]:
-    if not request["is_authorized"]:
-        raise GenericForbidden("Only authorized requests may have access key scopes.")
-    root_ctx: RootContext = request.app["_root.context"]
-    owner_access_key: AccessKey | None = (params or {}).get("owner_access_key", None)
-    if owner_access_key is None or owner_access_key == request["keypair"]["access_key"]:
-        return request["keypair"]["access_key"], request["keypair"]["access_key"]
-    async with root_ctx.db.begin_readonly() as conn:
-        try:
-            await check_if_requester_is_eligible_to_act_as_target_access_key(
-                conn,
-                request["user"]["role"],
-                request["user"]["domain_name"],
-                owner_access_key,
-            )
-            return request["keypair"]["access_key"], owner_access_key
-        except ValueError as e:
-            raise InvalidAPIParameters(str(e)) from e
-        except RuntimeError as e:
-            raise GenericForbidden(str(e)) from e
-
-
-async def get_user_uuid_scopes(
-    request: web.Request, params: Any | None = None
-) -> tuple[uuid.UUID, uuid.UUID]:
-    if not request["is_authorized"]:
-        raise GenericForbidden("Only authorized requests may have access key scopes.")
-    root_ctx: RootContext = request.app["_root.context"]
-    owner_uuid: uuid.UUID | None = (params or {}).get("owner_uuid", None)
-    if owner_uuid is None or owner_uuid == request["user"]["uuid"]:
-        return request["user"]["uuid"], request["user"]["uuid"]
-    async with root_ctx.db.begin_readonly() as conn:
-        try:
-            await check_if_requester_is_eligible_to_act_as_target_user_uuid(
-                conn,
-                request["user"]["role"],
-                request["user"]["domain_name"],
-                owner_uuid,
-            )
-            return request["user"]["uuid"], owner_uuid
-        except ValueError as e:
-            raise InvalidAPIParameters(str(e)) from e
-        except RuntimeError as e:
-            raise GenericForbidden(str(e)) from e
-
-
-async def get_user_scopes(
-    request: web.Request,
-    params: dict[str, Any] | None = None,
-) -> tuple[uuid.UUID, UserRole]:
-    root_ctx: RootContext = request.app["_root.context"]
-    if not request["is_authorized"]:
-        raise GenericForbidden("Only authorized requests may have user scopes.")
-    if params is not None and (owner_user_email := params.get("owner_user_email")) is not None:
-        if not request["is_superadmin"]:
-            raise InvalidAPIParameters("Only superadmins may have user scopes.")
-        async with root_ctx.db.begin_readonly() as conn:
-            user_query = (
-                sa.select(users.c.uuid, users.c.role, users.c.domain_name)
-                .select_from(users)
-                .where(
-                    (users.c.email == owner_user_email),
-                )
-            )
-            result = await conn.execute(user_query)
-            row = result.first()
-            if row is None:
-                raise InvalidAPIParameters("Cannot delegate an unknown user")
-            owner_user_uuid = row.uuid
-            owner_user_role = row.role
-            owner_user_domain = row.domain_name
-        if request["is_superadmin"]:
-            pass
-        elif request["is_admin"]:
-            if request["user"]["domain_name"] != owner_user_domain:
-                raise GenericForbidden(
-                    "Domain-admins can perform operations on behalf of "
-                    "other users in the same domain only.",
-                )
-            if owner_user_role == UserRole.SUPERADMIN:
-                raise GenericForbidden(
-                    "Domain-admins cannot perform operations on behalf of super-admins.",
-                )
-            pass
-        else:
-            raise GenericForbidden(
-                "Only admins can perform operations on behalf of other users.",
-            )
-    else:
-        owner_user_uuid = request["user"]["uuid"]
-        owner_user_role = request["user"]["role"]
-    return owner_user_uuid, owner_user_role
 
 
 P = ParamSpec("P")

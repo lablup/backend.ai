@@ -14,9 +14,13 @@ from ai.backend.common.types import (
 def resource_slot_to_quantities(slot: ResourceSlot) -> list[SlotQuantity]:
     """Convert a ResourceSlot dict to a list of SlotQuantity entries.
 
-    Skips entries with falsy (zero/None) values.
+    Preserves zero-valued slots; only skips None values.
     """
-    return [SlotQuantity(slot_name=k, quantity=Decimal(str(v))) for k, v in slot.items() if v]
+    return [
+        SlotQuantity(slot_name=k, quantity=Decimal(str(v)))
+        for k, v in slot.items()
+        if v is not None
+    ]
 
 
 def add_quantities(a: list[SlotQuantity], b: list[SlotQuantity]) -> list[SlotQuantity]:
@@ -69,9 +73,14 @@ def get_quantity(
     return default
 
 
+def quantities_to_dict(quantities: list[SlotQuantity]) -> dict[str, str]:
+    """Convert list[SlotQuantity] to a dict (order preserved)."""
+    return {sq.slot_name: str(sq.quantity) for sq in quantities}
+
+
 def quantities_to_json(quantities: list[SlotQuantity]) -> str:
     """Serialize list[SlotQuantity] to JSON string (order preserved)."""
-    return json.dumps({sq.slot_name: str(sq.quantity) for sq in quantities})
+    return json.dumps(quantities_to_dict(quantities))
 
 
 def quantities_from_json(data: str) -> list[SlotQuantity]:

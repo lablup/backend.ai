@@ -134,7 +134,6 @@ class TestProjectResourcePolicyRepository:
         )
         return Creator(spec=spec)
 
-    @pytest.mark.asyncio
     async def test_create_success(
         self,
         project_resource_policy_repository: ProjectResourcePolicyRepository,
@@ -177,7 +176,6 @@ class TestProjectResourcePolicyRepository:
             # Check that the mock_policy_row was added
             assert mock_session.add.call_args[0][0] == mock_policy_row
 
-    @pytest.mark.asyncio
     async def test_create_duplicate_name(
         self,
         project_resource_policy_repository: ProjectResourcePolicyRepository,
@@ -198,7 +196,6 @@ class TestProjectResourcePolicyRepository:
         with pytest.raises(RepositoryIntegrityError):
             await project_resource_policy_repository.create(new_policy_creator)
 
-    @pytest.mark.asyncio
     async def test_get_by_name_success(
         self,
         project_resource_policy_repository: ProjectResourcePolicyRepository,
@@ -224,7 +221,6 @@ class TestProjectResourcePolicyRepository:
         assert result == sample_policy_data
         mock_session.execute.assert_called_once()
 
-    @pytest.mark.asyncio
     async def test_get_by_name_not_found(
         self,
         project_resource_policy_repository: ProjectResourcePolicyRepository,
@@ -247,7 +243,6 @@ class TestProjectResourcePolicyRepository:
             exc_info.value
         )
 
-    @pytest.mark.asyncio
     async def test_update_success(
         self,
         project_resource_policy_repository: ProjectResourcePolicyRepository,
@@ -284,7 +279,6 @@ class TestProjectResourcePolicyRepository:
         assert hasattr(sample_policy_row, "max_vfolder_count")
         assert hasattr(sample_policy_row, "max_quota_scope_size")
 
-    @pytest.mark.asyncio
     async def test_update_not_found(
         self,
         project_resource_policy_repository: ProjectResourcePolicyRepository,
@@ -312,7 +306,6 @@ class TestProjectResourcePolicyRepository:
             exc_info.value
         )
 
-    @pytest.mark.asyncio
     async def test_update_partial_fields(
         self,
         project_resource_policy_repository: ProjectResourcePolicyRepository,
@@ -347,7 +340,6 @@ class TestProjectResourcePolicyRepository:
         # Verify only specified field was updated
         sample_policy_row.max_vfolder_count = 25
 
-    @pytest.mark.asyncio
     async def test_delete_success(
         self,
         project_resource_policy_repository: ProjectResourcePolicyRepository,
@@ -375,7 +367,6 @@ class TestProjectResourcePolicyRepository:
         mock_session.execute.assert_called_once()
         mock_session.delete.assert_called_once_with(sample_policy_row)
 
-    @pytest.mark.asyncio
     async def test_delete_not_found(
         self,
         project_resource_policy_repository: ProjectResourcePolicyRepository,
@@ -398,7 +389,6 @@ class TestProjectResourcePolicyRepository:
             exc_info.value
         )
 
-    @pytest.mark.asyncio
     async def test_create_with_all_fields(
         self,
         project_resource_policy_repository: ProjectResourcePolicyRepository,
@@ -443,7 +433,6 @@ class TestProjectResourcePolicyRepository:
             assert result.max_quota_scope_size == 5368709120
             assert result.max_network_count == 20
 
-    @pytest.mark.asyncio
     async def test_repository_with_transaction_rollback(
         self,
         project_resource_policy_repository: ProjectResourcePolicyRepository,

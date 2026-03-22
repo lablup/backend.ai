@@ -16,9 +16,13 @@ from ai.backend.common.dto.clients.prometheus.response import (
     MetricResponse,
     MetricResponseInfo,
     PrometheusQueryData,
-    PrometheusQueryRangeResponse,
+    PrometheusResponse,
 )
-from ai.backend.common.exception import FailedToGetMetric, PrometheusConnectionError
+from ai.backend.common.exception import (
+    FailedToGetMetric,
+    InvalidAPIParameters,
+    PrometheusConnectionError,
+)
 from ai.backend.manager.services.metric.actions.container import (
     ContainerMetricAction,
     ContainerMetricActionResult,
@@ -37,9 +41,9 @@ from ai.backend.manager.services.metric.types import (
 
 def _make_query_range_response(
     metric_data: list[dict[str, Any]],
-) -> PrometheusQueryRangeResponse:
-    """Helper to build PrometheusQueryRangeResponse from raw metric dicts."""
-    return PrometheusQueryRangeResponse(
+) -> PrometheusResponse:
+    """Helper to build PrometheusResponse from raw metric dicts."""
+    return PrometheusResponse(
         status="success",
         data=PrometheusQueryData(
             result_type="matrix",
@@ -82,7 +86,6 @@ class TestContainerMetricServiceWithPrometheusClient:
         )
         return mock_prometheus_client
 
-    @pytest.mark.asyncio
     async def test_query_metadata_returns_metric_names(
         self,
         metric_service: ContainerUtilizationMetricService,
@@ -101,7 +104,6 @@ class TestContainerMetricServiceWithPrometheusClient:
         )
         return mock_prometheus_client
 
-    @pytest.mark.asyncio
     async def test_query_metadata_empty_result(
         self,
         metric_service: ContainerUtilizationMetricService,
@@ -118,7 +120,6 @@ class TestContainerMetricServiceWithPrometheusClient:
         )
         return mock_prometheus_client
 
-    @pytest.mark.asyncio
     async def test_query_metadata_propagates_connection_error(
         self,
         metric_service: ContainerUtilizationMetricService,
@@ -145,7 +146,6 @@ class TestContainerMetricServiceWithPrometheusClient:
         )
         return mock_prometheus_client
 
-    @pytest.mark.asyncio
     async def test_query_metric_gauge_returns_correct_result(
         self,
         metric_service: ContainerUtilizationMetricService,
@@ -185,7 +185,6 @@ class TestContainerMetricServiceWithPrometheusClient:
         )
         return mock_prometheus_client
 
-    @pytest.mark.asyncio
     async def test_query_metric_rate_returns_correct_result(
         self,
         metric_service: ContainerUtilizationMetricService,
@@ -229,7 +228,6 @@ class TestContainerMetricServiceWithPrometheusClient:
         )
         return mock_prometheus_client
 
-    @pytest.mark.asyncio
     async def test_query_metric_diff_returns_correct_result(
         self,
         metric_service: ContainerUtilizationMetricService,
@@ -272,7 +270,6 @@ class TestContainerMetricServiceWithPrometheusClient:
         )
         return mock_prometheus_client
 
-    @pytest.mark.asyncio
     async def test_query_metric_by_project(
         self,
         metric_service: ContainerUtilizationMetricService,
@@ -312,7 +309,6 @@ class TestContainerMetricServiceWithPrometheusClient:
         )
         return mock_prometheus_client
 
-    @pytest.mark.asyncio
     async def test_query_metric_by_user(
         self,
         metric_service: ContainerUtilizationMetricService,
@@ -353,7 +349,6 @@ class TestContainerMetricServiceWithPrometheusClient:
         )
         return mock_prometheus_client
 
-    @pytest.mark.asyncio
     async def test_query_metric_with_multiple_labels(
         self,
         metric_service: ContainerUtilizationMetricService,
@@ -383,7 +378,6 @@ class TestContainerMetricServiceWithPrometheusClient:
         mock_prometheus_client.query_range = AsyncMock(return_value=_make_query_range_response([]))
         return mock_prometheus_client
 
-    @pytest.mark.asyncio
     async def test_query_metric_empty_result(
         self,
         metric_service: ContainerUtilizationMetricService,
@@ -410,7 +404,6 @@ class TestContainerMetricServiceWithPrometheusClient:
         )
         return mock_prometheus_client
 
-    @pytest.mark.asyncio
     async def test_query_metric_propagates_failed_to_get_metric(
         self,
         metric_service: ContainerUtilizationMetricService,
@@ -433,7 +426,6 @@ class TestContainerMetricServiceWithPrometheusClient:
         )
         return mock_prometheus_client
 
-    @pytest.mark.asyncio
     async def test_query_metric_propagates_connection_error(
         self,
         metric_service: ContainerUtilizationMetricService,
@@ -467,7 +459,6 @@ class TestContainerMetricServiceWithPrometheusClient:
         )
         return mock_prometheus_client
 
-    @pytest.mark.asyncio
     async def test_query_metric_capacity_value_type(
         self,
         metric_service: ContainerUtilizationMetricService,
@@ -602,7 +593,6 @@ class TestTimewindowInitialization:
             ("cpu_util", ValueType.CURRENT),  # DIFF
         ],
     )
-    @pytest.mark.asyncio
     async def test_timewindow_applied_to_preset(
         self, mock_prometheus_client: MagicMock, metric_name: str, value_type: ValueType
     ) -> None:
@@ -768,7 +758,6 @@ class TestBuildPreset:
         ],
         ids=lambda c: c.id,
     )
-    @pytest.mark.asyncio
     async def test_build_preset_renders_expected_query(
         self, mock_prometheus_client: MagicMock, case: BuildPresetTestCase
     ) -> None:
@@ -780,3 +769,53 @@ class TestBuildPreset:
         rendered_query = preset.render()
 
         assert rendered_query == case.expected_query
+
+
+class TestMetricResponseInfoParsing:
+    """Unit tests for MetricResponseInfo parsing behavior."""
+
+    def test_parse_general_prometheus_metric_without_value_type(self) -> None:
+        """General Prometheus metrics (e.g. up, node_cpu_seconds_total) lack value_type → None."""
+        info = MetricResponseInfo(name="up", instance="localhost:9090", job="prometheus")
+
+        assert info.value_type is None
+        assert info.name == "up"
+        assert info.instance == "localhost:9090"
+
+    def test_parse_backendai_metric_with_value_type(self) -> None:
+        """Backend.AI custom metrics include value_type → populated."""
+        info = MetricResponseInfo(
+            name="backendai_container_utilization",
+            value_type="current",
+            container_metric_name="cpu_util",
+        )
+
+        assert info.value_type == "current"
+        assert info.name == "backendai_container_utilization"
+        assert info.container_metric_name == "cpu_util"
+
+
+class TestContainerMetricResponseInfoConversion:
+    """Unit tests for ContainerMetricResponseInfo.from_metric_response_info()."""
+
+    def test_from_metric_response_info_with_value_type_succeeds(self) -> None:
+        """When value_type is present, conversion succeeds."""
+        info = MetricResponseInfo(
+            name="backendai_container_utilization",
+            value_type="current",
+            container_metric_name="mem",
+            agent_id="agent-1",
+        )
+
+        result = ContainerMetricResponseInfo.from_metric_response_info(info)
+
+        assert result.value_type == "current"
+        assert result.container_metric_name == "mem"
+        assert result.agent_id == "agent-1"
+
+    def test_from_metric_response_info_without_value_type_raises(self) -> None:
+        """When value_type is None, raises InvalidAPIParameters."""
+        info = MetricResponseInfo(name="up", instance="localhost:9090")
+
+        with pytest.raises(InvalidAPIParameters):
+            ContainerMetricResponseInfo.from_metric_response_info(info)

@@ -40,7 +40,7 @@ def create_lock_factory(
     """Create a distributed lock factory based on configuration.
 
     This is a pure function that replaces the legacy ``init_lock_factory``
-    in ``server.py`` by accepting explicit dependencies instead of ``RootContext``.
+    in ``server.py`` by accepting explicit dependencies.
     """
     config = config_provider.config
     ipc_base_path = config.manager.ipc_base_path

@@ -5,7 +5,7 @@ from collections.abc import Collection
 
 import sqlalchemy as sa
 
-from ai.backend.manager.api.gql.base import StringMatchSpec
+from ai.backend.common.data.filter_specs import StringMatchSpec
 from ai.backend.manager.data.permission.id import ObjectId
 from ai.backend.manager.data.permission.status import RoleStatus
 from ai.backend.manager.data.permission.types import EntityType, RoleSource, ScopeType
@@ -171,9 +171,23 @@ class AssignedUserConditions:
     """Query conditions for assigned users."""
 
     @staticmethod
+    def by_user_id(user_id: uuid.UUID) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return UserRoleRow.user_id == user_id
+
+        return inner
+
+    @staticmethod
     def by_role_id(role_id: uuid.UUID) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
             return UserRoleRow.role_id == role_id
+
+        return inner
+
+    @staticmethod
+    def by_role_ids(role_ids: Collection[uuid.UUID]) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return UserRoleRow.role_id.in_(role_ids)
 
         return inner
 
@@ -316,11 +330,46 @@ class AssignedUserConditions:
         return inner
 
     @staticmethod
+    def by_user_ids(user_ids: Collection[uuid.UUID]) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return UserRoleRow.user_id.in_(user_ids)
+
+        return inner
+
+    @staticmethod
     def by_role_and_user_ids(
         pairs: Collection[tuple[uuid.UUID, uuid.UUID]],
     ) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
             return sa.tuple_(UserRoleRow.role_id, UserRoleRow.user_id).in_(pairs)
+
+        return inner
+
+    @staticmethod
+    def exists_role_combined(role_conditions: list[QueryCondition]) -> QueryCondition:
+        """Combine multiple role conditions into single EXISTS subquery."""
+
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            subq = sa.select(sa.literal(1)).where(RoleRow.id == UserRoleRow.role_id)
+            for cond in role_conditions:
+                subq = subq.where(cond())
+            return sa.exists(subq)
+
+        return inner
+
+    @staticmethod
+    def exists_user_combined(user_conditions: list[QueryCondition]) -> QueryCondition:
+        """Combine multiple user conditions into single EXISTS subquery."""
+
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            subq = (
+                sa.select(sa.literal(1))
+                .where(UserRow.uuid == UserRoleRow.user_id)
+                .correlate(UserRoleRow)
+            )
+            for cond in user_conditions:
+                subq = subq.where(cond())
+            return sa.exists(subq)
 
         return inner
 
@@ -674,9 +723,74 @@ class EntityScopeConditions:
 
         return inner
 
+    @staticmethod
+    def by_ids(ids: Collection[uuid.UUID]) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return AssociationScopesEntitiesRow.id.in_(ids)
+
+        return inner
+
+    @staticmethod
+    def by_cursor_forward(cursor_id: str) -> QueryCondition:
+        """Cursor condition for forward pagination (after cursor).
+
+        Uses subquery to get (registered_at, id) of the cursor row and compare.
+        """
+
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            cursor_subq = (
+                sa.select(
+                    AssociationScopesEntitiesRow.registered_at,
+                    AssociationScopesEntitiesRow.id,
+                )
+                .where(AssociationScopesEntitiesRow.id == uuid.UUID(cursor_id))
+                .scalar_subquery()
+            )
+            return (
+                sa.tuple_(
+                    AssociationScopesEntitiesRow.registered_at,
+                    AssociationScopesEntitiesRow.id,
+                )
+                < cursor_subq
+            )
+
+        return inner
+
+    @staticmethod
+    def by_cursor_backward(cursor_id: str) -> QueryCondition:
+        """Cursor condition for backward pagination (before cursor).
+
+        Uses subquery to get (registered_at, id) of the cursor row and compare.
+        """
+
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            cursor_subq = (
+                sa.select(
+                    AssociationScopesEntitiesRow.registered_at,
+                    AssociationScopesEntitiesRow.id,
+                )
+                .where(AssociationScopesEntitiesRow.id == uuid.UUID(cursor_id))
+                .scalar_subquery()
+            )
+            return (
+                sa.tuple_(
+                    AssociationScopesEntitiesRow.registered_at,
+                    AssociationScopesEntitiesRow.id,
+                )
+                > cursor_subq
+            )
+
+        return inner
+
 
 class EntityScopeOrders:
     """Query orders for entity scope search."""
+
+    @staticmethod
+    def id(ascending: bool = True) -> QueryOrder:
+        if ascending:
+            return AssociationScopesEntitiesRow.id.asc()
+        return AssociationScopesEntitiesRow.id.desc()
 
     @staticmethod
     def entity_type(ascending: bool = True) -> QueryOrder:
@@ -746,6 +860,13 @@ class ScopedPermissionConditions:
     def by_ids(permission_ids: Collection[uuid.UUID]) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
             return PermissionRow.id.in_(permission_ids)
+
+        return inner
+
+    @staticmethod
+    def by_role_ids(role_ids: Collection[uuid.UUID]) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return PermissionRow.role_id.in_(role_ids)
 
         return inner
 

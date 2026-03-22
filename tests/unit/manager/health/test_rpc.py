@@ -37,7 +37,6 @@ class TestAgentRpcHealthChecker:
 
         return client
 
-    @pytest.mark.asyncio
     async def test_success(self, mock_agent_client: AgentClient) -> None:
         """Test successful health check with mock agent client."""
         checker = AgentRpcHealthChecker(
@@ -60,7 +59,6 @@ class TestAgentRpcHealthChecker:
         assert status.error_message is None
         assert isinstance(status.last_checked_at, datetime)
 
-    @pytest.mark.asyncio
     async def test_target_service_group(
         self,
         mock_agent_client: AgentClient,
@@ -73,7 +71,6 @@ class TestAgentRpcHealthChecker:
 
         assert checker.target_service_group == AGENT
 
-    @pytest.mark.asyncio
     async def test_timeout_property(
         self,
         mock_agent_client: AgentClient,
@@ -87,7 +84,6 @@ class TestAgentRpcHealthChecker:
 
         assert checker.timeout == timeout_value
 
-    @pytest.mark.asyncio
     async def test_rpc_failure(self, mock_agent_client: AgentClient) -> None:
         """Test health check failure when RPC call raises exception."""
         # Configure mock to raise exception
@@ -110,7 +106,6 @@ class TestAgentRpcHealthChecker:
         assert "health check failed" in status.error_message.lower()
         assert isinstance(status.last_checked_at, datetime)
 
-    @pytest.mark.asyncio
     async def test_multiple_checks(
         self,
         mock_agent_client: AgentClient,
@@ -136,7 +131,6 @@ class TestAgentRpcHealthChecker:
         assert result2.results[component_id].is_healthy
         assert result3.results[component_id].is_healthy
 
-    @pytest.mark.asyncio
     async def test_connection_timeout(self, mock_agent_client: AgentClient) -> None:
         """Test health check failure when RPC call times out."""
         # Configure mock to simulate timeout
