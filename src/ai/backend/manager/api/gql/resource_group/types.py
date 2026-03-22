@@ -34,6 +34,7 @@ from ai.backend.common.dto.manager.v2.resource_group.response import (
     ResourceGroupNetworkConfigInfo,
     ResourceGroupSchedulerConfigInfo,
     ResourceGroupStatusInfo,
+    ResourceInfoNode,
     UpdateResourceGroupConfigPayloadNode,
     UpdateResourceGroupFairShareSpecPayloadNode,
 )
@@ -43,7 +44,6 @@ from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     PydanticInputMixin,
     gql_node_type,
-    gql_output_type,
     gql_pydantic_input,
     gql_pydantic_type,
 )
@@ -56,7 +56,6 @@ from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin, Pydant
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.api.gql.utils import dedent_strip
 from ai.backend.manager.data.scaling_group.types import (
-    ResourceInfo,
     SchedulerType,
 )
 from ai.backend.manager.models.scaling_group.types import FairShareScalingGroupSpec
@@ -308,7 +307,7 @@ class FairShareScalingGroupSpecGQL(PydanticOutputMixin[FairShareScalingGroupSpec
         )
 
 
-@gql_output_type(
+@gql_pydantic_type(
     BackendAIGQLMeta(
         added_version="26.1.0",
         description=(
@@ -316,9 +315,10 @@ class FairShareScalingGroupSpecGQL(PydanticOutputMixin[FairShareScalingGroupSpec
             "Provides aggregated resource metrics including capacity, used, and free resources."
         ),
     ),
+    model=ResourceInfoNode,
     name="ResourceInfo",
 )
-class ResourceInfoGQL:
+class ResourceInfoGQL(PydanticOutputMixin[ResourceInfoNode]):
     """Resource information containing capacity, used, and free resource metrics."""
 
     capacity: ResourceSlotGQL = strawberry.field(
@@ -332,15 +332,6 @@ class ResourceInfoGQL:
         )
     )
     free: ResourceSlotGQL = strawberry.field(description="Available resources (capacity - used).")
-
-    @classmethod
-    def from_resource_info(cls, info: ResourceInfo) -> Self:
-        """Convert from ResourceInfo dataclass to GQL type."""
-        return cls(
-            capacity=ResourceSlotGQL.from_slot_quantities(info.capacity),
-            used=ResourceSlotGQL.from_slot_quantities(info.used),
-            free=ResourceSlotGQL.from_slot_quantities(info.free),
-        )
 
 
 @gql_node_type(
@@ -411,8 +402,8 @@ class ResourceGroupGQL(PydanticNodeMixin[ResourceGroupDetailNode]):
     async def resource_info(self, info: Info[StrawberryGQLContext, None]) -> ResourceInfoGQL:
         """Get resource information for this resource group."""
         ctx = info.context
-        resource_info = await ctx.adapters.resource_group.get_resource_info(self.name)
-        return ResourceInfoGQL.from_resource_info(resource_info)
+        resource_info_dto = await ctx.adapters.resource_group.get_resource_info(self.name)
+        return ResourceInfoGQL.from_pydantic(resource_info_dto)
 
 
 # Filter and OrderBy types

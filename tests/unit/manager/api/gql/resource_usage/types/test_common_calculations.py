@@ -7,12 +7,25 @@ from decimal import Decimal
 
 import pytest
 
+from ai.backend.common.dto.manager.v2.fair_share.types import (
+    ResourceSlotEntryInfo,
+    ResourceSlotInfo,
+)
 from ai.backend.common.types import ResourceSlot
 from ai.backend.manager.api.gql.fair_share.types import ResourceSlotGQL
 from ai.backend.manager.api.gql.resource_usage.types.common_calculations import (
     calculate_average_daily_usage,
     calculate_usage_capacity_ratio,
 )
+
+
+def _make_resource_slot_gql(slot: ResourceSlot) -> ResourceSlotGQL:
+    """Helper to create a ResourceSlotGQL from a ResourceSlot dict."""
+    return ResourceSlotGQL.from_pydantic(
+        ResourceSlotInfo(
+            entries=[ResourceSlotEntryInfo(resource_type=k, quantity=v) for k, v in slot.items()]
+        )
+    )
 
 
 class TestCalculateAverageDailyUsage:
@@ -35,7 +48,7 @@ class TestCalculateAverageDailyUsage:
             "cpu": Decimal("172800.0"),  # 2 cores * 86400 seconds = 172800 core-seconds
             "mem": Decimal("34359738368.0"),  # 32 GiB * 86400 seconds
         })
-        return ResourceSlotGQL.from_resource_slot(slot)
+        return _make_resource_slot_gql(slot)
 
     @pytest.fixture
     def multi_day_resource_usage(self) -> ResourceSlotGQL:
@@ -43,7 +56,7 @@ class TestCalculateAverageDailyUsage:
         slot = ResourceSlot({
             "cpu": Decimal("1209600.0"),  # 2 cores * 7 days * 86400 seconds
         })
-        return ResourceSlotGQL.from_resource_slot(slot)
+        return _make_resource_slot_gql(slot)
 
     @pytest.fixture
     def empty_resource_usage(self) -> ResourceSlotGQL:
@@ -58,7 +71,7 @@ class TestCalculateAverageDailyUsage:
             "mem": Decimal("34359738368.0"),
             "cuda.shares": Decimal("86400.0"),  # 1 GPU share for 1 day
         })
-        return ResourceSlotGQL.from_resource_slot(slot)
+        return _make_resource_slot_gql(slot)
 
     def test_calculates_daily_average_for_single_day(
         self,
@@ -181,7 +194,7 @@ class TestCalculateUsageCapacityRatio:
         slot = ResourceSlot({
             "cpu": Decimal("172800.0"),  # 2 cores * 86400 seconds
         })
-        return ResourceSlotGQL.from_resource_slot(slot)
+        return _make_resource_slot_gql(slot)
 
     @pytest.fixture
     def sample_capacity(self) -> ResourceSlotGQL:
@@ -189,7 +202,7 @@ class TestCalculateUsageCapacityRatio:
         slot = ResourceSlot({
             "cpu": Decimal("8.0"),
         })
-        return ResourceSlotGQL.from_resource_slot(slot)
+        return _make_resource_slot_gql(slot)
 
     @pytest.fixture
     def zero_capacity(self) -> ResourceSlotGQL:
@@ -197,7 +210,7 @@ class TestCalculateUsageCapacityRatio:
         slot = ResourceSlot({
             "cpu": Decimal("0.0"),
         })
-        return ResourceSlotGQL.from_resource_slot(slot)
+        return _make_resource_slot_gql(slot)
 
     @pytest.fixture
     def partial_capacity(self) -> ResourceSlotGQL:
@@ -205,7 +218,7 @@ class TestCalculateUsageCapacityRatio:
         slot = ResourceSlot({
             "cpu": Decimal("8.0"),
         })
-        return ResourceSlotGQL.from_resource_slot(slot)
+        return _make_resource_slot_gql(slot)
 
     @pytest.fixture
     def multi_resource_usage_and_capacity(
@@ -223,8 +236,8 @@ class TestCalculateUsageCapacityRatio:
             "cuda.shares": Decimal("4.0"),
         })
         return (
-            ResourceSlotGQL.from_resource_slot(usage_slot),
-            ResourceSlotGQL.from_resource_slot(capacity_slot),
+            _make_resource_slot_gql(usage_slot),
+            _make_resource_slot_gql(capacity_slot),
         )
 
     @pytest.fixture
@@ -234,7 +247,7 @@ class TestCalculateUsageCapacityRatio:
             "cpu": Decimal("172800.0"),
             "mem": Decimal("1000.0"),
         })
-        return ResourceSlotGQL.from_resource_slot(slot)
+        return _make_resource_slot_gql(slot)
 
     @pytest.fixture
     def high_usage(self) -> ResourceSlotGQL:
@@ -242,7 +255,7 @@ class TestCalculateUsageCapacityRatio:
         slot = ResourceSlot({
             "cpu": Decimal("864000.0"),  # 10 cores * 86400 seconds
         })
-        return ResourceSlotGQL.from_resource_slot(slot)
+        return _make_resource_slot_gql(slot)
 
     def test_calculates_ratio_normal_case(
         self,

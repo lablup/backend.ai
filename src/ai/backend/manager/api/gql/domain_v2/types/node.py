@@ -129,10 +129,8 @@ class DomainV2GQL(PydanticNodeMixin[DomainNode]):
         self,
         info: Info,
     ) -> ActiveResourceOverviewGQL:
-        occupancy = await info.context.adapters.resource_slot.get_domain_resource_overview(
-            str(self.id)
-        )
-        return ActiveResourceOverviewGQL.from_occupancy(occupancy)
+        dto = await info.context.adapters.resource_slot.get_domain_resource_overview(str(self.id))
+        return ActiveResourceOverviewGQL.from_pydantic(dto)
 
     @strawberry.field(  # type: ignore[misc]
         description=(

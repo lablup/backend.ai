@@ -5,11 +5,16 @@ from __future__ import annotations
 from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import UTC, datetime
+from decimal import Decimal
 from typing import Any
 from uuid import UUID
 
 from ai.backend.common.api_handlers import SENTINEL
 from ai.backend.common.data.filter_specs import StringMatchSpec
+from ai.backend.common.dto.manager.v2.fair_share.types import (
+    ResourceSlotEntryInfo,
+    ResourceSlotInfo,
+)
 from ai.backend.common.dto.manager.v2.resource_group.request import (
     AdminSearchResourceGroupsInput,
     CreateResourceGroupInput,
@@ -28,6 +33,7 @@ from ai.backend.common.dto.manager.v2.resource_group.response import (
     ResourceGroupNode,
     ResourceGroupSchedulerConfigInfo,
     ResourceGroupStatusInfo,
+    ResourceInfoNode,
     UpdateResourceGroupConfigPayloadNode,
     UpdateResourceGroupFairShareSpecPayloadNode,
     UpdateResourceGroupPayload,
@@ -39,12 +45,11 @@ from ai.backend.common.dto.manager.v2.resource_group.types import (
     ResourceGroupOrderField,
     SchedulerTypeDTO,
 )
-from ai.backend.common.types import PreemptionMode, PreemptionOrder, ResourceSlot
+from ai.backend.common.types import PreemptionMode, PreemptionOrder, ResourceSlot, SlotQuantity
 from ai.backend.manager.data.scaling_group.types import (
     PreemptionConfig as DataPreemptionConfig,
 )
 from ai.backend.manager.data.scaling_group.types import (
-    ResourceInfo,
     ScalingGroupData,
     SchedulerType,
 )
@@ -91,6 +96,43 @@ from ai.backend.manager.types import OptionalState, TriState
 
 from .base import BaseAdapter
 from .pagination import PaginationSpec
+
+
+def _normalize_quantity(value: Decimal) -> Decimal:
+    """Normalize a Decimal by removing trailing zeros without scientific notation.
+
+    PostgreSQL NUMERIC(24, 6) preserves scale=6 through SUM() aggregation,
+    producing values like Decimal('7.000000'). This function strips trailing
+    zeros while avoiding scientific notation for large integer values.
+
+    Examples:
+        Decimal('7.000000') -> Decimal('7')
+        Decimal('0.500000') -> Decimal('0.5')
+        Decimal('4294967296.000000') -> Decimal('4294967296')
+    """
+    normalized = value.normalize()
+    sign, digits, exponent = normalized.as_tuple()
+    if isinstance(exponent, int) and exponent > 0:
+        # normalize() may produce scientific notation for large integers
+        # (e.g., Decimal('1000000000') -> Decimal('1E+9')).
+        # Convert back to plain integer representation.
+        return Decimal(int(normalized))
+    return normalized
+
+
+def _slot_quantities_to_resource_slot_info(
+    quantities: list[SlotQuantity],
+) -> ResourceSlotInfo:
+    """Convert a list of SlotQuantity to a ResourceSlotInfo DTO with normalized quantities."""
+    return ResourceSlotInfo(
+        entries=[
+            ResourceSlotEntryInfo(
+                resource_type=sq.slot_name,
+                quantity=_normalize_quantity(sq.quantity),
+            )
+            for sq in quantities
+        ]
+    )
 
 
 def _resource_group_pagination_spec() -> PaginationSpec:
@@ -318,19 +360,25 @@ class ResourceGroupAdapter(BaseAdapter):
             resource_group=self._data_to_node(action_result.scaling_group),
         )
 
-    async def get_resource_info(self, scaling_group: str) -> ResourceInfo:
+    async def get_resource_info(self, scaling_group: str) -> ResourceInfoNode:
         """Get resource information for a scaling group.
 
         Args:
             scaling_group: Name of the scaling group.
 
         Returns:
-            ResourceInfo with capacity, used, and free resource metrics.
+            ResourceInfoNode DTO with capacity, used, and free resource metrics.
+            Quantities are normalized (trailing zeros removed, no scientific notation).
         """
         action_result = await self._processors.scaling_group.get_resource_info.wait_for_complete(
             GetResourceInfoAction(scaling_group=scaling_group)
         )
-        return action_result.resource_info
+        raw = action_result.resource_info
+        return ResourceInfoNode(
+            capacity=_slot_quantities_to_resource_slot_info(raw.capacity),
+            used=_slot_quantities_to_resource_slot_info(raw.used),
+            free=_slot_quantities_to_resource_slot_info(raw.free),
+        )
 
     async def get_fair_share_spec(
         self,
@@ -371,8 +419,8 @@ class ResourceGroupAdapter(BaseAdapter):
         merged: dict[str, Any] = {}
         uses_default: list[str] = []
 
-        for sq in capacity:
-            resource_type = sq.slot_name
+        for entry in capacity.entries:
+            resource_type = entry.resource_type
             if resource_type in spec.resource_weights.data:
                 merged[resource_type] = spec.resource_weights.data[resource_type]
             else:

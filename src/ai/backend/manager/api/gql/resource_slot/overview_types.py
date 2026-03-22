@@ -2,15 +2,12 @@
 
 from __future__ import annotations
 
-from typing import Self
-
 import strawberry
 
 from ai.backend.common.dto.manager.v2.resource_slot.response import ActiveResourceOverviewInfoDTO
 from ai.backend.manager.api.gql.decorators import BackendAIGQLMeta, gql_pydantic_type
 from ai.backend.manager.api.gql.fair_share.types.common import ResourceSlotGQL
 from ai.backend.manager.api.gql.pydantic_compat import PydanticOutputMixin
-from ai.backend.manager.data.resource_slot.types import ResourceOccupancy
 
 
 @gql_pydantic_type(
@@ -36,11 +33,3 @@ class ActiveResourceOverviewGQL(PydanticOutputMixin[ActiveResourceOverviewInfoDT
     session_count: int = strawberry.field(
         description="Number of active sessions contributing to the current resource occupancy."
     )
-
-    @classmethod
-    def from_occupancy(cls, occupancy: ResourceOccupancy) -> Self:
-        """Convert a ResourceOccupancy data object to GraphQL type."""
-        return cls(
-            slots=ResourceSlotGQL.from_slot_quantities(occupancy.used_slots),
-            session_count=occupancy.session_count,
-        )

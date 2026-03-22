@@ -134,10 +134,10 @@ class ProjectV2GQL(PydanticNodeMixin[ProjectNode]):
         self,
         info: Info,
     ) -> ActiveResourceOverviewGQL:
-        occupancy = await info.context.adapters.resource_slot.get_project_resource_overview(
+        dto = await info.context.adapters.resource_slot.get_project_resource_overview(
             UUID(str(self.id))
         )
-        return ActiveResourceOverviewGQL.from_occupancy(occupancy)
+        return ActiveResourceOverviewGQL.from_pydantic(dto)
 
     @strawberry.field(  # type: ignore[misc]
         description=(

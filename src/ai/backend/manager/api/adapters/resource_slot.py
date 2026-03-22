@@ -5,6 +5,10 @@ from __future__ import annotations
 import uuid
 
 from ai.backend.common.dto.manager.query import StringFilter, UUIDFilter
+from ai.backend.common.dto.manager.v2.fair_share.types import (
+    ResourceSlotEntryInfo,
+    ResourceSlotInfo,
+)
 from ai.backend.common.dto.manager.v2.resource_slot.request import (
     AdminSearchAgentResourcesInput,
     AdminSearchResourceAllocationsInput,
@@ -17,6 +21,7 @@ from ai.backend.common.dto.manager.v2.resource_slot.request import (
     ResourceSlotTypeOrder,
 )
 from ai.backend.common.dto.manager.v2.resource_slot.response import (
+    ActiveResourceOverviewInfoDTO,
     AdminSearchAgentResourcesPayload,
     AdminSearchResourceAllocationsPayload,
     AdminSearchResourceSlotTypesPayload,
@@ -28,7 +33,6 @@ from ai.backend.common.dto.manager.v2.resource_slot.types import NumberFormatInf
 from ai.backend.manager.data.resource_slot.types import (
     AgentResourceData,
     ResourceAllocationData,
-    ResourceOccupancy,
     ResourceSlotTypeData,
 )
 from ai.backend.manager.models.resource_slot.conditions import (
@@ -414,20 +418,46 @@ class ResourceSlotAdapter(BaseAdapter):
     # Resource overview
     # -------------------------------------------------------------------------
 
-    async def get_domain_resource_overview(self, domain_name: str) -> ResourceOccupancy:
+    async def get_domain_resource_overview(self, domain_name: str) -> ActiveResourceOverviewInfoDTO:
         """Retrieve active resource occupancy overview for a domain."""
         action_result = (
             await self._processors.resource_slot.get_domain_resource_overview.wait_for_complete(
                 GetDomainResourceOverviewAction(domain_name=domain_name)
             )
         )
-        return action_result.item
+        occupancy = action_result.item
+        return ActiveResourceOverviewInfoDTO(
+            slots=ResourceSlotInfo(
+                entries=[
+                    ResourceSlotEntryInfo(
+                        resource_type=sq.slot_name,
+                        quantity=sq.quantity,
+                    )
+                    for sq in occupancy.used_slots
+                ]
+            ),
+            session_count=occupancy.session_count,
+        )
 
-    async def get_project_resource_overview(self, project_id: uuid.UUID) -> ResourceOccupancy:
+    async def get_project_resource_overview(
+        self, project_id: uuid.UUID
+    ) -> ActiveResourceOverviewInfoDTO:
         """Retrieve active resource occupancy overview for a project."""
         action_result = (
             await self._processors.resource_slot.get_project_resource_overview.wait_for_complete(
                 GetProjectResourceOverviewAction(project_id=project_id)
             )
         )
-        return action_result.item
+        occupancy = action_result.item
+        return ActiveResourceOverviewInfoDTO(
+            slots=ResourceSlotInfo(
+                entries=[
+                    ResourceSlotEntryInfo(
+                        resource_type=sq.slot_name,
+                        quantity=sq.quantity,
+                    )
+                    for sq in occupancy.used_slots
+                ]
+            ),
+            session_count=occupancy.session_count,
+        )

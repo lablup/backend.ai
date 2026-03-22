@@ -22,6 +22,7 @@ from ai.backend.common.dto.manager.v2.fair_share.types import (
     ResourceWeightEntryInfo,
 )
 from ai.backend.common.types import ResourceSlot
+from ai.backend.manager.api.adapters.fair_share import FairShareAdapter
 from ai.backend.manager.api.gql.fair_share.types.common import (
     FairShareSpecGQL,
     ResourceWeightEntryGQL,
@@ -55,7 +56,8 @@ class TestFairShareSpecGQLConversion:
         uses_default_resources = frozenset(["cpu", "mem"])
 
         # When
-        gql_spec = FairShareSpecGQL.from_spec(spec, use_default, uses_default_resources)
+        spec_info = FairShareAdapter._convert_spec(spec, use_default, uses_default_resources)
+        gql_spec = FairShareSpecGQL.from_pydantic(spec_info)
 
         # Then
         assert gql_spec.weight == Decimal("1.5")
@@ -94,7 +96,8 @@ class TestFairShareSpecGQLConversion:
         uses_default_resources: frozenset[str] = frozenset()  # Empty - all explicit
 
         # When
-        gql_spec = FairShareSpecGQL.from_spec(spec, use_default, uses_default_resources)
+        spec_info = FairShareAdapter._convert_spec(spec, use_default, uses_default_resources)
+        gql_spec = FairShareSpecGQL.from_pydantic(spec_info)
 
         # Then
         assert len(gql_spec.resource_weights) == 2
@@ -118,7 +121,8 @@ class TestFairShareSpecGQLConversion:
         uses_default_resources = frozenset(["cpu", "mem"])
 
         # When
-        gql_spec = FairShareSpecGQL.from_spec(spec, use_default, uses_default_resources)
+        spec_info = FairShareAdapter._convert_spec(spec, use_default, uses_default_resources)
+        gql_spec = FairShareSpecGQL.from_pydantic(spec_info)
 
         # Then
         assert gql_spec.uses_default is True
