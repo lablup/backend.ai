@@ -5,8 +5,6 @@ so that every GQL type carries consistent version and description metadata.
 
 Decorator roles:
     gql_node_type        — PydanticNodeMixin subclasses (Relay Node types with from_pydantic).
-    gql_output_type      — Non-node output types (payloads, nested structs, interface
-                           implementations) that are NOT PydanticNodeMixin subclasses.
     gql_connection_type  — Connection[T] and Edge[T] subclasses.
     gql_pydantic_type    — Output types backed by a v2 Pydantic DTO; Strawberry
                            auto-generates from_pydantic() / to_pydantic().
@@ -31,23 +29,19 @@ from ai.backend.common.meta import BackendAIGQLMeta
 from ai.backend.manager.api.gql.pydantic_compat import (
     PydanticInputMixin,
     PydanticNodeMixin,
-    PydanticOutputMixin,
 )
 
 __all__ = (
     "BackendAIGQLMeta",
     "PydanticInputMixin",
     "gql_connection_type",
-    "gql_from_pydantic_type",
     "gql_node_type",
-    "gql_output_type",
     "gql_pydantic_input",
     "gql_pydantic_interface",
     "gql_pydantic_type",
 )
 
 T = TypeVar("T", bound="PydanticNodeMixin[Any]")
-T_pydantic_out = TypeVar("T_pydantic_out", bound="PydanticOutputMixin[Any]")
 T_out = TypeVar("T_out")
 
 
@@ -66,41 +60,7 @@ def gql_node_type(
     """Decorator for GQL Relay Node types (PydanticNodeMixin subclasses).
 
     Use for types that inherit PydanticNodeMixin and implement the Relay Node interface.
-    For non-node output types (payloads, nested structs, interface implementations),
-    use gql_output_type instead.
-    """
-    description = f"Added in {meta.added_version}. {meta.description}"
-    if meta.deprecated_version is not None:
-        hint = f" Use {meta.deprecation_hint}." if meta.deprecation_hint else ""
-        description += f" Deprecated since {meta.deprecated_version}.{hint}"
-    return strawberry.type(
-        name=name,
-        description=description,
-        directives=directives,
-        extend=extend,
-    )
-
-
-@dataclass_transform(
-    order_default=True,
-    kw_only_default=True,
-    field_specifiers=(strawberry_field, StrawberryField),
-)
-def gql_from_pydantic_type(
-    meta: BackendAIGQLMeta,
-    *,
-    name: str | None = None,
-    directives: Sequence[object] = (),
-    extend: bool = False,
-) -> Callable[[type[T_pydantic_out]], type[T_pydantic_out]]:
-    """Decorator for non-Node GQL output types backed by a Pydantic DTO.
-
-    DEPRECATED: Do not use in new code.
-    Use ``@gql_pydantic_type(model=...)`` or ``@gql_node_type`` instead.
-
-    Use for types that inherit PydanticOutputMixin and represent mutation
-    payloads or nested output structs (NOT Relay Node types).
-    from_pydantic() is provided by PydanticOutputMixin inheritance.
+    For non-node output types backed by a Pydantic DTO, use gql_pydantic_type instead.
     """
     description = f"Added in {meta.added_version}. {meta.description}"
     if meta.deprecated_version is not None:
@@ -134,44 +94,6 @@ def gql_connection_type(
     return strawberry.type(
         name=name,
         description=description,
-        directives=directives,
-        extend=extend,
-    )
-
-
-@dataclass_transform(
-    order_default=True,
-    kw_only_default=True,
-    field_specifiers=(strawberry_field, StrawberryField),
-)
-def gql_output_type(
-    meta: BackendAIGQLMeta,
-    *,
-    name: str | None = None,
-    directives: Sequence[object] = (),
-    extend: bool = False,
-) -> Callable[[type[T_out]], type[T_out]]:
-    """Decorator for non-node GQL output types (payloads, nested structs, interface impls).
-
-    DEPRECATED: Do not use in new code.
-    Use ``@gql_pydantic_type(model=...)`` instead.
-
-    Use for output types that are NOT PydanticNodeMixin subclasses:
-    - Mutation result payloads (Create/Update/Delete/Validate payloads)
-    - Nested configuration or metadata structs (sub-fields of a Node)
-    - Interface implementations
-    - Subscription event payloads
-
-    For PydanticNodeMixin Relay Node types, use gql_node_type instead.
-    For Connection/Edge types, use gql_connection_type instead.
-    """
-    desc = f"Added in {meta.added_version}. {meta.description}"
-    if meta.deprecated_version is not None:
-        hint = f" Use {meta.deprecation_hint}." if meta.deprecation_hint else ""
-        desc += f" Deprecated since {meta.deprecated_version}.{hint}"
-    return strawberry.type(
-        name=name,
-        description=desc,
         directives=directives,
         extend=extend,
     )
