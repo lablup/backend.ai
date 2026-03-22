@@ -4,33 +4,54 @@ from __future__ import annotations
 
 from collections.abc import Iterable
 from datetime import datetime
-from typing import Any, Self, override
+from typing import Any, Self, cast
 from uuid import UUID
 
 import strawberry
 from strawberry import ID, Info
-from strawberry.relay import Connection, Edge, Node, NodeID, PageInfo
+from strawberry.relay import Connection, Edge, NodeID
 
 from ai.backend.common.data.model_deployment.types import ActivenessStatus as CommonActivenessStatus
 from ai.backend.common.data.model_deployment.types import LivenessStatus as CommonLivenessStatus
 from ai.backend.common.data.model_deployment.types import ReadinessStatus as CommonReadinessStatus
+from ai.backend.common.dto.manager.v2.deployment.request import (
+    ReplicaFilter as ReplicaFilterDTO,
+)
+from ai.backend.common.dto.manager.v2.deployment.request import (
+    ReplicaOrder as ReplicaOrderDTO,
+)
+from ai.backend.common.dto.manager.v2.deployment.request import (
+    ReplicaStatusFilter as ReplicaStatusFilterDTO,
+)
+from ai.backend.common.dto.manager.v2.deployment.request import (
+    ReplicaTrafficStatusFilter as ReplicaTrafficStatusFilterDTO,
+)
+from ai.backend.common.dto.manager.v2.deployment.response import (
+    ReplicaNode as ReplicaNodeDTO,
+)
+from ai.backend.common.dto.manager.v2.deployment.response import (
+    ReplicaStatusChangedPayload as ReplicaStatusChangedPayloadDTO,
+)
 from ai.backend.manager.api.gql.base import (
     OrderDirection,
     to_global_id,
 )
+from ai.backend.manager.api.gql.decorators import (
+    BackendAIGQLMeta,
+    PydanticInputMixin,
+    gql_connection_type,
+    gql_node_type,
+    gql_pydantic_input,
+    gql_pydantic_type,
+)
+from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin
 from ai.backend.manager.api.gql.session_federation import Session
-from ai.backend.manager.api.gql.types import GQLFilter, GQLOrderBy, StrawberryGQLContext
+from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.api.gql_legacy.session import ComputeSessionNode
 from ai.backend.manager.data.deployment.types import (
-    ModelReplicaData,
     ReplicaOrderField,
     RouteStatus,
     RouteTrafficStatus,
-)
-from ai.backend.manager.repositories.base import QueryCondition, QueryOrder
-from ai.backend.manager.repositories.deployment.options import RouteConditions, RouteOrders
-from ai.backend.manager.services.deployment.actions.model_revision.get_revision_by_id import (
-    GetRevisionByIdAction,
 )
 
 from .revision import ModelRevision
@@ -71,14 +92,18 @@ TrafficStatus: type[RouteTrafficStatus] = strawberry.enum(
 # ========== Status Filters ==========
 
 
-@strawberry.input(description="Added in 25.19.0")
-class ReplicaStatusFilter:
+@gql_pydantic_input(
+    BackendAIGQLMeta(description="", added_version="25.19.0"),
+)
+class ReplicaStatusFilter(PydanticInputMixin[ReplicaStatusFilterDTO]):
     in_: list[ReplicaStatus] | None = strawberry.field(name="in", default=None)
     equals: ReplicaStatus | None = None
 
 
-@strawberry.input(description="Added in 25.19.0")
-class TrafficStatusFilter:
+@gql_pydantic_input(
+    BackendAIGQLMeta(description="", added_version="25.19.0"),
+)
+class TrafficStatusFilter(PydanticInputMixin[ReplicaTrafficStatusFilterDTO]):
     in_: list[TrafficStatus] | None = strawberry.field(name="in", default=None)
     equals: TrafficStatus | None = None
 
@@ -86,72 +111,37 @@ class TrafficStatusFilter:
 # ========== ModelReplica Types ==========
 
 
-@strawberry.input(description="Added in 25.19.0")
-class ReplicaFilter(GQLFilter):
+@gql_pydantic_input(
+    BackendAIGQLMeta(description="", added_version="25.19.0"),
+    name="ReplicaFilter",
+)
+class ReplicaFilter(PydanticInputMixin[ReplicaFilterDTO]):
     status: ReplicaStatusFilter | None = None
     traffic_status: TrafficStatusFilter | None = None
 
-    AND: list[ReplicaFilter] | None = None
-    OR: list[ReplicaFilter] | None = None
-    NOT: list[ReplicaFilter] | None = None
-
-    @override
-    def build_conditions(self) -> list[QueryCondition]:
-        """Build query conditions from this filter."""
-        conditions: list[QueryCondition] = []
-
-        if self.status:
-            if self.status.in_ is not None:
-                statuses = [RouteStatus(s) for s in self.status.in_]
-                conditions.append(RouteConditions.by_statuses(statuses))
-            elif self.status.equals is not None:
-                conditions.append(RouteConditions.by_statuses([RouteStatus(self.status.equals)]))
-
-        if self.traffic_status:
-            if self.traffic_status.in_ is not None:
-                traffic_statuses = [RouteTrafficStatus(s) for s in self.traffic_status.in_]
-                conditions.append(RouteConditions.by_traffic_statuses(traffic_statuses))
-            elif self.traffic_status.equals is not None:
-                conditions.append(
-                    RouteConditions.by_traffic_statuses([
-                        RouteTrafficStatus(self.traffic_status.equals)
-                    ])
-                )
-
-        return conditions
+    AND: list[Self] | None = None
+    OR: list[Self] | None = None
+    NOT: list[Self] | None = None
 
 
-@strawberry.input(description="Added in 25.19.0")
-class ReplicaOrderBy(GQLOrderBy):
+@gql_pydantic_input(
+    BackendAIGQLMeta(description="", added_version="25.19.0"),
+)
+class ReplicaOrderBy(PydanticInputMixin[ReplicaOrderDTO]):
     field: ReplicaOrderField
     direction: OrderDirection = OrderDirection.DESC
 
-    @override
-    def to_query_order(self) -> QueryOrder:
-        """Convert to repository QueryOrder."""
-        ascending = self.direction == OrderDirection.ASC
-        match self.field:
-            case ReplicaOrderField.CREATED_AT:
-                return RouteOrders.created_at(ascending)
-            case ReplicaOrderField.ID:
-                return RouteOrders.id(ascending)
 
-
-@strawberry.type
-class ModelReplica(Node):
-    """
-    Added in 25.19.0.
-
-    Represents a single replica instance of a model deployment. Each replica
-    runs in a separate compute session and serves inference requests.
-
-    Replicas have health status indicators (readiness, liveness, activeness)
-    and traffic weight for load balancing.
-    """
-
+@gql_node_type(
+    BackendAIGQLMeta(
+        added_version="25.19.0",
+        description="A single replica instance of a model deployment. Each replica runs in a separate compute session and serves inference requests. Replicas have health status indicators (readiness, liveness, activeness) and traffic weight for load balancing.",
+    )
+)
+class ModelReplica(PydanticNodeMixin[ReplicaNodeDTO]):
     id: NodeID[str]
-    _session_id: strawberry.Private[UUID]
-    _revision_id: strawberry.Private[UUID]
+    session_id: ID
+    revision_id: ID
     readiness_status: ReadinessStatus = strawberry.field(
         description="Whether the replica has been checked and its health state.",
     )
@@ -171,18 +161,15 @@ class ModelReplica(Node):
     )
     async def session(self, info: Info[StrawberryGQLContext]) -> Session:
         session_global_id = to_global_id(
-            ComputeSessionNode, self._session_id, is_target_graphene_object=True
+            ComputeSessionNode, UUID(str(self.session_id)), is_target_graphene_object=True
         )
         return Session(id=ID(session_global_id))
 
     @strawberry.field
     async def revision(self, info: Info[StrawberryGQLContext]) -> ModelRevision:
         """Resolve revision by ID."""
-        processor = info.context.processors.deployment
-        result = await processor.get_revision_by_id.wait_for_complete(
-            GetRevisionByIdAction(revision_id=self._revision_id)
-        )
-        return ModelRevision.from_dataclass(result.data)
+        node = await info.context.adapters.deployment.get_revision(UUID(str(self.revision_id)))
+        return ModelRevision.from_pydantic(node)
 
     @classmethod
     async def resolve_nodes(  # type: ignore[override]  # Strawberry Node uses AwaitableOrValue overloads incompatible with async def
@@ -195,55 +182,31 @@ class ModelReplica(Node):
         results = await info.context.data_loaders.replica_loader.load_many([
             UUID(nid) for nid in node_ids
         ])
-        return [cls.from_dataclass(data) if data is not None else None for data in results]
-
-    @classmethod
-    def from_dataclass(cls, data: ModelReplicaData) -> Self:
-        return cls(
-            id=ID(str(data.id)),
-            _revision_id=data.revision_id,
-            _session_id=data.session_id,
-            readiness_status=ReadinessStatus(data.readiness_status),
-            liveness_status=LivenessStatus(data.liveness_status),
-            activeness_status=ActivenessStatus(data.activeness_status),
-            weight=data.weight,
-            created_at=data.created_at,
-        )
+        return cast(list[Self | None], results)
 
 
 ModelReplicaEdge = Edge[ModelReplica]
 
 
-@strawberry.type
+@gql_connection_type(
+    BackendAIGQLMeta(
+        added_version="25.19.0",
+        description="A Relay-style connection for paginated access to model replicas. Includes total count for UI pagination display.",
+    )
+)
 class ModelReplicaConnection(Connection[ModelReplica]):
-    """
-    Added in 25.19.0.
-
-    A Relay-style connection for paginated access to model replicas.
-    Includes total count for UI pagination display.
-    """
-
     count: int
 
     def __init__(self, *args: Any, count: int, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
         self.count = count
 
-    @classmethod
-    def from_dataclass(cls, replicas_data: list[ModelReplicaData]) -> ModelReplicaConnection:
-        nodes = [ModelReplica.from_dataclass(data) for data in replicas_data]
-        edges = [ModelReplicaEdge(node=node, cursor=str(node.id)) for node in nodes]
 
-        page_info = PageInfo(
-            has_next_page=False,
-            has_previous_page=False,
-            start_cursor=edges[0].cursor if edges else None,
-            end_cursor=edges[-1].cursor if edges else None,
-        )
-
-        return cls(count=len(nodes), edges=edges, page_info=page_info)
-
-
-@strawberry.type(description="Added in 25.19.0")
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version="25.19.0", description="Payload for replica status changed event."
+    ),
+    model=ReplicaStatusChangedPayloadDTO,
+)
 class ReplicaStatusChangedPayload:
     replica: ModelReplica

@@ -3,12 +3,13 @@
 from __future__ import annotations
 
 import strawberry
-from strawberry import ID, Info
+from strawberry import Info
 
 from ai.backend.common.data.permission.scope_entity_combinations import (
     VALID_SCOPE_ENTITY_COMBINATIONS,
 )
-from ai.backend.manager.api.gql.rbac.fetcher.permission import fetch_permissions
+from ai.backend.common.dto.manager.v2.rbac.request import AdminSearchPermissionsGQLInput
+from ai.backend.manager.api.gql.base import encode_cursor
 from ai.backend.manager.api.gql.rbac.types import (
     CreatePermissionInput,
     DeletePermissionInput,
@@ -21,17 +22,9 @@ from ai.backend.manager.api.gql.rbac.types import (
     ScopeEntityCombinationGQL,
     UpdatePermissionInput,
 )
+from ai.backend.manager.api.gql.rbac.types.permission import PermissionEdge
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.api.gql.utils import check_admin_only
-from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
-from ai.backend.manager.repositories.base.purger import Purger
-from ai.backend.manager.services.permission_contoller.actions.permission import (
-    CreatePermissionAction,
-    DeletePermissionAction,
-)
-from ai.backend.manager.services.permission_contoller.actions.update_permission import (
-    UpdatePermissionAction,
-)
 
 # ==================== Query Resolvers ====================
 
@@ -51,16 +44,34 @@ async def admin_permissions(
     offset: int | None = None,
 ) -> PermissionConnection:
     check_admin_only()
-    return await fetch_permissions(
-        info,
-        filter=filter,
-        order_by=order_by,
-        before=before,
-        after=after,
-        first=first,
-        last=last,
-        limit=limit,
-        offset=offset,
+    result = await info.context.adapters.rbac.admin_search_permissions_gql(
+        AdminSearchPermissionsGQLInput(
+            filter=filter.to_pydantic() if filter is not None else None,
+            order=[o.to_pydantic() for o in order_by] if order_by is not None else None,
+            first=first,
+            after=after,
+            last=last,
+            before=before,
+            limit=limit,
+            offset=offset,
+        )
+    )
+    edges = [
+        PermissionEdge(
+            node=PermissionGQL.from_pydantic(item),
+            cursor=encode_cursor(str(item.id)),
+        )
+        for item in result.items
+    ]
+    return PermissionConnection(
+        edges=edges,
+        page_info=strawberry.relay.PageInfo(
+            has_next_page=result.has_next_page,
+            has_previous_page=result.has_previous_page,
+            start_cursor=edges[0].cursor if edges else None,
+            end_cursor=edges[-1].cursor if edges else None,
+        ),
+        count=result.total_count,
     )
 
 
@@ -70,9 +81,9 @@ async def rbac_scope_entity_combinations(
 ) -> list[ScopeEntityCombinationGQL]:
     return [
         ScopeEntityCombinationGQL(
-            scope_type=RBACElementTypeGQL.from_element(scope),
+            scope_type=RBACElementTypeGQL(scope.value),
             valid_entity_types=sorted(
-                [RBACElementTypeGQL.from_element(entity) for entity in entities],
+                [RBACElementTypeGQL(entity.value) for entity in entities],
                 key=lambda e: e.value,
             ),
         )
@@ -89,12 +100,8 @@ async def admin_create_permission(
     input: CreatePermissionInput,
 ) -> PermissionGQL:
     check_admin_only()
-    action_result = (
-        await info.context.processors.permission_controller.create_permission.wait_for_complete(
-            CreatePermissionAction(creator=input.to_creator())
-        )
-    )
-    return PermissionGQL.from_dataclass(action_result.data)
+    result = await info.context.adapters.rbac.create_permission(input.to_pydantic())
+    return PermissionGQL.from_pydantic(result)
 
 
 @strawberry.mutation(description="Added in 26.3.0. Update a scoped permission (admin only).")  # type: ignore[misc]
@@ -103,12 +110,8 @@ async def admin_update_permission(
     input: UpdatePermissionInput,
 ) -> PermissionGQL:
     check_admin_only()
-    action_result = (
-        await info.context.processors.permission_controller.update_permission.wait_for_complete(
-            UpdatePermissionAction(updater=input.to_updater())
-        )
-    )
-    return PermissionGQL.from_dataclass(action_result.data)
+    result = await info.context.adapters.rbac.update_permission(input.to_pydantic())
+    return PermissionGQL.from_pydantic(result)
 
 
 @strawberry.mutation(description="Added in 26.3.0. Delete a scoped permission (admin only).")  # type: ignore[misc]
@@ -117,8 +120,5 @@ async def admin_delete_permission(
     input: DeletePermissionInput,
 ) -> DeletePermissionPayload:
     check_admin_only()
-    purger = Purger(row_class=PermissionRow, pk_value=input.id)
-    await info.context.processors.permission_controller.delete_permission.wait_for_complete(
-        DeletePermissionAction(purger=purger)
-    )
-    return DeletePermissionPayload(id=ID(str(input.id)))
+    result = await info.context.adapters.rbac.delete_permission(input.id)
+    return DeletePermissionPayload.from_pydantic(result)

@@ -14,9 +14,18 @@ from ai.backend.common.dto.manager.v2.deployment.request import (
     ActivateDeploymentInput,
     AddRevisionInput,
     BlueGreenConfigInput,
+    ClusterConfigInput,
     CreateDeploymentInput,
+    CreateRevisionInputDTO,
     DeleteDeploymentInput,
     ExtraVFolderMountInput,
+    ImageInput,
+    ModelMountConfigInput,
+    ModelRuntimeConfigInput,
+    ResourceConfigInput,
+    ResourceGroupInput,
+    ResourceSlotEntryInput,
+    ResourceSlotInput,
     RevisionInput,
     RollingUpdateConfigInput,
     ScaleDeploymentInput,
@@ -37,6 +46,30 @@ def _make_revision_input(**kwargs: object) -> RevisionInput:
     }
     defaults.update(kwargs)
     return RevisionInput(**defaults)
+
+
+def _make_create_revision_input_dto(**kwargs: object) -> CreateRevisionInputDTO:
+    defaults: dict[str, Any] = {
+        "cluster_config": ClusterConfigInput(mode=ClusterMode.SINGLE_NODE, size=1),
+        "resource_config": ResourceConfigInput(
+            resource_group=ResourceGroupInput(name="default"),
+            resource_slots=ResourceSlotInput(
+                entries=[
+                    ResourceSlotEntryInput(resource_type="cpu", quantity="2"),
+                    ResourceSlotEntryInput(resource_type="mem", quantity="4g"),
+                ]
+            ),
+        ),
+        "image": ImageInput(id=uuid.uuid4()),
+        "model_runtime_config": ModelRuntimeConfigInput(runtime_variant="custom"),
+        "model_mount_config": ModelMountConfigInput(
+            vfolder_id=uuid.uuid4(),
+            mount_destination="/models",
+            definition_path="/models/model.yaml",
+        ),
+    }
+    defaults.update(kwargs)
+    return CreateRevisionInputDTO(**defaults)
 
 
 class TestRevisionInput:
@@ -166,7 +199,7 @@ class TestCreateDeploymentInput:
             "domain_name": "default",
             "strategy": DeploymentStrategy.ROLLING,
             "desired_replica_count": 2,
-            "initial_revision": _make_revision_input(),
+            "initial_revision": _make_create_revision_input_dto(),
         }
         defaults.update(kwargs)
         return CreateDeploymentInput(**defaults)
@@ -233,9 +266,9 @@ class TestCreateDeploymentInput:
 
     def test_nested_revision_input(self) -> None:
         image_id = uuid.uuid4()
-        rev = _make_revision_input(image_id=image_id)
+        rev = _make_create_revision_input_dto(image=ImageInput(id=image_id))
         inp = self._make_input(initial_revision=rev)
-        assert inp.initial_revision.image_id == image_id
+        assert inp.initial_revision.image.id == image_id
 
     def test_missing_project_id_raises_validation_error(self) -> None:
         with pytest.raises(ValidationError):
@@ -250,9 +283,9 @@ class TestUpdateDeploymentInput:
     """Tests for UpdateDeploymentInput model creation and validation."""
 
     def test_all_none_fields_is_valid(self) -> None:
-        inp = UpdateDeploymentInput(name=None, desired_replicas=None, tags=None)
+        inp = UpdateDeploymentInput(name=None, desired_replica_count=None, tags=None)
         assert inp.name is None
-        assert inp.desired_replicas is None
+        assert inp.desired_replica_count is None
         assert inp.tags is None
 
     def test_default_tags_is_sentinel(self) -> None:
@@ -286,17 +319,17 @@ class TestUpdateDeploymentInput:
             UpdateDeploymentInput(name="")
 
     def test_desired_replicas_zero_is_valid(self) -> None:
-        inp = UpdateDeploymentInput(desired_replicas=0)
-        assert inp.desired_replicas == 0
+        inp = UpdateDeploymentInput(desired_replica_count=0)
+        assert inp.desired_replica_count == 0
 
     def test_negative_replicas_raises_validation_error(self) -> None:
         with pytest.raises(ValidationError):
-            UpdateDeploymentInput(desired_replicas=-1)
+            UpdateDeploymentInput(desired_replica_count=-1)
 
     def test_partial_update_name_only(self) -> None:
         inp = UpdateDeploymentInput(name="updated-name")
         assert inp.name == "updated-name"
-        assert inp.desired_replicas is None
+        assert inp.desired_replica_count is None
 
 
 class TestDeleteDeploymentInput:

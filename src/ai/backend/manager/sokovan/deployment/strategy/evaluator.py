@@ -25,11 +25,9 @@ from ai.backend.manager.errors.deployment import (
     InvalidDeploymentStrategy,
     InvalidDeploymentStrategySpec,
 )
+from ai.backend.manager.models.deployment_policy.conditions import DeploymentPolicyConditions
+from ai.backend.manager.models.routing.conditions import RouteConditions
 from ai.backend.manager.repositories.base import BatchQuerier, NoPagination
-from ai.backend.manager.repositories.deployment.options import (
-    DeploymentPolicyConditions,
-    RouteConditions,
-)
 from ai.backend.manager.repositories.deployment.repository import DeploymentRepository
 from ai.backend.manager.sokovan.deployment.recorder import DeploymentRecorderContext
 

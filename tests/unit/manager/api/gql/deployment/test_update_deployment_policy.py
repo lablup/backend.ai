@@ -12,6 +12,23 @@ from aiohttp import web
 from strawberry import ID
 
 from ai.backend.common.data.model_deployment.types import DeploymentStrategy
+from ai.backend.common.dto.manager.v2.deployment.request import (
+    BlueGreenConfigInput,
+    RollingUpdateConfigInput,
+    UpsertDeploymentPolicyInput,
+)
+from ai.backend.common.dto.manager.v2.deployment.response import (
+    DeploymentPolicyNode as DeploymentPolicyNodeDTO,
+)
+from ai.backend.common.dto.manager.v2.deployment.response import (
+    UpsertDeploymentPolicyPayload as UpsertDeploymentPolicyPayloadDTO,
+)
+from ai.backend.common.dto.manager.v2.deployment.types import (
+    BlueGreenConfigInfo,
+    BlueGreenStrategySpecInfo,
+    RollingUpdateConfigInfo,
+    RollingUpdateStrategySpecInfo,
+)
 from ai.backend.manager.api.gql import utils as gql_utils
 from ai.backend.manager.api.gql.deployment.resolver import policy as policy_resolver
 from ai.backend.manager.api.gql.deployment.types.policy import (
@@ -19,12 +36,6 @@ from ai.backend.manager.api.gql.deployment.types.policy import (
     RollingUpdateConfigInputGQL,
     UpdateDeploymentPolicyInputGQL,
     UpdateDeploymentPolicyPayloadGQL,
-)
-from ai.backend.manager.data.deployment.types import DeploymentPolicyData
-from ai.backend.manager.errors.api import InvalidAPIParameters
-from ai.backend.manager.models.deployment_policy import BlueGreenSpec, RollingUpdateSpec
-from ai.backend.manager.services.deployment.actions.deployment_policy.upsert_deployment_policy import (
-    UpsertDeploymentPolicyActionResult,
 )
 
 SAMPLE_DEPLOYMENT_ID = "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"
@@ -34,20 +45,13 @@ SAMPLE_DEPLOYMENT_ID = "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"
 
 
 @dataclass(frozen=True)
-class StrategyConversionScenario:
-    """Input → expected upserter output for a valid strategy conversion."""
+class ToPydanticConversionScenario:
+    """Input → expected DTO output for a valid conversion."""
 
     input: UpdateDeploymentPolicyInputGQL
-    expected_spec: RollingUpdateSpec | BlueGreenSpec
+    expected_rolling_update: RollingUpdateConfigInput | None
+    expected_blue_green: BlueGreenConfigInput | None
     expected_rollback_on_failure: bool
-
-
-@dataclass(frozen=True)
-class MissingConfigScenario:
-    """Input that should raise due to missing strategy config."""
-
-    input: UpdateDeploymentPolicyInputGQL
-    expected_error_match: str
 
 
 # --- Fixtures ---
@@ -70,16 +74,16 @@ def mock_regular_user() -> MagicMock:
 
 
 @pytest.fixture
-def mock_upsert_processor() -> AsyncMock:
-    """Create mock upsert_deployment_policy processor."""
+def mock_upsert_policy() -> AsyncMock:
+    """Create mock deployment upsert_policy adapter method."""
     return AsyncMock()
 
 
 @pytest.fixture
-def mock_info(mock_upsert_processor: AsyncMock) -> MagicMock:
-    """Create mock strawberry.Info with deployment processors."""
+def mock_info(mock_upsert_policy: AsyncMock) -> MagicMock:
+    """Create mock strawberry.Info with deployment adapters."""
     info = MagicMock()
-    info.context.processors.deployment.upsert_deployment_policy = mock_upsert_processor
+    info.context.adapters.deployment.upsert_policy = mock_upsert_policy
     return info
 
 
@@ -94,18 +98,34 @@ def rolling_update_input() -> UpdateDeploymentPolicyInputGQL:
     )
 
 
-def _make_policy_data(
+def _make_policy_node_dto(
     *,
     strategy: DeploymentStrategy = DeploymentStrategy.ROLLING,
-    strategy_spec: RollingUpdateSpec | BlueGreenSpec | None = None,
-) -> DeploymentPolicyData:
-    """Create a DeploymentPolicyData for mock results."""
-    if strategy_spec is None:
-        strategy_spec = RollingUpdateSpec(max_surge=1, max_unavailable=0)
-    return DeploymentPolicyData(
+    rolling_update: RollingUpdateConfigInfo | None = None,
+    blue_green: BlueGreenConfigInfo | None = None,
+) -> DeploymentPolicyNodeDTO:
+    """Create a DeploymentPolicyNode DTO for mock results."""
+    if strategy == DeploymentStrategy.ROLLING:
+        surge = rolling_update.max_surge if rolling_update is not None else 1
+        unavailable = rolling_update.max_unavailable if rolling_update is not None else 0
+        strategy_spec: RollingUpdateStrategySpecInfo | BlueGreenStrategySpecInfo = (
+            RollingUpdateStrategySpecInfo(
+                strategy=strategy,
+                max_surge=surge,
+                max_unavailable=unavailable,
+            )
+        )
+    else:
+        promote = blue_green.auto_promote if blue_green is not None else False
+        delay = blue_green.promote_delay_seconds if blue_green is not None else 0
+        strategy_spec = BlueGreenStrategySpecInfo(
+            strategy=strategy,
+            auto_promote=promote,
+            promote_delay_seconds=delay,
+        )
+    return DeploymentPolicyNodeDTO(
         id=uuid.uuid4(),
-        endpoint=uuid.uuid4(),
-        strategy=strategy,
+        deployment_id=uuid.UUID(SAMPLE_DEPLOYMENT_ID),
         strategy_spec=strategy_spec,
         rollback_on_failure=False,
         created_at=datetime(2026, 1, 1, tzinfo=UTC),
@@ -116,27 +136,30 @@ def _make_policy_data(
 # --- Input type conversion tests ---
 
 
-class TestToUpserterConversion:
-    """Tests for UpdateDeploymentPolicyInputGQL.to_upserter()."""
+class TestToPydanticConversion:
+    """Tests for UpdateDeploymentPolicyInputGQL.to_pydantic()."""
 
     @pytest.mark.parametrize(
         "scenario",
         [
             pytest.param(
-                StrategyConversionScenario(
+                ToPydanticConversionScenario(
                     input=UpdateDeploymentPolicyInputGQL(
                         deployment_id=ID(SAMPLE_DEPLOYMENT_ID),
                         strategy=DeploymentStrategy.ROLLING,
                         rollback_on_failure=True,
                         rolling_update=RollingUpdateConfigInputGQL(max_surge=2, max_unavailable=1),
                     ),
-                    expected_spec=RollingUpdateSpec(max_surge=2, max_unavailable=1),
+                    expected_rolling_update=RollingUpdateConfigInput(
+                        max_surge=2, max_unavailable=1
+                    ),
+                    expected_blue_green=None,
                     expected_rollback_on_failure=True,
                 ),
                 id="rolling",
             ),
             pytest.param(
-                StrategyConversionScenario(
+                ToPydanticConversionScenario(
                     input=UpdateDeploymentPolicyInputGQL(
                         deployment_id=ID(SAMPLE_DEPLOYMENT_ID),
                         strategy=DeploymentStrategy.BLUE_GREEN,
@@ -144,50 +167,24 @@ class TestToUpserterConversion:
                             auto_promote=True, promote_delay_seconds=30
                         ),
                     ),
-                    expected_spec=BlueGreenSpec(auto_promote=True, promote_delay_seconds=30),
+                    expected_rolling_update=None,
+                    expected_blue_green=BlueGreenConfigInput(
+                        auto_promote=True, promote_delay_seconds=30
+                    ),
                     expected_rollback_on_failure=False,
                 ),
                 id="blue_green",
             ),
         ],
     )
-    def test_converts_gql_input_to_upserter(self, scenario: StrategyConversionScenario) -> None:
-        """Test that GQL input is correctly converted to DeploymentPolicyUpserter."""
-        upserter = scenario.input.to_upserter()
+    def test_converts_gql_input_to_dto(self, scenario: ToPydanticConversionScenario) -> None:
+        """Test that GQL input is correctly converted to UpsertDeploymentPolicyInput DTO."""
+        dto = scenario.input.to_pydantic()
 
-        assert upserter.strategy == scenario.input.strategy
-        assert upserter.strategy_spec == scenario.expected_spec
-        assert upserter.rollback_on_failure is scenario.expected_rollback_on_failure
-
-    @pytest.mark.parametrize(
-        "scenario",
-        [
-            pytest.param(
-                MissingConfigScenario(
-                    input=UpdateDeploymentPolicyInputGQL(
-                        deployment_id=ID(SAMPLE_DEPLOYMENT_ID),
-                        strategy=DeploymentStrategy.ROLLING,
-                    ),
-                    expected_error_match="rolling_update",
-                ),
-                id="rolling",
-            ),
-            pytest.param(
-                MissingConfigScenario(
-                    input=UpdateDeploymentPolicyInputGQL(
-                        deployment_id=ID(SAMPLE_DEPLOYMENT_ID),
-                        strategy=DeploymentStrategy.BLUE_GREEN,
-                    ),
-                    expected_error_match="blue_green",
-                ),
-                id="blue_green",
-            ),
-        ],
-    )
-    def test_raises_when_strategy_config_is_missing(self, scenario: MissingConfigScenario) -> None:
-        """Test that to_upserter() raises when matching strategy config is not provided."""
-        with pytest.raises(InvalidAPIParameters, match=scenario.expected_error_match):
-            scenario.input.to_upserter()
+        assert dto.strategy == scenario.input.strategy
+        assert dto.rolling_update == scenario.expected_rolling_update
+        assert dto.blue_green == scenario.expected_blue_green
+        assert dto.rollback_on_failure is scenario.expected_rollback_on_failure
 
     def test_converts_deployment_id_to_uuid(self) -> None:
         """Test that string deployment_id is correctly parsed into UUID."""
@@ -196,9 +193,9 @@ class TestToUpserterConversion:
             strategy=DeploymentStrategy.ROLLING,
             rolling_update=RollingUpdateConfigInputGQL(),
         )
-        upserter = input_gql.to_upserter()
+        dto = input_gql.to_pydantic()
 
-        assert str(upserter.deployment_id) == SAMPLE_DEPLOYMENT_ID
+        assert str(dto.deployment_id) == SAMPLE_DEPLOYMENT_ID
 
 
 # --- Resolver tests ---
@@ -207,24 +204,21 @@ class TestToUpserterConversion:
 class TestAdminUpdateDeploymentPolicyResolver:
     """Tests for update_deployment_policy resolver."""
 
-    async def test_delegates_upsert_action_to_processor(
+    async def test_delegates_upsert_action_to_adapter(
         self,
         mock_superadmin_user: MagicMock,
-        mock_upsert_processor: AsyncMock,
+        mock_upsert_policy: AsyncMock,
         mock_info: MagicMock,
         rolling_update_input: UpdateDeploymentPolicyInputGQL,
         monkeypatch: pytest.MonkeyPatch,
     ) -> None:
-        """Test that resolver delegates to processor and returns payload."""
+        """Test that resolver delegates to adapter and returns payload."""
         # Given
-        policy_data = _make_policy_data(
+        policy_node = _make_policy_node_dto(
             strategy=DeploymentStrategy.ROLLING,
-            strategy_spec=RollingUpdateSpec(max_surge=2, max_unavailable=1),
+            rolling_update=RollingUpdateConfigInfo(max_surge=2, max_unavailable=1),
         )
-        mock_upsert_processor.wait_for_complete.return_value = UpsertDeploymentPolicyActionResult(
-            data=policy_data,
-            created=True,
-        )
+        mock_upsert_policy.return_value = UpsertDeploymentPolicyPayloadDTO(policy=policy_node)
 
         monkeypatch.setattr(
             gql_utils,
@@ -237,20 +231,20 @@ class TestAdminUpdateDeploymentPolicyResolver:
         result = await resolver_fn(rolling_update_input, mock_info)
 
         # Then
-        mock_upsert_processor.wait_for_complete.assert_called_once()
-        call_args = mock_upsert_processor.wait_for_complete.call_args
-        action = call_args[0][0]
+        mock_upsert_policy.assert_called_once()
+        call_args = mock_upsert_policy.call_args
+        dto: UpsertDeploymentPolicyInput = call_args[0][0]
 
-        assert str(action.upserter.deployment_id) == SAMPLE_DEPLOYMENT_ID
-        assert action.upserter.strategy == DeploymentStrategy.ROLLING
-        assert action.upserter.rollback_on_failure is True
+        assert str(dto.deployment_id) == SAMPLE_DEPLOYMENT_ID
+        assert dto.strategy == DeploymentStrategy.ROLLING
+        assert dto.rollback_on_failure is True
 
         assert isinstance(result, UpdateDeploymentPolicyPayloadGQL)
 
     async def test_rejects_non_superadmin(
         self,
         mock_regular_user: MagicMock,
-        mock_upsert_processor: AsyncMock,
+        mock_upsert_policy: AsyncMock,
         mock_info: MagicMock,
         monkeypatch: pytest.MonkeyPatch,
     ) -> None:
@@ -273,4 +267,4 @@ class TestAdminUpdateDeploymentPolicyResolver:
         with pytest.raises(web.HTTPForbidden):
             await resolver_fn(input_data, mock_info)
 
-        mock_upsert_processor.wait_for_complete.assert_not_called()
+        mock_upsert_policy.assert_not_called()

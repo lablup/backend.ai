@@ -3,23 +3,39 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import TYPE_CHECKING, Any, Self
+from typing import Any
 
 import strawberry
-from strawberry import ID
-from strawberry.relay import Connection, Edge, Node, NodeID
+from strawberry.relay import Connection, Edge, NodeID
+
+from ai.backend.common.dto.manager.v2.prometheus_query_preset.response import (
+    CreateQueryDefinitionGQLPayload as CreateQueryDefinitionGQLPayloadDTO,
+)
+from ai.backend.common.dto.manager.v2.prometheus_query_preset.response import (
+    ModifyQueryDefinitionGQLPayload as ModifyQueryDefinitionGQLPayloadDTO,
+)
+from ai.backend.common.dto.manager.v2.prometheus_query_preset.response import (
+    QueryDefinitionNode,
+)
+from ai.backend.manager.api.gql.decorators import (
+    BackendAIGQLMeta,
+    gql_connection_type,
+    gql_node_type,
+    gql_pydantic_type,
+)
+from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin, PydanticOutputMixin
 
 from .payloads import QueryDefinitionOptionsGQL
 
-if TYPE_CHECKING:
-    from ai.backend.manager.data.prometheus_query_preset import PrometheusQueryPresetData
 
-
-@strawberry.type(
+@gql_node_type(
+    BackendAIGQLMeta(
+        added_version="26.3.0",
+        description="Prometheus query definition entity implementing Relay Node pattern.",
+    ),
     name="QueryDefinition",
-    description="Added in 26.3.0. Prometheus query definition entity implementing Relay Node pattern.",
 )
-class QueryDefinitionGQL(Node):
+class QueryDefinitionGQL(PydanticNodeMixin[QueryDefinitionNode]):
     id: NodeID[str] = strawberry.field(description="Query definition UUID (primary key).")
     name: str = strawberry.field(description="Human-readable query definition identifier.")
     metric_name: str = strawberry.field(description="Prometheus metric name.")
@@ -33,28 +49,15 @@ class QueryDefinitionGQL(Node):
     created_at: datetime = strawberry.field(description="Creation timestamp.")
     updated_at: datetime = strawberry.field(description="Last update timestamp.")
 
-    @classmethod
-    def from_data(cls, data: PrometheusQueryPresetData) -> Self:
-        return cls(
-            id=ID(str(data.id)),
-            name=data.name,
-            metric_name=data.metric_name,
-            query_template=data.query_template,
-            time_window=data.time_window,
-            options=QueryDefinitionOptionsGQL(
-                filter_labels=data.filter_labels,
-                group_labels=data.group_labels,
-            ),
-            created_at=data.created_at,
-            updated_at=data.updated_at,
-        )
-
 
 QueryDefinitionEdge = Edge[QueryDefinitionGQL]
 
 
-@strawberry.type(
-    description="Added in 26.3.0. Paginated connection for query definition records.",
+@gql_connection_type(
+    BackendAIGQLMeta(
+        added_version="26.3.0",
+        description="Paginated connection for query definition records.",
+    ),
 )
 class QueryDefinitionConnection(Connection[QueryDefinitionGQL]):
     count: int = strawberry.field(
@@ -66,17 +69,29 @@ class QueryDefinitionConnection(Connection[QueryDefinitionGQL]):
         self.count = count
 
 
-@strawberry.type(
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version="26.3.0",
+        description="Payload returned after creating a query definition.",
+    ),
+    model=CreateQueryDefinitionGQLPayloadDTO,
     name="CreateQueryDefinitionPayload",
-    description="Added in 26.3.0. Payload returned after creating a query definition.",
 )
-class CreateQueryDefinitionPayload:
-    preset: QueryDefinitionGQL
+class CreateQueryDefinitionPayload(PydanticOutputMixin[CreateQueryDefinitionGQLPayloadDTO]):
+    """Payload for query definition creation mutation."""
+
+    preset: QueryDefinitionGQL = strawberry.field(description="Created query definition.")
 
 
-@strawberry.type(
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version="26.3.0",
+        description="Payload returned after modifying a query definition.",
+    ),
+    model=ModifyQueryDefinitionGQLPayloadDTO,
     name="ModifyQueryDefinitionPayload",
-    description="Added in 26.3.0. Payload returned after modifying a query definition.",
 )
-class ModifyQueryDefinitionPayload:
-    preset: QueryDefinitionGQL
+class ModifyQueryDefinitionPayload(PydanticOutputMixin[ModifyQueryDefinitionGQLPayloadDTO]):
+    """Payload for query definition modification mutation."""
+
+    preset: QueryDefinitionGQL = strawberry.field(description="Updated query definition.")

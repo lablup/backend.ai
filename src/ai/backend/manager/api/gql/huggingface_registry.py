@@ -2,50 +2,57 @@ from __future__ import annotations
 
 import uuid
 from collections.abc import Iterable, Sequence
-from typing import Self
+from typing import Self, cast
 
 import strawberry
 from strawberry import ID, UNSET, Info
-from strawberry.relay import Connection, Edge, Node, NodeID
+from strawberry.relay import Connection, Edge, NodeID
 
+from ai.backend.common.dto.manager.v2.huggingface_registry.request import (
+    AdminSearchHuggingFaceRegistriesInput,
+)
+from ai.backend.common.dto.manager.v2.huggingface_registry.request import (
+    CreateHuggingFaceRegistryInput as CreateHuggingFaceRegistryInputDTO,
+)
+from ai.backend.common.dto.manager.v2.huggingface_registry.request import (
+    DeleteHuggingFaceRegistryInput as DeleteHuggingFaceRegistryInputDTO,
+)
+from ai.backend.common.dto.manager.v2.huggingface_registry.request import (
+    UpdateHuggingFaceRegistryInput as UpdateHuggingFaceRegistryInputDTO,
+)
+from ai.backend.common.dto.manager.v2.huggingface_registry.response import (
+    CreateHuggingFaceRegistryPayload as CreateHuggingFaceRegistryPayloadDTO,
+)
+from ai.backend.common.dto.manager.v2.huggingface_registry.response import (
+    DeleteHuggingFaceRegistryPayload as DeleteHuggingFaceRegistryPayloadDTO,
+)
+from ai.backend.common.dto.manager.v2.huggingface_registry.response import (
+    HuggingFaceRegistryNode,
+)
+from ai.backend.common.dto.manager.v2.huggingface_registry.response import (
+    UpdateHuggingFaceRegistryPayload as UpdateHuggingFaceRegistryPayloadDTO,
+)
 from ai.backend.manager.api.gql.base import encode_cursor
-from ai.backend.manager.data.artifact_registries.types import (
-    ArtifactRegistryCreatorMeta,
-    ArtifactRegistryModifierMeta,
+from ai.backend.manager.api.gql.decorators import (
+    BackendAIGQLMeta,
+    PydanticInputMixin,
+    gql_connection_type,
+    gql_node_type,
+    gql_pydantic_input,
+    gql_pydantic_type,
 )
-from ai.backend.manager.data.huggingface_registry.types import HuggingFaceRegistryData
-from ai.backend.manager.models.huggingface_registry import HuggingFaceRegistryRow
-from ai.backend.manager.repositories.base.creator import Creator
-from ai.backend.manager.repositories.base.updater import Updater
-from ai.backend.manager.repositories.huggingface_registry import HuggingFaceRegistryCreatorSpec
-from ai.backend.manager.repositories.huggingface_registry.updaters import (
-    HuggingFaceRegistryUpdaterSpec,
-)
-from ai.backend.manager.services.artifact_registry.actions.huggingface.create import (
-    CreateHuggingFaceRegistryAction,
-)
-from ai.backend.manager.services.artifact_registry.actions.huggingface.delete import (
-    DeleteHuggingFaceRegistryAction,
-)
-from ai.backend.manager.services.artifact_registry.actions.huggingface.get import (
-    GetHuggingFaceRegistryAction,
-)
-from ai.backend.manager.services.artifact_registry.actions.huggingface.get_multi import (
-    GetHuggingFaceRegistriesAction,
-)
-from ai.backend.manager.services.artifact_registry.actions.huggingface.list import (
-    ListHuggingFaceRegistryAction,
-)
-from ai.backend.manager.services.artifact_registry.actions.huggingface.update import (
-    UpdateHuggingFaceRegistryAction,
-)
-from ai.backend.manager.types import OptionalState
+from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin, PydanticOutputMixin
 
 from .types import StrawberryGQLContext
 
 
-@strawberry.type(description="Added in 25.14.0")
-class HuggingFaceRegistry(Node):
+@gql_node_type(
+    BackendAIGQLMeta(
+        added_version="25.14.0",
+        description="HuggingFace registry node.",
+    ),
+)
+class HuggingFaceRegistry(PydanticNodeMixin[HuggingFaceRegistryNode]):
     id: NodeID[str]
     url: str
     name: str
@@ -62,38 +69,25 @@ class HuggingFaceRegistry(Node):
         results = await info.context.data_loaders.huggingface_registry_loader.load_many([
             uuid.UUID(nid) for nid in node_ids
         ])
-        return [cls.from_dataclass(data) if data is not None else None for data in results]
-
-    @classmethod
-    def from_dataclass(cls, data: HuggingFaceRegistryData) -> Self:
-        return cls(
-            id=ID(str(data.id)),
-            name=data.name,
-            url=data.url,
-            token=data.token,
-        )
+        return cast(list[Self | None], results)
 
     @classmethod
     async def load_by_id(
         cls, ctx: StrawberryGQLContext, registry_ids: Sequence[uuid.UUID]
     ) -> list[HuggingFaceRegistry]:
-        action_result = (
-            await ctx.processors.artifact_registry.get_huggingface_registries.wait_for_complete(
-                GetHuggingFaceRegistriesAction(registry_ids=list(registry_ids))
-            )
-        )
-
-        registries = []
-        for registry in action_result.result:
-            registries.append(HuggingFaceRegistry.from_dataclass(registry))
-
-        return registries
+        nodes = await ctx.adapters.huggingface_registry.get_many(list(registry_ids))
+        return [HuggingFaceRegistry.from_pydantic(node) for node in nodes]
 
 
 HuggingFaceRegistryEdge = Edge[HuggingFaceRegistry]
 
 
-@strawberry.type(description="Added in 25.14.0")
+@gql_connection_type(
+    BackendAIGQLMeta(
+        added_version="25.14.0",
+        description="Relay-style connection for paginated HuggingFace registry queries.",
+    ),
+)
 class HuggingFaceRegistryConnection(Connection[HuggingFaceRegistry]):
     @strawberry.field
     def count(self) -> int:
@@ -104,11 +98,8 @@ class HuggingFaceRegistryConnection(Connection[HuggingFaceRegistry]):
 async def huggingface_registry(
     id: ID, info: Info[StrawberryGQLContext]
 ) -> HuggingFaceRegistry | None:
-    processors = info.context.processors
-    action_result = await processors.artifact_registry.get_huggingface_registry.wait_for_complete(
-        GetHuggingFaceRegistryAction(registry_id=uuid.UUID(id))
-    )
-    return HuggingFaceRegistry.from_dataclass(action_result.result)
+    node = await info.context.adapters.huggingface_registry.get(uuid.UUID(id))
+    return HuggingFaceRegistry.from_pydantic(node)
 
 
 @strawberry.field(description="Added in 25.14.0")  # type: ignore[misc]
@@ -121,17 +112,17 @@ async def huggingface_registries(
     offset: int | None = None,
     limit: int | None = None,
 ) -> HuggingFaceRegistryConnection | None:
-    # TODO: Support pagination with before, after, first, last
-    # TODO: Does we need to support filtering, ordering here?
-    processors = info.context.processors
-
-    action_result = (
-        await processors.artifact_registry.list_huggingface_registries.wait_for_complete(
-            ListHuggingFaceRegistryAction()
+    payload = await info.context.adapters.huggingface_registry.search(
+        AdminSearchHuggingFaceRegistriesInput(
+            first=first,
+            after=after,
+            last=last,
+            before=before,
+            limit=limit,
+            offset=offset,
         )
     )
-
-    nodes = [HuggingFaceRegistry.from_dataclass(data) for data in action_result.data]
+    nodes = [HuggingFaceRegistry.from_pydantic(item) for item in payload.items]
     edges = [HuggingFaceRegistryEdge(node=node, cursor=encode_cursor(node.id)) for node in nodes]
 
     return HuggingFaceRegistryConnection(
@@ -145,56 +136,63 @@ async def huggingface_registries(
     )
 
 
-@strawberry.input(description="Added in 25.14.0")
-class CreateHuggingFaceRegistryInput:
-    url: str
+@gql_pydantic_input(
+    BackendAIGQLMeta(description="", added_version="25.14.0"),
+)
+class CreateHuggingFaceRegistryInput(PydanticInputMixin[CreateHuggingFaceRegistryInputDTO]):
     name: str
+    url: str
     token: str | None = None
 
-    def to_creator(self) -> Creator[HuggingFaceRegistryRow]:
-        return Creator(spec=HuggingFaceRegistryCreatorSpec(url=self.url, token=self.token))
 
-    def to_creator_meta(self) -> ArtifactRegistryCreatorMeta:
-        return ArtifactRegistryCreatorMeta(name=self.name)
-
-
-@strawberry.input(description="Added in 25.14.0")
-class UpdateHuggingFaceRegistryInput:
+@gql_pydantic_input(
+    BackendAIGQLMeta(description="", added_version="25.14.0"),
+)
+class UpdateHuggingFaceRegistryInput(PydanticInputMixin[UpdateHuggingFaceRegistryInputDTO]):
     id: ID
     url: str | None = UNSET
     name: str | None = UNSET
     token: str | None = UNSET
 
-    def to_updater(self) -> Updater[HuggingFaceRegistryRow]:
-        spec = HuggingFaceRegistryUpdaterSpec(
-            url=OptionalState[str].from_graphql(self.url),
-            token=OptionalState[str].from_graphql(self.token),
-        )
-        return Updater(spec=spec, pk_value=uuid.UUID(self.id))
 
-    def to_modifier_meta(self) -> ArtifactRegistryModifierMeta:
-        return ArtifactRegistryModifierMeta(
-            name=OptionalState[str].from_graphql(self.name),
-        )
-
-
-@strawberry.input(description="Added in 25.14.0")
-class DeleteHuggingFaceRegistryInput:
+@gql_pydantic_input(
+    BackendAIGQLMeta(description="", added_version="25.14.0"),
+)
+class DeleteHuggingFaceRegistryInput(PydanticInputMixin[DeleteHuggingFaceRegistryInputDTO]):
     id: ID
 
 
-@strawberry.type(description="Added in 25.14.0")
-class CreateHuggingFaceRegistryPayload:
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version="25.14.0",
+        description="Payload for creating a HuggingFace registry.",
+    ),
+    model=CreateHuggingFaceRegistryPayloadDTO,
+)
+class CreateHuggingFaceRegistryPayload(PydanticOutputMixin[CreateHuggingFaceRegistryPayloadDTO]):
     huggingface_registry: HuggingFaceRegistry
 
 
-@strawberry.type(description="Added in 25.14.0")
-class UpdateHuggingFaceRegistryPayload:
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version="25.14.0",
+        description="Payload for updating a HuggingFace registry.",
+    ),
+    model=UpdateHuggingFaceRegistryPayloadDTO,
+)
+class UpdateHuggingFaceRegistryPayload(PydanticOutputMixin[UpdateHuggingFaceRegistryPayloadDTO]):
     huggingface_registry: HuggingFaceRegistry
 
 
-@strawberry.type(description="Added in 25.14.0")
-class DeleteHuggingFaceRegistryPayload:
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version="25.14.0",
+        description="Payload for deleting a HuggingFace registry.",
+    ),
+    model=DeleteHuggingFaceRegistryPayloadDTO,
+    fields=["id"],
+)
+class DeleteHuggingFaceRegistryPayload(PydanticOutputMixin[DeleteHuggingFaceRegistryPayloadDTO]):
     id: ID
 
 
@@ -202,19 +200,9 @@ class DeleteHuggingFaceRegistryPayload:
 async def create_huggingface_registry(
     input: CreateHuggingFaceRegistryInput, info: Info[StrawberryGQLContext]
 ) -> CreateHuggingFaceRegistryPayload:
-    processors = info.context.processors
-
-    action_result = (
-        await processors.artifact_registry.create_huggingface_registry.wait_for_complete(
-            CreateHuggingFaceRegistryAction(
-                input.to_creator(),
-                input.to_creator_meta(),
-            )
-        )
-    )
-
+    result = await info.context.adapters.huggingface_registry.create(input.to_pydantic())
     return CreateHuggingFaceRegistryPayload(
-        huggingface_registry=HuggingFaceRegistry.from_dataclass(action_result.result)
+        huggingface_registry=HuggingFaceRegistry.from_pydantic(result.huggingface_registry)
     )
 
 
@@ -222,18 +210,9 @@ async def create_huggingface_registry(
 async def update_huggingface_registry(
     input: UpdateHuggingFaceRegistryInput, info: Info[StrawberryGQLContext]
 ) -> UpdateHuggingFaceRegistryPayload:
-    processors = info.context.processors
-
-    action_result = (
-        await processors.artifact_registry.update_huggingface_registry.wait_for_complete(
-            UpdateHuggingFaceRegistryAction(
-                updater=input.to_updater(), meta=input.to_modifier_meta()
-            )
-        )
-    )
-
+    result = await info.context.adapters.huggingface_registry.update(input.to_pydantic())
     return UpdateHuggingFaceRegistryPayload(
-        huggingface_registry=HuggingFaceRegistry.from_dataclass(action_result.result)
+        huggingface_registry=HuggingFaceRegistry.from_pydantic(result.huggingface_registry)
     )
 
 
@@ -241,10 +220,6 @@ async def update_huggingface_registry(
 async def delete_huggingface_registry(
     input: DeleteHuggingFaceRegistryInput, info: Info[StrawberryGQLContext]
 ) -> DeleteHuggingFaceRegistryPayload:
-    processors = info.context.processors
-
-    await processors.artifact_registry.delete_huggingface_registry.wait_for_complete(
-        DeleteHuggingFaceRegistryAction(registry_id=uuid.UUID(input.id))
-    )
-
-    return DeleteHuggingFaceRegistryPayload(id=input.id)
+    pydantic_input = input.to_pydantic()
+    result = await info.context.adapters.huggingface_registry.delete(pydantic_input)
+    return DeleteHuggingFaceRegistryPayload(id=ID(str(result.id)))

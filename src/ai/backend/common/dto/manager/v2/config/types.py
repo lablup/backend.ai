@@ -10,6 +10,7 @@ from ai.backend.common.dto.manager.config.types import (
     MAXIMUM_DOTFILE_SIZE,
     DotfilePermission,
 )
+from ai.backend.common.dto.manager.v2.common import OrderDirection
 
 __all__ = (
     "MAXIMUM_DOTFILE_SIZE",
@@ -18,13 +19,6 @@ __all__ = (
     "DotfileScope",
     "OrderDirection",
 )
-
-
-class OrderDirection(StrEnum):
-    """Order direction for sorting."""
-
-    ASC = "asc"
-    DESC = "desc"
 
 
 class DotfileScope(StrEnum):

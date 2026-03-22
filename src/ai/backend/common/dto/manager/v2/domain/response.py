@@ -13,6 +13,7 @@ from ai.backend.common.api_handlers import BaseResponseModel
 from ai.backend.common.dto.manager.pagination import PaginationInfo
 
 __all__ = (
+    "AdminSearchDomainsPayload",
     "DeleteDomainPayload",
     "DomainBasicInfo",
     "DomainLifecycleInfo",
@@ -102,6 +103,15 @@ class SearchDomainsPayload(BaseResponseModel):
     pagination: PaginationInfo = Field(
         description="Pagination information for the result set.",
     )
+
+
+class AdminSearchDomainsPayload(BaseResponseModel):
+    """Payload for admin-scoped paginated domain search results."""
+
+    items: list[DomainNode] = Field(description="List of domain nodes.")
+    total_count: int = Field(description="Total number of domains matching the filter.")
+    has_next_page: bool = Field(description="Whether there is a next page.")
+    has_previous_page: bool = Field(description="Whether there is a previous page.")
 
 
 class DeleteDomainPayload(BaseResponseModel):

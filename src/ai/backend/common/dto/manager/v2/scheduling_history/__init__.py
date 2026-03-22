@@ -3,6 +3,9 @@ Scheduling history DTOs v2 for Manager API.
 """
 
 from ai.backend.common.dto.manager.v2.scheduling_history.request import (
+    AdminSearchDeploymentHistoriesInput,
+    AdminSearchRouteHistoriesInput,
+    AdminSearchSessionHistoriesInput,
     DeploymentHistoryFilter,
     DeploymentHistoryOrder,
     RouteHistoryFilter,
@@ -14,6 +17,9 @@ from ai.backend.common.dto.manager.v2.scheduling_history.request import (
     SessionHistoryOrder,
 )
 from ai.backend.common.dto.manager.v2.scheduling_history.response import (
+    AdminSearchDeploymentHistoriesPayload,
+    AdminSearchRouteHistoriesPayload,
+    AdminSearchSessionHistoriesPayload,
     DeploymentHistoryNode,
     ListDeploymentHistoryPayload,
     ListRouteHistoryPayload,
@@ -23,22 +29,31 @@ from ai.backend.common.dto.manager.v2.scheduling_history.response import (
 )
 from ai.backend.common.dto.manager.v2.scheduling_history.types import (
     DeploymentHistoryOrderField,
+    DeploymentHistoryScopeDTO,
     OrderDirection,
     RouteHistoryOrderField,
+    RouteHistoryScopeDTO,
     SchedulingResultType,
     SessionHistoryOrderField,
+    SessionHistoryScopeDTO,
     SubStepResultInfo,
 )
 
 __all__ = (
     # Types
     "DeploymentHistoryOrderField",
+    "DeploymentHistoryScopeDTO",
     "OrderDirection",
     "RouteHistoryOrderField",
+    "RouteHistoryScopeDTO",
     "SchedulingResultType",
     "SessionHistoryOrderField",
+    "SessionHistoryScopeDTO",
     "SubStepResultInfo",
     # Input models (request)
+    "AdminSearchDeploymentHistoriesInput",
+    "AdminSearchRouteHistoriesInput",
+    "AdminSearchSessionHistoriesInput",
     "DeploymentHistoryFilter",
     "DeploymentHistoryOrder",
     "RouteHistoryFilter",
@@ -49,6 +64,9 @@ __all__ = (
     "SessionHistoryFilter",
     "SessionHistoryOrder",
     # Response models
+    "AdminSearchDeploymentHistoriesPayload",
+    "AdminSearchRouteHistoriesPayload",
+    "AdminSearchSessionHistoriesPayload",
     "DeploymentHistoryNode",
     "ListDeploymentHistoryPayload",
     "ListRouteHistoryPayload",

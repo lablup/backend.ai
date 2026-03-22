@@ -22,6 +22,8 @@ from ai.backend.common.dto.manager.rbac import (
 )
 from ai.backend.manager.api.rest.adapter import BaseFilterAdapter
 from ai.backend.manager.data.permission.role import RoleData, RoleDetailData
+from ai.backend.manager.models.rbac_models.conditions import RoleConditions
+from ai.backend.manager.models.rbac_models.orders import RoleOrders
 from ai.backend.manager.models.rbac_models.role import RoleRow
 from ai.backend.manager.repositories.base import (
     BatchQuerier,
@@ -31,10 +33,6 @@ from ai.backend.manager.repositories.base import (
     QueryOrder,
 )
 from ai.backend.manager.repositories.base.updater import Updater
-from ai.backend.manager.repositories.permission_controller.options import (
-    RoleConditions,
-    RoleOrders,
-)
 from ai.backend.manager.repositories.permission_controller.updaters import RoleUpdaterSpec
 from ai.backend.manager.types import OptionalState, TriState
 

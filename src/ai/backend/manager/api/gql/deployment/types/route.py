@@ -6,24 +6,51 @@ from collections.abc import Iterable
 from datetime import datetime
 from enum import StrEnum
 from functools import lru_cache
-from typing import TYPE_CHECKING, Annotated, Any, Self, override
+from typing import TYPE_CHECKING, Annotated, Any, Self, cast
 from uuid import UUID
 
 import strawberry
 from strawberry import ID, Info
-from strawberry.relay import Connection, Edge, Node, NodeID
+from strawberry.relay import Connection, Edge, NodeID
 from strawberry.scalars import JSON
 
+from ai.backend.common.dto.manager.v2.deployment.request import (
+    RouteFilter as RouteFilterDTO,
+)
+from ai.backend.common.dto.manager.v2.deployment.request import (
+    RouteOrder as RouteOrderDTO,
+)
+from ai.backend.common.dto.manager.v2.deployment.request import (
+    RouteStatusFilter as RouteStatusFilterDTO,
+)
+from ai.backend.common.dto.manager.v2.deployment.request import (
+    RouteTrafficStatusFilter as RouteTrafficStatusFilterDTO,
+)
+from ai.backend.common.dto.manager.v2.deployment.request import (
+    UpdateRouteTrafficStatusInput as UpdateRouteTrafficStatusInputDTO,
+)
+from ai.backend.common.dto.manager.v2.deployment.response import (
+    RouteNode as RouteNodeDTO,
+)
+from ai.backend.common.dto.manager.v2.deployment.response import (
+    UpdateRouteTrafficStatusPayload as UpdateRouteTrafficStatusPayloadDTO,
+)
 from ai.backend.manager.api.gql.adapter import PaginationSpec
 from ai.backend.manager.api.gql.base import (
     OrderDirection,
     to_global_id,
 )
-from ai.backend.manager.api.gql.types import GQLFilter, GQLOrderBy, StrawberryGQLContext
-from ai.backend.manager.api.gql_legacy.session import ComputeSessionNode
-from ai.backend.manager.data.deployment.types import (
-    RouteInfo,
+from ai.backend.manager.api.gql.decorators import (
+    BackendAIGQLMeta,
+    PydanticInputMixin,
+    gql_connection_type,
+    gql_node_type,
+    gql_pydantic_input,
+    gql_pydantic_type,
 )
+from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin
+from ai.backend.manager.api.gql.types import StrawberryGQLContext
+from ai.backend.manager.api.gql_legacy.session import ComputeSessionNode
 from ai.backend.manager.data.deployment.types import (
     RouteStatus as RouteStatusEnum,
 )
@@ -31,41 +58,38 @@ from ai.backend.manager.data.deployment.types import (
     RouteTrafficStatus as RouteTrafficStatusEnum,
 )
 from ai.backend.manager.errors.deployment import EndpointNotFound
+from ai.backend.manager.models.routing.conditions import RouteConditions
+from ai.backend.manager.models.routing.orders import RouteOrders
 from ai.backend.manager.models.routing.row import RoutingRow
-from ai.backend.manager.repositories.base import (
-    QueryCondition,
-    QueryOrder,
-    combine_conditions_or,
-    negate_conditions,
-)
-from ai.backend.manager.repositories.deployment.options import RouteConditions, RouteOrders
 
 if TYPE_CHECKING:
     from ai.backend.manager.api.gql.deployment.types.deployment import ModelDeployment
     from ai.backend.manager.api.gql.deployment.types.revision import ModelRevision
 
-RouteStatusGQL = strawberry.enum(
+RouteStatusGQL: type[RouteStatusEnum] = strawberry.enum(
     RouteStatusEnum,
     name="RouteStatus",
     description="Added in 25.19.0. Route status indicating the health and lifecycle state of a route.",
 )
 
-RouteTrafficStatusGQL = strawberry.enum(
+RouteTrafficStatusGQL: type[RouteTrafficStatusEnum] = strawberry.enum(
     RouteTrafficStatusEnum,
     name="RouteTrafficStatus",
     description="Added in 25.19.0. Traffic routing status for a route. Controls whether traffic should be sent to this route.",
 )
 
 
-@strawberry.type(
+@gql_node_type(
+    BackendAIGQLMeta(
+        added_version="25.19.0", description="Represents a route for a model deployment."
+    ),
     name="Route",
-    description="Added in 25.19.0. Represents a route for a model deployment.",
 )
-class Route(Node):
+class Route(PydanticNodeMixin[RouteNodeDTO]):
     id: NodeID[str]
-    _deployment_id: strawberry.Private[UUID]
-    _session_id: strawberry.Private[UUID | None]
-    _revision_id: strawberry.Private[UUID | None]
+    deployment_id: ID
+    session_id: ID | None
+    revision_id: ID | None
     status: RouteStatusGQL = strawberry.field(
         description="The current status of the route indicating its health state.",
     )
@@ -87,24 +111,21 @@ class Route(Node):
         self, info: Info[StrawberryGQLContext]
     ) -> Annotated[ModelDeployment, strawberry.lazy(".deployment")]:
         """Resolve deployment using dataloader."""
-        from ai.backend.manager.api.gql.deployment.types.deployment import ModelDeployment
-
-        deployment_data = await info.context.data_loaders.deployment_loader.load(
-            self._deployment_id
-        )
+        deployment_id = UUID(str(self.deployment_id))
+        deployment_data = await info.context.data_loaders.deployment_loader.load(deployment_id)
         if deployment_data is None:
-            raise EndpointNotFound(extra_msg=f"id={self._deployment_id}")
-        return ModelDeployment.from_dataclass(deployment_data)
+            raise EndpointNotFound(extra_msg=f"id={deployment_id}")
+        return deployment_data
 
     @strawberry.field(  # type: ignore[misc]
         description="The session associated with the route. Can be null if the route is still provisioning."
     )
     async def session(self, info: Info[StrawberryGQLContext]) -> ID | None:
         """Return session global ID if available."""
-        if self._session_id is None:
+        if self.session_id is None:
             return None
         session_global_id = to_global_id(
-            ComputeSessionNode, self._session_id, is_target_graphene_object=True
+            ComputeSessionNode, UUID(str(self.session_id)), is_target_graphene_object=True
         )
         return ID(session_global_id)
 
@@ -113,14 +134,9 @@ class Route(Node):
         self, info: Info[StrawberryGQLContext]
     ) -> Annotated[ModelRevision, strawberry.lazy(".revision")] | None:
         """Resolve revision using dataloader."""
-        from ai.backend.manager.api.gql.deployment.types.revision import ModelRevision
-
-        if self._revision_id is None:
+        if self.revision_id is None:
             return None
-        revision_data = await info.context.data_loaders.revision_loader.load(self._revision_id)
-        if revision_data is None:
-            return None
-        return ModelRevision.from_dataclass(revision_data)
+        return await info.context.data_loaders.revision_loader.load(UUID(str(self.revision_id)))
 
     @classmethod
     async def resolve_nodes(  # type: ignore[override]  # Strawberry Node uses AwaitableOrValue overloads incompatible with async def
@@ -133,27 +149,17 @@ class Route(Node):
         results = await info.context.data_loaders.route_loader.load_many([
             UUID(nid) for nid in node_ids
         ])
-        return [cls.from_dataclass(data) if data is not None else None for data in results]
-
-    @classmethod
-    def from_dataclass(cls, data: RouteInfo) -> Self:
-        return cls(
-            id=ID(str(data.route_id)),
-            _deployment_id=data.endpoint_id,
-            _session_id=UUID(str(data.session_id)) if data.session_id else None,
-            _revision_id=data.revision_id,
-            status=RouteStatusGQL(data.status),
-            traffic_status=RouteTrafficStatusGQL(data.traffic_status),
-            traffic_ratio=data.traffic_ratio,
-            created_at=data.created_at,
-            error_data=data.error_data,
-        )
+        return cast(list[Self | None], results)
 
 
 RouteEdge = Edge[Route]
 
 
-@strawberry.type(description="Added in 25.19.0. Connection type for paginated route results.")
+@gql_connection_type(
+    BackendAIGQLMeta(
+        added_version="25.19.0", description="Connection type for paginated route results."
+    )
+)
 class RouteConnection(Connection[Route]):
     count: int = strawberry.field(
         description="Total number of routes matching the filter criteria."
@@ -167,6 +173,50 @@ class RouteConnection(Connection[Route]):
 # Filter and OrderBy types
 
 
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description="Filter for route status with equality and membership operators.",
+        added_version="26.3.0",
+    ),
+    name="RouteStatusFilter",
+)
+class RouteStatusFilterGQL(PydanticInputMixin[RouteStatusFilterDTO]):
+    equals: RouteStatusGQL | None = strawberry.field(
+        default=None, description="Matches routes with this exact status."
+    )
+    in_: list[RouteStatusGQL] | None = strawberry.field(
+        name="in", default=None, description="Matches routes whose status is in this list."
+    )
+    not_equals: RouteStatusGQL | None = strawberry.field(
+        default=None, description="Excludes routes with this exact status."
+    )
+    not_in: list[RouteStatusGQL] | None = strawberry.field(
+        default=None, description="Excludes routes whose status is in this list."
+    )
+
+
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description="Filter for route traffic status with equality and membership operators.",
+        added_version="26.3.0",
+    ),
+    name="RouteTrafficStatusFilter",
+)
+class RouteTrafficStatusFilterGQL(PydanticInputMixin[RouteTrafficStatusFilterDTO]):
+    equals: RouteTrafficStatusGQL | None = strawberry.field(
+        default=None, description="Matches routes with this exact traffic status."
+    )
+    in_: list[RouteTrafficStatusGQL] | None = strawberry.field(
+        name="in", default=None, description="Matches routes whose traffic status is in this list."
+    )
+    not_equals: RouteTrafficStatusGQL | None = strawberry.field(
+        default=None, description="Excludes routes with this exact traffic status."
+    )
+    not_in: list[RouteTrafficStatusGQL] | None = strawberry.field(
+        default=None, description="Excludes routes whose traffic status is in this list."
+    )
+
+
 @strawberry.enum
 class RouteOrderField(StrEnum):
     CREATED_AT = "created_at"
@@ -174,70 +224,25 @@ class RouteOrderField(StrEnum):
     TRAFFIC_RATIO = "traffic_ratio"
 
 
-@strawberry.input(description="Added in 25.19.0. Filter for routes.")
-class RouteFilter(GQLFilter):
-    status: list[RouteStatusGQL] | None = None
-    traffic_status: list[RouteTrafficStatusGQL] | None = None
+@gql_pydantic_input(
+    BackendAIGQLMeta(description="Filter for routes.", added_version="25.19.0"),
+    name="RouteFilter",
+)
+class RouteFilter(PydanticInputMixin[RouteFilterDTO]):
+    status: RouteStatusFilterGQL | None = None
+    traffic_status: RouteTrafficStatusFilterGQL | None = None
 
-    AND: list[RouteFilter] | None = None
-    OR: list[RouteFilter] | None = None
-    NOT: list[RouteFilter] | None = None
-
-    @override
-    def build_conditions(self) -> list[QueryCondition]:
-        """Build query conditions from this filter."""
-        conditions: list[QueryCondition] = []
-
-        if self.status:
-            internal_statuses = [RouteStatusEnum(s.value) for s in self.status]
-            conditions.append(RouteConditions.by_statuses(internal_statuses))
-
-        if self.traffic_status:
-            internal_traffic_statuses = [
-                RouteTrafficStatusEnum(ts.value) for ts in self.traffic_status
-            ]
-            conditions.append(RouteConditions.by_traffic_statuses(internal_traffic_statuses))
-
-        # Handle AND logical operator
-        if self.AND:
-            for sub_filter in self.AND:
-                conditions.extend(sub_filter.build_conditions())
-
-        # Handle OR logical operator
-        if self.OR:
-            or_sub_conditions: list[QueryCondition] = []
-            for sub_filter in self.OR:
-                or_sub_conditions.extend(sub_filter.build_conditions())
-            if or_sub_conditions:
-                conditions.append(combine_conditions_or(or_sub_conditions))
-
-        # Handle NOT logical operator
-        if self.NOT:
-            not_sub_conditions: list[QueryCondition] = []
-            for sub_filter in self.NOT:
-                not_sub_conditions.extend(sub_filter.build_conditions())
-            if not_sub_conditions:
-                conditions.append(negate_conditions(not_sub_conditions))
-
-        return conditions
+    AND: list[Self] | None = None
+    OR: list[Self] | None = None
+    NOT: list[Self] | None = None
 
 
-@strawberry.input(description="Added in 25.19.0. Order by specification for routes.")
-class RouteOrderBy(GQLOrderBy):
+@gql_pydantic_input(
+    BackendAIGQLMeta(description="Order by specification for routes.", added_version="25.19.0"),
+)
+class RouteOrderBy(PydanticInputMixin[RouteOrderDTO]):
     field: RouteOrderField
     direction: OrderDirection = OrderDirection.ASC
-
-    @override
-    def to_query_order(self) -> QueryOrder:
-        """Convert to repository QueryOrder."""
-        ascending = self.direction == OrderDirection.ASC
-        match self.field:
-            case RouteOrderField.CREATED_AT:
-                return RouteOrders.created_at(ascending)
-            case RouteOrderField.STATUS:
-                return RouteOrders.status(ascending)
-            case RouteOrderField.TRAFFIC_RATIO:
-                return RouteOrders.traffic_ratio(ascending)
 
 
 # Pagination spec
@@ -257,20 +262,25 @@ def get_route_pagination_spec() -> PaginationSpec:
 # Input/Payload types for mutations
 
 
-@strawberry.input(
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description="Input for updating route traffic status.", added_version="25.19.0"
+    ),
     name="UpdateRouteTrafficStatusInput",
-    description="Added in 25.19.0. Input for updating route traffic status.",
 )
-class UpdateRouteTrafficStatusInputGQL:
+class UpdateRouteTrafficStatusInputGQL(PydanticInputMixin[UpdateRouteTrafficStatusInputDTO]):
     route_id: ID = strawberry.field(description="The ID of the route to update.")
     traffic_status: RouteTrafficStatusGQL = strawberry.field(
         description="The new traffic status (ACTIVE/INACTIVE)."
     )
 
 
-@strawberry.type(
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version="25.19.0", description="Result of updating route traffic status."
+    ),
+    model=UpdateRouteTrafficStatusPayloadDTO,
     name="UpdateRouteTrafficStatusPayload",
-    description="Added in 25.19.0. Result of updating route traffic status.",
 )
 class UpdateRouteTrafficStatusPayloadGQL:
-    route: Route = strawberry.field(description="The updated route.")
+    route: Route

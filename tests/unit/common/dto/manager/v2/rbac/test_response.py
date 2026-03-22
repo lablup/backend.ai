@@ -9,8 +9,6 @@ from datetime import UTC, datetime
 from ai.backend.common.data.permission.types import (
     EntityType,
     OperationType,
-    RoleSource,
-    RoleStatus,
 )
 from ai.backend.common.dto.manager.v2.rbac.response import (
     CreateRolePayload,
@@ -19,7 +17,11 @@ from ai.backend.common.dto.manager.v2.rbac.response import (
     RoleNode,
     UpdateRolePayload,
 )
-from ai.backend.common.dto.manager.v2.rbac.types import PermissionSummary
+from ai.backend.common.dto.manager.v2.rbac.types import (
+    PermissionSummary,
+    RoleSourceDTO,
+    RoleStatusDTO,
+)
 
 
 class TestRoleNodeCreation:
@@ -32,8 +34,8 @@ class TestRoleNodeCreation:
             id=role_id,
             name="Admin",
             description="Administrator role",
-            source=RoleSource.CUSTOM,
-            status=RoleStatus.ACTIVE,
+            source=RoleSourceDTO.CUSTOM,
+            status=RoleStatusDTO.ACTIVE,
             created_at=now,
             updated_at=now,
             deleted_at=None,
@@ -42,8 +44,8 @@ class TestRoleNodeCreation:
         assert node.id == role_id
         assert node.name == "Admin"
         assert node.description == "Administrator role"
-        assert node.source == RoleSource.CUSTOM
-        assert node.status == RoleStatus.ACTIVE
+        assert node.source == RoleSourceDTO.CUSTOM
+        assert node.status == RoleStatusDTO.ACTIVE
         assert node.created_at == now
         assert node.updated_at == now
         assert node.deleted_at is None
@@ -55,8 +57,8 @@ class TestRoleNodeCreation:
         node = RoleNode(
             id=role_id,
             name="Admin",
-            source=RoleSource.CUSTOM,
-            status=RoleStatus.ACTIVE,
+            source=RoleSourceDTO.CUSTOM,
+            status=RoleStatusDTO.ACTIVE,
             created_at=now,
             updated_at=now,
         )
@@ -71,8 +73,8 @@ class TestRoleNodeCreation:
         node = RoleNode(
             id=role_id,
             name="TestRole",
-            source=RoleSource.SYSTEM,
-            status=RoleStatus.ACTIVE,
+            source=RoleSourceDTO.SYSTEM,
+            status=RoleStatusDTO.ACTIVE,
             created_at=now,
             updated_at=now,
         )
@@ -85,8 +87,8 @@ class TestRoleNodeCreation:
             id=role_id,
             name="TestRole",
             description=None,
-            source=RoleSource.SYSTEM,
-            status=RoleStatus.ACTIVE,
+            source=RoleSourceDTO.SYSTEM,
+            status=RoleStatusDTO.ACTIVE,
             created_at=now,
             updated_at=now,
         )
@@ -98,14 +100,14 @@ class TestRoleNodeCreation:
         node = RoleNode(
             id=role_id,
             name="DeletedRole",
-            source=RoleSource.CUSTOM,
-            status=RoleStatus.DELETED,
+            source=RoleSourceDTO.CUSTOM,
+            status=RoleStatusDTO.DELETED,
             created_at=now,
             updated_at=now,
             deleted_at=now,
         )
         assert node.deleted_at == now
-        assert node.status == RoleStatus.DELETED
+        assert node.status == RoleStatusDTO.DELETED
 
     def test_system_source(self) -> None:
         role_id = uuid.uuid4()
@@ -113,12 +115,12 @@ class TestRoleNodeCreation:
         node = RoleNode(
             id=role_id,
             name="SystemRole",
-            source=RoleSource.SYSTEM,
-            status=RoleStatus.ACTIVE,
+            source=RoleSourceDTO.SYSTEM,
+            status=RoleStatusDTO.ACTIVE,
             created_at=now,
             updated_at=now,
         )
-        assert node.source == RoleSource.SYSTEM
+        assert node.source == RoleSourceDTO.SYSTEM
 
     def test_inactive_status(self) -> None:
         role_id = uuid.uuid4()
@@ -126,12 +128,12 @@ class TestRoleNodeCreation:
         node = RoleNode(
             id=role_id,
             name="InactiveRole",
-            source=RoleSource.CUSTOM,
-            status=RoleStatus.INACTIVE,
+            source=RoleSourceDTO.CUSTOM,
+            status=RoleStatusDTO.INACTIVE,
             created_at=now,
             updated_at=now,
         )
-        assert node.status == RoleStatus.INACTIVE
+        assert node.status == RoleStatusDTO.INACTIVE
 
 
 class TestRoleNodeWithPermissions:
@@ -143,8 +145,8 @@ class TestRoleNodeWithPermissions:
         node = RoleNode(
             id=role_id,
             name="Admin",
-            source=RoleSource.CUSTOM,
-            status=RoleStatus.ACTIVE,
+            source=RoleSourceDTO.CUSTOM,
+            status=RoleStatusDTO.ACTIVE,
             created_at=now,
             updated_at=now,
         )
@@ -160,8 +162,8 @@ class TestRoleNodeWithPermissions:
         node = RoleNode(
             id=role_id,
             name="Admin",
-            source=RoleSource.CUSTOM,
-            status=RoleStatus.ACTIVE,
+            source=RoleSourceDTO.CUSTOM,
+            status=RoleStatusDTO.ACTIVE,
             created_at=now,
             updated_at=now,
             permissions=[perm],
@@ -181,8 +183,8 @@ class TestRoleNodeWithPermissions:
         node = RoleNode(
             id=role_id,
             name="PowerUser",
-            source=RoleSource.CUSTOM,
-            status=RoleStatus.ACTIVE,
+            source=RoleSourceDTO.CUSTOM,
+            status=RoleStatusDTO.ACTIVE,
             created_at=now,
             updated_at=now,
             permissions=perms,
@@ -200,8 +202,8 @@ class TestRoleNodeWithPermissions:
         node = RoleNode(
             id=role_id,
             name="Admin",
-            source=RoleSource.CUSTOM,
-            status=RoleStatus.ACTIVE,
+            source=RoleSourceDTO.CUSTOM,
+            status=RoleStatusDTO.ACTIVE,
             created_at=now,
             updated_at=now,
             permissions=[perm],
@@ -223,8 +225,8 @@ class TestRoleNodeWithPermissions:
         node = RoleNode(
             id=role_id,
             name="Admin",
-            source=RoleSource.CUSTOM,
-            status=RoleStatus.ACTIVE,
+            source=RoleSourceDTO.CUSTOM,
+            status=RoleStatusDTO.ACTIVE,
             created_at=now,
             updated_at=now,
             permissions=perms,
@@ -245,8 +247,8 @@ class TestCreateRolePayload:
         role_node = RoleNode(
             id=role_id,
             name="Admin",
-            source=RoleSource.CUSTOM,
-            status=RoleStatus.ACTIVE,
+            source=RoleSourceDTO.CUSTOM,
+            status=RoleStatusDTO.ACTIVE,
             created_at=now,
             updated_at=now,
         )
@@ -261,8 +263,8 @@ class TestCreateRolePayload:
             id=role_id,
             name="Admin",
             description="Admin role",
-            source=RoleSource.CUSTOM,
-            status=RoleStatus.ACTIVE,
+            source=RoleSourceDTO.CUSTOM,
+            status=RoleStatusDTO.ACTIVE,
             created_at=now,
             updated_at=now,
         )
@@ -276,8 +278,8 @@ class TestCreateRolePayload:
         role_node = RoleNode(
             id=role_id,
             name="Admin",
-            source=RoleSource.CUSTOM,
-            status=RoleStatus.ACTIVE,
+            source=RoleSourceDTO.CUSTOM,
+            status=RoleStatusDTO.ACTIVE,
             created_at=now,
             updated_at=now,
         )
@@ -286,7 +288,7 @@ class TestCreateRolePayload:
         restored = CreateRolePayload.model_validate_json(json_str)
         assert restored.role.id == role_id
         assert restored.role.name == "Admin"
-        assert restored.role.source == RoleSource.CUSTOM
+        assert restored.role.source == RoleSourceDTO.CUSTOM
 
     def test_nested_permissions_in_payload(self) -> None:
         role_id = uuid.uuid4()
@@ -298,8 +300,8 @@ class TestCreateRolePayload:
         role_node = RoleNode(
             id=role_id,
             name="Admin",
-            source=RoleSource.CUSTOM,
-            status=RoleStatus.ACTIVE,
+            source=RoleSourceDTO.CUSTOM,
+            status=RoleStatusDTO.ACTIVE,
             created_at=now,
             updated_at=now,
             permissions=[perm],
@@ -318,8 +320,8 @@ class TestUpdateRolePayload:
         role_node = RoleNode(
             id=role_id,
             name="UpdatedAdmin",
-            source=RoleSource.CUSTOM,
-            status=RoleStatus.ACTIVE,
+            source=RoleSourceDTO.CUSTOM,
+            status=RoleStatusDTO.ACTIVE,
             created_at=now,
             updated_at=now,
         )
@@ -334,8 +336,8 @@ class TestUpdateRolePayload:
             id=role_id,
             name="UpdatedAdmin",
             description="Updated description",
-            source=RoleSource.CUSTOM,
-            status=RoleStatus.INACTIVE,
+            source=RoleSourceDTO.CUSTOM,
+            status=RoleStatusDTO.INACTIVE,
             created_at=now,
             updated_at=now,
         )
@@ -345,7 +347,7 @@ class TestUpdateRolePayload:
         assert restored.role.id == role_id
         assert restored.role.name == "UpdatedAdmin"
         assert restored.role.description == "Updated description"
-        assert restored.role.status == RoleStatus.INACTIVE
+        assert restored.role.status == RoleStatusDTO.INACTIVE
 
 
 class TestDeleteRolePayload:
@@ -415,8 +417,8 @@ class TestRoleNodeRoundTrip:
             id=role_id,
             name="Admin",
             description="Admin role",
-            source=RoleSource.CUSTOM,
-            status=RoleStatus.ACTIVE,
+            source=RoleSourceDTO.CUSTOM,
+            status=RoleStatusDTO.ACTIVE,
             created_at=now,
             updated_at=now,
             deleted_at=None,
@@ -441,8 +443,8 @@ class TestRoleNodeRoundTrip:
         node = RoleNode(
             id=role_id,
             name="DeletedRole",
-            source=RoleSource.CUSTOM,
-            status=RoleStatus.DELETED,
+            source=RoleSourceDTO.CUSTOM,
+            status=RoleStatusDTO.DELETED,
             created_at=now,
             updated_at=now,
             deleted_at=now,
@@ -450,7 +452,7 @@ class TestRoleNodeRoundTrip:
         json_str = node.model_dump_json()
         restored = RoleNode.model_validate_json(json_str)
         assert restored.id == role_id
-        assert restored.status == RoleStatus.DELETED
+        assert restored.status == RoleStatusDTO.DELETED
         assert restored.deleted_at is not None
 
     def test_round_trip_empty_permissions(self) -> None:
@@ -459,8 +461,8 @@ class TestRoleNodeRoundTrip:
         node = RoleNode(
             id=role_id,
             name="BasicRole",
-            source=RoleSource.SYSTEM,
-            status=RoleStatus.ACTIVE,
+            source=RoleSourceDTO.SYSTEM,
+            status=RoleStatusDTO.ACTIVE,
             created_at=now,
             updated_at=now,
             permissions=[],

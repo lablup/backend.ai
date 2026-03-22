@@ -9,20 +9,122 @@ from uuid import UUID
 from pydantic import Field, field_validator
 
 from ai.backend.common.api_handlers import BaseRequestModel
-from ai.backend.common.dto.manager.query import StringFilter
+from ai.backend.common.dto.manager.query import DateTimeFilter, StringFilter, UUIDFilter
 
-from .types import ImageOrderField, OrderDirection
+from .types import ImageOrderField, ImageStatusType, OrderDirection
 
 __all__ = (
+    "AdminSearchImageAliasesInput",
+    "AdminSearchImagesInput",
     "AliasImageInput",
+    "ContainerRegistryScopeInputDTO",
     "DealiasImageInput",
     "ForgetImageInput",
+    "ImageAliasFilterInputDTO",
+    "ImageAliasNestedFilterInputDTO",
+    "ImageAliasOrderByInputDTO",
     "ImageFilter",
+    "ImageFilterInputDTO",
     "ImageOrder",
+    "ImageOrderByInputDTO",
+    "ImageScopeInputDTO",
+    "ImageStatusFilterInputDTO",
     "PurgeImageInput",
     "RescanImagesInput",
     "SearchImagesInput",
+    "UUIDFilter",
 )
+
+
+class ContainerRegistryScopeInputDTO(BaseRequestModel):
+    """Scope for querying images within a specific container registry."""
+
+    registry_id: UUID = Field(description="UUID of the container registry to scope the query to.")
+
+
+class ImageScopeInputDTO(BaseRequestModel):
+    """Scope for querying aliases within a specific image."""
+
+    image_id: UUID = Field(description="UUID of the image to scope the query to.")
+
+
+class ImageStatusFilterInputDTO(BaseRequestModel):
+    """Filter for image status."""
+
+    equals: ImageStatusType | None = Field(
+        default=None, description="Matches images with this exact status."
+    )
+    in_: list[ImageStatusType] | None = Field(
+        default=None, description="Matches images whose status is in this list."
+    )
+    not_equals: ImageStatusType | None = Field(
+        default=None, description="Excludes images with this exact status."
+    )
+    not_in: list[ImageStatusType] | None = Field(
+        default=None, description="Excludes images whose status is in this list."
+    )
+
+
+class ImageAliasNestedFilterInputDTO(BaseRequestModel):
+    """Nested filter for image aliases within an image."""
+
+    alias: StringFilter | None = Field(default=None, description="Filter by alias string.")
+
+
+class ImageFilterInputDTO(BaseRequestModel):
+    """Filter options for images."""
+
+    status: ImageStatusFilterInputDTO | None = Field(default=None, description="Filter by status.")
+    name: StringFilter | None = Field(default=None, description="Filter by name.")
+    architecture: StringFilter | None = Field(default=None, description="Filter by architecture.")
+    registry_id: UUIDFilter | None = Field(
+        default=None, description="Filter by container registry ID."
+    )
+    alias: ImageAliasNestedFilterInputDTO | None = Field(
+        default=None, description="Filter by nested alias conditions."
+    )
+    last_used: DateTimeFilter | None = Field(
+        default=None, description="Filter by last used datetime (before/after)."
+    )
+    AND: list[ImageFilterInputDTO] | None = Field(
+        default=None, description="Combine with AND logic."
+    )
+    OR: list[ImageFilterInputDTO] | None = Field(default=None, description="Combine with OR logic.")
+    NOT: list[ImageFilterInputDTO] | None = Field(default=None, description="Negate filters.")
+
+
+ImageFilterInputDTO.model_rebuild()
+
+
+class ImageOrderByInputDTO(BaseRequestModel):
+    """Order specification for image queries."""
+
+    field: ImageOrderField = Field(description="Field to order by.")
+    direction: OrderDirection = Field(default=OrderDirection.ASC, description="Order direction.")
+
+
+class ImageAliasFilterInputDTO(BaseRequestModel):
+    """Filter options for image aliases."""
+
+    alias: StringFilter | None = Field(default=None, description="Filter by alias string.")
+    image_id: UUIDFilter | None = Field(default=None, description="Filter by image ID.")
+    AND: list[ImageAliasFilterInputDTO] | None = Field(
+        default=None, description="Combine with AND logic."
+    )
+    OR: list[ImageAliasFilterInputDTO] | None = Field(
+        default=None, description="Combine with OR logic."
+    )
+    NOT: list[ImageAliasFilterInputDTO] | None = Field(default=None, description="Negate filters.")
+
+
+ImageAliasFilterInputDTO.model_rebuild()
+
+
+class ImageAliasOrderByInputDTO(BaseRequestModel):
+    """Order specification for image alias queries."""
+
+    field: str = Field(description="Field to order by.")
+    direction: OrderDirection = Field(default=OrderDirection.ASC, description="Order direction.")
 
 
 class ImageFilter(BaseRequestModel):
@@ -86,3 +188,33 @@ class PurgeImageInput(BaseRequestModel):
     """Input for purging (hard-deleting) an image."""
 
     image_id: UUID = Field(description="ID of the image to purge")
+
+
+class AdminSearchImagesInput(BaseRequestModel):
+    """Input for admin search of images with cursor and offset pagination."""
+
+    filter: ImageFilterInputDTO | None = Field(default=None, description="Filter conditions.")
+    order: list[ImageOrderByInputDTO] | None = Field(
+        default=None, description="Order specifications."
+    )
+    first: int | None = Field(default=None, description="Cursor pagination: number of items.")
+    after: str | None = Field(default=None, description="Cursor pagination: after cursor.")
+    last: int | None = Field(default=None, description="Cursor pagination: last N items.")
+    before: str | None = Field(default=None, description="Cursor pagination: before cursor.")
+    limit: int | None = Field(default=None, description="Offset pagination: maximum items.")
+    offset: int | None = Field(default=None, description="Offset pagination: number to skip.")
+
+
+class AdminSearchImageAliasesInput(BaseRequestModel):
+    """Input for admin search of image aliases with cursor and offset pagination."""
+
+    filter: ImageAliasFilterInputDTO | None = Field(default=None, description="Filter conditions.")
+    order: list[ImageAliasOrderByInputDTO] | None = Field(
+        default=None, description="Order specifications."
+    )
+    first: int | None = Field(default=None, description="Cursor pagination: number of items.")
+    after: str | None = Field(default=None, description="Cursor pagination: after cursor.")
+    last: int | None = Field(default=None, description="Cursor pagination: last N items.")
+    before: str | None = Field(default=None, description="Cursor pagination: before cursor.")
+    limit: int | None = Field(default=None, description="Offset pagination: maximum items.")
+    offset: int | None = Field(default=None, description="Offset pagination: number to skip.")

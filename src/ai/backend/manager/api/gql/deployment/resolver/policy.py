@@ -12,9 +12,6 @@ from ai.backend.manager.api.gql.deployment.types.policy import (
 )
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.api.gql.utils import check_admin_only, dedent_strip
-from ai.backend.manager.services.deployment.actions.deployment_policy.upsert_deployment_policy import (
-    UpsertDeploymentPolicyAction,
-)
 
 
 @strawberry.mutation(  # type: ignore[misc]
@@ -30,13 +27,7 @@ async def update_deployment_policy(
 ) -> UpdateDeploymentPolicyPayloadGQL:
     """Update (upsert) a deployment policy for a deployment."""
     check_admin_only()
-    upserter = input.to_upserter()
-
-    processor = info.context.processors.deployment
-    result = await processor.upsert_deployment_policy.wait_for_complete(
-        UpsertDeploymentPolicyAction(upserter=upserter)
-    )
-
+    payload = await info.context.adapters.deployment.upsert_policy(input.to_pydantic())
     return UpdateDeploymentPolicyPayloadGQL(
-        deployment_policy=DeploymentPolicyGQL.from_data(result.data),
+        deployment_policy=DeploymentPolicyGQL.from_pydantic(payload.policy),
     )

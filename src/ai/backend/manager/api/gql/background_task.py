@@ -20,6 +20,7 @@ from ai.backend.common.events.event_types.bgtask.broadcast import (
 from ai.backend.common.events.hub.propagators.cache import WithCachePropagator
 from ai.backend.common.events.types import EventCacheDomain, EventDomain
 from ai.backend.logging import BraceStyleAdapter
+from ai.backend.manager.api.gql.decorators import BackendAIGQLMeta, gql_type
 from ai.backend.manager.errors.bgtask import InvalidBgtaskId
 
 if TYPE_CHECKING:
@@ -38,7 +39,12 @@ class BgtaskEventType(StrEnum):
     FAILED = "FAILED"
 
 
-@strawberry.type(description="Background task event payload")
+@gql_type(
+    BackendAIGQLMeta(
+        added_version="24.3.0",
+        description="Background task event payload.",
+    ),
+)
 class BackgroundTaskEventPayload:
     """
     Unified payload for all background task events.

@@ -21,6 +21,7 @@ from ai.backend.manager.models.agent import AgentRow
 from ai.backend.manager.models.container_registry import ContainerRegistryRow
 from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.endpoint import EndpointRow
+from ai.backend.manager.models.endpoint.conditions import DeploymentConditions
 from ai.backend.manager.models.group import GroupRow
 from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.image import ImageRow
@@ -33,6 +34,7 @@ from ai.backend.manager.models.resource_policy import (
 )
 from ai.backend.manager.models.resource_preset import ResourcePresetRow
 from ai.backend.manager.models.routing import RoutingRow
+from ai.backend.manager.models.routing.conditions import RouteConditions
 from ai.backend.manager.models.scaling_group import ScalingGroupOpts, ScalingGroupRow
 from ai.backend.manager.models.scheduling_history import DeploymentHistoryRow, RouteHistoryRow
 from ai.backend.manager.models.session import SessionRow
@@ -41,12 +43,11 @@ from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.vfolder import VFolderRow
 from ai.backend.manager.repositories.base.creator import BulkCreator
 from ai.backend.manager.repositories.base.updater import BatchUpdater
-from ai.backend.manager.repositories.deployment import DeploymentConditions, DeploymentRepository
+from ai.backend.manager.repositories.deployment import DeploymentRepository
 from ai.backend.manager.repositories.deployment.creators import (
     EndpointLifecycleBatchUpdaterSpec,
     RouteBatchUpdaterSpec,
 )
-from ai.backend.manager.repositories.deployment.options import RouteConditions
 from ai.backend.manager.repositories.scheduling_history.creators import (
     DeploymentHistoryCreatorSpec,
     RouteHistoryCreatorSpec,

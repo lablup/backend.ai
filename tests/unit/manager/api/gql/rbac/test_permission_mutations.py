@@ -9,35 +9,26 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 from aiohttp.web_exceptions import HTTPForbidden
 
-from ai.backend.common.data.permission.types import (
-    EntityType,
-    OperationType,
-    ScopeType,
-)
+from ai.backend.common.dto.manager.v2.rbac.response import PermissionNode
+from ai.backend.common.dto.manager.v2.rbac.types import OperationTypeDTO, RBACElementTypeDTO
 from ai.backend.manager.api.gql.rbac.resolver import permission as permission_resolver
 from ai.backend.manager.api.gql.rbac.types import PermissionGQL, UpdatePermissionInput
 from ai.backend.manager.api.gql.rbac.types.permission import (
     OperationTypeGQL,
     RBACElementTypeGQL,
 )
-from ai.backend.manager.data.permission.permission import PermissionData
-from ai.backend.manager.errors.common import ObjectNotFound
-from ai.backend.manager.services.permission_contoller.actions.update_permission import (
-    UpdatePermissionAction,
-    UpdatePermissionActionResult,
-)
 
 
-def _make_permission_data(
+def _make_permission_node(
     *,
     permission_id: uuid.UUID | None = None,
     role_id: uuid.UUID | None = None,
-    scope_type: ScopeType = ScopeType.DOMAIN,
+    scope_type: RBACElementTypeDTO = RBACElementTypeDTO.DOMAIN,
     scope_id: str = "default",
-    entity_type: EntityType = EntityType.VFOLDER,
-    operation: OperationType = OperationType.READ,
-) -> PermissionData:
-    return PermissionData(
+    entity_type: RBACElementTypeDTO = RBACElementTypeDTO.VFOLDER,
+    operation: OperationTypeDTO = OperationTypeDTO.READ,
+) -> PermissionNode:
+    return PermissionNode(
         id=permission_id or uuid.uuid4(),
         role_id=role_id or uuid.uuid4(),
         scope_type=scope_type,
@@ -47,17 +38,9 @@ def _make_permission_data(
     )
 
 
-def _create_mock_context(update_permission_processor: AsyncMock) -> MagicMock:
-    context = MagicMock()
-    context.processors = MagicMock()
-    context.processors.permission_controller = MagicMock()
-    context.processors.permission_controller.update_permission = update_permission_processor
-    return context
-
-
-def _create_mock_info(context: MagicMock) -> MagicMock:
+def _create_mock_info(update_permission_adapter: AsyncMock) -> MagicMock:
     info = MagicMock()
-    info.context = context
+    info.context.adapters.rbac.update_permission = update_permission_adapter
     return info
 
 
@@ -68,25 +51,20 @@ class TestAdminUpdatePermission:
             yield
 
     @pytest.fixture
-    def mock_processor(self) -> AsyncMock:
-        processor = AsyncMock()
-        processor.wait_for_complete = AsyncMock()
-        return processor
+    def mock_adapter_method(self) -> AsyncMock:
+        return AsyncMock()
 
     async def test_calls_processor_with_correct_action(
         self,
-        mock_processor: AsyncMock,
+        mock_adapter_method: AsyncMock,
     ) -> None:
         permission_id = uuid.uuid4()
-        perm_data = _make_permission_data(
+        perm_node = _make_permission_node(
             permission_id=permission_id,
-            operation=OperationType.UPDATE,
+            operation=OperationTypeDTO.UPDATE,
         )
-        mock_processor.wait_for_complete.return_value = UpdatePermissionActionResult(
-            data=perm_data,
-        )
-        context = _create_mock_context(mock_processor)
-        info = _create_mock_info(context)
+        mock_adapter_method.return_value = perm_node
+        info = _create_mock_info(mock_adapter_method)
 
         input_data = UpdatePermissionInput(
             id=permission_id,
@@ -96,41 +74,32 @@ class TestAdminUpdatePermission:
         resolver_fn = permission_resolver.admin_update_permission.base_resolver
         result = await resolver_fn(info=info, input=input_data)
 
-        mock_processor.wait_for_complete.assert_called_once()
-        call_args = mock_processor.wait_for_complete.call_args
-        action = call_args[0][0]
-        assert isinstance(action, UpdatePermissionAction)
-        assert action.updater.pk_value == permission_id
-
+        mock_adapter_method.assert_called_once()
         assert isinstance(result, PermissionGQL)
 
     async def test_partial_update_only_operation(
         self,
-        mock_processor: AsyncMock,
+        mock_adapter_method: AsyncMock,
     ) -> None:
         permission_id = uuid.uuid4()
-        perm_data = _make_permission_data(
+        perm_node = _make_permission_node(
             permission_id=permission_id,
-            operation=OperationType.UPDATE,
+            operation=OperationTypeDTO.UPDATE,
         )
-        mock_processor.wait_for_complete.return_value = UpdatePermissionActionResult(
-            data=perm_data,
-        )
-        context = _create_mock_context(mock_processor)
-        info = _create_mock_info(context)
+        mock_adapter_method.return_value = perm_node
+        info = _create_mock_info(mock_adapter_method)
 
         input_data = UpdatePermissionInput(
             id=permission_id,
             operation=OperationTypeGQL.UPDATE,
         )
-        updater = input_data.to_updater()
-        values = updater.spec.build_values()
+        dto = input_data.to_pydantic()
 
-        assert "operation" in values
-        assert values["operation"] == OperationType.UPDATE
-        assert "scope_type" not in values
-        assert "scope_id" not in values
-        assert "entity_type" not in values
+        assert dto.id == permission_id
+        assert dto.operation is not None
+        assert dto.scope_type is None
+        assert dto.scope_id is None
+        assert dto.entity_type is None
 
         resolver_fn = permission_resolver.admin_update_permission.base_resolver
         result = await resolver_fn(info=info, input=input_data)
@@ -138,21 +107,18 @@ class TestAdminUpdatePermission:
 
     async def test_full_update_all_fields(
         self,
-        mock_processor: AsyncMock,
+        mock_adapter_method: AsyncMock,
     ) -> None:
         permission_id = uuid.uuid4()
-        perm_data = _make_permission_data(
+        perm_node = _make_permission_node(
             permission_id=permission_id,
-            scope_type=ScopeType.PROJECT,
+            scope_type=RBACElementTypeDTO.PROJECT,
             scope_id="project-1",
-            entity_type=EntityType.SESSION,
-            operation=OperationType.CREATE,
+            entity_type=RBACElementTypeDTO.SESSION,
+            operation=OperationTypeDTO.CREATE,
         )
-        mock_processor.wait_for_complete.return_value = UpdatePermissionActionResult(
-            data=perm_data,
-        )
-        context = _create_mock_context(mock_processor)
-        info = _create_mock_info(context)
+        mock_adapter_method.return_value = perm_node
+        info = _create_mock_info(mock_adapter_method)
 
         input_data = UpdatePermissionInput(
             id=permission_id,
@@ -161,28 +127,27 @@ class TestAdminUpdatePermission:
             entity_type=RBACElementTypeGQL.SESSION,
             operation=OperationTypeGQL.CREATE,
         )
-        updater = input_data.to_updater()
-        values = updater.spec.build_values()
+        dto = input_data.to_pydantic()
 
-        assert values["scope_type"] == ScopeType.PROJECT
-        assert values["scope_id"] == "project-1"
-        assert values["entity_type"] == EntityType.SESSION
-        assert values["operation"] == OperationType.CREATE
+        assert dto.id == permission_id
+        assert dto.scope_type is not None
+        assert dto.scope_id == "project-1"
+        assert dto.entity_type is not None
+        assert dto.operation is not None
 
         resolver_fn = permission_resolver.admin_update_permission.base_resolver
         result = await resolver_fn(info=info, input=input_data)
         assert isinstance(result, PermissionGQL)
 
-    async def test_propagates_object_not_found(
+    async def test_propagates_exception(
         self,
-        mock_processor: AsyncMock,
+        mock_adapter_method: AsyncMock,
     ) -> None:
         permission_id = uuid.uuid4()
-        mock_processor.wait_for_complete.side_effect = ObjectNotFound(
+        mock_adapter_method.side_effect = ValueError(
             f"Permission with ID {permission_id} does not exist."
         )
-        context = _create_mock_context(mock_processor)
-        info = _create_mock_info(context)
+        info = _create_mock_info(mock_adapter_method)
 
         input_data = UpdatePermissionInput(
             id=permission_id,
@@ -190,28 +155,25 @@ class TestAdminUpdatePermission:
         )
 
         resolver_fn = permission_resolver.admin_update_permission.base_resolver
-        with pytest.raises(ObjectNotFound):
+        with pytest.raises(ValueError):
             await resolver_fn(info=info, input=input_data)
 
     async def test_returns_correct_gql_fields(
         self,
-        mock_processor: AsyncMock,
+        mock_adapter_method: AsyncMock,
     ) -> None:
         permission_id = uuid.uuid4()
         role_id = uuid.uuid4()
-        perm_data = _make_permission_data(
+        perm_node = _make_permission_node(
             permission_id=permission_id,
             role_id=role_id,
-            scope_type=ScopeType.DOMAIN,
+            scope_type=RBACElementTypeDTO.DOMAIN,
             scope_id="default",
-            entity_type=EntityType.VFOLDER,
-            operation=OperationType.READ,
+            entity_type=RBACElementTypeDTO.VFOLDER,
+            operation=OperationTypeDTO.READ,
         )
-        mock_processor.wait_for_complete.return_value = UpdatePermissionActionResult(
-            data=perm_data,
-        )
-        context = _create_mock_context(mock_processor)
-        info = _create_mock_info(context)
+        mock_adapter_method.return_value = perm_node
+        info = _create_mock_info(mock_adapter_method)
 
         input_data = UpdatePermissionInput(
             id=permission_id,
@@ -231,8 +193,7 @@ class TestAdminUpdatePermission:
 
 class TestAdminUpdatePermissionAccessControl:
     async def test_rejects_non_superadmin(self) -> None:
-        context = MagicMock()
-        info = _create_mock_info(context)
+        info = MagicMock()
         input_data = UpdatePermissionInput(
             id=uuid.uuid4(),
             operation=OperationTypeGQL.READ,

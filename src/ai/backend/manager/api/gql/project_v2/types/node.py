@@ -3,14 +3,25 @@
 from __future__ import annotations
 
 from collections.abc import Iterable
-from typing import TYPE_CHECKING, Annotated, Any, Self
+from typing import TYPE_CHECKING, Annotated, Any, Self, cast
 from uuid import UUID
 
 import strawberry
-from strawberry import ID, Info
-from strawberry.relay import Connection, Edge, Node, NodeID
+from strawberry import Info
+from strawberry.relay import Connection, Edge, NodeID
 
+from ai.backend.common.dto.manager.v2.fair_share.types import (
+    ProjectFairShareScopeDTO,
+    ProjectUsageScopeDTO,
+)
+from ai.backend.common.dto.manager.v2.group.response import ProjectNode
+from ai.backend.manager.api.gql.decorators import (
+    BackendAIGQLMeta,
+    gql_connection_type,
+    gql_pydantic_input,
+)
 from ai.backend.manager.api.gql.fair_share.types import ProjectFairShareGQL
+from ai.backend.manager.api.gql.pydantic_compat import PydanticInputMixin, PydanticNodeMixin
 from ai.backend.manager.api.gql.resource_slot.overview_types import ActiveResourceOverviewGQL
 from ai.backend.manager.api.gql.resource_usage.types import (
     ProjectUsageBucketConnection,
@@ -19,24 +30,26 @@ from ai.backend.manager.api.gql.resource_usage.types import (
 )
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 
-from .enums import ProjectTypeEnum, VFolderHostPermissionEnum
 from .nested import (
     ProjectBasicInfoGQL,
     ProjectLifecycleInfoGQL,
     ProjectOrganizationInfoGQL,
     ProjectStorageInfoGQL,
-    VFolderHostPermissionEntryGQL,
 )
 
 if TYPE_CHECKING:
     from ai.backend.manager.api.gql.domain_v2.types.node import DomainV2GQL
     from ai.backend.manager.api.gql.user.types.filters import UserFilterGQL, UserOrderByGQL
     from ai.backend.manager.api.gql.user.types.node import UserV2Connection
-    from ai.backend.manager.data.group.types import GroupData
 
 
-@strawberry.input(name="ProjectFairShareScope")
-class ProjectFairShareScopeGQL:
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description="Scope parameters for filtering project fair shares.", added_version="24.09.0"
+    ),
+    name="ProjectFairShareScope",
+)
+class ProjectFairShareScopeGQL(PydanticInputMixin[ProjectFairShareScopeDTO]):
     """Scope parameters for filtering project fair shares."""
 
     resource_group_name: str = strawberry.field(
@@ -44,8 +57,13 @@ class ProjectFairShareScopeGQL:
     )
 
 
-@strawberry.input(name="ProjectUsageScope")
-class ProjectUsageScopeGQL:
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description="Scope parameters for filtering project usage buckets.", added_version="24.09.0"
+    ),
+    name="ProjectUsageScope",
+)
+class ProjectUsageScopeGQL(PydanticInputMixin[ProjectUsageScopeDTO]):
     """Scope parameters for filtering project usage buckets."""
 
     resource_group_name: str = strawberry.field(
@@ -65,7 +83,7 @@ class ProjectUsageScopeGQL:
         "Resource allocation and container registry are provided through separate dedicated APIs."
     ),
 )
-class ProjectV2GQL(Node):
+class ProjectV2GQL(PydanticNodeMixin[ProjectNode]):
     """Project entity with structured field groups."""
 
     id: NodeID[str] = strawberry.field(description="Unique identifier for the project (UUID).")
@@ -95,15 +113,16 @@ class ProjectV2GQL(Node):
         info: Info,
         scope: ProjectFairShareScopeGQL,
     ) -> ProjectFairShareGQL:
-        from ai.backend.manager.api.gql.fair_share.fetcher.project import (
-            fetch_single_project_fair_share,
+        from ai.backend.common.dto.manager.v2.fair_share.request import GetProjectFairShareInput
+
+        payload = await info.context.adapters.fair_share.get_project(
+            GetProjectFairShareInput(
+                resource_group=scope.resource_group_name,
+                project_id=UUID(str(self.id)),
+            )
         )
 
-        return await fetch_single_project_fair_share(
-            info=info,
-            resource_group_name=scope.resource_group_name,
-            project_id=UUID(str(self.id)),
-        )
+        return ProjectFairShareGQL.from_pydantic(payload.item)
 
     @strawberry.field(  # type: ignore[misc]
         description=(
@@ -115,14 +134,10 @@ class ProjectV2GQL(Node):
         self,
         info: Info,
     ) -> ActiveResourceOverviewGQL:
-        from ai.backend.manager.services.resource_slot.actions.get_project_resource_overview import (
-            GetProjectResourceOverviewAction,
+        dto = await info.context.adapters.resource_slot.get_project_resource_overview(
+            UUID(str(self.id))
         )
-
-        result = await info.context.processors.resource_slot.get_project_resource_overview.wait_for_complete(
-            GetProjectResourceOverviewAction(project_id=UUID(str(self.id)))
-        )
-        return ActiveResourceOverviewGQL.from_occupancy(result.item)
+        return ActiveResourceOverviewGQL.from_pydantic(dto)
 
     @strawberry.field(  # type: ignore[misc]
         description=(
@@ -143,35 +158,46 @@ class ProjectV2GQL(Node):
         limit: int | None = None,
         offset: int | None = None,
     ) -> ProjectUsageBucketConnection:
-        from ai.backend.manager.api.gql.resource_usage.fetcher.project_usage import (
-            fetch_rg_project_usage_buckets,
+        from strawberry.relay import PageInfo
+
+        from ai.backend.manager.api.gql.base import encode_cursor
+        from ai.backend.manager.api.gql.resource_usage.types import (
+            ProjectUsageBucketEdge,
+            ProjectUsageBucketGQL,
         )
         from ai.backend.manager.repositories.resource_usage_history.types import (
             ProjectUsageBucketSearchScope,
         )
 
-        # Create repository scope with context information
         repository_scope = ProjectUsageBucketSearchScope(
             resource_group=scope.resource_group_name,
             domain_name=self.organization.domain_name,
             project_id=UUID(str(self.id)),
         )
-
-        # No additional filters needed (scope includes all entity info)
-        base_conditions = None
-
-        return await fetch_rg_project_usage_buckets(
-            info=info,
+        payload = await info.context.adapters.resource_usage.gql_search_project_scoped(
             scope=repository_scope,
-            filter=filter,
-            order_by=order_by,
-            before=before,
-            after=after,
+            filter=filter.to_pydantic() if filter else None,
+            order=[o.to_pydantic() for o in order_by] if order_by else None,
             first=first,
+            after=after,
             last=last,
+            before=before,
             limit=limit,
             offset=offset,
-            base_conditions=base_conditions,
+        )
+        nodes = [ProjectUsageBucketGQL.from_pydantic(item) for item in payload.items]
+        edges = [
+            ProjectUsageBucketEdge(node=node, cursor=encode_cursor(str(node.id))) for node in nodes
+        ]
+        return ProjectUsageBucketConnection(
+            edges=edges,
+            page_info=PageInfo(
+                has_next_page=payload.has_next_page,
+                has_previous_page=payload.has_previous_page,
+                start_cursor=edges[0].cursor if edges else None,
+                end_cursor=edges[-1].cursor if edges else None,
+            ),
+            count=payload.total_count,
         )
 
     @strawberry.field(  # type: ignore[misc]
@@ -184,13 +210,14 @@ class ProjectV2GQL(Node):
         DomainV2GQL,
         strawberry.lazy("ai.backend.manager.api.gql.domain_v2.types.node"),
     ]:
-        from ai.backend.manager.api.gql.domain_v2.types.node import DomainV2GQL
         from ai.backend.manager.errors.resource import DomainNotFound
 
-        data = await info.context.data_loaders.domain_loader.load(self.organization.domain_name)
-        if data is None:
+        domain: DomainV2GQL | None = await info.context.data_loaders.domain_loader.load(
+            self.organization.domain_name
+        )
+        if domain is None:
             raise DomainNotFound(self.organization.domain_name)
-        return DomainV2GQL.from_data(data)
+        return domain
 
     @strawberry.field(  # type: ignore[misc]
         description="Users who are members of this project.",
@@ -219,21 +246,42 @@ class ProjectV2GQL(Node):
         UserV2Connection,
         strawberry.lazy("ai.backend.manager.api.gql.user.types.node"),
     ]:
-        from ai.backend.manager.api.gql.user.fetcher.user import fetch_project_users
+        from strawberry.relay import PageInfo
+
+        from ai.backend.common.dto.manager.v2.user.request import AdminSearchUsersInput
+        from ai.backend.manager.api.gql.base import encode_cursor
+        from ai.backend.manager.api.gql.user.types.node import (
+            UserV2Connection,
+            UserV2Edge,
+            UserV2GQL,
+        )
         from ai.backend.manager.repositories.user.types import ProjectUserSearchScope
 
-        scope = ProjectUserSearchScope(project_id=UUID(str(self.id)))
-        return await fetch_project_users(
-            info=info,
-            scope=scope,
-            filter=filter,
-            order_by=order_by,
-            before=before,
-            after=after,
-            first=first,
-            last=last,
-            limit=limit,
-            offset=offset,
+        repo_scope = ProjectUserSearchScope(project_id=UUID(str(self.id)))
+        payload = await info.context.adapters.user.gql_search_by_project(
+            scope=repo_scope,
+            input=AdminSearchUsersInput(
+                filter=filter.to_pydantic() if filter else None,
+                order=[o.to_pydantic() for o in order_by] if order_by else None,
+                first=first,
+                after=after,
+                last=last,
+                before=before,
+                limit=limit,
+                offset=offset,
+            ),
+        )
+        nodes = [UserV2GQL.from_pydantic(item) for item in payload.items]
+        edges = [UserV2Edge(node=node, cursor=encode_cursor(str(node.id))) for node in nodes]
+        return UserV2Connection(
+            edges=edges,
+            page_info=PageInfo(
+                has_next_page=payload.has_next_page,
+                has_previous_page=payload.has_previous_page,
+                start_cursor=edges[0].cursor if edges else None,
+                end_cursor=edges[-1].cursor if edges else None,
+            ),
+            count=payload.total_count,
         )
 
     @classmethod
@@ -247,68 +295,21 @@ class ProjectV2GQL(Node):
         results = await info.context.data_loaders.project_loader.load_many([
             UUID(nid) for nid in node_ids
         ])
-        return [cls.from_data(data) if data is not None else None for data in results]
-
-    @classmethod
-    def from_data(
-        cls,
-        data: GroupData,
-    ) -> Self:
-        """Convert GroupData to GraphQL type.
-
-        Args:
-            data: GroupData instance from the data layer.
-
-        Returns:
-            ProjectV2GQL instance with structured field groups.
-
-        Note:
-            - All fields are directly from GroupRow (no external lookups)
-            - VFolderHostPermissionMap (dict) is converted to list[VFolderHostPermissionEntryGQL]
-            - No JSON scalars are used in the output
-            - ResourceSlot and container_registry are excluded; use dedicated APIs
-        """
-        # Convert VFolderHostPermissionMap (dict[str, set[VFolderHostPermission]]) to list of entries
-        vfolder_host_entries = [
-            VFolderHostPermissionEntryGQL(
-                host=host,
-                permissions=[VFolderHostPermissionEnum(perm.value) for perm in perms],
-            )
-            for host, perms in data.allowed_vfolder_hosts.items()
-        ]
-
-        return cls(
-            id=ID(str(data.id)),
-            basic_info=ProjectBasicInfoGQL(
-                name=data.name,
-                description=data.description,
-                type=ProjectTypeEnum(data.type.value),
-                integration_id=data.integration_id,
-            ),
-            organization=ProjectOrganizationInfoGQL(
-                domain_name=data.domain_name,
-                resource_policy=data.resource_policy,
-            ),
-            storage=ProjectStorageInfoGQL(
-                allowed_vfolder_hosts=vfolder_host_entries,
-            ),
-            lifecycle=ProjectLifecycleInfoGQL(
-                is_active=data.is_active,
-                created_at=data.created_at,
-                modified_at=data.modified_at,
-            ),
-        )
+        return cast(list[Self | None], results)
 
 
 ProjectV2Edge = Edge[ProjectV2GQL]
 
 
-@strawberry.type(
-    description=(
-        "Added in 26.2.0. Paginated connection for project records. "
-        "Provides relay-style cursor-based pagination for efficient traversal of project data. "
-        "Use 'edges' to access individual records with cursor information, "
-        "or 'nodes' for direct data access."
+@gql_connection_type(
+    BackendAIGQLMeta(
+        added_version="26.2.0",
+        description=(
+            "Paginated connection for project records. "
+            "Provides relay-style cursor-based pagination for efficient traversal of project data. "
+            "Use 'edges' to access individual records with cursor information, "
+            "or 'nodes' for direct data access."
+        ),
     )
 )
 class ProjectV2Connection(Connection[ProjectV2GQL]):

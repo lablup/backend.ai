@@ -6,30 +6,34 @@ import uuid
 from collections.abc import Iterable
 from datetime import datetime
 from enum import StrEnum
-from typing import Self, override
+from typing import Any, Self, cast
 
 import strawberry
-from strawberry import ID, Info
-from strawberry.relay import Node, NodeID
+from strawberry import Info
+from strawberry.relay import Connection, Edge, NodeID
 
 from ai.backend.common.data.permission.types import RBACElementType
+from ai.backend.common.dto.manager.v2.rbac.request import (
+    EntityFilter as EntityFilterDTO,
+)
+from ai.backend.common.dto.manager.v2.rbac.request import (
+    EntityOrderBy as EntityOrderByDTO,
+)
+from ai.backend.common.dto.manager.v2.rbac.response import (
+    AssociationScopesEntitiesNode,
+)
 from ai.backend.manager.api.gql.base import OrderDirection, StringFilter
+from ai.backend.manager.api.gql.decorators import (
+    BackendAIGQLMeta,
+    PydanticInputMixin,
+    gql_connection_type,
+    gql_node_type,
+    gql_pydantic_input,
+)
+from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin
 from ai.backend.manager.api.gql.rbac.types.entity_node import EntityNode
 from ai.backend.manager.api.gql.rbac.types.permission import RBACElementTypeGQL
 from ai.backend.manager.api.gql.types import GQLFilter, GQLOrderBy, StrawberryGQLContext
-from ai.backend.manager.data.permission.association_scopes_entities import (
-    AssociationScopesEntitiesData,
-)
-from ai.backend.manager.repositories.base import (
-    QueryCondition,
-    QueryOrder,
-    combine_conditions_or,
-    negate_conditions,
-)
-from ai.backend.manager.repositories.permission_controller.options import (
-    EntityScopeConditions,
-    EntityScopeOrders,
-)
 
 # ==================== Enums ====================
 
@@ -43,11 +47,14 @@ class EntityOrderField(StrEnum):
 # ==================== Node Types ====================
 
 
-@strawberry.type(
+@gql_node_type(
+    BackendAIGQLMeta(
+        added_version="26.3.0",
+        description="Entity reference from the association_scopes_entities table.",
+    ),
     name="EntityRef",
-    description="Added in 26.3.0. Entity reference from the association_scopes_entities table",
 )
-class EntityRefGQL(Node):
+class EntityRefGQL(PydanticNodeMixin[AssociationScopesEntitiesNode]):
     id: NodeID[str]
     scope_type: RBACElementTypeGQL
     scope_id: str
@@ -64,119 +71,45 @@ class EntityRefGQL(Node):
         info: Info[StrawberryGQLContext],
     ) -> EntityNode | None:
         from ai.backend.common.types import ImageID, SessionId
-        from ai.backend.manager.api.gql.artifact.types import ArtifactRevision
-        from ai.backend.manager.api.gql.container_registry.types import ContainerRegistryGQL
-        from ai.backend.manager.api.gql.deployment.types.deployment import ModelDeployment
-        from ai.backend.manager.api.gql.domain_v2.types.node import DomainV2GQL
-        from ai.backend.manager.api.gql.image.types import ImageV2GQL
-        from ai.backend.manager.api.gql.notification.types import (
-            NotificationChannel,
-            NotificationRule,
-        )
-        from ai.backend.manager.api.gql.project_v2.types.node import ProjectV2GQL
-        from ai.backend.manager.api.gql.rbac.types.role import RoleGQL
-        from ai.backend.manager.api.gql.resource_group.types import ResourceGroupGQL
-        from ai.backend.manager.api.gql.session.types import SessionV2GQL
-        from ai.backend.manager.api.gql.user.types.node import UserV2GQL
 
-        element_type = self.entity_type.to_element()
+        element_type = RBACElementType(self.entity_type.value)
         data_loaders = info.context.data_loaders
         match element_type:
             case RBACElementType.USER:
-                user_data = await data_loaders.user_loader.load(uuid.UUID(self.entity_id))
-                if user_data is None:
-                    return None
-                return UserV2GQL.from_data(user_data)
+                # DataLoader already returns UserV2GQL | None via from_pydantic conversion
+                return await data_loaders.user_loader.load(uuid.UUID(self.entity_id))
             case RBACElementType.PROJECT:
-                project_data = await data_loaders.project_loader.load(uuid.UUID(self.entity_id))
-                if project_data is None:
-                    return None
-                return ProjectV2GQL.from_data(project_data)
+                # DataLoader already returns ProjectV2GQL | None via from_pydantic conversion
+                return await data_loaders.project_loader.load(uuid.UUID(self.entity_id))
             case RBACElementType.DOMAIN:
-                domain_data = await data_loaders.domain_loader.load(self.entity_id)
-                if domain_data is None:
-                    return None
-                return DomainV2GQL.from_data(domain_data)
+                return await data_loaders.domain_loader.load(self.entity_id)
             case RBACElementType.ROLE:
-                role_data = await data_loaders.role_loader.load(uuid.UUID(self.entity_id))
-                if role_data is None:
-                    return None
-                return RoleGQL.from_dataclass(role_data)
+                # DataLoader already returns RoleGQL | None via from_pydantic conversion
+                return await data_loaders.role_loader.load(uuid.UUID(self.entity_id))
             case RBACElementType.IMAGE:
-                image_data = await data_loaders.image_loader.load(
-                    ImageID(uuid.UUID(self.entity_id))
-                )
-                if image_data is None:
-                    return None
-                return ImageV2GQL.from_data(image_data)
+                # DataLoader already returns ImageV2GQL | None via from_pydantic conversion
+                return await data_loaders.image_loader.load(ImageID(uuid.UUID(self.entity_id)))
             case RBACElementType.MODEL_DEPLOYMENT:
-                deploy_data = await data_loaders.deployment_loader.load(uuid.UUID(self.entity_id))
-                if deploy_data is None:
-                    return None
-                return ModelDeployment.from_dataclass(deploy_data)
+                # DataLoader already returns ModelDeployment | None via from_pydantic conversion
+                return await data_loaders.deployment_loader.load(uuid.UUID(self.entity_id))
             case RBACElementType.RESOURCE_GROUP:
-                rg_data = await data_loaders.resource_group_loader.load(self.entity_id)
-                if rg_data is None:
-                    return None
-                return ResourceGroupGQL.from_dataclass(rg_data)
+                return await data_loaders.resource_group_loader.load(self.entity_id)
             case RBACElementType.NOTIFICATION_CHANNEL:
-                channel_data = await data_loaders.notification_channel_loader.load(
+                return await data_loaders.notification_channel_loader.load(
                     uuid.UUID(self.entity_id)
                 )
-                if channel_data is None:
-                    return None
-                return NotificationChannel.from_dataclass(channel_data)
             case RBACElementType.NOTIFICATION_RULE:
-                rule_data = await data_loaders.notification_rule_loader.load(
-                    uuid.UUID(self.entity_id)
-                )
-                if rule_data is None:
-                    return None
-                return NotificationRule.from_dataclass(rule_data)
+                return await data_loaders.notification_rule_loader.load(uuid.UUID(self.entity_id))
             case RBACElementType.ARTIFACT_REVISION:
-                rev_data = await data_loaders.artifact_revision_loader.load(
-                    uuid.UUID(self.entity_id)
-                )
-                if rev_data is None:
-                    return None
-                return ArtifactRevision.from_dataclass(rev_data)
+                # DataLoader already returns ArtifactRevision | None via from_pydantic
+                return await data_loaders.artifact_revision_loader.load(uuid.UUID(self.entity_id))
             case RBACElementType.CONTAINER_REGISTRY:
-                cr_data = await data_loaders.container_registry_loader.load(
-                    uuid.UUID(self.entity_id)
-                )
-                if cr_data is None:
-                    return None
-                return ContainerRegistryGQL.from_data(cr_data)
+                # DataLoader already returns ContainerRegistryGQL | None via from_pydantic
+                return await data_loaders.container_registry_loader.load(uuid.UUID(self.entity_id))
             case RBACElementType.SESSION:
-                session_data = await data_loaders.session_loader.load(
-                    SessionId(uuid.UUID(self.entity_id))
-                )
-                if session_data is None:
-                    return None
-                return SessionV2GQL.from_data(session_data)
-            case (
-                RBACElementType.VFOLDER
-                | RBACElementType.KEYPAIR
-                | RBACElementType.NETWORK
-                | RBACElementType.STORAGE_HOST
-                | RBACElementType.ARTIFACT
-                | RBACElementType.ARTIFACT_REGISTRY
-                | RBACElementType.SESSION_TEMPLATE
-                | RBACElementType.APP_CONFIG
-                | RBACElementType.RESOURCE_PRESET
-                | RBACElementType.USER_RESOURCE_POLICY
-                | RBACElementType.KEYPAIR_RESOURCE_POLICY
-                | RBACElementType.PROJECT_RESOURCE_POLICY
-                | RBACElementType.AUDIT_LOG
-                | RBACElementType.EVENT_LOG
-                | RBACElementType.AGENT
-                | RBACElementType.KERNEL
-                | RBACElementType.ROUTING
-                | RBACElementType.DEPLOYMENT_TOKEN
-                | RBACElementType.DEPLOYMENT_POLICY
-                | RBACElementType.DEPLOYMENT_REVISION
-                | RBACElementType.IMAGE_ALIAS
-            ):
+                # DataLoader already returns SessionV2GQL | None via from_pydantic conversion
+                return await data_loaders.session_loader.load(SessionId(uuid.UUID(self.entity_id)))
+            case _:
                 return None
 
     @classmethod
@@ -187,106 +120,51 @@ class EntityRefGQL(Node):
         node_ids: Iterable[str],
         required: bool = False,
     ) -> Iterable[Self | None]:
+        # DataLoader already returns EntityRefGQL | None via from_pydantic conversion
         results = await info.context.data_loaders.element_association_loader.load_many([
             uuid.UUID(nid) for nid in node_ids
         ])
-        return [cls.from_dataclass(data) if data is not None else None for data in results]
-
-    @classmethod
-    def from_dataclass(cls, data: AssociationScopesEntitiesData) -> Self:
-        return cls(
-            id=ID(str(data.id)),
-            scope_type=RBACElementTypeGQL.from_element(data.scope_id.scope_type.to_element()),
-            scope_id=data.scope_id.scope_id,
-            entity_type=RBACElementTypeGQL.from_element(data.object_id.entity_type.to_element()),
-            entity_id=data.object_id.entity_id,
-            registered_at=data.registered_at,
-        )
+        return cast(list[Self | None], results)
 
 
 # ==================== Filter Types ====================
 
 
-@strawberry.input(description="Added in 26.3.0. Filter for entity associations")
-class EntityFilter(GQLFilter):
+@gql_pydantic_input(
+    BackendAIGQLMeta(description="Filter for entity associations", added_version="26.3.0"),
+    name="EntityFilter",
+)
+class EntityFilter(PydanticInputMixin[EntityFilterDTO], GQLFilter):
     entity_type: RBACElementTypeGQL | None = None
     entity_id: StringFilter | None = None
     AND: list[Self] | None = None
     OR: list[Self] | None = None
     NOT: list[Self] | None = None
 
-    @override
-    def build_conditions(self) -> list[QueryCondition]:
-        conditions: list[QueryCondition] = []
-
-        if self.entity_type is not None:
-            conditions.append(
-                EntityScopeConditions.by_entity_type(self.entity_type.to_element().to_entity_type())
-            )
-
-        if self.entity_id is not None:
-            condition = self.entity_id.build_query_condition(
-                contains_factory=EntityScopeConditions.by_entity_id_contains,
-                equals_factory=EntityScopeConditions.by_entity_id_equals,
-                starts_with_factory=EntityScopeConditions.by_entity_id_starts_with,
-                ends_with_factory=EntityScopeConditions.by_entity_id_ends_with,
-            )
-            if condition:
-                conditions.append(condition)
-
-        # Handle AND logical operator
-        if self.AND:
-            for sub_filter in self.AND:
-                conditions.extend(sub_filter.build_conditions())
-
-        # Handle OR logical operator
-        if self.OR:
-            or_sub_conditions: list[QueryCondition] = []
-            for sub_filter in self.OR:
-                or_sub_conditions.extend(sub_filter.build_conditions())
-            if or_sub_conditions:
-                conditions.append(combine_conditions_or(or_sub_conditions))
-
-        # Handle NOT logical operator
-        if self.NOT:
-            not_sub_conditions: list[QueryCondition] = []
-            for sub_filter in self.NOT:
-                not_sub_conditions.extend(sub_filter.build_conditions())
-            if not_sub_conditions:
-                conditions.append(negate_conditions(not_sub_conditions))
-
-        return conditions
-
 
 # ==================== OrderBy Types ====================
 
 
-@strawberry.input(description="Added in 26.3.0. Order by specification for entity associations")
-class EntityOrderBy(GQLOrderBy):
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description="Order by specification for entity associations", added_version="26.3.0"
+    ),
+    name="EntityOrderBy",
+)
+class EntityOrderBy(PydanticInputMixin[EntityOrderByDTO], GQLOrderBy):
     field: EntityOrderField
     direction: OrderDirection = OrderDirection.DESC
-
-    @override
-    def to_query_order(self) -> QueryOrder:
-        ascending = self.direction == OrderDirection.ASC
-        match self.field:
-            case EntityOrderField.ENTITY_TYPE:
-                return EntityScopeOrders.entity_type(ascending)
-            case EntityOrderField.REGISTERED_AT:
-                return EntityScopeOrders.registered_at(ascending)
 
 
 # ==================== Connection Types ====================
 
-
-@strawberry.type(description="Added in 26.3.0. Entity edge")
-class EntityEdge:
-    node: EntityRefGQL
-    cursor: str
+EntityEdge = Edge[EntityRefGQL]
 
 
-@strawberry.type(description="Added in 26.3.0. Entity connection")
-class EntityConnection:
-    edges: list[EntityEdge]
-    page_info: strawberry.relay.PageInfo
+@gql_connection_type(BackendAIGQLMeta(added_version="26.3.0", description="Entity connection."))
+class EntityConnection(Connection[EntityRefGQL]):
     count: int
+
+    def __init__(self, *args: Any, count: int, **kwargs: Any) -> None:
+        super().__init__(*args, **kwargs)
+        self.count = count

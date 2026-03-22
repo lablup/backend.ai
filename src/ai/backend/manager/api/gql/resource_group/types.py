@@ -3,46 +3,57 @@
 from __future__ import annotations
 
 from collections.abc import Iterable
-from datetime import datetime
 from decimal import Decimal
 from enum import StrEnum
-from typing import Self, assert_never, override
+from typing import Self
 
 import strawberry
 from strawberry import Info
-from strawberry.relay import Node, NodeID
+from strawberry.relay import NodeID
 
-from ai.backend.common.types import PreemptionMode, PreemptionOrder, ResourceSlot
+from ai.backend.common.dto.manager.v2.resource_group.request import (
+    PreemptionConfigInputDTO,
+)
+from ai.backend.common.dto.manager.v2.resource_group.request import (
+    ResourceGroupFilter as ResourceGroupFilterDTO,
+)
+from ai.backend.common.dto.manager.v2.resource_group.request import (
+    ResourceGroupOrder as ResourceGroupOrderDTO,
+)
+from ai.backend.common.dto.manager.v2.resource_group.request import (
+    UpdateResourceGroupConfigInput as UpdateResourceGroupConfigInputDTO,
+)
+from ai.backend.common.dto.manager.v2.resource_group.request import (
+    UpdateResourceGroupFairShareSpecInput as UpdateResourceGroupFairShareSpecInputDTO,
+)
+from ai.backend.common.dto.manager.v2.resource_group.response import (
+    FairShareScalingGroupSpecInfo,
+    PreemptionConfigInfo,
+    ResourceGroupDetailNode,
+    ResourceGroupMetadataInfo,
+    ResourceGroupNetworkConfigInfo,
+    ResourceGroupSchedulerConfigInfo,
+    ResourceGroupStatusInfo,
+    ResourceInfoNode,
+    UpdateResourceGroupConfigPayloadNode,
+    UpdateResourceGroupFairShareSpecPayloadNode,
+)
 from ai.backend.manager.api.gql.base import OrderDirection, StringFilter
+from ai.backend.manager.api.gql.decorators import (
+    BackendAIGQLMeta,
+    PydanticInputMixin,
+    gql_node_type,
+    gql_pydantic_input,
+    gql_pydantic_type,
+)
 from ai.backend.manager.api.gql.fair_share.types.common import (
     ResourceSlotGQL,
     ResourceWeightEntryGQL,
     ResourceWeightEntryInputGQL,
 )
-from ai.backend.manager.api.gql.types import GQLFilter, GQLOrderBy, StrawberryGQLContext
+from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin, PydanticOutputMixin
+from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.api.gql.utils import dedent_strip
-from ai.backend.manager.data.scaling_group.types import (
-    PreemptionConfig as DataPreemptionConfig,
-)
-from ai.backend.manager.data.scaling_group.types import (
-    ResourceInfo,
-    ScalingGroupData,
-    SchedulerType,
-)
-from ai.backend.manager.models.scaling_group.types import FairShareScalingGroupSpec
-from ai.backend.manager.repositories.base import (
-    QueryCondition,
-    QueryOrder,
-    combine_conditions_or,
-    negate_conditions,
-)
-from ai.backend.manager.repositories.scaling_group.options import (
-    ScalingGroupConditions,
-    ScalingGroupOrders,
-)
-from ai.backend.manager.services.scaling_group.actions.get_resource_info import (
-    GetResourceInfoAction,
-)
 
 __all__ = (
     "FairShareScalingGroupSpecGQL",
@@ -79,19 +90,6 @@ class SchedulerTypeGQL(StrEnum):
     DRF = "drf"
     FAIR_SHARE = "fair-share"
 
-    @classmethod
-    def from_scheduler_type(cls, scheduler_type: SchedulerType) -> SchedulerTypeGQL:
-        """Convert from data layer SchedulerType to GQL type."""
-        match scheduler_type:
-            case SchedulerType.FIFO:
-                return cls.FIFO
-            case SchedulerType.LIFO:
-                return cls.LIFO
-            case SchedulerType.DRF:
-                return cls.DRF
-            case SchedulerType.FAIR_SHARE:
-                return cls.FAIR_SHARE
-
 
 @strawberry.enum(
     name="PreemptionMode",
@@ -102,17 +100,6 @@ class PreemptionModeGQL(StrEnum):
 
     TERMINATE = "terminate"
     RESCHEDULE = "reschedule"
-
-    @classmethod
-    def from_preemption_mode(cls, mode: PreemptionMode) -> PreemptionModeGQL:
-        """Convert from internal PreemptionMode to GQL type."""
-        match mode:
-            case PreemptionMode.TERMINATE:
-                return cls.TERMINATE
-            case PreemptionMode.RESCHEDULE:
-                return cls.RESCHEDULE
-            case _:
-                assert_never(mode)
 
 
 @strawberry.enum(
@@ -125,105 +112,71 @@ class PreemptionOrderGQL(StrEnum):
     OLDEST = "oldest"
     NEWEST = "newest"
 
-    @classmethod
-    def from_preemption_order(cls, order: PreemptionOrder) -> PreemptionOrderGQL:
-        """Convert from internal PreemptionOrder to GQL type."""
-        match order:
-            case PreemptionOrder.OLDEST:
-                return cls.OLDEST
-            case PreemptionOrder.NEWEST:
-                return cls.NEWEST
-            case _:
-                assert_never(order)
 
-
-@strawberry.type(
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version="26.3.0",
+        description="Preemption configuration for a resource group.",
+    ),
+    model=PreemptionConfigInfo,
     name="PreemptionConfig",
-    description="Added in 26.3.0. Preemption configuration for a resource group.",
 )
-class PreemptionConfigGQL:
+class PreemptionConfigGQL(PydanticOutputMixin[PreemptionConfigInfo]):
     """Preemption configuration for GraphQL."""
 
     preemptible_priority: int = strawberry.field(
-        description=(
-            "Sessions with priority <= this value are eligible for preemption. Default is 5."
-        )
+        description="Sessions with priority <= this value are eligible for preemption."
     )
     order: PreemptionOrderGQL = strawberry.field(
-        description=(
-            "Tie-breaking order for sessions with the same priority during preemption. "
-            "'oldest' preempts the oldest session first, 'newest' preempts the newest. "
-            "Default is 'oldest'."
-        )
+        description="Tie-breaking order for same-priority sessions during preemption."
     )
     mode: PreemptionModeGQL = strawberry.field(
-        description=(
-            "How to preempt a session when preemption is triggered. "
-            "'terminate' destroys the session, 'reschedule' queues it for rescheduling. "
-            "Default is 'terminate'."
-        )
+        description="How to preempt a session when preemption is triggered."
     )
 
-    @classmethod
-    def from_dataclass(cls, data: DataPreemptionConfig) -> Self:
-        """Convert from data layer PreemptionConfig to GQL type."""
-        return cls(
-            preemptible_priority=data.preemptible_priority,
-            order=PreemptionOrderGQL.from_preemption_order(data.order),
-            mode=PreemptionModeGQL.from_preemption_mode(data.mode),
-        )
 
-
-@strawberry.type(
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version="26.2.0", description="Status information for a resource group."
+    ),
+    model=ResourceGroupStatusInfo,
+    all_fields=True,
     name="ResourceGroupStatus",
-    description="Added in 26.2.0. Status information for a resource group.",
 )
-class ResourceGroupStatusGQL:
-    """Status information for a resource group."""
-
-    is_active: bool = strawberry.field(
-        description="Whether the resource group is active and can accept new sessions."
-    )
-    is_public: bool = strawberry.field(
-        description="Whether the resource group is publicly accessible to all users."
-    )
+class ResourceGroupStatusGQL(PydanticOutputMixin[ResourceGroupStatusInfo]):
+    pass
 
 
-@strawberry.type(
+@gql_pydantic_type(
+    BackendAIGQLMeta(added_version="26.2.0", description="Metadata for a resource group."),
+    model=ResourceGroupMetadataInfo,
+    all_fields=True,
     name="ResourceGroupMetadata",
-    description="Added in 26.2.0. Metadata for a resource group.",
 )
-class ResourceGroupMetadataGQL:
-    """Metadata for a resource group."""
-
-    description: str | None = strawberry.field(
-        description="Human-readable description of the resource group."
-    )
-    created_at: datetime = strawberry.field(
-        description="Timestamp when the resource group was created."
-    )
+class ResourceGroupMetadataGQL(PydanticOutputMixin[ResourceGroupMetadataInfo]):
+    pass
 
 
-@strawberry.type(
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version="26.2.0", description="Network configuration for a resource group."
+    ),
+    model=ResourceGroupNetworkConfigInfo,
+    all_fields=True,
     name="ResourceGroupNetworkConfig",
-    description="Added in 26.2.0. Network configuration for a resource group.",
 )
-class ResourceGroupNetworkConfigGQL:
-    """Network configuration for a resource group."""
-
-    wsproxy_addr: str | None = strawberry.field(
-        description="WebSocket proxy address for this resource group."
-    )
-    use_host_network: bool = strawberry.field(
-        description="Whether to use host network mode for containers in this resource group."
-    )
+class ResourceGroupNetworkConfigGQL(PydanticOutputMixin[ResourceGroupNetworkConfigInfo]):
+    pass
 
 
-@strawberry.type(
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version="26.2.0", description="Scheduler configuration for a resource group."
+    ),
+    model=ResourceGroupSchedulerConfigInfo,
     name="ResourceGroupSchedulerConfig",
-    description="Added in 26.2.0. Scheduler configuration for a resource group.",
 )
-class ResourceGroupSchedulerConfigGQL:
+class ResourceGroupSchedulerConfigGQL(PydanticOutputMixin[ResourceGroupSchedulerConfigInfo]):
     """Scheduler configuration for a resource group."""
 
     type: SchedulerTypeGQL = strawberry.field(
@@ -234,14 +187,18 @@ class ResourceGroupSchedulerConfigGQL:
     )
 
 
-@strawberry.type(
-    name="FairShareScalingGroupSpec",
-    description=(
-        "Added in 26.1.0. Fair share calculation configuration for a resource group. "
-        "Defines parameters for computing fair share factors across domains, projects, and users."
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version="26.1.0",
+        description=(
+            "Fair share calculation configuration for a resource group. "
+            "Defines parameters for computing fair share factors across domains, projects, and users."
+        ),
     ),
+    model=FairShareScalingGroupSpecInfo,
+    name="FairShareScalingGroupSpec",
 )
-class FairShareScalingGroupSpecGQL:
+class FairShareScalingGroupSpecGQL(PydanticOutputMixin[FairShareScalingGroupSpecInfo]):
     """Fair share configuration for a resource group."""
 
     half_life_days: int = strawberry.field(
@@ -279,45 +236,19 @@ class FairShareScalingGroupSpecGQL:
         )
     )
 
-    @classmethod
-    def from_model(
-        cls,
-        spec: FairShareScalingGroupSpec,
-        uses_default_resources: frozenset[str],
-    ) -> Self:
-        """Convert from Pydantic model to GQL type.
 
-        Args:
-            spec: FairShareScalingGroupSpec with merged resource_weights
-            uses_default_resources: Set of resource types using default weight
-        """
-        # Convert ResourceSlot to list[ResourceWeightEntryGQL]
-        weight_entries = [
-            ResourceWeightEntryGQL(
-                resource_type=resource_type,
-                weight=weight,
-                uses_default=resource_type in uses_default_resources,
-            )
-            for resource_type, weight in spec.resource_weights.items()
-        ]
-
-        return cls(
-            half_life_days=spec.half_life_days,
-            lookback_days=spec.lookback_days,
-            decay_unit_days=spec.decay_unit_days,
-            default_weight=spec.default_weight,
-            resource_weights=weight_entries,
-        )
-
-
-@strawberry.type(
-    name="ResourceInfo",
-    description=(
-        "Added in 26.1.0. Resource information for a resource group. "
-        "Provides aggregated resource metrics including capacity, used, and free resources."
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version="26.1.0",
+        description=(
+            "Resource information for a resource group. "
+            "Provides aggregated resource metrics including capacity, used, and free resources."
+        ),
     ),
+    model=ResourceInfoNode,
+    name="ResourceInfo",
 )
-class ResourceInfoGQL:
+class ResourceInfoGQL(PydanticOutputMixin[ResourceInfoNode]):
     """Resource information containing capacity, used, and free resource metrics."""
 
     capacity: ResourceSlotGQL = strawberry.field(
@@ -332,21 +263,15 @@ class ResourceInfoGQL:
     )
     free: ResourceSlotGQL = strawberry.field(description="Available resources (capacity - used).")
 
-    @classmethod
-    def from_resource_info(cls, info: ResourceInfo) -> Self:
-        """Convert from ResourceInfo dataclass to GQL type."""
-        return cls(
-            capacity=ResourceSlotGQL.from_slot_quantities(info.capacity),
-            used=ResourceSlotGQL.from_slot_quantities(info.used),
-            free=ResourceSlotGQL.from_slot_quantities(info.free),
-        )
 
-
-@strawberry.type(
+@gql_node_type(
+    BackendAIGQLMeta(
+        added_version="26.1.0",
+        description="Resource group with structured configuration",
+    ),
     name="ResourceGroup",
-    description="Added in 26.1.0. Resource group with structured configuration",
 )
-class ResourceGroupGQL(Node):
+class ResourceGroupGQL(PydanticNodeMixin[ResourceGroupDetailNode]):
     id: NodeID[str] = strawberry.field(
         description="Relay-style global node identifier for the resource group"
     )
@@ -372,9 +297,6 @@ class ResourceGroupGQL(Node):
         )
     )
 
-    # Private field to store original fair share spec for lazy loading
-    _fair_share_spec_data: strawberry.Private[FairShareScalingGroupSpec]
-
     @classmethod
     async def resolve_nodes(  # type: ignore[override]  # Strawberry Node uses AwaitableOrValue overloads incompatible with async def
         cls,
@@ -382,33 +304,8 @@ class ResourceGroupGQL(Node):
         info: Info[StrawberryGQLContext],
         node_ids: Iterable[str],
         required: bool = False,
-    ) -> Iterable[Self | None]:
-        results = await info.context.data_loaders.resource_group_loader.load_many(node_ids)
-        return [cls.from_dataclass(data) if data is not None else None for data in results]
-
-    @classmethod
-    def from_dataclass(cls, data: ScalingGroupData) -> Self:
-        return cls(
-            id=data.name,
-            name=data.name,
-            status=ResourceGroupStatusGQL(
-                is_active=data.status.is_active,
-                is_public=data.status.is_public,
-            ),
-            metadata=ResourceGroupMetadataGQL(
-                description=data.metadata.description if data.metadata.description else None,
-                created_at=data.metadata.created_at,
-            ),
-            network=ResourceGroupNetworkConfigGQL(
-                wsproxy_addr=data.network.wsproxy_addr if data.network.wsproxy_addr else None,
-                use_host_network=data.network.use_host_network,
-            ),
-            scheduler=ResourceGroupSchedulerConfigGQL(
-                type=SchedulerTypeGQL.from_scheduler_type(data.scheduler.name),
-                preemption=PreemptionConfigGQL.from_dataclass(data.scheduler.options.preemption),
-            ),
-            _fair_share_spec_data=data.fair_share_spec,
-        )
+    ) -> Iterable[ResourceGroupGQL | None]:
+        return await info.context.data_loaders.resource_group_loader.load_many(node_ids)
 
     @strawberry.field(  # type: ignore[misc]
         description=(
@@ -420,44 +317,10 @@ class ResourceGroupGQL(Node):
     async def fair_share_spec(
         self, info: Info[StrawberryGQLContext, None]
     ) -> FairShareScalingGroupSpecGQL:
-        """Get fair share spec with merged resource weights from capacity.
-
-        This is a lazy-loaded field that merges the resource group's fair share spec
-        with its current capacity to provide complete resource weight information.
-        """
-        from ai.backend.common.types import ResourceSlot
-
+        """Get fair share spec with merged resource weights from capacity."""
         ctx = info.context
-
-        # Get capacity from resource info
-        action = GetResourceInfoAction(scaling_group=self.name)
-        result = await ctx.processors.scaling_group.get_resource_info.wait_for_complete(action)
-        capacity = result.resource_info.capacity
-
-        # Merge resource weights with capacity
-        merged = {}
-        uses_default = []
-
-        capacity_keys = {sq.slot_name for sq in capacity}
-        for resource_type in capacity_keys:
-            if resource_type in self._fair_share_spec_data.resource_weights.data:
-                merged[resource_type] = self._fair_share_spec_data.resource_weights.data[
-                    resource_type
-                ]
-            else:
-                merged[resource_type] = self._fair_share_spec_data.default_weight
-                uses_default.append(resource_type)
-
-        # Create merged spec
-        merged_spec = FairShareScalingGroupSpec(
-            half_life_days=self._fair_share_spec_data.half_life_days,
-            lookback_days=self._fair_share_spec_data.lookback_days,
-            decay_unit_days=self._fair_share_spec_data.decay_unit_days,
-            default_weight=self._fair_share_spec_data.default_weight,
-            resource_weights=ResourceSlot(merged),
-        )
-
-        return FairShareScalingGroupSpecGQL.from_model(merged_spec, frozenset(uses_default))
+        dto = await ctx.adapters.resource_group.get_fair_share_spec(self.name)
+        return FairShareScalingGroupSpecGQL.from_pydantic(dto)
 
     @strawberry.field(  # type: ignore[misc]
         description=(
@@ -469,9 +332,8 @@ class ResourceGroupGQL(Node):
     async def resource_info(self, info: Info[StrawberryGQLContext, None]) -> ResourceInfoGQL:
         """Get resource information for this resource group."""
         ctx = info.context
-        action = GetResourceInfoAction(scaling_group=self.name)
-        result = await ctx.processors.scaling_group.get_resource_info.wait_for_complete(action)
-        return ResourceInfoGQL.from_resource_info(result.resource_info)
+        resource_info_dto = await ctx.adapters.resource_group.get_resource_info(self.name)
+        return ResourceInfoGQL.from_pydantic(resource_info_dto)
 
 
 # Filter and OrderBy types
@@ -487,110 +349,37 @@ class ResourceGroupOrderFieldGQL(StrEnum):
     IS_ACTIVE = "is_active"
 
 
-@strawberry.input(
+@gql_pydantic_input(
+    BackendAIGQLMeta(description="Filter for resource groups", added_version="26.1.0"),
     name="ResourceGroupFilter",
-    description="Added in 26.1.0. Filter for resource groups",
 )
-class ResourceGroupFilterGQL(GQLFilter):
+class ResourceGroupFilterGQL(PydanticInputMixin[ResourceGroupFilterDTO]):
     name: StringFilter | None = None
     description: StringFilter | None = None
     is_active: bool | None = None
     is_public: bool | None = None
 
-    AND: list[ResourceGroupFilterGQL] | None = None
-    OR: list[ResourceGroupFilterGQL] | None = None
-    NOT: list[ResourceGroupFilterGQL] | None = None
-
-    @override
-    def build_conditions(self) -> list[QueryCondition]:
-        """Build query conditions from this filter.
-
-        Returns a list containing a single combined QueryCondition that represents
-        all filters with proper logical operators applied.
-        """
-        # Collect direct field conditions (these will be combined with AND)
-        field_conditions: list[QueryCondition] = []
-
-        # Apply name filter
-        if self.name:
-            name_condition = self.name.build_query_condition(
-                contains_factory=ScalingGroupConditions.by_name_contains,
-                equals_factory=ScalingGroupConditions.by_name_equals,
-                starts_with_factory=ScalingGroupConditions.by_name_starts_with,
-                ends_with_factory=ScalingGroupConditions.by_name_ends_with,
-            )
-            if name_condition:
-                field_conditions.append(name_condition)
-
-        # Apply description filter
-        if self.description:
-            description_condition = self.description.build_query_condition(
-                contains_factory=ScalingGroupConditions.by_description_contains,
-                equals_factory=ScalingGroupConditions.by_description_equals,
-                starts_with_factory=ScalingGroupConditions.by_description_starts_with,
-                ends_with_factory=ScalingGroupConditions.by_description_ends_with,
-            )
-            if description_condition:
-                field_conditions.append(description_condition)
-
-        # Apply is_active filter
-        if self.is_active is not None:
-            field_conditions.append(ScalingGroupConditions.by_is_active(self.is_active))
-
-        # Apply is_public filter
-        if self.is_public is not None:
-            field_conditions.append(ScalingGroupConditions.by_is_public(self.is_public))
-
-        # Handle AND logical operator - these are implicitly ANDed with field conditions
-        if self.AND:
-            for sub_filter in self.AND:
-                field_conditions.extend(sub_filter.build_conditions())
-
-        # Handle OR logical operator
-        if self.OR:
-            or_sub_conditions: list[QueryCondition] = []
-            for sub_filter in self.OR:
-                or_sub_conditions.extend(sub_filter.build_conditions())
-            if or_sub_conditions:
-                field_conditions.append(combine_conditions_or(or_sub_conditions))
-
-        # Handle NOT logical operator
-        if self.NOT:
-            not_sub_conditions: list[QueryCondition] = []
-            for sub_filter in self.NOT:
-                not_sub_conditions.extend(sub_filter.build_conditions())
-            if not_sub_conditions:
-                field_conditions.append(negate_conditions(not_sub_conditions))
-
-        return field_conditions
+    AND: list[Self] | None = None
+    OR: list[Self] | None = None
+    NOT: list[Self] | None = None
 
 
-@strawberry.input(
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description="Order by specification for resource groups", added_version="26.1.0"
+    ),
     name="ResourceGroupOrderBy",
-    description="Added in 26.1.0. Order by specification for resource groups",
 )
-class ResourceGroupOrderByGQL(GQLOrderBy):
+class ResourceGroupOrderByGQL(PydanticInputMixin[ResourceGroupOrderDTO]):
     field: ResourceGroupOrderFieldGQL
     direction: OrderDirection = OrderDirection.ASC
 
-    @override
-    def to_query_order(self) -> QueryOrder:
-        """Convert to repository QueryOrder."""
-        ascending = self.direction == OrderDirection.ASC
-        match self.field:
-            case ResourceGroupOrderFieldGQL.NAME:
-                return ScalingGroupOrders.name(ascending)
-            case ResourceGroupOrderFieldGQL.CREATED_AT:
-                return ScalingGroupOrders.created_at(ascending)
-            case ResourceGroupOrderFieldGQL.IS_ACTIVE:
-                return ScalingGroupOrders.is_active(ascending)
 
-
-@strawberry.input(
+@gql_pydantic_input(
+    BackendAIGQLMeta(description="Input for preemption configuration.", added_version="26.3.0"),
     name="PreemptionConfigInput",
-    description="Added in 26.3.0. Input for preemption configuration.",
 )
-class PreemptionConfigInput:
+class PreemptionConfigInput(PydanticInputMixin[PreemptionConfigInputDTO]):
     """Input for preemption configuration. Replaces entire preemption config when provided."""
 
     preemptible_priority: int = strawberry.field(
@@ -612,14 +401,16 @@ class PreemptionConfigInput:
 # Mutation Input/Payload types
 
 
-@strawberry.input(
-    name="UpdateResourceGroupFairShareSpecInput",
-    description=(
-        "Added in 26.1.0. Input for updating resource group fair share configuration. "
-        "All fields are optional - only provided fields will be updated, others retain existing values."
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description="Input for updating resource group fair share configuration. All fields are optional - only provided fields will be updated, others retain existing values.",
+        added_version="26.1.0",
     ),
+    name="UpdateResourceGroupFairShareSpecInput",
 )
-class UpdateResourceGroupFairShareSpecInput:
+class UpdateResourceGroupFairShareSpecInput(
+    PydanticInputMixin[UpdateResourceGroupFairShareSpecInputDTO]
+):
     """Partial update input for fair share spec. All fields optional for partial update."""
 
     resource_group_name: str = strawberry.field(description="Name of the resource group to update.")
@@ -650,44 +441,18 @@ class UpdateResourceGroupFairShareSpecInput:
         ),
     )
 
-    def merge_with(self, existing: FairShareScalingGroupSpec) -> FairShareScalingGroupSpec:
-        """Merge partial input with existing spec, returning a new complete spec."""
-        # Merge resource_weights: partial update with deletion support
-        merged_resource_weights = existing.resource_weights
-        if self.resource_weights is not None:
-            # Start with existing weights
-            merged_weights_dict = dict(existing.resource_weights)
-            for entry in self.resource_weights:
-                if entry.weight is None:
-                    # Remove the resource type (revert to default)
-                    merged_weights_dict.pop(entry.resource_type, None)
-                else:
-                    # Update or add the resource type
-                    merged_weights_dict[entry.resource_type] = entry.weight
-            merged_resource_weights = ResourceSlot(merged_weights_dict)
 
-        return FairShareScalingGroupSpec(
-            half_life_days=self.half_life_days
-            if self.half_life_days is not None
-            else existing.half_life_days,
-            lookback_days=self.lookback_days
-            if self.lookback_days is not None
-            else existing.lookback_days,
-            decay_unit_days=self.decay_unit_days
-            if self.decay_unit_days is not None
-            else existing.decay_unit_days,
-            default_weight=self.default_weight
-            if self.default_weight is not None
-            else existing.default_weight,
-            resource_weights=merged_resource_weights,
-        )
-
-
-@strawberry.type(
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version="26.1.0",
+        description="Payload for resource group fair share spec update mutation.",
+    ),
+    model=UpdateResourceGroupFairShareSpecPayloadNode,
     name="UpdateResourceGroupFairShareSpecPayload",
-    description="Added in 26.1.0. Payload for resource group fair share spec update mutation.",
 )
-class UpdateResourceGroupFairShareSpecPayload:
+class UpdateResourceGroupFairShareSpecPayload(
+    PydanticOutputMixin[UpdateResourceGroupFairShareSpecPayloadNode]
+):
     """Payload for fair share spec update mutation."""
 
     resource_group: ResourceGroupGQL = strawberry.field(
@@ -695,15 +460,14 @@ class UpdateResourceGroupFairShareSpecPayload:
     )
 
 
-@strawberry.input(
-    name="UpdateResourceGroupInput",
-    description=(
-        "Added in 26.2.0. Resource group configuration update input. "
-        "All fields are optional - only provided fields will be updated. "
-        "Supports all ScalingGroupUpdaterSpec fields (except fair_share, use separate mutation)."
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description="Resource group configuration update input. All fields are optional - only provided fields will be updated. Supports all ScalingGroupUpdaterSpec fields (except fair_share, use separate mutation).",
+        added_version="26.2.0",
     ),
+    name="UpdateResourceGroupInput",
 )
-class UpdateResourceGroupInput:
+class UpdateResourceGroupInput(PydanticInputMixin[UpdateResourceGroupConfigInputDTO]):
     """Input for updating resource group configuration. All fields optional for partial update."""
 
     resource_group_name: str = strawberry.field(description="Name of the resource group to update.")
@@ -754,11 +518,14 @@ class UpdateResourceGroupInput:
     )
 
 
-@strawberry.type(
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version="26.2.0", description="Payload for resource group update mutation."
+    ),
+    model=UpdateResourceGroupConfigPayloadNode,
     name="UpdateResourceGroupPayload",
-    description="Added in 26.2.0. Payload for resource group update mutation.",
 )
-class UpdateResourceGroupPayload:
+class UpdateResourceGroupPayload(PydanticOutputMixin[UpdateResourceGroupConfigPayloadNode]):
     """Payload for resource group update mutation."""
 
     resource_group: ResourceGroupGQL = strawberry.field(

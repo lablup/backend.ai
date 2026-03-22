@@ -16,6 +16,7 @@ from ai.backend.common.dto.manager.v2.prometheus_query_preset.request import (
     SearchQueryDefinitionsInput,
 )
 from ai.backend.common.dto.manager.v2.prometheus_query_preset.response import (
+    AdminSearchQueryDefinitionsPayload,
     CreateQueryDefinitionPayload,
     DeleteQueryDefinitionPayload,
     ExecuteQueryDefinitionPayload,
@@ -64,7 +65,8 @@ __all__ = (
     "ModifyQueryDefinitionPayload",
     "DeleteQueryDefinitionPayload",
     "GetQueryDefinitionPayload",
-    # Response (search payload)
+    # Response (search payloads)
+    "AdminSearchQueryDefinitionsPayload",
     "SearchQueryDefinitionsPayload",
     # Response (execute payloads)
     "QueryDefinitionMetricResultInfo",

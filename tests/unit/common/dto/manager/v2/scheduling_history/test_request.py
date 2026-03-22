@@ -13,6 +13,7 @@ from ai.backend.common.dto.manager.v2.scheduling_history.request import (
     DeploymentHistoryOrder,
     RouteHistoryFilter,
     RouteHistoryOrder,
+    SchedulingResultFilter,
     SearchDeploymentHistoryInput,
     SearchRouteHistoryInput,
     SearchSessionHistoryInput,
@@ -48,11 +49,14 @@ class TestSessionHistoryFilter:
 
     def test_with_result_filter(self) -> None:
         f = SessionHistoryFilter(
-            result=[SchedulingResultType.SUCCESS, SchedulingResultType.FAILURE]
+            result=SchedulingResultFilter(
+                in_=[SchedulingResultType.SUCCESS, SchedulingResultType.FAILURE]
+            )
         )
         assert f.result is not None
-        assert len(f.result) == 2
-        assert SchedulingResultType.SUCCESS in f.result
+        assert f.result.in_ is not None
+        assert len(f.result.in_) == 2
+        assert SchedulingResultType.SUCCESS in f.result.in_
 
     def test_with_from_status_list(self) -> None:
         f = SessionHistoryFilter(from_status=["PENDING", "PREPARING"])
@@ -142,9 +146,11 @@ class TestDeploymentHistoryFilter:
         assert f.deployment_id is not None
 
     def test_with_result_filter(self) -> None:
-        f = DeploymentHistoryFilter(result=[SchedulingResultType.STALE])
+        f = DeploymentHistoryFilter(
+            result=SchedulingResultFilter(equals=SchedulingResultType.STALE)
+        )
         assert f.result is not None
-        assert len(f.result) == 1
+        assert f.result.equals == SchedulingResultType.STALE
 
 
 class TestDeploymentHistoryOrder:

@@ -10,6 +10,7 @@ from pydantic import Field
 
 from ai.backend.common.api_handlers import BaseResponseModel
 from ai.backend.common.data.artifact.types import ArtifactRegistryType
+from ai.backend.common.dto.manager.v2.common import OrderDirection
 
 __all__ = (
     "ArtifactOrderingField",
@@ -27,13 +28,6 @@ class ArtifactOrderingField(StrEnum):
     SIZE = "SIZE"
     SCANNED_AT = "SCANNED_AT"
     UPDATED_AT = "UPDATED_AT"
-
-
-class OrderDirection(StrEnum):
-    """Order direction for sorting."""
-
-    ASC = "asc"
-    DESC = "desc"
 
 
 class ArtifactRevisionReadmeInfo(BaseResponseModel):

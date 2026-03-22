@@ -1,16 +1,19 @@
 from __future__ import annotations
 
-from typing import Any
+from typing import TYPE_CHECKING
 
 from aiohttp import web
 
 from .app import _mount_registry_tree
 from .routing import RouteRegistry
 
+if TYPE_CHECKING:
+    from ai.backend.manager.dependencies import DependencyResources
+
 
 def setup_api(
     root_app: web.Application,
-    dep_resources: Any,
+    dep_resources: DependencyResources,
     pidx: int,
 ) -> None:
     """Build the full API module tree and mount it on *root_app*.
@@ -19,6 +22,7 @@ def setup_api(
     ``dep_resources.processing.processors`` is available) but **before**
     ``runner.setup()`` freezes the application router.
     """
+    from ai.backend.manager.api.adapters.registry import Adapters
     from ai.backend.manager.api.gql.adapter import BaseGQLAdapter
     from ai.backend.manager.api.gql.data_loader.data_loaders import DataLoaders
 
@@ -26,6 +30,7 @@ def setup_api(
     from .types import GQLContextDeps
 
     r = dep_resources
+    adapters = Adapters.create(r.processing.processors)
     gql_context_deps = GQLContextDeps(
         config_provider=r.bootstrap.config_provider,
         etcd=r.bootstrap.etcd,
@@ -46,12 +51,14 @@ def setup_api(
         user_repository=r.domain.repositories.user.repository,
         agent_repository=r.domain.repositories.agent.repository,
         strawberry_gql_adapter=BaseGQLAdapter(),
-        strawberry_data_loaders=DataLoaders(r.processing.processors),
+        strawberry_data_loaders=DataLoaders(adapters),
+        adapters=adapters,
     )
 
     root_registry = RouteRegistry.create("", r.system.cors_options)
     for sub in build_api_routes(
         processors=r.processing.processors,
+        adapters=adapters,
         cors_options=r.system.cors_options,
         config_provider=r.bootstrap.config_provider,
         error_monitor=r.monitoring.error_monitor,

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 from decimal import Decimal
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 from uuid import UUID
 
 import pytest
@@ -12,7 +12,12 @@ from aiohttp import web
 
 from ai.backend.common.contexts.user import with_user
 from ai.backend.common.data.user.types import UserData, UserRole
+from ai.backend.common.dto.manager.v2.fair_share.response import (
+    GetDomainFairSharePayload,
+    SearchDomainFairSharesPayload,
+)
 from ai.backend.common.types import ResourceSlot, SlotQuantity
+from ai.backend.manager.api.adapters.fair_share import FairShareAdapter
 from ai.backend.manager.api.gql.fair_share.resolver import domain as domain_resolver
 from ai.backend.manager.api.gql.fair_share.types.domain import (
     DomainFairShareConnection,
@@ -26,10 +31,6 @@ from ai.backend.manager.data.fair_share import (
     FairShareSpec,
 )
 from ai.backend.manager.errors.resource import DomainNotFound
-from ai.backend.manager.services.fair_share.actions import (
-    GetDomainFairShareAction,
-    GetDomainFairShareActionResult,
-)
 
 # Common fixtures
 
@@ -58,14 +59,6 @@ def mock_regular_user() -> UserData:
         role=UserRole.USER,
         domain_name="default",
     )
-
-
-@pytest.fixture
-def mock_get_domain_processor() -> AsyncMock:
-    """Create mock get_domain_fair_share processor."""
-    processor = AsyncMock()
-    processor.wait_for_complete = AsyncMock()
-    return processor
 
 
 @pytest.fixture
@@ -104,18 +97,6 @@ def sample_domain_fair_share_data() -> DomainFairShareData:
     )
 
 
-def create_mock_context(get_domain_processor: AsyncMock | None = None) -> MagicMock:
-    """Create mock GraphQL context with processors."""
-    context = MagicMock()
-    context.processors = MagicMock()
-    context.processors.fair_share = MagicMock()
-
-    if get_domain_processor:
-        context.processors.fair_share.get_domain_fair_share = get_domain_processor
-
-    return context
-
-
 def create_mock_info(context: MagicMock) -> MagicMock:
     """Create mock strawberry.Info with context."""
     info = MagicMock()
@@ -127,17 +108,17 @@ def create_mock_info(context: MagicMock) -> MagicMock:
 
 
 class TestAdminDomainFairShareSingleQuery:
-    async def test_admin_domain_fair_share_calls_processor_with_correct_action(
+    async def test_admin_domain_fair_share_calls_adapter_with_correct_input(
         self,
         mock_superadmin_user: UserData,
-        mock_get_domain_processor: AsyncMock,
         sample_domain_fair_share_data: DomainFairShareData,
     ) -> None:
-        """Should call processor with correct GetDomainFairShareAction."""
-        mock_get_domain_processor.wait_for_complete.return_value = GetDomainFairShareActionResult(
-            data=sample_domain_fair_share_data
+        """Should call adapter with correct GetDomainFairShareInput."""
+        domain_node = FairShareAdapter._domain_data_to_dto(sample_domain_fair_share_data)
+        context = MagicMock()
+        context.adapters.fair_share.get_domain = AsyncMock(
+            return_value=GetDomainFairSharePayload(item=domain_node)
         )
-        context = create_mock_context(get_domain_processor=mock_get_domain_processor)
         info = create_mock_info(context)
 
         with with_user(mock_superadmin_user):
@@ -147,15 +128,11 @@ class TestAdminDomainFairShareSingleQuery:
                 domain_name="test-domain",
             )
 
-        # Should call processor with correct action
-        mock_get_domain_processor.wait_for_complete.assert_called_once()
-        call_args = mock_get_domain_processor.wait_for_complete.call_args
-        action = call_args[0][0]
-        assert isinstance(action, GetDomainFairShareAction)
-        assert action.resource_group == "default"
-        assert action.domain_name == "test-domain"
+        context.adapters.fair_share.get_domain.assert_called_once()
+        call_arg = context.adapters.fair_share.get_domain.call_args[0][0]
+        assert call_arg.resource_group == "default"
+        assert call_arg.domain_name == "test-domain"
 
-        # Should return DomainFairShareGQL
         assert isinstance(result, DomainFairShareGQL)
         assert result.resource_group_name == "default"
         assert result.domain_name == "test-domain"
@@ -163,13 +140,12 @@ class TestAdminDomainFairShareSingleQuery:
     async def test_admin_domain_fair_share_propagates_entity_not_found(
         self,
         mock_superadmin_user: UserData,
-        mock_get_domain_processor: AsyncMock,
     ) -> None:
-        """Should propagate DomainNotFound from service."""
-        mock_get_domain_processor.wait_for_complete.side_effect = DomainNotFound(
-            "Domain not found: nonexistent-domain"
+        """Should propagate DomainNotFound from adapter."""
+        context = MagicMock()
+        context.adapters.fair_share.get_domain = AsyncMock(
+            side_effect=DomainNotFound("Domain not found: nonexistent-domain")
         )
-        context = create_mock_context(get_domain_processor=mock_get_domain_processor)
         info = create_mock_info(context)
 
         with with_user(mock_superadmin_user):
@@ -183,10 +159,10 @@ class TestAdminDomainFairShareSingleQuery:
     async def test_admin_domain_fair_share_requires_admin(
         self,
         mock_regular_user: UserData,
-        mock_get_domain_processor: AsyncMock,
     ) -> None:
         """Should raise HTTPForbidden for non-admin users."""
-        context = create_mock_context(get_domain_processor=mock_get_domain_processor)
+        context = MagicMock()
+        context.adapters.fair_share.get_domain = AsyncMock()
         info = create_mock_info(context)
 
         with with_user(mock_regular_user):
@@ -197,20 +173,19 @@ class TestAdminDomainFairShareSingleQuery:
                     domain_name="test-domain",
                 )
 
-        # Should not call processor
-        mock_get_domain_processor.wait_for_complete.assert_not_called()
+        context.adapters.fair_share.get_domain.assert_not_called()
 
     async def test_admin_domain_fair_share_returns_correct_gql_type(
         self,
         mock_superadmin_user: UserData,
-        mock_get_domain_processor: AsyncMock,
         sample_domain_fair_share_data: DomainFairShareData,
     ) -> None:
         """Should return DomainFairShareGQL type with correct fields."""
-        mock_get_domain_processor.wait_for_complete.return_value = GetDomainFairShareActionResult(
-            data=sample_domain_fair_share_data
+        domain_node = FairShareAdapter._domain_data_to_dto(sample_domain_fair_share_data)
+        context = MagicMock()
+        context.adapters.fair_share.get_domain = AsyncMock(
+            return_value=GetDomainFairSharePayload(item=domain_node)
         )
-        context = create_mock_context(get_domain_processor=mock_get_domain_processor)
         info = create_mock_info(context)
 
         with with_user(mock_superadmin_user):
@@ -221,10 +196,6 @@ class TestAdminDomainFairShareSingleQuery:
             )
 
         assert isinstance(result, DomainFairShareGQL)
-        assert (
-            result.id
-            == f"{sample_domain_fair_share_data.resource_group}:{sample_domain_fair_share_data.domain_name}"
-        )
         assert result.resource_group_name == sample_domain_fair_share_data.resource_group
         assert result.domain_name == sample_domain_fair_share_data.domain_name
         assert result.spec.weight == sample_domain_fair_share_data.data.spec.weight
@@ -234,24 +205,72 @@ class TestAdminDomainFairShareSingleQuery:
 
 
 class TestAdminDomainFairSharesListQuery:
-    async def test_admin_domain_fair_shares_calls_fetcher_with_parameters(
+    async def test_admin_domain_fair_shares_calls_adapter_with_parameters(
         self,
         mock_superadmin_user: UserData,
     ) -> None:
-        """Should call fetch_domain_fair_shares with correct parameters."""
-        mock_fetcher = AsyncMock(
-            return_value=DomainFairShareConnection(
-                edges=[],
-                count=0,
-                page_info=MagicMock(),
-            )
+        """Should call adapter with correct parameters."""
+        context = MagicMock()
+        context.adapters.fair_share.search_domain = AsyncMock(
+            return_value=SearchDomainFairSharesPayload(items=[], total_count=0)
         )
+        info = create_mock_info(context)
 
         with with_user(mock_superadmin_user):
-            with patch.object(
-                domain_resolver, "fetch_domain_fair_shares", mock_fetcher
-            ) as patched_fetcher:
-                info = create_mock_info(MagicMock())
+            await domain_resolver.admin_domain_fair_shares.base_resolver(
+                info=info,
+                filter=None,
+                order_by=None,
+                before=None,
+                after=None,
+                first=None,
+                last=None,
+                limit=10,
+                offset=0,
+            )
+
+        context.adapters.fair_share.search_domain.assert_called_once()
+        input_dto = context.adapters.fair_share.search_domain.call_args[0][0]
+        assert input_dto.limit == 10
+        assert input_dto.offset == 0
+
+    async def test_admin_domain_fair_shares_returns_connection_type(
+        self,
+        mock_superadmin_user: UserData,
+    ) -> None:
+        """Should return DomainFairShareConnection type."""
+        context = MagicMock()
+        context.adapters.fair_share.search_domain = AsyncMock(
+            return_value=SearchDomainFairSharesPayload(items=[], total_count=0)
+        )
+        info = create_mock_info(context)
+
+        with with_user(mock_superadmin_user):
+            result = await domain_resolver.admin_domain_fair_shares.base_resolver(
+                info=info,
+                filter=None,
+                order_by=None,
+                before=None,
+                after=None,
+                first=None,
+                last=None,
+                limit=10,
+                offset=0,
+            )
+
+        assert isinstance(result, DomainFairShareConnection)
+
+    async def test_admin_domain_fair_shares_requires_admin(
+        self,
+        mock_regular_user: UserData,
+    ) -> None:
+        """Should raise HTTPForbidden for non-admin users."""
+        context = MagicMock()
+        context.adapters.fair_share.search_domain = AsyncMock()
+        info = create_mock_info(context)
+
+        with with_user(mock_regular_user):
+            with pytest.raises(web.HTTPForbidden):
                 await domain_resolver.admin_domain_fair_shares.base_resolver(
                     info=info,
                     filter=None,
@@ -264,95 +283,31 @@ class TestAdminDomainFairSharesListQuery:
                     offset=0,
                 )
 
-                # Should call fetcher with correct parameters
-                patched_fetcher.assert_called_once()
-                call_kwargs = patched_fetcher.call_args[1]
-                assert call_kwargs["limit"] == 10
-                assert call_kwargs["offset"] == 0
-
-    async def test_admin_domain_fair_shares_returns_connection_type(
-        self,
-        mock_superadmin_user: UserData,
-    ) -> None:
-        """Should return DomainFairShareConnection type."""
-        mock_fetcher = AsyncMock(
-            return_value=DomainFairShareConnection(
-                edges=[],
-                count=0,
-                page_info=MagicMock(),
-            )
-        )
-
-        with with_user(mock_superadmin_user):
-            with patch.object(domain_resolver, "fetch_domain_fair_shares", mock_fetcher):
-                info = create_mock_info(MagicMock())
-                result = await domain_resolver.admin_domain_fair_shares.base_resolver(
-                    info=info,
-                    filter=None,
-                    order_by=None,
-                    before=None,
-                    after=None,
-                    first=None,
-                    last=None,
-                    limit=10,
-                    offset=0,
-                )
-
-                assert isinstance(result, DomainFairShareConnection)
-
-    async def test_admin_domain_fair_shares_requires_admin(
-        self,
-        mock_regular_user: UserData,
-    ) -> None:
-        """Should raise HTTPForbidden for non-admin users."""
-        mock_fetcher = AsyncMock()
-
-        with with_user(mock_regular_user):
-            with patch.object(domain_resolver, "fetch_domain_fair_shares", mock_fetcher):
-                info = create_mock_info(MagicMock())
-                with pytest.raises(web.HTTPForbidden):
-                    await domain_resolver.admin_domain_fair_shares.base_resolver(
-                        info=info,
-                        filter=None,
-                        order_by=None,
-                        before=None,
-                        after=None,
-                        first=None,
-                        last=None,
-                        limit=10,
-                        offset=0,
-                    )
-
-                # Should not call fetcher
-                mock_fetcher.assert_not_called()
+        context.adapters.fair_share.search_domain.assert_not_called()
 
     async def test_admin_domain_fair_shares_handles_empty_results(
         self,
         mock_superadmin_user: UserData,
     ) -> None:
         """Should handle empty results gracefully."""
-        mock_fetcher = AsyncMock(
-            return_value=DomainFairShareConnection(
-                edges=[],
-                count=0,
-                page_info=MagicMock(),
-            )
+        context = MagicMock()
+        context.adapters.fair_share.search_domain = AsyncMock(
+            return_value=SearchDomainFairSharesPayload(items=[], total_count=0)
         )
+        info = create_mock_info(context)
 
         with with_user(mock_superadmin_user):
-            with patch.object(domain_resolver, "fetch_domain_fair_shares", mock_fetcher):
-                info = create_mock_info(MagicMock())
-                result = await domain_resolver.admin_domain_fair_shares.base_resolver(
-                    info=info,
-                    filter=None,
-                    order_by=None,
-                    before=None,
-                    after=None,
-                    first=None,
-                    last=None,
-                    limit=10,
-                    offset=0,
-                )
+            result = await domain_resolver.admin_domain_fair_shares.base_resolver(
+                info=info,
+                filter=None,
+                order_by=None,
+                before=None,
+                after=None,
+                first=None,
+                last=None,
+                limit=10,
+                offset=0,
+            )
 
-                assert result.count == 0
-                assert len(result.edges) == 0
+        assert result.count == 0
+        assert len(result.edges) == 0

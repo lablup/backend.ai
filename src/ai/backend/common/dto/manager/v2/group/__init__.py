@@ -3,6 +3,7 @@ Group (Project) DTOs for Manager API v2.
 """
 
 from ai.backend.common.dto.manager.v2.group.request import (
+    AdminSearchGroupsInput,
     CreateGroupInput,
     DeleteGroupInput,
     GroupFilter,
@@ -12,6 +13,7 @@ from ai.backend.common.dto.manager.v2.group.request import (
     UpdateGroupInput,
 )
 from ai.backend.common.dto.manager.v2.group.response import (
+    AdminSearchGroupsPayload,
     DeleteProjectPayload,
     ProjectBasicInfo,
     ProjectLifecycleInfo,
@@ -24,17 +26,26 @@ from ai.backend.common.dto.manager.v2.group.response import (
     VFolderHostPermissionEntry,
 )
 from ai.backend.common.dto.manager.v2.group.types import (
+    DomainProjectScopeDTO,
+    GroupDomainFilter,
     GroupOrderField,
+    GroupUserFilter,
     OrderDirection,
     ProjectType,
+    ProjectTypeFilter,
 )
 
 __all__ = (
     # Types
+    "DomainProjectScopeDTO",
     "ProjectType",
     "OrderDirection",
     "GroupOrderField",
+    "GroupDomainFilter",
+    "GroupUserFilter",
+    "ProjectTypeFilter",
     # Request DTOs
+    "AdminSearchGroupsInput",
     "CreateGroupInput",
     "UpdateGroupInput",
     "DeleteGroupInput",
@@ -43,6 +54,7 @@ __all__ = (
     "GroupOrder",
     "SearchGroupsRequest",
     # Response DTOs
+    "AdminSearchGroupsPayload",
     "ProjectBasicInfo",
     "ProjectOrganizationInfo",
     "VFolderHostPermissionEntry",

@@ -12,7 +12,7 @@ import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql
 
 from ai.backend.common.data.filter_specs import StringMatchSpec
-from ai.backend.manager.repositories.fair_share.options import (
+from ai.backend.manager.models.fair_share.conditions import (
     DomainFairShareConditions,
     ProjectFairShareConditions,
     UserFairShareConditions,

@@ -21,12 +21,10 @@ from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.session.types import SchedulingResult
 from ai.backend.manager.models.routing import RoutingRow
+from ai.backend.manager.models.routing.conditions import RouteConditions
 from ai.backend.manager.repositories.base.creator import BulkCreator
 from ai.backend.manager.repositories.base.updater import BatchUpdater
-from ai.backend.manager.repositories.deployment import (
-    DeploymentRepository,
-    RouteConditions,
-)
+from ai.backend.manager.repositories.deployment import DeploymentRepository
 from ai.backend.manager.repositories.deployment.creators import RouteBatchUpdaterSpec
 from ai.backend.manager.repositories.scheduling_history.creators import RouteHistoryCreatorSpec
 from ai.backend.manager.sokovan.deployment.route.executor import RouteExecutor

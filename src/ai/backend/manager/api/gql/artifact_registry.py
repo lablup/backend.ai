@@ -4,18 +4,25 @@ import strawberry
 from strawberry import ID, Info
 
 from ai.backend.common.data.artifact.types import ArtifactRegistryType
+from ai.backend.common.dto.manager.v2.artifact_registry.response import (
+    ArtifactRegistryGQLNode,
+)
+from ai.backend.manager.api.gql.decorators import BackendAIGQLMeta, gql_pydantic_type
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.data.artifact.types import (
     ArtifactType,
 )
 from ai.backend.manager.errors.api import NotImplementedAPI
 from ai.backend.manager.errors.common import ServerMisconfiguredError
-from ai.backend.manager.services.artifact_registry.actions.common.get_meta import (
-    GetArtifactRegistryMetaAction,
+
+
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version="25.14.0",
+        description="Artifact registry node.",
+    ),
+    model=ArtifactRegistryGQLNode,
 )
-
-
-@strawberry.type(description="Added in 25.14.0")
 class ArtifactRegistry:
     id: ID = strawberry.field(
         description=(
@@ -57,13 +64,9 @@ async def default_artifact_registry(
                 f"Default registry for artifact type {artifact_type} is not implemented."
             )
 
-    artifact_registry_meta = (
-        await info.context.processors.artifact_registry.get_registry_meta.wait_for_complete(
-            GetArtifactRegistryMetaAction(registry_name=registry_name)
-        )
+    registry_data = await info.context.adapters.artifact_registry.get_registry_meta(
+        registry_name=registry_name
     )
-
-    registry_data = artifact_registry_meta.result
 
     return ArtifactRegistry(
         id=ID(str(registry_data.id)),

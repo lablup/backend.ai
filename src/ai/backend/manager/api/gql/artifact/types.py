@@ -1,108 +1,193 @@
 from __future__ import annotations
 
 import uuid
-from collections.abc import Iterable, Mapping
+from collections.abc import Iterable
 from datetime import datetime
-from typing import Any, Self
+from typing import Any, Self, cast
 
 import strawberry
 from strawberry import ID, UNSET, Info
-from strawberry.relay import Connection, Edge, Node, NodeID
+from strawberry.relay import Connection, Edge, NodeID
 from strawberry.scalars import JSON
 
 from ai.backend.common.data.artifact.types import (
-    VerificationStepResult,
-    VerifierResult,
+    ArtifactRegistryType,
 )
-from ai.backend.common.data.storage.registries.types import ModelTarget as ModelTargetData
+from ai.backend.common.dto.manager.v2.artifact.request import (
+    AdminSearchArtifactRevisionsInput,
+    ArtifactGQLFilterInputDTO,
+    ArtifactGQLOrderByInputDTO,
+    ArtifactRevisionGQLFilterInputDTO,
+    ArtifactRevisionGQLOrderByInputDTO,
+    ArtifactRevisionRemoteStatusFilterDTO,
+    ArtifactRevisionStatusFilterDTO,
+    ArtifactStatusChangedInputDTO,
+)
+from ai.backend.common.dto.manager.v2.artifact.request import (
+    ApproveArtifactInput as ApproveArtifactInputDTO,
+)
+from ai.backend.common.dto.manager.v2.artifact.request import (
+    CancelImportTaskInput as CancelArtifactInputDTO,
+)
+from ai.backend.common.dto.manager.v2.artifact.request import (
+    CleanupRevisionsInput as CleanupArtifactRevisionsInputDTO,
+)
+from ai.backend.common.dto.manager.v2.artifact.request import (
+    DelegateeTargetInput as DelegateeTargetInputDTO,
+)
+from ai.backend.common.dto.manager.v2.artifact.request import (
+    DelegateImportArtifactsInput as DelegateImportArtifactsInputDTO,
+)
+from ai.backend.common.dto.manager.v2.artifact.request import (
+    DelegateScanArtifactsInput as DelegateScanArtifactsInputDTO,
+)
+from ai.backend.common.dto.manager.v2.artifact.request import (
+    DeleteArtifactsInput as DeleteArtifactsInputDTO,
+)
+from ai.backend.common.dto.manager.v2.artifact.request import (
+    ImportArtifactsInput as ImportArtifactsInputDTO,
+)
+from ai.backend.common.dto.manager.v2.artifact.request import (
+    ImportArtifactsOptionsInput as ImportArtifactsOptionsInputDTO,
+)
+from ai.backend.common.dto.manager.v2.artifact.request import (
+    ModelTargetInput as ModelTargetInputDTO,
+)
+from ai.backend.common.dto.manager.v2.artifact.request import (
+    RejectArtifactInput as RejectArtifactInputDTO,
+)
+from ai.backend.common.dto.manager.v2.artifact.request import (
+    RestoreArtifactsInput as RestoreArtifactsInputDTO,
+)
+from ai.backend.common.dto.manager.v2.artifact.request import (
+    ScanArtifactModelsInput as ScanArtifactModelsInputDTO,
+)
+from ai.backend.common.dto.manager.v2.artifact.request import (
+    ScanArtifactsInput as ScanArtifactsInputDTO,
+)
+from ai.backend.common.dto.manager.v2.artifact.request import (
+    UpdateArtifactGQLInput as UpdateArtifactGQLInputDTO,
+)
+from ai.backend.common.dto.manager.v2.artifact.response import (
+    ApproveArtifactGQLPayload,
+    ArtifactGQLNode,
+    ArtifactImportProgressUpdatedGQLPayload,
+    ArtifactNode,
+    ArtifactRevisionImportTaskInfoGQL,
+    ArtifactRevisionNode,
+    ArtifactStatusChangedGQLPayload,
+    ArtifactVerificationGQLResultDTO,
+    ArtifactVerifierGQLResultDTO,
+    ArtifactVerifierGQLResultEntryDTO,
+    ArtifactVerifierMetadataDTO,
+    ArtifactVerifierMetadataEntryDTO,
+    CancelImportArtifactGQLPayload,
+    CleanupArtifactRevisionsGQLPayload,
+    DelegateImportArtifactsGQLPayload,
+    DelegateScanArtifactsGQLPayload,
+    DeleteArtifactsGQLPayload,
+    ImportArtifactsGQLPayload,
+    RejectArtifactGQLPayload,
+    RestoreArtifactsGQLPayload,
+    ScanArtifactModelsGQLPayload,
+    ScanArtifactsGQLPayload,
+    SourceInfoDTO,
+    UpdateArtifactGQLPayload,
+)
 from ai.backend.manager.api.gql.base import (
     ByteSize,
     IntFilter,
     OrderDirection,
     StringFilter,
     UUIDFilter,
+    encode_cursor,
 )
-from ai.backend.manager.api.gql.types import GQLFilter, GQLOrderBy, StrawberryGQLContext
+from ai.backend.manager.api.gql.data_loader.data_loaders import DataLoaders
+from ai.backend.manager.api.gql.decorators import (
+    BackendAIGQLMeta,
+    gql_connection_type,
+    gql_node_type,
+    gql_pydantic_input,
+    gql_pydantic_type,
+)
+from ai.backend.manager.api.gql.pydantic_compat import (
+    PydanticInputMixin,
+    PydanticNodeMixin,
+    PydanticOutputMixin,
+)
+from ai.backend.manager.api.gql.types import GQLOrderBy, StrawberryGQLContext
 from ai.backend.manager.api.gql.utils import dedent_strip
 from ai.backend.manager.data.artifact.types import (
     ArtifactAvailability,
-    ArtifactData,
     ArtifactOrderField,
     ArtifactRemoteStatus,
-    ArtifactRevisionData,
     ArtifactRevisionOrderField,
     ArtifactStatus,
     ArtifactType,
 )
-from ai.backend.manager.data.artifact.types import DelegateeTarget as DelegateeTargetData
 from ai.backend.manager.defs import ARTIFACT_MAX_SCAN_LIMIT
-from ai.backend.manager.repositories.artifact.options import (
-    ArtifactConditions,
-    ArtifactOrders,
-    ArtifactRevisionConditions,
-    ArtifactRevisionOrders,
-)
-from ai.backend.manager.repositories.base import (
-    QueryCondition,
-    QueryOrder,
-    combine_conditions_or,
-    negate_conditions,
-)
-from ai.backend.manager.services.artifact.actions.get import GetArtifactAction
-from ai.backend.manager.services.artifact_revision.actions.get import GetArtifactRevisionAction
+from ai.backend.manager.errors.artifact_registry import ArtifactRegistryNotFoundError
+from ai.backend.manager.models.artifact_revision.conditions import ArtifactRevisionConditions
 
 
-@strawberry.type(
+async def get_registry_url(
+    data_loaders: DataLoaders,
+    registry_id: uuid.UUID,
+    registry_type: ArtifactRegistryType,
+) -> str:
+    """Get the URL for a registry based on its type."""
+    match registry_type:
+        case ArtifactRegistryType.HUGGINGFACE:
+            hf_registry = await data_loaders.huggingface_registry_loader.load(registry_id)
+            if hf_registry is None:
+                raise ArtifactRegistryNotFoundError(f"HuggingFace registry {registry_id} not found")
+            return hf_registry.url
+        case ArtifactRegistryType.RESERVOIR:
+            reservoir_registry = await data_loaders.reservoir_registry_loader.load(registry_id)
+            if reservoir_registry is None:
+                raise ArtifactRegistryNotFoundError(f"Reservoir registry {registry_id} not found")
+            return reservoir_registry.endpoint
+    raise ArtifactRegistryNotFoundError(f"Unknown registry type: {registry_type}")
+
+
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version="26.1.0",
+        description="A single key-value entry representing metadata from an artifact verifier. Contains additional information about the verification process.",
+    ),
+    model=ArtifactVerifierMetadataEntryDTO,
     name="ArtifactVerifierMetadataEntry",
-    description=dedent_strip("""
-    Added in 26.1.0.
-
-    A single key-value entry representing metadata from an artifact verifier.
-    Contains additional information about the verification process.
-    """),
 )
 class ArtifactVerifierMetadataEntryGQL:
-    """Single metadata entry with key and value."""
-
-    key: str = strawberry.field(description="The key identifier for this metadata entry.")
-    value: str = strawberry.field(description="The value for this metadata entry.")
+    key: strawberry.auto
+    value: strawberry.auto
 
 
-@strawberry.type(
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version="26.1.0",
+        description="A collection of metadata from an artifact verifier. Contains key-value pairs providing additional information about the verification.",
+    ),
+    model=ArtifactVerifierMetadataDTO,
     name="ArtifactVerifierMetadata",
-    description=dedent_strip("""
-    Added in 26.1.0.
-
-    A collection of metadata from an artifact verifier.
-    Contains key-value pairs providing additional information about the verification.
-    """),
 )
-class ArtifactVerifierMetadataGQL:
+class ArtifactVerifierMetadataGQL(PydanticOutputMixin[ArtifactVerifierMetadataDTO]):
     """Metadata containing multiple key-value entries."""
 
     entries: list[ArtifactVerifierMetadataEntryGQL] = strawberry.field(
         description="List of metadata entries. Each entry contains a key-value pair."
     )
 
-    @classmethod
-    def from_mapping(cls, data: Mapping[str, str]) -> ArtifactVerifierMetadataGQL:
-        """Convert a Mapping to GraphQL type."""
-        entries = [ArtifactVerifierMetadataEntryGQL(key=k, value=v) for k, v in data.items()]
-        return cls(entries=entries)
 
-
-@strawberry.type(
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version="25.17.0",
+        description="Result from a single malware verifier containing scan results and metadata. Each verifier scans the artifact for potential security issues and reports findings including infected file count, scan time, and any errors encountered.",
+    ),
+    model=ArtifactVerifierGQLResultDTO,
     name="ArtifactVerifierResult",
-    description=dedent_strip("""
-    Added in 25.17.0.
-
-    Result from a single malware verifier containing scan results and metadata.
-
-    Each verifier scans the artifact for potential security issues and reports
-    findings including infected file count, scan time, and any errors encountered.
-    """),
 )
-class ArtifactVerifierGQLResult:
+class ArtifactVerifierGQLResult(PydanticOutputMixin[ArtifactVerifierGQLResultDTO]):
     success: bool = strawberry.field(description="Whether the verification completed successfully")
     infected_count: int = strawberry.field(
         description="Number of infected or suspicious files detected"
@@ -119,219 +204,102 @@ class ArtifactVerifierGQLResult:
         description="Fatal error message if the verifier failed to complete"
     )
 
-    @classmethod
-    def from_dataclass(cls, data: VerifierResult) -> Self:
-        return cls(
-            success=data.success,
-            infected_count=data.infected_count,
-            scanned_at=data.scanned_at,
-            scan_time=data.scan_time,
-            scanned_count=data.scanned_count,
-            metadata=ArtifactVerifierMetadataGQL.from_mapping(data.metadata),
-            error=data.error,
-        )
 
-
-@strawberry.type(
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version="25.17.0",
+        description="Entry for a single verifier's result in the verification results. Associates a verifier name with its scan results.",
+    ),
+    model=ArtifactVerifierGQLResultEntryDTO,
     name="ArtifactVerifierResultEntry",
-    description=dedent_strip("""
-    Added in 25.17.0.
-
-    Entry for a single verifier's result in the verification results.
-
-    Associates a verifier name with its scan results.
-    """),
 )
-class ArtifactVerifierGQLResultEntry:
+class ArtifactVerifierGQLResultEntry(PydanticOutputMixin[ArtifactVerifierGQLResultEntryDTO]):
     name: str = strawberry.field(description="Name of the verifier (e.g., 'clamav', 'custom')")
     result: ArtifactVerifierGQLResult = strawberry.field(
         description="Scan result from this verifier"
     )
 
-    @classmethod
-    def from_verifier_result(cls, name: str, result: VerifierResult) -> Self:
-        return cls(
-            name=name,
-            result=ArtifactVerifierGQLResult.from_dataclass(result),
-        )
 
-
-@strawberry.type(
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version="25.17.0",
+        description="Complete verification result containing results from all configured verifiers. Artifacts undergo malware scanning through multiple verifiers after being imported. This type aggregates results from all verifiers that were run on the artifact.",
+    ),
+    model=ArtifactVerificationGQLResultDTO,
     name="ArtifactVerificationResult",
-    description=dedent_strip("""
-    Added in 25.17.0.
-
-    Complete verification result containing results from all configured verifiers.
-
-    Artifacts undergo malware scanning through multiple verifiers after being imported.
-    This type aggregates results from all verifiers that were run on the artifact.
-    """),
 )
-class ArtifactVerificationGQLResult:
+class ArtifactVerificationGQLResult(PydanticOutputMixin[ArtifactVerificationGQLResultDTO]):
     verifiers: list[ArtifactVerifierGQLResultEntry] = strawberry.field(
         description="Results from each verifier that scanned the artifact"
     )
 
-    @classmethod
-    def from_dataclass(cls, data: VerificationStepResult) -> Self:
-        verifier_entries = [
-            ArtifactVerifierGQLResultEntry.from_verifier_result(verifier_name, verifier_result)
-            for verifier_name, verifier_result in data.verifiers.items()
-        ]
-        return cls(verifiers=verifier_entries)
 
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description=dedent_strip("""
+        Filter options for artifacts based on various criteria such as type, name, registry,
+        source, and availability status.
 
-@strawberry.input(
-    description=dedent_strip("""
-    Added in 25.14.0.
-
-    Filter options for artifacts based on various criteria such as type, name, registry,
-    source, and availability status.
-
-    Supports logical operations (AND, OR, NOT) for complex filtering scenarios.
-    """)
+        Supports logical operations (AND, OR, NOT) for complex filtering scenarios.
+        """),
+        added_version="25.14.0",
+    ),
+    name="ArtifactFilter",
 )
-class ArtifactFilter(GQLFilter):
+class ArtifactFilter(PydanticInputMixin[ArtifactGQLFilterInputDTO]):
     type: list[ArtifactType] | None = None
     name: StringFilter | None = None
     registry: StringFilter | None = None
     source: StringFilter | None = None
     availability: list[ArtifactAvailability] | None = None
 
-    AND: list[ArtifactFilter] | None = None
-    OR: list[ArtifactFilter] | None = None
-    NOT: list[ArtifactFilter] | None = None
-
-    def build_conditions(self) -> list[QueryCondition]:
-        """Build query conditions from this filter.
-
-        Returns a list containing QueryConditions that represent
-        all filters with proper logical operators applied.
-        """
-        # Collect direct field conditions (these will be combined with AND)
-        field_conditions: list[QueryCondition] = []
-
-        # Apply type filter
-        if self.type:
-            field_conditions.append(ArtifactConditions.by_types(self.type))
-
-        # Apply name filter
-        if self.name:
-            name_condition = self.name.build_query_condition(
-                contains_factory=ArtifactConditions.by_name_contains,
-                equals_factory=ArtifactConditions.by_name_equals,
-                starts_with_factory=ArtifactConditions.by_name_starts_with,
-                ends_with_factory=ArtifactConditions.by_name_ends_with,
-            )
-            if name_condition:
-                field_conditions.append(name_condition)
-
-        # Apply registry filter
-        if self.registry:
-            registry_condition = self.registry.build_query_condition(
-                contains_factory=ArtifactConditions.by_registry_contains,
-                equals_factory=ArtifactConditions.by_registry_equals,
-                starts_with_factory=ArtifactConditions.by_registry_starts_with,
-                ends_with_factory=ArtifactConditions.by_registry_ends_with,
-            )
-            if registry_condition:
-                field_conditions.append(registry_condition)
-
-        # Apply source filter
-        if self.source:
-            source_condition = self.source.build_query_condition(
-                contains_factory=ArtifactConditions.by_source_contains,
-                equals_factory=ArtifactConditions.by_source_equals,
-                starts_with_factory=ArtifactConditions.by_source_starts_with,
-                ends_with_factory=ArtifactConditions.by_source_ends_with,
-            )
-            if source_condition:
-                field_conditions.append(source_condition)
-
-        # Apply availability filter
-        if self.availability:
-            field_conditions.append(ArtifactConditions.by_availability(self.availability))
-
-        # Handle AND logical operator - these are implicitly ANDed with field conditions
-        if self.AND:
-            for sub_filter in self.AND:
-                field_conditions.extend(sub_filter.build_conditions())
-
-        # Handle OR logical operator
-        if self.OR:
-            or_sub_conditions: list[QueryCondition] = []
-            for sub_filter in self.OR:
-                or_sub_conditions.extend(sub_filter.build_conditions())
-            if or_sub_conditions:
-                field_conditions.append(combine_conditions_or(or_sub_conditions))
-
-        # Handle NOT logical operator
-        if self.NOT:
-            not_sub_conditions: list[QueryCondition] = []
-            for sub_filter in self.NOT:
-                not_sub_conditions.extend(sub_filter.build_conditions())
-            if not_sub_conditions:
-                field_conditions.append(negate_conditions(not_sub_conditions))
-
-        return field_conditions
+    AND: list[Self] | None = None
+    OR: list[Self] | None = None
+    NOT: list[Self] | None = None
 
 
-@strawberry.input(
+@gql_pydantic_input(
+    BackendAIGQLMeta(description="", added_version="24.09.0"),
     description=dedent_strip("""
-    Added in 25.14.0.
-
     Specifies the field and direction for ordering artifacts in queries.
-    """)
+    """),
 )
-class ArtifactOrderBy(GQLOrderBy):
+class ArtifactOrderBy(PydanticInputMixin[ArtifactGQLOrderByInputDTO], GQLOrderBy):
     field: ArtifactOrderField
     direction: OrderDirection = OrderDirection.ASC
 
-    def to_query_order(self) -> QueryOrder:
-        """Convert to repository QueryOrder."""
-        ascending = self.direction == OrderDirection.ASC
-        match self.field:
-            case ArtifactOrderField.NAME:
-                return ArtifactOrders.name(ascending)
-            case ArtifactOrderField.TYPE:
-                return ArtifactOrders.type(ascending)
-            case ArtifactOrderField.SCANNED_AT:
-                return ArtifactOrders.scanned_at(ascending)
-            case ArtifactOrderField.UPDATED_AT:
-                return ArtifactOrders.updated_at(ascending)
-            case ArtifactOrderField.SIZE:
-                # SIZE ordering is not supported yet, fall back to updated_at
-                return ArtifactOrders.updated_at(ascending)
 
-
-@strawberry.input(
+@gql_pydantic_input(
+    BackendAIGQLMeta(description="", added_version="24.09.0"),
     description=dedent_strip("""
-    Added in 25.14.0.
-
     Filter for artifact revision status. Supports exact match or inclusion in a list of statuses.
-    """)
+    """),
 )
-class ArtifactRevisionStatusFilter:
+class ArtifactRevisionStatusFilter(PydanticInputMixin[ArtifactRevisionStatusFilterDTO]):
     in_: list[ArtifactStatus] | None = strawberry.field(name="in", default=None)
     equals: ArtifactStatus | None = None
 
 
-@strawberry.input(description="Added in 25.16.0")
-class ArtifactRevisionRemoteStatusFilter:
+@gql_pydantic_input(
+    BackendAIGQLMeta(description="", added_version="25.16.0"),
+)
+class ArtifactRevisionRemoteStatusFilter(PydanticInputMixin[ArtifactRevisionRemoteStatusFilterDTO]):
     in_: list[ArtifactRemoteStatus] | None = strawberry.field(name="in", default=None)
     equals: ArtifactRemoteStatus | None = None
 
 
-@strawberry.input(
-    description=dedent_strip("""
-    Added in 25.14.0.
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description=dedent_strip("""
+        Filter options for artifact revisions based on status, version, artifact ID, and file size.
 
-    Filter options for artifact revisions based on status, version, artifact ID, and file size.
-
-    Supports logical operations (AND, OR, NOT) for complex filtering scenarios.
-    """)
+        Supports logical operations (AND, OR, NOT) for complex filtering scenarios.
+        """),
+        added_version="25.14.0",
+    ),
+    name="ArtifactRevisionFilter",
 )
-class ArtifactRevisionFilter(GQLFilter):
+class ArtifactRevisionFilter(PydanticInputMixin[ArtifactRevisionGQLFilterInputDTO]):
     status: ArtifactRevisionStatusFilter | None = None
     remote_status: ArtifactRevisionRemoteStatusFilter | None = strawberry.field(
         default=None, description="Added in 25.16.0"
@@ -340,156 +308,32 @@ class ArtifactRevisionFilter(GQLFilter):
     artifact_id: UUIDFilter | None = strawberry.field(default=None)
     size: IntFilter | None = None
 
-    AND: list[ArtifactRevisionFilter] | None = None
-    OR: list[ArtifactRevisionFilter] | None = None
-    NOT: list[ArtifactRevisionFilter] | None = None
-
-    def build_conditions(self) -> list[QueryCondition]:
-        """Build query conditions from this filter.
-
-        Returns a list containing QueryConditions that represent
-        all filters with proper logical operators applied.
-        """
-        # Collect direct field conditions (these will be combined with AND)
-        field_conditions: list[QueryCondition] = []
-
-        # Apply status filter
-        if self.status:
-            statuses_to_filter: list[ArtifactStatus] = []
-            if self.status.in_:
-                statuses_to_filter = self.status.in_
-            elif self.status.equals:
-                statuses_to_filter = [self.status.equals]
-
-            if statuses_to_filter:
-                field_conditions.append(ArtifactRevisionConditions.by_statuses(statuses_to_filter))
-
-        # Apply remote_status filter
-        if self.remote_status:
-            remote_statuses_to_filter: list[ArtifactRemoteStatus] = []
-            if self.remote_status.in_:
-                remote_statuses_to_filter = self.remote_status.in_
-            elif self.remote_status.equals:
-                remote_statuses_to_filter = [self.remote_status.equals]
-
-            if remote_statuses_to_filter:
-                field_conditions.append(
-                    ArtifactRevisionConditions.by_remote_statuses(remote_statuses_to_filter)
-                )
-
-        # Apply version filter
-        if self.version:
-            version_condition = self.version.build_query_condition(
-                contains_factory=ArtifactRevisionConditions.by_version_contains,
-                equals_factory=ArtifactRevisionConditions.by_version_equals,
-                starts_with_factory=ArtifactRevisionConditions.by_version_starts_with,
-                ends_with_factory=ArtifactRevisionConditions.by_version_ends_with,
-            )
-            if version_condition:
-                field_conditions.append(version_condition)
-
-        # Apply artifact_id filter
-        if self.artifact_id:
-            if self.artifact_id.equals:
-                field_conditions.append(
-                    ArtifactRevisionConditions.by_artifact_id(self.artifact_id.equals)
-                )
-            elif self.artifact_id.in_:
-                field_conditions.append(
-                    ArtifactRevisionConditions.by_artifact_ids(self.artifact_id.in_)
-                )
-
-        # Apply size filter
-        if self.size:
-            if self.size.equals is not None:
-                field_conditions.append(ArtifactRevisionConditions.by_size_equals(self.size.equals))
-            elif self.size.not_equals is not None:
-                field_conditions.append(
-                    ArtifactRevisionConditions.by_size_not_equals(self.size.not_equals)
-                )
-            elif self.size.greater_than is not None:
-                field_conditions.append(
-                    ArtifactRevisionConditions.by_size_greater_than(self.size.greater_than)
-                )
-            elif self.size.greater_than_or_equal is not None:
-                field_conditions.append(
-                    ArtifactRevisionConditions.by_size_greater_than_or_equal(
-                        self.size.greater_than_or_equal
-                    )
-                )
-            elif self.size.less_than is not None:
-                field_conditions.append(
-                    ArtifactRevisionConditions.by_size_less_than(self.size.less_than)
-                )
-            elif self.size.less_than_or_equal is not None:
-                field_conditions.append(
-                    ArtifactRevisionConditions.by_size_less_than_or_equal(
-                        self.size.less_than_or_equal
-                    )
-                )
-
-        # Handle AND logical operator - these are implicitly ANDed with field conditions
-        if self.AND:
-            for sub_filter in self.AND:
-                field_conditions.extend(sub_filter.build_conditions())
-
-        # Handle OR logical operator
-        if self.OR:
-            or_sub_conditions: list[QueryCondition] = []
-            for sub_filter in self.OR:
-                or_sub_conditions.extend(sub_filter.build_conditions())
-            if or_sub_conditions:
-                field_conditions.append(combine_conditions_or(or_sub_conditions))
-
-        # Handle NOT logical operator
-        if self.NOT:
-            not_sub_conditions: list[QueryCondition] = []
-            for sub_filter in self.NOT:
-                not_sub_conditions.extend(sub_filter.build_conditions())
-            if not_sub_conditions:
-                field_conditions.append(negate_conditions(not_sub_conditions))
-
-        return field_conditions
+    AND: list[Self] | None = None
+    OR: list[Self] | None = None
+    NOT: list[Self] | None = None
 
 
-@strawberry.input(
+@gql_pydantic_input(
+    BackendAIGQLMeta(description="", added_version="24.09.0"),
     description=dedent_strip("""
-    Added in 25.14.0.
-
     Specifies the field and direction for ordering artifact revisions in queries.
-    """)
+    """),
 )
-class ArtifactRevisionOrderBy(GQLOrderBy):
+class ArtifactRevisionOrderBy(PydanticInputMixin[ArtifactRevisionGQLOrderByInputDTO], GQLOrderBy):
     field: ArtifactRevisionOrderField
     direction: OrderDirection = OrderDirection.ASC
 
-    def to_query_order(self) -> QueryOrder:
-        """Convert to repository QueryOrder."""
-        ascending = self.direction == OrderDirection.ASC
-        match self.field:
-            case ArtifactRevisionOrderField.VERSION:
-                return ArtifactRevisionOrders.version(ascending)
-            case ArtifactRevisionOrderField.STATUS:
-                return ArtifactRevisionOrders.status(ascending)
-            case ArtifactRevisionOrderField.SIZE:
-                return ArtifactRevisionOrders.size(ascending)
-            case ArtifactRevisionOrderField.CREATED_AT:
-                return ArtifactRevisionOrders.created_at(ascending)
-            case ArtifactRevisionOrderField.UPDATED_AT:
-                return ArtifactRevisionOrders.updated_at(ascending)
 
-
-@strawberry.input(
+@gql_pydantic_input(
+    BackendAIGQLMeta(description="", added_version="24.09.0"),
     description=dedent_strip("""
-    Added in 25.14.0.
-
     Input for scanning artifacts from external registries (HuggingFace, Reservoir).
 
     Discovers available artifacts and registers their metadata in the system.
     Artifacts remain in SCANNED status until explicitly imported via import_artifacts.
-    """)
+    """),
 )
-class ScanArtifactsInput:
+class ScanArtifactsInput(PydanticInputMixin[ScanArtifactsInputDTO]):
     registry_id: ID | None = None
     limit: int = strawberry.field(
         description=f"Maximum number of artifacts to scan (max: {ARTIFACT_MAX_SCAN_LIMIT})"
@@ -498,33 +342,31 @@ class ScanArtifactsInput:
     search: str | None = None
 
 
-@strawberry.input(
+@gql_pydantic_input(
+    BackendAIGQLMeta(description="", added_version="24.09.0"),
     description=dedent_strip("""
-    Added in 26.1.0.
-
     Options for importing artifact revisions.
 
     Controls import behavior such as forcing re-download regardless of digest freshness.
-    """)
+    """),
 )
-class ImportArtifactsOptionsGQL:
+class ImportArtifactsOptionsGQL(PydanticInputMixin[ImportArtifactsOptionsInputDTO]):
     force: bool = strawberry.field(
         default=False,
         description="Force re-download regardless of digest freshness check.",
     )
 
 
-@strawberry.input(
+@gql_pydantic_input(
+    BackendAIGQLMeta(description="", added_version="24.09.0"),
     description=dedent_strip("""
-    Added in 25.14.0.
-
     Input for importing scanned artifact revisions from external registries.
 
     Downloads artifact files from the external source and transitions them through:
     SCANNED → PULLING → PULLED → AVAILABLE status progression.
-    """)
+    """),
 )
-class ImportArtifactsInput:
+class ImportArtifactsInput(PydanticInputMixin[ImportArtifactsInputDTO]):
     artifact_revision_ids: list[ID]
     vfolder_id: ID | None = strawberry.field(
         default=None,
@@ -536,26 +378,21 @@ class ImportArtifactsInput:
     )
 
 
-@strawberry.input(description="Added in 25.15.0")
-class DelegateeTarget:
+@gql_pydantic_input(
+    BackendAIGQLMeta(description="", added_version="25.15.0"),
+)
+class DelegateeTarget(PydanticInputMixin[DelegateeTargetInputDTO]):
     delegatee_reservoir_id: ID
     target_registry_id: ID
 
-    def to_dataclass(self) -> DelegateeTargetData:
-        return DelegateeTargetData(
-            delegatee_reservoir_id=uuid.UUID(self.delegatee_reservoir_id),
-            target_registry_id=uuid.UUID(self.target_registry_id),
-        )
 
-
-@strawberry.input(
+@gql_pydantic_input(
+    BackendAIGQLMeta(description="", added_version="24.09.0"),
     description=dedent_strip("""
-    Added in 25.15.0.
-
     Input type for delegated scanning of artifacts from a delegatee reservoir registry's remote registry.
-""")
+"""),
 )
-class DelegateScanArtifactsInput:
+class DelegateScanArtifactsInput(PydanticInputMixin[DelegateScanArtifactsInputDTO]):
     delegator_reservoir_id: ID | None = strawberry.field(
         default=None, description="ID of the reservoir registry to delegate the scan request to"
     )
@@ -574,16 +411,15 @@ class DelegateScanArtifactsInput:
     )
 
 
-@strawberry.input(
+@gql_pydantic_input(
+    BackendAIGQLMeta(description="", added_version="24.09.0"),
     description=dedent_strip("""
-    Added in 25.15.0.
-
     Input type for delegated import of artifact revisions from a reservoir registry's remote registry.
     Used to specify which artifact revisions should be imported from the remote registry source
     into the local reservoir registry storage.
-""")
+"""),
 )
-class DelegateImportArtifactsInput:
+class DelegateImportArtifactsInput(PydanticInputMixin[DelegateImportArtifactsInputDTO]):
     artifact_revision_ids: list[ID] = strawberry.field(
         description="List of artifact revision IDs of delegatee artifact registry"
     )
@@ -598,184 +434,157 @@ class DelegateImportArtifactsInput:
     )
 
 
-@strawberry.input(
+@gql_pydantic_input(
+    BackendAIGQLMeta(description="", added_version="24.09.0"),
     description=dedent_strip("""
-    Added in 25.14.0.
-
     Input for updating artifact metadata properties.
 
     Modifies artifact metadata such as readonly status and description.
     This operation does not affect the actual artifact files or revisions.
-    """)
+    """),
 )
-class UpdateArtifactInput:
+class UpdateArtifactInput(PydanticInputMixin[UpdateArtifactGQLInputDTO]):
     artifact_id: ID
     readonly: bool | None = UNSET
     description: str | None = UNSET
 
 
-@strawberry.input(
+@gql_pydantic_input(
+    BackendAIGQLMeta(description="", added_version="24.09.0"),
     description=dedent_strip("""
-    Added in 25.14.0.
-
     Input for canceling an in-progress artifact import operation.
 
     Stops the download process and reverts the artifact revision status back to SCANNED.
-    """)
+    """),
 )
-class CancelArtifactInput:
+class CancelArtifactInput(PydanticInputMixin[CancelArtifactInputDTO]):
     artifact_revision_id: ID
 
 
-@strawberry.input(
+@gql_pydantic_input(
+    BackendAIGQLMeta(description="", added_version="24.09.0"),
     description=dedent_strip("""
-    Added in 25.14.0.
-
     Input for cleaning up stored artifact revision data.
 
     Removes downloaded files from storage and transitions the artifact revision
     back to SCANNED status, freeing up storage space.
-    """)
+    """),
 )
-class CleanupArtifactRevisionsInput:
+class CleanupArtifactRevisionsInput(PydanticInputMixin[CleanupArtifactRevisionsInputDTO]):
     artifact_revision_ids: list[ID]
 
 
-@strawberry.input(
+@gql_pydantic_input(
+    BackendAIGQLMeta(description="", added_version="24.09.0"),
     description=dedent_strip("""
-    Added in 25.15.0.
-
     Input for soft-deleting artifacts from the system.
 
     Marks artifacts as deleted without permanently removing them.
     Deleted artifacts can be restored using restore_artifacts.
-    """)
+    """),
 )
-class DeleteArtifactsInput:
+class DeleteArtifactsInput(PydanticInputMixin[DeleteArtifactsInputDTO]):
     artifact_ids: list[ID]
 
 
-@strawberry.input(
+@gql_pydantic_input(
+    BackendAIGQLMeta(description="", added_version="24.09.0"),
     description=dedent_strip("""
-    Added in 25.15.0.
-
     Input for restoring previously deleted artifacts.
 
     Reverses the soft-delete operation, making the artifacts available again.
-    """)
+    """),
 )
-class RestoreArtifactsInput:
+class RestoreArtifactsInput(PydanticInputMixin[RestoreArtifactsInputDTO]):
     artifact_ids: list[ID]
 
 
-@strawberry.input(
+@gql_pydantic_input(
+    BackendAIGQLMeta(description="", added_version="24.09.0"),
     description=dedent_strip("""
-    Added in 25.14.0.
-
     Input for approving an artifact revision.
 
     Admin-only operation to approve artifact revisions for general use.
-    """)
+    """),
 )
-class ApproveArtifactInput:
+class ApproveArtifactInput(PydanticInputMixin[ApproveArtifactInputDTO]):
     artifact_revision_id: ID
 
 
-@strawberry.input(
+@gql_pydantic_input(
+    BackendAIGQLMeta(description="", added_version="24.09.0"),
     description=dedent_strip("""
-    Added in 25.14.0.
-
     Input for rejecting an artifact revision.
 
     Admin-only operation to reject artifact revisions, preventing their use.
-    """)
+    """),
 )
-class RejectArtifactInput:
+class RejectArtifactInput(PydanticInputMixin[RejectArtifactInputDTO]):
     artifact_revision_id: ID
 
 
-@strawberry.input(
+@gql_pydantic_input(
+    BackendAIGQLMeta(description="", added_version="24.09.0"),
     description=dedent_strip("""
-    Added in 25.14.0.
-
     Input for subscribing to artifact status change notifications.
 
     Used with artifact_status_changed subscription to receive real-time updates
     when artifact revision statuses change.
-    """)
+    """),
 )
-class ArtifactStatusChangedInput:
+class ArtifactStatusChangedInput(PydanticInputMixin[ArtifactStatusChangedInputDTO]):
     artifact_revision_ids: list[ID]
 
 
-@strawberry.input(
+@gql_pydantic_input(
+    BackendAIGQLMeta(description="", added_version="24.09.0"),
     description=dedent_strip("""
-    Added in 25.14.0.
-
     Specifies a target model for scanning operations.
 
     Used to identify specific models in external registries for detailed scanning.
     If revision is not specified, defaults to 'main' revision.
-    """)
+    """),
 )
-class ModelTarget:
+class ModelTarget(PydanticInputMixin[ModelTargetInputDTO]):
     model_id: str
     revision: str | None = None
 
-    def to_dataclass(self) -> ModelTargetData:
-        return ModelTargetData(model_id=self.model_id, revision=self.revision)
 
-
-@strawberry.input(
+@gql_pydantic_input(
+    BackendAIGQLMeta(description="", added_version="24.09.0"),
     description=dedent_strip("""
-    Added in 25.14.0.
-
     Input for batch scanning of specific models from external registries.
 
     Scans multiple specified models and retrieves detailed information including
     README content and file sizes. This operation performs immediate detailed scanning
     unlike the general scan_artifacts which only retrieves basic metadata.
-    """)
+    """),
 )
-class ScanArtifactModelsInput:
+class ScanArtifactModelsInput(PydanticInputMixin[ScanArtifactModelsInputDTO]):
     models: list[ModelTarget]
     registry_id: uuid.UUID | None = None
 
 
 # Object Types
-@strawberry.type(
-    description=dedent_strip("""
-    Added in 25.14.0.
-
-    Information about the source or registry of an artifact.
-
-    Contains the name and URL of the registry where the artifact is stored or originates from.
-    """)
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version="25.14.0",
+        description="Information about the source or registry of an artifact. Contains the name and URL of the registry where the artifact is stored or originates from.",
+    ),
+    model=SourceInfoDTO,
 )
 class SourceInfo:
-    name: str | None
-    url: str | None
+    name: strawberry.auto
+    url: strawberry.auto
 
 
-@strawberry.type(
-    description=dedent_strip("""
-    Added in 25.14.0.
-
-    An artifact represents AI models, packages, images, or other resources that can be
-    stored, managed, and used within Backend.AI.
-
-    Artifacts are discovered through scanning external registries and,
-    can have multiple revisions.
-
-    Each artifact contains metadata and references to its source registry.
-
-    Key concepts:
-    - Type: MODEL, PACKAGE, or IMAGE
-    - Availability: ALIVE (available), DELETED (soft-deleted)
-    - Source: Original external registry where it was discovered
-    """)
+@gql_node_type(
+    BackendAIGQLMeta(
+        added_version="25.14.0",
+        description="An artifact represents AI models, packages, images, or other resources that can be stored, managed, and used within Backend.AI. Artifacts are discovered through scanning external registries and can have multiple revisions. Each artifact contains metadata and references to its source registry. Key concepts: Type (MODEL, PACKAGE, or IMAGE), Availability (ALIVE or DELETED), Source (original external registry where it was discovered).",
+    ),
 )
-class Artifact(Node):
+class Artifact(PydanticNodeMixin[ArtifactGQLNode]):
     id: NodeID[str]
     name: str
     type: ArtifactType
@@ -787,22 +596,6 @@ class Artifact(Node):
     scanned_at: datetime
     updated_at: datetime
     availability: ArtifactAvailability
-
-    @classmethod
-    def from_dataclass(cls, data: ArtifactData, registry_url: str, source_url: str) -> Self:
-        return cls(
-            id=ID(str(data.id)),
-            name=data.name,
-            type=ArtifactType(data.type),
-            description=data.description,
-            registry=SourceInfo(name=data.registry_type.value, url=registry_url),
-            source=SourceInfo(name=data.source_registry_type.value, url=source_url),
-            readonly=data.readonly,
-            extra=data.extra,
-            scanned_at=data.scanned_at,
-            updated_at=data.updated_at,
-            availability=data.availability,
-        )
 
     @strawberry.field
     async def revisions(
@@ -817,41 +610,66 @@ class Artifact(Node):
         limit: int | None = None,
         offset: int | None = None,
     ) -> ArtifactRevisionConnection:
-        from .fetcher import fetch_artifact_revisions
+        pydantic_filter = filter.to_pydantic() if filter is not None else None
+        pydantic_order = [o.to_pydantic() for o in order_by] if order_by is not None else None
 
         base_conditions = [ArtifactRevisionConditions.by_artifact_id(uuid.UUID(self.id))]
 
-        return await fetch_artifact_revisions(
-            info,
-            filter=filter,
-            order_by=order_by,
-            before=before,
-            after=after,
+        search_input = AdminSearchArtifactRevisionsInput(
+            filter=pydantic_filter,
+            order=pydantic_order,
             first=first,
+            after=after,
             last=last,
+            before=before,
             limit=limit,
             offset=offset,
+        )
+        payload = await info.context.adapters.artifact.search_revisions_gql(
+            search_input,
             base_conditions=base_conditions,
         )
 
+        edges = []
+        for item in payload.items:
+            revision = ArtifactRevision(
+                id=ID(str(item.id)),
+                status=ArtifactStatus(item.status.value),
+                remote_status=ArtifactRemoteStatus(item.remote_status)
+                if item.remote_status
+                else None,
+                readme=None,
+                version=item.version,
+                size=ByteSize(item.size) if item.size is not None else None,
+                created_at=item.created_at,
+                updated_at=item.updated_at,
+                digest=None,
+                verification_result=None,
+            )
+            cursor = encode_cursor(item.id)
+            edges.append(ArtifactRevisionEdge(node=revision, cursor=cursor))
 
-@strawberry.type(
-    description=dedent_strip("""
-    Added in 25.14.0.
+        page_info = strawberry.relay.PageInfo(
+            has_next_page=payload.has_next_page,
+            has_previous_page=payload.has_previous_page,
+            start_cursor=edges[0].cursor if edges else None,
+            end_cursor=edges[-1].cursor if edges else None,
+        )
 
-    A specific version/revision of an artifact containing the actual file data.
+        return ArtifactRevisionConnection(
+            count=payload.total_count,
+            edges=edges,
+            page_info=page_info,
+        )
 
-    Artifact revisions progress through different statuses:
-    - SCANNED: Discovered in external registry, metadata only
-    - PULLING: Currently downloading from external source
-    - PULLED: Downloaded to temporary storage
-    - AVAILABLE: Ready for use by users
 
-    Contains version information, file size, README content, and timestamps.
-    Most HuggingFace models only have a 'main' revision.
-    """)
+@gql_node_type(
+    BackendAIGQLMeta(
+        added_version="25.14.0",
+        description="A specific version/revision of an artifact containing the actual file data. Artifact revisions progress through different statuses: SCANNED (discovered in external registry, metadata only), PULLING (currently downloading from external source), PULLED (downloaded to temporary storage), AVAILABLE (ready for use by users). Contains version information, file size, README content, and timestamps. Most HuggingFace models only have a 'main' revision.",
+    ),
 )
-class ArtifactRevision(Node):
+class ArtifactRevision(PydanticNodeMixin[ArtifactRevisionNode]):
     id: NodeID[str]
     status: ArtifactStatus
     remote_status: ArtifactRemoteStatus | None = strawberry.field(description="Added in 25.15.0")
@@ -875,73 +693,76 @@ class ArtifactRevision(Node):
         node_ids: Iterable[str],
         required: bool = False,
     ) -> Iterable[Self | None]:
+        # DataLoader already returns ArtifactRevision | None via from_pydantic.
+        # cast is required because mypy cannot unify list[ArtifactRevision | None]
+        # with Iterable[Self | None] across generic DataLoader[UUID, ArtifactRevision | None].
         results = await info.context.data_loaders.artifact_revision_loader.load_many([
             uuid.UUID(nid) for nid in node_ids
         ])
-        return [cls.from_dataclass(data) if data is not None else None for data in results]
-
-    @classmethod
-    def from_dataclass(cls, data: ArtifactRevisionData) -> Self:
-        return cls(
-            id=ID(str(data.id)),
-            status=ArtifactStatus(data.status),
-            remote_status=ArtifactRemoteStatus(data.remote_status) if data.remote_status else None,
-            readme=data.readme,
-            version=data.version,
-            size=ByteSize(data.size) if data.size is not None else None,
-            created_at=data.created_at,
-            updated_at=data.updated_at,
-            digest=data.digest,
-            verification_result=ArtifactVerificationGQLResult.from_dataclass(
-                data.verification_result
-            )
-            if data.verification_result
-            else None,
-        )
+        return cast(list[Self | None], results)
 
     @strawberry.field
     async def artifact(self, info: Info[StrawberryGQLContext]) -> Artifact:
-        from ai.backend.manager.api.gql.artifact.fetcher import get_registry_url
-
-        revision_action_result = (
-            await info.context.processors.artifact_revision.get.wait_for_complete(
-                GetArtifactRevisionAction(artifact_revision_id=uuid.UUID(self.id))
-            )
-        )
-
-        artifact_id = revision_action_result.revision.artifact_id
-
-        artifact_action_result = await info.context.processors.artifact.get.wait_for_complete(
-            GetArtifactAction(artifact_id=artifact_id)
-        )
+        revision_node = await info.context.adapters.artifact.get_revision(uuid.UUID(self.id))
+        artifact_node = await info.context.adapters.artifact.get(revision_node.artifact_id)
 
         data_loaders = info.context.data_loaders
         registry_url = await get_registry_url(
             data_loaders,
-            artifact_action_result.result.registry_id,
-            artifact_action_result.result.registry_type,
+            artifact_node.registry_id,
+            artifact_node.registry_type,
         )
         source_url = await get_registry_url(
             data_loaders,
-            artifact_action_result.result.source_registry_id,
-            artifact_action_result.result.source_registry_type,
+            artifact_node.source_registry_id,
+            artifact_node.source_registry_type,
         )
 
-        return Artifact.from_dataclass(artifact_action_result.result, registry_url, source_url)
+        return Artifact.from_pydantic(to_artifact_gql_node(artifact_node, registry_url, source_url))
+
+
+def to_artifact_gql_node(node: ArtifactNode, registry_url: str, source_url: str) -> ArtifactGQLNode:
+    """Build an ArtifactGQLNode DTO from an ArtifactNode and resolved registry URLs."""
+    return ArtifactGQLNode(
+        id=node.id,
+        name=node.name,
+        type=node.type,
+        description=node.description,
+        registry=SourceInfoDTO(name=node.registry_type.value, url=registry_url),
+        source=SourceInfoDTO(name=node.source_registry_type.value, url=source_url),
+        readonly=node.readonly,
+        extra=node.extra,
+        scanned_at=node.scanned_at,
+        updated_at=node.updated_at,
+        availability=node.availability,
+    )
+
+
+def make_artifact_revision_from_node(node: ArtifactRevisionNode) -> ArtifactRevision:
+    """Create an ArtifactRevision GQL type from an ArtifactRevisionNode DTO (search result)."""
+    return ArtifactRevision(
+        id=ID(str(node.id)),
+        status=ArtifactStatus(node.status.value),
+        remote_status=ArtifactRemoteStatus(node.remote_status) if node.remote_status else None,
+        readme=None,
+        version=node.version,
+        size=ByteSize(node.size) if node.size is not None else None,
+        created_at=node.created_at,
+        updated_at=node.updated_at,
+        digest=None,
+        verification_result=None,
+    )
 
 
 ArtifactEdge = Edge[Artifact]
 ArtifactRevisionEdge = Edge[ArtifactRevision]
 
 
-@strawberry.type(
-    description=dedent_strip("""
-    Added in 25.14.0.
-
-    Paginated connection for artifacts with total count information.
-
-    Used for relay-style pagination with cursor-based navigation.
-    """)
+@gql_connection_type(
+    BackendAIGQLMeta(
+        added_version="25.14.0",
+        description="Paginated connection for artifacts with total count information. Used for relay-style pagination with cursor-based navigation.",
+    ),
 )
 class ArtifactConnection(Connection[Artifact]):
     count: int
@@ -951,14 +772,11 @@ class ArtifactConnection(Connection[Artifact]):
         self.count = count
 
 
-@strawberry.type(
-    description=dedent_strip("""
-    Added in 25.14.0.
-
-    Paginated connection for artifact revisions with total count information.
-
-    Used for relay-style pagination with cursor-based navigation.
-    """)
+@gql_connection_type(
+    BackendAIGQLMeta(
+        added_version="25.14.0",
+        description="Paginated connection for artifact revisions with total count information. Used for relay-style pagination with cursor-based navigation.",
+    ),
 )
 class ArtifactRevisionConnection(Connection[ArtifactRevision]):
     count: int
@@ -968,92 +786,76 @@ class ArtifactRevisionConnection(Connection[ArtifactRevision]):
         self.count = count
 
 
-@strawberry.type(
-    description=dedent_strip("""
-    Added in 25.14.0.
-
-    Payload for artifact import progress subscription events.
-
-    Provides real-time updates during the artifact import process,
-    including progress percentage and current status.
-    """)
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version="25.14.0",
+        description="Payload for artifact import progress subscription events. Provides real-time updates during the artifact import process, including progress percentage and current status.",
+    ),
+    model=ArtifactImportProgressUpdatedGQLPayload,
 )
 class ArtifactImportProgressUpdatedPayload:
-    artifact_id: ID
-    progress: float
-    status: ArtifactStatus
+    artifact_id: ID = strawberry.field(description="Artifact revision ID.")
+    progress: float = strawberry.field(description="Import progress as a percentage.")
+    status: ArtifactStatus = strawberry.field(description="Current import status.")
 
 
-@strawberry.type(
-    description=dedent_strip("""
-    Added in 25.14.0.
-
-    Response payload for artifact scanning operations.
-
-    Contains the list of artifacts discovered during scanning of external registries.
-    These artifacts are registered with SCANNED status and can be imported for actual use.
-    """)
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version="25.14.0",
+        description="Response payload for artifact scanning operations. Contains the list of artifacts discovered during scanning of external registries. These artifacts are registered with SCANNED status and can be imported for actual use.",
+    ),
+    model=ScanArtifactsGQLPayload,
 )
-class ScanArtifactsPayload:
+class ScanArtifactsPayload(PydanticOutputMixin[ScanArtifactsGQLPayload]):
     artifacts: list[Artifact]
 
 
-@strawberry.type(
-    description=dedent_strip("""
-    Added in 25.15.0.
-
-    Response payload for delegated artifact scanning operation.
-    Contains the list of artifacts discovered during the scan of a reservoir registry's remote registry.
-    These artifacts are now available for import or direct use.
-""")
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version="25.15.0",
+        description="Response payload for delegated artifact scanning operation. Contains the list of artifacts discovered during the scan of a reservoir registry's remote registry. These artifacts are now available for import or direct use.",
+    ),
+    model=DelegateScanArtifactsGQLPayload,
 )
-class DelegateScanArtifactsPayload:
+class DelegateScanArtifactsPayload(PydanticOutputMixin[DelegateScanArtifactsGQLPayload]):
     artifacts: list[Artifact] = strawberry.field(
         description="List of artifacts discovered during the delegated scan from the reservoir registry's remote registry"
     )
 
 
-@strawberry.type(
-    description=dedent_strip("""
-    Added in 25.14.0.
-
-    Represents a background task for importing an artifact revision.
-
-    Contains the task ID for monitoring progress and the associated artifact revision
-    being imported from external registries.
-    """)
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version="25.14.0",
+        description="Represents a background task for importing an artifact revision. Contains the task ID for monitoring progress and the associated artifact revision being imported from external registries.",
+    ),
+    model=ArtifactRevisionImportTaskInfoGQL,
 )
-class ArtifactRevisionImportTask:
+class ArtifactRevisionImportTask(PydanticOutputMixin[ArtifactRevisionImportTaskInfoGQL]):
     task_id: ID | None
     artifact_revision: ArtifactRevision
 
 
 # Mutation Payloads
-@strawberry.type(
-    description=dedent_strip("""
-    Added in 25.14.0.
-
-    Response payload for artifact import operations.
-
-    Contains the imported artifact revisions and their associated background tasks.
-    Tasks can be monitored to track the import progress from SCANNED to AVAILABLE status.
-    """)
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version="25.14.0",
+        description="Response payload for artifact import operations. Contains the imported artifact revisions and their associated background tasks. Tasks can be monitored to track the import progress from SCANNED to AVAILABLE status.",
+    ),
+    model=ImportArtifactsGQLPayload,
 )
-class ImportArtifactsPayload:
+class ImportArtifactsPayload(PydanticOutputMixin[ImportArtifactsGQLPayload]):
     artifact_revisions: ArtifactRevisionConnection
     tasks: list[ArtifactRevisionImportTask]
 
 
-@strawberry.type(
-    description=dedent_strip("""
-    Added in 25.15.0.
-
-    Response payload for delegated artifact import operation.
-    Contains the imported artifact revisions and associated background tasks.
-    The tasks can be monitored to track the progress of the import operation.
-""")
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version="25.15.0",
+        description="Response payload for delegated artifact import operation. Contains the imported artifact revisions and associated background tasks. The tasks can be monitored to track the progress of the import operation.",
+    ),
+    model=DelegateImportArtifactsGQLPayload,
 )
-class DelegateImportArtifactsPayload:
+class DelegateImportArtifactsPayload(PydanticOutputMixin[DelegateImportArtifactsGQLPayload]):
     artifact_revisions: ArtifactRevisionConnection = strawberry.field(
         description="Connection of artifact revisions that were imported from the reservoir registry's remote registry"
     )
@@ -1062,122 +864,100 @@ class DelegateImportArtifactsPayload:
     )
 
 
-@strawberry.type(
-    description=dedent_strip("""
-    Added in 25.14.0.
-
-    Response payload for artifact update operations.
-
-    Returns the updated artifact with modified metadata properties.
-    """)
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version="25.14.0",
+        description="Response payload for artifact update operations. Returns the updated artifact with modified metadata properties.",
+    ),
+    model=UpdateArtifactGQLPayload,
 )
-class UpdateArtifactPayload:
+class UpdateArtifactPayload(PydanticOutputMixin[UpdateArtifactGQLPayload]):
     artifact: Artifact
 
 
-@strawberry.type(
-    description=dedent_strip("""
-    Added in 25.14.0.
-
-    Response payload for artifact revision cleanup operations.
-
-    Contains the cleaned artifact revisions that have had their stored data removed,
-    transitioning them back to SCANNED status to free storage space.
-    """)
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version="25.14.0",
+        description="Response payload for artifact revision cleanup operations. Contains the cleaned artifact revisions that have had their stored data removed, transitioning them back to SCANNED status to free storage space.",
+    ),
+    model=CleanupArtifactRevisionsGQLPayload,
 )
-class CleanupArtifactRevisionsPayload:
+class CleanupArtifactRevisionsPayload(PydanticOutputMixin[CleanupArtifactRevisionsGQLPayload]):
     artifact_revisions: ArtifactRevisionConnection
 
 
-@strawberry.type(
-    description=dedent_strip("""
-    Added in 25.14.0.
-
-    Response payload for artifact revision approval operations.
-
-    Contains the approved artifact revision. Admin-only operation.
-    """)
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version="25.14.0",
+        description="Response payload for artifact revision approval operations. Contains the approved artifact revision. Admin-only operation.",
+    ),
+    model=ApproveArtifactGQLPayload,
 )
-class ApproveArtifactPayload:
+class ApproveArtifactPayload(PydanticOutputMixin[ApproveArtifactGQLPayload]):
     artifact_revision: ArtifactRevision
 
 
-@strawberry.type(
-    description=dedent_strip("""
-    Added in 25.14.0.
-
-    Response payload for artifact revision rejection operations.
-
-    Contains the rejected artifact revision. Admin-only operation.
-    """)
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version="25.14.0",
+        description="Response payload for artifact revision rejection operations. Contains the rejected artifact revision. Admin-only operation.",
+    ),
+    model=RejectArtifactGQLPayload,
 )
-class RejectArtifactPayload:
+class RejectArtifactPayload(PydanticOutputMixin[RejectArtifactGQLPayload]):
     artifact_revision: ArtifactRevision
 
 
-@strawberry.type(
-    description=dedent_strip("""
-    Added in 25.14.0.
-
-    Response payload for canceling artifact import operations.
-
-    Contains the artifact revision whose import was canceled,
-    reverting its status back to SCANNED.
-    """)
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version="25.14.0",
+        description="Response payload for canceling artifact import operations. Contains the artifact revision whose import was canceled, reverting its status back to SCANNED.",
+    ),
+    model=CancelImportArtifactGQLPayload,
 )
-class CancelImportArtifactPayload:
+class CancelImportArtifactPayload(PydanticOutputMixin[CancelImportArtifactGQLPayload]):
     artifact_revision: ArtifactRevision
 
 
-@strawberry.type(
-    description=dedent_strip("""
-    Added in 25.14.0.
-
-    Payload for artifact status change subscription events.
-
-    Provides real-time notifications when artifact revision statuses change
-    during import, cleanup, or other operations.
-    """)
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version="25.14.0",
+        description="Payload for artifact status change subscription events. Provides real-time notifications when artifact revision statuses change during import, cleanup, or other operations.",
+    ),
+    model=ArtifactStatusChangedGQLPayload,
 )
-class ArtifactStatusChangedPayload:
+class ArtifactStatusChangedPayload(PydanticOutputMixin[ArtifactStatusChangedGQLPayload]):
     artifact_revision: ArtifactRevision
 
 
-@strawberry.type(
-    description=dedent_strip("""
-    Added in 25.14.0.
-
-    Response payload for batch model scanning operations.
-
-    Contains the artifact revisions discovered during detailed scanning of specific models,
-    including README content and file size information.
-    """)
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version="25.14.0",
+        description="Response payload for batch model scanning operations. Contains the artifact revisions discovered during detailed scanning of specific models, including README content and file size information.",
+    ),
+    model=ScanArtifactModelsGQLPayload,
 )
-class ScanArtifactModelsPayload:
-    artifact_revision: ArtifactRevisionConnection
+class ScanArtifactModelsPayload(PydanticOutputMixin[ScanArtifactModelsGQLPayload]):
+    artifact_revisions: ArtifactRevisionConnection
 
 
-@strawberry.type(
-    description=dedent_strip("""
-    Added in 25.15.0.
-
-    Response payload for artifact deletion operations.
-
-    Contains the artifacts that were soft-deleted. These can be restored later.
-    """)
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version="25.15.0",
+        description="Response payload for artifact deletion operations. Contains the artifacts that were soft-deleted. These can be restored later.",
+    ),
+    model=DeleteArtifactsGQLPayload,
 )
-class DeleteArtifactsPayload:
+class DeleteArtifactsPayload(PydanticOutputMixin[DeleteArtifactsGQLPayload]):
     artifacts: list[Artifact]
 
 
-@strawberry.type(
-    description=dedent_strip("""
-    Added in 25.15.0.
-
-    Response payload for artifact restoration operations.
-
-    Contains the artifacts that were restored from soft-deleted state.
-    """)
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version="25.15.0",
+        description="Response payload for artifact restoration operations. Contains the artifacts that were restored from soft-deleted state.",
+    ),
+    model=RestoreArtifactsGQLPayload,
 )
-class RestoreArtifactsPayload:
+class RestoreArtifactsPayload(PydanticOutputMixin[RestoreArtifactsGQLPayload]):
     artifacts: list[Artifact]

@@ -752,3 +752,43 @@ class AccessTokenSearchResult:
     total_count: int
     has_next_page: bool
     has_previous_page: bool
+
+
+# ---------------------------------------------------------------------------
+# Search scope types
+# ---------------------------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class RouteSearchScope:
+    """Scope for searching routes within a specific deployment."""
+
+    deployment_id: UUID
+
+
+@dataclass(frozen=True)
+class ReplicaSearchScope:
+    """Scope for searching replicas within a specific deployment."""
+
+    deployment_id: UUID
+
+
+@dataclass(frozen=True)
+class AccessTokenSearchScope:
+    """Scope for searching access tokens within a specific deployment."""
+
+    deployment_id: UUID
+
+
+@dataclass(frozen=True)
+class AutoScalingRuleSearchScope:
+    """Scope for searching auto-scaling rules within a specific deployment."""
+
+    deployment_id: UUID
+
+
+@dataclass(frozen=True)
+class RevisionSearchScope:
+    """Scope for searching revisions within a specific deployment."""
+
+    deployment_id: UUID

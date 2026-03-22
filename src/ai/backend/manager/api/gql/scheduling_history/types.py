@@ -5,44 +5,69 @@ from __future__ import annotations
 from collections.abc import Iterable
 from datetime import datetime
 from enum import StrEnum
-from typing import Self, override
+from typing import Self, cast
 from uuid import UUID
 
 import strawberry
 from strawberry import ID, Info
-from strawberry.relay import Node, NodeID
+from strawberry.relay import NodeID
 
+from ai.backend.common.dto.manager.v2.scheduling_history.request import (
+    DeploymentHistoryFilter as DeploymentHistoryFilterDTO,
+)
+from ai.backend.common.dto.manager.v2.scheduling_history.request import (
+    DeploymentHistoryOrder as DeploymentHistoryOrderDTO,
+)
+from ai.backend.common.dto.manager.v2.scheduling_history.request import (
+    RouteHistoryFilter as RouteHistoryFilterDTO,
+)
+from ai.backend.common.dto.manager.v2.scheduling_history.request import (
+    RouteHistoryOrder as RouteHistoryOrderDTO,
+)
+from ai.backend.common.dto.manager.v2.scheduling_history.request import (
+    SchedulingResultFilter as SchedulingResultFilterDTO,
+)
+from ai.backend.common.dto.manager.v2.scheduling_history.request import (
+    SessionHistoryFilter as SessionHistoryFilterDTO,
+)
+from ai.backend.common.dto.manager.v2.scheduling_history.request import (
+    SessionHistoryOrder as SessionHistoryOrderDTO,
+)
+from ai.backend.common.dto.manager.v2.scheduling_history.response import (
+    DeploymentHistoryNode,
+    RouteHistoryNode,
+    SessionHistoryNode,
+)
+from ai.backend.common.dto.manager.v2.scheduling_history.types import (
+    DeploymentHistoryScopeDTO,
+    RouteHistoryScopeDTO,
+    SessionHistoryScopeDTO,
+    SubStepResultInfo,
+)
 from ai.backend.manager.api.gql.base import (
     DateTimeFilter,
     OrderDirection,
     StringFilter,
     UUIDFilter,
 )
-from ai.backend.manager.api.gql.types import GQLFilter, GQLOrderBy, StrawberryGQLContext
-from ai.backend.manager.data.deployment.types import DeploymentHistoryData, RouteHistoryData
-from ai.backend.manager.data.session.types import (
-    SchedulingResult,
-    SessionSchedulingHistoryData,
-    SubStepResult,
+from ai.backend.manager.api.gql.decorators import (
+    BackendAIGQLMeta,
+    gql_node_type,
+    gql_pydantic_input,
+    gql_pydantic_type,
 )
-from ai.backend.manager.repositories.base import (
-    QueryCondition,
-    QueryOrder,
-    combine_conditions_or,
-    negate_conditions,
+from ai.backend.manager.api.gql.pydantic_compat import (
+    PydanticInputMixin,
+    PydanticNodeMixin,
+    PydanticOutputMixin,
 )
-from ai.backend.manager.repositories.scheduling_history.options import (
-    DeploymentHistoryConditions,
-    DeploymentHistoryOrders,
-    RouteHistoryConditions,
-    RouteHistoryOrders,
-    SessionSchedulingHistoryConditions,
-    SessionSchedulingHistoryOrders,
-)
+from ai.backend.manager.api.gql.types import StrawberryGQLContext
 
 __all__ = (
     # Enums
     "SchedulingResultGQL",
+    # Filter wrappers
+    "SchedulingResultFilterGQL",
     "SessionSchedulingHistoryOrderField",
     "DeploymentHistoryOrderField",
     "RouteHistoryOrderField",
@@ -78,43 +103,6 @@ class SchedulingResultGQL(StrEnum):
     GIVE_UP = "GIVE_UP"
     SKIPPED = "SKIPPED"
 
-    @classmethod
-    def from_internal(cls, value: SchedulingResult) -> SchedulingResultGQL:
-        match value:
-            case SchedulingResult.SUCCESS:
-                return cls.SUCCESS
-            case SchedulingResult.FAILURE:
-                return cls.FAILURE
-            case SchedulingResult.STALE:
-                return cls.STALE
-            case SchedulingResult.NEED_RETRY:
-                return cls.NEED_RETRY
-            case SchedulingResult.EXPIRED:
-                return cls.EXPIRED
-            case SchedulingResult.GIVE_UP:
-                return cls.GIVE_UP
-            case SchedulingResult.SKIPPED:
-                return cls.SKIPPED
-            case _:
-                raise ValueError(f"Unknown SchedulingResult: {value}")
-
-    def to_internal(self) -> SchedulingResult:
-        match self:
-            case SchedulingResultGQL.SUCCESS:
-                return SchedulingResult.SUCCESS
-            case SchedulingResultGQL.FAILURE:
-                return SchedulingResult.FAILURE
-            case SchedulingResultGQL.STALE:
-                return SchedulingResult.STALE
-            case SchedulingResultGQL.NEED_RETRY:
-                return SchedulingResult.NEED_RETRY
-            case SchedulingResultGQL.EXPIRED:
-                return SchedulingResult.EXPIRED
-            case SchedulingResultGQL.GIVE_UP:
-                return SchedulingResult.GIVE_UP
-            case SchedulingResultGQL.SKIPPED:
-                return SchedulingResult.SKIPPED
-
 
 @strawberry.enum
 class SessionSchedulingHistoryOrderField(StrEnum):
@@ -137,8 +125,15 @@ class RouteHistoryOrderField(StrEnum):
 # Types
 
 
-@strawberry.type(description="Sub-step result in scheduling history")
-class SubStepResultGQL:
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version="26.3.0",
+        description="Sub-step result in scheduling history.",
+    ),
+    model=SubStepResultInfo,
+    name="SubStepResult",
+)
+class SubStepResultGQL(PydanticOutputMixin[SubStepResultInfo]):
     step: str
     result: SchedulingResultGQL
     error_code: str | None
@@ -146,22 +141,13 @@ class SubStepResultGQL:
     started_at: datetime | None
     ended_at: datetime | None
 
-    @classmethod
-    def from_dataclass(cls, data: SubStepResult) -> Self:
-        return cls(
-            step=data.step,
-            result=SchedulingResultGQL.from_internal(data.result),
-            error_code=data.error_code,
-            message=data.message,
-            started_at=data.started_at,
-            ended_at=data.ended_at,
-        )
 
-
-@strawberry.type(description="Session scheduling history record")
-class SessionSchedulingHistory(Node):
+@gql_node_type(
+    BackendAIGQLMeta(added_version="26.3.0", description="Session scheduling history record.")
+)
+class SessionSchedulingHistory(PydanticNodeMixin[SessionHistoryNode]):
     id: NodeID[str]
-    _session_id: strawberry.Private[UUID]
+    session_id: ID
     phase: str
     from_status: str | None
     to_status: str | None
@@ -173,10 +159,6 @@ class SessionSchedulingHistory(Node):
     created_at: datetime
     updated_at: datetime
 
-    @strawberry.field(description="The session ID this history record belongs to.")  # type: ignore[misc]
-    def session_id(self) -> ID:
-        return ID(str(self._session_id))
-
     @classmethod
     async def resolve_nodes(  # type: ignore[override]  # Strawberry Node uses AwaitableOrValue overloads incompatible with async def
         cls,
@@ -185,33 +167,17 @@ class SessionSchedulingHistory(Node):
         node_ids: Iterable[str],
         required: bool = False,
     ) -> Iterable[Self | None]:
+        # DataLoader returns GQL type instances directly via from_pydantic adapter.
         results = await info.context.data_loaders.session_history_loader.load_many([
             UUID(nid) for nid in node_ids
         ])
-        return [cls.from_dataclass(data) if data is not None else None for data in results]
-
-    @classmethod
-    def from_dataclass(cls, data: SessionSchedulingHistoryData) -> Self:
-        return cls(
-            id=ID(str(data.id)),
-            _session_id=data.session_id,
-            phase=data.phase,
-            from_status=data.from_status.value if data.from_status else None,
-            to_status=data.to_status.value if data.to_status else None,
-            result=SchedulingResultGQL.from_internal(data.result),
-            error_code=data.error_code,
-            message=data.message,
-            sub_steps=[SubStepResultGQL.from_dataclass(s) for s in data.sub_steps],
-            attempts=data.attempts,
-            created_at=data.created_at,
-            updated_at=data.updated_at,
-        )
+        return cast(list[Self | None], results)
 
 
-@strawberry.type(description="Deployment history record")
-class DeploymentHistory(Node):
+@gql_node_type(BackendAIGQLMeta(added_version="26.3.0", description="Deployment history record."))
+class DeploymentHistory(PydanticNodeMixin[DeploymentHistoryNode]):
     id: NodeID[str]
-    _deployment_id: strawberry.Private[UUID]
+    deployment_id: ID
     phase: str
     from_status: str | None
     to_status: str | None
@@ -223,10 +189,6 @@ class DeploymentHistory(Node):
     created_at: datetime
     updated_at: datetime
 
-    @strawberry.field(description="The deployment ID this history record belongs to.")  # type: ignore[misc]
-    def deployment_id(self) -> ID:
-        return ID(str(self._deployment_id))
-
     @classmethod
     async def resolve_nodes(  # type: ignore[override]  # Strawberry Node uses AwaitableOrValue overloads incompatible with async def
         cls,
@@ -235,34 +197,18 @@ class DeploymentHistory(Node):
         node_ids: Iterable[str],
         required: bool = False,
     ) -> Iterable[Self | None]:
+        # DataLoader returns GQL type instances directly via from_pydantic adapter.
         results = await info.context.data_loaders.deployment_history_loader.load_many([
             UUID(nid) for nid in node_ids
         ])
-        return [cls.from_dataclass(data) if data is not None else None for data in results]
-
-    @classmethod
-    def from_dataclass(cls, data: DeploymentHistoryData) -> Self:
-        return cls(
-            id=ID(str(data.id)),
-            _deployment_id=data.deployment_id,
-            phase=data.phase,
-            from_status=data.from_status.value if data.from_status else None,
-            to_status=data.to_status.value if data.to_status else None,
-            result=SchedulingResultGQL.from_internal(data.result),
-            error_code=data.error_code,
-            message=data.message,
-            sub_steps=[SubStepResultGQL.from_dataclass(s) for s in data.sub_steps],
-            attempts=data.attempts,
-            created_at=data.created_at,
-            updated_at=data.updated_at,
-        )
+        return cast(list[Self | None], results)
 
 
-@strawberry.type(description="Route history record")
-class RouteHistory(Node):
+@gql_node_type(BackendAIGQLMeta(added_version="26.3.0", description="Route history record."))
+class RouteHistory(PydanticNodeMixin[RouteHistoryNode]):
     id: NodeID[str]
-    _route_id: strawberry.Private[UUID]
-    _deployment_id: strawberry.Private[UUID]
+    route_id: ID
+    deployment_id: ID
     phase: str
     from_status: str | None
     to_status: str | None
@@ -274,14 +220,6 @@ class RouteHistory(Node):
     created_at: datetime
     updated_at: datetime
 
-    @strawberry.field(description="The route ID this history record belongs to.")  # type: ignore[misc]
-    def route_id(self) -> ID:
-        return ID(str(self._route_id))
-
-    @strawberry.field(description="The deployment ID this route belongs to.")  # type: ignore[misc]
-    def deployment_id(self) -> ID:
-        return ID(str(self._deployment_id))
-
     @classmethod
     async def resolve_nodes(  # type: ignore[override]  # Strawberry Node uses AwaitableOrValue overloads incompatible with async def
         cls,
@@ -290,474 +228,158 @@ class RouteHistory(Node):
         node_ids: Iterable[str],
         required: bool = False,
     ) -> Iterable[Self | None]:
+        # DataLoader returns GQL type instances directly via from_pydantic adapter.
         results = await info.context.data_loaders.route_history_loader.load_many([
             UUID(nid) for nid in node_ids
         ])
-        return [cls.from_dataclass(data) if data is not None else None for data in results]
-
-    @classmethod
-    def from_dataclass(cls, data: RouteHistoryData) -> Self:
-        return cls(
-            id=ID(str(data.id)),
-            _route_id=data.route_id,
-            _deployment_id=data.deployment_id,
-            phase=data.phase,
-            from_status=data.from_status.value if data.from_status else None,
-            to_status=data.to_status.value if data.to_status else None,
-            result=SchedulingResultGQL.from_internal(data.result),
-            error_code=data.error_code,
-            message=data.message,
-            sub_steps=[SubStepResultGQL.from_dataclass(s) for s in data.sub_steps],
-            attempts=data.attempts,
-            created_at=data.created_at,
-            updated_at=data.updated_at,
-        )
+        return cast(list[Self | None], results)
 
 
 # Scope input types (added in 26.2.0)
 
 
-@strawberry.input(description="Scope for session scheduling history query")
-class SessionScope:
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description="Scope for session scheduling history query", added_version="24.09.0"
+    ),
+    name="SessionScope",
+)
+class SessionScope(PydanticInputMixin[SessionHistoryScopeDTO]):
     """Scope for session-level scheduling history queries."""
 
     session_id: UUID = strawberry.field(description="Session ID to get history for")
 
 
-@strawberry.input(description="Scope for deployment scheduling history query")
-class DeploymentScope:
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description="Scope for deployment scheduling history query", added_version="24.09.0"
+    ),
+    name="DeploymentScope",
+)
+class DeploymentScope(PydanticInputMixin[DeploymentHistoryScopeDTO]):
     """Scope for deployment-level scheduling history queries."""
 
     deployment_id: UUID = strawberry.field(description="Deployment ID to get history for")
 
 
-@strawberry.input(description="Scope for route scheduling history query")
-class RouteScope:
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description="Scope for route scheduling history query", added_version="24.09.0"
+    ),
+    name="RouteScope",
+)
+class RouteScope(PydanticInputMixin[RouteHistoryScopeDTO]):
     """Scope for route-level scheduling history queries."""
 
     route_id: UUID = strawberry.field(description="Route ID to get history for")
 
 
-# Filters
+# Filters and orders (pydantic-backed inputs)
 
 
-@strawberry.input(description="Filter for session scheduling history")
-class SessionSchedulingHistoryFilter(GQLFilter):
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description="Filter for scheduling result with equality and membership operators.",
+        added_version="26.3.0",
+    ),
+    name="SchedulingResultFilter",
+)
+class SchedulingResultFilterGQL(PydanticInputMixin[SchedulingResultFilterDTO]):
+    equals: SchedulingResultGQL | None = None
+    in_: list[SchedulingResultGQL] | None = strawberry.field(name="in", default=None)
+    not_equals: SchedulingResultGQL | None = None
+    not_in: list[SchedulingResultGQL] | None = None
+
+
+@gql_pydantic_input(
+    BackendAIGQLMeta(description="Filter for session scheduling history", added_version="24.09.0"),
+    name="SessionSchedulingHistoryFilter",
+)
+class SessionSchedulingHistoryFilter(PydanticInputMixin[SessionHistoryFilterDTO]):
     id: UUIDFilter | None = None
     session_id: UUIDFilter | None = None
     phase: StringFilter | None = None
     from_status: list[str] | None = None
     to_status: list[str] | None = None
-    result: list[SchedulingResultGQL] | None = None
+    result: SchedulingResultFilterGQL | None = None
     error_code: StringFilter | None = None
     message: StringFilter | None = None
     created_at: DateTimeFilter | None = None
     updated_at: DateTimeFilter | None = None
-
-    AND: list[SessionSchedulingHistoryFilter] | None = None
-    OR: list[SessionSchedulingHistoryFilter] | None = None
-    NOT: list[SessionSchedulingHistoryFilter] | None = None
-
-    @override
-    def build_conditions(self) -> list[QueryCondition]:
-        """Build query conditions from this filter."""
-        conditions: list[QueryCondition] = []
-
-        if self.id is not None:
-            condition = self.id.build_query_condition(
-                equals_factory=SessionSchedulingHistoryConditions.by_id_filter,
-                in_factory=SessionSchedulingHistoryConditions.by_id_in,
-            )
-            if condition:
-                conditions.append(condition)
-
-        if self.session_id is not None:
-            condition = self.session_id.build_query_condition(
-                equals_factory=SessionSchedulingHistoryConditions.by_session_id_filter,
-                in_factory=SessionSchedulingHistoryConditions.by_session_id_in,
-            )
-            if condition:
-                conditions.append(condition)
-
-        if self.phase is not None:
-            condition = self.phase.build_query_condition(
-                contains_factory=SessionSchedulingHistoryConditions.by_phase_contains,
-                equals_factory=SessionSchedulingHistoryConditions.by_phase_equals,
-                starts_with_factory=SessionSchedulingHistoryConditions.by_phase_starts_with,
-                ends_with_factory=SessionSchedulingHistoryConditions.by_phase_ends_with,
-            )
-            if condition:
-                conditions.append(condition)
-
-        if self.from_status is not None and len(self.from_status) > 0:
-            conditions.append(SessionSchedulingHistoryConditions.by_from_statuses(self.from_status))
-
-        if self.to_status is not None and len(self.to_status) > 0:
-            conditions.append(SessionSchedulingHistoryConditions.by_to_statuses(self.to_status))
-
-        if self.result is not None and len(self.result) > 0:
-            conditions.append(
-                SessionSchedulingHistoryConditions.by_results([
-                    r.to_internal() for r in self.result
-                ])
-            )
-
-        if self.error_code is not None:
-            condition = self.error_code.build_query_condition(
-                contains_factory=SessionSchedulingHistoryConditions.by_error_code_contains,
-                equals_factory=SessionSchedulingHistoryConditions.by_error_code_equals,
-                starts_with_factory=SessionSchedulingHistoryConditions.by_error_code_starts_with,
-                ends_with_factory=SessionSchedulingHistoryConditions.by_error_code_ends_with,
-            )
-            if condition:
-                conditions.append(condition)
-
-        if self.message is not None:
-            condition = self.message.build_query_condition(
-                contains_factory=SessionSchedulingHistoryConditions.by_message_contains,
-                equals_factory=SessionSchedulingHistoryConditions.by_message_equals,
-                starts_with_factory=SessionSchedulingHistoryConditions.by_message_starts_with,
-                ends_with_factory=SessionSchedulingHistoryConditions.by_message_ends_with,
-            )
-            if condition:
-                conditions.append(condition)
-
-        if self.created_at is not None:
-            condition = self.created_at.build_query_condition(
-                before_factory=SessionSchedulingHistoryConditions.by_created_at_before,
-                after_factory=SessionSchedulingHistoryConditions.by_created_at_after,
-                equals_factory=SessionSchedulingHistoryConditions.by_created_at_equals,
-            )
-            if condition:
-                conditions.append(condition)
-
-        if self.updated_at is not None:
-            condition = self.updated_at.build_query_condition(
-                before_factory=SessionSchedulingHistoryConditions.by_updated_at_before,
-                after_factory=SessionSchedulingHistoryConditions.by_updated_at_after,
-                equals_factory=SessionSchedulingHistoryConditions.by_updated_at_equals,
-            )
-            if condition:
-                conditions.append(condition)
-
-        # Handle AND logical operator - these are implicitly ANDed with field conditions
-        if self.AND:
-            for sub_filter in self.AND:
-                conditions.extend(sub_filter.build_conditions())
-
-        # Handle OR logical operator
-        if self.OR:
-            or_sub_conditions: list[QueryCondition] = []
-            for sub_filter in self.OR:
-                or_sub_conditions.extend(sub_filter.build_conditions())
-            if or_sub_conditions:
-                conditions.append(combine_conditions_or(or_sub_conditions))
-
-        # Handle NOT logical operator
-        if self.NOT:
-            not_sub_conditions: list[QueryCondition] = []
-            for sub_filter in self.NOT:
-                not_sub_conditions.extend(sub_filter.build_conditions())
-            if not_sub_conditions:
-                conditions.append(negate_conditions(not_sub_conditions))
-
-        return conditions
+    AND: list[Self] | None = None
+    OR: list[Self] | None = None
+    NOT: list[Self] | None = None
 
 
-@strawberry.input(description="Order by specification for session scheduling history")
-class SessionSchedulingHistoryOrderBy(GQLOrderBy):
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description="Order by specification for session scheduling history", added_version="24.09.0"
+    ),
+    name="SessionSchedulingHistoryOrderBy",
+)
+class SessionSchedulingHistoryOrderBy(PydanticInputMixin[SessionHistoryOrderDTO]):
     field: SessionSchedulingHistoryOrderField
     direction: OrderDirection = OrderDirection.DESC
 
-    @override
-    def to_query_order(self) -> QueryOrder:
-        """Convert to repository QueryOrder."""
-        ascending = self.direction == OrderDirection.ASC
-        match self.field:
-            case SessionSchedulingHistoryOrderField.CREATED_AT:
-                return SessionSchedulingHistoryOrders.created_at(ascending)
-            case SessionSchedulingHistoryOrderField.UPDATED_AT:
-                return SessionSchedulingHistoryOrders.updated_at(ascending)
 
-
-@strawberry.input(description="Filter for deployment history")
-class DeploymentHistoryFilter(GQLFilter):
+@gql_pydantic_input(
+    BackendAIGQLMeta(description="Filter for deployment history", added_version="24.09.0"),
+    name="DeploymentHistoryFilter",
+)
+class DeploymentHistoryFilter(PydanticInputMixin[DeploymentHistoryFilterDTO]):
     id: UUIDFilter | None = None
     deployment_id: UUIDFilter | None = None
     phase: StringFilter | None = None
     from_status: list[str] | None = None
     to_status: list[str] | None = None
-    result: list[SchedulingResultGQL] | None = None
+    result: SchedulingResultFilterGQL | None = None
     error_code: StringFilter | None = None
     message: StringFilter | None = None
     created_at: DateTimeFilter | None = None
     updated_at: DateTimeFilter | None = None
-
-    AND: list[DeploymentHistoryFilter] | None = None
-    OR: list[DeploymentHistoryFilter] | None = None
-    NOT: list[DeploymentHistoryFilter] | None = None
-
-    @override
-    def build_conditions(self) -> list[QueryCondition]:
-        """Build query conditions from this filter."""
-        conditions: list[QueryCondition] = []
-
-        if self.id is not None:
-            condition = self.id.build_query_condition(
-                equals_factory=DeploymentHistoryConditions.by_id_filter,
-                in_factory=DeploymentHistoryConditions.by_id_in,
-            )
-            if condition:
-                conditions.append(condition)
-
-        if self.deployment_id is not None:
-            condition = self.deployment_id.build_query_condition(
-                equals_factory=DeploymentHistoryConditions.by_deployment_id_filter,
-                in_factory=DeploymentHistoryConditions.by_deployment_id_in,
-            )
-            if condition:
-                conditions.append(condition)
-
-        if self.phase is not None:
-            condition = self.phase.build_query_condition(
-                contains_factory=DeploymentHistoryConditions.by_phase_contains,
-                equals_factory=DeploymentHistoryConditions.by_phase_equals,
-                starts_with_factory=DeploymentHistoryConditions.by_phase_starts_with,
-                ends_with_factory=DeploymentHistoryConditions.by_phase_ends_with,
-            )
-            if condition:
-                conditions.append(condition)
-
-        if self.from_status is not None and len(self.from_status) > 0:
-            conditions.append(DeploymentHistoryConditions.by_from_statuses(self.from_status))
-
-        if self.to_status is not None and len(self.to_status) > 0:
-            conditions.append(DeploymentHistoryConditions.by_to_statuses(self.to_status))
-
-        if self.result is not None and len(self.result) > 0:
-            conditions.append(
-                DeploymentHistoryConditions.by_results([r.to_internal() for r in self.result])
-            )
-
-        if self.error_code is not None:
-            condition = self.error_code.build_query_condition(
-                contains_factory=DeploymentHistoryConditions.by_error_code_contains,
-                equals_factory=DeploymentHistoryConditions.by_error_code_equals,
-                starts_with_factory=DeploymentHistoryConditions.by_error_code_starts_with,
-                ends_with_factory=DeploymentHistoryConditions.by_error_code_ends_with,
-            )
-            if condition:
-                conditions.append(condition)
-
-        if self.message is not None:
-            condition = self.message.build_query_condition(
-                contains_factory=DeploymentHistoryConditions.by_message_contains,
-                equals_factory=DeploymentHistoryConditions.by_message_equals,
-                starts_with_factory=DeploymentHistoryConditions.by_message_starts_with,
-                ends_with_factory=DeploymentHistoryConditions.by_message_ends_with,
-            )
-            if condition:
-                conditions.append(condition)
-
-        if self.created_at is not None:
-            condition = self.created_at.build_query_condition(
-                before_factory=DeploymentHistoryConditions.by_created_at_before,
-                after_factory=DeploymentHistoryConditions.by_created_at_after,
-                equals_factory=DeploymentHistoryConditions.by_created_at_equals,
-            )
-            if condition:
-                conditions.append(condition)
-
-        if self.updated_at is not None:
-            condition = self.updated_at.build_query_condition(
-                before_factory=DeploymentHistoryConditions.by_updated_at_before,
-                after_factory=DeploymentHistoryConditions.by_updated_at_after,
-                equals_factory=DeploymentHistoryConditions.by_updated_at_equals,
-            )
-            if condition:
-                conditions.append(condition)
-
-        # Handle AND logical operator - these are implicitly ANDed with field conditions
-        if self.AND:
-            for sub_filter in self.AND:
-                conditions.extend(sub_filter.build_conditions())
-
-        # Handle OR logical operator
-        if self.OR:
-            or_sub_conditions: list[QueryCondition] = []
-            for sub_filter in self.OR:
-                or_sub_conditions.extend(sub_filter.build_conditions())
-            if or_sub_conditions:
-                conditions.append(combine_conditions_or(or_sub_conditions))
-
-        # Handle NOT logical operator
-        if self.NOT:
-            not_sub_conditions: list[QueryCondition] = []
-            for sub_filter in self.NOT:
-                not_sub_conditions.extend(sub_filter.build_conditions())
-            if not_sub_conditions:
-                conditions.append(negate_conditions(not_sub_conditions))
-
-        return conditions
+    AND: list[Self] | None = None
+    OR: list[Self] | None = None
+    NOT: list[Self] | None = None
 
 
-@strawberry.input(description="Order by specification for deployment history")
-class DeploymentHistoryOrderBy(GQLOrderBy):
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description="Order by specification for deployment history", added_version="24.09.0"
+    ),
+    name="DeploymentHistoryOrderBy",
+)
+class DeploymentHistoryOrderBy(PydanticInputMixin[DeploymentHistoryOrderDTO]):
     field: DeploymentHistoryOrderField
     direction: OrderDirection = OrderDirection.DESC
 
-    @override
-    def to_query_order(self) -> QueryOrder:
-        """Convert to repository QueryOrder."""
-        ascending = self.direction == OrderDirection.ASC
-        match self.field:
-            case DeploymentHistoryOrderField.CREATED_AT:
-                return DeploymentHistoryOrders.created_at(ascending)
-            case DeploymentHistoryOrderField.UPDATED_AT:
-                return DeploymentHistoryOrders.updated_at(ascending)
 
-
-@strawberry.input(description="Filter for route history")
-class RouteHistoryFilter(GQLFilter):
+@gql_pydantic_input(
+    BackendAIGQLMeta(description="Filter for route history", added_version="24.09.0"),
+    name="RouteHistoryFilter",
+)
+class RouteHistoryFilter(PydanticInputMixin[RouteHistoryFilterDTO]):
     id: UUIDFilter | None = None
     route_id: UUIDFilter | None = None
     deployment_id: UUIDFilter | None = None
     phase: StringFilter | None = None
     from_status: list[str] | None = None
     to_status: list[str] | None = None
-    result: list[SchedulingResultGQL] | None = None
+    result: SchedulingResultFilterGQL | None = None
     error_code: StringFilter | None = None
     message: StringFilter | None = None
     created_at: DateTimeFilter | None = None
     updated_at: DateTimeFilter | None = None
-
-    AND: list[RouteHistoryFilter] | None = None
-    OR: list[RouteHistoryFilter] | None = None
-    NOT: list[RouteHistoryFilter] | None = None
-
-    @override
-    def build_conditions(self) -> list[QueryCondition]:
-        """Build query conditions from this filter."""
-        conditions: list[QueryCondition] = []
-
-        if self.id is not None:
-            condition = self.id.build_query_condition(
-                equals_factory=RouteHistoryConditions.by_id_filter,
-                in_factory=RouteHistoryConditions.by_id_in,
-            )
-            if condition:
-                conditions.append(condition)
-
-        if self.route_id is not None:
-            condition = self.route_id.build_query_condition(
-                equals_factory=RouteHistoryConditions.by_route_id_filter,
-                in_factory=RouteHistoryConditions.by_route_id_in,
-            )
-            if condition:
-                conditions.append(condition)
-
-        if self.deployment_id is not None:
-            condition = self.deployment_id.build_query_condition(
-                equals_factory=RouteHistoryConditions.by_deployment_id_filter,
-                in_factory=RouteHistoryConditions.by_deployment_id_in,
-            )
-            if condition:
-                conditions.append(condition)
-
-        if self.phase is not None:
-            condition = self.phase.build_query_condition(
-                contains_factory=RouteHistoryConditions.by_phase_contains,
-                equals_factory=RouteHistoryConditions.by_phase_equals,
-                starts_with_factory=RouteHistoryConditions.by_phase_starts_with,
-                ends_with_factory=RouteHistoryConditions.by_phase_ends_with,
-            )
-            if condition:
-                conditions.append(condition)
-
-        if self.from_status is not None and len(self.from_status) > 0:
-            conditions.append(RouteHistoryConditions.by_from_statuses(self.from_status))
-
-        if self.to_status is not None and len(self.to_status) > 0:
-            conditions.append(RouteHistoryConditions.by_to_statuses(self.to_status))
-
-        if self.result is not None and len(self.result) > 0:
-            conditions.append(
-                RouteHistoryConditions.by_results([r.to_internal() for r in self.result])
-            )
-
-        if self.error_code is not None:
-            condition = self.error_code.build_query_condition(
-                contains_factory=RouteHistoryConditions.by_error_code_contains,
-                equals_factory=RouteHistoryConditions.by_error_code_equals,
-                starts_with_factory=RouteHistoryConditions.by_error_code_starts_with,
-                ends_with_factory=RouteHistoryConditions.by_error_code_ends_with,
-            )
-            if condition:
-                conditions.append(condition)
-
-        if self.message is not None:
-            condition = self.message.build_query_condition(
-                contains_factory=RouteHistoryConditions.by_message_contains,
-                equals_factory=RouteHistoryConditions.by_message_equals,
-                starts_with_factory=RouteHistoryConditions.by_message_starts_with,
-                ends_with_factory=RouteHistoryConditions.by_message_ends_with,
-            )
-            if condition:
-                conditions.append(condition)
-
-        if self.created_at is not None:
-            condition = self.created_at.build_query_condition(
-                before_factory=RouteHistoryConditions.by_created_at_before,
-                after_factory=RouteHistoryConditions.by_created_at_after,
-                equals_factory=RouteHistoryConditions.by_created_at_equals,
-            )
-            if condition:
-                conditions.append(condition)
-
-        if self.updated_at is not None:
-            condition = self.updated_at.build_query_condition(
-                before_factory=RouteHistoryConditions.by_updated_at_before,
-                after_factory=RouteHistoryConditions.by_updated_at_after,
-                equals_factory=RouteHistoryConditions.by_updated_at_equals,
-            )
-            if condition:
-                conditions.append(condition)
-
-        # Handle AND logical operator - these are implicitly ANDed with field conditions
-        if self.AND:
-            for sub_filter in self.AND:
-                conditions.extend(sub_filter.build_conditions())
-
-        # Handle OR logical operator
-        if self.OR:
-            or_sub_conditions: list[QueryCondition] = []
-            for sub_filter in self.OR:
-                or_sub_conditions.extend(sub_filter.build_conditions())
-            if or_sub_conditions:
-                conditions.append(combine_conditions_or(or_sub_conditions))
-
-        # Handle NOT logical operator
-        if self.NOT:
-            not_sub_conditions: list[QueryCondition] = []
-            for sub_filter in self.NOT:
-                not_sub_conditions.extend(sub_filter.build_conditions())
-            if not_sub_conditions:
-                conditions.append(negate_conditions(not_sub_conditions))
-
-        return conditions
+    AND: list[Self] | None = None
+    OR: list[Self] | None = None
+    NOT: list[Self] | None = None
 
 
-@strawberry.input(description="Order by specification for route history")
-class RouteHistoryOrderBy(GQLOrderBy):
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description="Order by specification for route history", added_version="24.09.0"
+    ),
+    name="RouteHistoryOrderBy",
+)
+class RouteHistoryOrderBy(PydanticInputMixin[RouteHistoryOrderDTO]):
     field: RouteHistoryOrderField
     direction: OrderDirection = OrderDirection.DESC
-
-    @override
-    def to_query_order(self) -> QueryOrder:
-        """Convert to repository QueryOrder."""
-        ascending = self.direction == OrderDirection.ASC
-        match self.field:
-            case RouteHistoryOrderField.CREATED_AT:
-                return RouteHistoryOrders.created_at(ascending)
-            case RouteHistoryOrderField.UPDATED_AT:
-                return RouteHistoryOrders.updated_at(ascending)

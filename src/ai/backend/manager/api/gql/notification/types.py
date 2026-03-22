@@ -6,151 +6,169 @@ import uuid
 from collections.abc import Iterable
 from datetime import datetime
 from enum import StrEnum
-from typing import Self, override
+from typing import Self
 
 import strawberry
 from strawberry import ID, UNSET, Info
-from strawberry.relay import Node, NodeID
+from strawberry.relay import NodeID
 
-from ai.backend.common.data.notification import (
-    NotificationChannelType,
-    NotificationRuleType,
-    WebhookSpec,
+# NOTE: NotificationChannelSpecGQL uses @gql_pydantic_interface so Strawberry
+# dispatches from_pydantic() to the concrete implementor (WebhookSpecGQL /
+# EmailSpecGQL) based on the runtime DTO type.  No _pydantic_extra needed in
+# NotificationChannel.
+from ai.backend.common.dto.manager.v2.notification.request import (
+    CreateNotificationChannelInput as CreateNotificationChannelInputDTO,
 )
-from ai.backend.common.data.notification.types import (
-    EmailMessage,
-    EmailSpec,
-    SMTPAuth,
-    SMTPConnection,
+from ai.backend.common.dto.manager.v2.notification.request import (
+    CreateNotificationRuleInput as CreateNotificationRuleInputDTO,
 )
-from ai.backend.common.data.permission.types import RBACElementType
-from ai.backend.common.exception import InvalidNotificationChannelSpec
+from ai.backend.common.dto.manager.v2.notification.request import (
+    DeleteNotificationChannelInput as DeleteNotificationChannelInputDTO,
+)
+from ai.backend.common.dto.manager.v2.notification.request import (
+    DeleteNotificationRuleInput as DeleteNotificationRuleInputDTO,
+)
+from ai.backend.common.dto.manager.v2.notification.request import (
+    EmailMessageInputDTO,
+    EmailSpecInputDTO,
+    NotificationChannelSpecInputDTO,
+    SMTPAuthInputDTO,
+    SMTPConnectionInputDTO,
+    WebhookSpecInputDTO,
+)
+from ai.backend.common.dto.manager.v2.notification.request import (
+    NotificationChannelFilter as NotificationChannelFilterDTO,
+)
+from ai.backend.common.dto.manager.v2.notification.request import (
+    NotificationChannelOrder as NotificationChannelOrderDTO,
+)
+from ai.backend.common.dto.manager.v2.notification.request import (
+    NotificationChannelTypeFilter as NotificationChannelTypeFilterDTO,
+)
+from ai.backend.common.dto.manager.v2.notification.request import (
+    NotificationRuleFilter as NotificationRuleFilterDTO,
+)
+from ai.backend.common.dto.manager.v2.notification.request import (
+    NotificationRuleOrder as NotificationRuleOrderDTO,
+)
+from ai.backend.common.dto.manager.v2.notification.request import (
+    NotificationRuleTypeFilter as NotificationRuleTypeFilterDTO,
+)
+from ai.backend.common.dto.manager.v2.notification.request import (
+    UpdateNotificationChannelInput as UpdateNotificationChannelInputDTO,
+)
+from ai.backend.common.dto.manager.v2.notification.request import (
+    UpdateNotificationRuleInput as UpdateNotificationRuleInputDTO,
+)
+from ai.backend.common.dto.manager.v2.notification.request import (
+    ValidateNotificationChannelInput as ValidateNotificationChannelInputDTO,
+)
+from ai.backend.common.dto.manager.v2.notification.request import (
+    ValidateNotificationRuleInput as ValidateNotificationRuleInputDTO,
+)
+from ai.backend.common.dto.manager.v2.notification.response import (
+    CreateNotificationChannelPayload as CreateNotificationChannelPayloadDTO,
+)
+from ai.backend.common.dto.manager.v2.notification.response import (
+    CreateNotificationRulePayload as CreateNotificationRulePayloadDTO,
+)
+from ai.backend.common.dto.manager.v2.notification.response import (
+    DeleteNotificationChannelPayload as DeleteNotificationChannelPayloadDTO,
+)
+from ai.backend.common.dto.manager.v2.notification.response import (
+    DeleteNotificationRulePayload as DeleteNotificationRulePayloadDTO,
+)
+from ai.backend.common.dto.manager.v2.notification.response import (
+    NotificationChannelNode,
+    NotificationRuleNode,
+)
+from ai.backend.common.dto.manager.v2.notification.response import (
+    UpdateNotificationChannelPayload as UpdateNotificationChannelPayloadDTO,
+)
+from ai.backend.common.dto.manager.v2.notification.response import (
+    UpdateNotificationRulePayload as UpdateNotificationRulePayloadDTO,
+)
+from ai.backend.common.dto.manager.v2.notification.response import (
+    ValidateNotificationChannelPayload as ValidateNotificationChannelPayloadDTO,
+)
+from ai.backend.common.dto.manager.v2.notification.response import (
+    ValidateNotificationRulePayload as ValidateNotificationRulePayloadDTO,
+)
+from ai.backend.common.dto.manager.v2.notification.types import (
+    EmailMessageInfo,
+    EmailSpecInfo,
+    NotificationChannelSpecInfo,
+    NotificationChannelTypeDTO,
+    NotificationRuleTypeDTO,
+    SMTPAuthInfo,
+    SMTPConnectionInfo,
+    WebhookSpecInfo,
+)
 from ai.backend.manager.api.gql.base import OrderDirection, StringFilter
-from ai.backend.manager.api.gql.types import GQLFilter, GQLOrderBy, StrawberryGQLContext
-from ai.backend.manager.data.notification import (
-    NotificationChannelData,
-    NotificationRuleData,
+from ai.backend.manager.api.gql.decorators import (
+    BackendAIGQLMeta,
+    PydanticInputMixin,
+    gql_node_type,
+    gql_pydantic_input,
+    gql_pydantic_interface,
+    gql_pydantic_type,
 )
-from ai.backend.manager.data.permission.types import RBACElementRef
-from ai.backend.manager.models.notification import NotificationChannelRow, NotificationRuleRow
-from ai.backend.manager.repositories.base import (
-    QueryCondition,
-    QueryOrder,
-    combine_conditions_or,
-    negate_conditions,
-)
-from ai.backend.manager.repositories.base.rbac.entity_creator import RBACEntityCreator
-from ai.backend.manager.repositories.base.updater import Updater
-from ai.backend.manager.repositories.notification.creators import (
-    NotificationChannelCreatorSpec,
-    NotificationRuleCreatorSpec,
-)
-from ai.backend.manager.repositories.notification.options import (
-    NotificationChannelConditions,
-    NotificationChannelOrders,
-    NotificationRuleConditions,
-    NotificationRuleOrders,
-)
-from ai.backend.manager.repositories.notification.updaters import (
-    NotificationChannelUpdaterSpec,
-    NotificationRuleUpdaterSpec,
-)
-from ai.backend.manager.types import OptionalState
+from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin, PydanticOutputMixin
+from ai.backend.manager.api.gql.types import StrawberryGQLContext
 
 # GraphQL enum types
 
+NotificationChannelTypeGQL = strawberry.enum(
+    NotificationChannelTypeDTO,
+    name="NotificationChannelType",
+    description="Notification channel types",
+)
 
-@strawberry.enum(name="NotificationChannelType", description="Notification channel types")
-class NotificationChannelTypeGQL(StrEnum):
-    WEBHOOK = "webhook"
-    EMAIL = "email"
-
-    @classmethod
-    def from_internal(cls, internal_type: NotificationChannelType) -> NotificationChannelTypeGQL:
-        """Convert internal NotificationChannelType to GraphQL enum."""
-        match internal_type:
-            case NotificationChannelType.WEBHOOK:
-                return cls.WEBHOOK
-            case NotificationChannelType.EMAIL:
-                return cls.EMAIL
-
-    def to_internal(self) -> NotificationChannelType:
-        """Convert GraphQL enum to internal NotificationChannelType."""
-        match self:
-            case NotificationChannelTypeGQL.WEBHOOK:
-                return NotificationChannelType.WEBHOOK
-            case NotificationChannelTypeGQL.EMAIL:
-                return NotificationChannelType.EMAIL
-
-
-@strawberry.enum(name="NotificationRuleType", description="Notification rule types")
-class NotificationRuleTypeGQL(StrEnum):
-    SESSION_STARTED = "session.started"
-    SESSION_TERMINATED = "session.terminated"
-    ARTIFACT_DOWNLOAD_COMPLETED = "artifact.download.completed"
-    ENDPOINT_LIFECYCLE_CHANGED = "endpoint.lifecycle.changed"
-
-    @classmethod
-    def from_internal(cls, internal_type: NotificationRuleType) -> NotificationRuleTypeGQL:
-        """Convert internal NotificationRuleType to GraphQL enum."""
-        match internal_type:
-            case NotificationRuleType.SESSION_STARTED:
-                return cls.SESSION_STARTED
-            case NotificationRuleType.SESSION_TERMINATED:
-                return cls.SESSION_TERMINATED
-            case NotificationRuleType.ARTIFACT_DOWNLOAD_COMPLETED:
-                return cls.ARTIFACT_DOWNLOAD_COMPLETED
-            case NotificationRuleType.ENDPOINT_LIFECYCLE_CHANGED:
-                return cls.ENDPOINT_LIFECYCLE_CHANGED
-
-    def to_internal(self) -> NotificationRuleType:
-        """Convert GraphQL enum to internal NotificationRuleType."""
-        match self:
-            case NotificationRuleTypeGQL.SESSION_STARTED:
-                return NotificationRuleType.SESSION_STARTED
-            case NotificationRuleTypeGQL.SESSION_TERMINATED:
-                return NotificationRuleType.SESSION_TERMINATED
-            case NotificationRuleTypeGQL.ARTIFACT_DOWNLOAD_COMPLETED:
-                return NotificationRuleType.ARTIFACT_DOWNLOAD_COMPLETED
-            case NotificationRuleTypeGQL.ENDPOINT_LIFECYCLE_CHANGED:
-                return NotificationRuleType.ENDPOINT_LIFECYCLE_CHANGED
+NotificationRuleTypeGQL = strawberry.enum(
+    NotificationRuleTypeDTO,
+    name="NotificationRuleType",
+    description="Notification rule types",
+)
 
 
 # GraphQL object types
-@strawberry.interface(
+@gql_pydantic_interface(
+    BackendAIGQLMeta(
+        added_version="26.3.0",
+        description="Interface for notification channel specifications.",
+    ),
+    model=NotificationChannelSpecInfo,
     name="NotificationChannelSpec",
-    description="Interface for notification channel specifications",
 )
 class NotificationChannelSpecGQL:
     channel_type: NotificationChannelTypeGQL
 
 
-@strawberry.type(
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version="26.3.0", description="Specification for webhook notification channel."
+    ),
+    model=WebhookSpecInfo,
     name="WebhookSpec",
-    description="Specification for webhook notification channel",
 )
 class WebhookSpecGQL(NotificationChannelSpecGQL):
+    channel_type: NotificationChannelTypeGQL
     url: str
 
-    @classmethod
-    def from_dataclass(cls, config: WebhookSpec) -> Self:
-        return cls(
-            channel_type=NotificationChannelTypeGQL.WEBHOOK,
-            url=config.url,
-        )
 
-
-@strawberry.type(
+@gql_pydantic_type(
+    BackendAIGQLMeta(added_version="26.3.0", description="SMTP authentication credentials."),
+    model=SMTPAuthInfo,
     name="SMTPAuth",
-    description="SMTP authentication credentials",
 )
 class SMTPAuthGQL:
     username: str | None
 
 
-@strawberry.type(
+@gql_pydantic_type(
+    BackendAIGQLMeta(added_version="26.3.0", description="SMTP server connection settings."),
+    model=SMTPConnectionInfo,
     name="SMTPConnection",
-    description="SMTP server connection settings",
 )
 class SMTPConnectionGQL:
     host: str
@@ -159,9 +177,10 @@ class SMTPConnectionGQL:
     timeout: int
 
 
-@strawberry.type(
+@gql_pydantic_type(
+    BackendAIGQLMeta(added_version="26.3.0", description="Email message settings."),
+    model=EmailMessageInfo,
     name="EmailMessage",
-    description="Email message settings",
 )
 class EmailMessageGQL:
     from_email: str
@@ -169,36 +188,22 @@ class EmailMessageGQL:
     subject_template: str | None
 
 
-@strawberry.type(
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version="26.3.0", description="Specification for email notification channel."
+    ),
+    model=EmailSpecInfo,
     name="EmailSpec",
-    description="Specification for email notification channel",
 )
 class EmailSpecGQL(NotificationChannelSpecGQL):
+    channel_type: NotificationChannelTypeGQL
     smtp: SMTPConnectionGQL
     message: EmailMessageGQL
     auth: SMTPAuthGQL | None
 
-    @classmethod
-    def from_dataclass(cls, config: EmailSpec) -> Self:
-        return cls(
-            channel_type=NotificationChannelTypeGQL.EMAIL,
-            smtp=SMTPConnectionGQL(
-                host=config.smtp.host,
-                port=config.smtp.port,
-                use_tls=config.smtp.use_tls,
-                timeout=config.smtp.timeout,
-            ),
-            auth=SMTPAuthGQL(username=config.auth.username) if config.auth is not None else None,
-            message=EmailMessageGQL(
-                from_email=config.message.from_email,
-                to_emails=config.message.to_emails,
-                subject_template=config.message.subject_template,
-            ),
-        )
 
-
-@strawberry.type(description="Notification channel")
-class NotificationChannel(Node):
+@gql_node_type(BackendAIGQLMeta(added_version="26.3.0", description="Notification channel."))
+class NotificationChannel(PydanticNodeMixin[NotificationChannelNode]):
     id: NodeID[str]
     name: str
     description: str | None
@@ -214,41 +219,14 @@ class NotificationChannel(Node):
         info: Info[StrawberryGQLContext],
         node_ids: Iterable[str],
         required: bool = False,
-    ) -> Iterable[Self | None]:
-        results = await info.context.data_loaders.notification_channel_loader.load_many([
+    ) -> Iterable[NotificationChannel | None]:
+        return await info.context.data_loaders.notification_channel_loader.load_many([
             uuid.UUID(nid) for nid in node_ids
         ])
-        return [cls.from_dataclass(data) if data is not None else None for data in results]
-
-    @classmethod
-    def from_dataclass(cls, data: NotificationChannelData) -> Self:
-        final_spec: NotificationChannelSpecGQL
-        match data.channel_type:
-            case NotificationChannelType.WEBHOOK:
-                if not isinstance(data.spec, WebhookSpec):
-                    raise InvalidNotificationChannelSpec(
-                        f"Expected WebhookSpec for WEBHOOK channel, got {type(data.spec).__name__}"
-                    )
-                final_spec = WebhookSpecGQL.from_dataclass(data.spec)
-            case NotificationChannelType.EMAIL:
-                if not isinstance(data.spec, EmailSpec):
-                    raise InvalidNotificationChannelSpec(
-                        f"Expected EmailSpec for EMAIL channel, got {type(data.spec).__name__}"
-                    )
-                final_spec = EmailSpecGQL.from_dataclass(data.spec)
-        return cls(
-            id=ID(str(data.id)),
-            name=data.name,
-            description=data.description,
-            channel_type=NotificationChannelTypeGQL.from_internal(data.channel_type),
-            spec=final_spec,
-            enabled=data.enabled,
-            created_at=data.created_at,
-        )
 
 
-@strawberry.type(description="Notification rule")
-class NotificationRule(Node):
+@gql_node_type(BackendAIGQLMeta(added_version="26.3.0", description="Notification rule."))
+class NotificationRule(PydanticNodeMixin[NotificationRuleNode]):
     id: NodeID[str]
     name: str
     description: str | None
@@ -265,24 +243,10 @@ class NotificationRule(Node):
         info: Info[StrawberryGQLContext],
         node_ids: Iterable[str],
         required: bool = False,
-    ) -> Iterable[Self | None]:
-        results = await info.context.data_loaders.notification_rule_loader.load_many([
+    ) -> Iterable[NotificationRule | None]:
+        return await info.context.data_loaders.notification_rule_loader.load_many([
             uuid.UUID(nid) for nid in node_ids
         ])
-        return [cls.from_dataclass(data) if data is not None else None for data in results]
-
-    @classmethod
-    def from_dataclass(cls, data: NotificationRuleData) -> Self:
-        return cls(
-            id=ID(str(data.id)),
-            name=data.name,
-            description=data.description,
-            rule_type=NotificationRuleTypeGQL.from_internal(data.rule_type),
-            channel=NotificationChannel.from_dataclass(data.channel),
-            message_template=data.message_template,
-            enabled=data.enabled,
-            created_at=data.created_at,
-        )
 
 
 # Filter and OrderBy types
@@ -295,86 +259,51 @@ class NotificationChannelOrderField(StrEnum):
     UPDATED_AT = "updated_at"
 
 
-@strawberry.input(description="Filter for notification channels")
-class NotificationChannelFilter(GQLFilter):
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description="Filter for notification channel type with equality and membership operators.",
+        added_version="26.3.0",
+    ),
+    name="NotificationChannelTypeFilter",
+)
+class NotificationChannelTypeFilterGQL(PydanticInputMixin[NotificationChannelTypeFilterDTO]):
+    equals: NotificationChannelTypeGQL | None = strawberry.field(
+        default=None, description="Matches channels with this exact type."
+    )
+    in_: list[NotificationChannelTypeGQL] | None = strawberry.field(
+        name="in", default=None, description="Matches channels whose type is in this list."
+    )
+    not_equals: NotificationChannelTypeGQL | None = strawberry.field(
+        default=None, description="Excludes channels with this exact type."
+    )
+    not_in: list[NotificationChannelTypeGQL] | None = strawberry.field(
+        default=None, description="Excludes channels whose type is in this list."
+    )
+
+
+@gql_pydantic_input(
+    BackendAIGQLMeta(description="Filter for notification channels", added_version="24.09.0"),
+    name="NotificationChannelFilter",
+)
+class NotificationChannelFilter(PydanticInputMixin[NotificationChannelFilterDTO]):
     name: StringFilter | None = None
-    channel_type: list[NotificationChannelTypeGQL] | None = None
+    channel_type: NotificationChannelTypeFilterGQL | None = None
     enabled: bool | None = None
 
-    AND: list[NotificationChannelFilter] | None = None
-    OR: list[NotificationChannelFilter] | None = None
-    NOT: list[NotificationChannelFilter] | None = None
-
-    @override
-    def build_conditions(self) -> list[QueryCondition]:
-        """Build query conditions from this filter.
-
-        Returns a list containing a single combined QueryCondition that represents
-        all filters with proper logical operators applied.
-        """
-        # Collect direct field conditions (these will be combined with AND)
-        field_conditions: list[QueryCondition] = []
-
-        # Apply name filter
-        if self.name:
-            name_condition = self.name.build_query_condition(
-                contains_factory=NotificationChannelConditions.by_name_contains,
-                equals_factory=NotificationChannelConditions.by_name_equals,
-                starts_with_factory=NotificationChannelConditions.by_name_starts_with,
-                ends_with_factory=NotificationChannelConditions.by_name_ends_with,
-            )
-            if name_condition:
-                field_conditions.append(name_condition)
-
-        # Apply channel_type filter
-        if self.channel_type:
-            internal_types = [ct.to_internal() for ct in self.channel_type]
-            field_conditions.append(NotificationChannelConditions.by_channel_types(internal_types))
-
-        # Apply enabled filter
-        if self.enabled is not None:
-            field_conditions.append(NotificationChannelConditions.by_enabled(self.enabled))
-
-        # Handle AND logical operator - these are implicitly ANDed with field conditions
-        if self.AND:
-            for sub_filter in self.AND:
-                field_conditions.extend(sub_filter.build_conditions())
-
-        # Handle OR logical operator
-        if self.OR:
-            or_sub_conditions: list[QueryCondition] = []
-            for sub_filter in self.OR:
-                or_sub_conditions.extend(sub_filter.build_conditions())
-            if or_sub_conditions:
-                field_conditions.append(combine_conditions_or(or_sub_conditions))
-
-        # Handle NOT logical operator
-        if self.NOT:
-            not_sub_conditions: list[QueryCondition] = []
-            for sub_filter in self.NOT:
-                not_sub_conditions.extend(sub_filter.build_conditions())
-            if not_sub_conditions:
-                field_conditions.append(negate_conditions(not_sub_conditions))
-
-        return field_conditions
+    AND: list[Self] | None = None
+    OR: list[Self] | None = None
+    NOT: list[Self] | None = None
 
 
-@strawberry.input(description="Order by specification for notification channels")
-class NotificationChannelOrderBy(GQLOrderBy):
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description="Order by specification for notification channels", added_version="24.09.0"
+    ),
+    name="NotificationChannelOrderBy",
+)
+class NotificationChannelOrderBy(PydanticInputMixin[NotificationChannelOrderDTO]):
     field: NotificationChannelOrderField
     direction: OrderDirection = OrderDirection.ASC
-
-    @override
-    def to_query_order(self) -> QueryOrder:
-        """Convert to repository QueryOrder."""
-        ascending = self.direction == OrderDirection.ASC
-        match self.field:
-            case NotificationChannelOrderField.NAME:
-                return NotificationChannelOrders.name(ascending)
-            case NotificationChannelOrderField.CREATED_AT:
-                return NotificationChannelOrders.created_at(ascending)
-            case NotificationChannelOrderField.UPDATED_AT:
-                return NotificationChannelOrders.updated_at(ascending)
 
 
 @strawberry.enum
@@ -384,232 +313,162 @@ class NotificationRuleOrderField(StrEnum):
     UPDATED_AT = "updated_at"
 
 
-@strawberry.input(description="Filter for notification rules")
-class NotificationRuleFilter(GQLFilter):
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description="Filter for notification rule type with equality and membership operators.",
+        added_version="26.3.0",
+    ),
+    name="NotificationRuleTypeFilter",
+)
+class NotificationRuleTypeFilterGQL(PydanticInputMixin[NotificationRuleTypeFilterDTO]):
+    equals: NotificationRuleTypeGQL | None = strawberry.field(
+        default=None, description="Matches rules with this exact type."
+    )
+    in_: list[NotificationRuleTypeGQL] | None = strawberry.field(
+        name="in", default=None, description="Matches rules whose type is in this list."
+    )
+    not_equals: NotificationRuleTypeGQL | None = strawberry.field(
+        default=None, description="Excludes rules with this exact type."
+    )
+    not_in: list[NotificationRuleTypeGQL] | None = strawberry.field(
+        default=None, description="Excludes rules whose type is in this list."
+    )
+
+
+@gql_pydantic_input(
+    BackendAIGQLMeta(description="Filter for notification rules", added_version="24.09.0"),
+    name="NotificationRuleFilter",
+)
+class NotificationRuleFilter(PydanticInputMixin[NotificationRuleFilterDTO]):
     name: StringFilter | None = None
-    rule_type: list[NotificationRuleTypeGQL] | None = None
+    rule_type: NotificationRuleTypeFilterGQL | None = None
     enabled: bool | None = None
 
-    AND: list[NotificationRuleFilter] | None = None
-    OR: list[NotificationRuleFilter] | None = None
-    NOT: list[NotificationRuleFilter] | None = None
-
-    @override
-    def build_conditions(self) -> list[QueryCondition]:
-        """Build query conditions from this filter.
-
-        Returns a list containing a single combined QueryCondition that represents
-        all filters with proper logical operators applied.
-        """
-        # Collect direct field conditions (these will be combined with AND)
-        field_conditions: list[QueryCondition] = []
-
-        # Apply name filter
-        if self.name:
-            name_condition = self.name.build_query_condition(
-                contains_factory=NotificationRuleConditions.by_name_contains,
-                equals_factory=NotificationRuleConditions.by_name_equals,
-                starts_with_factory=NotificationRuleConditions.by_name_starts_with,
-                ends_with_factory=NotificationRuleConditions.by_name_ends_with,
-            )
-            if name_condition:
-                field_conditions.append(name_condition)
-
-        # Apply rule_type filter
-        if self.rule_type:
-            internal_types = [rt.to_internal() for rt in self.rule_type]
-            field_conditions.append(NotificationRuleConditions.by_rule_types(internal_types))
-
-        # Apply enabled filter
-        if self.enabled is not None:
-            field_conditions.append(NotificationRuleConditions.by_enabled(self.enabled))
-
-        # Handle AND logical operator - these are implicitly ANDed with field conditions
-        if self.AND:
-            for sub_filter in self.AND:
-                field_conditions.extend(sub_filter.build_conditions())
-
-        # Handle OR logical operator
-        if self.OR:
-            or_sub_conditions: list[QueryCondition] = []
-            for sub_filter in self.OR:
-                or_sub_conditions.extend(sub_filter.build_conditions())
-            if or_sub_conditions:
-                field_conditions.append(combine_conditions_or(or_sub_conditions))
-
-        # Handle NOT logical operator
-        if self.NOT:
-            not_sub_conditions: list[QueryCondition] = []
-            for sub_filter in self.NOT:
-                not_sub_conditions.extend(sub_filter.build_conditions())
-            if not_sub_conditions:
-                field_conditions.append(negate_conditions(not_sub_conditions))
-
-        return field_conditions
+    AND: list[Self] | None = None
+    OR: list[Self] | None = None
+    NOT: list[Self] | None = None
 
 
-@strawberry.input(description="Order by specification for notification rules")
-class NotificationRuleOrderBy(GQLOrderBy):
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description="Order by specification for notification rules", added_version="24.09.0"
+    ),
+    name="NotificationRuleOrderBy",
+)
+class NotificationRuleOrderBy(PydanticInputMixin[NotificationRuleOrderDTO]):
     field: NotificationRuleOrderField
     direction: OrderDirection = OrderDirection.ASC
-
-    @override
-    def to_query_order(self) -> QueryOrder:
-        """Convert to repository QueryOrder."""
-        ascending = self.direction == OrderDirection.ASC
-        match self.field:
-            case NotificationRuleOrderField.NAME:
-                return NotificationRuleOrders.name(ascending)
-            case NotificationRuleOrderField.CREATED_AT:
-                return NotificationRuleOrders.created_at(ascending)
-            case NotificationRuleOrderField.UPDATED_AT:
-                return NotificationRuleOrders.updated_at(ascending)
 
 
 # Input types for mutations
 
 
-@strawberry.input(description="Input for webhook configuration")
-class WebhookSpecInput:
+@gql_pydantic_input(
+    BackendAIGQLMeta(description="Input for webhook configuration", added_version="24.09.0"),
+    name="WebhookSpecInput",
+)
+class WebhookSpecInput(PydanticInputMixin[WebhookSpecInputDTO]):
     url: str
 
-    def to_dataclass(self) -> WebhookSpec:
-        return WebhookSpec(url=self.url)
 
-
-@strawberry.input(description="Input for SMTP authentication credentials")
-class SMTPAuthInput:
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description="Input for SMTP authentication credentials", added_version="24.09.0"
+    ),
+    name="SMTPAuthInput",
+)
+class SMTPAuthInput(PydanticInputMixin[SMTPAuthInputDTO]):
     username: str | None = None
     password: str | None = None
 
-    def to_dataclass(self) -> SMTPAuth:
-        return SMTPAuth(username=self.username, password=self.password)
 
-
-@strawberry.input(description="Input for SMTP server connection settings")
-class SMTPConnectionInput:
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description="Input for SMTP server connection settings", added_version="24.09.0"
+    ),
+    name="SMTPConnectionInput",
+)
+class SMTPConnectionInput(PydanticInputMixin[SMTPConnectionInputDTO]):
     host: str
     port: int
     use_tls: bool = True
     timeout: int = 30
 
-    def to_dataclass(self) -> SMTPConnection:
-        return SMTPConnection(
-            host=self.host,
-            port=self.port,
-            use_tls=self.use_tls,
-            timeout=self.timeout,
-        )
 
-
-@strawberry.input(description="Input for email message settings")
-class EmailMessageInput:
+@gql_pydantic_input(
+    BackendAIGQLMeta(description="Input for email message settings", added_version="24.09.0"),
+    name="EmailMessageInput",
+)
+class EmailMessageInput(PydanticInputMixin[EmailMessageInputDTO]):
     from_email: str
     to_emails: list[str]
     subject_template: str | None = None
 
-    def to_dataclass(self) -> EmailMessage:
-        return EmailMessage(
-            from_email=self.from_email,
-            to_emails=self.to_emails,
-            subject_template=self.subject_template,
-        )
 
-
-@strawberry.input(description="Input for email notification channel configuration")
-class EmailSpecInput:
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description="Input for email notification channel configuration", added_version="24.09.0"
+    ),
+    name="EmailSpecInput",
+)
+class EmailSpecInput(PydanticInputMixin[EmailSpecInputDTO]):
     smtp: SMTPConnectionInput
     message: EmailMessageInput
     auth: SMTPAuthInput | None = None
 
-    def to_dataclass(self) -> EmailSpec:
-        return EmailSpec(
-            smtp=self.smtp.to_dataclass(),
-            message=self.message.to_dataclass(),
-            auth=self.auth.to_dataclass() if self.auth else None,
-        )
 
-
-@strawberry.input(
-    description="Input for notification channel configuration. Exactly one of webhook or email must be set.",
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description="Input for notification channel configuration. Exactly one of webhook or email must be set.",
+        added_version="24.09.0",
+    ),
+    name="NotificationChannelSpecInput",
     one_of=True,
 )
-class NotificationChannelSpecInput:
+class NotificationChannelSpecInput(PydanticInputMixin[NotificationChannelSpecInputDTO]):
     webhook: WebhookSpecInput | None = UNSET
     email: EmailSpecInput | None = UNSET
 
-    def to_dataclass(self) -> WebhookSpec | EmailSpec:
-        """Convert to the appropriate dataclass based on which field is set."""
-        if self.webhook is not None and self.webhook is not UNSET:
-            return self.webhook.to_dataclass()
-        if self.email is not None and self.email is not UNSET:
-            return self.email.to_dataclass()
-        raise InvalidNotificationChannelSpec("Exactly one of webhook or email must be set")
 
-    def get_channel_type(self) -> NotificationChannelType:
-        """Get the channel type based on which field is set."""
-        if self.webhook is not None and self.webhook is not UNSET:
-            return NotificationChannelType.WEBHOOK
-        if self.email is not None and self.email is not UNSET:
-            return NotificationChannelType.EMAIL
-        raise InvalidNotificationChannelSpec("Exactly one of webhook or email must be set")
-
-
-@strawberry.input(description="Input for creating a notification channel")
-class CreateNotificationChannelInput:
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description="Input for creating a notification channel", added_version="24.09.0"
+    ),
+)
+class CreateNotificationChannelInput(PydanticInputMixin[CreateNotificationChannelInputDTO]):
     name: str
     description: str | None = None
     channel_type: NotificationChannelTypeGQL
     spec: NotificationChannelSpecInput
     enabled: bool = True
 
-    def to_creator(self, created_by: uuid.UUID) -> RBACEntityCreator[NotificationChannelRow]:
-        return RBACEntityCreator(
-            spec=NotificationChannelCreatorSpec(
-                name=self.name,
-                description=self.description,
-                channel_type=self.channel_type.to_internal(),
-                spec=self.spec.to_dataclass(),
-                enabled=self.enabled,
-                created_by=created_by,
-            ),
-            element_type=RBACElementType.NOTIFICATION_CHANNEL,
-            scope_ref=RBACElementRef(RBACElementType.USER, str(created_by)),
-        )
 
-
-@strawberry.input(description="Input for updating a notification channel")
-class UpdateNotificationChannelInput:
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description="Input for updating a notification channel", added_version="24.09.0"
+    ),
+)
+class UpdateNotificationChannelInput(PydanticInputMixin[UpdateNotificationChannelInputDTO]):
     id: ID
     name: str | None = UNSET
     description: str | None = UNSET
     spec: NotificationChannelSpecInput | None = UNSET
     enabled: bool | None = UNSET
 
-    def to_updater(self, channel_id: uuid.UUID) -> Updater[NotificationChannelRow]:
-        spec_state = OptionalState[WebhookSpec | EmailSpec].nop()
-        if self.spec is not UNSET:
-            if self.spec is None:
-                spec_state = OptionalState[WebhookSpec | EmailSpec].nop()
-            else:
-                spec_state = OptionalState[WebhookSpec | EmailSpec].update(self.spec.to_dataclass())
 
-        updater_spec = NotificationChannelUpdaterSpec(
-            name=OptionalState[str].from_graphql(self.name),
-            description=OptionalState[str | None].from_graphql(self.description),
-            spec=spec_state,
-            enabled=OptionalState[bool].from_graphql(self.enabled),
-        )
-        return Updater(spec=updater_spec, pk_value=channel_id)
-
-
-@strawberry.input(description="Input for deleting a notification channel")
-class DeleteNotificationChannelInput:
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description="Input for deleting a notification channel", added_version="24.09.0"
+    ),
+)
+class DeleteNotificationChannelInput(PydanticInputMixin[DeleteNotificationChannelInputDTO]):
     id: ID
 
 
-@strawberry.input(description="Input for creating a notification rule")
-class CreateNotificationRuleInput:
+@gql_pydantic_input(
+    BackendAIGQLMeta(description="Input for creating a notification rule", added_version="24.09.0"),
+)
+class CreateNotificationRuleInput(PydanticInputMixin[CreateNotificationRuleInputDTO]):
     name: str
     description: str | None = None
     rule_type: NotificationRuleTypeGQL = strawberry.field()
@@ -617,98 +476,133 @@ class CreateNotificationRuleInput:
     message_template: str
     enabled: bool = True
 
-    def to_creator(self, created_by: uuid.UUID) -> RBACEntityCreator[NotificationRuleRow]:
-        return RBACEntityCreator(
-            spec=NotificationRuleCreatorSpec(
-                name=self.name,
-                description=self.description,
-                rule_type=self.rule_type.to_internal(),
-                channel_id=uuid.UUID(self.channel_id),
-                message_template=self.message_template,
-                enabled=self.enabled,
-                created_by=created_by,
-            ),
-            element_type=RBACElementType.NOTIFICATION_RULE,
-            scope_ref=RBACElementRef(RBACElementType.NOTIFICATION_CHANNEL, str(self.channel_id)),
-        )
 
-
-@strawberry.input(description="Input for updating a notification rule")
-class UpdateNotificationRuleInput:
+@gql_pydantic_input(
+    BackendAIGQLMeta(description="Input for updating a notification rule", added_version="24.09.0"),
+)
+class UpdateNotificationRuleInput(PydanticInputMixin[UpdateNotificationRuleInputDTO]):
     id: ID
     name: str | None = UNSET
     description: str | None = UNSET
     message_template: str | None = UNSET
     enabled: bool | None = UNSET
 
-    def to_updater(self, rule_id: uuid.UUID) -> Updater[NotificationRuleRow]:
-        spec = NotificationRuleUpdaterSpec(
-            name=OptionalState[str].from_graphql(self.name),
-            description=OptionalState[str | None].from_graphql(self.description),
-            message_template=OptionalState[str].from_graphql(self.message_template),
-            enabled=OptionalState[bool].from_graphql(self.enabled),
-        )
-        return Updater(spec=spec, pk_value=rule_id)
 
-
-@strawberry.input(description="Input for deleting a notification rule")
-class DeleteNotificationRuleInput:
+@gql_pydantic_input(
+    BackendAIGQLMeta(description="Input for deleting a notification rule", added_version="24.09.0"),
+)
+class DeleteNotificationRuleInput(PydanticInputMixin[DeleteNotificationRuleInputDTO]):
     id: ID
 
 
 # Payload types for mutations
 
 
-@strawberry.type(description="Payload for create notification channel mutation")
-class CreateNotificationChannelPayload:
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version="26.3.0", description="Payload for create notification channel mutation."
+    ),
+    model=CreateNotificationChannelPayloadDTO,
+)
+class CreateNotificationChannelPayload(PydanticOutputMixin[CreateNotificationChannelPayloadDTO]):
     channel: NotificationChannel
 
 
-@strawberry.type(description="Payload for update notification channel mutation")
-class UpdateNotificationChannelPayload:
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version="26.3.0", description="Payload for update notification channel mutation."
+    ),
+    model=UpdateNotificationChannelPayloadDTO,
+)
+class UpdateNotificationChannelPayload(PydanticOutputMixin[UpdateNotificationChannelPayloadDTO]):
     channel: NotificationChannel
 
 
-@strawberry.type(description="Payload for delete notification channel mutation")
-class DeleteNotificationChannelPayload:
-    id: ID
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version="26.3.0", description="Payload for delete notification channel mutation."
+    ),
+    model=DeleteNotificationChannelPayloadDTO,
+    fields=["id"],
+)
+class DeleteNotificationChannelPayload(PydanticOutputMixin[DeleteNotificationChannelPayloadDTO]):
+    id: ID = strawberry.field(description="ID of the deleted notification channel.")
 
 
-@strawberry.type(description="Payload for create notification rule mutation")
-class CreateNotificationRulePayload:
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version="26.3.0", description="Payload for create notification rule mutation."
+    ),
+    model=CreateNotificationRulePayloadDTO,
+)
+class CreateNotificationRulePayload(PydanticOutputMixin[CreateNotificationRulePayloadDTO]):
     rule: NotificationRule
 
 
-@strawberry.type(description="Payload for update notification rule mutation")
-class UpdateNotificationRulePayload:
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version="26.3.0", description="Payload for update notification rule mutation."
+    ),
+    model=UpdateNotificationRulePayloadDTO,
+)
+class UpdateNotificationRulePayload(PydanticOutputMixin[UpdateNotificationRulePayloadDTO]):
     rule: NotificationRule
 
 
-@strawberry.type(description="Payload for delete notification rule mutation")
-class DeleteNotificationRulePayload:
-    id: ID
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version="26.3.0", description="Payload for delete notification rule mutation."
+    ),
+    model=DeleteNotificationRulePayloadDTO,
+    fields=["id"],
+)
+class DeleteNotificationRulePayload(PydanticOutputMixin[DeleteNotificationRulePayloadDTO]):
+    id: ID = strawberry.field(description="ID of the deleted notification rule.")
 
 
 # Validate mutations
 
 
-@strawberry.input(description="Input for validate notification channel mutation")
-class ValidateNotificationChannelInput:
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description="Input for validate notification channel mutation", added_version="24.09.0"
+    ),
+)
+class ValidateNotificationChannelInput(PydanticInputMixin[ValidateNotificationChannelInputDTO]):
     id: ID
     test_message: str
 
 
-@strawberry.type(description="Payload for validate notification channel mutation")
-class ValidateNotificationChannelPayload:
-    id: ID
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version="26.3.0", description="Payload for validate notification channel mutation."
+    ),
+    model=ValidateNotificationChannelPayloadDTO,
+    fields=["id"],
+)
+class ValidateNotificationChannelPayload(
+    PydanticOutputMixin[ValidateNotificationChannelPayloadDTO]
+):
+    id: ID = strawberry.field(description="ID of the validated notification channel.")
 
 
-@strawberry.input(description="Input for validate notification rule mutation")
-class ValidateNotificationRuleInput:
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description="Input for validate notification rule mutation", added_version="24.09.0"
+    ),
+)
+class ValidateNotificationRuleInput(PydanticInputMixin[ValidateNotificationRuleInputDTO]):
     id: ID
     notification_data: strawberry.scalars.JSON | None = UNSET
 
 
-@strawberry.type(description="Payload for validate notification rule mutation")
-class ValidateNotificationRulePayload:
-    message: str
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version="26.3.0", description="Payload for validate notification rule mutation."
+    ),
+    model=ValidateNotificationRulePayloadDTO,
+    all_fields=True,
+    name="ValidateNotificationRulePayload",
+)
+class ValidateNotificationRulePayload(PydanticOutputMixin[ValidateNotificationRulePayloadDTO]):
+    pass

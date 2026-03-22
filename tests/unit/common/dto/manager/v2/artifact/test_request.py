@@ -12,6 +12,7 @@ from ai.backend.common.dto.manager.v2.artifact.request import (
     CancelImportTaskInput,
     CleanupRevisionsInput,
     ImportArtifactsInput,
+    ImportArtifactsOptionsInput,
     UpdateArtifactInput,
 )
 
@@ -75,14 +76,17 @@ class TestImportArtifactsInput:
         req = ImportArtifactsInput(artifact_revision_ids=ids)
         assert len(req.artifact_revision_ids) == 3
 
-    def test_force_default_is_false(self) -> None:
+    def test_options_default_is_none(self) -> None:
         rev_id = uuid.uuid4()
         req = ImportArtifactsInput(artifact_revision_ids=[rev_id])
+        assert req.options is None
+
+    def test_options_force_default_is_false(self) -> None:
+        req = ImportArtifactsOptionsInput()
         assert req.force is False
 
-    def test_force_true(self) -> None:
-        rev_id = uuid.uuid4()
-        req = ImportArtifactsInput(artifact_revision_ids=[rev_id], force=True)
+    def test_options_force_true(self) -> None:
+        req = ImportArtifactsOptionsInput(force=True)
         assert req.force is True
 
     def test_vfolder_id_default_is_none(self) -> None:
@@ -102,11 +106,15 @@ class TestImportArtifactsInput:
 
     def test_round_trip_serialization(self) -> None:
         rev_id = uuid.uuid4()
-        req = ImportArtifactsInput(artifact_revision_ids=[rev_id], force=True)
+        req = ImportArtifactsInput(
+            artifact_revision_ids=[rev_id],
+            options=ImportArtifactsOptionsInput(force=True),
+        )
         json_data = req.model_dump_json()
         restored = ImportArtifactsInput.model_validate_json(json_data)
         assert restored.artifact_revision_ids == [rev_id]
-        assert restored.force is True
+        assert restored.options is not None
+        assert restored.options.force is True
 
 
 class TestCleanupRevisionsInput:

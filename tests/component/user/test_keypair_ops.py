@@ -11,6 +11,7 @@ import sqlalchemy as sa
 from sqlalchemy.ext.asyncio.engine import AsyncEngine as SAEngine
 
 from ai.backend.client.v2.registry import BackendAIClientRegistry
+from ai.backend.manager.api.adapters.user import UserAdapter
 from ai.backend.manager.api.gql.schema import schema as strawberry_schema
 from ai.backend.manager.api.rest.admin.handler import AdminHandler
 from ai.backend.manager.api.rest.admin.registry import register_admin_routes
@@ -118,6 +119,7 @@ def server_module_registries(
     mock_gql_deps = MagicMock()
     mock_gql_deps.processors = mock_processors
     mock_gql_deps.config_provider = config_provider
+    mock_gql_deps.adapters.user = UserAdapter(processors=mock_processors)
 
     user_registry = register_user_routes(
         UserHandler(user=user_processors, config_provider=config_provider),

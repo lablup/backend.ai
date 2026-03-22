@@ -15,6 +15,7 @@ from ai.backend.common.events.types import EventDomain
 from ai.backend.common.types import SessionId
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.api.gql.base import to_global_id
+from ai.backend.manager.api.gql.decorators import BackendAIGQLMeta, gql_type
 from ai.backend.manager.api.gql_legacy.session import ComputeSessionNode
 from ai.backend.manager.errors.kernel import InvalidSessionId
 
@@ -46,39 +47,28 @@ class SchedulingStatus(StrEnum):
     ERROR = "ERROR"
 
 
-@strawberry.type(description="Added in 25.15.0. Scheduling event broadcast payload")
+@gql_type(
+    BackendAIGQLMeta(
+        added_version="25.15.0",
+        description="Scheduling event broadcast payload.",
+    ),
+)
 class SchedulingBroadcastEventPayload:
     """
     Payload for scheduling broadcast events.
     Represents a status transition during session scheduling.
     """
 
-    _session_id: strawberry.Private[strawberry.ID]
+    session_id: strawberry.ID
     status_transition: SchedulingStatus
     reason: str
-
-    @classmethod
-    def from_event(cls, event: SchedulingBroadcastEvent) -> SchedulingBroadcastEventPayload:
-        """Create payload from SchedulingBroadcastEvent."""
-        # Parse status_transition string to SchedulingStatus enum
-        try:
-            status_enum = SchedulingStatus(event.status_transition)
-        except KeyError:
-            log.warning(f"Unknown status transition: {event.status_transition}")
-            status_enum = SchedulingStatus.ERROR
-
-        return cls(
-            _session_id=strawberry.ID(str(event.session_id)),
-            status_transition=status_enum,
-            reason=event.reason,
-        )
 
     @strawberry.field(  # type: ignore[misc]
         description="The session ID associated with the replica. This can be null right after replica creation."
     )
     async def session(self, info: Info[StrawberryGQLContext]) -> Session:
         session_global_id = to_global_id(
-            ComputeSessionNode, self._session_id, is_target_graphene_object=True
+            ComputeSessionNode, self.session_id, is_target_graphene_object=True
         )
         return Session(id=strawberry.ID(session_global_id))
 
@@ -126,8 +116,16 @@ async def scheduling_events_by_session(
         # Stream events from propagator
         async for event in propagator.receive():
             if isinstance(event, SchedulingBroadcastEvent):
-                payload = SchedulingBroadcastEventPayload.from_event(event)
-                yield payload
+                try:
+                    status_enum = SchedulingStatus(event.status_transition)
+                except KeyError:
+                    log.warning(f"Unknown status transition: {event.status_transition}")
+                    status_enum = SchedulingStatus.ERROR
+                yield SchedulingBroadcastEventPayload(
+                    session_id=strawberry.ID(str(event.session_id)),
+                    status_transition=status_enum,
+                    reason=event.reason,
+                )
     finally:
         # Unregister propagator when subscription ends
         event_hub.unregister_event_propagator(propagator.id())

@@ -51,7 +51,9 @@ from .role import (
     RoleGQL,
     RoleOrderBy,
     RoleOrderField,
+    RoleSourceFilterGQL,
     RoleSourceGQL,
+    RoleStatusFilterGQL,
     RoleStatusGQL,
     UpdateRoleInput,
 )
@@ -64,6 +66,9 @@ __all__ = [
     # Role enums
     "RoleSourceGQL",
     "RoleStatusGQL",
+    # Role filter wrappers
+    "RoleSourceFilterGQL",
+    "RoleStatusFilterGQL",
     "RoleOrderField",
     "RoleAssignmentOrderField",
     # Entity enums

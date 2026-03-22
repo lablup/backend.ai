@@ -1,18 +1,43 @@
 from __future__ import annotations
 
-from collections.abc import Iterable, Mapping
+from collections.abc import Iterable
 from datetime import datetime
 from enum import StrEnum
-from typing import TYPE_CHECKING, Annotated, Any, Self
+from typing import TYPE_CHECKING, Annotated, Any, Self, cast
 
 import strawberry
-from strawberry import ID, Info
-from strawberry.relay import Connection, Edge, Node, NodeID
+from strawberry import Info
+from strawberry.relay import Connection, Edge, NodeID
 from strawberry.scalars import JSON
 
+from ai.backend.common.dto.manager.v2.agent.request import AgentFilter, AgentOrder
+from ai.backend.common.dto.manager.v2.agent.response import (
+    AgentNetworkInfoGQLDTO,
+    AgentNode,
+    AgentResourceGQLDTO,
+    AgentStatsGQLDTO,
+    AgentStatusInfoGQLDTO,  # used as pydantic model for AgentStatusInfoGQL
+    AgentSystemInfoGQLDTO,
+    ComputePluginEntryDTO,
+    ComputePluginsGQLDTO,
+)
+from ai.backend.common.dto.manager.v2.agent.types import (
+    AgentStatusEnum,
+    AgentStatusFilter,
+)
 from ai.backend.common.types import AgentId
 from ai.backend.manager.api.gql.base import OrderDirection, StringFilter
-from ai.backend.manager.api.gql.types import GQLFilter, GQLOrderBy, StrawberryGQLContext
+from ai.backend.manager.api.gql.decorators import (
+    BackendAIGQLMeta,
+    gql_connection_type,
+    gql_node_type,
+    gql_pydantic_input,
+    gql_pydantic_type,
+)
+from ai.backend.manager.api.gql.pydantic_compat import PydanticInputMixin, PydanticNodeMixin
+from ai.backend.manager.api.gql.types import StrawberryGQLContext
+from ai.backend.manager.api.gql.utils import dedent_strip
+from ai.backend.manager.data.agent.types import AgentStatus
 
 if TYPE_CHECKING:
     from ai.backend.manager.api.gql.kernel.types import (
@@ -30,20 +55,6 @@ if TYPE_CHECKING:
         SessionV2FilterGQL,
         SessionV2OrderByGQL,
     )
-from ai.backend.manager.api.gql.utils import dedent_strip
-from ai.backend.manager.data.agent.types import AgentDetailData, AgentStatus
-from ai.backend.manager.models.rbac.permission_defs import AgentPermission
-from ai.backend.manager.repositories.agent.options import AgentConditions, AgentOrders
-from ai.backend.manager.repositories.base import (
-    QueryCondition,
-    QueryOrder,
-    combine_conditions_or,
-    negate_conditions,
-)
-from ai.backend.manager.repositories.scheduler.options import (
-    KernelConditions,
-    SessionConditions,
-)
 
 
 @strawberry.enum(
@@ -55,18 +66,6 @@ class AgentPermissionGQL(StrEnum):
     UPDATE_ATTRIBUTE = "update_attribute"
     CREATE_COMPUTE_SESSION = "create_compute_session"
     CREATE_SERVICE = "create_service"
-
-    @classmethod
-    def from_agent_permission(cls, permission: AgentPermission) -> AgentPermissionGQL:
-        match permission:
-            case AgentPermission.READ_ATTRIBUTE:
-                return AgentPermissionGQL.READ_ATTRIBUTE
-            case AgentPermission.UPDATE_ATTRIBUTE:
-                return AgentPermissionGQL.UPDATE_ATTRIBUTE
-            case AgentPermission.CREATE_COMPUTE_SESSION:
-                return AgentPermissionGQL.CREATE_COMPUTE_SESSION
-            case AgentPermission.CREATE_SERVICE:
-                return AgentPermissionGQL.CREATE_SERVICE
 
 
 @strawberry.enum(
@@ -81,103 +80,51 @@ class AgentOrderFieldGQL(StrEnum):
     SCHEDULABLE = "schedulable"
 
 
-@strawberry.input(
+@gql_pydantic_input(
+    BackendAIGQLMeta(description="", added_version="24.09.0"),
     name="AgentStatusFilter",
     description=dedent_strip("""
-        Added in 26.1.0. Filter options for agent status within AgentFilter.
+        Filter options for agent status within AgentFilter.
         It includes options to filter whether agent status is in a specific list or equals a specific value.
     """),
 )
-class AgentStatusFilterGQL:
-    in_: list[AgentStatus] | None = strawberry.field(name="in", default=None)
-    equals: AgentStatus | None = None
+class AgentStatusFilterGQL(PydanticInputMixin[AgentStatusFilter]):
+    in_: list[AgentStatusEnum] | None = strawberry.field(name="in", default=None)
+    equals: AgentStatusEnum | None = None
 
 
-@strawberry.input(
-    name="AgentFilter", description="Added in 26.1.0. Filter options for querying agents"
+@gql_pydantic_input(
+    BackendAIGQLMeta(description="Filter options for querying agents", added_version="26.1.0"),
+    name="AgentFilter",
 )
-class AgentFilterGQL(GQLFilter):
+class AgentFilterGQL(PydanticInputMixin[AgentFilter]):
     id: StringFilter | None = None
     status: AgentStatusFilterGQL | None = None
     schedulable: bool | None = None
     scaling_group: StringFilter | None = None
 
-    AND: list[AgentFilterGQL] | None = None
-    OR: list[AgentFilterGQL] | None = None
-    NOT: list[AgentFilterGQL] | None = None
-
-    def build_conditions(self) -> list[QueryCondition]:
-        field_conditions: list[QueryCondition] = []
-        if self.id is not None:
-            name_condition = self.id.build_query_condition(
-                contains_factory=AgentConditions.by_id_contains,
-                equals_factory=AgentConditions.by_id_equals,
-                starts_with_factory=AgentConditions.by_id_starts_with,
-                ends_with_factory=AgentConditions.by_id_ends_with,
-            )
-            if name_condition is not None:
-                field_conditions.append(name_condition)
-        if self.status is not None:
-            if self.status.in_ is not None:
-                field_conditions.append(AgentConditions.by_status_contains(self.status.in_))
-            if self.status.equals is not None:
-                field_conditions.append(AgentConditions.by_status_equals(self.status.equals))
-        if self.schedulable is not None:
-            field_conditions.append(AgentConditions.by_schedulable(self.schedulable))
-        if self.scaling_group is not None:
-            scaling_group_condition = self.scaling_group.build_query_condition(
-                contains_factory=AgentConditions.by_scaling_group_contains,
-                equals_factory=AgentConditions.by_scaling_group_equals,
-                starts_with_factory=AgentConditions.by_scaling_group_starts_with,
-                ends_with_factory=AgentConditions.by_scaling_group_ends_with,
-            )
-            if scaling_group_condition is not None:
-                field_conditions.append(scaling_group_condition)
-
-        if self.AND:
-            for sub_filter in self.AND:
-                field_conditions.extend(sub_filter.build_conditions())
-
-        # Handle OR logical operator
-        if self.OR:
-            or_sub_conditions: list[QueryCondition] = []
-            for sub_filter in self.OR:
-                or_sub_conditions.extend(sub_filter.build_conditions())
-            if or_sub_conditions:
-                field_conditions.append(combine_conditions_or(or_sub_conditions))
-
-        # Handle NOT logical operator
-        if self.NOT:
-            not_sub_conditions: list[QueryCondition] = []
-            for sub_filter in self.NOT:
-                not_sub_conditions.extend(sub_filter.build_conditions())
-            if not_sub_conditions:
-                field_conditions.append(negate_conditions(not_sub_conditions))
-
-        return field_conditions
+    AND: list[Self] | None = None
+    OR: list[Self] | None = None
+    NOT: list[Self] | None = None
 
 
-@strawberry.input(name="AgentOrderBy", description="Added in 26.1.0. Options for ordering agents")
-class AgentOrderByGQL(GQLOrderBy):
+@gql_pydantic_input(
+    BackendAIGQLMeta(description="Options for ordering agents", added_version="26.1.0"),
+    name="AgentOrderBy",
+)
+class AgentOrderByGQL(PydanticInputMixin[AgentOrder]):
     field: AgentOrderFieldGQL
     direction: OrderDirection = OrderDirection.ASC
 
-    def to_query_order(self) -> QueryOrder:
-        ascending = self.direction == OrderDirection.ASC
-        match self.field:
-            case AgentOrderFieldGQL.ID:
-                return AgentOrders.id(ascending)
-            case AgentOrderFieldGQL.STATUS:
-                return AgentOrders.status(ascending)
-            case AgentOrderFieldGQL.FIRST_CONTACT:
-                return AgentOrders.first_contact(ascending)
-            case AgentOrderFieldGQL.SCALING_GROUP:
-                return AgentOrders.scaling_group(ascending)
-            case AgentOrderFieldGQL.SCHEDULABLE:
-                return AgentOrders.schedulable(ascending)
 
-
-@strawberry.type(name="AgentResource", description="Added in 25.15.0")
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version="25.15.0",
+        description="Hardware resource capacity, usage, and availability of an agent.",
+    ),
+    model=AgentResourceGQLDTO,
+    name="AgentResource",
+)
 class AgentResourceGQL:
     capacity: JSON = strawberry.field(
         description=dedent_strip("""
@@ -205,14 +152,25 @@ class AgentResourceGQL:
     )
 
 
-@strawberry.type(name="AgentStats", description="Added in 25.15.0")
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version="25.15.0",
+        description="Aggregated resource statistics for an agent.",
+    ),
+    model=AgentStatsGQLDTO,
+    name="AgentStats",
+)
 class AgentStatsGQL:
     total_resource: AgentResourceGQL = strawberry.field(description="Added in 25.15.0")
 
 
-@strawberry.type(
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version="26.1.0",
+        description="Status and lifecycle information for an agent.",
+    ),
+    model=AgentStatusInfoGQLDTO,
     name="AgentStatusInfo",
-    description="Added in 26.1.0. Status and lifecycle information for an agent",
 )
 class AgentStatusInfoGQL:
     status: AgentStatus = strawberry.field(
@@ -253,35 +211,31 @@ class AgentStatusInfoGQL:
     )
 
 
-@strawberry.type(
-    name="ComputePluginEntry",
-    description=(
-        "Added in 26.1.0. A single compute plugin entry representing one plugin and its metadata."
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version="26.1.0",
+        description="A single compute plugin entry representing one plugin and its metadata.",
     ),
+    model=ComputePluginEntryDTO,
+    name="ComputePluginEntry",
 )
 class ComputePluginEntryGQL:
     """Single compute plugin entry with plugin name and metadata."""
 
-    plugin_name: str = strawberry.field(
-        description=(
-            "Name of the compute plugin (e.g., 'cuda', 'rocm', 'tpu'). "
-            "This identifier corresponds to the accelerator or resource type supported by the agent."
-        )
-    )
-    value: str = strawberry.field(
-        description=(
-            "Plugin value string containing plugin-specific information. "
-            "The content varies by plugin type and may include version or configuration details."
-        )
-    )
+    plugin_name: strawberry.auto
+    value: strawberry.auto
 
 
-@strawberry.type(
-    name="ComputePlugins",
-    description=(
-        "Added in 26.1.0. A collection of compute plugins available on an agent. "
-        "Each entry specifies a plugin name and its associated metadata."
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version="26.1.0",
+        description=(
+            "A collection of compute plugins available on an agent. "
+            "Each entry specifies a plugin name and its associated metadata."
+        ),
     ),
+    model=ComputePluginsGQLDTO,
+    name="ComputePlugins",
 )
 class ComputePluginsGQL:
     """Compute plugins container with multiple plugin entries."""
@@ -293,18 +247,14 @@ class ComputePluginsGQL:
         )
     )
 
-    @classmethod
-    def from_mapping(cls, plugins: Mapping[str, str]) -> ComputePluginsGQL:
-        """Convert a mapping of plugin name to value to GraphQL type."""
-        entries = [
-            ComputePluginEntryGQL(plugin_name=name, value=value) for name, value in plugins.items()
-        ]
-        return cls(entries=entries)
 
-
-@strawberry.type(
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version="26.1.0",
+        description="System and configuration information for an agent.",
+    ),
+    model=AgentSystemInfoGQLDTO,
     name="AgentSystemInfo",
-    description="Added in 26.1.0. System and configuration information for an agent",
 )
 class AgentSystemInfoGQL:
     architecture: str = strawberry.field(
@@ -339,26 +289,27 @@ class AgentSystemInfoGQL:
     )
 
 
-@strawberry.type(
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version="26.1.0",
+        description="Network-related information for an agent.",
+    ),
+    model=AgentNetworkInfoGQLDTO,
     name="AgentNetworkInfo",
-    description="Added in 26.1.0. Network-related information for an agent",
 )
 class AgentNetworkInfoGQL:
-    region: str = strawberry.field(description="Logical region where the agent is deployed.")
-    addr: str = strawberry.field(
-        description=dedent_strip("""
-            Network address and port where the agent can be reached (format: "host:port").
-            This is the bind or advertised address used by the manager to communicate
-            with the agent for session lifecycle management and health monitoring.
-        """)
-    )
+    region: strawberry.auto
+    addr: strawberry.auto
 
 
-@strawberry.type(
-    name="AgentV2", description="Added in 26.1.0. Strawberry-based Agent type replacing AgentNode."
+@gql_node_type(
+    BackendAIGQLMeta(
+        added_version="26.1.0",
+        description="Strawberry-based Agent type replacing AgentNode.",
+    ),
+    name="AgentV2",
 )
-class AgentV2GQL(Node):
-    _agent_id: strawberry.Private[AgentId]
+class AgentV2GQL(PydanticNodeMixin[AgentNode]):
     id: NodeID[str]
     resource_info: AgentResourceGQL = strawberry.field(
         description=dedent_strip("""
@@ -410,7 +361,7 @@ class AgentV2GQL(Node):
         """
         Get the container count for a specific agent.
         """
-        return await info.context.data_loaders.container_count_loader.load(self._agent_id)
+        return await info.context.data_loaders.container_count_loader.load(AgentId(self.id))
 
     @strawberry.field(  # type: ignore[misc]
         description="Added in 26.2.0. List of kernels running on this agent with pagination support."
@@ -438,19 +389,36 @@ class AgentV2GQL(Node):
         KernelV2ConnectionGQL, strawberry.lazy("ai.backend.manager.api.gql.kernel.types")
     ]:
         """Fetch kernels associated with this agent."""
-        from ai.backend.manager.api.gql.kernel.fetcher import fetch_kernels
+        from ai.backend.common.dto.manager.v2.kernel.request import AdminSearchKernelsInput
+        from ai.backend.manager.api.gql.base import encode_cursor
+        from ai.backend.manager.api.gql.kernel.types import KernelV2ConnectionGQL, KernelV2EdgeGQL
 
-        return await fetch_kernels(
-            info=info,
-            filter=filter,
-            order_by=order_by,
-            before=before,
-            after=after,
-            first=first,
-            last=last,
-            limit=limit,
-            offset=offset,
-            base_conditions=[KernelConditions.by_agent_id(self._agent_id)],
+        payload = await info.context.adapters.session.search_kernels_by_agent(
+            AgentId(self.id),
+            AdminSearchKernelsInput(
+                filter=filter.to_pydantic() if filter else None,
+                order=[o.to_pydantic() for o in order_by] if order_by else None,
+                first=first,
+                after=after,
+                last=last,
+                before=before,
+                limit=limit,
+                offset=offset,
+            ),
+        )
+        from ai.backend.manager.api.gql.kernel.types import KernelV2GQL
+
+        nodes = [KernelV2GQL.from_pydantic(node) for node in payload.items]
+        edges = [KernelV2EdgeGQL(node=node, cursor=encode_cursor(node.id)) for node in nodes]
+        return KernelV2ConnectionGQL(
+            edges=edges,
+            page_info=strawberry.relay.PageInfo(
+                has_next_page=payload.has_next_page,
+                has_previous_page=payload.has_previous_page,
+                start_cursor=edges[0].cursor if edges else None,
+                end_cursor=edges[-1].cursor if edges else None,
+            ),
+            count=payload.total_count,
         )
 
     @strawberry.field(  # type: ignore[misc]
@@ -479,19 +447,38 @@ class AgentV2GQL(Node):
         SessionV2ConnectionGQL, strawberry.lazy("ai.backend.manager.api.gql.session.types")
     ]:
         """Fetch sessions associated with this agent."""
-        from ai.backend.manager.api.gql.session.fetcher.session import fetch_sessions
+        from ai.backend.common.dto.manager.v2.session.request import AdminSearchSessionsInput
+        from ai.backend.manager.api.gql.base import encode_cursor
+        from ai.backend.manager.api.gql.session.types import (
+            SessionV2ConnectionGQL,
+            SessionV2EdgeGQL,
+            SessionV2GQL,
+        )
 
-        return await fetch_sessions(
-            info=info,
-            filter=filter,
-            order_by=order_by,
-            before=before,
-            after=after,
-            first=first,
-            last=last,
-            limit=limit,
-            offset=offset,
-            base_conditions=[SessionConditions.by_agent_id(self._agent_id)],
+        payload = await info.context.adapters.session.search_sessions_by_agent(
+            AgentId(self.id),
+            AdminSearchSessionsInput(
+                filter=filter.to_pydantic() if filter else None,
+                order=[o.to_pydantic() for o in order_by] if order_by else None,
+                first=first,
+                after=after,
+                last=last,
+                before=before,
+                limit=limit,
+                offset=offset,
+            ),
+        )
+        nodes = [SessionV2GQL.from_pydantic(node) for node in payload.items]
+        edges = [SessionV2EdgeGQL(node=node, cursor=encode_cursor(node.id)) for node in nodes]
+        return SessionV2ConnectionGQL(
+            edges=edges,
+            page_info=strawberry.relay.PageInfo(
+                has_next_page=payload.has_next_page,
+                has_previous_page=payload.has_previous_page,
+                start_cursor=edges[0].cursor if edges else None,
+                end_cursor=edges[-1].cursor if edges else None,
+            ),
+            count=payload.total_count,
         )
 
     @strawberry.field(  # type: ignore[misc]
@@ -523,19 +510,81 @@ class AgentV2GQL(Node):
         strawberry.lazy("ai.backend.manager.api.gql.resource_slot.types"),
     ]:
         """Fetch per-slot resource capacity and usage for this agent."""
-        from ai.backend.manager.api.gql.resource_slot.fetcher import fetch_agent_resources
+        from decimal import Decimal
 
-        return await fetch_agent_resources(
-            info=info,
-            agent_id=str(self._agent_id),
-            filter=filter,
-            order_by=order_by,
+        import strawberry as _strawberry
+
+        from ai.backend.common.dto.manager.query import StringFilter as StringFilterDTO
+        from ai.backend.common.dto.manager.v2.resource_slot.request import (
+            AdminSearchAgentResourcesInput,
+        )
+        from ai.backend.common.dto.manager.v2.resource_slot.request import (
+            AgentResourceFilter as AgentResourceFilterDTO,
+        )
+        from ai.backend.common.dto.manager.v2.resource_slot.request import (
+            AgentResourceOrder as AgentResourceOrderDTO,
+        )
+        from ai.backend.manager.api.gql.base import encode_cursor
+        from ai.backend.manager.api.gql.resource_slot.types import (
+            AgentResourceConnectionGQL,
+            AgentResourceSlotEdgeGQL,
+            AgentResourceSlotGQL,
+        )
+
+        agent_id = str(self.id)
+        pydantic_filter: AgentResourceFilterDTO | None = None
+        if filter is not None:
+            pydantic_filter = filter.to_pydantic()
+            if pydantic_filter.agent_id is None:
+                pydantic_filter = AgentResourceFilterDTO(
+                    slot_name=pydantic_filter.slot_name,
+                    agent_id=StringFilterDTO(equals=agent_id),
+                    AND=pydantic_filter.AND,
+                    OR=pydantic_filter.OR,
+                    NOT=pydantic_filter.NOT,
+                )
+        else:
+            pydantic_filter = AgentResourceFilterDTO(
+                agent_id=StringFilterDTO(equals=agent_id),
+            )
+
+        pydantic_order: list[AgentResourceOrderDTO] | None = (
+            [o.to_pydantic() for o in order_by] if order_by is not None else None
+        )
+
+        search_input = AdminSearchAgentResourcesInput(
+            filter=pydantic_filter,
+            order=pydantic_order,
             first=first,
             after=after,
             last=last,
             before=before,
             limit=limit,
             offset=offset,
+        )
+        payload = await info.context.adapters.resource_slot.search_agent_resources(search_input)
+
+        edges = []
+        for item in payload.items:
+            slot_name = item.slot_name
+            node = AgentResourceSlotGQL(
+                id=_strawberry.ID(item.id),
+                slot_name=slot_name,
+                capacity=Decimal(item.capacity),
+                used=Decimal(item.used),
+            )
+            cursor = encode_cursor(slot_name)
+            edges.append(AgentResourceSlotEdgeGQL(node=node, cursor=cursor))
+
+        return AgentResourceConnectionGQL(
+            count=payload.total_count,
+            edges=edges,
+            page_info=_strawberry.relay.PageInfo(
+                has_next_page=payload.has_next_page,
+                has_previous_page=payload.has_previous_page,
+                start_cursor=edges[0].cursor if edges else None,
+                end_cursor=edges[-1].cursor if edges else None,
+            ),
         )
 
     @classmethod
@@ -549,49 +598,17 @@ class AgentV2GQL(Node):
         results = await info.context.data_loaders.agent_loader.load_many([
             AgentId(nid) for nid in node_ids
         ])
-        return [cls.from_agent_detail_data(data) if data is not None else None for data in results]
-
-    @classmethod
-    def from_agent_detail_data(cls, detail_data: AgentDetailData) -> Self:
-        data = detail_data.agent
-
-        return cls(
-            _agent_id=data.id,
-            id=ID(data.id),
-            resource_info=AgentResourceGQL(
-                capacity=data.available_slots.to_json(),
-                used=data.actual_occupied_slots.to_json(),
-                free=(data.available_slots - data.actual_occupied_slots).to_json(),
-            ),
-            status_info=AgentStatusInfoGQL(
-                status=data.status,
-                status_changed=data.status_changed,
-                first_contact=data.first_contact,
-                lost_at=data.lost_at,
-                schedulable=data.schedulable,
-            ),
-            system_info=AgentSystemInfoGQL(
-                architecture=data.architecture,
-                version=data.version,
-                auto_terminate_abusing_kernel=data.auto_terminate_abusing_kernel,
-                compute_plugins=ComputePluginsGQL.from_mapping(data.compute_plugins),
-            ),
-            network_info=AgentNetworkInfoGQL(
-                region=data.region,
-                addr=data.addr,
-            ),
-            permissions=[
-                AgentPermissionGQL.from_agent_permission(p) for p in detail_data.permissions
-            ],
-            scaling_group=data.scaling_group,
-        )
+        return cast(list[Self | None], results)
 
 
 AgentV2Edge = Edge[AgentV2GQL]
 
 
-@strawberry.type(
-    description="Added in 26.1.0. Relay-style connection type for paginated lists of agents"
+@gql_connection_type(
+    BackendAIGQLMeta(
+        added_version="26.1.0",
+        description="Relay-style connection type for paginated lists of agents.",
+    ),
 )
 class AgentV2Connection(Connection[AgentV2GQL]):
     count: int

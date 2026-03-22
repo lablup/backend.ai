@@ -2,107 +2,66 @@
 
 from __future__ import annotations
 
+from ai.backend.common.dto.manager.v2.agent.request import AgentFilter, AgentOrder
+from ai.backend.common.dto.manager.v2.agent.types import (
+    AgentOrderField,
+    AgentStatusEnum,
+    AgentStatusFilter,
+    OrderDirection,
+)
 from ai.backend.manager.api.gql.agent.types import (
     AgentFilterGQL,
     AgentOrderByGQL,
     AgentOrderFieldGQL,
     AgentStatusFilterGQL,
 )
-from ai.backend.manager.api.gql.base import OrderDirection, StringFilter
-from ai.backend.manager.data.agent.types import AgentStatus
-
-# Row imports to trigger mapper initialization (FK dependency order).
-from ai.backend.manager.models.agent import AgentRow
-from ai.backend.manager.models.deployment_auto_scaling_policy import (
-    DeploymentAutoScalingPolicyRow,
-)
-from ai.backend.manager.models.deployment_policy import DeploymentPolicyRow
-from ai.backend.manager.models.deployment_revision import DeploymentRevisionRow
-from ai.backend.manager.models.domain import DomainRow
-from ai.backend.manager.models.endpoint import EndpointRow
-from ai.backend.manager.models.group import GroupRow
-from ai.backend.manager.models.image import ImageRow
-from ai.backend.manager.models.kernel import KernelRow
-from ai.backend.manager.models.keypair import KeyPairRow
-from ai.backend.manager.models.rbac_models import UserRoleRow
-from ai.backend.manager.models.resource_policy import (
-    KeyPairResourcePolicyRow,
-    ProjectResourcePolicyRow,
-    UserResourcePolicyRow,
-)
-from ai.backend.manager.models.resource_preset import ResourcePresetRow
-from ai.backend.manager.models.routing import RoutingRow
-from ai.backend.manager.models.scaling_group import ScalingGroupRow
-from ai.backend.manager.models.session import SessionRow
-from ai.backend.manager.models.user import UserRow
-from ai.backend.manager.models.vfolder import VFolderRow
-from ai.backend.manager.repositories.base import QueryCondition
-
-# Reference Row models to prevent unused-import removal.
-_MAPPER_ROWS = [
-    DomainRow,
-    ScalingGroupRow,
-    UserResourcePolicyRow,
-    ProjectResourcePolicyRow,
-    KeyPairResourcePolicyRow,
-    UserRoleRow,
-    UserRow,
-    KeyPairRow,
-    GroupRow,
-    ImageRow,
-    VFolderRow,
-    EndpointRow,
-    DeploymentPolicyRow,
-    DeploymentAutoScalingPolicyRow,
-    DeploymentRevisionRow,
-    SessionRow,
-    AgentRow,
-    KernelRow,
-    RoutingRow,
-    ResourcePresetRow,
-]
-
-
-def _compile(condition_callable: QueryCondition) -> str:
-    """Compile a QueryCondition callable to SQL string."""
-    return str(condition_callable().compile(compile_kwargs={"literal_binds": True}))
+from ai.backend.manager.api.gql.base import OrderDirection as GQLOrderDirection
+from ai.backend.manager.api.gql.base import StringFilter
 
 
 class TestAgentFilter:
-    """Tests for AgentFilterGQL.build_conditions()."""
+    """Tests for AgentFilterGQL.to_pydantic()."""
 
     def test_id_filter(self) -> None:
         f = AgentFilterGQL(id=StringFilter(contains="agent-01"))
-        conditions = f.build_conditions()
-        assert len(conditions) == 1
-        sql = _compile(conditions[0])
-        assert "agents" in sql
+        result = f.to_pydantic()
+        assert isinstance(result, AgentFilter)
+        assert result.id is not None
+        assert result.id.contains == "agent-01"
 
     def test_status_in_filter(self) -> None:
         f = AgentFilterGQL(
-            status=AgentStatusFilterGQL(in_=[AgentStatus.ALIVE, AgentStatus.LOST]),
+            status=AgentStatusFilterGQL(in_=[AgentStatusEnum.ALIVE, AgentStatusEnum.LOST]),
         )
-        conditions = f.build_conditions()
-        assert len(conditions) == 1
+        result = f.to_pydantic()
+        assert isinstance(result, AgentFilter)
+        assert result.status is not None
+        assert isinstance(result.status, AgentStatusFilter)
+        assert result.status.in_ is not None
+        assert AgentStatusEnum.ALIVE in result.status.in_
+        assert AgentStatusEnum.LOST in result.status.in_
 
     def test_status_equals_filter(self) -> None:
         f = AgentFilterGQL(
-            status=AgentStatusFilterGQL(equals=AgentStatus.ALIVE),
+            status=AgentStatusFilterGQL(equals=AgentStatusEnum.ALIVE),
         )
-        conditions = f.build_conditions()
-        assert len(conditions) == 1
+        result = f.to_pydantic()
+        assert isinstance(result, AgentFilter)
+        assert result.status is not None
+        assert result.status.equals == AgentStatusEnum.ALIVE
 
     def test_schedulable_filter(self) -> None:
         f = AgentFilterGQL(schedulable=True)
-        conditions = f.build_conditions()
-        assert len(conditions) == 1
+        result = f.to_pydantic()
+        assert isinstance(result, AgentFilter)
+        assert result.schedulable is True
 
     def test_scaling_group_filter(self) -> None:
         f = AgentFilterGQL(scaling_group=StringFilter(equals="default"))
-        conditions = f.build_conditions()
-        assert len(conditions) == 1
-        sql = _compile(conditions[0])
-        assert "scaling_group" in sql
+        result = f.to_pydantic()
+        assert isinstance(result, AgentFilter)
+        assert result.scaling_group is not None
+        assert result.scaling_group.equals == "default"
 
     def test_combined_filters(self) -> None:
         f = AgentFilterGQL(
@@ -110,73 +69,116 @@ class TestAgentFilter:
             schedulable=True,
             scaling_group=StringFilter(equals="gpu"),
         )
-        conditions = f.build_conditions()
-        assert len(conditions) == 3
+        result = f.to_pydantic()
+        assert isinstance(result, AgentFilter)
+        assert result.id is not None
+        assert result.schedulable is True
+        assert result.scaling_group is not None
 
-    def test_empty_filter_returns_empty_list(self) -> None:
+    def test_empty_filter(self) -> None:
         f = AgentFilterGQL()
-        conditions = f.build_conditions()
-        assert conditions == []
+        result = f.to_pydantic()
+        assert isinstance(result, AgentFilter)
+        assert result.id is None
+        assert result.status is None
+        assert result.schedulable is None
+        assert result.scaling_group is None
+
+    def test_and_filter(self) -> None:
+        f = AgentFilterGQL(
+            AND=[
+                AgentFilterGQL(id=StringFilter(contains="agent-01")),
+                AgentFilterGQL(schedulable=True),
+            ]
+        )
+        result = f.to_pydantic()
+        assert isinstance(result, AgentFilter)
+        assert result.AND is not None
+        assert len(result.AND) == 2
+
+    def test_or_filter(self) -> None:
+        f = AgentFilterGQL(
+            OR=[
+                AgentFilterGQL(id=StringFilter(contains="agent-01")),
+                AgentFilterGQL(id=StringFilter(contains="agent-02")),
+            ]
+        )
+        result = f.to_pydantic()
+        assert isinstance(result, AgentFilter)
+        assert result.OR is not None
+        assert len(result.OR) == 2
+
+    def test_not_filter(self) -> None:
+        f = AgentFilterGQL(
+            NOT=[
+                AgentFilterGQL(schedulable=False),
+            ]
+        )
+        result = f.to_pydantic()
+        assert isinstance(result, AgentFilter)
+        assert result.NOT is not None
+        assert len(result.NOT) == 1
 
 
 class TestAgentOrderBy:
-    """Tests for AgentOrderByGQL.to_query_order()."""
+    """Tests for AgentOrderByGQL.to_pydantic()."""
 
     def test_id_ascending(self) -> None:
         order = AgentOrderByGQL(
             field=AgentOrderFieldGQL.ID,
-            direction=OrderDirection.ASC,
+            direction=GQLOrderDirection.ASC,
         )
-        result = order.to_query_order()
-        sql = str(result.compile(compile_kwargs={"literal_binds": True}))
-        assert "ASC" in sql.upper()
+        result = order.to_pydantic()
+        assert isinstance(result, AgentOrder)
+        assert result.field == AgentOrderField.ID
+        assert result.direction == OrderDirection.ASC
 
     def test_status_ascending(self) -> None:
         order = AgentOrderByGQL(
             field=AgentOrderFieldGQL.STATUS,
-            direction=OrderDirection.ASC,
+            direction=GQLOrderDirection.ASC,
         )
-        result = order.to_query_order()
-        sql = str(result.compile(compile_kwargs={"literal_binds": True}))
-        assert "status" in sql
-        assert "ASC" in sql.upper()
+        result = order.to_pydantic()
+        assert isinstance(result, AgentOrder)
+        assert result.field == AgentOrderField.STATUS
+        assert result.direction == OrderDirection.ASC
 
     def test_status_descending(self) -> None:
         order = AgentOrderByGQL(
             field=AgentOrderFieldGQL.STATUS,
-            direction=OrderDirection.DESC,
+            direction=GQLOrderDirection.DESC,
         )
-        result = order.to_query_order()
-        sql = str(result.compile(compile_kwargs={"literal_binds": True}))
-        assert "status" in sql
-        assert "DESC" in sql.upper()
+        result = order.to_pydantic()
+        assert isinstance(result, AgentOrder)
+        assert result.field == AgentOrderField.STATUS
+        assert result.direction == OrderDirection.DESC
 
     def test_first_contact_ascending(self) -> None:
         order = AgentOrderByGQL(
             field=AgentOrderFieldGQL.FIRST_CONTACT,
-            direction=OrderDirection.ASC,
+            direction=GQLOrderDirection.ASC,
         )
-        result = order.to_query_order()
-        sql = str(result.compile(compile_kwargs={"literal_binds": True}))
-        assert "first_contact" in sql
-        assert "ASC" in sql.upper()
+        result = order.to_pydantic()
+        assert isinstance(result, AgentOrder)
+        assert result.field == AgentOrderField.FIRST_CONTACT
+        assert result.direction == OrderDirection.ASC
 
     def test_scaling_group_descending(self) -> None:
         order = AgentOrderByGQL(
             field=AgentOrderFieldGQL.SCALING_GROUP,
-            direction=OrderDirection.DESC,
+            direction=GQLOrderDirection.DESC,
         )
-        result = order.to_query_order()
-        sql = str(result.compile(compile_kwargs={"literal_binds": True}))
-        assert "scaling_group" in sql
-        assert "DESC" in sql.upper()
+        result = order.to_pydantic()
+        assert isinstance(result, AgentOrder)
+        assert result.field == AgentOrderField.SCALING_GROUP
+        assert result.direction == OrderDirection.DESC
 
     def test_schedulable_ascending(self) -> None:
         order = AgentOrderByGQL(
             field=AgentOrderFieldGQL.SCHEDULABLE,
-            direction=OrderDirection.ASC,
+            direction=GQLOrderDirection.ASC,
         )
-        result = order.to_query_order()
-        sql = str(result.compile(compile_kwargs={"literal_binds": True}))
-        assert "schedulable" in sql
-        assert "ASC" in sql.upper()
+        result = order.to_pydantic()
+        assert isinstance(result, AgentOrder)
+        assert result.field == AgentOrderField.SCHEDULABLE
+        assert result.direction == OrderDirection.ASC

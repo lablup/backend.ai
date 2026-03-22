@@ -6,17 +6,23 @@ from __future__ import annotations
 
 from enum import StrEnum
 
+from ai.backend.common.dto.manager.v2.common import OrderDirection
+
 __all__ = (
     "OrderDirection",
+    "PreemptionModeDTO",
+    "PreemptionOrderDTO",
+    "ResourceGroupOrderDirection",
     "ResourceGroupOrderField",
+    "SchedulerTypeDTO",
 )
 
 
-class OrderDirection(StrEnum):
-    """Order direction for sorting."""
+class ResourceGroupOrderDirection(StrEnum):
+    """Order direction for resource group sorting."""
 
-    ASC = "asc"
-    DESC = "desc"
+    ASC = "ASC"
+    DESC = "DESC"
 
 
 class ResourceGroupOrderField(StrEnum):
@@ -24,4 +30,27 @@ class ResourceGroupOrderField(StrEnum):
 
     NAME = "name"
     CREATED_AT = "created_at"
-    MODIFIED_AT = "modified_at"
+    IS_ACTIVE = "is_active"
+
+
+class SchedulerTypeDTO(StrEnum):
+    """Scheduler type for resource group."""
+
+    FIFO = "fifo"
+    LIFO = "lifo"
+    DRF = "drf"
+    FAIR_SHARE = "fair-share"
+
+
+class PreemptionOrderDTO(StrEnum):
+    """Tie-breaking order for same-priority sessions during preemption."""
+
+    OLDEST = "oldest"
+    NEWEST = "newest"
+
+
+class PreemptionModeDTO(StrEnum):
+    """How to preempt a session when preemption is triggered."""
+
+    TERMINATE = "terminate"
+    RESCHEDULE = "reschedule"

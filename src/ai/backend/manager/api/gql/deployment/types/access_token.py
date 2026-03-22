@@ -4,113 +4,72 @@ from __future__ import annotations
 
 from collections.abc import Iterable
 from datetime import datetime
-from typing import Any, Self, override
+from typing import Any, Self, cast
 from uuid import UUID
 
 import strawberry
 from strawberry import ID, Info
-from strawberry.relay import Connection, Edge, Node, NodeID
+from strawberry.relay import Connection, Edge, NodeID
 
+from ai.backend.common.dto.manager.v2.deployment.request import (
+    AccessTokenFilter as AccessTokenFilterDTO,
+)
+from ai.backend.common.dto.manager.v2.deployment.request import (
+    AccessTokenOrder as AccessTokenOrderDTO,
+)
+from ai.backend.common.dto.manager.v2.deployment.request import (
+    CreateAccessTokenInput as CreateAccessTokenInputDTO,
+)
+from ai.backend.common.dto.manager.v2.deployment.response import (
+    AccessTokenNode as AccessTokenNodeDTO,
+)
+from ai.backend.common.dto.manager.v2.deployment.response import (
+    CreateAccessTokenPayload as CreateAccessTokenPayloadDTO,
+)
 from ai.backend.manager.api.gql.base import DateTimeFilter, OrderDirection, StringFilter
-from ai.backend.manager.api.gql.types import GQLFilter, GQLOrderBy, StrawberryGQLContext
-from ai.backend.manager.data.deployment.access_token import ModelDeploymentAccessTokenCreator
+from ai.backend.manager.api.gql.decorators import (
+    BackendAIGQLMeta,
+    PydanticInputMixin,
+    gql_connection_type,
+    gql_node_type,
+    gql_pydantic_input,
+    gql_pydantic_type,
+)
+from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin
+from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.data.deployment.types import (
     AccessTokenOrderField,
-    ModelDeploymentAccessTokenData,
-)
-from ai.backend.manager.repositories.base import (
-    QueryCondition,
-    QueryOrder,
-    combine_conditions_or,
-    negate_conditions,
-)
-from ai.backend.manager.repositories.deployment.options import (
-    AccessTokenConditions,
-    AccessTokenOrders,
 )
 
 
-@strawberry.input(description="Added in 25.16.0")
-class AccessTokenFilter(GQLFilter):
+@gql_pydantic_input(
+    BackendAIGQLMeta(description="", added_version="25.16.0"),
+    name="AccessTokenFilter",
+)
+class AccessTokenFilter(PydanticInputMixin[AccessTokenFilterDTO]):
     """Filter for access tokens."""
 
     token: StringFilter | None = None
     valid_until: DateTimeFilter | None = None
     created_at: DateTimeFilter | None = None
 
-    AND: list[AccessTokenFilter] | None = None
-    OR: list[AccessTokenFilter] | None = None
-    NOT: list[AccessTokenFilter] | None = None
-
-    @override
-    def build_conditions(self) -> list[QueryCondition]:
-        """Build query conditions from this filter."""
-        conditions: list[QueryCondition] = []
-
-        if self.token:
-            if self.token.equals:
-                conditions.append(AccessTokenConditions.by_token_equals(self.token.equals))
-            elif self.token.contains:
-                conditions.append(AccessTokenConditions.by_token_contains(self.token.contains))
-
-        if self.valid_until:
-            condition = self.valid_until.build_query_condition(
-                before_factory=AccessTokenConditions.by_valid_until_before,
-                after_factory=AccessTokenConditions.by_valid_until_after,
-                equals_factory=AccessTokenConditions.by_valid_until_equals,
-            )
-            if condition:
-                conditions.append(condition)
-
-        if self.created_at:
-            condition = self.created_at.build_query_condition(
-                before_factory=AccessTokenConditions.by_created_at_before,
-                after_factory=AccessTokenConditions.by_created_at_after,
-                equals_factory=AccessTokenConditions.by_created_at_equals,
-            )
-            if condition:
-                conditions.append(condition)
-
-        # Handle AND logical operator
-        if self.AND:
-            for sub_filter in self.AND:
-                conditions.extend(sub_filter.build_conditions())
-
-        # Handle OR logical operator
-        if self.OR:
-            or_sub_conditions: list[QueryCondition] = []
-            for sub_filter in self.OR:
-                or_sub_conditions.extend(sub_filter.build_conditions())
-            if or_sub_conditions:
-                conditions.append(combine_conditions_or(or_sub_conditions))
-
-        # Handle NOT logical operator
-        if self.NOT:
-            not_sub_conditions: list[QueryCondition] = []
-            for sub_filter in self.NOT:
-                not_sub_conditions.extend(sub_filter.build_conditions())
-            if not_sub_conditions:
-                conditions.append(negate_conditions(not_sub_conditions))
-
-        return conditions
+    AND: list[Self] | None = None
+    OR: list[Self] | None = None
+    NOT: list[Self] | None = None
 
 
-@strawberry.input(description="Added in 25.16.0")
-class AccessTokenOrderBy(GQLOrderBy):
+@gql_pydantic_input(
+    BackendAIGQLMeta(description="", added_version="25.16.0"),
+)
+class AccessTokenOrderBy(PydanticInputMixin[AccessTokenOrderDTO]):
     field: AccessTokenOrderField
     direction: OrderDirection = OrderDirection.DESC
 
-    @override
-    def to_query_order(self) -> QueryOrder:
-        """Convert to repository QueryOrder."""
-        ascending = self.direction == OrderDirection.ASC
-        match self.field:
-            case AccessTokenOrderField.CREATED_AT:
-                return AccessTokenOrders.created_at(ascending)
 
-
-@strawberry.type
-class AccessToken(Node):
+@gql_node_type(
+    BackendAIGQLMeta(added_version="25.16.0", description="An access token for model deployment.")
+)
+class AccessToken(PydanticNodeMixin[AccessTokenNodeDTO]):
     id: NodeID[str]
     token: str = strawberry.field(description="Added in 25.16.0: The access token.")
     created_at: datetime = strawberry.field(
@@ -131,22 +90,15 @@ class AccessToken(Node):
         results = await info.context.data_loaders.access_token_loader.load_many([
             UUID(nid) for nid in node_ids
         ])
-        return [cls.from_dataclass(data) if data is not None else None for data in results]
-
-    @classmethod
-    def from_dataclass(cls, data: ModelDeploymentAccessTokenData) -> Self:
-        return cls(
-            id=ID(str(data.id)),
-            token=data.token,
-            created_at=data.created_at,
-            valid_until=data.valid_until,
-        )
+        return cast(list[Self | None], results)
 
 
 AccessTokenEdge = Edge[AccessToken]
 
 
-@strawberry.type(description="Added in 25.16.0")
+@gql_connection_type(
+    BackendAIGQLMeta(added_version="25.16.0", description="Connection for access tokens.")
+)
 class AccessTokenConnection(Connection[AccessToken]):
     count: int
 
@@ -155,8 +107,13 @@ class AccessTokenConnection(Connection[AccessToken]):
         self.count = count
 
 
-@strawberry.input
-class CreateAccessTokenInput:
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description="Input for creating an access token for a model deployment.",
+        added_version="25.16.0",
+    ),
+)
+class CreateAccessTokenInput(PydanticInputMixin[CreateAccessTokenInputDTO]):
     model_deployment_id: ID = strawberry.field(
         description="Added in 25.16.0: The ID of the model deployment for which the access token is created."
     )
@@ -164,13 +121,10 @@ class CreateAccessTokenInput:
         description="Added in 25.16.0: The expiration timestamp of the access token."
     )
 
-    def to_creator(self) -> ModelDeploymentAccessTokenCreator:
-        return ModelDeploymentAccessTokenCreator(
-            model_deployment_id=UUID(self.model_deployment_id),
-            valid_until=self.valid_until,
-        )
 
-
-@strawberry.type
+@gql_pydantic_type(
+    BackendAIGQLMeta(added_version="25.16.0", description="Payload for creating an access token."),
+    model=CreateAccessTokenPayloadDTO,
+)
 class CreateAccessTokenPayload:
     access_token: AccessToken

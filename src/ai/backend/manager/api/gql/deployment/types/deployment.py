@@ -2,35 +2,103 @@
 
 from __future__ import annotations
 
-from collections.abc import Iterable, Sequence
+from collections.abc import Iterable
 from datetime import datetime
-from typing import Any, Self, override
-from uuid import UUID, uuid4
+from typing import Any, Self, cast
+from uuid import UUID
 
 import strawberry
-from strawberry import ID, Info
-from strawberry.relay import Connection, Edge, Node, NodeID
+from strawberry import ID, UNSET, Info
+from strawberry.relay import Connection, Edge, NodeID, PageInfo
 
-from ai.backend.common.contexts.user import current_user
 from ai.backend.common.data.model_deployment.types import (
-    DeploymentStrategy,
     ModelDeploymentStatus,
 )
-from ai.backend.common.exception import (
-    InvalidAPIParameters,
+from ai.backend.common.dto.manager.v2.deployment.request import (
+    AdminSearchRevisionsInput,
+    SearchAccessTokensInput,
+    SearchAutoScalingRulesInput,
+    SearchReplicasInput,
+)
+from ai.backend.common.dto.manager.v2.deployment.request import (
+    CreateDeploymentInput as CreateDeploymentInputDTO,
+)
+from ai.backend.common.dto.manager.v2.deployment.request import (
+    DeleteDeploymentInput as DeleteDeploymentInputDTO,
+)
+from ai.backend.common.dto.manager.v2.deployment.request import (
+    DeploymentFilter as DeploymentFilterDTO,
+)
+from ai.backend.common.dto.manager.v2.deployment.request import (
+    DeploymentOrder as DeploymentOrderDTO,
+)
+from ai.backend.common.dto.manager.v2.deployment.request import (
+    DeploymentStatusFilter as DeploymentStatusFilterDTO,
+)
+from ai.backend.common.dto.manager.v2.deployment.request import (
+    DeploymentStrategyInput as DeploymentStrategyInputDTO,
+)
+from ai.backend.common.dto.manager.v2.deployment.request import (
+    ModelDeploymentMetadataInput as ModelDeploymentMetadataInputDTO,
+)
+from ai.backend.common.dto.manager.v2.deployment.request import (
+    ModelDeploymentNetworkAccessInput as ModelDeploymentNetworkAccessInputDTO,
+)
+from ai.backend.common.dto.manager.v2.deployment.request import (
+    SyncReplicaInput as SyncReplicaInputDTO,
+)
+from ai.backend.common.dto.manager.v2.deployment.request import (
+    UpdateDeploymentInput as UpdateDeploymentInputDTO,
+)
+from ai.backend.common.dto.manager.v2.deployment.response import (
+    CreateDeploymentPayload as CreateDeploymentPayloadDTO,
+)
+from ai.backend.common.dto.manager.v2.deployment.response import (
+    DeleteDeploymentPayload as DeleteDeploymentPayloadDTO,
+)
+from ai.backend.common.dto.manager.v2.deployment.response import (
+    DeploymentNode as DeploymentNodeDTO,
+)
+from ai.backend.common.dto.manager.v2.deployment.response import (
+    DeploymentStatusChangedPayload as DeploymentStatusChangedPayloadDTO,
+)
+from ai.backend.common.dto.manager.v2.deployment.response import (
+    SyncReplicaPayload as SyncReplicaPayloadDTO,
+)
+from ai.backend.common.dto.manager.v2.deployment.response import (
+    UpdateDeploymentPayload as UpdateDeploymentPayloadDTO,
+)
+from ai.backend.common.dto.manager.v2.deployment.types import (
+    DeploymentMetadataInfoDTO,
+    DeploymentNetworkAccessInfoDTO,
+    DeploymentStrategyInfoDTO,
+    ReplicaStateInfo,
 )
 from ai.backend.manager.api.gql.base import (
     OrderDirection,
     StringFilter,
+    encode_cursor,
     to_global_id,
 )
+from ai.backend.manager.api.gql.decorators import (
+    BackendAIGQLMeta,
+    PydanticInputMixin,
+    gql_connection_type,
+    gql_node_type,
+    gql_pydantic_input,
+    gql_pydantic_type,
+)
 from ai.backend.manager.api.gql.deployment.types.access_token import (
+    AccessToken,
     AccessTokenConnection,
+    AccessTokenEdge,
     AccessTokenFilter,
     AccessTokenOrderBy,
 )
 from ai.backend.manager.api.gql.deployment.types.auto_scaling import (
+    AutoScalingRule,
     AutoScalingRuleConnection,
+    AutoScalingRuleEdge,
     AutoScalingRuleFilter,
     AutoScalingRuleOrderBy,
 )
@@ -41,7 +109,9 @@ from ai.backend.manager.api.gql.deployment.types.policy import (
     RollingUpdateConfigInputGQL,
 )
 from ai.backend.manager.api.gql.deployment.types.replica import (
+    ModelReplica,
     ModelReplicaConnection,
+    ModelReplicaEdge,
     ReplicaFilter,
     ReplicaOrderBy,
 )
@@ -49,51 +119,25 @@ from ai.backend.manager.api.gql.deployment.types.revision import (
     CreateRevisionInput,
     ModelRevision,
     ModelRevisionConnection,
+    ModelRevisionEdge,
     ModelRevisionFilter,
     ModelRevisionOrderBy,
 )
 from ai.backend.manager.api.gql.domain import Domain
 from ai.backend.manager.api.gql.project import Project
-from ai.backend.manager.api.gql.types import GQLFilter, GQLOrderBy, StrawberryGQLContext
+from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin
+from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.api.gql.user_federation import User
 from ai.backend.manager.api.gql_legacy.domain import DomainNode
 from ai.backend.manager.api.gql_legacy.group import GroupNode
 from ai.backend.manager.api.gql_legacy.user import UserNode
-from ai.backend.manager.data.deployment.creator import DeploymentPolicyConfig, NewDeploymentCreator
 from ai.backend.manager.data.deployment.types import (
-    DeploymentMetadata,
-    DeploymentNetworkSpec,
+    AccessTokenSearchScope,
+    AutoScalingRuleSearchScope,
     DeploymentOrderField,
-    ModelDeploymentData,
-    ModelDeploymentMetadataInfo,
-    ReplicaSpec,
+    ReplicaSearchScope,
+    RevisionSearchScope,
 )
-from ai.backend.manager.errors.user import UserNotFound
-from ai.backend.manager.models.endpoint import EndpointRow
-from ai.backend.manager.repositories.base import (
-    QueryCondition,
-    QueryOrder,
-    Updater,
-    combine_conditions_or,
-    negate_conditions,
-)
-from ai.backend.manager.repositories.deployment.options import (
-    AccessTokenConditions,
-    AutoScalingRuleConditions,
-    DeploymentConditions,
-    DeploymentOrders,
-    RevisionConditions,
-    RouteConditions,
-)
-from ai.backend.manager.repositories.deployment.updaters import (
-    DeploymentMetadataUpdaterSpec,
-    DeploymentNetworkSpecUpdaterSpec,
-    DeploymentPolicyUpdaterSpec,
-    DeploymentUpdaterSpec,
-    ReplicaSpecUpdaterSpec,
-    RevisionStateUpdaterSpec,
-)
-from ai.backend.manager.types import OptionalState, TriState
 
 DeploymentStatusGQL: type[ModelDeploymentStatus] = strawberry.enum(
     ModelDeploymentStatus,
@@ -102,114 +146,38 @@ DeploymentStatusGQL: type[ModelDeploymentStatus] = strawberry.enum(
 )
 
 
-@strawberry.type
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version="25.19.0",
+        description="Represents the deployment strategy configuration that determines how updates are rolled out to replicas (e.g., rolling update, blue-green).",
+    ),
+    model=DeploymentStrategyInfoDTO,
+)
 class DeploymentStrategyGQL:
-    """
-    Added in 25.19.0.
-
-    Represents the deployment strategy configuration that determines how
-    updates are rolled out to replicas (e.g., rolling update, blue-green).
-    """
-
     type: DeploymentStrategyTypeGQL
 
 
-@strawberry.type
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version="25.19.0",
+        description="Represents the current replica state of a deployment, including the desired replica count and access to the list of active replicas.",
+    ),
+    model=ReplicaStateInfo,
+)
 class ReplicaState:
-    """
-    Added in 25.19.0.
-
-    Represents the current replica state of a deployment, including the desired
-    replica count and access to the list of active replicas.
-    """
-
-    _deployment_id: strawberry.Private[UUID]
     desired_replica_count: int
 
-    @strawberry.field
-    async def replicas(
-        self,
-        info: Info[StrawberryGQLContext],
-        filter: ReplicaFilter | None = None,
-        order_by: list[ReplicaOrderBy] | None = None,
-        before: str | None = None,
-        after: str | None = None,
-        first: int | None = None,
-        last: int | None = None,
-        limit: int | None = None,
-        offset: int | None = None,
-    ) -> ModelReplicaConnection:
-        from ai.backend.manager.api.gql.deployment.fetcher.replica import fetch_replicas
 
-        return await fetch_replicas(
-            info=info,
-            filter=filter,
-            order_by=order_by,
-            before=before,
-            after=after,
-            first=first,
-            last=last,
-            limit=limit,
-            offset=offset,
-            base_conditions=[RouteConditions.by_endpoint_id(self._deployment_id)],
-        )
-
-
-@strawberry.type
-class ScalingRule:
-    """
-    Added in 25.19.0.
-
-    Provides access to auto-scaling rules configured for a deployment.
-    Auto-scaling rules define conditions for automatically adjusting
-    the number of replicas based on metrics.
-    """
-
-    _deployment_id: strawberry.Private[UUID]
-
-    @strawberry.field
-    async def auto_scaling_rules(
-        self,
-        info: Info[StrawberryGQLContext],
-        filter: AutoScalingRuleFilter | None = None,
-        order_by: list[AutoScalingRuleOrderBy] | None = None,
-        before: str | None = None,
-        after: str | None = None,
-        first: int | None = None,
-        last: int | None = None,
-        limit: int | None = None,
-        offset: int | None = None,
-    ) -> AutoScalingRuleConnection:
-        from ai.backend.manager.api.gql.deployment.fetcher.auto_scaling import (
-            fetch_auto_scaling_rules,
-        )
-
-        return await fetch_auto_scaling_rules(
-            info=info,
-            filter=filter,
-            order_by=order_by,
-            before=before,
-            after=after,
-            first=first,
-            last=last,
-            limit=limit,
-            offset=offset,
-            base_conditions=[AutoScalingRuleConditions.by_deployment_id(self._deployment_id)],
-        )
-
-
-@strawberry.type
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version="25.19.0",
+        description="Contains metadata information for a model deployment including its name, status, tags, and timestamps. Also provides access to the associated project and domain.",
+    ),
+    model=DeploymentMetadataInfoDTO,
+)
 class ModelDeploymentMetadata:
-    """
-    Added in 25.19.0.
-
-    Contains metadata information for a model deployment including its name,
-    status, tags, and timestamps. Also provides access to the associated
-    project and domain.
-    """
-
-    _project_id: strawberry.Private[UUID]
-    _domain_name: strawberry.Private[str]
+    project_id: ID
+    domain_name: str
     name: str
     status: DeploymentStatusGQL
     tags: list[str]
@@ -219,122 +187,53 @@ class ModelDeploymentMetadata:
     @strawberry.field
     async def project(self, info: Info[StrawberryGQLContext]) -> Project:
         project_global_id = to_global_id(
-            GroupNode, self._project_id, is_target_graphene_object=True
+            GroupNode, UUID(str(self.project_id)), is_target_graphene_object=True
         )
         return Project(id=ID(project_global_id))
 
     @strawberry.field
     async def domain(self, info: Info[StrawberryGQLContext]) -> Domain:
         domain_global_id = to_global_id(
-            DomainNode, self._domain_name, is_target_graphene_object=True
+            DomainNode, self.domain_name, is_target_graphene_object=True
         )
         return Domain(id=ID(domain_global_id))
 
-    @classmethod
-    def from_dataclass(cls, data: ModelDeploymentMetadataInfo) -> ModelDeploymentMetadata:
-        return cls(
-            name=data.name,
-            status=DeploymentStatusGQL(data.status),
-            tags=data.tags,
-            _project_id=data.project_id,
-            _domain_name=data.domain_name,
-            created_at=data.created_at,
-            updated_at=data.updated_at,
-        )
 
-
-@strawberry.type
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version="25.19.0",
+        description="Provides network access configuration for a model deployment, including the endpoint URL, preferred domain name, and public access settings. Also manages access tokens for authentication.",
+    ),
+    model=DeploymentNetworkAccessInfoDTO,
+)
 class ModelDeploymentNetworkAccess:
-    """
-    Added in 25.19.0.
-
-    Provides network access configuration for a model deployment, including
-    the endpoint URL, preferred domain name, and public access settings.
-    Also manages access tokens for authentication.
-    """
-
-    _deployment_id: strawberry.Private[UUID]
     endpoint_url: str | None = None
     preferred_domain_name: str | None = None
     open_to_public: bool = False
 
-    @strawberry.field
-    async def access_tokens(
-        self,
-        info: Info[StrawberryGQLContext],
-        filter: AccessTokenFilter | None = None,
-        order_by: list[AccessTokenOrderBy] | None = None,
-        before: str | None = None,
-        after: str | None = None,
-        first: int | None = None,
-        last: int | None = None,
-        limit: int | None = None,
-        offset: int | None = None,
-    ) -> AccessTokenConnection:
-        """Resolve access tokens for this deployment."""
-        from ai.backend.manager.api.gql.deployment.fetcher.access_token import (
-            fetch_access_tokens,
-        )
-
-        return await fetch_access_tokens(
-            info=info,
-            filter=filter,
-            order_by=order_by,
-            before=before,
-            after=after,
-            first=first,
-            last=last,
-            limit=limit,
-            offset=offset,
-            base_conditions=[AccessTokenConditions.by_endpoint_id(self._deployment_id)],
-        )
-
-    @classmethod
-    def from_dataclass(
-        cls, data: DeploymentNetworkSpec, deployment_id: UUID
-    ) -> ModelDeploymentNetworkAccess:
-        return cls(
-            _deployment_id=deployment_id,
-            endpoint_url=data.url,
-            preferred_domain_name=data.preferred_domain_name,
-            open_to_public=data.open_to_public,
-        )
-
 
 # Main ModelDeployment Type
-@strawberry.type
-class ModelDeployment(Node):
-    """
-    Added in 25.19.0.
-
-    Represents a model deployment in Backend.AI. A deployment is a long-running
-    inference service that exposes a trained model via HTTP endpoints.
-
-    Deployments manage the lifecycle of model replicas, handle traffic routing,
-    and provide auto-scaling capabilities based on configured rules.
-    """
-
+@gql_node_type(
+    BackendAIGQLMeta(
+        added_version="25.19.0",
+        description="Represents a model deployment in Backend.AI. A deployment is a long-running inference service that exposes a trained model via HTTP endpoints. Deployments manage the lifecycle of model replicas, handle traffic routing, and provide auto-scaling capabilities based on configured rules.",
+    )
+)
+class ModelDeployment(PydanticNodeMixin[DeploymentNodeDTO]):
     id: NodeID[str]
     metadata: ModelDeploymentMetadata
     network_access: ModelDeploymentNetworkAccess
     revision: ModelRevision | None = None
     default_deployment_strategy: DeploymentStrategyGQL
     replica_state: ReplicaState
-    _created_user_id: strawberry.Private[UUID]
-    _deployment_id: strawberry.Private[UUID]
+    created_user_id: ID
 
     @strawberry.field
     async def created_user(self, info: Info[StrawberryGQLContext]) -> User:
         user_global_id = to_global_id(
-            UserNode, self._created_user_id, is_target_graphene_object=True
+            UserNode, UUID(str(self.created_user_id)), is_target_graphene_object=True
         )
         return User(id=strawberry.ID(user_global_id))
-
-    @strawberry.field
-    async def scaling_rule(self, info: Info[StrawberryGQLContext]) -> ScalingRule:
-        return ScalingRule(
-            _deployment_id=self._deployment_id,
-        )
 
     @strawberry.field(description="Added in 25.19.0. Deployment policy configuration.")  # type: ignore[misc]
     async def deployment_policy(
@@ -342,11 +241,11 @@ class ModelDeployment(Node):
     ) -> DeploymentPolicyGQL | None:
         """Get the deployment policy for this deployment."""
         policy_data = await info.context.data_loaders.deployment_policy_by_endpoint_loader.load(
-            self._deployment_id
+            UUID(str(self.id))
         )
         if policy_data is None:
             return None
-        return DeploymentPolicyGQL.from_data(policy_data)
+        return policy_data
 
     @strawberry.field
     async def revision_history(
@@ -361,19 +260,157 @@ class ModelDeployment(Node):
         limit: int | None = None,
         offset: int | None = None,
     ) -> ModelRevisionConnection:
-        from ai.backend.manager.api.gql.deployment.fetcher.revision import fetch_revisions
+        pydantic_filter = filter.to_pydantic() if filter else None
+        pydantic_order = [o.to_pydantic() for o in order_by] if order_by else None
+        payload = await info.context.adapters.deployment.search_revisions(
+            scope=RevisionSearchScope(deployment_id=UUID(str(self.id))),
+            input=AdminSearchRevisionsInput(
+                filter=pydantic_filter,
+                order=pydantic_order,
+                first=first,
+                after=after,
+                last=last,
+                before=before,
+                limit=limit,
+                offset=offset,
+            ),
+        )
+        nodes = [ModelRevision.from_pydantic(item) for item in payload.items]
+        edges = [ModelRevisionEdge(node=node, cursor=encode_cursor(str(node.id))) for node in nodes]
+        return ModelRevisionConnection(
+            count=payload.total_count,
+            edges=edges,
+            page_info=PageInfo(
+                has_next_page=payload.has_next_page,
+                has_previous_page=payload.has_previous_page,
+                start_cursor=edges[0].cursor if edges else None,
+                end_cursor=edges[-1].cursor if edges else None,
+            ),
+        )
 
-        return await fetch_revisions(
-            info=info,
-            filter=filter,
-            order_by=order_by,
-            before=before,
-            after=after,
-            first=first,
-            last=last,
-            limit=limit,
-            offset=offset,
-            base_conditions=[RevisionConditions.by_deployment_id(self._deployment_id)],
+    @strawberry.field
+    async def replicas(
+        self,
+        info: Info[StrawberryGQLContext],
+        filter: ReplicaFilter | None = None,
+        order_by: list[ReplicaOrderBy] | None = None,
+        before: str | None = None,
+        after: str | None = None,
+        first: int | None = None,
+        last: int | None = None,
+        limit: int | None = None,
+        offset: int | None = None,
+    ) -> ModelReplicaConnection:
+        pydantic_filter = filter.to_pydantic() if filter else None
+        pydantic_order = [o.to_pydantic() for o in order_by] if order_by else None
+        payload = await info.context.adapters.deployment.search_replicas(
+            scope=ReplicaSearchScope(deployment_id=UUID(str(self.id))),
+            input=SearchReplicasInput(
+                filter=pydantic_filter,
+                order=pydantic_order,
+                first=first,
+                after=after,
+                last=last,
+                before=before,
+                limit=limit,
+                offset=offset,
+            ),
+        )
+        nodes = [ModelReplica.from_pydantic(item) for item in payload.items]
+        edges = [ModelReplicaEdge(node=node, cursor=str(node.id)) for node in nodes]
+        return ModelReplicaConnection(
+            count=payload.total_count,
+            edges=edges,
+            page_info=PageInfo(
+                has_next_page=payload.has_next_page,
+                has_previous_page=payload.has_previous_page,
+                start_cursor=edges[0].cursor if edges else None,
+                end_cursor=edges[-1].cursor if edges else None,
+            ),
+        )
+
+    @strawberry.field
+    async def auto_scaling_rules(
+        self,
+        info: Info[StrawberryGQLContext],
+        filter: AutoScalingRuleFilter | None = None,
+        order_by: list[AutoScalingRuleOrderBy] | None = None,
+        before: str | None = None,
+        after: str | None = None,
+        first: int | None = None,
+        last: int | None = None,
+        limit: int | None = None,
+        offset: int | None = None,
+    ) -> AutoScalingRuleConnection:
+        pydantic_filter = filter.to_pydantic() if filter else None
+        pydantic_order = [o.to_pydantic() for o in order_by] if order_by else None
+        payload = await info.context.adapters.deployment.search_rules(
+            scope=AutoScalingRuleSearchScope(deployment_id=UUID(str(self.id))),
+            input=SearchAutoScalingRulesInput(
+                filter=pydantic_filter,
+                order=pydantic_order,
+                first=first,
+                after=after,
+                last=last,
+                before=before,
+                limit=limit,
+                offset=offset,
+            ),
+        )
+        nodes = [AutoScalingRule.from_pydantic(item) for item in payload.items]
+        edges = [
+            AutoScalingRuleEdge(node=node, cursor=encode_cursor(str(node.id))) for node in nodes
+        ]
+        return AutoScalingRuleConnection(
+            count=payload.total_count,
+            edges=edges,
+            page_info=PageInfo(
+                has_next_page=payload.has_next_page,
+                has_previous_page=payload.has_previous_page,
+                start_cursor=edges[0].cursor if edges else None,
+                end_cursor=edges[-1].cursor if edges else None,
+            ),
+        )
+
+    @strawberry.field
+    async def access_tokens(
+        self,
+        info: Info[StrawberryGQLContext],
+        filter: AccessTokenFilter | None = None,
+        order_by: list[AccessTokenOrderBy] | None = None,
+        before: str | None = None,
+        after: str | None = None,
+        first: int | None = None,
+        last: int | None = None,
+        limit: int | None = None,
+        offset: int | None = None,
+    ) -> AccessTokenConnection:
+        pydantic_filter = filter.to_pydantic() if filter else None
+        pydantic_order = [o.to_pydantic() for o in order_by] if order_by else None
+        payload = await info.context.adapters.deployment.search_access_tokens(
+            scope=AccessTokenSearchScope(deployment_id=UUID(str(self.id))),
+            input=SearchAccessTokensInput(
+                filter=pydantic_filter,
+                order=pydantic_order,
+                first=first,
+                after=after,
+                last=last,
+                before=before,
+                limit=limit,
+                offset=offset,
+            ),
+        )
+        nodes = [AccessToken.from_pydantic(item) for item in payload.items]
+        edges = [AccessTokenEdge(node=node, cursor=encode_cursor(str(node.id))) for node in nodes]
+        return AccessTokenConnection(
+            count=payload.total_count,
+            edges=edges,
+            page_info=PageInfo(
+                has_next_page=payload.has_next_page,
+                has_previous_page=payload.has_previous_page,
+                start_cursor=edges[0].cursor if edges else None,
+                end_cursor=edges[-1].cursor if edges else None,
+            ),
         )
 
     @classmethod
@@ -387,210 +424,110 @@ class ModelDeployment(Node):
         results = await info.context.data_loaders.deployment_loader.load_many([
             UUID(nid) for nid in node_ids
         ])
-        return [cls.from_dataclass(data) if data is not None else None for data in results]
-
-    @classmethod
-    def from_dataclass(
-        cls,
-        data: ModelDeploymentData,
-    ) -> Self:
-        metadata = ModelDeploymentMetadata(
-            name=data.metadata.name,
-            status=DeploymentStatusGQL(data.metadata.status),
-            tags=data.metadata.tags,
-            _project_id=data.metadata.project_id,
-            _domain_name=data.metadata.domain_name,
-            created_at=data.metadata.created_at,
-            updated_at=data.metadata.updated_at,
-        )
-
-        return cls(
-            id=ID(str(data.id)),
-            metadata=metadata,
-            network_access=ModelDeploymentNetworkAccess.from_dataclass(
-                data.network_access, deployment_id=data.id
-            ),
-            revision=ModelRevision.from_dataclass(data.revision) if data.revision else None,
-            default_deployment_strategy=DeploymentStrategyGQL(
-                type=DeploymentStrategyTypeGQL(data.default_deployment_strategy)
-            ),
-            replica_state=ReplicaState(
-                desired_replica_count=data.replica_state.desired_replica_count,
-                _deployment_id=data.id,
-            ),
-            _created_user_id=data.created_user_id,
-            _deployment_id=data.id,
-        )
+        return cast(list[Self | None], results)
 
 
 # Filter Types
-@strawberry.input(description="Added in 25.19.0")
-class DeploymentStatusFilter:
+@gql_pydantic_input(
+    BackendAIGQLMeta(description="", added_version="25.19.0"),
+)
+class DeploymentStatusFilter(PydanticInputMixin[DeploymentStatusFilterDTO]):
     in_: list[DeploymentStatusGQL] | None = strawberry.field(name="in", default=None)
     equals: DeploymentStatusGQL | None = None
 
 
-@strawberry.input(description="Added in 25.19.0")
-class DeploymentFilter(GQLFilter):
+@gql_pydantic_input(
+    BackendAIGQLMeta(description="", added_version="25.19.0"),
+    name="DeploymentFilter",
+)
+class DeploymentFilter(PydanticInputMixin[DeploymentFilterDTO]):
     name: StringFilter | None = None
     status: DeploymentStatusFilter | None = None
     open_to_public: bool | None = None
     tags: StringFilter | None = None
     endpoint_url: StringFilter | None = None
-    ids_in: strawberry.Private[Sequence[UUID] | None] = None
 
-    AND: list[DeploymentFilter] | None = None
-    OR: list[DeploymentFilter] | None = None
-    NOT: list[DeploymentFilter] | None = None
-
-    @override
-    def build_conditions(self) -> list[QueryCondition]:
-        """Build query conditions from this filter.
-
-        Returns a list of QueryCondition callables that can be applied to SQLAlchemy queries.
-        """
-        field_conditions: list[QueryCondition] = []
-
-        # Apply name filter
-        if self.name:
-            name_condition = self.name.build_query_condition(
-                contains_factory=DeploymentConditions.by_name_contains,
-                equals_factory=DeploymentConditions.by_name_equals,
-                starts_with_factory=DeploymentConditions.by_name_starts_with,
-                ends_with_factory=DeploymentConditions.by_name_ends_with,
-            )
-            if name_condition:
-                field_conditions.append(name_condition)
-
-        # Apply status filter
-        if self.status:
-            if self.status.in_ is not None:
-                statuses = [ModelDeploymentStatus(s) for s in self.status.in_]
-                field_conditions.append(DeploymentConditions.by_status_in(statuses))
-            elif self.status.equals is not None:
-                field_conditions.append(
-                    DeploymentConditions.by_status_equals(ModelDeploymentStatus(self.status.equals))
-                )
-
-        # Apply open_to_public filter
-        if self.open_to_public is not None:
-            field_conditions.append(DeploymentConditions.by_open_to_public(self.open_to_public))
-
-        # Apply tags filter
-        if self.tags:
-            tags_condition = self.tags.build_query_condition(
-                contains_factory=DeploymentConditions.by_tag_contains,
-                equals_factory=DeploymentConditions.by_tag_equals,
-                starts_with_factory=DeploymentConditions.by_tag_starts_with,
-                ends_with_factory=DeploymentConditions.by_tag_ends_with,
-            )
-            if tags_condition:
-                field_conditions.append(tags_condition)
-
-        # Apply endpoint_url filter
-        if self.endpoint_url:
-            url_condition = self.endpoint_url.build_query_condition(
-                contains_factory=DeploymentConditions.by_url_contains,
-                equals_factory=DeploymentConditions.by_url_equals,
-                starts_with_factory=DeploymentConditions.by_url_starts_with,
-                ends_with_factory=DeploymentConditions.by_url_ends_with,
-            )
-            if url_condition:
-                field_conditions.append(url_condition)
-
-        # Apply ids_in filter (internal use)
-        if self.ids_in:
-            field_conditions.append(DeploymentConditions.by_ids(self.ids_in))
-
-        # Handle AND logical operator - these are implicitly ANDed with field conditions
-        if self.AND:
-            for sub_filter in self.AND:
-                field_conditions.extend(sub_filter.build_conditions())
-
-        # Handle OR logical operator
-        if self.OR:
-            or_sub_conditions: list[QueryCondition] = []
-            for sub_filter in self.OR:
-                or_sub_conditions.extend(sub_filter.build_conditions())
-            if or_sub_conditions:
-                field_conditions.append(combine_conditions_or(or_sub_conditions))
-
-        # Handle NOT logical operator
-        if self.NOT:
-            not_sub_conditions: list[QueryCondition] = []
-            for sub_filter in self.NOT:
-                not_sub_conditions.extend(sub_filter.build_conditions())
-            if not_sub_conditions:
-                field_conditions.append(negate_conditions(not_sub_conditions))
-
-        return field_conditions
+    AND: list[Self] | None = None
+    OR: list[Self] | None = None
+    NOT: list[Self] | None = None
 
 
-@strawberry.input(description="Added in 25.19.0")
-class DeploymentOrderBy(GQLOrderBy):
+@gql_pydantic_input(
+    BackendAIGQLMeta(description="", added_version="25.19.0"),
+)
+class DeploymentOrderBy(PydanticInputMixin[DeploymentOrderDTO]):
     field: DeploymentOrderField
     direction: OrderDirection = OrderDirection.DESC
 
-    @override
-    def to_query_order(self) -> QueryOrder:
-        """Convert to repository QueryOrder."""
-        ascending = self.direction == OrderDirection.ASC
-        match self.field:
-            case DeploymentOrderField.NAME:
-                return DeploymentOrders.name(ascending)
-            case DeploymentOrderField.CREATED_AT:
-                return DeploymentOrders.created_at(ascending)
-            case DeploymentOrderField.UPDATED_AT:
-                return DeploymentOrders.updated_at(ascending)
-
 
 # Payload Types
-@strawberry.type(description="Added in 25.19.0")
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version="25.19.0", description="Payload for creating a model deployment."
+    ),
+    model=CreateDeploymentPayloadDTO,
+)
 class CreateDeploymentPayload:
     deployment: ModelDeployment
 
 
-@strawberry.type(description="Added in 25.19.0")
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version="25.19.0", description="Payload for updating a model deployment."
+    ),
+    model=UpdateDeploymentPayloadDTO,
+)
 class UpdateDeploymentPayload:
     deployment: ModelDeployment
 
 
-@strawberry.type(description="Added in 25.19.0")
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version="25.19.0", description="Payload for deleting a model deployment."
+    ),
+    model=DeleteDeploymentPayloadDTO,
+)
 class DeleteDeploymentPayload:
     id: ID
 
 
-@strawberry.type(description="Added in 25.19.0")
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version="25.19.0", description="Payload for deployment status changed event."
+    ),
+    model=DeploymentStatusChangedPayloadDTO,
+)
 class DeploymentStatusChangedPayload:
     deployment: ModelDeployment
 
 
 # Input Types
-@strawberry.input(description="Added in 25.19.0")
-class ModelDeploymentMetadataInput:
+@gql_pydantic_input(
+    BackendAIGQLMeta(description="", added_version="25.19.0"),
+)
+class ModelDeploymentMetadataInput(PydanticInputMixin[ModelDeploymentMetadataInputDTO]):
     project_id: ID
     domain_name: str
     name: str | None = None
     tags: list[str] | None = None
 
 
-@strawberry.input(description="Added in 25.19.0")
-class ModelDeploymentNetworkAccessInput:
+@gql_pydantic_input(
+    BackendAIGQLMeta(description="", added_version="25.19.0"),
+)
+class ModelDeploymentNetworkAccessInput(PydanticInputMixin[ModelDeploymentNetworkAccessInputDTO]):
     preferred_domain_name: str | None = None
     open_to_public: bool = False
 
-    def to_network_spec(self) -> DeploymentNetworkSpec:
-        return DeploymentNetworkSpec(
-            open_to_public=self.open_to_public,
-            preferred_domain_name=self.preferred_domain_name,
-        )
 
-
-@strawberry.input(
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description="Deployment strategy configuration with discriminator pattern.",
+        added_version="25.19.0",
+    ),
     name="DeploymentStrategyInput",
-    description="Added in 25.19.0. Deployment strategy configuration with discriminator pattern.",
 )
-class DeploymentStrategyInputGQL:
+class DeploymentStrategyInputGQL(PydanticInputMixin[DeploymentStrategyInputDTO]):
     """Deployment strategy input with type discriminator and optional config fields.
 
     The `type` field determines which config field should be provided:
@@ -603,144 +540,36 @@ class DeploymentStrategyInputGQL:
     rolling_update: RollingUpdateConfigInputGQL | None = None
     blue_green: BlueGreenConfigInputGQL | None = None
 
-    def validate(self) -> None:
-        """Validate that the appropriate config is provided for the strategy type."""
-        if self.type == DeploymentStrategy.ROLLING and not self.rolling_update:
-            raise InvalidAPIParameters("rolling_update config required for ROLLING strategy")
-        if self.type == DeploymentStrategy.BLUE_GREEN and not self.blue_green:
-            raise InvalidAPIParameters("blue_green config required for BLUE_GREEN strategy")
 
-    def to_policy_config(self) -> DeploymentPolicyConfig:
-        """Convert to DeploymentPolicyConfig for service layer."""
-        self.validate()
-        strategy = DeploymentStrategy(self.type.value)
-        match strategy:
-            case DeploymentStrategy.ROLLING:
-                if self.rolling_update is None:
-                    raise InvalidAPIParameters("rolling_update config required but not provided")
-                return DeploymentPolicyConfig(
-                    strategy=strategy,
-                    strategy_spec=self.rolling_update.to_spec(),
-                    rollback_on_failure=self.rollback_on_failure,
-                )
-            case DeploymentStrategy.BLUE_GREEN:
-                if self.blue_green is None:
-                    raise InvalidAPIParameters("blue_green config required but not provided")
-                return DeploymentPolicyConfig(
-                    strategy=strategy,
-                    strategy_spec=self.blue_green.to_spec(),
-                    rollback_on_failure=self.rollback_on_failure,
-                )
-
-
-@strawberry.input(description="Added in 25.19.0")
-class CreateDeploymentInput:
+@gql_pydantic_input(
+    BackendAIGQLMeta(description="", added_version="25.19.0"),
+)
+class CreateDeploymentInput(PydanticInputMixin[CreateDeploymentInputDTO]):
     metadata: ModelDeploymentMetadataInput
     network_access: ModelDeploymentNetworkAccessInput
     default_deployment_strategy: DeploymentStrategyInputGQL
     desired_replica_count: int
     initial_revision: CreateRevisionInput
 
-    def to_creator(self) -> NewDeploymentCreator:
-        name = self.metadata.name or f"deployment-{uuid4().hex[:8]}"
-        tag = ",".join(self.metadata.tags) if self.metadata.tags else None
-        user_data = current_user()
-        if user_data is None:
-            raise UserNotFound("User not found in context")
-        metadata_for_creator = DeploymentMetadata(
-            name=name,
-            domain=self.metadata.domain_name,
-            project=UUID(str(self.metadata.project_id)),
-            resource_group=self.initial_revision.resource_config.resource_group.name,
-            created_user=user_data.user_id,
-            session_owner=user_data.user_id,
-            created_at=None,
-            revision_history_limit=10,
-            tag=tag,
-        )
-        return NewDeploymentCreator(
-            metadata=metadata_for_creator,
-            replica_spec=ReplicaSpec(replica_count=self.desired_replica_count),
-            network=self.network_access.to_network_spec(),
-            model_revision=self.initial_revision.to_model_revision_creator(),
-            policy=self.default_deployment_strategy.to_policy_config(),
-        )
 
-
-@strawberry.input(description="Added in 25.19.0")
-class UpdateDeploymentInput:
+@gql_pydantic_input(
+    BackendAIGQLMeta(description="", added_version="25.19.0"),
+)
+class UpdateDeploymentInput(PydanticInputMixin[UpdateDeploymentInputDTO]):
     id: ID
-    open_to_public: bool | None = None
-    tags: list[str] | None = None
-    default_deployment_strategy: DeploymentStrategyInputGQL | None = None
-    active_revision_id: ID | None = None
-    desired_replica_count: int | None = None
-    name: str | None = None
-    preferred_domain_name: str | None = None
-
-    def to_updater(self, deployment_id: UUID) -> Updater[EndpointRow]:
-        """Convert input to deployment updater."""
-        # Build metadata sub-spec if any metadata fields are provided
-        metadata_spec: DeploymentMetadataUpdaterSpec | None = None
-        if self.name is not None or self.tags is not None:
-            # Convert tags list to comma-separated string for tag column
-            tag_str: str | None = None
-            if self.tags is not None:
-                tag_str = ",".join(self.tags)
-            metadata_spec = DeploymentMetadataUpdaterSpec(
-                name=OptionalState[str].from_graphql(self.name),
-                tag=TriState[str].from_graphql(tag_str),
-            )
-
-        # Build replica spec sub-spec if any replica fields are provided
-        replica_spec: ReplicaSpecUpdaterSpec | None = None
-        if self.desired_replica_count is not None:
-            replica_spec = ReplicaSpecUpdaterSpec(
-                desired_replica_count=OptionalState[int].from_graphql(self.desired_replica_count),
-            )
-
-        # Build network sub-spec if any network fields are provided
-        network_spec: DeploymentNetworkSpecUpdaterSpec | None = None
-        if self.open_to_public is not None:
-            network_spec = DeploymentNetworkSpecUpdaterSpec(
-                open_to_public=OptionalState[bool].from_graphql(self.open_to_public),
-            )
-
-        # Build revision state sub-spec if any revision fields are provided
-        revision_state_spec: RevisionStateUpdaterSpec | None = None
-        if self.active_revision_id is not None:
-            active_revision_uuid = UUID(self.active_revision_id)
-            revision_state_spec = RevisionStateUpdaterSpec(
-                current_revision=TriState[UUID].from_graphql(active_revision_uuid),
-            )
-
-        spec = DeploymentUpdaterSpec(
-            metadata=metadata_spec,
-            replica_spec=replica_spec,
-            network=network_spec,
-            revision_state=revision_state_spec,
-        )
-        return Updater(spec=spec, pk_value=deployment_id)
-
-    def to_policy_updater_spec(self) -> DeploymentPolicyUpdaterSpec | None:
-        """Convert deployment strategy input to policy updater spec.
-
-        Returns None if no deployment_strategy is provided (no policy update).
-        """
-        if self.default_deployment_strategy is None:
-            return None
-
-        # Validate and convert
-        creator = self.default_deployment_strategy.to_policy_config()
-        return DeploymentPolicyUpdaterSpec(
-            strategy=OptionalState.update(creator.strategy),
-            strategy_spec=OptionalState.update(creator.strategy_spec),
-            rollback_on_failure=OptionalState.update(creator.rollback_on_failure),
-        )
+    open_to_public: bool | None = UNSET
+    tags: list[str] | None = UNSET
+    default_deployment_strategy: DeploymentStrategyInputGQL | None = UNSET
+    active_revision_id: ID | None = UNSET
+    desired_replica_count: int | None = UNSET
+    name: str | None = UNSET
+    preferred_domain_name: str | None = UNSET
 
 
-@strawberry.input(description="Added in 25.19.0")
-class DeleteDeploymentInput:
+@gql_pydantic_input(
+    BackendAIGQLMeta(description="", added_version="25.19.0"),
+)
+class DeleteDeploymentInput(PydanticInputMixin[DeleteDeploymentInputDTO]):
     id: ID
 
 
@@ -748,7 +577,9 @@ ModelDeploymentEdge = Edge[ModelDeployment]
 
 
 # Connection types for Relay support
-@strawberry.type(description="Added in 25.19.0")
+@gql_connection_type(
+    BackendAIGQLMeta(added_version="25.19.0", description="Connection for model deployments.")
+)
 class ModelDeploymentConnection(Connection[ModelDeployment]):
     count: int
 
@@ -758,11 +589,20 @@ class ModelDeploymentConnection(Connection[ModelDeployment]):
 
 
 # Sync replica types
-@strawberry.input(description="Added in 25.19.0")
-class SyncReplicaInput:
+@gql_pydantic_input(
+    BackendAIGQLMeta(description="", added_version="25.19.0"),
+)
+class SyncReplicaInput(PydanticInputMixin[SyncReplicaInputDTO]):
     model_deployment_id: ID
 
 
-@strawberry.type(description="Added in 25.19.0")
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version="25.19.0", description="Payload for replica sync mutation result."
+    ),
+    model=SyncReplicaPayloadDTO,
+)
 class SyncReplicaPayload:
-    success: bool
+    """Payload for replica sync mutation result."""
+
+    success: strawberry.auto

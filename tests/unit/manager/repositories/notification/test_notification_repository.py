@@ -37,6 +37,11 @@ from ai.backend.manager.models.notification import (
     NotificationChannelRow,
     NotificationRuleRow,
 )
+from ai.backend.manager.models.notification.conditions import (
+    NotificationChannelConditions,
+    NotificationRuleConditions,
+)
+from ai.backend.manager.models.notification.orders import NotificationChannelOrders
 from ai.backend.manager.models.rbac_models import UserRoleRow
 from ai.backend.manager.models.rbac_models.association_scopes_entities import (
     AssociationScopesEntitiesRow,
@@ -66,11 +71,6 @@ from ai.backend.manager.repositories.notification import NotificationRepository
 from ai.backend.manager.repositories.notification.creators import (
     NotificationChannelCreatorSpec,
     NotificationRuleCreatorSpec,
-)
-from ai.backend.manager.repositories.notification.options import (
-    NotificationChannelConditions,
-    NotificationChannelOrders,
-    NotificationRuleConditions,
 )
 from ai.backend.manager.repositories.notification.updaters import (
     NotificationChannelUpdaterSpec,

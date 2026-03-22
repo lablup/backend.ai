@@ -3,12 +3,12 @@
 from __future__ import annotations
 
 import ipaddress
-from typing import cast
 from uuid import UUID
 
 import strawberry
 from strawberry import Info
 
+from ai.backend.common.api_handlers import Sentinel
 from ai.backend.common.contexts.client_ip import current_client_ip
 from ai.backend.common.contexts.user import current_user
 from ai.backend.common.exception import InvalidIpAddressValue, UnreachableError
@@ -16,13 +16,11 @@ from ai.backend.common.types import ReadableCIDR
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.api.gql.user.types import (
     BulkCreateUsersV2PayloadGQL,
-    BulkCreateUserV2ErrorGQL,
     BulkCreateUserV2InputGQL,
     BulkPurgeUsersV2InputGQL,
     BulkPurgeUsersV2PayloadGQL,
     BulkPurgeUserV2ErrorGQL,
     BulkUpdateUsersV2PayloadGQL,
-    BulkUpdateUserV2ErrorGQL,
     BulkUpdateUserV2InputGQL,
     CreateUserInputGQL,
     CreateUserPayloadGQL,
@@ -35,7 +33,6 @@ from ai.backend.manager.api.gql.user.types import (
     UpdateMyAllowedClientIPPayloadGQL,
     UpdateUserPayloadGQL,
     UpdateUserV2InputGQL,
-    UserV2GQL,
 )
 from ai.backend.manager.api.gql.utils import check_admin_only
 from ai.backend.manager.data.user.types import UserStatus
@@ -50,7 +47,6 @@ from ai.backend.manager.services.user.actions.create_user import (
     BulkCreateUserAction,
     UserCreateSpec,
 )
-from ai.backend.manager.services.user.actions.get_user import GetUserAction
 from ai.backend.manager.services.user.actions.modify_user import (
     BulkModifyUserAction,
     ModifyUserAction,
@@ -116,53 +112,40 @@ async def admin_bulk_create_users_v2(
     # Build list of UserCreateSpec from input
     items: list[UserCreateSpec] = []
     for user_input in input.users:
+        dto = user_input.to_pydantic()
         password_info = PasswordInfo(
-            password=user_input.password,
+            password=dto.password,
             algorithm=auth_config.password_hash_algorithm,
             rounds=auth_config.password_hash_rounds,
             salt_size=auth_config.password_hash_salt_size,
         )
 
         spec = UserCreatorSpec(
-            email=user_input.email,
-            username=user_input.username,
+            email=dto.email,
+            username=dto.username,
             password=password_info,
-            need_password_change=user_input.need_password_change,
-            domain_name=user_input.domain_name,
-            full_name=user_input.full_name,
-            description=user_input.description,
-            status=UserStatus(user_input.status.value),
-            role=user_input.role.value,
-            allowed_client_ip=user_input.allowed_client_ip,
-            totp_activated=user_input.totp_activated,
-            resource_policy=user_input.resource_policy,
-            sudo_session_enabled=user_input.sudo_session_enabled,
-            container_uid=user_input.container_uid,
-            container_main_gid=user_input.container_main_gid,
-            container_gids=user_input.container_gids,
+            need_password_change=dto.need_password_change,
+            domain_name=dto.domain_name,
+            full_name=dto.full_name,
+            description=dto.description,
+            status=UserStatus(dto.status),
+            role=str(dto.role),
+            allowed_client_ip=dto.allowed_client_ip,
+            totp_activated=dto.totp_activated,
+            resource_policy=dto.resource_policy,
+            sudo_session_enabled=dto.sudo_session_enabled,
+            container_uid=dto.container_uid,
+            container_main_gid=dto.container_main_gid,
+            container_gids=dto.container_gids,
         )
 
-        group_ids = [str(gid) for gid in user_input.group_ids] if user_input.group_ids else None
+        group_ids = [str(gid) for gid in dto.group_ids] if dto.group_ids else None
         items.append(UserCreateSpec(creator=Creator(spec=spec), group_ids=group_ids))
 
     action = BulkCreateUserAction(items=items)
-    result = await ctx.processors.user.bulk_create_users.wait_for_complete(action)
+    payload = await ctx.adapters.user.bulk_create_users(action)
 
-    created_users = [UserV2GQL.from_data(user_data) for user_data in result.data.successes]
-    failed = [
-        BulkCreateUserV2ErrorGQL(
-            index=error.index,
-            username=cast(UserCreatorSpec, error.spec).username,
-            email=cast(UserCreatorSpec, error.spec).email,
-            message=str(error.exception),
-        )
-        for error in result.data.failures
-    ]
-
-    return BulkCreateUsersV2PayloadGQL(
-        created_users=created_users,
-        failed=failed,
-    )
+    return BulkCreateUsersV2PayloadGQL.from_pydantic(payload)
 
 
 # Update Mutations
@@ -223,54 +206,108 @@ async def admin_bulk_update_users_v2(
 
     items: list[UserUpdateSpec] = []
     for user_item in input.users:
-        user_input = user_item.input
+        dto = user_item.input.to_pydantic()
 
         updater_spec = UserUpdaterSpec(
-            username=OptionalState.from_graphql(user_input.username),
-            password=OptionalState.from_graphql(user_input.password).map(
-                lambda pw: PasswordInfo(
-                    password=pw,
-                    algorithm=auth_config.password_hash_algorithm,
-                    rounds=auth_config.password_hash_rounds,
-                    salt_size=auth_config.password_hash_salt_size,
-                )
+            username=(
+                OptionalState.update(dto.username)
+                if dto.username is not None
+                else OptionalState.nop()
             ),
-            need_password_change=OptionalState.from_graphql(user_input.need_password_change),
-            full_name=OptionalState.from_graphql(user_input.full_name),
-            description=OptionalState.from_graphql(user_input.description),
-            status=OptionalState.from_graphql(user_input.status).map(lambda s: UserStatus(s.value)),
-            domain_name=OptionalState.from_graphql(user_input.domain_name),
-            role=OptionalState.from_graphql(user_input.role).map(lambda r: UserRole(r.value)),
-            allowed_client_ip=TriState.from_graphql(user_input.allowed_client_ip),
-            resource_policy=OptionalState.from_graphql(user_input.resource_policy),
-            sudo_session_enabled=OptionalState.from_graphql(user_input.sudo_session_enabled),
-            main_access_key=TriState.from_graphql(user_input.main_access_key),
-            container_uid=TriState.from_graphql(user_input.container_uid),
-            container_main_gid=TriState.from_graphql(user_input.container_main_gid),
-            container_gids=TriState.from_graphql(user_input.container_gids),
-            group_ids=OptionalState.from_graphql(user_input.group_ids).map(
-                lambda gids: [str(gid) for gid in gids]
+            password=(
+                OptionalState.update(
+                    PasswordInfo(
+                        password=dto.password,
+                        algorithm=auth_config.password_hash_algorithm,
+                        rounds=auth_config.password_hash_rounds,
+                        salt_size=auth_config.password_hash_salt_size,
+                    )
+                )
+                if dto.password is not None
+                else OptionalState.nop()
+            ),
+            need_password_change=(
+                OptionalState.update(dto.need_password_change)
+                if dto.need_password_change is not None
+                else OptionalState.nop()
+            ),
+            full_name=(
+                TriState.nop()
+                if isinstance(dto.full_name, Sentinel)
+                else TriState.nullify()
+                if dto.full_name is None
+                else TriState.update(dto.full_name)
+            ),
+            description=(
+                TriState.nop()
+                if isinstance(dto.description, Sentinel)
+                else TriState.nullify()
+                if dto.description is None
+                else TriState.update(dto.description)
+            ),
+            status=(
+                OptionalState.update(UserStatus(dto.status))
+                if dto.status is not None
+                else OptionalState.nop()
+            ),
+            domain_name=(
+                OptionalState.update(dto.domain_name)
+                if dto.domain_name is not None
+                else OptionalState.nop()
+            ),
+            role=(
+                OptionalState.update(UserRole(dto.role))
+                if dto.role is not None
+                else OptionalState.nop()
+            ),
+            allowed_client_ip=(
+                TriState.nop()
+                if isinstance(dto.allowed_client_ip, Sentinel)
+                else TriState.from_graphql(dto.allowed_client_ip)
+            ),
+            resource_policy=(
+                OptionalState.update(dto.resource_policy)
+                if dto.resource_policy is not None
+                else OptionalState.nop()
+            ),
+            sudo_session_enabled=(
+                OptionalState.update(dto.sudo_session_enabled)
+                if dto.sudo_session_enabled is not None
+                else OptionalState.nop()
+            ),
+            main_access_key=(
+                TriState.nop()
+                if isinstance(dto.main_access_key, Sentinel)
+                else TriState.from_graphql(dto.main_access_key)
+            ),
+            container_uid=(
+                TriState.nop()
+                if isinstance(dto.container_uid, Sentinel)
+                else TriState.from_graphql(dto.container_uid)
+            ),
+            container_main_gid=(
+                TriState.nop()
+                if isinstance(dto.container_main_gid, Sentinel)
+                else TriState.from_graphql(dto.container_main_gid)
+            ),
+            container_gids=(
+                TriState.nop()
+                if isinstance(dto.container_gids, Sentinel)
+                else TriState.from_graphql(dto.container_gids)
+            ),
+            group_ids=(
+                OptionalState.nop()
+                if isinstance(dto.group_ids, Sentinel) or dto.group_ids is None
+                else OptionalState.update([str(gid) for gid in dto.group_ids])
             ),
         )
 
         items.append(UserUpdateSpec(user_id=user_item.user_id, updater_spec=updater_spec))
 
     action = BulkModifyUserAction(items=items)
-    result = await ctx.processors.user.bulk_modify_users.wait_for_complete(action)
+    payload = await ctx.adapters.user.bulk_modify_users(action)
 
-    updated_users = [UserV2GQL.from_data(user_data) for user_data in result.data.successes]
-    failed = [
-        BulkUpdateUserV2ErrorGQL(
-            user_id=items[error.index].user_id,
-            message=str(error.exception),
-        )
-        for error in result.data.failures
-    ]
-
-    return BulkUpdateUsersV2PayloadGQL(
-        updated_users=updated_users,
-        failed=failed,
-    )
+    return BulkUpdateUsersV2PayloadGQL.from_pydantic(payload)
 
 
 @strawberry.mutation(
@@ -428,18 +465,18 @@ async def admin_bulk_purge_users_v2(
             else OptionalState.nop()
         ),
     )
-    result = await ctx.processors.user.bulk_purge_users.wait_for_complete(action)
+    payload = await ctx.adapters.user.bulk_purge_users(action)
 
     failed = [
         BulkPurgeUserV2ErrorGQL(
             user_id=error.user_id,
-            message=str(error.exception),
+            message=error.message,
         )
-        for error in result.data.failures
+        for error in payload.failed
     ]
 
     return BulkPurgeUsersV2PayloadGQL(
-        purged_count=result.data.purged_count(),
+        purged_count=payload.purged_count,
         failed=failed,
     )
 
@@ -466,10 +503,8 @@ async def update_my_allowed_client_ip(
     ctx = info.context
 
     # Get user email (needed for ModifyUserAction)
-    user_result = await ctx.processors.user.get_user.wait_for_complete(
-        GetUserAction(user_uuid=me.user_id)
-    )
-    email = user_result.user.email
+    user_payload = await ctx.adapters.user.get(me.user_id)
+    email = user_payload.user.basic_info.email
 
     new_allowlist = input.allowed_client_ip
 
@@ -522,6 +557,6 @@ async def update_my_allowed_client_ip(
         email=email,
         updater=Updater(spec=updater_spec, pk_value=email),
     )
-    await ctx.processors.user.modify_user.wait_for_complete(action)
+    await ctx.adapters.user.modify_user(action)
 
     return UpdateMyAllowedClientIPPayloadGQL(success=True)

@@ -2,30 +2,40 @@
 
 from __future__ import annotations
 
-import enum
 from datetime import datetime
 from enum import StrEnum
 from typing import Self
 
 import strawberry
-from strawberry.relay import Node, NodeID
+from strawberry.relay import NodeID
 from strawberry.scalars import JSON
 
-from ai.backend.common.types import ServiceCatalogStatus
-from ai.backend.manager.api.gql.base import OrderDirection
-from ai.backend.manager.api.gql.types import GQLFilter, GQLOrderBy
+from ai.backend.common.dto.manager.v2.service_catalog.request import (
+    ServiceCatalogFilter as ServiceCatalogFilterDTO,
+)
+from ai.backend.common.dto.manager.v2.service_catalog.request import (
+    ServiceCatalogOrder as ServiceCatalogOrderDTO,
+)
+from ai.backend.common.dto.manager.v2.service_catalog.response import ServiceCatalogNode
+from ai.backend.common.dto.manager.v2.service_catalog.types import (
+    EndpointInfo,
+)
+from ai.backend.common.dto.manager.v2.service_catalog.types import (
+    ServiceCatalogStatusFilter as ServiceCatalogStatusFilterDTO,
+)
+from ai.backend.manager.api.gql.base import OrderDirection, StringFilter
+from ai.backend.manager.api.gql.decorators import (
+    BackendAIGQLMeta,
+    gql_node_type,
+    gql_pydantic_input,
+    gql_pydantic_type,
+)
+from ai.backend.manager.api.gql.pydantic_compat import (
+    PydanticInputMixin,
+    PydanticNodeMixin,
+    PydanticOutputMixin,
+)
 from ai.backend.manager.api.gql.utils import dedent_strip
-from ai.backend.manager.data.service_catalog.types import (
-    ServiceCatalogData,
-    ServiceCatalogEndpointData,
-)
-from ai.backend.manager.models.service_catalog.row import ServiceCatalogRow
-from ai.backend.manager.repositories.base import (
-    QueryCondition,
-    QueryOrder,
-    combine_conditions_or,
-    negate_conditions,
-)
 
 __all__ = (
     "ServiceCatalogEndpointGQL",
@@ -33,6 +43,7 @@ __all__ = (
     "ServiceCatalogGQL",
     "ServiceCatalogOrderByGQL",
     "ServiceCatalogOrderFieldGQL",
+    "ServiceCatalogStatusFilterGQL",
     "ServiceCatalogStatusGQL",
 )
 
@@ -46,22 +57,16 @@ class ServiceCatalogStatusGQL(StrEnum):
     UNHEALTHY = "unhealthy"
     DEREGISTERED = "deregistered"
 
-    @classmethod
-    def from_status(cls, status: ServiceCatalogStatus) -> ServiceCatalogStatusGQL:
-        match status:
-            case ServiceCatalogStatus.HEALTHY:
-                return cls.HEALTHY
-            case ServiceCatalogStatus.UNHEALTHY:
-                return cls.UNHEALTHY
-            case ServiceCatalogStatus.DEREGISTERED:
-                return cls.DEREGISTERED
 
-
-@strawberry.type(
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version="26.3.0",
+        description="An endpoint exposed by a service instance.",
+    ),
+    model=EndpointInfo,
     name="ServiceCatalogEndpoint",
-    description="Added in 26.3.0. An endpoint exposed by a service instance.",
 )
-class ServiceCatalogEndpointGQL:
+class ServiceCatalogEndpointGQL(PydanticOutputMixin[EndpointInfo]):
     role: str = strawberry.field(description="Role of this endpoint (e.g., 'main', 'health').")
     scope: str = strawberry.field(
         description="Network scope (e.g., 'public', 'private', 'internal')."
@@ -71,23 +76,15 @@ class ServiceCatalogEndpointGQL:
     protocol: str = strawberry.field(description="Protocol (e.g., 'grpc', 'http', 'https').")
     metadata: JSON | None = strawberry.field(description="Additional metadata.", default=None)
 
-    @classmethod
-    def from_data(cls, data: ServiceCatalogEndpointData) -> Self:
-        return cls(
-            role=data.role,
-            scope=data.scope,
-            address=data.address,
-            port=data.port,
-            protocol=data.protocol,
-            metadata=data.metadata,
-        )
 
-
-@strawberry.type(
+@gql_node_type(
+    BackendAIGQLMeta(
+        added_version="26.3.0",
+        description="A registered service instance in the catalog.",
+    ),
     name="ServiceCatalog",
-    description="Added in 26.3.0. A registered service instance in the catalog.",
 )
-class ServiceCatalogGQL(Node):
+class ServiceCatalogGQL(PydanticNodeMixin[ServiceCatalogNode]):
     id: NodeID[str] = strawberry.field(description="Relay-style global node ID.")
     service_group: str = strawberry.field(
         description=dedent_strip("""
@@ -107,105 +104,70 @@ class ServiceCatalogGQL(Node):
         description="Endpoints exposed by this service instance."
     )
 
-    @classmethod
-    def from_data(cls, data: ServiceCatalogData) -> Self:
-        return cls(
-            id=str(data.id),
-            service_group=data.service_group,
-            instance_id=data.instance_id,
-            display_name=data.display_name,
-            version=data.version,
-            labels=data.labels,
-            status=ServiceCatalogStatusGQL.from_status(data.status),
-            startup_time=data.startup_time,
-            registered_at=data.registered_at,
-            last_heartbeat=data.last_heartbeat,
-            config_hash=data.config_hash,
-            endpoints=[ServiceCatalogEndpointGQL.from_data(ep) for ep in data.endpoints],
-        )
-
 
 @strawberry.enum(
     name="ServiceCatalogOrderField",
     description="Added in 26.3.0. Fields available for ordering service catalog queries.",
 )
-class ServiceCatalogOrderFieldGQL(enum.Enum):
-    SERVICE_GROUP = "SERVICE_GROUP"
-    REGISTERED_AT = "REGISTERED_AT"
+class ServiceCatalogOrderFieldGQL(StrEnum):
+    SERVICE_GROUP = "service_group"
+    REGISTERED_AT = "registered_at"
 
 
-@strawberry.input(
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description="Specifies the field and direction for ordering service catalog queries.",
+        added_version="26.3.0",
+    ),
     name="ServiceCatalogOrderBy",
-    description="Added in 26.3.0. Specifies the field and direction for ordering service catalog queries.",
 )
-class ServiceCatalogOrderByGQL(GQLOrderBy):
+class ServiceCatalogOrderByGQL(PydanticInputMixin[ServiceCatalogOrderDTO]):
     field: ServiceCatalogOrderFieldGQL
     direction: OrderDirection = OrderDirection.ASC
 
-    def to_query_order(self) -> QueryOrder:
-        """Convert to repository QueryOrder."""
-        ascending = self.direction == OrderDirection.ASC
-        match self.field:
-            case ServiceCatalogOrderFieldGQL.SERVICE_GROUP:
-                return (
-                    ServiceCatalogRow.service_group.asc()
-                    if ascending
-                    else ServiceCatalogRow.service_group.desc()
-                )
-            case ServiceCatalogOrderFieldGQL.REGISTERED_AT:
-                return (
-                    ServiceCatalogRow.registered_at.asc()
-                    if ascending
-                    else ServiceCatalogRow.registered_at.desc()
-                )
 
-
-@strawberry.input(
-    name="ServiceCatalogFilter",
-    description="Added in 26.3.0. Filter for service catalog queries.",
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description="Filter for ServiceCatalogStatus enum fields. Supports equals, in, not_equals, and not_in operations.",
+        added_version="26.3.0",
+    ),
+    name="ServiceCatalogStatusFilter",
 )
-class ServiceCatalogFilterGQL(GQLFilter):
-    service_group: str | None = strawberry.field(
+class ServiceCatalogStatusFilterGQL(PydanticInputMixin[ServiceCatalogStatusFilterDTO]):
+    """Filter for service catalog status enum fields."""
+
+    equals: ServiceCatalogStatusGQL | None = strawberry.field(
         default=None,
-        description="Filter by service group name (exact match).",
+        description="Exact match for service catalog status.",
     )
-    status: ServiceCatalogStatusGQL | None = strawberry.field(
+    in_: list[ServiceCatalogStatusGQL] | None = strawberry.field(
+        name="in",
         default=None,
-        description="Filter by health status.",
+        description="Match any of the provided statuses.",
     )
-    AND: list[ServiceCatalogFilterGQL] | None = None
-    OR: list[ServiceCatalogFilterGQL] | None = None
-    NOT: list[ServiceCatalogFilterGQL] | None = None
+    not_equals: ServiceCatalogStatusGQL | None = strawberry.field(
+        default=None,
+        description="Exclude exact status match.",
+    )
+    not_in: list[ServiceCatalogStatusGQL] | None = strawberry.field(
+        default=None,
+        description="Exclude any of the provided statuses.",
+    )
 
-    def build_conditions(self) -> list[QueryCondition]:
-        """Build query conditions from filter fields."""
-        conditions: list[QueryCondition] = []
-        if self.service_group is not None:
-            group = self.service_group
-            conditions.append(lambda: ServiceCatalogRow.service_group == group)
-        if self.status is not None:
-            status_val = ServiceCatalogStatus(self.status.value)
-            conditions.append(lambda: ServiceCatalogRow.status == status_val)
 
-        # Handle AND logical operator
-        if self.AND:
-            for sub_filter in self.AND:
-                conditions.extend(sub_filter.build_conditions())
-
-        # Handle OR logical operator
-        if self.OR:
-            or_sub_conditions: list[QueryCondition] = []
-            for sub_filter in self.OR:
-                or_sub_conditions.extend(sub_filter.build_conditions())
-            if or_sub_conditions:
-                conditions.append(combine_conditions_or(or_sub_conditions))
-
-        # Handle NOT logical operator
-        if self.NOT:
-            not_sub_conditions: list[QueryCondition] = []
-            for sub_filter in self.NOT:
-                not_sub_conditions.extend(sub_filter.build_conditions())
-            if not_sub_conditions:
-                conditions.append(negate_conditions(not_sub_conditions))
-
-        return conditions
+@gql_pydantic_input(
+    BackendAIGQLMeta(description="Filter for service catalog queries.", added_version="26.3.0"),
+    name="ServiceCatalogFilter",
+)
+class ServiceCatalogFilterGQL(PydanticInputMixin[ServiceCatalogFilterDTO]):
+    service_group: StringFilter | None = strawberry.field(
+        default=None,
+        description="Filter by service group name. Supports equals, contains, startsWith, and endsWith.",
+    )
+    status: ServiceCatalogStatusFilterGQL | None = strawberry.field(
+        default=None,
+        description="Filter by health status. Supports equals, in, not_equals, and not_in operations.",
+    )
+    AND: list[Self] | None = None
+    OR: list[Self] | None = None
+    NOT: list[Self] | None = None

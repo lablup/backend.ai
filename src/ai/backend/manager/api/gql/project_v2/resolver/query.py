@@ -6,14 +6,11 @@ from uuid import UUID
 
 import strawberry
 from strawberry import Info
+from strawberry.relay import PageInfo
 
+from ai.backend.common.dto.manager.v2.group.request import AdminSearchGroupsInput
+from ai.backend.manager.api.gql.base import encode_cursor
 from ai.backend.manager.api.gql.domain_v2.types import DomainV2GQL
-from ai.backend.manager.api.gql.project_v2.fetcher import (
-    fetch_admin_projects,
-    fetch_domain_projects,
-    fetch_project,
-    fetch_project_domain,
-)
 from ai.backend.manager.api.gql.project_v2.types import (
     DomainProjectScope,
     ProjectV2Connection,
@@ -21,6 +18,7 @@ from ai.backend.manager.api.gql.project_v2.types import (
     ProjectV2GQL,
     ProjectV2OrderBy,
 )
+from ai.backend.manager.api.gql.project_v2.types.node import ProjectV2Edge
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.api.gql.utils import check_admin_only
 
@@ -34,19 +32,9 @@ async def project_v2(
     info: Info[StrawberryGQLContext],
     project_id: UUID,
 ) -> ProjectV2GQL | None:
-    """Get a single project by UUID.
-
-    Args:
-        info: Strawberry GraphQL context.
-        project_id: UUID of the project to retrieve.
-
-    Returns:
-        ProjectV2GQL object.
-
-    Raises:
-        ProjectNotFound: If the project with the given UUID does not exist.
-    """
-    return await fetch_project(info, project_id=project_id)
+    """Get a single project by UUID."""
+    node = await info.context.adapters.project.get(project_id)
+    return ProjectV2GQL.from_pydantic(node)
 
 
 @strawberry.field(
@@ -66,33 +54,31 @@ async def admin_projects_v2(
     limit: int | None = None,
     offset: int | None = None,
 ) -> ProjectV2Connection | None:
-    """List all projects with optional filtering, ordering, and pagination.
-
-    Args:
-        info: Strawberry GraphQL context.
-        filter: Optional filter criteria.
-        order_by: Optional ordering specification.
-        before: Cursor for backward pagination.
-        after: Cursor for forward pagination.
-        first: Number of items from the start.
-        last: Number of items from the end.
-        limit: Maximum number of items (offset-based).
-        offset: Starting position (offset-based).
-
-    Returns:
-        ProjectV2Connection with paginated project records.
-    """
+    """List all projects with optional filtering, ordering, and pagination."""
     check_admin_only()
-    return await fetch_admin_projects(
-        info,
-        filter=filter,
-        order_by=order_by,
-        before=before,
-        after=after,
-        first=first,
-        last=last,
-        limit=limit,
-        offset=offset,
+    payload = await info.context.adapters.project.admin_search(
+        AdminSearchGroupsInput(
+            filter=filter.to_pydantic() if filter else None,
+            order=[o.to_pydantic() for o in order_by] if order_by else None,
+            first=first,
+            after=after,
+            last=last,
+            before=before,
+            limit=limit,
+            offset=offset,
+        )
+    )
+    nodes = [ProjectV2GQL.from_pydantic(node) for node in payload.items]
+    edges = [ProjectV2Edge(node=node, cursor=encode_cursor(str(node.id))) for node in nodes]
+    return ProjectV2Connection(
+        edges=edges,
+        page_info=PageInfo(
+            has_next_page=payload.has_next_page,
+            has_previous_page=payload.has_previous_page,
+            start_cursor=edges[0].cursor if edges else None,
+            end_cursor=edges[-1].cursor if edges else None,
+        ),
+        count=payload.total_count,
     )
 
 
@@ -114,36 +100,34 @@ async def domain_projects_v2(
     limit: int | None = None,
     offset: int | None = None,
 ) -> ProjectV2Connection | None:
-    """List projects within a specific domain.
-
-    Args:
-        info: Strawberry GraphQL context.
-        scope: Domain scope specifying which domain to query.
-        filter: Optional additional filter criteria.
-        order_by: Optional ordering specification.
-        before: Cursor for backward pagination.
-        after: Cursor for forward pagination.
-        first: Number of items from the start.
-        last: Number of items from the end.
-        limit: Maximum number of items (offset-based).
-        offset: Starting position (offset-based).
-
-    Returns:
-        ProjectV2Connection with paginated project records from the domain.
-    """
+    """List projects within a specific domain."""
     from ai.backend.manager.repositories.group.types import DomainProjectSearchScope
 
-    return await fetch_domain_projects(
-        info,
-        scope=DomainProjectSearchScope(domain_name=scope.domain_name),
-        filter=filter,
-        order_by=order_by,
-        before=before,
-        after=after,
-        first=first,
-        last=last,
-        limit=limit,
-        offset=offset,
+    repo_scope = DomainProjectSearchScope(domain_name=scope.domain_name)
+    payload = await info.context.adapters.project.search_by_domain(
+        scope=repo_scope,
+        input=AdminSearchGroupsInput(
+            filter=filter.to_pydantic() if filter else None,
+            order=[o.to_pydantic() for o in order_by] if order_by else None,
+            first=first,
+            after=after,
+            last=last,
+            before=before,
+            limit=limit,
+            offset=offset,
+        ),
+    )
+    nodes = [ProjectV2GQL.from_pydantic(node) for node in payload.items]
+    edges = [ProjectV2Edge(node=node, cursor=encode_cursor(str(node.id))) for node in nodes]
+    return ProjectV2Connection(
+        edges=edges,
+        page_info=PageInfo(
+            has_next_page=payload.has_next_page,
+            has_previous_page=payload.has_previous_page,
+            start_cursor=edges[0].cursor if edges else None,
+            end_cursor=edges[-1].cursor if edges else None,
+        ),
+        count=payload.total_count,
     )
 
 
@@ -157,17 +141,7 @@ async def project_domain_v2(
     info: Info[StrawberryGQLContext],
     project_id: UUID,
 ) -> DomainV2GQL | None:
-    """Get the domain that a project belongs to.
-
-    Args:
-        info: Strawberry GraphQL context.
-        project_id: UUID of the project.
-
-    Returns:
-        DomainV2GQL object for the project's domain.
-
-    Raises:
-        ProjectNotFound: If the project with the given UUID does not exist.
-        DomainNotFound: If the project's domain does not exist.
-    """
-    return await fetch_project_domain(info, project_id=project_id)
+    """Get the domain that a project belongs to."""
+    project_node = await info.context.adapters.project.get(project_id)
+    domain_node = await info.context.adapters.domain.get(project_node.organization.domain_name)
+    return DomainV2GQL.from_pydantic(domain_node)

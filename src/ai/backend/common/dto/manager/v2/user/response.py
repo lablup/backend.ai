@@ -15,10 +15,22 @@ from ai.backend.common.dto.manager.pagination import PaginationInfo
 from ai.backend.common.dto.manager.v2.user.types import UserRole, UserStatus
 
 __all__ = (
+    "AdminSearchUsersPayload",
+    "BulkCreateUserV2Error",
+    "BulkCreateUsersPayload",
+    "BulkPurgeUserV2Error",
+    "BulkPurgeUsersPayload",
+    "BulkUpdateUserV2Error",
+    "BulkUpdateUsersPayload",
+    "CreateUserPayload",
     "DeleteUserPayload",
+    "DeleteUsersPayload",
     "EntityTimestamps",
     "PurgeUserPayload",
+    "PurgeUsersPayload",
     "SearchUsersPayload",
+    "UpdateMyAllowedClientIPPayload",
+    "UpdateUserPayload",
     "UserBasicInfo",
     "UserContainerSettings",
     "UserNode",
@@ -195,9 +207,105 @@ class DeleteUserPayload(BaseResponseModel):
     )
 
 
+class DeleteUsersPayload(BaseResponseModel):
+    """Payload for bulk user soft-delete mutation."""
+
+    deleted_count: int = Field(
+        description="Number of users successfully soft-deleted.",
+    )
+
+
 class PurgeUserPayload(BaseResponseModel):
     """Payload for user permanent deletion mutation."""
 
     success: bool = Field(
         description="Whether the purge was successful.",
     )
+
+
+class PurgeUsersPayload(BaseResponseModel):
+    """Payload for bulk user permanent deletion mutation."""
+
+    purged_count: int = Field(
+        description="Number of users successfully purged.",
+    )
+    failed_user_ids: list[UUID] = Field(
+        description="List of user UUIDs that failed to purge, if any.",
+    )
+
+
+class BulkCreateUserV2Error(BaseResponseModel):
+    """Error information for a single user that failed during bulk creation."""
+
+    index: int = Field(description="Original position in the input list.")
+    username: str = Field(description="Username of the user that failed.")
+    email: str = Field(description="Email of the user that failed.")
+    message: str = Field(description="Error message describing the failure.")
+
+
+class BulkUpdateUserV2Error(BaseResponseModel):
+    """Error information for a single user that failed during bulk update."""
+
+    user_id: UUID = Field(description="UUID of the user that failed to update.")
+    message: str = Field(description="Error message describing the failure.")
+
+
+class BulkPurgeUserV2Error(BaseResponseModel):
+    """Error information for a single user that failed during bulk purge."""
+
+    user_id: UUID = Field(description="UUID of the user that failed to purge.")
+    message: str = Field(description="Error message describing the failure.")
+
+
+class BulkPurgeUsersPayload(BaseResponseModel):
+    """Payload for bulk user permanent deletion mutation."""
+
+    purged_count: int = Field(description="Number of users successfully purged.")
+    failed: list[BulkPurgeUserV2Error] = Field(
+        description="List of errors for users that failed to purge.",
+    )
+
+
+class UpdateMyAllowedClientIPPayload(BaseResponseModel):
+    """Payload for updating the current user's allowed client IP list."""
+
+    success: bool = Field(description="Whether the update was successful.")
+
+
+class CreateUserPayload(BaseResponseModel):
+    """Payload for single user creation mutation."""
+
+    user: UserNode = Field(description="The newly created user.")
+
+
+class UpdateUserPayload(BaseResponseModel):
+    """Payload for user update mutation."""
+
+    user: UserNode = Field(description="The updated user.")
+
+
+class BulkCreateUsersPayload(BaseResponseModel):
+    """Payload for bulk user creation mutation."""
+
+    created_users: list[UserNode] = Field(description="List of successfully created users.")
+    failed: list[BulkCreateUserV2Error] = Field(
+        description="List of errors for users that failed to create."
+    )
+
+
+class BulkUpdateUsersPayload(BaseResponseModel):
+    """Payload for bulk user update mutation."""
+
+    updated_users: list[UserNode] = Field(description="List of successfully updated users.")
+    failed: list[BulkUpdateUserV2Error] = Field(
+        description="List of errors for users that failed to update."
+    )
+
+
+class AdminSearchUsersPayload(BaseResponseModel):
+    """Payload for searching users with cursor-based or offset pagination."""
+
+    items: list[UserNode] = Field(description="List of user nodes matching the query.")
+    total_count: int = Field(description="Total number of users matching the query criteria.")
+    has_next_page: bool = Field(description="Whether there are more items after this page.")
+    has_previous_page: bool = Field(description="Whether there are more items before this page.")

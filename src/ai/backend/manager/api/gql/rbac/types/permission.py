@@ -5,38 +5,54 @@ from __future__ import annotations
 import uuid
 from collections.abc import Iterable
 from enum import StrEnum
-from typing import TYPE_CHECKING, Annotated, Any, Self, override
+from typing import TYPE_CHECKING, Annotated, Any, Self, cast
 
 import strawberry
 from strawberry import ID, Info
-from strawberry.relay import Connection, Edge, Node, NodeID
+from strawberry.relay import Connection, Edge, NodeID
 
-from ai.backend.common.data.permission.types import (
-    OperationType,
-    RBACElementType,
+from ai.backend.common.data.permission.types import RBACElementType
+from ai.backend.common.dto.manager.v2.rbac.request import (
+    CreatePermissionInput as CreatePermissionInputDTO,
+)
+from ai.backend.common.dto.manager.v2.rbac.request import (
+    DeletePermissionInput as DeletePermissionInputDTO,
+)
+from ai.backend.common.dto.manager.v2.rbac.request import (
+    PermissionFilter as PermissionFilterDTO,
+)
+from ai.backend.common.dto.manager.v2.rbac.request import (
+    PermissionOrderBy as PermissionOrderByDTO,
+)
+from ai.backend.common.dto.manager.v2.rbac.request import (
+    UpdatePermissionInput as UpdatePermissionInputDTO,
+)
+from ai.backend.common.dto.manager.v2.rbac.response import (
+    DeletePermissionPayload as DeletePermissionPayloadDTO,
+)
+from ai.backend.common.dto.manager.v2.rbac.response import (
+    PermissionNode as PermissionNodeDTO,
+)
+from ai.backend.common.dto.manager.v2.rbac.response import (
+    ScopeEntityCombinationInfo,
+)
+from ai.backend.common.dto.manager.v2.rbac.types import (
+    OperationTypeDTO,
+    RBACElementTypeDTO,
 )
 from ai.backend.common.types import SessionId
 from ai.backend.manager.api.gql.base import OrderDirection
+from ai.backend.manager.api.gql.decorators import (
+    BackendAIGQLMeta,
+    PydanticInputMixin,
+    gql_connection_type,
+    gql_node_type,
+    gql_pydantic_input,
+    gql_pydantic_type,
+)
+from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin, PydanticOutputMixin
 from ai.backend.manager.api.gql.rbac.types.entity_node import EntityNode
 from ai.backend.manager.api.gql.types import GQLFilter, GQLOrderBy, StrawberryGQLContext
-from ai.backend.manager.data.permission.permission import PermissionData
-from ai.backend.manager.errors.api import InvalidAPIParameters
-from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
-from ai.backend.manager.repositories.base import (
-    QueryCondition,
-    QueryOrder,
-    combine_conditions_or,
-    negate_conditions,
-)
-from ai.backend.manager.repositories.base.creator import Creator
-from ai.backend.manager.repositories.base.updater import Updater
-from ai.backend.manager.repositories.permission_controller.creators import PermissionCreatorSpec
-from ai.backend.manager.repositories.permission_controller.options import (
-    ScopedPermissionConditions,
-    ScopedPermissionOrders,
-)
-from ai.backend.manager.repositories.permission_controller.updaters import PermissionUpdaterSpec
-from ai.backend.manager.types import OptionalState
 
 if TYPE_CHECKING:
     from ai.backend.manager.api.gql.rbac.types.role import RoleGQL
@@ -44,93 +60,17 @@ if TYPE_CHECKING:
 # ==================== Enums ====================
 
 
-@strawberry.enum(
+RBACElementTypeGQL: type[RBACElementTypeDTO] = strawberry.enum(
+    RBACElementTypeDTO,
     name="RBACElementType",
     description="Added in 26.3.0. Unified RBAC element type for scope-entity relationships",
 )
-class RBACElementTypeGQL(StrEnum):
-    # Scope hierarchy
-    DOMAIN = "domain"
-    PROJECT = "project"
-    USER = "user"
 
-    # Root-query-enabled entities (scoped)
-    SESSION = "session"
-    VFOLDER = "vfolder"
-    MODEL_DEPLOYMENT = "model_deployment"
-    KEYPAIR = "keypair"
-    NOTIFICATION_CHANNEL = "notification_channel"
-    NETWORK = "network"
-    RESOURCE_GROUP = "resource_group"
-    CONTAINER_REGISTRY = "container_registry"
-    STORAGE_HOST = "storage_host"
-    AGENT = "agent"
-    KERNEL = "kernel"
-    ROUTING = "routing"
-    IMAGE = "image"
-    ARTIFACT = "artifact"
-    ARTIFACT_REGISTRY = "artifact_registry"
-    SESSION_TEMPLATE = "session_template"
-    APP_CONFIG = "app_config"
-
-    # Root-query-enabled entities (superadmin-only)
-    RESOURCE_PRESET = "resource_preset"
-    USER_RESOURCE_POLICY = "user_resource_policy"
-    KEYPAIR_RESOURCE_POLICY = "keypair_resource_policy"
-    PROJECT_RESOURCE_POLICY = "project_resource_policy"
-    ROLE = "role"
-    AUDIT_LOG = "audit_log"
-    EVENT_LOG = "event_log"
-
-    # Auto-only entities used in permissions
-    NOTIFICATION_RULE = "notification_rule"
-
-    # Auto sub-entities with direct GET APIs
-    DEPLOYMENT_TOKEN = "deployment:token"
-    DEPLOYMENT_POLICY = "deployment:policy"
-    DEPLOYMENT_REVISION = "deployment:revision"
-    IMAGE_ALIAS = "image:alias"
-
-    # Entity-level scopes
-    ARTIFACT_REVISION = "artifact_revision"
-
-    @classmethod
-    def from_element(cls, value: RBACElementType) -> RBACElementTypeGQL:
-        return cls(value.value)
-
-    def to_element(self) -> RBACElementType:
-        return RBACElementType(self.value)
-
-
-@strawberry.enum(name="OperationType", description="Added in 26.3.0. RBAC operation type")
-class OperationTypeGQL(StrEnum):
-    CREATE = "create"
-    READ = "read"
-    UPDATE = "update"
-    SOFT_DELETE = "soft-delete"
-    HARD_DELETE = "hard-delete"
-    GRANT_ALL = "grant:all"
-    GRANT_READ = "grant:read"
-    GRANT_UPDATE = "grant:update"
-    GRANT_SOFT_DELETE = "grant:soft-delete"
-    GRANT_HARD_DELETE = "grant:hard-delete"
-
-    @classmethod
-    def from_internal(cls, value: OperationType) -> OperationTypeGQL:
-        try:
-            return cls(value.value)
-        except ValueError:
-            raise InvalidAPIParameters(
-                extra_msg=f"{value.value!r} is not a valid OperationTypeGQL"
-            ) from None
-
-    def to_internal(self) -> OperationType:
-        try:
-            return OperationType(self.value)
-        except ValueError:
-            raise InvalidAPIParameters(
-                extra_msg=f"{self.value!r} is not a valid OperationType"
-            ) from None
+OperationTypeGQL: type[OperationTypeDTO] = strawberry.enum(
+    OperationTypeDTO,
+    name="OperationType",
+    description="Added in 26.3.0. RBAC operation type",
+)
 
 
 @strawberry.enum(description="Added in 26.3.0. Permission ordering field")
@@ -142,8 +82,11 @@ class PermissionOrderField(StrEnum):
 # ==================== Node Types ====================
 
 
-@strawberry.type(name="Permission", description="Added in 26.3.0. RBAC scoped permission")
-class PermissionGQL(Node):
+@gql_node_type(
+    BackendAIGQLMeta(added_version="26.3.0", description="RBAC scoped permission."),
+    name="Permission",
+)
+class PermissionGQL(PydanticNodeMixin[PermissionNodeDTO]):
     id: NodeID[str]
     role_id: uuid.UUID
     scope_type: RBACElementTypeGQL
@@ -159,10 +102,11 @@ class PermissionGQL(Node):
         node_ids: Iterable[str],
         required: bool = False,
     ) -> Iterable[Self | None]:
+        # DataLoader already returns PermissionGQL | None via from_pydantic conversion
         results = await info.context.data_loaders.permission_loader.load_many([
             uuid.UUID(nid) for nid in node_ids
         ])
-        return [cls.from_dataclass(data) if data is not None else None for data in results]
+        return cast(list[Self | None], results)
 
     @strawberry.field(description="The role this permission belongs to.")  # type: ignore[misc]
     async def role(
@@ -174,12 +118,8 @@ class PermissionGQL(Node):
         ]
         | None
     ):
-        from ai.backend.manager.api.gql.rbac.types.role import RoleGQL
-
-        data = await info.context.data_loaders.role_loader.load(self.role_id)
-        if data is None:
-            return None
-        return RoleGQL.from_dataclass(data)
+        # DataLoader already returns RoleGQL | None via from_pydantic conversion
+        return await info.context.data_loaders.role_loader.load(self.role_id)
 
     @strawberry.field(  # type: ignore[misc]
         description="The scope this permission applies to."
@@ -189,70 +129,34 @@ class PermissionGQL(Node):
         *,
         info: Info[StrawberryGQLContext],
     ) -> EntityNode | None:
-        from ai.backend.manager.api.gql.artifact.types import ArtifactRevision
-        from ai.backend.manager.api.gql.container_registry.types import ContainerRegistryGQL
-        from ai.backend.manager.api.gql.deployment.types.deployment import ModelDeployment
-        from ai.backend.manager.api.gql.domain_v2.types.node import DomainV2GQL
-        from ai.backend.manager.api.gql.project_v2.types.node import ProjectV2GQL
-        from ai.backend.manager.api.gql.rbac.types.role import RoleGQL
-        from ai.backend.manager.api.gql.resource_group.types import ResourceGroupGQL
-        from ai.backend.manager.api.gql.session.types import SessionV2GQL
-        from ai.backend.manager.api.gql.user.types.node import UserV2GQL
-
-        element_type = self.scope_type.to_element()
+        element_type = RBACElementType(self.scope_type.value)
         data_loaders = info.context.data_loaders
         match element_type:
             case RBACElementType.USER:
-                user_data = await data_loaders.user_loader.load(uuid.UUID(self.scope_id))
-                if user_data is None:
-                    return None
-                return UserV2GQL.from_data(user_data)
+                # DataLoader already returns UserV2GQL | None via from_pydantic conversion
+                return await data_loaders.user_loader.load(uuid.UUID(self.scope_id))
             case RBACElementType.PROJECT:
-                project_data = await data_loaders.project_loader.load(uuid.UUID(self.scope_id))
-                if project_data is None:
-                    return None
-                return ProjectV2GQL.from_data(project_data)
+                # DataLoader already returns ProjectV2GQL | None via from_pydantic conversion
+                return await data_loaders.project_loader.load(uuid.UUID(self.scope_id))
             case RBACElementType.DOMAIN:
-                domain_data = await data_loaders.domain_loader.load(self.scope_id)
-                if domain_data is None:
-                    return None
-                return DomainV2GQL.from_data(domain_data)
+                return await data_loaders.domain_loader.load(self.scope_id)
             case RBACElementType.ROLE:
-                role_data = await data_loaders.role_loader.load(uuid.UUID(self.scope_id))
-                if role_data is None:
-                    return None
-                return RoleGQL.from_dataclass(role_data)
+                # DataLoader already returns RoleGQL | None via from_pydantic conversion
+                return await data_loaders.role_loader.load(uuid.UUID(self.scope_id))
             case RBACElementType.RESOURCE_GROUP:
-                rg_data = await data_loaders.resource_group_loader.load(self.scope_id)
-                if rg_data is None:
-                    return None
-                return ResourceGroupGQL.from_dataclass(rg_data)
+                return await data_loaders.resource_group_loader.load(self.scope_id)
             case RBACElementType.MODEL_DEPLOYMENT:
-                deploy_data = await data_loaders.deployment_loader.load(uuid.UUID(self.scope_id))
-                if deploy_data is None:
-                    return None
-                return ModelDeployment.from_dataclass(deploy_data)
+                # DataLoader already returns ModelDeployment | None via from_pydantic conversion
+                return await data_loaders.deployment_loader.load(uuid.UUID(self.scope_id))
             case RBACElementType.ARTIFACT_REVISION:
-                rev_data = await data_loaders.artifact_revision_loader.load(
-                    uuid.UUID(self.scope_id)
-                )
-                if rev_data is None:
-                    return None
-                return ArtifactRevision.from_dataclass(rev_data)
+                # DataLoader already returns ArtifactRevision | None via from_pydantic
+                return await data_loaders.artifact_revision_loader.load(uuid.UUID(self.scope_id))
             case RBACElementType.CONTAINER_REGISTRY:
-                cr_data = await data_loaders.container_registry_loader.load(
-                    uuid.UUID(self.scope_id)
-                )
-                if cr_data is None:
-                    return None
-                return ContainerRegistryGQL.from_data(cr_data)
+                # DataLoader already returns ContainerRegistryGQL | None via from_pydantic
+                return await data_loaders.container_registry_loader.load(uuid.UUID(self.scope_id))
             case RBACElementType.SESSION:
-                session_data = await data_loaders.session_loader.load(
-                    SessionId(uuid.UUID(self.scope_id))
-                )
-                if session_data is None:
-                    return None
-                return SessionV2GQL.from_data(session_data)
+                # DataLoader already returns SessionV2GQL | None via from_pydantic conversion
+                return await data_loaders.session_loader.load(SessionId(uuid.UUID(self.scope_id)))
             case (
                 RBACElementType.VFOLDER
                 | RBACElementType.KEYPAIR
@@ -281,23 +185,15 @@ class PermissionGQL(Node):
             ):
                 return None
 
-    @classmethod
-    def from_dataclass(cls, data: PermissionData) -> Self:
-        return cls(
-            id=ID(str(data.id)),
-            role_id=data.role_id,
-            scope_type=RBACElementTypeGQL.from_element(data.scope_type.to_element()),
-            scope_id=data.scope_id,
-            entity_type=RBACElementTypeGQL.from_element(data.entity_type.to_element()),
-            operation=OperationTypeGQL.from_internal(data.operation),
-        )
-
 
 # ==================== Filter Types ====================
 
 
-@strawberry.input(description="Added in 26.3.0. Filter for scoped permissions")
-class PermissionFilter(GQLFilter):
+@gql_pydantic_input(
+    BackendAIGQLMeta(description="Filter for scoped permissions", added_version="26.3.0"),
+    name="PermissionFilter",
+)
+class PermissionFilter(PydanticInputMixin[PermissionFilterDTO], GQLFilter):
     role_id: uuid.UUID | None = None
     scope_type: RBACElementTypeGQL | None = None
     entity_type: RBACElementTypeGQL | None = None
@@ -305,147 +201,76 @@ class PermissionFilter(GQLFilter):
     OR: list[Self] | None = None
     NOT: list[Self] | None = None
 
-    @override
-    def build_conditions(self) -> list[QueryCondition]:
-        conditions: list[QueryCondition] = []
-
-        if self.role_id is not None:
-            conditions.append(ScopedPermissionConditions.by_role_id(self.role_id))
-
-        if self.scope_type is not None:
-            conditions.append(
-                ScopedPermissionConditions.by_scope_type(
-                    self.scope_type.to_element().to_scope_type()
-                )
-            )
-
-        if self.entity_type is not None:
-            conditions.append(
-                ScopedPermissionConditions.by_entity_type(
-                    self.entity_type.to_element().to_entity_type()
-                )
-            )
-
-        # Handle AND logical operator
-        if self.AND:
-            for sub_filter in self.AND:
-                conditions.extend(sub_filter.build_conditions())
-
-        # Handle OR logical operator
-        if self.OR:
-            or_sub_conditions: list[QueryCondition] = []
-            for sub_filter in self.OR:
-                or_sub_conditions.extend(sub_filter.build_conditions())
-            if or_sub_conditions:
-                conditions.append(combine_conditions_or(or_sub_conditions))
-
-        # Handle NOT logical operator
-        if self.NOT:
-            not_sub_conditions: list[QueryCondition] = []
-            for sub_filter in self.NOT:
-                not_sub_conditions.extend(sub_filter.build_conditions())
-            if not_sub_conditions:
-                conditions.append(negate_conditions(not_sub_conditions))
-
-        return conditions
-
 
 # ==================== OrderBy Types ====================
 
 
-@strawberry.input(description="Added in 26.3.0. Order by specification for permissions")
-class PermissionOrderBy(GQLOrderBy):
+@gql_pydantic_input(
+    BackendAIGQLMeta(description="Order by specification for permissions", added_version="26.3.0"),
+    name="PermissionOrderBy",
+)
+class PermissionOrderBy(PydanticInputMixin[PermissionOrderByDTO], GQLOrderBy):
     field: PermissionOrderField
     direction: OrderDirection = OrderDirection.DESC
-
-    @override
-    def to_query_order(self) -> QueryOrder:
-        ascending = self.direction == OrderDirection.ASC
-        match self.field:
-            case PermissionOrderField.ID:
-                return ScopedPermissionOrders.id(ascending)
-            case PermissionOrderField.ENTITY_TYPE:
-                return ScopedPermissionOrders.entity_type(ascending)
 
 
 # ==================== Input Types ====================
 
 
-@strawberry.input(description="Added in 26.3.0. Input for creating a scoped permission")
-class CreatePermissionInput:
+@gql_pydantic_input(
+    BackendAIGQLMeta(description="Input for creating a scoped permission", added_version="26.3.0"),
+)
+class CreatePermissionInput(PydanticInputMixin[CreatePermissionInputDTO]):
     role_id: uuid.UUID
     scope_type: RBACElementTypeGQL
     scope_id: str
     entity_type: RBACElementTypeGQL
     operation: OperationTypeGQL
 
-    def to_creator(self) -> Creator[PermissionRow]:
-        return Creator(
-            spec=PermissionCreatorSpec(
-                role_id=self.role_id,
-                scope_type=self.scope_type.to_element().to_scope_type(),
-                scope_id=self.scope_id,
-                entity_type=self.entity_type.to_element().to_entity_type(),
-                operation=self.operation.to_internal(),
-            )
-        )
 
-
-@strawberry.input(description="Added in 26.3.0. Input for updating a scoped permission")
-class UpdatePermissionInput:
+@gql_pydantic_input(
+    BackendAIGQLMeta(description="Input for updating a scoped permission", added_version="26.3.0"),
+)
+class UpdatePermissionInput(PydanticInputMixin[UpdatePermissionInputDTO]):
     id: uuid.UUID
     scope_type: RBACElementTypeGQL | None = None
     scope_id: str | None = None
     entity_type: RBACElementTypeGQL | None = None
     operation: OperationTypeGQL | None = None
 
-    def to_updater(self) -> Updater[PermissionRow]:
-        spec = PermissionUpdaterSpec(
-            scope_type=(
-                OptionalState.update(self.scope_type.to_element().to_scope_type())
-                if self.scope_type is not None
-                else OptionalState.nop()
-            ),
-            scope_id=(
-                OptionalState.update(self.scope_id)
-                if self.scope_id is not None
-                else OptionalState.nop()
-            ),
-            entity_type=(
-                OptionalState.update(self.entity_type.to_element().to_entity_type())
-                if self.entity_type is not None
-                else OptionalState.nop()
-            ),
-            operation=(
-                OptionalState.update(self.operation.to_internal())
-                if self.operation is not None
-                else OptionalState.nop()
-            ),
-        )
-        return Updater(spec=spec, pk_value=self.id)
 
-
-@strawberry.input(description="Added in 26.3.0. Input for deleting a scoped permission")
-class DeletePermissionInput:
+@gql_pydantic_input(
+    BackendAIGQLMeta(description="Input for deleting a scoped permission", added_version="26.3.0"),
+)
+class DeletePermissionInput(PydanticInputMixin[DeletePermissionInputDTO]):
     id: uuid.UUID
 
 
 # ==================== Payload Types ====================
 
 
-@strawberry.type(description="Added in 26.3.0. Payload for delete permission mutation")
-class DeletePermissionPayload:
-    id: ID
+@gql_pydantic_type(
+    BackendAIGQLMeta(added_version="26.3.0", description="Payload for delete permission mutation."),
+    model=DeletePermissionPayloadDTO,
+    fields=["id"],
+    name="DeletePermissionPayload",
+)
+class DeletePermissionPayload(PydanticOutputMixin[DeletePermissionPayloadDTO]):
+    id: ID = strawberry.field(description="ID of the deleted permission.")
 
 
 # ==================== Connection Types ====================
 
 
-@strawberry.type(
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version="26.3.0",
+        description="Valid scope-entity type combination for RBAC permissions.",
+    ),
+    model=ScopeEntityCombinationInfo,
     name="ScopeEntityCombination",
-    description="Added in 26.3.0. Valid scope-entity type combination for RBAC permissions.",
 )
-class ScopeEntityCombinationGQL:
+class ScopeEntityCombinationGQL(PydanticOutputMixin[ScopeEntityCombinationInfo]):
     scope_type: RBACElementTypeGQL
     valid_entity_types: list[RBACElementTypeGQL]
 
@@ -453,7 +278,7 @@ class ScopeEntityCombinationGQL:
 PermissionEdge = Edge[PermissionGQL]
 
 
-@strawberry.type(description="Added in 26.3.0. Permission connection")
+@gql_connection_type(BackendAIGQLMeta(added_version="26.3.0", description="Permission connection."))
 class PermissionConnection(Connection[PermissionGQL]):
     count: int
 

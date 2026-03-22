@@ -8,10 +8,13 @@ from decimal import Decimal
 from enum import StrEnum
 
 from ai.backend.common.api_handlers import BaseResponseModel
+from ai.backend.common.dto.manager.v2.common import OrderDirection
 
 __all__ = (
     "ImageLabelInfo",
     "ImageOrderField",
+    "ImagePermissionType",
+    "ImageResourceLimitGQLInfo",
     "ImageResourceLimitInfo",
     "ImageStatusType",
     "ImageTagInfo",
@@ -33,13 +36,6 @@ class ImageTypeEnum(StrEnum):
     COMPUTE = "compute"
     SYSTEM = "system"
     SERVICE = "service"
-
-
-class OrderDirection(StrEnum):
-    """Order direction for sorting."""
-
-    ASC = "asc"
-    DESC = "desc"
 
 
 class ImageOrderField(StrEnum):
@@ -70,3 +66,17 @@ class ImageResourceLimitInfo(BaseResponseModel):
     key: str
     min: Decimal
     max: Decimal | None
+
+
+class ImageResourceLimitGQLInfo(BaseResponseModel):
+    """Resource limit definition for GQL type (min/max as str for display)."""
+
+    key: str
+    min: str
+    max: str
+
+
+class ImagePermissionType(BaseResponseModel):
+    """A single permission entry for an image."""
+
+    value: str

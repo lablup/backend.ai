@@ -105,27 +105,33 @@ class TestUpdateObjectStorageInput:
     """Tests for UpdateObjectStorageInput model."""
 
     def test_default_region_is_sentinel(self) -> None:
-        req = UpdateObjectStorageInput()
+        req = UpdateObjectStorageInput(id=uuid.uuid4())
         assert req.region is SENTINEL
         assert isinstance(req.region, Sentinel)
 
     def test_region_none_clears_field(self) -> None:
-        req = UpdateObjectStorageInput(region=None)
+        req = UpdateObjectStorageInput(id=uuid.uuid4(), region=None)
         assert req.region is None
 
     def test_region_string_updates_field(self) -> None:
-        req = UpdateObjectStorageInput(region="eu-west-1")
+        req = UpdateObjectStorageInput(id=uuid.uuid4(), region="eu-west-1")
         assert req.region == "eu-west-1"
 
     def test_all_none_fields_valid(self) -> None:
         req = UpdateObjectStorageInput(
-            name=None, host=None, access_key=None, secret_key=None, endpoint=None, region=None
+            id=uuid.uuid4(),
+            name=None,
+            host=None,
+            access_key=None,
+            secret_key=None,
+            endpoint=None,
+            region=None,
         )
         assert req.name is None
         assert req.host is None
 
     def test_partial_update_name_only(self) -> None:
-        req = UpdateObjectStorageInput(name="new-name")
+        req = UpdateObjectStorageInput(id=uuid.uuid4(), name="new-name")
         assert req.name == "new-name"
         assert req.host is None
 

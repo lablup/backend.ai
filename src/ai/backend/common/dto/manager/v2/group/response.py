@@ -15,6 +15,7 @@ from ai.backend.common.dto.manager.pagination import PaginationInfo
 from ai.backend.common.dto.manager.v2.group.types import ProjectType
 
 __all__ = (
+    "AdminSearchGroupsPayload",
     "DeleteProjectPayload",
     "ProjectBasicInfo",
     "ProjectLifecycleInfo",
@@ -157,3 +158,12 @@ class PurgeProjectPayload(BaseResponseModel):
     purged: bool = Field(
         description="Whether the purge was successful.",
     )
+
+
+class AdminSearchGroupsPayload(BaseResponseModel):
+    """Payload for admin-scoped paginated group search results."""
+
+    items: list[ProjectNode] = Field(description="List of group nodes.")
+    total_count: int = Field(description="Total number of groups matching the filter.")
+    has_next_page: bool = Field(description="Whether there is a next page.")
+    has_previous_page: bool = Field(description="Whether there is a previous page.")

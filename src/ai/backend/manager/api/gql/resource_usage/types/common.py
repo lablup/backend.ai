@@ -7,17 +7,25 @@ from enum import StrEnum
 
 import strawberry
 
-
-@strawberry.type(
-    name="UsageBucketMetadata",
-    description=(
-        "Added in 26.1.0. Common metadata for usage bucket records including "
-        "the measurement period and timestamps."
-    ),
+from ai.backend.common.dto.manager.v2.resource_usage.response import (
+    UsageBucketMetadataNode as UsageBucketMetadataNodeDTO,
 )
-class UsageBucketMetadataGQL:
-    """Common metadata for usage bucket records."""
+from ai.backend.manager.api.gql.decorators import BackendAIGQLMeta, gql_pydantic_type
+from ai.backend.manager.api.gql.pydantic_compat import PydanticOutputMixin
 
+
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version="26.1.0",
+        description=(
+            "Common metadata for usage bucket records including "
+            "the measurement period and timestamps."
+        ),
+    ),
+    model=UsageBucketMetadataNodeDTO,
+    name="UsageBucketMetadata",
+)
+class UsageBucketMetadataGQL(PydanticOutputMixin[UsageBucketMetadataNodeDTO]):
     period_start: date = strawberry.field(
         description="Start date of the usage measurement period (inclusive)."
     )

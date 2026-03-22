@@ -21,7 +21,9 @@ from ai.backend.common.dto.manager.v2.user.types import (
     OrderDirection,
     UserOrderField,
     UserRole,
+    UserRoleFilter,
     UserStatus,
+    UserStatusFilter,
 )
 
 
@@ -314,13 +316,15 @@ class TestUserFilter:
         assert f.status is None
         assert f.role is None
 
-    def test_status_list_filter(self) -> None:
-        f = UserFilter(status=[UserStatus.ACTIVE, UserStatus.INACTIVE])
-        assert f.status == [UserStatus.ACTIVE, UserStatus.INACTIVE]
+    def test_status_filter(self) -> None:
+        f = UserFilter(status=UserStatusFilter(in_=[UserStatus.ACTIVE, UserStatus.INACTIVE]))
+        assert f.status is not None
+        assert f.status.in_ == [UserStatus.ACTIVE, UserStatus.INACTIVE]
 
-    def test_role_list_filter(self) -> None:
-        f = UserFilter(role=[UserRole.ADMIN, UserRole.SUPERADMIN])
-        assert f.role == [UserRole.ADMIN, UserRole.SUPERADMIN]
+    def test_role_filter(self) -> None:
+        f = UserFilter(role=UserRoleFilter(in_=[UserRole.ADMIN, UserRole.SUPERADMIN]))
+        assert f.role is not None
+        assert f.role.in_ == [UserRole.ADMIN, UserRole.SUPERADMIN]
 
 
 class TestUserOrder:
@@ -366,13 +370,14 @@ class TestSearchUsersRequest:
 
     def test_with_filter_and_order(self) -> None:
         req = SearchUsersRequest(
-            filter=UserFilter(status=[UserStatus.ACTIVE]),
+            filter=UserFilter(status=UserStatusFilter(equals=UserStatus.ACTIVE)),
             order=[UserOrder(field=UserOrderField.EMAIL, direction=OrderDirection.ASC)],
             limit=10,
             offset=5,
         )
         assert req.filter is not None
-        assert req.filter.status == [UserStatus.ACTIVE]
+        assert req.filter.status is not None
+        assert req.filter.status.equals == UserStatus.ACTIVE
         assert req.order is not None
         assert len(req.order) == 1
         assert req.limit == 10
@@ -380,12 +385,13 @@ class TestSearchUsersRequest:
 
     def test_round_trip(self) -> None:
         req = SearchUsersRequest(
-            filter=UserFilter(role=[UserRole.ADMIN]),
+            filter=UserFilter(role=UserRoleFilter(equals=UserRole.ADMIN)),
             limit=20,
             offset=0,
         )
         json_data = req.model_dump_json()
         restored = SearchUsersRequest.model_validate_json(json_data)
         assert restored.filter is not None
-        assert restored.filter.role == [UserRole.ADMIN]
+        assert restored.filter.role is not None
+        assert restored.filter.role.equals == UserRole.ADMIN
         assert restored.limit == 20

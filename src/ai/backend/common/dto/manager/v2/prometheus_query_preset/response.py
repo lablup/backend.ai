@@ -21,12 +21,17 @@ __all__ = (
     "ModifyQueryDefinitionPayload",
     "DeleteQueryDefinitionPayload",
     "GetQueryDefinitionPayload",
-    # Search payload
+    # Search payloads
+    "AdminSearchQueryDefinitionsPayload",
     "SearchQueryDefinitionsPayload",
     # Execute payloads
     "QueryDefinitionMetricResultInfo",
     "QueryDefinitionExecuteDataInfo",
     "ExecuteQueryDefinitionPayload",
+    # GQL-layer sub-models
+    "QueryDefinitionResultInfo",
+    "CreateQueryDefinitionGQLPayload",
+    "ModifyQueryDefinitionGQLPayload",
 )
 
 
@@ -67,6 +72,15 @@ class GetQueryDefinitionPayload(BaseResponseModel):
     item: QueryDefinitionNode | None = Field(default=None, description="Query definition data")
 
 
+class AdminSearchQueryDefinitionsPayload(BaseResponseModel):
+    """Payload for admin-scoped paginated query definition search results."""
+
+    items: list[QueryDefinitionNode] = Field(description="List of query definition nodes.")
+    total_count: int = Field(description="Total number of query definitions matching the filter.")
+    has_next_page: bool = Field(description="Whether there is a next page.")
+    has_previous_page: bool = Field(description="Whether there is a previous page.")
+
+
 class SearchQueryDefinitionsPayload(BaseResponseModel):
     """Payload for searching query definitions."""
 
@@ -95,3 +109,23 @@ class ExecuteQueryDefinitionPayload(BaseResponseModel):
 
     status: str = Field(description="Prometheus query status (e.g. 'success')")
     data: QueryDefinitionExecuteDataInfo = Field(description="Query execution data")
+
+
+class QueryDefinitionResultInfo(BaseResponseModel):
+    """GQL-layer result DTO for executing a query definition."""
+
+    status: str = Field(description="Prometheus response status.")
+    result_type: str = Field(description="Result type (e.g., matrix).")
+    result: list[QueryDefinitionMetricResultInfo] = Field(description="Metric result entries.")
+
+
+class CreateQueryDefinitionGQLPayload(BaseResponseModel):
+    """GQL-layer payload returned after creating a query definition."""
+
+    preset: QueryDefinitionNode = Field(description="Created query definition.")
+
+
+class ModifyQueryDefinitionGQLPayload(BaseResponseModel):
+    """GQL-layer payload returned after modifying a query definition."""
+
+    preset: QueryDefinitionNode = Field(description="Updated query definition.")

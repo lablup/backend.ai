@@ -77,19 +77,17 @@ from ai.backend.manager.data.deployment.upserter import DeploymentPolicyUpserter
 from ai.backend.manager.errors.api import InvalidAPIParameters
 from ai.backend.manager.errors.deployment import IncompleteRevisionData
 from ai.backend.manager.models.deployment_policy import BlueGreenSpec, RollingUpdateSpec
+from ai.backend.manager.models.deployment_revision.conditions import RevisionConditions
+from ai.backend.manager.models.deployment_revision.orders import RevisionOrders
+from ai.backend.manager.models.endpoint.conditions import DeploymentConditions
+from ai.backend.manager.models.endpoint.orders import DeploymentOrders
+from ai.backend.manager.models.routing.conditions import RouteConditions
+from ai.backend.manager.models.routing.orders import RouteOrders
 from ai.backend.manager.repositories.base import (
     BatchQuerier,
     OffsetPagination,
     QueryCondition,
     QueryOrder,
-)
-from ai.backend.manager.repositories.deployment.options import (
-    DeploymentConditions,
-    DeploymentOrders,
-    RevisionConditions,
-    RevisionOrders,
-    RouteConditions,
-    RouteOrders,
 )
 
 __all__ = (
