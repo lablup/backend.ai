@@ -59,7 +59,7 @@ class MetricLabelEntryGQL(PydanticOutputMixin[MetricLabelEntryInfo]):
     ),
     model=MetricValueInfo,
     all_fields=True,
-    name="MetricResultValue",
+    name="QueryDefinitionMetricResultValue",
 )
 class MetricResultValueGQL(PydanticOutputMixin[MetricValueInfo]):
     pass

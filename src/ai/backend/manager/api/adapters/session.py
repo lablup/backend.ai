@@ -6,6 +6,7 @@ from collections.abc import Sequence
 from decimal import Decimal
 from uuid import UUID
 
+from ai.backend.common.contexts.user import current_user
 from ai.backend.common.dto.manager.v2.deployment.types import (
     EnvironmentVariableEntryInfoDTO,
     EnvironmentVariablesInfoDTO,
@@ -142,6 +143,17 @@ _KERNEL_PAGINATION_SPEC = PaginationSpec(
 class SessionAdapter(BaseAdapter):
     """Adapter for session and kernel domain operations."""
 
+    @staticmethod
+    def _require_user_id() -> UUID:
+        """Return the current user's UUID from request context.
+
+        Raises RuntimeError if called outside a request context.
+        """
+        user = current_user()
+        if user is None:
+            raise RuntimeError("SessionAdapter requires an authenticated user in context")
+        return user.user_id
+
     # -------------------------------------------------------------------------
     # Batch load (DataLoader)
     # -------------------------------------------------------------------------
@@ -158,7 +170,7 @@ class SessionAdapter(BaseAdapter):
             conditions=[SessionConditions.by_ids(session_ids)],
         )
         action_result = await self._processors.session.search_sessions.wait_for_complete(
-            SearchSessionsAction(querier=querier)
+            SearchSessionsAction(querier=querier, user_id=self._require_user_id())
         )
         session_map: dict[SessionId, SessionNode] = {
             SessionId(data.id): self._session_data_to_node(data) for data in action_result.data
@@ -179,7 +191,7 @@ class SessionAdapter(BaseAdapter):
             conditions=[KernelConditions.by_ids(kernel_ids)],
         )
         action_result = await self._processors.session.search_kernels.wait_for_complete(
-            SearchKernelsAction(querier=querier)
+            SearchKernelsAction(querier=querier, user_id=self._require_user_id())
         )
         kernel_map: dict[KernelId, KernelNode] = {
             info.id: self._kernel_info_to_node(info) for info in action_result.data
@@ -210,7 +222,7 @@ class SessionAdapter(BaseAdapter):
         )
 
         action_result = await self._processors.session.search_sessions.wait_for_complete(
-            SearchSessionsAction(querier=querier)
+            SearchSessionsAction(querier=querier, user_id=self._require_user_id())
         )
 
         return AdminSearchSessionsPayload(
@@ -243,7 +255,7 @@ class SessionAdapter(BaseAdapter):
         )
 
         action_result = await self._processors.session.search_sessions.wait_for_complete(
-            SearchSessionsAction(querier=querier)
+            SearchSessionsAction(querier=querier, user_id=self._require_user_id())
         )
 
         return AdminSearchSessionsPayload(
@@ -344,7 +356,7 @@ class SessionAdapter(BaseAdapter):
         )
 
         action_result = await self._processors.session.search_kernels.wait_for_complete(
-            SearchKernelsAction(querier=querier)
+            SearchKernelsAction(querier=querier, user_id=self._require_user_id())
         )
 
         return AdminSearchKernelsPayload(
@@ -377,7 +389,7 @@ class SessionAdapter(BaseAdapter):
         )
 
         action_result = await self._processors.session.search_kernels.wait_for_complete(
-            SearchKernelsAction(querier=querier)
+            SearchKernelsAction(querier=querier, user_id=self._require_user_id())
         )
 
         return AdminSearchKernelsPayload(
@@ -410,7 +422,7 @@ class SessionAdapter(BaseAdapter):
         )
 
         action_result = await self._processors.session.search_kernels.wait_for_complete(
-            SearchKernelsAction(querier=querier)
+            SearchKernelsAction(querier=querier, user_id=self._require_user_id())
         )
 
         return AdminSearchKernelsPayload(

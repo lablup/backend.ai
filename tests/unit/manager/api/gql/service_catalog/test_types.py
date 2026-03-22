@@ -24,19 +24,16 @@ from ai.backend.manager.api.gql.service_catalog.types import (
 
 
 class TestServiceCatalogStatusGQL:
-    """Tests for ServiceCatalogStatusGQL enum."""
+    """Tests for ServiceCatalogStatusGQL enum value alignment with ServiceCatalogStatus."""
 
-    def test_from_status_healthy(self) -> None:
-        result = ServiceCatalogStatusGQL.from_status(ServiceCatalogStatus.HEALTHY)
-        assert result == ServiceCatalogStatusGQL.HEALTHY
+    def test_healthy_value_matches(self) -> None:
+        assert ServiceCatalogStatus.HEALTHY.value == ServiceCatalogStatusGQL.HEALTHY.value
 
-    def test_from_status_unhealthy(self) -> None:
-        result = ServiceCatalogStatusGQL.from_status(ServiceCatalogStatus.UNHEALTHY)
-        assert result == ServiceCatalogStatusGQL.UNHEALTHY
+    def test_unhealthy_value_matches(self) -> None:
+        assert ServiceCatalogStatus.UNHEALTHY.value == ServiceCatalogStatusGQL.UNHEALTHY.value
 
-    def test_from_status_deregistered(self) -> None:
-        result = ServiceCatalogStatusGQL.from_status(ServiceCatalogStatus.DEREGISTERED)
-        assert result == ServiceCatalogStatusGQL.DEREGISTERED
+    def test_deregistered_value_matches(self) -> None:
+        assert ServiceCatalogStatus.DEREGISTERED.value == ServiceCatalogStatusGQL.DEREGISTERED.value
 
 
 class TestServiceCatalogEndpointGQL:

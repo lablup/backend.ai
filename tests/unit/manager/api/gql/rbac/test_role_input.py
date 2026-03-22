@@ -1,167 +1,140 @@
-"""Unit tests for UpdateRoleInput.to_updater()."""
+"""Unit tests for UpdateRoleInput.to_pydantic()."""
 
 from __future__ import annotations
 
 import uuid
 
+from ai.backend.common.api_handlers import SENTINEL
 from ai.backend.common.data.permission.types import RoleStatus
+from ai.backend.common.dto.manager.v2.rbac.request import UpdateRoleInput as UpdateRoleInputDTO
 from ai.backend.manager.api.gql.rbac.types.role import RoleStatusGQL, UpdateRoleInput
-from ai.backend.manager.repositories.permission_controller.updaters import RoleUpdaterSpec
-from ai.backend.manager.types import _TriStateEnum
 
 
-class TestUpdateRoleInputToUpdater:
-    """Tests for UpdateRoleInput.to_updater() method."""
+class TestUpdateRoleInputToPydantic:
+    """Tests for UpdateRoleInput.to_pydantic() method."""
 
-    def test_description_with_none_creates_nullify_tristate(self) -> None:
-        """UpdateRoleInput with description=None → TriState.nullify() in updater spec."""
+    def test_description_with_none_produces_none_in_dto(self) -> None:
+        """UpdateRoleInput with description=None → dto.description is None (clear)."""
         role_input = UpdateRoleInput(
             id=uuid.uuid4(),
             description=None,
         )
 
-        updater = role_input.to_updater()
-        spec = updater.spec
-        assert isinstance(spec, RoleUpdaterSpec)
+        dto = role_input.to_pydantic()
+        assert isinstance(dto, UpdateRoleInputDTO)
+        assert dto.description is None
 
-        assert spec.description._state == _TriStateEnum.NULLIFY
-
-    def test_description_with_unset_creates_nop_tristate(self) -> None:
-        """UpdateRoleInput with description=UNSET → TriState.nop() in updater spec."""
+    def test_description_with_unset_produces_sentinel_in_dto(self) -> None:
+        """UpdateRoleInput with description=UNSET → dto.description is SENTINEL (no change)."""
         role_input = UpdateRoleInput(
             id=uuid.uuid4(),
             # description is omitted (UNSET by default)
         )
 
-        updater = role_input.to_updater()
-        spec = updater.spec
-        assert isinstance(spec, RoleUpdaterSpec)
+        dto = role_input.to_pydantic()
+        assert isinstance(dto, UpdateRoleInputDTO)
+        assert dto.description is SENTINEL
 
-        assert spec.description._state == _TriStateEnum.NOP
-
-    def test_description_with_string_creates_update_tristate(self) -> None:
-        """UpdateRoleInput with description="text" → TriState.update("text") in updater spec."""
+    def test_description_with_string_produces_string_in_dto(self) -> None:
+        """UpdateRoleInput with description="text" → dto.description == "text"."""
         role_input = UpdateRoleInput(
             id=uuid.uuid4(),
             description="some text",
         )
 
-        updater = role_input.to_updater()
-        spec = updater.spec
-        assert isinstance(spec, RoleUpdaterSpec)
+        dto = role_input.to_pydantic()
+        assert isinstance(dto, UpdateRoleInputDTO)
+        assert dto.description == "some text"
 
-        assert spec.description._state == _TriStateEnum.UPDATE
-        assert spec.description.value() == "some text"
-
-    def test_name_with_unset_creates_nop_optionalstate(self) -> None:
-        """UpdateRoleInput with name=UNSET → OptionalState.nop() in updater spec."""
+    def test_name_with_unset_produces_none_in_dto(self) -> None:
+        """UpdateRoleInput with name=UNSET → dto.name is None (no change)."""
         role_input = UpdateRoleInput(
             id=uuid.uuid4(),
             # name is omitted (UNSET by default)
         )
 
-        updater = role_input.to_updater()
-        spec = updater.spec
-        assert isinstance(spec, RoleUpdaterSpec)
+        dto = role_input.to_pydantic()
+        assert isinstance(dto, UpdateRoleInputDTO)
+        assert dto.name is None
 
-        assert spec.name._state == _TriStateEnum.NOP
-
-    def test_name_with_string_creates_update_optionalstate(self) -> None:
-        """UpdateRoleInput with name="new name" → OptionalState.update("new name") in updater spec."""
+    def test_name_with_string_produces_string_in_dto(self) -> None:
+        """UpdateRoleInput with name="new name" → dto.name == "new name"."""
         role_input = UpdateRoleInput(
             id=uuid.uuid4(),
             name="new name",
         )
 
-        updater = role_input.to_updater()
-        spec = updater.spec
-        assert isinstance(spec, RoleUpdaterSpec)
+        dto = role_input.to_pydantic()
+        assert isinstance(dto, UpdateRoleInputDTO)
+        assert dto.name == "new name"
 
-        assert spec.name._state == _TriStateEnum.UPDATE
-        assert spec.name.value() == "new name"
-
-    def test_status_with_unset_creates_nop_optionalstate(self) -> None:
-        """UpdateRoleInput with status=UNSET → OptionalState.nop() in updater spec."""
+    def test_status_with_unset_produces_none_in_dto(self) -> None:
+        """UpdateRoleInput with status=UNSET → dto.status is None (no change)."""
         role_input = UpdateRoleInput(
             id=uuid.uuid4(),
             # status is omitted (UNSET by default)
         )
 
-        updater = role_input.to_updater()
-        spec = updater.spec
-        assert isinstance(spec, RoleUpdaterSpec)
+        dto = role_input.to_pydantic()
+        assert isinstance(dto, UpdateRoleInputDTO)
+        assert dto.status is None
 
-        assert spec.status._state == _TriStateEnum.NOP
-
-    def test_status_with_active_creates_update_optionalstate(self) -> None:
-        """UpdateRoleInput with status=RoleStatusGQL.ACTIVE → OptionalState.update(RoleStatus.ACTIVE)."""
+    def test_status_with_active_produces_role_status_active(self) -> None:
+        """UpdateRoleInput with status=RoleStatusGQL.ACTIVE → dto.status == RoleStatus.ACTIVE."""
         role_input = UpdateRoleInput(
             id=uuid.uuid4(),
             status=RoleStatusGQL.ACTIVE,
         )
 
-        updater = role_input.to_updater()
-        spec = updater.spec
-        assert isinstance(spec, RoleUpdaterSpec)
+        dto = role_input.to_pydantic()
+        assert isinstance(dto, UpdateRoleInputDTO)
+        assert dto.status == RoleStatus.ACTIVE
 
-        assert spec.status._state == _TriStateEnum.UPDATE
-        assert spec.status.value() == RoleStatus.ACTIVE
-
-    def test_status_with_inactive_creates_update_optionalstate(self) -> None:
-        """UpdateRoleInput with status=RoleStatusGQL.INACTIVE → OptionalState.update(RoleStatus.INACTIVE)."""
+    def test_status_with_inactive_produces_role_status_inactive(self) -> None:
+        """UpdateRoleInput with status=RoleStatusGQL.INACTIVE → dto.status == RoleStatus.INACTIVE."""
         role_input = UpdateRoleInput(
             id=uuid.uuid4(),
             status=RoleStatusGQL.INACTIVE,
         )
 
-        updater = role_input.to_updater()
-        spec = updater.spec
-        assert isinstance(spec, RoleUpdaterSpec)
+        dto = role_input.to_pydantic()
+        assert isinstance(dto, UpdateRoleInputDTO)
+        assert dto.status == RoleStatus.INACTIVE
 
-        assert spec.status._state == _TriStateEnum.UPDATE
-        assert spec.status.value() == RoleStatus.INACTIVE
-
-    def test_multiple_fields_with_mixed_states(self) -> None:
-        """Test multiple fields with different states."""
-        role_id = uuid.uuid4()
+    def test_multiple_fields_with_mixed_values(self) -> None:
+        """Multiple fields with different values produce correct DTO."""
         role_input = UpdateRoleInput(
-            id=role_id,
+            id=uuid.uuid4(),
             name="updated role",
             description=None,
             status=RoleStatusGQL.ACTIVE,
         )
 
-        updater = role_input.to_updater()
-        spec = updater.spec
-        assert isinstance(spec, RoleUpdaterSpec)
+        dto = role_input.to_pydantic()
+        assert isinstance(dto, UpdateRoleInputDTO)
+        assert dto.name == "updated role"
+        assert dto.description is None
+        assert dto.status == RoleStatus.ACTIVE
 
-        assert updater.pk_value == role_id
-        assert spec.name._state == _TriStateEnum.UPDATE
-        assert spec.name.value() == "updated role"
-        assert spec.description._state == _TriStateEnum.NULLIFY
-        assert spec.status._state == _TriStateEnum.UPDATE
-        assert spec.status.value() == RoleStatus.ACTIVE
-
-    def test_all_fields_unset_creates_all_nop(self) -> None:
-        """When all fields are UNSET, all spec fields should be nop."""
+    def test_all_fields_unset_produces_all_defaults(self) -> None:
+        """When all fields are UNSET, all DTO fields use their defaults."""
         role_input = UpdateRoleInput(
             id=uuid.uuid4(),
             # all fields omitted (UNSET by default)
         )
 
-        updater = role_input.to_updater()
-        spec = updater.spec
-        assert isinstance(spec, RoleUpdaterSpec)
+        dto = role_input.to_pydantic()
+        assert isinstance(dto, UpdateRoleInputDTO)
+        assert dto.name is None
+        assert dto.description is SENTINEL
+        assert dto.status is None
 
-        assert spec.name._state == _TriStateEnum.NOP
-        assert spec.description._state == _TriStateEnum.NOP
-        assert spec.status._state == _TriStateEnum.NOP
-
-    def test_updater_pk_value_matches_input_id(self) -> None:
-        """Updater.pk_value should match the input id."""
+    def test_id_is_on_gql_input_not_in_dto(self) -> None:
+        """id is a GQL input field used for routing but not included in the DTO."""
         role_id = uuid.uuid4()
         role_input = UpdateRoleInput(id=role_id)
 
-        updater = role_input.to_updater()
-
-        assert updater.pk_value == role_id
+        assert role_input.id == role_id
+        dto = role_input.to_pydantic()
+        assert isinstance(dto, UpdateRoleInputDTO)
+        assert not hasattr(dto, "id")
