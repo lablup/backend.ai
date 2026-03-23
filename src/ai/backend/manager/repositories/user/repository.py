@@ -126,6 +126,20 @@ class UserRepository:
         return await self._db_source.bulk_update_users_validated(items)
 
     @user_repository_resilience.apply()
+    async def update_user_by_uuid_validated(
+        self,
+        user_uuid: UUID,
+        updater: Updater[UserRow],
+    ) -> UserData:
+        """Update user by UUID with validation and handle role/group changes."""
+        return await self._db_source.update_user_by_uuid_validated(user_uuid, updater)
+
+    @user_repository_resilience.apply()
+    async def delete_user_by_uuid_validated(self, user_uuid: UUID) -> None:
+        """Soft delete user by UUID, setting status to DELETED and deactivating keypairs."""
+        await self._db_source.delete_user_by_uuid_validated(user_uuid)
+
+    @user_repository_resilience.apply()
     async def soft_delete_user_validated(self, email: str) -> None:
         """
         Soft delete user by setting status to DELETED and deactivating keypairs.
