@@ -10384,6 +10384,8 @@ enum RBACElementType
   ROLE @join__enumValue(graph: STRAWBERRY)
   AUDIT_LOG @join__enumValue(graph: STRAWBERRY)
   EVENT_LOG @join__enumValue(graph: STRAWBERRY)
+  PROJECT_ADMIN_PAGE @join__enumValue(graph: STRAWBERRY)
+  DOMAIN_ADMIN_PAGE @join__enumValue(graph: STRAWBERRY)
   NOTIFICATION_RULE @join__enumValue(graph: STRAWBERRY)
   DEPLOYMENT_TOKEN @join__enumValue(graph: STRAWBERRY)
   DEPLOYMENT_POLICY @join__enumValue(graph: STRAWBERRY)
