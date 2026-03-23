@@ -257,7 +257,7 @@ class TestSearchScopesHandler:
         mock_permission_controller.search_scopes.wait_for_complete.assert_called_once()
         call_args = mock_permission_controller.search_scopes.wait_for_complete.call_args
         action = call_args[0][0]
-        assert action.scope_type == self.TEST_SCOPE_TYPE
+        assert action.element_type == self.TEST_SCOPE_TYPE.to_element()
 
     async def test_search_scopes_rejects_non_superadmin(
         self,
