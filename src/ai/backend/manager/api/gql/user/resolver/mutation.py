@@ -11,6 +11,7 @@ from strawberry import Info
 from ai.backend.common.api_handlers import Sentinel
 from ai.backend.common.contexts.client_ip import current_client_ip
 from ai.backend.common.contexts.user import current_user
+from ai.backend.common.dto.manager.v2.user.request import UpdateUserInput as UpdateUserInputDTO
 from ai.backend.common.exception import InvalidIpAddressValue, UnreachableError
 from ai.backend.common.types import ReadableCIDR
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
@@ -35,10 +36,11 @@ from ai.backend.manager.api.gql.user.types import (
     UpdateUserV2InputGQL,
 )
 from ai.backend.manager.api.gql.utils import check_admin_only
+from ai.backend.manager.config.unified import AuthConfig
 from ai.backend.manager.data.user.types import UserStatus
 from ai.backend.manager.errors.api import InvalidAPIParameters
 from ai.backend.manager.models.hasher.types import PasswordInfo
-from ai.backend.manager.models.user import UserRole
+from ai.backend.manager.models.user import UserRole, UserRow
 from ai.backend.manager.repositories.base.creator import Creator
 from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.repositories.user.creators import UserCreatorSpec
@@ -54,6 +56,107 @@ from ai.backend.manager.services.user.actions.modify_user import (
 )
 from ai.backend.manager.services.user.actions.purge_user import BulkPurgeUserAction
 from ai.backend.manager.types import OptionalState, TriState
+
+
+def _build_updater_from_input(
+    dto: UpdateUserInputDTO,
+    auth_config: AuthConfig,
+    user_id: UUID,
+) -> Updater[UserRow]:
+    """Build a UserUpdaterSpec + Updater from a parsed UpdateUserInputDTO."""
+    updater_spec = UserUpdaterSpec(
+        username=(
+            OptionalState.update(dto.username) if dto.username is not None else OptionalState.nop()
+        ),
+        password=(
+            OptionalState.update(
+                PasswordInfo(
+                    password=dto.password,
+                    algorithm=auth_config.password_hash_algorithm,
+                    rounds=auth_config.password_hash_rounds,
+                    salt_size=auth_config.password_hash_salt_size,
+                )
+            )
+            if dto.password is not None
+            else OptionalState.nop()
+        ),
+        need_password_change=(
+            OptionalState.update(dto.need_password_change)
+            if dto.need_password_change is not None
+            else OptionalState.nop()
+        ),
+        full_name=(
+            TriState.nop()
+            if isinstance(dto.full_name, Sentinel)
+            else TriState.nullify()
+            if dto.full_name is None
+            else TriState.update(dto.full_name)
+        ),
+        description=(
+            TriState.nop()
+            if isinstance(dto.description, Sentinel)
+            else TriState.nullify()
+            if dto.description is None
+            else TriState.update(dto.description)
+        ),
+        status=(
+            OptionalState.update(UserStatus(dto.status))
+            if dto.status is not None
+            else OptionalState.nop()
+        ),
+        domain_name=(
+            OptionalState.update(dto.domain_name)
+            if dto.domain_name is not None
+            else OptionalState.nop()
+        ),
+        role=(
+            OptionalState.update(UserRole(dto.role))
+            if dto.role is not None
+            else OptionalState.nop()
+        ),
+        allowed_client_ip=(
+            TriState.nop()
+            if isinstance(dto.allowed_client_ip, Sentinel)
+            else TriState.from_graphql(dto.allowed_client_ip)
+        ),
+        resource_policy=(
+            OptionalState.update(dto.resource_policy)
+            if dto.resource_policy is not None
+            else OptionalState.nop()
+        ),
+        sudo_session_enabled=(
+            OptionalState.update(dto.sudo_session_enabled)
+            if dto.sudo_session_enabled is not None
+            else OptionalState.nop()
+        ),
+        main_access_key=(
+            TriState.nop()
+            if isinstance(dto.main_access_key, Sentinel)
+            else TriState.from_graphql(dto.main_access_key)
+        ),
+        container_uid=(
+            TriState.nop()
+            if isinstance(dto.container_uid, Sentinel)
+            else TriState.from_graphql(dto.container_uid)
+        ),
+        container_main_gid=(
+            TriState.nop()
+            if isinstance(dto.container_main_gid, Sentinel)
+            else TriState.from_graphql(dto.container_main_gid)
+        ),
+        container_gids=(
+            TriState.nop()
+            if isinstance(dto.container_gids, Sentinel)
+            else TriState.from_graphql(dto.container_gids)
+        ),
+        group_ids=(
+            OptionalState.nop()
+            if isinstance(dto.group_ids, Sentinel) or dto.group_ids is None
+            else OptionalState.update([str(gid) for gid in dto.group_ids])
+        ),
+    )
+    return Updater(spec=updater_spec, pk_value=user_id)
+
 
 # Create Mutations
 
@@ -82,7 +185,39 @@ async def admin_create_user_v2(
         NotImplementedError: This mutation is not yet implemented.
     """
     check_admin_only()
-    raise NotImplementedError("admin_create_user_v2 is not yet implemented")
+    ctx = info.context
+    auth_config = ctx.config_provider.config.auth
+    dto = input.to_pydantic()
+    password_info = PasswordInfo(
+        password=dto.password,
+        algorithm=auth_config.password_hash_algorithm,
+        rounds=auth_config.password_hash_rounds,
+        salt_size=auth_config.password_hash_salt_size,
+    )
+    spec = UserCreatorSpec(
+        email=dto.email,
+        username=dto.username,
+        password=password_info,
+        need_password_change=dto.need_password_change,
+        domain_name=dto.domain_name,
+        full_name=dto.full_name,
+        description=dto.description,
+        status=UserStatus(dto.status),
+        role=str(dto.role),
+        allowed_client_ip=dto.allowed_client_ip,
+        totp_activated=dto.totp_activated,
+        resource_policy=dto.resource_policy,
+        sudo_session_enabled=dto.sudo_session_enabled,
+        container_uid=dto.container_uid,
+        container_main_gid=dto.container_main_gid,
+        container_gids=dto.container_gids,
+    )
+    group_ids = [str(gid) for gid in dto.group_ids] if dto.group_ids else None
+    payload = await ctx.adapters.user.create_user(
+        creator=Creator(spec=spec),
+        group_ids=group_ids,
+    )
+    return CreateUserPayloadGQL.from_pydantic(payload)
 
 
 @strawberry.mutation(
@@ -177,7 +312,11 @@ async def admin_update_user_v2(
         NotImplementedError: This mutation is not yet implemented.
     """
     check_admin_only()
-    raise NotImplementedError("admin_update_user_v2 is not yet implemented")
+    ctx = info.context
+    dto = input.to_pydantic()
+    updater = _build_updater_from_input(dto, ctx.config_provider.config.auth, user_id)
+    payload = await ctx.adapters.user.modify_user_by_id(user_id=user_id, updater=updater)
+    return UpdateUserPayloadGQL.from_pydantic(payload)
 
 
 @strawberry.mutation(
@@ -333,7 +472,14 @@ async def update_user_v2(
     Raises:
         NotImplementedError: This mutation is not yet implemented.
     """
-    raise NotImplementedError("update_user_v2 is not yet implemented")
+    ctx = info.context
+    me = current_user()
+    if me is None:
+        raise UnreachableError("User context is not available")
+    dto = input.to_pydantic()
+    updater = _build_updater_from_input(dto, ctx.config_provider.config.auth, me.user_id)
+    payload = await ctx.adapters.user.modify_user_by_id(user_id=me.user_id, updater=updater)
+    return UpdateUserPayloadGQL.from_pydantic(payload)
 
 
 # Delete UpdateUserV2InputGQLlete)
@@ -363,7 +509,9 @@ async def admin_delete_user_v2(
         NotImplementedError: This mutation is not yet implemented.
     """
     check_admin_only()
-    raise NotImplementedError("admin_delete_user_v2 is not yet implemented")
+    ctx = info.context
+    await ctx.adapters.user.delete_user_by_id(user_id=user_id)
+    return DeleteUserPayloadGQL(success=True)
 
 
 @strawberry.mutation(
@@ -390,7 +538,10 @@ async def admin_delete_users_v2(
         NotImplementedError: This mutation is not yet implemented.
     """
     check_admin_only()
-    raise NotImplementedError("admin_delete_users_v2 is not yet implemented")
+    ctx = info.context
+    for user_id in input.user_ids:
+        await ctx.adapters.user.delete_user_by_id(user_id=user_id)
+    return DeleteUsersPayloadGQL(deleted_count=len(input.user_ids))
 
 
 # Purge Mutations (Hard Delete)
@@ -420,7 +571,18 @@ async def admin_purge_user_v2(
         NotImplementedError: This mutation is not yet implemented.
     """
     check_admin_only()
-    raise NotImplementedError("admin_purge_user_v2 is not yet implemented")
+    ctx = info.context
+    me = current_user()
+    if me is None:
+        raise UnreachableError("User context is not available after check_admin_only()")
+    dto = input.to_pydantic()
+    await ctx.adapters.user.purge_user_by_id(
+        user_id=dto.user_id,
+        admin_user_id=me.user_id,
+        purge_shared_vfolders=OptionalState.nop(),
+        delegate_endpoint_ownership=OptionalState.nop(),
+    )
+    return PurgeUserPayloadGQL(success=True)
 
 
 @strawberry.mutation(

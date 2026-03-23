@@ -31,9 +31,13 @@ from ai.backend.common.dto.manager.v2.user.response import (
     BulkPurgeUserV2Error,
     BulkUpdateUsersPayload,
     BulkUpdateUserV2Error,
+    CreateUserPayload,
+    DeleteUserPayload,
     EntityTimestamps,
+    PurgeUserPayload,
     SearchUsersPayload,
     UpdateMyAllowedClientIPPayload,
+    UpdateUserPayload,
     UserBasicInfo,
     UserContainerSettings,
     UserNode,
@@ -72,13 +76,19 @@ from ai.backend.manager.repositories.base import (
     combine_conditions_or,
     negate_conditions,
 )
+from ai.backend.manager.repositories.base.creator import Creator
+from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.repositories.user.creators import UserCreatorSpec
 from ai.backend.manager.repositories.user.types import (
     DomainUserSearchScope,
     ProjectUserSearchScope,
     RoleUserSearchScope,
 )
-from ai.backend.manager.services.user.actions.create_user import BulkCreateUserAction
+from ai.backend.manager.services.user.actions.create_user import (
+    BulkCreateUserAction,
+    CreateUserAction,
+)
+from ai.backend.manager.services.user.actions.delete_user import DeleteUserByIdAction
 from ai.backend.manager.services.user.actions.get_user import GetUserAction
 from ai.backend.manager.services.user.actions.keypair_ops import (
     IssueMyKeypairAction,
@@ -89,8 +99,12 @@ from ai.backend.manager.services.user.actions.keypair_ops import (
 from ai.backend.manager.services.user.actions.modify_user import (
     BulkModifyUserAction,
     ModifyUserAction,
+    ModifyUserByIdAction,
 )
-from ai.backend.manager.services.user.actions.purge_user import BulkPurgeUserAction
+from ai.backend.manager.services.user.actions.purge_user import (
+    BulkPurgeUserAction,
+    PurgeUserByIdAction,
+)
 from ai.backend.manager.services.user.actions.search_users import SearchUsersAction
 from ai.backend.manager.services.user.actions.search_users_by_domain import (
     SearchUsersByDomainAction,
@@ -101,6 +115,7 @@ from ai.backend.manager.services.user.actions.search_users_by_project import (
 from ai.backend.manager.services.user.actions.search_users_by_role import (
     SearchUsersByRoleAction,
 )
+from ai.backend.manager.types import OptionalState
 
 from .base import BaseAdapter
 from .pagination import PaginationSpec
@@ -115,13 +130,7 @@ _USER_PAGINATION_SPEC = PaginationSpec(
 
 
 class UserAdapter(BaseAdapter):
-    """Adapter for user domain operations.
-
-    Intentionally omits: create, update, delete, purge.
-    - create: requires PasswordInfo (password hashing) from auth config (caller responsibility)
-    - update/delete/purge: require email-based action signatures not yet bridged;
-      the corresponding GQL mutations currently raise NotImplementedError
-    """
+    """Adapter for user domain operations."""
 
     # ------------------------------------------------------------------ batch load (DataLoader)
 
@@ -320,6 +329,55 @@ class UserAdapter(BaseAdapter):
             GetUserAction(user_uuid=user_id)
         )
         return UserPayload(user=self._user_data_to_node(action_result.user))
+
+    # ------------------------------------------------------------------ single CRUD
+
+    async def create_user(
+        self,
+        creator: Creator[UserRow],
+        group_ids: list[str] | None,
+    ) -> CreateUserPayload:
+        """Create a single user. PasswordInfo hashing is the caller's responsibility."""
+        result = await self._processors.user.create_user.wait_for_complete(
+            CreateUserAction(creator=creator, group_ids=group_ids)
+        )
+        return CreateUserPayload(user=self._user_data_to_node(result.data.user))
+
+    async def modify_user_by_id(
+        self,
+        user_id: UUID,
+        updater: Updater[UserRow],
+    ) -> UpdateUserPayload:
+        """Update a user by UUID. Updater construction is the caller's responsibility."""
+        result = await self._processors.user.modify_user_by_id.wait_for_complete(
+            ModifyUserByIdAction(user_id=user_id, updater=updater)
+        )
+        return UpdateUserPayload(user=self._user_data_to_node(result.data))
+
+    async def delete_user_by_id(self, user_id: UUID) -> DeleteUserPayload:
+        """Soft-delete a user by UUID."""
+        await self._processors.user.delete_user_by_id.wait_for_complete(
+            DeleteUserByIdAction(user_id=user_id)
+        )
+        return DeleteUserPayload(success=True)
+
+    async def purge_user_by_id(
+        self,
+        user_id: UUID,
+        admin_user_id: UUID,
+        purge_shared_vfolders: OptionalState[bool],
+        delegate_endpoint_ownership: OptionalState[bool],
+    ) -> PurgeUserPayload:
+        """Permanently purge a user by UUID."""
+        await self._processors.user.purge_user_by_id.wait_for_complete(
+            PurgeUserByIdAction(
+                user_id=user_id,
+                admin_user_id=admin_user_id,
+                purge_shared_vfolders=purge_shared_vfolders,
+                delegate_endpoint_ownership=delegate_endpoint_ownership,
+            )
+        )
+        return PurgeUserPayload(success=True)
 
     # ------------------------------------------------------------------ bulk create/update/purge
 
