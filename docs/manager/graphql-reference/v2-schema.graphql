@@ -3425,6 +3425,101 @@ type KernelV2UserInfo {
 }
 
 """
+Added in 26.5.0. Paginated connection for keypair records. Provides relay-style cursor-based pagination. Use 'edges' to access individual records with cursor information.
+"""
+type KeyPairConnection {
+  """Pagination data for this connection"""
+  pageInfo: PageInfo!
+
+  """Contains the nodes in this connection"""
+  edges: [KeyPairGQLEdge!]!
+
+  """Total number of keypair records matching the query criteria."""
+  count: Int!
+}
+
+"""
+Added in 26.5.0. Added in 26.5.0. Keypair entity representing an API access key. The access_key field serves as the unique identifier. Secret key and private SSH key are excluded for security reasons.
+"""
+type KeyPairGQL implements Node {
+  """The Globally Unique ID of this object"""
+  id: ID!
+
+  """Whether the keypair is currently active."""
+  isActive: Boolean
+
+  """Whether the keypair has admin privileges."""
+  isAdmin: Boolean
+
+  """Timestamp when the keypair was created."""
+  createdAt: DateTime
+
+  """Timestamp when the keypair was last modified."""
+  modifiedAt: DateTime
+
+  """Timestamp when the keypair was last used for an API call."""
+  lastUsed: DateTime
+
+  """API rate limit (requests per minute)."""
+  rateLimit: Int!
+
+  """Total number of API queries made with this keypair."""
+  numQueries: Int!
+
+  """Name of the resource policy assigned to this keypair."""
+  resourcePolicy: String!
+
+  """The SSH public key associated with this keypair."""
+  sshPublicKey: String
+
+  """UUID of the user who owns this keypair."""
+  userId: UUID!
+}
+
+"""An edge in a connection."""
+type KeyPairGQLEdge {
+  """A cursor for use in pagination"""
+  cursor: String!
+
+  """The item at the end of the edge"""
+  node: KeyPairGQL!
+}
+
+"""
+Added in 26.5.0. Filter input for keypair queries. Supports filtering by active state, admin flag, and access key. Multiple filters can be combined using AND, OR, and NOT logical operators.
+"""
+input KeypairFilter {
+  isActive: Boolean = null
+  isAdmin: Boolean = null
+  accessKey: StringFilter = null
+  resourcePolicy: StringFilter = null
+  createdAt: DateTimeFilter = null
+  lastUsed: DateTimeFilter = null
+  AND: [KeypairFilter!] = null
+  OR: [KeypairFilter!] = null
+  NOT: [KeypairFilter!] = null
+}
+
+"""
+Added in 26.5.0. Specifies ordering for keypair query results. Default direction is DESC.
+"""
+input KeypairOrderBy {
+  field: KeypairOrderField! = CREATED_AT
+  direction: OrderDirection! = DESC
+}
+
+"""
+Added in 26.5.0. Fields available for ordering keypair query results. CREATED_AT: Order by creation timestamp. LAST_USED: Order by last used timestamp. ACCESS_KEY: Order by access key alphabetically. IS_ACTIVE: Order by active status.
+"""
+enum KeypairOrderField {
+  CREATED_AT
+  LAST_USED
+  ACCESS_KEY
+  IS_ACTIVE
+  RESOURCE_POLICY
+}
+
+"""
 Added in 25.19.0. This enum represents the liveness status of a replica, indicating whether the deployment is currently running and able to serve requests.
 """
 enum LivenessStatus {
@@ -5470,6 +5565,11 @@ type Query {
   Added in 26.3.0. Search entity associations (admin only). Optionally filter by entity_type and entity_id.
   """
   adminEntities(filter: EntityFilter = null, orderBy: [EntityOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): EntityConnection!
+
+  """
+  Added in 26.5.0. List keypairs owned by the current authenticated user. Supports filtering, ordering, and both cursor-based and offset-based pagination.
+  """
+  myKeypairs(filter: KeypairFilter = null, orderBy: [KeypairOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): KeyPairConnection!
 
   """
   Added in 26.3.0. List roles assigned to the current authenticated user.
