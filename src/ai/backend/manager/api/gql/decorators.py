@@ -22,8 +22,9 @@ Decorator roles:
 
 from __future__ import annotations
 
+import enum
 from collections.abc import Callable, Sequence
-from typing import Any, TypeVar, dataclass_transform
+from typing import Any, TypeVar, dataclass_transform, overload
 
 import strawberry
 import strawberry.experimental.pydantic
@@ -276,9 +277,27 @@ def gql_root_field(
     )
 
 
+@overload
+def gql_enum[T_enum: enum.Enum](
+    meta: BackendAIGQLMeta,
+    enum_cls: type[T_enum],
+    *,
+    name: str | None = ...,
+) -> type[T_enum]: ...
+
+
+@overload
+def gql_enum[T_enum: enum.Enum](
+    meta: BackendAIGQLMeta,
+    enum_cls: None = ...,
+    *,
+    name: str | None = ...,
+) -> Callable[[type[T_enum]], type[T_enum]]: ...
+
+
 def gql_enum(
     meta: BackendAIGQLMeta,
-    enum_cls: type | None = None,
+    enum_cls: type[enum.Enum] | None = None,
     *,
     name: str | None = None,
 ) -> Any:
@@ -293,14 +312,14 @@ def gql_enum(
         # As function (DTO wrapping)
         StatusGQL = gql_enum(BackendAIGQLMeta(...), StatusDTO, name="Status")
     """
-    kwargs: dict[str, Any] = {
-        "description": _build_description(meta),
-    }
-    if name is not None:
-        kwargs["name"] = name
+    description = _build_description(meta)
     if enum_cls is not None:
-        return strawberry.enum(enum_cls, **kwargs)
-    return strawberry.enum(**kwargs)
+        if name is not None:
+            return strawberry.enum(enum_cls, description=description, name=name)
+        return strawberry.enum(enum_cls, description=description)
+    if name is not None:
+        return strawberry.enum(description=description, name=name)
+    return strawberry.enum(description=description)
 
 
 def gql_mutation(

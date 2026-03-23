@@ -42,8 +42,8 @@ from ai.backend.manager.data.deployment.types import (
 
 def _route_filter_to_dto(filter: RouteFilter) -> RouteFilterDTO:
     return RouteFilterDTO(
-        status=[RouteStatusCommon(s.value) for s in filter.status] if filter.status else None,
-        traffic_status=[RouteTrafficStatusCommon(s.value) for s in filter.traffic_status]
+        status=[RouteStatusCommon(s.value) for s in filter.status] if filter.status else None,  # type: ignore[attr-defined]
+        traffic_status=[RouteTrafficStatusCommon(s.value) for s in filter.traffic_status]  # type: ignore[attr-defined]
         if filter.traffic_status
         else None,
         AND=[_route_filter_to_dto(f) for f in filter.AND] if filter.AND else None,
@@ -126,7 +126,7 @@ async def update_route_traffic_status(
     _, route_id = resolve_global_id(input.route_id)
     route_node = await info.context.adapters.deployment.update_route_traffic(
         UUID(route_id),
-        RouteTrafficStatusCommon(input.traffic_status.value),
+        RouteTrafficStatusCommon(input.traffic_status.value),  # type: ignore[attr-defined]
     )
     return UpdateRouteTrafficStatusPayloadGQL(
         route=Route.from_pydantic(route_node),

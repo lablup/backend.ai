@@ -109,7 +109,6 @@ if TYPE_CHECKING:
 
 # ==================== Enums ====================
 
-
 RoleSourceGQL: type[RoleSourceDTO] = gql_enum(
     BackendAIGQLMeta(added_version="26.3.0", description="Role definition source"),
     RoleSourceDTO,

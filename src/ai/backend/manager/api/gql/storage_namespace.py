@@ -77,7 +77,7 @@ StorageNamespaceEdge = Edge[StorageNamespace]
     ),
 )
 class StorageNamespaceConnection(Connection[StorageNamespace]):
-    @gql_field(description="The count of this entity.")
+    @gql_field(description="The count of this entity.")  # type: ignore[misc]
     def count(self) -> int:
         return len(self.edges)
 

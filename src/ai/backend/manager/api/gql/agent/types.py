@@ -84,12 +84,14 @@ class AgentOrderFieldGQL(StrEnum):
 
 
 @gql_pydantic_input(
-    BackendAIGQLMeta(description="", added_version="24.09.0"),
+    BackendAIGQLMeta(
+        description=dedent_strip("""
+            Filter options for agent status within AgentFilter.
+            It includes options to filter whether agent status is in a specific list or equals a specific value.
+        """),
+        added_version="24.09.0",
+    ),
     name="AgentStatusFilter",
-    description=dedent_strip("""
-        Filter options for agent status within AgentFilter.
-        It includes options to filter whether agent status is in a specific list or equals a specific value.
-    """),
 )
 class AgentStatusFilterGQL(PydanticInputMixin[AgentStatusFilter]):
     in_: list[AgentStatusEnum] | None = gql_field(

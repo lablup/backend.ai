@@ -61,7 +61,6 @@ if TYPE_CHECKING:
 
 # ==================== Enums ====================
 
-
 RBACElementTypeGQL: type[RBACElementTypeDTO] = gql_enum(
     BackendAIGQLMeta(
         added_version="26.3.0",
@@ -132,7 +131,7 @@ class PermissionGQL(PydanticNodeMixin[PermissionNodeDTO]):
         *,
         info: Info[StrawberryGQLContext],
     ) -> EntityNode | None:
-        element_type = RBACElementType(self.scope_type.value)
+        element_type = RBACElementType(self.scope_type.value)  # type: ignore[attr-defined]
         data_loaders = info.context.data_loaders
         match element_type:
             case RBACElementType.USER:

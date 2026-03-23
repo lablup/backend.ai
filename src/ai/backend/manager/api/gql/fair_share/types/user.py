@@ -297,8 +297,8 @@ class RGUserFairShareFilter(PydanticInputMixin[UserFairShareFilterDTO]):
             "Fields available for ordering user fair share query results. "
             "FAIR_SHARE_FACTOR: Order by the calculated fair share factor (0-1 range, lower = higher priority). "
             "CREATED_AT: Order by record creation timestamp. "
-            "USER_USERNAME: Order alphabetically by username (added in 26.2.0). "
-            "USER_EMAIL: Order alphabetically by email (added in 26.2.0)."
+            "USER_USERNAME: Order alphabetically by username. "
+            "USER_EMAIL: Order alphabetically by email."
         ),
     ),
     name="UserFairShareOrderField",

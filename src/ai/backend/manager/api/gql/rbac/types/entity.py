@@ -71,7 +71,7 @@ class EntityRefGQL(PydanticNodeMixin[AssociationScopesEntitiesNode]):
     ) -> EntityNode | None:
         from ai.backend.common.types import ImageID, SessionId
 
-        element_type = RBACElementType(self.entity_type.value)
+        element_type = RBACElementType(self.entity_type.value)  # type: ignore[attr-defined]
         data_loaders = info.context.data_loaders
         match element_type:
             case RBACElementType.USER:

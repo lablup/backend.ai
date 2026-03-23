@@ -58,14 +58,14 @@ class AppConfig(PydanticOutputMixin[AppConfigNode]):
 
 
 @gql_pydantic_input(
-    BackendAIGQLMeta(description="", added_version="24.09.0"),
-    description=dedent_strip(
-        """\
-        Input for creating or updating domain-level app configuration.
-        The provided extra_config object will completely replace the existing configuration;
-        existing keys not present in the new extra_config will be removed.
-        All users in this domain will be affected by these settings when their configurations are merged.
-        """
+    BackendAIGQLMeta(
+        description=dedent_strip("""\
+            Input for creating or updating domain-level app configuration.
+            The provided extra_config object will completely replace the existing configuration;
+            existing keys not present in the new extra_config will be removed.
+            All users in this domain will be affected by these settings when their configurations are merged.
+        """),
+        added_version="24.09.0",
     ),
 )
 class UpsertDomainConfigInput(PydanticInputMixin[UpsertDomainConfigInputDTO]):
@@ -76,15 +76,15 @@ class UpsertDomainConfigInput(PydanticInputMixin[UpsertDomainConfigInputDTO]):
 
 
 @gql_pydantic_input(
-    BackendAIGQLMeta(description="", added_version="24.09.0"),
-    description=dedent_strip(
-        """\
-        Input for creating or updating user-level app configuration.
-        The provided extra_config object will completely replace the existing configuration;
-        existing keys not present in the new extra_config will be removed.
-        These settings will override domain-level settings when configurations are merged for this user.
-        If user_id is not provided, the current user's configuration will be updated.
-        """
+    BackendAIGQLMeta(
+        description=dedent_strip("""\
+            Input for creating or updating user-level app configuration.
+            The provided extra_config object will completely replace the existing configuration;
+            existing keys not present in the new extra_config will be removed.
+            These settings will override domain-level settings when configurations are merged for this user.
+            If user_id is not provided, the current user's configuration will be updated.
+        """),
+        added_version="24.09.0",
     ),
 )
 class UpsertUserConfigInput(PydanticInputMixin[UpsertUserConfigInputDTO]):
@@ -106,12 +106,12 @@ class DeleteDomainConfigInput(PydanticInputMixin[DeleteDomainConfigInputDTO]):
 
 
 @gql_pydantic_input(
-    BackendAIGQLMeta(description="", added_version="24.09.0"),
-    description=dedent_strip(
-        """\
-        Input for deleting user-level app configuration.
-        If user_id is not provided, the current user's configuration will be deleted.
-        """
+    BackendAIGQLMeta(
+        description=dedent_strip("""\
+            Input for deleting user-level app configuration.
+            If user_id is not provided, the current user's configuration will be deleted.
+        """),
+        added_version="24.09.0",
     ),
 )
 class DeleteUserConfigInput(PydanticInputMixin[DeleteUserConfigInputDTO]):

@@ -308,8 +308,8 @@ class RGProjectFairShareFilter(PydanticInputMixin[ProjectFairShareFilterDTO]):
             "Fields available for ordering project fair share query results. "
             "FAIR_SHARE_FACTOR: Order by the calculated fair share factor (0-1 range, lower = higher priority). "
             "CREATED_AT: Order by record creation timestamp. "
-            "PROJECT_NAME: Order alphabetically by project name (added in 26.2.0). "
-            "PROJECT_IS_ACTIVE: Order by project active status (added in 26.2.0)."
+            "PROJECT_NAME: Order alphabetically by project name. "
+            "PROJECT_IS_ACTIVE: Order by project active status."
         ),
     ),
     name="ProjectFairShareOrderField",

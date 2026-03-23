@@ -120,13 +120,13 @@ from ai.backend.manager.api.gql.types import StrawberryGQLContext
 
 # GraphQL enum types
 
-NotificationChannelTypeGQL = gql_enum(
+NotificationChannelTypeGQL: type[NotificationChannelTypeDTO] = gql_enum(
     BackendAIGQLMeta(added_version="26.3.0", description="Notification channel types"),
     NotificationChannelTypeDTO,
     name="NotificationChannelType",
 )
 
-NotificationRuleTypeGQL = gql_enum(
+NotificationRuleTypeGQL: type[NotificationRuleTypeDTO] = gql_enum(
     BackendAIGQLMeta(added_version="26.3.0", description="Notification rule types"),
     NotificationRuleTypeDTO,
     name="NotificationRuleType",

@@ -349,6 +349,12 @@ module = [
 ]
 disable_error_code = ["union-attr", "misc"]
 
+# gql_enum() function-call results are valid types at runtime (strawberry handles them)
+# but mypy cannot recognise dynamically-wrapped enum variables as types
+[[tool.mypy.overrides]]
+module = "ai.backend.manager.api.gql.*"
+disable_error_code = ["valid-type"]
+
 # Ignore errors in vendor code, accelerators, and build tools
 # These are external/generated code or low-priority plugins
 [[tool.mypy.overrides]]

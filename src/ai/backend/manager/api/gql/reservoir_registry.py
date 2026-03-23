@@ -81,7 +81,7 @@ class ReservoirRegistry(PydanticNodeMixin[ReservoirRegistryNode]):
         nodes = await ctx.adapters.reservoir_registry.get_many(list(reservoir_ids))
         return [ReservoirRegistry.from_pydantic(node) for node in nodes]
 
-    @gql_field(description="The remote artifact registries of this entity.")
+    @gql_field(description="The remote artifact registries of this entity.")  # type: ignore[misc]
     @classmethod
     async def remote_artifact_registries(
         cls, ctx: strawberry.Info[StrawberryGQLContext]
@@ -99,7 +99,7 @@ ReservoirRegistryEdge = Edge[ReservoirRegistry]
     ),
 )
 class ReservoirRegistryConnection(Connection[ReservoirRegistry]):
-    @gql_field(description="The count of this entity.")
+    @gql_field(description="The count of this entity.")  # type: ignore[misc]
     def count(self) -> int:
         return len(self.edges)
 

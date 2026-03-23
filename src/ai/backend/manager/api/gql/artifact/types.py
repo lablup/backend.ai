@@ -256,10 +256,12 @@ class ArtifactFilter(PydanticInputMixin[ArtifactGQLFilterInputDTO]):
 
 
 @gql_pydantic_input(
-    BackendAIGQLMeta(description="", added_version="24.09.0"),
-    description=dedent_strip("""
-    Specifies the field and direction for ordering artifacts in queries.
-    """),
+    BackendAIGQLMeta(
+        description=dedent_strip("""
+            Specifies the field and direction for ordering artifacts in queries.
+        """),
+        added_version="24.09.0",
+    ),
 )
 class ArtifactOrderBy(PydanticInputMixin[ArtifactGQLOrderByInputDTO], GQLOrderBy):
     field: ArtifactOrderField
@@ -267,10 +269,12 @@ class ArtifactOrderBy(PydanticInputMixin[ArtifactGQLOrderByInputDTO], GQLOrderBy
 
 
 @gql_pydantic_input(
-    BackendAIGQLMeta(description="", added_version="24.09.0"),
-    description=dedent_strip("""
-    Filter for artifact revision status. Supports exact match or inclusion in a list of statuses.
-    """),
+    BackendAIGQLMeta(
+        description=dedent_strip("""
+            Filter for artifact revision status. Supports exact match or inclusion in a list of statuses.
+        """),
+        added_version="24.09.0",
+    ),
 )
 class ArtifactRevisionStatusFilter(PydanticInputMixin[ArtifactRevisionStatusFilterDTO]):
     in_: list[ArtifactStatus] | None = gql_field(
@@ -319,10 +323,12 @@ class ArtifactRevisionFilter(PydanticInputMixin[ArtifactRevisionGQLFilterInputDT
 
 
 @gql_pydantic_input(
-    BackendAIGQLMeta(description="", added_version="24.09.0"),
-    description=dedent_strip("""
-    Specifies the field and direction for ordering artifact revisions in queries.
-    """),
+    BackendAIGQLMeta(
+        description=dedent_strip("""
+            Specifies the field and direction for ordering artifact revisions in queries.
+        """),
+        added_version="24.09.0",
+    ),
 )
 class ArtifactRevisionOrderBy(PydanticInputMixin[ArtifactRevisionGQLOrderByInputDTO], GQLOrderBy):
     field: ArtifactRevisionOrderField
@@ -330,13 +336,15 @@ class ArtifactRevisionOrderBy(PydanticInputMixin[ArtifactRevisionGQLOrderByInput
 
 
 @gql_pydantic_input(
-    BackendAIGQLMeta(description="", added_version="24.09.0"),
-    description=dedent_strip("""
-    Input for scanning artifacts from external registries (HuggingFace, Reservoir).
+    BackendAIGQLMeta(
+        description=dedent_strip("""
+            Input for scanning artifacts from external registries (HuggingFace, Reservoir).
 
-    Discovers available artifacts and registers their metadata in the system.
-    Artifacts remain in SCANNED status until explicitly imported via import_artifacts.
-    """),
+            Discovers available artifacts and registers their metadata in the system.
+            Artifacts remain in SCANNED status until explicitly imported via import_artifacts.
+        """),
+        added_version="24.09.0",
+    ),
 )
 class ScanArtifactsInput(PydanticInputMixin[ScanArtifactsInputDTO]):
     registry_id: ID | None = None
@@ -346,12 +354,14 @@ class ScanArtifactsInput(PydanticInputMixin[ScanArtifactsInputDTO]):
 
 
 @gql_pydantic_input(
-    BackendAIGQLMeta(description="", added_version="24.09.0"),
-    description=dedent_strip("""
-    Options for importing artifact revisions.
+    BackendAIGQLMeta(
+        description=dedent_strip("""
+            Options for importing artifact revisions.
 
-    Controls import behavior such as forcing re-download regardless of digest freshness.
-    """),
+            Controls import behavior such as forcing re-download regardless of digest freshness.
+        """),
+        added_version="24.09.0",
+    ),
 )
 class ImportArtifactsOptionsGQL(PydanticInputMixin[ImportArtifactsOptionsInputDTO]):
     force: bool = gql_field(
@@ -360,13 +370,15 @@ class ImportArtifactsOptionsGQL(PydanticInputMixin[ImportArtifactsOptionsInputDT
 
 
 @gql_pydantic_input(
-    BackendAIGQLMeta(description="", added_version="24.09.0"),
-    description=dedent_strip("""
-    Input for importing scanned artifact revisions from external registries.
+    BackendAIGQLMeta(
+        description=dedent_strip("""
+            Input for importing scanned artifact revisions from external registries.
 
-    Downloads artifact files from the external source and transitions them through:
-    SCANNED → PULLING → PULLED → AVAILABLE status progression.
-    """),
+            Downloads artifact files from the external source and transitions them through:
+            SCANNED → PULLING → PULLED → AVAILABLE status progression.
+        """),
+        added_version="24.09.0",
+    ),
 )
 class ImportArtifactsInput(PydanticInputMixin[ImportArtifactsInputDTO]):
     artifact_revision_ids: list[ID]
@@ -395,10 +407,12 @@ class DelegateeTarget(PydanticInputMixin[DelegateeTargetInputDTO]):
 
 
 @gql_pydantic_input(
-    BackendAIGQLMeta(description="", added_version="24.09.0"),
-    description=dedent_strip("""
-    Input type for delegated scanning of artifacts from a delegatee reservoir registry's remote registry.
-"""),
+    BackendAIGQLMeta(
+        description=dedent_strip("""
+            Input type for delegated scanning of artifacts from a delegatee reservoir registry's remote registry.
+        """),
+        added_version="24.09.0",
+    ),
 )
 class DelegateScanArtifactsInput(PydanticInputMixin[DelegateScanArtifactsInputDTO]):
     delegator_reservoir_id: ID | None = gql_field(
@@ -418,12 +432,14 @@ class DelegateScanArtifactsInput(PydanticInputMixin[DelegateScanArtifactsInputDT
 
 
 @gql_pydantic_input(
-    BackendAIGQLMeta(description="", added_version="24.09.0"),
-    description=dedent_strip("""
-    Input type for delegated import of artifact revisions from a reservoir registry's remote registry.
-    Used to specify which artifact revisions should be imported from the remote registry source
-    into the local reservoir registry storage.
-"""),
+    BackendAIGQLMeta(
+        description=dedent_strip("""
+            Input type for delegated import of artifact revisions from a reservoir registry's remote registry.
+            Used to specify which artifact revisions should be imported from the remote registry source
+            into the local reservoir registry storage.
+        """),
+        added_version="24.09.0",
+    ),
 )
 class DelegateImportArtifactsInput(PydanticInputMixin[DelegateImportArtifactsInputDTO]):
     artifact_revision_ids: list[ID] = gql_field(
@@ -448,13 +464,15 @@ class DelegateImportArtifactsInput(PydanticInputMixin[DelegateImportArtifactsInp
 
 
 @gql_pydantic_input(
-    BackendAIGQLMeta(description="", added_version="24.09.0"),
-    description=dedent_strip("""
-    Input for updating artifact metadata properties.
+    BackendAIGQLMeta(
+        description=dedent_strip("""
+            Input for updating artifact metadata properties.
 
-    Modifies artifact metadata such as readonly status and description.
-    This operation does not affect the actual artifact files or revisions.
-    """),
+            Modifies artifact metadata such as readonly status and description.
+            This operation does not affect the actual artifact files or revisions.
+        """),
+        added_version="24.09.0",
+    ),
 )
 class UpdateArtifactInput(PydanticInputMixin[UpdateArtifactGQLInputDTO]):
     artifact_id: ID
@@ -463,100 +481,116 @@ class UpdateArtifactInput(PydanticInputMixin[UpdateArtifactGQLInputDTO]):
 
 
 @gql_pydantic_input(
-    BackendAIGQLMeta(description="", added_version="24.09.0"),
-    description=dedent_strip("""
-    Input for canceling an in-progress artifact import operation.
+    BackendAIGQLMeta(
+        description=dedent_strip("""
+            Input for canceling an in-progress artifact import operation.
 
-    Stops the download process and reverts the artifact revision status back to SCANNED.
-    """),
+            Stops the download process and reverts the artifact revision status back to SCANNED.
+        """),
+        added_version="24.09.0",
+    ),
 )
 class CancelArtifactInput(PydanticInputMixin[CancelArtifactInputDTO]):
     artifact_revision_id: ID
 
 
 @gql_pydantic_input(
-    BackendAIGQLMeta(description="", added_version="24.09.0"),
-    description=dedent_strip("""
-    Input for cleaning up stored artifact revision data.
+    BackendAIGQLMeta(
+        description=dedent_strip("""
+            Input for cleaning up stored artifact revision data.
 
-    Removes downloaded files from storage and transitions the artifact revision
-    back to SCANNED status, freeing up storage space.
-    """),
+            Removes downloaded files from storage and transitions the artifact revision
+            back to SCANNED status, freeing up storage space.
+        """),
+        added_version="24.09.0",
+    ),
 )
 class CleanupArtifactRevisionsInput(PydanticInputMixin[CleanupArtifactRevisionsInputDTO]):
     artifact_revision_ids: list[ID]
 
 
 @gql_pydantic_input(
-    BackendAIGQLMeta(description="", added_version="24.09.0"),
-    description=dedent_strip("""
-    Input for soft-deleting artifacts from the system.
+    BackendAIGQLMeta(
+        description=dedent_strip("""
+            Input for soft-deleting artifacts from the system.
 
-    Marks artifacts as deleted without permanently removing them.
-    Deleted artifacts can be restored using restore_artifacts.
-    """),
+            Marks artifacts as deleted without permanently removing them.
+            Deleted artifacts can be restored using restore_artifacts.
+        """),
+        added_version="24.09.0",
+    ),
 )
 class DeleteArtifactsInput(PydanticInputMixin[DeleteArtifactsInputDTO]):
     artifact_ids: list[ID]
 
 
 @gql_pydantic_input(
-    BackendAIGQLMeta(description="", added_version="24.09.0"),
-    description=dedent_strip("""
-    Input for restoring previously deleted artifacts.
+    BackendAIGQLMeta(
+        description=dedent_strip("""
+            Input for restoring previously deleted artifacts.
 
-    Reverses the soft-delete operation, making the artifacts available again.
-    """),
+            Reverses the soft-delete operation, making the artifacts available again.
+        """),
+        added_version="24.09.0",
+    ),
 )
 class RestoreArtifactsInput(PydanticInputMixin[RestoreArtifactsInputDTO]):
     artifact_ids: list[ID]
 
 
 @gql_pydantic_input(
-    BackendAIGQLMeta(description="", added_version="24.09.0"),
-    description=dedent_strip("""
-    Input for approving an artifact revision.
+    BackendAIGQLMeta(
+        description=dedent_strip("""
+            Input for approving an artifact revision.
 
-    Admin-only operation to approve artifact revisions for general use.
-    """),
+            Admin-only operation to approve artifact revisions for general use.
+        """),
+        added_version="24.09.0",
+    ),
 )
 class ApproveArtifactInput(PydanticInputMixin[ApproveArtifactInputDTO]):
     artifact_revision_id: ID
 
 
 @gql_pydantic_input(
-    BackendAIGQLMeta(description="", added_version="24.09.0"),
-    description=dedent_strip("""
-    Input for rejecting an artifact revision.
+    BackendAIGQLMeta(
+        description=dedent_strip("""
+            Input for rejecting an artifact revision.
 
-    Admin-only operation to reject artifact revisions, preventing their use.
-    """),
+            Admin-only operation to reject artifact revisions, preventing their use.
+        """),
+        added_version="24.09.0",
+    ),
 )
 class RejectArtifactInput(PydanticInputMixin[RejectArtifactInputDTO]):
     artifact_revision_id: ID
 
 
 @gql_pydantic_input(
-    BackendAIGQLMeta(description="", added_version="24.09.0"),
-    description=dedent_strip("""
-    Input for subscribing to artifact status change notifications.
+    BackendAIGQLMeta(
+        description=dedent_strip("""
+            Input for subscribing to artifact status change notifications.
 
-    Used with artifact_status_changed subscription to receive real-time updates
-    when artifact revision statuses change.
-    """),
+            Used with artifact_status_changed subscription to receive real-time updates
+            when artifact revision statuses change.
+        """),
+        added_version="24.09.0",
+    ),
 )
 class ArtifactStatusChangedInput(PydanticInputMixin[ArtifactStatusChangedInputDTO]):
     artifact_revision_ids: list[ID]
 
 
 @gql_pydantic_input(
-    BackendAIGQLMeta(description="", added_version="24.09.0"),
-    description=dedent_strip("""
-    Specifies a target model for scanning operations.
+    BackendAIGQLMeta(
+        description=dedent_strip("""
+            Specifies a target model for scanning operations.
 
-    Used to identify specific models in external registries for detailed scanning.
-    If revision is not specified, defaults to 'main' revision.
-    """),
+            Used to identify specific models in external registries for detailed scanning.
+            If revision is not specified, defaults to 'main' revision.
+        """),
+        added_version="24.09.0",
+    ),
 )
 class ModelTarget(PydanticInputMixin[ModelTargetInputDTO]):
     model_id: str
@@ -564,14 +598,16 @@ class ModelTarget(PydanticInputMixin[ModelTargetInputDTO]):
 
 
 @gql_pydantic_input(
-    BackendAIGQLMeta(description="", added_version="24.09.0"),
-    description=dedent_strip("""
-    Input for batch scanning of specific models from external registries.
+    BackendAIGQLMeta(
+        description=dedent_strip("""
+            Input for batch scanning of specific models from external registries.
 
-    Scans multiple specified models and retrieves detailed information including
-    README content and file sizes. This operation performs immediate detailed scanning
-    unlike the general scan_artifacts which only retrieves basic metadata.
-    """),
+            Scans multiple specified models and retrieves detailed information including
+            README content and file sizes. This operation performs immediate detailed scanning
+            unlike the general scan_artifacts which only retrieves basic metadata.
+        """),
+        added_version="24.09.0",
+    ),
 )
 class ScanArtifactModelsInput(PydanticInputMixin[ScanArtifactModelsInputDTO]):
     models: list[ModelTarget]
@@ -610,7 +646,7 @@ class Artifact(PydanticNodeMixin[ArtifactGQLNode]):
     updated_at: datetime
     availability: ArtifactAvailability
 
-    @gql_field(description="The revisions of this entity.")
+    @gql_field(description="The revisions of this entity.")  # type: ignore[misc]
     async def revisions(
         self,
         info: Info[StrawberryGQLContext],
@@ -725,7 +761,7 @@ class ArtifactRevision(PydanticNodeMixin[ArtifactRevisionNode]):
         ])
         return cast(list[Self | None], results)
 
-    @gql_field(description="The artifact of this entity.")
+    @gql_field(description="The artifact of this entity.")  # type: ignore[misc]
     async def artifact(self, info: Info[StrawberryGQLContext]) -> Artifact:
         revision_node = await info.context.adapters.artifact.get_revision(uuid.UUID(self.id))
         artifact_node = await info.context.adapters.artifact.get(revision_node.artifact_id)

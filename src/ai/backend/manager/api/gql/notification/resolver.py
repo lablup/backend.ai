@@ -348,7 +348,7 @@ async def notification_rule_type_schema(
     """Return the JSON schema for a given notification rule type."""
     from ai.backend.common.data.notification import NotifiableMessage, NotificationRuleType
 
-    internal_type = NotificationRuleType(rule_type.value)
+    internal_type = NotificationRuleType(rule_type.value)  # type: ignore[attr-defined]
     return NotifiableMessage.get_message_schema(internal_type)
 
 

@@ -96,7 +96,7 @@ async def rbac_scope_entity_combinations(
             scope_type=RBACElementTypeGQL(scope.value),
             valid_entity_types=sorted(
                 [RBACElementTypeGQL(entity.value) for entity in entities],
-                key=lambda e: e.value,
+                key=lambda e: e.value,  # type: ignore[attr-defined]
             ),
         )
         for scope, entities in VALID_SCOPE_ENTITY_COMBINATIONS.items()

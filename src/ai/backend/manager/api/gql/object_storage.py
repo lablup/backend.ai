@@ -93,7 +93,7 @@ class ObjectStorage(PydanticNodeMixin[ObjectStorageNode]):
         ])
         return cast(list[Self | None], results)
 
-    @gql_field(description="The namespaces of this entity.")
+    @gql_field(description="The namespaces of this entity.")  # type: ignore[misc]
     async def namespaces(
         self,
         info: Info[StrawberryGQLContext],
@@ -130,7 +130,7 @@ ObjectStorageEdge = Edge[ObjectStorage]
     ),
 )
 class ObjectStorageConnection(Connection[ObjectStorage]):
-    @gql_field(description="The count of this entity.")
+    @gql_field(description="The count of this entity.")  # type: ignore[misc]
     def count(self) -> int:
         return len(self.edges)
 

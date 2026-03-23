@@ -233,7 +233,7 @@ class RGDomainFairShareFilter(PydanticInputMixin[DomainFairShareFilterDTO]):
             "FAIR_SHARE_FACTOR: Order by the calculated fair share factor (0-1 range, lower = higher priority). "
             "DOMAIN_NAME: Order alphabetically by domain name. "
             "CREATED_AT: Order by record creation timestamp. "
-            "DOMAIN_IS_ACTIVE: Order by domain active status (added in 26.2.0)."
+            "DOMAIN_IS_ACTIVE: Order by domain active status."
         ),
     ),
     name="DomainFairShareOrderField",
