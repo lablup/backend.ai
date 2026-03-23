@@ -607,10 +607,14 @@ class UserAdapter(BaseAdapter):
         self, user_id: UUID, access_key: str, is_active: bool
     ) -> UpdateMyKeypairPayload:
         """Update a keypair owned by the current user."""
-        updater_spec = KeyPairUpdaterSpec(is_active=OptionalState.update(is_active))
-        updater = Updater(spec=updater_spec, pk_value=access_key)
         result = await self._processors.user.update_my_keypair.wait_for_complete(
-            UpdateMyKeypairAction(user_uuid=user_id, updater=updater)
+            UpdateMyKeypairAction(
+                user_uuid=user_id,
+                updater=Updater(
+                    spec=KeyPairUpdaterSpec(is_active=OptionalState.update(is_active)),
+                    pk_value=access_key,
+                ),
+            )
         )
         return UpdateMyKeypairPayload(keypair=self._keypair_data_to_node(result.keypair))
 

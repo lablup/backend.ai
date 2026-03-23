@@ -13,7 +13,6 @@ from ai.backend.common.api_handlers import BaseResponseModel
 
 from .types import (
     OperationTypeDTO,
-    PermissionSummary,
     RBACElementTypeDTO,
     RoleSourceDTO,
     RoleStatusDTO,
@@ -38,7 +37,7 @@ __all__ = (
 
 
 class RoleNode(BaseResponseModel):
-    """Node model representing a role entity with optional nested permissions."""
+    """Node model representing a role entity."""
 
     id: UUID = Field(description="Role ID")
     name: str = Field(description="Role name")
@@ -48,9 +47,6 @@ class RoleNode(BaseResponseModel):
     created_at: datetime = Field(description="Creation timestamp")
     updated_at: datetime = Field(description="Last update timestamp")
     deleted_at: datetime | None = Field(default=None, description="Deletion timestamp")
-    permissions: list[PermissionSummary] = Field(
-        default_factory=list, description="Compact permission list"
-    )
 
 
 class CreateRolePayload(BaseResponseModel):

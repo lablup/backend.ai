@@ -203,6 +203,9 @@ class ImageV2MetadataInfoGQL:
     created_at: datetime | None = strawberry.field(
         description="Timestamp when the image was created/registered."
     )
+    last_used_at: datetime | None = strawberry.field(
+        description="Added in 26.3.0. Timestamp of the most recent session created with this image. Returns null if the image has never been used.",
+    )
     tags: list[ImageV2TagEntryGQL] = strawberry.field(
         description="Parsed tag components from the image reference (e.g., python=3.11, cuda=12.1)."
     )
@@ -278,9 +281,9 @@ class ImageV2GQL(PydanticNodeMixin[ImageNode]):
     @strawberry.field(  # type: ignore[misc]
         description="Added in 26.3.0. Timestamp of the most recent session created with this image. Returns null if the image has never been used.",
     )
-    async def last_used(self, info: Info[StrawberryGQLContext]) -> datetime | None:
+    def last_used(self) -> datetime | None:
         """Get the timestamp of the most recent session created with this image."""
-        return await info.context.data_loaders.image_last_used_loader.load(ImageID(self.id))
+        return self.metadata.last_used_at
 
     @strawberry.field(description="Added in 26.2.0. Aliases for this image.")  # type: ignore[misc]
     async def aliases(

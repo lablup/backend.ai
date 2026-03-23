@@ -9,7 +9,13 @@ from strawberry import ID, Info
 from strawberry.relay import PageInfo
 
 from ai.backend.common.data.model_deployment.types import (
+    RouteStatus as RouteStatusCommon,
+)
+from ai.backend.common.data.model_deployment.types import (
     RouteTrafficStatus as RouteTrafficStatusCommon,
+)
+from ai.backend.common.dto.manager.v2.deployment.request import (
+    RouteFilter as RouteFilterDTO,
 )
 from ai.backend.common.dto.manager.v2.deployment.request import (
     SearchRoutesInput,
@@ -28,6 +34,19 @@ from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.data.deployment.types import (
     RouteSearchScope,
 )
+
+
+def _route_filter_to_dto(filter: RouteFilter) -> RouteFilterDTO:
+    return RouteFilterDTO(
+        status=[RouteStatusCommon(s.value) for s in filter.status] if filter.status else None,
+        traffic_status=[RouteTrafficStatusCommon(s.value) for s in filter.traffic_status]
+        if filter.traffic_status
+        else None,
+        AND=[_route_filter_to_dto(f) for f in filter.AND] if filter.AND else None,
+        OR=[_route_filter_to_dto(f) for f in filter.OR] if filter.OR else None,
+        NOT=[_route_filter_to_dto(f) for f in filter.NOT] if filter.NOT else None,
+    )
+
 
 # Query resolvers
 
@@ -49,7 +68,7 @@ async def routes(
 ) -> RouteConnection | None:
     """List routes for a deployment with optional filters."""
     _, endpoint_id = resolve_global_id(deployment_id)
-    pydantic_filter = filter.to_pydantic() if filter else None
+    pydantic_filter = _route_filter_to_dto(filter) if filter else None
     pydantic_order = [o.to_pydantic() for o in order_by] if order_by else None
     payload = await info.context.adapters.deployment.search_routes(
         scope=RouteSearchScope(deployment_id=UUID(endpoint_id)),
@@ -94,8 +113,9 @@ async def update_route_traffic_status(
     info: Info[StrawberryGQLContext],
 ) -> UpdateRouteTrafficStatusPayloadGQL:
     """Update route traffic status (ACTIVE/INACTIVE)."""
+    _, route_id = resolve_global_id(input.route_id)
     route_node = await info.context.adapters.deployment.update_route_traffic(
-        UUID(input.route_id),
+        UUID(route_id),
         RouteTrafficStatusCommon(input.traffic_status.value),
     )
     return UpdateRouteTrafficStatusPayloadGQL(

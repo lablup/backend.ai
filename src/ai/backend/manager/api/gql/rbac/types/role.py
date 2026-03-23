@@ -182,6 +182,7 @@ class RoleGQL(PydanticNodeMixin[Any]):
         strawberry.lazy("ai.backend.manager.api.gql.rbac.types.permission"),
     ]:
         from ai.backend.manager.api.gql.rbac.types.permission import (
+            PermissionConnection,
             PermissionEdge,
             PermissionFilter,
             PermissionGQL,
