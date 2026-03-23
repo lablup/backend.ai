@@ -6023,6 +6023,9 @@ type KeyPairGQL implements Node
   """The Globally Unique ID of this object"""
   id: ID!
 
+  """The access key string."""
+  accessKey: String!
+
   """Whether the keypair is currently active."""
   isActive: Boolean
 
