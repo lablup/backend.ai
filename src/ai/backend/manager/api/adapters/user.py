@@ -99,6 +99,7 @@ from ai.backend.manager.repositories.base import (
 from ai.backend.manager.repositories.base.creator import Creator
 from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.repositories.keypair.types import UserKeypairSearchScope
+from ai.backend.manager.repositories.keypair.updaters import KeyPairUpdaterSpec
 from ai.backend.manager.repositories.user.creators import UserCreatorSpec
 from ai.backend.manager.repositories.user.types import (
     DomainUserSearchScope,
@@ -591,9 +592,8 @@ class UserAdapter(BaseAdapter):
             IssueMyKeypairAction(user_uuid=user_id)
         )
         return IssueMyKeypairPayload(
-            access_key=result.generated_data.access_key,
-            secret_key=result.generated_data.secret_key,
-            ssh_public_key=result.generated_data.ssh_public_key,
+            keypair=self._keypair_data_to_node(result.generated_data.keypair),
+            secret_key=str(result.generated_data.keypair.secret_key),
         )
 
     async def revoke_my_keypair(self, user_id: UUID, access_key: str) -> RevokeMyKeypairPayload:
@@ -608,9 +608,15 @@ class UserAdapter(BaseAdapter):
     ) -> UpdateMyKeypairPayload:
         """Update a keypair owned by the current user."""
         result = await self._processors.user.update_my_keypair.wait_for_complete(
-            UpdateMyKeypairAction(user_uuid=user_id, access_key=access_key, is_active=is_active)
+            UpdateMyKeypairAction(
+                user_uuid=user_id,
+                updater=Updater(
+                    spec=KeyPairUpdaterSpec(is_active=OptionalState.update(is_active)),
+                    pk_value=access_key,
+                ),
+            )
         )
-        return UpdateMyKeypairPayload(success=result.success)
+        return UpdateMyKeypairPayload(keypair=self._keypair_data_to_node(result.keypair))
 
     async def switch_my_main_access_key(
         self, user_id: UUID, access_key: str
