@@ -1,15 +1,18 @@
 from __future__ import annotations
 
-import enum
 from collections.abc import Callable, MutableMapping
 from typing import Any
 
 from ai.backend.cli.types import Undefined, undefined
+from ai.backend.common.types import Sentinel
 
 __all__ = (
     "Sentinel",
     "sentinel",
 )
+
+# Re-export for backwards compatibility
+sentinel = Sentinel.TOKEN
 
 
 def set_if_set(
@@ -23,18 +26,3 @@ def set_if_set(
         if clean_func is not None:
             value = clean_func(value)
         target_dict[key] = value
-
-
-class Sentinel(enum.Enum):
-    """
-    A special type to represent a special value to indicate closing/shutdown of queues.
-    """
-
-    TOKEN = 0
-
-    def __bool__(self) -> bool:
-        # It should be evaluated as False when used as a boolean expr.
-        return False
-
-
-sentinel = Sentinel.TOKEN

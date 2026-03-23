@@ -81,8 +81,10 @@ class BaseClientPool(metaclass=abc.ABCMeta):
     def __init__(
         self,
         factory: ClientSessionFactory,
+        *,
+        _stacklevel: int = 1,
     ) -> None:
-        frame = inspect.stack()[1]
+        frame = inspect.stack()[_stacklevel]
         self._creator_info = f"{frame.filename}:{frame.lineno}:{frame.function}()"
         self._client_session_factory = factory
         self._clients = {}
@@ -120,7 +122,7 @@ class ClientPool(BaseClientPool):
         factory: ClientSessionFactory,
         cleanup_interval_seconds: float = 600,
     ) -> None:
-        super().__init__(factory)
+        super().__init__(factory, _stacklevel=2)
         self._cleanup_task = asyncio.create_task(
             self._cleanup_loop(cleanup_interval_seconds),
             name=f"_cleanup_task from {self!r}",
@@ -174,7 +176,7 @@ class SyncClientPool(BaseClientPool):
         factory: ClientSessionFactory,
         cleanup_interval_seconds: float = 600,
     ) -> None:
-        super().__init__(factory)
+        super().__init__(factory, _stacklevel=2)
         self._cleanup_interval = cleanup_interval_seconds
         self._worker_thread = SyncWorkerThread(daemon=True)
         self._worker_thread.start()
