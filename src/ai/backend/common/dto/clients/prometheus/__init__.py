@@ -6,7 +6,7 @@ from .response import (
     MetricResponseInfo,
     MetricResponseValue,
     PrometheusQueryData,
-    PrometheusQueryRangeResponse,
+    PrometheusResponse,
 )
 
 __all__ = [
@@ -17,5 +17,5 @@ __all__ = [
     "MetricResponseInfo",
     "MetricResponseValue",
     "PrometheusQueryData",
-    "PrometheusQueryRangeResponse",
+    "PrometheusResponse",
 ]

@@ -17,13 +17,14 @@ from ai.backend.common.dto.manager.resource_slot.response import (
 )
 from ai.backend.manager.api.rest.adapter import BaseFilterAdapter
 from ai.backend.manager.data.resource_slot.types import ResourceSlotTypeData
+from ai.backend.manager.models.resource_slot.conditions import ResourceSlotTypeConditions
+from ai.backend.manager.models.resource_slot.orders import ResourceSlotTypeOrders
 from ai.backend.manager.repositories.base import (
     BatchQuerier,
     OffsetPagination,
     QueryCondition,
     QueryOrder,
 )
-from ai.backend.manager.repositories.resource_slot.query import QueryConditions, QueryOrders
 
 __all__ = ("ResourceSlotAdapter",)
 
@@ -65,10 +66,10 @@ class ResourceSlotAdapter(BaseFilterAdapter):
         if filter.slot_name is not None:
             condition = self.convert_string_filter(
                 filter.slot_name,
-                contains_factory=QueryConditions.by_slot_name_contains,
-                equals_factory=QueryConditions.by_slot_name_equals,
-                starts_with_factory=QueryConditions.by_slot_name_starts_with,
-                ends_with_factory=QueryConditions.by_slot_name_ends_with,
+                contains_factory=ResourceSlotTypeConditions.by_slot_name_contains,
+                equals_factory=ResourceSlotTypeConditions.by_slot_name_equals,
+                starts_with_factory=ResourceSlotTypeConditions.by_slot_name_starts_with,
+                ends_with_factory=ResourceSlotTypeConditions.by_slot_name_ends_with,
             )
             if condition is not None:
                 conditions.append(condition)
@@ -76,10 +77,10 @@ class ResourceSlotAdapter(BaseFilterAdapter):
         if filter.slot_type is not None:
             condition = self.convert_string_filter(
                 filter.slot_type,
-                contains_factory=QueryConditions.by_slot_type_contains,
-                equals_factory=QueryConditions.by_slot_type_equals,
-                starts_with_factory=QueryConditions.by_slot_type_starts_with,
-                ends_with_factory=QueryConditions.by_slot_type_ends_with,
+                contains_factory=ResourceSlotTypeConditions.by_slot_type_contains,
+                equals_factory=ResourceSlotTypeConditions.by_slot_type_equals,
+                starts_with_factory=ResourceSlotTypeConditions.by_slot_type_starts_with,
+                ends_with_factory=ResourceSlotTypeConditions.by_slot_type_ends_with,
             )
             if condition is not None:
                 conditions.append(condition)
@@ -87,10 +88,10 @@ class ResourceSlotAdapter(BaseFilterAdapter):
         if filter.display_name is not None:
             condition = self.convert_string_filter(
                 filter.display_name,
-                contains_factory=QueryConditions.by_display_name_contains,
-                equals_factory=QueryConditions.by_display_name_equals,
-                starts_with_factory=QueryConditions.by_display_name_starts_with,
-                ends_with_factory=QueryConditions.by_display_name_ends_with,
+                contains_factory=ResourceSlotTypeConditions.by_display_name_contains,
+                equals_factory=ResourceSlotTypeConditions.by_display_name_equals,
+                starts_with_factory=ResourceSlotTypeConditions.by_display_name_starts_with,
+                ends_with_factory=ResourceSlotTypeConditions.by_display_name_ends_with,
             )
             if condition is not None:
                 conditions.append(condition)
@@ -102,9 +103,9 @@ class ResourceSlotAdapter(BaseFilterAdapter):
         ascending = order.direction == OrderDirection.ASC
 
         if order.field == ResourceSlotTypeOrderField.SLOT_NAME:
-            return QueryOrders.slot_name(ascending=ascending)
+            return ResourceSlotTypeOrders.slot_name(ascending=ascending)
         if order.field == ResourceSlotTypeOrderField.RANK:
-            return QueryOrders.rank(ascending=ascending)
+            return ResourceSlotTypeOrders.rank(ascending=ascending)
         if order.field == ResourceSlotTypeOrderField.DISPLAY_NAME:
-            return QueryOrders.display_name(ascending=ascending)
+            return ResourceSlotTypeOrders.display_name(ascending=ascending)
         raise ValueError(f"Unknown order field: {order.field}")

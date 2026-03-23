@@ -6,11 +6,13 @@ from typing import Any, override
 
 import yarl
 
+from ai.backend.common.data.permission.types import RBACElementType, ScopeType
 from ai.backend.common.types import AccessKey, ClusterMode, SessionTypes
 from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.actions.types import ActionOperationType
+from ai.backend.manager.data.permission.types import RBACElementRef
 from ai.backend.manager.models.user import UserRole
-from ai.backend.manager.services.session.base import SessionAction
+from ai.backend.manager.services.session.base import SessionScopeAction
 
 
 # TODO: Idea: Refactor this type using pydantic and utilize as API model
@@ -41,7 +43,13 @@ class CreateFromParamsActionParams:
 
 
 @dataclass
-class CreateFromParamsAction(SessionAction):
+class CreateFromParamsAction(SessionScopeAction):
+    """Create a new session from parameters.
+
+    RBAC validation checks if the user has CREATE permission in USER scope.
+    Scope is always USER scope with user_id.
+    """
+
     params: CreateFromParamsActionParams
     user_id: uuid.UUID
     user_role: UserRole
@@ -57,6 +65,21 @@ class CreateFromParamsAction(SessionAction):
     @classmethod
     def operation_type(cls) -> ActionOperationType:
         return ActionOperationType.CREATE
+
+    @override
+    def scope_type(self) -> ScopeType:
+        return ScopeType.USER
+
+    @override
+    def scope_id(self) -> str:
+        return str(self.user_id)
+
+    @override
+    def target_element(self) -> RBACElementRef:
+        return RBACElementRef(
+            element_type=RBACElementType.USER,
+            element_id=str(self.user_id),
+        )
 
 
 @dataclass

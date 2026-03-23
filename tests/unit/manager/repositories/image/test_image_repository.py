@@ -21,6 +21,7 @@ from ai.backend.manager.models.container_registry import ContainerRegistryRow
 from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.group.row import GroupRow
 from ai.backend.manager.models.image import ImageAliasRow, ImageRow, ImageStatus, ImageType
+from ai.backend.manager.models.image.conditions import ImageConditions
 from ai.backend.manager.models.kernel import KernelRow
 from ai.backend.manager.models.keypair import KeyPairRow
 from ai.backend.manager.models.resource_policy import (
@@ -33,7 +34,6 @@ from ai.backend.manager.models.session.row import SessionRow
 from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.base import BatchQuerier, OffsetPagination
-from ai.backend.manager.repositories.image.options import ImageConditions
 from ai.backend.manager.repositories.image.repository import ImageRepository
 from ai.backend.testutils.db import with_tables
 

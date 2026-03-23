@@ -22,13 +22,12 @@ class DeploymentPolicyUpserterSpec(UpserterSpec[DeploymentPolicyRow]):
     """UpserterSpec for deployment policy upsert (INSERT ON CONFLICT UPDATE).
 
     Uses the unique constraint on ``endpoint`` column to detect conflicts.
-    On conflict, updates strategy, strategy_spec, and rollback_on_failure.
+    On conflict, updates strategy and strategy_spec.
     """
 
     endpoint_id: uuid.UUID
     strategy: DeploymentStrategy
     strategy_spec: RollingUpdateSpec | BlueGreenSpec
-    rollback_on_failure: bool
 
     @property
     @override
@@ -41,7 +40,6 @@ class DeploymentPolicyUpserterSpec(UpserterSpec[DeploymentPolicyRow]):
             "endpoint": self.endpoint_id,
             "strategy": self.strategy,
             "strategy_spec": self.strategy_spec.model_dump(),
-            "rollback_on_failure": self.rollback_on_failure,
         }
 
     @override
@@ -49,6 +47,5 @@ class DeploymentPolicyUpserterSpec(UpserterSpec[DeploymentPolicyRow]):
         return {
             "strategy": self.strategy,
             "strategy_spec": self.strategy_spec.model_dump(),
-            "rollback_on_failure": self.rollback_on_failure,
             "updated_at": sa.func.now(),
         }

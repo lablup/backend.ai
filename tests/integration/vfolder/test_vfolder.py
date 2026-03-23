@@ -50,14 +50,14 @@ class TestVFolderLifecycle:
         # 2. Get info by name
         info = await admin_registry.vfolder.get_info(original_name)
         assert isinstance(info, VFolderGetInfoResponse)
-        assert info.item.name == original_name
-        assert info.item.id == vf["id"].hex
+        assert info.root.name == original_name
+        assert info.root.id == vf["id"].hex
 
         # 3. Get ID by name
         id_result = await admin_registry.vfolder.get_id(
             GetVFolderIDReq(name=original_name),
         )
-        assert id_result.item.id == vf["id"].hex
+        assert id_result.root.id == vf["id"].hex
 
         # 4. Rename
         new_name = f"renamed-{original_name}"
@@ -66,7 +66,7 @@ class TestVFolderLifecycle:
             RenameVFolderReq(new_name=new_name),
         )
         renamed_info = await admin_registry.vfolder.get_info(new_name)
-        assert renamed_info.item.name == new_name
+        assert renamed_info.root.name == new_name
 
         # 5. Update options
         await admin_registry.vfolder.update_options(
@@ -74,7 +74,7 @@ class TestVFolderLifecycle:
             UpdateVFolderOptionsReq(cloneable=True),
         )
         updated_info = await admin_registry.vfolder.get_info(new_name)
-        assert updated_info.item.cloneable is True
+        assert updated_info.root.cloneable is True
 
         # 6. Delete (soft - moves to trash)
         await admin_registry.vfolder.delete_by_id(

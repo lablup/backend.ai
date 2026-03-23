@@ -349,7 +349,7 @@ class VfolderRepository:
                         entity_type=EntityType.VFOLDER,
                         entity_id=str(params.id),
                     ),
-                    granted_entity_scope_type=ScopeType.VFOLDER,
+                    granted_entity_scope_type=RBACElementType.VFOLDER,
                     target_scope_id=ScopeId(
                         scope_type=ScopeType.USER,
                         scope_id=str(params.user),
@@ -538,7 +538,7 @@ class VfolderRepository:
                     entity_type=EntityType.VFOLDER,
                     entity_id=str(vfolder_id),
                 ),
-                granted_entity_scope_type=ScopeType.VFOLDER,
+                granted_entity_scope_type=RBACElementType.VFOLDER,
                 target_scope_id=ScopeId(
                     scope_type=ScopeType.USER,
                     scope_id=str(user_id),
@@ -577,7 +577,7 @@ class VfolderRepository:
                     entity_type=EntityType.VFOLDER,
                     entity_id=str(vfolder_id),
                 ),
-                entity_scope_type=ScopeType.VFOLDER,
+                entity_scope_type=RBACElementType.VFOLDER,
                 target_role_ids=[user_role_id],
                 operations=None,  # Revoke all operations
             )

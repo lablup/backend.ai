@@ -1,17 +1,20 @@
 """Fair Share repository package."""
 
+from ai.backend.manager.models.fair_share.conditions import (
+    DomainFairShareConditions,
+    ProjectFairShareConditions,
+    UserFairShareConditions,
+)
+from ai.backend.manager.models.fair_share.orders import (
+    DomainFairShareOrders,
+    ProjectFairShareOrders,
+    UserFairShareOrders,
+)
+
 from .creators import (
     DomainFairShareCreatorSpec,
     ProjectFairShareCreatorSpec,
     UserFairShareCreatorSpec,
-)
-from .options import (
-    DomainFairShareConditions,
-    DomainFairShareOrders,
-    ProjectFairShareConditions,
-    ProjectFairShareOrders,
-    UserFairShareConditions,
-    UserFairShareOrders,
 )
 from .repositories import FairShareRepositories
 from .repository import FairShareRepository

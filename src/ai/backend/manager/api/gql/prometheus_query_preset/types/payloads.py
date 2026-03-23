@@ -2,81 +2,106 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, Self
-
 import strawberry
 from strawberry import ID
 
-if TYPE_CHECKING:
-    from ai.backend.common.dto.clients.prometheus.response import MetricResponse
+from ai.backend.common.dto.manager.v2.prometheus_query_preset.response import (
+    DeleteQueryDefinitionPayload as DeleteQueryDefinitionPayloadDTO,
+)
+from ai.backend.common.dto.manager.v2.prometheus_query_preset.response import (
+    QueryDefinitionMetricResultInfo,
+)
+from ai.backend.common.dto.manager.v2.prometheus_query_preset.response import (
+    QueryDefinitionResultInfo as QueryDefinitionResultInfoDTO,
+)
+from ai.backend.common.dto.manager.v2.prometheus_query_preset.types import (
+    MetricLabelEntryInfo,
+    MetricValueInfo,
+    QueryDefinitionOptionsInfo,
+)
+from ai.backend.manager.api.gql.decorators import (
+    BackendAIGQLMeta,
+    gql_pydantic_type,
+)
+from ai.backend.manager.api.gql.pydantic_compat import PydanticOutputMixin
 
 
-@strawberry.type(
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version="26.3.0",
+        description="Options for query definition label governance.",
+    ),
+    model=QueryDefinitionOptionsInfo,
+    all_fields=True,
     name="QueryDefinitionOptions",
-    description="Added in 26.3.0. Options for query definition label governance.",
 )
-class QueryDefinitionOptionsGQL:
-    filter_labels: list[str] = strawberry.field(description="Allowed filter label keys.")
-    group_labels: list[str] = strawberry.field(description="Allowed group-by label keys.")
+class QueryDefinitionOptionsGQL(PydanticOutputMixin[QueryDefinitionOptionsInfo]):
+    pass
 
 
-@strawberry.type(
-    name="QueryDefinitionMetricLabelEntry",
-    description="Added in 26.3.0. Key-value label entry from Prometheus result.",
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version="26.3.0",
+        description="Key-value label entry from Prometheus result.",
+    ),
+    model=MetricLabelEntryInfo,
+    all_fields=True,
+    name="MetricLabelEntry",
 )
-class MetricLabelEntryGQL:
-    key: str
-    value: str
-
-    @classmethod
-    def from_metric_dict(cls, metric: dict[str, Any]) -> list[Self]:
-        return [cls(key=k, value=str(v)) for k, v in metric.items()]
+class MetricLabelEntryGQL(PydanticOutputMixin[MetricLabelEntryInfo]):
+    pass
 
 
-@strawberry.type(
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version="26.3.0",
+        description="Single timestamp-value pair from Prometheus.",
+    ),
+    model=MetricValueInfo,
+    all_fields=True,
     name="QueryDefinitionMetricResultValue",
-    description="Added in 26.3.0. Single timestamp-value pair from Prometheus.",
 )
-class MetricResultValueGQL:
-    timestamp: float
-    value: str
+class MetricResultValueGQL(PydanticOutputMixin[MetricValueInfo]):
+    pass
 
 
-@strawberry.type(
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version="26.3.0",
+        description="Single metric result from Prometheus query.",
+    ),
+    model=QueryDefinitionMetricResultInfo,
     name="QueryDefinitionMetricResult",
-    description="Added in 26.3.0. Single metric result from Prometheus query.",
 )
-class MetricResultGQL:
+class MetricResultGQL(PydanticOutputMixin[QueryDefinitionMetricResultInfo]):
     metric: list[MetricLabelEntryGQL] = strawberry.field(
         description="Metric labels as key-value entries."
     )
     values: list[MetricResultValueGQL] = strawberry.field(description="Time-series values.")
 
-    @classmethod
-    def from_metric_response(cls, metric_response: MetricResponse) -> Self:
-        return cls(
-            metric=MetricLabelEntryGQL.from_metric_dict(
-                metric_response.metric.model_dump(exclude_none=True)
-            ),
-            values=[
-                MetricResultValueGQL(timestamp=ts, value=val) for ts, val in metric_response.values
-            ],
-        )
 
-
-@strawberry.type(
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version="26.3.0",
+        description="Result from executing a query definition.",
+    ),
+    model=QueryDefinitionResultInfoDTO,
     name="QueryDefinitionExecuteResult",
-    description="Added in 26.3.0. Result from executing a query definition.",
 )
-class QueryDefinitionResultGQL:
+class QueryDefinitionResultGQL(PydanticOutputMixin[QueryDefinitionResultInfoDTO]):
     status: str = strawberry.field(description="Prometheus response status.")
     result_type: str = strawberry.field(description="Result type (e.g., matrix).")
     result: list[MetricResultGQL] = strawberry.field(description="Metric result entries.")
 
 
-@strawberry.type(
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version="26.3.0",
+        description="Payload returned after deleting a query definition.",
+    ),
+    model=DeleteQueryDefinitionPayloadDTO,
+    fields=["id"],
     name="DeleteQueryDefinitionPayload",
-    description="Added in 26.3.0. Payload returned after deleting a query definition.",
 )
-class DeleteQueryDefinitionPayload:
-    id: ID = strawberry.field(description="ID of the deleted query definition.")
+class DeleteQueryDefinitionPayload(PydanticOutputMixin[DeleteQueryDefinitionPayloadDTO]):
+    id: ID = strawberry.field(description="Deleted query definition ID.")

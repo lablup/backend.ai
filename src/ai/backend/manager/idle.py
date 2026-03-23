@@ -138,7 +138,7 @@ class UtilizationResourceReport(UserDict[str, UtilizationExtraInfo]):
     @classmethod
     def from_avg_threshold(
         cls,
-        avg_utils: Mapping[str, float],
+        avg_utils: Mapping[str, float | None],
         thresholds: ResourceThresholds,
         exclusions: set[str],
     ) -> UtilizationResourceReport:
@@ -146,7 +146,9 @@ class UtilizationResourceReport(UserDict[str, UtilizationExtraInfo]):
         for metric_key, val in thresholds.items():
             if val.average is None or metric_key in exclusions:
                 continue
-            avg_util = avg_utils.get(metric_key, 0)
+            avg_util = avg_utils.get(metric_key)
+            if avg_util is None:
+                continue
             data[metric_key] = UtilizationExtraInfo(float(avg_util), float(val.average))
         return cls(data)
 
@@ -1119,13 +1121,15 @@ class UtilizationIdleChecker(BaseIdleChecker):
         # Update utilization time-series data.
         raw_util_series = await self._redis_live.get_live_data(util_series_key)
 
-        def default_util_series() -> dict[str, list[float]]:
+        def default_util_series() -> dict[str, list[float | None]]:
             return {resource: [] for resource in current_utilizations.keys()}
 
         if raw_util_series is not None:
             try:
-                raw_data: dict[str, list[float]] = msgpack.unpackb(raw_util_series, use_list=True)
-                util_series: dict[str, list[float]] = {
+                raw_data: dict[str, list[float | None]] = msgpack.unpackb(
+                    raw_util_series, use_list=True
+                )
+                util_series: dict[str, list[float | None]] = {
                     metric_key: v for metric_key, v in raw_data.items()
                 }
             except TypeError:
@@ -1159,13 +1163,13 @@ class UtilizationIdleChecker(BaseIdleChecker):
             ex=max(86400, int(self.time_window.total_seconds() * 2)),
         )
 
-        def _avg(util_list: list[float]) -> float:
-            try:
-                return sum(util_list) / len(util_list)
-            except ZeroDivisionError:
-                return 0.0
+        def _avg(util_list: list[float | None]) -> float | None:
+            filtered = [v for v in util_list if v is not None]
+            if not filtered:
+                return None
+            return sum(filtered) / len(filtered)
 
-        avg_utils: Mapping[str, float] = {k: _avg(v) for k, v in util_series.items()}
+        avg_utils: Mapping[str, float | None] = {k: _avg(v) for k, v in util_series.items()}
 
         util_avg_thresholds = UtilizationResourceReport.from_avg_threshold(
             avg_utils, self.resource_thresholds, excluded_resources
@@ -1208,14 +1212,20 @@ class UtilizationIdleChecker(BaseIdleChecker):
         self,
         kernel_ids: Sequence[KernelId],
         occupied_slots: Mapping[str, Any],
-    ) -> Mapping[str, float] | None:
+    ) -> Mapping[str, float | None] | None:
         """
         Return the current utilization key-value pairs of multiple kernels, possibly the
         components of a cluster session. If there are multiple kernel_ids, this method
         will return the averaged values over the kernels for each utilization.
+
+        When a metric is missing from some kernels' stats (e.g., CUDA plugin failure),
+        the metric is averaged only over the kernels that reported it. If no kernel
+        reported a metric, it is returned as None (not 0.0) so that the idle checker
+        can exclude it from the idle decision rather than treating it as idle.
         """
         try:
-            utilizations: defaultdict[str, float] = defaultdict(float)
+            utilization_sums: defaultdict[str, float] = defaultdict(float)
+            utilization_counts: defaultdict[str, int] = defaultdict(int)
             live_stat = {}
             kernel_counter = 0
             for kernel_id in kernel_ids:
@@ -1227,12 +1237,14 @@ class UtilizationIdleChecker(BaseIdleChecker):
                     continue
                 live_stat = raw_live_stat
                 kernel_utils = {
-                    k: float(nmget(live_stat, f"{k}.pct", 0.0))
-                    for k in self.resource_names_to_check
+                    k: nmget(live_stat, f"{k}.pct") for k in self.resource_names_to_check
                 }
 
                 for resource, val in kernel_utils.items():
-                    utilizations[resource] = utilizations[resource] + val
+                    if val is None:
+                        continue
+                    utilization_sums[resource] += float(val)
+                    utilization_counts[resource] += 1
 
                 # NOTE: Manual calculation of mem utilization.
                 # mem.capacity does not report total amount of memory allocated to
@@ -1240,15 +1252,20 @@ class UtilizationIdleChecker(BaseIdleChecker):
                 # executing. So, we just replace it with the value of occupied slot.
                 mem_slots = float(occupied_slots.get("mem", 0))
                 mem_current = float(nmget(live_stat, "mem.current", 0.0))
-                utilizations["mem"] = (
-                    utilizations["mem"] + mem_current / mem_slots * 100 if mem_slots > 0 else 0
-                )
+                if mem_slots > 0:
+                    utilization_sums["mem"] += mem_current / mem_slots * 100
 
                 kernel_counter += 1
             if kernel_counter == 0:
                 return None
-            divider = kernel_counter
-            return {k: v / divider for k, v in utilizations.items()}
+            result: dict[str, float | None] = {}
+            for resource in self.resource_names_to_check:
+                count = utilization_counts.get(resource, 0)
+                if count > 0:
+                    result[resource] = utilization_sums[resource] / count
+                else:
+                    result[resource] = None
+            return result
         except Exception as e:
             _msg = f"Unable to collect utilization for idleness check (kernels:{kernel_ids})"
             log.warning(_msg, exc_info=e)

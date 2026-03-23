@@ -6,24 +6,31 @@ This module provides GraphQL query fields for ImageV2.
 
 from __future__ import annotations
 
+import uuid
 from uuid import UUID
 
 import strawberry
 from strawberry import ID, Info
 
+from ai.backend.common.dto.manager.v2.image.request import (
+    AdminSearchImageAliasesInput,
+    AdminSearchImagesInput,
+)
 from ai.backend.common.types import ImageID
+from ai.backend.manager.api.gql.base import encode_cursor
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.api.gql.utils import check_admin_only, dedent_strip
-from ai.backend.manager.repositories.image.options import ImageAliasConditions, ImageConditions
+from ai.backend.manager.models.image.conditions import ImageAliasConditions, ImageConditions
 
-from .fetcher import fetch_image, fetch_image_alias, fetch_image_aliases, fetch_images
 from .types import (
     ContainerRegistryScopeGQL,
     ImageV2AliasConnectionGQL,
+    ImageV2AliasEdgeGQL,
     ImageV2AliasFilterGQL,
     ImageV2AliasGQL,
     ImageV2AliasOrderByGQL,
     ImageV2ConnectionGQL,
+    ImageV2EdgeGQL,
     ImageV2FilterGQL,
     ImageV2GQL,
     ImageV2OrderByGQL,
@@ -57,17 +64,34 @@ async def admin_images_v2(
     offset: int | None = None,
 ) -> ImageV2ConnectionGQL | None:
     check_admin_only()
-    return await fetch_images(
-        info,
-        filter,
-        order_by,
-        before,
-        after,
-        first,
-        last,
-        limit,
-        offset,
+    pydantic_filter = filter.to_pydantic() if filter else None
+    pydantic_orders = [o.to_pydantic() for o in order_by] if order_by else None
+    payload = await info.context.adapters.image.admin_search_images_gql(
+        AdminSearchImagesInput(
+            filter=pydantic_filter,
+            order=pydantic_orders,
+            first=first,
+            after=after,
+            last=last,
+            before=before,
+            limit=limit,
+            offset=offset,
+        ),
     )
+    edges = [
+        ImageV2EdgeGQL(
+            node=ImageV2GQL.from_pydantic(node),
+            cursor=encode_cursor(node.id),
+        )
+        for node in payload.items
+    ]
+    page_info = strawberry.relay.PageInfo(
+        has_next_page=payload.has_next_page,
+        has_previous_page=payload.has_previous_page,
+        start_cursor=edges[0].cursor if edges else None,
+        end_cursor=edges[-1].cursor if edges else None,
+    )
+    return ImageV2ConnectionGQL(count=payload.total_count, edges=edges, page_info=page_info)
 
 
 @strawberry.field(  # type: ignore[misc]
@@ -81,7 +105,10 @@ async def admin_images_v2(
     """)
 )
 async def image_v2(id: ID, info: Info[StrawberryGQLContext]) -> ImageV2GQL | None:
-    return await fetch_image(info, ImageID(UUID(id)))
+    image_data = await info.context.data_loaders.image_loader.load(ImageID(UUID(id)))
+    if image_data is None:
+        return None
+    return image_data
 
 
 @strawberry.field(  # type: ignore[misc]
@@ -108,20 +135,36 @@ async def container_registry_images_v2(
     limit: int | None = None,
     offset: int | None = None,
 ) -> ImageV2ConnectionGQL | None:
-    # Add registry scope as base condition
+    pydantic_filter = filter.to_pydantic() if filter else None
+    pydantic_orders = [o.to_pydantic() for o in order_by] if order_by else None
     base_conditions = [ImageConditions.by_registry_id(scope.registry_id)]
-    return await fetch_images(
-        info,
-        filter,
-        order_by,
-        before,
-        after,
-        first,
-        last,
-        limit,
-        offset,
+    payload = await info.context.adapters.image.admin_search_images_gql(
+        AdminSearchImagesInput(
+            filter=pydantic_filter,
+            order=pydantic_orders,
+            first=first,
+            after=after,
+            last=last,
+            before=before,
+            limit=limit,
+            offset=offset,
+        ),
         base_conditions=base_conditions,
     )
+    edges = [
+        ImageV2EdgeGQL(
+            node=ImageV2GQL.from_pydantic(node),
+            cursor=encode_cursor(node.id),
+        )
+        for node in payload.items
+    ]
+    page_info = strawberry.relay.PageInfo(
+        has_next_page=payload.has_next_page,
+        has_previous_page=payload.has_previous_page,
+        start_cursor=edges[0].cursor if edges else None,
+        end_cursor=edges[-1].cursor if edges else None,
+    )
+    return ImageV2ConnectionGQL(count=payload.total_count, edges=edges, page_info=page_info)
 
 
 # Image Alias Query Fields
@@ -148,17 +191,34 @@ async def admin_image_aliases(
     offset: int | None = None,
 ) -> ImageV2AliasConnectionGQL | None:
     check_admin_only()
-    return await fetch_image_aliases(
-        info,
-        filter,
-        order_by,
-        before,
-        after,
-        first,
-        last,
-        limit,
-        offset,
+    pydantic_filter = filter.to_pydantic() if filter else None
+    pydantic_orders = [o.to_pydantic() for o in order_by] if order_by else None
+    payload = await info.context.adapters.image.admin_search_image_aliases(
+        AdminSearchImageAliasesInput(
+            filter=pydantic_filter,
+            order=pydantic_orders,
+            first=first,
+            after=after,
+            last=last,
+            before=before,
+            limit=limit,
+            offset=offset,
+        ),
     )
+    edges = [
+        ImageV2AliasEdgeGQL(
+            node=ImageV2AliasGQL.from_pydantic(node),
+            cursor=encode_cursor(node.id),
+        )
+        for node in payload.items
+    ]
+    page_info = strawberry.relay.PageInfo(
+        has_next_page=payload.has_next_page,
+        has_previous_page=payload.has_previous_page,
+        start_cursor=edges[0].cursor if edges else None,
+        end_cursor=edges[-1].cursor if edges else None,
+    )
+    return ImageV2AliasConnectionGQL(count=payload.total_count, edges=edges, page_info=page_info)
 
 
 @strawberry.field(  # type: ignore[misc]
@@ -171,7 +231,10 @@ async def admin_image_aliases(
     """)
 )
 async def image_alias(id: ID, info: Info[StrawberryGQLContext]) -> ImageV2AliasGQL | None:
-    return await fetch_image_alias(info, UUID(id))
+    alias_data = await info.context.data_loaders.image_alias_loader.load(uuid.UUID(id))
+    if alias_data is None:
+        return None
+    return alias_data
 
 
 @strawberry.field(  # type: ignore[misc]
@@ -197,17 +260,33 @@ async def image_scoped_aliases(
     limit: int | None = None,
     offset: int | None = None,
 ) -> ImageV2AliasConnectionGQL | None:
-    # Add image scope as base condition
+    pydantic_filter = filter.to_pydantic() if filter else None
+    pydantic_orders = [o.to_pydantic() for o in order_by] if order_by else None
     base_conditions = [ImageAliasConditions.by_image_ids([ImageID(scope.image_id)])]
-    return await fetch_image_aliases(
-        info,
-        filter,
-        order_by,
-        before,
-        after,
-        first,
-        last,
-        limit,
-        offset,
+    payload = await info.context.adapters.image.admin_search_image_aliases(
+        AdminSearchImageAliasesInput(
+            filter=pydantic_filter,
+            order=pydantic_orders,
+            first=first,
+            after=after,
+            last=last,
+            before=before,
+            limit=limit,
+            offset=offset,
+        ),
         base_conditions=base_conditions,
     )
+    edges = [
+        ImageV2AliasEdgeGQL(
+            node=ImageV2AliasGQL.from_pydantic(node),
+            cursor=encode_cursor(node.id),
+        )
+        for node in payload.items
+    ]
+    page_info = strawberry.relay.PageInfo(
+        has_next_page=payload.has_next_page,
+        has_previous_page=payload.has_previous_page,
+        start_cursor=edges[0].cursor if edges else None,
+        end_cursor=edges[-1].cursor if edges else None,
+    )
+    return ImageV2AliasConnectionGQL(count=payload.total_count, edges=edges, page_info=page_info)

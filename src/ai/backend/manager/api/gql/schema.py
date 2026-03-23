@@ -1,10 +1,13 @@
 import strawberry
+from graphql.pyutils.undefined import Undefined as GraphQLUndefined
 from strawberry.federation import Schema
 from strawberry.schema.config import StrawberryConfig
 
+from ai.backend.common.api_handlers import Sentinel as BackendSentinel
 from ai.backend.manager.api.gql.extensions import (
     GQLExceptionHandlerExtension,
     GQLLoggingExtension,
+    GQLMetricExtension,
     GQLValidationExtension,
 )
 
@@ -45,6 +48,7 @@ from .artifact import (
     update_artifact,
 )
 from .artifact_registry import default_artifact_registry
+from .audit_log import admin_audit_logs_v2
 from .background_task import background_task_events
 from .deployment import (
     # Revision
@@ -74,6 +78,7 @@ from .deployment import (
     routes,
     sync_replicas,
     update_auto_scaling_rule,
+    update_deployment_policy,
     update_model_deployment,
     update_route_traffic_status,
 )
@@ -130,6 +135,13 @@ from .image import (
     image_v2,
 )
 from .kernel.resolver import admin_kernels_v2, kernel_v2, session_kernels_v2
+from .keypair import (
+    issue_my_keypair,
+    my_keypairs,
+    revoke_my_keypair,
+    switch_my_main_access_key,
+    update_my_keypair,
+)
 from .notification import (
     admin_create_notification_channel,
     admin_create_notification_rule,
@@ -214,6 +226,7 @@ from .resource_group import (
     resource_groups,
     update_resource_group_fair_share_spec,
 )
+from .resource_slot.resolver import resource_slot_type, resource_slot_types
 from .resource_usage import (
     admin_domain_usage_buckets,
     admin_project_usage_buckets,
@@ -261,6 +274,7 @@ from .user import (
     domain_users_v2,
     my_user_v2,
     project_users_v2,
+    update_my_allowed_client_ip,
     update_user_v2,
 )
 from .vfs_storage import (
@@ -322,7 +336,10 @@ class Query:
     admin_user_usage_buckets = admin_user_usage_buckets
     admin_images_v2 = admin_images_v2
     admin_kernels_v2 = admin_kernels_v2
+    admin_audit_logs_v2 = admin_audit_logs_v2
     admin_sessions_v2 = admin_sessions_v2
+    resource_slot_type = resource_slot_type
+    resource_slot_types = resource_slot_types
     admin_image_aliases = admin_image_aliases
     # Prometheus Query Preset Admin APIs
     admin_prometheus_query_preset = admin_prometheus_query_preset
@@ -334,6 +351,8 @@ class Query:
     admin_permissions = admin_permissions
     admin_role_assignments = admin_role_assignments
     admin_entities = admin_entities
+    # Keypair self-service queries
+    my_keypairs = my_keypairs
     # RBAC User APIs
     my_roles = my_roles
     rbac_scope_entity_combinations = rbac_scope_entity_combinations
@@ -417,6 +436,7 @@ class Mutation:
     delete_model_deployment = delete_model_deployment
     sync_replicas = sync_replicas
     add_model_revision = add_model_revision
+    update_deployment_policy = update_deployment_policy
     # Notification - Admin APIs
     admin_create_notification_channel = admin_create_notification_channel
     admin_update_notification_channel = admin_update_notification_channel
@@ -494,6 +514,13 @@ class Mutation:
     admin_delete_users_v2 = admin_delete_users_v2
     admin_purge_user_v2 = admin_purge_user_v2
     admin_bulk_purge_users_v2 = admin_bulk_purge_users_v2
+    # Keypair self-service mutations
+    issue_my_keypair = issue_my_keypair
+    revoke_my_keypair = revoke_my_keypair
+    switch_my_main_access_key = switch_my_main_access_key
+    update_my_keypair = update_my_keypair
+    # IP allowlist self-service mutation
+    update_my_allowed_client_ip = update_my_allowed_client_ip
     # Prometheus Query Preset - Admin APIs
     admin_create_prometheus_query_preset = admin_create_prometheus_query_preset
     admin_modify_prometheus_query_preset = admin_modify_prometheus_query_preset
@@ -524,6 +551,15 @@ class Subscription:
 
 class CustomizedSchema(Schema):
     def as_str(self) -> str:
+        # Strawberry picks up pydantic field defaults (including SENTINEL) as GraphQL
+        # schema field default_values.  SENTINEL is not a valid GraphQL scalar value, so
+        # replace any SENTINEL default with Undefined (= "no default" in the schema SDL).
+        for type_def in self._schema.type_map.values():
+            if not hasattr(type_def, "fields"):
+                continue
+            for field in type_def.fields.values():
+                if isinstance(getattr(field, "default_value", None), BackendSentinel):
+                    field.default_value = GraphQLUndefined
         sdl = super().as_str()
         sdl = sdl.replace("type PageInfo", "type PageInfo @shareable").replace(
             'import: ["@external", "@key"]', 'import: ["@external", "@key", "@shareable"]'
@@ -540,6 +576,7 @@ schema = CustomizedSchema(
     enable_federation_2=True,
     extensions=[
         GQLLoggingExtension,
+        GQLMetricExtension,
         GQLValidationExtension,
         GQLExceptionHandlerExtension,
     ],

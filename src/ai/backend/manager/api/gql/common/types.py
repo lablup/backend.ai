@@ -2,18 +2,25 @@
 
 from __future__ import annotations
 
-from collections.abc import Mapping
 from enum import StrEnum
-from typing import Any
 
 import strawberry
 
-from ai.backend.common.types import (
-    ClusterMode,
-    ServicePortProtocols,
-    SessionResult,
-    SessionTypes,
+from ai.backend.common.dto.manager.v2.resource_slot.types import (
+    ResourceOptsDTOInput,
+    ResourceOptsEntryDTO,
+    ResourceOptsEntryInfoDTO,
+    ResourceOptsInfoDTO,
+    ServicePortEntryInfoDTO,
+    ServicePortsInfoDTO,
 )
+from ai.backend.common.dto.manager.v2.streaming.types import ServiceProtocol
+from ai.backend.manager.api.gql.decorators import (
+    BackendAIGQLMeta,
+    gql_pydantic_input,
+    gql_pydantic_type,
+)
+from ai.backend.manager.api.gql.pydantic_compat import PydanticInputMixin, PydanticOutputMixin
 
 # ========== Common Enums ==========
 
@@ -28,23 +35,6 @@ class ClusterModeGQL(StrEnum):
     SINGLE_NODE = "SINGLE_NODE"
     MULTI_NODE = "MULTI_NODE"
 
-    @classmethod
-    def from_internal(cls, internal: ClusterMode) -> ClusterModeGQL:
-        """Convert internal ClusterMode to GraphQL enum."""
-        match internal:
-            case ClusterMode.SINGLE_NODE:
-                return cls.SINGLE_NODE
-            case ClusterMode.MULTI_NODE:
-                return cls.MULTI_NODE
-
-    def to_internal(self) -> ClusterMode:
-        """Convert GraphQL enum to internal ClusterMode."""
-        match self:
-            case ClusterModeGQL.SINGLE_NODE:
-                return ClusterMode.SINGLE_NODE
-            case ClusterModeGQL.MULTI_NODE:
-                return ClusterMode.MULTI_NODE
-
 
 @strawberry.enum(
     name="SessionV2Type",
@@ -57,31 +47,6 @@ class SessionV2TypeGQL(StrEnum):
     BATCH = "batch"
     INFERENCE = "inference"
     SYSTEM = "system"
-
-    @classmethod
-    def from_internal(cls, internal: SessionTypes) -> SessionV2TypeGQL:
-        """Convert internal SessionTypes to GraphQL enum."""
-        match internal:
-            case SessionTypes.INTERACTIVE:
-                return cls.INTERACTIVE
-            case SessionTypes.BATCH:
-                return cls.BATCH
-            case SessionTypes.INFERENCE:
-                return cls.INFERENCE
-            case SessionTypes.SYSTEM:
-                return cls.SYSTEM
-
-    def to_internal(self) -> SessionTypes:
-        """Convert GraphQL enum to internal SessionTypes."""
-        match self:
-            case SessionV2TypeGQL.INTERACTIVE:
-                return SessionTypes.INTERACTIVE
-            case SessionV2TypeGQL.BATCH:
-                return SessionTypes.BATCH
-            case SessionV2TypeGQL.INFERENCE:
-                return SessionTypes.INFERENCE
-            case SessionV2TypeGQL.SYSTEM:
-                return SessionTypes.SYSTEM
 
 
 @strawberry.enum(
@@ -105,130 +70,75 @@ class SessionV2ResultGQL(StrEnum):
     SUCCESS = "success"
     FAILURE = "failure"
 
-    @classmethod
-    def from_internal(cls, internal: SessionResult) -> SessionV2ResultGQL:
-        """Convert internal SessionResult to GraphQL enum."""
-        match internal:
-            case SessionResult.UNDEFINED:
-                return cls.UNDEFINED
-            case SessionResult.SUCCESS:
-                return cls.SUCCESS
-            case SessionResult.FAILURE:
-                return cls.FAILURE
 
-    def to_internal(self) -> SessionResult:
-        """Convert GraphQL enum to internal SessionResult."""
-        match self:
-            case SessionV2ResultGQL.UNDEFINED:
-                return SessionResult.UNDEFINED
-            case SessionV2ResultGQL.SUCCESS:
-                return SessionResult.SUCCESS
-            case SessionV2ResultGQL.FAILURE:
-                return SessionResult.FAILURE
-
-
-@strawberry.enum(
+ServicePortProtocolGQL: type[ServiceProtocol] = strawberry.enum(
+    ServiceProtocol,
     name="ServicePortProtocol",
     description="Added in 26.2.0. Protocol type for service ports.",
 )
-class ServicePortProtocolGQL(StrEnum):
-    """GraphQL enum for service port protocols."""
-
-    HTTP = "http"
-    TCP = "tcp"
-    PREOPEN = "preopen"
-    INTERNAL = "internal"
-    VNC = "vnc"
-    RDP = "rdp"
-
-    @classmethod
-    def from_internal(cls, internal: ServicePortProtocols) -> ServicePortProtocolGQL:
-        """Convert internal ServicePortProtocols to GraphQL enum."""
-        match internal:
-            case ServicePortProtocols.HTTP:
-                return cls.HTTP
-            case ServicePortProtocols.TCP:
-                return cls.TCP
-            case ServicePortProtocols.PREOPEN:
-                return cls.PREOPEN
-            case ServicePortProtocols.INTERNAL:
-                return cls.INTERNAL
-            case ServicePortProtocols.VNC:
-                return cls.VNC
-            case ServicePortProtocols.RDP:
-                return cls.RDP
-
-    def to_internal(self) -> ServicePortProtocols:
-        """Convert GraphQL enum to internal ServicePortProtocols."""
-        match self:
-            case ServicePortProtocolGQL.HTTP:
-                return ServicePortProtocols.HTTP
-            case ServicePortProtocolGQL.TCP:
-                return ServicePortProtocols.TCP
-            case ServicePortProtocolGQL.PREOPEN:
-                return ServicePortProtocols.PREOPEN
-            case ServicePortProtocolGQL.INTERNAL:
-                return ServicePortProtocols.INTERNAL
-            case ServicePortProtocolGQL.VNC:
-                return ServicePortProtocols.VNC
-            case ServicePortProtocolGQL.RDP:
-                return ServicePortProtocols.RDP
 
 
 # ========== Resource Options Types ==========
 
 
-@strawberry.type(
-    name="ResourceOptsEntry",
-    description=(
-        "Added in 26.1.0. A single key-value entry representing a resource option. "
-        "Contains additional resource configuration such as shared memory settings."
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version="26.1.0",
+        description=(
+            "A single key-value entry representing a resource option. "
+            "Contains additional resource configuration such as shared memory settings."
+        ),
     ),
+    model=ResourceOptsEntryInfoDTO,
+    name="ResourceOptsEntry",
 )
-class ResourceOptsEntryGQL:
+class ResourceOptsEntryGQL(PydanticOutputMixin[ResourceOptsEntryInfoDTO]):
     """Single resource option entry with name and value."""
 
     name: str = strawberry.field(description="The name of this resource option. Example: 'shmem'.")
     value: str = strawberry.field(description="The value for this resource option. Example: '64m'.")
 
 
-@strawberry.type(
-    name="ResourceOpts",
-    description=(
-        "Added in 26.1.0. A collection of additional resource options for a deployment. "
-        "Contains key-value pairs for resource configuration like shared memory."
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version="26.1.0",
+        description=(
+            "A collection of additional resource options for a deployment. "
+            "Contains key-value pairs for resource configuration like shared memory."
+        ),
     ),
+    model=ResourceOptsInfoDTO,
+    name="ResourceOpts",
 )
-class ResourceOptsGQL:
+class ResourceOptsGQL(PydanticOutputMixin[ResourceOptsInfoDTO]):
     """Resource options containing multiple key-value entries."""
 
     entries: list[ResourceOptsEntryGQL] = strawberry.field(
         description="List of resource option entries. Each entry contains a key-value pair."
     )
 
-    @classmethod
-    def from_mapping(cls, data: Mapping[str, Any] | None) -> ResourceOptsGQL | None:
-        """Convert a Mapping to GraphQL type."""
-        if data is None:
-            return None
-        entries = [ResourceOptsEntryGQL(name=k, value=str(v)) for k, v in data.items()]
-        return cls(entries=entries)
 
-
-@strawberry.input(
-    description="Added in 26.1.0. A single key-value entry representing a resource option."
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description="A single key-value entry representing a resource option.",
+        added_version="26.1.0",
+    ),
+    name="ResourceOptsEntryInput",
 )
-class ResourceOptsEntryInput:
+class ResourceOptsEntryInput(PydanticInputMixin[ResourceOptsEntryDTO]):
     """Single resource option entry input with name and value."""
 
     name: str = strawberry.field(description="The name of this resource option (e.g., 'shmem').")
     value: str = strawberry.field(description="The value for this resource option (e.g., '64m').")
 
 
-@strawberry.input(
-    description="Added in 26.1.0. A collection of additional resource options for input."
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description="A collection of additional resource options for input.", added_version="26.1.0"
+    ),
+    name="ResourceOptsInput",
 )
-class ResourceOptsInput:
+class ResourceOptsInput(PydanticInputMixin[ResourceOptsDTOInput]):
     """Resource options input containing multiple key-value entries."""
 
     entries: list[ResourceOptsEntryInput] = strawberry.field(
@@ -239,14 +149,18 @@ class ResourceOptsInput:
 # ========== Service Port Types ==========
 
 
-@strawberry.type(
-    name="ServicePortEntry",
-    description=(
-        "Added in 26.2.0. A single service port entry representing an exposed service. "
-        "Contains port mapping and protocol information for accessing services."
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version="26.2.0",
+        description=(
+            "A single service port entry representing an exposed service. "
+            "Contains port mapping and protocol information for accessing services."
+        ),
     ),
+    model=ServicePortEntryInfoDTO,
+    name="ServicePortEntry",
 )
-class ServicePortEntryGQL:
+class ServicePortEntryGQL(PydanticOutputMixin[ServicePortEntryInfoDTO]):
     """Single service port entry with name, protocol, and port mappings."""
 
     name: str = strawberry.field(
@@ -263,26 +177,19 @@ class ServicePortEntryGQL:
         description="Whether this port is used for inference endpoints."
     )
 
-    @classmethod
-    def from_dict(cls, data: dict[str, Any]) -> ServicePortEntryGQL:
-        """Convert a dict to ServicePortEntryGQL."""
-        return cls(
-            name=data["name"],
-            protocol=ServicePortProtocolGQL.from_internal(ServicePortProtocols(data["protocol"])),
-            container_ports=list(data["container_ports"]),
-            host_ports=list(data["host_ports"]),
-            is_inference=data["is_inference"],
-        )
 
-
-@strawberry.type(
-    name="ServicePorts",
-    description=(
-        "Added in 26.2.0. A collection of exposed service ports. "
-        "Each entry defines a service accessible through the compute session."
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version="26.2.0",
+        description=(
+            "A collection of exposed service ports. "
+            "Each entry defines a service accessible through the compute session."
+        ),
     ),
+    model=ServicePortsInfoDTO,
+    name="ServicePorts",
 )
-class ServicePortsGQL:
+class ServicePortsGQL(PydanticOutputMixin[ServicePortsInfoDTO]):
     """Service ports containing multiple port entries."""
 
     entries: list[ServicePortEntryGQL] = strawberry.field(

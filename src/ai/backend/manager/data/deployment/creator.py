@@ -117,7 +117,6 @@ class DeploymentPolicyConfig:
 
     strategy: DeploymentStrategy
     strategy_spec: RollingUpdateSpec | BlueGreenSpec
-    rollback_on_failure: bool = False
 
 
 @dataclass
@@ -127,7 +126,6 @@ class DeploymentPolicyCreator:
     deployment_id: UUID
     strategy: DeploymentStrategy
     strategy_spec: RollingUpdateSpec | BlueGreenSpec
-    rollback_on_failure: bool = False
 
 
 @dataclass

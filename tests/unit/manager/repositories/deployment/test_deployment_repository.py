@@ -1198,6 +1198,7 @@ class TestDeploymentRevisionOperations:
                 ImageRow,
                 EndpointRow,
                 EntityFieldRow,  # DeploymentRevisionRow relationship dependency
+                AssociationScopesEntitiesRow,  # RBACEntityCreator dependency
                 DeploymentRevisionRow,
                 DeploymentPolicyRow,
             ],
@@ -1455,7 +1456,16 @@ class TestDeploymentRevisionOperations:
             runtime_variant=RuntimeVariant.CUSTOM,
             extra_mounts=[],
         )
-        return await deployment_repository.create_revision(Creator(spec=spec))
+        return await deployment_repository.create_revision(
+            RBACEntityCreator(
+                spec=spec,
+                element_type=RBACElementType.DEPLOYMENT_REVISION,
+                scope_ref=RBACElementRef(
+                    element_type=RBACElementType.MODEL_DEPLOYMENT,
+                    element_id=str(test_endpoint_id),
+                ),
+            )
+        )
 
     @pytest.fixture
     async def test_multiple_revisions(
@@ -1488,7 +1498,16 @@ class TestDeploymentRevisionOperations:
                 runtime_variant=RuntimeVariant.CUSTOM,
                 extra_mounts=[],
             )
-            revision = await deployment_repository.create_revision(Creator(spec=spec))
+            revision = await deployment_repository.create_revision(
+                RBACEntityCreator(
+                    spec=spec,
+                    element_type=RBACElementType.DEPLOYMENT_REVISION,
+                    scope_ref=RBACElementRef(
+                        element_type=RBACElementType.MODEL_DEPLOYMENT,
+                        element_id=str(test_endpoint_id),
+                    ),
+                )
+            )
             revisions.append(revision)
         return revisions
 
@@ -1523,7 +1542,16 @@ class TestDeploymentRevisionOperations:
                 runtime_variant=RuntimeVariant.CUSTOM,
                 extra_mounts=[],
             )
-            revision = await deployment_repository.create_revision(Creator(spec=spec))
+            revision = await deployment_repository.create_revision(
+                RBACEntityCreator(
+                    spec=spec,
+                    element_type=RBACElementType.DEPLOYMENT_REVISION,
+                    scope_ref=RBACElementRef(
+                        element_type=RBACElementType.MODEL_DEPLOYMENT,
+                        element_id=str(test_endpoint_id),
+                    ),
+                )
+            )
             revisions.append(revision)
         return revisions
 
@@ -1534,7 +1562,7 @@ class TestDeploymentRevisionOperations:
         test_image_id: uuid.UUID,
         test_scaling_group_name: str,
     ) -> None:
-        """Test creating a deployment revision using Creator."""
+        """Test creating a deployment revision using RBACEntityCreator."""
         spec = DeploymentRevisionCreatorSpec(
             endpoint_id=test_endpoint_id,
             revision_number=1,
@@ -1555,7 +1583,14 @@ class TestDeploymentRevisionOperations:
             runtime_variant=RuntimeVariant.CUSTOM,
             extra_mounts=[],
         )
-        creator = Creator(spec=spec)
+        creator = RBACEntityCreator(
+            spec=spec,
+            element_type=RBACElementType.DEPLOYMENT_REVISION,
+            scope_ref=RBACElementRef(
+                element_type=RBACElementType.MODEL_DEPLOYMENT,
+                element_id=str(test_endpoint_id),
+            ),
+        )
 
         result = await deployment_repository.create_revision(creator)
 
@@ -2414,7 +2449,6 @@ class TestDeploymentPolicyOperations:
             endpoint_id=test_endpoint_id,
             strategy=DeploymentStrategy.ROLLING,
             strategy_spec=RollingUpdateSpec(max_surge=1, max_unavailable=0),
-            rollback_on_failure=False,
         )
         result = await deployment_repository.upsert_deployment_policy(Upserter(spec=spec))
         return result.data
@@ -2429,7 +2463,6 @@ class TestDeploymentPolicyOperations:
             endpoint_id=test_endpoint_id,
             strategy=DeploymentStrategy.BLUE_GREEN,
             strategy_spec=BlueGreenSpec(auto_promote=True, promote_delay_seconds=60),
-            rollback_on_failure=False,
         )
 
         result = await deployment_repository.upsert_deployment_policy(Upserter(spec=spec))
@@ -2440,7 +2473,6 @@ class TestDeploymentPolicyOperations:
         assert result.data.strategy_spec == BlueGreenSpec(
             auto_promote=True, promote_delay_seconds=60
         )
-        assert result.data.rollback_on_failure is False
         assert result.created is True
 
     async def test_upsert_deployment_policy_update(
@@ -2454,14 +2486,12 @@ class TestDeploymentPolicyOperations:
             endpoint_id=test_endpoint_id,
             strategy=DeploymentStrategy.BLUE_GREEN,
             strategy_spec=BlueGreenSpec(auto_promote=True, promote_delay_seconds=30),
-            rollback_on_failure=True,
         )
 
         result = await deployment_repository.upsert_deployment_policy(Upserter(spec=spec))
 
         assert result.data.endpoint == test_endpoint_id
         assert result.data.strategy == DeploymentStrategy.BLUE_GREEN
-        assert result.data.rollback_on_failure is True
         assert result.created is False
 
     async def test_get_deployment_policy(
@@ -2726,7 +2756,6 @@ class TestSearchDeploymentPolicies:
                         endpoint_id=eid,
                         strategy=strategy,
                         strategy_spec=spec,
-                        rollback_on_failure=False,
                     )
                 )
             )
@@ -2915,6 +2944,7 @@ class TestRouteOperations:
                 VFolderRow,
                 EndpointRow,
                 RoutingRow,
+                AssociationScopesEntitiesRow,
             ],
         ):
             yield database_connection
@@ -3127,7 +3157,14 @@ class TestRouteOperations:
             revision_id=None,
             traffic_status=RouteTrafficStatus.ACTIVE,
         )
-        creator = Creator(spec=spec)
+        creator = RBACEntityCreator(
+            spec=spec,
+            element_type=RBACElementType.ROUTING,
+            scope_ref=RBACElementRef(
+                element_type=RBACElementType.MODEL_DEPLOYMENT,
+                element_id=str(test_endpoint_id),
+            ),
+        )
 
         route_id = await deployment_repository.create_route(creator)
 
@@ -3151,7 +3188,15 @@ class TestRouteOperations:
             domain=test_domain_name,
             project_id=test_group_id,
         )
-        route_id = await deployment_repository.create_route(Creator(spec=spec))
+        creator = RBACEntityCreator(
+            spec=spec,
+            element_type=RBACElementType.ROUTING,
+            scope_ref=RBACElementRef(
+                element_type=RBACElementType.MODEL_DEPLOYMENT,
+                element_id=str(test_endpoint_id),
+            ),
+        )
+        route_id = await deployment_repository.create_route(creator)
 
         # Update the route status
         updater = Updater(
@@ -3190,7 +3235,15 @@ class TestRouteOperations:
             domain=test_domain_name,
             project_id=test_group_id,
         )
-        route_id = await deployment_repository.create_route(Creator(spec=spec))
+        creator = RBACEntityCreator(
+            spec=spec,
+            element_type=RBACElementType.ROUTING,
+            scope_ref=RBACElementRef(
+                element_type=RBACElementType.MODEL_DEPLOYMENT,
+                element_id=str(test_endpoint_id),
+            ),
+        )
+        route_id = await deployment_repository.create_route(creator)
 
         # Update the route using unified spec (excluding session to avoid FK constraint)
         updater = Updater(

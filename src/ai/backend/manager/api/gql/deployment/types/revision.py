@@ -2,20 +2,82 @@
 
 from __future__ import annotations
 
-from collections.abc import Iterable, Mapping, Sequence
+from collections.abc import Iterable
 from datetime import datetime
-from pathlib import PurePosixPath
-from typing import TYPE_CHECKING, Annotated, Any, Self, cast, override
+from enum import StrEnum
+from typing import TYPE_CHECKING, Annotated, Any, Self, cast
 from uuid import UUID
 
 import strawberry
 from strawberry import ID, Info
-from strawberry.relay import Connection, Edge, Node, NodeID, PageInfo
+from strawberry.relay import Connection, Edge, NodeID
 from strawberry.scalars import JSON
 
-from ai.backend.common.types import ClusterMode as CommonClusterMode
+from ai.backend.common.dto.manager.v2.deployment.request import (
+    ActivateRevisionInput as ActivateRevisionInputDTO,
+)
+from ai.backend.common.dto.manager.v2.deployment.request import (
+    AddRevisionGQLInputDTO,
+    CreateRevisionInputDTO,
+)
+from ai.backend.common.dto.manager.v2.deployment.request import (
+    ClusterConfigInput as ClusterConfigInputDTO,
+)
+from ai.backend.common.dto.manager.v2.deployment.request import (
+    EnvironmentVariableEntryInput as EnvironmentVariableEntryInputDTO,
+)
+from ai.backend.common.dto.manager.v2.deployment.request import (
+    EnvironmentVariablesInput as EnvironmentVariablesInputDTO,
+)
+from ai.backend.common.dto.manager.v2.deployment.request import (
+    ExtraVFolderMountInput as ExtraVFolderMountInputDTO,
+)
+from ai.backend.common.dto.manager.v2.deployment.request import (
+    ImageInput as ImageInputDTO,
+)
+from ai.backend.common.dto.manager.v2.deployment.request import (
+    ModelMountConfigInput as ModelMountConfigInputDTO,
+)
+from ai.backend.common.dto.manager.v2.deployment.request import (
+    ModelRuntimeConfigInput as ModelRuntimeConfigInputDTO,
+)
+from ai.backend.common.dto.manager.v2.deployment.request import (
+    ResourceConfigInput as ResourceConfigInputDTO,
+)
+from ai.backend.common.dto.manager.v2.deployment.request import (
+    ResourceGroupInput as ResourceGroupInputDTO,
+)
+from ai.backend.common.dto.manager.v2.deployment.request import (
+    ResourceSlotEntryInput as ResourceSlotEntryInputDTO,
+)
+from ai.backend.common.dto.manager.v2.deployment.request import (
+    ResourceSlotInput as ResourceSlotInputDTO,
+)
+from ai.backend.common.dto.manager.v2.deployment.request import (
+    RevisionFilter as RevisionFilterDTO,
+)
+from ai.backend.common.dto.manager.v2.deployment.request import (
+    RevisionOrder as RevisionOrderDTO,
+)
+from ai.backend.common.dto.manager.v2.deployment.response import (
+    ActivateRevisionPayload as ActivateRevisionPayloadDTO,
+)
+from ai.backend.common.dto.manager.v2.deployment.response import (
+    AddRevisionPayload as AddRevisionPayloadDTO,
+)
+from ai.backend.common.dto.manager.v2.deployment.response import (
+    RevisionNode as RevisionNodeDTO,
+)
+from ai.backend.common.dto.manager.v2.deployment.types import (
+    ClusterConfigInfoDTO,
+    EnvironmentVariableEntryInfoDTO,
+    EnvironmentVariablesInfoDTO,
+    ExtraVFolderMountGQLDTO,
+    ModelMountConfigInfoDTO,
+    ModelRuntimeConfigInfoDTO,
+    ResourceConfigInfoDTO,
+)
 from ai.backend.common.types import MountPermission as CommonMountPermission
-from ai.backend.common.types import RuntimeVariant
 from ai.backend.manager.api.gql.base import (
     OrderDirection,
     StringFilter,
@@ -26,33 +88,23 @@ from ai.backend.manager.api.gql.common.types import (
     ResourceOptsGQL,
     ResourceOptsInput,
 )
+from ai.backend.manager.api.gql.decorators import (
+    BackendAIGQLMeta,
+    PydanticInputMixin,
+    gql_connection_type,
+    gql_node_type,
+    gql_pydantic_input,
+    gql_pydantic_type,
+)
 from ai.backend.manager.api.gql.fair_share.types.common import ResourceSlotGQL
 from ai.backend.manager.api.gql.image_federation import Image
+from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin
 from ai.backend.manager.api.gql.resource_group.federation import ResourceGroup
-from ai.backend.manager.api.gql.types import GQLFilter, GQLOrderBy, StrawberryGQLContext
-from ai.backend.manager.api.gql.vfolder import ExtraVFolderMountConnection, VFolder
+from ai.backend.manager.api.gql.types import StrawberryGQLContext
+from ai.backend.manager.api.gql.vfolder import VFolder
 from ai.backend.manager.api.gql_legacy.image import ImageNode
 from ai.backend.manager.api.gql_legacy.scaling_group import ScalingGroupNode
 from ai.backend.manager.api.gql_legacy.vfolder import VirtualFolderNode
-from ai.backend.manager.data.deployment.creator import ModelRevisionCreator, VFolderMountsCreator
-from ai.backend.manager.data.deployment.types import (
-    ClusterConfigData,
-    ExecutionSpec,
-    ModelMountConfigData,
-    ModelRevisionData,
-    ModelRevisionOrderField,
-    ModelRuntimeConfigData,
-    MountInfo,
-    ResourceConfigData,
-    ResourceSpec,
-)
-from ai.backend.manager.repositories.base import (
-    QueryCondition,
-    QueryOrder,
-    combine_conditions_or,
-    negate_conditions,
-)
-from ai.backend.manager.repositories.deployment.options import RevisionConditions, RevisionOrders
 
 if TYPE_CHECKING:
     from .deployment import ModelDeployment
@@ -64,9 +116,13 @@ MountPermission: type[CommonMountPermission] = strawberry.enum(
 )
 
 
-@strawberry.type(
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version="26.1.0",
+        description="A single environment variable entry with name and value.",
+    ),
+    model=EnvironmentVariableEntryInfoDTO,
     name="EnvironmentVariableEntry",
-    description="Added in 26.1.0. A single environment variable entry with name and value.",
 )
 class EnvironmentVariableEntryGQL:
     """A single environment variable entry with name and value."""
@@ -77,9 +133,12 @@ class EnvironmentVariableEntryGQL:
     value: str = strawberry.field(description="Environment variable value.")
 
 
-@strawberry.type(
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version="26.1.0", description="A collection of environment variable entries."
+    ),
+    model=EnvironmentVariablesInfoDTO,
     name="EnvironmentVariables",
-    description="Added in 26.1.0. A collection of environment variable entries.",
 )
 class EnvironmentVariablesGQL:
     """A collection of environment variable entries."""
@@ -89,90 +148,27 @@ class EnvironmentVariablesGQL:
     )
 
 
-@strawberry.type
-class ModelMountConfig:
-    """
-    Added in 25.19.0.
-
-    Configuration for mounting the model data into the inference container.
-    Specifies the virtual folder, mount destination, and model definition path.
-    """
-
-    _vfolder_id: strawberry.Private[UUID]
-    mount_destination: str = strawberry.field(
-        description="Path inside the container where the model is mounted."
-    )
-    definition_path: str = strawberry.field(
-        description="Path to the model definition file within the mounted folder."
-    )
-
-    @strawberry.field
-    async def vfolder(self, info: Info[StrawberryGQLContext]) -> VFolder:
-        vfolder_global_id = to_global_id(
-            VirtualFolderNode, self._vfolder_id, is_target_graphene_object=True
-        )
-        return VFolder(id=ID(vfolder_global_id))
-
-    @classmethod
-    def from_dataclass(cls, data: ModelMountConfigData) -> ModelMountConfig | None:
-        if data.vfolder_id is None or data.mount_destination is None:
-            return None
-        return cls(
-            _vfolder_id=data.vfolder_id,
-            mount_destination=data.mount_destination,
-            definition_path=data.definition_path,
-        )
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version="25.19.0",
+        description="Cluster configuration for model deployment replicas. Defines the clustering mode and number of replicas.",
+    ),
+    model=ClusterConfigInfoDTO,
+)
+class ClusterConfig:
+    mode: ClusterModeGQL = strawberry.field(description="The clustering mode (e.g., SINGLE_NODE).")
+    size: int = strawberry.field(description="Number of replicas in the cluster.")
 
 
-@strawberry.type
-class ModelRuntimeConfig:
-    """
-    Added in 25.19.0.
-
-    Runtime configuration for the inference framework.
-    Includes the runtime variant, framework-specific configuration,
-    and environment variables.
-    """
-
-    runtime_variant: str = strawberry.field(
-        description="The inference runtime variant (e.g., vllm, triton)."
-    )
-    inference_runtime_config: JSON | None = strawberry.field(
-        description="Framework-specific configuration in JSON format.",
-        default=None,
-    )
-    environ: EnvironmentVariablesGQL | None = strawberry.field(
-        description="Environment variables for the service, e.g. CUDA_VISIBLE_DEVICES=0.",
-        default=None,
-    )
-
-    @classmethod
-    def from_dataclass(cls, data: ModelRuntimeConfigData) -> ModelRuntimeConfig:
-        environ_gql: EnvironmentVariablesGQL | None = None
-        if data.environ is not None:
-            environ_gql = EnvironmentVariablesGQL(
-                entries=[
-                    EnvironmentVariableEntryGQL(name=key, value=value)
-                    for key, value in data.environ.items()
-                ]
-            )
-        return cls(
-            runtime_variant=data.runtime_variant,
-            inference_runtime_config=data.inference_runtime_config,
-            environ=environ_gql,
-        )
-
-
-@strawberry.type
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version="25.19.0",
+        description="Compute resource configuration for the deployment. Specifies CPU, memory, GPU allocations and additional resource options.",
+    ),
+    model=ResourceConfigInfoDTO,
+)
 class ResourceConfig:
-    """
-    Added in 25.19.0.
-
-    Compute resource configuration for the deployment.
-    Specifies CPU, memory, GPU allocations and additional resource options.
-    """
-
-    _resource_group_name: strawberry.Private[str]
+    resource_group_name: str
     resource_slots: ResourceSlotGQL = strawberry.field(
         description="Added in 26.1.0. Allocated compute resources including CPU, memory, and accelerators."
     )
@@ -185,54 +181,86 @@ class ResourceConfig:
     def resource_group(self) -> ResourceGroup:
         """Resolves the federated ResourceGroup."""
         global_id = to_global_id(
-            ScalingGroupNode, self._resource_group_name, is_target_graphene_object=True
+            ScalingGroupNode, self.resource_group_name, is_target_graphene_object=True
         )
         return ResourceGroup(id=ID(global_id))
 
-    @classmethod
-    def from_dataclass(cls, data: ResourceConfigData) -> ResourceConfig:
-        return cls(
-            _resource_group_name=data.resource_group_name,
-            resource_slots=ResourceSlotGQL.from_resource_slot(data.resource_slot),
-            resource_opts=ResourceOptsGQL.from_mapping(data.resource_opts)
-            if data.resource_opts
-            else None,
+
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version="25.19.0",
+        description="Runtime configuration for the inference framework. Includes the runtime variant, framework-specific configuration, and environment variables.",
+    ),
+    model=ModelRuntimeConfigInfoDTO,
+)
+class ModelRuntimeConfig:
+    runtime_variant: str = strawberry.field(
+        description="The inference runtime variant (e.g., vllm, triton)."
+    )
+    inference_runtime_config: JSON | None = strawberry.field(
+        description="Framework-specific configuration in JSON format.",
+        default=None,
+    )
+    environ: EnvironmentVariablesGQL | None = strawberry.field(
+        description="Environment variables for the service, e.g. CUDA_VISIBLE_DEVICES=0.",
+        default=None,
+    )
+
+
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version="25.19.0",
+        description="Configuration for mounting the model data into the inference container. Specifies the virtual folder, mount destination, and model definition path.",
+    ),
+    model=ModelMountConfigInfoDTO,
+)
+class ModelMountConfig:
+    vfolder_id: ID
+    mount_destination: str = strawberry.field(
+        description="Path inside the container where the model is mounted."
+    )
+    definition_path: str = strawberry.field(
+        description="Path to the model definition file within the mounted folder."
+    )
+
+    @strawberry.field
+    async def vfolder(self, info: Info[StrawberryGQLContext]) -> VFolder:
+        vfolder_global_id = to_global_id(
+            VirtualFolderNode, UUID(str(self.vfolder_id)), is_target_graphene_object=True
         )
+        return VFolder(id=ID(vfolder_global_id))
 
 
-@strawberry.type
-class ClusterConfig:
-    """
-    Added in 25.19.0.
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version="25.19.0",
+        description="An extra virtual folder mount attached to a model revision.",
+    ),
+    model=ExtraVFolderMountGQLDTO,
+)
+class ExtraVFolderMountInfoGQL:
+    vfolder_id: ID
+    mount_destination: str | None = strawberry.field(
+        description="Mount destination path inside the container.",
+        default=None,
+    )
 
-    Cluster configuration for model deployment replicas.
-    Defines the clustering mode and number of replicas.
-    """
-
-    mode: ClusterModeGQL = strawberry.field(description="The clustering mode (e.g., SINGLE_NODE).")
-    size: int = strawberry.field(description="Number of replicas in the cluster.")
-
-    @classmethod
-    def from_dataclass(cls, data: ClusterConfigData) -> ClusterConfig:
-        return cls(
-            mode=ClusterModeGQL(data.mode.name),
-            size=data.size,
+    @strawberry.field
+    async def vfolder(self, info: Info[StrawberryGQLContext]) -> VFolder:
+        vfolder_global_id = to_global_id(
+            VirtualFolderNode, UUID(str(self.vfolder_id)), is_target_graphene_object=True
         )
+        return VFolder(id=ID(vfolder_global_id))
 
 
-@strawberry.type
-class ModelRevision(Node):
-    """
-    Added in 25.19.0.
-
-    Represents a versioned configuration snapshot of a model deployment.
-    Each revision captures the complete configuration including cluster settings,
-    resource allocations, runtime configuration, and model mount settings.
-
-    Revisions enable version control and rollback capabilities for deployments.
-    """
-
-    _image_id: strawberry.Private[UUID]
+@gql_node_type(
+    BackendAIGQLMeta(
+        added_version="25.19.0",
+        description="Represents a versioned configuration snapshot of a model deployment. Each revision captures the complete configuration including cluster settings, resource allocations, runtime configuration, and model mount settings. Revisions enable version control and rollback capabilities for deployments.",
+    )
+)
+class ModelRevision(PydanticNodeMixin[RevisionNodeDTO]):
+    image_id: ID
     id: NodeID[str]
     name: str = strawberry.field(description="The name identifier for this revision.")
     cluster_config: ClusterConfig = strawberry.field(
@@ -247,14 +275,16 @@ class ModelRevision(Node):
     model_mount_config: ModelMountConfig | None = strawberry.field(
         description="Model data mount configuration."
     )
-    extra_mounts: ExtraVFolderMountConnection = strawberry.field(
+    extra_mounts: list[ExtraVFolderMountInfoGQL] = strawberry.field(
         description="Additional volume folder mounts."
     )
     created_at: datetime = strawberry.field(description="Timestamp when the revision was created.")
 
     @strawberry.field
     async def image(self, info: Info[StrawberryGQLContext]) -> Image:
-        image_global_id = to_global_id(ImageNode, self._image_id, is_target_graphene_object=True)
+        image_global_id = to_global_id(
+            ImageNode, UUID(str(self.image_id)), is_target_graphene_object=True
+        )
         return Image(id=ID(image_global_id))
 
     @classmethod
@@ -268,119 +298,65 @@ class ModelRevision(Node):
         results = await info.context.data_loaders.revision_loader.load_many([
             UUID(nid) for nid in node_ids
         ])
-        return [cls.from_dataclass(data) if data is not None else None for data in results]
+        return cast(list[Self | None], results)
 
-    @classmethod
-    def from_dataclass(cls, data: ModelRevisionData) -> Self:
-        return cls(
-            id=ID(str(data.id)),
-            name=data.name,
-            cluster_config=ClusterConfig.from_dataclass(data.cluster_config),
-            resource_config=ResourceConfig.from_dataclass(data.resource_config),
-            model_runtime_config=ModelRuntimeConfig.from_dataclass(data.model_runtime_config),
-            model_mount_config=ModelMountConfig.from_dataclass(data.model_mount_config),
-            extra_mounts=ExtraVFolderMountConnection.from_dataclass(data.extra_vfolder_mounts),
-            _image_id=data.image_id,
-            created_at=data.created_at,
-        )
+
+@strawberry.enum(
+    name="ModelRevisionOrderField",
+    description="Added in 25.19.0. Fields available for ordering model revisions.",
+)
+class ModelRevisionOrderFieldGQL(StrEnum):
+    NAME = "name"
+    CREATED_AT = "created_at"
 
 
 # Filter and Order Types
-@strawberry.input(description="Added in 25.19.0")
-class ModelRevisionFilter(GQLFilter):
+@gql_pydantic_input(
+    BackendAIGQLMeta(description="", added_version="25.19.0"),
+    name="ModelRevisionFilter",
+)
+class ModelRevisionFilter(PydanticInputMixin[RevisionFilterDTO]):
     name: StringFilter | None = None
     deployment_id: ID | None = None
-    ids_in: strawberry.Private[Sequence[UUID] | None] = None
 
-    AND: list[ModelRevisionFilter] | None = None
-    OR: list[ModelRevisionFilter] | None = None
-    NOT: list[ModelRevisionFilter] | None = None
-
-    @override
-    def build_conditions(self) -> list[QueryCondition]:
-        """Build query conditions from this filter.
-
-        Returns a list of QueryCondition callables that can be applied to SQLAlchemy queries.
-        """
-        field_conditions: list[QueryCondition] = []
-
-        # Apply name filter
-        if self.name:
-            name_condition = self.name.build_query_condition(
-                contains_factory=RevisionConditions.by_name_contains,
-                equals_factory=RevisionConditions.by_name_equals,
-                starts_with_factory=RevisionConditions.by_name_starts_with,
-                ends_with_factory=RevisionConditions.by_name_ends_with,
-            )
-            if name_condition:
-                field_conditions.append(name_condition)
-
-        # Apply deployment_id filter
-        if self.deployment_id:
-            field_conditions.append(RevisionConditions.by_deployment_id(UUID(self.deployment_id)))
-
-        # Apply ids_in filter
-        if self.ids_in:
-            field_conditions.append(RevisionConditions.by_ids(self.ids_in))
-
-        # Handle AND logical operator - these are implicitly ANDed with field conditions
-        if self.AND:
-            for sub_filter in self.AND:
-                field_conditions.extend(sub_filter.build_conditions())
-
-        # Handle OR logical operator
-        if self.OR:
-            or_sub_conditions: list[QueryCondition] = []
-            for sub_filter in self.OR:
-                or_sub_conditions.extend(sub_filter.build_conditions())
-            if or_sub_conditions:
-                field_conditions.append(combine_conditions_or(or_sub_conditions))
-
-        # Handle NOT logical operator
-        if self.NOT:
-            not_sub_conditions: list[QueryCondition] = []
-            for sub_filter in self.NOT:
-                not_sub_conditions.extend(sub_filter.build_conditions())
-            if not_sub_conditions:
-                field_conditions.append(negate_conditions(not_sub_conditions))
-
-        return field_conditions
+    AND: list[Self] | None = None
+    OR: list[Self] | None = None
+    NOT: list[Self] | None = None
 
 
-@strawberry.input(description="Added in 25.19.0")
-class ModelRevisionOrderBy(GQLOrderBy):
-    field: ModelRevisionOrderField
+@gql_pydantic_input(
+    BackendAIGQLMeta(description="", added_version="25.19.0"),
+)
+class ModelRevisionOrderBy(PydanticInputMixin[RevisionOrderDTO]):
+    field: ModelRevisionOrderFieldGQL
     direction: OrderDirection = OrderDirection.DESC
-
-    @override
-    def to_query_order(self) -> QueryOrder:
-        """Convert to repository QueryOrder."""
-        ascending = self.direction == OrderDirection.ASC
-        match self.field:
-            case ModelRevisionOrderField.NAME:
-                return RevisionOrders.name(ascending)
-            case ModelRevisionOrderField.CREATED_AT:
-                return RevisionOrders.created_at(ascending)
 
 
 # Payload Types
-@strawberry.type(description="Added in 25.19.0")
+@gql_pydantic_type(
+    BackendAIGQLMeta(added_version="25.19.0", description="Payload for adding a revision."),
+    model=AddRevisionPayloadDTO,
+)
 class AddRevisionPayload:
     revision: ModelRevision
 
 
-@strawberry.input(
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description="Input for activating a revision to be the current revision.",
+        added_version="25.19.0",
+    ),
     name="ActivateRevisionInput",
-    description="Added in 25.19.0. Input for activating a revision to be the current revision.",
 )
-class ActivateRevisionInputGQL:
+class ActivateRevisionInputGQL(PydanticInputMixin[ActivateRevisionInputDTO]):
     deployment_id: ID
     revision_id: ID
 
 
-@strawberry.type(
+@gql_pydantic_type(
+    BackendAIGQLMeta(added_version="25.19.0", description="Result of activating a revision."),
+    model=ActivateRevisionPayloadDTO,
     name="ActivateRevisionPayload",
-    description="Added in 25.19.0. Result of activating a revision.",
 )
 class ActivateRevisionPayloadGQL:
     deployment: Annotated[ModelDeployment, strawberry.lazy(".deployment")]
@@ -389,23 +365,28 @@ class ActivateRevisionPayloadGQL:
 
 
 # Input Types
-@strawberry.input(description="Added in 25.19.0")
-class ClusterConfigInput:
+@gql_pydantic_input(
+    BackendAIGQLMeta(description="", added_version="25.19.0"),
+)
+class ClusterConfigInput(PydanticInputMixin[ClusterConfigInputDTO]):
     mode: ClusterModeGQL
     size: int
 
 
-@strawberry.input(description="Added in 25.19.0")
-class ResourceGroupInput:
+@gql_pydantic_input(
+    BackendAIGQLMeta(description="", added_version="25.19.0"),
+)
+class ResourceGroupInput(PydanticInputMixin[ResourceGroupInputDTO]):
     name: str
 
 
-@strawberry.input(
-    description=(
-        "Added in 26.1.0. A single entry representing one resource type and its allocated quantity."
-    )
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description="A single entry representing one resource type and its allocated quantity.",
+        added_version="26.1.0",
+    ),
 )
-class ResourceSlotEntryInput:
+class ResourceSlotEntryInput(PydanticInputMixin[ResourceSlotEntryInputDTO]):
     """Single resource slot entry input with resource type and quantity."""
 
     resource_type: str = strawberry.field(
@@ -414,10 +395,13 @@ class ResourceSlotEntryInput:
     quantity: str = strawberry.field(description="Quantity of the resource as a decimal string.")
 
 
-@strawberry.input(
-    description=("Added in 26.1.0. A collection of compute resource allocations for input.")
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description="A collection of compute resource allocations for input.",
+        added_version="26.1.0",
+    ),
 )
-class ResourceSlotInput:
+class ResourceSlotInput(PydanticInputMixin[ResourceSlotInputDTO]):
     """Resource slot input containing multiple resource type entries."""
 
     entries: list[ResourceSlotEntryInput] = strawberry.field(
@@ -425,8 +409,10 @@ class ResourceSlotInput:
     )
 
 
-@strawberry.input(description="Added in 25.19.0")
-class ResourceConfigInput:
+@gql_pydantic_input(
+    BackendAIGQLMeta(description="", added_version="25.19.0"),
+)
+class ResourceConfigInput(PydanticInputMixin[ResourceConfigInputDTO]):
     resource_group: ResourceGroupInput
     resource_slots: ResourceSlotInput = strawberry.field(
         description="Added in 26.1.0. Resources allocated for the deployment."
@@ -437,16 +423,21 @@ class ResourceConfigInput:
     )
 
 
-@strawberry.input(description="Added in 25.19.0")
-class ImageInput:
+@gql_pydantic_input(
+    BackendAIGQLMeta(description="", added_version="25.19.0"),
+)
+class ImageInput(PydanticInputMixin[ImageInputDTO]):
     id: ID
 
 
-@strawberry.input(
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description="A single environment variable entry with name and value.",
+        added_version="26.1.0",
+    ),
     name="EnvironmentVariableEntryInput",
-    description="Added in 26.1.0. A single environment variable entry with name and value.",
 )
-class EnvironmentVariableEntryInputGQL:
+class EnvironmentVariableEntryInputGQL(PydanticInputMixin[EnvironmentVariableEntryInputDTO]):
     """A single environment variable entry with name and value."""
 
     name: str = strawberry.field(
@@ -455,11 +446,13 @@ class EnvironmentVariableEntryInputGQL:
     value: str = strawberry.field(description="Environment variable value.")
 
 
-@strawberry.input(
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description="A collection of environment variable entries.", added_version="26.1.0"
+    ),
     name="EnvironmentVariablesInput",
-    description="Added in 26.1.0. A collection of environment variable entries.",
 )
-class EnvironmentVariablesInputGQL:
+class EnvironmentVariablesInputGQL(PydanticInputMixin[EnvironmentVariablesInputDTO]):
     """A collection of environment variable entries."""
 
     entries: list[EnvironmentVariableEntryInputGQL] = strawberry.field(
@@ -467,8 +460,10 @@ class EnvironmentVariablesInputGQL:
     )
 
 
-@strawberry.input(description="Added in 25.19.0")
-class ModelRuntimeConfigInput:
+@gql_pydantic_input(
+    BackendAIGQLMeta(description="", added_version="25.19.0"),
+)
+class ModelRuntimeConfigInput(PydanticInputMixin[ModelRuntimeConfigInputDTO]):
     runtime_variant: str
     inference_runtime_config: JSON | None = None
     environ: EnvironmentVariablesInputGQL | None = strawberry.field(
@@ -477,23 +472,30 @@ class ModelRuntimeConfigInput:
     )
 
 
-@strawberry.input(description="Added in 25.19.0")
-class ModelMountConfigInput:
+@gql_pydantic_input(
+    BackendAIGQLMeta(description="", added_version="25.19.0"),
+)
+class ModelMountConfigInput(PydanticInputMixin[ModelMountConfigInputDTO]):
     vfolder_id: ID
     mount_destination: str
     definition_path: str
 
 
-@strawberry.input(description="Added in 25.19.0")
-class ExtraVFolderMountInput:
+@gql_pydantic_input(
+    BackendAIGQLMeta(description="", added_version="25.19.0"),
+)
+class ExtraVFolderMountInput(PydanticInputMixin[ExtraVFolderMountInputDTO]):
     vfolder_id: ID
     mount_destination: str | None
 
 
-@strawberry.input(
-    description="Added in 25.19.0. Input for specifying revision configuration within a deployment."
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description="Input for specifying revision configuration within a deployment.",
+        added_version="25.19.0",
+    ),
 )
-class CreateRevisionInput:
+class CreateRevisionInput(PydanticInputMixin[CreateRevisionInputDTO]):
     name: str | None = None
     cluster_config: ClusterConfigInput
     resource_config: ResourceConfigInput
@@ -502,53 +504,11 @@ class CreateRevisionInput:
     model_mount_config: ModelMountConfigInput
     extra_mounts: list[ExtraVFolderMountInput] | None
 
-    def to_model_revision_creator(self) -> ModelRevisionCreator:
-        resource_spec = ResourceSpec(
-            cluster_mode=CommonClusterMode(self.cluster_config.mode),
-            cluster_size=self.cluster_config.size,
-            resource_slots=cast(Mapping[str, Any], self.resource_config.resource_slots),
-            resource_opts=cast(Mapping[str, Any] | None, self.resource_config.resource_opts),
-        )
 
-        extra_mounts = []
-        if self.extra_mounts is not None:
-            extra_mounts = [
-                MountInfo(
-                    vfolder_id=UUID(str(extra_mount.vfolder_id)),
-                    kernel_path=PurePosixPath(extra_mount.mount_destination)
-                    if extra_mount.mount_destination
-                    else None,
-                )
-                for extra_mount in self.extra_mounts
-            ]
-
-        mounts = VFolderMountsCreator(
-            model_vfolder_id=UUID(str(self.model_mount_config.vfolder_id)),
-            model_definition_path=self.model_mount_config.definition_path,
-            model_mount_destination=self.model_mount_config.mount_destination,
-            extra_mounts=extra_mounts,
-        )
-
-        execution_spec = ExecutionSpec(
-            environ={e.name: e.value for e in self.model_runtime_config.environ.entries}
-            if self.model_runtime_config.environ
-            else None,
-            runtime_variant=RuntimeVariant(self.model_runtime_config.runtime_variant),
-            inference_runtime_config=cast(
-                dict[str, Any] | None, self.model_runtime_config.inference_runtime_config
-            ),
-        )
-
-        return ModelRevisionCreator(
-            image_id=UUID(str(self.image.id)),
-            resource_spec=resource_spec,
-            mounts=mounts,
-            execution=execution_spec,
-        )
-
-
-@strawberry.input(description="Added in 25.19.0")
-class AddRevisionInput:
+@gql_pydantic_input(
+    BackendAIGQLMeta(description="", added_version="25.19.0"),
+)
+class AddRevisionInput(PydanticInputMixin[AddRevisionGQLInputDTO]):
     name: str | None = None
     deployment_id: ID
     cluster_config: ClusterConfigInput
@@ -558,73 +518,16 @@ class AddRevisionInput:
     model_mount_config: ModelMountConfigInput
     extra_mounts: list[ExtraVFolderMountInput] | None
 
-    def to_model_revision_creator(self) -> ModelRevisionCreator:
-        """Build ModelRevisionCreator from input fields."""
-        resource_spec = ResourceSpec(
-            cluster_mode=CommonClusterMode(self.cluster_config.mode),
-            cluster_size=self.cluster_config.size,
-            resource_slots=cast(Mapping[str, Any], self.resource_config.resource_slots),
-            resource_opts=cast(Mapping[str, Any] | None, self.resource_config.resource_opts),
-        )
-
-        extra_mounts = []
-        if self.extra_mounts is not None:
-            extra_mounts = [
-                MountInfo(
-                    vfolder_id=UUID(str(extra_mount.vfolder_id)),
-                    kernel_path=PurePosixPath(extra_mount.mount_destination)
-                    if extra_mount.mount_destination
-                    else None,
-                )
-                for extra_mount in self.extra_mounts
-            ]
-
-        mounts = VFolderMountsCreator(
-            model_vfolder_id=UUID(str(self.model_mount_config.vfolder_id)),
-            model_definition_path=self.model_mount_config.definition_path,
-            model_mount_destination=self.model_mount_config.mount_destination,
-            extra_mounts=extra_mounts,
-        )
-
-        execution_spec = ExecutionSpec(
-            environ={e.name: e.value for e in self.model_runtime_config.environ.entries}
-            if self.model_runtime_config.environ
-            else None,
-            runtime_variant=RuntimeVariant(self.model_runtime_config.runtime_variant),
-            inference_runtime_config=cast(
-                dict[str, Any] | None, self.model_runtime_config.inference_runtime_config
-            ),
-        )
-
-        return ModelRevisionCreator(
-            image_id=UUID(str(self.image.id)),
-            resource_spec=resource_spec,
-            mounts=mounts,
-            execution=execution_spec,
-        )
-
 
 ModelRevisionEdge = Edge[ModelRevision]
 
 
-@strawberry.type(description="Added in 25.19.0")
+@gql_connection_type(
+    BackendAIGQLMeta(added_version="25.19.0", description="Connection for model revisions.")
+)
 class ModelRevisionConnection(Connection[ModelRevision]):
     count: int
 
     def __init__(self, *args: Any, count: int, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
         self.count = count
-
-    @classmethod
-    def from_dataclass(cls, revisions_data: list[ModelRevisionData]) -> ModelRevisionConnection:
-        nodes = [ModelRevision.from_dataclass(data) for data in revisions_data]
-        edges = [ModelRevisionEdge(node=node, cursor=str(node.id)) for node in nodes]
-
-        page_info = PageInfo(
-            has_next_page=False,
-            has_previous_page=False,
-            start_cursor=edges[0].cursor if edges else None,
-            end_cursor=edges[-1].cursor if edges else None,
-        )
-
-        return cls(count=len(nodes), edges=edges, page_info=page_info)

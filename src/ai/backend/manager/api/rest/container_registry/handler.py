@@ -1,7 +1,7 @@
 """Container registry handler using the new ApiHandler pattern.
 
 All handlers use typed parameters (``BodyParam``, ``PathParam``,
-``RequestCtx``) that are automatically extracted by
+``QueryParam``, ``RequestCtx``) that are automatically extracted by
 ``_wrap_api_handler``, and responses are returned as ``APIResponse``
 objects.
 """
@@ -13,25 +13,55 @@ import uuid
 from http import HTTPStatus
 from typing import Final
 
-from ai.backend.common.api_handlers import APIResponse, BaseRequestModel, BodyParam, PathParam
+from ai.backend.common.api_handlers import (
+    APIResponse,
+    BaseRequestModel,
+    BodyParam,
+    PathParam,
+    QueryParam,
+)
 from ai.backend.common.container_registry import (
+    ContainerRegistryModel,
+    CreateContainerRegistryRequestModel,
+    ImageOperationRequestModel,
+    ListContainerRegistriesResponseModel,
     PatchContainerRegistryRequestModel,
     PatchContainerRegistryResponseModel,
 )
 from ai.backend.common.dto.manager.registry.request import HarborWebhookRequestModel
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.dto.context import RequestCtx
+from ai.backend.manager.models.container_registry import ContainerRegistryRow
+from ai.backend.manager.repositories.base.creator import Creator
+from ai.backend.manager.repositories.base.purger import Purger
 from ai.backend.manager.repositories.base.updater import Updater
+from ai.backend.manager.repositories.container_registry.creators import (
+    ContainerRegistryCreatorSpec,
+)
 from ai.backend.manager.repositories.container_registry.updaters import (
     ContainerRegistryUpdaterSpec,
+)
+from ai.backend.manager.services.container_registry.actions.clear_images import ClearImagesAction
+from ai.backend.manager.services.container_registry.actions.create_container_registry import (
+    CreateContainerRegistryAction,
+)
+from ai.backend.manager.services.container_registry.actions.delete_container_registry import (
+    DeleteContainerRegistryAction,
 )
 from ai.backend.manager.services.container_registry.actions.handle_harbor_webhook import (
     HandleHarborWebhookAction,
     HarborWebhookResourceInput,
 )
+from ai.backend.manager.services.container_registry.actions.load_all_container_registries import (
+    LoadAllContainerRegistriesAction,
+)
+from ai.backend.manager.services.container_registry.actions.load_container_registries import (
+    LoadContainerRegistriesAction,
+)
 from ai.backend.manager.services.container_registry.actions.modify_container_registry import (
     ModifyContainerRegistryAction,
 )
+from ai.backend.manager.services.container_registry.actions.rescan_images import RescanImagesAction
 from ai.backend.manager.services.container_registry.processors import ContainerRegistryProcessors
 from ai.backend.manager.types import OptionalState, TriState
 
@@ -44,6 +74,13 @@ class RegistryIdPath(BaseRequestModel):
     registry_id: uuid.UUID
 
 
+class LoadContainerRegistriesQueryModel(BaseRequestModel):
+    """Query parameters for load endpoint."""
+
+    registry: str
+    project: str | None = None
+
+
 class ContainerRegistryHandler:
     """Container registry API handler.
 
@@ -52,6 +89,133 @@ class ContainerRegistryHandler:
 
     def __init__(self, *, container_registry: ContainerRegistryProcessors) -> None:
         self._container_registry = container_registry
+
+    # ------------------------------------------------------------------
+    # POST /container-registries
+    # ------------------------------------------------------------------
+
+    async def create(
+        self,
+        body: BodyParam[CreateContainerRegistryRequestModel],
+    ) -> APIResponse:
+        params = body.parsed
+        log.info("CREATE_CONTAINER_REGISTRY (registry_name:{})", params.registry_name)
+
+        creator_spec = ContainerRegistryCreatorSpec(
+            url=params.url,
+            registry_name=params.registry_name,
+            type=params.type,
+            project=params.project,
+            username=params.username,
+            password=params.password,
+            ssl_verify=params.ssl_verify,
+            is_global=params.is_global,
+            extra=params.extra,
+            allowed_groups=params.allowed_groups,
+        )
+        result = await self._container_registry.create_container_registry.wait_for_complete(
+            CreateContainerRegistryAction(creator=Creator(spec=creator_spec))
+        )
+
+        resp = PatchContainerRegistryResponseModel(
+            id=result.data.id,
+            url=result.data.url,
+            registry_name=result.data.registry_name,
+            type=result.data.type,
+            project=result.data.project,
+            username=result.data.username,
+            password=result.data.password,
+            ssl_verify=result.data.ssl_verify,
+            is_global=result.data.is_global,
+            extra=result.data.extra,
+        )
+        return APIResponse.build(HTTPStatus.CREATED, resp)
+
+    # ------------------------------------------------------------------
+    # DELETE /container-registries/{registry_id}
+    # ------------------------------------------------------------------
+
+    async def delete(
+        self,
+        path: PathParam[RegistryIdPath],
+    ) -> APIResponse:
+        registry_id = path.parsed.registry_id
+        log.info("DELETE_CONTAINER_REGISTRY (registry:{})", registry_id)
+
+        await self._container_registry.delete_container_registry.wait_for_complete(
+            DeleteContainerRegistryAction(
+                purger=Purger(row_class=ContainerRegistryRow, pk_value=registry_id)
+            )
+        )
+        return APIResponse.no_content(HTTPStatus.NO_CONTENT)
+
+    # ------------------------------------------------------------------
+    # GET /container-registries
+    # ------------------------------------------------------------------
+
+    async def list_all(self) -> APIResponse:
+        log.info("LIST_ALL_CONTAINER_REGISTRIES")
+
+        result = await self._container_registry.load_all_container_registries.wait_for_complete(
+            LoadAllContainerRegistriesAction()
+        )
+
+        resp = ListContainerRegistriesResponseModel(
+            items=[
+                ContainerRegistryModel(
+                    id=reg.id,
+                    url=reg.url,
+                    registry_name=reg.registry_name,
+                    type=reg.type,
+                    project=reg.project,
+                    username=reg.username,
+                    password=reg.password,
+                    ssl_verify=reg.ssl_verify,
+                    is_global=reg.is_global,
+                    extra=reg.extra,
+                )
+                for reg in result.registries
+            ]
+        )
+        return APIResponse.build(HTTPStatus.OK, resp)
+
+    # ------------------------------------------------------------------
+    # GET /container-registries/load
+    # ------------------------------------------------------------------
+
+    async def load(
+        self,
+        query: QueryParam[LoadContainerRegistriesQueryModel],
+    ) -> APIResponse:
+        params = query.parsed
+        log.info(
+            "LOAD_CONTAINER_REGISTRIES (registry:{}, project:{})",
+            params.registry,
+            params.project,
+        )
+
+        result = await self._container_registry.load_container_registries.wait_for_complete(
+            LoadContainerRegistriesAction(registry=params.registry, project=params.project)
+        )
+
+        resp = ListContainerRegistriesResponseModel(
+            items=[
+                ContainerRegistryModel(
+                    id=reg.id,
+                    url=reg.url,
+                    registry_name=reg.registry_name,
+                    type=reg.type,
+                    project=reg.project,
+                    username=reg.username,
+                    password=reg.password,
+                    ssl_verify=reg.ssl_verify,
+                    is_global=reg.is_global,
+                    extra=reg.extra,
+                )
+                for reg in result.registries
+            ]
+        )
+        return APIResponse.build(HTTPStatus.OK, resp)
 
     # ------------------------------------------------------------------
     # PATCH /container-registries/{registry_id}
@@ -121,6 +285,42 @@ class ContainerRegistryHandler:
             extra=result.data.extra,
         )
         return APIResponse.build(HTTPStatus.OK, resp)
+
+    # ------------------------------------------------------------------
+    # POST /container-registries/rescan
+    # ------------------------------------------------------------------
+
+    async def rescan_images(
+        self,
+        body: BodyParam[ImageOperationRequestModel],
+    ) -> APIResponse:
+        params = body.parsed
+        log.info("RESCAN_IMAGES (registry:{}, project:{})", params.registry, params.project)
+
+        await self._container_registry.rescan_images.wait_for_complete(
+            RescanImagesAction(
+                registry=params.registry,
+                project=params.project,
+                progress_reporter=None,
+            )
+        )
+        return APIResponse.no_content(HTTPStatus.NO_CONTENT)
+
+    # ------------------------------------------------------------------
+    # POST /container-registries/clear
+    # ------------------------------------------------------------------
+
+    async def clear_images(
+        self,
+        body: BodyParam[ImageOperationRequestModel],
+    ) -> APIResponse:
+        params = body.parsed
+        log.info("CLEAR_IMAGES (registry:{}, project:{})", params.registry, params.project)
+
+        await self._container_registry.clear_images.wait_for_complete(
+            ClearImagesAction(registry=params.registry, project=params.project)
+        )
+        return APIResponse.no_content(HTTPStatus.NO_CONTENT)
 
     # ------------------------------------------------------------------
     # POST /container-registries/webhook/harbor

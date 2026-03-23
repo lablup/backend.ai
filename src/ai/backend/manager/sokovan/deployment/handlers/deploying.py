@@ -1,22 +1,26 @@
 """Handlers for DEPLOYING sub-steps (BEP-1049).
 
-All sub-step handlers are registered flat in the coordinator alongside other
-lifecycle handlers.  The coordinator dispatches by sub-step using the
-``(lifecycle_type, sub_step)`` registry key.
+Two DEPLOYING handlers are registered in the coordinator's HandlerRegistry:
 
-Each handler's ``execute()`` evaluates the strategy FSM and classifies
-deployments into successes / errors / skipped.  The coordinator then
-applies ``status_transitions()`` to move deployments to the next sub-step
-or lifecycle state.
+- **DeployingProvisioningHandler**: Runs the strategy FSM each cycle to
+  create/drain routes and check for completion.
+- **DeployingRollingBackHandler**: Clears ``deploying_revision`` and
+  transitions directly to READY.
 
 Sub-step flow::
 
-    PROVISIONING ──success──▸ PROGRESSING ──success──▸ READY
-                                  │                   (via COMPLETED marker)
-                                  │failure
-                                  ▼
-                             ROLLING_BACK ──success──▸ READY
-                                                      (via ROLLED_BACK marker)
+    PROVISIONING ──(need_retry)──▸ PROVISIONING  (route mutations, logged)
+         │
+         │ (success)
+         ▼
+       READY  (completed — all routes replaced)
+
+    PROVISIONING ──(timeout)──▸ ROLLING_BACK ──(success)──▸ READY
+
+The evaluator determines sub-step assignments and route mutations;
+the applier persists them to DB atomically.  Each handler classifies
+deployments into successes (transition forward), need_retry (route mutations
+with history logged), and skipped (no change — waiting).
 """
 
 from __future__ import annotations
@@ -28,15 +32,23 @@ from typing import override
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.deployment.types import (
     DeploymentLifecycleStatus,
+    DeploymentLifecycleSubStep,
     DeploymentStatusTransitions,
-    DeploymentSubStep,
 )
 from ai.backend.manager.data.model_serving.types import EndpointLifecycle
 from ai.backend.manager.defs import LockID
+from ai.backend.manager.repositories.deployment.repository import DeploymentRepository
 from ai.backend.manager.sokovan.deployment.deployment_controller import DeploymentController
 from ai.backend.manager.sokovan.deployment.route.route_controller import RouteController
 from ai.backend.manager.sokovan.deployment.route.types import RouteLifecycleType
+from ai.backend.manager.sokovan.deployment.strategy.applier import (
+    StrategyResultApplier,
+)
+from ai.backend.manager.sokovan.deployment.strategy.evaluator import (
+    DeploymentStrategyEvaluator,
+)
 from ai.backend.manager.sokovan.deployment.types import (
+    DeploymentExecutionError,
     DeploymentExecutionResult,
     DeploymentLifecycleType,
     DeploymentWithHistory,
@@ -53,22 +65,29 @@ log = BraceStyleAdapter(logging.getLogger(__name__))
 
 
 class DeployingProvisioningHandler(DeploymentHandler):
-    """Handler for DEPLOYING / PROVISIONING sub-step.
+    """Handler for the DEPLOYING / PROVISIONING sub-step.
 
-    New-revision routes are being created; waiting for them to become HEALTHY.
+    Runs the strategy FSM each cycle to create/drain routes and check
+    for completion.  Classification:
 
-    - success: Routes provisioned → transition to PROGRESSING.
-    - failure: Provisioning failed → transition to ROLLING_BACK.
-    - skipped: Still waiting for routes — no transition, re-schedule.
+    - **Route mutations executed** (create/drain): need_retry — stays in
+      PROVISIONING with a new history record for progress tracking.
+      Never escalated to give_up (normal progress).
+    - **No changes** (routes still warming up): skipped — no history.
+    - **Completed** (all old routes replaced): success → READY.
     """
 
     def __init__(
         self,
         deployment_controller: DeploymentController,
         route_controller: RouteController,
+        evaluator: DeploymentStrategyEvaluator,
+        applier: StrategyResultApplier,
     ) -> None:
         self._deployment_controller = deployment_controller
         self._route_controller = route_controller
+        self._evaluator = evaluator
+        self._applier = applier
 
     @classmethod
     @override
@@ -86,8 +105,8 @@ class DeployingProvisioningHandler(DeploymentHandler):
         return [
             DeploymentLifecycleStatus(
                 lifecycle=EndpointLifecycle.DEPLOYING,
-                sub_status=DeploymentSubStep.PROVISIONING,
-            )
+                sub_step=DeploymentLifecycleSubStep.DEPLOYING_PROVISIONING,
+            ),
         ]
 
     @classmethod
@@ -95,17 +114,16 @@ class DeployingProvisioningHandler(DeploymentHandler):
     def status_transitions(cls) -> DeploymentStatusTransitions:
         return DeploymentStatusTransitions(
             success=DeploymentLifecycleStatus(
-                lifecycle=EndpointLifecycle.DEPLOYING,
-                sub_status=DeploymentSubStep.PROGRESSING,
+                lifecycle=EndpointLifecycle.READY,
+                sub_step=None,
             ),
-            need_retry=None,
+            need_retry=DeploymentLifecycleStatus(
+                lifecycle=EndpointLifecycle.DEPLOYING,
+                sub_step=DeploymentLifecycleSubStep.DEPLOYING_PROVISIONING,
+            ),
             expired=DeploymentLifecycleStatus(
                 lifecycle=EndpointLifecycle.DEPLOYING,
-                sub_status=DeploymentSubStep.ROLLING_BACK,
-            ),
-            give_up=DeploymentLifecycleStatus(
-                lifecycle=EndpointLifecycle.DEPLOYING,
-                sub_status=DeploymentSubStep.ROLLING_BACK,
+                sub_step=DeploymentLifecycleSubStep.DEPLOYING_ROLLING_BACK,
             ),
         )
 
@@ -113,84 +131,81 @@ class DeployingProvisioningHandler(DeploymentHandler):
     async def execute(
         self, deployments: Sequence[DeploymentWithHistory]
     ) -> DeploymentExecutionResult:
-        raise NotImplementedError("Strategy evaluator and applier are not yet wired — see BA-5014")
+        deployment_infos = [d.deployment_info for d in deployments]
+        deployment_map = {d.deployment_info.id: d for d in deployments}
+
+        summary = await self._evaluator.evaluate(deployment_infos)
+        apply_result = await self._applier.apply(summary)
+
+        # Filter out deployments marked for destruction during DEPLOYING.
+        destroying_ids = {
+            d.deployment_info.id
+            for d in deployments
+            if d.deployment_info.state.lifecycle
+            in (EndpointLifecycle.DESTROYING, EndpointLifecycle.DESTROYED)
+        }
+        if destroying_ids:
+            log.warning(
+                "Skipping {} deployments with DESTROYING/DESTROYED lifecycle during DEPLOYING",
+                len(destroying_ids),
+            )
+
+        successes: list[DeploymentWithHistory] = []
+        failures: list[DeploymentExecutionError] = []
+        skipped: list[DeploymentWithHistory] = []
+
+        # COMPLETED → success (coordinator transitions to READY)
+        for endpoint_id in apply_result.completed_ids:
+            if endpoint_id in destroying_ids:
+                continue
+            deployment = deployment_map.get(endpoint_id)
+            if deployment is not None:
+                successes.append(deployment)
+
+        # Evaluation errors → failures
+        for error_data in summary.errors:
+            deployment = deployment_map.get(error_data.deployment.id)
+            if deployment is not None:
+                failures.append(
+                    DeploymentExecutionError(
+                        deployment_info=deployment,
+                        reason=error_data.reason,
+                        error_detail=error_data.reason,
+                    )
+                )
+
+        # Classify rest: route mutations happened → failures (recoverable, coordinator
+        # will classify as need_retry), no changes → skipped (no history).
+        completed_or_error_ids = apply_result.completed_ids | {
+            e.deployment.id for e in summary.errors
+        }
+        has_route_mutations = bool(apply_result.routes_created or apply_result.routes_drained)
+        for deployment in deployments:
+            endpoint_id = deployment.deployment_info.id
+            if endpoint_id in completed_or_error_ids or endpoint_id in destroying_ids:
+                continue
+            if has_route_mutations:
+                failures.append(
+                    DeploymentExecutionError(
+                        deployment_info=deployment,
+                        reason="Route mutations in progress",
+                        error_detail="Waiting for route provisioning to complete",
+                    )
+                )
+            else:
+                skipped.append(deployment)
+
+        return DeploymentExecutionResult(successes=successes, failures=failures, skipped=skipped)
 
     @override
     async def post_process(self, result: DeploymentExecutionResult) -> None:
         await self._deployment_controller.mark_lifecycle_needed(
-            DeploymentLifecycleType.DEPLOYING, sub_step=DeploymentSubStep.PROVISIONING
+            DeploymentLifecycleType.DEPLOYING,
+            sub_step=DeploymentLifecycleSubStep.DEPLOYING_PROVISIONING,
         )
-        await self._route_controller.mark_lifecycle_needed(RouteLifecycleType.PROVISIONING)
-
-
-class DeployingProgressingHandler(DeploymentHandler):
-    """Handler for DEPLOYING / PROGRESSING sub-step (+ COMPLETED marker).
-
-    Targets PROGRESSING (active) and COMPLETED (terminal marker):
-
-    - success: Strategy conditions met (COMPLETED) → transition to READY.
-    - expired/give_up: Strategy failed → transition to ROLLING_BACK.
-    - skipped: Still progressing — no transition, re-schedule.
-    """
-
-    def __init__(
-        self,
-        deployment_controller: DeploymentController,
-        route_controller: RouteController,
-    ) -> None:
-        self._deployment_controller = deployment_controller
-        self._route_controller = route_controller
-
-    @classmethod
-    @override
-    def name(cls) -> str:
-        return "deploying-progressing"
-
-    @property
-    @override
-    def lock_id(self) -> LockID | None:
-        return LockID.LOCKID_DEPLOYMENT_DEPLOYING
-
-    @classmethod
-    @override
-    def target_statuses(cls) -> list[DeploymentLifecycleStatus]:
-        return [
-            DeploymentLifecycleStatus(
-                lifecycle=EndpointLifecycle.DEPLOYING,
-                sub_status=DeploymentSubStep.PROGRESSING,
-            ),
-            DeploymentLifecycleStatus(
-                lifecycle=EndpointLifecycle.DEPLOYING,
-                sub_status=DeploymentSubStep.COMPLETED,
-            ),
-        ]
-
-    @classmethod
-    @override
-    def status_transitions(cls) -> DeploymentStatusTransitions:
-        return DeploymentStatusTransitions(
-            success=DeploymentLifecycleStatus(lifecycle=EndpointLifecycle.READY),
-            need_retry=None,
-            expired=DeploymentLifecycleStatus(
-                lifecycle=EndpointLifecycle.DEPLOYING,
-                sub_status=DeploymentSubStep.ROLLING_BACK,
-            ),
-            give_up=DeploymentLifecycleStatus(
-                lifecycle=EndpointLifecycle.DEPLOYING,
-                sub_status=DeploymentSubStep.ROLLING_BACK,
-            ),
-        )
-
-    @override
-    async def execute(
-        self, deployments: Sequence[DeploymentWithHistory]
-    ) -> DeploymentExecutionResult:
-        raise NotImplementedError("Strategy evaluator and applier are not yet wired — see BA-5014")
-
-    @override
-    async def post_process(self, result: DeploymentExecutionResult) -> None:
         await self._deployment_controller.mark_lifecycle_needed(
-            DeploymentLifecycleType.DEPLOYING, sub_step=DeploymentSubStep.PROGRESSING
+            DeploymentLifecycleType.DEPLOYING,
+            sub_step=DeploymentLifecycleSubStep.DEPLOYING_ROLLING_BACK,
         )
         await self._route_controller.mark_lifecycle_needed(RouteLifecycleType.PROVISIONING)
 
@@ -198,21 +213,18 @@ class DeployingProgressingHandler(DeploymentHandler):
 class DeployingRollingBackHandler(DeploymentHandler):
     """Handler for DEPLOYING / ROLLING_BACK sub-step.
 
-    Actively rolling back — terminate new-revision routes,
-    restore traffic to previous revision routes.
-
-    - success: Rollback complete → transition to READY.
-    - failure: Rollback itself failed → transition to READY (best-effort).
-    - skipped: Still rolling back — no transition, re-schedule.
+    Clears ``deploying_revision`` and transitions directly to READY.
     """
 
     def __init__(
         self,
         deployment_controller: DeploymentController,
         route_controller: RouteController,
+        deployment_repo: DeploymentRepository,
     ) -> None:
         self._deployment_controller = deployment_controller
         self._route_controller = route_controller
+        self._deployment_repo = deployment_repo
 
     @classmethod
     @override
@@ -230,30 +242,37 @@ class DeployingRollingBackHandler(DeploymentHandler):
         return [
             DeploymentLifecycleStatus(
                 lifecycle=EndpointLifecycle.DEPLOYING,
-                sub_status=DeploymentSubStep.ROLLING_BACK,
-            ),
+                sub_step=DeploymentLifecycleSubStep.DEPLOYING_ROLLING_BACK,
+            )
         ]
 
     @classmethod
     @override
     def status_transitions(cls) -> DeploymentStatusTransitions:
         return DeploymentStatusTransitions(
-            success=DeploymentLifecycleStatus(lifecycle=EndpointLifecycle.READY),
-            need_retry=None,
-            # TODO: How can we handle this?
-            expired=DeploymentLifecycleStatus(lifecycle=EndpointLifecycle.READY),
-            give_up=DeploymentLifecycleStatus(lifecycle=EndpointLifecycle.READY),
+            success=DeploymentLifecycleStatus(
+                lifecycle=EndpointLifecycle.READY,
+                sub_step=None,
+            ),
         )
 
     @override
     async def execute(
         self, deployments: Sequence[DeploymentWithHistory]
     ) -> DeploymentExecutionResult:
-        raise NotImplementedError("Strategy evaluator and applier are not yet wired — see BA-5014")
+        all_deployment_ids = {deployment.deployment_info.id for deployment in deployments}
+        await self._deployment_repo.clear_deploying_revision(all_deployment_ids)
+        log.info(
+            "Cleared deploying_revision for {} rolling-back deployments",
+            len(all_deployment_ids),
+        )
+
+        return DeploymentExecutionResult(successes=list(deployments))
 
     @override
     async def post_process(self, result: DeploymentExecutionResult) -> None:
         await self._deployment_controller.mark_lifecycle_needed(
-            DeploymentLifecycleType.DEPLOYING, sub_step=DeploymentSubStep.ROLLING_BACK
+            DeploymentLifecycleType.DEPLOYING,
+            sub_step=DeploymentLifecycleSubStep.DEPLOYING_ROLLING_BACK,
         )
         await self._route_controller.mark_lifecycle_needed(RouteLifecycleType.PROVISIONING)

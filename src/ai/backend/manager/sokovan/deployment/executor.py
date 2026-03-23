@@ -12,6 +12,7 @@ from ai.backend.common.clients.http_client.client_pool import (
 )
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
 from ai.backend.common.config import ModelHealthCheck
+from ai.backend.common.data.permission.types import RBACElementType
 from ai.backend.common.exception import BackendAIError
 from ai.backend.common.types import (
     RuntimeVariant,
@@ -32,17 +33,17 @@ from ai.backend.manager.data.deployment.types import (
     RouteStatus,
     RouteTrafficStatus,
 )
+from ai.backend.manager.data.permission.types import RBACElementRef
 from ai.backend.manager.data.resource.types import ScalingGroupProxyTarget
 from ai.backend.manager.errors.deployment import ReplicaCountMismatch
-from ai.backend.manager.errors.service import ModelDefinitionNotFound
 from ai.backend.manager.models.routing import RoutingRow
-from ai.backend.manager.repositories.base import Creator
+from ai.backend.manager.models.routing.conditions import RouteConditions
+from ai.backend.manager.repositories.base.rbac.entity_creator import RBACEntityCreator
 from ai.backend.manager.repositories.base.updater import BatchUpdater
 from ai.backend.manager.repositories.deployment.creators import (
     RouteBatchUpdaterSpec,
     RouteCreatorSpec,
 )
-from ai.backend.manager.repositories.deployment.options import RouteConditions
 from ai.backend.manager.repositories.deployment.repository import (
     AutoScalingMetricsData,
     DeploymentRepository,
@@ -127,13 +128,6 @@ class DeploymentExecutor:
         valid_deployments: list[DeploymentWithHistory] = []
         for deployment in deployments:
             info = deployment.deployment_info
-            target_revision = info.target_revision()
-            if not target_revision:
-                log.warning(
-                    "Deployment {} has no target revision, skipping",
-                    info.id,
-                )
-                continue
             targets = scaling_group_targets[info.metadata.resource_group]
             if not targets:
                 log.warning(
@@ -190,7 +184,7 @@ class DeploymentExecutor:
 
         return DeploymentExecutionResult(
             successes=successful_deployments,
-            errors=errors,
+            failures=errors,
         )
 
     async def check_ready_deployments_that_need_scaling(
@@ -229,7 +223,7 @@ class DeploymentExecutor:
 
         return DeploymentExecutionResult(
             successes=successes,
-            errors=errors,
+            failures=errors,
         )
 
     async def scale_deployment(
@@ -243,7 +237,7 @@ class DeploymentExecutor:
                     endpoint_ids
                 )
 
-        scale_out_creators: list[Creator[RoutingRow]] = []
+        scale_out_creators: list[RBACEntityCreator[RoutingRow]] = []
         scale_in_route_ids: list[UUID] = []
         successes: list[DeploymentWithHistory] = []
         skipped: list[DeploymentWithHistory] = []
@@ -296,7 +290,7 @@ class DeploymentExecutor:
         return DeploymentExecutionResult(
             successes=successes,
             skipped=skipped,
-            errors=errors,
+            failures=errors,
         )
 
     async def calculate_desired_replicas(
@@ -366,7 +360,7 @@ class DeploymentExecutor:
         return DeploymentExecutionResult(
             successes=successes,
             skipped=skipped,
-            errors=errors,
+            failures=errors,
         )
 
     async def destroy_deployment(
@@ -428,7 +422,7 @@ class DeploymentExecutor:
 
         return DeploymentExecutionResult(
             successes=successes,
-            errors=errors,
+            failures=errors,
         )
 
     # Private helper methods
@@ -443,10 +437,13 @@ class DeploymentExecutor:
 
         with recorder.phase("register_endpoint"):
             with recorder.step("check_target_revision"):
-                target_revision = deployment.target_revision()
-                if not target_revision:
-                    raise ModelDefinitionNotFound(
-                        f"No target revision for deployment {deployment.id}"
+                if deployment.current_revision_id is not None:
+                    target_revision = deployment.resolve_revision_spec(
+                        deployment.current_revision_id
+                    )
+                else:
+                    target_revision = await self._deployment_repo.get_revision_spec_from_endpoint(
+                        deployment.id
                     )
 
             with recorder.step("generate_model_definition"):
@@ -584,12 +581,12 @@ class DeploymentExecutor:
         self,
         deployment: DeploymentInfo,
         route_map: Mapping[UUID, Sequence[RouteInfo]],
-    ) -> tuple[list[Creator[RoutingRow]], list[UUID]]:
+    ) -> tuple[list[RBACEntityCreator[RoutingRow]], list[UUID]]:
         """Evaluate scaling action for a deployment and return creators/route IDs."""
         pool = DeploymentRecorderContext.current_pool()
         recorder = pool.recorder(deployment.id)
 
-        scale_out_creators: list[Creator[RoutingRow]] = []
+        scale_out_creators: list[RBACEntityCreator[RoutingRow]] = []
         scale_in_route_ids: list[UUID] = []
 
         with recorder.phase("evaluate_scaling"):
@@ -607,7 +604,16 @@ class DeploymentExecutor:
                             project_id=deployment.metadata.project,
                             revision_id=deployment.current_revision_id,
                         )
-                        scale_out_creators.append(Creator(spec=creator_spec))
+                        scale_out_creators.append(
+                            RBACEntityCreator(
+                                spec=creator_spec,
+                                element_type=RBACElementType.ROUTING,
+                                scope_ref=RBACElementRef(
+                                    element_type=RBACElementType.MODEL_DEPLOYMENT,
+                                    element_id=str(deployment.id),
+                                ),
+                            )
+                        )
                 elif len(routes) > target_count:
                     termination_route_candidates = sorted(
                         routes, key=lambda r: (r.status.termination_priority())

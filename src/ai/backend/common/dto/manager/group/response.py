@@ -24,6 +24,7 @@ __all__ = (
     "SearchGroupsResponse",
     "UpdateGroupResponse",
     "DeleteGroupResponse",
+    "PurgeGroupResponse",
     "AddGroupMembersResponse",
     "RemoveGroupMembersResponse",
     "ListGroupMembersResponse",
@@ -93,6 +94,12 @@ class DeleteGroupResponse(BaseResponseModel):
     """Response for deleting a group."""
 
     deleted: bool = Field(description="Whether the group was deleted")
+
+
+class PurgeGroupResponse(BaseResponseModel):
+    """Response for purging a group."""
+
+    purged: bool = Field(description="Whether the group was purged")
 
 
 class AddGroupMembersResponse(BaseResponseModel):

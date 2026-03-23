@@ -3,7 +3,7 @@ from __future__ import annotations
 from uuid import uuid4
 
 import pytest
-from pydantic import ValidationError
+from pydantic import TypeAdapter, ValidationError
 
 from ai.backend.common.dto.manager.session.types import (
     CreationConfigV1,
@@ -19,6 +19,7 @@ from ai.backend.common.dto.manager.session.types import (
     CreationConfigV7,
     MountOption,
     ResourceOpts,
+    TimeoutSeconds,
 )
 from ai.backend.common.types import BinarySize, MountPermission, MountTypes
 
@@ -186,3 +187,44 @@ class TestCreationConfigV7:
         })
         assert cfg.mounts == ["/old-data"]
         assert cfg.mount_map == {"old": "/path"}
+
+
+class TestTimeoutSeconds:
+    def setup_method(self) -> None:
+        self.adapter: TypeAdapter[int] = TypeAdapter(TimeoutSeconds)
+
+    def test_int_input(self) -> None:
+        value = self.adapter.validate_python(300)
+        assert isinstance(value, int)
+        assert value == 300
+
+    def test_float_input(self) -> None:
+        value = self.adapter.validate_python(600.5)
+        assert isinstance(value, int)
+        assert value == 600
+
+    def test_str_duration_seconds(self) -> None:
+        assert self.adapter.validate_python("30s") == 30
+
+    def test_str_duration_hours(self) -> None:
+        assert self.adapter.validate_python("1h") == 3600
+
+    def test_str_duration_minutes(self) -> None:
+        assert self.adapter.validate_python("5m") == 300
+
+    def test_str_numeric(self) -> None:
+        assert self.adapter.validate_python("300") == 300
+
+    def test_negative_rejected(self) -> None:
+        with pytest.raises(ValidationError):
+            self.adapter.validate_python(-100)
+
+    def test_invalid_str_rejected(self) -> None:
+        with pytest.raises(ValidationError):
+            self.adapter.validate_python("abc")
+
+    def test_yr_mo_rejected(self) -> None:
+        with pytest.raises(ValidationError):
+            self.adapter.validate_python("1yr")
+        with pytest.raises(ValidationError):
+            self.adapter.validate_python("2mo")

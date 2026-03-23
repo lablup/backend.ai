@@ -4,7 +4,7 @@ import secrets
 import uuid
 from collections.abc import AsyncIterator, Callable, Coroutine
 from typing import Any
-from unittest.mock import MagicMock
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 from sqlalchemy.ext.asyncio.engine import AsyncEngine as SAEngine
@@ -17,6 +17,7 @@ from ai.backend.common.dto.manager.user import (
     UserStatus,
 )
 from ai.backend.manager.actions.validators import ActionValidators
+from ai.backend.manager.actions.validators.rbac import RBACValidators
 from ai.backend.manager.api.rest.admin.handler import AdminHandler
 from ai.backend.manager.api.rest.admin.registry import register_admin_routes
 from ai.backend.manager.api.rest.routing import RouteRegistry
@@ -37,6 +38,15 @@ from ai.backend.manager.services.user.service import UserService
 UserFactory = Callable[..., Coroutine[Any, Any, CreateUserResponse]]
 
 
+def _create_mock_validators() -> MagicMock:
+    mock_rbac = MagicMock(spec=RBACValidators)
+    mock_rbac.scope = AsyncMock()
+    mock_rbac.single_entity = AsyncMock()
+    mock_validators = MagicMock(spec=ActionValidators)
+    mock_validators.rbac = mock_rbac
+    return mock_validators
+
+
 @pytest.fixture()
 def user_processors(
     database_engine: ExtendedAsyncSAEngine,
@@ -52,7 +62,7 @@ def user_processors(
         user_repository=user_repository,
     )
     return UserProcessors(
-        user_service=service, action_monitors=[], validators=MagicMock(spec=ActionValidators)
+        user_service=service, action_monitors=[], validators=_create_mock_validators()
     )
 
 

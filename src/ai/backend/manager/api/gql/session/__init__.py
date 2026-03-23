@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from .fetcher import fetch_sessions
 from .resolver import admin_sessions_v2
 from .types import (
     SessionV2ConnectionGQL,
@@ -21,8 +20,6 @@ from .types import (
 )
 
 __all__ = [
-    # Fetchers
-    "fetch_sessions",
     # Resolvers
     "admin_sessions_v2",
     # V2 types

@@ -1,43 +1,74 @@
 from __future__ import annotations
 
-import json
 import uuid
 from collections.abc import Iterable
-from typing import Self
+from typing import Self, cast
 
 import strawberry
 from strawberry import ID, UNSET, Info
-from strawberry.relay import Connection, Edge, Node, NodeID
+from strawberry.relay import Connection, Edge, NodeID
 
+from ai.backend.common.dto.manager.v2.object_storage.request import (
+    AdminSearchObjectStoragesInput,
+)
+from ai.backend.common.dto.manager.v2.object_storage.request import (
+    CreateObjectStorageInput as CreateObjectStorageInputDTO,
+)
+from ai.backend.common.dto.manager.v2.object_storage.request import (
+    DeleteObjectStorageInput as DeleteObjectStorageInputDTO,
+)
+from ai.backend.common.dto.manager.v2.object_storage.request import (
+    GetPresignedDownloadURLInput as GetPresignedDownloadURLInputDTO,
+)
+from ai.backend.common.dto.manager.v2.object_storage.request import (
+    GetPresignedUploadURLInput as GetPresignedUploadURLInputDTO,
+)
+from ai.backend.common.dto.manager.v2.object_storage.request import (
+    UpdateObjectStorageInput as UpdateObjectStorageInputDTO,
+)
+from ai.backend.common.dto.manager.v2.object_storage.response import (
+    CreateObjectStoragePayload as CreateObjectStoragePayloadDTO,
+)
+from ai.backend.common.dto.manager.v2.object_storage.response import (
+    DeleteObjectStoragePayload as DeleteObjectStoragePayloadDTO,
+)
+from ai.backend.common.dto.manager.v2.object_storage.response import (
+    ObjectStorageNode,
+)
+from ai.backend.common.dto.manager.v2.object_storage.response import (
+    PresignedDownloadURLPayload as PresignedDownloadURLPayloadDTO,
+)
+from ai.backend.common.dto.manager.v2.object_storage.response import (
+    PresignedUploadURLPayload as PresignedUploadURLPayloadDTO,
+)
+from ai.backend.common.dto.manager.v2.object_storage.response import (
+    UpdateObjectStoragePayload as UpdateObjectStoragePayloadDTO,
+)
 from ai.backend.manager.api.gql.base import encode_cursor
-from ai.backend.manager.data.object_storage.types import ObjectStorageData
-from ai.backend.manager.models.object_storage import ObjectStorageRow
-from ai.backend.manager.repositories.base.creator import Creator
-from ai.backend.manager.repositories.base.updater import Updater
-from ai.backend.manager.repositories.object_storage import ObjectStorageCreatorSpec
-from ai.backend.manager.repositories.object_storage.updaters import ObjectStorageUpdaterSpec
-from ai.backend.manager.services.object_storage.actions.create import CreateObjectStorageAction
-from ai.backend.manager.services.object_storage.actions.delete import DeleteObjectStorageAction
-from ai.backend.manager.services.object_storage.actions.get import GetObjectStorageAction
-from ai.backend.manager.services.object_storage.actions.get_download_presigned_url import (
-    GetDownloadPresignedURLAction,
+from ai.backend.manager.api.gql.decorators import (
+    BackendAIGQLMeta,
+    gql_connection_type,
+    gql_node_type,
+    gql_pydantic_input,
+    gql_pydantic_type,
 )
-from ai.backend.manager.services.object_storage.actions.get_upload_presigned_url import (
-    GetUploadPresignedURLAction,
+from ai.backend.manager.api.gql.pydantic_compat import (
+    PydanticInputMixin,
+    PydanticNodeMixin,
+    PydanticOutputMixin,
 )
-from ai.backend.manager.services.object_storage.actions.list import ListObjectStorageAction
-from ai.backend.manager.services.object_storage.actions.update import UpdateObjectStorageAction
-from ai.backend.manager.services.storage_namespace.actions.get_multi import (
-    GetNamespacesAction,
-)
-from ai.backend.manager.types import OptionalState
 
 from .storage_namespace import StorageNamespace, StorageNamespaceConnection, StorageNamespaceEdge
 from .types import StrawberryGQLContext
 
 
-@strawberry.type(description="Added in 25.14.0")
-class ObjectStorage(Node):
+@gql_node_type(
+    BackendAIGQLMeta(
+        added_version="25.14.0",
+        description="Object storage node.",
+    ),
+)
+class ObjectStorage(PydanticNodeMixin[ObjectStorageNode]):
     id: NodeID[str]
     name: str
     host: str
@@ -57,19 +88,7 @@ class ObjectStorage(Node):
         results = await info.context.data_loaders.object_storage_loader.load_many([
             uuid.UUID(nid) for nid in node_ids
         ])
-        return [cls.from_dataclass(data) if data is not None else None for data in results]
-
-    @classmethod
-    def from_dataclass(cls, data: ObjectStorageData) -> Self:
-        return cls(
-            id=ID(str(data.id)),
-            name=data.name,
-            host=data.host,
-            access_key=data.access_key,
-            secret_key=data.secret_key,
-            endpoint=data.endpoint,
-            region=data.region or "",
-        )
+        return cast(list[Self | None], results)
 
     @strawberry.field
     async def namespaces(
@@ -83,13 +102,8 @@ class ObjectStorage(Node):
         offset: int | None,
     ) -> StorageNamespaceConnection:
         # TODO: Support pagination
-        action_result = (
-            await info.context.processors.storage_namespace.get_namespaces.wait_for_complete(
-                GetNamespacesAction(uuid.UUID(self.id))
-            )
-        )
-
-        nodes = [StorageNamespace.from_dataclass(bucket) for bucket in action_result.result]
+        items = await info.context.adapters.storage_namespace.get_namespaces(uuid.UUID(self.id))
+        nodes = [StorageNamespace.from_pydantic(item) for item in items]
         edges = [StorageNamespaceEdge(node=node, cursor=encode_cursor(node.id)) for node in nodes]
 
         return StorageNamespaceConnection(
@@ -106,7 +120,12 @@ class ObjectStorage(Node):
 ObjectStorageEdge = Edge[ObjectStorage]
 
 
-@strawberry.type(description="Added in 25.14.0")
+@gql_connection_type(
+    BackendAIGQLMeta(
+        added_version="25.14.0",
+        description="Relay-style connection for paginated object storage queries.",
+    ),
+)
 class ObjectStorageConnection(Connection[ObjectStorage]):
     @strawberry.field
     def count(self) -> int:
@@ -115,11 +134,8 @@ class ObjectStorageConnection(Connection[ObjectStorage]):
 
 @strawberry.field(description="Added in 25.14.0")  # type: ignore[misc]
 async def object_storage(id: ID, info: Info[StrawberryGQLContext]) -> ObjectStorage | None:
-    processors = info.context.processors
-    action_result = await processors.object_storage.get.wait_for_complete(
-        GetObjectStorageAction(storage_id=uuid.UUID(id))
-    )
-    return ObjectStorage.from_dataclass(action_result.result)
+    node = await info.context.adapters.object_storage.get(uuid.UUID(id))
+    return ObjectStorage.from_pydantic(node, extra={"region": node.region or ""})
 
 
 @strawberry.field(description="Added in 25.14.0")  # type: ignore[misc]
@@ -132,14 +148,20 @@ async def object_storages(
     limit: int | None = None,
     offset: int | None = None,
 ) -> ObjectStorageConnection | None:
-    # TODO: Does we need to support filtering, ordering here?
-    processors = info.context.processors
-
-    action_result = await processors.object_storage.list_storages.wait_for_complete(
-        ListObjectStorageAction()
+    payload = await info.context.adapters.object_storage.admin_search(
+        AdminSearchObjectStoragesInput(
+            first=first,
+            after=after,
+            last=last,
+            before=before,
+            limit=limit,
+            offset=offset,
+        )
     )
-
-    nodes = [ObjectStorage.from_dataclass(data) for data in action_result.data]
+    nodes = [
+        ObjectStorage.from_pydantic(item, extra={"region": item.region or ""})
+        for item in payload.items
+    ]
     edges = [ObjectStorageEdge(node=node, cursor=encode_cursor(node.id)) for node in nodes]
 
     return ObjectStorageConnection(
@@ -153,8 +175,10 @@ async def object_storages(
     )
 
 
-@strawberry.input(description="Added in 25.14.0")
-class CreateObjectStorageInput:
+@gql_pydantic_input(
+    BackendAIGQLMeta(description="", added_version="25.14.0"),
+)
+class CreateObjectStorageInput(PydanticInputMixin[CreateObjectStorageInputDTO]):
     name: str
     host: str
     access_key: str
@@ -162,21 +186,11 @@ class CreateObjectStorageInput:
     endpoint: str
     region: str
 
-    def to_creator(self) -> Creator[ObjectStorageRow]:
-        return Creator(
-            spec=ObjectStorageCreatorSpec(
-                name=self.name,
-                host=self.host,
-                access_key=self.access_key,
-                secret_key=self.secret_key,
-                endpoint=self.endpoint,
-                region=self.region,
-            )
-        )
 
-
-@strawberry.input(description="Added in 25.14.0")
-class UpdateObjectStorageInput:
+@gql_pydantic_input(
+    BackendAIGQLMeta(description="", added_version="25.14.0"),
+)
+class UpdateObjectStorageInput(PydanticInputMixin[UpdateObjectStorageInputDTO]):
     id: ID
     name: str | None = UNSET
     host: str | None = UNSET
@@ -185,76 +199,104 @@ class UpdateObjectStorageInput:
     endpoint: str | None = UNSET
     region: str | None = UNSET
 
-    def to_updater(self) -> Updater[ObjectStorageRow]:
-        spec = ObjectStorageUpdaterSpec(
-            name=OptionalState[str].from_graphql(self.name),
-            host=OptionalState[str].from_graphql(self.host),
-            access_key=OptionalState[str].from_graphql(self.access_key),
-            secret_key=OptionalState[str].from_graphql(self.secret_key),
-            endpoint=OptionalState[str].from_graphql(self.endpoint),
-            region=OptionalState[str].from_graphql(self.region),
-        )
-        return Updater(spec=spec, pk_value=uuid.UUID(self.id))
 
-
-@strawberry.input(description="Added in 25.14.0")
-class DeleteObjectStorageInput:
+@gql_pydantic_input(
+    BackendAIGQLMeta(description="", added_version="25.14.0"),
+)
+class DeleteObjectStorageInput(PydanticInputMixin[DeleteObjectStorageInputDTO]):
     id: ID
 
 
-@strawberry.input(description="Added in 25.14.0")
-class GetPresignedDownloadURLInput:
+@gql_pydantic_input(
+    BackendAIGQLMeta(description="", added_version="25.14.0"),
+)
+class GetPresignedDownloadURLInput(PydanticInputMixin[GetPresignedDownloadURLInputDTO]):
     artifact_revision_id: ID
     key: str
     expiration: int | None = None
 
 
-@strawberry.input(description="Added in 25.14.0")
-class GetPresignedUploadURLInput:
+@gql_pydantic_input(
+    BackendAIGQLMeta(description="", added_version="25.14.0"),
+)
+class GetPresignedUploadURLInput(PydanticInputMixin[GetPresignedUploadURLInputDTO]):
     artifact_revision_id: ID
     key: str
 
 
-@strawberry.type(description="Added in 25.14.0")
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version="25.14.0",
+        description="Payload for creating an object storage.",
+    ),
+    model=CreateObjectStoragePayloadDTO,
+)
 class CreateObjectStoragePayload:
     object_storage: ObjectStorage
 
 
-@strawberry.type(description="Added in 25.14.0")
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version="25.14.0",
+        description="Payload for updating an object storage.",
+    ),
+    model=UpdateObjectStoragePayloadDTO,
+)
 class UpdateObjectStoragePayload:
     object_storage: ObjectStorage
 
 
-@strawberry.type(description="Added in 25.14.0")
-class DeleteObjectStoragePayload:
-    id: ID
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version="25.14.0",
+        description="Payload for deleting an object storage.",
+    ),
+    model=DeleteObjectStoragePayloadDTO,
+    fields=["id"],
+    name="DeleteObjectStoragePayload",
+)
+class DeleteObjectStoragePayload(PydanticOutputMixin[DeleteObjectStoragePayloadDTO]):
+    id: ID = strawberry.field(description="ID of the deleted object storage.")
 
 
-@strawberry.type(description="Added in 25.14.0")
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version="25.14.0",
+        description="Payload for presigned download URL generation result.",
+    ),
+    model=PresignedDownloadURLPayloadDTO,
+    name="GetPresignedDownloadURLPayload",
+)
 class GetPresignedDownloadURLPayload:
-    presigned_url: str
+    """Payload for presigned download URL generation result."""
+
+    presigned_url: strawberry.auto
 
 
-@strawberry.type(description="Added in 25.14.0")
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version="25.14.0",
+        description="Payload for presigned upload URL generation result.",
+    ),
+    model=PresignedUploadURLPayloadDTO,
+    name="GetPresignedUploadURLPayload",
+)
 class GetPresignedUploadURLPayload:
-    presigned_url: str
-    fields: str  # JSON string containing the form fields
+    """Payload for presigned upload URL generation result."""
+
+    presigned_url: strawberry.auto
+    fields: strawberry.auto
 
 
 @strawberry.mutation(description="Added in 25.14.0")  # type: ignore[misc]
 async def create_object_storage(
     input: CreateObjectStorageInput, info: Info[StrawberryGQLContext]
 ) -> CreateObjectStoragePayload:
-    processors = info.context.processors
-
-    action_result = await processors.object_storage.create.wait_for_complete(
-        CreateObjectStorageAction(
-            creator=input.to_creator(),
-        )
-    )
-
+    result = await info.context.adapters.object_storage.create(input.to_pydantic())
     return CreateObjectStoragePayload(
-        object_storage=ObjectStorage.from_dataclass(action_result.result)
+        object_storage=ObjectStorage.from_pydantic(
+            result.object_storage, extra={"region": result.object_storage.region or ""}
+        )
     )
 
 
@@ -262,16 +304,11 @@ async def create_object_storage(
 async def update_object_storage(
     input: UpdateObjectStorageInput, info: Info[StrawberryGQLContext]
 ) -> UpdateObjectStoragePayload:
-    processors = info.context.processors
-
-    action_result = await processors.object_storage.update.wait_for_complete(
-        UpdateObjectStorageAction(
-            updater=input.to_updater(),
-        )
-    )
-
+    result = await info.context.adapters.object_storage.update(input.to_pydantic())
     return UpdateObjectStoragePayload(
-        object_storage=ObjectStorage.from_dataclass(action_result.result)
+        object_storage=ObjectStorage.from_pydantic(
+            result.object_storage, extra={"region": result.object_storage.region or ""}
+        )
     )
 
 
@@ -279,47 +316,34 @@ async def update_object_storage(
 async def delete_object_storage(
     input: DeleteObjectStorageInput, info: Info[StrawberryGQLContext]
 ) -> DeleteObjectStoragePayload:
-    processors = info.context.processors
-
-    action_result = await processors.object_storage.delete.wait_for_complete(
-        DeleteObjectStorageAction(
-            storage_id=uuid.UUID(input.id),
-        )
-    )
-
-    return DeleteObjectStoragePayload(id=ID(str(action_result.deleted_storage_id)))
+    pydantic_input = input.to_pydantic()
+    result = await info.context.adapters.object_storage.delete(pydantic_input)
+    return DeleteObjectStoragePayload.from_pydantic(result)
 
 
 @strawberry.mutation(description="Added in 25.14.0")  # type: ignore[misc]
 async def get_presigned_download_url(
     input: GetPresignedDownloadURLInput, info: Info[StrawberryGQLContext]
 ) -> GetPresignedDownloadURLPayload:
-    processors = info.context.processors
-
-    action_result = await processors.object_storage.get_presigned_download_url.wait_for_complete(
-        GetDownloadPresignedURLAction(
-            artifact_revision_id=uuid.UUID(input.artifact_revision_id),
-            key=input.key,
-            expiration=input.expiration,
-        )
+    dto = input.to_pydantic()
+    result = await info.context.adapters.object_storage.get_presigned_download_url(
+        artifact_revision_id=dto.artifact_revision_id,
+        key=dto.key,
+        expiration=dto.expiration,
     )
-
-    return GetPresignedDownloadURLPayload(presigned_url=action_result.presigned_url)
+    return GetPresignedDownloadURLPayload(presigned_url=result.presigned_url)
 
 
 @strawberry.mutation(description="Added in 25.14.0")  # type: ignore[misc]
 async def get_presigned_upload_url(
     input: GetPresignedUploadURLInput, info: Info[StrawberryGQLContext]
 ) -> GetPresignedUploadURLPayload:
-    processors = info.context.processors
-
-    action_result = await processors.object_storage.get_presigned_upload_url.wait_for_complete(
-        GetUploadPresignedURLAction(
-            artifact_revision_id=uuid.UUID(input.artifact_revision_id),
-            key=input.key,
-        )
+    dto = input.to_pydantic()
+    result = await info.context.adapters.object_storage.get_presigned_upload_url(
+        artifact_revision_id=dto.artifact_revision_id,
+        key=dto.key,
     )
-
     return GetPresignedUploadURLPayload(
-        presigned_url=action_result.presigned_url, fields=json.dumps(action_result.fields)
+        presigned_url=result.presigned_url,
+        fields=result.fields,
     )

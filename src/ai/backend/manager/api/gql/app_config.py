@@ -6,153 +6,168 @@ import strawberry
 from strawberry import ID, Info
 
 from ai.backend.common.contexts.user import current_user
+from ai.backend.common.dto.manager.v2.app_config.request import (
+    DeleteDomainConfigInput as DeleteDomainConfigInputDTO,
+)
+from ai.backend.common.dto.manager.v2.app_config.request import (
+    DeleteUserConfigInput as DeleteUserConfigInputDTO,
+)
+from ai.backend.common.dto.manager.v2.app_config.request import (
+    UpsertDomainConfigInput as UpsertDomainConfigInputDTO,
+)
+from ai.backend.common.dto.manager.v2.app_config.request import (
+    UpsertUserConfigInput as UpsertUserConfigInputDTO,
+)
+from ai.backend.common.dto.manager.v2.app_config.response import (
+    AppConfigNode,
+    UpsertDomainConfigPayloadDTO,
+    UpsertUserConfigPayloadDTO,
+)
+from ai.backend.common.dto.manager.v2.app_config.response import (
+    DeleteDomainConfigPayload as DeleteDomainConfigPayloadDTO,
+)
+from ai.backend.common.dto.manager.v2.app_config.response import (
+    DeleteUserConfigPayload as DeleteUserConfigPayloadDTO,
+)
+from ai.backend.manager.api.gql.decorators import (
+    BackendAIGQLMeta,
+    PydanticInputMixin,
+    gql_pydantic_input,
+    gql_pydantic_type,
+)
+from ai.backend.manager.api.gql.pydantic_compat import PydanticOutputMixin
 from ai.backend.manager.api.gql.utils import check_admin_only, dedent_strip
 from ai.backend.manager.errors.auth import InsufficientPrivilege
-from ai.backend.manager.repositories.app_config.updaters import AppConfigUpdaterSpec
-from ai.backend.manager.services.app_config.actions import (
-    DeleteDomainConfigAction,
-    DeleteUserConfigAction,
-    GetDomainConfigAction,
-    GetMergedAppConfigAction,
-    GetUserConfigAction,
-    UpsertDomainConfigAction,
-    UpsertUserConfigAction,
-)
-from ai.backend.manager.types import OptionalState
 
 from .types import StrawberryGQLContext
 
 
-@strawberry.type(description="Added in 25.16.0. App configuration data")
-class AppConfig:
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version="25.16.0",
+        description="App configuration data.",
+    ),
+    model=AppConfigNode,
+)
+class AppConfig(PydanticOutputMixin[AppConfigNode]):
     """GraphQL type for app configuration."""
 
     extra_config: strawberry.scalars.JSON
 
 
-@strawberry.input(
+@gql_pydantic_input(
+    BackendAIGQLMeta(description="", added_version="24.09.0"),
     description=dedent_strip(
         """\
-        Added in 25.16.0.
         Input for creating or updating domain-level app configuration.
         The provided extra_config object will completely replace the existing configuration;
         existing keys not present in the new extra_config will be removed.
         All users in this domain will be affected by these settings when their configurations are merged.
         """
-    )
+    ),
 )
-class UpsertDomainConfigInput:
+class UpsertDomainConfigInput(PydanticInputMixin[UpsertDomainConfigInputDTO]):
     """Input type for upserting domain-level app configuration."""
 
     domain_name: str
     extra_config: strawberry.scalars.JSON
 
-    def to_updater_spec(self) -> AppConfigUpdaterSpec:
-        return AppConfigUpdaterSpec(extra_config=OptionalState.update(self.extra_config))
 
-
-@strawberry.input(
+@gql_pydantic_input(
+    BackendAIGQLMeta(description="", added_version="24.09.0"),
     description=dedent_strip(
         """\
-        Added in 25.16.0.
         Input for creating or updating user-level app configuration.
         The provided extra_config object will completely replace the existing configuration;
         existing keys not present in the new extra_config will be removed.
         These settings will override domain-level settings when configurations are merged for this user.
         If user_id is not provided, the current user's configuration will be updated.
         """
-    )
+    ),
 )
-class UpsertUserConfigInput:
+class UpsertUserConfigInput(PydanticInputMixin[UpsertUserConfigInputDTO]):
     """Input type for upserting user-level app configuration."""
 
     extra_config: strawberry.scalars.JSON
     user_id: ID | None = None
 
-    def to_updater_spec(self) -> AppConfigUpdaterSpec:
-        return AppConfigUpdaterSpec(extra_config=OptionalState.update(self.extra_config))
 
-
-@strawberry.input(description="Added in 25.16.0. Input for deleting domain-level app configuration")
-class DeleteDomainConfigInput:
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description="Input for deleting domain-level app configuration", added_version="25.16.0"
+    ),
+)
+class DeleteDomainConfigInput(PydanticInputMixin[DeleteDomainConfigInputDTO]):
     """Input type for deleting domain-level app configuration."""
 
     domain_name: str
 
 
-@strawberry.input(
+@gql_pydantic_input(
+    BackendAIGQLMeta(description="", added_version="24.09.0"),
     description=dedent_strip(
         """\
-        Added in 25.16.0.
         Input for deleting user-level app configuration.
         If user_id is not provided, the current user's configuration will be deleted.
         """
-    )
+    ),
 )
-class DeleteUserConfigInput:
+class DeleteUserConfigInput(PydanticInputMixin[DeleteUserConfigInputDTO]):
     """Input type for deleting user-level app configuration."""
 
     user_id: ID | None = None
 
 
-@strawberry.type(
-    description=dedent_strip(
-        """\
-        Added in 25.16.0.
-        Payload returned after upserting domain-level app configuration.
-        Contains the resulting configuration that was stored.
-        """
-    )
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version="25.16.0",
+        description="Payload returned after upserting domain-level app configuration. Contains the resulting configuration that was stored.",
+    ),
+    model=UpsertDomainConfigPayloadDTO,
 )
-class UpsertDomainConfigPayload:
+class UpsertDomainConfigPayload(PydanticOutputMixin[UpsertDomainConfigPayloadDTO]):
     """Payload returned after upserting domain-level app configuration."""
 
     app_config: AppConfig
 
 
-@strawberry.type(
-    description=dedent_strip(
-        """\
-        Added in 25.16.0.
-        Payload returned after upserting user-level app configuration.
-        Contains the resulting configuration that was stored.
-        """
-    )
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version="25.16.0",
+        description="Payload returned after upserting user-level app configuration. Contains the resulting configuration that was stored.",
+    ),
+    model=UpsertUserConfigPayloadDTO,
 )
-class UpsertUserConfigPayload:
+class UpsertUserConfigPayload(PydanticOutputMixin[UpsertUserConfigPayloadDTO]):
     """Payload returned after upserting user-level app configuration."""
 
     app_config: AppConfig
 
 
-@strawberry.type(
-    description=dedent_strip(
-        """\
-        Added in 25.16.0.
-        Payload returned after deleting domain-level app configuration.
-        Indicates whether the deletion was successful.
-        """
-    )
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version="25.16.0",
+        description="Payload returned after deleting domain-level app configuration. Indicates whether the deletion was successful.",
+    ),
+    model=DeleteDomainConfigPayloadDTO,
 )
 class DeleteDomainConfigPayload:
     """Payload returned after deleting domain-level app configuration."""
 
-    deleted: bool
+    deleted: strawberry.auto
 
 
-@strawberry.type(
-    description=dedent_strip(
-        """\
-        Added in 25.16.0.
-        Payload returned after deleting user-level app configuration.
-        Indicates whether the deletion was successful.
-        """
-    )
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version="25.16.0",
+        description="Payload returned after deleting user-level app configuration. Indicates whether the deletion was successful.",
+    ),
+    model=DeleteUserConfigPayloadDTO,
 )
 class DeleteUserConfigPayload:
     """Payload returned after deleting user-level app configuration."""
 
-    deleted: bool
+    deleted: strawberry.auto
 
 
 @strawberry.field(  # type: ignore[misc]
@@ -173,16 +188,10 @@ async def admin_domain_app_config(
 ) -> AppConfig | None:
     """Get domain-level app configuration (admin only)."""
     check_admin_only()
-    processors = info.context.processors
-
-    action_result = await processors.app_config.get_domain_config.wait_for_complete(
-        GetDomainConfigAction(domain_name=domain_name)
-    )
-
-    if not action_result.result:
+    result = await info.context.adapters.app_config.get_domain_config(domain_name)
+    if result is None:
         return None
-
-    return AppConfig(extra_config=action_result.result.extra_config)
+    return AppConfig.from_pydantic(result)
 
 
 @strawberry.field(  # type: ignore[misc]
@@ -207,19 +216,14 @@ async def domain_app_config(
     info: Info[StrawberryGQLContext],
 ) -> AppConfig | None:
     """Get domain-level app configuration."""
-    processors = info.context.processors
     me = current_user()
     if me is None or not (me.is_admin or me.is_superadmin):
         raise InsufficientPrivilege("Admin privileges required to access domain configuration")
 
-    action_result = await processors.app_config.get_domain_config.wait_for_complete(
-        GetDomainConfigAction(domain_name=domain_name)
-    )
-
-    if not action_result.result:
+    result = await info.context.adapters.app_config.get_domain_config(domain_name)
+    if result is None:
         return None
-
-    return AppConfig(extra_config=action_result.result.extra_config)
+    return AppConfig.from_pydantic(result)
 
 
 @strawberry.field(  # type: ignore[misc]
@@ -241,7 +245,6 @@ async def user_app_config(
     user_id: ID | None = None,
 ) -> AppConfig | None:
     """Get user-level app configuration."""
-    processors = info.context.processors
     me = current_user()
     if me is None:
         raise InsufficientPrivilege("Authentication required")
@@ -252,14 +255,10 @@ async def user_app_config(
     if str(me.user_id) != target_user_id and not (me.is_admin or me.is_superadmin):
         raise InsufficientPrivilege("Cannot access another user's app configuration")
 
-    action_result = await processors.app_config.get_user_config.wait_for_complete(
-        GetUserConfigAction(user_id=target_user_id)
-    )
-
-    if not action_result.result:
+    result = await info.context.adapters.app_config.get_user_config(target_user_id)
+    if result is None:
         return None
-
-    return AppConfig(extra_config=action_result.result.extra_config)
+    return AppConfig.from_pydantic(result)
 
 
 @strawberry.field(  # type: ignore[misc]
@@ -278,16 +277,12 @@ async def merged_app_config(
     info: Info[StrawberryGQLContext],
 ) -> AppConfig:
     """Get merged app configuration for the current user."""
-    processors = info.context.processors
     me = current_user()
     if me is None:
         raise InsufficientPrivilege("Authentication required")
 
-    action_result = await processors.app_config.get_merged_config.wait_for_complete(
-        GetMergedAppConfigAction(user_id=str(me.user_id))
-    )
-
-    return AppConfig(extra_config=action_result.merged_config)
+    result = await info.context.adapters.app_config.get_merged_config(str(me.user_id))
+    return AppConfig.from_pydantic(result)
 
 
 @strawberry.mutation(  # type: ignore[misc]
@@ -309,18 +304,10 @@ async def admin_upsert_domain_app_config(
 ) -> UpsertDomainConfigPayload:
     """Create or update domain-level app configuration (admin only)."""
     check_admin_only()
-    processors = info.context.processors
-
-    action_result = await processors.app_config.upsert_domain_config.wait_for_complete(
-        UpsertDomainConfigAction(
-            domain_name=input.domain_name,
-            updater_spec=input.to_updater_spec(),
-        )
+    result = await info.context.adapters.app_config.upsert_domain_config(
+        input.domain_name, input.extra_config
     )
-
-    return UpsertDomainConfigPayload(
-        app_config=AppConfig(extra_config=action_result.result.extra_config)
-    )
+    return UpsertDomainConfigPayload(app_config=AppConfig.from_pydantic(result))
 
 
 @strawberry.mutation(  # type: ignore[misc]
@@ -346,21 +333,14 @@ async def upsert_domain_app_config(
     info: Info[StrawberryGQLContext],
 ) -> UpsertDomainConfigPayload:
     """Create or update domain-level app configuration."""
-    processors = info.context.processors
     me = current_user()
     if me is None or not (me.is_admin or me.is_superadmin):
         raise InsufficientPrivilege("Admin privileges required to modify domain configuration")
 
-    action_result = await processors.app_config.upsert_domain_config.wait_for_complete(
-        UpsertDomainConfigAction(
-            domain_name=input.domain_name,
-            updater_spec=input.to_updater_spec(),
-        )
+    result = await info.context.adapters.app_config.upsert_domain_config(
+        input.domain_name, input.extra_config
     )
-
-    return UpsertDomainConfigPayload(
-        app_config=AppConfig(extra_config=action_result.result.extra_config)
-    )
+    return UpsertDomainConfigPayload(app_config=AppConfig.from_pydantic(result))
 
 
 @strawberry.mutation(  # type: ignore[misc]
@@ -382,7 +362,6 @@ async def upsert_user_app_config(
     info: Info[StrawberryGQLContext],
 ) -> UpsertUserConfigPayload:
     """Create or update user-level app configuration."""
-    processors = info.context.processors
     me = current_user()
     if me is None:
         raise InsufficientPrivilege("Authentication required")
@@ -393,16 +372,10 @@ async def upsert_user_app_config(
     if str(me.user_id) != target_user_id and not (me.is_admin or me.is_superadmin):
         raise InsufficientPrivilege("Cannot modify another user's app configuration")
 
-    action_result = await processors.app_config.upsert_user_config.wait_for_complete(
-        UpsertUserConfigAction(
-            user_id=target_user_id,
-            updater_spec=input.to_updater_spec(),
-        )
+    result = await info.context.adapters.app_config.upsert_user_config(
+        target_user_id, input.extra_config
     )
-
-    return UpsertUserConfigPayload(
-        app_config=AppConfig(extra_config=action_result.result.extra_config)
-    )
+    return UpsertUserConfigPayload(app_config=AppConfig.from_pydantic(result))
 
 
 @strawberry.mutation(  # type: ignore[misc]
@@ -423,13 +396,8 @@ async def admin_delete_domain_app_config(
 ) -> DeleteDomainConfigPayload:
     """Delete domain-level app configuration (admin only)."""
     check_admin_only()
-    processors = info.context.processors
-
-    action_result = await processors.app_config.delete_domain_config.wait_for_complete(
-        DeleteDomainConfigAction(domain_name=input.domain_name)
-    )
-
-    return DeleteDomainConfigPayload(deleted=action_result.deleted)
+    result = await info.context.adapters.app_config.delete_domain_config(input.domain_name)
+    return DeleteDomainConfigPayload(deleted=result.deleted)
 
 
 @strawberry.mutation(  # type: ignore[misc]
@@ -454,16 +422,12 @@ async def delete_domain_app_config(
     info: Info[StrawberryGQLContext],
 ) -> DeleteDomainConfigPayload:
     """Delete domain-level app configuration."""
-    processors = info.context.processors
     me = current_user()
     if me is None or not (me.is_admin or me.is_superadmin):
         raise InsufficientPrivilege("Admin privileges required to delete domain configuration")
 
-    action_result = await processors.app_config.delete_domain_config.wait_for_complete(
-        DeleteDomainConfigAction(domain_name=input.domain_name)
-    )
-
-    return DeleteDomainConfigPayload(deleted=action_result.deleted)
+    result = await info.context.adapters.app_config.delete_domain_config(input.domain_name)
+    return DeleteDomainConfigPayload(deleted=result.deleted)
 
 
 @strawberry.mutation(  # type: ignore[misc]
@@ -484,7 +448,6 @@ async def delete_user_app_config(
     info: Info[StrawberryGQLContext],
 ) -> DeleteUserConfigPayload:
     """Delete user-level app configuration."""
-    processors = info.context.processors
     me = current_user()
     if me is None:
         raise InsufficientPrivilege("Authentication required")
@@ -495,8 +458,5 @@ async def delete_user_app_config(
     if str(me.user_id) != target_user_id and not (me.is_admin or me.is_superadmin):
         raise InsufficientPrivilege("Cannot delete another user's app configuration")
 
-    action_result = await processors.app_config.delete_user_config.wait_for_complete(
-        DeleteUserConfigAction(user_id=target_user_id)
-    )
-
-    return DeleteUserConfigPayload(deleted=action_result.deleted)
+    result = await info.context.adapters.app_config.delete_user_config(target_user_id)
+    return DeleteUserConfigPayload(deleted=result.deleted)

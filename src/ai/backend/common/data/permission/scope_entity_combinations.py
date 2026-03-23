@@ -26,7 +26,7 @@ VALID_SCOPE_ENTITY_COMBINATIONS: Mapping[RBACElementType, frozenset[RBACElementT
         RBACElementType.CONTAINER_REGISTRY,
         RBACElementType.SESSION,
         RBACElementType.VFOLDER,
-        RBACElementType.DEPLOYMENT,
+        RBACElementType.MODEL_DEPLOYMENT,
         RBACElementType.NETWORK,
         RBACElementType.USER,
         RBACElementType.STORAGE_HOST,
@@ -35,7 +35,7 @@ VALID_SCOPE_ENTITY_COMBINATIONS: Mapping[RBACElementType, frozenset[RBACElementT
         RBACElementType.RESOURCE_GROUP,
         RBACElementType.SESSION,
         RBACElementType.VFOLDER,
-        RBACElementType.DEPLOYMENT,
+        RBACElementType.MODEL_DEPLOYMENT,
         RBACElementType.KEYPAIR,
     }),
     RBACElementType.RESOURCE_GROUP: frozenset({

@@ -6,17 +6,31 @@ from datetime import datetime
 
 import strawberry
 
+from ai.backend.common.dto.manager.v2.domain.response import (
+    DomainBasicInfo as DomainBasicInfoDTO,
+)
+from ai.backend.common.dto.manager.v2.domain.response import (
+    DomainLifecycleInfo as DomainLifecycleInfoDTO,
+)
+from ai.backend.common.dto.manager.v2.domain.response import (
+    DomainRegistryInfo as DomainRegistryInfoDTO,
+)
+from ai.backend.manager.api.gql.decorators import BackendAIGQLMeta, gql_pydantic_type
+
 # ============================================================================
 # Basic Information
 # ============================================================================
 
 
-@strawberry.type(
-    name="DomainBasicInfo",
-    description=(
-        "Added in 26.2.0. Basic domain information. "
-        "Contains identity and descriptive fields for the domain."
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version="26.2.0",
+        description=(
+            "Basic domain information. Contains identity and descriptive fields for the domain."
+        ),
     ),
+    model=DomainBasicInfoDTO,
+    name="DomainBasicInfo",
 )
 class DomainBasicInfoGQL:
     """Basic domain information."""
@@ -33,12 +47,16 @@ class DomainBasicInfoGQL:
 # ============================================================================
 
 
-@strawberry.type(
-    name="DomainRegistryInfo",
-    description=(
-        "Added in 26.2.0. Domain container registry configuration. "
-        "Contains allowed container registry URLs for this domain."
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version="26.2.0",
+        description=(
+            "Domain container registry configuration. "
+            "Contains allowed container registry URLs for this domain."
+        ),
     ),
+    model=DomainRegistryInfoDTO,
+    name="DomainRegistryInfo",
 )
 class DomainRegistryInfoGQL:
     """Domain container registry configuration."""
@@ -56,12 +74,15 @@ class DomainRegistryInfoGQL:
 # ============================================================================
 
 
-@strawberry.type(
-    name="DomainLifecycleInfo",
-    description=(
-        "Added in 26.2.0. Domain lifecycle information. "
-        "Contains activation status and timestamp tracking."
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version="26.2.0",
+        description=(
+            "Domain lifecycle information. Contains activation status and timestamp tracking."
+        ),
     ),
+    model=DomainLifecycleInfoDTO,
+    name="DomainLifecycleInfo",
 )
 class DomainLifecycleInfoGQL:
     """Domain lifecycle information."""

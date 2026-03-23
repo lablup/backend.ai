@@ -1559,7 +1559,7 @@
             "entity_type": "user",
             "entity_id": "4f13d193-f646-425a-a340-270c4d2b9860",
             "registered_at": "2025-09-12 09:51:58.265582+00",
-            "relation_type": "auto"
+            "relation_type": "ref"
         },
         {
             "id": "8dba017e-9e94-4c8f-88d3-649806b94610",
@@ -1568,7 +1568,7 @@
             "entity_type": "user",
             "entity_id": "4f13d193-f646-425a-a340-270c4d2b9860",
             "registered_at": "2025-09-12 09:51:58.265582+00",
-            "relation_type": "auto"
+            "relation_type": "ref"
         },
         {
             "id": "fd06bdf3-da3a-4db5-8ff9-235312735846",
@@ -1577,7 +1577,7 @@
             "entity_type": "user",
             "entity_id": "009fb1a4-487c-4f6e-9b1b-228b94b1d040",
             "registered_at": "2025-09-12 09:51:58.265582+00",
-            "relation_type": "auto"
+            "relation_type": "ref"
         },
         {
             "id": "693eacdd-77c4-488c-9473-0836a56f2f02",
@@ -1586,7 +1586,7 @@
             "entity_type": "user",
             "entity_id": "009fb1a4-487c-4f6e-9b1b-228b94b1d040",
             "registered_at": "2025-09-12 09:51:58.265582+00",
-            "relation_type": "auto"
+            "relation_type": "ref"
         },
         {
             "id": "db05f809-0136-4b3c-a6bc-491a17a8d094",
@@ -1595,7 +1595,7 @@
             "entity_type": "user",
             "entity_id": "dfa9da54-4b28-432f-be29-c0d680c7a412",
             "registered_at": "2025-09-12 09:51:58.265582+00",
-            "relation_type": "auto"
+            "relation_type": "ref"
         },
         {
             "id": "210ca076-335e-407d-abe5-94cdf6e796f0",
@@ -1604,7 +1604,7 @@
             "entity_type": "user",
             "entity_id": "dfa9da54-4b28-432f-be29-c0d680c7a412",
             "registered_at": "2025-09-12 09:51:58.265582+00",
-            "relation_type": "auto"
+            "relation_type": "ref"
         },
         {
             "id": "8cf49307-75ce-45cb-b19b-0bf2b8afb0a0",

@@ -4,12 +4,17 @@ from __future__ import annotations
 
 from datetime import UTC, date, datetime
 from decimal import Decimal
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 from uuid import UUID
 
 import pytest
 
+from ai.backend.common.dto.manager.v2.fair_share.response import (
+    GetProjectFairSharePayload,
+    SearchProjectFairSharesPayload,
+)
 from ai.backend.common.types import ResourceSlot, SlotQuantity
+from ai.backend.manager.api.adapters.fair_share import FairShareAdapter
 from ai.backend.manager.api.gql.fair_share.resolver import project as project_resolver
 from ai.backend.manager.api.gql.fair_share.types import (
     ProjectFairShareGQL,
@@ -23,7 +28,6 @@ from ai.backend.manager.data.fair_share import (
     ProjectFairShareData,
 )
 from ai.backend.manager.errors.resource import ProjectNotFound
-from ai.backend.manager.services.fair_share.actions import GetProjectFairShareAction
 
 
 class TestRGProjectFairShare:
@@ -70,11 +74,10 @@ class TestRGProjectFairShare:
         self, project_fair_share_data: ProjectFairShareData
     ) -> MagicMock:
         """Info context where project fair share exists."""
+        project_node = FairShareAdapter._project_data_to_dto(project_fair_share_data)
         info = MagicMock()
-        action_result = MagicMock()
-        action_result.data = project_fair_share_data
-        info.context.processors.fair_share.get_project_fair_share.wait_for_complete = AsyncMock(
-            return_value=action_result
+        info.context.adapters.fair_share.get_project = AsyncMock(
+            return_value=GetProjectFairSharePayload(item=project_node)
         )
         return info
 
@@ -98,11 +101,11 @@ class TestRGProjectFairShare:
         assert result.resource_group_name == "default"
         assert result.domain_name == "test-domain"
 
-    async def test_calls_action_with_correct_params(
+    async def test_calls_adapter_with_correct_params(
         self,
         info_with_project_fair_share_exists: MagicMock,
     ) -> None:
-        """Should call action with correct resource_group and project_id."""
+        """Should call adapter with correct resource_group and project_id."""
         scope = ResourceGroupProjectScope(resource_group_name="custom-rg", domain_name="my-domain")
         project_id = UUID("11111111-2222-3333-4444-555555555555")
 
@@ -113,19 +116,19 @@ class TestRGProjectFairShare:
             project_id,
         )
 
-        call_args = info_with_project_fair_share_exists.context.processors.fair_share.get_project_fair_share.wait_for_complete.call_args
-        action = call_args[0][0]
-        assert isinstance(action, GetProjectFairShareAction)
-        assert action.resource_group == "custom-rg"
-        assert action.project_id == project_id
+        call_arg = (
+            info_with_project_fair_share_exists.context.adapters.fair_share.get_project.call_args[
+                0
+            ][0]
+        )
+        assert call_arg.resource_group == "custom-rg"
+        assert call_arg.project_id == project_id
 
     @pytest.fixture
     def info_with_project_not_found(self) -> MagicMock:
         """Info context where project does not exist."""
         info = MagicMock()
-        info.context.processors.fair_share.get_project_fair_share.wait_for_complete = AsyncMock(
-            side_effect=ProjectNotFound()
-        )
+        info.context.adapters.fair_share.get_project = AsyncMock(side_effect=ProjectNotFound())
         return info
 
     async def test_raises_project_not_found_when_project_does_not_exist(
@@ -148,35 +151,30 @@ class TestRGProjectFairShare:
 class TestRGProjectFairShares:
     """Tests for rg_project_fair_shares resolver."""
 
-    async def test_calls_fetch_rg_project_fair_shares(self) -> None:
-        """Should call fetch_rg_project_fair_shares with correct scope."""
+    async def test_calls_adapter_with_correct_scope(self) -> None:
+        """Should call adapter with correct resource_group and domain_name."""
         info = MagicMock()
+        info.context.adapters.fair_share.search_rg_project = AsyncMock(
+            return_value=SearchProjectFairSharesPayload(items=[], total_count=0)
+        )
         scope = ResourceGroupProjectScope(resource_group_name="default", domain_name="test-domain")
-        mock_connection = MagicMock()
 
-        with patch(
-            "ai.backend.manager.api.gql.fair_share.resolver.project.fetch_rg_project_fair_shares",
-            new_callable=AsyncMock,
-            return_value=mock_connection,
-        ) as mock_fetch:
-            resolver_fn = project_resolver.rg_project_fair_shares.base_resolver
-            result = await resolver_fn(
-                info,
-                scope,
-                None,  # filter
-                None,  # order_by
-                None,  # before
-                None,  # after
-                10,  # first
-                None,  # last
-                None,  # limit
-                None,  # offset
-            )
+        resolver_fn = project_resolver.rg_project_fair_shares.base_resolver
+        await resolver_fn(
+            info,
+            scope,
+            None,  # filter
+            None,  # order_by
+            None,  # before
+            None,  # after
+            10,  # first
+            None,  # last
+            None,  # limit
+            None,  # offset
+        )
 
-            assert result == mock_connection
-            mock_fetch.assert_called_once()
-            call_kwargs = mock_fetch.call_args.kwargs
-            assert call_kwargs["info"] == info
-            assert call_kwargs["scope"].resource_group == "default"
-            assert call_kwargs["scope"].domain_name == "test-domain"
-            assert call_kwargs["first"] == 10
+        info.context.adapters.fair_share.search_rg_project.assert_called_once()
+        call_args = info.context.adapters.fair_share.search_rg_project.call_args
+        assert call_args[0][0].first == 10
+        assert call_args.kwargs["resource_group"] == "default"
+        assert call_args.kwargs["domain_name"] == "test-domain"

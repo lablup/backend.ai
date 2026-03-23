@@ -11,7 +11,7 @@ from uuid import UUID
 import pytest
 import sqlalchemy as sa
 
-from ai.backend.common.data.permission.types import OperationType, RelationType
+from ai.backend.common.data.permission.types import OperationType, RBACElementType, RelationType
 from ai.backend.manager.data.permission.id import ObjectId, ScopeId
 from ai.backend.manager.data.permission.types import (
     EntityType,
@@ -53,7 +53,7 @@ GRANTER_TABLES = [
 class GranterTestContext:
     """Context data for granter tests."""
 
-    entity_scope_type: ScopeType
+    entity_scope_type: RBACElementType
     entity_id: ObjectId
     target_scope_id: ScopeId
 
@@ -116,7 +116,7 @@ class TestGranterBasic:
             role_id = role.id
 
         yield SingleRoleContext(
-            entity_scope_type=ScopeType.VFOLDER,
+            entity_scope_type=RBACElementType.VFOLDER,
             entity_id=entity_id,
             target_scope_id=target_scope_id,
             role_id=role_id,
@@ -133,7 +133,7 @@ class TestGranterBasic:
         target_scope_id = ScopeId(scope_type=ScopeType.USER, scope_id=str(uuid.uuid4()))
 
         yield GranterTestContext(
-            entity_scope_type=ScopeType.VFOLDER,
+            entity_scope_type=RBACElementType.VFOLDER,
             entity_id=entity_id,
             target_scope_id=target_scope_id,
         )
@@ -232,7 +232,7 @@ class TestGranterMultipleRoles:
                 role_ids.append(role.id)
 
         yield MultiRoleContext(
-            entity_scope_type=ScopeType.VFOLDER,
+            entity_scope_type=RBACElementType.VFOLDER,
             entity_id=entity_id,
             target_scope_id=target_scope_id,
             role_ids=role_ids,
@@ -296,7 +296,7 @@ class TestGranterMultipleOperations:
             role_id = role.id
 
         yield SingleRoleContext(
-            entity_scope_type=ScopeType.VFOLDER,
+            entity_scope_type=RBACElementType.VFOLDER,
             entity_id=entity_id,
             target_scope_id=target_scope_id,
             role_id=role_id,

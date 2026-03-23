@@ -7,14 +7,19 @@ resource options, and mount option types.
 
 from __future__ import annotations
 
+from typing import Annotated, Any
 from uuid import UUID
 
-from pydantic import AliasChoices, ConfigDict, Field
+from pydantic import AliasChoices, ConfigDict, Field, GetCoreSchemaHandler, GetJsonSchemaHandler
+from pydantic.json_schema import JsonSchemaValue
+from pydantic_core import core_schema
 
 from ai.backend.common.api_handlers import BaseFieldModel
 from ai.backend.common.types import BinarySizeField, MountPermission, MountTypes
 
 __all__ = (
+    # Annotated types
+    "TimeoutSeconds",
     # Shared field models
     "ResourceOpts",
     "MountOption",
@@ -31,6 +36,104 @@ __all__ = (
     "CreationConfigV6Template",
     "CreationConfigV7",
 )
+
+
+class _TimeoutSecondsPydanticAnnotation:
+    """Pydantic annotated type that accepts int | float | str and returns int seconds.
+
+    Supported string formats:
+    - Numeric string: "300" → 300
+    - Duration suffixes: "30s", "5m", "1h", "2d", "1w"
+
+    Not supported: "yr" / "mo" (relativedelta) — raises ValueError.
+    Negative values are rejected.
+    """
+
+    @classmethod
+    def timeout_seconds_validator(cls, value: int | float | str) -> int:
+        if not isinstance(value, (int, float, str)):
+            raise ValueError("value must be a number or string")
+        if isinstance(value, (int, float)):
+            result = int(value)
+            if result < 0:
+                raise ValueError("value must be positive")
+            return result
+        if len(value) == 0:
+            raise ValueError("value must not be empty")
+
+        unit = value[-1]
+        if unit.isdigit():
+            # Plain numeric string like "300"
+            try:
+                result = int(float(value))
+            except ValueError as e:
+                raise ValueError(f"invalid numeric literal: {value}") from e
+            if result < 0:
+                raise ValueError("value must be positive")
+            return result
+        if value[-2:].isalpha():
+            # Two-char suffix like "yr" or "mo"
+            suffix = value[-2:]
+            if suffix in ("yr", "mo"):
+                raise ValueError(f"duration unit '{suffix}' is not supported for timeout seconds")
+            raise ValueError(f"unknown duration unit: {suffix!r}")
+        # Single-char suffix
+        try:
+            t = float(value[:-1])
+        except ValueError as e:
+            raise ValueError(f"invalid numeric literal: {value[:-1]!r}") from e
+        if t < 0:
+            raise ValueError("value must be positive")
+        match unit:
+            case "w":
+                return int(t * 7 * 24 * 3600)
+            case "d":
+                return int(t * 24 * 3600)
+            case "h":
+                return int(t * 3600)
+            case "m":
+                return int(t * 60)
+            case "s":
+                return int(t)
+            case _:
+                raise ValueError(f"unknown duration unit: {unit!r}")
+
+    @classmethod
+    def timeout_seconds_serializer(cls, value: int) -> int:
+        return value
+
+    @classmethod
+    def __get_pydantic_core_schema__(
+        cls,
+        _source_type: Any,
+        _handler: GetCoreSchemaHandler,
+    ) -> core_schema.CoreSchema:
+        schema = core_schema.chain_schema([
+            core_schema.union_schema([
+                core_schema.int_schema(),
+                core_schema.float_schema(),
+                core_schema.str_schema(),
+            ]),
+            core_schema.no_info_plain_validator_function(cls.timeout_seconds_validator),
+        ])
+
+        return core_schema.json_or_python_schema(
+            json_schema=schema,
+            python_schema=schema,
+            serialization=core_schema.plain_serializer_function_ser_schema(
+                cls.timeout_seconds_serializer
+            ),
+        )
+
+    @classmethod
+    def __get_pydantic_json_schema__(
+        cls, _core_schema: core_schema.CoreSchema, handler: GetJsonSchemaHandler
+    ) -> JsonSchemaValue:
+        return handler(core_schema.int_schema())
+
+
+TimeoutSeconds = Annotated[int, _TimeoutSecondsPydanticAnnotation]
+"""Timeout in seconds. Accepts int, float (truncated to int), or duration strings like '30s', '5m', '1h', '2d', '1w'."""
 
 
 class ResourceOpts(BaseFieldModel):

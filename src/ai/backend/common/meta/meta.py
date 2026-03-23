@@ -16,6 +16,7 @@ __all__ = (
     "BackendAIFieldMeta",
     "BackendAIConfigMeta",
     "BackendAIAPIMeta",
+    "BackendAIGQLMeta",
     "get_field_meta",
     "get_field_type",
     "generate_example",
@@ -142,6 +143,17 @@ class BackendAIAPIMeta(BackendAIFieldMeta):
     """Whether this field is a composite type with nested fields.
     When True, example values are auto-generated from child field metadata
     rather than specified directly."""
+
+
+@dataclass(frozen=True)
+class BackendAIGQLMeta(BackendAIFieldMeta):
+    """GraphQL type metadata for Strawberry type decorators.
+
+    Extends BackendAIFieldMeta for GraphQL type-level version tracking
+    and documentation. Used with gql_node_type, gql_connection_type,
+    and gql_pydantic_type decorators in place of @strawberry.type and
+    @strawberry.experimental.pydantic.type.
+    """
 
 
 def get_field_meta(

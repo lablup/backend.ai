@@ -40,6 +40,8 @@ from .resolver import (
     routes,
     sync_replicas,
     update_auto_scaling_rule,
+    # Policy
+    update_deployment_policy,
     update_model_deployment,
     update_route_traffic_status,
 )
@@ -135,7 +137,6 @@ from .types import (
     RouteOrderField,
     RouteStatusGQL,
     RouteTrafficStatusGQL,
-    ScalingRule,
     SyncReplicaInput,
     SyncReplicaPayload,
     TrafficStatus,
@@ -144,6 +145,9 @@ from .types import (
     UpdateAutoScalingRulePayload,
     UpdateDeploymentInput,
     UpdateDeploymentPayload,
+    # Policy (mutation types)
+    UpdateDeploymentPolicyInputGQL,
+    UpdateDeploymentPolicyPayloadGQL,
     UpdateRouteTrafficStatusInputGQL,
     UpdateRouteTrafficStatusPayloadGQL,
     get_route_pagination_spec,
@@ -191,7 +195,6 @@ __all__ = [
     "ModelDeploymentNetworkAccess",
     "ModelDeploymentNetworkAccessInput",
     "ReplicaState",
-    "ScalingRule",
     "SyncReplicaInput",
     "SyncReplicaPayload",
     "UpdateDeploymentInput",
@@ -204,6 +207,8 @@ __all__ = [
     "DeploymentStrategyTypeGQL",
     "RollingUpdateConfigInputGQL",
     "RollingUpdateStrategySpecGQL",
+    "UpdateDeploymentPolicyInputGQL",
+    "UpdateDeploymentPolicyPayloadGQL",
     # Replica Types
     "ActivenessStatus",
     "LivenessStatus",
@@ -267,6 +272,8 @@ __all__ = [
     "deployments",
     "sync_replicas",
     "update_model_deployment",
+    # Resolvers - Policy
+    "update_deployment_policy",
     # Resolvers - Replica
     "replica",
     "replica_status_changed",

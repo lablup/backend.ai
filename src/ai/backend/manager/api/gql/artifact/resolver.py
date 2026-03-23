@@ -4,9 +4,17 @@ from collections.abc import AsyncGenerator
 from uuid import UUID
 
 import strawberry
-from strawberry import ID, Info
+from strawberry import ID, UNSET, Info
 
+from ai.backend.common.api_handlers import SENTINEL
 from ai.backend.common.data.storage.registries.types import ModelSortKey
+from ai.backend.common.dto.manager.v2.artifact.request import (
+    AdminSearchArtifactRevisionsInput,
+    AdminSearchArtifactsGQLInput,
+)
+from ai.backend.common.dto.manager.v2.artifact.request import (
+    UpdateArtifactInput as UpdateArtifactInputDTO,
+)
 from ai.backend.manager.api.gql.base import (
     encode_cursor,
 )
@@ -18,44 +26,13 @@ from ai.backend.manager.errors.artifact import (
     ArtifactImportDelegationError,
     ArtifactScanLimitExceededError,
 )
-from ai.backend.manager.repositories.artifact.updaters import ArtifactUpdaterSpec
-from ai.backend.manager.repositories.base.updater import Updater
-from ai.backend.manager.services.artifact.actions.delegate_scan import DelegateScanArtifactsAction
-from ai.backend.manager.services.artifact.actions.delete_multi import DeleteArtifactsAction
-from ai.backend.manager.services.artifact.actions.restore_multi import RestoreArtifactsAction
-from ai.backend.manager.services.artifact.actions.retrieve_model_multi import RetrieveModelsAction
-from ai.backend.manager.services.artifact.actions.scan import ScanArtifactsAction
-from ai.backend.manager.services.artifact.actions.update import UpdateArtifactAction
-from ai.backend.manager.services.artifact_revision.actions.approve import (
-    ApproveArtifactRevisionAction,
-)
-from ai.backend.manager.services.artifact_revision.actions.cancel_import import CancelImportAction
-from ai.backend.manager.services.artifact_revision.actions.cleanup import (
-    CleanupArtifactRevisionAction,
-)
-from ai.backend.manager.services.artifact_revision.actions.delegate_import_revision_batch import (
-    DelegateImportArtifactRevisionBatchAction,
-)
-from ai.backend.manager.services.artifact_revision.actions.import_revision import (
-    ImportArtifactRevisionAction,
-)
-from ai.backend.manager.services.artifact_revision.actions.reject import (
-    RejectArtifactRevisionAction,
-)
-from ai.backend.manager.types import TriState
 
-from .fetcher import (
-    fetch_artifact,
-    fetch_artifact_revision,
-    fetch_artifact_revisions,
-    fetch_artifacts,
-    get_registry_url,
-)
 from .types import (
     ApproveArtifactInput,
     ApproveArtifactPayload,
     Artifact,
     ArtifactConnection,
+    ArtifactEdge,
     ArtifactFilter,
     ArtifactImportProgressUpdatedPayload,
     ArtifactOrderBy,
@@ -90,6 +67,9 @@ from .types import (
     ScanArtifactsPayload,
     UpdateArtifactInput,
     UpdateArtifactPayload,
+    get_registry_url,
+    make_artifact_revision_from_node,
+    to_artifact_gql_node,
 )
 
 
@@ -121,16 +101,43 @@ async def artifacts(
 ) -> ArtifactConnection | None:
     if filter is None:
         filter = ArtifactFilter(availability=[ArtifactAvailability.ALIVE])
-    return await fetch_artifacts(
-        info,
-        filter,
-        order_by,
-        before,
-        after,
-        first,
-        last,
-        limit,
-        offset,
+    pydantic_filter = filter.to_pydantic() if filter is not None else None
+    pydantic_order = [o.to_pydantic() for o in order_by] if order_by is not None else None
+
+    search_input = AdminSearchArtifactsGQLInput(
+        filter=pydantic_filter,
+        order=pydantic_order,
+        first=first,
+        after=after,
+        last=last,
+        before=before,
+        limit=limit,
+        offset=offset,
+    )
+    payload = await info.context.adapters.artifact.admin_search_gql(search_input)
+
+    data_loaders = info.context.data_loaders
+    edges = []
+    for item in payload.items:
+        registry_url = await get_registry_url(data_loaders, item.registry_id, item.registry_type)
+        source_url = await get_registry_url(
+            data_loaders, item.source_registry_id, item.source_registry_type
+        )
+        artifact = Artifact.from_pydantic(to_artifact_gql_node(item, registry_url, source_url))
+        cursor = encode_cursor(item.id)
+        edges.append(ArtifactEdge(node=artifact, cursor=cursor))
+
+    page_info = strawberry.relay.PageInfo(
+        has_next_page=payload.has_next_page,
+        has_previous_page=payload.has_previous_page,
+        start_cursor=edges[0].cursor if edges else None,
+        end_cursor=edges[-1].cursor if edges else None,
+    )
+
+    return ArtifactConnection(
+        count=payload.total_count,
+        edges=edges,
+        page_info=page_info,
     )
 
 
@@ -145,7 +152,20 @@ async def artifacts(
     """)
 )
 async def artifact(id: ID, info: Info[StrawberryGQLContext]) -> Artifact | None:
-    return await fetch_artifact(info, UUID(id))
+    artifact_id = UUID(id)
+    artifact_node = await info.context.adapters.artifact.get(artifact_id)
+
+    data_loaders = info.context.data_loaders
+    registry_url = await get_registry_url(
+        data_loaders, artifact_node.registry_id, artifact_node.registry_type
+    )
+    source_url = await get_registry_url(
+        data_loaders,
+        artifact_node.source_registry_id,
+        artifact_node.source_registry_type,
+    )
+
+    return Artifact.from_pydantic(to_artifact_gql_node(artifact_node, registry_url, source_url))
 
 
 @strawberry.field(  # type: ignore[misc]
@@ -172,16 +192,38 @@ async def artifact_revisions(
     limit: int | None = None,
     offset: int | None = None,
 ) -> ArtifactRevisionConnection | None:
-    return await fetch_artifact_revisions(
-        info,
-        filter,
-        order_by,
-        before,
-        after,
-        first,
-        last,
-        limit,
-        offset,
+    pydantic_filter = filter.to_pydantic() if filter is not None else None
+    pydantic_order = [o.to_pydantic() for o in order_by] if order_by is not None else None
+
+    search_input = AdminSearchArtifactRevisionsInput(
+        filter=pydantic_filter,
+        order=pydantic_order,
+        first=first,
+        after=after,
+        last=last,
+        before=before,
+        limit=limit,
+        offset=offset,
+    )
+    payload = await info.context.adapters.artifact.search_revisions_gql(search_input)
+
+    edges = []
+    for item in payload.items:
+        revision = make_artifact_revision_from_node(item)
+        cursor = encode_cursor(item.id)
+        edges.append(ArtifactRevisionEdge(node=revision, cursor=cursor))
+
+    page_info = strawberry.relay.PageInfo(
+        has_next_page=payload.has_next_page,
+        has_previous_page=payload.has_previous_page,
+        start_cursor=edges[0].cursor if edges else None,
+        end_cursor=edges[-1].cursor if edges else None,
+    )
+
+    return ArtifactRevisionConnection(
+        count=payload.total_count,
+        edges=edges,
+        page_info=page_info,
     )
 
 
@@ -196,7 +238,8 @@ async def artifact_revisions(
     """)
 )
 async def artifact_revision(id: ID, info: Info[StrawberryGQLContext]) -> ArtifactRevision | None:
-    return await fetch_artifact_revision(info, UUID(id))
+    revision_node = await info.context.adapters.artifact.get_revision(UUID(id))
+    return make_artifact_revision_from_node(revision_node)
 
 
 @strawberry.mutation(  # type: ignore[misc]
@@ -218,26 +261,26 @@ async def scan_artifacts(
     if input.limit > ARTIFACT_MAX_SCAN_LIMIT:
         raise ArtifactScanLimitExceededError(f"Limit cannot exceed {ARTIFACT_MAX_SCAN_LIMIT}")
 
-    action_result = await info.context.processors.artifact.scan.wait_for_complete(
-        ScanArtifactsAction(
-            artifact_type=input.artifact_type,
-            registry_id=UUID(input.registry_id) if input.registry_id else None,
-            limit=input.limit,
-            # TODO: Move this huggingface_registries config if needed
-            order=ModelSortKey.DOWNLOADS,
-            search=input.search,
-        )
+    results = await info.context.adapters.artifact.scan(
+        artifact_type=input.artifact_type,
+        registry_id=UUID(input.registry_id) if input.registry_id else None,
+        limit=input.limit,
+        # TODO: Move this huggingface_registries config if needed
+        order=ModelSortKey.DOWNLOADS,
+        search=input.search,
     )
 
     data_loaders = info.context.data_loaders
 
     artifacts = []
-    for item in action_result.result:
+    for item in results:
         registry_url = await get_registry_url(data_loaders, item.registry_id, item.registry_type)
         source_url = await get_registry_url(
             data_loaders, item.source_registry_id, item.source_registry_type
         )
-        artifacts.append(Artifact.from_dataclass(item, registry_url, source_url))
+        artifacts.append(
+            Artifact.from_pydantic(to_artifact_gql_node(item, registry_url, source_url))
+        )
     return ScanArtifactsPayload(artifacts=artifacts)
 
 
@@ -266,21 +309,17 @@ async def import_artifacts(
     options = input.options or ImportArtifactsOptionsGQL()
     force = options.force
     for revision_id in input.artifact_revision_ids:
-        action_result = (
-            await info.context.processors.artifact_revision.import_revision.wait_for_complete(
-                ImportArtifactRevisionAction(
-                    artifact_revision_id=UUID(revision_id),
-                    vfolder_id=vfolder_id,
-                    storage_prefix=storage_prefix,
-                    force=force,
-                )
-            )
+        revision_node, task_id = await info.context.adapters.artifact.import_revision(
+            artifact_revision_id=UUID(revision_id),
+            vfolder_id=vfolder_id,
+            storage_prefix=storage_prefix,
+            force=force,
         )
-        artifact_revision = ArtifactRevision.from_dataclass(action_result.result)
+        artifact_revision = make_artifact_revision_from_node(revision_node)
         imported_artifacts.append(artifact_revision)
         tasks.append(
             ArtifactRevisionImportTask(
-                task_id=ID(str(action_result.task_id)),
+                task_id=ID(str(task_id)),
                 artifact_revision=artifact_revision,
             )
         )
@@ -330,28 +369,26 @@ async def delegate_scan_artifacts(
         UUID(input.delegator_reservoir_id) if input.delegator_reservoir_id else None
     )
 
-    action_result = await info.context.processors.artifact.delegate_scan.wait_for_complete(
-        DelegateScanArtifactsAction(
-            delegator_reservoir_id=delegator_reservoir_id,
-            delegatee_target=input.delegatee_target.to_dataclass()
-            if input.delegatee_target
-            else None,
-            artifact_type=input.artifact_type,
-            limit=input.limit,
-            order=ModelSortKey.DOWNLOADS,
-            search=input.search,
-        )
+    results = await info.context.adapters.artifact.delegate_scan(
+        delegator_reservoir_id=delegator_reservoir_id,
+        delegatee_target=input.delegatee_target.to_pydantic() if input.delegatee_target else None,
+        artifact_type=input.artifact_type,
+        limit=input.limit,
+        order=ModelSortKey.DOWNLOADS,
+        search=input.search,
     )
 
     data_loaders = info.context.data_loaders
 
     artifacts = []
-    for item in action_result.result:
+    for item in results:
         registry_url = await get_registry_url(data_loaders, item.registry_id, item.registry_type)
         source_url = await get_registry_url(
             data_loaders, item.source_registry_id, item.source_registry_type
         )
-        artifacts.append(Artifact.from_dataclass(item, registry_url, source_url))
+        artifacts.append(
+            Artifact.from_pydantic(to_artifact_gql_node(item, registry_url, source_url))
+        )
     return DelegateScanArtifactsPayload(artifacts=artifacts)
 
 
@@ -373,39 +410,28 @@ async def delegate_scan_artifacts(
 async def delegate_import_artifacts(
     input: DelegateImportArtifactsInput, info: Info[StrawberryGQLContext]
 ) -> DelegateImportArtifactsPayload:
-    imported_artifacts = []
     tasks = []
 
     options = input.options or ImportArtifactsOptionsGQL()
     force = options.force
-    action_result = await info.context.processors.artifact_revision.delegate_import_revision_batch.wait_for_complete(
-        DelegateImportArtifactRevisionBatchAction(
-            delegator_reservoir_id=UUID(input.delegator_reservoir_id)
-            if input.delegator_reservoir_id
-            else None,
-            delegatee_target=input.delegatee_target.to_dataclass()
-            if input.delegatee_target
-            else None,
-            artifact_type=input.artifact_type,
-            artifact_revision_ids=[
-                UUID(revision_id) for revision_id in input.artifact_revision_ids
-            ],
-            force=force,
-        )
+    revision_nodes, task_ids = await info.context.adapters.artifact.delegate_import_batch(
+        delegator_reservoir_id=UUID(input.delegator_reservoir_id)
+        if input.delegator_reservoir_id
+        else None,
+        delegatee_target=input.delegatee_target.to_pydantic() if input.delegatee_target else None,
+        artifact_type=input.artifact_type,
+        artifact_revision_ids=[UUID(revision_id) for revision_id in input.artifact_revision_ids],
+        force=force,
     )
-    artifact_revisions = [
-        ArtifactRevision.from_dataclass(result) for result in action_result.result
-    ]
-    imported_artifacts.extend(artifact_revisions)
+    artifact_revisions = [make_artifact_revision_from_node(node) for node in revision_nodes]
+    imported_artifacts = list(artifact_revisions)
 
-    if len(artifact_revisions) != len(action_result.task_ids):
+    if len(artifact_revisions) != len(task_ids):
         raise ArtifactImportDelegationError(
             "Mismatch between artifact revisions and task IDs returned"
         )
 
-    for task_uuid, artifact_revision in zip(
-        action_result.task_ids, artifact_revisions, strict=True
-    ):
+    for task_uuid, artifact_revision in zip(task_ids, artifact_revisions, strict=True):
         task_id = ID(str(task_uuid)) if task_uuid is not None else None
         tasks.append(
             ArtifactRevisionImportTask(
@@ -446,30 +472,26 @@ async def delegate_import_artifacts(
 async def update_artifact(
     input: UpdateArtifactInput, info: Info[StrawberryGQLContext]
 ) -> UpdateArtifactPayload:
-    action_result = await info.context.processors.artifact.update.wait_for_complete(
-        UpdateArtifactAction(
-            updater=Updater(
-                spec=ArtifactUpdaterSpec(
-                    readonly=TriState.from_graphql(input.readonly),
-                    description=TriState.from_graphql(input.description),
-                ),
-                pk_value=UUID(input.artifact_id),
-            ),
-        )
+    pydantic_input = UpdateArtifactInputDTO(
+        readonly=input.readonly if input.readonly is not UNSET else None,
+        description=input.description if input.description is not UNSET else SENTINEL,
     )
+    payload = await info.context.adapters.artifact.update(pydantic_input, UUID(input.artifact_id))
 
-    artifact = action_result.result
     data_loaders = info.context.data_loaders
+    artifact_node = payload.artifact
 
     registry_url = await get_registry_url(
-        data_loaders, artifact.registry_id, artifact.registry_type
+        data_loaders, artifact_node.registry_id, artifact_node.registry_type
     )
     source_url = await get_registry_url(
-        data_loaders, artifact.source_registry_id, artifact.source_registry_type
+        data_loaders, artifact_node.source_registry_id, artifact_node.source_registry_type
     )
 
     return UpdateArtifactPayload(
-        artifact=Artifact.from_dataclass(artifact, registry_url=registry_url, source_url=source_url)
+        artifact=Artifact.from_pydantic(
+            to_artifact_gql_node(artifact_node, registry_url, source_url)
+        )
     )
 
 
@@ -491,13 +513,10 @@ async def cleanup_artifact_revisions(
 ) -> CleanupArtifactRevisionsPayload:
     cleaned_artifact_revisions: list[ArtifactRevision] = []
     # TODO: Refactor with asyncio.gather()
-    for artifact_revision_id in input.artifact_revision_ids:
-        action_result = await info.context.processors.artifact_revision.cleanup.wait_for_complete(
-            CleanupArtifactRevisionAction(
-                artifact_revision_id=UUID(artifact_revision_id),
-            )
-        )
-        cleaned_artifact_revisions.append(ArtifactRevision.from_dataclass(action_result.result))
+    pydantic_input = input.to_pydantic()
+    for artifact_revision_id in pydantic_input.artifact_revision_ids:
+        revision_node = await info.context.adapters.artifact.cleanup_revision(artifact_revision_id)
+        cleaned_artifact_revisions.append(make_artifact_revision_from_node(revision_node))
 
     edges = [
         ArtifactRevisionEdge(node=revision, cursor=encode_cursor(revision.id))
@@ -531,21 +550,20 @@ async def cleanup_artifact_revisions(
 async def delete_artifacts(
     input: DeleteArtifactsInput, info: Info[StrawberryGQLContext]
 ) -> DeleteArtifactsPayload:
-    action_result = await info.context.processors.artifact.delete_artifacts.wait_for_complete(
-        DeleteArtifactsAction(
-            artifact_ids=[UUID(id) for id in input.artifact_ids],
-        )
-    )
+    pydantic_input = input.to_pydantic()
+    payload = await info.context.adapters.artifact.delete(pydantic_input)
 
     data_loaders = info.context.data_loaders
 
     artifacts = []
-    for item in action_result.artifacts:
+    for item in payload.artifacts:
         registry_url = await get_registry_url(data_loaders, item.registry_id, item.registry_type)
         source_url = await get_registry_url(
             data_loaders, item.source_registry_id, item.source_registry_type
         )
-        artifacts.append(Artifact.from_dataclass(item, registry_url, source_url))
+        artifacts.append(
+            Artifact.from_pydantic(to_artifact_gql_node(item, registry_url, source_url))
+        )
 
     return DeleteArtifactsPayload(artifacts=artifacts)
 
@@ -563,21 +581,21 @@ async def delete_artifacts(
 async def restore_artifacts(
     input: RestoreArtifactsInput, info: Info[StrawberryGQLContext]
 ) -> RestoreArtifactsPayload:
-    action_result = await info.context.processors.artifact.restore_artifacts.wait_for_complete(
-        RestoreArtifactsAction(
-            artifact_ids=[UUID(id) for id in input.artifact_ids],
-        )
+    artifact_node_list = await info.context.adapters.artifact.restore(
+        artifact_ids=[UUID(id) for id in input.artifact_ids],
     )
 
     data_loaders = info.context.data_loaders
 
     artifacts = []
-    for item in action_result.artifacts:
+    for item in artifact_node_list:
         registry_url = await get_registry_url(data_loaders, item.registry_id, item.registry_type)
         source_url = await get_registry_url(
             data_loaders, item.source_registry_id, item.source_registry_type
         )
-        artifacts.append(Artifact.from_dataclass(item, registry_url, source_url))
+        artifacts.append(
+            Artifact.from_pydantic(to_artifact_gql_node(item, registry_url, source_url))
+        )
 
     return RestoreArtifactsPayload(artifacts=artifacts)
 
@@ -596,13 +614,12 @@ async def cancel_import_artifact(
     input: CancelArtifactInput, info: Info[StrawberryGQLContext]
 ) -> CancelImportArtifactPayload:
     # TODO: Cancel actual import bgtask
-    action_result = await info.context.processors.artifact_revision.cancel_import.wait_for_complete(
-        CancelImportAction(
-            artifact_revision_id=UUID(input.artifact_revision_id),
-        )
+    pydantic_input = input.to_pydantic()
+    revision_node = await info.context.adapters.artifact.cancel_import(
+        pydantic_input.artifact_revision_id
     )
     return CancelImportArtifactPayload(
-        artifact_revision=ArtifactRevision.from_dataclass(action_result.result)
+        artifact_revision=make_artifact_revision_from_node(revision_node)
     )
 
 
@@ -620,15 +637,10 @@ async def cancel_import_artifact(
 async def approve_artifact_revision(
     input: ApproveArtifactInput, info: Info[StrawberryGQLContext]
 ) -> ApproveArtifactPayload:
-    action_result = await info.context.processors.artifact_revision.approve.wait_for_complete(
-        ApproveArtifactRevisionAction(
-            artifact_revision_id=UUID(input.artifact_revision_id),
-        )
+    revision_node = await info.context.adapters.artifact.approve_revision(
+        UUID(input.artifact_revision_id)
     )
-
-    return ApproveArtifactPayload(
-        artifact_revision=ArtifactRevision.from_dataclass(action_result.result)
-    )
+    return ApproveArtifactPayload(artifact_revision=make_artifact_revision_from_node(revision_node))
 
 
 @strawberry.mutation(  # type: ignore[misc]
@@ -644,15 +656,10 @@ async def approve_artifact_revision(
 async def reject_artifact_revision(
     input: RejectArtifactInput, info: Info[StrawberryGQLContext]
 ) -> RejectArtifactPayload:
-    action_result = await info.context.processors.artifact_revision.reject.wait_for_complete(
-        RejectArtifactRevisionAction(
-            artifact_revision_id=UUID(input.artifact_revision_id),
-        )
+    revision_node = await info.context.adapters.artifact.reject_revision(
+        UUID(input.artifact_revision_id)
     )
-
-    return RejectArtifactPayload(
-        artifact_revision=ArtifactRevision.from_dataclass(action_result.result)
-    )
+    return RejectArtifactPayload(artifact_revision=make_artifact_revision_from_node(revision_node))
 
 
 @strawberry.mutation(  # type: ignore[misc]
@@ -669,17 +676,16 @@ async def reject_artifact_revision(
 async def scan_artifact_models(
     input: ScanArtifactModelsInput, info: Info[StrawberryGQLContext]
 ) -> ScanArtifactModelsPayload:
-    action_result = await info.context.processors.artifact.retrieve_models.wait_for_complete(
-        RetrieveModelsAction(
-            models=[m.to_dataclass() for m in input.models], registry_id=input.registry_id
-        )
+    results = await info.context.adapters.artifact.retrieve_models(
+        models=[m.to_pydantic() for m in input.models],
+        registry_id=input.registry_id,
     )
 
     edges = []
-    for data in action_result.result:
+    for data in results:
         edges.extend([
             ArtifactRevisionEdge(
-                node=ArtifactRevision.from_dataclass(revision),
+                node=ArtifactRevision.from_pydantic(revision),
                 cursor=encode_cursor(revision.id),
             )
             for revision in data.revisions
@@ -696,7 +702,7 @@ async def scan_artifact_models(
         ),
     )
 
-    return ScanArtifactModelsPayload(artifact_revision=artifacts_connection)
+    return ScanArtifactModelsPayload(artifact_revisions=artifacts_connection)
 
 
 # Subscriptions

@@ -18,10 +18,10 @@ from ai.backend.manager.repositories.group.types import (
 )
 from ai.backend.manager.services.group.actions.base import (
     GroupAction,
-    GroupScopeAction,
-    GroupScopeActionResult,
-    GroupSingleEntityAction,
-    GroupSingleEntityActionResult,
+    ProjectScopeAction,
+    ProjectScopeActionResult,
+    ProjectSingleEntityAction,
+    ProjectSingleEntityActionResult,
 )
 
 
@@ -42,7 +42,7 @@ class SearchProjectsAction(GroupAction):
 
 
 @dataclass
-class SearchProjectsByDomainAction(GroupScopeAction):
+class SearchProjectsByDomainAction(ProjectScopeAction):
     """Search projects within a domain."""
 
     scope: DomainProjectSearchScope
@@ -67,7 +67,7 @@ class SearchProjectsByDomainAction(GroupScopeAction):
 
 
 @dataclass
-class SearchProjectsByUserAction(GroupScopeAction):
+class SearchProjectsByUserAction(ProjectScopeAction):
     """Search projects a user is member of."""
 
     scope: UserProjectSearchScope
@@ -92,7 +92,7 @@ class SearchProjectsByUserAction(GroupScopeAction):
 
 
 @dataclass
-class GetProjectAction(GroupSingleEntityAction):
+class GetProjectAction(ProjectSingleEntityAction):
     """Get a single project by UUID."""
 
     project_id: UUID
@@ -129,7 +129,7 @@ class SearchProjectsActionResult(BaseActionResult):
 
 
 @dataclass
-class ScopedSearchProjectsActionResult(GroupScopeActionResult):
+class ScopedSearchProjectsActionResult(ProjectScopeActionResult):
     """Result from searching projects within a scope."""
 
     items: list[GroupData]
@@ -149,7 +149,7 @@ class ScopedSearchProjectsActionResult(GroupScopeActionResult):
 
 
 @dataclass
-class GetProjectActionResult(GroupSingleEntityActionResult):
+class GetProjectActionResult(ProjectSingleEntityActionResult):
     """Result from getting a single project."""
 
     data: GroupData

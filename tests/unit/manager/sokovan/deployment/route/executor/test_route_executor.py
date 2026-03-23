@@ -3,7 +3,7 @@
 Based on BEP-1033 test scenarios for route executor testing.
 
 Test Scenarios:
-- RP-001 ~ RP-003: Route Provisioning
+- RP-001 ~ RP-004: Route Provisioning
 - RH-001 ~ RH-004: Route Health Check
 - RR-001 ~ RR-004: Running Route Check
 - RE-001 ~ RE-003: Route Eviction
@@ -13,6 +13,7 @@ Test Scenarios:
 
 from __future__ import annotations
 
+import dataclasses
 from unittest.mock import AsyncMock, MagicMock
 from uuid import uuid4
 
@@ -121,6 +122,64 @@ class TestProvisionRoutes:
         # Assert
         assert len(result.successes) == 0
         assert len(result.errors) == 1
+
+    async def test_provision_route_passes_revision_id_to_context(
+        self,
+        route_executor: RouteExecutor,
+        mock_deployment_repo: AsyncMock,
+        mock_scheduling_controller: AsyncMock,
+        provisioning_route: RouteData,
+    ) -> None:
+        """RP-004: Provisioning passes route's revision_id to fetch_deployment_context."""
+        # Arrange
+        explicit_revision_id = uuid4()
+        route = dataclasses.replace(provisioning_route, revision_id=explicit_revision_id)
+        deployment = MagicMock()
+        deployment.id = route.endpoint_id
+        mock_deployment_repo.get_endpoints_by_ids.return_value = [deployment]
+
+        entity_ids = [route.route_id]
+        with RouteRecorderContext.scope("test", entity_ids=entity_ids):
+            # Act
+            result = await route_executor.provision_routes([route])
+
+        # Assert
+        assert len(result.successes) == 1
+        assert len(result.errors) == 0
+        mock_deployment_repo.fetch_deployment_context.assert_awaited_once_with(
+            deployment,
+            revision_id=explicit_revision_id,
+        )
+
+    async def test_provision_route_falls_back_to_deploying_revision(
+        self,
+        route_executor: RouteExecutor,
+        mock_deployment_repo: AsyncMock,
+        mock_scheduling_controller: AsyncMock,
+        provisioning_route: RouteData,
+    ) -> None:
+        """RP-004b: When route has no revision_id, falls back to deploying_revision_id."""
+        # Arrange
+        fallback_revision_id = uuid4()
+        route = dataclasses.replace(provisioning_route, revision_id=None)
+        deployment = MagicMock()
+        deployment.id = route.endpoint_id
+        deployment.deploying_revision_id = fallback_revision_id
+        deployment.current_revision_id = None
+        mock_deployment_repo.get_endpoints_by_ids.return_value = [deployment]
+
+        entity_ids = [route.route_id]
+        with RouteRecorderContext.scope("test", entity_ids=entity_ids):
+            # Act
+            result = await route_executor.provision_routes([route])
+
+        # Assert
+        assert len(result.successes) == 1
+        assert len(result.errors) == 0
+        mock_deployment_repo.fetch_deployment_context.assert_awaited_once_with(
+            deployment,
+            revision_id=fallback_revision_id,
+        )
 
 
 # =============================================================================

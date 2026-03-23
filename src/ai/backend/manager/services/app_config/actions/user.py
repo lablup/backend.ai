@@ -1,53 +1,60 @@
 """User-level app configuration actions."""
 
-from __future__ import annotations
-
 from dataclasses import dataclass
 from typing import override
 
-from ai.backend.common.data.permission.types import EntityType
-from ai.backend.manager.actions.action import BaseActionResult
+from ai.backend.common.data.permission.types import RBACElementType, ScopeType
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.app_config.types import AppConfigData
+from ai.backend.manager.data.permission.types import RBACElementRef
 from ai.backend.manager.repositories.app_config.updaters import AppConfigUpdaterSpec
-
-from .base import AppConfigAction
+from ai.backend.manager.services.app_config.actions.base import (
+    AppConfigScopeAction,
+    AppConfigScopeActionResult,
+)
 
 
 @dataclass
-class GetUserConfigAction(AppConfigAction):
+class GetUserConfigAction(AppConfigScopeAction):
     """Action to get user-level app configuration."""
 
     user_id: str
 
     @override
     @classmethod
-    def entity_type(cls) -> EntityType:
-        return EntityType.APP_CONFIG_USER
-
-    @override
-    def entity_id(self) -> str | None:
-        return self.user_id
-
-    @override
-    @classmethod
     def operation_type(cls) -> ActionOperationType:
         return ActionOperationType.GET
 
+    @override
+    def scope_type(self) -> ScopeType:
+        return ScopeType.USER
+
+    @override
+    def scope_id(self) -> str:
+        return self.user_id
+
+    @override
+    def target_element(self) -> RBACElementRef:
+        return RBACElementRef(RBACElementType.USER, self.user_id)
+
 
 @dataclass
-class GetUserConfigActionResult(BaseActionResult):
+class GetUserConfigActionResult(AppConfigScopeActionResult):
     """Result of get user config action."""
 
     result: AppConfigData | None
 
     @override
-    def entity_id(self) -> str | None:
-        return self.result.scope_id if self.result else None
+    def scope_type(self) -> ScopeType:
+        return ScopeType.USER
+
+    @override
+    def scope_id(self) -> str:
+        return self.result.scope_id if self.result else ""
 
 
 @dataclass
-class UpsertUserConfigAction(AppConfigAction):
+class UpsertUserConfigAction(AppConfigScopeAction):
     """Action to create or update user-level app configuration."""
 
     user_id: str
@@ -55,58 +62,72 @@ class UpsertUserConfigAction(AppConfigAction):
 
     @override
     @classmethod
-    def entity_type(cls) -> EntityType:
-        return EntityType.APP_CONFIG_USER
-
-    @override
-    def entity_id(self) -> str | None:
-        return self.user_id
-
-    @override
-    @classmethod
     def operation_type(cls) -> ActionOperationType:
         return ActionOperationType.UPDATE
 
+    @override
+    def scope_type(self) -> ScopeType:
+        return ScopeType.USER
+
+    @override
+    def scope_id(self) -> str:
+        return self.user_id
+
+    @override
+    def target_element(self) -> RBACElementRef:
+        return RBACElementRef(RBACElementType.USER, self.user_id)
+
 
 @dataclass
-class UpsertUserConfigActionResult(BaseActionResult):
+class UpsertUserConfigActionResult(AppConfigScopeActionResult):
     """Result of upsert user config action."""
 
     result: AppConfigData
 
     @override
-    def entity_id(self) -> str | None:
+    def scope_type(self) -> ScopeType:
+        return ScopeType.USER
+
+    @override
+    def scope_id(self) -> str:
         return self.result.scope_id
 
 
 @dataclass
-class DeleteUserConfigAction(AppConfigAction):
+class DeleteUserConfigAction(AppConfigScopeAction):
     """Action to delete user-level app configuration."""
 
     user_id: str
 
     @override
     @classmethod
-    def entity_type(cls) -> EntityType:
-        return EntityType.APP_CONFIG_USER
-
-    @override
-    def entity_id(self) -> str | None:
-        return self.user_id
-
-    @override
-    @classmethod
     def operation_type(cls) -> ActionOperationType:
         return ActionOperationType.DELETE
 
+    @override
+    def scope_type(self) -> ScopeType:
+        return ScopeType.USER
+
+    @override
+    def scope_id(self) -> str:
+        return self.user_id
+
+    @override
+    def target_element(self) -> RBACElementRef:
+        return RBACElementRef(RBACElementType.USER, self.user_id)
+
 
 @dataclass
-class DeleteUserConfigActionResult(BaseActionResult):
+class DeleteUserConfigActionResult(AppConfigScopeActionResult):
     """Result of delete user config action."""
 
     deleted: bool
     user_id: str
 
     @override
-    def entity_id(self) -> str | None:
-        return self.user_id if self.deleted else None
+    def scope_type(self) -> ScopeType:
+        return ScopeType.USER
+
+    @override
+    def scope_id(self) -> str:
+        return self.user_id

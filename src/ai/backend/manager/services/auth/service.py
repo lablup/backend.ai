@@ -104,15 +104,21 @@ class AuthService:
     async def get_role(self, action: GetRoleAction) -> GetRoleActionResult:
         group_role = None
         if action.group_id is not None:
-            try:
-                # TODO: per-group role is not yet implemented.
-                await self._auth_repository.get_group_membership(action.group_id, action.user_id)
+            if action.is_superadmin:
+                # Superadmins have global access across all domains and groups.
                 group_role = "user"
-            except GroupMembershipNotFoundError as e:
-                raise ObjectNotFound(
-                    extra_msg="No such project or you are not the member of it.",
-                    object_name="project (user group)",
-                ) from e
+            else:
+                try:
+                    # TODO: per-group role is not yet implemented.
+                    await self._auth_repository.get_group_membership(
+                        action.group_id, action.user_id
+                    )
+                    group_role = "user"
+                except GroupMembershipNotFoundError as e:
+                    raise ObjectNotFound(
+                        extra_msg="No such project or you are not the member of it.",
+                        object_name="project (user group)",
+                    ) from e
 
         return GetRoleActionResult(
             global_role="superadmin" if action.is_superadmin else "user",
@@ -407,7 +413,7 @@ class AuthService:
 
     async def get_ssh_keypair(self, action: GetSSHKeypairAction) -> GetSSHKeypairActionResult:
         pubkey = await self._auth_repository.get_ssh_public_key(action.access_key)
-        return GetSSHKeypairActionResult(public_key=pubkey or "")
+        return GetSSHKeypairActionResult(public_key=pubkey or "", access_key=action.access_key)
 
     async def generate_ssh_keypair(
         self, action: GenerateSSHKeypairAction
@@ -419,7 +425,8 @@ class AuthService:
             ssh_keypair=SSHKeypair(
                 ssh_public_key=pubkey,
                 ssh_private_key=privkey,
-            )
+            ),
+            user_id=action.user_id,
         )
 
     async def upload_ssh_keypair(
@@ -438,6 +445,7 @@ class AuthService:
                 ssh_public_key=pubkey,
                 ssh_private_key=privkey,
             ),
+            user_id=action.user_id,
         )
 
     async def resolve_access_key_scope(

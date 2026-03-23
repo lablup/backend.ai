@@ -19,6 +19,7 @@ from ai.backend.common.defs.session import (
     SESSION_PRIORITY_MAX,
     SESSION_PRIORITY_MIN,
 )
+from ai.backend.common.dto.manager.session.types import TimeoutSeconds
 from ai.backend.common.types import ClusterMode, SessionTypes
 
 __all__ = (
@@ -113,7 +114,7 @@ class CreateFromTemplateRequest(BaseRequestModel):
         default=None,
         validation_alias=AliasChoices("starts_at", "startsAt"),
     )
-    batch_timeout: str | None = Field(
+    batch_timeout: TimeoutSeconds | None = Field(
         default=None,
         validation_alias=AliasChoices("batch_timeout", "batchTimeout"),
     )
@@ -192,7 +193,7 @@ class CreateFromParamsRequest(BaseRequestModel):
         default=None,
         validation_alias=AliasChoices("starts_at", "startsAt"),
     )
-    batch_timeout: str | None = Field(
+    batch_timeout: TimeoutSeconds | None = Field(
         default=None,
         validation_alias=AliasChoices("batch_timeout", "batchTimeout"),
     )

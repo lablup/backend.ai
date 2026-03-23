@@ -106,7 +106,6 @@ class DeploymentServiceBaseFixtures:
             endpoint=uuid.uuid4(),
             strategy=DeploymentStrategy.ROLLING,
             strategy_spec=RollingUpdateSpec(max_surge=1, max_unavailable=0),
-            rollback_on_failure=False,
             created_at=datetime(2024, 1, 1, 0, 0, 0, tzinfo=UTC),
             updated_at=datetime(2024, 1, 1, 0, 0, 0, tzinfo=UTC),
         )
@@ -129,7 +128,6 @@ class TestUpsertDeploymentPolicy(DeploymentServiceBaseFixtures):
             deployment_id=endpoint_id,
             strategy=DeploymentStrategy.ROLLING,
             strategy_spec=RollingUpdateSpec(max_surge=2, max_unavailable=1),
-            rollback_on_failure=True,
         )
 
     @pytest.fixture
@@ -138,7 +136,6 @@ class TestUpsertDeploymentPolicy(DeploymentServiceBaseFixtures):
             deployment_id=endpoint_id,
             strategy=DeploymentStrategy.BLUE_GREEN,
             strategy_spec=BlueGreenSpec(auto_promote=True, promote_delay_seconds=30),
-            rollback_on_failure=False,
         )
 
     @pytest.fixture
@@ -148,7 +145,6 @@ class TestUpsertDeploymentPolicy(DeploymentServiceBaseFixtures):
             endpoint=uuid.uuid4(),
             strategy=DeploymentStrategy.BLUE_GREEN,
             strategy_spec=BlueGreenSpec(auto_promote=True, promote_delay_seconds=30),
-            rollback_on_failure=False,
             created_at=datetime(2024, 1, 1, 0, 0, 0, tzinfo=UTC),
             updated_at=datetime(2024, 1, 1, 0, 0, 0, tzinfo=UTC),
         )
@@ -177,7 +173,6 @@ class TestUpsertDeploymentPolicy(DeploymentServiceBaseFixtures):
         spec = upserter_arg.spec
         assert spec.endpoint_id == endpoint_id
         assert spec.strategy == DeploymentStrategy.ROLLING
-        assert spec.rollback_on_failure is True
 
     async def test_upsert_deployment_policy_update(
         self,

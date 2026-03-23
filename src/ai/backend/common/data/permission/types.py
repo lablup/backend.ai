@@ -98,6 +98,7 @@ class EntityType(enum.StrEnum):
     ERROR_LOG = "error_log"
     EXPORT = "export"
     GROUP = "group"
+    KERNEL = "kernel"
     KEYPAIR = "keypair"
     MODEL_SERVICE = "model_service"
     NETWORK = "network"
@@ -113,6 +114,7 @@ class EntityType(enum.StrEnum):
     PROMETHEUS_QUERY_PRESET = "prometheus_query_preset"
     RESOURCE_PRESET = "resource_preset"
     ROLE = "role"
+    ROUTING = "routing"
     DOTFILE = "dotfile"
     ETCD_CONFIG = "etcd_config"
     MANAGER_ADMIN = "manager_admin"
@@ -318,10 +320,12 @@ class ScopeType(enum.StrEnum):
     # === Entity-level scopes ===
     SESSION = "session"
     DEPLOYMENT = "deployment"
+    MODEL_DEPLOYMENT = "model_deployment"
     VFOLDER = "vfolder"
     IMAGE = "image"
     ARTIFACT = "artifact"
     ARTIFACT_REVISION = "artifact_revision"
+    AGENT = "agent"
     ROLE = "role"
     NOTIFICATION_CHANNEL = "notification_channel"
 
@@ -356,7 +360,6 @@ class RBACElementType(enum.StrEnum):
     # === Root-query-enabled entities (scoped) ===
     SESSION = "session"
     VFOLDER = "vfolder"
-    DEPLOYMENT = "deployment"
     MODEL_DEPLOYMENT = "model_deployment"
     KEYPAIR = "keypair"
     NOTIFICATION_CHANNEL = "notification_channel"
@@ -384,6 +387,12 @@ class RBACElementType(enum.StrEnum):
 
     # === Auto-only entities used in permissions ===
     NOTIFICATION_RULE = "notification_rule"
+
+    # === Auto sub-entities with direct GET APIs ===
+    DEPLOYMENT_TOKEN = "deployment:token"
+    DEPLOYMENT_POLICY = "deployment:policy"
+    DEPLOYMENT_REVISION = "deployment:revision"
+    IMAGE_ALIAS = "image:alias"
 
     # === Entity-level scopes (for entity-scope permissions) ===
     ARTIFACT_REVISION = "artifact_revision"

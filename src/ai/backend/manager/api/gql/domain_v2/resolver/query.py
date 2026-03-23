@@ -4,12 +4,10 @@ from __future__ import annotations
 
 import strawberry
 from strawberry import Info
+from strawberry.relay import PageInfo
 
-from ai.backend.manager.api.gql.domain_v2.fetcher import (
-    fetch_admin_domains,
-    fetch_domain,
-    fetch_rg_domains,
-)
+from ai.backend.common.dto.manager.v2.domain.request import AdminSearchDomainsInput
+from ai.backend.manager.api.gql.base import encode_cursor
 from ai.backend.manager.api.gql.domain_v2.types import (
     DomainV2Connection,
     DomainV2Filter,
@@ -30,19 +28,8 @@ async def domain_v2(
     info: Info[StrawberryGQLContext],
     domain_name: str,
 ) -> DomainV2GQL | None:
-    """Get a single domain by name.
-
-    Args:
-        info: Strawberry GraphQL context.
-        domain_name: Name of the domain to retrieve.
-
-    Returns:
-        DomainV2GQL object.
-
-    Raises:
-        DomainNotFound: If the domain with the given name does not exist.
-    """
-    return await fetch_domain(info, domain_name=domain_name)
+    node = await info.context.adapters.domain.get(domain_name)
+    return DomainV2GQL.from_pydantic(node)
 
 
 @strawberry.field(
@@ -62,33 +49,30 @@ async def admin_domains_v2(
     limit: int | None = None,
     offset: int | None = None,
 ) -> DomainV2Connection | None:
-    """List all domains with optional filtering, ordering, and pagination.
-
-    Args:
-        info: Strawberry GraphQL context.
-        filter: Optional filter criteria.
-        order_by: Optional ordering specification.
-        before: Cursor for backward pagination.
-        after: Cursor for forward pagination.
-        first: Number of items from the start.
-        last: Number of items from the end.
-        limit: Maximum number of items (offset-based).
-        offset: Starting position (offset-based).
-
-    Returns:
-        DomainV2Connection with paginated domain records.
-    """
     check_admin_only()
-    return await fetch_admin_domains(
-        info,
-        filter=filter,
-        order_by=order_by,
-        before=before,
-        after=after,
-        first=first,
-        last=last,
-        limit=limit,
-        offset=offset,
+    payload = await info.context.adapters.domain.admin_search(
+        AdminSearchDomainsInput(
+            filter=filter.to_pydantic() if filter else None,
+            order=[o.to_pydantic() for o in order_by] if order_by else None,
+            first=first,
+            after=after,
+            last=last,
+            before=before,
+            limit=limit,
+            offset=offset,
+        )
+    )
+    nodes = [DomainV2GQL.from_pydantic(node) for node in payload.items]
+    edges = [strawberry.relay.Edge(node=node, cursor=encode_cursor(str(node.id))) for node in nodes]
+    return DomainV2Connection(
+        edges=edges,
+        page_info=PageInfo(
+            has_next_page=payload.has_next_page,
+            has_previous_page=payload.has_previous_page,
+            start_cursor=edges[0].cursor if edges else None,
+            end_cursor=edges[-1].cursor if edges else None,
+        ),
+        count=payload.total_count,
     )
 
 
@@ -105,35 +89,29 @@ async def rg_domains_v2(
     limit: int | None = None,
     offset: int | None = None,
 ) -> DomainV2Connection | None:
-    """List domains within a resource group scope.
-
-    Args:
-        info: Strawberry GraphQL context.
-        scope: Resource group scope for filtering domains.
-        filter: Optional filter criteria.
-        order_by: Optional ordering specification.
-        before: Cursor for backward pagination.
-        after: Cursor for forward pagination.
-        first: Number of items from the start.
-        last: Number of items from the end.
-        limit: Maximum number of items (offset-based).
-        offset: Starting position (offset-based).
-
-    Returns:
-        DomainV2Connection with paginated domain records.
-    """
-    # Convert GraphQL scope to repository scope
     repo_scope = DomainSearchScope(resource_group=scope.resource_group_name)
-
-    return await fetch_rg_domains(
-        info,
+    payload = await info.context.adapters.domain.search_rg_domains(
         scope=repo_scope,
-        filter=filter,
-        order_by=order_by,
-        before=before,
-        after=after,
-        first=first,
-        last=last,
-        limit=limit,
-        offset=offset,
+        input=AdminSearchDomainsInput(
+            filter=filter.to_pydantic() if filter else None,
+            order=[o.to_pydantic() for o in order_by] if order_by else None,
+            first=first,
+            after=after,
+            last=last,
+            before=before,
+            limit=limit,
+            offset=offset,
+        ),
+    )
+    nodes = [DomainV2GQL.from_pydantic(node) for node in payload.items]
+    edges = [strawberry.relay.Edge(node=node, cursor=encode_cursor(str(node.id))) for node in nodes]
+    return DomainV2Connection(
+        edges=edges,
+        page_info=PageInfo(
+            has_next_page=payload.has_next_page,
+            has_previous_page=payload.has_previous_page,
+            start_cursor=edges[0].cursor if edges else None,
+            end_cursor=edges[-1].cursor if edges else None,
+        ),
+        count=payload.total_count,
     )

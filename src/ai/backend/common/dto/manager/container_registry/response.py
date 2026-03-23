@@ -7,11 +7,13 @@ so that callers can import everything from a single domain-specific path.
 
 from ai.backend.common.container_registry import (
     ContainerRegistryModel,
+    ListContainerRegistriesResponseModel,
     PatchContainerRegistryResponseModel,
 )
 
 __all__ = (
     # Container registry models (re-exported from common.container_registry)
     "ContainerRegistryModel",
+    "ListContainerRegistriesResponseModel",
     "PatchContainerRegistryResponseModel",
 )

@@ -3,7 +3,7 @@ from decimal import Decimal
 from typing import Any, override
 
 from ai.backend.common.types import AutoScalingMetricComparator, AutoScalingMetricSource
-from ai.backend.manager.types import OptionalState, PartialModifier
+from ai.backend.manager.types import OptionalState, PartialModifier, TriState
 
 
 # Dataclasses for auto scaling rules used in Model Service (legacy)
@@ -32,8 +32,8 @@ class AutoScalingConditionModifier(PartialModifier):
 class AutoScalingActionModifier(PartialModifier):
     step_size: OptionalState[int] = field(default_factory=OptionalState[int].nop)
     cooldown_seconds: OptionalState[int] = field(default_factory=OptionalState[int].nop)
-    min_replicas: OptionalState[int | None] = field(default_factory=OptionalState[int | None].nop)
-    max_replicas: OptionalState[int | None] = field(default_factory=OptionalState[int | None].nop)
+    min_replicas: TriState[int] = field(default_factory=TriState[int].nop)
+    max_replicas: TriState[int] = field(default_factory=TriState[int].nop)
 
     @override
     def fields_to_update(self) -> dict[str, Any]:

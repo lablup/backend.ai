@@ -55,10 +55,13 @@ from ai.backend.logging.otel import (
 
 from . import __version__
 from .api import ManagerStatus
+from .api.rest.app import _mount_registry_tree
+from .api.rest.internal.tree import build_internal_api_routes
 from .api.rest.middleware import (
     build_auth_middleware,
     build_exception_middleware,
 )
+from .api.rest.routing import RouteRegistry
 from .config.bootstrap import BootstrapConfig
 from .config.unified import EventLoopType
 from .dependencies import DependencyInput, DependencyResources, ManagerDependencyComposer
@@ -87,6 +90,10 @@ async def webapp_plugin_ctx(
         blocklist=r.bootstrap.config_provider.config.manager.disabled_plugins,
     )
     cors_options = r.system.cors_options
+    root_app["_db"] = r.infrastructure.db
+    root_app["_config_provider"] = r.bootstrap.config_provider
+    root_app["_etcd"] = r.bootstrap.etcd
+    root_app["_valkey_stat"] = r.infrastructure.valkey.stat
     for plugin_name, plugin_instance in plugin_ctx.plugins.items():
         if pidx == 0:
             log.info("Loading webapp plugin: {0}", plugin_name)
@@ -196,6 +203,10 @@ def build_internal_app(dep_resources: DependencyResources) -> web.Application:
         r"/metrics/service_discovery",
         build_prometheus_service_discovery_handler(dep_resources.system.service_discovery),
     )
+    root_reg = RouteRegistry.create("", {})
+    for sub in build_internal_api_routes(health_probe=dep_resources.system.health_probe):
+        root_reg.add_subregistry(sub)
+    _mount_registry_tree(app, root_reg)
     return app
 
 

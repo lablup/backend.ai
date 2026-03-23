@@ -6,6 +6,27 @@ from datetime import datetime
 
 import strawberry
 
+from ai.backend.common.dto.manager.v2.group.response import (
+    ProjectBasicInfo as ProjectBasicInfoDTO,
+)
+from ai.backend.common.dto.manager.v2.group.response import (
+    ProjectLifecycleInfo as ProjectLifecycleInfoDTO,
+)
+from ai.backend.common.dto.manager.v2.group.response import (
+    ProjectOrganizationInfo as ProjectOrganizationInfoDTO,
+)
+from ai.backend.common.dto.manager.v2.group.response import (
+    ProjectStorageInfo as ProjectStorageInfoDTO,
+)
+from ai.backend.common.dto.manager.v2.group.response import (
+    VFolderHostPermissionEntry as VFolderHostPermissionEntryDTO,
+)
+from ai.backend.manager.api.gql.decorators import (
+    BackendAIGQLMeta,
+    gql_pydantic_type,
+)
+from ai.backend.manager.api.gql.pydantic_compat import PydanticOutputMixin
+
 from .enums import ProjectTypeEnum, VFolderHostPermissionEnum
 
 # ============================================================================
@@ -13,12 +34,15 @@ from .enums import ProjectTypeEnum, VFolderHostPermissionEnum
 # ============================================================================
 
 
-@strawberry.type(
-    name="ProjectBasicInfo",
-    description=(
-        "Added in 26.2.0. Basic project information. "
-        "Contains identity and descriptive fields for the project."
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version="26.2.0",
+        description=(
+            "Basic project information. Contains identity and descriptive fields for the project."
+        ),
     ),
+    model=ProjectBasicInfoDTO,
+    name="ProjectBasicInfo",
 )
 class ProjectBasicInfoGQL:
     """Basic project information."""
@@ -38,12 +62,16 @@ class ProjectBasicInfoGQL:
 # ============================================================================
 
 
-@strawberry.type(
-    name="ProjectOrganizationInfo",
-    description=(
-        "Added in 26.2.0. Project's organizational context. "
-        "Contains domain membership and resource policy information."
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version="26.2.0",
+        description=(
+            "Project's organizational context. "
+            "Contains domain membership and resource policy information."
+        ),
     ),
+    model=ProjectOrganizationInfoDTO,
+    name="ProjectOrganizationInfo",
 )
 class ProjectOrganizationInfoGQL:
     """Project's organizational context."""
@@ -59,14 +87,18 @@ class ProjectOrganizationInfoGQL:
 # ============================================================================
 
 
-@strawberry.type(
-    name="VFolderHostPermissionEntry",
-    description=(
-        "Added in 26.2.0. Storage host permission configuration. "
-        "Defines what operations are allowed for a specific storage host."
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version="26.2.0",
+        description=(
+            "Storage host permission configuration. "
+            "Defines what operations are allowed for a specific storage host."
+        ),
     ),
+    model=VFolderHostPermissionEntryDTO,
+    name="VFolderHostPermissionEntry",
 )
-class VFolderHostPermissionEntryGQL:
+class VFolderHostPermissionEntryGQL(PydanticOutputMixin[VFolderHostPermissionEntryDTO]):
     """Storage host permission entry."""
 
     host: str = strawberry.field(
@@ -80,14 +112,18 @@ class VFolderHostPermissionEntryGQL:
     )
 
 
-@strawberry.type(
-    name="ProjectStorageInfo",
-    description=(
-        "Added in 26.2.0. Project storage configuration. "
-        "Contains allowed virtual folder hosts and their permissions."
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version="26.2.0",
+        description=(
+            "Project storage configuration. "
+            "Contains allowed virtual folder hosts and their permissions."
+        ),
     ),
+    model=ProjectStorageInfoDTO,
+    name="ProjectStorageInfo",
 )
-class ProjectStorageInfoGQL:
+class ProjectStorageInfoGQL(PydanticOutputMixin[ProjectStorageInfoDTO]):
     """Project storage configuration."""
 
     allowed_vfolder_hosts: list[VFolderHostPermissionEntryGQL] = strawberry.field(
@@ -104,12 +140,15 @@ class ProjectStorageInfoGQL:
 # ============================================================================
 
 
-@strawberry.type(
-    name="ProjectLifecycleInfo",
-    description=(
-        "Added in 26.2.0. Project lifecycle information. "
-        "Contains activation status and timestamp tracking."
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version="26.2.0",
+        description=(
+            "Project lifecycle information. Contains activation status and timestamp tracking."
+        ),
     ),
+    model=ProjectLifecycleInfoDTO,
+    name="ProjectLifecycleInfo",
 )
 class ProjectLifecycleInfoGQL:
     """Project lifecycle information."""

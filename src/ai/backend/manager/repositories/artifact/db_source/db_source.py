@@ -40,7 +40,10 @@ from ai.backend.manager.models.artifact import ArtifactRow
 from ai.backend.manager.models.artifact_revision import ArtifactRevisionRow
 from ai.backend.manager.models.association_artifacts_storages import AssociationArtifactsStorageRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.manager.repositories.artifact.creators import ArtifactCreatorSpec
+from ai.backend.manager.repositories.artifact.creators import (
+    ArtifactCreatorSpec,
+    ArtifactRevisionCreatorSpec,
+)
 from ai.backend.manager.repositories.base import BatchQuerier, execute_batch_querier
 from ai.backend.manager.repositories.base.rbac.entity_creator import (
     RBACEntityCreator,
@@ -231,23 +234,27 @@ class ArtifactDBSource:
                     if revision_data.verification_result is not None:
                         verification_result = revision_data.verification_result.model_dump()
 
-                    new_revision = ArtifactRevisionRow(
-                        id=revision_data.id,
-                        artifact_id=revision_data.artifact_id,
-                        version=revision_data.version,
-                        readme=revision_data.readme,
-                        size=revision_data.size,
-                        status=ArtifactStatus.SCANNED,
-                        remote_status=revision_data.remote_status,
-                        created_at=revision_data.created_at,
-                        updated_at=revision_data.updated_at,
-                        digest=revision_data.digest,
-                        verification_result=verification_result,
+                    creator = RBACEntityCreator(
+                        spec=ArtifactRevisionCreatorSpec(
+                            id=revision_data.id,
+                            artifact_id=revision_data.artifact_id,
+                            version=revision_data.version,
+                            readme=revision_data.readme,
+                            size=revision_data.size,
+                            status=ArtifactStatus.SCANNED,
+                            remote_status=revision_data.remote_status,
+                            created_at=revision_data.created_at,
+                            updated_at=revision_data.updated_at,
+                            digest=revision_data.digest,
+                            verification_result=verification_result,
+                        ),
+                        element_type=RBACElementType.ARTIFACT_REVISION,
+                        scope_ref=RBACElementRef(
+                            RBACElementType.ARTIFACT, str(revision_data.artifact_id)
+                        ),
                     )
-                    db_sess.add(new_revision)
-                    await db_sess.flush()
-                    await db_sess.refresh(new_revision)
-                    result_revisions.append(new_revision.to_dataclass())
+                    creator_result = await execute_rbac_entity_creator(db_sess, creator)
+                    result_revisions.append(creator_result.row.to_dataclass())
                     artifact_ids_to_update.add(revision_data.artifact_id)
                 else:
                     # Update existing revision only if there are changes
@@ -368,15 +375,24 @@ class ArtifactDBSource:
                     artifacts_map[artifact_row.id][1].append(existing_revision)
                 else:
                     # Insert new artifact revision
-                    new_revision = ArtifactRevisionRow.from_huggingface_model_data(
-                        artifact_id=artifact_row.id,
-                        model_data=model,
+                    creator = RBACEntityCreator(
+                        spec=ArtifactRevisionCreatorSpec(
+                            artifact_id=artifact_row.id,
+                            version=model.revision,
+                            readme=model.readme,
+                            size=model.size,
+                            status=ArtifactStatus.SCANNED,
+                            remote_status=None,
+                            created_at=model.created_at,
+                            updated_at=model.modified_at,
+                            digest=model.sha,
+                            verification_result=None,
+                        ),
+                        element_type=RBACElementType.ARTIFACT_REVISION,
+                        scope_ref=RBACElementRef(RBACElementType.ARTIFACT, str(artifact_row.id)),
                     )
-
-                    db_sess.add(new_revision)
-                    await db_sess.flush()
-                    await db_sess.refresh(new_revision)
-                    artifacts_map[artifact_row.id][1].append(new_revision)
+                    creator_result = await execute_rbac_entity_creator(db_sess, creator)
+                    artifacts_map[artifact_row.id][1].append(creator_result.row)
                     artifact_ids_to_update.add(artifact_row.id)
 
             # Update artifact updated_at timestamp for affected artifacts

@@ -48,6 +48,12 @@ from ai.backend.manager.models.scheduling_history import (
     RouteHistoryRow,
     SessionSchedulingHistoryRow,
 )
+from ai.backend.manager.models.scheduling_history.conditions import (
+    DeploymentHistoryConditions,
+    KernelSchedulingHistoryConditions,
+    RouteHistoryConditions,
+    SessionSchedulingHistoryConditions,
+)
 from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
@@ -55,12 +61,6 @@ from ai.backend.manager.models.vfolder import VFolderRow
 from ai.backend.manager.repositories.base import BatchQuerier, OffsetPagination
 from ai.backend.manager.repositories.scheduling_history import (
     SchedulingHistoryRepository,
-)
-from ai.backend.manager.repositories.scheduling_history.options import (
-    DeploymentHistoryConditions,
-    KernelSchedulingHistoryConditions,
-    RouteHistoryConditions,
-    SessionSchedulingHistoryConditions,
 )
 from ai.backend.testutils.db import with_tables
 

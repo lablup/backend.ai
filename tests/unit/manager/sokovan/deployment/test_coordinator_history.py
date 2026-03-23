@@ -185,7 +185,6 @@ def mock_handler_with_success(
     mock.execute = AsyncMock(
         return_value=DeploymentExecutionResult(
             successes=[sample_deployment_with_history],
-            errors=[],
         )
     )
     mock.post_process = AsyncMock()
@@ -215,7 +214,7 @@ def mock_handler_with_failure(
     mock.execute = AsyncMock(
         return_value=DeploymentExecutionResult(
             successes=[],
-            errors=[sample_deployment_execution_error],
+            failures=[sample_deployment_execution_error],
         )
     )
     mock.post_process = AsyncMock()
@@ -374,6 +373,79 @@ class TestProcessDeploymentLifecycle:
         """History is not recorded when handler returns empty result."""
         coordinator_with_pending_deployments._registry.handlers = {
             (DeploymentLifecycleType.CHECK_PENDING, None): mock_handler_with_empty_result
+        }
+
+        await coordinator_with_pending_deployments.process_deployment_lifecycle(
+            DeploymentLifecycleType.CHECK_PENDING
+        )
+
+        mock_deployment_repository.update_endpoint_lifecycle_bulk_with_history.assert_not_called()
+
+    async def test_records_history_on_failure_classified_as_need_retry(
+        self,
+        coordinator_with_pending_deployments: DeploymentCoordinator,
+        mock_deployment_repository: AsyncMock,
+        sample_deployment_execution_error: DeploymentExecutionError,
+    ) -> None:
+        """History is recorded when handler returns failures classified as need_retry."""
+        need_retry_status = DeploymentLifecycleStatus(lifecycle=EndpointLifecycle.DEPLOYING)
+        mock_handler = MagicMock(spec=DeploymentHandler)
+        mock_handler.name = MagicMock(return_value="deploying_progressing")
+        mock_handler.lock_id = None
+        mock_handler.target_statuses = MagicMock(
+            return_value=[DeploymentLifecycleStatus(lifecycle=EndpointLifecycle.DEPLOYING)]
+        )
+        mock_handler.status_transitions = MagicMock(
+            return_value=DeploymentStatusTransitions(
+                success=DeploymentLifecycleStatus(lifecycle=EndpointLifecycle.READY),
+                need_retry=need_retry_status,
+            )
+        )
+        mock_handler.execute = AsyncMock(
+            return_value=DeploymentExecutionResult(
+                failures=[sample_deployment_execution_error],
+            )
+        )
+        mock_handler.post_process = AsyncMock()
+
+        coordinator_with_pending_deployments._registry.handlers = {
+            (DeploymentLifecycleType.CHECK_PENDING, None): mock_handler
+        }
+
+        await coordinator_with_pending_deployments.process_deployment_lifecycle(
+            DeploymentLifecycleType.CHECK_PENDING
+        )
+
+        mock_deployment_repository.update_endpoint_lifecycle_bulk_with_history.assert_called_once()
+
+    async def test_failure_without_need_retry_transition_does_not_record_history(
+        self,
+        coordinator_with_pending_deployments: DeploymentCoordinator,
+        mock_deployment_repository: AsyncMock,
+        sample_deployment_execution_error: DeploymentExecutionError,
+    ) -> None:
+        """No history recorded when failures exist but transitions.need_retry is None."""
+        mock_handler = MagicMock(spec=DeploymentHandler)
+        mock_handler.name = MagicMock(return_value="deploying_progressing")
+        mock_handler.lock_id = None
+        mock_handler.target_statuses = MagicMock(
+            return_value=[DeploymentLifecycleStatus(lifecycle=EndpointLifecycle.DEPLOYING)]
+        )
+        mock_handler.status_transitions = MagicMock(
+            return_value=DeploymentStatusTransitions(
+                success=DeploymentLifecycleStatus(lifecycle=EndpointLifecycle.READY),
+                need_retry=None,
+            )
+        )
+        mock_handler.execute = AsyncMock(
+            return_value=DeploymentExecutionResult(
+                failures=[sample_deployment_execution_error],
+            )
+        )
+        mock_handler.post_process = AsyncMock()
+
+        coordinator_with_pending_deployments._registry.handlers = {
+            (DeploymentLifecycleType.CHECK_PENDING, None): mock_handler
         }
 
         await coordinator_with_pending_deployments.process_deployment_lifecycle(
