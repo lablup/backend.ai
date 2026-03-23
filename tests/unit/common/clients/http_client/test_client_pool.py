@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import time
+from typing import cast
 from unittest.mock import AsyncMock, MagicMock
 
 import aiohttp
@@ -17,6 +18,11 @@ def _mock_factory(key: ClientKey, /) -> aiohttp.ClientSession:
     session = MagicMock(spec=aiohttp.ClientSession)
     session.close = AsyncMock()
     return session
+
+
+def _close_mock(session: aiohttp.ClientSession) -> AsyncMock:
+    """Extract the AsyncMock for close() from a mock session."""
+    return cast(AsyncMock, session.close)
 
 
 class TestBaseClientPool:
@@ -61,7 +67,7 @@ class TestClientPool:
         key = ClientKey(endpoint="http://localhost:8080", domain="test")
         session = pool.load_client_session(key)
         await pool.close()
-        session.close.assert_awaited_once()
+        _close_mock(session).assert_awaited_once()
 
     async def test_close_is_idempotent(self) -> None:
         pool = ClientPool(_mock_factory)
@@ -84,7 +90,7 @@ class TestSyncClientPool:
         key = ClientKey(endpoint="http://localhost:8080", domain="test")
         session = pool.load_client_session(key)
         pool.close()
-        session.close.assert_awaited_once()
+        _close_mock(session).assert_awaited_once()
 
     def test_close_is_idempotent(self) -> None:
         pool = SyncClientPool(_mock_factory, cleanup_interval_seconds=9999)
@@ -113,7 +119,7 @@ class TestSyncClientPool:
             pool.load_client_session(key2)
 
             assert key not in pool._clients
-            stale_session.close.assert_awaited_once()
+            _close_mock(stale_session).assert_awaited_once()
         finally:
             pool.close()
 
@@ -128,6 +134,6 @@ class TestSyncClientPool:
             pool.load_client_session(key2)
 
             assert key in pool._clients
-            session.close.assert_not_awaited()
+            _close_mock(session).assert_not_awaited()
         finally:
             pool.close()
