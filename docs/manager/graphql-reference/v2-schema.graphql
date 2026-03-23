@@ -3132,16 +3132,13 @@ input IntFilter {
 Added in 26.2.0. Payload returned after issuing a new keypair. The secret_key is only shown once.
 """
 type IssueMyKeypairPayload {
-  """The newly generated access key."""
-  accessKey: String!
+  """The newly created keypair."""
+  keypair: KeyPairGQL!
 
   """
   The newly generated secret key. This value is only returned at creation time.
   """
   secretKey: String!
-
-  """The generated SSH public key."""
-  sshPublicKey: String!
 }
 
 """
@@ -7906,8 +7903,8 @@ input UpdateMyKeypairInput {
 
 """Added in 26.2.0. Payload returned after updating a keypair."""
 type UpdateMyKeypairPayload {
-  """Whether the update was successful."""
-  success: Boolean!
+  """The updated keypair."""
+  keypair: KeyPairGQL!
 }
 
 """Added in 24.09.0. Input for updating a notification channel"""
