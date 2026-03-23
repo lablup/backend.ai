@@ -9,9 +9,6 @@ from strawberry import ID, Info
 from strawberry.relay import PageInfo
 from strawberry.scalars import JSON
 
-from ai.backend.common.dto.manager.v2.deployment.request import (
-    ActivateRevisionInput as ActivateRevisionInputDTO,
-)
 from ai.backend.common.dto.manager.v2.deployment.request import AdminSearchRevisionsInput
 from ai.backend.manager.api.gql.base import encode_cursor, resolve_global_id
 from ai.backend.manager.api.gql.deployment.types.deployment import ModelDeployment
@@ -137,14 +134,7 @@ async def activate_deployment_revision(
     info: Info[StrawberryGQLContext, None],
 ) -> ActivateRevisionPayloadGQL:
     """Activate a revision to be the current revision for a deployment."""
-    _, deployment_id = resolve_global_id(input.deployment_id)
-    _, revision_id = resolve_global_id(input.revision_id)
-    payload = await info.context.adapters.deployment.activate_revision(
-        ActivateRevisionInputDTO(
-            deployment_id=UUID(deployment_id),
-            revision_id=UUID(revision_id),
-        )
-    )
+    payload = await info.context.adapters.deployment.activate_revision(input.to_pydantic())
     return ActivateRevisionPayloadGQL(
         deployment=ModelDeployment.from_pydantic(payload.deployment),
         previous_revision_id=ID(str(payload.previous_revision_id))

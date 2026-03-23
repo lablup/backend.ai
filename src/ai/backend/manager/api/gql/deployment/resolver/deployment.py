@@ -11,12 +11,6 @@ from strawberry.relay import PageInfo
 
 from ai.backend.common.contexts.user import current_user
 from ai.backend.common.dto.manager.v2.deployment.request import AdminSearchDeploymentsInput
-from ai.backend.common.dto.manager.v2.deployment.request import (
-    DeleteDeploymentInput as DeleteDeploymentInputDTO,
-)
-from ai.backend.common.dto.manager.v2.deployment.request import (
-    SyncReplicaInput as SyncReplicaInputDTO,
-)
 from ai.backend.manager.api.gql.base import encode_cursor, resolve_global_id
 from ai.backend.manager.api.gql.deployment.types.deployment import (
     CreateDeploymentInput,
@@ -109,10 +103,7 @@ async def update_model_deployment(
     input: UpdateDeploymentInput, info: Info[StrawberryGQLContext]
 ) -> UpdateDeploymentPayload:
     """Update an existing model deployment."""
-    _, deployment_id = resolve_global_id(input.id)
-    payload = await info.context.adapters.deployment.update(
-        input.to_pydantic(), UUID(deployment_id)
-    )
+    payload = await info.context.adapters.deployment.update(input.to_pydantic(), UUID(input.id))
     return UpdateDeploymentPayload(deployment=ModelDeployment.from_pydantic(payload.deployment))
 
 
@@ -121,8 +112,7 @@ async def delete_model_deployment(
     input: DeleteDeploymentInput, info: Info[StrawberryGQLContext]
 ) -> DeleteDeploymentPayload:
     """Delete a model deployment."""
-    _, deployment_id = resolve_global_id(input.id)
-    await info.context.adapters.deployment.delete(DeleteDeploymentInputDTO(id=UUID(deployment_id)))
+    await info.context.adapters.deployment.delete(input.to_pydantic())
     return DeleteDeploymentPayload(id=input.id)
 
 
@@ -132,10 +122,7 @@ async def delete_model_deployment(
 async def sync_replicas(
     input: SyncReplicaInput, info: Info[StrawberryGQLContext]
 ) -> SyncReplicaPayload:
-    _, deployment_id = resolve_global_id(input.model_deployment_id)
-    payload = await info.context.adapters.deployment.sync_replicas(
-        SyncReplicaInputDTO(model_deployment_id=UUID(deployment_id))
-    )
+    payload = await info.context.adapters.deployment.sync_replicas(input.to_pydantic())
     return SyncReplicaPayload(success=payload.success)
 
 
