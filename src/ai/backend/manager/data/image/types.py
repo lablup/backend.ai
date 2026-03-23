@@ -85,6 +85,7 @@ class ImageData:
     resource_limits: list[ResourceLimit]
     tags: list[ImageTagEntry]
     status: ImageStatus
+    last_used_at: datetime | None = field(default=None, compare=False)
 
 
 @dataclass

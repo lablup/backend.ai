@@ -5,8 +5,6 @@ from __future__ import annotations
 from ai.backend.manager.models.image import ImageAliasRow, ImageRow
 from ai.backend.manager.repositories.base import QueryOrder
 
-from .conditions import ImageConditions
-
 
 class ImageOrders:
     """Query orders for images."""
@@ -55,10 +53,9 @@ class ImageOrders:
 
     @staticmethod
     def last_used(ascending: bool = True) -> QueryOrder:
-        last_used_subq = ImageConditions._last_used_subquery()
         if ascending:
-            return last_used_subq.asc()
-        return last_used_subq.desc()
+            return ImageRow.last_used_at.asc()
+        return ImageRow.last_used_at.desc()
 
 
 class ImageAliasOrders:

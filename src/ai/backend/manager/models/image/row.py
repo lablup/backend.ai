@@ -374,6 +374,11 @@ class ImageRow(Base):  # type: ignore[misc]
         server_default=ImageStatus.ALIVE.name,
         nullable=False,
     )
+    last_used_at: Mapped[datetime | None] = mapped_column(
+        "last_used_at",
+        sa.DateTime(timezone=True),
+        nullable=True,
+    )
 
     aliases = relationship("ImageAliasRow", back_populates="image")
     # sessions = relationship("SessionRow", back_populates="image_row")
@@ -915,6 +920,7 @@ class ImageRow(Base):  # type: ignore[misc]
             ],
             tags=[ImageTagEntry(key=k, value=v) for k, v in ptag_set.items()],
             status=self.status,
+            last_used_at=self.last_used_at,
         )
 
     def to_detailed_dataclass(self) -> ImageDataWithDetails:

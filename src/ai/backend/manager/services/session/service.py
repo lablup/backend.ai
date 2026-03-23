@@ -523,6 +523,9 @@ class SessionService:
                 callback_url=callback_url,
                 sudo_session_enabled=sudo_session_enabled,
             )
+            await self._session_repository.update_image_last_used_at(
+                image_row.id, datetime.now(tzutc())
+            )
             return CreateFromParamsActionResult(
                 session_id=uuid.UUID(resp["sessionId"]), result=resp
             )

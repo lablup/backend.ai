@@ -43,10 +43,6 @@ from ai.backend.manager.services.image.actions.get_images import (
     GetImagesByCanonicalsAction,
     GetImagesByCanonicalsActionResult,
 )
-from ai.backend.manager.services.image.actions.load_image_last_used import (
-    LoadImageLastUsedAction,
-    LoadImageLastUsedActionResult,
-)
 from ai.backend.manager.services.image.actions.modify_image import (
     ModifyImageAction,
     ModifyImageActionResult,
@@ -133,7 +129,6 @@ class ImageProcessors(AbstractProcessorPackage):
     get_all_images: ActionProcessor[GetAllImagesAction, GetAllImagesActionResult]
     search_images: ActionProcessor[SearchImagesAction, SearchImagesActionResult]
     search_aliases: ActionProcessor[SearchAliasesAction, SearchAliasesActionResult]
-    load_image_last_used: ActionProcessor[LoadImageLastUsedAction, LoadImageLastUsedActionResult]
 
     def __init__(
         self,
@@ -188,7 +183,6 @@ class ImageProcessors(AbstractProcessorPackage):
             service.set_image_resource_limit_by_id, action_monitors
         )
         self.search_aliases = ActionProcessor(service.search_aliases, action_monitors)
-        self.load_image_last_used = ActionProcessor(service.load_image_last_used, action_monitors)
 
     @override
     def supported_actions(self) -> list[ActionSpec]:
@@ -208,5 +202,4 @@ class ImageProcessors(AbstractProcessorPackage):
             ClearImageCustomResourceLimitAction.spec(),
             ClearImageCustomResourceLimitByIdAction.spec(),
             SetImageResourceLimitByIdAction.spec(),
-            LoadImageLastUsedAction.spec(),
         ]
