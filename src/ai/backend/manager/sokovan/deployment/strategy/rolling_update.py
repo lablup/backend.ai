@@ -21,7 +21,7 @@ from ai.backend.manager.data.deployment.types import (
     RouteStatus,
 )
 from ai.backend.manager.data.permission.types import RBACElementRef
-from ai.backend.manager.models.deployment_policy import RollingUpdateSpec
+from ai.backend.manager.models.deployment_policy import DeploymentStrategySpec, RollingUpdateSpec
 from ai.backend.manager.models.routing import RoutingRow
 from ai.backend.manager.repositories.base.rbac.entity_creator import RBACEntityCreator
 from ai.backend.manager.repositories.deployment.creators import RouteCreatorSpec
@@ -65,7 +65,7 @@ class RollingUpdateStrategy(AbstractDeploymentStrategy):
         self,
         deployment: DeploymentInfo,
         routes: Sequence[RouteInfo],
-        spec: RollingUpdateSpec,
+        spec: DeploymentStrategySpec,
     ) -> StrategyCycleResult:
         """Evaluate one cycle of rolling update for a single deployment.
 
@@ -80,6 +80,7 @@ class RollingUpdateStrategy(AbstractDeploymentStrategy):
         sweep handles it by transitioning to ROLLING_BACK when the
         deploying timeout is exceeded.
         """
+        assert isinstance(spec, RollingUpdateSpec)
         desired = deployment.replica_spec.target_replica_count
         deploying_revision_id = deployment.deploying_revision_id
         if deploying_revision_id is None:
@@ -101,11 +102,9 @@ class RollingUpdateStrategy(AbstractDeploymentStrategy):
             classified.new_failed_count,
         )
 
-        if result := self._check_provisioning(deployment, classified):
-            return result
         if result := self._check_completed(deployment, classified, desired):
             return result
-        return self._compute_progressing(deployment, classified, desired, spec)
+        return self._compute_route_mutations(deployment, classified, desired, spec)
 
     def _classify_routes(
         self,
@@ -130,21 +129,6 @@ class RollingUpdateStrategy(AbstractDeploymentStrategy):
                 classified.new_unhealthy_count += 1
         return classified
 
-    def _check_provisioning(
-        self,
-        deployment: DeploymentInfo,
-        classified: _ClassifiedRoutes,
-    ) -> StrategyCycleResult | None:
-        """Return PROVISIONING result if any new routes are still being provisioned."""
-        if not classified.new_provisioning_count:
-            return None
-        log.debug(
-            "deployment {}: {} new routes still provisioning",
-            deployment.id,
-            classified.new_provisioning_count,
-        )
-        return StrategyCycleResult(sub_step=DeploymentLifecycleSubStep.DEPLOYING_PROVISIONING)
-
     def _check_completed(
         self,
         deployment: DeploymentInfo,
@@ -161,14 +145,26 @@ class RollingUpdateStrategy(AbstractDeploymentStrategy):
         )
         return StrategyCycleResult(sub_step=DeploymentLifecycleSubStep.DEPLOYING_COMPLETED)
 
-    def _compute_progressing(
+    def _compute_route_mutations(
         self,
         deployment: DeploymentInfo,
         classified: _ClassifiedRoutes,
         desired: int,
         spec: RollingUpdateSpec,
     ) -> StrategyCycleResult:
-        """Compute surge/unavailable budget and return PROVISIONING with route mutations."""
+        """Compute surge/unavailable budget and return PROVISIONING with route mutations.
+
+        If new routes are still being provisioned, waits without creating or
+        terminating additional routes.
+        """
+        if classified.new_provisioning_count:
+            log.debug(
+                "deployment {}: {} new routes still provisioning",
+                deployment.id,
+                classified.new_provisioning_count,
+            )
+            return StrategyCycleResult(sub_step=DeploymentLifecycleSubStep.DEPLOYING_PROVISIONING)
+
         max_surge = spec.max_surge  # extra routes allowed above desired
         max_unavailable = spec.max_unavailable  # routes allowed to be down
 

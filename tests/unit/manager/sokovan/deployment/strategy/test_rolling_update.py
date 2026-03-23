@@ -650,7 +650,7 @@ class TestRealisticScenario:
 
         # Cycle 1: 5 old → create 2, terminate 1
         old_routes = [make_route(revision_id=OLD_REV, status=RouteStatus.HEALTHY) for _ in range(5)]
-        r1 = RollingUpdateStrategy(spec).evaluate_cycle(deployment, old_routes)
+        r1 = RollingUpdateStrategy().evaluate_cycle(deployment, old_routes, spec)
         assert len(r1.route_changes.rollout_specs) == 2
         assert len(r1.route_changes.drain_route_ids) == 1
 
@@ -659,7 +659,7 @@ class TestRealisticScenario:
             *[make_route(revision_id=OLD_REV, status=RouteStatus.HEALTHY) for _ in range(4)],
             *[make_route(revision_id=NEW_REV, status=RouteStatus.HEALTHY) for _ in range(2)],
         ]
-        r2 = RollingUpdateStrategy(spec).evaluate_cycle(deployment, routes_c2)
+        r2 = RollingUpdateStrategy().evaluate_cycle(deployment, routes_c2, spec)
         assert len(r2.route_changes.rollout_specs) == 1
         assert len(r2.route_changes.drain_route_ids) == 2
 
@@ -668,7 +668,7 @@ class TestRealisticScenario:
             *[make_route(revision_id=OLD_REV, status=RouteStatus.HEALTHY) for _ in range(2)],
             *[make_route(revision_id=NEW_REV, status=RouteStatus.HEALTHY) for _ in range(3)],
         ]
-        r3 = RollingUpdateStrategy(spec).evaluate_cycle(deployment, routes_c3)
+        r3 = RollingUpdateStrategy().evaluate_cycle(deployment, routes_c3, spec)
         assert len(r3.route_changes.rollout_specs) == 2
         assert len(r3.route_changes.drain_route_ids) == 1
 
@@ -677,14 +677,14 @@ class TestRealisticScenario:
             make_route(revision_id=OLD_REV, status=RouteStatus.HEALTHY),
             *[make_route(revision_id=NEW_REV, status=RouteStatus.HEALTHY) for _ in range(5)],
         ]
-        r4 = RollingUpdateStrategy(spec).evaluate_cycle(deployment, routes_c4)
+        r4 = RollingUpdateStrategy().evaluate_cycle(deployment, routes_c4, spec)
         assert len(r4.route_changes.rollout_specs) == 0
         assert len(r4.route_changes.drain_route_ids) == 1
         assert r4.sub_step == DeploymentLifecycleSubStep.DEPLOYING_PROVISIONING
 
         # Cycle 5: 0 old, 5 new healthy → completed
         routes_c5 = [make_route(revision_id=NEW_REV, status=RouteStatus.HEALTHY) for _ in range(5)]
-        r5 = RollingUpdateStrategy(spec).evaluate_cycle(deployment, routes_c5)
+        r5 = RollingUpdateStrategy().evaluate_cycle(deployment, routes_c5, spec)
         assert r5.sub_step == DeploymentLifecycleSubStep.DEPLOYING_COMPLETED
 
 
@@ -709,7 +709,7 @@ class TestDeadlockPrevention:
 
         # Cycle 2: 2 old → create 1, terminate 0
         routes_c2 = [make_route(revision_id=OLD_REV, status=RouteStatus.HEALTHY) for _ in range(2)]
-        r2 = RollingUpdateStrategy(spec).evaluate_cycle(deployment, routes_c2)
+        r2 = RollingUpdateStrategy().evaluate_cycle(deployment, routes_c2, spec)
         assert len(r2.route_changes.rollout_specs) == 1
         assert len(r2.route_changes.drain_route_ids) == 0
 
