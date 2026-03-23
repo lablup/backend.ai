@@ -35,6 +35,7 @@ class KeyPairGQL(PydanticNodeMixin[KeypairNode]):
     id: NodeID[str] = strawberry.field(
         description="Access key (primary key, used as the Relay Node ID)."
     )
+    access_key: str = strawberry.field(description="The access key string.")
     is_active: bool | None = strawberry.field(
         description="Whether the keypair is currently active."
     )
