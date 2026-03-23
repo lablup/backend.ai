@@ -437,7 +437,11 @@ class AssignedUserConditions:
         """Combine multiple permission conditions into single EXISTS subquery."""
 
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            subq = sa.select(sa.literal(1)).where(PermissionRow.role_id == UserRoleRow.role_id)
+            subq = (
+                sa.select(sa.literal(1))
+                .where(PermissionRow.role_id == UserRoleRow.role_id)
+                .correlate(UserRoleRow)
+            )
             for cond in permission_conditions:
                 subq = subq.where(cond())
             return sa.exists(subq)
