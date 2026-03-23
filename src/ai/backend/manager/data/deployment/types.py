@@ -161,11 +161,11 @@ class DeploymentLifecycleSubStep(enum.StrEnum):
     """
 
     # -- DEPLOYING phase --
-    DEPLOYING_PROVISIONING = "provisioning"
+    DEPLOYING_PROVISIONING = "deploying_provisioning"
     """New revision routes are being provisioned and old routes are being drained."""
-    DEPLOYING_ROLLING_BACK = "rolling_back"
+    DEPLOYING_ROLLING_BACK = "deploying_rolling_back"
     """Clearing deploying_revision and transitioning to READY."""
-    DEPLOYING_COMPLETED = "completed"
+    DEPLOYING_COMPLETED = "deploying_completed"
     """All strategy conditions satisfied; triggers revision swap."""
 
     @classmethod
