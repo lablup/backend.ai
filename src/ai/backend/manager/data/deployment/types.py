@@ -182,10 +182,17 @@ class DeploymentLifecycleSubStep(enum.StrEnum):
     DEPLOYING_COMPLETED = "deploying_completed"
     """All strategy conditions satisfied; triggers revision swap."""
 
+    DEPLOYING_AWAITING_PROMOTION = "deploying_awaiting_promotion"
+    """All new routes healthy; waiting for manual approval or delay timer."""
+
     @classmethod
     def deploying_handler_sub_steps(cls) -> tuple[DeploymentLifecycleSubStep, ...]:
         """Sub-steps that have their own deploying handler (excludes COMPLETED, which is an evaluator outcome)."""
-        return (cls.DEPLOYING_PROVISIONING, cls.DEPLOYING_ROLLING_BACK)
+        return (
+            cls.DEPLOYING_PROVISIONING,
+            cls.DEPLOYING_AWAITING_PROMOTION,
+            cls.DEPLOYING_ROLLING_BACK,
+        )
 
 
 @dataclass(frozen=True)

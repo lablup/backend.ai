@@ -65,6 +65,7 @@ from .deployment_controller import DeploymentController
 from .executor import DeploymentExecutor
 from .handlers import (
     CheckReplicaDeploymentHandler,
+    DeployingAwaitingPromotionHandler,
     DeployingProvisioningHandler,
     DeployingRollingBackHandler,
     DeploymentHandler,
@@ -313,6 +314,16 @@ class DeploymentCoordinator:
                     applier=applier,
                     deployment_executor=executor,
                     deployment_repo=self._deployment_repository,
+                ),
+            ),
+            (
+                (
+                    DeploymentLifecycleType.DEPLOYING,
+                    DeploymentLifecycleSubStep.DEPLOYING_AWAITING_PROMOTION,
+                ),
+                DeployingAwaitingPromotionHandler(
+                    deployment_controller=self._deployment_controller,
+                    deployment_repository=self._deployment_repository,
                 ),
             ),
             (

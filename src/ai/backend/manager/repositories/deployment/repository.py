@@ -64,6 +64,7 @@ from ai.backend.manager.data.deployment.types import (
     RouteInfo,
     RouteSearchResult,
     RouteStatus,
+    RouteTrafficStatus,
     ScalingGroupCleanupConfig,
 )
 from ai.backend.manager.data.image.types import ImageIdentifier
@@ -80,6 +81,7 @@ from ai.backend.manager.models.deployment_policy import DeploymentPolicyRow
 from ai.backend.manager.models.deployment_revision import DeploymentRevisionRow
 from ai.backend.manager.models.endpoint import EndpointRow, EndpointTokenRow
 from ai.backend.manager.models.routing import RoutingRow
+from ai.backend.manager.models.routing.conditions import RouteConditions as RouteIdConditions
 from ai.backend.manager.models.scheduling_history import (
     DeploymentHistoryRow,
     RouteHistoryRow,
@@ -93,6 +95,7 @@ from ai.backend.manager.repositories.base.purger import Purger, PurgerResult
 from ai.backend.manager.repositories.base.rbac.entity_creator import RBACEntityCreator
 from ai.backend.manager.repositories.base.updater import BatchUpdater, Updater
 from ai.backend.manager.repositories.base.upserter import Upserter
+from ai.backend.manager.repositories.deployment.creators import RouteBatchUpdaterSpec
 from ai.backend.manager.repositories.scheduler.types.session_creation import DeploymentContext
 
 from .db_source import DeploymentDBSource
@@ -1612,11 +1615,12 @@ class DeploymentRepository:
         self,
         rollout: Sequence[RBACEntityCreator[RoutingRow]],
         drain: BatchUpdater[RoutingRow] | None,
+        promote: BatchUpdater[RoutingRow] | None,
         completed_ids: set[UUID],
     ) -> int:
         """Apply route mutations from a strategy evaluation cycle.
 
-        Performs route rollout/drain and revision swap in a single transaction.
+        Performs route rollout/drain/promote and revision swap in a single transaction.
         Sub-step transitions are handled by the coordinator via
         ``EndpointLifecycleBatchUpdaterSpec``.
 
@@ -1626,7 +1630,51 @@ class DeploymentRepository:
         return await self._db_source.apply_strategy_mutations(
             rollout=rollout,
             drain=drain,
+            promote=promote,
             completed_ids=completed_ids,
+        )
+
+    @deployment_repository_resilience.apply()
+    async def promote_deployment(
+        self,
+        deployment_id: UUID,
+        promote_route_ids: list[UUID],
+        drain_route_ids: list[UUID],
+    ) -> int:
+        """Promote a deployment by switching traffic from blue to green routes.
+
+        Atomically promotes green routes (→ACTIVE), drains blue routes (→TERMINATING),
+        and swaps deploying_revision → current_revision.
+
+        Returns:
+            Number of deployments whose revision was swapped (0 or 1).
+        """
+        promote: BatchUpdater[RoutingRow] | None = None
+        if promote_route_ids:
+            promote = BatchUpdater(
+                spec=RouteBatchUpdaterSpec(
+                    traffic_ratio=1.0,
+                    traffic_status=RouteTrafficStatus.ACTIVE,
+                ),
+                conditions=[RouteIdConditions.by_ids(promote_route_ids)],
+            )
+
+        drain: BatchUpdater[RoutingRow] | None = None
+        if drain_route_ids:
+            drain = BatchUpdater(
+                spec=RouteBatchUpdaterSpec(
+                    status=RouteStatus.TERMINATING,
+                    traffic_ratio=0.0,
+                    traffic_status=RouteTrafficStatus.INACTIVE,
+                ),
+                conditions=[RouteIdConditions.by_ids(drain_route_ids)],
+            )
+
+        return await self._db_source.apply_strategy_mutations(
+            rollout=[],
+            drain=drain,
+            promote=promote,
+            completed_ids={deployment_id},
         )
 
     @deployment_repository_resilience.apply()

@@ -1,21 +1,26 @@
 """Handlers for DEPLOYING sub-steps (BEP-1049).
 
-Two DEPLOYING handlers are registered in the coordinator's HandlerRegistry:
+Three DEPLOYING handlers are registered in the coordinator's HandlerRegistry:
 
-- **DeployingProvisioningHandler**: Runs the strategy FSM each cycle to
-  create/drain routes and check for completion.
+- **DeployingProvisioningHandler**: Creates new-revision routes and waits for
+  them to become HEALTHY; advances to AWAITING_PROMOTION on success.
+- **DeployingAwaitingPromotionHandler**: All new routes healthy; waiting for
+  promotion trigger (manual approval or delay timer); advances to READY on
+  COMPLETED, or ROLLING_BACK on timeout/give_up.
 - **DeployingRollingBackHandler**: Clears ``deploying_revision`` and
   transitions directly to READY.
 
 Sub-step flow::
 
-    PROVISIONING ──(need_retry)──▸ PROVISIONING  (route mutations, logged)
-         │
-         │ (success)
-         ▼
-       READY  (completed — all routes replaced)
-
-    PROVISIONING ──(timeout)──▸ ROLLING_BACK ──(success)──▸ READY
+    PROVISIONING ──(success)──▸ AWAITING_PROMOTION
+         │                           │
+         │ (expired/give_up)  ┌──────┴──────┐
+         ▼                    ▼              ▼
+    ROLLING_BACK         COMPLETED      ROLLING_BACK
+         │                    │              │
+         │ (success)          │ (success)    │ (success)
+         ▼                    ▼              ▼
+       READY                READY          READY
 
 The evaluator determines sub-step assignments and route mutations;
 the applier persists them to DB atomically.  Each handler classifies
@@ -26,18 +31,25 @@ with history logged), and skipped (no change — waiting).
 from __future__ import annotations
 
 import logging
+import uuid
 from collections.abc import Sequence
+from datetime import UTC, datetime
 from typing import override
 from uuid import UUID
 
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.deployment.types import (
+    DeploymentInfo,
     DeploymentLifecycleStatus,
     DeploymentLifecycleSubStep,
     DeploymentStatusTransitions,
+    RouteStatus,
 )
 from ai.backend.manager.data.model_serving.types import EndpointLifecycle
 from ai.backend.manager.defs import LockID
+from ai.backend.manager.models.deployment_policy import BlueGreenSpec
+from ai.backend.manager.models.routing.conditions import RouteConditions
+from ai.backend.manager.repositories.base import BatchQuerier, NoPagination
 from ai.backend.manager.repositories.deployment.repository import DeploymentRepository
 from ai.backend.manager.sokovan.deployment.deployment_controller import DeploymentController
 from ai.backend.manager.sokovan.deployment.executor import DeploymentExecutor
@@ -69,14 +81,10 @@ log = BraceStyleAdapter(logging.getLogger(__name__))
 class DeployingProvisioningHandler(DeploymentHandler):
     """Handler for the DEPLOYING / PROVISIONING sub-step.
 
-    Runs the strategy FSM each cycle to create/drain routes and check
-    for completion.  Classification:
-
-    - **Route mutations executed** (create/drain): need_retry — stays in
-      PROVISIONING with a new history record for progress tracking.
-      Never escalated to give_up (normal progress).
-    - **No changes** (routes still warming up): skipped — no history.
-    - **Completed** (all old routes replaced): success → READY.
+    New-revision routes are being created; waiting for them to become HEALTHY.
+    The evaluator assigns sub-steps; when all new routes are healthy the
+    deployment advances to AWAITING_PROMOTION (success), otherwise it stays in
+    PROVISIONING (skipped — no state transition).
     """
 
     def __init__(
@@ -120,14 +128,14 @@ class DeployingProvisioningHandler(DeploymentHandler):
     def status_transitions(cls) -> DeploymentStatusTransitions:
         return DeploymentStatusTransitions(
             success=DeploymentLifecycleStatus(
-                lifecycle=EndpointLifecycle.READY,
-                sub_step=None,
-            ),
-            need_retry=DeploymentLifecycleStatus(
                 lifecycle=EndpointLifecycle.DEPLOYING,
-                sub_step=DeploymentLifecycleSubStep.DEPLOYING_PROVISIONING,
+                sub_step=DeploymentLifecycleSubStep.DEPLOYING_AWAITING_PROMOTION,
             ),
             expired=DeploymentLifecycleStatus(
+                lifecycle=EndpointLifecycle.DEPLOYING,
+                sub_step=DeploymentLifecycleSubStep.DEPLOYING_ROLLING_BACK,
+            ),
+            give_up=DeploymentLifecycleStatus(
                 lifecycle=EndpointLifecycle.DEPLOYING,
                 sub_step=DeploymentLifecycleSubStep.DEPLOYING_ROLLING_BACK,
             ),
@@ -170,81 +178,48 @@ class DeployingProvisioningHandler(DeploymentHandler):
         except Exception as exc:
             log.exception("Pre-registration step failed: {}", exc)
             failed_registration_ids = {
-                d.deployment_info.id
-                for d in deployments
-                if not d.deployment_info.network.url
-                and d.deployment_info.deploying_revision_id is not None
+                deployment.deployment_info.id
+                for deployment in deployments
+                if not deployment.deployment_info.network.url
+                and deployment.deployment_info.deploying_revision_id is not None
             }
         if failed_registration_ids:
             deployments = [
-                d for d in deployments if d.deployment_info.id not in failed_registration_ids
+                deployment
+                for deployment in deployments
+                if deployment.deployment_info.id not in failed_registration_ids
             ]
 
-        deployment_infos = [d.deployment_info for d in deployments]
-        deployment_map = {d.deployment_info.id: d for d in deployments}
+        deployment_infos = [deployment.deployment_info for deployment in deployments]
+        deployment_map = {deployment.deployment_info.id: deployment for deployment in deployments}
 
         summary = await self._evaluator.evaluate(deployment_infos)
-        apply_result = await self._applier.apply(summary)
-
-        # Filter out deployments marked for destruction during DEPLOYING.
-        destroying_ids = {
-            d.deployment_info.id
-            for d in deployments
-            if d.deployment_info.state.lifecycle
-            in (EndpointLifecycle.DESTROYING, EndpointLifecycle.DESTROYED)
-        }
-        if destroying_ids:
-            log.warning(
-                "Skipping {} deployments with DESTROYING/DESTROYED lifecycle during DEPLOYING",
-                len(destroying_ids),
-            )
+        await self._applier.apply(summary)
 
         successes: list[DeploymentWithHistory] = []
-        failures: list[DeploymentExecutionError] = []
         skipped: list[DeploymentWithHistory] = []
 
-        # COMPLETED → success (coordinator transitions to READY)
-        for endpoint_id in apply_result.completed_ids:
-            if endpoint_id in destroying_ids:
-                continue
-            deployment = deployment_map.get(endpoint_id)
-            if deployment is not None:
-                successes.append(deployment)
-
-        # Evaluation errors → failures
-        for error_data in summary.errors:
-            deployment = deployment_map.get(error_data.deployment.id)
-            if deployment is not None:
-                failures.append(
-                    DeploymentExecutionError(
-                        deployment_info=deployment,
-                        reason=error_data.reason,
-                        error_detail=error_data.reason,
-                    )
-                )
-
-        # Classify rest: route mutations happened → failures (recoverable, coordinator
-        # will classify as need_retry), no changes → skipped (no history).
-        completed_or_error_ids = apply_result.completed_ids | {
-            e.deployment.id for e in summary.errors
-        }
-        has_route_mutations = bool(apply_result.routes_created or apply_result.routes_drained)
         for deployment in deployments:
             endpoint_id = deployment.deployment_info.id
-            if endpoint_id in completed_or_error_ids or endpoint_id in destroying_ids:
+            assigned = summary.assignments.get(endpoint_id)
+            if assigned is None:
                 continue
-            if has_route_mutations:
-                failures.append(
-                    DeploymentExecutionError(
-                        deployment_info=deployment,
-                        reason="Route mutations in progress",
-                        error_detail="Waiting for route provisioning to complete",
-                    )
-                )
+            if assigned == DeploymentLifecycleSubStep.DEPLOYING_AWAITING_PROMOTION:
+                successes.append(deployment)
             else:
                 skipped.append(deployment)
 
-        return DeploymentExecutionResult(successes=successes, failures=failures, skipped=skipped)
+        errors = [
+            DeploymentExecutionError(
+                deployment_info=deployment_map[evaluation_error.deployment.id],
+                reason=evaluation_error.reason,
+                error_detail=evaluation_error.reason,
+            )
+            for evaluation_error in summary.errors
+            if evaluation_error.deployment.id in deployment_map
+        ]
+
+        return DeploymentExecutionResult(successes=successes, failures=errors, skipped=skipped)
 
     @override
     async def post_process(self, result: DeploymentExecutionResult) -> None:
@@ -252,17 +227,139 @@ class DeployingProvisioningHandler(DeploymentHandler):
             DeploymentLifecycleType.DEPLOYING,
             sub_step=DeploymentLifecycleSubStep.DEPLOYING_PROVISIONING,
         )
-        await self._deployment_controller.mark_lifecycle_needed(
-            DeploymentLifecycleType.DEPLOYING,
+        await self._route_controller.mark_lifecycle_needed(RouteLifecycleType.PROVISIONING)
+
+
+class DeployingAwaitingPromotionHandler(DeploymentHandler):
+    """Handler for DEPLOYING / AWAITING_PROMOTION.
+
+    Checks whether auto-promotion conditions are met
+    (``auto_promote=True`` + delay elapsed).  If so, executes
+    promote/drain via the repository and returns *success* so the
+    coordinator transitions to READY.
+
+    Otherwise the deployment is *skipped* and stays in
+    AWAITING_PROMOTION until the user calls ``promote_deployment``
+    or the deploying timeout expires.
+    """
+
+    def __init__(
+        self,
+        deployment_controller: DeploymentController,
+        deployment_repository: DeploymentRepository,
+    ) -> None:
+        self._deployment_controller = deployment_controller
+        self._deployment_repository = deployment_repository
+
+    @classmethod
+    @override
+    def name(cls) -> str:
+        return "deploying-awaiting-promotion"
+
+    @property
+    @override
+    def lock_id(self) -> LockID | None:
+        return LockID.LOCKID_DEPLOYMENT_DEPLOYING
+
+    @classmethod
+    @override
+    def target_statuses(cls) -> list[DeploymentLifecycleStatus]:
+        return [
+            DeploymentLifecycleStatus(
+                lifecycle=EndpointLifecycle.DEPLOYING,
+                sub_step=DeploymentLifecycleSubStep.DEPLOYING_AWAITING_PROMOTION,
+            ),
+        ]
+
+    @classmethod
+    @override
+    def status_transitions(cls) -> DeploymentStatusTransitions:
+        ready = DeploymentLifecycleStatus(
+            lifecycle=EndpointLifecycle.READY,
+            sub_step=None,
+        )
+        rolling_back = DeploymentLifecycleStatus(
+            lifecycle=EndpointLifecycle.DEPLOYING,
             sub_step=DeploymentLifecycleSubStep.DEPLOYING_ROLLING_BACK,
         )
-        await self._route_controller.mark_lifecycle_needed(RouteLifecycleType.PROVISIONING)
+        return DeploymentStatusTransitions(
+            success=ready,
+            expired=rolling_back,
+            give_up=rolling_back,
+        )
+
+    @override
+    async def execute(
+        self, deployments: Sequence[DeploymentWithHistory]
+    ) -> DeploymentExecutionResult:
+        successes: list[DeploymentWithHistory] = []
+        skipped: list[DeploymentWithHistory] = []
+
+        for deployment in deployments:
+            info = deployment.deployment_info
+            policy = info.policy
+            if policy is None or not isinstance(policy.strategy_spec, BlueGreenSpec):
+                skipped.append(deployment)
+                continue
+
+            spec: BlueGreenSpec = policy.strategy_spec
+            if not spec.auto_promote:
+                skipped.append(deployment)
+                continue
+
+            if spec.promote_delay_seconds > 0 and deployment.phase_started_at is not None:
+                elapsed = (datetime.now(UTC) - deployment.phase_started_at).total_seconds()
+                if elapsed < spec.promote_delay_seconds:
+                    skipped.append(deployment)
+                    continue
+
+            promote_route_ids, drain_route_ids = await self._classify_routes(info)
+            await self._deployment_repository.promote_deployment(
+                deployment_id=info.id,
+                promote_route_ids=promote_route_ids,
+                drain_route_ids=drain_route_ids,
+            )
+            log.info("deployment {}: auto-promoted", info.id)
+            successes.append(deployment)
+
+        return DeploymentExecutionResult(successes=successes, skipped=skipped)
+
+    async def _classify_routes(
+        self,
+        info: DeploymentInfo,
+    ) -> tuple[list[uuid.UUID], list[uuid.UUID]]:
+        route_search = await self._deployment_repository.search_routes(
+            BatchQuerier(
+                pagination=NoPagination(),
+                conditions=[
+                    RouteConditions.by_endpoint_ids({info.id}),
+                    RouteConditions.exclude_statuses([RouteStatus.TERMINATED]),
+                ],
+            )
+        )
+        promote_route_ids: list[uuid.UUID] = []
+        drain_route_ids: list[uuid.UUID] = []
+        for route in route_search.items:
+            if route.revision_id == info.deploying_revision_id:
+                if route.status == RouteStatus.HEALTHY:
+                    promote_route_ids.append(route.route_id)
+            elif route.status.is_active():
+                drain_route_ids.append(route.route_id)
+        return promote_route_ids, drain_route_ids
+
+    @override
+    async def post_process(self, result: DeploymentExecutionResult) -> None:
+        await self._deployment_controller.mark_lifecycle_needed(
+            DeploymentLifecycleType.DEPLOYING,
+            sub_step=DeploymentLifecycleSubStep.DEPLOYING_AWAITING_PROMOTION,
+        )
 
 
 class DeployingRollingBackHandler(DeploymentHandler):
     """Handler for DEPLOYING / ROLLING_BACK sub-step.
 
-    Clears ``deploying_revision`` and transitions directly to READY.
+    Clears ``deploying_revision`` and transitions to READY,
+    completing the rollback process.
     """
 
     def __init__(
@@ -298,11 +395,15 @@ class DeployingRollingBackHandler(DeploymentHandler):
     @classmethod
     @override
     def status_transitions(cls) -> DeploymentStatusTransitions:
+        ready = DeploymentLifecycleStatus(
+            lifecycle=EndpointLifecycle.READY,
+            sub_step=None,
+        )
         return DeploymentStatusTransitions(
-            success=DeploymentLifecycleStatus(
-                lifecycle=EndpointLifecycle.READY,
-                sub_step=None,
-            ),
+            success=ready,
+            need_retry=None,
+            expired=ready,
+            give_up=ready,
         )
 
     @override

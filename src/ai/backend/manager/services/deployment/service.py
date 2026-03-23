@@ -25,6 +25,7 @@ from ai.backend.manager.data.deployment.creator import (
 from ai.backend.manager.data.deployment.types import (
     ClusterConfigData,
     DeploymentInfo,
+    DeploymentLifecycleSubStep,
     ExtraVFolderMountData,
     ModelDeploymentAccessTokenData,
     ModelDeploymentData,
@@ -51,11 +52,15 @@ from ai.backend.manager.models.deployment_policy import (
     DeploymentPolicyRow,
 )
 from ai.backend.manager.models.endpoint import EndpointTokenRow
+from ai.backend.manager.repositories.base import BatchQuerier, NoPagination
 from ai.backend.manager.repositories.base.rbac.entity_creator import RBACEntityCreator
 from ai.backend.manager.repositories.base.upserter import Upserter
 from ai.backend.manager.repositories.deployment import DeploymentRepository
 from ai.backend.manager.repositories.deployment.creators import (
     EndpointTokenCreatorSpec,
+)
+from ai.backend.manager.repositories.deployment.options import (
+    RouteConditions as RouteQueryConditions,
 )
 from ai.backend.manager.repositories.deployment.updaters import DeploymentUpdaterSpec
 from ai.backend.manager.repositories.deployment.upserters import DeploymentPolicyUpserterSpec
@@ -160,6 +165,8 @@ from ai.backend.manager.services.deployment.actions.refresh_deployment_revisions
 from ai.backend.manager.services.deployment.actions.revision_operations import (
     ActivateRevisionAction,
     ActivateRevisionActionResult,
+    PromoteDeploymentAction,
+    PromoteDeploymentActionResult,
 )
 from ai.backend.manager.services.deployment.actions.route import (
     SearchRoutesAction,
@@ -191,6 +198,7 @@ from ai.backend.manager.sokovan.deployment import DeploymentController
 from ai.backend.manager.sokovan.deployment.definition_generator.registry import (
     ModelDefinitionGeneratorRegistry,
 )
+from ai.backend.manager.sokovan.deployment.exceptions import InvalidEndpointState
 from ai.backend.manager.sokovan.deployment.revision_generator.registry import (
     RevisionGeneratorRegistry,
 )
@@ -702,6 +710,71 @@ class DeploymentService:
             failed,
         )
         return RefreshDeploymentRevisionsActionResult(results=results)
+
+    async def promote_deployment(
+        self, action: PromoteDeploymentAction
+    ) -> PromoteDeploymentActionResult:
+        """Manually promote a blue-green deployment.
+
+        Directly switches traffic from blue (old) to green (new) routes
+        when the deployment is in AWAITING_PROMOTION state.  This bypasses
+        the FSM cycle and applies the promote/drain atomically.
+        """
+        deployment_info = await self._deployment_repository.get_endpoint_info(action.deployment_id)
+
+        if deployment_info.sub_step != DeploymentLifecycleSubStep.DEPLOYING_AWAITING_PROMOTION:
+            raise InvalidEndpointState(
+                f"Deployment {action.deployment_id} is not in AWAITING_PROMOTION state "
+                f"(current sub_step: {deployment_info.sub_step}). "
+                "Manual promotion is only allowed during AWAITING_PROMOTION."
+            )
+
+        deploying_revision_id = deployment_info.deploying_revision_id
+        if deploying_revision_id is None:
+            raise InvalidEndpointState(
+                f"Deployment {action.deployment_id} has no deploying_revision_id."
+            )
+
+        # Fetch non-terminated routes for this deployment
+        route_search = await self._deployment_repository.search_routes(
+            BatchQuerier(
+                pagination=NoPagination(),
+                conditions=[
+                    RouteQueryConditions.by_endpoint_ids({action.deployment_id}),
+                    RouteQueryConditions.exclude_statuses([RouteStatus.TERMINATED]),
+                ],
+            )
+        )
+
+        # Classify into green (promote) and blue (drain)
+        promote_route_ids = []
+        drain_route_ids = []
+        for route in route_search.items:
+            if route.revision_id == deploying_revision_id:
+                if route.status == RouteStatus.HEALTHY:
+                    promote_route_ids.append(route.route_id)
+            else:
+                if route.status.is_active():
+                    drain_route_ids.append(route.route_id)
+
+        await self._deployment_repository.promote_deployment(
+            deployment_id=action.deployment_id,
+            promote_route_ids=promote_route_ids,
+            drain_route_ids=drain_route_ids,
+        )
+
+        log.info(
+            "Manually promoted deployment {}: {} routes promoted, {} routes drained",
+            action.deployment_id,
+            len(promote_route_ids),
+            len(drain_route_ids),
+        )
+
+        deployment_info = await self._deployment_repository.get_endpoint_info(action.deployment_id)
+
+        return PromoteDeploymentActionResult(
+            deployment=_convert_deployment_info_to_data(deployment_info),
+        )
 
     # ========== Route Operations ==========
 

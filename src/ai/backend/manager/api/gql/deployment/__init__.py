@@ -39,6 +39,7 @@ from .resolver import (
     inference_runtime_configs,
     my_deployments,
     project_deployments,
+    promote_deployment,
     # Replica
     replica,
     replica_status_changed,
@@ -129,6 +130,8 @@ from .types import (
     ModelRuntimeConfigInput,
     MountPermission,
     ProjectDeploymentScopeGQL,
+    PromoteDeploymentInputGQL,
+    PromoteDeploymentPayloadGQL,
     ReadinessStatus,
     ReplicaFilter,
     ReplicaOrderBy,
@@ -242,6 +245,8 @@ __all__ = [
     # Revision Types
     "ActivateRevisionInputGQL",
     "ActivateRevisionPayloadGQL",
+    "PromoteDeploymentInputGQL",
+    "PromoteDeploymentPayloadGQL",
     "AddRevisionInput",
     "AddRevisionPayload",
     "ClusterConfig",
@@ -302,6 +307,7 @@ __all__ = [
     # Resolvers - Revision
     "activate_deployment_revision",
     "add_model_revision",
+    "promote_deployment",
     "inference_runtime_config",
     "inference_runtime_configs",
     "revision",

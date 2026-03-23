@@ -426,6 +426,12 @@ class ActivateRevisionPayload(BaseResponseModel):
     )
 
 
+class PromoteDeploymentPayload(BaseResponseModel):
+    """Payload for promote deployment mutation result."""
+
+    deployment: DeploymentNode = Field(description="The promoted deployment")
+
+
 class UpdateRouteTrafficStatusPayload(BaseResponseModel):
     """Payload for update route traffic status mutation result."""
 

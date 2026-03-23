@@ -6969,9 +6969,6 @@ type ImageV2MetadataInfo
   """Image creation timestamp."""
   createdAt: DateTime
 
-  """Timestamp of the most recent session created with this image."""
-  lastUsedAt: DateTime
-
   """Parsed tag components."""
   tags: [ImageV2TagEntry!]!
 
@@ -10415,6 +10412,9 @@ type Mutation
   """
   activateDeploymentRevision(input: ActivateRevisionInput!): ActivateRevisionPayload! @join__field(graph: STRAWBERRY)
 
+  """Added in 26.4.0. Manually promote a blue-green deployment."""
+  promoteDeployment(input: PromoteDeploymentInput!): PromoteDeploymentPayload! @join__field(graph: STRAWBERRY)
+
   """Added in 25.19.0. Update the traffic status of a route"""
   updateRouteTrafficStatus(input: UpdateRouteTrafficStatusInput!): UpdateRouteTrafficStatusPayload! @join__field(graph: STRAWBERRY)
 
@@ -12375,6 +12375,21 @@ input ProjectWeightInputItem
   Priority weight multiplier. Higher weight = higher priority allocation ratio. Set to null to use resource group's default_weight.
   """
   weight: Decimal = null
+}
+
+"""Added in 26.4.0. Input for manually promoting a blue-green deployment."""
+input PromoteDeploymentInput
+  @join__type(graph: STRAWBERRY)
+{
+  deploymentId: ID!
+}
+
+"""Added in 26.4.0. Result of manually promoting a deployment."""
+type PromoteDeploymentPayload
+  @join__type(graph: STRAWBERRY)
+{
+  """The promoted deployment"""
+  deployment: ModelDeployment!
 }
 
 """

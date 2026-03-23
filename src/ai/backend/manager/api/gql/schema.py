@@ -82,6 +82,7 @@ from .deployment import (
     inference_runtime_configs,
     my_deployments,
     project_deployments,
+    promote_deployment,
     # Replica
     replica,
     replica_status_changed,
@@ -711,6 +712,7 @@ class Mutation:
     reject_artifact_revision = reject_artifact_revision
     create_access_token = create_access_token
     activate_deployment_revision = activate_deployment_revision
+    promote_deployment = promote_deployment
     update_route_traffic_status = update_route_traffic_status
     # Fair Share - Admin APIs
     admin_upsert_domain_fair_share_weight = admin_upsert_domain_fair_share_weight

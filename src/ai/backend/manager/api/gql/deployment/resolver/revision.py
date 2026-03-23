@@ -34,6 +34,8 @@ from ai.backend.manager.api.gql.deployment.types.revision import (
     ModelRevisionEdge,
     ModelRevisionFilter,
     ModelRevisionOrderBy,
+    PromoteDeploymentInputGQL,
+    PromoteDeploymentPayloadGQL,
 )
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.data.deployment.inference_runtime_config import (
@@ -180,4 +182,18 @@ async def activate_deployment_revision(
         else None,
         activated_revision_id=ID(str(payload.activated_revision_id)),
         deployment_policy=DeploymentPolicyGQL.from_pydantic(payload.deployment_policy),
+    )
+
+
+@strawberry.mutation(  # type: ignore[misc]
+    description="Added in 26.4.0. Manually promote a blue-green deployment."
+)
+async def promote_deployment(
+    input: PromoteDeploymentInputGQL,
+    info: Info[StrawberryGQLContext, None],
+) -> PromoteDeploymentPayloadGQL:
+    """Promote a deployment that is in AWAITING_PROMOTION state."""
+    payload = await info.context.adapters.deployment.promote_deployment(input.to_pydantic())
+    return PromoteDeploymentPayloadGQL(
+        deployment=ModelDeployment.from_pydantic(payload.deployment),
     )

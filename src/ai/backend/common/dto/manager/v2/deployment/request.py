@@ -877,6 +877,12 @@ class ActivateRevisionInput(BaseRequestModel):
     revision_id: UUID = Field(description="Revision ID to activate")
 
 
+class PromoteDeploymentInput(BaseRequestModel):
+    """Input for manually promoting a blue-green deployment."""
+
+    deployment_id: UUID = Field(description="Deployment ID to promote")
+
+
 class UpdateRouteTrafficStatusInput(BaseRequestModel):
     """Input for updating a route's traffic status."""
 

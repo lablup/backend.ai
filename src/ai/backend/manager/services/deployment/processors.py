@@ -105,6 +105,8 @@ from ai.backend.manager.services.deployment.actions.refresh_deployment_revisions
 from ai.backend.manager.services.deployment.actions.revision_operations import (
     ActivateRevisionAction,
     ActivateRevisionActionResult,
+    PromoteDeploymentAction,
+    PromoteDeploymentActionResult,
 )
 from ai.backend.manager.services.deployment.actions.route import (
     SearchRoutesAction,
@@ -179,6 +181,7 @@ class DeploymentProcessors(AbstractProcessorPackage):
     admin_refresh_deployment_revisions: ActionProcessor[
         RefreshDeploymentRevisionsAction, RefreshDeploymentRevisionsActionResult
     ]
+    promote_deployment: ActionProcessor[PromoteDeploymentAction, PromoteDeploymentActionResult]
 
     # Route operations
     sync_replicas: ActionProcessor[SyncReplicaAction, SyncReplicaActionResult]
@@ -264,6 +267,7 @@ class DeploymentProcessors(AbstractProcessorPackage):
         self.admin_refresh_deployment_revisions = ActionProcessor(
             service.admin_refresh_deployment_revisions, action_monitors
         )
+        self.promote_deployment = ActionProcessor(service.promote_deployment, action_monitors)
 
         # Route operations
         self.sync_replicas = ActionProcessor(service.sync_replicas, action_monitors)
@@ -324,6 +328,7 @@ class DeploymentProcessors(AbstractProcessorPackage):
             SearchRevisionResourceSlotsAction.spec(),
             ActivateRevisionAction.spec(),
             RefreshDeploymentRevisionsAction.spec(),
+            PromoteDeploymentAction.spec(),
             # Route operations
             SyncReplicaAction.spec(),
             SearchRoutesAction.spec(),

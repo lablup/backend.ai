@@ -107,6 +107,8 @@ from .revision import (
     ModelRuntimeConfig,
     ModelRuntimeConfigInput,
     MountPermission,
+    PromoteDeploymentInputGQL,
+    PromoteDeploymentPayloadGQL,
     ResourceConfig,
     ResourceConfigInput,
     ResourceGroupInput,
@@ -218,6 +220,8 @@ __all__ = [
     # Revision
     "ActivateRevisionInputGQL",
     "ActivateRevisionPayloadGQL",
+    "PromoteDeploymentInputGQL",
+    "PromoteDeploymentPayloadGQL",
     "AddRevisionInput",
     "AddRevisionPayload",
     "ClusterConfig",

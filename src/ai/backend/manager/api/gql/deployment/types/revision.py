@@ -63,6 +63,9 @@ from ai.backend.common.dto.manager.v2.deployment.request import (
     ModelRuntimeConfigInput as ModelRuntimeConfigInputDTO,
 )
 from ai.backend.common.dto.manager.v2.deployment.request import (
+    PromoteDeploymentInput as PromoteDeploymentInputDTO,
+)
+from ai.backend.common.dto.manager.v2.deployment.request import (
     ResourceConfigInput as ResourceConfigInputDTO,
 )
 from ai.backend.common.dto.manager.v2.deployment.request import (
@@ -82,6 +85,9 @@ from ai.backend.common.dto.manager.v2.deployment.response import (
 )
 from ai.backend.common.dto.manager.v2.deployment.response import (
     AddRevisionPayload as AddRevisionPayloadDTO,
+)
+from ai.backend.common.dto.manager.v2.deployment.response import (
+    PromoteDeploymentPayload as PromoteDeploymentPayloadDTO,
 )
 from ai.backend.common.dto.manager.v2.deployment.response import (
     RevisionNode as RevisionNodeDTO,
@@ -629,6 +635,29 @@ class ActivateRevisionPayloadGQL:
     previous_revision_id: ID | None
     activated_revision_id: ID
     deployment_policy: Annotated[DeploymentPolicyGQL, strawberry.lazy(".policy")]
+
+
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description="Input for manually promoting a blue-green deployment.",
+        added_version="26.4.0",
+    ),
+    name="PromoteDeploymentInput",
+)
+class PromoteDeploymentInputGQL(PydanticInputMixin[PromoteDeploymentInputDTO]):
+    deployment_id: ID
+
+
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version="26.4.0",
+        description="Result of manually promoting a deployment.",
+    ),
+    model=PromoteDeploymentPayloadDTO,
+    name="PromoteDeploymentPayload",
+)
+class PromoteDeploymentPayloadGQL:
+    deployment: Annotated[ModelDeployment, strawberry.lazy(".deployment")]
 
 
 # Input Types

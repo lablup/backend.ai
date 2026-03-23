@@ -38,6 +38,7 @@ from .revision import (
     add_model_revision,
     inference_runtime_config,
     inference_runtime_configs,
+    promote_deployment,
     revision,
     revisions,
 )
@@ -86,6 +87,7 @@ __all__ = [
     "inference_runtime_configs",
     "add_model_revision",
     "activate_deployment_revision",
+    "promote_deployment",
     # Route
     "routes",
     "route",

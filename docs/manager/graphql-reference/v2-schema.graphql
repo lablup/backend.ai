@@ -4386,9 +4386,6 @@ type ImageV2MetadataInfo {
   """Image creation timestamp."""
   createdAt: DateTime
 
-  """Timestamp of the most recent session created with this image."""
-  lastUsedAt: DateTime
-
   """Parsed tag components."""
   tags: [ImageV2TagEntry!]!
 
@@ -6403,6 +6400,9 @@ type Mutation {
   """
   activateDeploymentRevision(input: ActivateRevisionInput!): ActivateRevisionPayload!
 
+  """Added in 26.4.0. Manually promote a blue-green deployment."""
+  promoteDeployment(input: PromoteDeploymentInput!): PromoteDeploymentPayload!
+
   """Added in 25.19.0. Update the traffic status of a route"""
   updateRouteTrafficStatus(input: UpdateRouteTrafficStatusInput!): UpdateRouteTrafficStatusPayload!
 
@@ -8080,6 +8080,17 @@ type PurgeDomainPayloadGQL {
 type PurgeProjectPayloadGQL {
   """Whether the purge was successful."""
   purged: Boolean!
+}
+
+"""Added in 26.4.0. Input for manually promoting a blue-green deployment."""
+input PromoteDeploymentInput {
+  deploymentId: ID!
+}
+
+"""Added in 26.4.0. Result of manually promoting a deployment."""
+type PromoteDeploymentPayload {
+  """The promoted deployment"""
+  deployment: ModelDeployment!
 }
 
 """Added in 26.3.0. Input for purging a role"""

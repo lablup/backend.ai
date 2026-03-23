@@ -2868,6 +2868,7 @@ class DeploymentDBSource:
         self,
         rollout: Sequence[RBACEntityCreator[RoutingRow]],
         drain: BatchUpdater[RoutingRow] | None,
+        promote: BatchUpdater[RoutingRow] | None,
         completed_ids: set[uuid.UUID],
     ) -> int:
         """Apply route mutations from a strategy evaluation cycle in a single transaction.
@@ -2880,6 +2881,7 @@ class DeploymentDBSource:
         """
         async with self._begin_session_read_committed() as db_sess:
             await self._create_routes(db_sess, rollout)
+            await self._promote_routes(db_sess, promote)
             await self._drain_routes(db_sess, drain)
             return await self._complete_deployment_revision_swap(db_sess, completed_ids)
 
@@ -2891,6 +2893,15 @@ class DeploymentDBSource:
         """Create new routes for rollout."""
         if rollout:
             await execute_rbac_entity_creators(db_sess, rollout)
+
+    @staticmethod
+    async def _promote_routes(
+        db_sess: SASession,
+        promote: BatchUpdater[RoutingRow] | None,
+    ) -> None:
+        """Promote routes by activating their traffic status."""
+        if promote:
+            await execute_batch_updater(db_sess, promote)
 
     @staticmethod
     async def _drain_routes(

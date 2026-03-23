@@ -43,6 +43,7 @@ from ai.backend.common.dto.manager.v2.deployment.request import (
     DeleteDeploymentInput,
     DeploymentFilter,
     DeploymentOrder,
+    PromoteDeploymentInput,
     ReplicaFilter,
     ReplicaOrder,
     RevisionFilter,
@@ -79,6 +80,7 @@ from ai.backend.common.dto.manager.v2.deployment.response import (
     GetAccessTokenPayload,
     GetAutoScalingRulePayload,
     GetDeploymentPolicyPayload,
+    PromoteDeploymentPayload,
     ReplicaNode,
     RevisionNode,
     RevisionRefreshResultInfo,
@@ -290,6 +292,7 @@ from ai.backend.manager.services.deployment.actions.refresh_deployment_revisions
 )
 from ai.backend.manager.services.deployment.actions.revision_operations import (
     ActivateRevisionAction,
+    PromoteDeploymentAction,
 )
 from ai.backend.manager.services.deployment.actions.route.search_routes import SearchRoutesAction
 from ai.backend.manager.services.deployment.actions.route.update_route_traffic_status import (
@@ -866,6 +869,15 @@ class DeploymentAdapter(BaseAdapter):
                 )
                 for r in action_result.results
             ]
+        )
+
+    async def promote_deployment(self, input: PromoteDeploymentInput) -> PromoteDeploymentPayload:
+        """Manually promote a blue-green deployment."""
+        action_result = await self._processors.deployment.promote_deployment.wait_for_complete(
+            PromoteDeploymentAction(deployment_id=input.deployment_id)
+        )
+        return PromoteDeploymentPayload(
+            deployment=self._deployment_data_to_dto(action_result.deployment),
         )
 
     async def delete(self, input: DeleteDeploymentInput) -> DeleteDeploymentPayload:
