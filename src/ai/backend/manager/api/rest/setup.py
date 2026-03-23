@@ -30,7 +30,7 @@ def setup_api(
     from .types import GQLContextDeps
 
     r = dep_resources
-    adapters = Adapters.create(r.processing.processors)
+    adapters = Adapters.create(r.processing.processors, r.bootstrap.config_provider.config.auth)
     gql_context_deps = GQLContextDeps(
         config_provider=r.bootstrap.config_provider,
         etcd=r.bootstrap.etcd,
