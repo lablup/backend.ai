@@ -28,6 +28,7 @@ from ai.backend.manager.data.user.types import (
     UserData,
     UserSearchResult,
 )
+from ai.backend.manager.models.keypair.row import KeyPairRow
 from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.models.storage import StorageSessionManager
 from ai.backend.manager.models.user import UserRow
@@ -298,9 +299,9 @@ class UserRepository:
         await self._db_source.revoke_my_keypair(user_uuid, access_key)
 
     @user_repository_resilience.apply()
-    async def update_my_keypair(self, user_uuid: UUID, access_key: str, is_active: bool) -> None:
+    async def update_my_keypair(self, user_uuid: UUID, updater: Updater[KeyPairRow]) -> KeyPairData:
         """Update a keypair owned by the current user."""
-        await self._db_source.update_my_keypair(user_uuid, access_key, is_active)
+        return await self._db_source.update_my_keypair(user_uuid, updater)
 
     @user_repository_resilience.apply()
     async def switch_my_main_access_key(self, user_uuid: UUID, access_key: str) -> None:

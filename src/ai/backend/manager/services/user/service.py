@@ -438,12 +438,11 @@ class UserService:
         return RevokeMyKeypairActionResult(success=True)
 
     async def update_my_keypair(self, action: UpdateMyKeypairAction) -> UpdateMyKeypairActionResult:
-        await self._user_repository.update_my_keypair(
+        keypair_data = await self._user_repository.update_my_keypair(
             user_uuid=action.user_uuid,
-            access_key=action.access_key,
-            is_active=action.is_active,
+            updater=action.updater,
         )
-        return UpdateMyKeypairActionResult(success=True)
+        return UpdateMyKeypairActionResult(keypair=keypair_data)
 
     async def switch_my_main_access_key(
         self, action: SwitchMyMainAccessKeyAction

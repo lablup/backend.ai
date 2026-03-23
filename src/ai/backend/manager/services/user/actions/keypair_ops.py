@@ -10,7 +10,9 @@ from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.common.types import SearchResult
 from ai.backend.manager.data.keypair.types import GeneratedKeyPairData, KeyPairData
+from ai.backend.manager.models.keypair.row import KeyPairRow
 from ai.backend.manager.repositories.base.querier import BatchQuerier
+from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.repositories.keypair.types import UserKeypairSearchScope
 from ai.backend.manager.services.user.actions.base import UserAction
 
@@ -37,7 +39,7 @@ class IssueMyKeypairActionResult(BaseActionResult):
 
     @override
     def entity_id(self) -> str | None:
-        return self.generated_data.access_key
+        return str(self.generated_data.keypair.access_key)
 
 
 @dataclass
@@ -71,12 +73,11 @@ class UpdateMyKeypairAction(UserAction):
     """Update a keypair owned by the current user (e.g. toggle active state)."""
 
     user_uuid: UUID
-    access_key: str
-    is_active: bool
+    updater: Updater[KeyPairRow]
 
     @override
     def entity_id(self) -> str | None:
-        return self.access_key
+        return str(self.updater.pk_value)
 
     @override
     @classmethod
@@ -86,11 +87,11 @@ class UpdateMyKeypairAction(UserAction):
 
 @dataclass
 class UpdateMyKeypairActionResult(BaseActionResult):
-    success: bool
+    keypair: KeyPairData
 
     @override
     def entity_id(self) -> str | None:
-        return None
+        return str(self.keypair.access_key)
 
 
 @dataclass

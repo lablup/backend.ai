@@ -7,8 +7,8 @@ from collections.abc import Sequence
 from typing import TYPE_CHECKING, cast
 from uuid import UUID
 
-from ai.backend.common.contexts.user import current_user
 from ai.backend.common.api_handlers import Sentinel
+from ai.backend.common.contexts.user import current_user
 from ai.backend.common.data.filter_specs import UUIDInMatchSpec
 from ai.backend.common.data.user.types import UserRole
 from ai.backend.common.data.user.types import UserRole as DataUserRole
@@ -80,9 +80,9 @@ from ai.backend.manager.data.user.types import UserData, UserStatus
 from ai.backend.manager.data.user.types import UserStatus as DataUserStatus
 from ai.backend.manager.models.domain.conditions import DomainConditions
 from ai.backend.manager.models.group.conditions import GroupConditions
+from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.keypair.conditions import KeypairConditions, KeypairOrders
 from ai.backend.manager.models.keypair.row import KeyPairRow
-from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.user.conditions import UserConditions
 from ai.backend.manager.models.user.orders import UserOrders
 from ai.backend.manager.models.user.row import UserRole as UserRoleModel
@@ -96,9 +96,10 @@ from ai.backend.manager.repositories.base import (
     combine_conditions_or,
     negate_conditions,
 )
-from ai.backend.manager.repositories.keypair.types import UserKeypairSearchScope
 from ai.backend.manager.repositories.base.creator import Creator
 from ai.backend.manager.repositories.base.updater import Updater
+from ai.backend.manager.repositories.keypair.types import UserKeypairSearchScope
+from ai.backend.manager.repositories.keypair.updaters import KeyPairUpdaterSpec
 from ai.backend.manager.repositories.user.creators import UserCreatorSpec
 from ai.backend.manager.repositories.user.types import (
     DomainUserSearchScope,
@@ -591,9 +592,8 @@ class UserAdapter(BaseAdapter):
             IssueMyKeypairAction(user_uuid=user_id)
         )
         return IssueMyKeypairPayload(
-            access_key=result.generated_data.access_key,
-            secret_key=result.generated_data.secret_key,
-            ssh_public_key=result.generated_data.ssh_public_key,
+            keypair=self._keypair_data_to_node(result.generated_data.keypair),
+            secret_key=str(result.generated_data.keypair.secret_key),
         )
 
     async def revoke_my_keypair(self, user_id: UUID, access_key: str) -> RevokeMyKeypairPayload:
@@ -607,10 +607,12 @@ class UserAdapter(BaseAdapter):
         self, user_id: UUID, access_key: str, is_active: bool
     ) -> UpdateMyKeypairPayload:
         """Update a keypair owned by the current user."""
+        updater_spec = KeyPairUpdaterSpec(is_active=OptionalState.update(is_active))
+        updater = Updater(spec=updater_spec, pk_value=access_key)
         result = await self._processors.user.update_my_keypair.wait_for_complete(
-            UpdateMyKeypairAction(user_uuid=user_id, access_key=access_key, is_active=is_active)
+            UpdateMyKeypairAction(user_uuid=user_id, updater=updater)
         )
-        return UpdateMyKeypairPayload(success=result.success)
+        return UpdateMyKeypairPayload(keypair=self._keypair_data_to_node(result.keypair))
 
     async def switch_my_main_access_key(
         self, user_id: UUID, access_key: str

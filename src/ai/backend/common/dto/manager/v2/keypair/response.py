@@ -50,11 +50,10 @@ class KeypairNode(BaseResponseModel):
 class IssueMyKeypairPayload(BaseResponseModel):
     """Payload returned after issuing a new keypair."""
 
-    access_key: str = Field(description="The newly generated access key.")
+    keypair: KeypairNode = Field(description="The newly created keypair.")
     secret_key: str = Field(
         description="The newly generated secret key. This value is only returned at creation time."
     )
-    ssh_public_key: str = Field(description="The generated SSH public key.")
 
 
 class RevokeMyKeypairPayload(BaseResponseModel):
@@ -66,7 +65,7 @@ class RevokeMyKeypairPayload(BaseResponseModel):
 class UpdateMyKeypairPayload(BaseResponseModel):
     """Payload returned after updating a keypair."""
 
-    success: bool = Field(description="Whether the update was successful.")
+    keypair: KeypairNode = Field(description="The updated keypair.")
 
 
 class SwitchMyMainAccessKeyPayload(BaseResponseModel):
