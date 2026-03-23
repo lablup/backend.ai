@@ -8,7 +8,10 @@ from uuid import UUID
 
 from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.actions.types import ActionOperationType
-from ai.backend.manager.data.keypair.types import GeneratedKeyPairData
+from ai.backend.manager.data.common.types import SearchResult
+from ai.backend.manager.data.keypair.types import GeneratedKeyPairData, KeyPairData
+from ai.backend.manager.repositories.base.querier import BatchQuerier
+from ai.backend.manager.repositories.keypair.types import UserKeypairSearchScope
 from ai.backend.manager.services.user.actions.base import UserAction
 
 
@@ -110,6 +113,32 @@ class SwitchMyMainAccessKeyAction(UserAction):
 @dataclass
 class SwitchMyMainAccessKeyActionResult(BaseActionResult):
     success: bool
+
+    @override
+    def entity_id(self) -> str | None:
+        return None
+
+
+@dataclass
+class SearchMyKeypairsAction(UserAction):
+    """Search keypairs owned by the current user."""
+
+    scope: UserKeypairSearchScope
+    querier: BatchQuerier
+
+    @override
+    def entity_id(self) -> str | None:
+        return None
+
+    @override
+    @classmethod
+    def operation_type(cls) -> ActionOperationType:
+        return ActionOperationType.SEARCH
+
+
+@dataclass
+class SearchMyKeypairsActionResult(BaseActionResult):
+    result: SearchResult[KeyPairData]
 
     @override
     def entity_id(self) -> str | None:

@@ -137,6 +137,7 @@ from .image import (
 from .kernel.resolver import admin_kernels_v2, kernel_v2, session_kernels_v2
 from .keypair import (
     issue_my_keypair,
+    my_keypairs,
     revoke_my_keypair,
     switch_my_main_access_key,
     update_my_keypair,
@@ -350,6 +351,8 @@ class Query:
     admin_permissions = admin_permissions
     admin_role_assignments = admin_role_assignments
     admin_entities = admin_entities
+    # Keypair self-service queries
+    my_keypairs = my_keypairs
     # RBAC User APIs
     my_roles = my_roles
     rbac_scope_entity_combinations = rbac_scope_entity_combinations

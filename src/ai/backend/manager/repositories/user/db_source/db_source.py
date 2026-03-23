@@ -19,7 +19,8 @@ from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeySta
 from ai.backend.common.data.permission.types import RBACElementType
 from ai.backend.common.types import AccessKey, VFolderID
 from ai.backend.logging.utils import BraceStyleAdapter
-from ai.backend.manager.data.keypair.types import GeneratedKeyPairData, KeyPairCreator
+from ai.backend.manager.data.common.types import SearchResult
+from ai.backend.manager.data.keypair.types import GeneratedKeyPairData, KeyPairCreator, KeyPairData
 from ai.backend.manager.data.permission.types import RBACElementRef
 from ai.backend.manager.data.user.types import (
     BulkUserCreateResultData,
@@ -91,6 +92,7 @@ from ai.backend.manager.repositories.base.rbac.entity_creator import (
 )
 from ai.backend.manager.repositories.base.updater import BulkUpdaterError, Updater
 from ai.backend.manager.repositories.keypair.creators import KeyPairCreatorSpec
+from ai.backend.manager.repositories.keypair.types import UserKeypairSearchScope
 from ai.backend.manager.repositories.permission_controller.creators import UserRoleCreatorSpec
 from ai.backend.manager.repositories.permission_controller.role_manager import RoleManager
 from ai.backend.manager.repositories.user.creators import UserCreatorSpec
@@ -1326,4 +1328,29 @@ class UserDBSource:
                 sa.update(keypairs)
                 .where(keypairs.c.access_key == access_key)
                 .values(is_active=is_active)
+            )
+
+    async def search_my_keypairs(
+        self,
+        scope: UserKeypairSearchScope,
+        querier: BatchQuerier,
+    ) -> SearchResult[KeyPairData]:
+        """Search keypairs owned by the scoped user.
+
+        Args:
+            scope: Search scope containing the user UUID whose keypairs to retrieve.
+            querier: BatchQuerier containing conditions, orders, and pagination.
+
+        Returns:
+            SearchResult with matching keypairs and pagination info.
+        """
+        async with self._db.begin_readonly_session() as db_session:
+            query = sa.select(KeyPairRow)
+            result = await execute_batch_querier(db_session, query, querier, scope=scope)
+            items = [row.KeyPairRow.to_data() for row in result.rows]
+            return SearchResult(
+                items=items,
+                total_count=result.total_count,
+                has_next_page=result.has_next_page,
+                has_previous_page=result.has_previous_page,
             )

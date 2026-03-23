@@ -19,7 +19,8 @@ from ai.backend.common.resilience.resilience import Resilience
 from ai.backend.common.types import AccessKey, SlotName
 from ai.backend.common.utils import nmget
 from ai.backend.logging.utils import BraceStyleAdapter
-from ai.backend.manager.data.keypair.types import GeneratedKeyPairData
+from ai.backend.manager.data.common.types import SearchResult
+from ai.backend.manager.data.keypair.types import GeneratedKeyPairData, KeyPairData
 from ai.backend.manager.data.user.types import (
     BulkUserCreateResultData,
     BulkUserUpdateResultData,
@@ -34,6 +35,7 @@ from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.base.creator import Creator
 from ai.backend.manager.repositories.base.querier import BatchQuerier
 from ai.backend.manager.repositories.base.updater import Updater
+from ai.backend.manager.repositories.keypair.types import UserKeypairSearchScope
 from ai.backend.manager.repositories.user.db_source import UserDBSource
 from ai.backend.manager.repositories.user.types import (
     DomainUserSearchScope,
@@ -290,6 +292,23 @@ class UserRepository:
     async def switch_my_main_access_key(self, user_uuid: UUID, access_key: str) -> None:
         """Switch the main access key for the current user."""
         await self._db_source.switch_my_main_access_key(user_uuid, access_key)
+
+    @user_repository_resilience.apply()
+    async def search_my_keypairs(
+        self,
+        scope: UserKeypairSearchScope,
+        querier: BatchQuerier,
+    ) -> SearchResult[KeyPairData]:
+        """Search keypairs owned by the scoped user.
+
+        Args:
+            scope: Search scope containing the user UUID whose keypairs to retrieve.
+            querier: BatchQuerier containing conditions, orders, and pagination.
+
+        Returns:
+            SearchResult with matching keypairs and pagination info.
+        """
+        return await self._db_source.search_my_keypairs(scope, querier)
 
     async def _get_time_binned_monthly_stats(
         self,

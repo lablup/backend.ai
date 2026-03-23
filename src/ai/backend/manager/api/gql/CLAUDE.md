@@ -63,6 +63,24 @@ GQL types are thin wrappers over the v2 DTOs in `common/dto/manager/v2/`.
 - Do **NOT** catch domain exceptions (e.g., `NotFound`) in fetcher functions just to return `None`.
   Let the exception propagate — only `resolve_nodes` may return `Iterable[Self | None]` per Relay spec.
 
+## Query Pagination Arguments
+
+All search/list queries MUST provide ALL of the following argument groups — do NOT omit any:
+- `filter: XxxFilterGQL | None` — entity-specific filter
+- `order_by: list[XxxOrderByGQL] | None` — ordering specification
+- `before: str | None`, `after: str | None` — cursor-based pagination cursors
+- `first: int | None`, `last: int | None` — cursor-based pagination limits
+- `limit: int | None`, `offset: int | None` — offset-based pagination
+
+Clients must be able to choose between cursor and offset pagination freely.
+
+## `my_` Resolver Pattern
+
+For self-service queries (`my_keypairs`, `my_roles`, etc.):
+- The resolver does NOT call `current_user()` or construct a scope.
+- The resolver passes only the search input DTO to the adapter.
+- The adapter is responsible for calling `current_user()` internally and constructing the scope.
+
 ## Legacy Code
 
 - Do NOT copy patterns from `gql_legacy/` (Graphene) — it is being migrated to Strawberry.

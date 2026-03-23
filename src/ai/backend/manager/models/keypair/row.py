@@ -177,6 +177,8 @@ class KeyPairRow(Base):  # type: ignore[misc]
             ssh_private_key=self.ssh_private_key,
             dotfiles=self.dotfiles if self.dotfiles else b"\x90",
             bootstrap_script=self.bootstrap_script,
+            last_used=self.last_used,
+            num_queries=self.num_queries if self.num_queries is not None else 0,
         )
 
 
