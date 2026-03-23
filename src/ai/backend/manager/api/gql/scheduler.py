@@ -9,13 +9,17 @@ from typing import TYPE_CHECKING
 import strawberry
 from strawberry import Info
 
+from ai.backend.common.dto.manager.v2.scheduler import (
+    SchedulingBroadcastEventPayloadNode,
+    SchedulingStatusDTO,
+)
 from ai.backend.common.events.event_types.session.broadcast import SchedulingBroadcastEvent
 from ai.backend.common.events.hub.propagators.bypass import AsyncBypassPropagator
 from ai.backend.common.events.types import EventDomain
 from ai.backend.common.types import SessionId
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.api.gql.base import to_global_id
-from ai.backend.manager.api.gql.decorators import BackendAIGQLMeta, gql_type
+from ai.backend.manager.api.gql.decorators import BackendAIGQLMeta, gql_pydantic_type
 from ai.backend.manager.api.gql_legacy.session import ComputeSessionNode
 from ai.backend.manager.errors.kernel import InvalidSessionId
 
@@ -47,15 +51,17 @@ class SchedulingStatus(StrEnum):
     ERROR = "ERROR"
 
 
-@gql_type(
+@gql_pydantic_type(
     BackendAIGQLMeta(
         added_version="25.15.0",
         description="Scheduling event broadcast payload.",
     ),
+    model=SchedulingBroadcastEventPayloadNode,
+    name="SchedulingBroadcastEventPayload",
 )
-class SchedulingBroadcastEventPayload:
-    """
-    Payload for scheduling broadcast events.
+class SchedulingBroadcastEventPayloadGQL:
+    """Payload for scheduling broadcast events.
+
     Represents a status transition during session scheduling.
     """
 
@@ -82,11 +88,10 @@ class SchedulingBroadcastEventPayload:
 async def scheduling_events_by_session(
     session_id: strawberry.ID,
     info: Info[StrawberryGQLContext],
-) -> AsyncGenerator[SchedulingBroadcastEventPayload, None]:
-    """
-    Subscribe to scheduling events for a specific session.
+) -> AsyncGenerator[SchedulingBroadcastEventPayloadGQL, None]:
+    """Subscribe to scheduling events for a specific session.
 
-    This subscription streams status transition events for a session during its lifecycle,
+    Streams status transition events for a session during its lifecycle,
     such as PENDING -> SCHEDULED -> PREPARING -> RUNNING -> TERMINATED.
 
     Args:
@@ -94,7 +99,7 @@ async def scheduling_events_by_session(
         info: GraphQL context containing user information and services
 
     Yields:
-        SchedulingBroadcastEventPayload: Event payloads for each status transition
+        SchedulingBroadcastEventPayloadGQL: Event payloads for each status transition
 
     Requires:
         - User must own the session or have admin/superadmin permissions
@@ -117,15 +122,16 @@ async def scheduling_events_by_session(
         async for event in propagator.receive():
             if isinstance(event, SchedulingBroadcastEvent):
                 try:
-                    status_enum = SchedulingStatus(event.status_transition)
-                except KeyError:
+                    status_dto = SchedulingStatusDTO(event.status_transition)
+                except ValueError:
                     log.warning(f"Unknown status transition: {event.status_transition}")
-                    status_enum = SchedulingStatus.ERROR
-                yield SchedulingBroadcastEventPayload(
-                    session_id=strawberry.ID(str(event.session_id)),
-                    status_transition=status_enum,
+                    status_dto = SchedulingStatusDTO.ERROR
+                dto = SchedulingBroadcastEventPayloadNode(
+                    session_id=str(event.session_id),
+                    status_transition=status_dto,
                     reason=event.reason,
                 )
+                yield SchedulingBroadcastEventPayloadGQL.from_pydantic(dto)  # type: ignore[attr-defined]
     finally:
         # Unregister propagator when subscription ends
         event_hub.unregister_event_propagator(propagator.id())

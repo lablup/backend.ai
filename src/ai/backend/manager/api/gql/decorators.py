@@ -9,8 +9,7 @@ Decorator roles:
     gql_pydantic_type    — Output types backed by a v2 Pydantic DTO; Strawberry
                            auto-generates from_pydantic() / to_pydantic().
     gql_pydantic_input   — Input types backed by a v2 Pydantic DTO via PydanticInputMixin.
-    gql_type             — Plain output types not backed by Pydantic DTOs (e.g. subscription
-                           event payloads). Use only when no suitable Pydantic DTO exists.
+    gql_pydantic_interface — Interface types backed by a v2 Pydantic DTO.
 """
 
 from __future__ import annotations
@@ -41,11 +40,9 @@ __all__ = (
     "gql_pydantic_input",
     "gql_pydantic_interface",
     "gql_pydantic_type",
-    "gql_type",
 )
 
 T = TypeVar("T", bound="PydanticNodeMixin[Any]")
-T_any = TypeVar("T_any")
 T_conn = TypeVar("T_conn", bound="Connection[Any]")
 T_input = TypeVar("T_input", bound="PydanticInputMixin[Any]")
 
@@ -219,34 +216,4 @@ def gql_pydantic_type[PydanticModel: BaseModel](
         directives=directives,
         all_fields=all_fields,
         use_pydantic_alias=use_pydantic_alias,
-    )
-
-
-@dataclass_transform(
-    order_default=True,
-    kw_only_default=True,
-    field_specifiers=(strawberry_field, StrawberryField),
-)
-def gql_type(
-    meta: BackendAIGQLMeta,
-    *,
-    name: str | None = None,
-    directives: Sequence[object] = (),
-    extend: bool = False,
-) -> Callable[[type[T_any]], type[T_any]]:
-    """Decorator for plain GQL output types not backed by Pydantic DTOs.
-
-    Use only for types that cannot use gql_node_type or gql_pydantic_type,
-    such as subscription event payloads that are constructed directly from
-    event objects rather than from Pydantic DTOs.
-    """
-    description = f"Added in {meta.added_version}. {meta.description}"
-    if meta.deprecated_version is not None:
-        hint = f" Use {meta.deprecation_hint}." if meta.deprecation_hint else ""
-        description += f" Deprecated since {meta.deprecated_version}.{hint}"
-    return strawberry.type(
-        name=name,
-        description=description,
-        directives=directives,
-        extend=extend,
     )

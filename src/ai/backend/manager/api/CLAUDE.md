@@ -11,13 +11,15 @@
 
 ## Calling Services
 
-- Handlers MUST invoke services through a Processor, not directly:
+**New API (v2):** Handlers MUST call Adapters (`self._adapters.{domain}.method(dto_input)`),
+never Processors or Services directly. Adapters are shared with the GQL layer.
+
+**Legacy REST (v1):** Handlers call Processors directly:
   ```python
-  # CORRECT — handler receives specific processor via constructor DI
   await self._foo.wait_for_complete(FooAction(...))
-  # WRONG — never call service methods directly
-  await self._foo_service.do_something(...)
   ```
+
+**All new API endpoints MUST follow the v2 pattern.**
 
 ## Naming
 

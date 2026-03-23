@@ -8,62 +8,20 @@ Manager REST API provides Backend.AI's main HTTP-based API endpoints. Built on t
 
 ## Architecture
 
+### REST v2 (new endpoints)
+
 ```
-┌──────────────────────────────────────────┐
-│         Client (SDK/CLI/Web UI)          │
-└────────────────┬─────────────────────────┘
-                 │
-                 ↓ HTTP Request
-┌────────────────────────────────────────────┐
-│            REST API Handler                │
-│         (Starlette Routes)                 │
-│                                            │
-│  - session.py (session creation/mgmt)      │
-│  - vfolder.py (virtual folders)            │
-│  - admin.py (admin tasks)                  │
-│  - auth.py (authentication)                │
-│  - scaling_group.py (scaling groups)       │
-│  - ... (other endpoints)                   │
-└────────────────┬───────────────────────────┘
-                 │
-                 ↓
-┌────────────────────────────────────────────┐
-│           Middleware Stack                 │
-│                                            │
-│  1. Authentication Middleware              │
-│  2. Rate Limiting Middleware               │
-│  3. Request Validation                     │
-│  4. Error Handling Middleware              │
-│  5. Metric Collection                      │
-└────────────────┬───────────────────────────┘
-                 │
-                 ↓
-┌────────────────────────────────────────────┐
-│         Action Processor Layer             │
-│                                            │
-│  - Authorization (RBAC)                    │
-│  - Action Validation                       │
-│  - Audit Logging                           │
-│  - Monitoring                              │
-└────────────────┬───────────────────────────┘
-                 │
-                 ↓
-┌────────────────────────────────────────────┐
-│           Services Layer                   │
-│                                            │
-│  - Business Logic                          │
-│  - External Service Orchestration          │
-│  - Quota/Limit Enforcement                 │
-└────────────────┬───────────────────────────┘
-                 │
-                 ↓
-┌────────────────────────────────────────────┐
-│         Repositories Layer                 │
-│                                            │
-│  - Data Access                             │
-│  - Transaction Management                  │
-└────────────────────────────────────────────┘
+Client → REST v2 Handler → Adapter (api/adapters/) → Processor → Service → Repository
+                           ↑DTO in/out (common/dto/manager/v2/)
 ```
+
+### REST v1 (legacy endpoints)
+
+```
+Client → REST v1 Handler → Middleware → Processor → Service → Repository
+```
+
+**New endpoints MUST use the REST v2 pattern.**
 
 ## Standard Operations
 
@@ -141,133 +99,31 @@ Handles authentication for API handlers with `@auth_required` decorator.
 
 Converts exceptions to appropriate HTTP responses.
 
-## Actions Layer Integration
+## REST v2 Handler Pattern
 
-REST API handlers and GraphQL handlers invoke Action Processor to execute business logic.
-
-**Handler Responsibilities:**
-- Only handles HTTP request/response data conversion
-- Creates Action objects and invokes Processor
-- Does not implement business logic directly
-
-See [Actions Layer Documentation](../actions/README.md) for details.
-
-## Adapter Pattern
-
-The API layer uses adapters to convert between API DTOs and repository queries.
-
-### Architecture
-
-```
-Client Request (JSON/Form)
-    ↓
-API Handler
-    ↓ parse & validate
-DTO Objects (Pydantic models)
-    ↓ convert
-Adapter
-    ↓ build
-Querier (conditions, orders, pagination)
-    ↓ pass through
-Service Layer
-    ↓ delegate
-Repository
-    ↓ query
-Database
-```
-
-### Adapter Responsibilities
-
-**REST Adapters** convert API request DTOs to repository `Querier` objects:
+REST v2 handlers use shared Adapters and Pydantic DTOs from `common/dto/manager/v2/`.
 
 ```python
-from ai.backend.manager.api.rest.adapter import BaseFilterAdapter
-from ai.backend.manager.repositories.base import Querier
+from ai.backend.common.api_handlers import APIResponse, BodyParam
+from ai.backend.common.dto.manager.v2.domain.request import AdminSearchDomainsInput
+from ai.backend.manager.api.adapters.registry import Adapters
 
-class NotificationChannelAdapter(BaseFilterAdapter):
-    """Converts notification channel DTOs to Querier."""
 
-    def build_querier(self, request: SearchNotificationChannelsReq) -> Querier:
-        """Build repository query from API request."""
-        conditions = []
-        orders = []
-        pagination = None
+class DomainV2Handler:
+    def __init__(self, *, adapters: Adapters) -> None:
+        self._adapters = adapters
 
-        # Convert filters
-        if request.filter:
-            conditions.extend(request.filter.build_conditions())
-
-        # Convert ordering
-        if request.order:
-            orders.append(request.order.to_query_order())
-
-        # Convert pagination
-        if request.limit:
-            pagination = OffsetPagination(
-                limit=request.limit,
-                offset=request.offset or 0
-            )
-
-        return Querier(
-            conditions=conditions,
-            orders=orders,
-            pagination=pagination
-        )
-```
-
-### Base Adapter Utilities
-
-`BaseFilterAdapter` provides common filter conversion utilities:
-
-```python
-class BaseFilterAdapter:
-    """Base adapter for common filter patterns."""
-
-    def convert_string_filter(
+    async def admin_search(
         self,
-        string_filter: StringFilter,
-        equals_fn: Callable[[str, bool], QueryCondition],
-        contains_fn: Callable[[str, bool], QueryCondition],
-    ) -> Optional[QueryCondition]:
-        """Convert StringFilter to QueryCondition."""
-        if string_filter.equals:
-            return equals_fn(string_filter.equals, False)
-        elif string_filter.i_equals:
-            return equals_fn(string_filter.i_equals, True)
-        elif string_filter.contains:
-            return contains_fn(string_filter.contains, False)
-        elif string_filter.i_contains:
-            return contains_fn(string_filter.i_contains, True)
-        return None
-```
-
-### Handler Integration
-
-API handlers instantiate adapters as instance fields for reuse:
-
-```python
-class NotificationAPIHandler:
-    """REST API handler for notification operations."""
-
-    def __init__(self) -> None:
-        self.channel_adapter = NotificationChannelAdapter()
-        self.rule_adapter = NotificationRuleAdapter()
-
-    @api_handler
-    async def search_channels(
-        self,
-        body: BodyParam[SearchNotificationChannelsReq],
-        processors_ctx: ProcessorsCtx,
+        body: BodyParam[AdminSearchDomainsInput],
     ) -> APIResponse:
-        """Search notification channels."""
-        # Convert DTO to Querier
-        querier = self.channel_adapter.build_querier(body.parsed)
-
-        # Pass Querier through Service Layer
-        channels = await processors_ctx.notification.search_channels(querier)
-
-        return APIResponse(data=channels)
+        payload = await self._adapters.domain.admin_search(body.parsed)
+        return APIResponse.build(status_code=HTTPStatus.OK, response_model=payload)
 ```
+
+- `BodyParam[T]` where T is a DTO from `common/dto/manager/v2/`
+- Response is a DTO Payload returned directly via `APIResponse.build(response_model=payload)`
+- Adapters are shared with GraphQL — defined in `api/adapters/{domain}.py`
 
 ## REST API Pattern Reference
 
@@ -488,134 +344,9 @@ async def list_items(
 
 ## GraphQL Pattern Reference
 
-GraphQL APIs follow similar patterns using Strawberry types.
-
-### Scope in GraphQL
-
-**Input Types:**
-```python
-import strawberry
-
-
-@strawberry.input
-class ResourceGroupDomainScope:
-    """Scope for domain-level operations in a resource group."""
-
-    resource_group: str
-    domain_name: str | None = None
-```
-
-**Resolver Usage:**
-```python
-@strawberry.field
-async def domain_fair_shares(
-    self,
-    info: Info,
-    scope: ResourceGroupDomainScope,
-) -> list[DomainFairShareResult]:
-    """Query domain fair shares within a resource group."""
-    repository = info.context["repositories"].fair_share
-
-    search_scope = DomainFairShareSearchScope(
-        resource_group=scope.resource_group,
-        domain_name=scope.domain_name,
-    )
-
-    result = await repository.search_domain_fair_shares(search_scope)
-    return [item.to_gql() for item in result.items]
-```
-
-### Admin Check in GraphQL
-
-**Utility Function:**
-```python
-from strawberry.types import Info
-
-
-def check_admin_only(info: Info) -> None:
-    """Check if request user is superadmin."""
-    user_role = info.context["user"]["role"]
-    if user_role != "superadmin":
-        raise InsufficientPermission("Superadmin required")
-```
-
-**Resolver Usage:**
-```python
-@strawberry.mutation
-async def admin_create_domain(
-    self,
-    info: Info,
-    name: str,
-    description: str | None = None,
-) -> CreateDomainResult:
-    """Create domain (superadmin only)."""
-    check_admin_only(info)
-
-    processors = info.context["processors"].domain
-    action = CreateDomainAction(name=name, description=description)
-
-    result = await processors.create_domain.execute(action)
-    return CreateDomainResult(domain_id=result.domain_id)
-```
-
-### GraphQL Pagination
-
-GraphQL supports cursor-based pagination (Relay spec):
-
-```python
-@strawberry.type
-class PageInfo:
-    has_next_page: bool
-    has_previous_page: bool
-    start_cursor: str | None
-    end_cursor: str | None
-
-
-@strawberry.type
-class DomainFairShareConnection:
-    edges: list[DomainFairShareEdge]
-    page_info: PageInfo
-    total_count: int
-
-
-@strawberry.field
-async def domain_fair_shares(
-    self,
-    info: Info,
-    scope: ResourceGroupDomainScope,
-    first: int | None = None,
-    after: str | None = None,
-) -> DomainFairShareConnection:
-    """Query with cursor pagination."""
-    offset = decode_cursor(after) if after else 0
-    limit = first or 20
-
-    result = await repository.batch_query_domain_fair_shares(
-        conditions=scope.to_conditions(),
-        offset=offset,
-        limit=limit + 1,
-    )
-
-    has_next = len(result.items) > limit
-    items = result.items[:limit]
-
-    return DomainFairShareConnection(
-        edges=[
-            DomainFairShareEdge(
-                cursor=encode_cursor(offset + i),
-                node=item.to_gql(),
-            )
-            for i, item in enumerate(items)
-        ],
-        page_info=PageInfo(
-            has_next_page=has_next,
-            has_previous_page=(offset > 0),
-            start_cursor=encode_cursor(offset) if items else None,
-            end_cursor=encode_cursor(offset + len(items) - 1) if items else None,
-        ),
-        total_count=result.total_count,
-    )
-```
+See [GraphQL API README](./gql/README.md) for full patterns.
+All GQL types must be backed by Pydantic DTOs from `common/dto/manager/v2/` and use
+custom decorators from `gql/decorators.py`. Resolvers call Adapters (`info.context.adapters.*`).
 
 ## Error Handling
 
