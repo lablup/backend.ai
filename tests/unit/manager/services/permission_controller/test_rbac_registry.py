@@ -76,7 +76,7 @@ class TestRBACRegistry:
         add concrete implementations, which will force developers to register them.
         """
         # Collect all concrete BaseRBACAction subclasses
-        concrete_classes = _collect_all_rbac_subclasses(BaseRBACAction)
+        concrete_classes = _collect_all_rbac_subclasses(BaseRBACAction)  # type: ignore[type-abstract]
 
         # Get registered entity types from the service's registry
         registered_entity_types = set(empty_registry_service._rbac_action_registry.keys())
