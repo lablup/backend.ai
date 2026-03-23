@@ -2,24 +2,22 @@ from __future__ import annotations
 
 import abc
 import asyncio
-import inspect
-import queue
-import threading
 import warnings
-from collections.abc import AsyncIterator, Awaitable, Coroutine, Iterator
-from contextvars import Context, ContextVar, copy_context
+from collections.abc import AsyncIterator, Awaitable
+from contextvars import ContextVar
 from typing import (
     Any,
     Literal,
-    TypeVar,
 )
 
 import aiohttp
 from multidict import CIMultiDict
 
+from ai.backend.common.sync import SyncWorkerThread
+from ai.backend.common.types import Sentinel, SSLContextType
+
 from .config import MIN_API_VERSION, APIConfig, get_config, parse_api_version
 from .exceptions import APIVersionWarning, BackendAPIError, BackendClientError
-from .types import Sentinel, sentinel
 
 __all__: tuple[str, ...] = (
     "AsyncSession",
@@ -29,8 +27,6 @@ __all__: tuple[str, ...] = (
 )
 
 from contextlib import asynccontextmanager as actxmgr
-
-from ai.backend.common.types import SSLContextType
 
 api_session: ContextVar[BaseSession] = ContextVar("api_session")
 
@@ -118,113 +114,6 @@ async def _close_aiohttp_session(session: aiohttp.ClientSession) -> None:
     await session.close()
     if transports > 0:
         await all_is_lost.wait()
-
-
-_Item = TypeVar("_Item")
-
-
-class _SyncWorkerThread(threading.Thread):
-    work_queue: queue.Queue[
-        tuple[AsyncIterator[Any] | Coroutine[Any, Any, Any], Context] | Sentinel
-    ]
-    done_queue: queue.Queue[Any | Exception]
-    stream_queue: queue.Queue[Any | Exception | Sentinel]
-    stream_block: threading.Event
-    agen_shutdown: bool
-
-    __slots__ = (
-        "agen_shutdown",
-        "done_queue",
-        "stream_block",
-        "stream_queue",
-        "work_queue",
-    )
-
-    def __init__(self, *args: Any, **kwargs: Any) -> None:
-        super().__init__(*args, **kwargs)
-        self.work_queue = queue.Queue()
-        self.done_queue = queue.Queue()
-        self.stream_queue = queue.Queue()
-        self.stream_block = threading.Event()
-        self.agen_shutdown = False
-
-    def run(self) -> None:
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        try:
-            while True:
-                item = self.work_queue.get()
-                if item is sentinel:
-                    break
-                coro, ctx = item
-                if inspect.isasyncgen(coro):
-                    ctx.run(loop.run_until_complete, self.agen_wrapper(coro))
-                else:
-                    try:
-                        # FIXME: Once python/mypy#12756 is resolved, remove the type-ignore tag.
-                        result = ctx.run(loop.run_until_complete, coro)
-                    except Exception as e:
-                        self.done_queue.put_nowait(e)
-                    else:
-                        self.done_queue.put_nowait(result)
-                self.work_queue.task_done()
-        except (SystemExit, KeyboardInterrupt):
-            pass
-        finally:
-            loop.run_until_complete(loop.shutdown_asyncgens())
-            loop.stop()
-            loop.close()
-
-    def execute(self, coro: Coroutine[Any, Any, Any]) -> Any:
-        ctx = copy_context()  # preserve context for the worker thread
-        try:
-            self.work_queue.put((coro, ctx))
-            result = self.done_queue.get()
-            self.done_queue.task_done()
-            if isinstance(result, Exception):
-                raise result
-            return result
-        finally:
-            del ctx
-
-    async def agen_wrapper(self, agen: AsyncIterator[Any]) -> None:
-        self.agen_shutdown = False
-        try:
-            async for item in agen:
-                self.stream_block.clear()
-                self.stream_queue.put(item)
-                # flow-control the generator.
-                self.stream_block.wait()
-                if self.agen_shutdown:
-                    break
-        except Exception as e:
-            self.stream_queue.put(e)
-        finally:
-            self.stream_queue.put(sentinel)
-            await agen.aclose()
-
-    def execute_generator(self, asyncgen: AsyncIterator[_Item]) -> Iterator[_Item]:
-        ctx = copy_context()  # preserve context for the worker thread
-        try:
-            self.work_queue.put((asyncgen, ctx))
-            while True:
-                item = self.stream_queue.get()
-                try:
-                    if item is sentinel:
-                        break
-                    if isinstance(item, Exception):
-                        raise item
-                    yield item
-                finally:
-                    self.stream_block.set()
-                    self.stream_queue.task_done()
-        finally:
-            del ctx
-
-    def interrupt_generator(self) -> None:
-        self.agen_shutdown = True
-        self.stream_block.set()
-        self.stream_queue.put(sentinel)
 
 
 class BaseSession(metaclass=abc.ABCMeta):
@@ -423,26 +312,29 @@ class Session(BaseSession):
     but cannot use streaming APIs based on WebSocket and Server-Sent Events.
     """
 
-    __slots__ = ("_worker_thread",)
+    __slots__ = ("_aiohttp_session_injected", "_worker_thread")
 
     def __init__(
         self,
         *,
         config: APIConfig | None = None,
         proxy_mode: bool = False,
+        aiohttp_session: aiohttp.ClientSession | None = None,
     ) -> None:
         super().__init__(config=config, proxy_mode=proxy_mode)
-        self._worker_thread = _SyncWorkerThread()
+        self._worker_thread = SyncWorkerThread()
         self._worker_thread.start()
 
-        async def _create_aiohttp_session() -> aiohttp.ClientSession:
-            ssl: SSLContextType = True
-            if self._config.skip_sslcert_validation:
-                ssl = False
-            connector = aiohttp.TCPConnector(ssl=ssl)
-            return aiohttp.ClientSession(connector=connector)
+        if aiohttp_session is not None:
+            self.aiohttp_session = aiohttp_session
+            self._aiohttp_session_injected = True
+        else:
 
-        self.aiohttp_session = self.worker_thread.execute(_create_aiohttp_session())
+            async def _create_aiohttp_session() -> aiohttp.ClientSession:
+                return _default_http_client_session(self._config.skip_sslcert_validation)
+
+            self.aiohttp_session = self.worker_thread.execute(_create_aiohttp_session())
+            self._aiohttp_session_injected = False
 
     def open(self) -> None:
         self._context_token = api_session.set(self)
@@ -461,14 +353,14 @@ class Session(BaseSession):
         if self._closed:
             return
         self._closed = True
-        self._worker_thread.interrupt_generator()
-        self._worker_thread.execute(_close_aiohttp_session(self.aiohttp_session))
-        self._worker_thread.work_queue.put(sentinel)
+        if not self._aiohttp_session_injected:
+            self._worker_thread.execute(_close_aiohttp_session(self.aiohttp_session))
+        self._worker_thread.work_queue.put(Sentinel.TOKEN)
         self._worker_thread.join()
         api_session.reset(self._context_token)
 
     @property
-    def worker_thread(self) -> _SyncWorkerThread:
+    def worker_thread(self) -> SyncWorkerThread:
         """
         The thread that internally executes the asynchronous implementations
         of the given API functions.
