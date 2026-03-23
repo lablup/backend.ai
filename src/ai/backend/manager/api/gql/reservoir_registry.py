@@ -39,6 +39,7 @@ from ai.backend.manager.api.gql.decorators import (
     gql_node_type,
     gql_pydantic_input,
     gql_pydantic_type,
+    gql_root_field,
 )
 from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin, PydanticOutputMixin
 from ai.backend.manager.errors.api import NotImplementedAPI
@@ -103,13 +104,17 @@ class ReservoirRegistryConnection(Connection[ReservoirRegistry]):
         return len(self.edges)
 
 
-@gql_field(description="Added in 25.14.0")  # type: ignore[misc]
+@gql_root_field(
+    BackendAIGQLMeta(added_version="25.14.0", description="Get a reservoir registry by ID")
+)  # type: ignore[misc]
 async def reservoir_registry(id: ID, info: Info[StrawberryGQLContext]) -> ReservoirRegistry | None:
     node = await info.context.adapters.reservoir_registry.get(uuid.UUID(id))
     return ReservoirRegistry.from_pydantic(node)
 
 
-@gql_field(description="Added in 25.14.0")  # type: ignore[misc]
+@gql_root_field(
+    BackendAIGQLMeta(added_version="25.14.0", description="List all reservoir registries")
+)  # type: ignore[misc]
 async def reservoir_registries(
     info: Info[StrawberryGQLContext],
     before: str | None = None,

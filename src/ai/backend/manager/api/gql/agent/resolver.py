@@ -15,12 +15,15 @@ from ai.backend.manager.api.gql.agent.types import (
 )
 from ai.backend.manager.api.gql.base import to_global_id
 from ai.backend.manager.api.gql.decorators import (
-    gql_field,
+    BackendAIGQLMeta,
+    gql_root_field,
 )
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 
 
-@gql_field(description="Added in 25.15.0")  # type: ignore[misc]
+@gql_root_field(
+    BackendAIGQLMeta(added_version="25.15.0", description="Get aggregate agent resource statistics")
+)  # type: ignore[misc]
 async def agent_stats(info: Info[StrawberryGQLContext]) -> AgentStatsGQL | None:
     total = await info.context.adapters.agent.get_total_resources()
     resource = AgentResourceGQL(
@@ -31,7 +34,11 @@ async def agent_stats(info: Info[StrawberryGQLContext]) -> AgentStatsGQL | None:
     return AgentStatsGQL(total_resource=resource)
 
 
-@gql_field(description="Added in 26.1.0")  # type: ignore[misc]
+@gql_root_field(
+    BackendAIGQLMeta(
+        added_version="26.1.0", description="List agents with filtering and pagination"
+    )
+)  # type: ignore[misc]
 async def agents_v2(
     info: Info[StrawberryGQLContext],
     filter: AgentFilterGQL | None = None,

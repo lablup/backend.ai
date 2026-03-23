@@ -11,9 +11,9 @@ from ai.backend.common.dto.manager.v2.resource_group.request import AdminSearchR
 from ai.backend.manager.api.gql.base import encode_cursor
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
-    gql_added_field,
     gql_connection_type,
     gql_mutation,
+    gql_root_field,
 )
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.api.gql.utils import check_admin_only
@@ -50,7 +50,7 @@ class ResourceGroupConnection(Connection[ResourceGroupGQL]):
 # Query fields
 
 
-@gql_added_field(
+@gql_root_field(
     BackendAIGQLMeta(added_version="26.2.0", description="List resource groups (admin only)")
 )  # type: ignore[misc]
 async def admin_resource_groups(
@@ -97,7 +97,7 @@ async def admin_resource_groups(
     )
 
 
-@gql_added_field(
+@gql_root_field(
     BackendAIGQLMeta(added_version="26.2.0", description="List resource groups"),
     deprecation_reason="Use admin_resource_groups instead. This API will be removed after v26.3.0. See BEP-1041 for migration guide.",
 )  # type: ignore[misc]

@@ -15,12 +15,12 @@ from ai.backend.common.dto.manager.v2.scheduling_history.request import (
     AdminSearchRouteHistoriesInput,
     AdminSearchSessionHistoriesInput,
 )
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.base import encode_cursor
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
-    gql_added_field,
     gql_connection_type,
-    gql_field,
+    gql_root_field,
 )
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.api.gql.utils import check_admin_only
@@ -88,7 +88,12 @@ class RouteHistoryConnection(Connection[RouteHistory]):
 # Query fields
 
 
-@gql_field(description="List session scheduling history (admin only)")  # type: ignore[misc]
+@gql_root_field(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="List session scheduling history (admin only)",
+    )
+)  # type: ignore[misc]
 async def admin_session_scheduling_histories(
     info: Info[StrawberryGQLContext],
     filter: SessionSchedulingHistoryFilter | None = None,
@@ -130,8 +135,11 @@ async def admin_session_scheduling_histories(
     )
 
 
-@gql_field(
-    description="List session scheduling history (superadmin only)",
+@gql_root_field(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="List session scheduling history (superadmin only)",
+    ),
     deprecation_reason="Use admin_session_scheduling_histories instead. This API will be removed after v26.3.0. See BEP-1041 for migration guide.",
 )  # type: ignore[misc]
 async def session_scheduling_histories(
@@ -177,7 +185,11 @@ async def session_scheduling_histories(
     )
 
 
-@gql_field(description="List deployment history (admin only)")  # type: ignore[misc]
+@gql_root_field(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION, description="List deployment history (admin only)"
+    )
+)  # type: ignore[misc]
 async def admin_deployment_histories(
     info: Info[StrawberryGQLContext],
     filter: DeploymentHistoryFilter | None = None,
@@ -216,8 +228,10 @@ async def admin_deployment_histories(
     )
 
 
-@gql_field(
-    description="List deployment history (superadmin only)",
+@gql_root_field(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION, description="List deployment history (superadmin only)"
+    ),
     deprecation_reason="Use admin_deployment_histories instead. This API will be removed after v26.3.0. See BEP-1041 for migration guide.",
 )  # type: ignore[misc]
 async def deployment_histories(
@@ -260,7 +274,11 @@ async def deployment_histories(
     )
 
 
-@gql_field(description="List route history (admin only)")  # type: ignore[misc]
+@gql_root_field(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION, description="List route history (admin only)"
+    )
+)  # type: ignore[misc]
 async def admin_route_histories(
     info: Info[StrawberryGQLContext],
     filter: RouteHistoryFilter | None = None,
@@ -299,8 +317,10 @@ async def admin_route_histories(
     )
 
 
-@gql_field(
-    description="List route history (superadmin only)",
+@gql_root_field(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION, description="List route history (superadmin only)"
+    ),
     deprecation_reason="Use admin_route_histories instead. This API will be removed after v26.3.0. See BEP-1041 for migration guide.",
 )  # type: ignore[misc]
 async def route_histories(
@@ -346,7 +366,7 @@ async def route_histories(
 # Scoped query fields (added in 26.2.0)
 
 
-@gql_added_field(
+@gql_root_field(
     BackendAIGQLMeta(
         added_version="26.2.0", description="Get scheduling history for a specific session."
     )
@@ -394,7 +414,7 @@ async def session_scoped_scheduling_histories(
     )
 
 
-@gql_added_field(
+@gql_root_field(
     BackendAIGQLMeta(
         added_version="26.2.0", description="Get scheduling history for a specific deployment."
     )
@@ -439,7 +459,7 @@ async def deployment_scoped_scheduling_histories(
     )
 
 
-@gql_added_field(
+@gql_root_field(
     BackendAIGQLMeta(
         added_version="26.2.0", description="Get scheduling history for a specific route."
     )

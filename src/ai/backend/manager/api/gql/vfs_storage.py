@@ -32,13 +32,13 @@ from ai.backend.common.dto.manager.v2.vfs_storage.response import (
 from ai.backend.manager.api.gql.base import encode_cursor
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
-    gql_added_field,
     gql_connection_type,
     gql_field,
     gql_mutation,
     gql_node_type,
     gql_pydantic_input,
     gql_pydantic_type,
+    gql_root_field,
 )
 from ai.backend.manager.api.gql.pydantic_compat import (
     PydanticInputMixin,
@@ -90,13 +90,13 @@ class VFSStorageConnection(Connection[VFSStorage]):
         return len(self.edges)
 
 
-@gql_added_field(BackendAIGQLMeta(added_version="25.16.0", description="Get a VFS storage by ID"))  # type: ignore[misc]
+@gql_root_field(BackendAIGQLMeta(added_version="25.16.0", description="Get a VFS storage by ID"))  # type: ignore[misc]
 async def vfs_storage(id: ID, info: Info[StrawberryGQLContext]) -> VFSStorage | None:
     node = await info.context.adapters.vfs_storage.get(uuid.UUID(id))
     return VFSStorage.from_pydantic(node)
 
 
-@gql_added_field(BackendAIGQLMeta(added_version="25.16.0", description="List all VFS storages"))  # type: ignore[misc]
+@gql_root_field(BackendAIGQLMeta(added_version="25.16.0", description="List all VFS storages"))  # type: ignore[misc]
 async def vfs_storages(
     info: Info[StrawberryGQLContext],
     before: str | None = None,

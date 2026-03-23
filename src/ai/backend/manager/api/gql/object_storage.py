@@ -53,6 +53,7 @@ from ai.backend.manager.api.gql.decorators import (
     gql_node_type,
     gql_pydantic_input,
     gql_pydantic_type,
+    gql_root_field,
 )
 from ai.backend.manager.api.gql.pydantic_compat import (
     PydanticInputMixin,
@@ -134,13 +135,15 @@ class ObjectStorageConnection(Connection[ObjectStorage]):
         return len(self.edges)
 
 
-@gql_field(description="Added in 25.14.0")  # type: ignore[misc]
+@gql_root_field(
+    BackendAIGQLMeta(added_version="25.14.0", description="Get an object storage by ID")
+)  # type: ignore[misc]
 async def object_storage(id: ID, info: Info[StrawberryGQLContext]) -> ObjectStorage | None:
     node = await info.context.adapters.object_storage.get(uuid.UUID(id))
     return ObjectStorage.from_pydantic(node, extra={"region": node.region or ""})
 
 
-@gql_field(description="Added in 25.14.0")  # type: ignore[misc]
+@gql_root_field(BackendAIGQLMeta(added_version="25.14.0", description="List all object storages"))  # type: ignore[misc]
 async def object_storages(
     info: Info[StrawberryGQLContext],
     before: str | None = None,

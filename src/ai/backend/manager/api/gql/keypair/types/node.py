@@ -23,7 +23,7 @@ from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin
     BackendAIGQLMeta(
         added_version=NEXT_RELEASE_VERSION,
         description=(
-            "Added in 26.5.0. Keypair entity representing an API access key. "
+            "Keypair entity representing an API access key. "
             "The access_key field serves as the unique identifier. "
             "Secret key and private SSH key are excluded for security reasons."
         ),

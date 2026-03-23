@@ -42,6 +42,7 @@ from ai.backend.manager.api.gql.decorators import (
     gql_node_type,
     gql_pydantic_input,
     gql_pydantic_type,
+    gql_root_field,
 )
 from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin, PydanticOutputMixin
 
@@ -96,7 +97,9 @@ class HuggingFaceRegistryConnection(Connection[HuggingFaceRegistry]):
         return len(self.edges)
 
 
-@gql_field(description="Added in 25.14.0")  # type: ignore[misc]
+@gql_root_field(
+    BackendAIGQLMeta(added_version="25.14.0", description="Get a HuggingFace registry by ID")
+)  # type: ignore[misc]
 async def huggingface_registry(
     id: ID, info: Info[StrawberryGQLContext]
 ) -> HuggingFaceRegistry | None:
@@ -104,7 +107,9 @@ async def huggingface_registry(
     return HuggingFaceRegistry.from_pydantic(node)
 
 
-@gql_field(description="Added in 25.14.0")  # type: ignore[misc]
+@gql_root_field(
+    BackendAIGQLMeta(added_version="25.14.0", description="List all HuggingFace registries")
+)  # type: ignore[misc]
 async def huggingface_registries(
     info: Info[StrawberryGQLContext],
     before: str | None = None,

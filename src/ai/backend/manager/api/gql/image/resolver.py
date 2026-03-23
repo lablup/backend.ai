@@ -20,7 +20,7 @@ from ai.backend.common.types import ImageID
 from ai.backend.manager.api.gql.base import encode_cursor
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
-    gql_added_field,
+    gql_root_field,
 )
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.api.gql.utils import check_admin_only
@@ -43,7 +43,7 @@ from .types import (
 
 
 # Query Fields
-@gql_added_field(
+@gql_root_field(
     BackendAIGQLMeta(
         added_version="26.2.0",
         description="Query images with optional filtering, ordering, and pagination (admin only). Returns container images available in the system. Images are container specifications that define runtime environments for compute sessions. Use filters to narrow down results by status, name, or architecture. Supports both cursor-based and offset-based pagination.",
@@ -91,7 +91,7 @@ async def admin_images_v2(
     return ImageV2ConnectionGQL(count=payload.total_count, edges=edges, page_info=page_info)
 
 
-@gql_added_field(
+@gql_root_field(
     BackendAIGQLMeta(
         added_version="26.2.0",
         description="Retrieve a specific image by its ID. Returns detailed information about the image including its identity, metadata, resource requirements, and permission settings.",
@@ -104,7 +104,7 @@ async def image_v2(id: ID, info: Info[StrawberryGQLContext]) -> ImageV2GQL | Non
     return image_data
 
 
-@gql_added_field(
+@gql_root_field(
     BackendAIGQLMeta(
         added_version="26.2.0",
         description="Query images within a specific container registry with optional filtering, ordering, and pagination. Returns container images that belong to the specified registry. Use filters to narrow down results by status, name, or architecture. Supports both cursor-based and offset-based pagination.",
@@ -155,7 +155,7 @@ async def container_registry_images_v2(
 
 
 # Image Alias Query Fields
-@gql_added_field(
+@gql_root_field(
     BackendAIGQLMeta(
         added_version="26.2.0",
         description="Query image aliases with optional filtering, ordering, and pagination. Returns image aliases that provide alternative names for container images. Use filters to search by alias string. Supports both cursor-based and offset-based pagination.",
@@ -203,7 +203,7 @@ async def admin_image_aliases(
     return ImageV2AliasConnectionGQL(count=payload.total_count, edges=edges, page_info=page_info)
 
 
-@gql_added_field(
+@gql_root_field(
     BackendAIGQLMeta(
         added_version="26.2.0",
         description="Retrieve a specific image alias by its ID. Returns the alias information including the alias string.",
@@ -216,7 +216,7 @@ async def image_alias(id: ID, info: Info[StrawberryGQLContext]) -> ImageV2AliasG
     return alias_data
 
 
-@gql_added_field(
+@gql_root_field(
     BackendAIGQLMeta(
         added_version="26.2.0",
         description="Query image aliases within a specific image with optional filtering, ordering, and pagination. Returns image aliases that belong to the specified image. Supports both cursor-based and offset-based pagination.",

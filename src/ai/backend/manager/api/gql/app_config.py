@@ -32,10 +32,10 @@ from ai.backend.common.dto.manager.v2.app_config.response import (
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     PydanticInputMixin,
-    gql_added_field,
     gql_mutation,
     gql_pydantic_input,
     gql_pydantic_type,
+    gql_root_field,
 )
 from ai.backend.manager.api.gql.pydantic_compat import PydanticOutputMixin
 from ai.backend.manager.api.gql.utils import check_admin_only, dedent_strip
@@ -172,7 +172,7 @@ class DeleteUserConfigPayload:
     deleted: strawberry.auto
 
 
-@gql_added_field(
+@gql_root_field(
     BackendAIGQLMeta(
         added_version="26.2.0",
         description="Retrieve domain-level app configuration (admin only). Returns only the configuration set specifically for the domain, without merging. This query is useful for checking what values are configured at the domain level when you want to modify domain or user configurations separately. For actual configuration values to be applied, use mergedAppConfig instead.",
@@ -190,7 +190,7 @@ async def admin_domain_app_config(
     return AppConfig.from_pydantic(result)
 
 
-@gql_added_field(
+@gql_root_field(
     BackendAIGQLMeta(
         added_version="25.16.0",
         description="Retrieve domain-level app configuration. Returns only the configuration set specifically for the domain, without merging. This query is useful for checking what values are configured at the domain level when you want to modify domain or user configurations separately. For actual configuration values to be applied, use mergedAppConfig instead. Requires admin privileges.",
@@ -212,7 +212,7 @@ async def domain_app_config(
     return AppConfig.from_pydantic(result)
 
 
-@gql_added_field(
+@gql_root_field(
     BackendAIGQLMeta(
         added_version="25.16.0",
         description="Retrieve user-level app configuration. Returns only the configuration set specifically for the user, without merging with domain config. This query is useful for checking what values are configured at the user level when you want to modify domain or user configurations separately. For actual configuration values to be applied, use mergedAppConfig instead. If user_id is not provided, returns the current user's configuration. Users can only access their own configuration, but admins can access any user's configuration.",
@@ -239,7 +239,7 @@ async def user_app_config(
     return AppConfig.from_pydantic(result)
 
 
-@gql_added_field(
+@gql_root_field(
     BackendAIGQLMeta(
         added_version="25.16.0",
         description="Retrieve merged app configuration for the current user. The result combines domain-level and user-level configurations, where user settings override domain settings for the same keys. This query should be used when working with user app configurations to get the actual configuration values that will be applied.",

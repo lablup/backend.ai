@@ -11,6 +11,7 @@ from ai.backend.manager.api.gql.decorators import (
     gql_added_field,
     gql_field,
     gql_pydantic_type,
+    gql_root_field,
 )
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.data.artifact.types import (
@@ -44,7 +45,12 @@ class ArtifactRegistry:
     type: ArtifactRegistryType = gql_field(description="Type of the default artifact registry.")
 
 
-@gql_field(description="Added in 25.14.0")  # type: ignore[misc]
+@gql_root_field(
+    BackendAIGQLMeta(
+        added_version="25.14.0",
+        description="Get the default artifact registry for a given artifact type",
+    )
+)  # type: ignore[misc]
 async def default_artifact_registry(
     artifact_type: ArtifactType, info: Info[StrawberryGQLContext]
 ) -> ArtifactRegistry | None:

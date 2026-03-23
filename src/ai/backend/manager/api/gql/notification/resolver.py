@@ -19,8 +19,8 @@ from ai.backend.manager.api.gql.base import encode_cursor
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     gql_connection_type,
-    gql_field,
     gql_mutation,
+    gql_root_field,
 )
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.api.gql.utils import check_admin_only
@@ -85,7 +85,12 @@ class NotificationRuleConnection(Connection[NotificationRule]):
 # Query fields
 
 
-@gql_field(description="Get a notification channel by ID (admin only)")  # type: ignore[misc]
+@gql_root_field(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Get a notification channel by ID (admin only)",
+    )
+)  # type: ignore[misc]
 async def admin_notification_channel(
     id: ID, info: Info[StrawberryGQLContext]
 ) -> NotificationChannel | None:
@@ -94,8 +99,10 @@ async def admin_notification_channel(
     return NotificationChannel.from_pydantic(result.item)
 
 
-@gql_field(
-    description="Get a notification channel by ID",
+@gql_root_field(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION, description="Get a notification channel by ID"
+    ),
     deprecation_reason="Use admin_notification_channel instead. This API will be removed after v26.3.0. See BEP-1041 for migration guide.",
 )  # type: ignore[misc]
 async def notification_channel(
@@ -105,7 +112,11 @@ async def notification_channel(
     return NotificationChannel.from_pydantic(result.item)
 
 
-@gql_field(description="List notification channels (admin only)")  # type: ignore[misc]
+@gql_root_field(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION, description="List notification channels (admin only)"
+    )
+)  # type: ignore[misc]
 async def admin_notification_channels(
     info: Info[StrawberryGQLContext],
     filter: NotificationChannelFilter | None = None,
@@ -151,8 +162,8 @@ async def admin_notification_channels(
     )
 
 
-@gql_field(
-    description="List notification channels",
+@gql_root_field(
+    BackendAIGQLMeta(added_version=NEXT_RELEASE_VERSION, description="List notification channels"),
     deprecation_reason="Use admin_notification_channels instead. This API will be removed after v26.3.0. See BEP-1041 for migration guide.",
 )  # type: ignore[misc]
 async def notification_channels(
@@ -198,7 +209,11 @@ async def notification_channels(
     )
 
 
-@gql_field(description="Get a notification rule by ID (admin only)")  # type: ignore[misc]
+@gql_root_field(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION, description="Get a notification rule by ID (admin only)"
+    )
+)  # type: ignore[misc]
 async def admin_notification_rule(
     id: ID, info: Info[StrawberryGQLContext]
 ) -> NotificationRule | None:
@@ -207,8 +222,10 @@ async def admin_notification_rule(
     return NotificationRule.from_pydantic(result.item)
 
 
-@gql_field(
-    description="Get a notification rule by ID",
+@gql_root_field(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION, description="Get a notification rule by ID"
+    ),
     deprecation_reason="Use admin_notification_rule instead. This API will be removed after v26.3.0. See BEP-1041 for migration guide.",
 )  # type: ignore[misc]
 async def notification_rule(id: ID, info: Info[StrawberryGQLContext]) -> NotificationRule | None:
@@ -216,7 +233,11 @@ async def notification_rule(id: ID, info: Info[StrawberryGQLContext]) -> Notific
     return NotificationRule.from_pydantic(result.item)
 
 
-@gql_field(description="List notification rules (admin only)")  # type: ignore[misc]
+@gql_root_field(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION, description="List notification rules (admin only)"
+    )
+)  # type: ignore[misc]
 async def admin_notification_rules(
     info: Info[StrawberryGQLContext],
     filter: NotificationRuleFilter | None = None,
@@ -260,8 +281,8 @@ async def admin_notification_rules(
     )
 
 
-@gql_field(
-    description="List notification rules",
+@gql_root_field(
+    BackendAIGQLMeta(added_version=NEXT_RELEASE_VERSION, description="List notification rules"),
     deprecation_reason="Use admin_notification_rules instead. This API will be removed after v26.3.0. See BEP-1041 for migration guide.",
 )  # type: ignore[misc]
 async def notification_rules(
@@ -305,13 +326,22 @@ async def notification_rules(
     )
 
 
-@gql_field(description="List available notification rule types")  # type: ignore[misc]
+@gql_root_field(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION, description="List available notification rule types"
+    )
+)  # type: ignore[misc]
 async def notification_rule_types() -> list[NotificationRuleTypeGQL] | None:
     """Return all available notification rule types."""
     return list(NotificationRuleTypeGQL)
 
 
-@gql_field(description="Get JSON schema for a notification rule type's message format")  # type: ignore[misc]
+@gql_root_field(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Get JSON schema for a notification rule type's message format",
+    )
+)  # type: ignore[misc]
 async def notification_rule_type_schema(
     rule_type: NotificationRuleTypeGQL,
 ) -> strawberry.scalars.JSON:

@@ -20,8 +20,8 @@ from ai.backend.manager.api.gql.base import (
 )
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
-    gql_added_field,
     gql_mutation,
+    gql_root_field,
     gql_subscription,
 )
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
@@ -79,7 +79,7 @@ from .types import (
 
 
 # Query Fields
-@gql_added_field(
+@gql_root_field(
     BackendAIGQLMeta(
         added_version="25.14.0",
         description="Query artifacts with optional filtering, ordering, and pagination. Returns artifacts that are available in the system, discovered through scanning external registries like HuggingFace or Reservoir. By default, only shows ALIVE (non-deleted) artifacts. Use filters to narrow down results by type, name, registry, or availability. Supports cursor-based pagination for efficient browsing of large datasets.",
@@ -138,7 +138,7 @@ async def artifacts(
     )
 
 
-@gql_added_field(
+@gql_root_field(
     BackendAIGQLMeta(
         added_version="25.14.0",
         description="Retrieve a specific artifact by its ID. Returns detailed information about the artifact including its metadata, registry information, and availability status.",
@@ -161,7 +161,7 @@ async def artifact(id: ID, info: Info[StrawberryGQLContext]) -> Artifact | None:
     return Artifact.from_pydantic(to_artifact_gql_node(artifact_node, registry_url, source_url))
 
 
-@gql_added_field(
+@gql_root_field(
     BackendAIGQLMeta(
         added_version="25.14.0",
         description="Query artifact revisions with optional filtering, ordering, and pagination. Returns specific versions/revisions of artifacts. Each revision represents a specific version of an artifact with its own status, file data, and metadata. Use filters to find revisions by status, version, or artifact ID. Supports cursor-based pagination for efficient browsing.",
@@ -213,7 +213,7 @@ async def artifact_revisions(
     )
 
 
-@gql_added_field(
+@gql_root_field(
     BackendAIGQLMeta(
         added_version="25.14.0",
         description="Retrieve a specific artifact revision by its ID. Returns detailed information about the revision including its status, version, file size, and README content.",
