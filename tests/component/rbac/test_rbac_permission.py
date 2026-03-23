@@ -55,7 +55,7 @@ from .conftest import RoleFactory
 def permission_service(database_engine: ExtendedAsyncSAEngine) -> PermissionControllerService:
     """Direct service fixture for operations not exposed through processors."""
     repo = PermissionControllerRepository(database_engine)
-    return PermissionControllerService(repo)
+    return PermissionControllerService(repo, rbac_action_registry=[])
 
 
 @pytest.fixture()
