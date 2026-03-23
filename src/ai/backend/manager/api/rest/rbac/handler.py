@@ -12,7 +12,6 @@ from http import HTTPStatus
 
 from ai.backend.common.api_handlers import APIResponse, BodyParam, PathParam
 from ai.backend.common.data.permission.types import (
-    GLOBAL_SCOPE_ID,
     EntityType,
     ScopeType,
 )
@@ -50,9 +49,7 @@ from ai.backend.common.dto.manager.rbac.response import (
     SearchScopesResponse,
 )
 from ai.backend.common.exception import RBACTypeConversionError
-from ai.backend.manager.data.permission.id import ScopeId
 from ai.backend.manager.data.permission.role import UserRoleAssignmentInput, UserRoleRevocationInput
-from ai.backend.manager.data.permission.types import ScopeData
 from ai.backend.manager.dto.context import UserContext
 from ai.backend.manager.errors.permission import NotEnoughPermission
 from ai.backend.manager.models.rbac_models.role import RoleRow
@@ -326,21 +323,6 @@ class RBACHandler:
             raise NotEnoughPermission("Only superadmin can search scopes.")
 
         scope_type = path.parsed.scope_type
-        # Handle GLOBAL scope as a static early-return (GLOBAL is not in RBACElementType)
-        if scope_type.value == GLOBAL_SCOPE_ID:
-            global_result = SearchScopesResponse(
-                items=[
-                    self._scope_adapter.convert_to_dto(
-                        ScopeData(
-                            id=ScopeId(scope_type=ScopeType.GLOBAL, scope_id=GLOBAL_SCOPE_ID),
-                            name=GLOBAL_SCOPE_ID,
-                        )
-                    )
-                ],
-                pagination=PaginationInfo(total=1, offset=0, limit=1),
-            )
-            return APIResponse.build(status_code=HTTPStatus.OK, response_model=global_result)
-
         element_type = scope_type.to_element()
         querier = self._scope_adapter.build_querier(scope_type, body.parsed)
         action = SearchScopesAction(element_type=element_type, querier=querier)

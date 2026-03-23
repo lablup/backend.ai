@@ -11,7 +11,7 @@ from collections.abc import AsyncGenerator
 import pytest
 
 from ai.backend.common.data.filter_specs import StringMatchSpec
-from ai.backend.common.data.permission.types import GLOBAL_SCOPE_ID, RBACElementType, ScopeType
+from ai.backend.common.data.permission.types import RBACElementType, ScopeType
 from ai.backend.common.types import ResourceSlot
 from ai.backend.manager.models.agent import AgentRow
 from ai.backend.manager.models.deployment_auto_scaling_policy import DeploymentAutoScalingPolicyRow
@@ -780,21 +780,6 @@ class TestSearchGlobalScope:
     ) -> PermissionControllerRepository:
         """Create PermissionControllerRepository instance."""
         return PermissionControllerRepository(db_with_scope_tables)
-
-    async def test_search_scopes_global_returns_static_result(
-        self,
-        permission_controller_repository: PermissionControllerRepository,
-    ) -> None:
-        """Test global scope returns single static result."""
-        result = permission_controller_repository.get_global_scope()
-
-        assert result.total_count == 1
-        assert len(result.items) == 1
-        assert result.items[0].id.scope_type == ScopeType.GLOBAL
-        assert result.items[0].id.scope_id == GLOBAL_SCOPE_ID
-        assert result.items[0].name == GLOBAL_SCOPE_ID
-        assert result.has_next_page is False
-        assert result.has_previous_page is False
 
 
 class TestSearchScopesEmptyResult:
