@@ -43,7 +43,7 @@ class TestGetScopeTypes:
         self, mock_repository: PermissionControllerRepository
     ) -> PermissionControllerService:
         """Create service with mocked repository."""
-        return PermissionControllerService(repository=mock_repository)
+        return PermissionControllerService(repository=mock_repository, rbac_action_registry=[])
 
     async def test_get_scope_types_returns_all_scope_types(
         self,
@@ -75,7 +75,7 @@ class TestSearchScopes:
         self, mock_repository: PermissionControllerRepository
     ) -> PermissionControllerService:
         """Create service with mocked repository."""
-        return PermissionControllerService(repository=mock_repository)
+        return PermissionControllerService(repository=mock_repository, rbac_action_registry=[])
 
     async def test_search_scopes_calls_repository(
         self,

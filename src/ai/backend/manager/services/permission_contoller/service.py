@@ -3,12 +3,15 @@ from collections.abc import Sequence
 
 from ai.backend.common.data.permission.types import (
     EntityType,
-    OperationType,
     RBACElementType,
     ScopeType,
 )
 from ai.backend.logging.utils import BraceStyleAdapter
-from ai.backend.manager.actions.action.rbac import BaseRBACAction
+from ai.backend.manager.actions.action.rbac import (
+    BaseRBACAction,
+    RBACActionName,
+    RBACRequiredPermission,
+)
 from ai.backend.manager.repositories.permission_controller.db_source.db_source import (
     CreateRoleInput,
 )
@@ -299,18 +302,17 @@ class PermissionControllerService:
 
     def get_entity_valid_operations(
         self,
-    ) -> dict[RBACElementType, set[OperationType]]:
+    ) -> dict[RBACElementType, dict[RBACActionName, RBACRequiredPermission]]:
         """
         Get valid operations for all registered RBAC element types.
 
         Aggregates required permissions from all registered action classes,
-        grouping them by element type.
-
-        Returns:
-            dict[RBACElementType, set[OperationType]]: Valid operations by element type
+        grouping them by element type. Each entry maps action name to its
+        required permission.
         """
-        result: dict[RBACElementType, set[OperationType]] = {}
+        result: dict[RBACElementType, dict[RBACActionName, RBACRequiredPermission]] = {}
         for action_cls in self._rbac_action_registry:
-            element_type, operation = action_cls.required_permission()
-            result.setdefault(element_type, set()).add(operation)
+            perm = action_cls.required_permission()
+            actions = result.setdefault(perm.element_type, {})
+            actions[action_cls.action_name()] = perm
         return result

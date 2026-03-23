@@ -12,7 +12,7 @@ from .batch import (
     BaseBatchAction,
     BaseBatchActionResult,
 )
-from .rbac import BaseRBACAction
+from .rbac import BaseRBACAction, RBACActionName, RBACRequiredPermission
 
 __all__ = (
     "BaseAction",
@@ -22,6 +22,8 @@ __all__ = (
     "BaseBatchAction",
     "BaseBatchActionResult",
     "BaseRBACAction",
+    "RBACActionName",
+    "RBACRequiredPermission",
     "ProcessResult",
     "SearchActionResult",
     "TAction",
