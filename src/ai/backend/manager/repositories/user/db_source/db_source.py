@@ -1355,16 +1355,16 @@ class UserDBSource:
         """Update a keypair owned by the current user."""
         access_key = str(updater.pk_value)
         async with self._db.begin_session() as session:
-            kp_row = (
-                await session.scalars(
-                    sa.select(KeyPairRow)
-                    .where(KeyPairRow.access_key == access_key)
-                    .options(noload("*"))
-                )
-            ).first()
-            if not kp_row:
+            # Use a scalar-only query to avoid loading the full ORM object into the
+            # session identity map. Loading the full row here would cause execute_updater's
+            # UPDATE...RETURNING to return the stale cached object instead of the fresh
+            # post-update values.
+            user_of_keypair = await session.scalar(
+                sa.select(KeyPairRow.user).where(KeyPairRow.access_key == access_key)
+            )
+            if user_of_keypair is None:
                 raise KeyPairNotFound(f"Keypair {access_key} not found")
-            if kp_row.user != user_uuid:
+            if user_of_keypair != user_uuid:
                 raise KeyPairForbidden("Cannot update another user's keypair")
 
             update_result = await execute_updater(session, updater)
