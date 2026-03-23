@@ -9,6 +9,7 @@ from typing import TYPE_CHECKING, Annotated, Any, Self, cast
 from uuid import UUID
 
 import strawberry
+from pydantic import Field
 from strawberry import ID, Info
 from strawberry.relay import Connection, Edge, NodeID
 from strawberry.scalars import JSON
@@ -502,7 +503,9 @@ class CreateRevisionInput(PydanticInputMixin[CreateRevisionInputDTO]):
     image: ImageInput
     model_runtime_config: ModelRuntimeConfigInput
     model_mount_config: ModelMountConfigInput
-    extra_mounts: list[ExtraVFolderMountInput] | None
+    extra_mounts: list[ExtraVFolderMountInput] | None = Field(
+        default=None, description="Extra vfolder mounts"
+    )
 
 
 @gql_pydantic_input(
@@ -516,7 +519,9 @@ class AddRevisionInput(PydanticInputMixin[AddRevisionGQLInputDTO]):
     image: ImageInput
     model_runtime_config: ModelRuntimeConfigInput
     model_mount_config: ModelMountConfigInput
-    extra_mounts: list[ExtraVFolderMountInput] | None
+    extra_mounts: list[ExtraVFolderMountInput] | None = Field(
+        default=None, description="Extra vfolder mounts"
+    )
 
 
 ModelRevisionEdge = Edge[ModelRevision]
