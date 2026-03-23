@@ -2,6 +2,46 @@
 Common types for container registry DTO v2.
 """
 
-from ai.backend.common.container_registry import ContainerRegistryType
+from enum import StrEnum
 
-__all__ = ("ContainerRegistryType",)
+from pydantic import Field
+
+from ai.backend.common.api_handlers import BaseRequestModel
+from ai.backend.common.container_registry import ContainerRegistryType
+from ai.backend.common.dto.manager.v2.common import OrderDirection
+
+__all__ = (
+    "ContainerRegistryOrderField",
+    "ContainerRegistryType",
+    "ContainerRegistryTypeFilter",
+    "OrderDirection",
+)
+
+
+class ContainerRegistryOrderField(StrEnum):
+    """Fields available for ordering container registries."""
+
+    REGISTRY_NAME = "registry_name"
+    URL = "url"
+    TYPE = "type"
+    IS_GLOBAL = "is_global"
+
+
+class ContainerRegistryTypeFilter(BaseRequestModel):
+    """Filter for container registry type enum fields.
+
+    Supports equals, in, not_equals, and not_in operations.
+    """
+
+    equals: ContainerRegistryType | None = Field(
+        default=None, description="Exact match for registry type."
+    )
+    in_: list[ContainerRegistryType] | None = Field(
+        default=None, alias="in", description="Match any of the provided types."
+    )
+    not_equals: ContainerRegistryType | None = Field(
+        default=None, description="Exclude exact type match."
+    )
+    not_in: list[ContainerRegistryType] | None = Field(
+        default=None, description="Exclude any of the provided types."
+    )

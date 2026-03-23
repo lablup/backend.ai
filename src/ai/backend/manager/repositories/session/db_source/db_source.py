@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import uuid
 from collections.abc import Sequence
+from datetime import datetime
 from typing import Any, cast
 
 import sqlalchemy as sa
@@ -552,4 +553,14 @@ class SessionDBSource:
                 total_count=result.total_count,
                 has_next_page=result.has_next_page,
                 has_previous_page=result.has_previous_page,
+            )
+
+    async def update_image_last_used_at(
+        self,
+        image_id: uuid.UUID,
+        timestamp: datetime,
+    ) -> None:
+        async with self._db.begin_session() as db_sess:
+            await db_sess.execute(
+                sa.update(ImageRow).where(ImageRow.id == image_id).values(last_used_at=timestamp)
             )

@@ -13,8 +13,8 @@ from ai.backend.manager.data.deployment.creator import DeploymentCreationDraft
 from ai.backend.manager.data.deployment.scale import AutoScalingRule, AutoScalingRuleCreator
 from ai.backend.manager.data.deployment.types import (
     DeploymentInfo,
+    DeploymentLifecycleSubStep,
     DeploymentPolicyData,
-    DeploymentSubStep,
     RouteInfo,
     RouteSearchResult,
     RouteTrafficStatus,
@@ -22,13 +22,13 @@ from ai.backend.manager.data.deployment.types import (
 from ai.backend.manager.data.permission.types import RBACElementRef
 from ai.backend.manager.models.endpoint import EndpointRow
 from ai.backend.manager.models.routing import RoutingRow
+from ai.backend.manager.models.routing.conditions import RouteConditions
 from ai.backend.manager.models.storage import StorageSessionManager
 from ai.backend.manager.repositories.base import BatchQuerier, OffsetPagination
 from ai.backend.manager.repositories.base.rbac.entity_creator import RBACEntityCreator
 from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.repositories.deployment import DeploymentRepository
 from ai.backend.manager.repositories.deployment.creators.endpoint import LegacyEndpointCreatorSpec
-from ai.backend.manager.repositories.deployment.options import RouteConditions
 from ai.backend.manager.repositories.deployment.updaters import (
     DeploymentUpdaterSpec,
     RouteUpdaterSpec,
@@ -151,10 +151,9 @@ class DeploymentController:
             current_revision = modified_endpoint.resolve_revision_spec(
                 modified_endpoint.current_revision_id
             )
-            if current_revision:
-                await self._scheduling_controller.validate_session_spec(
-                    SessionValidationSpec.from_revision(model_revision=current_revision)
-                )
+            await self._scheduling_controller.validate_session_spec(
+                SessionValidationSpec.from_revision(model_revision=current_revision)
+            )
         res = await self._deployment_repository.update_endpoint_with_spec(updater)
         try:
             await self.mark_lifecycle_needed(DeploymentLifecycleType.CHECK_REPLICA)
@@ -205,7 +204,7 @@ class DeploymentController:
     async def mark_lifecycle_needed(
         self,
         lifecycle_type: DeploymentLifecycleType,
-        sub_step: DeploymentSubStep | None = None,
+        sub_step: DeploymentLifecycleSubStep | None = None,
     ) -> None:
         """
         Mark that a deployment lifecycle operation is needed for the next cycle.

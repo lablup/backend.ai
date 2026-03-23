@@ -3,12 +3,15 @@ from __future__ import annotations
 import strawberry
 from strawberry import Info
 
-from ai.backend.manager.api.gql.audit_log.fetcher import fetch_audit_logs
+from ai.backend.common.dto.manager.v2.audit_log.request import AdminSearchAuditLogsInput
 from ai.backend.manager.api.gql.audit_log.types import (
     AuditLogFilterGQL,
     AuditLogOrderByGQL,
     AuditLogV2ConnectionGQL,
+    AuditLogV2EdgeGQL,
+    AuditLogV2GQL,
 )
+from ai.backend.manager.api.gql.base import encode_cursor
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.api.gql.utils import check_admin_only
 
@@ -26,14 +29,27 @@ async def admin_audit_logs_v2(
     offset: int | None = None,
 ) -> AuditLogV2ConnectionGQL:
     check_admin_only()
-    return await fetch_audit_logs(
-        info,
-        filter=filter,
-        order_by=order_by,
-        before=before,
-        after=after,
-        first=first,
-        last=last,
-        limit=limit,
-        offset=offset,
+    result = await info.context.adapters.audit_log.admin_search(
+        AdminSearchAuditLogsInput(
+            filter=filter.to_pydantic() if filter else None,
+            order=[o.to_pydantic() for o in order_by] if order_by else None,
+            first=first,
+            after=after,
+            last=last,
+            before=before,
+            limit=limit,
+            offset=offset,
+        )
+    )
+    nodes = [AuditLogV2GQL.from_pydantic(item) for item in result.items]
+    edges = [AuditLogV2EdgeGQL(node=node, cursor=encode_cursor(node.id)) for node in nodes]
+    return AuditLogV2ConnectionGQL(
+        edges=edges,
+        page_info=strawberry.relay.PageInfo(
+            has_next_page=result.has_next_page,
+            has_previous_page=result.has_previous_page,
+            start_cursor=edges[0].cursor if edges else None,
+            end_cursor=edges[-1].cursor if edges else None,
+        ),
+        count=result.total_count,
     )

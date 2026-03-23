@@ -9,7 +9,7 @@ import sqlalchemy as sa
 from sqlalchemy.engine import CursorResult
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
 
-from ai.backend.common.data.permission.types import OperationType, ScopeType
+from ai.backend.common.data.permission.types import OperationType, RBACElementType
 from ai.backend.manager.data.permission.id import ObjectId
 from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
 
@@ -36,7 +36,7 @@ class RBACRevoker:
     """
 
     entity_id: ObjectId
-    entity_scope_type: ScopeType
+    entity_scope_type: RBACElementType
     target_role_ids: list[UUID]
     operations: list[OperationType] | None = None
 
@@ -50,7 +50,7 @@ async def _delete_permissions(
     db_sess: SASession,
     role_ids: Collection[UUID],
     entity_id: ObjectId,
-    scope_type: ScopeType,
+    scope_type: RBACElementType,
     operations: list[OperationType] | None,
 ) -> int:
     """Delete permissions for the given entity-as-scope and roles."""
@@ -59,7 +59,7 @@ async def _delete_permissions(
 
     conditions = [
         PermissionRow.role_id.in_(role_ids),
-        PermissionRow.scope_type == scope_type,
+        PermissionRow.scope_type == scope_type.to_scope_type(),
         PermissionRow.scope_id == entity_id.entity_id,
         PermissionRow.entity_type == entity_id.entity_type,
     ]

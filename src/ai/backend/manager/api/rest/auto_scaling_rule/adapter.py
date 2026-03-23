@@ -21,15 +21,13 @@ from ai.backend.common.types import AutoScalingMetricSource
 from ai.backend.manager.api.rest.adapter import BaseFilterAdapter
 from ai.backend.manager.data.deployment.scale_modifier import ModelDeploymentAutoScalingRuleModifier
 from ai.backend.manager.data.deployment.types import ModelDeploymentAutoScalingRuleData
+from ai.backend.manager.models.endpoint.conditions import AutoScalingRuleConditions
+from ai.backend.manager.models.endpoint.orders import AutoScalingRuleOrders
 from ai.backend.manager.repositories.base import (
     BatchQuerier,
     OffsetPagination,
     QueryCondition,
     QueryOrder,
-)
-from ai.backend.manager.repositories.deployment.options import (
-    AutoScalingRuleConditions,
-    AutoScalingRuleOrders,
 )
 from ai.backend.manager.types import OptionalState
 

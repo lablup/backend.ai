@@ -11,6 +11,7 @@ import sqlalchemy as sa
 from sqlalchemy.ext.asyncio.engine import AsyncEngine as SAEngine
 
 from ai.backend.client.v2.registry import BackendAIClientRegistry
+from ai.backend.manager.api.adapters.user import UserAdapter
 from ai.backend.manager.api.gql.schema import schema as strawberry_schema
 from ai.backend.manager.api.rest.admin.handler import AdminHandler
 from ai.backend.manager.api.rest.admin.registry import register_admin_routes
@@ -29,7 +30,10 @@ from ai.backend.manager.services.user.processors import UserProcessors
 _UPDATE_MY_KEYPAIR = """
 mutation UpdateMyKeypair($accessKey: String!, $isActive: Boolean!) {
     updateMyKeypair(input: {accessKey: $accessKey, isActive: $isActive}) {
-        success
+        keypair {
+            accessKey
+            isActive
+        }
     }
 }
 """
@@ -45,7 +49,9 @@ mutation SwitchMyMainAccessKey($accessKey: String!) {
 _ISSUE_MY_KEYPAIR = """
 mutation IssueMyKeypair {
     issueMyKeypair {
-        accessKey
+        keypair {
+            accessKey
+        }
         secretKey
     }
 }
@@ -118,6 +124,7 @@ def server_module_registries(
     mock_gql_deps = MagicMock()
     mock_gql_deps.processors = mock_processors
     mock_gql_deps.config_provider = config_provider
+    mock_gql_deps.adapters.user = UserAdapter(processors=mock_processors, auth_config=None)  # type: ignore[arg-type]
 
     user_registry = register_user_routes(
         UserHandler(user=user_processors, config_provider=config_provider),
@@ -163,7 +170,8 @@ class TestUpdateMyKeypair:
             {"accessKey": access_key, "isActive": False},
         )
         payload = _assert_gql_success(response, "updateMyKeypair")
-        assert payload["success"] is True
+        assert payload["keypair"]["accessKey"] == access_key
+        assert payload["keypair"]["isActive"] is False
 
         async with db_engine.begin() as conn:
             row = await conn.execute(
@@ -184,7 +192,7 @@ class TestUpdateMyKeypair:
         # Issue a secondary keypair — the primary keypair used by user_registry remains active.
         issue_resp = await _call_gql(user_registry, _ISSUE_MY_KEYPAIR)
         issue_payload = _assert_gql_success(issue_resp, "issueMyKeypair")
-        secondary_ak: str = issue_payload["accessKey"]
+        secondary_ak: str = issue_payload["keypair"]["accessKey"]
 
         try:
             # Deactivate the secondary keypair (primary keypair still active → auth works).
@@ -202,7 +210,8 @@ class TestUpdateMyKeypair:
                 {"accessKey": secondary_ak, "isActive": True},
             )
             payload = _assert_gql_success(response, "updateMyKeypair")
-            assert payload["success"] is True
+            assert payload["keypair"]["accessKey"] == secondary_ak
+            assert payload["keypair"]["isActive"] is True
 
             async with db_engine.begin() as conn:
                 row = await conn.execute(
@@ -261,7 +270,7 @@ class TestUpdateMyKeypair:
         # Issue a second keypair so we can deactivate it without locking out the user.
         issue_resp = await _call_gql(user_registry, _ISSUE_MY_KEYPAIR)
         issue_payload = _assert_gql_success(issue_resp, "issueMyKeypair")
-        new_access_key: str = issue_payload["accessKey"]
+        new_access_key: str = issue_payload["keypair"]["accessKey"]
 
         try:
             # Deactivate the newly-issued keypair.

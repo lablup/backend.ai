@@ -7,16 +7,18 @@ import sqlalchemy as sa
 from ai.backend.common.data.filter_specs import StringMatchSpec
 from ai.backend.manager.data.group.types import ProjectType
 from ai.backend.manager.models.domain import DomainRow
-from ai.backend.manager.models.group import GroupRow
-from ai.backend.manager.models.user import UserRow
-from ai.backend.manager.repositories.fair_share.options import (
+from ai.backend.manager.models.fair_share.conditions import (
     DomainFairShareConditions,
-    DomainFairShareOrders,
     ProjectFairShareConditions,
-    ProjectFairShareOrders,
     UserFairShareConditions,
+)
+from ai.backend.manager.models.fair_share.orders import (
+    DomainFairShareOrders,
+    ProjectFairShareOrders,
     UserFairShareOrders,
 )
+from ai.backend.manager.models.group import GroupRow
+from ai.backend.manager.models.user import UserRow
 
 
 class TestDomainFairShareEntityConditions:

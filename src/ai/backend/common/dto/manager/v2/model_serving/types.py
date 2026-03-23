@@ -9,6 +9,7 @@ from uuid import UUID
 
 from ai.backend.common.api_handlers import BaseResponseModel
 from ai.backend.common.data.endpoint.types import EndpointLifecycle
+from ai.backend.common.dto.manager.v2.common import OrderDirection
 from ai.backend.common.types import RuntimeVariant
 
 __all__ = (
@@ -18,13 +19,6 @@ __all__ = (
     "RuntimeVariant",
     "ServiceOrderField",
 )
-
-
-class OrderDirection(StrEnum):
-    """Order direction for sorting."""
-
-    ASC = "asc"
-    DESC = "desc"
 
 
 class ServiceOrderField(StrEnum):

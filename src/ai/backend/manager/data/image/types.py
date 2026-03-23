@@ -85,6 +85,7 @@ class ImageData:
     resource_limits: list[ResourceLimit]
     tags: list[ImageTagEntry]
     status: ImageStatus
+    last_used_at: datetime | None = field(default=None, compare=False)
 
 
 @dataclass
@@ -126,6 +127,7 @@ class ImageDataWithDetails:
     aliases: list[str] = field(default_factory=list)
     size_bytes: int = field(default=0)
     created_at: datetime | None = field(default=None)
+    last_used_at: datetime | None = field(default=None, compare=False)
     # legacy
     hash: str | None = field(default=None)
 

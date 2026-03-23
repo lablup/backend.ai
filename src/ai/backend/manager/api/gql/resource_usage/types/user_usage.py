@@ -2,34 +2,36 @@
 
 from __future__ import annotations
 
-from typing import Any, override
+from typing import Any, Self
 from uuid import UUID
 
 import strawberry
-from strawberry import ID
-from strawberry.relay import Connection, Edge, Node, NodeID
+from strawberry.relay import Connection, Edge, NodeID
 
+from ai.backend.common.dto.manager.v2.resource_usage.request import (
+    UserUsageBucketFilter as UserUsageBucketFilterDTO,
+)
+from ai.backend.common.dto.manager.v2.resource_usage.request import (
+    UserUsageBucketOrderBy as UserUsageBucketOrderByDTO,
+)
+from ai.backend.common.dto.manager.v2.resource_usage.response import (
+    UserUsageBucketNode,
+)
 from ai.backend.manager.api.gql.base import (
     DateFilter,
     OrderDirection,
     StringFilter,
     UUIDFilter,
 )
+from ai.backend.manager.api.gql.decorators import (
+    BackendAIGQLMeta,
+    gql_connection_type,
+    gql_node_type,
+    gql_pydantic_input,
+)
 from ai.backend.manager.api.gql.fair_share.types import ResourceSlotGQL
+from ai.backend.manager.api.gql.pydantic_compat import PydanticInputMixin, PydanticNodeMixin
 from ai.backend.manager.api.gql.types import GQLFilter, GQLOrderBy
-from ai.backend.manager.repositories.base import (
-    QueryCondition,
-    QueryOrder,
-    combine_conditions_or,
-    negate_conditions,
-)
-from ai.backend.manager.repositories.resource_usage_history.options import (
-    UserUsageBucketConditions,
-    UserUsageBucketOrders,
-)
-from ai.backend.manager.repositories.resource_usage_history.types import (
-    UserUsageBucketData,
-)
 
 from .common import UsageBucketMetadataGQL, UsageBucketOrderField
 from .common_calculations import (
@@ -38,14 +40,17 @@ from .common_calculations import (
 )
 
 
-@strawberry.type(
-    name="UserUsageBucket",
-    description=(
-        "Added in 26.1.0. User-level usage bucket representing aggregated resource "
-        "consumption for a specific time period. This is the most granular level of usage tracking."
+@gql_node_type(
+    BackendAIGQLMeta(
+        added_version="26.1.0",
+        description=(
+            "User-level usage bucket representing aggregated resource "
+            "consumption for a specific time period. This is the most granular level of usage tracking."
+        ),
     ),
+    name="UserUsageBucket",
 )
-class UserUsageBucketGQL(Node):
+class UserUsageBucketGQL(PydanticNodeMixin[UserUsageBucketNode]):
     """User-level usage bucket containing aggregated resource usage for a period."""
 
     id: NodeID[str]
@@ -102,35 +107,19 @@ class UserUsageBucketGQL(Node):
             self.capacity_snapshot,
         )
 
-    @classmethod
-    def from_dataclass(cls, data: UserUsageBucketData) -> UserUsageBucketGQL:
-        return cls(
-            id=ID(str(data.id)),
-            user_uuid=data.user_uuid,
-            project_id=data.project_id,
-            domain_name=data.domain_name,
-            resource_group_name=data.resource_group,
-            metadata=UsageBucketMetadataGQL(
-                period_start=data.period_start,
-                period_end=data.period_end,
-                decay_unit_days=data.decay_unit_days,
-                created_at=data.created_at,
-                updated_at=data.updated_at,
-            ),
-            resource_usage=ResourceSlotGQL.from_resource_slot(data.resource_usage),
-            capacity_snapshot=ResourceSlotGQL.from_resource_slot(data.capacity_snapshot),
-        )
-
 
 UserUsageBucketEdge = Edge[UserUsageBucketGQL]
 
 
-@strawberry.type(
-    description=(
-        "Added in 26.1.0. Paginated connection for user usage bucket records. "
-        "Provides relay-style cursor-based pagination for browsing historical usage data by time period. "
-        "Use 'edges' to access individual records with cursor information, or 'nodes' for direct data access."
-    )
+@gql_connection_type(
+    BackendAIGQLMeta(
+        added_version="26.1.0",
+        description=(
+            "Paginated connection for user usage bucket records. "
+            "Provides relay-style cursor-based pagination for browsing historical usage data by time period. "
+            "Use 'edges' to access individual records with cursor information, or 'nodes' for direct data access."
+        ),
+    ),
 )
 class UserUsageBucketConnection(Connection[UserUsageBucketGQL]):
     count: int = strawberry.field(
@@ -142,16 +131,14 @@ class UserUsageBucketConnection(Connection[UserUsageBucketGQL]):
         self.count = count
 
 
-@strawberry.input(
-    name="UserUsageBucketFilter",
-    description=(
-        "Added in 26.1.0. Filter input for querying user usage bucket records. "
-        "Usage buckets contain historical resource consumption data aggregated by time period for users. "
-        "This is the most granular level of usage bucket filtering. "
-        "Multiple filters can be combined using AND, OR, and NOT logical operators."
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description="Filter input for querying user usage bucket records. Usage buckets contain historical resource consumption data aggregated by time period for users. This is the most granular level of usage bucket filtering. Multiple filters can be combined using AND, OR, and NOT logical operators.",
+        added_version="26.1.0",
     ),
+    name="UserUsageBucketFilter",
 )
-class UserUsageBucketFilter(GQLFilter):
+class UserUsageBucketFilter(PydanticInputMixin[UserUsageBucketFilterDTO], GQLFilter):
     """Filter for user usage buckets."""
 
     resource_group: StringFilter | None = strawberry.field(
@@ -189,109 +176,28 @@ class UserUsageBucketFilter(GQLFilter):
         default=None, description="Filter by usage measurement period end date."
     )
 
-    AND: list[UserUsageBucketFilter] | None = strawberry.field(
+    AND: list[Self] | None = strawberry.field(
         default=None,
         description="Combine multiple filters with AND logic. All conditions must match.",
     )
-    OR: list[UserUsageBucketFilter] | None = strawberry.field(
+    OR: list[Self] | None = strawberry.field(
         default=None,
         description="Combine multiple filters with OR logic. At least one condition must match.",
     )
-    NOT: list[UserUsageBucketFilter] | None = strawberry.field(
+    NOT: list[Self] | None = strawberry.field(
         default=None,
         description="Negate the specified filters. Records matching these conditions will be excluded.",
     )
 
-    @override
-    def build_conditions(self) -> list[QueryCondition]:
-        conditions: list[QueryCondition] = []
 
-        if self.resource_group:
-            sg_condition = self.resource_group.build_query_condition(
-                contains_factory=UserUsageBucketConditions.by_resource_group_contains,
-                equals_factory=UserUsageBucketConditions.by_resource_group_equals,
-                starts_with_factory=UserUsageBucketConditions.by_resource_group_starts_with,
-                ends_with_factory=UserUsageBucketConditions.by_resource_group_ends_with,
-            )
-            if sg_condition:
-                conditions.append(sg_condition)
-
-        if self.user_uuid:
-            uuid_condition = self.user_uuid.build_query_condition(
-                equals_factory=UserUsageBucketConditions.by_user_uuid,
-                in_factory=UserUsageBucketConditions.by_user_uuids,
-            )
-            if uuid_condition:
-                conditions.append(uuid_condition)
-
-        if self.project_id:
-            pid_condition = self.project_id.build_query_condition(
-                equals_factory=UserUsageBucketConditions.by_project_id,
-                in_factory=UserUsageBucketConditions.by_project_ids,
-            )
-            if pid_condition:
-                conditions.append(pid_condition)
-
-        if self.domain_name:
-            dn_condition = self.domain_name.build_query_condition(
-                contains_factory=UserUsageBucketConditions.by_domain_name_contains,
-                equals_factory=UserUsageBucketConditions.by_domain_name_equals,
-                starts_with_factory=UserUsageBucketConditions.by_domain_name_starts_with,
-                ends_with_factory=UserUsageBucketConditions.by_domain_name_ends_with,
-            )
-            if dn_condition:
-                conditions.append(dn_condition)
-
-        if self.period_start:
-            ps_condition = self.period_start.build_query_condition(
-                before_factory=UserUsageBucketConditions.by_period_start_before,
-                after_factory=UserUsageBucketConditions.by_period_start_after,
-                equals_factory=UserUsageBucketConditions.by_period_start,
-                not_equals_factory=UserUsageBucketConditions.by_period_start_not_equals,
-            )
-            if ps_condition:
-                conditions.append(ps_condition)
-
-        if self.period_end:
-            pe_condition = self.period_end.build_query_condition(
-                before_factory=UserUsageBucketConditions.by_period_end_before,
-                after_factory=UserUsageBucketConditions.by_period_end_after,
-                equals_factory=UserUsageBucketConditions.by_period_end,
-                not_equals_factory=UserUsageBucketConditions.by_period_end_not_equals,
-            )
-            if pe_condition:
-                conditions.append(pe_condition)
-
-        if self.AND:
-            for sub_filter in self.AND:
-                conditions.extend(sub_filter.build_conditions())
-
-        if self.OR:
-            or_conditions: list[QueryCondition] = []
-            for sub_filter in self.OR:
-                or_conditions.extend(sub_filter.build_conditions())
-            if or_conditions:
-                conditions.append(combine_conditions_or(or_conditions))
-
-        if self.NOT:
-            not_conditions: list[QueryCondition] = []
-            for sub_filter in self.NOT:
-                not_conditions.extend(sub_filter.build_conditions())
-            if not_conditions:
-                conditions.append(negate_conditions(not_conditions))
-
-        return conditions
-
-
-@strawberry.input(
-    name="UserUsageBucketOrderBy",
-    description=(
-        "Added in 26.1.0. Specifies ordering for user usage bucket query results. "
-        "Combine field selection with direction to sort results. "
-        "Default direction is DESC (most recent first)."
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description="Specifies ordering for user usage bucket query results. Combine field selection with direction to sort results. Default direction is DESC (most recent first).",
+        added_version="26.1.0",
     ),
+    name="UserUsageBucketOrderBy",
 )
-class UserUsageBucketOrderBy(GQLOrderBy):
+class UserUsageBucketOrderBy(PydanticInputMixin[UserUsageBucketOrderByDTO], GQLOrderBy):
     """OrderBy for user usage buckets."""
 
     field: UsageBucketOrderField = strawberry.field(
@@ -304,13 +210,6 @@ class UserUsageBucketOrderBy(GQLOrderBy):
             "DESC for reverse chronological order (most recent first)."
         ),
     )
-
-    @override
-    def to_query_order(self) -> QueryOrder:
-        ascending = self.direction == OrderDirection.ASC
-        match self.field:
-            case UsageBucketOrderField.PERIOD_START:
-                return UserUsageBucketOrders.by_period_start(ascending)
 
 
 __all__ = [

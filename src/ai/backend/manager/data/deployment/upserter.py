@@ -14,4 +14,3 @@ class DeploymentPolicyUpserter:
     deployment_id: UUID
     strategy: DeploymentStrategy
     strategy_spec: RollingUpdateSpec | BlueGreenSpec
-    rollback_on_failure: bool = False

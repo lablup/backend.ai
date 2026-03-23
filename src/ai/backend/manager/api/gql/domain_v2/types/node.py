@@ -3,13 +3,24 @@
 from __future__ import annotations
 
 from collections.abc import Iterable
-from typing import TYPE_CHECKING, Annotated, Any, Self
+from typing import TYPE_CHECKING, Annotated, Any
 
 import strawberry
-from strawberry import ID, Info
-from strawberry.relay import Connection, Edge, Node, NodeID
+from strawberry import Info
+from strawberry.relay import Connection, Edge, NodeID
 
+from ai.backend.common.dto.manager.v2.domain.response import DomainNode
+from ai.backend.common.dto.manager.v2.domain.types import (
+    DomainFairShareScopeDTO,
+    DomainUsageScopeDTO,
+)
+from ai.backend.manager.api.gql.decorators import (
+    BackendAIGQLMeta,
+    gql_connection_type,
+    gql_pydantic_input,
+)
 from ai.backend.manager.api.gql.fair_share.types import DomainFairShareGQL
+from ai.backend.manager.api.gql.pydantic_compat import PydanticInputMixin, PydanticNodeMixin
 from ai.backend.manager.api.gql.resource_slot.overview_types import ActiveResourceOverviewGQL
 from ai.backend.manager.api.gql.resource_usage.types import (
     DomainUsageBucketConnection,
@@ -32,11 +43,13 @@ if TYPE_CHECKING:
     from ai.backend.manager.api.gql.project_v2.types.node import ProjectV2Connection
     from ai.backend.manager.api.gql.user.types.filters import UserFilterGQL, UserOrderByGQL
     from ai.backend.manager.api.gql.user.types.node import UserV2Connection
-    from ai.backend.manager.data.domain.types import DomainData
 
 
-@strawberry.input(name="DomainFairShareScope")
-class DomainFairShareScopeGQL:
+@gql_pydantic_input(
+    BackendAIGQLMeta(description="", added_version="24.09.0"),
+    name="DomainFairShareScope",
+)
+class DomainFairShareScopeGQL(PydanticInputMixin[DomainFairShareScopeDTO]):
     """Scope parameters for filtering domain fair shares."""
 
     resource_group_name: str = strawberry.field(
@@ -44,8 +57,11 @@ class DomainFairShareScopeGQL:
     )
 
 
-@strawberry.input(name="DomainUsageScope")
-class DomainUsageScopeGQL:
+@gql_pydantic_input(
+    BackendAIGQLMeta(description="", added_version="24.09.0"),
+    name="DomainUsageScope",
+)
+class DomainUsageScopeGQL(PydanticInputMixin[DomainUsageScopeDTO]):
     """Scope parameters for filtering domain usage buckets."""
 
     resource_group_name: str = strawberry.field(
@@ -65,7 +81,7 @@ class DomainUsageScopeGQL:
         "Resource allocation and storage permissions are provided through separate dedicated APIs."
     ),
 )
-class DomainV2GQL(Node):
+class DomainV2GQL(PydanticNodeMixin[DomainNode]):
     """Domain entity with structured field groups."""
 
     id: NodeID[str] = strawberry.field(description="Domain name (primary key).")
@@ -92,15 +108,16 @@ class DomainV2GQL(Node):
         info: Info,
         scope: DomainFairShareScopeGQL,
     ) -> DomainFairShareGQL:
-        from ai.backend.manager.api.gql.fair_share.fetcher.domain import (
-            fetch_single_domain_fair_share,
+        from ai.backend.common.dto.manager.v2.fair_share.request import GetDomainFairShareInput
+
+        payload = await info.context.adapters.fair_share.get_domain(
+            GetDomainFairShareInput(
+                resource_group=scope.resource_group_name,
+                domain_name=str(self.id),
+            )
         )
 
-        return await fetch_single_domain_fair_share(
-            info=info,
-            resource_group_name=scope.resource_group_name,
-            domain_name=str(self.id),
-        )
+        return DomainFairShareGQL.from_pydantic(payload.item)
 
     @strawberry.field(  # type: ignore[misc]
         description=(
@@ -112,14 +129,8 @@ class DomainV2GQL(Node):
         self,
         info: Info,
     ) -> ActiveResourceOverviewGQL:
-        from ai.backend.manager.services.resource_slot.actions.get_domain_resource_overview import (
-            GetDomainResourceOverviewAction,
-        )
-
-        result = await info.context.processors.resource_slot.get_domain_resource_overview.wait_for_complete(
-            GetDomainResourceOverviewAction(domain_name=str(self.id))
-        )
-        return ActiveResourceOverviewGQL.from_occupancy(result.item)
+        dto = await info.context.adapters.resource_slot.get_domain_resource_overview(str(self.id))
+        return ActiveResourceOverviewGQL.from_pydantic(dto)
 
     @strawberry.field(  # type: ignore[misc]
         description=(
@@ -140,34 +151,48 @@ class DomainV2GQL(Node):
         limit: int | None = None,
         offset: int | None = None,
     ) -> DomainUsageBucketConnection:
-        from ai.backend.manager.api.gql.resource_usage.fetcher.domain_usage import (
-            fetch_rg_domain_usage_buckets,
+        from strawberry.relay import PageInfo
+
+        from ai.backend.manager.api.gql.base import encode_cursor
+        from ai.backend.manager.api.gql.resource_usage.types import (
+            DomainUsageBucketEdge,
+            DomainUsageBucketGQL,
         )
         from ai.backend.manager.repositories.resource_usage_history.types import (
             DomainUsageBucketSearchScope,
         )
 
-        # Create repository scope with context information
         repository_scope = DomainUsageBucketSearchScope(
             resource_group=scope.resource_group_name,
             domain_name=str(self.id),
         )
 
-        # No additional filters needed (scope includes all entity info)
-        base_conditions = None
-
-        return await fetch_rg_domain_usage_buckets(
-            info=info,
+        payload = await info.context.adapters.resource_usage.gql_search_domain_scoped(
             scope=repository_scope,
-            filter=filter,
-            order_by=order_by,
-            before=before,
-            after=after,
+            filter=filter.to_pydantic() if filter else None,
+            order=[o.to_pydantic() for o in order_by] if order_by else None,
             first=first,
+            after=after,
             last=last,
+            before=before,
             limit=limit,
             offset=offset,
-            base_conditions=base_conditions,
+        )
+
+        nodes = [DomainUsageBucketGQL.from_pydantic(item) for item in payload.items]
+        edges = [
+            DomainUsageBucketEdge(node=node, cursor=encode_cursor(str(node.id))) for node in nodes
+        ]
+
+        return DomainUsageBucketConnection(
+            edges=edges,
+            page_info=PageInfo(
+                has_next_page=payload.has_next_page,
+                has_previous_page=payload.has_previous_page,
+                start_cursor=edges[0].cursor if edges else None,
+                end_cursor=edges[-1].cursor if edges else None,
+            ),
+            count=payload.total_count,
         )
 
     @strawberry.field(  # type: ignore[misc]
@@ -197,23 +222,42 @@ class DomainV2GQL(Node):
         ProjectV2Connection,
         strawberry.lazy("ai.backend.manager.api.gql.project_v2.types.node"),
     ]:
-        from ai.backend.manager.api.gql.project_v2.fetcher.project import (
-            fetch_domain_projects,
+        from strawberry.relay import PageInfo
+
+        from ai.backend.common.dto.manager.v2.group.request import AdminSearchGroupsInput
+        from ai.backend.manager.api.gql.base import encode_cursor
+        from ai.backend.manager.api.gql.project_v2.types.node import (
+            ProjectV2Connection,
+            ProjectV2Edge,
+            ProjectV2GQL,
         )
         from ai.backend.manager.repositories.group.types import DomainProjectSearchScope
 
         scope = DomainProjectSearchScope(domain_name=str(self.id))
-        return await fetch_domain_projects(
-            info=info,
+        payload = await info.context.adapters.project.search_by_domain(
             scope=scope,
-            filter=filter,
-            order_by=order_by,
-            before=before,
-            after=after,
-            first=first,
-            last=last,
-            limit=limit,
-            offset=offset,
+            input=AdminSearchGroupsInput(
+                filter=filter.to_pydantic() if filter else None,
+                order=[o.to_pydantic() for o in order_by] if order_by else None,
+                first=first,
+                after=after,
+                last=last,
+                before=before,
+                limit=limit,
+                offset=offset,
+            ),
+        )
+        nodes = [ProjectV2GQL.from_pydantic(node) for node in payload.items]
+        edges = [ProjectV2Edge(node=node, cursor=encode_cursor(str(node.id))) for node in nodes]
+        return ProjectV2Connection(
+            edges=edges,
+            page_info=PageInfo(
+                has_next_page=payload.has_next_page,
+                has_previous_page=payload.has_previous_page,
+                start_cursor=edges[0].cursor if edges else None,
+                end_cursor=edges[-1].cursor if edges else None,
+            ),
+            count=payload.total_count,
         )
 
     @strawberry.field(  # type: ignore[misc]
@@ -243,21 +287,42 @@ class DomainV2GQL(Node):
         UserV2Connection,
         strawberry.lazy("ai.backend.manager.api.gql.user.types.node"),
     ]:
-        from ai.backend.manager.api.gql.user.fetcher.user import fetch_domain_users
+        from strawberry.relay import PageInfo
+
+        from ai.backend.common.dto.manager.v2.user.request import AdminSearchUsersInput
+        from ai.backend.manager.api.gql.base import encode_cursor
+        from ai.backend.manager.api.gql.user.types.node import (
+            UserV2Connection,
+            UserV2Edge,
+            UserV2GQL,
+        )
         from ai.backend.manager.repositories.user.types import DomainUserSearchScope
 
         scope = DomainUserSearchScope(domain_name=str(self.id))
-        return await fetch_domain_users(
-            info=info,
+        payload = await info.context.adapters.user.gql_search_by_domain(
             scope=scope,
-            filter=filter,
-            order_by=order_by,
-            before=before,
-            after=after,
-            first=first,
-            last=last,
-            limit=limit,
-            offset=offset,
+            input=AdminSearchUsersInput(
+                filter=filter.to_pydantic() if filter else None,
+                order=[o.to_pydantic() for o in order_by] if order_by else None,
+                first=first,
+                after=after,
+                last=last,
+                before=before,
+                limit=limit,
+                offset=offset,
+            ),
+        )
+        nodes = [UserV2GQL.from_pydantic(item) for item in payload.items]
+        edges = [UserV2Edge(node=node, cursor=encode_cursor(str(node.id))) for node in nodes]
+        return UserV2Connection(
+            edges=edges,
+            page_info=PageInfo(
+                has_next_page=payload.has_next_page,
+                has_previous_page=payload.has_previous_page,
+                start_cursor=edges[0].cursor if edges else None,
+                end_cursor=edges[-1].cursor if edges else None,
+            ),
+            count=payload.total_count,
         )
 
     @classmethod
@@ -267,57 +332,22 @@ class DomainV2GQL(Node):
         info: Info[StrawberryGQLContext],
         node_ids: Iterable[str],
         required: bool = False,
-    ) -> Iterable[Self | None]:
-        results = await info.context.data_loaders.domain_loader.load_many(node_ids)
-        return [cls.from_data(data) if data is not None else None for data in results]
-
-    @classmethod
-    def from_data(
-        cls,
-        data: DomainData,
-    ) -> Self:
-        """Convert DomainData to GraphQL type.
-
-        Args:
-            data: DomainData instance from the data layer.
-
-        Returns:
-            DomainV2GQL instance with structured field groups.
-
-        Note:
-            - All fields are directly from DomainRow (no external lookups)
-            - No JSON scalars are used in the output
-            - Primary key is domain name (string), not UUID
-            - ResourceSlot and storage permissions are excluded; use dedicated APIs
-            - Dotfiles (binary data) is excluded; use query_domain_dotfiles()
-        """
-        return cls(
-            id=ID(data.name),  # name is the primary key
-            basic_info=DomainBasicInfoGQL(
-                name=data.name,
-                description=data.description,
-                integration_id=data.integration_id,
-            ),
-            registry=DomainRegistryInfoGQL(
-                allowed_docker_registries=data.allowed_docker_registries,
-            ),
-            lifecycle=DomainLifecycleInfoGQL(
-                is_active=data.is_active,
-                created_at=data.created_at,
-                modified_at=data.modified_at,
-            ),
-        )
+    ) -> Iterable[DomainV2GQL | None]:
+        return await info.context.data_loaders.domain_loader.load_many(node_ids)
 
 
 DomainV2Edge = Edge[DomainV2GQL]
 
 
-@strawberry.type(
-    description=(
-        "Added in 26.2.0. Paginated connection for domain records. "
-        "Provides relay-style cursor-based pagination for efficient traversal of domain data. "
-        "Use 'edges' to access individual records with cursor information, "
-        "or 'nodes' for direct data access."
+@gql_connection_type(
+    BackendAIGQLMeta(
+        added_version="26.2.0",
+        description=(
+            "Paginated connection for domain records. "
+            "Provides relay-style cursor-based pagination for efficient traversal of domain data. "
+            "Use 'edges' to access individual records with cursor information, "
+            "or 'nodes' for direct data access."
+        ),
     )
 )
 class DomainV2Connection(Connection[DomainV2GQL]):

@@ -45,11 +45,11 @@ class TestAgentOrderField:
     def test_status_value(self) -> None:
         assert AgentOrderField.STATUS.value == "status"
 
-    def test_resource_group_value(self) -> None:
-        assert AgentOrderField.RESOURCE_GROUP.value == "resource_group"
+    def test_scaling_group_value(self) -> None:
+        assert AgentOrderField.SCALING_GROUP.value == "scaling_group"
 
     def test_all_members_count(self) -> None:
-        assert len(list(AgentOrderField)) == 3
+        assert len(list(AgentOrderField)) == 5
 
     def test_from_string_id(self) -> None:
         assert AgentOrderField("id") is AgentOrderField.ID
@@ -57,27 +57,27 @@ class TestAgentOrderField:
     def test_from_string_status(self) -> None:
         assert AgentOrderField("status") is AgentOrderField.STATUS
 
-    def test_from_string_resource_group(self) -> None:
-        assert AgentOrderField("resource_group") is AgentOrderField.RESOURCE_GROUP
+    def test_from_string_scaling_group(self) -> None:
+        assert AgentOrderField("scaling_group") is AgentOrderField.SCALING_GROUP
 
 
 class TestOrderDirection:
     """Tests for OrderDirection enum."""
 
     def test_asc_value(self) -> None:
-        assert OrderDirection.ASC.value == "asc"
+        assert OrderDirection.ASC.value == "ASC"
 
     def test_desc_value(self) -> None:
-        assert OrderDirection.DESC.value == "desc"
+        assert OrderDirection.DESC.value == "DESC"
 
     def test_all_members_count(self) -> None:
         assert len(list(OrderDirection)) == 2
 
     def test_from_string_asc(self) -> None:
-        assert OrderDirection("asc") is OrderDirection.ASC
+        assert OrderDirection("ASC") is OrderDirection.ASC
 
     def test_from_string_desc(self) -> None:
-        assert OrderDirection("desc") is OrderDirection.DESC
+        assert OrderDirection("DESC") is OrderDirection.DESC
 
 
 class TestAgentStatusFilter:

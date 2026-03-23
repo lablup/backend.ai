@@ -17,17 +17,19 @@ from ai.backend.manager.data.permission.types import (
     ScopeType,
 )
 from ai.backend.manager.models.rbac_models import UserRoleRow
+from ai.backend.manager.models.rbac_models.conditions import (
+    ObjectPermissionConditions,
+    ScopedPermissionConditions,
+)
+from ai.backend.manager.models.rbac_models.orders import (
+    ObjectPermissionOrders,
+    ScopedPermissionOrders,
+)
 from ai.backend.manager.models.rbac_models.permission.object_permission import ObjectPermissionRow
 from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
 from ai.backend.manager.models.rbac_models.role import RoleRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.base import BatchQuerier, OffsetPagination
-from ai.backend.manager.repositories.permission_controller.options import (
-    ObjectPermissionConditions,
-    ObjectPermissionOrders,
-    ScopedPermissionConditions,
-    ScopedPermissionOrders,
-)
 from ai.backend.manager.repositories.permission_controller.repository import (
     PermissionControllerRepository,
 )

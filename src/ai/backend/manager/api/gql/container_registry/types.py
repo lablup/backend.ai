@@ -4,18 +4,17 @@ from __future__ import annotations
 
 from collections.abc import Iterable
 from enum import StrEnum
-from typing import Self
+from typing import Any, Self, cast
 from uuid import UUID
 
 import strawberry
 from strawberry import Info
-from strawberry.relay import Node, NodeID
+from strawberry.relay import NodeID
 from strawberry.scalars import JSON
 
-from ai.backend.common.container_registry import ContainerRegistryType
+from ai.backend.manager.api.gql.decorators import BackendAIGQLMeta, gql_node_type
+from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
-from ai.backend.manager.data.container_registry.types import ContainerRegistryData
-from ai.backend.manager.defs import PASSWORD_PLACEHOLDER
 
 
 @strawberry.enum(
@@ -32,16 +31,15 @@ class ContainerRegistryTypeGQL(StrEnum):
     LOCAL = "local"
     OCP = "ocp"
 
-    @classmethod
-    def from_enum(cls, value: ContainerRegistryType) -> ContainerRegistryTypeGQL:
-        return cls(value.value)
 
-
-@strawberry.type(
+@gql_node_type(
+    BackendAIGQLMeta(
+        added_version="26.4.0",
+        description="Container registry node.",
+    ),
     name="ContainerRegistryV2",
-    description="Added in 26.4.0. Container registry node.",
 )
-class ContainerRegistryGQL(Node):
+class ContainerRegistryGQL(PydanticNodeMixin[Any]):
     id: NodeID[str] = strawberry.field(
         description="Relay-style global node identifier for the container registry"
     )
@@ -78,19 +76,4 @@ class ContainerRegistryGQL(Node):
         results = await info.context.data_loaders.container_registry_loader.load_many([
             UUID(nid) for nid in node_ids
         ])
-        return [cls.from_data(data) if data is not None else None for data in results]
-
-    @classmethod
-    def from_data(cls, data: ContainerRegistryData) -> Self:
-        return cls(
-            id=str(data.id),
-            url=data.url,
-            registry_name=data.registry_name,
-            type=ContainerRegistryTypeGQL.from_enum(data.type),
-            project=data.project,
-            username=data.username,
-            password=PASSWORD_PLACEHOLDER if data.password is not None else None,
-            ssl_verify=data.ssl_verify,
-            is_global=data.is_global,
-            extra=data.extra,
-        )
+        return cast(list[Self | None], results)

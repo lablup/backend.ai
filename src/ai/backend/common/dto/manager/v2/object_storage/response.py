@@ -11,6 +11,7 @@ from pydantic import Field
 from ai.backend.common.api_handlers import BaseResponseModel
 
 __all__ = (
+    "AdminSearchObjectStoragesPayload",
     "BucketsPayload",
     "CreateObjectStoragePayload",
     "DeleteObjectStoragePayload",
@@ -62,6 +63,15 @@ class PresignedDownloadURLPayload(BaseResponseModel):
     """Payload for presigned download URL generation result."""
 
     presigned_url: str = Field(description="Presigned URL for downloading")
+
+
+class AdminSearchObjectStoragesPayload(BaseResponseModel):
+    """Payload for admin-scoped paginated object storage search results."""
+
+    items: list[ObjectStorageNode] = Field(description="List of object storage nodes.")
+    total_count: int = Field(description="Total number of object storages matching the filter.")
+    has_next_page: bool = Field(description="Whether there is a next page.")
+    has_previous_page: bool = Field(description="Whether there is a previous page.")
 
 
 class BucketsPayload(BaseResponseModel):

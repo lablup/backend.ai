@@ -2,16 +2,9 @@
 
 from __future__ import annotations
 
-import json
 import uuid
 from datetime import UTC, datetime
 
-from ai.backend.common.data.permission.types import (
-    EntityType,
-    OperationType,
-    RoleSource,
-    RoleStatus,
-)
 from ai.backend.common.dto.manager.v2.rbac.response import (
     CreateRolePayload,
     DeleteRolePayload,
@@ -19,7 +12,10 @@ from ai.backend.common.dto.manager.v2.rbac.response import (
     RoleNode,
     UpdateRolePayload,
 )
-from ai.backend.common.dto.manager.v2.rbac.types import PermissionSummary
+from ai.backend.common.dto.manager.v2.rbac.types import (
+    RoleSourceDTO,
+    RoleStatusDTO,
+)
 
 
 class TestRoleNodeCreation:
@@ -32,22 +28,20 @@ class TestRoleNodeCreation:
             id=role_id,
             name="Admin",
             description="Administrator role",
-            source=RoleSource.CUSTOM,
-            status=RoleStatus.ACTIVE,
+            source=RoleSourceDTO.CUSTOM,
+            status=RoleStatusDTO.ACTIVE,
             created_at=now,
             updated_at=now,
             deleted_at=None,
-            permissions=[],
         )
         assert node.id == role_id
         assert node.name == "Admin"
         assert node.description == "Administrator role"
-        assert node.source == RoleSource.CUSTOM
-        assert node.status == RoleStatus.ACTIVE
+        assert node.source == RoleSourceDTO.CUSTOM
+        assert node.status == RoleStatusDTO.ACTIVE
         assert node.created_at == now
         assert node.updated_at == now
         assert node.deleted_at is None
-        assert node.permissions == []
 
     def test_creation_with_minimal_fields(self) -> None:
         role_id = uuid.uuid4()
@@ -55,15 +49,14 @@ class TestRoleNodeCreation:
         node = RoleNode(
             id=role_id,
             name="Admin",
-            source=RoleSource.CUSTOM,
-            status=RoleStatus.ACTIVE,
+            source=RoleSourceDTO.CUSTOM,
+            status=RoleStatusDTO.ACTIVE,
             created_at=now,
             updated_at=now,
         )
         assert node.id == role_id
         assert node.description is None
         assert node.deleted_at is None
-        assert node.permissions == []
 
     def test_description_is_none_by_default(self) -> None:
         role_id = uuid.uuid4()
@@ -71,8 +64,8 @@ class TestRoleNodeCreation:
         node = RoleNode(
             id=role_id,
             name="TestRole",
-            source=RoleSource.SYSTEM,
-            status=RoleStatus.ACTIVE,
+            source=RoleSourceDTO.SYSTEM,
+            status=RoleStatusDTO.ACTIVE,
             created_at=now,
             updated_at=now,
         )
@@ -85,8 +78,8 @@ class TestRoleNodeCreation:
             id=role_id,
             name="TestRole",
             description=None,
-            source=RoleSource.SYSTEM,
-            status=RoleStatus.ACTIVE,
+            source=RoleSourceDTO.SYSTEM,
+            status=RoleStatusDTO.ACTIVE,
             created_at=now,
             updated_at=now,
         )
@@ -98,14 +91,14 @@ class TestRoleNodeCreation:
         node = RoleNode(
             id=role_id,
             name="DeletedRole",
-            source=RoleSource.CUSTOM,
-            status=RoleStatus.DELETED,
+            source=RoleSourceDTO.CUSTOM,
+            status=RoleStatusDTO.DELETED,
             created_at=now,
             updated_at=now,
             deleted_at=now,
         )
         assert node.deleted_at == now
-        assert node.status == RoleStatus.DELETED
+        assert node.status == RoleStatusDTO.DELETED
 
     def test_system_source(self) -> None:
         role_id = uuid.uuid4()
@@ -113,12 +106,12 @@ class TestRoleNodeCreation:
         node = RoleNode(
             id=role_id,
             name="SystemRole",
-            source=RoleSource.SYSTEM,
-            status=RoleStatus.ACTIVE,
+            source=RoleSourceDTO.SYSTEM,
+            status=RoleStatusDTO.ACTIVE,
             created_at=now,
             updated_at=now,
         )
-        assert node.source == RoleSource.SYSTEM
+        assert node.source == RoleSourceDTO.SYSTEM
 
     def test_inactive_status(self) -> None:
         role_id = uuid.uuid4()
@@ -126,114 +119,12 @@ class TestRoleNodeCreation:
         node = RoleNode(
             id=role_id,
             name="InactiveRole",
-            source=RoleSource.CUSTOM,
-            status=RoleStatus.INACTIVE,
+            source=RoleSourceDTO.CUSTOM,
+            status=RoleStatusDTO.INACTIVE,
             created_at=now,
             updated_at=now,
         )
-        assert node.status == RoleStatus.INACTIVE
-
-
-class TestRoleNodeWithPermissions:
-    """Tests for RoleNode with nested PermissionSummary list."""
-
-    def test_permissions_default_empty_list(self) -> None:
-        role_id = uuid.uuid4()
-        now = datetime.now(tz=UTC)
-        node = RoleNode(
-            id=role_id,
-            name="Admin",
-            source=RoleSource.CUSTOM,
-            status=RoleStatus.ACTIVE,
-            created_at=now,
-            updated_at=now,
-        )
-        assert node.permissions == []
-
-    def test_permissions_with_single_entry(self) -> None:
-        role_id = uuid.uuid4()
-        now = datetime.now(tz=UTC)
-        perm = PermissionSummary(
-            entity_type=EntityType.SESSION,
-            operation=OperationType.READ,
-        )
-        node = RoleNode(
-            id=role_id,
-            name="Admin",
-            source=RoleSource.CUSTOM,
-            status=RoleStatus.ACTIVE,
-            created_at=now,
-            updated_at=now,
-            permissions=[perm],
-        )
-        assert len(node.permissions) == 1
-        assert node.permissions[0].entity_type == EntityType.SESSION
-        assert node.permissions[0].operation == OperationType.READ
-
-    def test_permissions_with_multiple_entries(self) -> None:
-        role_id = uuid.uuid4()
-        now = datetime.now(tz=UTC)
-        perms = [
-            PermissionSummary(entity_type=EntityType.SESSION, operation=OperationType.READ),
-            PermissionSummary(entity_type=EntityType.VFOLDER, operation=OperationType.CREATE),
-            PermissionSummary(entity_type=EntityType.IMAGE, operation=OperationType.UPDATE),
-        ]
-        node = RoleNode(
-            id=role_id,
-            name="PowerUser",
-            source=RoleSource.CUSTOM,
-            status=RoleStatus.ACTIVE,
-            created_at=now,
-            updated_at=now,
-            permissions=perms,
-        )
-        assert len(node.permissions) == 3
-        assert node.permissions[1].entity_type == EntityType.VFOLDER
-
-    def test_permissions_serialize_to_nested_json(self) -> None:
-        role_id = uuid.uuid4()
-        now = datetime.now(tz=UTC)
-        perm = PermissionSummary(
-            entity_type=EntityType.SESSION,
-            operation=OperationType.READ,
-        )
-        node = RoleNode(
-            id=role_id,
-            name="Admin",
-            source=RoleSource.CUSTOM,
-            status=RoleStatus.ACTIVE,
-            created_at=now,
-            updated_at=now,
-            permissions=[perm],
-        )
-        data = json.loads(node.model_dump_json())
-        assert "permissions" in data
-        assert isinstance(data["permissions"], list)
-        assert len(data["permissions"]) == 1
-        assert data["permissions"][0]["entity_type"] == EntityType.SESSION
-        assert data["permissions"][0]["operation"] == OperationType.READ
-
-    def test_permissions_nested_structure_preserved_in_round_trip(self) -> None:
-        role_id = uuid.uuid4()
-        now = datetime.now(tz=UTC)
-        perms = [
-            PermissionSummary(entity_type=EntityType.SESSION, operation=OperationType.READ),
-            PermissionSummary(entity_type=EntityType.VFOLDER, operation=OperationType.CREATE),
-        ]
-        node = RoleNode(
-            id=role_id,
-            name="Admin",
-            source=RoleSource.CUSTOM,
-            status=RoleStatus.ACTIVE,
-            created_at=now,
-            updated_at=now,
-            permissions=perms,
-        )
-        json_str = node.model_dump_json()
-        restored = RoleNode.model_validate_json(json_str)
-        assert len(restored.permissions) == 2
-        assert restored.permissions[0].entity_type == EntityType.SESSION
-        assert restored.permissions[1].entity_type == EntityType.VFOLDER
+        assert node.status == RoleStatusDTO.INACTIVE
 
 
 class TestCreateRolePayload:
@@ -245,8 +136,8 @@ class TestCreateRolePayload:
         role_node = RoleNode(
             id=role_id,
             name="Admin",
-            source=RoleSource.CUSTOM,
-            status=RoleStatus.ACTIVE,
+            source=RoleSourceDTO.CUSTOM,
+            status=RoleStatusDTO.ACTIVE,
             created_at=now,
             updated_at=now,
         )
@@ -261,8 +152,8 @@ class TestCreateRolePayload:
             id=role_id,
             name="Admin",
             description="Admin role",
-            source=RoleSource.CUSTOM,
-            status=RoleStatus.ACTIVE,
+            source=RoleSourceDTO.CUSTOM,
+            status=RoleStatusDTO.ACTIVE,
             created_at=now,
             updated_at=now,
         )
@@ -276,8 +167,8 @@ class TestCreateRolePayload:
         role_node = RoleNode(
             id=role_id,
             name="Admin",
-            source=RoleSource.CUSTOM,
-            status=RoleStatus.ACTIVE,
+            source=RoleSourceDTO.CUSTOM,
+            status=RoleStatusDTO.ACTIVE,
             created_at=now,
             updated_at=now,
         )
@@ -286,27 +177,7 @@ class TestCreateRolePayload:
         restored = CreateRolePayload.model_validate_json(json_str)
         assert restored.role.id == role_id
         assert restored.role.name == "Admin"
-        assert restored.role.source == RoleSource.CUSTOM
-
-    def test_nested_permissions_in_payload(self) -> None:
-        role_id = uuid.uuid4()
-        now = datetime.now(tz=UTC)
-        perm = PermissionSummary(
-            entity_type=EntityType.SESSION,
-            operation=OperationType.READ,
-        )
-        role_node = RoleNode(
-            id=role_id,
-            name="Admin",
-            source=RoleSource.CUSTOM,
-            status=RoleStatus.ACTIVE,
-            created_at=now,
-            updated_at=now,
-            permissions=[perm],
-        )
-        payload = CreateRolePayload(role=role_node)
-        assert len(payload.role.permissions) == 1
-        assert payload.role.permissions[0].entity_type == EntityType.SESSION
+        assert restored.role.source == RoleSourceDTO.CUSTOM
 
 
 class TestUpdateRolePayload:
@@ -318,8 +189,8 @@ class TestUpdateRolePayload:
         role_node = RoleNode(
             id=role_id,
             name="UpdatedAdmin",
-            source=RoleSource.CUSTOM,
-            status=RoleStatus.ACTIVE,
+            source=RoleSourceDTO.CUSTOM,
+            status=RoleStatusDTO.ACTIVE,
             created_at=now,
             updated_at=now,
         )
@@ -334,8 +205,8 @@ class TestUpdateRolePayload:
             id=role_id,
             name="UpdatedAdmin",
             description="Updated description",
-            source=RoleSource.CUSTOM,
-            status=RoleStatus.INACTIVE,
+            source=RoleSourceDTO.CUSTOM,
+            status=RoleStatusDTO.INACTIVE,
             created_at=now,
             updated_at=now,
         )
@@ -345,7 +216,7 @@ class TestUpdateRolePayload:
         assert restored.role.id == role_id
         assert restored.role.name == "UpdatedAdmin"
         assert restored.role.description == "Updated description"
-        assert restored.role.status == RoleStatus.INACTIVE
+        assert restored.role.status == RoleStatusDTO.INACTIVE
 
 
 class TestDeleteRolePayload:
@@ -415,14 +286,11 @@ class TestRoleNodeRoundTrip:
             id=role_id,
             name="Admin",
             description="Admin role",
-            source=RoleSource.CUSTOM,
-            status=RoleStatus.ACTIVE,
+            source=RoleSourceDTO.CUSTOM,
+            status=RoleStatusDTO.ACTIVE,
             created_at=now,
             updated_at=now,
             deleted_at=None,
-            permissions=[
-                PermissionSummary(entity_type=EntityType.SESSION, operation=OperationType.READ),
-            ],
         )
         json_str = node.model_dump_json()
         restored = RoleNode.model_validate_json(json_str)
@@ -432,8 +300,6 @@ class TestRoleNodeRoundTrip:
         assert restored.source == node.source
         assert restored.status == node.status
         assert restored.deleted_at is None
-        assert len(restored.permissions) == 1
-        assert restored.permissions[0].entity_type == EntityType.SESSION
 
     def test_round_trip_with_deleted_at(self) -> None:
         role_id = uuid.uuid4()
@@ -441,8 +307,8 @@ class TestRoleNodeRoundTrip:
         node = RoleNode(
             id=role_id,
             name="DeletedRole",
-            source=RoleSource.CUSTOM,
-            status=RoleStatus.DELETED,
+            source=RoleSourceDTO.CUSTOM,
+            status=RoleStatusDTO.DELETED,
             created_at=now,
             updated_at=now,
             deleted_at=now,
@@ -450,21 +316,21 @@ class TestRoleNodeRoundTrip:
         json_str = node.model_dump_json()
         restored = RoleNode.model_validate_json(json_str)
         assert restored.id == role_id
-        assert restored.status == RoleStatus.DELETED
+        assert restored.status == RoleStatusDTO.DELETED
         assert restored.deleted_at is not None
 
-    def test_round_trip_empty_permissions(self) -> None:
+    def test_round_trip_minimal_fields(self) -> None:
         role_id = uuid.uuid4()
         now = datetime.now(tz=UTC)
         node = RoleNode(
             id=role_id,
             name="BasicRole",
-            source=RoleSource.SYSTEM,
-            status=RoleStatus.ACTIVE,
+            source=RoleSourceDTO.SYSTEM,
+            status=RoleStatusDTO.ACTIVE,
             created_at=now,
             updated_at=now,
-            permissions=[],
         )
         json_str = node.model_dump_json()
         restored = RoleNode.model_validate_json(json_str)
-        assert restored.permissions == []
+        assert restored.id == role_id
+        assert restored.name == "BasicRole"

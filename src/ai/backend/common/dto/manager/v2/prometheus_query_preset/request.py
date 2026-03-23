@@ -5,6 +5,7 @@ Request DTOs for prometheus_query_preset DTO v2.
 from __future__ import annotations
 
 import re
+from datetime import datetime
 from uuid import UUID
 
 from pydantic import Field, field_validator
@@ -32,9 +33,19 @@ __all__ = (
     # Execute supporting
     "MetricLabelEntry",
     "ExecuteQueryDefinitionInput",
+    # Query time range
+    "QueryTimeRangeInputDTO",
 )
 
 _DEFAULT_PAGE_LIMIT = 50
+
+
+class QueryTimeRangeInputDTO(BaseRequestModel):
+    """Input for a Prometheus query time range."""
+
+    start: datetime = Field(description="Start of the time range.")
+    end: datetime = Field(description="End of the time range.")
+    step: str = Field(description="Query resolution step (e.g., '60s').")
 
 
 class CreateQueryDefinitionOptionsInput(BaseRequestModel):

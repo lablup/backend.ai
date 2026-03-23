@@ -23,6 +23,10 @@ from .types import (
 )
 
 __all__ = (
+    # Filter sub-models
+    "DomainFairShareDomainNestedFilter",
+    "ProjectFairShareProjectNestedFilter",
+    "UserFairShareUserNestedFilter",
     # Filter models
     "DomainFairShareFilter",
     "ProjectFairShareFilter",
@@ -69,6 +73,27 @@ __all__ = (
 _DEFAULT_PAGE_LIMIT = 50
 
 
+# Filter nested sub-models
+
+
+class DomainFairShareDomainNestedFilter(BaseRequestModel):
+    """Nested filter for domain entity within domain fair share."""
+
+    is_active: bool | None = Field(default=None, description="Filter by domain active status")
+
+
+class ProjectFairShareProjectNestedFilter(BaseRequestModel):
+    """Nested filter for project entity within project fair share."""
+
+    is_active: bool | None = Field(default=None, description="Filter by project active status")
+
+
+class UserFairShareUserNestedFilter(BaseRequestModel):
+    """Nested filter for user entity within user fair share."""
+
+    is_active: bool | None = Field(default=None, description="Filter by user active status")
+
+
 # Filter models
 
 
@@ -77,6 +102,16 @@ class DomainFairShareFilter(BaseRequestModel):
 
     resource_group: StringFilter | None = Field(default=None, description="Filter by scaling group")
     domain_name: StringFilter | None = Field(default=None, description="Filter by domain name")
+    domain: DomainFairShareDomainNestedFilter | None = Field(
+        default=None, description="Filter by domain entity properties"
+    )
+    AND: list[DomainFairShareFilter] | None = Field(
+        default=None, description="Combine with AND logic"
+    )
+    OR: list[DomainFairShareFilter] | None = Field(
+        default=None, description="Combine with OR logic"
+    )
+    NOT: list[DomainFairShareFilter] | None = Field(default=None, description="Negate filters")
 
 
 class ProjectFairShareFilter(BaseRequestModel):
@@ -85,6 +120,16 @@ class ProjectFairShareFilter(BaseRequestModel):
     resource_group: StringFilter | None = Field(default=None, description="Filter by scaling group")
     project_id: UUIDFilter | None = Field(default=None, description="Filter by project ID")
     domain_name: StringFilter | None = Field(default=None, description="Filter by domain name")
+    project: ProjectFairShareProjectNestedFilter | None = Field(
+        default=None, description="Filter by project entity properties"
+    )
+    AND: list[ProjectFairShareFilter] | None = Field(
+        default=None, description="Combine with AND logic"
+    )
+    OR: list[ProjectFairShareFilter] | None = Field(
+        default=None, description="Combine with OR logic"
+    )
+    NOT: list[ProjectFairShareFilter] | None = Field(default=None, description="Negate filters")
 
 
 class UserFairShareFilter(BaseRequestModel):
@@ -94,6 +139,20 @@ class UserFairShareFilter(BaseRequestModel):
     user_uuid: UUIDFilter | None = Field(default=None, description="Filter by user UUID")
     project_id: UUIDFilter | None = Field(default=None, description="Filter by project ID")
     domain_name: StringFilter | None = Field(default=None, description="Filter by domain name")
+    user: UserFairShareUserNestedFilter | None = Field(
+        default=None, description="Filter by user entity properties"
+    )
+    AND: list[UserFairShareFilter] | None = Field(
+        default=None, description="Combine with AND logic"
+    )
+    OR: list[UserFairShareFilter] | None = Field(default=None, description="Combine with OR logic")
+    NOT: list[UserFairShareFilter] | None = Field(default=None, description="Negate filters")
+
+
+# model_rebuild() required for self-referential fields
+DomainFairShareFilter.model_rebuild()
+ProjectFairShareFilter.model_rebuild()
+UserFairShareFilter.model_rebuild()
 
 
 class DomainUsageBucketFilter(BaseRequestModel):
@@ -215,10 +274,12 @@ class SearchDomainFairSharesInput(BaseRequestModel):
     order: list[DomainFairShareOrder] | None = Field(
         default=None, description="Order specifications"
     )
-    limit: int = Field(
-        default=_DEFAULT_PAGE_LIMIT, ge=1, le=1000, description="Maximum items to return"
-    )
-    offset: int = Field(default=0, ge=0, description="Number of items to skip")
+    first: int | None = Field(default=None, ge=1, description="Cursor-based: items after cursor")
+    after: str | None = Field(default=None, description="Cursor-based: start cursor (exclusive)")
+    last: int | None = Field(default=None, ge=1, description="Cursor-based: items before cursor")
+    before: str | None = Field(default=None, description="Cursor-based: end cursor (exclusive)")
+    limit: int | None = Field(default=None, ge=1, le=1000, description="Offset-based: max results")
+    offset: int | None = Field(default=None, ge=0, description="Offset-based: pagination offset")
 
 
 class SearchProjectFairSharesInput(BaseRequestModel):
@@ -228,10 +289,12 @@ class SearchProjectFairSharesInput(BaseRequestModel):
     order: list[ProjectFairShareOrder] | None = Field(
         default=None, description="Order specifications"
     )
-    limit: int = Field(
-        default=_DEFAULT_PAGE_LIMIT, ge=1, le=1000, description="Maximum items to return"
-    )
-    offset: int = Field(default=0, ge=0, description="Number of items to skip")
+    first: int | None = Field(default=None, ge=1, description="Cursor-based: items after cursor")
+    after: str | None = Field(default=None, description="Cursor-based: start cursor (exclusive)")
+    last: int | None = Field(default=None, ge=1, description="Cursor-based: items before cursor")
+    before: str | None = Field(default=None, description="Cursor-based: end cursor (exclusive)")
+    limit: int | None = Field(default=None, ge=1, le=1000, description="Offset-based: max results")
+    offset: int | None = Field(default=None, ge=0, description="Offset-based: pagination offset")
 
 
 class SearchUserFairSharesInput(BaseRequestModel):
@@ -239,10 +302,12 @@ class SearchUserFairSharesInput(BaseRequestModel):
 
     filter: UserFairShareFilter | None = Field(default=None, description="Filter conditions")
     order: list[UserFairShareOrder] | None = Field(default=None, description="Order specifications")
-    limit: int = Field(
-        default=_DEFAULT_PAGE_LIMIT, ge=1, le=1000, description="Maximum items to return"
-    )
-    offset: int = Field(default=0, ge=0, description="Number of items to skip")
+    first: int | None = Field(default=None, ge=1, description="Cursor-based: items after cursor")
+    after: str | None = Field(default=None, description="Cursor-based: start cursor (exclusive)")
+    last: int | None = Field(default=None, ge=1, description="Cursor-based: items before cursor")
+    before: str | None = Field(default=None, description="Cursor-based: end cursor (exclusive)")
+    limit: int | None = Field(default=None, ge=1, le=1000, description="Offset-based: max results")
+    offset: int | None = Field(default=None, ge=0, description="Offset-based: pagination offset")
 
 
 class SearchDomainUsageBucketsInput(BaseRequestModel):
@@ -288,11 +353,10 @@ class SearchUserUsageBucketsInput(BaseRequestModel):
 
 
 class UpsertDomainFairShareWeightInput(BaseRequestModel):
-    """Input for upserting domain fair share weight.
+    """Input for upserting domain fair share weight."""
 
-    Set weight to null to use the resource group's default_weight.
-    """
-
+    resource_group_name: str = Field(description="Scaling group name.")
+    domain_name: str = Field(description="Name of the domain to update weight for.")
     weight: Decimal | None = Field(
         default=None,
         description=(
@@ -303,12 +367,11 @@ class UpsertDomainFairShareWeightInput(BaseRequestModel):
 
 
 class UpsertProjectFairShareWeightInput(BaseRequestModel):
-    """Input for upserting project fair share weight.
+    """Input for upserting project fair share weight."""
 
-    Set weight to null to use the resource group's default_weight.
-    """
-
-    domain_name: str = Field(description="Domain name the project belongs to")
+    resource_group_name: str = Field(description="Scaling group name.")
+    project_id: UUID = Field(description="UUID of the project to update weight for.")
+    domain_name: str = Field(description="Name of the domain the project belongs to.")
     weight: Decimal | None = Field(
         default=None,
         description=(
@@ -319,12 +382,12 @@ class UpsertProjectFairShareWeightInput(BaseRequestModel):
 
 
 class UpsertUserFairShareWeightInput(BaseRequestModel):
-    """Input for upserting user fair share weight.
+    """Input for upserting user fair share weight."""
 
-    Set weight to null to use the resource group's default_weight.
-    """
-
-    domain_name: str = Field(description="Domain name the user belongs to")
+    resource_group_name: str = Field(description="Scaling group name.")
+    user_uuid: UUID = Field(description="User UUID.")
+    project_id: UUID = Field(description="Project ID.")
+    domain_name: str = Field(description="Name of the domain the user belongs to.")
     weight: Decimal | None = Field(
         default=None,
         description=(
@@ -347,8 +410,8 @@ class DomainWeightEntryInput(BaseRequestModel):
 class BulkUpsertDomainFairShareWeightInput(BaseRequestModel):
     """Input for bulk upserting domain fair share weights."""
 
-    resource_group: str = Field(description="Scaling group name")
-    inputs: list[DomainWeightEntryInput] = Field(description="List of domain weights to upsert")
+    resource_group_name: str = Field(description="Scaling group name.")
+    inputs: list[DomainWeightEntryInput] = Field(description="List of domain weights to upsert.")
 
 
 class ProjectWeightEntryInput(BaseRequestModel):
@@ -362,8 +425,8 @@ class ProjectWeightEntryInput(BaseRequestModel):
 class BulkUpsertProjectFairShareWeightInput(BaseRequestModel):
     """Input for bulk upserting project fair share weights."""
 
-    resource_group: str = Field(description="Scaling group name")
-    inputs: list[ProjectWeightEntryInput] = Field(description="List of project weights to upsert")
+    resource_group_name: str = Field(description="Scaling group name.")
+    inputs: list[ProjectWeightEntryInput] = Field(description="List of project weights to upsert.")
 
 
 class UserWeightEntryInput(BaseRequestModel):
@@ -378,8 +441,8 @@ class UserWeightEntryInput(BaseRequestModel):
 class BulkUpsertUserFairShareWeightInput(BaseRequestModel):
     """Input for bulk upserting user fair share weights."""
 
-    resource_group: str = Field(description="Scaling group name")
-    inputs: list[UserWeightEntryInput] = Field(description="List of user weights to upsert")
+    resource_group_name: str = Field(description="Scaling group name.")
+    inputs: list[UserWeightEntryInput] = Field(description="List of user weights to upsert.")
 
 
 # Update spec input

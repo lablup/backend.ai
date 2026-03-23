@@ -1,7 +1,9 @@
 import strawberry
+from graphql.pyutils.undefined import Undefined as GraphQLUndefined
 from strawberry.federation import Schema
 from strawberry.schema.config import StrawberryConfig
 
+from ai.backend.common.api_handlers import Sentinel as BackendSentinel
 from ai.backend.manager.api.gql.extensions import (
     GQLExceptionHandlerExtension,
     GQLLoggingExtension,
@@ -135,6 +137,7 @@ from .image import (
 from .kernel.resolver import admin_kernels_v2, kernel_v2, session_kernels_v2
 from .keypair import (
     issue_my_keypair,
+    my_keypairs,
     revoke_my_keypair,
     switch_my_main_access_key,
     update_my_keypair,
@@ -348,6 +351,8 @@ class Query:
     admin_permissions = admin_permissions
     admin_role_assignments = admin_role_assignments
     admin_entities = admin_entities
+    # Keypair self-service queries
+    my_keypairs = my_keypairs
     # RBAC User APIs
     my_roles = my_roles
     rbac_scope_entity_combinations = rbac_scope_entity_combinations
@@ -546,6 +551,15 @@ class Subscription:
 
 class CustomizedSchema(Schema):
     def as_str(self) -> str:
+        # Strawberry picks up pydantic field defaults (including SENTINEL) as GraphQL
+        # schema field default_values.  SENTINEL is not a valid GraphQL scalar value, so
+        # replace any SENTINEL default with Undefined (= "no default" in the schema SDL).
+        for type_def in self._schema.type_map.values():
+            if not hasattr(type_def, "fields"):
+                continue
+            for field in type_def.fields.values():
+                if isinstance(getattr(field, "default_value", None), BackendSentinel):
+                    field.default_value = GraphQLUndefined
         sdl = super().as_str()
         sdl = sdl.replace("type PageInfo", "type PageInfo @shareable").replace(
             'import: ["@external", "@key"]', 'import: ["@external", "@key", "@shareable"]'

@@ -8,68 +8,129 @@ Covers:
 
 from __future__ import annotations
 
+import uuid as _uuid
 from collections.abc import Iterable
 from decimal import Decimal
 from enum import StrEnum
 from typing import Any, Self
 
 import strawberry
-from strawberry import ID, Info
-from strawberry.relay import Connection, Edge, Node, NodeID
+from strawberry import Info
+from strawberry.relay import Connection, Edge, NodeID
 
+from ai.backend.common.dto.manager.v2.resource_slot.request import (
+    AgentResourceFilter as AgentResourceFilterDTO,
+)
+from ai.backend.common.dto.manager.v2.resource_slot.request import (
+    AgentResourceOrder as AgentResourceOrderDTO,
+)
+from ai.backend.common.dto.manager.v2.resource_slot.request import (
+    ResourceAllocationFilter as ResourceAllocationFilterDTO,
+)
+from ai.backend.common.dto.manager.v2.resource_slot.request import (
+    ResourceAllocationOrder as ResourceAllocationOrderDTO,
+)
+from ai.backend.common.dto.manager.v2.resource_slot.request import (
+    ResourceSlotTypeFilter as ResourceSlotTypeFilterDTO,
+)
+from ai.backend.common.dto.manager.v2.resource_slot.request import (
+    ResourceSlotTypeOrder as ResourceSlotTypeOrderDTO,
+)
+from ai.backend.common.dto.manager.v2.resource_slot.response import (
+    AgentResourceNode as AgentResourceNodeDTO,
+)
+from ai.backend.common.dto.manager.v2.resource_slot.response import (
+    ResourceAllocationNode as ResourceAllocationNodeDTO,
+)
+from ai.backend.common.dto.manager.v2.resource_slot.response import (
+    ResourceSlotTypeNode as ResourceSlotTypeNodeDTO,
+)
+from ai.backend.common.dto.manager.v2.resource_slot.types import (
+    NumberFormatInfo as NumberFormatInfoDTO,
+)
 from ai.backend.manager.api.gql.base import OrderDirection, StringFilter
-from ai.backend.manager.api.gql.types import GQLFilter, GQLOrderBy, StrawberryGQLContext
+from ai.backend.manager.api.gql.decorators import (
+    BackendAIGQLMeta,
+    gql_connection_type,
+    gql_node_type,
+    gql_pydantic_input,
+    gql_pydantic_type,
+)
+from ai.backend.manager.api.gql.pydantic_compat import PydanticInputMixin, PydanticNodeMixin
+from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.api.gql.utils import dedent_strip
-from ai.backend.manager.data.resource_slot.types import (
-    AgentResourceData,
-    NumberFormatData,
-    ResourceAllocationData,
-    ResourceSlotTypeData,
-)
-from ai.backend.manager.repositories.base import (
-    QueryCondition,
-    QueryOrder,
-    combine_conditions_or,
-    negate_conditions,
-)
-from ai.backend.manager.repositories.resource_slot.query import (
-    AgentResourceQueryConditions,
-    AgentResourceQueryOrders,
-    QueryConditions,
-    QueryOrders,
-    ResourceAllocationQueryConditions,
-    ResourceAllocationQueryOrders,
-)
+
+# ========== DTO helpers for Node.resolve_nodes ==========
+
+
+async def load_resource_slot_type_node(
+    info: Info[StrawberryGQLContext],
+    slot_name: str,
+) -> ResourceSlotTypeNodeDTO:
+    """Load a ResourceSlotTypeNode DTO for a single slot_name (used by Node.resolve_nodes)."""
+    return await info.context.adapters.resource_slot.get_slot_type(slot_name)
+
+
+async def load_agent_resource_node(
+    info: Info[StrawberryGQLContext],
+    agent_id: str,
+    slot_name: str,
+) -> AgentResourceNodeDTO:
+    """Load an AgentResourceNode DTO for a single agent+slot (used by Node.resolve_nodes).
+
+    Raises AgentResourceNotFound if the entry does not exist.
+    """
+    return await info.context.adapters.resource_slot.get_agent_resource(agent_id, slot_name)
+
+
+async def load_kernel_allocation_node(
+    info: Info[StrawberryGQLContext],
+    kernel_id_str: str,
+    slot_name: str,
+) -> ResourceAllocationNodeDTO:
+    """Load a ResourceAllocationNode DTO for a single kernel+slot (used by Node.resolve_nodes).
+
+    Raises ResourceAllocationNotFound if the entry does not exist.
+    """
+    return await info.context.adapters.resource_slot.get_kernel_allocation(
+        _uuid.UUID(kernel_id_str), slot_name
+    )
+
 
 # ========== NumberFormat ==========
 
 
-@strawberry.type(
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version="26.3.0",
+        description="Display number format configuration for a resource slot type.",
+    ),
+    model=NumberFormatInfoDTO,
     name="NumberFormat",
-    description="Added in 26.3.0. Display number format configuration for a resource slot type.",
 )
 class NumberFormatGQL:
     binary: bool = strawberry.field(
-        description="Whether to use binary (1024-based) prefix instead of decimal (1000-based)."
+        description="Whether to use binary (1024-based) or decimal (1000-based) prefixes."
     )
-    round_length: int = strawberry.field(description="Number of decimal places to display.")
-
-    @classmethod
-    def from_data(cls, data: NumberFormatData) -> Self:
-        return cls(binary=data.binary, round_length=data.round_length)
+    round_length: int = strawberry.field(
+        description="Number of decimal places to round to when displaying values."
+    )
 
 
 # ========== ResourceSlotTypeGQL (Node) ==========
 
 
-@strawberry.type(
+@gql_node_type(
+    BackendAIGQLMeta(
+        added_version="26.3.0",
+        description=dedent_strip("""
+            A registered resource slot type describing display metadata
+            and formatting rules for a specific resource (e.g., cpu, mem, cuda.device).
+        """),
+    ),
     name="ResourceSlotType",
-    description=dedent_strip("""
-        Added in 26.3.0. A registered resource slot type describing display metadata
-        and formatting rules for a specific resource (e.g., cpu, mem, cuda.device).
-    """),
 )
-class ResourceSlotTypeGQL(Node):
+class ResourceSlotTypeGQL(PydanticNodeMixin[Any]):
     id: NodeID[str]
     slot_name: str = strawberry.field(
         description="Unique identifier for the resource slot (e.g., 'cpu', 'mem', 'cuda.device')."
@@ -100,42 +161,30 @@ class ResourceSlotTypeGQL(Node):
         node_ids: Iterable[str],
         required: bool = False,
     ) -> Iterable[Self | None]:
-        from ai.backend.manager.api.gql.resource_slot.fetcher import load_resource_slot_type_data
         from ai.backend.manager.errors.resource_slot import ResourceSlotTypeNotFound
 
         results: list[Self | None] = []
         for slot_name in node_ids:
             try:
-                data = await load_resource_slot_type_data(info, slot_name)
+                node = await load_resource_slot_type_node(info, slot_name)
             except ResourceSlotTypeNotFound:
                 if required:
                     raise
                 results.append(None)
             else:
-                results.append(cls.from_data(data))
+                results.append(cls.from_pydantic(node))
         return results
-
-    @classmethod
-    def from_data(cls, data: ResourceSlotTypeData) -> Self:
-        return cls(
-            id=ID(data.slot_name),
-            slot_name=data.slot_name,
-            slot_type=data.slot_type,
-            display_name=data.display_name,
-            description=data.description,
-            display_unit=data.display_unit,
-            display_icon=data.display_icon,
-            number_format=NumberFormatGQL.from_data(data.number_format),
-            rank=data.rank,
-        )
 
 
 ResourceSlotTypeEdgeGQL = Edge[ResourceSlotTypeGQL]
 
 
-@strawberry.type(
+@gql_connection_type(
+    BackendAIGQLMeta(
+        added_version="26.3.0",
+        description="Relay-style connection for paginated resource slot types.",
+    ),
     name="ResourceSlotTypeConnection",
-    description="Added in 26.3.0. Relay-style connection for paginated resource slot types.",
 )
 class ResourceSlotTypeConnectionGQL(Connection[ResourceSlotTypeGQL]):
     count: int
@@ -158,98 +207,47 @@ class ResourceSlotTypeOrderFieldGQL(StrEnum):
     DISPLAY_NAME = "display_name"
 
 
-@strawberry.input(
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description="Filter criteria for querying resource slot types.", added_version="26.3.0"
+    ),
     name="ResourceSlotTypeFilter",
-    description="Added in 26.3.0. Filter criteria for querying resource slot types.",
 )
-class ResourceSlotTypeFilterGQL(GQLFilter):
+class ResourceSlotTypeFilterGQL(PydanticInputMixin[ResourceSlotTypeFilterDTO]):
     slot_name: StringFilter | None = None
     slot_type: StringFilter | None = None
     display_name: StringFilter | None = None
 
-    AND: list[ResourceSlotTypeFilterGQL] | None = None
-    OR: list[ResourceSlotTypeFilterGQL] | None = None
-    NOT: list[ResourceSlotTypeFilterGQL] | None = None
-
-    def build_conditions(self) -> list[QueryCondition]:
-        conditions: list[QueryCondition] = []
-        if self.slot_name:
-            condition = self.slot_name.build_query_condition(
-                contains_factory=QueryConditions.by_slot_name_contains,
-                equals_factory=QueryConditions.by_slot_name_equals,
-                starts_with_factory=QueryConditions.by_slot_name_starts_with,
-                ends_with_factory=QueryConditions.by_slot_name_ends_with,
-            )
-            if condition:
-                conditions.append(condition)
-        if self.slot_type:
-            condition = self.slot_type.build_query_condition(
-                contains_factory=QueryConditions.by_slot_type_contains,
-                equals_factory=QueryConditions.by_slot_type_equals,
-                starts_with_factory=QueryConditions.by_slot_type_starts_with,
-                ends_with_factory=QueryConditions.by_slot_type_ends_with,
-            )
-            if condition:
-                conditions.append(condition)
-        if self.display_name:
-            condition = self.display_name.build_query_condition(
-                contains_factory=QueryConditions.by_display_name_contains,
-                equals_factory=QueryConditions.by_display_name_equals,
-                starts_with_factory=QueryConditions.by_display_name_starts_with,
-                ends_with_factory=QueryConditions.by_display_name_ends_with,
-            )
-            if condition:
-                conditions.append(condition)
-        if self.AND:
-            for sub_filter in self.AND:
-                conditions.extend(sub_filter.build_conditions())
-        if self.OR:
-            or_sub_conditions: list[QueryCondition] = []
-            for sub_filter in self.OR:
-                or_sub_conditions.extend(sub_filter.build_conditions())
-            if or_sub_conditions:
-                conditions.append(combine_conditions_or(or_sub_conditions))
-        if self.NOT:
-            not_sub_conditions: list[QueryCondition] = []
-            for sub_filter in self.NOT:
-                not_sub_conditions.extend(sub_filter.build_conditions())
-            if not_sub_conditions:
-                conditions.append(negate_conditions(not_sub_conditions))
-        return conditions
+    AND: list[Self] | None = None
+    OR: list[Self] | None = None
+    NOT: list[Self] | None = None
 
 
-@strawberry.input(
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description="Ordering specification for resource slot types.", added_version="26.3.0"
+    ),
     name="ResourceSlotTypeOrderBy",
-    description="Added in 26.3.0. Ordering specification for resource slot types.",
 )
-class ResourceSlotTypeOrderByGQL(GQLOrderBy):
+class ResourceSlotTypeOrderByGQL(PydanticInputMixin[ResourceSlotTypeOrderDTO]):
     field: ResourceSlotTypeOrderFieldGQL
     direction: OrderDirection = OrderDirection.ASC
-
-    def to_query_order(self) -> QueryOrder:
-        ascending = self.direction == OrderDirection.ASC
-        match self.field:
-            case ResourceSlotTypeOrderFieldGQL.SLOT_NAME:
-                return QueryOrders.slot_name(ascending)
-            case ResourceSlotTypeOrderFieldGQL.RANK:
-                return QueryOrders.rank(ascending)
-            case ResourceSlotTypeOrderFieldGQL.DISPLAY_NAME:
-                return QueryOrders.display_name(ascending)
-            case _:
-                raise ValueError(f"Unhandled ResourceSlotTypeOrderFieldGQL value: {self.field!r}")
 
 
 # ========== AgentResourceSlotGQL (Node) ==========
 
 
-@strawberry.type(
+@gql_node_type(
+    BackendAIGQLMeta(
+        added_version="26.3.0",
+        description=dedent_strip("""
+            Per-slot resource capacity and usage entry for an agent.
+            Represents one row from the agent_resources table.
+        """),
+    ),
     name="AgentResourceSlot",
-    description=dedent_strip("""
-        Added in 26.3.0. Per-slot resource capacity and usage entry for an agent.
-        Represents one row from the agent_resources table.
-    """),
 )
-class AgentResourceSlotGQL(Node):
+class AgentResourceSlotGQL(PydanticNodeMixin[AgentResourceNodeDTO]):
     """Per-agent, per-slot resource capacity and usage."""
 
     id: NodeID[str]
@@ -272,39 +270,31 @@ class AgentResourceSlotGQL(Node):
         required: bool = False,
     ) -> Iterable[Self | None]:
         # Node ID format: "{agent_id}:{slot_name}"
-        from ai.backend.manager.api.gql.resource_slot.fetcher import load_agent_resource_data
         from ai.backend.manager.errors.resource_slot import AgentResourceNotFound
 
         results: list[Self | None] = []
         for node_id in node_ids:
             agent_id, _, slot_name = node_id.partition(":")
             try:
-                data = await load_agent_resource_data(info, agent_id, slot_name)
+                node = await load_agent_resource_node(info, agent_id, slot_name)
             except AgentResourceNotFound:
                 if required:
                     raise
                 results.append(None)
             else:
-                results.append(cls.from_data(data))
+                results.append(cls.from_pydantic(node))
         return results
-
-    @classmethod
-    def from_data(cls, data: AgentResourceData) -> Self:
-        node_id = f"{data.agent_id}:{data.slot_name}"
-        return cls(
-            id=ID(node_id),
-            slot_name=data.slot_name,
-            capacity=data.capacity,
-            used=data.used,
-        )
 
 
 AgentResourceSlotEdgeGQL = Edge[AgentResourceSlotGQL]
 
 
-@strawberry.type(
+@gql_connection_type(
+    BackendAIGQLMeta(
+        added_version="26.3.0",
+        description="Relay-style connection for per-slot agent resources.",
+    ),
     name="AgentResourceConnection",
-    description="Added in 26.3.0. Relay-style connection for per-slot agent resources.",
 )
 class AgentResourceConnectionGQL(Connection[AgentResourceSlotGQL]):
     count: int
@@ -327,78 +317,46 @@ class AgentResourceSlotOrderFieldGQL(StrEnum):
     USED = "used"
 
 
-@strawberry.input(
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description="Filter criteria for querying agent resource slots.", added_version="26.3.0"
+    ),
     name="AgentResourceSlotFilter",
-    description="Added in 26.3.0. Filter criteria for querying agent resource slots.",
 )
-class AgentResourceSlotFilterGQL(GQLFilter):
+class AgentResourceSlotFilterGQL(PydanticInputMixin[AgentResourceFilterDTO]):
     slot_name: StringFilter | None = None
+    agent_id: StringFilter | None = None
 
-    AND: list[AgentResourceSlotFilterGQL] | None = None
-    OR: list[AgentResourceSlotFilterGQL] | None = None
-    NOT: list[AgentResourceSlotFilterGQL] | None = None
-
-    def build_conditions(self) -> list[QueryCondition]:
-        conditions: list[QueryCondition] = []
-        if self.slot_name:
-            condition = self.slot_name.build_query_condition(
-                contains_factory=AgentResourceQueryConditions.by_slot_name_contains,
-                equals_factory=AgentResourceQueryConditions.by_slot_name_equals,
-                starts_with_factory=AgentResourceQueryConditions.by_slot_name_starts_with,
-                ends_with_factory=AgentResourceQueryConditions.by_slot_name_ends_with,
-            )
-            if condition:
-                conditions.append(condition)
-        if self.AND:
-            for sub_filter in self.AND:
-                conditions.extend(sub_filter.build_conditions())
-        if self.OR:
-            or_sub_conditions: list[QueryCondition] = []
-            for sub_filter in self.OR:
-                or_sub_conditions.extend(sub_filter.build_conditions())
-            if or_sub_conditions:
-                conditions.append(combine_conditions_or(or_sub_conditions))
-        if self.NOT:
-            not_sub_conditions: list[QueryCondition] = []
-            for sub_filter in self.NOT:
-                not_sub_conditions.extend(sub_filter.build_conditions())
-            if not_sub_conditions:
-                conditions.append(negate_conditions(not_sub_conditions))
-        return conditions
+    AND: list[Self] | None = None
+    OR: list[Self] | None = None
+    NOT: list[Self] | None = None
 
 
-@strawberry.input(
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description="Ordering specification for agent resource slots.", added_version="26.3.0"
+    ),
     name="AgentResourceSlotOrderBy",
-    description="Added in 26.3.0. Ordering specification for agent resource slots.",
 )
-class AgentResourceSlotOrderByGQL(GQLOrderBy):
+class AgentResourceSlotOrderByGQL(PydanticInputMixin[AgentResourceOrderDTO]):
     field: AgentResourceSlotOrderFieldGQL
     direction: OrderDirection = OrderDirection.ASC
-
-    def to_query_order(self) -> QueryOrder:
-        ascending = self.direction == OrderDirection.ASC
-        match self.field:
-            case AgentResourceSlotOrderFieldGQL.SLOT_NAME:
-                return AgentResourceQueryOrders.slot_name(ascending)
-            case AgentResourceSlotOrderFieldGQL.CAPACITY:
-                return AgentResourceQueryOrders.capacity(ascending)
-            case AgentResourceSlotOrderFieldGQL.USED:
-                return AgentResourceQueryOrders.used(ascending)
-            case _:
-                raise ValueError(f"Unhandled AgentResourceSlotOrderFieldGQL value: {self.field!r}")
 
 
 # ========== KernelResourceAllocationGQL (Node) ==========
 
 
-@strawberry.type(
+@gql_node_type(
+    BackendAIGQLMeta(
+        added_version="26.3.0",
+        description=dedent_strip("""
+            Per-slot resource allocation entry for a kernel.
+            Represents one row from the resource_allocations table.
+        """),
+    ),
     name="KernelResourceAllocation",
-    description=dedent_strip("""
-        Added in 26.3.0. Per-slot resource allocation entry for a kernel.
-        Represents one row from the resource_allocations table.
-    """),
 )
-class KernelResourceAllocationGQL(Node):
+class KernelResourceAllocationGQL(PydanticNodeMixin[Any]):
     """Per-kernel, per-slot resource allocation."""
 
     id: NodeID[str]
@@ -421,31 +379,20 @@ class KernelResourceAllocationGQL(Node):
         required: bool = False,
     ) -> Iterable[Self | None]:
         # Node ID format: "{kernel_id}:{slot_name}"
-        from ai.backend.manager.api.gql.resource_slot.fetcher import load_kernel_allocation_data
         from ai.backend.manager.errors.resource_slot import ResourceAllocationNotFound
 
         results: list[Self | None] = []
         for node_id in node_ids:
             kernel_id_str, _, slot_name = node_id.partition(":")
             try:
-                data = await load_kernel_allocation_data(info, kernel_id_str, slot_name)
+                node = await load_kernel_allocation_node(info, kernel_id_str, slot_name)
             except ResourceAllocationNotFound:
                 if required:
                     raise
                 results.append(None)
             else:
-                results.append(cls.from_data(data))
+                results.append(cls.from_pydantic(node))
         return results
-
-    @classmethod
-    def from_data(cls, data: ResourceAllocationData) -> Self:
-        node_id = f"{data.kernel_id}:{data.slot_name}"
-        return cls(
-            id=ID(node_id),
-            slot_name=data.slot_name,
-            requested=data.requested,
-            used=data.used,
-        )
 
 
 # ========== KernelResourceAllocation Filter/OrderBy ==========
@@ -461,75 +408,42 @@ class KernelResourceAllocationOrderFieldGQL(StrEnum):
     USED = "used"
 
 
-@strawberry.input(
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description="Filter criteria for querying kernel resource allocations.",
+        added_version="26.3.0",
+    ),
     name="KernelResourceAllocationFilter",
-    description="Added in 26.3.0. Filter criteria for querying kernel resource allocations.",
 )
-class KernelResourceAllocationFilterGQL(GQLFilter):
+class KernelResourceAllocationFilterGQL(PydanticInputMixin[ResourceAllocationFilterDTO]):
     slot_name: StringFilter | None = None
 
-    AND: list[KernelResourceAllocationFilterGQL] | None = None
-    OR: list[KernelResourceAllocationFilterGQL] | None = None
-    NOT: list[KernelResourceAllocationFilterGQL] | None = None
-
-    def build_conditions(self) -> list[QueryCondition]:
-        conditions: list[QueryCondition] = []
-        if self.slot_name:
-            condition = self.slot_name.build_query_condition(
-                contains_factory=ResourceAllocationQueryConditions.by_slot_name_contains,
-                equals_factory=ResourceAllocationQueryConditions.by_slot_name_equals,
-                starts_with_factory=ResourceAllocationQueryConditions.by_slot_name_starts_with,
-                ends_with_factory=ResourceAllocationQueryConditions.by_slot_name_ends_with,
-            )
-            if condition:
-                conditions.append(condition)
-        if self.AND:
-            for sub_filter in self.AND:
-                conditions.extend(sub_filter.build_conditions())
-        if self.OR:
-            or_sub_conditions: list[QueryCondition] = []
-            for sub_filter in self.OR:
-                or_sub_conditions.extend(sub_filter.build_conditions())
-            if or_sub_conditions:
-                conditions.append(combine_conditions_or(or_sub_conditions))
-        if self.NOT:
-            not_sub_conditions: list[QueryCondition] = []
-            for sub_filter in self.NOT:
-                not_sub_conditions.extend(sub_filter.build_conditions())
-            if not_sub_conditions:
-                conditions.append(negate_conditions(not_sub_conditions))
-        return conditions
+    AND: list[Self] | None = None
+    OR: list[Self] | None = None
+    NOT: list[Self] | None = None
 
 
-@strawberry.input(
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description="Ordering specification for kernel resource allocations.",
+        added_version="26.3.0",
+    ),
     name="KernelResourceAllocationOrderBy",
-    description="Added in 26.3.0. Ordering specification for kernel resource allocations.",
 )
-class KernelResourceAllocationOrderByGQL(GQLOrderBy):
+class KernelResourceAllocationOrderByGQL(PydanticInputMixin[ResourceAllocationOrderDTO]):
     field: KernelResourceAllocationOrderFieldGQL
     direction: OrderDirection = OrderDirection.ASC
-
-    def to_query_order(self) -> QueryOrder:
-        ascending = self.direction == OrderDirection.ASC
-        match self.field:
-            case KernelResourceAllocationOrderFieldGQL.SLOT_NAME:
-                return ResourceAllocationQueryOrders.slot_name(ascending)
-            case KernelResourceAllocationOrderFieldGQL.REQUESTED:
-                return ResourceAllocationQueryOrders.requested(ascending)
-            case KernelResourceAllocationOrderFieldGQL.USED:
-                return ResourceAllocationQueryOrders.used(ascending)
-            case _:
-                raise ValueError(
-                    f"Unhandled KernelResourceAllocationOrderFieldGQL value: {self.field!r}"
-                )
 
 
 KernelResourceAllocationEdgeGQL = Edge[KernelResourceAllocationGQL]
 
 
-@strawberry.type(
+@gql_connection_type(
+    BackendAIGQLMeta(
+        added_version="26.3.0",
+        description="Relay-style connection for per-slot kernel resource allocations.",
+    ),
     name="ResourceAllocationConnection",
-    description="Added in 26.3.0. Relay-style connection for per-slot kernel resource allocations.",
 )
 class ResourceAllocationConnectionGQL(Connection[KernelResourceAllocationGQL]):
     count: int

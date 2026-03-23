@@ -6,15 +6,39 @@ from datetime import datetime
 
 import strawberry
 
+from ai.backend.common.dto.manager.v2.user.response import (
+    EntityTimestamps as EntityTimestampsDTO,
+)
+from ai.backend.common.dto.manager.v2.user.response import (
+    UserBasicInfo as UserBasicInfoDTO,
+)
+from ai.backend.common.dto.manager.v2.user.response import (
+    UserContainerSettings as UserContainerSettingsDTO,
+)
+from ai.backend.common.dto.manager.v2.user.response import (
+    UserOrganizationInfo as UserOrganizationInfoDTO,
+)
+from ai.backend.common.dto.manager.v2.user.response import (
+    UserSecurityInfo as UserSecurityInfoDTO,
+)
+from ai.backend.common.dto.manager.v2.user.response import (
+    UserStatusInfo as UserStatusInfoDTO,
+)
+from ai.backend.manager.api.gql.decorators import BackendAIGQLMeta, gql_pydantic_type
+
 from .enums import UserRoleEnumGQL, UserStatusEnumGQL
 
 
-@strawberry.type(
-    name="UserV2BasicInfo",
-    description=(
-        "Added in 26.2.0. Basic user profile information. "
-        "Contains identity and descriptive fields for the user account."
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version="26.2.0",
+        description=(
+            "Basic user profile information. "
+            "Contains identity and descriptive fields for the user account."
+        ),
     ),
+    model=UserBasicInfoDTO,
+    name="UserV2BasicInfo",
 )
 class UserBasicInfoGQL:
     """Basic user profile information."""
@@ -31,12 +55,15 @@ class UserBasicInfoGQL:
     )
 
 
-@strawberry.type(
-    name="UserV2StatusInfo",
-    description=(
-        "Added in 26.2.0. User account status information. "
-        "Contains current status and password-related flags."
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version="26.2.0",
+        description=(
+            "User account status information. Contains current status and password-related flags."
+        ),
     ),
+    model=UserStatusInfoDTO,
+    name="UserV2StatusInfo",
 )
 class UserStatusInfoGQL:
     """User account status information."""
@@ -55,12 +82,16 @@ class UserStatusInfoGQL:
     )
 
 
-@strawberry.type(
-    name="UserV2OrganizationInfo",
-    description=(
-        "Added in 26.2.0. User's organizational context and permissions. "
-        "Contains domain membership, role, and resource policy information."
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version="26.2.0",
+        description=(
+            "User's organizational context and permissions. "
+            "Contains domain membership, role, and resource policy information."
+        ),
     ),
+    model=UserOrganizationInfoDTO,
+    name="UserV2OrganizationInfo",
 )
 class UserOrganizationInfoGQL:
     """User's organizational context and permissions."""
@@ -79,12 +110,16 @@ class UserOrganizationInfoGQL:
     )
 
 
-@strawberry.type(
-    name="UserV2SecurityInfo",
-    description=(
-        "Added in 26.2.0. User security settings and authentication configuration. "
-        "Contains IP restrictions, TOTP settings, and privilege flags."
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version="26.2.0",
+        description=(
+            "User security settings and authentication configuration. "
+            "Contains IP restrictions, TOTP settings, and privilege flags."
+        ),
     ),
+    model=UserSecurityInfoDTO,
+    name="UserV2SecurityInfo",
 )
 class UserSecurityInfoGQL:
     """User security settings and authentication configuration."""
@@ -92,12 +127,13 @@ class UserSecurityInfoGQL:
     allowed_client_ip: list[str] | None = strawberry.field(
         description=(
             "List of allowed client IP addresses or CIDR ranges. "
-            "If set, login is restricted to these IP addresses. "
-            "Supports both IPv4 and IPv6 formats (e.g., '192.168.1.0/24', '::1')."
+            "If set, login is restricted to these IP addresses."
         )
     )
     totp_activated: bool | None = strawberry.field(
-        description="Whether TOTP (Time-based One-Time Password) two-factor authentication is enabled."
+        description=(
+            "Whether TOTP (Time-based One-Time Password) two-factor authentication is enabled."
+        )
     )
     totp_activated_at: datetime | None = strawberry.field(
         description="Timestamp when TOTP was activated."
@@ -107,12 +143,16 @@ class UserSecurityInfoGQL:
     )
 
 
-@strawberry.type(
-    name="UserV2ContainerSettings",
-    description=(
-        "Added in 26.2.0. Container execution settings for the user. "
-        "Defines UID/GID mappings for containers created by this user."
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version="26.2.0",
+        description=(
+            "Container execution settings for the user. "
+            "Defines UID/GID mappings for containers created by this user."
+        ),
     ),
+    model=UserContainerSettingsDTO,
+    name="UserV2ContainerSettings",
 )
 class UserContainerSettingsGQL:
     """Container execution settings for the user."""
@@ -121,19 +161,25 @@ class UserContainerSettingsGQL:
         description="User ID (UID) to use inside containers. If null, system default is used."
     )
     container_main_gid: int | None = strawberry.field(
-        description="Primary group ID (GID) to use inside containers. If null, system default is used."
+        description=(
+            "Primary group ID (GID) to use inside containers. If null, system default is used."
+        )
     )
     container_gids: list[int] | None = strawberry.field(
         description="Additional supplementary group IDs for container processes."
     )
 
 
-@strawberry.type(
-    name="EntityTimestamps",
-    description=(
-        "Added in 26.2.0. Common timestamp fields for entity lifecycle tracking. "
-        "Reusable across different entity types."
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version="26.2.0",
+        description=(
+            "Common timestamp fields for entity lifecycle tracking. "
+            "Reusable across different entity types."
+        ),
     ),
+    model=EntityTimestampsDTO,
+    name="EntityTimestamps",
 )
 class EntityTimestampsGQL:
     """Common timestamp fields for entity lifecycle tracking."""

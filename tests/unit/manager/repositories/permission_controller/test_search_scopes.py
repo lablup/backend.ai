@@ -24,6 +24,16 @@ from ai.backend.manager.models.image import ImageRow
 from ai.backend.manager.models.kernel import KernelRow
 from ai.backend.manager.models.keypair import KeyPairRow
 from ai.backend.manager.models.rbac_models import UserRoleRow
+from ai.backend.manager.models.rbac_models.conditions import (
+    DomainScopeConditions,
+    ProjectScopeConditions,
+    UserScopeConditions,
+)
+from ai.backend.manager.models.rbac_models.orders import (
+    DomainScopeOrders,
+    ProjectScopeOrders,
+    UserScopeOrders,
+)
 from ai.backend.manager.models.resource_policy import (
     KeyPairResourcePolicyRow,
     ProjectResourcePolicyRow,
@@ -37,14 +47,6 @@ from ai.backend.manager.models.user import PasswordHashAlgorithm, PasswordInfo, 
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.vfolder import VFolderRow
 from ai.backend.manager.repositories.base import BatchQuerier, OffsetPagination
-from ai.backend.manager.repositories.permission_controller.options import (
-    DomainScopeConditions,
-    DomainScopeOrders,
-    ProjectScopeConditions,
-    ProjectScopeOrders,
-    UserScopeConditions,
-    UserScopeOrders,
-)
 from ai.backend.manager.repositories.permission_controller.repository import (
     PermissionControllerRepository,
 )

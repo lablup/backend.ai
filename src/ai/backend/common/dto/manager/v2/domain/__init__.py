@@ -3,6 +3,7 @@ Domain DTO v2 models for Manager API.
 """
 
 from ai.backend.common.dto.manager.v2.domain.request import (
+    AdminSearchDomainsInput,
     CreateDomainInput,
     DeleteDomainInput,
     DomainFilter,
@@ -12,6 +13,7 @@ from ai.backend.common.dto.manager.v2.domain.request import (
     UpdateDomainInput,
 )
 from ai.backend.common.dto.manager.v2.domain.response import (
+    AdminSearchDomainsPayload,
     DeleteDomainPayload,
     DomainBasicInfo,
     DomainLifecycleInfo,
@@ -22,12 +24,17 @@ from ai.backend.common.dto.manager.v2.domain.response import (
     SearchDomainsPayload,
 )
 from ai.backend.common.dto.manager.v2.domain.types import (
+    DomainFairShareScopeDTO,
     DomainOrderField,
+    DomainProjectFilter,
+    DomainUsageScopeDTO,
+    DomainUserFilter,
     OrderDirection,
 )
 
 __all__ = (
     # Request DTOs
+    "AdminSearchDomainsInput",
     "CreateDomainInput",
     "UpdateDomainInput",
     "DeleteDomainInput",
@@ -36,6 +43,7 @@ __all__ = (
     "DomainOrder",
     "SearchDomainsRequest",
     # Response DTOs
+    "AdminSearchDomainsPayload",
     "DomainBasicInfo",
     "DomainRegistryInfo",
     "DomainLifecycleInfo",
@@ -45,6 +53,10 @@ __all__ = (
     "DeleteDomainPayload",
     "PurgeDomainPayload",
     # Types
+    "DomainFairShareScopeDTO",
     "DomainOrderField",
+    "DomainProjectFilter",
+    "DomainUsageScopeDTO",
+    "DomainUserFilter",
     "OrderDirection",
 )

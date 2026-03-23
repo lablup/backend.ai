@@ -3,40 +3,22 @@
 from __future__ import annotations
 
 import uuid
-from functools import lru_cache
 from typing import Any
 
 import strawberry
-from strawberry import ID, UNSET, Info
+from strawberry import ID, Info
 from strawberry.relay import Connection, Edge
 
 from ai.backend.common.contexts.user import current_user
-from ai.backend.manager.api.gql.adapter import PaginationOptions, PaginationSpec
+from ai.backend.common.dto.manager.v2.notification.request import (
+    SearchNotificationChannelsInput,
+    SearchNotificationRulesInput,
+)
 from ai.backend.manager.api.gql.base import encode_cursor
+from ai.backend.manager.api.gql.decorators import BackendAIGQLMeta, gql_connection_type
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.api.gql.utils import check_admin_only
 from ai.backend.manager.errors.auth import InvalidAuthParameters
-from ai.backend.manager.models.notification.row import NotificationChannelRow, NotificationRuleRow
-from ai.backend.manager.repositories.notification.options import (
-    NotificationChannelConditions,
-    NotificationChannelOrders,
-    NotificationRuleConditions,
-    NotificationRuleOrders,
-)
-from ai.backend.manager.services.notification.actions import (
-    CreateChannelAction,
-    CreateRuleAction,
-    DeleteChannelAction,
-    DeleteRuleAction,
-    GetChannelAction,
-    GetRuleAction,
-    SearchChannelsAction,
-    SearchRulesAction,
-    UpdateChannelAction,
-    UpdateRuleAction,
-    ValidateChannelAction,
-    ValidateRuleAction,
-)
 
 from .types import (
     CreateNotificationChannelInput,
@@ -64,37 +46,14 @@ from .types import (
     ValidateNotificationRulePayload,
 )
 
-# Pagination specs
-
-
-@lru_cache(maxsize=1)
-def _get_channel_pagination_spec() -> PaginationSpec:
-    return PaginationSpec(
-        forward_order=NotificationChannelOrders.created_at(ascending=False),
-        backward_order=NotificationChannelOrders.created_at(ascending=True),
-        forward_condition_factory=NotificationChannelConditions.by_cursor_forward,
-        backward_condition_factory=NotificationChannelConditions.by_cursor_backward,
-        tiebreaker_order=NotificationChannelRow.id.asc(),
-    )
-
-
-@lru_cache(maxsize=1)
-def _get_rule_pagination_spec() -> PaginationSpec:
-    return PaginationSpec(
-        forward_order=NotificationRuleOrders.created_at(ascending=False),
-        backward_order=NotificationRuleOrders.created_at(ascending=True),
-        forward_condition_factory=NotificationRuleConditions.by_cursor_forward,
-        backward_condition_factory=NotificationRuleConditions.by_cursor_backward,
-        tiebreaker_order=NotificationRuleRow.id.asc(),
-    )
-
-
 # Connection types
 
 NotificationChannelEdge = Edge[NotificationChannel]
 
 
-@strawberry.type(description="Notification channel connection")
+@gql_connection_type(
+    BackendAIGQLMeta(added_version="26.3.0", description="Notification channel connection.")
+)
 class NotificationChannelConnection(Connection[NotificationChannel]):
     count: int
 
@@ -106,7 +65,9 @@ class NotificationChannelConnection(Connection[NotificationChannel]):
 NotificationRuleEdge = Edge[NotificationRule]
 
 
-@strawberry.type(description="Notification rule connection")
+@gql_connection_type(
+    BackendAIGQLMeta(added_version="26.3.0", description="Notification rule connection.")
+)
 class NotificationRuleConnection(Connection[NotificationRule]):
     count: int
 
@@ -123,11 +84,8 @@ async def admin_notification_channel(
     id: ID, info: Info[StrawberryGQLContext]
 ) -> NotificationChannel | None:
     check_admin_only()
-    processors = info.context.processors
-    action_result = await processors.notification.get_channel.wait_for_complete(
-        GetChannelAction(channel_id=uuid.UUID(id))
-    )
-    return NotificationChannel.from_dataclass(action_result.channel_data)
+    result = await info.context.adapters.notification.get_channel(uuid.UUID(id))
+    return NotificationChannel.from_pydantic(result.item)
 
 
 @strawberry.field(  # type: ignore[misc]
@@ -140,11 +98,8 @@ async def admin_notification_channel(
 async def notification_channel(
     id: ID, info: Info[StrawberryGQLContext]
 ) -> NotificationChannel | None:
-    processors = info.context.processors
-    action_result = await processors.notification.get_channel.wait_for_complete(
-        GetChannelAction(channel_id=uuid.UUID(id))
-    )
-    return NotificationChannel.from_dataclass(action_result.channel_data)
+    result = await info.context.adapters.notification.get_channel(uuid.UUID(id))
+    return NotificationChannel.from_pydantic(result.item)
 
 
 @strawberry.field(description="List notification channels (admin only)")  # type: ignore[misc]
@@ -160,29 +115,23 @@ async def admin_notification_channels(
     offset: int | None = None,
 ) -> NotificationChannelConnection | None:
     check_admin_only()
-    processors = info.context.processors
 
-    # Build querier from filter, order_by, and pagination using adapter
-    querier = info.context.gql_adapter.build_querier(
-        PaginationOptions(
+    pydantic_filter = filter.to_pydantic() if filter is not None else None
+    pydantic_orders = [o.to_pydantic() for o in order_by] if order_by is not None else None
+    payload = await info.context.adapters.notification.search_channels(
+        SearchNotificationChannelsInput(
+            filter=pydantic_filter,
+            order=pydantic_orders,
             first=first,
             after=after,
             last=last,
             before=before,
             limit=limit,
             offset=offset,
-        ),
-        _get_channel_pagination_spec(),
-        filter=filter,
-        order_by=order_by,
+        )
     )
 
-    action_result = await processors.notification.search_channels.wait_for_complete(
-        SearchChannelsAction(querier=querier)
-    )
-
-    nodes = [NotificationChannel.from_dataclass(data) for data in action_result.channels]
-
+    nodes = [NotificationChannel.from_pydantic(item) for item in payload.items]
     edges = [
         NotificationChannelEdge(node=node, cursor=encode_cursor(str(node.id))) for node in nodes
     ]
@@ -190,12 +139,12 @@ async def admin_notification_channels(
     return NotificationChannelConnection(
         edges=edges,
         page_info=strawberry.relay.PageInfo(
-            has_next_page=action_result.has_next_page,
-            has_previous_page=action_result.has_previous_page,
+            has_next_page=payload.has_next_page,
+            has_previous_page=payload.has_previous_page,
             start_cursor=edges[0].cursor if edges else None,
             end_cursor=edges[-1].cursor if edges else None,
         ),
-        count=action_result.total_count,
+        count=payload.total_count,
     )
 
 
@@ -217,29 +166,22 @@ async def notification_channels(
     limit: int | None = None,
     offset: int | None = None,
 ) -> NotificationChannelConnection | None:
-    processors = info.context.processors
-
-    # Build querier from filter, order_by, and pagination using adapter
-    querier = info.context.gql_adapter.build_querier(
-        PaginationOptions(
+    pydantic_filter = filter.to_pydantic() if filter is not None else None
+    pydantic_orders = [o.to_pydantic() for o in order_by] if order_by is not None else None
+    payload = await info.context.adapters.notification.search_channels(
+        SearchNotificationChannelsInput(
+            filter=pydantic_filter,
+            order=pydantic_orders,
             first=first,
             after=after,
             last=last,
             before=before,
             limit=limit,
             offset=offset,
-        ),
-        _get_channel_pagination_spec(),
-        filter=filter,
-        order_by=order_by,
+        )
     )
 
-    action_result = await processors.notification.search_channels.wait_for_complete(
-        SearchChannelsAction(querier=querier)
-    )
-
-    nodes = [NotificationChannel.from_dataclass(data) for data in action_result.channels]
-
+    nodes = [NotificationChannel.from_pydantic(item) for item in payload.items]
     edges = [
         NotificationChannelEdge(node=node, cursor=encode_cursor(str(node.id))) for node in nodes
     ]
@@ -247,12 +189,12 @@ async def notification_channels(
     return NotificationChannelConnection(
         edges=edges,
         page_info=strawberry.relay.PageInfo(
-            has_next_page=action_result.has_next_page,
-            has_previous_page=action_result.has_previous_page,
+            has_next_page=payload.has_next_page,
+            has_previous_page=payload.has_previous_page,
             start_cursor=edges[0].cursor if edges else None,
             end_cursor=edges[-1].cursor if edges else None,
         ),
-        count=action_result.total_count,
+        count=payload.total_count,
     )
 
 
@@ -261,11 +203,8 @@ async def admin_notification_rule(
     id: ID, info: Info[StrawberryGQLContext]
 ) -> NotificationRule | None:
     check_admin_only()
-    processors = info.context.processors
-    action_result = await processors.notification.get_rule.wait_for_complete(
-        GetRuleAction(rule_id=uuid.UUID(id))
-    )
-    return NotificationRule.from_dataclass(action_result.rule_data)
+    result = await info.context.adapters.notification.get_rule(uuid.UUID(id))
+    return NotificationRule.from_pydantic(result.item)
 
 
 @strawberry.field(  # type: ignore[misc]
@@ -276,11 +215,8 @@ async def admin_notification_rule(
     ),
 )
 async def notification_rule(id: ID, info: Info[StrawberryGQLContext]) -> NotificationRule | None:
-    processors = info.context.processors
-    action_result = await processors.notification.get_rule.wait_for_complete(
-        GetRuleAction(rule_id=uuid.UUID(id))
-    )
-    return NotificationRule.from_dataclass(action_result.rule_data)
+    result = await info.context.adapters.notification.get_rule(uuid.UUID(id))
+    return NotificationRule.from_pydantic(result.item)
 
 
 @strawberry.field(description="List notification rules (admin only)")  # type: ignore[misc]
@@ -296,40 +232,34 @@ async def admin_notification_rules(
     offset: int | None = None,
 ) -> NotificationRuleConnection | None:
     check_admin_only()
-    processors = info.context.processors
 
-    # Build querier from filter, order_by, and pagination using adapter
-    querier = info.context.gql_adapter.build_querier(
-        PaginationOptions(
+    pydantic_filter = filter.to_pydantic() if filter is not None else None
+    pydantic_orders = [o.to_pydantic() for o in order_by] if order_by is not None else None
+    payload = await info.context.adapters.notification.search_rules(
+        SearchNotificationRulesInput(
+            filter=pydantic_filter,
+            order=pydantic_orders,
             first=first,
             after=after,
             last=last,
             before=before,
             limit=limit,
             offset=offset,
-        ),
-        _get_rule_pagination_spec(),
-        filter=filter,
-        order_by=order_by,
+        )
     )
 
-    action_result = await processors.notification.search_rules.wait_for_complete(
-        SearchRulesAction(querier=querier)
-    )
-
-    nodes = [NotificationRule.from_dataclass(data) for data in action_result.rules]
-
+    nodes = [NotificationRule.from_pydantic(item) for item in payload.items]
     edges = [NotificationRuleEdge(node=node, cursor=encode_cursor(str(node.id))) for node in nodes]
 
     return NotificationRuleConnection(
         edges=edges,
         page_info=strawberry.relay.PageInfo(
-            has_next_page=action_result.has_next_page,
-            has_previous_page=action_result.has_previous_page,
+            has_next_page=payload.has_next_page,
+            has_previous_page=payload.has_previous_page,
             start_cursor=edges[0].cursor if edges else None,
             end_cursor=edges[-1].cursor if edges else None,
         ),
-        count=action_result.total_count,
+        count=payload.total_count,
     )
 
 
@@ -351,49 +281,40 @@ async def notification_rules(
     limit: int | None = None,
     offset: int | None = None,
 ) -> NotificationRuleConnection | None:
-    processors = info.context.processors
-
-    # Build querier from filter, order_by, and pagination using adapter
-    querier = info.context.gql_adapter.build_querier(
-        PaginationOptions(
+    pydantic_filter = filter.to_pydantic() if filter is not None else None
+    pydantic_orders = [o.to_pydantic() for o in order_by] if order_by is not None else None
+    payload = await info.context.adapters.notification.search_rules(
+        SearchNotificationRulesInput(
+            filter=pydantic_filter,
+            order=pydantic_orders,
             first=first,
             after=after,
             last=last,
             before=before,
             limit=limit,
             offset=offset,
-        ),
-        _get_rule_pagination_spec(),
-        filter=filter,
-        order_by=order_by,
+        )
     )
 
-    action_result = await processors.notification.search_rules.wait_for_complete(
-        SearchRulesAction(querier=querier)
-    )
-
-    nodes = [NotificationRule.from_dataclass(data) for data in action_result.rules]
-
+    nodes = [NotificationRule.from_pydantic(item) for item in payload.items]
     edges = [NotificationRuleEdge(node=node, cursor=encode_cursor(str(node.id))) for node in nodes]
 
     return NotificationRuleConnection(
         edges=edges,
         page_info=strawberry.relay.PageInfo(
-            has_next_page=action_result.has_next_page,
-            has_previous_page=action_result.has_previous_page,
+            has_next_page=payload.has_next_page,
+            has_previous_page=payload.has_previous_page,
             start_cursor=edges[0].cursor if edges else None,
             end_cursor=edges[-1].cursor if edges else None,
         ),
-        count=action_result.total_count,
+        count=payload.total_count,
     )
 
 
 @strawberry.field(description="List available notification rule types")  # type: ignore[misc]
 async def notification_rule_types() -> list[NotificationRuleTypeGQL] | None:
     """Return all available notification rule types."""
-    from ai.backend.common.data.notification import NotificationRuleType
-
-    return [NotificationRuleTypeGQL.from_internal(rt) for rt in NotificationRuleType]
+    return list(NotificationRuleTypeGQL)
 
 
 @strawberry.field(description="Get JSON schema for a notification rule type's message format")  # type: ignore[misc]
@@ -401,10 +322,9 @@ async def notification_rule_type_schema(
     rule_type: NotificationRuleTypeGQL,
 ) -> strawberry.scalars.JSON:
     """Return the JSON schema for a given notification rule type."""
-    from ai.backend.common.data.notification import NotifiableMessage
+    from ai.backend.common.data.notification import NotifiableMessage, NotificationRuleType
 
-    # Convert GraphQL enum to internal enum and get schema
-    internal_type = rule_type.to_internal()
+    internal_type = NotificationRuleType(rule_type.value)
     return NotifiableMessage.get_message_schema(internal_type)
 
 
@@ -416,18 +336,13 @@ async def admin_create_notification_channel(
     input: CreateNotificationChannelInput, info: Info[StrawberryGQLContext]
 ) -> CreateNotificationChannelPayload:
     check_admin_only()
-    processors = info.context.processors
     me = current_user()
     if me is None:
         raise InvalidAuthParameters("User authentication is required")
-
-    action_result = await processors.notification.create_channel.wait_for_complete(
-        CreateChannelAction(creator=input.to_creator(me.user_id))
+    result = await info.context.adapters.notification.create_channel(
+        input.to_pydantic(), me.user_id
     )
-
-    return CreateNotificationChannelPayload(
-        channel=NotificationChannel.from_dataclass(action_result.channel_data)
-    )
+    return CreateNotificationChannelPayload.from_pydantic(result)
 
 
 @strawberry.mutation(  # type: ignore[misc]
@@ -440,18 +355,13 @@ async def admin_create_notification_channel(
 async def create_notification_channel(
     input: CreateNotificationChannelInput, info: Info[StrawberryGQLContext]
 ) -> CreateNotificationChannelPayload:
-    processors = info.context.processors
     me = current_user()
     if me is None:
         raise InvalidAuthParameters("User authentication is required")
-
-    action_result = await processors.notification.create_channel.wait_for_complete(
-        CreateChannelAction(creator=input.to_creator(me.user_id))
+    result = await info.context.adapters.notification.create_channel(
+        input.to_pydantic(), me.user_id
     )
-
-    return CreateNotificationChannelPayload(
-        channel=NotificationChannel.from_dataclass(action_result.channel_data)
-    )
+    return CreateNotificationChannelPayload.from_pydantic(result)
 
 
 @strawberry.mutation(description="Update a notification channel (admin only)")  # type: ignore[misc]
@@ -459,16 +369,11 @@ async def admin_update_notification_channel(
     input: UpdateNotificationChannelInput, info: Info[StrawberryGQLContext]
 ) -> UpdateNotificationChannelPayload:
     check_admin_only()
-    processors = info.context.processors
-
     channel_id = uuid.UUID(input.id)
-    action_result = await processors.notification.update_channel.wait_for_complete(
-        UpdateChannelAction(updater=input.to_updater(channel_id))
+    result = await info.context.adapters.notification.update_channel(
+        channel_id, input.to_pydantic()
     )
-
-    return UpdateNotificationChannelPayload(
-        channel=NotificationChannel.from_dataclass(action_result.channel_data)
-    )
+    return UpdateNotificationChannelPayload.from_pydantic(result)
 
 
 @strawberry.mutation(  # type: ignore[misc]
@@ -481,16 +386,11 @@ async def admin_update_notification_channel(
 async def update_notification_channel(
     input: UpdateNotificationChannelInput, info: Info[StrawberryGQLContext]
 ) -> UpdateNotificationChannelPayload:
-    processors = info.context.processors
-
     channel_id = uuid.UUID(input.id)
-    action_result = await processors.notification.update_channel.wait_for_complete(
-        UpdateChannelAction(updater=input.to_updater(channel_id))
+    result = await info.context.adapters.notification.update_channel(
+        channel_id, input.to_pydantic()
     )
-
-    return UpdateNotificationChannelPayload(
-        channel=NotificationChannel.from_dataclass(action_result.channel_data)
-    )
+    return UpdateNotificationChannelPayload.from_pydantic(result)
 
 
 @strawberry.mutation(description="Delete a notification channel (admin only)")  # type: ignore[misc]
@@ -498,13 +398,8 @@ async def admin_delete_notification_channel(
     input: DeleteNotificationChannelInput, info: Info[StrawberryGQLContext]
 ) -> DeleteNotificationChannelPayload:
     check_admin_only()
-    processors = info.context.processors
-
-    await processors.notification.delete_channel.wait_for_complete(
-        DeleteChannelAction(channel_id=uuid.UUID(input.id))
-    )
-
-    return DeleteNotificationChannelPayload(id=input.id)
+    result = await info.context.adapters.notification.delete_channel(input.to_pydantic())
+    return DeleteNotificationChannelPayload.from_pydantic(result)
 
 
 @strawberry.mutation(  # type: ignore[misc]
@@ -517,13 +412,8 @@ async def admin_delete_notification_channel(
 async def delete_notification_channel(
     input: DeleteNotificationChannelInput, info: Info[StrawberryGQLContext]
 ) -> DeleteNotificationChannelPayload:
-    processors = info.context.processors
-
-    await processors.notification.delete_channel.wait_for_complete(
-        DeleteChannelAction(channel_id=uuid.UUID(input.id))
-    )
-
-    return DeleteNotificationChannelPayload(id=input.id)
+    result = await info.context.adapters.notification.delete_channel(input.to_pydantic())
+    return DeleteNotificationChannelPayload.from_pydantic(result)
 
 
 @strawberry.mutation(description="Create a new notification rule (admin only)")  # type: ignore[misc]
@@ -531,18 +421,11 @@ async def admin_create_notification_rule(
     input: CreateNotificationRuleInput, info: Info[StrawberryGQLContext]
 ) -> CreateNotificationRulePayload:
     check_admin_only()
-    processors = info.context.processors
     me = current_user()
     if me is None:
         raise InvalidAuthParameters("User authentication is required")
-
-    action_result = await processors.notification.create_rule.wait_for_complete(
-        CreateRuleAction(creator=input.to_creator(me.user_id))
-    )
-
-    return CreateNotificationRulePayload(
-        rule=NotificationRule.from_dataclass(action_result.rule_data)
-    )
+    result = await info.context.adapters.notification.create_rule(input.to_pydantic(), me.user_id)
+    return CreateNotificationRulePayload.from_pydantic(result)
 
 
 @strawberry.mutation(  # type: ignore[misc]
@@ -555,18 +438,11 @@ async def admin_create_notification_rule(
 async def create_notification_rule(
     input: CreateNotificationRuleInput, info: Info[StrawberryGQLContext]
 ) -> CreateNotificationRulePayload:
-    processors = info.context.processors
     me = current_user()
     if me is None:
         raise InvalidAuthParameters("User authentication is required")
-
-    action_result = await processors.notification.create_rule.wait_for_complete(
-        CreateRuleAction(creator=input.to_creator(me.user_id))
-    )
-
-    return CreateNotificationRulePayload(
-        rule=NotificationRule.from_dataclass(action_result.rule_data)
-    )
+    result = await info.context.adapters.notification.create_rule(input.to_pydantic(), me.user_id)
+    return CreateNotificationRulePayload.from_pydantic(result)
 
 
 @strawberry.mutation(description="Update a notification rule (admin only)")  # type: ignore[misc]
@@ -574,16 +450,9 @@ async def admin_update_notification_rule(
     input: UpdateNotificationRuleInput, info: Info[StrawberryGQLContext]
 ) -> UpdateNotificationRulePayload:
     check_admin_only()
-    processors = info.context.processors
-
     rule_id = uuid.UUID(input.id)
-    action_result = await processors.notification.update_rule.wait_for_complete(
-        UpdateRuleAction(updater=input.to_updater(rule_id))
-    )
-
-    return UpdateNotificationRulePayload(
-        rule=NotificationRule.from_dataclass(action_result.rule_data)
-    )
+    result = await info.context.adapters.notification.update_rule(rule_id, input.to_pydantic())
+    return UpdateNotificationRulePayload.from_pydantic(result)
 
 
 @strawberry.mutation(  # type: ignore[misc]
@@ -596,16 +465,9 @@ async def admin_update_notification_rule(
 async def update_notification_rule(
     input: UpdateNotificationRuleInput, info: Info[StrawberryGQLContext]
 ) -> UpdateNotificationRulePayload:
-    processors = info.context.processors
-
     rule_id = uuid.UUID(input.id)
-    action_result = await processors.notification.update_rule.wait_for_complete(
-        UpdateRuleAction(updater=input.to_updater(rule_id))
-    )
-
-    return UpdateNotificationRulePayload(
-        rule=NotificationRule.from_dataclass(action_result.rule_data)
-    )
+    result = await info.context.adapters.notification.update_rule(rule_id, input.to_pydantic())
+    return UpdateNotificationRulePayload.from_pydantic(result)
 
 
 @strawberry.mutation(description="Delete a notification rule (admin only)")  # type: ignore[misc]
@@ -613,13 +475,8 @@ async def admin_delete_notification_rule(
     input: DeleteNotificationRuleInput, info: Info[StrawberryGQLContext]
 ) -> DeleteNotificationRulePayload:
     check_admin_only()
-    processors = info.context.processors
-
-    await processors.notification.delete_rule.wait_for_complete(
-        DeleteRuleAction(rule_id=uuid.UUID(input.id))
-    )
-
-    return DeleteNotificationRulePayload(id=input.id)
+    result = await info.context.adapters.notification.delete_rule(input.to_pydantic())
+    return DeleteNotificationRulePayload.from_pydantic(result)
 
 
 @strawberry.mutation(  # type: ignore[misc]
@@ -632,13 +489,8 @@ async def admin_delete_notification_rule(
 async def delete_notification_rule(
     input: DeleteNotificationRuleInput, info: Info[StrawberryGQLContext]
 ) -> DeleteNotificationRulePayload:
-    processors = info.context.processors
-
-    await processors.notification.delete_rule.wait_for_complete(
-        DeleteRuleAction(rule_id=uuid.UUID(input.id))
-    )
-
-    return DeleteNotificationRulePayload(id=input.id)
+    result = await info.context.adapters.notification.delete_rule(input.to_pydantic())
+    return DeleteNotificationRulePayload.from_pydantic(result)
 
 
 @strawberry.mutation(description="Validate a notification channel (admin only)")  # type: ignore[misc]
@@ -646,18 +498,8 @@ async def admin_validate_notification_channel(
     input: ValidateNotificationChannelInput, info: Info[StrawberryGQLContext]
 ) -> ValidateNotificationChannelPayload:
     check_admin_only()
-    processors = info.context.processors
-
-    await processors.notification.validate_channel.wait_for_complete(
-        ValidateChannelAction(
-            channel_id=uuid.UUID(input.id),
-            test_message=input.test_message,
-        )
-    )
-
-    return ValidateNotificationChannelPayload(
-        id=input.id,
-    )
+    result = await info.context.adapters.notification.validate_channel(input.to_pydantic())
+    return ValidateNotificationChannelPayload.from_pydantic(result)
 
 
 @strawberry.mutation(  # type: ignore[misc]
@@ -670,18 +512,8 @@ async def admin_validate_notification_channel(
 async def validate_notification_channel(
     input: ValidateNotificationChannelInput, info: Info[StrawberryGQLContext]
 ) -> ValidateNotificationChannelPayload:
-    processors = info.context.processors
-
-    await processors.notification.validate_channel.wait_for_complete(
-        ValidateChannelAction(
-            channel_id=uuid.UUID(input.id),
-            test_message=input.test_message,
-        )
-    )
-
-    return ValidateNotificationChannelPayload(
-        id=input.id,
-    )
+    result = await info.context.adapters.notification.validate_channel(input.to_pydantic())
+    return ValidateNotificationChannelPayload.from_pydantic(result)
 
 
 @strawberry.mutation(description="Validate a notification rule (admin only)")  # type: ignore[misc]
@@ -689,22 +521,8 @@ async def admin_validate_notification_rule(
     input: ValidateNotificationRuleInput, info: Info[StrawberryGQLContext]
 ) -> ValidateNotificationRulePayload:
     check_admin_only()
-    processors = info.context.processors
-
-    notification_data = {}
-    if input.notification_data is not UNSET and input.notification_data is not None:
-        notification_data = dict(input.notification_data)
-
-    action_result = await processors.notification.validate_rule.wait_for_complete(
-        ValidateRuleAction(
-            rule_id=uuid.UUID(input.id),
-            notification_data=notification_data,
-        )
-    )
-
-    return ValidateNotificationRulePayload(
-        message=action_result.message,
-    )
+    result = await info.context.adapters.notification.validate_rule(input.to_pydantic())
+    return ValidateNotificationRulePayload.from_pydantic(result)
 
 
 @strawberry.mutation(  # type: ignore[misc]
@@ -717,19 +535,5 @@ async def admin_validate_notification_rule(
 async def validate_notification_rule(
     input: ValidateNotificationRuleInput, info: Info[StrawberryGQLContext]
 ) -> ValidateNotificationRulePayload:
-    processors = info.context.processors
-
-    notification_data = {}
-    if input.notification_data is not UNSET and input.notification_data is not None:
-        notification_data = dict(input.notification_data)
-
-    action_result = await processors.notification.validate_rule.wait_for_complete(
-        ValidateRuleAction(
-            rule_id=uuid.UUID(input.id),
-            notification_data=notification_data,
-        )
-    )
-
-    return ValidateNotificationRulePayload(
-        message=action_result.message,
-    )
+    result = await info.context.adapters.notification.validate_rule(input.to_pydantic())
+    return ValidateNotificationRulePayload.from_pydantic(result)

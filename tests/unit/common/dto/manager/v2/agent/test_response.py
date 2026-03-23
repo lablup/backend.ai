@@ -13,6 +13,8 @@ from ai.backend.common.dto.manager.v2.agent.response import (
     AgentResourceStatsPayload,
     AgentStatusInfo,
     AgentSystemInfo,
+    ComputePluginEntryDTO,
+    ComputePluginsGQLDTO,
     GetAgentDetailPayload,
     SearchAgentsPayload,
 )
@@ -45,6 +47,7 @@ def _make_agent_node(agent_id: str = "agent-001") -> AgentNode:
         status_info=_make_status_info(),
         system_info=_make_system_info(),
         network_info=_make_network_info(),
+        scaling_group="default",
     )
 
 
@@ -138,14 +141,20 @@ class TestAgentSystemInfo:
         assert info.compute_plugins is None
 
     def test_with_compute_plugins(self) -> None:
-        plugins = {"cuda": {"version": "12.0"}, "rocm": {"version": "5.0"}}
+        plugins = ComputePluginsGQLDTO(
+            entries=[
+                ComputePluginEntryDTO(plugin_name="cuda", value="12.0"),
+                ComputePluginEntryDTO(plugin_name="rocm", value="5.0"),
+            ]
+        )
         info = AgentSystemInfo(
             architecture="x86_64",
             version="26.1.0",
             compute_plugins=plugins,
         )
         assert info.compute_plugins == plugins
-        assert info.compute_plugins["cuda"]["version"] == "12.0"
+        assert info.compute_plugins.entries[0].plugin_name == "cuda"
+        assert info.compute_plugins.entries[0].value == "12.0"
 
     def test_aarch64_architecture(self) -> None:
         info = AgentSystemInfo(architecture="aarch64", version="26.0.0")
@@ -155,14 +164,18 @@ class TestAgentSystemInfo:
         info = AgentSystemInfo(
             architecture="x86_64",
             version="26.1.0",
-            compute_plugins={"cuda": {"version": "12.0"}},
+            compute_plugins=ComputePluginsGQLDTO(
+                entries=[ComputePluginEntryDTO(plugin_name="cuda", value="12.0")]
+            ),
         )
         json_str = info.model_dump_json()
         restored = AgentSystemInfo.model_validate_json(json_str)
         assert restored.architecture == "x86_64"
         assert restored.version == "26.1.0"
         assert restored.compute_plugins is not None
-        assert restored.compute_plugins["cuda"]["version"] == "12.0"
+        entry = restored.compute_plugins.entries[0]
+        assert entry["plugin_name"] == "cuda"
+        assert entry["value"] == "12.0"
 
 
 class TestAgentNetworkInfo:

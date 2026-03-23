@@ -15,14 +15,14 @@ class TestOrderDirection:
     """Tests for OrderDirection enum."""
 
     def test_asc_value(self) -> None:
-        assert OrderDirection.ASC.value == "asc"
+        assert OrderDirection.ASC.value == "ASC"
 
     def test_desc_value(self) -> None:
-        assert OrderDirection.DESC.value == "desc"
+        assert OrderDirection.DESC.value == "DESC"
 
     def test_all_values_present(self) -> None:
         values = {e.value for e in OrderDirection}
-        assert values == {"asc", "desc"}
+        assert values == {"ASC", "DESC"}
 
 
 class TestScalingGroupOrderField:

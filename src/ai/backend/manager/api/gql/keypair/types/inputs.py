@@ -4,32 +4,56 @@ from __future__ import annotations
 
 import strawberry
 
-
-@strawberry.input(
-    name="RevokeMyKeypairInput",
-    description="Input for revoking a keypair owned by the current user.",
+from ai.backend.common.dto.manager.v2.auth.request import (
+    RevokeMyKeypairInput as RevokeMyKeypairInputDTO,
 )
-class RevokeMyKeypairInputGQL:
+from ai.backend.common.dto.manager.v2.auth.request import (
+    SwitchMyMainAccessKeyInput as SwitchMyMainAccessKeyInputDTO,
+)
+from ai.backend.common.dto.manager.v2.auth.request import (
+    UpdateMyKeypairInput as UpdateMyKeypairInputDTO,
+)
+from ai.backend.manager.api.gql.decorators import (
+    BackendAIGQLMeta,
+    PydanticInputMixin,
+    gql_pydantic_input,
+)
+
+
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description="Input for revoking a keypair owned by the current user.",
+        added_version="24.09.0",
+    ),
+    name="RevokeMyKeypairInput",
+)
+class RevokeMyKeypairInputGQL(PydanticInputMixin[RevokeMyKeypairInputDTO]):
     access_key: str = strawberry.field(
         description="Access key of the keypair to revoke. Must not be the main access key."
     )
 
 
-@strawberry.input(
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description="Input for switching the main access key of the current user.",
+        added_version="24.09.0",
+    ),
     name="SwitchMyMainAccessKeyInput",
-    description="Input for switching the main access key of the current user.",
 )
-class SwitchMyMainAccessKeyInputGQL:
+class SwitchMyMainAccessKeyInputGQL(PydanticInputMixin[SwitchMyMainAccessKeyInputDTO]):
     access_key: str = strawberry.field(
         description="Access key to set as the new main access key. Must be active and owned by the user."
     )
 
 
-@strawberry.input(
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description="Input for updating a keypair owned by the current user.",
+        added_version="24.09.0",
+    ),
     name="UpdateMyKeypairInput",
-    description="Input for updating a keypair owned by the current user.",
 )
-class UpdateMyKeypairInputGQL:
+class UpdateMyKeypairInputGQL(PydanticInputMixin[UpdateMyKeypairInputDTO]):
     access_key: str = strawberry.field(
         description="Access key of the keypair to update. Must be owned by the current user."
     )

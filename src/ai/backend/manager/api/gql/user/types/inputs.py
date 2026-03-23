@@ -7,19 +7,55 @@ from uuid import UUID
 import strawberry
 from strawberry import UNSET
 
+from ai.backend.common.dto.manager.v2.user.request import (
+    BulkCreateUsersInput as BulkCreateUsersInputDTO,
+)
+from ai.backend.common.dto.manager.v2.user.request import (
+    BulkPurgeUsersInput as BulkPurgeUsersInputDTO,
+)
+from ai.backend.common.dto.manager.v2.user.request import (
+    BulkPurgeUsersOptions as BulkPurgeUsersOptionsDTO,
+)
+from ai.backend.common.dto.manager.v2.user.request import (
+    BulkUpdateUserItemInput as BulkUpdateUserItemInputDTO,
+)
+from ai.backend.common.dto.manager.v2.user.request import (
+    BulkUpdateUsersInput as BulkUpdateUsersInputDTO,
+)
+from ai.backend.common.dto.manager.v2.user.request import (
+    CreateUserInput as CreateUserInputDTO,
+)
+from ai.backend.common.dto.manager.v2.user.request import (
+    DeleteUsersInput as DeleteUsersInputDTO,
+)
+from ai.backend.common.dto.manager.v2.user.request import (
+    PurgeUserV2Input as PurgeUserV2InputDTO,
+)
+from ai.backend.common.dto.manager.v2.user.request import (
+    UpdateMyAllowedClientIPInput as UpdateMyAllowedClientIPInputDTO,
+)
+from ai.backend.common.dto.manager.v2.user.request import (
+    UpdateUserInput as UpdateUserInputDTO,
+)
+from ai.backend.manager.api.gql.decorators import (
+    BackendAIGQLMeta,
+    gql_pydantic_input,
+)
+from ai.backend.manager.api.gql.pydantic_compat import PydanticInputMixin
+
 from .enums import UserRoleEnumGQL, UserStatusEnumGQL
 
 # Create User Inputs
 
 
-@strawberry.input(
-    name="CreateUserV2Input",
-    description=(
-        "Added in 26.2.0. Input for creating a new user. "
-        "Required fields: email, username, password, domain_name, need_password_change, status, role."
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description="Input for creating a new user. Required fields: email, username, password, domain_name, need_password_change, status, role.",
+        added_version="26.2.0",
     ),
+    name="CreateUserV2Input",
 )
-class CreateUserInputGQL:
+class CreateUserInputGQL(PydanticInputMixin[CreateUserInputDTO]):
     """Input for creating a single user."""
 
     email: str = strawberry.field(
@@ -77,14 +113,14 @@ class CreateUserInputGQL:
     )
 
 
-@strawberry.input(
-    name="BulkCreateUserV2Input",
-    description=(
-        "Added in 26.2.0. Input for bulk creating multiple users. "
-        "Each user has individual specifications."
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description="Input for bulk creating multiple users. Each user has individual specifications.",
+        added_version="26.2.0",
     ),
+    name="BulkCreateUserV2Input",
 )
-class BulkCreateUserV2InputGQL:
+class BulkCreateUserV2InputGQL(PydanticInputMixin[BulkCreateUsersInputDTO]):
     """Input for bulk creating users with individual specs."""
 
     users: list[CreateUserInputGQL] = strawberry.field(description="List of user creation inputs.")
@@ -93,14 +129,14 @@ class BulkCreateUserV2InputGQL:
 # Update User Inputs
 
 
-@strawberry.input(
-    name="UpdateUserV2Input",
-    description=(
-        "Added in 26.3.0. Input for updating user information. "
-        "All fields are optional - only provided fields will be updated."
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description="Input for updating user information. All fields are optional - only provided fields will be updated.",
+        added_version="26.3.0",
     ),
+    name="UpdateUserV2Input",
 )
-class UpdateUserV2InputGQL:
+class UpdateUserV2InputGQL(PydanticInputMixin[UpdateUserInputDTO]):
     """Input for updating user information. All fields optional."""
 
     username: str | None = strawberry.field(
@@ -169,28 +205,28 @@ class UpdateUserV2InputGQL:
     )
 
 
-@strawberry.input(
-    name="BulkUpdateUserV2ItemInput",
-    description=(
-        "Added in 26.3.0. Input for a single user update within a bulk operation. "
-        "Pairs a user ID with the fields to update."
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description="Input for a single user update within a bulk operation. Pairs a user ID with the fields to update.",
+        added_version="26.3.0",
     ),
+    name="BulkUpdateUserV2ItemInput",
 )
-class BulkUpdateUserV2ItemInputGQL:
+class BulkUpdateUserV2ItemInputGQL(PydanticInputMixin[BulkUpdateUserItemInputDTO]):
     """Input for a single user update in bulk operation."""
 
     user_id: UUID = strawberry.field(description="UUID of the user to update.")
     input: UpdateUserV2InputGQL = strawberry.field(description="Fields to update for this user.")
 
 
-@strawberry.input(
-    name="BulkUpdateUserV2Input",
-    description=(
-        "Added in 26.3.0. Input for bulk updating multiple users. "
-        "Each user has individual update specifications."
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description="Input for bulk updating multiple users. Each user has individual update specifications.",
+        added_version="26.3.0",
     ),
+    name="BulkUpdateUserV2Input",
 )
-class BulkUpdateUserV2InputGQL:
+class BulkUpdateUserV2InputGQL(PydanticInputMixin[BulkUpdateUsersInputDTO]):
     """Input for bulk updating users with individual specs."""
 
     users: list[BulkUpdateUserV2ItemInputGQL] = strawberry.field(
@@ -201,14 +237,14 @@ class BulkUpdateUserV2InputGQL:
 # Delete User Inputs
 
 
-@strawberry.input(
-    name="DeleteUsersV2Input",
-    description=(
-        "Added in 26.2.0. Input for soft-deleting multiple users. "
-        "Soft delete changes user status to DELETED but preserves data."
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description="Input for soft-deleting multiple users. Soft delete changes user status to DELETED but preserves data.",
+        added_version="26.2.0",
     ),
+    name="DeleteUsersV2Input",
 )
-class DeleteUsersInputGQL:
+class DeleteUsersInputGQL(PydanticInputMixin[DeleteUsersInputDTO]):
     """Input for soft-deleting multiple users."""
 
     user_ids: list[UUID] = strawberry.field(description="List of user UUIDs to soft-delete.")
@@ -217,24 +253,24 @@ class DeleteUsersInputGQL:
 # Purge User Inputs
 
 
-@strawberry.input(
-    name="PurgeUserV2Input",
-    description=(
-        "Added in 26.2.0. Input for permanently deleting a user and all associated data. "
-        "This action is irreversible."
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description="Input for permanently deleting a user and all associated data. This action is irreversible.",
+        added_version="26.2.0",
     ),
+    name="PurgeUserV2Input",
 )
-class PurgeUserInputGQL:
+class PurgeUserInputGQL(PydanticInputMixin[PurgeUserV2InputDTO]):
     """Input for permanently deleting a single user."""
 
     user_id: UUID = strawberry.field(description="UUID of the user to purge.")
 
 
-@strawberry.input(
+@gql_pydantic_input(
+    BackendAIGQLMeta(description="Options for bulk user purge operation.", added_version="26.3.0"),
     name="BulkPurgeUsersV2Options",
-    description="Added in 26.3.0. Options for bulk user purge operation.",
 )
-class BulkPurgeUsersV2OptionsGQL:
+class BulkPurgeUsersV2OptionsGQL(PydanticInputMixin[BulkPurgeUsersOptionsDTO]):
     """Options for bulk user purge operation."""
 
     purge_shared_vfolders: bool = strawberry.field(
@@ -247,14 +283,14 @@ class BulkPurgeUsersV2OptionsGQL:
     )
 
 
-@strawberry.input(
-    name="BulkPurgeUsersV2Input",
-    description=(
-        "Added in 26.3.0. Input for permanently deleting multiple users. "
-        "This action is irreversible."
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description="Input for permanently deleting multiple users. This action is irreversible.",
+        added_version="26.3.0",
     ),
+    name="BulkPurgeUsersV2Input",
 )
-class BulkPurgeUsersV2InputGQL:
+class BulkPurgeUsersV2InputGQL(PydanticInputMixin[BulkPurgeUsersInputDTO]):
     """Input for bulk permanently deleting multiple users."""
 
     user_ids: list[UUID] = strawberry.field(description="List of user UUIDs to purge.")
@@ -267,15 +303,14 @@ class BulkPurgeUsersV2InputGQL:
 # IP Allowlist Inputs
 
 
-@strawberry.input(
-    name="UpdateMyAllowedClientIPInput",
-    description=(
-        "Added in 26.4.0. Input for updating the current user's allowed client IP list. "
-        "Set allowed_client_ip to null to remove all restrictions. "
-        "Use force=true to bypass the lockout safety check."
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description="Input for updating the current user's allowed client IP list. Set allowed_client_ip to null to remove all restrictions. Use force=true to bypass the lockout safety check.",
+        added_version="26.4.0",
     ),
+    name="UpdateMyAllowedClientIPInput",
 )
-class UpdateMyAllowedClientIPInputGQL:
+class UpdateMyAllowedClientIPInputGQL(PydanticInputMixin[UpdateMyAllowedClientIPInputDTO]):
     """Input for updating the current user's allowed client IP addresses."""
 
     allowed_client_ip: list[str] | None = strawberry.field(

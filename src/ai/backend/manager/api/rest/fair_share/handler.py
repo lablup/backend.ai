@@ -68,6 +68,7 @@ from ai.backend.common.dto.manager.fair_share import (
     UserUsageBucketFilter,
 )
 from ai.backend.common.dto.manager.query import StringFilter, UUIDFilter
+from ai.backend.manager.models.scaling_group.conditions import ScalingGroupConditions
 from ai.backend.manager.repositories.base import (
     BatchQuerier,
     NoPagination,
@@ -76,9 +77,6 @@ from ai.backend.manager.repositories.fair_share.types import (
     DomainFairShareSearchScope,
     ProjectFairShareSearchScope,
     UserFairShareSearchScope,
-)
-from ai.backend.manager.repositories.scaling_group.options import (
-    ScalingGroupConditions,
 )
 from ai.backend.manager.services.fair_share.actions import (
     BulkUpsertDomainFairShareWeightAction,

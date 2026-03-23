@@ -5,6 +5,7 @@ from .types import (
     ServiceCatalogEndpointGQL,
     ServiceCatalogFilterGQL,
     ServiceCatalogGQL,
+    ServiceCatalogStatusFilterGQL,
     ServiceCatalogStatusGQL,
 )
 
@@ -13,6 +14,7 @@ __all__ = (
     "ServiceCatalogEndpointGQL",
     "ServiceCatalogFilterGQL",
     "ServiceCatalogGQL",
+    "ServiceCatalogStatusFilterGQL",
     "ServiceCatalogStatusGQL",
     # Query Resolvers
     "admin_service_catalogs",

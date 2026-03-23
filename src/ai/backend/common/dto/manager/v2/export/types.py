@@ -12,6 +12,7 @@ from enum import StrEnum
 from pydantic import Field
 
 from ai.backend.common.api_handlers import BaseRequestModel, BaseResponseModel
+from ai.backend.common.dto.manager.v2.common import OrderDirection
 
 __all__ = (
     "BooleanFilter",
@@ -20,13 +21,6 @@ __all__ = (
     "ExportReportKey",
     "OrderDirection",
 )
-
-
-class OrderDirection(StrEnum):
-    """Specifies the direction for sorting export results."""
-
-    ASC = "asc"
-    DESC = "desc"
 
 
 class ExportReportKey(StrEnum):

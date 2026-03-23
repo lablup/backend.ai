@@ -57,9 +57,10 @@ class ExecuteResultStatus(StrEnum):
 class ServiceProtocol(StrEnum):
     """Supported service proxy protocols."""
 
-    TCP = "tcp"
     HTTP = "http"
+    TCP = "tcp"
     PREOPEN = "preopen"
+    INTERNAL = "internal"
     VNC = "vnc"
     RDP = "rdp"
 

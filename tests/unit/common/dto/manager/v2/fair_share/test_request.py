@@ -195,8 +195,8 @@ class TestSearchDomainFairSharesInput:
         inp = SearchDomainFairSharesInput()
         assert inp.filter is None
         assert inp.order is None
-        assert inp.limit == 50
-        assert inp.offset == 0
+        assert inp.limit is None
+        assert inp.offset is None
 
     def test_custom_limit_and_offset(self) -> None:
         inp = SearchDomainFairSharesInput(limit=100, offset=10)
@@ -236,8 +236,8 @@ class TestSearchProjectFairSharesInput:
 
     def test_default_values(self) -> None:
         inp = SearchProjectFairSharesInput()
-        assert inp.limit == 50
-        assert inp.offset == 0
+        assert inp.limit is None
+        assert inp.offset is None
         assert inp.filter is None
 
 
@@ -246,8 +246,8 @@ class TestSearchUserFairSharesInput:
 
     def test_default_values(self) -> None:
         inp = SearchUserFairSharesInput()
-        assert inp.limit == 50
-        assert inp.offset == 0
+        assert inp.limit is None
+        assert inp.offset is None
 
 
 class TestSearchDomainUsageBucketsInput:
@@ -281,25 +281,33 @@ class TestUpsertDomainFairShareWeightInput:
     """Tests for UpsertDomainFairShareWeightInput model."""
 
     def test_weight_none_is_valid(self) -> None:
-        inp = UpsertDomainFairShareWeightInput(weight=None)
+        inp = UpsertDomainFairShareWeightInput(
+            resource_group_name="default", domain_name="test", weight=None
+        )
         assert inp.weight is None
 
     def test_default_weight_is_none(self) -> None:
-        inp = UpsertDomainFairShareWeightInput()
+        inp = UpsertDomainFairShareWeightInput(resource_group_name="default", domain_name="test")
         assert inp.weight is None
 
     def test_weight_with_value(self) -> None:
-        inp = UpsertDomainFairShareWeightInput(weight=Decimal("1.5"))
+        inp = UpsertDomainFairShareWeightInput(
+            resource_group_name="default", domain_name="test", weight=Decimal("1.5")
+        )
         assert inp.weight == Decimal("1.5")
 
     def test_round_trip_serialization(self) -> None:
-        inp = UpsertDomainFairShareWeightInput(weight=Decimal("2.0"))
+        inp = UpsertDomainFairShareWeightInput(
+            resource_group_name="default", domain_name="test", weight=Decimal("2.0")
+        )
         json_str = inp.model_dump_json()
         restored = UpsertDomainFairShareWeightInput.model_validate_json(json_str)
         assert restored.weight == Decimal("2.0")
 
     def test_round_trip_with_none_weight(self) -> None:
-        inp = UpsertDomainFairShareWeightInput(weight=None)
+        inp = UpsertDomainFairShareWeightInput(
+            resource_group_name="default", domain_name="test", weight=None
+        )
         json_str = inp.model_dump_json()
         restored = UpsertDomainFairShareWeightInput.model_validate_json(json_str)
         assert restored.weight is None
@@ -309,12 +317,22 @@ class TestUpsertProjectFairShareWeightInput:
     """Tests for UpsertProjectFairShareWeightInput model."""
 
     def test_valid_creation(self) -> None:
-        inp = UpsertProjectFairShareWeightInput(domain_name="test", weight=None)
+        inp = UpsertProjectFairShareWeightInput(
+            resource_group_name="default",
+            project_id=_SAMPLE_UUID,
+            domain_name="test",
+            weight=None,
+        )
         assert inp.domain_name == "test"
         assert inp.weight is None
 
     def test_weight_with_value(self) -> None:
-        inp = UpsertProjectFairShareWeightInput(domain_name="test", weight=Decimal("0.5"))
+        inp = UpsertProjectFairShareWeightInput(
+            resource_group_name="default",
+            project_id=_SAMPLE_UUID,
+            domain_name="test",
+            weight=Decimal("0.5"),
+        )
         assert inp.weight == Decimal("0.5")
 
     def test_missing_domain_name_raises_validation_error(self) -> None:
@@ -326,12 +344,24 @@ class TestUpsertUserFairShareWeightInput:
     """Tests for UpsertUserFairShareWeightInput model."""
 
     def test_valid_creation(self) -> None:
-        inp = UpsertUserFairShareWeightInput(domain_name="test", weight=None)
+        inp = UpsertUserFairShareWeightInput(
+            resource_group_name="default",
+            user_uuid=_SAMPLE_UUID,
+            project_id=_SAMPLE_UUID2,
+            domain_name="test",
+            weight=None,
+        )
         assert inp.domain_name == "test"
         assert inp.weight is None
 
     def test_weight_with_value(self) -> None:
-        inp = UpsertUserFairShareWeightInput(domain_name="test", weight=Decimal("3.0"))
+        inp = UpsertUserFairShareWeightInput(
+            resource_group_name="default",
+            user_uuid=_SAMPLE_UUID,
+            project_id=_SAMPLE_UUID2,
+            domain_name="test",
+            weight=Decimal("3.0"),
+        )
         assert inp.weight == Decimal("3.0")
 
 
@@ -356,12 +386,12 @@ class TestBulkUpsertDomainFairShareWeightInput:
             DomainWeightEntryInput(domain_name="domain-a", weight=Decimal("1.0")),
             DomainWeightEntryInput(domain_name="domain-b", weight=None),
         ]
-        inp = BulkUpsertDomainFairShareWeightInput(resource_group="default", inputs=entries)
-        assert inp.resource_group == "default"
+        inp = BulkUpsertDomainFairShareWeightInput(resource_group_name="default", inputs=entries)
+        assert inp.resource_group_name == "default"
         assert len(inp.inputs) == 2
 
     def test_empty_inputs_list(self) -> None:
-        inp = BulkUpsertDomainFairShareWeightInput(resource_group="default", inputs=[])
+        inp = BulkUpsertDomainFairShareWeightInput(resource_group_name="default", inputs=[])
         assert inp.inputs == []
 
     def test_missing_resource_group_raises_validation_error(self) -> None:
@@ -402,8 +432,8 @@ class TestBulkUpsertProjectFairShareWeightInput:
                 weight=Decimal("1.5"),
             )
         ]
-        inp = BulkUpsertProjectFairShareWeightInput(resource_group="default", inputs=entries)
-        assert inp.resource_group == "default"
+        inp = BulkUpsertProjectFairShareWeightInput(resource_group_name="default", inputs=entries)
+        assert inp.resource_group_name == "default"
         assert len(inp.inputs) == 1
 
 
@@ -435,8 +465,8 @@ class TestBulkUpsertUserFairShareWeightInput:
                 weight=None,
             )
         ]
-        inp = BulkUpsertUserFairShareWeightInput(resource_group="sg1", inputs=entries)
-        assert inp.resource_group == "sg1"
+        inp = BulkUpsertUserFairShareWeightInput(resource_group_name="sg1", inputs=entries)
+        assert inp.resource_group_name == "sg1"
         assert len(inp.inputs) == 1
 
 

@@ -126,8 +126,11 @@ class TestServiceProtocol:
     def test_rdp_value(self) -> None:
         assert ServiceProtocol.RDP.value == "rdp"
 
+    def test_internal_value(self) -> None:
+        assert ServiceProtocol.INTERNAL.value == "internal"
+
     def test_enum_members_count(self) -> None:
-        assert len(list(ServiceProtocol)) == 5
+        assert len(list(ServiceProtocol)) == 6
 
     def test_all_values_are_strings(self) -> None:
         for member in ServiceProtocol:

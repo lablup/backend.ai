@@ -41,6 +41,7 @@ from ai.backend.common.dto.manager.v2.fair_share.types import (
     FairShareSpecInfo,
     ResourceSlotEntryInfo,
     ResourceSlotInfo,
+    ResourceWeightEntryInfo,
     UsageBucketMetadataInfo,
 )
 
@@ -52,7 +53,9 @@ _DATE_START = date(2025, 1, 1)
 _DATE_END = date(2025, 3, 31)
 
 
-def _make_resource_slot(resource_type: str = "cpu", quantity: str = "4") -> ResourceSlotInfo:
+def _make_resource_slot(
+    resource_type: str = "cpu", quantity: Decimal = Decimal("4")
+) -> ResourceSlotInfo:
     return ResourceSlotInfo(
         entries=[ResourceSlotEntryInfo(resource_type=resource_type, quantity=quantity)]
     )
@@ -64,7 +67,9 @@ def _make_fair_share_spec() -> FairShareSpecInfo:
         half_life_days=30,
         lookback_days=90,
         decay_unit_days=1,
-        resource_weights=_make_resource_slot(),
+        resource_weights=[
+            ResourceWeightEntryInfo(resource_type="cpu", weight=Decimal("1.0"), uses_default=False)
+        ],
     )
 
 
@@ -87,14 +92,14 @@ def _make_usage_bucket_metadata() -> UsageBucketMetadataInfo:
         created_at=_NOW,
         updated_at=_NOW,
         average_daily_usage=_make_resource_slot(),
-        usage_capacity_ratio=_make_resource_slot(quantity="0.5"),
+        usage_capacity_ratio=_make_resource_slot(quantity=Decimal("0.5")),
     )
 
 
 def _make_domain_fair_share_node() -> DomainFairShareNode:
     return DomainFairShareNode(
-        id=_UUID1,
-        resource_group="default",
+        id=str(_UUID1),
+        resource_group_name="default",
         domain_name="test-domain",
         spec=_make_fair_share_spec(),
         calculation_snapshot=_make_calculation_snapshot(),
@@ -105,8 +110,8 @@ def _make_domain_fair_share_node() -> DomainFairShareNode:
 
 def _make_project_fair_share_node() -> ProjectFairShareNode:
     return ProjectFairShareNode(
-        id=_UUID1,
-        resource_group="default",
+        id=str(_UUID1),
+        resource_group_name="default",
         project_id=_UUID2,
         domain_name="test-domain",
         spec=_make_fair_share_spec(),
@@ -118,8 +123,8 @@ def _make_project_fair_share_node() -> ProjectFairShareNode:
 
 def _make_user_fair_share_node() -> UserFairShareNode:
     return UserFairShareNode(
-        id=_UUID1,
-        resource_group="default",
+        id=str(_UUID1),
+        resource_group_name="default",
         user_uuid=_UUID2,
         project_id=_UUID3,
         domain_name="test-domain",
@@ -135,8 +140,8 @@ class TestDomainFairShareNode:
 
     def test_creation_with_all_fields(self) -> None:
         node = _make_domain_fair_share_node()
-        assert node.id == _UUID1
-        assert node.resource_group == "default"
+        assert node.id == str(_UUID1)
+        assert node.resource_group_name == "default"
         assert node.domain_name == "test-domain"
 
     def test_contains_nested_fair_share_spec(self) -> None:
@@ -162,7 +167,7 @@ class TestDomainFairShareNode:
         node = _make_domain_fair_share_node()
         json_str = node.model_dump_json()
         restored = DomainFairShareNode.model_validate_json(json_str)
-        assert restored.id == _UUID1
+        assert restored.id == str(_UUID1)
         assert restored.domain_name == "test-domain"
 
     def test_round_trip_preserves_nested_spec(self) -> None:
@@ -192,7 +197,7 @@ class TestProjectFairShareNode:
 
     def test_creation_with_all_fields(self) -> None:
         node = _make_project_fair_share_node()
-        assert node.id == _UUID1
+        assert node.id == str(_UUID1)
         assert node.project_id == _UUID2
         assert node.domain_name == "test-domain"
 
@@ -240,7 +245,7 @@ class TestDomainUsageBucketNode:
             resource_group="default",
             metadata=_make_usage_bucket_metadata(),
             resource_usage=_make_resource_slot(),
-            capacity_snapshot=_make_resource_slot(quantity="16"),
+            capacity_snapshot=_make_resource_slot(quantity=Decimal("16")),
         )
         assert node.id == _UUID1
         assert node.domain_name == "test-domain"
@@ -253,7 +258,7 @@ class TestDomainUsageBucketNode:
             resource_group="default",
             metadata=_make_usage_bucket_metadata(),
             resource_usage=_make_resource_slot(),
-            capacity_snapshot=_make_resource_slot(quantity="16"),
+            capacity_snapshot=_make_resource_slot(quantity=Decimal("16")),
         )
         assert isinstance(node.metadata, UsageBucketMetadataInfo)
         assert isinstance(node.resource_usage, ResourceSlotInfo)
@@ -265,7 +270,7 @@ class TestDomainUsageBucketNode:
             resource_group="default",
             metadata=_make_usage_bucket_metadata(),
             resource_usage=_make_resource_slot(),
-            capacity_snapshot=_make_resource_slot(quantity="16"),
+            capacity_snapshot=_make_resource_slot(quantity=Decimal("16")),
         )
         json_str = node.model_dump_json()
         restored = DomainUsageBucketNode.model_validate_json(json_str)
@@ -284,7 +289,7 @@ class TestProjectUsageBucketNode:
             resource_group="default",
             metadata=_make_usage_bucket_metadata(),
             resource_usage=_make_resource_slot(),
-            capacity_snapshot=_make_resource_slot(quantity="16"),
+            capacity_snapshot=_make_resource_slot(quantity=Decimal("16")),
         )
         assert node.project_id == _UUID2
 
@@ -301,7 +306,7 @@ class TestUserUsageBucketNode:
             resource_group="default",
             metadata=_make_usage_bucket_metadata(),
             resource_usage=_make_resource_slot(),
-            capacity_snapshot=_make_resource_slot(quantity="16"),
+            capacity_snapshot=_make_resource_slot(quantity=Decimal("16")),
         )
         assert node.user_uuid == _UUID2
         assert node.project_id == _UUID3
@@ -458,15 +463,15 @@ class TestUpsertDomainFairShareWeightPayload:
 
     def test_creation_with_node(self) -> None:
         node = _make_domain_fair_share_node()
-        payload = UpsertDomainFairShareWeightPayload(item=node)
-        assert isinstance(payload.item, DomainFairShareNode)
+        payload = UpsertDomainFairShareWeightPayload(domain_fair_share=node)
+        assert isinstance(payload.domain_fair_share, DomainFairShareNode)
 
     def test_round_trip_serialization(self) -> None:
         node = _make_domain_fair_share_node()
-        payload = UpsertDomainFairShareWeightPayload(item=node)
+        payload = UpsertDomainFairShareWeightPayload(domain_fair_share=node)
         json_str = payload.model_dump_json()
         restored = UpsertDomainFairShareWeightPayload.model_validate_json(json_str)
-        assert restored.item.domain_name == "test-domain"
+        assert restored.domain_fair_share.domain_name == "test-domain"
 
 
 class TestUpsertProjectFairShareWeightPayload:
@@ -474,8 +479,8 @@ class TestUpsertProjectFairShareWeightPayload:
 
     def test_creation_with_node(self) -> None:
         node = _make_project_fair_share_node()
-        payload = UpsertProjectFairShareWeightPayload(item=node)
-        assert isinstance(payload.item, ProjectFairShareNode)
+        payload = UpsertProjectFairShareWeightPayload(project_fair_share=node)
+        assert isinstance(payload.project_fair_share, ProjectFairShareNode)
 
 
 class TestUpsertUserFairShareWeightPayload:
@@ -483,8 +488,8 @@ class TestUpsertUserFairShareWeightPayload:
 
     def test_creation_with_node(self) -> None:
         node = _make_user_fair_share_node()
-        payload = UpsertUserFairShareWeightPayload(item=node)
-        assert isinstance(payload.item, UserFairShareNode)
+        payload = UpsertUserFairShareWeightPayload(user_fair_share=node)
+        assert isinstance(payload.user_fair_share, UserFairShareNode)
 
 
 class TestBulkUpsertDomainFairShareWeightPayload:

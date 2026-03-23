@@ -11,7 +11,11 @@ from uuid import UUID
 import pytest
 import sqlalchemy as sa
 
-from ai.backend.common.data.permission.types import EntityType, OperationType, ScopeType
+from ai.backend.common.data.permission.types import (
+    EntityType,
+    OperationType,
+    RBACElementType,
+)
 from ai.backend.manager.data.permission.id import ObjectId
 from ai.backend.manager.data.permission.types import RoleSource
 from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
@@ -46,7 +50,7 @@ class SingleEntityWithRoleContext:
     """Context with single entity granted to a role."""
 
     entity_id: ObjectId
-    entity_scope_type: ScopeType
+    entity_scope_type: RBACElementType
     role_id: UUID
 
 
@@ -55,7 +59,7 @@ class EntityWithTwoRolesContext:
     """Context with entity granted to two different roles."""
 
     entity_id: ObjectId
-    entity_scope_type: ScopeType
+    entity_scope_type: RBACElementType
     role_id1: UUID
     role_id2: UUID
 
@@ -90,7 +94,7 @@ class TestRevokerBasic:
     ) -> AsyncGenerator[SingleEntityWithRoleContext, None]:
         """Create entity with role having permissions."""
         entity_id = ObjectId(entity_type=EntityType.VFOLDER, entity_id=str(uuid.uuid4()))
-        entity_scope_type = ScopeType.VFOLDER
+        entity_scope_type = RBACElementType.VFOLDER
 
         role_id: UUID
 
@@ -108,7 +112,7 @@ class TestRevokerBasic:
             for op in [OperationType.READ, OperationType.UPDATE]:
                 perm = PermissionRow(
                     role_id=role.id,
-                    scope_type=entity_scope_type,
+                    scope_type=entity_scope_type.to_scope_type(),
                     scope_id=entity_id.entity_id,
                     entity_type=entity_id.entity_type,
                     operation=op,
@@ -231,7 +235,7 @@ class TestRevokerMultipleRoles:
     ) -> AsyncGenerator[EntityWithTwoRolesContext, None]:
         """Create entity granted to two different roles."""
         entity_id = ObjectId(entity_type=EntityType.VFOLDER, entity_id=str(uuid.uuid4()))
-        entity_scope_type = ScopeType.VFOLDER
+        entity_scope_type = RBACElementType.VFOLDER
 
         role_id1: UUID
         role_id2: UUID
@@ -256,7 +260,7 @@ class TestRevokerMultipleRoles:
             for role in [role1, role2]:
                 perm = PermissionRow(
                     role_id=role.id,
-                    scope_type=entity_scope_type,
+                    scope_type=entity_scope_type.to_scope_type(),
                     scope_id=entity_id.entity_id,
                     entity_type=entity_id.entity_type,
                     operation=OperationType.READ,
@@ -331,7 +335,7 @@ class TestRevokerIdempotent:
     ) -> AsyncGenerator[SingleEntityWithRoleContext, None]:
         """Create entity with role having permissions."""
         entity_id = ObjectId(entity_type=EntityType.VFOLDER, entity_id=str(uuid.uuid4()))
-        entity_scope_type = ScopeType.VFOLDER
+        entity_scope_type = RBACElementType.VFOLDER
 
         role_id: UUID
 
@@ -346,7 +350,7 @@ class TestRevokerIdempotent:
 
             perm = PermissionRow(
                 role_id=role.id,
-                scope_type=entity_scope_type,
+                scope_type=entity_scope_type.to_scope_type(),
                 scope_id=entity_id.entity_id,
                 entity_type=entity_id.entity_type,
                 operation=OperationType.READ,

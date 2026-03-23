@@ -13,8 +13,6 @@ from datetime import UTC, datetime
 import pytest
 
 from ai.backend.common.data.artifact.types import ArtifactRegistryType
-from ai.backend.manager.api.gql.artifact.types import ArtifactRevisionFilter
-from ai.backend.manager.api.gql.base import UUIDFilter
 from ai.backend.manager.data.artifact.types import (
     ArtifactAvailability,
     ArtifactStatus,
@@ -433,15 +431,14 @@ class TestArtifactRevisionRepository:
         artifact_repository: ArtifactRepository,
         sample_revisions_for_artifact_id_filtering: ArtifactIdFilteringFixture,
     ) -> None:
-        """Test ArtifactRevisionFilter.build_conditions() with artifact_id field"""
+        """Test artifact_id filter condition on search_artifact_revisions."""
         fixture = sample_revisions_for_artifact_id_filtering
 
-        gql_filter = ArtifactRevisionFilter(
-            artifact_id=UUIDFilter(equals=fixture.target_artifact_id)
-        )
         querier = BatchQuerier(
             pagination=OffsetPagination(limit=10, offset=0),
-            conditions=gql_filter.build_conditions(),
+            conditions=[
+                lambda: ArtifactRevisionRow.artifact_id == fixture.target_artifact_id,
+            ],
             orders=[],
         )
 

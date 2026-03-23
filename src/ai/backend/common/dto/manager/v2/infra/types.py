@@ -9,6 +9,7 @@ from enum import StrEnum
 from pydantic import Field
 
 from ai.backend.common.api_handlers import BaseResponseModel
+from ai.backend.common.dto.manager.v2.common import OrderDirection
 
 __all__ = (
     "AcceleratorMetadataInfo",
@@ -16,13 +17,6 @@ __all__ = (
     "NumberFormatInfo",
     "OrderDirection",
 )
-
-
-class OrderDirection(StrEnum):
-    """Order direction for sorting."""
-
-    ASC = "asc"
-    DESC = "desc"
 
 
 class InfraOrderField(StrEnum):

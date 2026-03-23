@@ -77,19 +77,17 @@ from ai.backend.manager.data.deployment.upserter import DeploymentPolicyUpserter
 from ai.backend.manager.errors.api import InvalidAPIParameters
 from ai.backend.manager.errors.deployment import IncompleteRevisionData
 from ai.backend.manager.models.deployment_policy import BlueGreenSpec, RollingUpdateSpec
+from ai.backend.manager.models.deployment_revision.conditions import RevisionConditions
+from ai.backend.manager.models.deployment_revision.orders import RevisionOrders
+from ai.backend.manager.models.endpoint.conditions import DeploymentConditions
+from ai.backend.manager.models.endpoint.orders import DeploymentOrders
+from ai.backend.manager.models.routing.conditions import RouteConditions
+from ai.backend.manager.models.routing.orders import RouteOrders
 from ai.backend.manager.repositories.base import (
     BatchQuerier,
     OffsetPagination,
     QueryCondition,
     QueryOrder,
-)
-from ai.backend.manager.repositories.deployment.options import (
-    DeploymentConditions,
-    DeploymentOrders,
-    RevisionConditions,
-    RevisionOrders,
-    RouteConditions,
-    RouteOrders,
 )
 
 __all__ = (
@@ -141,6 +139,7 @@ class DeploymentAdapter(BaseFilterAdapter):
             default_deployment_strategy=data.default_deployment_strategy,
             current_revision=current_revision,
             deployment_policy=deployment_policy,
+            sub_step=data.sub_step,
         )
 
     def build_querier(self, request: SearchDeploymentsRequest) -> BatchQuerier:
@@ -526,7 +525,6 @@ class CreateDeploymentAdapter:
         return DeploymentPolicyConfig(
             strategy=strategy,
             strategy_spec=strategy_spec,
-            rollback_on_failure=strategy_input.rollback_on_failure,
         )
 
 
@@ -556,7 +554,6 @@ class DeploymentPolicyAdapter:
             deployment_id=data.endpoint,
             strategy=data.strategy,
             strategy_spec=data.strategy_spec.model_dump(),
-            rollback_on_failure=data.rollback_on_failure,
             created_at=data.created_at,
             updated_at=data.updated_at,
         )
@@ -592,5 +589,4 @@ class DeploymentPolicyAdapter:
             deployment_id=deployment_id,
             strategy=strategy,
             strategy_spec=strategy_spec,
-            rollback_on_failure=request.rollback_on_failure,
         )

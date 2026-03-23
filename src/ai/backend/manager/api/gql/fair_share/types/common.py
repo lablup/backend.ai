@@ -2,49 +2,43 @@
 
 from __future__ import annotations
 
-from collections.abc import Mapping, Sequence
 from datetime import date, datetime
 from decimal import Decimal
-from typing import Self
 
 import strawberry
 
-from ai.backend.common.types import SlotQuantity
-from ai.backend.manager.data.fair_share.types import FairShareSpec
-from ai.backend.manager.errors.fair_share import FairShareError
-
-
-def _normalize_quantity(value: Decimal) -> Decimal:
-    """Normalize a Decimal by removing trailing zeros without scientific notation.
-
-    PostgreSQL NUMERIC(24, 6) preserves scale=6 through SUM() aggregation,
-    producing values like Decimal('7.000000'). This function strips trailing
-    zeros while avoiding scientific notation for large integer values.
-
-    Examples:
-        Decimal('7.000000') -> Decimal('7')
-        Decimal('0.500000') -> Decimal('0.5')
-        Decimal('4294967296.000000') -> Decimal('4294967296')
-    """
-    normalized = value.normalize()
-    sign, digits, exponent = normalized.as_tuple()
-    if isinstance(exponent, int) and exponent > 0:
-        # normalize() may produce scientific notation for large integers
-        # (e.g., Decimal('1000000000') -> Decimal('1E+9')).
-        # Convert back to plain integer representation.
-        return Decimal(int(normalized))
-    return normalized
-
-
-@strawberry.type(
-    name="ResourceSlotEntry",
-    description=(
-        "Added in 26.1.0. A single entry representing one resource type and its allocated quantity. "
-        "Resource types include compute resources (cpu, mem), accelerators (cuda.shares, cuda.device, "
-        "rocm.device), and custom resources defined by plugins."
-    ),
+from ai.backend.common.dto.manager.v2.fair_share.types import (
+    FairShareCalculationSnapshotInfo,
+    FairShareSpecInfo,
+    ResourceSlotEntryInfo,
+    ResourceSlotInfo,
+    ResourceWeightEntryInfo,
 )
-class ResourceSlotEntryGQL:
+from ai.backend.common.dto.manager.v2.resource_group.request import (
+    ResourceWeightEntryInput as ResourceWeightEntryInputDTO,
+)
+from ai.backend.manager.api.gql.decorators import (
+    BackendAIGQLMeta,
+    PydanticInputMixin,
+    gql_pydantic_input,
+    gql_pydantic_type,
+)
+from ai.backend.manager.api.gql.pydantic_compat import PydanticOutputMixin
+
+
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version="26.1.0",
+        description=(
+            "A single entry representing one resource type and its allocated quantity. "
+            "Resource types include compute resources (cpu, mem), accelerators (cuda.shares, cuda.device, "
+            "rocm.device), and custom resources defined by plugins."
+        ),
+    ),
+    model=ResourceSlotEntryInfo,
+    name="ResourceSlotEntry",
+)
+class ResourceSlotEntryGQL(PydanticOutputMixin[ResourceSlotEntryInfo]):
     """Single resource slot entry with resource type and quantity."""
 
     resource_type: str = strawberry.field(
@@ -65,14 +59,14 @@ class ResourceSlotEntryGQL:
     )
 
 
-@strawberry.input(
-    name="ResourceWeightEntryInput",
-    description=(
-        "Added in 26.1.0. Input for a single resource weight entry. "
-        "Specifies how much a resource type contributes to fair share calculations."
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description="Input for a single resource weight entry. Specifies how much a resource type contributes to fair share calculations.",
+        added_version="26.1.0",
     ),
+    name="ResourceWeightEntryInput",
 )
-class ResourceWeightEntryInputGQL:
+class ResourceWeightEntryInputGQL(PydanticInputMixin[ResourceWeightEntryInputDTO]):
     """Input for single resource weight entry."""
 
     resource_type: str = strawberry.field(
@@ -92,15 +86,19 @@ class ResourceWeightEntryInputGQL:
     )
 
 
-@strawberry.type(
-    name="ResourceSlot",
-    description=(
-        "Added in 26.1.0. A collection of compute resource allocations. "
-        "Represents the resources consumed, allocated, or available for a workload. "
-        "Each entry specifies a resource type and its quantity."
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version="26.1.0",
+        description=(
+            "A collection of compute resource allocations. "
+            "Represents the resources consumed, allocated, or available for a workload. "
+            "Each entry specifies a resource type and its quantity."
+        ),
     ),
+    model=ResourceSlotInfo,
+    name="ResourceSlot",
 )
-class ResourceSlotGQL:
+class ResourceSlotGQL(PydanticOutputMixin[ResourceSlotInfo]):
     """Resource slot containing multiple resource type entries."""
 
     entries: list[ResourceSlotEntryGQL] = strawberry.field(
@@ -110,38 +108,19 @@ class ResourceSlotGQL:
         )
     )
 
-    @classmethod
-    def from_resource_slot(cls, slot: Mapping[str, Decimal | str]) -> ResourceSlotGQL:
-        """Convert a ResourceSlot or dict-based resource slot to GraphQL type."""
-        entries = [
-            ResourceSlotEntryGQL(
-                resource_type=k,
-                quantity=Decimal(v) if isinstance(v, str) else v,
-            )
-            for k, v in slot.items()
-        ]
-        return cls(entries=entries)
 
-    @classmethod
-    def from_slot_quantities(cls, quantities: Sequence[SlotQuantity]) -> ResourceSlotGQL:
-        """Convert a list of SlotQuantity to GraphQL type."""
-        entries = [
-            ResourceSlotEntryGQL(
-                resource_type=sq.slot_name, quantity=_normalize_quantity(sq.quantity)
-            )
-            for sq in quantities
-        ]
-        return cls(entries=entries)
-
-
-@strawberry.type(
-    name="ResourceWeightEntry",
-    description=(
-        "Added in 26.2.0. Resource weight with default indicator. "
-        "Shows whether this resource type's weight was explicitly set or uses default."
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version="26.2.0",
+        description=(
+            "Resource weight with default indicator. "
+            "Shows whether this resource type's weight was explicitly set or uses default."
+        ),
     ),
+    model=ResourceWeightEntryInfo,
+    name="ResourceWeightEntry",
 )
-class ResourceWeightEntryGQL:
+class ResourceWeightEntryGQL(PydanticOutputMixin[ResourceWeightEntryInfo]):
     """Individual resource type weight with default usage flag."""
 
     resource_type: str = strawberry.field(
@@ -166,14 +145,18 @@ class ResourceWeightEntryGQL:
     )
 
 
-@strawberry.type(
-    name="FairShareSpec",
-    description=(
-        "Added in 26.1.0. Configuration parameters that control how fair share factors are calculated. "
-        "These parameters determine the decay rate, lookback period, and resource weighting for usage aggregation."
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version="26.1.0",
+        description=(
+            "Configuration parameters that control how fair share factors are calculated. "
+            "These parameters determine the decay rate, lookback period, and resource weighting for usage aggregation."
+        ),
     ),
+    model=FairShareSpecInfo,
+    name="FairShareSpec",
 )
-class FairShareSpecGQL:
+class FairShareSpecGQL(PydanticOutputMixin[FairShareSpecInfo]):
     """Specification parameters for fair share calculation."""
 
     weight: Decimal = strawberry.field(
@@ -216,58 +199,19 @@ class FairShareSpecGQL:
         )
     )
 
-    @classmethod
-    def from_spec(
-        cls,
-        spec: FairShareSpec,
-        use_default: bool,
-        uses_default_resources: frozenset[str],
-    ) -> Self:
-        """Convert from data layer FairShareSpec to GQL type.
 
-        No DB queries - all data comes from Repository layer.
-        Repository ensures spec.weight is always set (either explicit or default_weight).
-
-        Args:
-            spec: FairShareSpec with weight already resolved
-            use_default: Whether this spec uses default values (from FairShareData)
-            uses_default_resources: Set of resource types using default weights
-
-        Returns:
-            FairShareSpecGQL with effective weight and uses_default flag.
-        """
-        # spec.weight is never None here - Repository sets it to default_weight if needed
-        if spec.weight is None:
-            raise FairShareError("Repository must set spec.weight")
-
-        # Convert ResourceSlot to list[ResourceWeightEntryGQL]
-        weight_entries = [
-            ResourceWeightEntryGQL(
-                resource_type=resource_type,
-                weight=weight,
-                uses_default=resource_type in uses_default_resources,
-            )
-            for resource_type, weight in spec.resource_weights.items()
-        ]
-
-        return cls(
-            weight=spec.weight,
-            uses_default=use_default,
-            half_life_days=spec.half_life_days,
-            lookback_days=spec.lookback_days,
-            decay_unit_days=spec.decay_unit_days,
-            resource_weights=weight_entries,
-        )
-
-
-@strawberry.type(
-    name="FairShareCalculationSnapshot",
-    description=(
-        "Added in 26.1.0. Snapshot of the most recent fair share calculation results. "
-        "Contains the computed fair share factor and the intermediate values used in the calculation."
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version="26.1.0",
+        description=(
+            "Snapshot of the most recent fair share calculation results. "
+            "Contains the computed fair share factor and the intermediate values used in the calculation."
+        ),
     ),
+    model=FairShareCalculationSnapshotInfo,
+    name="FairShareCalculationSnapshot",
 )
-class FairShareCalculationSnapshotGQL:
+class FairShareCalculationSnapshotGQL(PydanticOutputMixin[FairShareCalculationSnapshotInfo]):
     """Contains the computed values and the time window used for calculation."""
 
     fair_share_factor: Decimal = strawberry.field(
