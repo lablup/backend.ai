@@ -461,8 +461,8 @@ class RouteFilter(BaseRequestModel):
     """Filter for deployment routes."""
 
     deployment_id: UUID | None = Field(default=None, description="Filter by deployment ID")
-    status: RouteStatusFilter | None = Field(default=None, description="Route status filter")
-    traffic_status: RouteTrafficStatusFilter | None = Field(
+    status: list[RouteStatus] | None = Field(default=None, description="Route status filter")
+    traffic_status: list[RouteTrafficStatus] | None = Field(
         default=None, description="Traffic status filter"
     )
     AND: list[RouteFilter] | None = Field(default=None, description="AND conjunction")

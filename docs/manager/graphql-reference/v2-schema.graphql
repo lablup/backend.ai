@@ -6856,8 +6856,8 @@ type RouteEdge {
 
 """Added in 25.19.0. Filter for routes."""
 input RouteFilter {
-  status: RouteStatusFilter = null
-  trafficStatus: RouteTrafficStatusFilter = null
+  status: [RouteStatus!] = null
+  trafficStatus: [RouteTrafficStatus!] = null
   AND: [RouteFilter!] = null
   OR: [RouteFilter!] = null
   NOT: [RouteFilter!] = null
@@ -6961,45 +6961,11 @@ enum RouteStatus {
 }
 
 """
-Added in 26.3.0. Filter for route status with equality and membership operators.
-"""
-input RouteStatusFilter {
-  """Matches routes with this exact status."""
-  equals: RouteStatus = null
-
-  """Matches routes whose status is in this list."""
-  in: [RouteStatus!] = null
-
-  """Excludes routes with this exact status."""
-  notEquals: RouteStatus = null
-
-  """Excludes routes whose status is in this list."""
-  notIn: [RouteStatus!] = null
-}
-
-"""
 Added in 25.19.0. Traffic routing status for a route. Controls whether traffic should be sent to this route.
 """
 enum RouteTrafficStatus {
   ACTIVE
   INACTIVE
-}
-
-"""
-Added in 26.3.0. Filter for route traffic status with equality and membership operators.
-"""
-input RouteTrafficStatusFilter {
-  """Matches routes with this exact traffic status."""
-  equals: RouteTrafficStatus = null
-
-  """Matches routes whose traffic status is in this list."""
-  in: [RouteTrafficStatus!] = null
-
-  """Excludes routes with this exact traffic status."""
-  notEquals: RouteTrafficStatus = null
-
-  """Excludes routes whose traffic status is in this list."""
-  notIn: [RouteTrafficStatus!] = null
 }
 
 """Added in 24.09.0. Input for SMTP authentication credentials"""

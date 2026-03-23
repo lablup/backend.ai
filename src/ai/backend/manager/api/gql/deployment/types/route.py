@@ -15,6 +15,9 @@ from strawberry.relay import Connection, Edge, NodeID
 from strawberry.scalars import JSON
 
 from ai.backend.common.dto.manager.v2.deployment.request import (
+    RouteFilter as RouteFilterDTO,
+)
+from ai.backend.common.dto.manager.v2.deployment.request import (
     RouteOrder as RouteOrderDTO,
 )
 from ai.backend.common.dto.manager.v2.deployment.request import (
@@ -175,7 +178,7 @@ class RouteOrderField(StrEnum):
     BackendAIGQLMeta(description="Filter for routes.", added_version="25.19.0"),
     name="RouteFilter",
 )
-class RouteFilter:
+class RouteFilter(PydanticInputMixin[RouteFilterDTO]):
     status: list[RouteStatusGQL] | None = None
     traffic_status: list[RouteTrafficStatusGQL] | None = None
 
