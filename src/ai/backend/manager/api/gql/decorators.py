@@ -368,10 +368,12 @@ def gql_federation_type(
     Wraps ``strawberry.federation.type`` for federation entity types.
     Use for types that participate in Apollo Federation with ``@key`` directives.
     """
+    # GraphQL spec forbids descriptions on `extend type` declarations
+    description = None if extend else _build_description(meta)
     return strawberry.federation.type(
         name=name,
         keys=keys or [],
-        description=_build_description(meta),
+        description=description,
         extend=extend,
         directives=directives,
     )
