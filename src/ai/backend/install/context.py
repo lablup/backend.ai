@@ -355,9 +355,7 @@ class Context(metaclass=ABCMeta):
 
         base_path = self.install_info.base_path
 
-        with self.resource_path(
-            "ai.backend.install.configs", "gateway.config.ts"
-        ) as src_gateway:
+        with self.resource_path("ai.backend.install.configs", "gateway.config.ts") as src_gateway:
             dst_gateway = base_path / "gateway.config.ts"
             shutil.copy(src_gateway, dst_gateway)
             self.log_header(f"Copied gateway.config.ts -> {dst_gateway}")
