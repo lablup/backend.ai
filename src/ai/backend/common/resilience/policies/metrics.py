@@ -62,10 +62,14 @@ class MetricPolicy(Policy):
         self._observer = LayerMetricObserver.instance()
         self._metric_error_logged = False
 
-    def _safe_observe(self, fn: Callable[[], None]) -> None:
-        """Call a metric-recording function, suppressing any errors."""
+    def _safe_observe(self, fn: Callable[[], None]) -> bool:
+        """Call a metric-recording function, suppressing any errors.
+
+        Returns True if the function executed successfully, False otherwise.
+        """
         try:
             fn()
+            return True
         except Exception:
             if not self._metric_error_logged:
                 log.warning(
@@ -75,6 +79,7 @@ class MetricPolicy(Policy):
                     exc_info=True,
                 )
                 self._metric_error_logged = True
+            return False
 
     async def execute(
         self,
@@ -97,7 +102,7 @@ class MetricPolicy(Policy):
         log.trace("Metric tracking for operation: {}", operation)
         start = time.perf_counter()
 
-        self._safe_observe(
+        triggered = self._safe_observe(
             lambda: self._observer.observe_layer_operation_triggered(
                 domain=self._domain,
                 layer=self._layer,
@@ -107,25 +112,29 @@ class MetricPolicy(Policy):
 
         try:
             result = await next_call(*args, **kwargs)
-            self._safe_observe(
-                lambda: self._observer.observe_layer_operation(
-                    domain=self._domain,
-                    layer=self._layer,
-                    operation=operation,
-                    duration=time.perf_counter() - start,
-                    exception=None,
+            # Only record completion if the trigger was recorded, to avoid
+            # decrementing the in-flight gauge below zero.
+            if triggered:
+                self._safe_observe(
+                    lambda: self._observer.observe_layer_operation(
+                        domain=self._domain,
+                        layer=self._layer,
+                        operation=operation,
+                        duration=time.perf_counter() - start,
+                        exception=None,
+                    )
                 )
-            )
             return result
         except BaseException as exc:
             caught = exc
-            self._safe_observe(
-                lambda: self._observer.observe_layer_operation(
-                    domain=self._domain,
-                    layer=self._layer,
-                    operation=operation,
-                    duration=time.perf_counter() - start,
-                    exception=caught,
+            if triggered:
+                self._safe_observe(
+                    lambda: self._observer.observe_layer_operation(
+                        domain=self._domain,
+                        layer=self._layer,
+                        operation=operation,
+                        duration=time.perf_counter() - start,
+                        exception=caught,
+                    )
                 )
-            )
             raise

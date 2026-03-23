@@ -130,7 +130,12 @@ class TestMetricPolicy:
     async def test_safe_observe_suppresses_trigger_metric_errors(
         self, mocker: MockerFixture
     ) -> None:
-        """Test that _safe_observe suppresses errors from observe_layer_operation_triggered."""
+        """Test that _safe_observe suppresses errors from observe_layer_operation_triggered.
+
+        When the trigger metric fails, the completion metric (observe_layer_operation)
+        must be skipped to avoid decrementing the in-flight gauge that was never
+        incremented, which would drive the gauge negative.
+        """
         mock_observer = MagicMock()
         mock_observer.observe_layer_operation_triggered.side_effect = ValueError(
             "mmap slice assignment is wrong size"
@@ -151,6 +156,8 @@ class TestMetricPolicy:
         result = await successful_operation()
         assert result == "success"
         mock_observer.observe_layer_operation_triggered.assert_called_once()
+        # Completion metric must NOT be called when trigger failed (prevents negative gauge)
+        mock_observer.observe_layer_operation.assert_not_called()
 
     async def test_safe_observe_suppresses_completion_metric_errors(
         self, mocker: MockerFixture
@@ -202,12 +209,17 @@ class TestMetricPolicy:
         with pytest.raises(RuntimeError, match="connection lost"):
             await failing_operation()
 
-    async def test_safe_observe_suppresses_all_metric_errors(self, mocker: MockerFixture) -> None:
-        """Test that when both trigger and completion metrics fail, the operation succeeds."""
+    async def test_skips_completion_metric_when_trigger_fails(self, mocker: MockerFixture) -> None:
+        """Test that when trigger metric fails, completion metric is skipped entirely.
+
+        This prevents the in-flight gauge from going negative, since
+        observe_layer_operation() calls .dec() on the gauge that
+        observe_layer_operation_triggered() calls .inc() on.
+        """
         mock_observer = MagicMock()
-        mmap_error = ValueError("mmap slice assignment is wrong size")
-        mock_observer.observe_layer_operation_triggered.side_effect = mmap_error
-        mock_observer.observe_layer_operation.side_effect = mmap_error
+        mock_observer.observe_layer_operation_triggered.side_effect = ValueError(
+            "mmap slice assignment is wrong size"
+        )
         mocker.patch(
             "ai.backend.common.resilience.policies.metrics.LayerMetricObserver.instance",
             return_value=mock_observer,
@@ -223,6 +235,9 @@ class TestMetricPolicy:
 
         result = await successful_operation()
         assert result == "success"
+        mock_observer.observe_layer_operation_triggered.assert_called_once()
+        # Completion metric must not be called — gauge was never incremented
+        mock_observer.observe_layer_operation.assert_not_called()
 
     async def test_cancelled_error_propagates_through_metric_policy(
         self, mocker: MockerFixture
@@ -283,7 +298,7 @@ class TestMetricPolicy:
         self, mocker: MockerFixture
     ) -> None:
         """Test that when trigger metric fails and the operation also fails,
-        the original operation exception propagates."""
+        the original operation exception propagates and completion metric is skipped."""
         mock_observer = MagicMock()
         mock_observer.observe_layer_operation_triggered.side_effect = ValueError(
             "mmap slice assignment is wrong size"
@@ -303,16 +318,18 @@ class TestMetricPolicy:
 
         with pytest.raises(RuntimeError, match="connection lost"):
             await failing_operation()
+        # Completion metric must not be called when trigger failed
+        mock_observer.observe_layer_operation.assert_not_called()
 
-    async def test_operation_error_propagates_when_all_metrics_fail(
+    async def test_operation_error_propagates_when_trigger_and_operation_fail(
         self, mocker: MockerFixture
     ) -> None:
-        """Test that when both metrics fail and the operation also fails,
-        the original operation exception propagates."""
+        """Test that when trigger metric fails and the operation also fails,
+        the original operation exception propagates and completion is skipped."""
         mock_observer = MagicMock()
-        mmap_error = ValueError("mmap slice assignment is wrong size")
-        mock_observer.observe_layer_operation_triggered.side_effect = mmap_error
-        mock_observer.observe_layer_operation.side_effect = mmap_error
+        mock_observer.observe_layer_operation_triggered.side_effect = ValueError(
+            "mmap slice assignment is wrong size"
+        )
         mocker.patch(
             "ai.backend.common.resilience.policies.metrics.LayerMetricObserver.instance",
             return_value=mock_observer,
@@ -328,3 +345,5 @@ class TestMetricPolicy:
 
         with pytest.raises(RuntimeError, match="connection lost"):
             await failing_operation()
+        # Completion metric skipped since trigger failed
+        mock_observer.observe_layer_operation.assert_not_called()
