@@ -96,7 +96,6 @@ from ai.backend.common.dto.manager.v2.rbac.request import (
 )
 from ai.backend.common.dto.manager.v2.rbac.types import (
     OperationTypeDTO,
-    PermissionSummary,
     RBACElementTypeDTO,
     RoleSourceDTO,
     RoleStatusDTO,
@@ -1181,7 +1180,6 @@ class RBACAdapter(BaseAdapter):
             created_at=data.created_at,
             updated_at=data.updated_at,
             deleted_at=data.deleted_at,
-            permissions=[],
         )
 
     @staticmethod
@@ -1195,13 +1193,6 @@ class RBACAdapter(BaseAdapter):
             created_at=data.created_at,
             updated_at=data.updated_at,
             deleted_at=data.deleted_at,
-            permissions=[
-                PermissionSummary(
-                    entity_type=p.object_id.entity_type,
-                    operation=p.operation,
-                )
-                for p in data.object_permissions
-            ],
         )
 
     @staticmethod
