@@ -144,7 +144,7 @@ class TestBasicFSMStates:
         deployment = make_deployment(desired=1)
         spec = RollingUpdateSpec(max_surge=1, max_unavailable=0)
 
-        result = RollingUpdateStrategy(spec).evaluate_cycle(deployment, [])
+        result = RollingUpdateStrategy().evaluate_cycle(deployment, [], spec)
 
         assert result.sub_step == DeploymentLifecycleSubStep.DEPLOYING_PROVISIONING
         assert len(result.route_changes.rollout_specs) == 1
@@ -159,7 +159,7 @@ class TestBasicFSMStates:
             make_route(revision_id=NEW_REV, status=RouteStatus.PROVISIONING),
         ]
 
-        result = RollingUpdateStrategy(spec).evaluate_cycle(deployment, routes)
+        result = RollingUpdateStrategy().evaluate_cycle(deployment, routes, spec)
 
         assert result.sub_step == DeploymentLifecycleSubStep.DEPLOYING_PROVISIONING
         assert len(result.route_changes.rollout_specs) == 0
@@ -174,7 +174,7 @@ class TestBasicFSMStates:
             make_route(revision_id=NEW_REV, status=RouteStatus.HEALTHY),
         ]
 
-        result = RollingUpdateStrategy(spec).evaluate_cycle(deployment, routes)
+        result = RollingUpdateStrategy().evaluate_cycle(deployment, routes, spec)
 
         assert result.sub_step == DeploymentLifecycleSubStep.DEPLOYING_COMPLETED
 
@@ -197,7 +197,7 @@ class TestBasicFSMStates:
             make_route(revision_id=NEW_REV, status=failed_status),
         ]
 
-        result = RollingUpdateStrategy(spec).evaluate_cycle(deployment, routes)
+        result = RollingUpdateStrategy().evaluate_cycle(deployment, routes, spec)
 
         assert result.sub_step == DeploymentLifecycleSubStep.DEPLOYING_PROVISIONING
 
@@ -304,7 +304,7 @@ class TestSurgeAndUnavailabilityBudget:
             for _ in range(scenario.input.old_count)
         ]
 
-        result = RollingUpdateStrategy(spec).evaluate_cycle(deployment, routes)
+        result = RollingUpdateStrategy().evaluate_cycle(deployment, routes, spec)
 
         assert len(result.route_changes.rollout_specs) == scenario.expected.create
         assert len(result.route_changes.drain_route_ids) == scenario.expected.terminate
@@ -319,7 +319,7 @@ class TestSurgeAndUnavailabilityBudget:
             make_route(revision_id=NEW_REV, status=RouteStatus.HEALTHY),
         ]
 
-        result = RollingUpdateStrategy(spec).evaluate_cycle(deployment, routes)
+        result = RollingUpdateStrategy().evaluate_cycle(deployment, routes, spec)
 
         assert len(result.route_changes.rollout_specs) == 0
 
@@ -334,7 +334,7 @@ class TestSurgeAndUnavailabilityBudget:
             make_route(revision_id=NEW_REV, status=RouteStatus.HEALTHY),
         ]
 
-        result = RollingUpdateStrategy(spec).evaluate_cycle(deployment, routes)
+        result = RollingUpdateStrategy().evaluate_cycle(deployment, routes, spec)
 
         assert len(result.route_changes.drain_route_ids) == 1
 
@@ -362,7 +362,7 @@ class TestMultiCycleProgression:
             make_route(revision_id=NEW_REV, status=RouteStatus.HEALTHY),
         ]
 
-        result = RollingUpdateStrategy(spec).evaluate_cycle(deployment, routes)
+        result = RollingUpdateStrategy().evaluate_cycle(deployment, routes, spec)
 
         assert len(result.route_changes.rollout_specs) == 1
         assert len(result.route_changes.drain_route_ids) == 0
@@ -378,7 +378,7 @@ class TestMultiCycleProgression:
             make_route(revision_id=NEW_REV, status=RouteStatus.HEALTHY),
         ]
 
-        result = RollingUpdateStrategy(spec).evaluate_cycle(deployment, routes)
+        result = RollingUpdateStrategy().evaluate_cycle(deployment, routes, spec)
 
         assert len(result.route_changes.rollout_specs) == 0
         assert len(result.route_changes.drain_route_ids) == 1
@@ -393,7 +393,7 @@ class TestMultiCycleProgression:
             make_route(revision_id=NEW_REV, status=RouteStatus.HEALTHY),
         ]
 
-        result = RollingUpdateStrategy(spec).evaluate_cycle(deployment, routes)
+        result = RollingUpdateStrategy().evaluate_cycle(deployment, routes, spec)
 
         assert result.sub_step == DeploymentLifecycleSubStep.DEPLOYING_PROVISIONING
         assert len(result.route_changes.drain_route_ids) == 1
@@ -415,7 +415,7 @@ class TestRouteStatusClassification:
             make_route(revision_id=NEW_REV, status=RouteStatus.DEGRADED),
         ]
 
-        result = RollingUpdateStrategy(spec).evaluate_cycle(deployment, routes)
+        result = RollingUpdateStrategy().evaluate_cycle(deployment, routes, spec)
 
         assert result.sub_step == DeploymentLifecycleSubStep.DEPLOYING_PROVISIONING
 
@@ -427,7 +427,7 @@ class TestRouteStatusClassification:
             make_route(revision_id=NEW_REV, status=RouteStatus.UNHEALTHY),
         ]
 
-        result = RollingUpdateStrategy(spec).evaluate_cycle(deployment, routes)
+        result = RollingUpdateStrategy().evaluate_cycle(deployment, routes, spec)
 
         assert result.sub_step == DeploymentLifecycleSubStep.DEPLOYING_PROVISIONING
 
@@ -447,7 +447,7 @@ class TestRouteStatusClassification:
             make_route(revision_id=NEW_REV, status=RouteStatus.HEALTHY),
         ]
 
-        result = RollingUpdateStrategy(spec).evaluate_cycle(deployment, routes)
+        result = RollingUpdateStrategy().evaluate_cycle(deployment, routes, spec)
 
         assert result.sub_step == DeploymentLifecycleSubStep.DEPLOYING_COMPLETED
 
@@ -461,7 +461,7 @@ class TestRouteStatusClassification:
             make_route(revision_id=NEW_REV, status=RouteStatus.FAILED_TO_START),
         ]
 
-        result = RollingUpdateStrategy(spec).evaluate_cycle(deployment, routes)
+        result = RollingUpdateStrategy().evaluate_cycle(deployment, routes, spec)
 
         assert result.sub_step == DeploymentLifecycleSubStep.DEPLOYING_PROVISIONING
 
@@ -474,7 +474,7 @@ class TestRouteStatusClassification:
             make_route(revision_id=OLD_REV, status=RouteStatus.HEALTHY),
         ]
 
-        result = RollingUpdateStrategy(spec).evaluate_cycle(deployment, routes)
+        result = RollingUpdateStrategy().evaluate_cycle(deployment, routes, spec)
 
         assert result.sub_step == DeploymentLifecycleSubStep.DEPLOYING_PROVISIONING
 
@@ -511,7 +511,7 @@ class TestTerminationPriority:
             ),
         ]
 
-        result = RollingUpdateStrategy(spec).evaluate_cycle(deployment, routes)
+        result = RollingUpdateStrategy().evaluate_cycle(deployment, routes, spec)
 
         terminated = result.route_changes.drain_route_ids
         assert len(terminated) == 3
@@ -533,7 +533,7 @@ class TestEdgeCases:
         deployment = make_deployment(desired=0)
         spec = RollingUpdateSpec(max_surge=1, max_unavailable=0)
 
-        result = RollingUpdateStrategy(spec).evaluate_cycle(deployment, [])
+        result = RollingUpdateStrategy().evaluate_cycle(deployment, [], spec)
 
         assert result.sub_step == DeploymentLifecycleSubStep.DEPLOYING_COMPLETED
 
@@ -547,7 +547,7 @@ class TestEdgeCases:
             make_route(revision_id=NEW_REV, status=RouteStatus.HEALTHY),
         ]
 
-        result = RollingUpdateStrategy(spec).evaluate_cycle(deployment, routes)
+        result = RollingUpdateStrategy().evaluate_cycle(deployment, routes, spec)
 
         assert result.sub_step == DeploymentLifecycleSubStep.DEPLOYING_COMPLETED
 
@@ -560,7 +560,7 @@ class TestEdgeCases:
             make_route(revision_id=NEW_REV, status=RouteStatus.FAILED_TO_START),
         ]
 
-        result = RollingUpdateStrategy(spec).evaluate_cycle(deployment, routes)
+        result = RollingUpdateStrategy().evaluate_cycle(deployment, routes, spec)
 
         assert result.sub_step == DeploymentLifecycleSubStep.DEPLOYING_PROVISIONING
 
@@ -573,7 +573,7 @@ class TestEdgeCases:
             make_route(revision_id=OLD_REV, status=RouteStatus.TERMINATED),
         ]
 
-        result = RollingUpdateStrategy(spec).evaluate_cycle(deployment, routes)
+        result = RollingUpdateStrategy().evaluate_cycle(deployment, routes, spec)
 
         assert len(result.route_changes.rollout_specs) == 2
 
@@ -584,7 +584,7 @@ class TestEdgeCases:
         routes = [make_route(revision_id=OLD_REV, status=RouteStatus.HEALTHY)]
 
         with pytest.raises(Exception):  # InvalidEndpointState
-            RollingUpdateStrategy(spec).evaluate_cycle(deployment, routes)
+            RollingUpdateStrategy().evaluate_cycle(deployment, routes, spec)
 
     def test_route_without_revision_classified_as_old(self) -> None:
         """Routes with revision_id=None are classified as old."""
@@ -592,7 +592,7 @@ class TestEdgeCases:
         spec = RollingUpdateSpec(max_surge=1, max_unavailable=0)
         routes = [make_route(revision_id=None, status=RouteStatus.HEALTHY)]  # type: ignore[arg-type]
 
-        result = RollingUpdateStrategy(spec).evaluate_cycle(deployment, routes)
+        result = RollingUpdateStrategy().evaluate_cycle(deployment, routes, spec)
 
         assert len(result.route_changes.rollout_specs) == 1
 
@@ -605,7 +605,7 @@ class TestEdgeCases:
             make_route(revision_id=NEW_REV, status=RouteStatus.PROVISIONING),
         ]
 
-        result = RollingUpdateStrategy(spec).evaluate_cycle(deployment, routes)
+        result = RollingUpdateStrategy().evaluate_cycle(deployment, routes, spec)
 
         assert result.sub_step == DeploymentLifecycleSubStep.DEPLOYING_PROVISIONING
 
@@ -623,7 +623,7 @@ class TestRouteCreatorSpecs:
         deployment = make_deployment(desired=1)
         spec = RollingUpdateSpec(max_surge=1, max_unavailable=0)
 
-        result = RollingUpdateStrategy(spec).evaluate_cycle(deployment, [])
+        result = RollingUpdateStrategy().evaluate_cycle(deployment, [], spec)
 
         assert len(result.route_changes.rollout_specs) == 1
         creator_spec = result.route_changes.rollout_specs[0].spec
@@ -703,7 +703,7 @@ class TestDeadlockPrevention:
 
         # Cycle 1: 3 old → terminate 1, create 0
         routes = [make_route(revision_id=OLD_REV, status=RouteStatus.HEALTHY) for _ in range(3)]
-        r1 = RollingUpdateStrategy(spec).evaluate_cycle(deployment, routes)
+        r1 = RollingUpdateStrategy().evaluate_cycle(deployment, routes, spec)
         assert len(r1.route_changes.rollout_specs) == 0
         assert len(r1.route_changes.drain_route_ids) == 1
 
@@ -724,7 +724,7 @@ class TestDeadlockPrevention:
             make_route(revision_id=NEW_REV, status=RouteStatus.HEALTHY),
         ]
 
-        result = RollingUpdateStrategy(spec).evaluate_cycle(deployment, routes)
+        result = RollingUpdateStrategy().evaluate_cycle(deployment, routes, spec)
 
         assert len(result.route_changes.rollout_specs) == 0
         assert len(result.route_changes.drain_route_ids) == 1
@@ -740,7 +740,7 @@ class TestDeadlockPrevention:
             make_route(revision_id=NEW_REV, status=RouteStatus.PROVISIONING),
         ]
 
-        result = RollingUpdateStrategy(spec).evaluate_cycle(deployment, routes)
+        result = RollingUpdateStrategy().evaluate_cycle(deployment, routes, spec)
 
         assert result.sub_step == DeploymentLifecycleSubStep.DEPLOYING_PROVISIONING
         assert len(result.route_changes.rollout_specs) == 0
@@ -765,7 +765,7 @@ class TestDesiredReplicaCount:
         spec = RollingUpdateSpec(max_surge=1, max_unavailable=0)
         routes = [make_route(revision_id=OLD_REV, status=RouteStatus.HEALTHY)]
 
-        result = RollingUpdateStrategy(spec).evaluate_cycle(deployment, routes)
+        result = RollingUpdateStrategy().evaluate_cycle(deployment, routes, spec)
 
         assert len(result.route_changes.rollout_specs) == 3
 
@@ -782,7 +782,7 @@ class TestDesiredReplicaCount:
             make_route(revision_id=NEW_REV, status=RouteStatus.HEALTHY),
         ]
 
-        result = RollingUpdateStrategy(spec).evaluate_cycle(deployment, routes)
+        result = RollingUpdateStrategy().evaluate_cycle(deployment, routes, spec)
 
         assert result.sub_step == DeploymentLifecycleSubStep.DEPLOYING_COMPLETED
 
@@ -801,7 +801,7 @@ class TestScaleChangeDuringRollingUpdate:
         spec = RollingUpdateSpec(max_surge=1, max_unavailable=0)
         routes = [make_route(revision_id=OLD_REV, status=RouteStatus.HEALTHY) for _ in range(3)]
 
-        result = RollingUpdateStrategy(spec).evaluate_cycle(deployment, routes)
+        result = RollingUpdateStrategy().evaluate_cycle(deployment, routes, spec)
 
         assert len(result.route_changes.rollout_specs) == 0
         assert len(result.route_changes.drain_route_ids) == 2
@@ -812,6 +812,6 @@ class TestScaleChangeDuringRollingUpdate:
         spec = RollingUpdateSpec(max_surge=2, max_unavailable=0)
         routes = [make_route(revision_id=OLD_REV, status=RouteStatus.HEALTHY) for _ in range(2)]
 
-        result = RollingUpdateStrategy(spec).evaluate_cycle(deployment, routes)
+        result = RollingUpdateStrategy().evaluate_cycle(deployment, routes, spec)
 
         assert len(result.route_changes.rollout_specs) == 5

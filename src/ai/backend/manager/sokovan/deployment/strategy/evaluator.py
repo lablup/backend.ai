@@ -133,7 +133,7 @@ class DeploymentStrategyEvaluator:
 
             try:
                 strategy = self._create_strategy(policy.strategy, policy)
-                cycle_result = strategy.evaluate_cycle(deployment, routes)
+                cycle_result = strategy.evaluate_cycle(deployment, routes, policy.strategy_spec)
             except BackendAIError as e:
                 log.warning("deployment {}: evaluation error — {}", deployment.id, e)
                 result.errors.append(EvaluationErrorData(deployment=deployment, reason=str(e)))
@@ -195,4 +195,4 @@ class DeploymentStrategyEvaluator:
                     f" got {type(spec).__name__}"
                 ),
             )
-        return entry.strategy_cls(spec)
+        return entry.strategy_cls()

@@ -3,7 +3,7 @@ from __future__ import annotations
 import logging
 import uuid
 from datetime import datetime
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Union
 
 import sqlalchemy as sa
 from pydantic import BaseModel, Field, model_validator
@@ -26,6 +26,7 @@ if TYPE_CHECKING:
 __all__ = (
     "BlueGreenSpec",
     "DeploymentPolicyRow",
+    "DeploymentStrategySpec",
     "RollingUpdateSpec",
 )
 
@@ -59,6 +60,9 @@ class BlueGreenSpec(BaseModel):
 
     auto_promote: bool = False
     promote_delay_seconds: int = 0
+
+
+DeploymentStrategySpec = Union[RollingUpdateSpec, BlueGreenSpec]
 
 
 def _get_endpoint_join_condition() -> sa.ColumnElement[bool]:

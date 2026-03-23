@@ -21,15 +21,12 @@ from .types import AbstractDeploymentStrategy, StrategyCycleResult
 class BlueGreenStrategy(AbstractDeploymentStrategy):
     """Blue-green deployment strategy FSM."""
 
-    def __init__(self, spec: BlueGreenSpec) -> None:
-        super().__init__(spec)
-        self._spec = spec
-
     @override
     def evaluate_cycle(
         self,
         deployment: DeploymentInfo,
         routes: Sequence[RouteInfo],
+        spec: BlueGreenSpec,
     ) -> StrategyCycleResult:
         """Evaluate one cycle of blue-green deployment for a single deployment."""
         raise NotImplementedError("Blue-green deployment strategy is not yet implemented")

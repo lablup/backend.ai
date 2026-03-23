@@ -60,17 +60,12 @@ class _ClassifiedRoutes:
 class RollingUpdateStrategy(AbstractDeploymentStrategy):
     """Rolling update deployment strategy FSM."""
 
-    _spec: RollingUpdateSpec
-
-    def __init__(self, spec: RollingUpdateSpec) -> None:
-        super().__init__(spec)
-        self._spec = spec
-
     @override
     def evaluate_cycle(
         self,
         deployment: DeploymentInfo,
         routes: Sequence[RouteInfo],
+        spec: RollingUpdateSpec,
     ) -> StrategyCycleResult:
         """Evaluate one cycle of rolling update for a single deployment.
 
@@ -110,7 +105,7 @@ class RollingUpdateStrategy(AbstractDeploymentStrategy):
             return result
         if result := self._check_completed(deployment, classified, desired):
             return result
-        return self._compute_progressing(deployment, classified, desired)
+        return self._compute_progressing(deployment, classified, desired, spec)
 
     def _classify_routes(
         self,
@@ -171,10 +166,11 @@ class RollingUpdateStrategy(AbstractDeploymentStrategy):
         deployment: DeploymentInfo,
         classified: _ClassifiedRoutes,
         desired: int,
+        spec: RollingUpdateSpec,
     ) -> StrategyCycleResult:
         """Compute surge/unavailable budget and return PROVISIONING with route mutations."""
-        max_surge = self._spec.max_surge  # extra routes allowed above desired
-        max_unavailable = self._spec.max_unavailable  # routes allowed to be down
+        max_surge = spec.max_surge  # extra routes allowed above desired
+        max_unavailable = spec.max_unavailable  # routes allowed to be down
 
         max_total = desired + max_surge  # upper bound on simultaneous routes
         current_total = (
