@@ -36,7 +36,6 @@ from ai.backend.manager.data.deployment.types import (
 from ai.backend.manager.data.permission.types import RBACElementRef
 from ai.backend.manager.data.resource.types import ScalingGroupProxyTarget
 from ai.backend.manager.errors.deployment import ReplicaCountMismatch
-from ai.backend.manager.errors.service import ModelDefinitionNotFound
 from ai.backend.manager.models.routing import RoutingRow
 from ai.backend.manager.models.routing.conditions import RouteConditions
 from ai.backend.manager.repositories.base.rbac.entity_creator import RBACEntityCreator
@@ -129,20 +128,6 @@ class DeploymentExecutor:
         valid_deployments: list[DeploymentWithHistory] = []
         for deployment in deployments:
             info = deployment.deployment_info
-            if info.current_revision_id is None:
-                log.warning(
-                    "Deployment {} has no current revision, skipping",
-                    info.id,
-                )
-                continue
-            current_revision = info.resolve_revision_spec(info.current_revision_id)
-            if not current_revision:
-                log.warning(
-                    "Deployment {} current revision {} not found in model_revisions, skipping",
-                    info.id,
-                    info.current_revision_id,
-                )
-                continue
             targets = scaling_group_targets[info.metadata.resource_group]
             if not targets:
                 log.warning(
@@ -199,7 +184,7 @@ class DeploymentExecutor:
 
         return DeploymentExecutionResult(
             successes=successful_deployments,
-            errors=errors,
+            failures=errors,
         )
 
     async def check_ready_deployments_that_need_scaling(
@@ -238,7 +223,7 @@ class DeploymentExecutor:
 
         return DeploymentExecutionResult(
             successes=successes,
-            errors=errors,
+            failures=errors,
         )
 
     async def scale_deployment(
@@ -305,7 +290,7 @@ class DeploymentExecutor:
         return DeploymentExecutionResult(
             successes=successes,
             skipped=skipped,
-            errors=errors,
+            failures=errors,
         )
 
     async def calculate_desired_replicas(
@@ -375,7 +360,7 @@ class DeploymentExecutor:
         return DeploymentExecutionResult(
             successes=successes,
             skipped=skipped,
-            errors=errors,
+            failures=errors,
         )
 
     async def destroy_deployment(
@@ -437,7 +422,7 @@ class DeploymentExecutor:
 
         return DeploymentExecutionResult(
             successes=successes,
-            errors=errors,
+            failures=errors,
         )
 
     # Private helper methods
@@ -452,20 +437,19 @@ class DeploymentExecutor:
 
         with recorder.phase("register_endpoint"):
             with recorder.step("check_target_revision"):
-                if deployment.current_revision_id is None:
-                    raise ModelDefinitionNotFound(
-                        f"No current revision for deployment {deployment.id}"
+                if deployment.current_revision_id is not None:
+                    target_revision = deployment.resolve_revision_spec(
+                        deployment.current_revision_id
                     )
-                current_revision = deployment.resolve_revision_spec(deployment.current_revision_id)
-                if not current_revision:
-                    raise ModelDefinitionNotFound(
-                        f"Current revision {deployment.current_revision_id} not found for deployment {deployment.id}"
+                else:
+                    target_revision = await self._deployment_repo.get_revision_spec_from_endpoint(
+                        deployment.id
                     )
 
             with recorder.step("generate_model_definition"):
                 model_definition = (
                     await self._model_definition_generator_registry.generate_model_definition(
-                        current_revision
+                        target_revision
                     )
                 )
                 health_check_config = model_definition.health_check_config()
@@ -482,7 +466,7 @@ class DeploymentExecutor:
                     session_owner_id=deployment.metadata.session_owner,
                     project_id=deployment.metadata.project,
                     domain_name=deployment.metadata.domain,
-                    runtime_variant=current_revision.execution.runtime_variant,
+                    runtime_variant=target_revision.execution.runtime_variant,
                     existing_url=deployment.network.url,
                     open_to_public=deployment.network.open_to_public,
                     health_check_config=health_check_config,

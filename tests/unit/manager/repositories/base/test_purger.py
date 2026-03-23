@@ -21,9 +21,12 @@ from ai.backend.manager.repositories.base import (
     BatchPurger,
     BatchPurgerResult,
     BatchPurgerSpec,
+    BulkPurgerError,
+    BulkPurgerResultWithFailures,
     Purger,
     PurgerResult,
     execute_batch_purger,
+    execute_bulk_purger_partial,
     execute_purger,
 )
 
@@ -923,3 +926,288 @@ class TestBatchPurgerIntegrityError:
 
             assert isinstance(result, BatchPurgerResult)
             assert result.deleted_count == 2
+
+
+# =============================================================================
+# Bulk Purger Partial Tests (savepoint-based partial failure support)
+# =============================================================================
+
+
+class BulkPurgerPartialTestRow(Base):  # type: ignore[misc]
+    """ORM model for bulk purger partial testing."""
+
+    __tablename__ = "test_bulk_purger_partial"
+    __table_args__ = {"extend_existing": True}
+
+    id: Mapped[int] = mapped_column(sa.Integer, primary_key=True)
+    name: Mapped[str] = mapped_column(sa.String(50), nullable=False)
+
+
+class BulkPurgerPartialParentRow(Base):  # type: ignore[misc]
+    """Parent ORM model for FK violation testing in bulk purger partial."""
+
+    __tablename__ = "test_bulk_purger_partial_parent"
+    __table_args__ = {"extend_existing": True}
+
+    id: Mapped[int] = mapped_column(sa.Integer, primary_key=True)
+    name: Mapped[str] = mapped_column(sa.String(50), nullable=False)
+
+
+class BulkPurgerPartialChildRow(Base):  # type: ignore[misc]
+    """Child ORM model for FK violation testing in bulk purger partial."""
+
+    __tablename__ = "test_bulk_purger_partial_child"
+    __table_args__ = {"extend_existing": True}
+
+    id: Mapped[int] = mapped_column(sa.Integer, primary_key=True)
+    parent_id: Mapped[int] = mapped_column(
+        sa.Integer,
+        sa.ForeignKey("test_bulk_purger_partial_parent.id"),
+        nullable=False,
+    )
+    name: Mapped[str] = mapped_column(sa.String(50), nullable=False)
+
+
+class TestBulkPurgerPartial:
+    """Tests for execute_bulk_purger_partial with savepoint-based partial failure support."""
+
+    @pytest.fixture
+    async def test_row_class(
+        self,
+        database_connection: ExtendedAsyncSAEngine,
+    ) -> AsyncGenerator[type[BulkPurgerPartialTestRow], None]:
+        """Create test table structure."""
+        async with database_connection.begin() as conn:
+            await conn.run_sync(
+                lambda c: BulkPurgerPartialTestRow.__table__.create(c, checkfirst=True)
+            )
+
+        yield BulkPurgerPartialTestRow
+
+        async with database_connection.begin() as conn:
+            await conn.run_sync(
+                lambda c: BulkPurgerPartialTestRow.__table__.drop(c, checkfirst=True)
+            )
+
+    @pytest.fixture
+    async def fk_tables(
+        self,
+        database_connection: ExtendedAsyncSAEngine,
+    ) -> AsyncGenerator[
+        tuple[type[BulkPurgerPartialParentRow], type[BulkPurgerPartialChildRow]], None
+    ]:
+        """Create parent and child tables with FK constraint."""
+        async with database_connection.begin() as conn:
+            await conn.run_sync(
+                lambda c: Base.metadata.create_all(
+                    c,
+                    [
+                        BulkPurgerPartialParentRow.__table__,
+                        BulkPurgerPartialChildRow.__table__,
+                    ],
+                )
+            )
+
+        yield BulkPurgerPartialParentRow, BulkPurgerPartialChildRow
+
+        async with database_connection.begin() as conn:
+            await conn.execute(
+                sa.text("DROP TABLE IF EXISTS test_bulk_purger_partial_child CASCADE")
+            )
+            await conn.execute(
+                sa.text("DROP TABLE IF EXISTS test_bulk_purger_partial_parent CASCADE")
+            )
+
+    async def test_all_purgers_succeed(
+        self,
+        database_connection: ExtendedAsyncSAEngine,
+        test_row_class: type[BulkPurgerPartialTestRow],
+    ) -> None:
+        """Test 3 purgers targeting existing rows → all 3 rows deleted, successes has 3 items, errors is empty."""
+        # Insert 3 test rows
+        async with database_connection.begin_session() as db_sess:
+            for i in range(1, 4):
+                db_sess.add(BulkPurgerPartialTestRow(id=i, name=f"item-{i}"))
+
+        # Execute bulk purger partial with 3 purgers
+        async with database_connection.begin_session() as db_sess:
+            purgers = [
+                Purger(row_class=test_row_class, pk_value=1),
+                Purger(row_class=test_row_class, pk_value=2),
+                Purger(row_class=test_row_class, pk_value=3),
+            ]
+            result = await execute_bulk_purger_partial(db_sess, purgers)
+
+            # Verify all 3 succeeded
+            assert isinstance(result, BulkPurgerResultWithFailures)
+            assert result.success_count() == 3
+            assert len(result.successes) == 3
+            assert len(result.errors) == 0
+            assert not result.has_failures()
+
+            # Verify deleted rows content
+            assert result.successes[0].id == 1
+            assert result.successes[0].name == "item-1"
+            assert result.successes[1].id == 2
+            assert result.successes[1].name == "item-2"
+            assert result.successes[2].id == 3
+            assert result.successes[2].name == "item-3"
+
+            # Verify all rows were deleted from database
+            count_result = await db_sess.execute(
+                sa.select(sa.func.count()).select_from(test_row_class)
+            )
+            assert count_result.scalar() == 0
+
+    async def test_partial_failure_with_fk_constraint(
+        self,
+        database_connection: ExtendedAsyncSAEngine,
+        fk_tables: tuple[type[BulkPurgerPartialParentRow], type[BulkPurgerPartialChildRow]],
+    ) -> None:
+        """Test 3 purgers where 1 targets a row with FK constraint → 2 successes + 1 BulkPurgerError with RepositoryIntegrityError."""
+        parent_cls, child_cls = fk_tables
+
+        # Insert 3 parent rows
+        async with database_connection.begin_session() as db_sess:
+            db_sess.add(BulkPurgerPartialParentRow(id=1, name="parent-1"))
+            db_sess.add(BulkPurgerPartialParentRow(id=2, name="parent-2"))
+            db_sess.add(BulkPurgerPartialParentRow(id=3, name="parent-3"))
+            await db_sess.flush()
+
+            # Add child referencing parent-2 (creates FK constraint)
+            db_sess.add(BulkPurgerPartialChildRow(id=1, parent_id=2, name="child-1"))
+
+        # Execute bulk purger partial with 3 purgers
+        async with database_connection.begin_session() as db_sess:
+            purgers = [
+                Purger(row_class=parent_cls, pk_value=1),
+                Purger(row_class=parent_cls, pk_value=2),  # Has FK constraint
+                Purger(row_class=parent_cls, pk_value=3),
+            ]
+            result = await execute_bulk_purger_partial(db_sess, purgers)
+
+            # Verify 2 successes + 1 failure
+            assert isinstance(result, BulkPurgerResultWithFailures)
+            assert result.success_count() == 2
+            assert len(result.successes) == 2
+            assert len(result.errors) == 1
+            assert result.has_failures()
+
+            # Verify successful deletions (parent-1 and parent-3)
+            assert result.successes[0].id == 1
+            assert result.successes[0].name == "parent-1"
+            assert result.successes[1].id == 3
+            assert result.successes[1].name == "parent-3"
+
+            # Verify error (parent-2 with FK constraint)
+            error = result.errors[0]
+            assert isinstance(error, BulkPurgerError)
+            assert error.purger.pk_value == 2
+            assert error.index == 1  # Second purger in the list
+            assert isinstance(error.exception, ForeignKeyViolationError)
+            assert isinstance(error.exception, RepositoryIntegrityError)
+
+            # Verify database state: parent-2 still exists, parent-1 and parent-3 deleted
+            count_result = await db_sess.execute(sa.select(sa.func.count()).select_from(parent_cls))
+            assert count_result.scalar() == 1
+
+            # Verify parent-2 still exists
+            parent_2_result = await db_sess.execute(sa.select(parent_cls).where(parent_cls.id == 2))
+            parent_2 = parent_2_result.scalar_one_or_none()
+            assert parent_2 is not None
+            assert parent_2.name == "parent-2"
+
+    async def test_non_existent_pk_is_skipped(
+        self,
+        database_connection: ExtendedAsyncSAEngine,
+        test_row_class: type[BulkPurgerPartialTestRow],
+    ) -> None:
+        """Test 3 purgers where 1 targets non-existent PK → 2 successes + 0 errors (non-existent row is skipped, not an error)."""
+        # Insert only 2 test rows (id 1 and 3)
+        async with database_connection.begin_session() as db_sess:
+            db_sess.add(BulkPurgerPartialTestRow(id=1, name="item-1"))
+            db_sess.add(BulkPurgerPartialTestRow(id=3, name="item-3"))
+
+        # Execute bulk purger partial with 3 purgers (one targets non-existent id=2)
+        async with database_connection.begin_session() as db_sess:
+            purgers = [
+                Purger(row_class=test_row_class, pk_value=1),
+                Purger(row_class=test_row_class, pk_value=2),  # Non-existent PK
+                Purger(row_class=test_row_class, pk_value=3),
+            ]
+            result = await execute_bulk_purger_partial(db_sess, purgers)
+
+            # Verify 2 successes + 0 errors (non-existent is skipped)
+            assert isinstance(result, BulkPurgerResultWithFailures)
+            assert result.success_count() == 2
+            assert len(result.successes) == 2
+            assert len(result.errors) == 0
+            assert not result.has_failures()
+
+            # Verify successful deletions
+            assert result.successes[0].id == 1
+            assert result.successes[0].name == "item-1"
+            assert result.successes[1].id == 3
+            assert result.successes[1].name == "item-3"
+
+            # Verify all rows were deleted from database
+            count_result = await db_sess.execute(
+                sa.select(sa.func.count()).select_from(test_row_class)
+            )
+            assert count_result.scalar() == 0
+
+    async def test_empty_purger_list(
+        self,
+        database_connection: ExtendedAsyncSAEngine,
+        test_row_class: type[BulkPurgerPartialTestRow],
+    ) -> None:
+        """Test empty purger list → returns BulkPurgerResultWithFailures with empty successes and errors."""
+        async with database_connection.begin_session() as db_sess:
+            purgers: list[Purger[BulkPurgerPartialTestRow]] = []
+            result = await execute_bulk_purger_partial(db_sess, purgers)
+
+            # Verify empty result
+            assert isinstance(result, BulkPurgerResultWithFailures)
+            assert result.success_count() == 0
+            assert len(result.successes) == 0
+            assert len(result.errors) == 0
+            assert not result.has_failures()
+
+    async def test_error_index_tracking(
+        self,
+        database_connection: ExtendedAsyncSAEngine,
+        fk_tables: tuple[type[BulkPurgerPartialParentRow], type[BulkPurgerPartialChildRow]],
+    ) -> None:
+        """Test error index tracking: BulkPurgerError.index matches the original position in the purger list."""
+        parent_cls, child_cls = fk_tables
+
+        # Insert 5 parent rows
+        async with database_connection.begin_session() as db_sess:
+            for i in range(1, 6):
+                db_sess.add(BulkPurgerPartialParentRow(id=i, name=f"parent-{i}"))
+            await db_sess.flush()
+
+            # Add children referencing parent-2 and parent-4 (creates FK constraints)
+            db_sess.add(BulkPurgerPartialChildRow(id=1, parent_id=2, name="child-1"))
+            db_sess.add(BulkPurgerPartialChildRow(id=2, parent_id=4, name="child-2"))
+
+        # Execute bulk purger partial with 5 purgers
+        async with database_connection.begin_session() as db_sess:
+            purgers = [
+                Purger(row_class=parent_cls, pk_value=1),  # index 0 - success
+                Purger(row_class=parent_cls, pk_value=2),  # index 1 - FK error
+                Purger(row_class=parent_cls, pk_value=3),  # index 2 - success
+                Purger(row_class=parent_cls, pk_value=4),  # index 3 - FK error
+                Purger(row_class=parent_cls, pk_value=5),  # index 4 - success
+            ]
+            result = await execute_bulk_purger_partial(db_sess, purgers)
+
+            # Verify 3 successes + 2 errors
+            assert result.success_count() == 3
+            assert len(result.errors) == 2
+
+            # Verify error indices
+            assert result.errors[0].index == 1  # parent-2
+            assert result.errors[0].purger.pk_value == 2
+            assert result.errors[1].index == 3  # parent-4
+            assert result.errors[1].purger.pk_value == 4

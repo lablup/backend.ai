@@ -28,7 +28,7 @@ The `DeploymentStrategyEvaluator` periodically evaluates each Rolling Update dep
 
 ```
   ┌──────────────────────────────────────┐
-  │  Any New routes PROVISIONING?        │──Yes──→ provisioning
+  │  Any New routes PROVISIONING?        │──Yes──→ provisioning (wait)
   └──────────────────┬───────────────────┘
                      No
                      ▼
@@ -53,15 +53,38 @@ The `DeploymentStrategyEvaluator` periodically evaluates each Rolling Update dep
                 progressing
 ```
 
-### Sub-Step Variants
+Rollback is **not** decided by the FSM itself. If all new routes fail, the FSM will keep attempting to create new routes via the surge/unavailable calculation. Eventually the DEPLOYING timeout (30 min) is exceeded and the coordinator transitions the deployment to ROLLING_BACK via the `expired` path.
 
-Each cycle evaluation directly returns one of the shared sub-step variants. Completion is not a sub-step but a signal on `CycleEvaluationResult(sub_step=PROGRESSING, completed=True)` — the coordinator handles revision swap and READY transition directly.
+### Route Classification
 
-| Sub-Step | Condition | Handler Action |
-|----------|-----------|----------------|
-| **provisioning** | New routes are PROVISIONING | DeployingProvisioningHandler → DEPLOYING→DEPLOYING, reschedule |
-| **progressing** | Calculated surge/unavailable, created/terminated routes | DeployingProgressingHandler → DEPLOYING→DEPLOYING, reschedule |
-| **progressing** (`completed=True`) | No Old routes and New healthy >= desired_replicas | Coordinator → atomic revision swap + DEPLOYING→READY |
+Routes are classified by revision and status:
+
+| Category | Condition | Description |
+|----------|-----------|-------------|
+| `old_active` | revision != deploying_revision, is_active() | Old routes currently serving traffic |
+| `new_provisioning` | revision == deploying_revision, PROVISIONING | New routes being created |
+| `new_healthy` | revision == deploying_revision, HEALTHY | New routes ready to serve |
+| `new_unhealthy` | revision == deploying_revision, UNHEALTHY/DEGRADED | New routes with issues |
+| `new_failed` | revision == deploying_revision, FAILED/TERMINATED | New routes that failed |
+
+### Handler Flow
+
+All DEPLOYING deployments are handled by `DeployingProvisioningHandler`, which stays in the PROVISIONING sub-step throughout the entire deployment lifecycle. The handler runs the strategy evaluator each cycle:
+
+| Result | Condition | Handler Action |
+|--------|-----------|----------------|
+| **success** | Evaluator returns COMPLETED (no Old routes, New healthy >= desired) | Coordinator transitions to READY |
+| **need_retry** | Route mutations executed (create/drain) | Stays in DEPLOYING/PROVISIONING, history recorded |
+| **skipped** | No changes — routes still provisioning or waiting | No transition; coordinator checks for timeout |
+| **expired** | Skipped deployment exceeds DEPLOYING timeout (30 min) | Coordinator transitions to DEPLOYING/ROLLING_BACK |
+
+When a deployment transitions to ROLLING_BACK, the `DeployingRollingBackHandler` clears `deploying_revision` and transitions directly to READY.
+
+### Safety Guards
+
+- **Zero-downtime protection**: When `max_unavailable < desired`, never terminates ALL old routes until at least one new route is healthy
+- **Deadlock prevention**: `RollingUpdateSpec` validator ensures at least one of `max_surge` or `max_unavailable` is positive
+- **Timeout-based rollback**: The FSM does not detect failure — the coordinator's timeout mechanism handles it. If the deployment cannot complete within the DEPLOYING timeout (30 min), the coordinator transitions to ROLLING_BACK via the `expired` path
 
 ## max_surge / max_unavailable Calculation
 
@@ -107,6 +130,7 @@ Example with `desired_replicas = 3`, `max_surge = 1`, `max_unavailable = 1`:
   │  healthy=3, min_available=2 → can_terminate=1       │
   │                                                     │
   │  → Create 1 New, Terminate 1 Old                    │
+  │  → need_retry (route mutations executed)             │
   └─────────────────────────────────────────────────────┘
                           │
                           ▼
@@ -115,7 +139,7 @@ Example with `desired_replicas = 3`, `max_surge = 1`, `max_unavailable = 1`:
   │  Old: [■ ■]    (2 healthy)                          │
   │  New: [◇]      (1 provisioning)                     │
   │                                                     │
-  │  → PROVISIONING exists → wait                       │
+  │  → PROVISIONING exists → skipped (wait)             │
   └─────────────────────────────────────────────────────┘
                           │
                           ▼
@@ -129,6 +153,7 @@ Example with `desired_replicas = 3`, `max_surge = 1`, `max_unavailable = 1`:
   │  healthy=3, min_available=2 → can_terminate=1       │
   │                                                     │
   │  → Create 1 New, Terminate 1 Old                    │
+  │  → need_retry (route mutations executed)             │
   └─────────────────────────────────────────────────────┘
                           │
                           ▼
@@ -137,7 +162,7 @@ Example with `desired_replicas = 3`, `max_surge = 1`, `max_unavailable = 1`:
   │  Old: [■]      (1 healthy)                          │
   │  New: [■ ◇]    (1 healthy, 1 provisioning)          │
   │                                                     │
-  │  → PROVISIONING exists → wait                       │
+  │  → PROVISIONING exists → skipped (wait)             │
   └─────────────────────────────────────────────────────┘
                           │
                           ▼
@@ -151,6 +176,7 @@ Example with `desired_replicas = 3`, `max_surge = 1`, `max_unavailable = 1`:
   │  healthy=3, min_available=2 → can_terminate=1       │
   │                                                     │
   │  → Create 1 New, Terminate 1 Old                    │
+  │  → need_retry (route mutations executed)             │
   └─────────────────────────────────────────────────────┘
                           │
                           ▼
@@ -159,7 +185,7 @@ Example with `desired_replicas = 3`, `max_surge = 1`, `max_unavailable = 1`:
   │  Old: []                                            │
   │  New: [■ ■ ◇]  (2 healthy, 1 provisioning)          │
   │                                                     │
-  │  → PROVISIONING exists → wait                       │
+  │  → PROVISIONING exists → skipped (wait)             │
   └─────────────────────────────────────────────────────┘
                           │
                           ▼
@@ -170,11 +196,24 @@ Example with `desired_replicas = 3`, `max_surge = 1`, `max_unavailable = 1`:
   │                                                     │
   │  No Old and New >= desired_replicas → completed     │
   │  → deploying_revision → current_revision swap       │
-  │  → DEPLOYING → READY state transition               │
+  │  → success → coordinator transitions to READY       │
   └─────────────────────────────────────────────────────┘
 
   Legend: ■ = healthy, ◇ = provisioning
 ```
+
+## Timeout and Rollback
+
+Deploying timeout is handled through the coordinator's generic `expired` transition mechanism:
+
+1. `DeployingProvisioningHandler` declares `expired → DEPLOYING/ROLLING_BACK` in `status_transitions()`
+2. Each cycle, the coordinator checks `result.skipped` deployments against the DEPLOYING timeout (30 min)
+3. Timeout is measured using `phase_started_at` from `DeploymentWithHistory` — the `created_at` of the first scheduling history record for this handler phase
+4. `phase_started_at` is stable across retries: history records with same phase/error_code/to_status are merged (only `attempts` incremented, `created_at` unchanged)
+5. Timed-out deployments transition to DEPLOYING/ROLLING_BACK
+6. `DeployingRollingBackHandler` clears `deploying_revision` and transitions to READY
+
+No separate timeout handler or periodic task is needed — timeout checking is built into the coordinator's standard transition handling.
 
 ## Component Structure
 
@@ -209,7 +248,7 @@ Example with `desired_replicas = 3`, `max_surge = 1`, `max_unavailable = 1`:
   │  │  old_active:       old + is_active()               │      │
   │  └────────────────────────────────────────────────────┘      │
   │                                                              │
-  │  Route changes returned (applied by coordinator):            │
+  │  Route changes returned (applied by applier):                │
   │  ┌────────────────────────────────────────────────────┐      │
   │  │  rollout_specs: RouteCreatorSpec(                  │      │
   │  │    revision_id = deploying_revision,               │      │
@@ -223,14 +262,18 @@ Example with `desired_replicas = 3`, `max_surge = 1`, `max_unavailable = 1`:
                              │
                              ▼
   ┌──────────────────────────────────────────────────────────────┐
-  │  Per-Sub-Step Handlers (coordinator generic path)            │
+  │  DeployingProvisioningHandler                                │
+  │  (single handler for entire DEPLOYING lifecycle)             │
   │                                                              │
-  │  PROVISIONING → DeployingProvisioningHandler                  │
-  │    next_status: DEPLOYING → coordinator records history      │
+  │  completed → success → coordinator transitions to READY      │
+  │  route mutations → need_retry → stays in PROVISIONING        │
+  │  no changes → skipped → coordinator checks timeout           │
+  │  evaluation errors → errors → classified by coordinator      │
   │                                                              │
-  │  PROGRESSING → DeployingProgressingHandler                   │
-  │    next_status: DEPLOYING → coordinator records history      │
-  │    completed=True → coordinator atomic revision swap + READY │
+  │  DeployingRollingBackHandler                                 │
+  │  (cleanup on timeout)                                        │
+  │                                                              │
+  │  clear deploying_revision → success → READY                  │
   └──────────────────────────────────────────────────────────────┘
 ```
 
@@ -242,11 +285,16 @@ When all Old routes are removed and New routes reach desired_replicas or above a
   completed determination (evaluator)
        │
        ▼
-  Coordinator._transition_completed_deployments()
+  StrategyResultApplier.apply()
     → Atomic transaction:
       1. complete_deployment_revision_swap(ids)
          current_revision = deploying_revision
          deploying_revision = NULL
-      2. DEPLOYING → READY lifecycle transition
-      3. History recording
+      2. Returns completed_ids in StrategyApplyResult
+       │
+       ▼
+  DeployingProvisioningHandler
+    → completed_ids → successes
+    → coordinator transitions DEPLOYING → READY
+    → History recording
 ```

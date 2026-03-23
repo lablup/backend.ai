@@ -64,10 +64,10 @@ from ai.backend.manager.data.deployment.scale_modifier import (
 )
 from ai.backend.manager.data.deployment.types import (
     DeploymentInfo,
+    DeploymentLifecycleSubStep,
     DeploymentMetadata,
     DeploymentNetworkSpec,
     DeploymentState,
-    DeploymentSubStep,
     ExecutionSpec,
     ModelDeploymentAutoScalingRuleData,
     ModelRevisionSpec,
@@ -315,9 +315,9 @@ class EndpointRow(Base):  # type: ignore[misc]
     deploying_revision: Mapped[UUID | None] = mapped_column(
         "deploying_revision", GUID, nullable=True
     )
-    sub_step: Mapped[DeploymentSubStep | None] = mapped_column(
+    sub_step: Mapped[DeploymentLifecycleSubStep | None] = mapped_column(
         "sub_step",
-        StrEnumType(DeploymentSubStep),
+        StrEnumType(DeploymentLifecycleSubStep),
         nullable=True,
         default=None,
     )
@@ -867,15 +867,43 @@ class EndpointRow(Base):  # type: ignore[misc]
             sub_step=self.sub_step,
         )
 
-    def _to_deployment_info_legacy(self) -> DeploymentInfo:
-        """Build DeploymentInfo using endpoint-level fields (legacy fallback)."""
-        # Create ImageIdentifier from endpoint's image_row
+    def build_revision_spec_from_endpoint(self) -> ModelRevisionSpec:
+        """Build a ModelRevisionSpec from endpoint-level fields.
+
+        Used when no deployment_revisions record exists yet (e.g., newly created
+        deployments that have not had a revision explicitly added/activated).
+        """
         if self.image_row is None:
             raise ValueError("image_row is not loaded")
         image_identifier = ImageIdentifier(
             canonical=self.image_row.name,
             architecture=self.image_row.architecture,
         )
+        return ModelRevisionSpec(
+            image_identifier=image_identifier,
+            resource_spec=ResourceSpec(
+                cluster_mode=ClusterMode(self.cluster_mode),
+                cluster_size=self.cluster_size,
+                resource_slots=self.resource_slots,
+                resource_opts=self.resource_opts,
+            ),
+            mounts=MountMetadata(
+                model_vfolder_id=self.model or uuid.UUID(int=0),
+                model_definition_path=self.model_definition_path,
+                model_mount_destination=self.model_mount_destination,
+                extra_mounts=self.extra_mounts,
+            ),
+            execution=ExecutionSpec(
+                startup_command=self.startup_command,
+                bootstrap_script=self.bootstrap_script,
+                environ=self.environ,
+                runtime_variant=self.runtime_variant,
+                callback_url=yarl.URL(self.callback_url) if self.callback_url else None,
+            ),
+        )
+
+    def _to_deployment_info_legacy(self) -> DeploymentInfo:
+        """Build DeploymentInfo using endpoint-level fields (legacy fallback)."""
         return DeploymentInfo(
             id=self.id,
             metadata=DeploymentMetadata(
@@ -901,30 +929,7 @@ class EndpointRow(Base):  # type: ignore[misc]
                 open_to_public=self.open_to_public if self.open_to_public is not None else False,
                 url=self.url,
             ),
-            model_revisions=[
-                ModelRevisionSpec(
-                    image_identifier=image_identifier,
-                    resource_spec=ResourceSpec(
-                        cluster_mode=ClusterMode(self.cluster_mode),
-                        cluster_size=self.cluster_size,
-                        resource_slots=self.resource_slots,
-                        resource_opts=self.resource_opts,
-                    ),
-                    mounts=MountMetadata(
-                        model_vfolder_id=self.model or uuid.UUID(int=0),
-                        model_definition_path=self.model_definition_path,
-                        model_mount_destination=self.model_mount_destination,
-                        extra_mounts=self.extra_mounts,
-                    ),
-                    execution=ExecutionSpec(
-                        startup_command=self.startup_command,
-                        bootstrap_script=self.bootstrap_script,
-                        environ=self.environ,
-                        runtime_variant=self.runtime_variant,
-                        callback_url=yarl.URL(self.callback_url) if self.callback_url else None,
-                    ),
-                ),
-            ],
+            model_revisions=[self.build_revision_spec_from_endpoint()],
             current_revision_id=self.current_revision,
             deploying_revision_id=self.deploying_revision,
             sub_step=self.sub_step,

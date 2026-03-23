@@ -32,11 +32,12 @@ from typing import override
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.deployment.types import (
     DeploymentLifecycleStatus,
+    DeploymentLifecycleSubStep,
     DeploymentStatusTransitions,
-    DeploymentSubStep,
 )
 from ai.backend.manager.data.model_serving.types import EndpointLifecycle
 from ai.backend.manager.defs import LockID
+from ai.backend.manager.repositories.deployment.repository import DeploymentRepository
 from ai.backend.manager.sokovan.deployment.deployment_controller import DeploymentController
 from ai.backend.manager.sokovan.deployment.route.route_controller import RouteController
 from ai.backend.manager.sokovan.deployment.route.types import RouteLifecycleType
@@ -104,7 +105,7 @@ class DeployingProvisioningHandler(DeploymentHandler):
         return [
             DeploymentLifecycleStatus(
                 lifecycle=EndpointLifecycle.DEPLOYING,
-                sub_status=DeploymentSubStep.PROVISIONING,
+                sub_step=DeploymentLifecycleSubStep.DEPLOYING_PROVISIONING,
             ),
         ]
 
@@ -114,11 +115,15 @@ class DeployingProvisioningHandler(DeploymentHandler):
         return DeploymentStatusTransitions(
             success=DeploymentLifecycleStatus(
                 lifecycle=EndpointLifecycle.READY,
-                sub_status=None,
+                sub_step=None,
             ),
             need_retry=DeploymentLifecycleStatus(
                 lifecycle=EndpointLifecycle.DEPLOYING,
-                sub_status=DeploymentSubStep.PROVISIONING,
+                sub_step=DeploymentLifecycleSubStep.DEPLOYING_PROVISIONING,
+            ),
+            expired=DeploymentLifecycleStatus(
+                lifecycle=EndpointLifecycle.DEPLOYING,
+                sub_step=DeploymentLifecycleSubStep.DEPLOYING_ROLLING_BACK,
             ),
         )
 
@@ -146,9 +151,8 @@ class DeployingProvisioningHandler(DeploymentHandler):
             )
 
         successes: list[DeploymentWithHistory] = []
-        errors: list[DeploymentExecutionError] = []
+        failures: list[DeploymentExecutionError] = []
         skipped: list[DeploymentWithHistory] = []
-        need_retry: list[DeploymentWithHistory] = []
 
         # COMPLETED → success (coordinator transitions to READY)
         for endpoint_id in apply_result.completed_ids:
@@ -158,11 +162,11 @@ class DeployingProvisioningHandler(DeploymentHandler):
             if deployment is not None:
                 successes.append(deployment)
 
-        # Evaluation errors → execution errors
+        # Evaluation errors → failures
         for error_data in summary.errors:
             deployment = deployment_map.get(error_data.deployment.id)
             if deployment is not None:
-                errors.append(
+                failures.append(
                     DeploymentExecutionError(
                         deployment_info=deployment,
                         reason=error_data.reason,
@@ -170,8 +174,8 @@ class DeployingProvisioningHandler(DeploymentHandler):
                     )
                 )
 
-        # Classify rest: route mutations happened → need_retry (never give_up),
-        # no changes → skipped (no history).
+        # Classify rest: route mutations happened → failures (recoverable, coordinator
+        # will classify as need_retry), no changes → skipped (no history).
         completed_or_error_ids = apply_result.completed_ids | {
             e.deployment.id for e in summary.errors
         }
@@ -181,18 +185,27 @@ class DeployingProvisioningHandler(DeploymentHandler):
             if endpoint_id in completed_or_error_ids or endpoint_id in destroying_ids:
                 continue
             if has_route_mutations:
-                need_retry.append(deployment)
+                failures.append(
+                    DeploymentExecutionError(
+                        deployment_info=deployment,
+                        reason="Route mutations in progress",
+                        error_detail="Waiting for route provisioning to complete",
+                    )
+                )
             else:
                 skipped.append(deployment)
 
-        return DeploymentExecutionResult(
-            successes=successes, errors=errors, skipped=skipped, need_retry=need_retry
-        )
+        return DeploymentExecutionResult(successes=successes, failures=failures, skipped=skipped)
 
     @override
     async def post_process(self, result: DeploymentExecutionResult) -> None:
         await self._deployment_controller.mark_lifecycle_needed(
-            DeploymentLifecycleType.DEPLOYING, sub_step=DeploymentSubStep.PROVISIONING
+            DeploymentLifecycleType.DEPLOYING,
+            sub_step=DeploymentLifecycleSubStep.DEPLOYING_PROVISIONING,
+        )
+        await self._deployment_controller.mark_lifecycle_needed(
+            DeploymentLifecycleType.DEPLOYING,
+            sub_step=DeploymentLifecycleSubStep.DEPLOYING_ROLLING_BACK,
         )
         await self._route_controller.mark_lifecycle_needed(RouteLifecycleType.PROVISIONING)
 
@@ -201,18 +214,17 @@ class DeployingRollingBackHandler(DeploymentHandler):
     """Handler for DEPLOYING / ROLLING_BACK sub-step.
 
     Clears ``deploying_revision`` and transitions directly to READY.
-    This is a cleanup-only operation — no FSM evaluation needed.
     """
 
     def __init__(
         self,
         deployment_controller: DeploymentController,
         route_controller: RouteController,
-        applier: StrategyResultApplier,
+        deployment_repo: DeploymentRepository,
     ) -> None:
         self._deployment_controller = deployment_controller
         self._route_controller = route_controller
-        self._applier = applier
+        self._deployment_repo = deployment_repo
 
     @classmethod
     @override
@@ -230,7 +242,7 @@ class DeployingRollingBackHandler(DeploymentHandler):
         return [
             DeploymentLifecycleStatus(
                 lifecycle=EndpointLifecycle.DEPLOYING,
-                sub_status=DeploymentSubStep.ROLLING_BACK,
+                sub_step=DeploymentLifecycleSubStep.DEPLOYING_ROLLING_BACK,
             )
         ]
 
@@ -240,7 +252,7 @@ class DeployingRollingBackHandler(DeploymentHandler):
         return DeploymentStatusTransitions(
             success=DeploymentLifecycleStatus(
                 lifecycle=EndpointLifecycle.READY,
-                sub_status=None,
+                sub_step=None,
             ),
         )
 
@@ -249,16 +261,18 @@ class DeployingRollingBackHandler(DeploymentHandler):
         self, deployments: Sequence[DeploymentWithHistory]
     ) -> DeploymentExecutionResult:
         all_deployment_ids = {deployment.deployment_info.id for deployment in deployments}
-        await self._applier.clear_deploying_revision(all_deployment_ids)
+        await self._deployment_repo.clear_deploying_revision(all_deployment_ids)
         log.info(
             "Cleared deploying_revision for {} rolling-back deployments",
             len(all_deployment_ids),
         )
+
         return DeploymentExecutionResult(successes=list(deployments))
 
     @override
     async def post_process(self, result: DeploymentExecutionResult) -> None:
         await self._deployment_controller.mark_lifecycle_needed(
-            DeploymentLifecycleType.DEPLOYING, sub_step=DeploymentSubStep.ROLLING_BACK
+            DeploymentLifecycleType.DEPLOYING,
+            sub_step=DeploymentLifecycleSubStep.DEPLOYING_ROLLING_BACK,
         )
         await self._route_controller.mark_lifecycle_needed(RouteLifecycleType.PROVISIONING)

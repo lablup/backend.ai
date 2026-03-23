@@ -30,8 +30,7 @@ from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.deployment.types import (
     DeploymentInfo,
     DeploymentLifecycleStatus,
-    DeploymentSubStatus,
-    DeploymentSubStep,
+    DeploymentLifecycleSubStep,
 )
 from ai.backend.manager.data.session.types import SchedulingResult, SubStepResult
 from ai.backend.manager.defs import SERVICE_MAX_RETRIES
@@ -82,7 +81,7 @@ log = BraceStyleAdapter(logging.getLogger(__name__))
 
 # Handler registry key: (lifecycle_type, sub_step).
 # sub_step is None for handlers that don't filter by sub-step.
-type HandlerKey = tuple[DeploymentLifecycleType, DeploymentSubStep | None]
+type HandlerKey = tuple[DeploymentLifecycleType, DeploymentLifecycleSubStep | None]
 
 # Timeout thresholds for deployment lifecycle statuses (seconds).
 _DEPLOYMENT_STATUS_TIMEOUT_MAP: dict[EndpointLifecycle, float] = {
@@ -149,39 +148,24 @@ class HandlerRegistry:
 
     handlers: dict[HandlerKey, DeploymentHandler]
 
-    def sub_steps_for(self, lifecycle_type: DeploymentLifecycleType) -> list[DeploymentSubStep]:
-        """Derive sub-steps from registered handler keys."""
-        return [
-            sub_step
-            for lt, sub_step in self.handlers
-            if lt == lifecycle_type and sub_step is not None
-        ]
-
 
 @dataclass
 class DeploymentTaskSpec:
     """Specification for a deployment lifecycle periodic task."""
 
     lifecycle_type: DeploymentLifecycleType
-    sub_step: DeploymentSubStep | None = None
+    sub_step: DeploymentLifecycleSubStep | None = None
     short_interval: float | None = None  # None means no short-cycle task
     long_interval: float = 60.0
     initial_delay: float = 30.0
 
-    def _sub_step_value(self) -> str | None:
-        return self.sub_step.value if self.sub_step is not None else None
-
     def create_if_needed_event(self) -> DoDeploymentLifecycleIfNeededEvent:
         """Create event for checking if processing is needed."""
-        return DoDeploymentLifecycleIfNeededEvent(
-            self.lifecycle_type.value, sub_step=self._sub_step_value()
-        )
+        return DoDeploymentLifecycleIfNeededEvent(self.lifecycle_type.value, sub_step=self.sub_step)
 
     def create_process_event(self) -> DoDeploymentLifecycleEvent:
         """Create event for forced processing."""
-        return DoDeploymentLifecycleEvent(
-            self.lifecycle_type.value, sub_step=self._sub_step_value()
-        )
+        return DoDeploymentLifecycleEvent(self.lifecycle_type.value, sub_step=self.sub_step)
 
     @property
     def _suffix(self) -> str:
@@ -314,7 +298,10 @@ class DeploymentCoordinator:
                 ),
             ),
             (
-                (DeploymentLifecycleType.DEPLOYING, DeploymentSubStep.PROVISIONING),
+                (
+                    DeploymentLifecycleType.DEPLOYING,
+                    DeploymentLifecycleSubStep.DEPLOYING_PROVISIONING,
+                ),
                 DeployingProvisioningHandler(
                     deployment_controller=self._deployment_controller,
                     route_controller=self._route_controller,
@@ -323,11 +310,14 @@ class DeploymentCoordinator:
                 ),
             ),
             (
-                (DeploymentLifecycleType.DEPLOYING, DeploymentSubStep.ROLLING_BACK),
+                (
+                    DeploymentLifecycleType.DEPLOYING,
+                    DeploymentLifecycleSubStep.DEPLOYING_ROLLING_BACK,
+                ),
                 DeployingRollingBackHandler(
                     deployment_controller=self._deployment_controller,
                     route_controller=self._route_controller,
-                    applier=applier,
+                    deployment_repo=self._deployment_repository,
                 ),
             ),
         ]
@@ -337,7 +327,7 @@ class DeploymentCoordinator:
     async def process_deployment_lifecycle(
         self,
         lifecycle_type: DeploymentLifecycleType,
-        sub_step: DeploymentSubStep | None = None,
+        sub_step: DeploymentLifecycleSubStep | None = None,
     ) -> None:
         handler = self._registry.handlers.get((lifecycle_type, sub_step))
         if handler is None:
@@ -363,12 +353,18 @@ class DeploymentCoordinator:
         handler_name = handler.name()
         target_statuses = handler.target_statuses()
         lifecycle_stages = [status.lifecycle for status in target_statuses]
+        target_sub_steps: list[DeploymentLifecycleSubStep] = [
+            status.sub_step for status in target_statuses if status.sub_step is not None
+        ]
         deployments = await self._deployment_repository.get_deployments_for_handler(
-            lifecycle_stages, handler_name
+            lifecycle_stages,
+            handler_name,
+            sub_steps=target_sub_steps or None,
         )
         if not deployments:
             log.trace("No deployments to process for handler: {}", handler_name)
             return
+
         log.info("handler: {} - processing {} deployments", handler_name, len(deployments))
 
         deployment_ids = [deployment.deployment_info.id for deployment in deployments]
@@ -379,7 +375,7 @@ class DeploymentCoordinator:
             except Exception:
                 log.exception("handler {}: execute() raised an unexpected error", handler_name)
                 result = DeploymentExecutionResult(
-                    errors=[
+                    failures=[
                         DeploymentExecutionError(
                             deployment_info=deployment,
                             reason=f"Unexpected error in {handler_name}",
@@ -438,25 +434,37 @@ class DeploymentCoordinator:
             all_history_specs.extend(transition.history_specs)
             notification_events.extend(transition.notification_events)
 
-        # Explicit need_retry from handlers (e.g. route mutations in progress).
-        # These are never escalated to give_up — they represent normal progress.
-        if result.need_retry and transitions.need_retry is not None:
-            transition = self._build_success_transition(
-                handler_name=handler_name,
-                deployments=result.need_retry,
-                lifecycle_status=transitions.need_retry,
-                target_lifecycles=target_statuses,
-                records=records,
-                timestamp_now=timestamp_now,
-            )
-            batch_updaters.append(transition.updater)
-            all_history_specs.extend(transition.history_specs)
-            notification_events.extend(transition.notification_events)
+        # Expired transitions for skipped deployments — check timeout even when
+        # no execution error occurred (e.g. deployment is just waiting for routes).
+        if result.skipped and transitions.expired is not None:
+            current_dbtime = await self._deployment_repository.get_db_now()
+            timed_out: list[DeploymentWithHistory] = []
+            for deployment in result.skipped:
+                lifecycle = deployment.deployment_info.state.lifecycle
+                if _is_transition_timed_out(deployment.phase_started_at, lifecycle, current_dbtime):
+                    timed_out.append(deployment)
+            if timed_out:
+                log.warning(
+                    "handler {}: {} skipped deployments timed out — transitioning to expired",
+                    handler_name,
+                    len(timed_out),
+                )
+                transition = self._build_success_transition(
+                    handler_name=handler_name,
+                    deployments=timed_out,
+                    lifecycle_status=transitions.expired,
+                    target_lifecycles=target_statuses,
+                    records=records,
+                    timestamp_now=timestamp_now,
+                )
+                batch_updaters.append(transition.updater)
+                all_history_specs.extend(transition.history_specs)
+                notification_events.extend(transition.notification_events)
 
         # Failure transitions — classify into need_retry/expired/give_up
-        if result.errors:
+        if result.failures:
             current_dbtime = await self._deployment_repository.get_db_now()
-            classified = self._classify_failures(result.errors, current_dbtime)
+            classified = self._classify_failures(result.failures, current_dbtime)
 
             failure_categories = [
                 (classified.give_up, transitions.give_up, SchedulingResult.GIVE_UP, "give_up"),
@@ -510,7 +518,7 @@ class DeploymentCoordinator:
         return BatchUpdater(
             spec=EndpointLifecycleBatchUpdaterSpec(
                 lifecycle_stage=lifecycle_status.lifecycle,
-                sub_step=lifecycle_status.sub_status,
+                sub_step=lifecycle_status.sub_step,
             ),
             conditions=[
                 DeploymentConditions.by_ids(endpoint_ids),
@@ -665,16 +673,16 @@ class DeploymentCoordinator:
     def _build_history_sub_steps(
         entity_id: UUID,
         records: Mapping[UUID, ExecutionRecord],
-        sub_status: DeploymentSubStatus | None,
+        sub_step: DeploymentLifecycleSubStep | None,
         scheduling_result: SchedulingResult,
     ) -> list[SubStepResult]:
-        """Build sub_steps list, appending sub_status as an entry if present."""
+        """Build sub_steps list, appending sub_step as an entry if present."""
         sub_steps = extract_sub_steps_for_entity(entity_id, records)
-        if sub_status is not None:
+        if sub_step is not None:
             now = datetime.now(UTC)
             sub_steps.append(
                 SubStepResult(
-                    step=sub_status.value,
+                    step=sub_step.value,
                     result=scheduling_result,
                     started_at=now,
                     ended_at=now,
@@ -711,12 +719,11 @@ class DeploymentCoordinator:
     async def process_if_needed(
         self,
         lifecycle_type: DeploymentLifecycleType,
-        sub_step: DeploymentSubStep | None = None,
+        sub_step: DeploymentLifecycleSubStep | None = None,
     ) -> None:
         """Process deployment lifecycle operation if needed (based on internal state)."""
-        sub_step_value = sub_step.value if sub_step is not None else None
         if not await self._valkey_schedule.load_and_delete_deployment_mark(
-            lifecycle_type.value, sub_step_value
+            lifecycle_type.value, sub_step.value if sub_step is not None else None
         ):
             return
         await self.process_deployment_lifecycle(lifecycle_type, sub_step)
@@ -763,8 +770,8 @@ class DeploymentCoordinator:
                 initial_delay=25.0,
             ),
         ]
-        # Deploying — one task per sub-step
-        for sub_step in self._registry.sub_steps_for(DeploymentLifecycleType.DEPLOYING):
+        # Deploying — one task per handler sub-step
+        for sub_step in DeploymentLifecycleSubStep.deploying_handler_sub_steps():
             specs.append(
                 DeploymentTaskSpec(
                     DeploymentLifecycleType.DEPLOYING,

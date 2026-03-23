@@ -21,6 +21,7 @@ from ai.backend.common.data.model_deployment.types import (
     ModelDeploymentStatus,
     ReadinessStatus,
 )
+from ai.backend.manager.errors.deployment import DeploymentRevisionNotFound
 
 if TYPE_CHECKING:
     from ai.backend.manager.data.session.types import SchedulingResult, SubStepResult
@@ -121,6 +122,10 @@ class RouteStatus(enum.Enum):
     def is_inactive(self) -> bool:
         return self in self.inactive_route_statuses()
 
+    def is_provisioning(self) -> bool:
+        """PROVISIONING or DEGRADED (still warming up, health checks not yet passing)."""
+        return self in (RouteStatus.PROVISIONING, RouteStatus.DEGRADED)
+
     def termination_priority(self) -> int:
         priority_map = {
             RouteStatus.UNHEALTHY: 1,
@@ -148,45 +153,42 @@ class RouteTrafficStatus(enum.StrEnum):
 # ========== Status Transition Types (BEP-1030) ==========
 
 
-class DeploymentSubStatus(enum.StrEnum):
-    """Base class for deployment lifecycle sub-statuses.
+class DeploymentLifecycleSubStep(enum.StrEnum):
+    """Sub-steps within deployment lifecycle phases.
 
-    Each lifecycle type can define its own sub-status enum by
-    inheriting from this class.  For example, DEPLOYING handlers
-    use ``DeploymentSubStep`` (provisioning, rolling_back, …).
+    Member names are prefixed with the lifecycle phase they belong to
+    (e.g. ``DEPLOYING_``).  String values are stored in the database as-is.
     """
 
+    # -- DEPLOYING phase --
+    DEPLOYING_PROVISIONING = "deploying_provisioning"
+    """New revision routes are being provisioned and old routes are being drained."""
+    DEPLOYING_ROLLING_BACK = "deploying_rolling_back"
+    """Clearing deploying_revision and transitioning to READY."""
+    DEPLOYING_COMPLETED = "deploying_completed"
+    """All strategy conditions satisfied; triggers revision swap."""
 
-class DeploymentSubStep(DeploymentSubStatus):
-    """Sub-steps for the DEPLOYING lifecycle phase.
-
-    - PROVISIONING: New revision routes are being provisioned and old routes
-      are being drained.  The main handler for rolling updates.
-    - ROLLING_BACK: Clearing deploying_revision and transitioning to READY.
-    - COMPLETED: All strategy conditions satisfied; triggers revision swap.
-    """
-
-    PROVISIONING = "provisioning"
-    ROLLING_BACK = "rolling_back"
-    COMPLETED = "completed"
+    @classmethod
+    def deploying_handler_sub_steps(cls) -> tuple[DeploymentLifecycleSubStep, ...]:
+        """Sub-steps that have their own deploying handler (excludes COMPLETED, which is an evaluator outcome)."""
+        return (cls.DEPLOYING_PROVISIONING, cls.DEPLOYING_ROLLING_BACK)
 
 
 @dataclass(frozen=True)
 class DeploymentLifecycleStatus:
     """Target lifecycle state for a deployment status transition.
 
-    Pairs an EndpointLifecycle with an optional sub-status to provide
+    Pairs an EndpointLifecycle with an optional sub-step to provide
     context about which sub-step led to this transition.
 
     Attributes:
         lifecycle: The target endpoint lifecycle state
-        sub_status: Optional sub-status indicating what determined this
-            transition. Concrete values come from DeploymentSubStatus
-            subclasses (e.g. DeploymentSubStep for DEPLOYING handlers).
+        sub_step: Optional sub-step indicating what determined this
+            transition (e.g. DEPLOYING_* members for DEPLOYING handlers).
     """
 
     lifecycle: EndpointLifecycle
-    sub_status: DeploymentSubStatus | None = None
+    sub_step: DeploymentLifecycleSubStep | None = None
 
 
 @dataclass(frozen=True)
@@ -376,13 +378,19 @@ class DeploymentInfo:
     current_revision_id: UUID | None = None
     policy: DeploymentPolicyData | None = None
     deploying_revision_id: UUID | None = None
-    sub_step: DeploymentSubStep | None = None
+    sub_step: DeploymentLifecycleSubStep | None = None
 
-    def resolve_revision_spec(self, revision_id: UUID) -> ModelRevisionSpec | None:
-        """Find a ModelRevisionSpec by revision_id from model_revisions."""
-        return next(
-            (r for r in self.model_revisions if r.revision_id == revision_id),
-            None,
+    def resolve_revision_spec(self, revision_id: UUID) -> ModelRevisionSpec:
+        """Find a ModelRevisionSpec by revision_id from model_revisions.
+
+        Raises:
+            DeploymentRevisionNotFound: If the revision is not found.
+        """
+        for revision in self.model_revisions:
+            if revision.revision_id == revision_id:
+                return revision
+        raise DeploymentRevisionNotFound(
+            f"Revision {revision_id} not found in model_revisions of deployment {self.id}"
         )
 
 
@@ -569,6 +577,7 @@ class ModelDeploymentData:
     created_user_id: UUID
     policy: DeploymentPolicyData | None = None
     access_token_ids: list[UUID] | None = None
+    sub_step: DeploymentLifecycleSubStep | None = None
 
 
 class DeploymentOrderField(enum.StrEnum):

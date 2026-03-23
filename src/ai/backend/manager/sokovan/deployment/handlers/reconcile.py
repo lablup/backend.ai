@@ -79,5 +79,5 @@ class ReconcileDeploymentHandler(DeploymentHandler):
     async def post_process(self, result: DeploymentExecutionResult) -> None:
         """Handle post-processing after checking ready deployments."""
         log.debug("Post-processing after checking ready deployments")
-        if result.errors:
+        if result.failures:
             await self._deployment_controller.mark_lifecycle_needed(DeploymentLifecycleType.SCALING)

@@ -12,7 +12,7 @@ from pydantic import BaseModel
 from ai.backend.common.data.model_deployment.types import DeploymentStrategy
 from ai.backend.manager.data.deployment.types import (
     DeploymentInfo,
-    DeploymentSubStep,
+    DeploymentLifecycleSubStep,
     RouteInfo,
 )
 from ai.backend.manager.models.routing import RoutingRow
@@ -34,7 +34,7 @@ class StrategyCycleResult:
     ``sub_step`` indicates the next state: PROVISIONING or COMPLETED.
     """
 
-    sub_step: DeploymentSubStep
+    sub_step: DeploymentLifecycleSubStep
     route_changes: RouteChanges = field(default_factory=RouteChanges)
 
 
@@ -51,18 +51,17 @@ class StrategyEvaluationSummary:
     """Aggregate result of evaluating all DEPLOYING deployments.
 
     The evaluator classifies each deployment into a sub_step and records
-    the mapping so the applier can bulk-update the DB column.
-    All outcomes — including ROLLING_BACK and COMPLETED — are expressed
-    as sub_step values and persisted to the DB by the applier.
+    the mapping.  The applier uses COMPLETED assignments to trigger
+    revision swaps.  Sub-step transitions are handled by the coordinator.
     """
 
     # Mapping from endpoint ID to its evaluated sub_step — used to bulk-update the DB.
-    assignments: dict[UUID, DeploymentSubStep] = field(default_factory=dict)
+    assignments: dict[UUID, DeploymentLifecycleSubStep] = field(default_factory=dict)
 
     # Aggregated route mutations from all per-deployment evaluations.
     route_changes: RouteChanges = field(default_factory=RouteChanges)
 
-    # Deployments that failed evaluation (no policy, strategy error, etc.)
+    # Deployments that failed evaluation or have failed routes.
     errors: list[EvaluationErrorData] = field(default_factory=list)
 
 

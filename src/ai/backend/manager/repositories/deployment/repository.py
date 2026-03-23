@@ -48,13 +48,14 @@ from ai.backend.manager.data.deployment.types import (
     DeploymentInfo,
     DeploymentInfoSearchResult,
     DeploymentInfoWithAutoScalingRules,
+    DeploymentLifecycleSubStep,
     DeploymentPolicyData,
     DeploymentPolicySearchResult,
     DeploymentPolicyUpsertResult,
-    DeploymentSubStep,
     DeploymentWithHistory,
     ModelDeploymentAutoScalingRuleData,
     ModelRevisionData,
+    ModelRevisionSpec,
     RevisionSearchResult,
     RouteInfo,
     RouteSearchResult,
@@ -288,7 +289,7 @@ class DeploymentRepository:
     async def get_endpoints_by_statuses(
         self,
         statuses: list[EndpointLifecycle],
-        sub_steps: list[DeploymentSubStep] | None = None,
+        sub_steps: list[DeploymentLifecycleSubStep] | None = None,
     ) -> list[DeploymentInfo]:
         """Get endpoints by lifecycle statuses, optionally filtered by sub_steps."""
         return await self._db_source.get_endpoints_by_statuses(statuses, sub_steps=sub_steps)
@@ -298,6 +299,7 @@ class DeploymentRepository:
         self,
         statuses: list[EndpointLifecycle],
         handler_name: str,
+        sub_steps: list[DeploymentLifecycleSubStep] | None = None,
     ) -> list[DeploymentWithHistory]:
         """Get deployments for handler execution with history populated.
 
@@ -308,11 +310,14 @@ class DeploymentRepository:
         Args:
             statuses: Endpoint lifecycle statuses to include
             handler_name: Current handler phase name for history matching
+            sub_steps: Optional sub-step filter for deployment handlers
 
         Returns:
             List of DeploymentWithHistory with history fields populated.
         """
-        return await self._db_source.fetch_deployments_for_handler(statuses, handler_name)
+        return await self._db_source.fetch_deployments_for_handler(
+            statuses, handler_name, sub_steps
+        )
 
     @deployment_repository_resilience.apply()
     async def get_endpoint_info(
@@ -720,6 +725,18 @@ class DeploymentRepository:
         """
         return await self._db_source.fetch_deployment_context(deployment_info, revision_id)
 
+    @deployment_repository_resilience.apply()
+    async def fetch_deployment_context_from_endpoint(
+        self,
+        deployment_info: DeploymentInfo,
+    ) -> DeploymentContext:
+        """Fetch deployment context using endpoint-level fields as image source.
+
+        Used when no revision exists yet (e.g., newly created deployments
+        before any revision is explicitly added/activated).
+        """
+        return await self._db_source.fetch_deployment_context_from_endpoint(deployment_info)
+
     # Auto-scaling operations
 
     @deployment_repository_resilience.apply()
@@ -1119,6 +1136,17 @@ class DeploymentRepository:
             DeploymentRevisionNotFound: If the endpoint has no current revision.
         """
         return await self._db_source.get_current_revision(endpoint_id)
+
+    @deployment_repository_resilience.apply()
+    async def get_revision_spec_from_endpoint(
+        self,
+        endpoint_id: uuid.UUID,
+    ) -> ModelRevisionSpec:
+        """Get a ModelRevisionSpec built from endpoint-level fields.
+
+        Used when no deployment_revisions record exists yet.
+        """
+        return await self._db_source.get_revision_spec_from_endpoint(endpoint_id)
 
     @deployment_repository_resilience.apply()
     async def search_revisions(

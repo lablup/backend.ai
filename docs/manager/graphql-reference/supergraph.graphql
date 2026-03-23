@@ -1506,10 +1506,19 @@ type AvailableServiceNode implements Node
 type BackgroundTaskEventPayload
   @join__type(graph: STRAWBERRY)
 {
+  """UUID of the background task."""
   taskId: ID!
+
+  """Type of the background task event."""
   eventType: BgtaskEventType!
+
+  """Human-readable message for this event."""
   message: String!
+
+  """Current progress value. Only populated for UPDATED events."""
   currentProgress: Float
+
+  """Total progress value. Only populated for UPDATED events."""
   totalProgress: Float
 }
 
@@ -11748,14 +11757,19 @@ enum SchedulerType
 type SchedulingBroadcastEventPayload
   @join__type(graph: STRAWBERRY)
 {
-  sessionId: ID!
-  statusTransition: SchedulingStatus!
-  reason: String!
-
   """
   The session ID associated with the replica. This can be null right after replica creation.
   """
   session: ComputeSessionNode!
+
+  """UUID of the session being scheduled."""
+  sessionId: ID!
+
+  """Status transition that occurred during session scheduling."""
+  statusTransition: SchedulingStatus!
+
+  """Human-readable reason for this status transition."""
+  reason: String!
 }
 
 """Scheduling result status"""

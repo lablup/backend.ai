@@ -50,7 +50,7 @@ DEPLOYING sub-step handlers are registered **flat** in the coordinator's `Handle
 
 ### Overall Architecture
 
-Core idea: The coordinator maintains a `HandlerRegistry` with a flat `(lifecycle_type, sub_step)` key. Simple lifecycle types (CHECK_PENDING, SCALING, etc.) register with `sub_step=None`. DEPLOYING registers three handlers — one for PROVISIONING, one for PROGRESSING (which also handles COMPLETED and ROLLED_BACK terminal states), and one for ROLLING_BACK. Each handler independently calls the strategy evaluator and applier.
+Core idea: The coordinator maintains a `HandlerRegistry` with a flat `(lifecycle_type, sub_step)` key. Simple lifecycle types (CHECK_PENDING, SCALING, etc.) register with `sub_step=None`. DEPLOYING registers two handlers — one for PROVISIONING and one for ROLLING_BACK. Each handler independently calls the strategy evaluator and applier.
 
 ```
 ┌──────────────────────────────────────────────────────────────────────────────┐
@@ -62,7 +62,6 @@ Core idea: The coordinator maintains a `HandlerRegistry` with a flat `(lifecycle
 │  │ check_replica:           5s / 30s                                  │      │
 │  │ scaling:                 5s / 30s                                  │      │
 │  │ deploying/provisioning:  5s / 30s  ← drives PROVISIONING cycle    │      │
-│  │ deploying/progressing:   5s / 30s  ← drives PROGRESSING cycle     │      │
 │  │ deploying/rolling_back:  5s / 30s  ← drives ROLLING_BACK cycle    │      │
 │  │ reconcile:               -- / 30s                                  │      │
 │  │ destroying:              5s / 60s                                  │      │
@@ -93,22 +92,23 @@ Core idea: The coordinator maintains a `HandlerRegistry` with a flat `(lifecycle
 │      (SCALING, None)                 → ScalingHandler                        │
 │      (RECONCILE, None)               → ReconcileHandler                      │
 │      (DEPLOYING, PROVISIONING)       → DeployingProvisioningHandler          │
-│      (DEPLOYING, PROGRESSING)        → DeployingProgressingHandler           │
 │      (DEPLOYING, ROLLING_BACK)       → DeployingRollingBackHandler           │
 │      (DESTROYING, None)              → DestroyingHandler                     │
 │    }                                                                         │
 │                                                                              │
 │  _run_handler(handler):                                                      │
 │    1. Query deployments by handler.target_statuses()                         │
-│    2. Build attempt context from scheduling history                          │
+│    2. Build DeploymentWithHistory from scheduling history                    │
 │    3. Execute handler + handle status transitions                            │
 │    4. Classify failures (give_up / expired / need_retry)                     │
-│    5. Post-process (reschedule, trigger dependent lifecycles)                │
+│    5. Check skipped deployments for timeout → expired transition             │
+│    6. Post-process (reschedule, trigger dependent lifecycles)                │
 │                                                                              │
 │  Result handling (same generic path for all handlers):                       │
 │    successes  → success status (transition + history + sub_step update)      │
 │    errors     → classified into give_up / expired / need_retry               │
-│    skipped    → no transition (still in progress)                            │
+│    skipped    → timeout check; if expired transition defined and timed out,  │
+│                 transition to expired status                                 │
 └────────────────┬─────────────────────────────────────────────────────────────┘
                  │
                  ▼
@@ -121,27 +121,18 @@ Core idea: The coordinator maintains a `HandlerRegistry` with a flat `(lifecycle
 │  ├─ execute(deployments) → DeploymentExecutionResult         ← abstract     │
 │  └─ post_process(result) → None                              ← abstract     │
 │                                                                              │
-│  DEPLOYING handlers (3 total):                                               │
+│  DEPLOYING handlers (2 total):                                               │
 │  ├─ DeployingProvisioningHandler                                             │
 │  │    targets: [(DEPLOYING, PROVISIONING)]                                   │
 │  │    execute: evaluator.evaluate() + applier.apply()                        │
-│  │    success → DEPLOYING/PROGRESSING                                        │
-│  │    expired/give_up → DEPLOYING/ROLLING_BACK                               │
-│  │                                                                           │
-│  ├─ DeployingProgressingHandler                                              │
-│  │    targets: [(DEPLOYING, PROGRESSING),                                    │
-│  │              (DEPLOYING, COMPLETED),                                      │
-│  │              (DEPLOYING, ROLLED_BACK)]                                    │
-│  │    execute: evaluator.evaluate() + applier.apply()                        │
-│  │    success (COMPLETED/ROLLED_BACK) → READY                                │
-│  │    skipped (still PROGRESSING) → no transition                            │
-│  │    expired/give_up → DEPLOYING/ROLLING_BACK                               │
+│  │    success → READY (all routes replaced)                                  │
+│  │    need_retry → DEPLOYING/PROVISIONING (route mutations executed)         │
+│  │    expired → DEPLOYING/ROLLING_BACK (timeout)                             │
 │  │                                                                           │
 │  └─ DeployingRollingBackHandler                                              │
 │       targets: [(DEPLOYING, ROLLING_BACK)]                                   │
-│       execute: evaluator.evaluate() + applier.apply()                        │
-│       success → DEPLOYING/ROLLED_BACK                                        │
-│       expired/give_up → DEPLOYING/ROLLED_BACK                                │
+│       execute: clear deploying_revision                                      │
+│       success → READY                                                        │
 └──────────────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -166,10 +157,6 @@ activate_revision(deployment_id, revision_id)
             ├─ deploying_revision = revision_id
             └─ lifecycle = DEPLOYING
          → mark("deploying")
-
-update_deployment(replica_count, metadata, ...)
-    │
-    └─ Always mark("check_replica")  ← strategy-independent
 ```
 
 Replica count changes are additions/removals of the same revision, so no strategy is needed.
@@ -187,11 +174,8 @@ Both Blue-Green and Rolling Update cycle FSMs share a common set of **sub-step v
 
 | Sub-Step | Description | Handled by | Transition |
 |----------|-------------|------------|------------|
-| **PROVISIONING** | New routes being created or still provisioning | DeployingProvisioningHandler | success → DEPLOYING/PROGRESSING, skipped (still provisioning) → no transition, failure → DEPLOYING/ROLLING_BACK |
-| **PROGRESSING** | Strategy making active progress — routes being replaced | DeployingProgressingHandler | skipped (still progressing) → no transition, failure → DEPLOYING/ROLLING_BACK |
-| **COMPLETED** | All strategy conditions met — revision swap done | DeployingProgressingHandler | success → READY |
-| **ROLLING_BACK** | Actively rolling back — terminating new-revision routes, restoring previous revision | DeployingRollingBackHandler | success → DEPLOYING/ROLLED_BACK, failure → DEPLOYING/ROLLED_BACK |
-| **ROLLED_BACK** | Rollback complete — deploying_revision cleared | DeployingProgressingHandler | success → READY |
+| **PROVISIONING** | New routes being created, strategy progressing, or waiting for routes to become healthy | DeployingProvisioningHandler | success → READY, need_retry → DEPLOYING/PROVISIONING, expired → DEPLOYING/ROLLING_BACK |
+| **ROLLING_BACK** | Actively rolling back — clearing deploying_revision and restoring previous revision | DeployingRollingBackHandler | success → READY |
 
 ### DeploymentStrategyEvaluator
 
@@ -225,7 +209,7 @@ DeploymentStrategyEvaluator.evaluate(deployments)
   StrategyEvaluationSummary {
     assignments: {
       deploy_A_id: PROVISIONING,
-      deploy_B_id: PROGRESSING,
+      deploy_B_id: PROVISIONING,
       deploy_C_id: COMPLETED,
     },
     route_changes: RouteChanges {
@@ -240,100 +224,79 @@ DeploymentStrategyEvaluator.evaluate(deployments)
 
 1. **Evaluator + Applier are called per handler**: Each DEPLOYING handler calls `evaluator.evaluate()` then `applier.apply()` in its `execute()`. The applier persists sub_step assignments and route mutations atomically via `StrategyTransaction`.
 2. **Strategy FSMs implement a common interface via registry**: All strategy implementations extend `AbstractDeploymentStrategy` and implement `evaluate_cycle()`. Concrete classes (`RollingUpdateStrategy`, `BlueGreenStrategy`) live in dedicated module files. The `DeploymentStrategyRegistry` is injected into the evaluator.
-3. **COMPLETED and ROLLED_BACK terminal states are handled by ProgressingHandler**: The applier performs revision swap for COMPLETED deployments and clears deploying_revision for ROLLED_BACK deployments. The ProgressingHandler returns COMPLETED as successes and ROLLED_BACK as errors, both flowing through the coordinator's standard transition path to READY.
-4. **ROLLING_BACK is an active handler**: When provisioning or progressing fails (expired/give_up), the coordinator transitions the deployment to ROLLING_BACK. The `DeployingRollingBackHandler` then actively manages the rollback process — terminating new-revision routes and restoring previous revision traffic — across one or more coordinator cycles. On completion, it transitions to DEPLOYING/ROLLED_BACK, which the ProgressingHandler picks up for the final lifecycle transition to READY.
+3. **Completion is detected by the evaluator**: When the strategy FSM determines all routes are replaced, it returns COMPLETED. The applier performs the revision swap (`deploying_revision` → `current_revision`). The provisioning handler returns these as successes, which the coordinator transitions to READY.
+4. **ROLLING_BACK is a cleanup handler**: When the provisioning handler's skipped deployments exceed timeout (expired), the coordinator transitions them to DEPLOYING/ROLLING_BACK. The `DeployingRollingBackHandler` clears `deploying_revision` and transitions directly to READY. No multi-cycle rollback — it is a single-step cleanup.
 
 ### DEPLOYING Handlers
 
-Three handlers cover all DEPLOYING sub-steps:
+Two handlers cover all DEPLOYING sub-steps:
 
 #### DeployingProvisioningHandler
 
-Targets `(DEPLOYING, PROVISIONING)`. Routes for the new revision are being created and waiting to become healthy.
+Targets `(DEPLOYING, PROVISIONING)`. The main DEPLOYING handler — runs the strategy FSM each cycle to create/drain routes and check for completion.
 
-- **success**: Routes provisioned → transition to PROGRESSING.
-- **skipped**: Still provisioning → no transition, re-schedule.
-- **expired/give_up**: Provisioning failed → transition to ROLLING_BACK.
+- **success**: All routes replaced (COMPLETED) → transition to READY.
+- **need_retry**: Route mutations executed (create/drain) → stays in PROVISIONING with history record.
+- **skipped**: No changes, still waiting for routes → no transition. **Coordinator checks timeout**: if `phase_started_at` exceeds the DEPLOYING timeout threshold, transitions to ROLLING_BACK via the `expired` path.
+- **errors**: Evaluation errors → classified into give_up/expired/need_retry.
 
 ```python
 class DeployingProvisioningHandler(DeploymentHandler):
     # targets: [(DEPLOYING, PROVISIONING)]
-    # success → DEPLOYING/PROGRESSING
-    # expired/give_up → DEPLOYING/ROLLING_BACK
-
-    async def execute(self, deployments):
-        summary = await self._evaluator.evaluate(deployment_infos)
-        await self._applier.apply(summary)
-        # Classify by assigned sub_step:
-        #   PROGRESSING → successes (coordinator transitions)
-        #   still PROVISIONING → skipped (no state transition)
-        #   evaluation errors → errors
-        return DeploymentExecutionResult(successes=..., errors=..., skipped=...)
-```
-
-#### DeployingProgressingHandler
-
-Targets `(DEPLOYING, PROGRESSING)`, `(DEPLOYING, COMPLETED)`, and `(DEPLOYING, ROLLED_BACK)`. This handler processes active progression and both terminal states:
-
-- **COMPLETED**: Revision swap done → returned as success → coordinator transitions to READY.
-- **ROLLED_BACK**: Deploying revision cleared → returned as error → coordinator transitions to READY.
-- **PROGRESSING**: Still replacing routes → skipped (no state transition), re-evaluate next cycle.
-- **expired/give_up**: Strategy failed → transition to ROLLING_BACK for active rollback.
-
-```python
-class DeployingProgressingHandler(DeploymentHandler):
-    # targets: [(DEPLOYING, PROGRESSING), (DEPLOYING, COMPLETED), (DEPLOYING, ROLLED_BACK)]
     # success → READY
-    # expired/give_up → DEPLOYING/ROLLING_BACK
+    # need_retry → DEPLOYING/PROVISIONING
+    # expired → DEPLOYING/ROLLING_BACK
 
     async def execute(self, deployments):
         summary = await self._evaluator.evaluate(deployment_infos)
         apply_result = await self._applier.apply(summary)
-        # Classify:
-        #   COMPLETED → successes (coordinator transitions to READY)
-        #   ROLLED_BACK → errors (coordinator transitions to READY)
-        #   still PROGRESSING → skipped (no state transition)
+        # Classify by apply_result:
+        #   completed_ids → successes (coordinator transitions to READY)
+        #   route mutations → need_retry (stays in PROVISIONING)
+        #   no changes → skipped (coordinator checks timeout)
         #   evaluation errors → errors
-        # Also filters out DESTROYING/DESTROYED deployments to prevent resurrection.
-        return DeploymentExecutionResult(successes=..., errors=..., skipped=...)
+        return DeploymentExecutionResult(successes=..., errors=..., skipped=..., need_retry=...)
 ```
 
 #### DeployingRollingBackHandler
 
-Targets `(DEPLOYING, ROLLING_BACK)`. Actively rolling back — terminates new-revision routes and restores traffic to previous revision routes.
+Targets `(DEPLOYING, ROLLING_BACK)`. Clears `deploying_revision` and transitions directly to READY.
 
-- **success**: Rollback complete → transition to DEPLOYING/ROLLED_BACK (ProgressingHandler picks up and transitions to READY).
-- **expired/give_up**: Rollback itself failed → transition to DEPLOYING/ROLLED_BACK (best-effort).
+- **success**: Deploying revision cleared → transition to READY.
 
 ```python
 class DeployingRollingBackHandler(DeploymentHandler):
     # targets: [(DEPLOYING, ROLLING_BACK)]
-    # success → DEPLOYING/ROLLED_BACK
-    # expired/give_up → DEPLOYING/ROLLED_BACK
+    # success → READY
 
     async def execute(self, deployments):
-        summary = await self._evaluator.evaluate(deployment_infos)
-        await self._applier.apply(summary)
-        # All evaluated deployments → successes (coordinator transitions to ROLLED_BACK)
-        # evaluation errors → errors
-        return DeploymentExecutionResult(successes=..., errors=...)
+        await self._applier.clear_deploying_revision(deployment_ids)
+        return DeploymentExecutionResult(successes=list(deployments))
 ```
 
-**Design rationale**: ROLLING_BACK is an **active process** (terminating routes, restoring traffic) that may span multiple coordinator cycles, just like PROVISIONING and PROGRESSING. Making it a separate handler gives it its own retry/timeout classification via `_AttemptContext` and its own periodic task scheduling entry, ensuring rollback progress is independently tracked and rescheduled. Once complete, it transitions to ROLLED_BACK — a terminal marker that ProgressingHandler picks up for the final lifecycle transition to READY.
+### Failure Classification and Timeout Handling
 
-### Failure Classification and Retry Logic
-
-The coordinator classifies handler errors using scheduling history to determine the appropriate response:
+The coordinator classifies handler errors and checks skipped deployments for timeout:
 
 ```
-_handle_status_transitions(handler, result, records, attempt_ctx_map)
+_handle_status_transitions(handler, result, records)
     │
     │  Success transitions:
     │    result.successes → transitions.success status
     │
+    │  Need-retry transitions (explicit from handler):
+    │    result.need_retry → transitions.need_retry status
+    │    (never escalated to give_up — represents normal progress)
+    │
+    │  Skipped timeout check:
+    │    If transitions.expired is defined and result.skipped is non-empty:
+    │      For each skipped deployment, check phase_started_at against
+    │      DEPLOYMENT_STATUS_TIMEOUT_MAP threshold.
+    │      Timed-out deployments → transitions.expired status.
+    │
     │  Failure classification (priority order):
-    │    1. give_up:    attempts >= SERVICE_MAX_RETRIES
-    │    2. expired:    elapsed > DEPLOYMENT_STATUS_TIMEOUT_MAP threshold
+    │    1. give_up:    phase_attempts >= SERVICE_MAX_RETRIES
+    │    2. expired:    phase_started_at elapsed > timeout threshold
     │    3. need_retry: default (can be retried next cycle)
     │
     │  Each category uses its own transition from status_transitions():
@@ -342,11 +305,11 @@ _handle_status_transitions(handler, result, records, attempt_ctx_map)
     │    need_retry → transitions.need_retry
 ```
 
-`_AttemptContext` tracks per-deployment retry state from scheduling history:
-- `attempts`: Number of consecutive attempts in the same handler phase
-- `started_at`: Timestamp when the current phase began
-- `should_give_up(max_retries)`: Returns true if max retries exceeded
-- `is_expired(lifecycle, current_dbtime)`: Returns true if timeout exceeded (e.g., DEPLOYING: 30 min)
+`DeploymentWithHistory` tracks per-deployment state from scheduling history:
+- `phase_attempts`: Number of consecutive attempts in the same handler phase
+- `phase_started_at`: Timestamp when the current phase's history record was first created (not reset on retries — history records with same phase/error_code/to_status are merged, incrementing `attempts` without changing `created_at`)
+
+The skipped timeout check is critical for DEPLOYING: when deployments are simply waiting for routes to become healthy (no evaluation errors, no route mutations), they appear as `skipped`. Without this check, they would never hit the `expired` path since `_classify_failures` only processes `result.errors`.
 
 ### Coordinator Flow
 
@@ -362,13 +325,13 @@ process_deployment_lifecycle(lifecycle_type, sub_step=None)
     │    │
     │    │  1. Query deployments by handler.target_statuses()
     │    │     (lifecycles + sub_steps extracted from DeploymentLifecycleStatus list)
-    │    │  2. Build attempt_ctx_map from scheduling history
+    │    │  2. Build DeploymentWithHistory from scheduling history
     │    │  3. Enter DeploymentRecorderContext.scope()
     │    │  ┌───────────────────────────────────────────────────────┐
     │    │  │  result = handler.execute(deployments)                │
     │    │  │  all_records = pool.build_all_records()               │
     │    │  │  _handle_status_transitions(                          │
-    │    │  │      handler, result, records, attempt_ctx_map)       │
+    │    │  │      handler, result, records)                        │
     │    │  └───────────────────────────────────────────────────────┘
     │    │  4. handler.post_process(result)
     │    │
@@ -379,6 +342,7 @@ Key design points:
 - The coordinator has **no DEPLOYING-specific logic**. All handlers (simple and sub-step) use the same `_run_handler()` and `_handle_status_transitions()` path.
 - DB filtering uses `target_statuses()` from the handler: lifecycles are extracted via `.lifecycle`, sub-steps via `.sub_status`.
 - `_handle_status_transitions()` applies `sub_status` from `status_transitions()` to `EndpointLifecycleBatchUpdaterSpec`, ensuring the `sub_step` column is updated alongside the lifecycle transition.
+- Skipped timeout check is a generic mechanism: any handler that declares `transitions.expired` gets automatic timeout checking on skipped deployments.
 
 ### Sub-Step Recording
 
@@ -396,13 +360,13 @@ sub_steps:
   provisioning  → SUCCESS
 ```
 
-**PROGRESSING cycle** — creating new routes / terminating old routes:
+**PROVISIONING cycle** — creating new routes / terminating old routes:
 
 ```
 sub_steps:
   rollout       → SUCCESS (message: "1 new route(s)")
   drain         → SUCCESS (message: "1 route(s)")
-  progressing   → SUCCESS
+  provisioning  → SUCCESS
 ```
 
 **COMPLETED cycle (Rolling Update)** — final drain:

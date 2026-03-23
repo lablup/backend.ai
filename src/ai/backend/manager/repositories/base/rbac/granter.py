@@ -8,8 +8,8 @@ from sqlalchemy.ext.asyncio import AsyncSession as SASession
 
 from ai.backend.common.data.permission.types import (
     OperationType,
+    RBACElementType,
     RelationType,
-    ScopeType,
 )
 from ai.backend.manager.data.permission.id import (
     ObjectId,
@@ -45,7 +45,7 @@ class RBACGranter:
     """
 
     granted_entity_id: ObjectId
-    granted_entity_scope_type: ScopeType
+    granted_entity_scope_type: RBACElementType
     target_scope_id: ScopeId
     target_role_ids: list[UUID]
     operations: list[OperationType]
@@ -97,7 +97,7 @@ async def execute_rbac_granter(
     perms = [
         PermissionRow(
             role_id=role_id,
-            scope_type=granter.granted_entity_scope_type,
+            scope_type=granter.granted_entity_scope_type.to_scope_type(),
             scope_id=entity_id.entity_id,
             entity_type=entity_id.entity_type,
             operation=operation,

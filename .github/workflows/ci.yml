@@ -87,7 +87,7 @@ jobs:
             # Fork PR: full history already fetched, just ensure the base SHA is available
             git fetch origin "${{ github.event.pull_request.base.sha }}"
           else
-            git fetch --depth=1 origin "${{ github.event.pull_request.base.sha }}"
+            git fetch --depth=50 origin "${{ github.event.pull_request.base.sha }}"
           fi
           BASE_REF="${{ github.event.pull_request.base.sha }}"
         else
@@ -266,7 +266,7 @@ jobs:
             tests/unit/:: -- -v
         else
           if [ "$GITHUB_EVENT_NAME" == "pull_request" ]; then
-            git fetch --depth=1 origin "${{ github.event.pull_request.base.sha }}"
+            git fetch --depth=50 origin "${{ github.event.pull_request.base.sha }}"
             BASE_REF="${{ github.event.pull_request.base.sha }}"
           else
             BASE_REF="HEAD~1"
@@ -353,7 +353,7 @@ jobs:
               # Fork PR: full history already fetched, just ensure the base SHA is available
               git fetch origin "${{ github.event.pull_request.base.sha }}"
             else
-              git fetch --depth=1 origin "${{ github.event.pull_request.base.sha }}"
+              git fetch --depth=50 origin "${{ github.event.pull_request.base.sha }}"
             fi
             BASE_REF="${{ github.event.pull_request.base.sha }}"
           else
@@ -430,7 +430,7 @@ jobs:
             tests/integration/:: -- -v
         else
           if [ "$GITHUB_EVENT_NAME" == "pull_request" ]; then
-            git fetch --depth=1 origin "${{ github.event.pull_request.base.sha }}"
+            git fetch --depth=50 origin "${{ github.event.pull_request.base.sha }}"
             BASE_REF="${{ github.event.pull_request.base.sha }}"
           else
             BASE_REF="HEAD~1"

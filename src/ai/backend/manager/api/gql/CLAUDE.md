@@ -5,7 +5,19 @@
 ## Type Naming
 
 - Every Strawberry type MUST carry a `GQL` suffix: `DomainGQL`, `DomainFilterGQL`, `DomainScopeGQL`.
-- Applies to all `@strawberry.type`, `@strawberry.input`, and `@strawberry.enum` classes.
+- Applies to all GQL output types, input types, and connection types.
+
+## Decorators
+
+- NEVER use `@strawberry.type`, `@strawberry.input`, or `@strawberry.experimental.pydantic.*` directly.
+- Use only the custom decorators defined in `decorators.py`:
+  - `@gql_node_type` — Relay Node types (inherit `PydanticNodeMixin[DTO]`)
+  - `@gql_pydantic_type(model=DTO)` — output types and payloads backed by a v2 Pydantic DTO
+  - `@gql_pydantic_input` — input types (inherit `PydanticInputMixin[DTO]`)
+  - `@gql_pydantic_interface(model=DTO)` — interface types backed by a v2 Pydantic DTO
+  - `@gql_connection_type` — Connection[T] and Edge[T] subclasses
+- `@strawberry.enum`, `@strawberry.field`, `@strawberry.mutation`, `@strawberry.subscription` are allowed directly.
+- Do NOT add new decorators to bypass the Pydantic DTO requirement.
 
 ## Imports
 
@@ -29,17 +41,27 @@
 
 ## Calling Services
 
-- Resolvers MUST invoke services through a Processor — never call service methods directly.
+- Resolvers MUST invoke services through Adapters (`info.context.adapters.*`), never
+  Processors or Services directly.
+- Adapters accept Pydantic DTOs (from `common/dto/manager/v2/`) and return Pydantic DTOs.
+
+## Pydantic DTO Integration
+
+GQL types are thin wrappers over the v2 DTOs in `common/dto/manager/v2/`.
+
+- Node types: inherit `PydanticNodeMixin[DTO]`, decorate with `@gql_node_type`. Convert via `FooGQL.from_pydantic(dto)`.
+- Nested output / payload types: use `@gql_pydantic_type(model=DTO)`. Strawberry auto-generates `from_pydantic()`.
+- Input types: inherit `PydanticInputMixin[DTO]`, decorate with `@gql_pydantic_input`. Convert via `input_gql.to_pydantic()`.
+- GQL enum values MUST match DTO enum values exactly (conversion is by `.value`).
+- GQL field names MUST match DTO field names.
+- `strawberry.UNSET` in GQL maps to `SENTINEL` default in DTO automatically via `to_pydantic()`.
 
 ## Error Handling & Nullable Schema
 
 - When a query/resolver may fail to find an object, declare the return type as **nullable**
-  (`T | None`) in the GraphQL schema so the client can handle partial failures gracefully.
+  (`T | None`) in the GraphQL schema.
 - Do **NOT** catch domain exceptions (e.g., `NotFound`) in fetcher functions just to return `None`.
-  Let the exception propagate — GraphQL will return it as an `errors` entry alongside `data: null`,
-  giving the client both the null value and the error reason.
-- The only place where catching exceptions to produce `None` is acceptable is `resolve_nodes`,
-  which must return `Iterable[Self | None]` per the Relay spec.
+  Let the exception propagate — only `resolve_nodes` may return `Iterable[Self | None]` per Relay spec.
 
 ## Legacy Code
 

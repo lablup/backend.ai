@@ -970,10 +970,19 @@ enum AutoScalingRuleOrderField {
 
 """Added in 24.3.0. Background task event payload."""
 type BackgroundTaskEventPayload {
+  """UUID of the background task."""
   taskId: ID!
+
+  """Type of the background task event."""
   eventType: BgtaskEventType!
+
+  """Human-readable message for this event."""
   message: String!
+
+  """Current progress value. Only populated for UPDATED events."""
   currentProgress: Float
+
+  """Total progress value. Only populated for UPDATED events."""
   totalProgress: Float
 }
 
@@ -6968,14 +6977,19 @@ enum SchedulerType {
 
 """Added in 25.15.0. Scheduling event broadcast payload."""
 type SchedulingBroadcastEventPayload {
-  sessionId: ID!
-  statusTransition: SchedulingStatus!
-  reason: String!
-
   """
   The session ID associated with the replica. This can be null right after replica creation.
   """
   session: ComputeSessionNode!
+
+  """UUID of the session being scheduled."""
+  sessionId: ID!
+
+  """Status transition that occurred during session scheduling."""
+  statusTransition: SchedulingStatus!
+
+  """Human-readable reason for this status transition."""
+  reason: String!
 }
 
 """Scheduling result status"""
