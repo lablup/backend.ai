@@ -50,10 +50,30 @@ def upgrade() -> None:
 def downgrade() -> None:
     conn = op.get_bind()
 
+    # Remove READ permission for project_admin_page only from project admin roles
+    # that match the same pattern and scope_type used in upgrade().
     conn.execute(
         sa.text("""
-        DELETE FROM permissions
-        WHERE entity_type IN ('project_admin_page', 'domain_admin_page')
-          AND operation = 'read'
+        DELETE FROM permissions p
+        USING roles r
+        WHERE p.role_id = r.id
+          AND r.name LIKE 'role\\_project\\_%\\_admin'
+          AND p.scope_type = 'project'
+          AND p.entity_type = 'project_admin_page'
+          AND p.operation = 'read'
+    """)
+    )
+
+    # Remove READ permission for domain_admin_page only from domain admin roles
+    # that match the same pattern and scope_type used in upgrade().
+    conn.execute(
+        sa.text("""
+        DELETE FROM permissions p
+        USING roles r
+        WHERE p.role_id = r.id
+          AND r.name LIKE 'role\\_domain\\_%\\_admin'
+          AND p.scope_type = 'domain'
+          AND p.entity_type = 'domain_admin_page'
+          AND p.operation = 'read'
     """)
     )
