@@ -690,9 +690,9 @@ class RBACAdapter(BaseAdapter):
         creator: Creator[PermissionRow] = Creator(
             spec=PermissionCreatorSpec(
                 role_id=input.role_id,
-                scope_type=RBACElementType(input.scope_type).to_scope_type(),
+                scope_type=RBACElementType(input.scope_type),
                 scope_id=input.scope_id,
-                entity_type=RBACElementType(input.entity_type).to_entity_type(),
+                entity_type=RBACElementType(input.entity_type),
                 operation=InternalOperationType(input.operation),
             )
         )
@@ -707,7 +707,7 @@ class RBACAdapter(BaseAdapter):
         """Update an existing scoped permission."""
         spec = PermissionUpdaterSpec(
             scope_type=(
-                OptionalState.update(RBACElementType(input.scope_type).to_scope_type())
+                OptionalState.update(RBACElementType(input.scope_type))
                 if input.scope_type is not None
                 else OptionalState.nop()
             ),
@@ -717,7 +717,7 @@ class RBACAdapter(BaseAdapter):
                 else OptionalState.nop()
             ),
             entity_type=(
-                OptionalState.update(RBACElementType(input.entity_type).to_entity_type())
+                OptionalState.update(RBACElementType(input.entity_type))
                 if input.entity_type is not None
                 else OptionalState.nop()
             ),
@@ -878,11 +878,13 @@ class RBACAdapter(BaseAdapter):
         if f.role_id is not None:
             conditions.append(ScopedPermissionConditions.by_role_id(f.role_id))
         if f.scope_type is not None:
-            scope_type = RBACElementType(f.scope_type).to_scope_type()
-            conditions.append(ScopedPermissionConditions.by_scope_type(scope_type))
+            conditions.append(
+                ScopedPermissionConditions.by_scope_type(RBACElementType(f.scope_type))
+            )
         if f.entity_type is not None:
-            entity_type = RBACElementType(f.entity_type).to_entity_type()
-            conditions.append(ScopedPermissionConditions.by_entity_type(entity_type))
+            conditions.append(
+                ScopedPermissionConditions.by_entity_type(RBACElementType(f.entity_type))
+            )
         if f.AND:
             for sub in f.AND:
                 conditions.extend(self._convert_permission_filter(sub))
@@ -1112,8 +1114,7 @@ class RBACAdapter(BaseAdapter):
     def _convert_entity_filter(self, f: EntityFilterDTO) -> list[QueryCondition]:
         conditions: list[QueryCondition] = []
         if f.entity_type is not None:
-            entity_type = RBACElementType(f.entity_type).to_entity_type()
-            conditions.append(EntityScopeConditions.by_entity_type(entity_type))
+            conditions.append(EntityScopeConditions.by_entity_type(RBACElementType(f.entity_type)))
         if f.entity_id is not None:
             condition = self.convert_string_filter(
                 f.entity_id,

@@ -15,6 +15,7 @@ import pytest
 from ai.backend.common.data.permission.types import (
     EntityType,
     OperationType,
+    RBACElementType,
     RelationType,
     RoleSource,
     ScopeType,
@@ -921,10 +922,10 @@ class TestGetEntityTypes:
         action = GetEntityTypesAction()
         result = await service.get_entity_types(action)
 
-        expected = list(EntityType)
-        assert len(result.entity_types) == len(expected)
+        expected = list(RBACElementType)
+        assert len(result.element_types) == len(expected)
         for et in expected:
-            assert et in result.entity_types
+            assert et in result.element_types
 
 
 class TestSearchEntities:

@@ -10,7 +10,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from ai.backend.common.data.permission.types import GLOBAL_SCOPE_ID, ScopeType
+from ai.backend.common.data.permission.types import RBACElementType, ScopeType
 from ai.backend.manager.data.permission.id import ScopeId
 from ai.backend.manager.data.permission.types import ScopeData, ScopeListResult
 from ai.backend.manager.repositories.base import BatchQuerier, OffsetPagination
@@ -54,10 +54,10 @@ class TestGetScopeTypes:
 
         result = await service.get_scope_types(action)
 
-        expected_types = list(ScopeType)
-        assert len(result.scope_types) == len(expected_types)
+        expected_types = list(RBACElementType)
+        assert len(result.element_types) == len(expected_types)
         for scope_type in expected_types:
-            assert scope_type in result.scope_types
+            assert scope_type in result.element_types
 
 
 class TestSearchScopes:
@@ -105,11 +105,11 @@ class TestSearchScopes:
             orders=[],
             pagination=OffsetPagination(limit=limit, offset=offset),
         )
-        action = SearchScopesAction(scope_type=ScopeType.DOMAIN, querier=querier)
+        action = SearchScopesAction(element_type=RBACElementType.DOMAIN, querier=querier)
 
         result = await service.search_scopes(action)
 
-        mock_repository.search_scopes.assert_called_once_with(ScopeType.DOMAIN, querier)
+        mock_repository.search_scopes.assert_called_once_with(RBACElementType.DOMAIN, querier)
         assert result.result.total_count == total_count
         assert len(result.result.items) == total_count
         assert result.result.items[0].id.scope_type == ScopeType.DOMAIN
@@ -150,7 +150,7 @@ class TestSearchScopes:
             orders=[],
             pagination=OffsetPagination(limit=limit, offset=offset),
         )
-        action = SearchScopesAction(scope_type=ScopeType.PROJECT, querier=querier)
+        action = SearchScopesAction(element_type=RBACElementType.PROJECT, querier=querier)
 
         result = await service.search_scopes(action)
 
@@ -158,38 +158,3 @@ class TestSearchScopes:
         assert len(result.result.items) == items_count
         assert result.result.has_next_page is True
         assert result.result.has_previous_page is False
-
-    async def test_search_scopes_global_type(
-        self,
-        service: PermissionControllerService,
-        mock_repository: MagicMock,
-    ) -> None:
-        """Test search_scopes handles global scope type."""
-        total_count = 1
-        limit = 10
-        offset = 0
-        mock_result = ScopeListResult(
-            items=[
-                ScopeData(
-                    id=ScopeId(scope_type=ScopeType.GLOBAL, scope_id=GLOBAL_SCOPE_ID),
-                    name=GLOBAL_SCOPE_ID,
-                )
-            ],
-            total_count=total_count,
-            has_next_page=False,
-            has_previous_page=False,
-        )
-        mock_repository.search_scopes.return_value = mock_result
-
-        querier = BatchQuerier(
-            conditions=[],
-            orders=[],
-            pagination=OffsetPagination(limit=limit, offset=offset),
-        )
-        action = SearchScopesAction(scope_type=ScopeType.GLOBAL, querier=querier)
-
-        result = await service.search_scopes(action)
-
-        mock_repository.search_scopes.assert_called_once_with(ScopeType.GLOBAL, querier)
-        assert result.result.total_count == total_count
-        assert result.result.items[0].id.scope_type == ScopeType.GLOBAL

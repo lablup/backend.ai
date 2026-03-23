@@ -12,7 +12,7 @@ from datetime import UTC, datetime, timedelta
 
 import pytest
 
-from ai.backend.manager.data.permission.types import EntityType, ScopeType
+from ai.backend.manager.data.permission.types import EntityType, RBACElementType, ScopeType
 from ai.backend.manager.models.rbac_models import UserRoleRow
 from ai.backend.manager.models.rbac_models.association_scopes_entities import (
     AssociationScopesEntitiesRow,
@@ -113,7 +113,7 @@ class TestSearchElementAssociations:
         """Returned items should contain correct scope and entity data."""
         querier = BatchQuerier(
             conditions=[
-                EntityScopeConditions.by_entity_type(EntityType.IMAGE),
+                EntityScopeConditions.by_entity_type(RBACElementType.IMAGE),
             ],
             orders=[],
             pagination=OffsetPagination(limit=10, offset=0),

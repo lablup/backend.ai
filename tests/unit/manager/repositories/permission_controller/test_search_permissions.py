@@ -14,6 +14,7 @@ import pytest
 from ai.backend.manager.data.permission.types import (
     EntityType,
     OperationType,
+    RBACElementType,
     ScopeType,
 )
 from ai.backend.manager.models.rbac_models import UserRoleRow
@@ -118,7 +119,7 @@ class TestSearchPermissions:
     ) -> None:
         querier = BatchQuerier(
             conditions=[
-                ScopedPermissionConditions.by_entity_type(EntityType.VFOLDER),
+                ScopedPermissionConditions.by_entity_type(RBACElementType.VFOLDER),
             ],
             orders=[],
             pagination=OffsetPagination(limit=10, offset=0),
@@ -234,7 +235,7 @@ class TestSearchObjectPermissions:
         querier = BatchQuerier(
             conditions=[
                 ObjectPermissionConditions.by_role_id(role_with_object_permissions.role_id),
-                ObjectPermissionConditions.by_entity_type(EntityType.VFOLDER),
+                ObjectPermissionConditions.by_entity_type(RBACElementType.VFOLDER),
             ],
             orders=[],
             pagination=OffsetPagination(limit=10, offset=0),
