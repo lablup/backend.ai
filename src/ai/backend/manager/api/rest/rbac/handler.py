@@ -49,6 +49,7 @@ from ai.backend.common.dto.manager.rbac.response import (
     SearchEntitiesResponse,
     SearchScopesResponse,
 )
+from ai.backend.common.exception import RBACTypeConversionError
 from ai.backend.manager.data.permission.id import ScopeId
 from ai.backend.manager.data.permission.role import UserRoleAssignmentInput, UserRoleRevocationInput
 from ai.backend.manager.data.permission.types import ScopeData
@@ -309,7 +310,7 @@ class RBACHandler:
         for et in action_result.element_types:
             try:
                 scope_types.append(et.to_scope_type())
-            except Exception:
+            except RBACTypeConversionError:
                 pass
         resp = GetScopeTypesResponse(items=scope_types)
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=resp)
@@ -371,7 +372,7 @@ class RBACHandler:
         for et in action_result.element_types:
             try:
                 entity_types.append(et.to_entity_type())
-            except Exception:
+            except RBACTypeConversionError:
                 pass
         resp = GetEntityTypesResponse(items=entity_types)
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=resp)
