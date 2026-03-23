@@ -12,6 +12,7 @@ from .batch import (
     BaseBatchAction,
     BaseBatchActionResult,
 )
+from .rbac import BaseRBACAction
 
 __all__ = (
     "BaseAction",
@@ -20,6 +21,7 @@ __all__ = (
     "BaseActionTriggerMeta",
     "BaseBatchAction",
     "BaseBatchActionResult",
+    "BaseRBACAction",
     "ProcessResult",
     "SearchActionResult",
     "TAction",
