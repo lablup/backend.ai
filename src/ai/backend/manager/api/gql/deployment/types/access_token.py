@@ -71,13 +71,9 @@ class AccessTokenOrderBy(PydanticInputMixin[AccessTokenOrderDTO]):
 )
 class AccessToken(PydanticNodeMixin[AccessTokenNodeDTO]):
     id: NodeID[str]
-    token: str = gql_field(description="Added in 25.16.0: The access token.")
-    created_at: datetime = gql_field(
-        description="Added in 25.16.0: The creation timestamp of the access token."
-    )
-    valid_until: datetime = gql_field(
-        description="Added in 25.16.0: The expiration timestamp of the access token."
-    )
+    token: str = gql_field(description="The access token.")
+    created_at: datetime = gql_field(description="The creation timestamp of the access token.")
+    valid_until: datetime = gql_field(description="The expiration timestamp of the access token.")
 
     @classmethod
     async def resolve_nodes(  # type: ignore[override]  # Strawberry Node uses AwaitableOrValue overloads incompatible with async def
@@ -115,11 +111,9 @@ class AccessTokenConnection(Connection[AccessToken]):
 )
 class CreateAccessTokenInput(PydanticInputMixin[CreateAccessTokenInputDTO]):
     model_deployment_id: ID = gql_field(
-        description="Added in 25.16.0: The ID of the model deployment for which the access token is created."
+        description="The ID of the model deployment for which the access token is created."
     )
-    valid_until: datetime = gql_field(
-        description="Added in 25.16.0: The expiration timestamp of the access token."
-    )
+    valid_until: datetime = gql_field(description="The expiration timestamp of the access token.")
 
 
 @gql_pydantic_type(

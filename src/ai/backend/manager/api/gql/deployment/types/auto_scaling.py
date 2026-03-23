@@ -97,28 +97,22 @@ class AutoScalingRule(PydanticNodeMixin[AutoScalingRuleNodeDTO]):
     id: NodeID[str]
 
     metric_source: AutoScalingMetricSource = gql_field(
-        description="Added in 25.19.0 (e.g. KERNEL, INFERENCE_FRAMEWORK)"
+        description="The source of the scaling metric (e.g. KERNEL, INFERENCE_FRAMEWORK)."
     )
     metric_name: str = gql_field(description="The metric name field.")
 
     min_threshold: Decimal | None = gql_field(
-        description="Added in 25.19.0: The minimum threshold for scaling (e.g. 0.5)"
+        description="The minimum threshold for scaling (e.g. 0.5)."
     )
     max_threshold: Decimal | None = gql_field(
-        description="Added in 25.19.0: The maximum threshold for scaling (e.g. 21.0)"
+        description="The maximum threshold for scaling (e.g. 21.0)."
     )
 
-    step_size: int = gql_field(description="Added in 25.19.0: The step size for scaling (e.g. 1).")
-    time_window: int = gql_field(
-        description="Added in 25.19.0: The time window (seconds) for scaling (e.g. 60)."
-    )
+    step_size: int = gql_field(description="The step size for scaling (e.g. 1).")
+    time_window: int = gql_field(description="The time window in seconds for scaling (e.g. 60).")
 
-    min_replicas: int | None = gql_field(
-        description="Added in 25.19.0: The minimum number of replicas (e.g. 1)."
-    )
-    max_replicas: int | None = gql_field(
-        description="Added in 25.19.0: The maximum number of replicas (e.g. 10)."
-    )
+    min_replicas: int | None = gql_field(description="The minimum number of replicas (e.g. 1).")
+    max_replicas: int | None = gql_field(description="The maximum number of replicas (e.g. 10).")
 
     created_at: datetime
     last_triggered_at: datetime

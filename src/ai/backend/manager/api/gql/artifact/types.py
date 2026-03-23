@@ -302,8 +302,12 @@ class ArtifactRevisionRemoteStatusFilter(PydanticInputMixin[ArtifactRevisionRemo
 )
 class ArtifactRevisionFilter(PydanticInputMixin[ArtifactRevisionGQLFilterInputDTO]):
     status: ArtifactRevisionStatusFilter | None = None
-    remote_status: ArtifactRevisionRemoteStatusFilter | None = gql_field(
-        description="Added in 25.16.0", default=None
+    remote_status: ArtifactRevisionRemoteStatusFilter | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version="25.16.0",
+            description="Filter by remote synchronization status.",
+        ),
+        default=None,
     )
     version: StringFilter | None = None
     artifact_id: UUIDFilter | None = gql_field(description="The artifact id field.", default=None)
@@ -366,12 +370,18 @@ class ImportArtifactsOptionsGQL(PydanticInputMixin[ImportArtifactsOptionsInputDT
 )
 class ImportArtifactsInput(PydanticInputMixin[ImportArtifactsInputDTO]):
     artifact_revision_ids: list[ID]
-    vfolder_id: ID | None = gql_field(
-        description="Target vfolder ID to store the imported artifacts. Added in 26.1.0.",
+    vfolder_id: ID | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version="26.1.0",
+            description="Target vfolder ID to store the imported artifacts.",
+        ),
         default=None,
     )
-    options: ImportArtifactsOptionsGQL | None = gql_field(
-        description="Options controlling import behavior such as forcing re-download. Added in 26.1.0.",
+    options: ImportArtifactsOptionsGQL | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version="26.1.0",
+            description="Options controlling import behavior such as forcing re-download.",
+        ),
         default=None,
     )
 
@@ -428,8 +438,11 @@ class DelegateImportArtifactsInput(PydanticInputMixin[DelegateImportArtifactsInp
     delegatee_target: DelegateeTarget | None = gql_field(
         description="The delegatee target field.", default=None
     )
-    options: ImportArtifactsOptionsGQL | None = gql_field(
-        description="Options controlling import behavior such as forcing re-download. Added in 26.1.0.",
+    options: ImportArtifactsOptionsGQL | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version="26.1.0",
+            description="Options controlling import behavior such as forcing re-download.",
+        ),
         default=None,
     )
 
@@ -672,17 +685,28 @@ class Artifact(PydanticNodeMixin[ArtifactGQLNode]):
 class ArtifactRevision(PydanticNodeMixin[ArtifactRevisionNode]):
     id: NodeID[str]
     status: ArtifactStatus
-    remote_status: ArtifactRemoteStatus | None = gql_field(description="Added in 25.15.0")
+    remote_status: ArtifactRemoteStatus | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version="25.15.0",
+            description="Remote synchronization status of the artifact revision.",
+        )
+    )
     version: str
     readme: str | None
     size: ByteSize | None
     created_at: datetime | None
     updated_at: datetime | None
-    digest: str | None = gql_field(
-        description="Digest at the time of import. None for models that have not been imported. Added in 25.17.0"
+    digest: str | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version="25.17.0",
+            description="Digest at the time of import. None for models that have not been imported.",
+        )
     )
-    verification_result: ArtifactVerificationGQLResult | None = gql_field(
-        description="Verification result containing malware scan results from all verifiers. None if not yet verified. Added in 25.17.0"
+    verification_result: ArtifactVerificationGQLResult | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version="25.17.0",
+            description="Verification result containing malware scan results from all verifiers. None if not yet verified.",
+        )
     )
 
     @classmethod

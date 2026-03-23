@@ -151,7 +151,9 @@ class AgentResourceGQL:
     name="AgentStats",
 )
 class AgentStatsGQL:
-    total_resource: AgentResourceGQL = gql_field(description="Added in 25.15.0")
+    total_resource: AgentResourceGQL = gql_field(
+        description="Total resource capacity of the agent."
+    )
 
 
 @gql_pydantic_type(
