@@ -12,16 +12,7 @@ from strawberry.relay import PageInfo
 from ai.backend.common.contexts.user import current_user
 from ai.backend.common.dto.manager.v2.deployment.request import AdminSearchDeploymentsInput
 from ai.backend.common.dto.manager.v2.deployment.request import (
-    BlueGreenConfigInput as BlueGreenConfigInputDTO,
-)
-from ai.backend.common.dto.manager.v2.deployment.request import (
-    CreateDeploymentInput as CreateDeploymentInputDTO,
-)
-from ai.backend.common.dto.manager.v2.deployment.request import (
     DeleteDeploymentInput as DeleteDeploymentInputDTO,
-)
-from ai.backend.common.dto.manager.v2.deployment.request import (
-    RollingUpdateConfigInput as RollingUpdateConfigInputDTO,
 )
 from ai.backend.common.dto.manager.v2.deployment.request import (
     SyncReplicaInput as SyncReplicaInputDTO,
@@ -109,38 +100,7 @@ async def create_model_deployment(
     user_data = current_user()
     if user_data is None:
         raise UserNotFound("User not found in context")
-    strategy_input = input.default_deployment_strategy
-    rolling_update_dto = (
-        RollingUpdateConfigInputDTO(
-            max_surge=strategy_input.rolling_update.max_surge,
-            max_unavailable=strategy_input.rolling_update.max_unavailable,
-        )
-        if strategy_input.rolling_update is not None
-        else None
-    )
-    blue_green_dto = (
-        BlueGreenConfigInputDTO(
-            auto_promote=strategy_input.blue_green.auto_promote,
-            promote_delay_seconds=strategy_input.blue_green.promote_delay_seconds,
-        )
-        if strategy_input.blue_green is not None
-        else None
-    )
-    dto = CreateDeploymentInputDTO(
-        project_id=UUID(input.metadata.project_id),
-        domain_name=input.metadata.domain_name,
-        name=input.metadata.name,
-        tags=input.metadata.tags,
-        open_to_public=input.network_access.open_to_public,
-        preferred_domain_name=input.network_access.preferred_domain_name,
-        strategy=strategy_input.type,
-        rollback_on_failure=strategy_input.rollback_on_failure,
-        desired_replica_count=input.desired_replica_count,
-        initial_revision=input.initial_revision.to_pydantic(),
-        rolling_update=rolling_update_dto,
-        blue_green=blue_green_dto,
-    )
-    payload = await info.context.adapters.deployment.create(dto, user_data.user_id)
+    payload = await info.context.adapters.deployment.create(input.to_pydantic(), user_data.user_id)
     return CreateDeploymentPayload(deployment=ModelDeployment.from_pydantic(payload.deployment))
 
 

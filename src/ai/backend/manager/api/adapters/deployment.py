@@ -359,47 +359,49 @@ class DeploymentAdapter(BaseAdapter):
                 else None,
             ),
         )
+        strategy = input.default_deployment_strategy
         policy: DeploymentPolicyConfig | None = None
-        if input.rolling_update is not None:
+        if strategy.rolling_update is not None:
             policy = DeploymentPolicyConfig(
                 strategy=DeploymentStrategy.ROLLING,
                 strategy_spec=RollingUpdateSpec(
-                    max_surge=input.rolling_update.max_surge,
-                    max_unavailable=input.rolling_update.max_unavailable,
+                    max_surge=strategy.rolling_update.max_surge,
+                    max_unavailable=strategy.rolling_update.max_unavailable,
                 ),
-                rollback_on_failure=input.rollback_on_failure,
+                rollback_on_failure=strategy.rollback_on_failure,
             )
-        elif input.blue_green is not None:
+        elif strategy.blue_green is not None:
             policy = DeploymentPolicyConfig(
                 strategy=DeploymentStrategy.BLUE_GREEN,
                 strategy_spec=BlueGreenSpec(
-                    auto_promote=input.blue_green.auto_promote,
-                    promote_delay_seconds=input.blue_green.promote_delay_seconds,
+                    auto_promote=strategy.blue_green.auto_promote,
+                    promote_delay_seconds=strategy.blue_green.promote_delay_seconds,
                 ),
-                rollback_on_failure=input.rollback_on_failure,
+                rollback_on_failure=strategy.rollback_on_failure,
             )
         else:
             policy = DeploymentPolicyConfig(
-                strategy=input.strategy,
+                strategy=strategy.type,
                 strategy_spec=RollingUpdateSpec(),
-                rollback_on_failure=input.rollback_on_failure,
+                rollback_on_failure=strategy.rollback_on_failure,
             )
+        meta = input.metadata
         creator = NewDeploymentCreator(
             metadata=DeploymentMetadata(
-                name=input.name or f"deployment-{created_user_id.hex[:8]}",
-                domain=input.domain_name,
-                project=input.project_id,
+                name=meta.name or f"deployment-{created_user_id.hex[:8]}",
+                domain=meta.domain_name,
+                project=meta.project_id,
                 resource_group=ir.resource_config.resource_group.name,
                 created_user=created_user_id,
                 session_owner=created_user_id,
                 created_at=None,
                 revision_history_limit=10,
-                tag=",".join(input.tags) if input.tags else None,
+                tag=",".join(meta.tags) if meta.tags else None,
             ),
             replica_spec=ReplicaSpec(replica_count=input.desired_replica_count),
             network=DeploymentNetworkSpec(
-                open_to_public=input.open_to_public,
-                preferred_domain_name=input.preferred_domain_name,
+                open_to_public=input.network_access.open_to_public,
+                preferred_domain_name=input.network_access.preferred_domain_name,
             ),
             model_revision=model_revision_creator,
             policy=policy,
