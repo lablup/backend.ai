@@ -97,7 +97,6 @@ class BlueGreenStrategySpecGQL(DeploymentStrategySpecGQL):
 class DeploymentPolicyGQL(PydanticNodeMixin[DeploymentPolicyNodeDTO]):
     id: NodeID[str]
     strategy_spec: DeploymentStrategySpecGQL
-    rollback_on_failure: bool
     created_at: datetime
     updated_at: datetime
 
@@ -146,7 +145,6 @@ class BlueGreenConfigInputGQL(PydanticInputMixin[BlueGreenConfigInputDTO]):
 class UpdateDeploymentPolicyInputGQL(PydanticInputMixin[UpsertDeploymentPolicyInputDTO]):
     deployment_id: ID
     strategy: DeploymentStrategyTypeGQL
-    rollback_on_failure: bool = False
     rolling_update: RollingUpdateConfigInputGQL | None = None
     blue_green: BlueGreenConfigInputGQL | None = None
 

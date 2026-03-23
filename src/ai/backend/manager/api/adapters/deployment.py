@@ -368,7 +368,6 @@ class DeploymentAdapter(BaseAdapter):
                     max_surge=strategy.rolling_update.max_surge,
                     max_unavailable=strategy.rolling_update.max_unavailable,
                 ),
-                rollback_on_failure=strategy.rollback_on_failure,
             )
         elif strategy.blue_green is not None:
             policy = DeploymentPolicyConfig(
@@ -377,13 +376,11 @@ class DeploymentAdapter(BaseAdapter):
                     auto_promote=strategy.blue_green.auto_promote,
                     promote_delay_seconds=strategy.blue_green.promote_delay_seconds,
                 ),
-                rollback_on_failure=strategy.rollback_on_failure,
             )
         else:
             policy = DeploymentPolicyConfig(
                 strategy=strategy.type,
                 strategy_spec=RollingUpdateSpec(),
-                rollback_on_failure=strategy.rollback_on_failure,
             )
         meta = input.metadata
         creator = NewDeploymentCreator(
@@ -726,7 +723,6 @@ class DeploymentAdapter(BaseAdapter):
             deployment_id=input.deployment_id,
             strategy=input.strategy,
             strategy_spec=strategy_spec,
-            rollback_on_failure=input.rollback_on_failure,
         )
         action_result = (
             await self._processors.deployment.upsert_deployment_policy.wait_for_complete(
@@ -1408,7 +1404,6 @@ class DeploymentAdapter(BaseAdapter):
                 )
             policy_info = DeploymentPolicyInfo(
                 strategy=data.policy.strategy,
-                rollback_on_failure=data.policy.rollback_on_failure,
                 rolling_update=rolling,
                 blue_green=blue_green,
             )
@@ -1569,7 +1564,6 @@ class DeploymentAdapter(BaseAdapter):
             id=data.id,
             deployment_id=data.endpoint,
             strategy_spec=strategy_spec,
-            rollback_on_failure=data.rollback_on_failure,
             created_at=data.created_at,
             updated_at=data.updated_at,
         )

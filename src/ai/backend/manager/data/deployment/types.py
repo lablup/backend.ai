@@ -730,7 +730,6 @@ class DeploymentPolicyData:
     endpoint: UUID
     strategy: DeploymentStrategy
     strategy_spec: RollingUpdateSpec | BlueGreenSpec
-    rollback_on_failure: bool
     created_at: datetime
     updated_at: datetime
 

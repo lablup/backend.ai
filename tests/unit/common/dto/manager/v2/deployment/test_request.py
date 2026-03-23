@@ -231,10 +231,6 @@ class TestCreateDeploymentInput:
         inp = self._make_input()
         assert inp.network_access.open_to_public is False
 
-    def test_default_rollback_on_failure_is_false(self) -> None:
-        inp = self._make_input()
-        assert inp.default_deployment_strategy.rollback_on_failure is False
-
     def test_optional_name_defaults_to_none(self) -> None:
         inp = self._make_input()
         assert inp.metadata.name is None

@@ -396,12 +396,10 @@ class TestDeploymentPolicyInfo:
         rolling = RollingUpdateConfigInfo(max_surge=1, max_unavailable=0)
         info = DeploymentPolicyInfo(
             strategy=DeploymentStrategy.ROLLING,
-            rollback_on_failure=True,
             rolling_update=rolling,
             blue_green=None,
         )
         assert info.strategy == DeploymentStrategy.ROLLING
-        assert info.rollback_on_failure is True
         assert info.rolling_update is not None
         assert info.rolling_update.max_surge == 1
         assert info.blue_green is None
@@ -410,7 +408,6 @@ class TestDeploymentPolicyInfo:
         bg = BlueGreenConfigInfo(auto_promote=True, promote_delay_seconds=30)
         info = DeploymentPolicyInfo(
             strategy=DeploymentStrategy.BLUE_GREEN,
-            rollback_on_failure=False,
             rolling_update=None,
             blue_green=bg,
         )
@@ -422,14 +419,12 @@ class TestDeploymentPolicyInfo:
         rolling = RollingUpdateConfigInfo(max_surge=2, max_unavailable=1)
         info = DeploymentPolicyInfo(
             strategy=DeploymentStrategy.ROLLING,
-            rollback_on_failure=True,
             rolling_update=rolling,
             blue_green=None,
         )
         json_str = info.model_dump_json()
         restored = DeploymentPolicyInfo.model_validate_json(json_str)
         assert restored.strategy == info.strategy
-        assert restored.rollback_on_failure == info.rollback_on_failure
         assert restored.rolling_update is not None
         assert restored.rolling_update.max_surge == 2
         assert restored.blue_green is None

@@ -525,7 +525,6 @@ class CreateDeploymentAdapter:
         return DeploymentPolicyConfig(
             strategy=strategy,
             strategy_spec=strategy_spec,
-            rollback_on_failure=strategy_input.rollback_on_failure,
         )
 
 
@@ -555,7 +554,6 @@ class DeploymentPolicyAdapter:
             deployment_id=data.endpoint,
             strategy=data.strategy,
             strategy_spec=data.strategy_spec.model_dump(),
-            rollback_on_failure=data.rollback_on_failure,
             created_at=data.created_at,
             updated_at=data.updated_at,
         )
@@ -591,5 +589,4 @@ class DeploymentPolicyAdapter:
             deployment_id=deployment_id,
             strategy=strategy,
             strategy_spec=strategy_spec,
-            rollback_on_failure=request.rollback_on_failure,
         )

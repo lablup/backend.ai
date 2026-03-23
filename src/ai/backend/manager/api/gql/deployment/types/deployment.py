@@ -536,7 +536,6 @@ class DeploymentStrategyInputGQL(PydanticInputMixin[DeploymentStrategyInputDTO])
     """
 
     type: DeploymentStrategyTypeGQL
-    rollback_on_failure: bool = False
     rolling_update: RollingUpdateConfigInputGQL | None = None
     blue_green: BlueGreenConfigInputGQL | None = None
 

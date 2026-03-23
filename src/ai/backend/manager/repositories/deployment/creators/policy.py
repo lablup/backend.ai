@@ -26,7 +26,6 @@ class DeploymentPolicyCreatorSpec(CreatorSpec[DeploymentPolicyRow]):
     endpoint_id: uuid.UUID
     strategy: DeploymentStrategy
     strategy_spec: RollingUpdateSpec | BlueGreenSpec
-    rollback_on_failure: bool
 
     @override
     def build_row(self) -> DeploymentPolicyRow:
@@ -34,5 +33,4 @@ class DeploymentPolicyCreatorSpec(CreatorSpec[DeploymentPolicyRow]):
             endpoint=self.endpoint_id,
             strategy=self.strategy,
             strategy_spec=self.strategy_spec.model_dump(),
-            rollback_on_failure=self.rollback_on_failure,
         )

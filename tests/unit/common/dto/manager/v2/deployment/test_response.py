@@ -274,7 +274,6 @@ class TestDeploymentNode:
         rolling = RollingUpdateConfigInfo(max_surge=1, max_unavailable=0)
         policy = DeploymentPolicyInfo(
             strategy=DeploymentStrategy.ROLLING,
-            rollback_on_failure=True,
             rolling_update=rolling,
             blue_green=None,
         )
@@ -287,7 +286,6 @@ class TestDeploymentNode:
         bg = BlueGreenConfigInfo(auto_promote=False, promote_delay_seconds=0)
         policy = DeploymentPolicyInfo(
             strategy=DeploymentStrategy.BLUE_GREEN,
-            rollback_on_failure=False,
             rolling_update=None,
             blue_green=bg,
         )

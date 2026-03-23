@@ -51,7 +51,6 @@ class ToPydanticConversionScenario:
     input: UpdateDeploymentPolicyInputGQL
     expected_rolling_update: RollingUpdateConfigInput | None
     expected_blue_green: BlueGreenConfigInput | None
-    expected_rollback_on_failure: bool
 
 
 # --- Fixtures ---
@@ -93,7 +92,6 @@ def rolling_update_input() -> UpdateDeploymentPolicyInputGQL:
     return UpdateDeploymentPolicyInputGQL(
         deployment_id=ID(SAMPLE_DEPLOYMENT_ID),
         strategy=DeploymentStrategy.ROLLING,
-        rollback_on_failure=True,
         rolling_update=RollingUpdateConfigInputGQL(max_surge=2, max_unavailable=1),
     )
 
@@ -127,7 +125,6 @@ def _make_policy_node_dto(
         id=uuid.uuid4(),
         deployment_id=uuid.UUID(SAMPLE_DEPLOYMENT_ID),
         strategy_spec=strategy_spec,
-        rollback_on_failure=False,
         created_at=datetime(2026, 1, 1, tzinfo=UTC),
         updated_at=datetime(2026, 1, 1, tzinfo=UTC),
     )
@@ -147,14 +144,12 @@ class TestToPydanticConversion:
                     input=UpdateDeploymentPolicyInputGQL(
                         deployment_id=ID(SAMPLE_DEPLOYMENT_ID),
                         strategy=DeploymentStrategy.ROLLING,
-                        rollback_on_failure=True,
                         rolling_update=RollingUpdateConfigInputGQL(max_surge=2, max_unavailable=1),
                     ),
                     expected_rolling_update=RollingUpdateConfigInput(
                         max_surge=2, max_unavailable=1
                     ),
                     expected_blue_green=None,
-                    expected_rollback_on_failure=True,
                 ),
                 id="rolling",
             ),
@@ -171,7 +166,6 @@ class TestToPydanticConversion:
                     expected_blue_green=BlueGreenConfigInput(
                         auto_promote=True, promote_delay_seconds=30
                     ),
-                    expected_rollback_on_failure=False,
                 ),
                 id="blue_green",
             ),
@@ -184,7 +178,6 @@ class TestToPydanticConversion:
         assert dto.strategy == scenario.input.strategy
         assert dto.rolling_update == scenario.expected_rolling_update
         assert dto.blue_green == scenario.expected_blue_green
-        assert dto.rollback_on_failure is scenario.expected_rollback_on_failure
 
     def test_converts_deployment_id_to_uuid(self) -> None:
         """Test that string deployment_id is correctly parsed into UUID."""
@@ -237,7 +230,6 @@ class TestAdminUpdateDeploymentPolicyResolver:
 
         assert str(dto.deployment_id) == SAMPLE_DEPLOYMENT_ID
         assert dto.strategy == DeploymentStrategy.ROLLING
-        assert dto.rollback_on_failure is True
 
         assert isinstance(result, UpdateDeploymentPolicyPayloadGQL)
 

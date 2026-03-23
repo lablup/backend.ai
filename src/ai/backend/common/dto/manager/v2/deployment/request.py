@@ -263,9 +263,6 @@ class DeploymentStrategyInput(BaseRequestModel):
     """Deployment strategy input with type discriminator."""
 
     type: DeploymentStrategy = Field(description="Deployment strategy type")
-    rollback_on_failure: bool = Field(
-        default=False, description="Roll back automatically on failure"
-    )
     rolling_update: RollingUpdateConfigInput | None = Field(
         default=None, description="Rolling update config (required for ROLLING strategy)"
     )
@@ -733,7 +730,6 @@ class UpsertDeploymentPolicyInput(BaseRequestModel):
 
     deployment_id: UUID = Field(description="Deployment ID")
     strategy: DeploymentStrategy = Field(description="Deployment strategy")
-    rollback_on_failure: bool = Field(default=False, description="Roll back on failure")
     rolling_update: RollingUpdateConfigInput | None = Field(
         default=None, description="Rolling update config (required for ROLLING strategy)"
     )
