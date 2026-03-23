@@ -30,9 +30,11 @@ class SyncWorkerThread(threading.Thread):
     stream_block: threading.Event
     agen_shutdown: bool
     _loop: asyncio.AbstractEventLoop | None
+    _loop_ready: threading.Event
 
     __slots__ = (
         "_loop",
+        "_loop_ready",
         "agen_shutdown",
         "done_queue",
         "stream_block",
@@ -48,16 +50,22 @@ class SyncWorkerThread(threading.Thread):
         self.stream_block = threading.Event()
         self.agen_shutdown = False
         self._loop = None
+        self._loop_ready = threading.Event()
 
     @property
     def loop(self) -> asyncio.AbstractEventLoop | None:
         """The event loop running inside this worker thread (available after start)."""
         return self._loop
 
+    def wait_until_ready(self, timeout: float | None = None) -> None:
+        """Block until the worker thread's event loop is ready."""
+        self._loop_ready.wait(timeout=timeout)
+
     def run(self) -> None:
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
         self._loop = loop
+        self._loop_ready.set()
         try:
             while True:
                 item = self.work_queue.get()

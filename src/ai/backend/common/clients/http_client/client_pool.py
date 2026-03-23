@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import abc
 import asyncio
-import concurrent.futures
 import inspect
 import logging
 import time
@@ -155,17 +154,20 @@ AsyncClientPool = ClientPool
 
 class SyncClientPool(BaseClientPool):
     """
-    Synchronous client pool that manages an internal worker thread with
-    an asyncio event loop for running the cleanup task.
+    Synchronous client pool with inline eviction of idle sessions.
 
-    Unlike the original PR implementation, the cleanup loop runs as
-    a background asyncio.Task inside the worker thread's event loop
-    (scheduled via call_soon_threadsafe), so it does NOT block the
-    worker thread's work queue processing.
+    Unlike :class:`ClientPool` (which uses a background ``asyncio.Task``
+    for periodic cleanup), this pool evicts stale sessions lazily during
+    :meth:`load_client_session` calls.  This avoids the need for a
+    continuously-running event loop and the associated thread-safety
+    complexity of cross-thread ``asyncio.run_coroutine_threadsafe``.
+
+    A dedicated :class:`SyncWorkerThread` is used only for closing
+    ``aiohttp.ClientSession`` objects (which require an event loop).
     """
 
     _worker_thread: SyncWorkerThread
-    _cleanup_task: concurrent.futures.Future[None] | None
+    _cleanup_interval: float
 
     def __init__(
         self,
@@ -174,37 +176,32 @@ class SyncClientPool(BaseClientPool):
     ) -> None:
         super().__init__(factory)
         self._cleanup_interval = cleanup_interval_seconds
-        self._cleanup_task = None
         self._worker_thread = SyncWorkerThread(daemon=True)
         self._worker_thread.start()
-        # Schedule the cleanup loop as a background task inside the
-        # worker thread's event loop, so it doesn't block execute().
-        self._schedule_cleanup()
 
-    def _schedule_cleanup(self) -> None:
-        loop = self._worker_thread.loop
-        if loop is not None and loop.is_running():
-            self._cleanup_task = asyncio.run_coroutine_threadsafe(
-                self._cleanup_loop(self._cleanup_interval),
-                loop,
-            )
+    def load_client_session(self, key: ClientKey) -> aiohttp.ClientSession:
+        self._evict_stale_sessions()
+        return super().load_client_session(key)
 
-    async def _cleanup_loop(self, cleanup_interval_seconds: float) -> None:
-        while True:
-            await asyncio.sleep(cleanup_interval_seconds)
-            now = time.perf_counter()
-            for key, client in list(self._clients.items()):
-                if now - client.last_used > cleanup_interval_seconds:
-                    del self._clients[key]
-                    try:
-                        await client.session.close()
-                    except Exception as e:
-                        log.exception("Error closing client session: {}", e)
+    def _evict_stale_sessions(self) -> None:
+        """Remove and close sessions that have been idle longer than the cleanup interval."""
+        now = time.perf_counter()
+        stale_keys = [
+            key
+            for key, client in self._clients.items()
+            if now - client.last_used > self._cleanup_interval
+        ]
+        for key in stale_keys:
+            client = self._clients.pop(key, None)
+            if client is not None:
+                try:
+                    self._worker_thread.execute(client.session.close())
+                except Exception as e:
+                    log.exception("Error closing stale client session: {}", e)
 
     def close(self) -> None:
         """Synchronously close all sessions and stop the worker thread."""
         if self._worker_thread.is_alive():
-            # Close sessions via the worker thread's event loop
             self._worker_thread.execute(self._close_sessions())
             self._worker_thread.work_queue.put(Sentinel.TOKEN)
             self._worker_thread.join()

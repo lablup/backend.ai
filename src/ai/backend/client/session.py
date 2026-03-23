@@ -353,6 +353,7 @@ class Session(BaseSession):
         if self._closed:
             return
         self._closed = True
+        self._worker_thread.interrupt_generator()
         if not self._aiohttp_session_injected:
             self._worker_thread.execute(_close_aiohttp_session(self.aiohttp_session))
         self._worker_thread.work_queue.put(Sentinel.TOKEN)

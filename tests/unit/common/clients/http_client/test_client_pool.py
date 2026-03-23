@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import time
 from unittest.mock import AsyncMock, MagicMock
 
 import aiohttp
@@ -96,3 +97,37 @@ class TestSyncClientPool:
         r = repr(pool)
         assert "SyncClientPool" in r
         pool.close()
+
+    def test_evicts_stale_sessions_on_load(self) -> None:
+        pool = SyncClientPool(_mock_factory, cleanup_interval_seconds=1)
+        try:
+            key = ClientKey(endpoint="http://localhost:8080", domain="test")
+            stale_session = pool.load_client_session(key)
+
+            # Simulate time passing beyond the cleanup interval
+            past_time = time.perf_counter() - 2
+            pool._clients[key].last_used = past_time
+
+            # Loading a different key should trigger eviction of the stale session
+            key2 = ClientKey(endpoint="http://other:8080", domain="test")
+            pool.load_client_session(key2)
+
+            assert key not in pool._clients
+            stale_session.close.assert_awaited_once()
+        finally:
+            pool.close()
+
+    def test_does_not_evict_fresh_sessions(self) -> None:
+        pool = SyncClientPool(_mock_factory, cleanup_interval_seconds=9999)
+        try:
+            key = ClientKey(endpoint="http://localhost:8080", domain="test")
+            session = pool.load_client_session(key)
+
+            # Load again — session should still be there
+            key2 = ClientKey(endpoint="http://other:8080", domain="test")
+            pool.load_client_session(key2)
+
+            assert key in pool._clients
+            session.close.assert_not_awaited()
+        finally:
+            pool.close()
