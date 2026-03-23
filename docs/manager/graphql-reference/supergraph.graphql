@@ -6969,6 +6969,9 @@ type ImageV2MetadataInfo
   """Image creation timestamp."""
   createdAt: DateTime
 
+  """Timestamp of the most recent session created with this image."""
+  lastUsedAt: DateTime
+
   """Parsed tag components."""
   tags: [ImageV2TagEntry!]!
 
