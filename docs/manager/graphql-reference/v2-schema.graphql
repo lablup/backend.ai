@@ -1986,7 +1986,6 @@ type DeploymentPolicy implements Node {
   """The Globally Unique ID of this object"""
   id: ID!
   strategySpec: DeploymentStrategySpec!
-  rollbackOnFailure: Boolean!
   createdAt: DateTime!
   updatedAt: DateTime!
 }
@@ -2035,7 +2034,6 @@ Added in 25.19.0. Deployment strategy configuration with discriminator pattern.
 """
 input DeploymentStrategyInput {
   type: DeploymentStrategyType!
-  rollbackOnFailure: Boolean! = false
   rollingUpdate: RollingUpdateConfigInput = null
   blueGreen: BlueGreenConfigInput = null
 }
@@ -7741,7 +7739,6 @@ If a policy already exists for the deployment, it is replaced entirely.
 input UpdateDeploymentPolicyInput {
   deploymentId: ID!
   strategy: DeploymentStrategyType!
-  rollbackOnFailure: Boolean! = false
   rollingUpdate: RollingUpdateConfigInput = null
   blueGreen: BlueGreenConfigInput = null
 }

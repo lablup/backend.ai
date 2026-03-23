@@ -3563,7 +3563,6 @@ type DeploymentPolicy implements Node
   """The Globally Unique ID of this object"""
   id: ID!
   strategySpec: DeploymentStrategySpec!
-  rollbackOnFailure: Boolean!
   createdAt: DateTime!
   updatedAt: DateTime!
 }
@@ -3624,7 +3623,6 @@ input DeploymentStrategyInput
   @join__type(graph: STRAWBERRY)
 {
   type: DeploymentStrategyType!
-  rollbackOnFailure: Boolean! = false
   rollingUpdate: RollingUpdateConfigInput = null
   blueGreen: BlueGreenConfigInput = null
 }
@@ -12816,7 +12814,6 @@ input UpdateDeploymentPolicyInput
 {
   deploymentId: ID!
   strategy: DeploymentStrategyType!
-  rollbackOnFailure: Boolean! = false
   rollingUpdate: RollingUpdateConfigInput = null
   blueGreen: BlueGreenConfigInput = null
 }
