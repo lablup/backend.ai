@@ -1,7 +1,7 @@
 """add last_used_at to images
 
 Revision ID: cf3290640ea8
-Revises: ffcf0ed13a26
+Revises: 3549e469dfee
 Create Date: 2026-03-23 00:00:00.000000
 
 """
@@ -11,7 +11,7 @@ from alembic import op
 
 # revision identifiers, used by Alembic.
 revision = "cf3290640ea8"
-down_revision = "32ad43817452"
+down_revision = "3549e469dfee"
 branch_labels = None
 depends_on = None
 

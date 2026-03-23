@@ -677,9 +677,9 @@ class TestImageRepositoryLastUsedAt:
 
         await session_repository.update_image_last_used_at(img.id, ts)
 
-        result = await image_repository.get_image_by_id(img.id, load_aliases=False)
-        assert result.image.last_used_at is not None
-        assert abs(result.image.last_used_at.timestamp() - ts.timestamp()) < 1.0
+        result = await image_repository.fetch_image_by_id(img.id)
+        assert result.last_used_at is not None
+        assert abs(result.last_used_at.timestamp() - ts.timestamp()) < 1.0
 
     async def test_update_image_last_used_at_overwrites_previous(
         self,
@@ -696,6 +696,6 @@ class TestImageRepositoryLastUsedAt:
         await session_repository.update_image_last_used_at(img.id, older)
         await session_repository.update_image_last_used_at(img.id, newer)
 
-        result = await image_repository.get_image_by_id(img.id, load_aliases=False)
-        assert result.image.last_used_at is not None
-        assert abs(result.image.last_used_at.timestamp() - newer.timestamp()) < 1.0
+        result = await image_repository.fetch_image_by_id(img.id)
+        assert result.last_used_at is not None
+        assert abs(result.last_used_at.timestamp() - newer.timestamp()) < 1.0
