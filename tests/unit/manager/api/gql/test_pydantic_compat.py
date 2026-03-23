@@ -353,9 +353,9 @@ class TestAdaptersRegistry:
     """Verify Adapters registry can be created."""
 
     def test_create_registry(self) -> None:
-        adapters = Adapters.create(processors=None)  # type: ignore[arg-type]
+        adapters = Adapters.create(processors=None, auth_config=None)  # type: ignore[arg-type]
         assert isinstance(adapters, Adapters)
 
     def test_container_registry_adapter_available(self) -> None:
-        adapters = Adapters.create(processors=None)  # type: ignore[arg-type]
+        adapters = Adapters.create(processors=None, auth_config=None)  # type: ignore[arg-type]
         assert isinstance(adapters.container_registry, ContainerRegistryAdapter)

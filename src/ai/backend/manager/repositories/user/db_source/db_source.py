@@ -553,14 +553,44 @@ class UserDBSource:
             )
         return UserData.from_row(updated_user)
 
+    async def update_user_by_uuid_validated(
+        self,
+        user_uuid: UUID,
+        updater: Updater[UserRow],
+    ) -> UserData:
+        """Update user by UUID with validation and handle role/group changes."""
+        updater_spec = cast(UserUpdaterSpec, updater.spec)
+        async with self._db.begin() as conn:
+            return await self._update_single_user_validated(conn, user_uuid, updater_spec)
+
+    async def delete_user_by_uuid_validated(self, user_uuid: UUID) -> None:
+        """Soft delete user by UUID, setting status to DELETED and deactivating keypairs."""
+        async with self._db.begin() as conn:
+            await conn.execute(
+                sa.update(keypairs).values(is_active=False).where(keypairs.c.user == user_uuid)
+            )
+            await conn.execute(
+                sa.update(users)
+                .values(status=UserStatus.DELETED, status_info="admin-requested")
+                .where(users.c.uuid == user_uuid)
+            )
+
     async def soft_delete_user_validated(self, email: str) -> None:
         """
         Soft delete user by setting status to DELETED and deactivating keypairs.
+        Idempotent: silently succeeds if the user does not exist.
         """
         async with self._db.begin() as conn:
-            # Deactivate all user keypairs
+            # Resolve email to UUID for the correct FK column (keypairs.c.user).
+            # Return early if the user doesn't exist — soft delete is idempotent.
+            result = await conn.execute(sa.select(users.c.uuid).where(users.c.email == email))
+            row = result.first()
+            if not row:
+                return
+            user_uuid = cast(UUID, row.uuid)
+            # Deactivate all user keypairs via UUID FK
             await conn.execute(
-                sa.update(keypairs).values(is_active=False).where(keypairs.c.user_id == email)
+                sa.update(keypairs).values(is_active=False).where(keypairs.c.user == user_uuid)
             )
             # Soft delete user
             await conn.execute(
@@ -952,6 +982,14 @@ class UserDBSource:
     async def _get_user_uuid_by_email(self, session: SASession, email: str) -> UUID:
         """Get user UUID by email."""
         result = await session.execute(sa.select(UserRow.uuid).where(UserRow.email == email))
+        row = result.first()
+        if not row:
+            raise UserNotFound()
+        return cast(UUID, row.uuid)
+
+    async def _get_user_uuid_by_email_with_conn(self, conn: AsyncConnection, email: str) -> UUID:
+        """Get user UUID by email using an existing connection."""
+        result = await conn.execute(sa.select(users.c.uuid).where(users.c.email == email))
         row = result.first()
         if not row:
             raise UserNotFound()

@@ -211,8 +211,23 @@ class ModelDeploymentMetadataInput(BaseRequestModel):
 
     project_id: UUID = Field(description="Project ID")
     domain_name: str = Field(description="Domain name")
-    name: str | None = Field(default=None, description="Deployment name")
+    name: str | None = Field(
+        default=None,
+        min_length=1,
+        max_length=256,
+        description="Deployment name",
+    )
     tags: list[str] | None = Field(default=None, description="Deployment tags")
+
+    @field_validator("name")
+    @classmethod
+    def name_must_not_be_blank(cls, v: str | None) -> str | None:
+        if v is None:
+            return v
+        stripped = v.strip()
+        if not stripped:
+            raise ValueError("name must not be blank or whitespace-only")
+        return stripped
 
 
 class ModelDeploymentNetworkAccessInput(BaseRequestModel):
@@ -291,39 +306,15 @@ class RevisionInput(BaseRequestModel):
 class CreateDeploymentInput(BaseRequestModel):
     """Input for creating a deployment."""
 
-    project_id: UUID = Field(description="Project ID")
-    domain_name: str = Field(description="Domain name")
-    name: str | None = Field(
-        default=None,
-        min_length=1,
-        max_length=256,
-        description="Deployment name",
+    metadata: ModelDeploymentMetadataInput = Field(description="Deployment metadata")
+    network_access: ModelDeploymentNetworkAccessInput = Field(
+        description="Network access configuration"
     )
-    tags: list[str] | None = Field(default=None, description="Deployment tags")
-    open_to_public: bool = Field(default=False, description="Whether the deployment is public")
-    preferred_domain_name: str | None = Field(
-        default=None, description="Preferred domain name for URL"
-    )
-    strategy: DeploymentStrategy = Field(description="Deployment strategy")
-    rollback_on_failure: bool = Field(
-        default=False, description="Roll back automatically on failure"
+    default_deployment_strategy: DeploymentStrategyInput = Field(
+        description="Deployment strategy configuration"
     )
     desired_replica_count: int = Field(ge=0, description="Desired number of replicas")
     initial_revision: CreateRevisionInputDTO = Field(description="Initial revision configuration")
-    rolling_update: RollingUpdateConfigInput | None = Field(
-        default=None, description="Rolling update config"
-    )
-    blue_green: BlueGreenConfigInput | None = Field(default=None, description="Blue/green config")
-
-    @field_validator("name")
-    @classmethod
-    def name_must_not_be_blank(cls, v: str | None) -> str | None:
-        if v is None:
-            return v
-        stripped = v.strip()
-        if not stripped:
-            raise ValueError("name must not be blank or whitespace-only")
-        return stripped
 
 
 class UpdateDeploymentInput(BaseRequestModel):

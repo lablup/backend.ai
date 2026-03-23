@@ -11,6 +11,7 @@ from strawberry import Info
 from ai.backend.common.api_handlers import Sentinel
 from ai.backend.common.contexts.client_ip import current_client_ip
 from ai.backend.common.contexts.user import current_user
+from ai.backend.common.dto.manager.v2.user.request import DeleteUserInput, PurgeUserInput
 from ai.backend.common.exception import InvalidIpAddressValue, UnreachableError
 from ai.backend.common.types import ReadableCIDR
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
@@ -82,7 +83,9 @@ async def admin_create_user_v2(
         NotImplementedError: This mutation is not yet implemented.
     """
     check_admin_only()
-    raise NotImplementedError("admin_create_user_v2 is not yet implemented")
+    ctx = info.context
+    payload = await ctx.adapters.user.create_user(input.to_pydantic())
+    return CreateUserPayloadGQL.from_pydantic(payload)
 
 
 @strawberry.mutation(
@@ -177,7 +180,9 @@ async def admin_update_user_v2(
         NotImplementedError: This mutation is not yet implemented.
     """
     check_admin_only()
-    raise NotImplementedError("admin_update_user_v2 is not yet implemented")
+    ctx = info.context
+    payload = await ctx.adapters.user.modify_user_by_id(user_id, input.to_pydantic())
+    return UpdateUserPayloadGQL.from_pydantic(payload)
 
 
 @strawberry.mutation(
@@ -333,7 +338,12 @@ async def update_user_v2(
     Raises:
         NotImplementedError: This mutation is not yet implemented.
     """
-    raise NotImplementedError("update_user_v2 is not yet implemented")
+    ctx = info.context
+    me = current_user()
+    if me is None:
+        raise UnreachableError("User context is not available")
+    payload = await ctx.adapters.user.modify_user_by_id(me.user_id, input.to_pydantic())
+    return UpdateUserPayloadGQL.from_pydantic(payload)
 
 
 # Delete UpdateUserV2InputGQLlete)
@@ -363,7 +373,9 @@ async def admin_delete_user_v2(
         NotImplementedError: This mutation is not yet implemented.
     """
     check_admin_only()
-    raise NotImplementedError("admin_delete_user_v2 is not yet implemented")
+    ctx = info.context
+    await ctx.adapters.user.delete_user_by_id(DeleteUserInput(user_id=user_id))
+    return DeleteUserPayloadGQL(success=True)
 
 
 @strawberry.mutation(
@@ -390,7 +402,11 @@ async def admin_delete_users_v2(
         NotImplementedError: This mutation is not yet implemented.
     """
     check_admin_only()
-    raise NotImplementedError("admin_delete_users_v2 is not yet implemented")
+    ctx = info.context
+    dto = input.to_pydantic()
+    for user_id in dto.user_ids:
+        await ctx.adapters.user.delete_user_by_id(DeleteUserInput(user_id=user_id))
+    return DeleteUsersPayloadGQL(deleted_count=len(dto.user_ids))
 
 
 # Purge Mutations (Hard Delete)
@@ -420,7 +436,16 @@ async def admin_purge_user_v2(
         NotImplementedError: This mutation is not yet implemented.
     """
     check_admin_only()
-    raise NotImplementedError("admin_purge_user_v2 is not yet implemented")
+    ctx = info.context
+    me = current_user()
+    if me is None:
+        raise UnreachableError("User context is not available after check_admin_only()")
+    dto = input.to_pydantic()
+    await ctx.adapters.user.purge_user_by_id(
+        PurgeUserInput(user_id=dto.user_id),
+        me.user_id,
+    )
+    return PurgeUserPayloadGQL(success=True)
 
 
 @strawberry.mutation(

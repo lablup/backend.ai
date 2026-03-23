@@ -32,6 +32,7 @@ from ai.backend.manager.api.adapters.user import UserAdapter
 from ai.backend.manager.api.adapters.vfs_storage import VFSStorageAdapter
 
 if TYPE_CHECKING:
+    from ai.backend.manager.config.unified import AuthConfig
     from ai.backend.manager.services.processors import Processors
 
 
@@ -100,7 +101,7 @@ class Adapters:
         self.vfs_storage = vfs_storage
 
     @classmethod
-    def create(cls, processors: Processors) -> Adapters:
+    def create(cls, processors: Processors, auth_config: AuthConfig) -> Adapters:
         """Factory that wires up all adapters from the shared Processors."""
         return cls(
             agent=AgentAdapter(processors),
@@ -127,6 +128,6 @@ class Adapters:
             service_catalog=ServiceCatalogAdapter(processors),
             session=SessionAdapter(processors),
             storage_namespace=StorageNamespaceAdapter(processors),
-            user=UserAdapter(processors),
+            user=UserAdapter(processors, auth_config),
             vfs_storage=VFSStorageAdapter(processors),
         )

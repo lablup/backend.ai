@@ -18,8 +18,11 @@ from ai.backend.common.dto.manager.v2.deployment.request import (
     CreateDeploymentInput,
     CreateRevisionInputDTO,
     DeleteDeploymentInput,
+    DeploymentStrategyInput,
     ExtraVFolderMountInput,
     ImageInput,
+    ModelDeploymentMetadataInput,
+    ModelDeploymentNetworkAccessInput,
     ModelMountConfigInput,
     ModelRuntimeConfigInput,
     ResourceConfigInput,
@@ -193,11 +196,21 @@ class TestBlueGreenConfigInput:
 class TestCreateDeploymentInput:
     """Tests for CreateDeploymentInput model creation and validation."""
 
-    def _make_input(self, **kwargs: object) -> CreateDeploymentInput:
+    def _make_metadata(self, **kwargs: object) -> ModelDeploymentMetadataInput:
         defaults: dict[str, Any] = {
             "project_id": uuid.uuid4(),
             "domain_name": "default",
-            "strategy": DeploymentStrategy.ROLLING,
+        }
+        defaults.update(kwargs)
+        return ModelDeploymentMetadataInput(**defaults)
+
+    def _make_input(self, **kwargs: object) -> CreateDeploymentInput:
+        defaults: dict[str, Any] = {
+            "metadata": self._make_metadata(),
+            "network_access": ModelDeploymentNetworkAccessInput(),
+            "default_deployment_strategy": DeploymentStrategyInput(
+                type=DeploymentStrategy.ROLLING,
+            ),
             "desired_replica_count": 2,
             "initial_revision": _make_create_revision_input_dto(),
         }
@@ -206,39 +219,47 @@ class TestCreateDeploymentInput:
 
     def test_valid_creation_with_required_fields(self) -> None:
         project_id = uuid.uuid4()
-        inp = self._make_input(project_id=project_id)
-        assert inp.project_id == project_id
-        assert inp.domain_name == "default"
-        assert inp.strategy == DeploymentStrategy.ROLLING
+        inp = self._make_input(
+            metadata=self._make_metadata(project_id=project_id),
+        )
+        assert inp.metadata.project_id == project_id
+        assert inp.metadata.domain_name == "default"
+        assert inp.default_deployment_strategy.type == DeploymentStrategy.ROLLING
         assert inp.desired_replica_count == 2
 
     def test_default_open_to_public_is_false(self) -> None:
         inp = self._make_input()
-        assert inp.open_to_public is False
+        assert inp.network_access.open_to_public is False
 
     def test_default_rollback_on_failure_is_false(self) -> None:
         inp = self._make_input()
-        assert inp.rollback_on_failure is False
+        assert inp.default_deployment_strategy.rollback_on_failure is False
 
     def test_optional_name_defaults_to_none(self) -> None:
         inp = self._make_input()
-        assert inp.name is None
+        assert inp.metadata.name is None
 
     def test_optional_tags_defaults_to_none(self) -> None:
         inp = self._make_input()
-        assert inp.tags is None
+        assert inp.metadata.tags is None
 
     def test_name_whitespace_is_stripped(self) -> None:
-        inp = self._make_input(name="  my-deployment  ")
-        assert inp.name == "my-deployment"
+        inp = self._make_input(
+            metadata=self._make_metadata(name="  my-deployment  "),
+        )
+        assert inp.metadata.name == "my-deployment"
 
     def test_whitespace_only_name_raises_validation_error(self) -> None:
         with pytest.raises(ValidationError):
-            self._make_input(name="   ")
+            self._make_input(
+                metadata=self._make_metadata(name="   "),
+            )
 
     def test_empty_name_raises_validation_error(self) -> None:
         with pytest.raises(ValidationError):
-            self._make_input(name="")
+            self._make_input(
+                metadata=self._make_metadata(name=""),
+            )
 
     def test_desired_replica_count_zero_is_valid(self) -> None:
         inp = self._make_input(desired_replica_count=0)
@@ -249,20 +270,34 @@ class TestCreateDeploymentInput:
             self._make_input(desired_replica_count=-1)
 
     def test_blue_green_strategy(self) -> None:
-        inp = self._make_input(strategy=DeploymentStrategy.BLUE_GREEN)
-        assert inp.strategy == DeploymentStrategy.BLUE_GREEN
+        inp = self._make_input(
+            default_deployment_strategy=DeploymentStrategyInput(
+                type=DeploymentStrategy.BLUE_GREEN,
+            ),
+        )
+        assert inp.default_deployment_strategy.type == DeploymentStrategy.BLUE_GREEN
 
     def test_with_rolling_update_config(self) -> None:
         rolling = RollingUpdateConfigInput(max_surge=2, max_unavailable=1)
-        inp = self._make_input(rolling_update=rolling)
-        assert inp.rolling_update is not None
-        assert inp.rolling_update.max_surge == 2
+        inp = self._make_input(
+            default_deployment_strategy=DeploymentStrategyInput(
+                type=DeploymentStrategy.ROLLING,
+                rolling_update=rolling,
+            ),
+        )
+        assert inp.default_deployment_strategy.rolling_update is not None
+        assert inp.default_deployment_strategy.rolling_update.max_surge == 2
 
     def test_with_blue_green_config(self) -> None:
         bg = BlueGreenConfigInput(auto_promote=True, promote_delay_seconds=30)
-        inp = self._make_input(blue_green=bg)
-        assert inp.blue_green is not None
-        assert inp.blue_green.auto_promote is True
+        inp = self._make_input(
+            default_deployment_strategy=DeploymentStrategyInput(
+                type=DeploymentStrategy.BLUE_GREEN,
+                blue_green=bg,
+            ),
+        )
+        assert inp.default_deployment_strategy.blue_green is not None
+        assert inp.default_deployment_strategy.blue_green.auto_promote is True
 
     def test_nested_revision_input(self) -> None:
         image_id = uuid.uuid4()
@@ -270,11 +305,11 @@ class TestCreateDeploymentInput:
         inp = self._make_input(initial_revision=rev)
         assert inp.initial_revision.image.id == image_id
 
-    def test_missing_project_id_raises_validation_error(self) -> None:
+    def test_missing_metadata_raises_validation_error(self) -> None:
         with pytest.raises(ValidationError):
             CreateDeploymentInput.model_validate({
-                "domain_name": "default",
-                "strategy": "ROLLING",
+                "network_access": {},
+                "default_deployment_strategy": {"type": "ROLLING"},
                 "desired_replica_count": 1,
             })
 

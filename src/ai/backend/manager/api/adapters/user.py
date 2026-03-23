@@ -4,10 +4,11 @@ from __future__ import annotations
 
 import uuid
 from collections.abc import Sequence
-from typing import cast
+from typing import TYPE_CHECKING, cast
 from uuid import UUID
 
 from ai.backend.common.contexts.user import current_user
+from ai.backend.common.api_handlers import Sentinel
 from ai.backend.common.data.filter_specs import UUIDInMatchSpec
 from ai.backend.common.data.user.types import UserRole
 from ai.backend.common.data.user.types import UserRole as DataUserRole
@@ -27,7 +28,11 @@ from ai.backend.common.dto.manager.v2.keypair.response import (
 )
 from ai.backend.common.dto.manager.v2.user.request import (
     AdminSearchUsersInput,
+    CreateUserInput,
+    DeleteUserInput,
+    PurgeUserInput,
     SearchUsersRequest,
+    UpdateUserInput,
     UserFilter,
     UserOrder,
 )
@@ -39,9 +44,13 @@ from ai.backend.common.dto.manager.v2.user.response import (
     BulkPurgeUserV2Error,
     BulkUpdateUsersPayload,
     BulkUpdateUserV2Error,
+    CreateUserPayload,
+    DeleteUserPayload,
     EntityTimestamps,
+    PurgeUserPayload,
     SearchUsersPayload,
     UpdateMyAllowedClientIPPayload,
+    UpdateUserPayload,
     UserBasicInfo,
     UserContainerSettings,
     UserNode,
@@ -73,8 +82,10 @@ from ai.backend.manager.models.domain.conditions import DomainConditions
 from ai.backend.manager.models.group.conditions import GroupConditions
 from ai.backend.manager.models.keypair.conditions import KeypairConditions, KeypairOrders
 from ai.backend.manager.models.keypair.row import KeyPairRow
+from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.user.conditions import UserConditions
 from ai.backend.manager.models.user.orders import UserOrders
+from ai.backend.manager.models.user.row import UserRole as UserRoleModel
 from ai.backend.manager.models.user.row import UserRow
 from ai.backend.manager.repositories.base import (
     BatchQuerier,
@@ -86,13 +97,20 @@ from ai.backend.manager.repositories.base import (
     negate_conditions,
 )
 from ai.backend.manager.repositories.keypair.types import UserKeypairSearchScope
+from ai.backend.manager.repositories.base.creator import Creator
+from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.repositories.user.creators import UserCreatorSpec
 from ai.backend.manager.repositories.user.types import (
     DomainUserSearchScope,
     ProjectUserSearchScope,
     RoleUserSearchScope,
 )
-from ai.backend.manager.services.user.actions.create_user import BulkCreateUserAction
+from ai.backend.manager.repositories.user.updaters import UserUpdaterSpec
+from ai.backend.manager.services.user.actions.create_user import (
+    BulkCreateUserAction,
+    CreateUserAction,
+)
+from ai.backend.manager.services.user.actions.delete_user import DeleteUserByIdAction
 from ai.backend.manager.services.user.actions.get_user import GetUserAction
 from ai.backend.manager.services.user.actions.keypair_ops import (
     IssueMyKeypairAction,
@@ -104,8 +122,12 @@ from ai.backend.manager.services.user.actions.keypair_ops import (
 from ai.backend.manager.services.user.actions.modify_user import (
     BulkModifyUserAction,
     ModifyUserAction,
+    ModifyUserByIdAction,
 )
-from ai.backend.manager.services.user.actions.purge_user import BulkPurgeUserAction
+from ai.backend.manager.services.user.actions.purge_user import (
+    BulkPurgeUserAction,
+    PurgeUserByIdAction,
+)
 from ai.backend.manager.services.user.actions.search_users import SearchUsersAction
 from ai.backend.manager.services.user.actions.search_users_by_domain import (
     SearchUsersByDomainAction,
@@ -116,6 +138,11 @@ from ai.backend.manager.services.user.actions.search_users_by_project import (
 from ai.backend.manager.services.user.actions.search_users_by_role import (
     SearchUsersByRoleAction,
 )
+from ai.backend.manager.types import OptionalState, TriState
+
+if TYPE_CHECKING:
+    from ai.backend.manager.config.unified import AuthConfig
+    from ai.backend.manager.services.processors import Processors
 
 from .base import BaseAdapter
 from .pagination import PaginationSpec
@@ -138,13 +165,11 @@ _KEYPAIR_PAGINATION_SPEC = PaginationSpec(
 
 
 class UserAdapter(BaseAdapter):
-    """Adapter for user domain operations.
+    """Adapter for user domain operations."""
 
-    Intentionally omits: create, update, delete, purge.
-    - create: requires PasswordInfo (password hashing) from auth config (caller responsibility)
-    - update/delete/purge: require email-based action signatures not yet bridged;
-      the corresponding GQL mutations currently raise NotImplementedError
-    """
+    def __init__(self, processors: Processors, auth_config: AuthConfig) -> None:
+        super().__init__(processors)
+        self._auth_config = auth_config
 
     # ------------------------------------------------------------------ batch load (DataLoader)
 
@@ -343,6 +368,170 @@ class UserAdapter(BaseAdapter):
             GetUserAction(user_uuid=user_id)
         )
         return UserPayload(user=self._user_data_to_node(action_result.user))
+
+    # ------------------------------------------------------------------ single CRUD
+
+    async def create_user(self, input: CreateUserInput) -> CreateUserPayload:
+        """Create a single user."""
+        password_info = PasswordInfo(
+            password=input.password,
+            algorithm=self._auth_config.password_hash_algorithm,
+            rounds=self._auth_config.password_hash_rounds,
+            salt_size=self._auth_config.password_hash_salt_size,
+        )
+        spec = UserCreatorSpec(
+            email=input.email,
+            username=input.username,
+            password=password_info,
+            need_password_change=input.need_password_change,
+            domain_name=input.domain_name,
+            full_name=input.full_name,
+            description=input.description,
+            status=UserStatus(input.status),
+            role=str(UserRoleModel(input.role)),
+            allowed_client_ip=input.allowed_client_ip,
+            totp_activated=input.totp_activated,
+            resource_policy=input.resource_policy,
+            sudo_session_enabled=input.sudo_session_enabled,
+            container_uid=input.container_uid,
+            container_main_gid=input.container_main_gid,
+            container_gids=input.container_gids,
+        )
+        group_ids = [str(gid) for gid in input.group_ids] if input.group_ids else None
+        result = await self._processors.user.create_user.wait_for_complete(
+            CreateUserAction(creator=Creator(spec=spec), group_ids=group_ids)
+        )
+        return CreateUserPayload(user=self._user_data_to_node(result.data.user))
+
+    async def modify_user_by_id(self, user_id: UUID, input: UpdateUserInput) -> UpdateUserPayload:
+        """Update a user by UUID."""
+        updater_spec = UserUpdaterSpec(
+            username=(
+                OptionalState.update(input.username)
+                if input.username is not None
+                else OptionalState.nop()
+            ),
+            password=(
+                OptionalState.update(
+                    PasswordInfo(
+                        password=input.password,
+                        algorithm=self._auth_config.password_hash_algorithm,
+                        rounds=self._auth_config.password_hash_rounds,
+                        salt_size=self._auth_config.password_hash_salt_size,
+                    )
+                )
+                if input.password is not None
+                else OptionalState.nop()
+            ),
+            need_password_change=(
+                OptionalState.update(input.need_password_change)
+                if input.need_password_change is not None
+                else OptionalState.nop()
+            ),
+            full_name=(
+                TriState.nop()
+                if isinstance(input.full_name, Sentinel)
+                else TriState.nullify()
+                if input.full_name is None
+                else TriState.update(input.full_name)
+            ),
+            description=(
+                TriState.nop()
+                if isinstance(input.description, Sentinel)
+                else TriState.nullify()
+                if input.description is None
+                else TriState.update(input.description)
+            ),
+            status=(
+                OptionalState.update(UserStatus(input.status))
+                if input.status is not None
+                else OptionalState.nop()
+            ),
+            domain_name=(
+                OptionalState.update(input.domain_name)
+                if input.domain_name is not None
+                else OptionalState.nop()
+            ),
+            role=(
+                OptionalState.update(UserRoleModel(input.role))
+                if input.role is not None
+                else OptionalState.nop()
+            ),
+            allowed_client_ip=(
+                TriState.nop()
+                if isinstance(input.allowed_client_ip, Sentinel)
+                else TriState.from_graphql(input.allowed_client_ip)
+            ),
+            resource_policy=(
+                OptionalState.update(input.resource_policy)
+                if input.resource_policy is not None
+                else OptionalState.nop()
+            ),
+            sudo_session_enabled=(
+                OptionalState.update(input.sudo_session_enabled)
+                if input.sudo_session_enabled is not None
+                else OptionalState.nop()
+            ),
+            main_access_key=(
+                TriState.nop()
+                if isinstance(input.main_access_key, Sentinel)
+                else TriState.from_graphql(input.main_access_key)
+            ),
+            container_uid=(
+                TriState.nop()
+                if isinstance(input.container_uid, Sentinel)
+                else TriState.from_graphql(input.container_uid)
+            ),
+            container_main_gid=(
+                TriState.nop()
+                if isinstance(input.container_main_gid, Sentinel)
+                else TriState.from_graphql(input.container_main_gid)
+            ),
+            container_gids=(
+                TriState.nop()
+                if isinstance(input.container_gids, Sentinel)
+                else TriState.from_graphql(input.container_gids)
+            ),
+            group_ids=(
+                OptionalState.nop()
+                if isinstance(input.group_ids, Sentinel) or input.group_ids is None
+                else OptionalState.update([str(gid) for gid in input.group_ids])
+            ),
+        )
+        updater: Updater[UserRow] = Updater(spec=updater_spec, pk_value=user_id)
+        result = await self._processors.user.modify_user_by_id.wait_for_complete(
+            ModifyUserByIdAction(user_id=user_id, updater=updater)
+        )
+        return UpdateUserPayload(user=self._user_data_to_node(result.data))
+
+    async def delete_user_by_id(self, input: DeleteUserInput) -> DeleteUserPayload:
+        """Soft-delete a user by UUID."""
+        await self._processors.user.delete_user_by_id.wait_for_complete(
+            DeleteUserByIdAction(user_id=input.user_id)
+        )
+        return DeleteUserPayload(success=True)
+
+    async def purge_user_by_id(
+        self, input: PurgeUserInput, admin_user_id: UUID
+    ) -> PurgeUserPayload:
+        """Permanently purge a user by UUID."""
+        await self._processors.user.purge_user_by_id.wait_for_complete(
+            PurgeUserByIdAction(
+                user_id=input.user_id,
+                admin_user_id=admin_user_id,
+                purge_shared_vfolders=(
+                    OptionalState.update(input.purge_shared_vfolders)
+                    if input.purge_shared_vfolders
+                    else OptionalState.nop()
+                ),
+                delegate_endpoint_ownership=(
+                    OptionalState.update(input.delegate_endpoint_ownership)
+                    if input.delegate_endpoint_ownership
+                    else OptionalState.nop()
+                ),
+            )
+        )
+        return PurgeUserPayload(success=True)
 
     # ------------------------------------------------------------------ bulk create/update/purge
 

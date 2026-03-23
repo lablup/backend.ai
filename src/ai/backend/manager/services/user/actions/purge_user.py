@@ -55,6 +55,42 @@ class PurgeUserActionResult(UserSingleEntityActionResult):
 
 
 @dataclass
+class PurgeUserByIdAction(UserSingleEntityAction):
+    """UUID-based user purge action for Strawberry v2 mutations."""
+
+    user_id: UUID
+    admin_user_id: UUID
+    purge_shared_vfolders: OptionalState[bool] = field(default_factory=OptionalState.nop)
+    delegate_endpoint_ownership: OptionalState[bool] = field(default_factory=OptionalState.nop)
+
+    @override
+    @classmethod
+    def operation_type(cls) -> ActionOperationType:
+        return ActionOperationType.PURGE
+
+    @override
+    def target_entity_id(self) -> str:
+        return str(self.user_id)
+
+    @override
+    def target_element(self) -> RBACElementRef:
+        return RBACElementRef(RBACElementType.USER, str(self.user_id))
+
+
+@dataclass
+class PurgeUserByIdActionResult(UserSingleEntityActionResult):
+    user_uuid: UUID
+
+    @override
+    def entity_id(self) -> str | None:
+        return str(self.user_uuid)
+
+    @override
+    def target_entity_id(self) -> str:
+        return str(self.user_uuid)
+
+
+@dataclass
 class BulkPurgeUserAction(UserAction):
     """Action for bulk purging multiple users."""
 
