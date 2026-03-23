@@ -86,6 +86,7 @@ resources(
         "configs/**/*.toml",
         "configs/**/*.yaml",
         "configs/**/*.json",
+        "configs/**/*.ts",
         "fixtures/**/*.json",
     ],
 )
