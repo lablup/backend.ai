@@ -80,7 +80,8 @@ class RollingUpdateStrategy(AbstractDeploymentStrategy):
         sweep handles it by transitioning to ROLLING_BACK when the
         deploying timeout is exceeded.
         """
-        assert isinstance(spec, RollingUpdateSpec)
+        if not isinstance(spec, RollingUpdateSpec):
+            raise TypeError(f"Expected RollingUpdateSpec, got {type(spec).__name__}")
         desired = deployment.replica_spec.target_replica_count
         deploying_revision_id = deployment.deploying_revision_id
         if deploying_revision_id is None:
@@ -136,7 +137,11 @@ class RollingUpdateStrategy(AbstractDeploymentStrategy):
         desired: int,
     ) -> StrategyCycleResult | None:
         """Return COMPLETED result if all old routes are replaced and enough new are healthy."""
-        if classified.old_active or classified.new_healthy_count < desired:
+        if (
+            classified.old_active
+            or classified.new_provisioning_count
+            or classified.new_healthy_count < desired
+        ):
             return None
         log.info(
             "deployment {}: rolling update complete ({} healthy routes)",
