@@ -15,16 +15,7 @@ from strawberry.relay import Connection, Edge, NodeID
 from strawberry.scalars import JSON
 
 from ai.backend.common.dto.manager.v2.deployment.request import (
-    RouteFilter as RouteFilterDTO,
-)
-from ai.backend.common.dto.manager.v2.deployment.request import (
     RouteOrder as RouteOrderDTO,
-)
-from ai.backend.common.dto.manager.v2.deployment.request import (
-    RouteStatusFilter as RouteStatusFilterDTO,
-)
-from ai.backend.common.dto.manager.v2.deployment.request import (
-    RouteTrafficStatusFilter as RouteTrafficStatusFilterDTO,
 )
 from ai.backend.common.dto.manager.v2.deployment.request import (
     UpdateRouteTrafficStatusInput as UpdateRouteTrafficStatusInputDTO,
@@ -173,50 +164,6 @@ class RouteConnection(Connection[Route]):
 # Filter and OrderBy types
 
 
-@gql_pydantic_input(
-    BackendAIGQLMeta(
-        description="Filter for route status with equality and membership operators.",
-        added_version="26.3.0",
-    ),
-    name="RouteStatusFilter",
-)
-class RouteStatusFilterGQL(PydanticInputMixin[RouteStatusFilterDTO]):
-    equals: RouteStatusGQL | None = strawberry.field(
-        default=None, description="Matches routes with this exact status."
-    )
-    in_: list[RouteStatusGQL] | None = strawberry.field(
-        name="in", default=None, description="Matches routes whose status is in this list."
-    )
-    not_equals: RouteStatusGQL | None = strawberry.field(
-        default=None, description="Excludes routes with this exact status."
-    )
-    not_in: list[RouteStatusGQL] | None = strawberry.field(
-        default=None, description="Excludes routes whose status is in this list."
-    )
-
-
-@gql_pydantic_input(
-    BackendAIGQLMeta(
-        description="Filter for route traffic status with equality and membership operators.",
-        added_version="26.3.0",
-    ),
-    name="RouteTrafficStatusFilter",
-)
-class RouteTrafficStatusFilterGQL(PydanticInputMixin[RouteTrafficStatusFilterDTO]):
-    equals: RouteTrafficStatusGQL | None = strawberry.field(
-        default=None, description="Matches routes with this exact traffic status."
-    )
-    in_: list[RouteTrafficStatusGQL] | None = strawberry.field(
-        name="in", default=None, description="Matches routes whose traffic status is in this list."
-    )
-    not_equals: RouteTrafficStatusGQL | None = strawberry.field(
-        default=None, description="Excludes routes with this exact traffic status."
-    )
-    not_in: list[RouteTrafficStatusGQL] | None = strawberry.field(
-        default=None, description="Excludes routes whose traffic status is in this list."
-    )
-
-
 @strawberry.enum
 class RouteOrderField(StrEnum):
     CREATED_AT = "created_at"
@@ -228,9 +175,9 @@ class RouteOrderField(StrEnum):
     BackendAIGQLMeta(description="Filter for routes.", added_version="25.19.0"),
     name="RouteFilter",
 )
-class RouteFilter(PydanticInputMixin[RouteFilterDTO]):
-    status: RouteStatusFilterGQL | None = None
-    traffic_status: RouteTrafficStatusFilterGQL | None = None
+class RouteFilter:
+    status: list[RouteStatusGQL] | None = None
+    traffic_status: list[RouteTrafficStatusGQL] | None = None
 
     AND: list[Self] | None = None
     OR: list[Self] | None = None
