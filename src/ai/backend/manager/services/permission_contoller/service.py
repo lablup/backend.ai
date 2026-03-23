@@ -1,10 +1,14 @@
 import logging
-from collections.abc import Mapping
+from collections.abc import Sequence
 
-from ai.backend.common.data.permission.types import EntityType, ScopeType
+from ai.backend.common.data.permission.types import (
+    EntityType,
+    OperationType,
+    RBACElementType,
+    ScopeType,
+)
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.actions.action.rbac import BaseRBACAction
-from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.repositories.permission_controller.db_source.db_source import (
     CreateRoleInput,
 )
@@ -109,12 +113,12 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 class PermissionControllerService:
     _repository: PermissionControllerRepository
-    _rbac_action_registry: Mapping[EntityType, type[BaseRBACAction]]
+    _rbac_action_registry: Sequence[type[BaseRBACAction]]
 
     def __init__(
         self,
         repository: PermissionControllerRepository,
-        rbac_action_registry: Mapping[EntityType, type[BaseRBACAction]],
+        rbac_action_registry: Sequence[type[BaseRBACAction]],
     ) -> None:
         self._repository = repository
         self._rbac_action_registry = rbac_action_registry
@@ -295,17 +299,18 @@ class PermissionControllerService:
 
     def get_entity_valid_operations(
         self,
-    ) -> dict[EntityType, Mapping[ActionOperationType, str]]:
+    ) -> dict[RBACElementType, set[OperationType]]:
         """
-        Get valid operations for all registered RBAC entity types.
+        Get valid operations for all registered RBAC element types.
 
-        Returns a mapping where keys are EntityType values and values are
-        mappings of ActionOperationType to human-readable descriptions.
+        Aggregates required permissions from all registered action classes,
+        grouping them by element type.
 
         Returns:
-            dict[EntityType, Mapping[ActionOperationType, str]]: Valid operations by entity type
+            dict[RBACElementType, set[OperationType]]: Valid operations by element type
         """
-        return {
-            entity_type: action_class.valid_operations()
-            for entity_type, action_class in self._rbac_action_registry.items()
-        }
+        result: dict[RBACElementType, set[OperationType]] = {}
+        for action_cls in self._rbac_action_registry:
+            element_type, operation = action_cls.required_permission()
+            result.setdefault(element_type, set()).add(operation)
+        return result

@@ -3,20 +3,18 @@ Unit tests for BaseRBACAction registry in PermissionControllerService.
 
 Tests:
 1. Registration completeness - verifies all concrete BaseRBACAction subclasses are registered
-2. get_entity_valid_operations() method - verifies correct structure and behavior
+2. get_entity_valid_operations() method - verifies correct aggregation logic
 """
 
 from __future__ import annotations
 
-from collections.abc import Mapping
 from typing import TYPE_CHECKING
 from unittest.mock import MagicMock
 
 import pytest
 
-from ai.backend.common.data.permission.types import EntityType
+from ai.backend.common.data.permission.types import OperationType, RBACElementType
 from ai.backend.manager.actions.action.rbac import BaseRBACAction
-from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.services.permission_contoller.service import (
     PermissionControllerService,
 )
@@ -62,7 +60,7 @@ class TestRBACRegistry:
         """Service with empty RBAC registry (initial state)."""
         return PermissionControllerService(
             repository=mock_repository,
-            rbac_action_registry={},
+            rbac_action_registry=[],
         )
 
     def test_registration_completeness(
@@ -78,19 +76,18 @@ class TestRBACRegistry:
         # Collect all concrete BaseRBACAction subclasses
         concrete_classes = _collect_all_rbac_subclasses(BaseRBACAction)  # type: ignore[type-abstract]
 
-        # Get registered entity types from the service's registry
-        registered_entity_types = set(empty_registry_service._rbac_action_registry.keys())
+        # Get registered classes from the service's registry
+        registered_classes = set(empty_registry_service._rbac_action_registry)
 
-        # For each concrete class, verify it's registered
+        # Verify all concrete classes are registered
         for rbac_class in concrete_classes:
-            entity_type = rbac_class.entity_type()
-            assert entity_type in registered_entity_types, (
-                f"{rbac_class.__name__} (EntityType.{entity_type.name}) is not registered in rbac_action_registry"
+            assert rbac_class in registered_classes, (
+                f"{rbac_class.__name__} is not registered in rbac_action_registry"
             )
 
         # Ensure no extra registrations
         expected_count = len(concrete_classes)
-        actual_count = len(registered_entity_types)
+        actual_count = len(registered_classes)
         assert actual_count == expected_count, (
             f"Registry has {actual_count} entries but {expected_count} concrete classes exist"
         )
@@ -104,42 +101,39 @@ class TestRBACRegistry:
         assert isinstance(result, dict)
         assert len(result) == 0
 
-    def test_get_entity_valid_operations_with_mock_classes(
+    def test_get_entity_valid_operations_aggregation(
         self, mock_repository: PermissionControllerRepository
     ) -> None:
-        """get_entity_valid_operations() returns correct structure with mock classes."""
+        """get_entity_valid_operations() correctly aggregates permissions by element type."""
 
         # Create mock RBAC action classes
-        class MockUserRBACAction(BaseRBACAction):
+        class MockUserReadAction(BaseRBACAction):
             @classmethod
-            def entity_type(cls) -> EntityType:
-                return EntityType.USER
+            def required_permission(cls) -> tuple[RBACElementType, OperationType]:
+                return (RBACElementType.USER, OperationType.READ)
 
+        class MockUserCreateAction(BaseRBACAction):
             @classmethod
-            def valid_operations(cls) -> Mapping[ActionOperationType, str]:
-                return {
-                    ActionOperationType.GET: "Get user details",
-                    ActionOperationType.SEARCH: "Search users",
-                    ActionOperationType.CREATE: "Create new user",
-                }
+            def required_permission(cls) -> tuple[RBACElementType, OperationType]:
+                return (RBACElementType.USER, OperationType.CREATE)
 
-        class MockVFolderRBACAction(BaseRBACAction):
+        class MockVFolderReadAction(BaseRBACAction):
             @classmethod
-            def entity_type(cls) -> EntityType:
-                return EntityType.VFOLDER
+            def required_permission(cls) -> tuple[RBACElementType, OperationType]:
+                return (RBACElementType.VFOLDER, OperationType.READ)
 
+        class MockVFolderDeleteAction(BaseRBACAction):
             @classmethod
-            def valid_operations(cls) -> Mapping[ActionOperationType, str]:
-                return {
-                    ActionOperationType.GET: "Get vfolder details",
-                    ActionOperationType.DELETE: "Delete vfolder",
-                }
+            def required_permission(cls) -> tuple[RBACElementType, OperationType]:
+                return (RBACElementType.VFOLDER, OperationType.SOFT_DELETE)
 
-        # Create service with populated registry
-        registry = {
-            EntityType.USER: MockUserRBACAction,
-            EntityType.VFOLDER: MockVFolderRBACAction,
-        }
+        # Create service with populated registry (flat list)
+        registry = [
+            MockUserReadAction,
+            MockUserCreateAction,
+            MockVFolderReadAction,
+            MockVFolderDeleteAction,
+        ]
         service = PermissionControllerService(
             repository=mock_repository,
             rbac_action_registry=registry,
@@ -151,48 +145,49 @@ class TestRBACRegistry:
         # Verify structure
         assert isinstance(result, dict)
         assert len(result) == 2
-        assert EntityType.USER in result
-        assert EntityType.VFOLDER in result
+        assert RBACElementType.USER in result
+        assert RBACElementType.VFOLDER in result
 
-        # Verify USER operations
-        user_ops = result[EntityType.USER]
-        assert isinstance(user_ops, Mapping)
-        assert len(user_ops) == 3
-        assert user_ops[ActionOperationType.GET] == "Get user details"
-        assert user_ops[ActionOperationType.SEARCH] == "Search users"
-        assert user_ops[ActionOperationType.CREATE] == "Create new user"
+        # Verify USER operations (aggregated from 2 actions)
+        user_ops = result[RBACElementType.USER]
+        assert isinstance(user_ops, set)
+        assert len(user_ops) == 2
+        assert OperationType.READ in user_ops
+        assert OperationType.CREATE in user_ops
 
-        # Verify VFOLDER operations
-        vfolder_ops = result[EntityType.VFOLDER]
-        assert isinstance(vfolder_ops, Mapping)
+        # Verify VFOLDER operations (aggregated from 2 actions)
+        vfolder_ops = result[RBACElementType.VFOLDER]
+        assert isinstance(vfolder_ops, set)
         assert len(vfolder_ops) == 2
-        assert vfolder_ops[ActionOperationType.GET] == "Get vfolder details"
-        assert vfolder_ops[ActionOperationType.DELETE] == "Delete vfolder"
+        assert OperationType.READ in vfolder_ops
+        assert OperationType.SOFT_DELETE in vfolder_ops
 
-    def test_get_entity_valid_operations_returns_new_dict(
+    def test_get_entity_valid_operations_deduplication(
         self, mock_repository: PermissionControllerRepository
     ) -> None:
-        """get_entity_valid_operations() returns a new dict each time (immutability check)."""
+        """get_entity_valid_operations() deduplicates operations for the same element type."""
 
-        class MockUserRBACAction(BaseRBACAction):
+        # Create multiple actions with the same permission
+        class MockUserReadAction1(BaseRBACAction):
             @classmethod
-            def entity_type(cls) -> EntityType:
-                return EntityType.USER
+            def required_permission(cls) -> tuple[RBACElementType, OperationType]:
+                return (RBACElementType.USER, OperationType.READ)
 
+        class MockUserReadAction2(BaseRBACAction):
             @classmethod
-            def valid_operations(cls) -> Mapping[ActionOperationType, str]:
-                return {ActionOperationType.GET: "Get user"}
+            def required_permission(cls) -> tuple[RBACElementType, OperationType]:
+                return (RBACElementType.USER, OperationType.READ)
 
-        registry = {EntityType.USER: MockUserRBACAction}
+        registry = [MockUserReadAction1, MockUserReadAction2]
         service = PermissionControllerService(
             repository=mock_repository,
             rbac_action_registry=registry,
         )
 
-        # Call twice
-        result1 = service.get_entity_valid_operations()
-        result2 = service.get_entity_valid_operations()
+        result = service.get_entity_valid_operations()
 
-        # They should be equal in content but not the same object
-        assert result1 == result2
-        assert result1 is not result2  # Different dict instances
+        # Should have only 1 operation despite 2 actions declaring the same permission
+        assert RBACElementType.USER in result
+        user_ops = result[RBACElementType.USER]
+        assert len(user_ops) == 1
+        assert OperationType.READ in user_ops
