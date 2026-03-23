@@ -433,6 +433,18 @@ class AssignedUserConditions:
 
         return inner
 
+    @staticmethod
+    def exists_permission_combined(permission_conditions: list[QueryCondition]) -> QueryCondition:
+        """Combine multiple permission conditions into single EXISTS subquery."""
+
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            subq = sa.select(sa.literal(1)).where(PermissionRow.role_id == UserRoleRow.role_id)
+            for cond in permission_conditions:
+                subq = subq.where(cond())
+            return sa.exists(subq)
+
+        return inner
+
 
 class DomainScopeConditions:
     """Query conditions for domain scope IDs."""
