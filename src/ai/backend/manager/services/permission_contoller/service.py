@@ -1,7 +1,10 @@
 import logging
+from collections.abc import Mapping
 
 from ai.backend.common.data.permission.types import EntityType, ScopeType
 from ai.backend.logging.utils import BraceStyleAdapter
+from ai.backend.manager.actions.action.rbac import BaseRBACAction
+from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.repositories.permission_controller.db_source.db_source import (
     CreateRoleInput,
 )
@@ -106,9 +109,15 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 class PermissionControllerService:
     _repository: PermissionControllerRepository
+    _rbac_action_registry: Mapping[EntityType, type[BaseRBACAction]]
 
-    def __init__(self, repository: PermissionControllerRepository) -> None:
+    def __init__(
+        self,
+        repository: PermissionControllerRepository,
+        rbac_action_registry: Mapping[EntityType, type[BaseRBACAction]],
+    ) -> None:
         self._repository = repository
+        self._rbac_action_registry = rbac_action_registry
 
     async def create_role(self, action: CreateRoleAction) -> CreateRoleActionResult:
         """
@@ -283,3 +292,20 @@ class PermissionControllerService:
         """Search element associations (full association rows) within a scope."""
         result = await self._repository.search_element_associations(action.querier)
         return SearchElementAssociationsActionResult(result=result)
+
+    def get_entity_valid_operations(
+        self,
+    ) -> dict[EntityType, Mapping[ActionOperationType, str]]:
+        """
+        Get valid operations for all registered RBAC entity types.
+
+        Returns a mapping where keys are EntityType values and values are
+        mappings of ActionOperationType to human-readable descriptions.
+
+        Returns:
+            dict[EntityType, Mapping[ActionOperationType, str]]: Valid operations by entity type
+        """
+        return {
+            entity_type: action_class.valid_operations()
+            for entity_type, action_class in self._rbac_action_registry.items()
+        }

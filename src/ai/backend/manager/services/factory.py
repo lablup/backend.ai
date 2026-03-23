@@ -278,6 +278,7 @@ def create_services(args: ServiceArgs) -> Services:
         ),
         permission_controller=PermissionControllerService(
             repository=repositories.permission_controller.repository,
+            rbac_action_registry={},
         ),
         vfs_storage=VFSStorageService(
             vfs_storage_repository=repositories.vfs_storage.repository,
