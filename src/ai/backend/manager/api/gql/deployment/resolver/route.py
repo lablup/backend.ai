@@ -29,7 +29,6 @@ from ai.backend.manager.data.deployment.types import (
     RouteSearchScope,
 )
 
-
 # Query resolvers
 
 
