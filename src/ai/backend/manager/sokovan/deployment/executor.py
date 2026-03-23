@@ -29,7 +29,6 @@ from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.deployment.scale import AutoScalingRule
 from ai.backend.manager.data.deployment.types import (
     DeploymentInfo,
-    ModelRevisionSpec,
     RouteInfo,
     RouteStatus,
     RouteTrafficStatus,
