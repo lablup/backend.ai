@@ -226,7 +226,6 @@ class PermissionConditions:
         return inner
 
 
-
 class AssignedUserConditions:
     """Query conditions for assigned users."""
 

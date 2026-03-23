@@ -6,7 +6,7 @@ Tests verify that condition factories produce correct SQLAlchemy expressions.
 from __future__ import annotations
 
 from ai.backend.manager.data.permission.types import EntityType, OperationType, ScopeType
-from ai.backend.manager.repositories.permission_controller.options import (
+from ai.backend.manager.models.rbac_models.conditions import (
     AssignedUserConditions,
     PermissionConditions,
 )
