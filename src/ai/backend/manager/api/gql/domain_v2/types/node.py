@@ -16,7 +16,10 @@ from ai.backend.common.dto.manager.v2.domain.types import (
 )
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
+    gql_added_field,
     gql_connection_type,
+    gql_federation_type,
+    gql_field,
     gql_pydantic_input,
 )
 from ai.backend.manager.api.gql.fair_share.types import DomainFairShareGQL
@@ -52,9 +55,7 @@ if TYPE_CHECKING:
 class DomainFairShareScopeGQL(PydanticInputMixin[DomainFairShareScopeDTO]):
     """Scope parameters for filtering domain fair shares."""
 
-    resource_group_name: str = strawberry.field(
-        description="Resource group to filter fair shares by."
-    )
+    resource_group_name: str = gql_field(description="Resource group to filter fair shares by.")
 
 
 @gql_pydantic_input(
@@ -64,45 +65,39 @@ class DomainFairShareScopeGQL(PydanticInputMixin[DomainFairShareScopeDTO]):
 class DomainUsageScopeGQL(PydanticInputMixin[DomainUsageScopeDTO]):
     """Scope parameters for filtering domain usage buckets."""
 
-    resource_group_name: str = strawberry.field(
-        description="Resource group to filter usage buckets by."
-    )
+    resource_group_name: str = gql_field(description="Resource group to filter usage buckets by.")
 
 
-@strawberry.federation.type(
-    keys=["id"],
-    name="DomainV2",
-    description=(
-        "Added in 26.2.0. Domain entity with structured field groups. "
-        "Formerly DomainNode. Provides comprehensive domain information organized "
-        "into logical categories: basic_info (identity), registry (container registries), "
-        "and lifecycle (status/timestamps). "
-        "All fields use typed structures instead of JSON scalars. "
-        "Resource allocation and storage permissions are provided through separate dedicated APIs."
+@gql_federation_type(
+    BackendAIGQLMeta(
+        added_version="26.2.0",
+        description=(
+            "Domain entity with structured field groups. "
+            "Formerly DomainNode. Provides comprehensive domain information organized "
+            "into logical categories: basic_info (identity), registry (container registries), "
+            "and lifecycle (status/timestamps). "
+            "All fields use typed structures instead of JSON scalars. "
+            "Resource allocation and storage permissions are provided through separate dedicated APIs."
+        ),
     ),
+    name="DomainV2",
+    keys=["id"],
 )
 class DomainV2GQL(PydanticNodeMixin[DomainNode]):
     """Domain entity with structured field groups."""
 
-    id: NodeID[str] = strawberry.field(description="Domain name (primary key).")
-    basic_info: DomainBasicInfoGQL = strawberry.field(
+    id: NodeID[str] = gql_field(description="Domain name (primary key).")
+    basic_info: DomainBasicInfoGQL = gql_field(
         description="Basic domain information including name and description."
     )
-    registry: DomainRegistryInfoGQL = strawberry.field(
-        description="Container registry configuration."
-    )
-    lifecycle: DomainLifecycleInfoGQL = strawberry.field(
+    registry: DomainRegistryInfoGQL = gql_field(description="Container registry configuration.")
+    lifecycle: DomainLifecycleInfoGQL = gql_field(
         description="Lifecycle information including activation status and timestamps."
     )
 
-    @strawberry.field(  # type: ignore[misc]
-        description=(
-            "Fair share record for this domain in the specified resource group. "
-            "Returns the scheduling priority configuration for this domain. "
-            "Always returns an object, even if no explicit configuration exists "
-            "(in which case default values are used)."
-        )
-    )
+    @gql_field(
+        description="Fair share record for this domain in the specified resource group. Returns the scheduling priority configuration for this domain. Always returns an object, even if no explicit configuration exists (in which case default values are used)."
+    )  # type: ignore[misc]
     async def fair_share(
         self,
         info: Info,
@@ -119,12 +114,12 @@ class DomainV2GQL(PydanticNodeMixin[DomainNode]):
 
         return DomainFairShareGQL.from_pydantic(payload.item)
 
-    @strawberry.field(  # type: ignore[misc]
-        description=(
-            "Added in 26.4.0. Active resource usage overview for this domain. "
-            "Returns the currently occupied resource slots and the number of active sessions."
+    @gql_added_field(
+        BackendAIGQLMeta(
+            added_version="26.4.0",
+            description="Active resource usage overview for this domain. Returns the currently occupied resource slots and the number of active sessions.",
         )
-    )
+    )  # type: ignore[misc]
     async def active_resource_overview(
         self,
         info: Info,
@@ -132,12 +127,9 @@ class DomainV2GQL(PydanticNodeMixin[DomainNode]):
         dto = await info.context.adapters.resource_slot.get_domain_resource_overview(str(self.id))
         return ActiveResourceOverviewGQL.from_pydantic(dto)
 
-    @strawberry.field(  # type: ignore[misc]
-        description=(
-            "Usage buckets for this domain, filtered by resource group. "
-            "Returns aggregated resource usage statistics over time."
-        )
-    )
+    @gql_field(
+        description="Usage buckets for this domain, filtered by resource group. Returns aggregated resource usage statistics over time."
+    )  # type: ignore[misc]
     async def usage_buckets(
         self,
         info: Info,
@@ -195,9 +187,7 @@ class DomainV2GQL(PydanticNodeMixin[DomainNode]):
             count=payload.total_count,
         )
 
-    @strawberry.field(  # type: ignore[misc]
-        description="Projects belonging to this domain.",
-    )
+    @gql_field(description="Projects belonging to this domain.")  # type: ignore[misc]
     async def projects(
         self,
         info: Info,
@@ -260,9 +250,7 @@ class DomainV2GQL(PydanticNodeMixin[DomainNode]):
             count=payload.total_count,
         )
 
-    @strawberry.field(  # type: ignore[misc]
-        description="Users belonging to this domain.",
-    )
+    @gql_field(description="Users belonging to this domain.")  # type: ignore[misc]
     async def users(
         self,
         info: Info,
@@ -353,7 +341,7 @@ DomainV2Edge = Edge[DomainV2GQL]
 class DomainV2Connection(Connection[DomainV2GQL]):
     """Paginated connection for domain records."""
 
-    count: int = strawberry.field(
+    count: int = gql_field(
         description="Total number of domain records matching the query criteria."
     )
 

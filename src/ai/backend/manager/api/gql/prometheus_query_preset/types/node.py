@@ -5,7 +5,6 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Any
 
-import strawberry
 from strawberry.relay import Connection, Edge, NodeID
 
 from ai.backend.common.dto.manager.v2.prometheus_query_preset.response import (
@@ -20,6 +19,7 @@ from ai.backend.common.dto.manager.v2.prometheus_query_preset.response import (
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     gql_connection_type,
+    gql_field,
     gql_node_type,
     gql_pydantic_type,
 )
@@ -36,18 +36,18 @@ from .payloads import QueryDefinitionOptionsGQL
     name="QueryDefinition",
 )
 class QueryDefinitionGQL(PydanticNodeMixin[QueryDefinitionNode]):
-    id: NodeID[str] = strawberry.field(description="Query definition UUID (primary key).")
-    name: str = strawberry.field(description="Human-readable query definition identifier.")
-    metric_name: str = strawberry.field(description="Prometheus metric name.")
-    query_template: str = strawberry.field(description="PromQL template with placeholders.")
-    time_window: str | None = strawberry.field(
+    id: NodeID[str] = gql_field(description="Query definition UUID (primary key).")
+    name: str = gql_field(description="Human-readable query definition identifier.")
+    metric_name: str = gql_field(description="Prometheus metric name.")
+    query_template: str = gql_field(description="PromQL template with placeholders.")
+    time_window: str | None = gql_field(
         description="Default time window. Falls back to server config if null."
     )
-    options: QueryDefinitionOptionsGQL = strawberry.field(
+    options: QueryDefinitionOptionsGQL = gql_field(
         description="Query definition options including filter and group labels."
     )
-    created_at: datetime = strawberry.field(description="Creation timestamp.")
-    updated_at: datetime = strawberry.field(description="Last update timestamp.")
+    created_at: datetime = gql_field(description="Creation timestamp.")
+    updated_at: datetime = gql_field(description="Last update timestamp.")
 
 
 QueryDefinitionEdge = Edge[QueryDefinitionGQL]
@@ -60,7 +60,7 @@ QueryDefinitionEdge = Edge[QueryDefinitionGQL]
     ),
 )
 class QueryDefinitionConnection(Connection[QueryDefinitionGQL]):
-    count: int = strawberry.field(
+    count: int = gql_field(
         description="Total number of query definition records matching the query criteria."
     )
 
@@ -80,7 +80,7 @@ class QueryDefinitionConnection(Connection[QueryDefinitionGQL]):
 class CreateQueryDefinitionPayload(PydanticOutputMixin[CreateQueryDefinitionGQLPayloadDTO]):
     """Payload for query definition creation mutation."""
 
-    preset: QueryDefinitionGQL = strawberry.field(description="Created query definition.")
+    preset: QueryDefinitionGQL = gql_field(description="Created query definition.")
 
 
 @gql_pydantic_type(
@@ -94,4 +94,4 @@ class CreateQueryDefinitionPayload(PydanticOutputMixin[CreateQueryDefinitionGQLP
 class ModifyQueryDefinitionPayload(PydanticOutputMixin[ModifyQueryDefinitionGQLPayloadDTO]):
     """Payload for query definition modification mutation."""
 
-    preset: QueryDefinitionGQL = strawberry.field(description="Updated query definition.")
+    preset: QueryDefinitionGQL = gql_field(description="Updated query definition.")

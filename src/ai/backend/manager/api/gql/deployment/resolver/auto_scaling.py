@@ -2,9 +2,12 @@
 
 from __future__ import annotations
 
-import strawberry
 from strawberry import ID, Info
 
+from ai.backend.manager.api.gql.decorators import (
+    BackendAIGQLMeta,
+    gql_mutation,
+)
 from ai.backend.manager.api.gql.deployment.types.auto_scaling import (
     AutoScalingRule,
     CreateAutoScalingRuleInput,
@@ -19,7 +22,7 @@ from ai.backend.manager.api.gql.types import StrawberryGQLContext
 # Mutation resolvers
 
 
-@strawberry.mutation(description="Added in 25.16.0")  # type: ignore[misc]
+@gql_mutation(BackendAIGQLMeta(added_version="25.16.0", description="Create auto scaling rule."))  # type: ignore[misc]
 async def create_auto_scaling_rule(
     input: CreateAutoScalingRuleInput, info: Info[StrawberryGQLContext]
 ) -> CreateAutoScalingRulePayload:
@@ -28,7 +31,7 @@ async def create_auto_scaling_rule(
     return CreateAutoScalingRulePayload(rule=AutoScalingRule.from_pydantic(payload.rule))
 
 
-@strawberry.mutation(description="Added in 25.16.0")  # type: ignore[misc]
+@gql_mutation(BackendAIGQLMeta(added_version="25.16.0", description="Update auto scaling rule."))  # type: ignore[misc]
 async def update_auto_scaling_rule(
     input: UpdateAutoScalingRuleInput, info: Info[StrawberryGQLContext]
 ) -> UpdateAutoScalingRulePayload:
@@ -37,7 +40,7 @@ async def update_auto_scaling_rule(
     return UpdateAutoScalingRulePayload(rule=AutoScalingRule.from_pydantic(payload.rule))
 
 
-@strawberry.mutation(description="Added in 25.16.0")  # type: ignore[misc]
+@gql_mutation(BackendAIGQLMeta(added_version="25.16.0", description="Delete auto scaling rule."))  # type: ignore[misc]
 async def delete_auto_scaling_rule(
     input: DeleteAutoScalingRuleInput, info: Info[StrawberryGQLContext]
 ) -> DeleteAutoScalingRulePayload:

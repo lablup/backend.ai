@@ -26,6 +26,8 @@ from ai.backend.manager.api.adapters.cursor import encode_cursor as encode_curso
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     PydanticInputMixin,
+    gql_enum,
+    gql_field,
     gql_pydantic_input,
 )
 from ai.backend.manager.data.common.types import SearchResult
@@ -75,16 +77,32 @@ class StringFilter(PydanticInputMixin[StringFilterDTO]):
     not_equals: str | None = None
 
     # Case-insensitive operations
-    i_contains: str | None = strawberry.field(name="iContains", default=None)
-    i_starts_with: str | None = strawberry.field(name="iStartsWith", default=None)
-    i_ends_with: str | None = strawberry.field(name="iEndsWith", default=None)
-    i_equals: str | None = strawberry.field(name="iEquals", default=None)
+    i_contains: str | None = gql_field(
+        description="The i contains field.", name="iContains", default=None
+    )
+    i_starts_with: str | None = gql_field(
+        description="The i starts with field.", name="iStartsWith", default=None
+    )
+    i_ends_with: str | None = gql_field(
+        description="The i ends with field.", name="iEndsWith", default=None
+    )
+    i_equals: str | None = gql_field(
+        description="The i equals field.", name="iEquals", default=None
+    )
 
     # Case-insensitive NOT operations
-    i_not_contains: str | None = strawberry.field(name="iNotContains", default=None)
-    i_not_starts_with: str | None = strawberry.field(name="iNotStartsWith", default=None)
-    i_not_ends_with: str | None = strawberry.field(name="iNotEndsWith", default=None)
-    i_not_equals: str | None = strawberry.field(name="iNotEquals", default=None)
+    i_not_contains: str | None = gql_field(
+        description="The i not contains field.", name="iNotContains", default=None
+    )
+    i_not_starts_with: str | None = gql_field(
+        description="The i not starts with field.", name="iNotStartsWith", default=None
+    )
+    i_not_ends_with: str | None = gql_field(
+        description="The i not ends with field.", name="iNotEndsWith", default=None
+    )
+    i_not_equals: str | None = gql_field(
+        description="The i not equals field.", name="iNotEquals", default=None
+    )
 
     def build_query_condition(
         self,
@@ -202,7 +220,7 @@ class IntFilter(PydanticInputMixin[IntFilterDTO]):
 class UUIDFilter(PydanticInputMixin[UUIDFilterDTO]):
     # Basic operations
     equals: uuid.UUID | None = None
-    in_: list[uuid.UUID] | None = strawberry.field(name="in", default=None)
+    in_: list[uuid.UUID] | None = gql_field(description="The in  field.", name="in", default=None)
 
     # NOT operations
     not_equals: uuid.UUID | None = None
@@ -337,13 +355,18 @@ class DateFilter(PydanticInputMixin[DateFilterDTO]):
         return None
 
 
-@strawberry.enum
+@gql_enum(BackendAIGQLMeta(added_version="24.09.0", description="Sort direction for ordering"))
 class OrderDirection(StrEnum):
     ASC = "ASC"
     DESC = "DESC"
 
 
-@strawberry.enum
+@gql_enum(
+    BackendAIGQLMeta(
+        added_version="24.09.0",
+        description="Sort direction for ordering with null placement control",
+    )
+)
 class Ordering(StrEnum):
     ASC = "ASC"
     ASC_NULLS_FIRST = "ASC_NULLS_FIRST"

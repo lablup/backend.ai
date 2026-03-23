@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from datetime import datetime
 
-import strawberry
 from strawberry import ID
 from strawberry.relay import NodeID
 
@@ -32,6 +31,7 @@ from ai.backend.common.dto.manager.v2.deployment.types import (
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     PydanticInputMixin,
+    gql_enum,
     gql_node_type,
     gql_pydantic_input,
     gql_pydantic_interface,
@@ -41,10 +41,13 @@ from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin, Pydant
 from ai.backend.manager.api.gql.utils import dedent_strip
 
 # Enum defined here to avoid circular import with deployment.py
-DeploymentStrategyTypeGQL: type[DeploymentStrategy] = strawberry.enum(
+DeploymentStrategyTypeGQL: type[DeploymentStrategy] = gql_enum(
+    BackendAIGQLMeta(
+        added_version="25.19.0",
+        description="This enum represents the deployment strategy type of a model deployment, indicating the strategy used for deployment.",
+    ),
     DeploymentStrategy,
     name="DeploymentStrategyType",
-    description="Added in 25.19.0. This enum represents the deployment strategy type of a model deployment, indicating the strategy used for deployment.",
 )
 
 # ========== Output Types (Response) ==========

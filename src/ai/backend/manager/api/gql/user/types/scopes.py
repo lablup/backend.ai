@@ -4,11 +4,10 @@ from __future__ import annotations
 
 from uuid import UUID
 
-import strawberry
-
 from ai.backend.common.dto.manager.v2.user.types import DomainUserScope, ProjectUserScope
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
+    gql_field,
     gql_pydantic_input,
 )
 from ai.backend.manager.api.gql.pydantic_compat import PydanticInputMixin
@@ -24,7 +23,7 @@ from ai.backend.manager.api.gql.pydantic_compat import PydanticInputMixin
 class DomainUserScopeGQL(PydanticInputMixin[DomainUserScope]):
     """Scope for domain-level user queries."""
 
-    domain_name: str = strawberry.field(
+    domain_name: str = gql_field(
         description="Domain name to scope the user query. Only users belonging to this domain will be returned."
     )
 
@@ -39,6 +38,6 @@ class DomainUserScopeGQL(PydanticInputMixin[DomainUserScope]):
 class ProjectUserScopeGQL(PydanticInputMixin[ProjectUserScope]):
     """Scope for project-level user queries."""
 
-    project_id: UUID = strawberry.field(
+    project_id: UUID = gql_field(
         description="Project UUID to scope the user query. Only users who are members of this project will be returned."
     )

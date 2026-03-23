@@ -2,9 +2,12 @@
 
 from __future__ import annotations
 
-import strawberry
 from strawberry import Info
 
+from ai.backend.manager.api.gql.decorators import (
+    BackendAIGQLMeta,
+    gql_mutation,
+)
 from ai.backend.manager.api.gql.deployment.types.access_token import (
     AccessToken,
     CreateAccessTokenInput,
@@ -15,7 +18,7 @@ from ai.backend.manager.api.gql.types import StrawberryGQLContext
 # Mutation resolvers
 
 
-@strawberry.mutation(description="Added in 25.16.0")  # type: ignore[misc]
+@gql_mutation(BackendAIGQLMeta(added_version="25.16.0", description="Create access token."))  # type: ignore[misc]
 async def create_access_token(
     input: CreateAccessTokenInput, info: Info[StrawberryGQLContext]
 ) -> CreateAccessTokenPayload:

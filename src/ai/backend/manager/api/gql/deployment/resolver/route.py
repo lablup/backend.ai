@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from uuid import UUID
 
-import strawberry
 from strawberry import ID, Info
 from strawberry.relay import PageInfo
 
@@ -21,6 +20,11 @@ from ai.backend.common.dto.manager.v2.deployment.request import (
     SearchRoutesInput,
 )
 from ai.backend.manager.api.gql.base import encode_cursor, resolve_global_id
+from ai.backend.manager.api.gql.decorators import (
+    BackendAIGQLMeta,
+    gql_mutation,
+    gql_root_field,
+)
 from ai.backend.manager.api.gql.deployment.types.route import (
     Route,
     RouteConnection,
@@ -51,9 +55,11 @@ def _route_filter_to_dto(filter: RouteFilter) -> RouteFilterDTO:
 # Query resolvers
 
 
-@strawberry.field(  # type: ignore[misc]
-    description="Added in 25.19.0. List routes for a deployment with optional filters."
-)
+@gql_root_field(
+    BackendAIGQLMeta(
+        added_version="25.19.0", description="List routes for a deployment with optional filters."
+    )
+)  # type: ignore[misc]
 async def routes(
     info: Info[StrawberryGQLContext],
     deployment_id: ID,
@@ -97,7 +103,9 @@ async def routes(
     )
 
 
-@strawberry.field(description="Added in 25.19.0. Get a specific route by ID.")  # type: ignore[misc]
+@gql_root_field(
+    BackendAIGQLMeta(added_version="25.19.0", description="Get a specific route by ID.")
+)  # type: ignore[misc]
 async def route(id: ID, info: Info[StrawberryGQLContext]) -> Route | None:
     """Get a specific route by ID."""
     _, route_id = resolve_global_id(id)
@@ -107,7 +115,9 @@ async def route(id: ID, info: Info[StrawberryGQLContext]) -> Route | None:
 # Mutation resolvers
 
 
-@strawberry.mutation(description="Added in 25.19.0. Update the traffic status of a route.")  # type: ignore[misc]
+@gql_mutation(
+    BackendAIGQLMeta(added_version="25.19.0", description="Update the traffic status of a route")
+)  # type: ignore[misc]
 async def update_route_traffic_status(
     input: UpdateRouteTrafficStatusInputGQL,
     info: Info[StrawberryGQLContext],

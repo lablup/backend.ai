@@ -34,6 +34,8 @@ from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     PydanticInputMixin,
     gql_connection_type,
+    gql_field,
+    gql_mutation,
     gql_node_type,
     gql_pydantic_input,
     gql_pydantic_type,
@@ -78,7 +80,7 @@ class ReservoirRegistry(PydanticNodeMixin[ReservoirRegistryNode]):
         nodes = await ctx.adapters.reservoir_registry.get_many(list(reservoir_ids))
         return [ReservoirRegistry.from_pydantic(node) for node in nodes]
 
-    @strawberry.field
+    @gql_field(description="The remote artifact registries of this entity.")
     @classmethod
     async def remote_artifact_registries(
         cls, ctx: strawberry.Info[StrawberryGQLContext]
@@ -96,18 +98,18 @@ ReservoirRegistryEdge = Edge[ReservoirRegistry]
     ),
 )
 class ReservoirRegistryConnection(Connection[ReservoirRegistry]):
-    @strawberry.field
+    @gql_field(description="The count of this entity.")
     def count(self) -> int:
         return len(self.edges)
 
 
-@strawberry.field(description="Added in 25.14.0")  # type: ignore[misc]
+@gql_field(description="Added in 25.14.0")  # type: ignore[misc]
 async def reservoir_registry(id: ID, info: Info[StrawberryGQLContext]) -> ReservoirRegistry | None:
     node = await info.context.adapters.reservoir_registry.get(uuid.UUID(id))
     return ReservoirRegistry.from_pydantic(node)
 
 
-@strawberry.field(description="Added in 25.14.0")  # type: ignore[misc]
+@gql_field(description="Added in 25.14.0")  # type: ignore[misc]
 async def reservoir_registries(
     info: Info[StrawberryGQLContext],
     before: str | None = None,
@@ -205,7 +207,7 @@ class DeleteReservoirRegistryPayload(PydanticOutputMixin[DeleteReservoirRegistry
     id: ID
 
 
-@strawberry.mutation(description="Added in 25.14.0")  # type: ignore[misc]
+@gql_mutation(BackendAIGQLMeta(added_version="25.14.0", description="Create reservoir registry."))  # type: ignore[misc]
 async def create_reservoir_registry(
     input: CreateReservoirRegistryInput, info: Info[StrawberryGQLContext]
 ) -> CreateReservoirRegistryPayload:
@@ -215,7 +217,7 @@ async def create_reservoir_registry(
     )
 
 
-@strawberry.mutation(description="Added in 25.14.0")  # type: ignore[misc]
+@gql_mutation(BackendAIGQLMeta(added_version="25.14.0", description="Update reservoir registry."))  # type: ignore[misc]
 async def update_reservoir_registry(
     input: UpdateReservoirRegistryInput, info: Info[StrawberryGQLContext]
 ) -> UpdateReservoirRegistryPayload:
@@ -225,7 +227,7 @@ async def update_reservoir_registry(
     )
 
 
-@strawberry.mutation(description="Added in 25.14.0")  # type: ignore[misc]
+@gql_mutation(BackendAIGQLMeta(added_version="25.14.0", description="Delete reservoir registry."))  # type: ignore[misc]
 async def delete_reservoir_registry(
     input: DeleteReservoirRegistryInput, info: Info[StrawberryGQLContext]
 ) -> DeleteReservoirRegistryPayload:

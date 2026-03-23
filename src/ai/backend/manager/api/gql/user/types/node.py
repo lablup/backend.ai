@@ -16,6 +16,8 @@ from ai.backend.common.exception import InvalidAPIParameters
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     gql_connection_type,
+    gql_federation_type,
+    gql_field,
     gql_pydantic_input,
 )
 from ai.backend.manager.api.gql.fair_share.types import UserFairShareGQL
@@ -54,10 +56,8 @@ if TYPE_CHECKING:
 class UserFairShareScopeGQL(PydanticInputMixin[UserFairShareScope]):
     """Scope parameters for filtering user fair shares."""
 
-    resource_group_name: str = strawberry.field(
-        description="Resource group to filter fair shares by."
-    )
-    project_id: UUID = strawberry.field(
+    resource_group_name: str = gql_field(description="Resource group to filter fair shares by.")
+    project_id: UUID = gql_field(
         description="Project ID that the user belongs to (required for user-level fair shares)."
     )
 
@@ -71,55 +71,47 @@ class UserFairShareScopeGQL(PydanticInputMixin[UserFairShareScope]):
 class UserUsageScopeGQL(PydanticInputMixin[UserUsageScope]):
     """Scope parameters for filtering user usage buckets."""
 
-    resource_group_name: str = strawberry.field(
-        description="Resource group to filter usage buckets by."
-    )
-    project_id: UUID = strawberry.field(
+    resource_group_name: str = gql_field(description="Resource group to filter usage buckets by.")
+    project_id: UUID = gql_field(
         description="Project ID that the user belongs to (required for user-level usage)."
     )
 
 
-@strawberry.federation.type(
-    keys=["id"],
-    name="UserV2",
-    description=(
-        "Added in 26.2.0. User entity with structured field groups. "
-        "Provides comprehensive user information organized into logical categories: "
-        "basic_info (profile), status (account state), organization (permissions), "
-        "security (auth settings), container (execution settings), and timestamps."
+@gql_federation_type(
+    BackendAIGQLMeta(
+        added_version="26.2.0",
+        description=(
+            "User entity with structured field groups. "
+            "Provides comprehensive user information organized into logical categories: "
+            "basic_info (profile), status (account state), organization (permissions), "
+            "security (auth settings), container (execution settings), and timestamps."
+        ),
     ),
+    name="UserV2",
+    keys=["id"],
 )
 class UserV2GQL(PydanticNodeMixin[UserNode]):
     """User entity with structured field groups."""
 
-    id: NodeID[str] = strawberry.field(description="Unique identifier for the user (UUID).")
-    basic_info: UserBasicInfoGQL = strawberry.field(
+    id: NodeID[str] = gql_field(description="Unique identifier for the user (UUID).")
+    basic_info: UserBasicInfoGQL = gql_field(
         description="Basic profile information including username, email, and display name."
     )
-    status: UserStatusInfoGQL = strawberry.field(
-        description="Account status and password-related flags."
-    )
-    organization: UserOrganizationInfoGQL = strawberry.field(
+    status: UserStatusInfoGQL = gql_field(description="Account status and password-related flags.")
+    organization: UserOrganizationInfoGQL = gql_field(
         description="Organizational context including domain, role, and resource policy."
     )
-    security: UserSecurityInfoGQL = strawberry.field(
+    security: UserSecurityInfoGQL = gql_field(
         description="Security settings including IP restrictions and TOTP configuration."
     )
-    container: UserContainerSettingsGQL = strawberry.field(
+    container: UserContainerSettingsGQL = gql_field(
         description="Container execution settings including UID/GID mappings."
     )
-    timestamps: EntityTimestampsGQL = strawberry.field(
-        description="Creation and modification timestamps."
-    )
+    timestamps: EntityTimestampsGQL = gql_field(description="Creation and modification timestamps.")
 
-    @strawberry.field(  # type: ignore[misc]
-        description=(
-            "Fair share record for this user in the specified resource group and project. "
-            "Returns the scheduling priority configuration for this user. "
-            "Always returns an object, even if no explicit configuration exists "
-            "(in which case default values are used)."
-        )
-    )
+    @gql_field(
+        description="Fair share record for this user in the specified resource group and project. Returns the scheduling priority configuration for this user. Always returns an object, even if no explicit configuration exists (in which case default values are used)."
+    )  # type: ignore[misc]
     async def fair_share(
         self,
         info: Info,
@@ -140,12 +132,9 @@ class UserV2GQL(PydanticNodeMixin[UserNode]):
 
         return UserFairShareGQL.from_pydantic(payload.item)
 
-    @strawberry.field(  # type: ignore[misc]
-        description=(
-            "Usage buckets for this user, filtered by resource group and project. "
-            "Returns aggregated resource usage statistics over time."
-        )
-    )
+    @gql_field(
+        description="Usage buckets for this user, filtered by resource group and project. Returns aggregated resource usage statistics over time."
+    )  # type: ignore[misc]
     async def usage_buckets(
         self,
         info: Info,
@@ -204,9 +193,7 @@ class UserV2GQL(PydanticNodeMixin[UserNode]):
             count=payload.total_count,
         )
 
-    @strawberry.field(  # type: ignore[misc]
-        description="The domain this user belongs to.",
-    )
+    @gql_field(description="The domain this user belongs to.")  # type: ignore[misc]
     async def domain(
         self,
         info: Info,
@@ -224,9 +211,7 @@ class UserV2GQL(PydanticNodeMixin[UserNode]):
         )
         return domain
 
-    @strawberry.field(  # type: ignore[misc]
-        description="Projects this user is a member of.",
-    )
+    @gql_field(description="Projects this user is a member of.")  # type: ignore[misc]
     async def projects(
         self,
         info: Info,
@@ -321,9 +306,7 @@ UserV2Edge = Edge[UserV2GQL]
 class UserV2Connection(Connection[UserV2GQL]):
     """Paginated connection for user records."""
 
-    count: int = strawberry.field(
-        description="Total number of user records matching the query criteria."
-    )
+    count: int = gql_field(description="Total number of user records matching the query criteria.")
 
     def __init__(self, *args: Any, count: int, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)

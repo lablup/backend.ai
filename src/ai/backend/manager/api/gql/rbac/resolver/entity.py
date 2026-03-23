@@ -7,6 +7,10 @@ from strawberry import Info
 
 from ai.backend.common.dto.manager.v2.rbac.request import AdminSearchEntitiesGQLInput
 from ai.backend.manager.api.gql.base import encode_cursor
+from ai.backend.manager.api.gql.decorators import (
+    BackendAIGQLMeta,
+    gql_root_field,
+)
 from ai.backend.manager.api.gql.rbac.types import (
     EntityConnection,
     EntityFilter,
@@ -17,8 +21,11 @@ from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.api.gql.utils import check_admin_only
 
 
-@strawberry.field(
-    description="Added in 26.3.0. Search entity associations (admin only). Optionally filter by entity_type and entity_id."
+@gql_root_field(
+    BackendAIGQLMeta(
+        added_version="26.3.0",
+        description="Search entity associations (admin only). Optionally filter by entity_type and entity_id.",
+    )
 )  # type: ignore[misc]
 async def admin_entities(
     info: Info[StrawberryGQLContext],

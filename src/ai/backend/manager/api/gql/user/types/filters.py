@@ -5,8 +5,6 @@ from __future__ import annotations
 from enum import StrEnum
 from typing import Self
 
-import strawberry
-
 from ai.backend.common.dto.manager.v2.user.request import UserFilter, UserOrder
 from ai.backend.common.dto.manager.v2.user.types import (
     UserDomainFilter,
@@ -22,6 +20,8 @@ from ai.backend.manager.api.gql.base import (
 )
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
+    gql_enum,
+    gql_field,
     gql_pydantic_input,
 )
 from ai.backend.manager.api.gql.pydantic_compat import PydanticInputMixin
@@ -40,7 +40,9 @@ class UserStatusEnumFilterGQL(PydanticInputMixin[UserStatusFilter]):
     """Filter for user status enum fields."""
 
     equals: UserStatusEnumGQL | None = None
-    in_: list[UserStatusEnumGQL] | None = strawberry.field(name="in", default=None)
+    in_: list[UserStatusEnumGQL] | None = gql_field(
+        description="The in  field.", name="in", default=None
+    )
     not_equals: UserStatusEnumGQL | None = None
     not_in: list[UserStatusEnumGQL] | None = None
 
@@ -56,7 +58,9 @@ class UserRoleEnumFilterGQL(PydanticInputMixin[UserRoleFilter]):
     """Filter for user role enum fields."""
 
     equals: UserRoleEnumGQL | None = None
-    in_: list[UserRoleEnumGQL] | None = strawberry.field(name="in", default=None)
+    in_: list[UserRoleEnumGQL] | None = gql_field(
+        description="The in  field.", name="in", default=None
+    )
     not_equals: UserRoleEnumGQL | None = None
     not_in: list[UserRoleEnumGQL] | None = None
 
@@ -113,18 +117,21 @@ class UserFilterGQL(PydanticInputMixin[UserFilter]):
     NOT: list[Self] | None = None
 
 
-@strawberry.enum(
-    name="UserV2OrderField",
-    description=(
-        "Added in 26.2.0. Fields available for ordering user query results. "
-        "CREATED_AT: Order by creation timestamp. "
-        "MODIFIED_AT: Order by last modification timestamp. "
-        "USERNAME: Order by username alphabetically. "
-        "EMAIL: Order by email address alphabetically. "
-        "STATUS: Order by account status. "
-        "DOMAIN_NAME: Order by domain name (scalar subquery). "
-        "PROJECT_NAME: Order by project name (MIN aggregation)."
+@gql_enum(
+    BackendAIGQLMeta(
+        added_version="26.2.0",
+        description=(
+            "Fields available for ordering user query results. "
+            "CREATED_AT: Order by creation timestamp. "
+            "MODIFIED_AT: Order by last modification timestamp. "
+            "USERNAME: Order by username alphabetically. "
+            "EMAIL: Order by email address alphabetically. "
+            "STATUS: Order by account status. "
+            "DOMAIN_NAME: Order by domain name (scalar subquery). "
+            "PROJECT_NAME: Order by project name (MIN aggregation)."
+        ),
     ),
+    name="UserV2OrderField",
 )
 class UserOrderFieldGQL(StrEnum):
     CREATED_AT = "created_at"

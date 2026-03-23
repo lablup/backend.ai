@@ -2,21 +2,25 @@
 
 from __future__ import annotations
 
-import strawberry
 from strawberry import Info
 from strawberry.relay import PageInfo
 
 from ai.backend.common.dto.manager.v2.keypair.request import SearchMyKeypairsGQLInput
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.base import encode_cursor
+from ai.backend.manager.api.gql.decorators import (
+    BackendAIGQLMeta,
+    gql_root_field,
+)
 from ai.backend.manager.api.gql.keypair.types.filters import KeypairFilterGQL, KeypairOrderByGQL
 from ai.backend.manager.api.gql.keypair.types.node import KeyPairConnection, KeyPairEdge, KeyPairGQL
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 
 
-@strawberry.field(
-    description=(
-        "Added in 26.5.0. List keypairs owned by the current authenticated user. "
-        "Supports filtering, ordering, and both cursor-based and offset-based pagination."
+@gql_root_field(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="List keypairs owned by the current authenticated user. Supports filtering, ordering, and both cursor-based and offset-based pagination.",
     )
 )  # type: ignore[misc]
 async def my_keypairs(

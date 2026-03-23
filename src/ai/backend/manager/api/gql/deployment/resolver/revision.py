@@ -4,13 +4,17 @@ from __future__ import annotations
 
 from uuid import UUID
 
-import strawberry
 from strawberry import ID, Info
 from strawberry.relay import PageInfo
 from strawberry.scalars import JSON
 
 from ai.backend.common.dto.manager.v2.deployment.request import AdminSearchRevisionsInput
 from ai.backend.manager.api.gql.base import encode_cursor, resolve_global_id
+from ai.backend.manager.api.gql.decorators import (
+    BackendAIGQLMeta,
+    gql_mutation,
+    gql_root_field,
+)
 from ai.backend.manager.api.gql.deployment.types.deployment import ModelDeployment
 from ai.backend.manager.api.gql.deployment.types.revision import (
     ActivateRevisionInputGQL,
@@ -34,7 +38,12 @@ from ai.backend.manager.data.deployment.inference_runtime_config import (
 # Query resolvers
 
 
-@strawberry.field(description="Added in 25.16.0")  # type: ignore[misc]
+@gql_root_field(
+    BackendAIGQLMeta(
+        added_version="25.16.0",
+        description="List revisions with optional filtering and pagination (admin, all deployments).",
+    )
+)  # type: ignore[misc]
 async def revisions(
     info: Info[StrawberryGQLContext],
     filter: ModelRevisionFilter | None = None,
@@ -75,7 +84,9 @@ async def revisions(
     )
 
 
-@strawberry.field(description="Added in 25.16.0")  # type: ignore[misc]
+@gql_root_field(
+    BackendAIGQLMeta(added_version="25.16.0", description="Get a specific revision by ID.")
+)  # type: ignore[misc]
 async def revision(id: ID, info: Info[StrawberryGQLContext]) -> ModelRevision | None:
     """Get a specific revision by ID."""
     _, revision_id = resolve_global_id(id)
@@ -83,9 +94,11 @@ async def revision(id: ID, info: Info[StrawberryGQLContext]) -> ModelRevision | 
     return ModelRevision.from_pydantic(node)
 
 
-@strawberry.field(  # type: ignore[misc]
-    description="Added in 25.16.0. Get JSON Schema for inference runtime configuration"
-)
+@gql_root_field(
+    BackendAIGQLMeta(
+        added_version="25.16.0", description="Get JSON Schema for inference runtime configuration"
+    )
+)  # type: ignore[misc]
 async def inference_runtime_config(name: str) -> JSON:
     match name.lower():
         case "vllm":
@@ -102,9 +115,12 @@ async def inference_runtime_config(name: str) -> JSON:
             }
 
 
-@strawberry.field(  # type: ignore[misc]
-    description="Added in 25.16.0 Get configuration JSON Schemas for all inference runtimes"
-)
+@gql_root_field(
+    BackendAIGQLMeta(
+        added_version="25.16.0",
+        description="Get configuration JSON Schemas for all inference runtimes.",
+    )
+)  # type: ignore[misc]
 async def inference_runtime_configs(info: Info[StrawberryGQLContext]) -> JSON:
     return {
         "vllm": VLLMRuntimeConfig.to_json_schema(),
@@ -117,7 +133,7 @@ async def inference_runtime_configs(info: Info[StrawberryGQLContext]) -> JSON:
 # Mutation resolvers
 
 
-@strawberry.mutation(description="Added in 25.16.0")  # type: ignore[misc]
+@gql_mutation(BackendAIGQLMeta(added_version="25.16.0", description="Add model revision."))  # type: ignore[misc]
 async def add_model_revision(
     input: AddRevisionInput, info: Info[StrawberryGQLContext]
 ) -> AddRevisionPayload:
@@ -126,9 +142,12 @@ async def add_model_revision(
     return AddRevisionPayload(revision=ModelRevision.from_pydantic(payload.revision))
 
 
-@strawberry.mutation(  # type: ignore[misc]
-    description="Added in 25.19.0. Activate a specific revision to be the current revision."
-)
+@gql_mutation(
+    BackendAIGQLMeta(
+        added_version="25.19.0",
+        description="Activate a specific revision to be the current revision",
+    )
+)  # type: ignore[misc]
 async def activate_deployment_revision(
     input: ActivateRevisionInputGQL,
     info: Info[StrawberryGQLContext, None],

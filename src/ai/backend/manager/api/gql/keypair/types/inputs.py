@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import strawberry
-
 from ai.backend.common.dto.manager.v2.auth.request import (
     RevokeMyKeypairInput as RevokeMyKeypairInputDTO,
 )
@@ -16,6 +14,7 @@ from ai.backend.common.dto.manager.v2.auth.request import (
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     PydanticInputMixin,
+    gql_field,
     gql_pydantic_input,
 )
 
@@ -28,7 +27,7 @@ from ai.backend.manager.api.gql.decorators import (
     name="RevokeMyKeypairInput",
 )
 class RevokeMyKeypairInputGQL(PydanticInputMixin[RevokeMyKeypairInputDTO]):
-    access_key: str = strawberry.field(
+    access_key: str = gql_field(
         description="Access key of the keypair to revoke. Must not be the main access key."
     )
 
@@ -41,7 +40,7 @@ class RevokeMyKeypairInputGQL(PydanticInputMixin[RevokeMyKeypairInputDTO]):
     name="SwitchMyMainAccessKeyInput",
 )
 class SwitchMyMainAccessKeyInputGQL(PydanticInputMixin[SwitchMyMainAccessKeyInputDTO]):
-    access_key: str = strawberry.field(
+    access_key: str = gql_field(
         description="Access key to set as the new main access key. Must be active and owned by the user."
     )
 
@@ -54,7 +53,7 @@ class SwitchMyMainAccessKeyInputGQL(PydanticInputMixin[SwitchMyMainAccessKeyInpu
     name="UpdateMyKeypairInput",
 )
 class UpdateMyKeypairInputGQL(PydanticInputMixin[UpdateMyKeypairInputDTO]):
-    access_key: str = strawberry.field(
+    access_key: str = gql_field(
         description="Access key of the keypair to update. Must be owned by the current user."
     )
-    is_active: bool = strawberry.field(description="Target active state for the keypair.")
+    is_active: bool = gql_field(description="Target active state for the keypair.")

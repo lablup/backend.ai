@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import strawberry
-
 from ai.backend.common.dto.manager.v2.keypair.response import (
     IssueMyKeypairPayload as IssueMyKeypairPayloadDTO,
 )
@@ -16,7 +14,11 @@ from ai.backend.common.dto.manager.v2.keypair.response import (
 from ai.backend.common.dto.manager.v2.keypair.response import (
     UpdateMyKeypairPayload as UpdateMyKeypairPayloadDTO,
 )
-from ai.backend.manager.api.gql.decorators import BackendAIGQLMeta, gql_pydantic_type
+from ai.backend.manager.api.gql.decorators import (
+    BackendAIGQLMeta,
+    gql_field,
+    gql_pydantic_type,
+)
 from ai.backend.manager.api.gql.keypair.types.node import KeyPairGQL
 from ai.backend.manager.api.gql.pydantic_compat import PydanticOutputMixin
 
@@ -31,7 +33,7 @@ from ai.backend.manager.api.gql.pydantic_compat import PydanticOutputMixin
     name="IssueMyKeypairPayload",
 )
 class IssueMyKeypairPayloadGQL(PydanticOutputMixin[IssueMyKeypairPayloadDTO]):
-    keypair: KeyPairGQL = strawberry.field(description="The newly created keypair.")
+    keypair: KeyPairGQL = gql_field(description="The newly created keypair.")
 
 
 @gql_pydantic_type(
@@ -70,4 +72,4 @@ class SwitchMyMainAccessKeyPayloadGQL(PydanticOutputMixin[SwitchMyMainAccessKeyP
     name="UpdateMyKeypairPayload",
 )
 class UpdateMyKeypairPayloadGQL(PydanticOutputMixin[UpdateMyKeypairPayloadDTO]):
-    keypair: KeyPairGQL = strawberry.field(description="The updated keypair.")
+    keypair: KeyPairGQL = gql_field(description="The updated keypair.")

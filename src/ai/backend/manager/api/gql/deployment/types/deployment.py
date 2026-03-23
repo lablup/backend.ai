@@ -83,7 +83,10 @@ from ai.backend.manager.api.gql.base import (
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     PydanticInputMixin,
+    gql_added_field,
     gql_connection_type,
+    gql_enum,
+    gql_field,
     gql_node_type,
     gql_pydantic_input,
     gql_pydantic_type,
@@ -139,10 +142,13 @@ from ai.backend.manager.data.deployment.types import (
     RevisionSearchScope,
 )
 
-DeploymentStatusGQL: type[ModelDeploymentStatus] = strawberry.enum(
+DeploymentStatusGQL: type[ModelDeploymentStatus] = gql_enum(
+    BackendAIGQLMeta(
+        added_version="25.19.0",
+        description="This enum represents the deployment status of a model deployment, indicating its current state.",
+    ),
     ModelDeploymentStatus,
     name="DeploymentStatus",
-    description="Added in 25.19.0. This enum represents the deployment status of a model deployment, indicating its current state.",
 )
 
 
@@ -184,14 +190,14 @@ class ModelDeploymentMetadata:
     created_at: datetime
     updated_at: datetime
 
-    @strawberry.field
+    @gql_field(description="The project of this entity.")
     async def project(self, info: Info[StrawberryGQLContext]) -> Project:
         project_global_id = to_global_id(
             GroupNode, UUID(str(self.project_id)), is_target_graphene_object=True
         )
         return Project(id=ID(project_global_id))
 
-    @strawberry.field
+    @gql_field(description="The domain of this entity.")
     async def domain(self, info: Info[StrawberryGQLContext]) -> Domain:
         domain_global_id = to_global_id(
             DomainNode, self.domain_name, is_target_graphene_object=True
@@ -228,14 +234,16 @@ class ModelDeployment(PydanticNodeMixin[DeploymentNodeDTO]):
     replica_state: ReplicaState
     created_user_id: ID
 
-    @strawberry.field
+    @gql_field(description="The created user of this entity.")
     async def created_user(self, info: Info[StrawberryGQLContext]) -> User:
         user_global_id = to_global_id(
             UserNode, UUID(str(self.created_user_id)), is_target_graphene_object=True
         )
         return User(id=strawberry.ID(user_global_id))
 
-    @strawberry.field(description="Added in 25.19.0. Deployment policy configuration.")  # type: ignore[misc]
+    @gql_added_field(
+        BackendAIGQLMeta(added_version="25.19.0", description="Deployment policy configuration.")
+    )  # type: ignore[misc]
     async def deployment_policy(
         self, info: Info[StrawberryGQLContext]
     ) -> DeploymentPolicyGQL | None:
@@ -247,7 +255,7 @@ class ModelDeployment(PydanticNodeMixin[DeploymentNodeDTO]):
             return None
         return policy_data
 
-    @strawberry.field
+    @gql_field(description="The revision history of this entity.")
     async def revision_history(
         self,
         info: Info[StrawberryGQLContext],
@@ -288,7 +296,7 @@ class ModelDeployment(PydanticNodeMixin[DeploymentNodeDTO]):
             ),
         )
 
-    @strawberry.field
+    @gql_field(description="The replicas of this entity.")
     async def replicas(
         self,
         info: Info[StrawberryGQLContext],
@@ -329,7 +337,7 @@ class ModelDeployment(PydanticNodeMixin[DeploymentNodeDTO]):
             ),
         )
 
-    @strawberry.field
+    @gql_field(description="The auto scaling rules of this entity.")
     async def auto_scaling_rules(
         self,
         info: Info[StrawberryGQLContext],
@@ -372,7 +380,7 @@ class ModelDeployment(PydanticNodeMixin[DeploymentNodeDTO]):
             ),
         )
 
-    @strawberry.field
+    @gql_field(description="The access tokens of this entity.")
     async def access_tokens(
         self,
         info: Info[StrawberryGQLContext],
@@ -432,7 +440,9 @@ class ModelDeployment(PydanticNodeMixin[DeploymentNodeDTO]):
     BackendAIGQLMeta(description="", added_version="25.19.0"),
 )
 class DeploymentStatusFilter(PydanticInputMixin[DeploymentStatusFilterDTO]):
-    in_: list[DeploymentStatusGQL] | None = strawberry.field(name="in", default=None)
+    in_: list[DeploymentStatusGQL] | None = gql_field(
+        description="The in  field.", name="in", default=None
+    )
     equals: DeploymentStatusGQL | None = None
 
 

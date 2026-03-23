@@ -2,13 +2,16 @@
 
 from __future__ import annotations
 
-import strawberry
 from aiohttp import web
 from strawberry import Info
 from strawberry.relay import PageInfo
 
 from ai.backend.common.contexts.user import current_user
 from ai.backend.manager.api.gql.base import encode_cursor
+from ai.backend.manager.api.gql.decorators import (
+    BackendAIGQLMeta,
+    gql_root_field,
+)
 from ai.backend.manager.api.gql.resource_usage.types import (
     ProjectUsageBucketConnection,
     ProjectUsageBucketEdge,
@@ -22,7 +25,9 @@ from ai.backend.manager.api.gql.utils import check_admin_only
 # Admin APIs
 
 
-@strawberry.field(description="Added in 26.2.0. List project usage buckets (admin only).")  # type: ignore[misc]
+@gql_root_field(
+    BackendAIGQLMeta(added_version="26.2.0", description="List project usage buckets (admin only).")
+)  # type: ignore[misc]
 async def admin_project_usage_buckets(
     info: Info[StrawberryGQLContext],
     filter: ProjectUsageBucketFilter | None = None,
@@ -66,12 +71,12 @@ async def admin_project_usage_buckets(
 # Resource Group Scoped APIs
 
 
-@strawberry.field(  # type: ignore[misc]
-    description=(
-        "Added in 26.2.0. List project usage buckets within resource group scope. "
-        "This API is not yet implemented."
+@gql_root_field(
+    BackendAIGQLMeta(
+        added_version="26.2.0",
+        description="List project usage buckets within resource group scope. This API is not yet implemented.",
     )
-)
+)  # type: ignore[misc]
 async def rg_project_usage_buckets(
     info: Info[StrawberryGQLContext],
     scope: ResourceGroupProjectScope,
@@ -91,13 +96,12 @@ async def rg_project_usage_buckets(
 # Legacy APIs (deprecated)
 
 
-@strawberry.field(  # type: ignore[misc]
-    description="Added in 26.1.0. List project usage buckets (superadmin only).",
-    deprecation_reason=(
-        "Use admin_project_usage_buckets instead. "
-        "This API will be removed after v26.3.0. See BEP-1041 for migration guide."
+@gql_root_field(
+    BackendAIGQLMeta(
+        added_version="26.1.0", description="List project usage buckets (superadmin only)."
     ),
-)
+    deprecation_reason="Use admin_project_usage_buckets instead. This API will be removed after v26.3.0. See BEP-1041 for migration guide.",
+)  # type: ignore[misc]
 async def project_usage_buckets(
     info: Info[StrawberryGQLContext],
     filter: ProjectUsageBucketFilter | None = None,

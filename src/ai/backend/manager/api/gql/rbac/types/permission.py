@@ -46,6 +46,8 @@ from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     PydanticInputMixin,
     gql_connection_type,
+    gql_enum,
+    gql_field,
     gql_node_type,
     gql_pydantic_input,
     gql_pydantic_type,
@@ -60,20 +62,23 @@ if TYPE_CHECKING:
 # ==================== Enums ====================
 
 
-RBACElementTypeGQL: type[RBACElementTypeDTO] = strawberry.enum(
+RBACElementTypeGQL: type[RBACElementTypeDTO] = gql_enum(
+    BackendAIGQLMeta(
+        added_version="26.3.0",
+        description="Unified RBAC element type for scope-entity relationships",
+    ),
     RBACElementTypeDTO,
     name="RBACElementType",
-    description="Added in 26.3.0. Unified RBAC element type for scope-entity relationships",
 )
 
-OperationTypeGQL: type[OperationTypeDTO] = strawberry.enum(
+OperationTypeGQL: type[OperationTypeDTO] = gql_enum(
+    BackendAIGQLMeta(added_version="26.3.0", description="RBAC operation type"),
     OperationTypeDTO,
     name="OperationType",
-    description="Added in 26.3.0. RBAC operation type",
 )
 
 
-@strawberry.enum(description="Added in 26.3.0. Permission ordering field")
+@gql_enum(BackendAIGQLMeta(added_version="26.3.0", description="Permission ordering field"))
 class PermissionOrderField(StrEnum):
     ID = "id"
     ENTITY_TYPE = "entity_type"
@@ -108,7 +113,7 @@ class PermissionGQL(PydanticNodeMixin[PermissionNodeDTO]):
         ])
         return cast(list[Self | None], results)
 
-    @strawberry.field(description="The role this permission belongs to.")  # type: ignore[misc]
+    @gql_field(description="The role this permission belongs to.")  # type: ignore[misc]
     async def role(
         self, info: Info[StrawberryGQLContext]
     ) -> (
@@ -121,9 +126,7 @@ class PermissionGQL(PydanticNodeMixin[PermissionNodeDTO]):
         # DataLoader already returns RoleGQL | None via from_pydantic conversion
         return await info.context.data_loaders.role_loader.load(self.role_id)
 
-    @strawberry.field(  # type: ignore[misc]
-        description="The scope this permission applies to."
-    )
+    @gql_field(description="The scope this permission applies to.")  # type: ignore[misc]
     async def scope(
         self,
         *,
@@ -256,7 +259,7 @@ class DeletePermissionInput(PydanticInputMixin[DeletePermissionInputDTO]):
     name="DeletePermissionPayload",
 )
 class DeletePermissionPayload(PydanticOutputMixin[DeletePermissionPayloadDTO]):
-    id: ID = strawberry.field(description="ID of the deleted permission.")
+    id: ID = gql_field(description="ID of the deleted permission.")
 
 
 # ==================== Connection Types ====================

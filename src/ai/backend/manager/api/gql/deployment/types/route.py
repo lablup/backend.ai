@@ -38,6 +38,8 @@ from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     PydanticInputMixin,
     gql_connection_type,
+    gql_enum,
+    gql_field,
     gql_node_type,
     gql_pydantic_input,
     gql_pydantic_type,
@@ -60,16 +62,22 @@ if TYPE_CHECKING:
     from ai.backend.manager.api.gql.deployment.types.deployment import ModelDeployment
     from ai.backend.manager.api.gql.deployment.types.revision import ModelRevision
 
-RouteStatusGQL: type[RouteStatusEnum] = strawberry.enum(
+RouteStatusGQL: type[RouteStatusEnum] = gql_enum(
+    BackendAIGQLMeta(
+        added_version="25.19.0",
+        description="Route status indicating the health and lifecycle state of a route.",
+    ),
     RouteStatusEnum,
     name="RouteStatus",
-    description="Added in 25.19.0. Route status indicating the health and lifecycle state of a route.",
 )
 
-RouteTrafficStatusGQL: type[RouteTrafficStatusEnum] = strawberry.enum(
+RouteTrafficStatusGQL: type[RouteTrafficStatusEnum] = gql_enum(
+    BackendAIGQLMeta(
+        added_version="25.19.0",
+        description="Traffic routing status for a route. Controls whether traffic should be sent to this route.",
+    ),
     RouteTrafficStatusEnum,
     name="RouteTrafficStatus",
-    description="Added in 25.19.0. Traffic routing status for a route. Controls whether traffic should be sent to this route.",
 )
 
 
@@ -84,23 +92,17 @@ class Route(PydanticNodeMixin[RouteNodeDTO]):
     deployment_id: ID
     session_id: ID | None
     revision_id: ID | None
-    status: RouteStatusGQL = strawberry.field(
-        description="The current status of the route indicating its health state.",
+    status: RouteStatusGQL = gql_field(
+        description="The current status of the route indicating its health state."
     )
-    traffic_status: RouteTrafficStatusGQL = strawberry.field(
-        description="The traffic routing status (ACTIVE/INACTIVE). Controls whether traffic should be sent to this route.",
+    traffic_status: RouteTrafficStatusGQL = gql_field(
+        description="The traffic routing status (ACTIVE/INACTIVE). Controls whether traffic should be sent to this route."
     )
-    traffic_ratio: float = strawberry.field(
-        description="The traffic ratio for load balancing.",
-    )
-    created_at: datetime | None = strawberry.field(
-        description="The timestamp when the route was created.",
-    )
-    error_data: JSON | None = strawberry.field(
-        description="Error data if the route is in a failed state.",
-    )
+    traffic_ratio: float = gql_field(description="The traffic ratio for load balancing.")
+    created_at: datetime | None = gql_field(description="The timestamp when the route was created.")
+    error_data: JSON | None = gql_field(description="Error data if the route is in a failed state.")
 
-    @strawberry.field(description="The deployment this route belongs to.")  # type: ignore[misc]
+    @gql_field(description="The deployment this route belongs to.")  # type: ignore[misc]
     async def deployment(
         self, info: Info[StrawberryGQLContext]
     ) -> Annotated[ModelDeployment, strawberry.lazy(".deployment")]:
@@ -111,9 +113,9 @@ class Route(PydanticNodeMixin[RouteNodeDTO]):
             raise EndpointNotFound(extra_msg=f"id={deployment_id}")
         return deployment_data
 
-    @strawberry.field(  # type: ignore[misc]
+    @gql_field(
         description="The session associated with the route. Can be null if the route is still provisioning."
-    )
+    )  # type: ignore[misc]
     async def session(self, info: Info[StrawberryGQLContext]) -> ID | None:
         """Return session global ID if available."""
         if self.session_id is None:
@@ -123,7 +125,7 @@ class Route(PydanticNodeMixin[RouteNodeDTO]):
         )
         return ID(session_global_id)
 
-    @strawberry.field(description="The revision associated with the route.")  # type: ignore[misc]
+    @gql_field(description="The revision associated with the route.")  # type: ignore[misc]
     async def revision(
         self, info: Info[StrawberryGQLContext]
     ) -> Annotated[ModelRevision, strawberry.lazy(".revision")] | None:
@@ -155,9 +157,7 @@ RouteEdge = Edge[Route]
     )
 )
 class RouteConnection(Connection[Route]):
-    count: int = strawberry.field(
-        description="Total number of routes matching the filter criteria."
-    )
+    count: int = gql_field(description="Total number of routes matching the filter criteria.")
 
     def __init__(self, *args: Any, count: int, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
@@ -167,7 +167,9 @@ class RouteConnection(Connection[Route]):
 # Filter and OrderBy types
 
 
-@strawberry.enum
+@gql_enum(
+    BackendAIGQLMeta(added_version="25.19.0", description="Fields available for ordering routes")
+)
 class RouteOrderField(StrEnum):
     CREATED_AT = "created_at"
     STATUS = "status"
@@ -219,8 +221,8 @@ def get_route_pagination_spec() -> PaginationSpec:
     name="UpdateRouteTrafficStatusInput",
 )
 class UpdateRouteTrafficStatusInputGQL(PydanticInputMixin[UpdateRouteTrafficStatusInputDTO]):
-    route_id: ID = strawberry.field(description="The ID of the route to update.")
-    traffic_status: RouteTrafficStatusGQL = strawberry.field(
+    route_id: ID = gql_field(description="The ID of the route to update.")
+    traffic_status: RouteTrafficStatusGQL = gql_field(
         description="The new traffic status (ACTIVE/INACTIVE)."
     )
 

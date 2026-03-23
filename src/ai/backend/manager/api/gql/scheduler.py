@@ -19,7 +19,13 @@ from ai.backend.common.events.types import EventDomain
 from ai.backend.common.types import SessionId
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.api.gql.base import to_global_id
-from ai.backend.manager.api.gql.decorators import BackendAIGQLMeta, gql_pydantic_type
+from ai.backend.manager.api.gql.decorators import (
+    BackendAIGQLMeta,
+    gql_enum,
+    gql_field,
+    gql_pydantic_type,
+    gql_subscription,
+)
 from ai.backend.manager.api.gql_legacy.session import ComputeSessionNode
 from ai.backend.manager.errors.kernel import InvalidSessionId
 
@@ -31,7 +37,9 @@ if TYPE_CHECKING:
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
-@strawberry.enum(description="Status of session scheduling transitions")
+@gql_enum(
+    BackendAIGQLMeta(added_version="24.3.0", description="Status of session scheduling transitions")
+)
 class SchedulingStatus(StrEnum):
     """
     Enum representing session scheduling status transitions.
@@ -69,9 +77,9 @@ class SchedulingBroadcastEventPayloadGQL:
     status_transition: SchedulingStatus
     reason: str
 
-    @strawberry.field(  # type: ignore[misc]
+    @gql_field(
         description="The session ID associated with the replica. This can be null right after replica creation."
-    )
+    )  # type: ignore[misc]
     async def session(self, info: Info[StrawberryGQLContext]) -> Session:
         session_global_id = to_global_id(
             ComputeSessionNode, self.session_id, is_target_graphene_object=True
@@ -79,11 +87,15 @@ class SchedulingBroadcastEventPayloadGQL:
         return Session(id=strawberry.ID(session_global_id))
 
 
-@strawberry.subscription(  # type: ignore[misc]
-    description="Subscribe to real-time scheduling events for a specific session. "
-    "Streams status transition events during the session lifecycle "
-    "(PENDING → SCHEDULED → PREPARING → RUNNING → TERMINATED). "
-    "Added in 25.15.0."
+@gql_subscription(  # type: ignore[misc]
+    BackendAIGQLMeta(
+        added_version="25.15.0",
+        description=(
+            "Subscribe to real-time scheduling events for a specific session. "
+            "Streams status transition events during the session lifecycle "
+            "(PENDING → SCHEDULED → PREPARING → RUNNING → TERMINATED)."
+        ),
+    )
 )
 async def scheduling_events_by_session(
     session_id: strawberry.ID,

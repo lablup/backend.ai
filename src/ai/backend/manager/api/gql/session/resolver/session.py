@@ -5,6 +5,10 @@ from strawberry import Info
 
 from ai.backend.common.dto.manager.v2.session.request import AdminSearchSessionsInput
 from ai.backend.manager.api.gql.base import encode_cursor
+from ai.backend.manager.api.gql.decorators import (
+    BackendAIGQLMeta,
+    gql_root_field,
+)
 from ai.backend.manager.api.gql.session.types import (
     SessionV2ConnectionGQL,
     SessionV2EdgeGQL,
@@ -16,8 +20,11 @@ from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.api.gql.utils import check_admin_only
 
 
-@strawberry.field(
-    description="Added in 26.3.0. Query sessions with pagination and filtering. (admin only)"
+@gql_root_field(
+    BackendAIGQLMeta(
+        added_version="26.3.0",
+        description="Query sessions with pagination and filtering. (admin only)",
+    )
 )  # type: ignore[misc]
 async def admin_sessions_v2(
     info: Info[StrawberryGQLContext],

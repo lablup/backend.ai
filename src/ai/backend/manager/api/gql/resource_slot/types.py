@@ -14,7 +14,6 @@ from decimal import Decimal
 from enum import StrEnum
 from typing import Any, Self
 
-import strawberry
 from strawberry import Info
 from strawberry.relay import Connection, Edge, NodeID
 
@@ -52,6 +51,8 @@ from ai.backend.manager.api.gql.base import OrderDirection, StringFilter
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     gql_connection_type,
+    gql_enum,
+    gql_field,
     gql_node_type,
     gql_pydantic_input,
     gql_pydantic_type,
@@ -109,10 +110,10 @@ async def load_kernel_allocation_node(
     name="NumberFormat",
 )
 class NumberFormatGQL:
-    binary: bool = strawberry.field(
+    binary: bool = gql_field(
         description="Whether to use binary (1024-based) or decimal (1000-based) prefixes."
     )
-    round_length: int = strawberry.field(
+    round_length: int = gql_field(
         description="Number of decimal places to round to when displaying values."
     )
 
@@ -132,26 +133,26 @@ class NumberFormatGQL:
 )
 class ResourceSlotTypeGQL(PydanticNodeMixin[Any]):
     id: NodeID[str]
-    slot_name: str = strawberry.field(
+    slot_name: str = gql_field(
         description="Unique identifier for the resource slot (e.g., 'cpu', 'mem', 'cuda.device')."
     )
-    slot_type: str = strawberry.field(
+    slot_type: str = gql_field(
         description="Category of the slot type (e.g., 'count', 'bytes', 'unique-count')."
     )
-    display_name: str = strawberry.field(description="Human-readable name for display in UIs.")
-    description: str = strawberry.field(
+    display_name: str = gql_field(description="Human-readable name for display in UIs.")
+    description: str = gql_field(
         description="Longer description of what this resource slot represents."
     )
-    display_unit: str = strawberry.field(
+    display_unit: str = gql_field(
         description="Unit label used when displaying resource amounts (e.g., 'GiB', 'cores')."
     )
-    display_icon: str = strawberry.field(
+    display_icon: str = gql_field(
         description="Icon identifier for UI rendering (e.g., 'cpu', 'memory', 'gpu')."
     )
-    number_format: NumberFormatGQL = strawberry.field(
+    number_format: NumberFormatGQL = gql_field(
         description="Number formatting rules (binary vs decimal prefix, rounding)."
     )
-    rank: int = strawberry.field(description="Display ordering rank. Lower values appear first.")
+    rank: int = gql_field(description="Display ordering rank. Lower values appear first.")
 
     @classmethod
     async def resolve_nodes(  # type: ignore[override]
@@ -197,9 +198,12 @@ class ResourceSlotTypeConnectionGQL(Connection[ResourceSlotTypeGQL]):
 # ========== ResourceSlotType Filter/OrderBy ==========
 
 
-@strawberry.enum(
+@gql_enum(
+    BackendAIGQLMeta(
+        added_version="26.3.0",
+        description="Fields available for ordering resource slot types.",
+    ),
     name="ResourceSlotTypeOrderField",
-    description="Added in 26.3.0. Fields available for ordering resource slot types.",
 )
 class ResourceSlotTypeOrderFieldGQL(StrEnum):
     SLOT_NAME = "slot_name"
@@ -251,13 +255,13 @@ class AgentResourceSlotGQL(PydanticNodeMixin[AgentResourceNodeDTO]):
     """Per-agent, per-slot resource capacity and usage."""
 
     id: NodeID[str]
-    slot_name: str = strawberry.field(
+    slot_name: str = gql_field(
         description="Resource slot identifier (e.g., 'cpu', 'mem', 'cuda.device')."
     )
-    capacity: Decimal = strawberry.field(
+    capacity: Decimal = gql_field(
         description="Total hardware resource capacity for this slot on the agent."
     )
-    used: Decimal = strawberry.field(
+    used: Decimal = gql_field(
         description="Amount of this slot currently consumed by running and scheduled sessions."
     )
 
@@ -307,9 +311,12 @@ class AgentResourceConnectionGQL(Connection[AgentResourceSlotGQL]):
 # ========== AgentResourceSlot Filter/OrderBy ==========
 
 
-@strawberry.enum(
+@gql_enum(
+    BackendAIGQLMeta(
+        added_version="26.3.0",
+        description="Fields available for ordering agent resource slots.",
+    ),
     name="AgentResourceSlotOrderField",
-    description="Added in 26.3.0. Fields available for ordering agent resource slots.",
 )
 class AgentResourceSlotOrderFieldGQL(StrEnum):
     SLOT_NAME = "slot_name"
@@ -360,13 +367,13 @@ class KernelResourceAllocationGQL(PydanticNodeMixin[Any]):
     """Per-kernel, per-slot resource allocation."""
 
     id: NodeID[str]
-    slot_name: str = strawberry.field(
+    slot_name: str = gql_field(
         description="Resource slot identifier (e.g., 'cpu', 'mem', 'cuda.device')."
     )
-    requested: Decimal = strawberry.field(
+    requested: Decimal = gql_field(
         description="Amount of this resource slot originally requested for the kernel."
     )
-    used: Decimal | None = strawberry.field(
+    used: Decimal | None = gql_field(
         description="Amount currently used. May be null if not yet measured."
     )
 
@@ -398,9 +405,12 @@ class KernelResourceAllocationGQL(PydanticNodeMixin[Any]):
 # ========== KernelResourceAllocation Filter/OrderBy ==========
 
 
-@strawberry.enum(
+@gql_enum(
+    BackendAIGQLMeta(
+        added_version="26.3.0",
+        description="Fields available for ordering kernel resource allocations.",
+    ),
     name="KernelResourceAllocationOrderField",
-    description="Added in 26.3.0. Fields available for ordering kernel resource allocations.",
 )
 class KernelResourceAllocationOrderFieldGQL(StrEnum):
     SLOT_NAME = "slot_name"

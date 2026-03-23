@@ -4,12 +4,15 @@ from __future__ import annotations
 
 from uuid import UUID
 
-import strawberry
 from strawberry import Info
 from strawberry.relay import PageInfo
 
 from ai.backend.common.dto.manager.v2.group.request import AdminSearchGroupsInput
 from ai.backend.manager.api.gql.base import encode_cursor
+from ai.backend.manager.api.gql.decorators import (
+    BackendAIGQLMeta,
+    gql_root_field,
+)
 from ai.backend.manager.api.gql.domain_v2.types import DomainV2GQL
 from ai.backend.manager.api.gql.project_v2.types import (
     DomainProjectScope,
@@ -23,9 +26,10 @@ from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.api.gql.utils import check_admin_only
 
 
-@strawberry.field(
-    description=(
-        "Added in 26.2.0. Get a single project by ID. Returns an error if project is not found."
+@gql_root_field(
+    BackendAIGQLMeta(
+        added_version="26.2.0",
+        description="Get a single project by ID. Returns an error if project is not found.",
     )
 )  # type: ignore[misc]
 async def project_v2(
@@ -37,10 +41,10 @@ async def project_v2(
     return ProjectV2GQL.from_pydantic(node)
 
 
-@strawberry.field(
-    description=(
-        "Added in 26.2.0. List all projects with filtering and pagination (admin only). "
-        "Requires superadmin privileges."
+@gql_root_field(
+    BackendAIGQLMeta(
+        added_version="26.2.0",
+        description="List all projects with filtering and pagination (admin only). Requires superadmin privileges.",
     )
 )  # type: ignore[misc]
 async def admin_projects_v2(
@@ -82,10 +86,10 @@ async def admin_projects_v2(
     )
 
 
-@strawberry.field(
-    description=(
-        "Added in 26.2.0. List projects within a specific domain. "
-        "Requires domain admin privileges or higher."
+@gql_root_field(
+    BackendAIGQLMeta(
+        added_version="26.2.0",
+        description="List projects within a specific domain. Requires domain admin privileges or higher.",
     )
 )  # type: ignore[misc]
 async def domain_projects_v2(
@@ -131,10 +135,10 @@ async def domain_projects_v2(
     )
 
 
-@strawberry.field(
-    description=(
-        "Added in 26.2.0. Get the domain that a project belongs to. "
-        "Returns an error if project or domain is not found."
+@gql_root_field(
+    BackendAIGQLMeta(
+        added_version="26.2.0",
+        description="Get the domain that a project belongs to. Returns an error if project or domain is not found.",
     )
 )  # type: ignore[misc]
 async def project_domain_v2(

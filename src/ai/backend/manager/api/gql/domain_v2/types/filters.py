@@ -5,8 +5,6 @@ from __future__ import annotations
 from enum import StrEnum
 from typing import Self
 
-import strawberry
-
 from ai.backend.common.dto.manager.v2.domain.request import DomainFilter, DomainOrder
 from ai.backend.common.dto.manager.v2.domain.types import (
     DomainProjectFilter,
@@ -19,6 +17,7 @@ from ai.backend.manager.api.gql.base import (
 )
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
+    gql_enum,
     gql_pydantic_input,
 )
 from ai.backend.manager.api.gql.pydantic_compat import PydanticInputMixin
@@ -75,18 +74,21 @@ class DomainV2Filter(PydanticInputMixin[DomainFilter]):
     NOT: list[Self] | None = None
 
 
-@strawberry.enum(
-    name="DomainV2OrderField",
-    description=(
-        "Added in 26.2.0. Fields available for ordering domain query results. "
-        "CREATED_AT: Order by creation timestamp. "
-        "MODIFIED_AT: Order by last modification timestamp. "
-        "NAME: Order by domain name alphabetically. "
-        "IS_ACTIVE: Order by active status. "
-        "PROJECT_NAME: Order by project name (MIN aggregation). "
-        "USER_USERNAME: Order by username (MIN aggregation). "
-        "USER_EMAIL: Order by user email (MIN aggregation)."
+@gql_enum(
+    BackendAIGQLMeta(
+        added_version="26.2.0",
+        description=(
+            "Fields available for ordering domain query results. "
+            "CREATED_AT: Order by creation timestamp. "
+            "MODIFIED_AT: Order by last modification timestamp. "
+            "NAME: Order by domain name alphabetically. "
+            "IS_ACTIVE: Order by active status. "
+            "PROJECT_NAME: Order by project name (MIN aggregation). "
+            "USER_USERNAME: Order by username (MIN aggregation). "
+            "USER_EMAIL: Order by user email (MIN aggregation)."
+        ),
     ),
+    name="DomainV2OrderField",
 )
 class DomainV2OrderField(StrEnum):
     CREATED_AT = "created_at"

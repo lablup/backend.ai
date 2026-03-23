@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from datetime import datetime
 
-import strawberry
 from strawberry import UNSET
 
 from ai.backend.common.dto.manager.v2.prometheus_query_preset.request import (
@@ -30,6 +29,7 @@ from ai.backend.common.dto.manager.v2.prometheus_query_preset.request import (
 )
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
+    gql_field,
     gql_pydantic_input,
 )
 from ai.backend.manager.api.gql.pydantic_compat import PydanticInputMixin
@@ -40,8 +40,8 @@ from ai.backend.manager.api.gql.pydantic_compat import PydanticInputMixin
     name="QueryDefinitionOptionsInput",
 )
 class QueryDefinitionOptionsInput(PydanticInputMixin[CreateQueryDefinitionOptionsInputDTO]):
-    filter_labels: list[str] = strawberry.field(description="Allowed filter label keys.")
-    group_labels: list[str] = strawberry.field(description="Allowed group-by label keys.")
+    filter_labels: list[str] = gql_field(description="Allowed filter label keys.")
+    group_labels: list[str] = gql_field(description="Allowed group-by label keys.")
 
 
 @gql_pydantic_input(
@@ -51,13 +51,13 @@ class QueryDefinitionOptionsInput(PydanticInputMixin[CreateQueryDefinitionOption
     name="CreateQueryDefinitionInput",
 )
 class CreateQueryDefinitionInput(PydanticInputMixin[CreateQueryDefinitionInputDTO]):
-    name: str = strawberry.field(description="Human-readable identifier (must be unique).")
-    metric_name: str = strawberry.field(description="Prometheus metric name.")
-    query_template: str = strawberry.field(
+    name: str = gql_field(description="Human-readable identifier (must be unique).")
+    metric_name: str = gql_field(description="Prometheus metric name.")
+    query_template: str = gql_field(
         description="PromQL template with {labels}, {window}, {group_by} placeholders."
     )
-    time_window: str | None = strawberry.field(default=None, description="Default time window.")
-    options: QueryDefinitionOptionsInput = strawberry.field(
+    time_window: str | None = gql_field(description="Default time window.", default=None)
+    options: QueryDefinitionOptionsInput = gql_field(
         description="Query definition options including filter and group labels."
     )
 
@@ -71,11 +71,11 @@ class CreateQueryDefinitionInput(PydanticInputMixin[CreateQueryDefinitionInputDT
 class ModifyQueryDefinitionOptionsInputGQL(
     PydanticInputMixin[ModifyQueryDefinitionOptionsInputDTO]
 ):
-    filter_labels: list[str] | None = strawberry.field(
-        default=None, description="Allowed filter label keys."
+    filter_labels: list[str] | None = gql_field(
+        description="Allowed filter label keys.", default=None
     )
-    group_labels: list[str] | None = strawberry.field(
-        default=None, description="Allowed group-by label keys."
+    group_labels: list[str] | None = gql_field(
+        description="Allowed group-by label keys.", default=None
     )
 
 
@@ -86,14 +86,12 @@ class ModifyQueryDefinitionOptionsInputGQL(
     name="ModifyQueryDefinitionInput",
 )
 class ModifyQueryDefinitionInput(PydanticInputMixin[ModifyQueryDefinitionInputDTO]):
-    name: str | None = strawberry.field(default=UNSET, description="New name.")
-    metric_name: str | None = strawberry.field(default=UNSET, description="New metric name.")
-    query_template: str | None = strawberry.field(default=UNSET, description="New PromQL template.")
-    time_window: str | None = strawberry.field(
-        default=UNSET, description="New default time window."
-    )
-    options: ModifyQueryDefinitionOptionsInputGQL | None = strawberry.field(
-        default=UNSET, description="New query definition options."
+    name: str | None = gql_field(description="New name.", default=UNSET)
+    metric_name: str | None = gql_field(description="New metric name.", default=UNSET)
+    query_template: str | None = gql_field(description="New PromQL template.", default=UNSET)
+    time_window: str | None = gql_field(description="New default time window.", default=UNSET)
+    options: ModifyQueryDefinitionOptionsInputGQL | None = gql_field(
+        description="New query definition options.", default=UNSET
     )
 
 
@@ -102,9 +100,9 @@ class ModifyQueryDefinitionInput(PydanticInputMixin[ModifyQueryDefinitionInputDT
     name="QueryTimeRangeInput",
 )
 class QueryTimeRangeInput(PydanticInputMixin[QueryTimeRangeInputDTO]):
-    start: datetime = strawberry.field(description="Start of the time range.")
-    end: datetime = strawberry.field(description="End of the time range.")
-    step: str = strawberry.field(description="Query resolution step (e.g., '60s').")
+    start: datetime = gql_field(description="Start of the time range.")
+    end: datetime = gql_field(description="End of the time range.")
+    step: str = gql_field(description="Query resolution step (e.g., '60s').")
 
 
 @gql_pydantic_input(
@@ -112,8 +110,8 @@ class QueryTimeRangeInput(PydanticInputMixin[QueryTimeRangeInputDTO]):
     name="MetricLabelEntryInput",
 )
 class MetricLabelEntryInput(PydanticInputMixin[MetricLabelEntryDTO]):
-    key: str = strawberry.field(description="Label key.")
-    value: str = strawberry.field(description="Label value.")
+    key: str = gql_field(description="Label key.")
+    value: str = gql_field(description="Label value.")
 
 
 @gql_pydantic_input(
@@ -123,9 +121,9 @@ class MetricLabelEntryInput(PydanticInputMixin[MetricLabelEntryDTO]):
     name="ExecuteQueryDefinitionOptionsInput",
 )
 class ExecuteQueryDefinitionOptionsInput(PydanticInputMixin[ExecuteQueryDefinitionOptionsInputDTO]):
-    filter_labels: list[MetricLabelEntryInput] | None = strawberry.field(
-        default=None, description="Label key-value pairs to filter by."
+    filter_labels: list[MetricLabelEntryInput] | None = gql_field(
+        description="Label key-value pairs to filter by.", default=None
     )
-    group_labels: list[str] | None = strawberry.field(
-        default=None, description="Label keys to group results by."
+    group_labels: list[str] | None = gql_field(
+        description="Label keys to group results by.", default=None
     )

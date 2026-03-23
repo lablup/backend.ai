@@ -37,6 +37,8 @@ from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     PydanticInputMixin,
     gql_connection_type,
+    gql_field,
+    gql_mutation,
     gql_node_type,
     gql_pydantic_input,
     gql_pydantic_type,
@@ -89,12 +91,12 @@ HuggingFaceRegistryEdge = Edge[HuggingFaceRegistry]
     ),
 )
 class HuggingFaceRegistryConnection(Connection[HuggingFaceRegistry]):
-    @strawberry.field
+    @gql_field(description="The count of this entity.")
     def count(self) -> int:
         return len(self.edges)
 
 
-@strawberry.field(description="Added in 25.14.0")  # type: ignore[misc]
+@gql_field(description="Added in 25.14.0")  # type: ignore[misc]
 async def huggingface_registry(
     id: ID, info: Info[StrawberryGQLContext]
 ) -> HuggingFaceRegistry | None:
@@ -102,7 +104,7 @@ async def huggingface_registry(
     return HuggingFaceRegistry.from_pydantic(node)
 
 
-@strawberry.field(description="Added in 25.14.0")  # type: ignore[misc]
+@gql_field(description="Added in 25.14.0")  # type: ignore[misc]
 async def huggingface_registries(
     info: Info[StrawberryGQLContext],
     before: str | None = None,
@@ -196,7 +198,7 @@ class DeleteHuggingFaceRegistryPayload(PydanticOutputMixin[DeleteHuggingFaceRegi
     id: ID
 
 
-@strawberry.mutation(description="Added in 25.14.0")  # type: ignore[misc]
+@gql_mutation(BackendAIGQLMeta(added_version="25.14.0", description="Create huggingface registry."))  # type: ignore[misc]
 async def create_huggingface_registry(
     input: CreateHuggingFaceRegistryInput, info: Info[StrawberryGQLContext]
 ) -> CreateHuggingFaceRegistryPayload:
@@ -206,7 +208,7 @@ async def create_huggingface_registry(
     )
 
 
-@strawberry.mutation(description="Added in 25.14.0")  # type: ignore[misc]
+@gql_mutation(BackendAIGQLMeta(added_version="25.14.0", description="Update huggingface registry."))  # type: ignore[misc]
 async def update_huggingface_registry(
     input: UpdateHuggingFaceRegistryInput, info: Info[StrawberryGQLContext]
 ) -> UpdateHuggingFaceRegistryPayload:
@@ -216,7 +218,7 @@ async def update_huggingface_registry(
     )
 
 
-@strawberry.mutation(description="Added in 25.14.0")  # type: ignore[misc]
+@gql_mutation(BackendAIGQLMeta(added_version="25.14.0", description="Delete huggingface registry."))  # type: ignore[misc]
 async def delete_huggingface_registry(
     input: DeleteHuggingFaceRegistryInput, info: Info[StrawberryGQLContext]
 ) -> DeleteHuggingFaceRegistryPayload:

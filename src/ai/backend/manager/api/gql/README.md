@@ -61,8 +61,9 @@ domain_v2/
 
 ### Decorator Rules
 
-All GQL output types and input types MUST use custom decorators from `decorators.py`.
-Never use `@strawberry.type` or `@strawberry.input` directly.
+All GQL types MUST use custom decorators from `decorators.py`.
+Never use `@strawberry.type`, `@strawberry.input`, `@strawberry.field`, `@strawberry.enum`,
+`@strawberry.mutation`, `@strawberry.subscription`, or `@strawberry.federation.type` directly.
 
 ```python
 from ai.backend.manager.api.gql.decorators import (
@@ -71,6 +72,13 @@ from ai.backend.manager.api.gql.decorators import (
     gql_pydantic_type,
     gql_pydantic_input,
     gql_connection_type,
+    gql_field,
+    gql_added_field,
+    gql_root_field,
+    gql_enum,
+    gql_mutation,
+    gql_subscription,
+    gql_federation_type,
 )
 ```
 
@@ -89,7 +97,7 @@ class DomainV2GQL(PydanticNodeMixin[DomainNode]):
     basic_info: DomainBasicInfoGQL
     # ...
 
-    @strawberry.field
+    @gql_field(description="Projects belonging to this domain.")
     async def projects(self, info: Info[StrawberryGQLContext]) -> ...:
         return await info.context.data_loaders.project_loader.load(self.domain_name)
 ```
@@ -150,8 +158,23 @@ class AdminSearchDomainsPayloadGQL:
 
 ### Enum Values
 
-- `@strawberry.enum` may be used directly on `StrEnum` subclasses.
+- Use `gql_enum` (decorator or function call) — never `@strawberry.enum` directly.
 - GQL enum values MUST match DTO enum values exactly (conversion is by `.value`).
+
+```python
+# As decorator
+@gql_enum(BackendAIGQLMeta(added_version="25.1.0", description="Domain status."))
+class DomainStatusGQL(StrEnum):
+    ACTIVE = "ACTIVE"
+    INACTIVE = "INACTIVE"
+
+# As function (DTO wrapping)
+DomainStatusGQL = gql_enum(
+    BackendAIGQLMeta(added_version="25.1.0", description="Domain status."),
+    DomainStatusDTO,
+    name="DomainStatus",
+)
+```
 
 ## Fetcher Pattern
 
@@ -183,7 +206,7 @@ async def fetch_admin_search_domains(
 ### Query Resolvers
 
 ```python
-@strawberry.field(description="Added in 25.1.0. Search all domains (admin only).")
+@gql_root_field(BackendAIGQLMeta(added_version="25.1.0", description="Search all domains (admin only)."))
 async def admin_search_domains(
     info: Info[StrawberryGQLContext],
     filter: DomainV2FilterGQL | None = None,
@@ -200,7 +223,7 @@ async def admin_search_domains(
 ### Mutation Resolvers
 
 ```python
-@strawberry.mutation(description="Added in 25.1.0. Create a domain.")
+@gql_mutation(BackendAIGQLMeta(added_version="25.1.0", description="Create a domain."))
 async def admin_create_domain(
     input: CreateDomainInputGQL,
     info: Info[StrawberryGQLContext],
@@ -218,7 +241,7 @@ Use `strawberry.lazy()` to avoid circular imports:
 if TYPE_CHECKING:
     from ai.backend.manager.api.gql.project_v2.types.node import ProjectV2GQL
 
-@strawberry.field
+@gql_field(description="Projects associated with this domain.")
 async def projects(
     self, info: Info[StrawberryGQLContext]
 ) -> Annotated[ProjectV2GQL, strawberry.lazy("...project_v2.types.node")] | None:
