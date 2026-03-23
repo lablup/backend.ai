@@ -374,10 +374,11 @@ class ImageRow(Base):  # type: ignore[misc]
         server_default=ImageStatus.ALIVE.name,
         nullable=False,
     )
-    last_used_at: Mapped[datetime | None] = mapped_column(
+    last_used_at: Mapped[datetime] = mapped_column(
         "last_used_at",
         sa.DateTime(timezone=True),
-        nullable=True,
+        nullable=False,
+        server_default=sa.func.now(),
     )
 
     aliases = relationship("ImageAliasRow", back_populates="image")
@@ -951,6 +952,7 @@ class ImageRow(Base):  # type: ignore[misc]
             ],
             supported_accelerators=self.accelerators.split(",") if self.accelerators else ["*"],
             created_at=self.created_at,
+            last_used_at=self.last_used_at,
             # legacy
             hash=self.trimmed_digest or None,
         )
