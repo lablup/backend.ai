@@ -39,6 +39,7 @@ class PermissionRow(Base):  # type: ignore[misc]
     role_id: Mapped[uuid.UUID] = mapped_column(
         "role_id",
         GUID,
+        sa.ForeignKey("roles.id", ondelete="CASCADE"),
         nullable=False,
     )
     scope_type: Mapped[ScopeType] = mapped_column(
