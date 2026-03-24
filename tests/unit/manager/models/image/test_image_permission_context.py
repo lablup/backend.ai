@@ -48,6 +48,65 @@ PROJECT_RESOURCE_POLICY_NAME = "test-project-policy"
 class TestImagePermissionContextNonGlobalRegistry:
     """Regression tests for non-global registry permission context building."""
 
+    # ------------------------------------------------------------------
+    # Helpers
+    # ------------------------------------------------------------------
+
+    async def _create_project(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        name: str,
+        domain: str,
+        user: UserRow,
+    ) -> UUID:
+        project_id = uuid4()
+        async with db_with_cleanup.begin_session() as sess:
+            sess.add(
+                GroupRow(
+                    id=project_id,
+                    name=name,
+                    domain_name=domain,
+                    is_active=True,
+                    resource_policy=PROJECT_RESOURCE_POLICY_NAME,
+                )
+            )
+            await sess.flush()
+            sess.add(
+                AssocGroupUserRow(
+                    id=uuid4(),
+                    user_id=user.uuid,
+                    group_id=project_id,
+                )
+            )
+            await sess.commit()
+        return project_id
+
+    def _make_image(
+        self,
+        registry_id: UUID,
+        project: str,
+        name_suffix: str,
+    ) -> ImageRow:
+        return ImageRow(
+            name=f"{REGISTRY_NAME}/{project}/{name_suffix}:latest",
+            image=name_suffix,
+            tag="latest",
+            registry=REGISTRY_NAME,
+            registry_id=registry_id,
+            project=project,
+            architecture="x86_64",
+            config_digest=f"sha256:{uuid4().hex}",
+            size_bytes=100_000,
+            type=ImageType.COMPUTE,
+            status=ImageStatus.ALIVE,
+            labels={},
+            resources={},
+        )
+
+    # ------------------------------------------------------------------
+    # Fixtures
+    # ------------------------------------------------------------------
+
     @pytest.fixture
     async def db_with_cleanup(
         self,
@@ -124,35 +183,6 @@ class TestImagePermissionContextNonGlobalRegistry:
         async with db_with_cleanup.begin_readonly_session() as sess:
             return await sess.get_one(UserRow, user_id)
 
-    async def _create_project(
-        self,
-        db_with_cleanup: ExtendedAsyncSAEngine,
-        name: str,
-        domain: str,
-        user: UserRow,
-    ) -> UUID:
-        project_id = uuid4()
-        async with db_with_cleanup.begin_session() as sess:
-            sess.add(
-                GroupRow(
-                    id=project_id,
-                    name=name,
-                    domain_name=domain,
-                    is_active=True,
-                    resource_policy=PROJECT_RESOURCE_POLICY_NAME,
-                )
-            )
-            await sess.flush()
-            sess.add(
-                AssocGroupUserRow(
-                    id=uuid4(),
-                    user_id=user.uuid,
-                    group_id=project_id,
-                )
-            )
-            await sess.commit()
-        return project_id
-
     @pytest.fixture
     async def queried_project(
         self, db_with_cleanup: ExtendedAsyncSAEngine, domain: str, user: UserRow
@@ -223,28 +253,6 @@ class TestImagePermissionContextNonGlobalRegistry:
             await sess.commit()
         return registry_id
 
-    def _make_image(
-        self,
-        registry_id: UUID,
-        project: str,
-        name_suffix: str,
-    ) -> ImageRow:
-        return ImageRow(
-            name=f"{REGISTRY_NAME}/{project}/{name_suffix}:latest",
-            image=name_suffix,
-            tag="latest",
-            registry=REGISTRY_NAME,
-            registry_id=registry_id,
-            project=project,
-            architecture="x86_64",
-            config_digest=f"sha256:{uuid4().hex}",
-            size_bytes=100_000,
-            type=ImageType.COMPUTE,
-            status=ImageStatus.ALIVE,
-            labels={},
-            resources={},
-        )
-
     @pytest.fixture
     async def global_image_id(
         self,
@@ -281,6 +289,10 @@ class TestImagePermissionContextNonGlobalRegistry:
             user_id=user.uuid,
             user_role=UserRole.USER,
         )
+
+    # ------------------------------------------------------------------
+    # Tests
+    # ------------------------------------------------------------------
 
     async def test_no_keyerror_when_non_global_registry_associated_with_multiple_projects(
         self,
