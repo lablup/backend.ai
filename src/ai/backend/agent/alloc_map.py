@@ -4,6 +4,7 @@ import enum
 import fnmatch
 import itertools
 import logging
+import math
 import operator
 from abc import ABCMeta, abstractmethod
 from collections import defaultdict
@@ -570,7 +571,7 @@ class FractionAllocMap(AbstractAllocMap):
         *,
         context_tag: str | None = None,
     ) -> None:
-        if len(sorted_dev_allocs) == 0:
+        if len(sorted_dev_allocs) <= 0:
             raise FractionalResourceFragmented(
                 "FractionAllocMap: no device left for allocation!",
                 context_tag=context_tag,
@@ -578,18 +579,54 @@ class FractionAllocMap(AbstractAllocMap):
                 requested_alloc=alloc,
                 dev_allocs=sorted_dev_allocs,
             )
-        most_free_dev_id, most_free_device_alloc = sorted_dev_allocs[0]
-        most_free_device_allocatable = (
-            self.device_slots[most_free_dev_id].amount - most_free_device_alloc
+
+        if alloc <= 0:
+            raise InvalidResourceArgument("Allocation amount must be positive.")
+
+        # NOTE: This logic assumes a single node with homogeneous devices (same capacity).
+        # Heterogeneous device mixes or multi-node setups require a separate strategy.
+        device_capacity = self.device_slots[sorted_dev_allocs[0][0]].amount
+
+        # Minimum number of devices needed: ceil(requested / per-device capacity)
+        num_devices_needed = math.ceil(alloc / device_capacity)
+
+        # Per-device density rounded down to the quantum size to match distribute_evenly behavior
+        per_device_density = alloc / Decimal(num_devices_needed)
+        quantized_per_device_alloc = round_down(per_device_density, self.quantum_size)
+
+        # Remainder calculation: matches distribute_evenly logic
+        # num_devices_with_extra_quantum: devices that receive +Q due to round_down remainder
+        shortfall = alloc - (quantized_per_device_alloc * num_devices_needed)
+        num_devices_with_extra_quantum = round(shortfall / self.quantum_size)
+
+        # Two-tier availability check:
+        # - num_devices_with_extra_quantum devices need (D_q + Q) free capacity
+        # - remaining devices need D_q free capacity
+        high_alloc = quantized_per_device_alloc + self.quantum_size
+        low_alloc = quantized_per_device_alloc
+
+        high_satisfied = 0
+        low_satisfied = 0
+        for dev_id, current_alloc in sorted_dev_allocs:
+            free_capacity = self.device_slots[dev_id].amount - current_alloc
+            if free_capacity >= high_alloc:
+                high_satisfied += 1
+            elif free_capacity >= low_alloc:
+                low_satisfied += 1
+
+        if (
+            high_satisfied >= num_devices_with_extra_quantum
+            and (high_satisfied + low_satisfied) >= num_devices_needed
+        ):
+            return
+
+        raise FractionalResourceFragmented(
+            "FractionAllocMap: refusing to create kernel with fractional resource fragmented!",
+            context_tag=context_tag,
+            slot_name=slot_name,
+            requested_alloc=alloc,
+            dev_allocs=sorted_dev_allocs,
         )
-        if most_free_device_allocatable < alloc:
-            raise FractionalResourceFragmented(
-                "FractionAllocMap: refusing to create kernel with fractional resource fragmented!",
-                context_tag=context_tag,
-                slot_name=slot_name,
-                requested_alloc=alloc,
-                dev_allocs=sorted_dev_allocs,
-            )
 
     def _allocate_by_filling(
         self,
