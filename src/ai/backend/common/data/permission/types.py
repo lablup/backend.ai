@@ -171,14 +171,14 @@ class EntityType(enum.StrEnum):
     IMAGE_AGENT = "image:agent"
     IMAGE_RESOURCE_LIMIT = "image:resource_limit"
     # Artifact sub
-    ARTIFACT_REVISION = "artifact:revision"
+    ARTIFACT_REVISION = "artifact_revision"
     ARTIFACT_SCAN = "artifact:scan"
     ARTIFACT_MODEL = "artifact:model"
     ARTIFACT_IMPORT = "artifact:import"
     ARTIFACT_DOWNLOAD = "artifact:download"
     ARTIFACT_README = "artifact:readme"
     ARTIFACT_VERIFICATION = "artifact:verification"
-    ARTIFACT_REVISION_STORAGE_LINK = "artifact:revision:storage_link"
+    ARTIFACT_REVISION_STORAGE_LINK = "artifact_revision:storage_link"
     # VFolder sub
     VFOLDER_FILE = "vfolder:file"
     VFOLDER_DIRECTORY = "vfolder:directory"
