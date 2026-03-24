@@ -1797,17 +1797,6 @@ class VfolderRepository:
                     operations=None,
                 )
                 await execute_rbac_revoker(session, revoker)
-                # Remove new owner's scope-entity mapping
-                await session.execute(
-                    sa.delete(AssociationScopesEntitiesRow).where(
-                        sa.and_(
-                            AssociationScopesEntitiesRow.scope_type == ScopeType.USER,
-                            AssociationScopesEntitiesRow.scope_id == str(user_info.uuid),
-                            AssociationScopesEntitiesRow.entity_type == EntityType.VFOLDER,
-                            AssociationScopesEntitiesRow.entity_id == str(vfolder_id),
-                        )
-                    )
-                )
 
         await execute_with_retry(_delete_related_rows)
 
