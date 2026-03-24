@@ -107,6 +107,7 @@ from ..models.vfolder import (
     is_unmanaged,
 )
 from ..models.vfolder import VFolderRow as VFolderDBRow
+from ..repositories.permission_controller.role_manager import RoleManager
 from ..services.vfolder.actions.base import (
     CloneVFolderAction,
     CreateVFolderAction,
@@ -2694,14 +2695,17 @@ async def change_vfolder_ownership(request: web.Request, params: Any) -> web.Res
     )
     async with root_ctx.db.begin_readonly() as conn:
         query = (
-            sa.select([vfolders.c.host])
+            sa.select([vfolders.c.host, vfolders.c.user])
             .select_from(vfolders)
             .where(
                 (vfolders.c.id == vfolder_id)
                 & (vfolders.c.ownership_type == VFolderOwnershipType.USER)
             )
         )
-        folder_host = await conn.scalar(query)
+        result = await conn.execute(query)
+        row = result.first()
+        folder_host = row.host if row else None
+        old_owner_uuid = row.user if row else None
     if folder_host not in allowed_hosts_by_user:
         raise VFolderOperationFailed("User to migrate vfolder needs an access to the storage host.")
 
@@ -2736,8 +2740,29 @@ async def change_vfolder_ownership(request: web.Request, params: Any) -> web.Res
                 & (vfolder_permissions.c.user == user_info.uuid)
             )
             await conn.execute(query)
+        # Clean up new owner's RBAC permission (invitee records) to prevent
+        # unique constraint violation on future re-invite after round-trip transfer
+        role_manager = RoleManager()
+        async with root_ctx.db.begin_session() as db_session:
+            try:
+                await role_manager.delete_object_permission_of_user(
+                    db_session, user_info.uuid, vfolder_id
+                )
+            except (AttributeError, ValueError):
+                pass  # New owner had no RBAC permission records
 
     await execute_with_retry(_delete_vfolder_related_rows)
+
+    # Clean up old owner's RBAC permission records
+    if old_owner_uuid is not None and old_owner_uuid != user_info.uuid:
+        role_manager = RoleManager()
+        async with root_ctx.db.begin_session() as db_session:
+            try:
+                await role_manager.delete_object_permission_of_user(
+                    db_session, old_owner_uuid, vfolder_id
+                )
+            except (AttributeError, ValueError):
+                pass  # Old owner had no RBAC permission records
 
     return web.json_response({}, status=HTTPStatus.OK)
 
