@@ -35,6 +35,7 @@ from .role import (
     CreateRoleInput,
     DeleteRoleInput,
     DeleteRolePayload,
+    PermissionNestedFilterGQL,
     PurgeRoleInput,
     PurgeRolePayload,
     RevokeRoleInput,
@@ -83,6 +84,7 @@ __all__ = [
     "RoleFilter",
     "RoleAssignmentFilter",
     "RoleAssignmentRoleNestedFilterGQL",
+    "PermissionNestedFilterGQL",
     "EntityFilter",
     # OrderBy
     "PermissionOrderBy",

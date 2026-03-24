@@ -33,6 +33,9 @@ from ai.backend.common.dto.manager.v2.rbac.request import (
     DeleteRoleInput as DeleteRoleInputDTO,
 )
 from ai.backend.common.dto.manager.v2.rbac.request import (
+    PermissionNestedFilter as PermissionNestedFilterDTO,
+)
+from ai.backend.common.dto.manager.v2.rbac.request import (
     PurgeRoleInput as PurgeRoleInputDTO,
 )
 from ai.backend.common.dto.manager.v2.rbac.request import (
@@ -100,6 +103,10 @@ from ai.backend.manager.api.gql.decorators import (
     gql_pydantic_type,
 )
 from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin, PydanticOutputMixin
+from ai.backend.manager.api.gql.rbac.types.permission import (
+    OperationTypeGQL,
+    RBACElementTypeGQL,
+)
 from ai.backend.manager.api.gql.types import GQLFilter, GQLOrderBy, StrawberryGQLContext
 
 if TYPE_CHECKING:
@@ -429,12 +436,31 @@ class RoleAssignmentRoleNestedFilterGQL(PydanticInputMixin[RoleNestedFilterDTO])
 
 
 @gql_pydantic_input(
+    BackendAIGQLMeta(
+        description="Nested filter for permissions within a role assignment. Filters assignments where the assigned role has permissions matching all specified conditions.",
+        added_version="26.3.0",
+    ),
+    name="PermissionNestedFilter",
+)
+class PermissionNestedFilterGQL(PydanticInputMixin[PermissionNestedFilterDTO]):
+    scope_id: str | None = None
+    scope_type: RBACElementTypeGQL | None = None
+    entity_type: RBACElementTypeGQL | None = None
+    operation: OperationTypeGQL | None = None
+
+    AND: list[Self] | None = None
+    OR: list[Self] | None = None
+    NOT: list[Self] | None = None
+
+
+@gql_pydantic_input(
     BackendAIGQLMeta(description="Filter for role assignments", added_version="26.3.0"),
     name="RoleAssignmentFilter",
 )
 class RoleAssignmentFilter(PydanticInputMixin[RoleAssignmentFilterDTO], GQLFilter):
     role_id: uuid.UUID | None = None
     role: RoleAssignmentRoleNestedFilterGQL | None = None
+    permission: PermissionNestedFilterGQL | None = None
     username: StringFilter | None = None
     email: StringFilter | None = None
 
