@@ -4,7 +4,11 @@ import os
 from typing import Self
 
 import psutil
-from prometheus_client import Counter, Gauge, Histogram
+from ai.backend.common.metrics.safe import (
+    SafeCounter as Counter,
+    SafeGauge as Gauge,
+    SafeHistogram as Histogram,
+)
 
 from ai.backend.common.data.permission.types import EntityType
 from ai.backend.common.exception import BackendAIError, ErrorCode
