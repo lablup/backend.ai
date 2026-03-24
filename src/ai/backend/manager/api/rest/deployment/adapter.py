@@ -426,6 +426,7 @@ def build_revision_creator(revision_input: RevisionInput) -> ModelRevisionCreato
         resource_spec=resource_spec,
         mounts=mounts,
         execution=execution,
+        model_definition=revision_input.model_definition,
     )
 
 

@@ -773,6 +773,7 @@ class DeploymentAdapter(BaseAdapter):
                 else None,
                 inference_runtime_config=input.model_runtime_config.inference_runtime_config,
             ),
+            model_definition=input.model_definition,
         )
         action_result = await self._processors.deployment.add_model_revision.wait_for_complete(
             AddModelRevisionAction(model_deployment_id=input.deployment_id, adder=adder)
