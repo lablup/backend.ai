@@ -72,6 +72,9 @@ from ai.backend.common.dto.manager.v2.rbac.request import (
     PermissionFilter as PermissionFilterDTO,
 )
 from ai.backend.common.dto.manager.v2.rbac.request import (
+    PermissionNestedFilter as PermissionNestedFilterDTO,
+)
+from ai.backend.common.dto.manager.v2.rbac.request import (
     PermissionOrderBy as PermissionOrderByDTO,
 )
 from ai.backend.common.dto.manager.v2.rbac.request import (
@@ -132,6 +135,7 @@ from ai.backend.manager.models.rbac_models.association_scopes_entities import (
 from ai.backend.manager.models.rbac_models.conditions import (
     AssignedUserConditions,
     EntityScopeConditions,
+    PermissionConditions,
     RoleConditions,
     ScopedPermissionConditions,
 )
@@ -1055,12 +1059,49 @@ class RBACAdapter(BaseAdapter):
                 conditions.append(negate_conditions(not_conditions))
         return conditions
 
+    def _convert_permission_nested_filter(
+        self, f: PermissionNestedFilterDTO
+    ) -> list[QueryCondition]:
+        raw_conditions: list[QueryCondition] = []
+        if f.scope_id is not None:
+            raw_conditions.append(PermissionConditions.by_scope_id(f.scope_id))
+        if f.scope_type is not None:
+            scope_type = RBACElementType(f.scope_type).to_scope_type()
+            raw_conditions.append(PermissionConditions.by_scope_types([scope_type]))
+        if f.entity_type is not None:
+            entity_type = RBACElementType(f.entity_type).to_entity_type()
+            raw_conditions.append(PermissionConditions.by_entity_types([entity_type]))
+        if f.operation is not None:
+            operation = InternalOperationType(f.operation)
+            raw_conditions.append(PermissionConditions.by_operations([operation]))
+        conditions: list[QueryCondition] = []
+        if raw_conditions:
+            conditions.append(AssignedUserConditions.exists_permission_combined(raw_conditions))
+        if f.AND:
+            for sub in f.AND:
+                conditions.extend(self._convert_permission_nested_filter(sub))
+        if f.OR:
+            or_conditions: list[QueryCondition] = []
+            for sub in f.OR:
+                or_conditions.extend(self._convert_permission_nested_filter(sub))
+            if or_conditions:
+                conditions.append(combine_conditions_or(or_conditions))
+        if f.NOT:
+            not_conditions: list[QueryCondition] = []
+            for sub in f.NOT:
+                not_conditions.extend(self._convert_permission_nested_filter(sub))
+            if not_conditions:
+                conditions.append(negate_conditions(not_conditions))
+        return conditions
+
     def _convert_assignment_filter(self, f: RoleAssignmentFilterDTO) -> list[QueryCondition]:
         conditions: list[QueryCondition] = []
         if f.role_id is not None:
             conditions.append(AssignedUserConditions.by_role_id(f.role_id))
         if f.role is not None:
             conditions.extend(self._convert_role_nested_filter(f.role))
+        if f.permission is not None:
+            conditions.extend(self._convert_permission_nested_filter(f.permission))
         if f.username is not None:
             condition = self.convert_string_filter(
                 f.username,
