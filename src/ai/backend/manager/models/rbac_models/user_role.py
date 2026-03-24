@@ -48,8 +48,18 @@ class UserRoleRow(Base):  # type: ignore[misc]
     id: Mapped[uuid.UUID] = mapped_column(
         "id", GUID, primary_key=True, server_default=sa.text("uuid_generate_v4()")
     )
-    user_id: Mapped[uuid.UUID] = mapped_column("user_id", GUID, nullable=False)
-    role_id: Mapped[uuid.UUID] = mapped_column("role_id", GUID, nullable=False)
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        "user_id",
+        GUID,
+        sa.ForeignKey("users.uuid", ondelete="CASCADE"),
+        nullable=False,
+    )
+    role_id: Mapped[uuid.UUID] = mapped_column(
+        "role_id",
+        GUID,
+        sa.ForeignKey("roles.id", ondelete="CASCADE"),
+        nullable=False,
+    )
     granted_by: Mapped[uuid.UUID | None] = mapped_column(
         "granted_by", GUID, nullable=True
     )  # Null if granted by system
