@@ -5,7 +5,12 @@ from collections.abc import Iterator
 from contextlib import contextmanager
 from typing import Self
 
-from prometheus_client import Counter, Histogram
+from ai.backend.common.metrics.safe import (
+    SafeCounter as Counter,
+)
+from ai.backend.common.metrics.safe import (
+    SafeHistogram as Histogram,
+)
 
 
 class SchedulerOperationMetricObserver:

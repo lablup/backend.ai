@@ -37,6 +37,11 @@ from ai.backend.common.metrics.metric import (
     SystemMetricObserver,
 )
 from ai.backend.common.metrics.multiprocess import generate_latest_multiprocess
+from ai.backend.common.metrics.safe import (
+    SafeCounter,
+    SafeGauge,
+    SafeHistogram,
+)
 from ai.backend.common.types import (
     MetricKey,
     MetricValue,
@@ -78,107 +83,107 @@ class ProxyMetricObserver:
     _connection_total_traffics_tcp: prometheus_client.Histogram
 
     def __init__(self) -> None:
-        self._upstream_request_sent_http = prometheus_client.Counter(
+        self._upstream_request_sent_http = SafeCounter(
             name="appproxy_upstream_request_sent_http",
             labelnames=["remote"],
             documentation="Total number of HTTP requests sent to upstream",
         )
         self._upstream_request_sent_http.labels(remote="").inc(0)
-        self._upstream_response_received_http = prometheus_client.Counter(
+        self._upstream_response_received_http = SafeCounter(
             name="appproxy_upstream_response_received_http",
             labelnames=["remote"],
             documentation="Total number of HTTP responses received from upstream",
         )
         self._upstream_response_received_http.labels(remote="").inc(0)
-        self._requests_received_http = prometheus_client.Counter(
+        self._requests_received_http = SafeCounter(
             name="appproxy_requests_received_http",
             labelnames=["remote"],
             documentation="Total number of HTTP requests received from downstream",
         )
         self._requests_received_http.labels(remote="").inc(0)
-        self._responses_sent_http = prometheus_client.Counter(
+        self._responses_sent_http = SafeCounter(
             name="appproxy_responses_sent_http",
             labelnames=["remote"],
             documentation="Total number of HTTP responses sent to downstream",
         )
         self._responses_sent_http.labels(remote="").inc(0)
-        self._pending_requests_http = prometheus_client.Gauge(
+        self._pending_requests_http = SafeGauge(
             name="appproxy_pending_requests_http",
             labelnames=["remote"],
             documentation="Ongoing HTTP proxy requests initiated by downstream",
             multiprocess_mode="livesum",
         )
         self._pending_requests_http.labels(remote="").set(0)
-        self._proxy_request_iteration_duration_http = prometheus_client.Histogram(
+        self._proxy_request_iteration_duration_http = SafeHistogram(
             name="appproxy_proxy_request_iteration_duration_http",
             labelnames=["remote"],
             documentation="Total seconds taken to complete each HTTP proxy request",
         )
-        self._request_body_size_http = prometheus_client.Histogram(
+        self._request_body_size_http = SafeHistogram(
             name="appproxy_request_body_size_http",
             labelnames=["remote"],
             documentation="Request body size measured for each HTTP proxy request",
         )
-        self._response_body_size_http = prometheus_client.Histogram(
+        self._response_body_size_http = SafeHistogram(
             name="appproxy_response_body_size_http",
             labelnames=["remote"],
             documentation="Byte length of the response body generated from upstream HTTP response",
         )
-        self._connections_established_ws = prometheus_client.Counter(
+        self._connections_established_ws = SafeCounter(
             name="appproxy_connections_established_ws",
             documentation="Total number of WebSocket connections established",
         )
         self._connections_established_ws.inc(0)
-        self._connections_closed_ws = prometheus_client.Counter(
+        self._connections_closed_ws = SafeCounter(
             name="appproxy_connections_closed_ws",
             documentation="Total number of WebSocket connections closed",
         )
         self._connections_closed_ws.inc(0)
-        self._pending_connections_ws = prometheus_client.Gauge(
+        self._pending_connections_ws = SafeGauge(
             name="appproxy_pending_connections_ws",
             documentation="Ongoing WebSocket proxy connections",
             multiprocess_mode="livesum",
         )
         self._pending_connections_ws.set(0)
-        self._proxy_request_iteration_duration_ws = prometheus_client.Histogram(
+        self._proxy_request_iteration_duration_ws = SafeHistogram(
             name="appproxy_proxy_request_iteration_duration_ws",
             documentation="Total seconds taken to complete each WebSocket proxy request",
         )
-        self._connection_processed_traffics_ws = prometheus_client.Counter(
+        self._connection_processed_traffics_ws = SafeCounter(
             name="appproxy_connection_processed_traffics_ws",
             documentation="Number of bytes transferred from each WebSocket connection bidirectionally, updated on-the-fly",
         )
         self._connection_processed_traffics_ws.inc(0)
-        self._connection_total_traffics_ws = prometheus_client.Histogram(
+        self._connection_total_traffics_ws = SafeHistogram(
             name="appproxy_connection_total_traffics_ws",
             documentation="Number of bytes transferred from each WebSocket connection bidirectionally, updated after WebSocket connection closes",
         )
-        self._connections_established_tcp = prometheus_client.Counter(
+        self._connections_established_tcp = SafeCounter(
             name="appproxy_connections_established_tcp",
             documentation="Total number of TCP connections established",
         )
         self._connections_established_tcp.inc(0)
-        self._connections_closed_tcp = prometheus_client.Counter(
+        self._connections_closed_tcp = SafeCounter(
             name="appproxy_connections_closed_tcp",
             documentation="Total number of TCP connections closed",
         )
         self._connections_closed_tcp.inc(0)
-        self._pending_connections_tcp = prometheus_client.Gauge(
+        self._pending_connections_tcp = SafeGauge(
             name="appproxy_pending_connections_tcp",
             documentation="Ongoing TCP proxy connections",
             multiprocess_mode="livesum",
         )
         self._pending_connections_tcp.set(0)
-        self._proxy_request_iteration_duration_tcp = prometheus_client.Histogram(
+        self._proxy_request_iteration_duration_tcp = SafeHistogram(
             name="appproxy_proxy_request_iteration_duration_tcp",
             documentation="Total seconds taken to complete each TCP proxy request",
         )
-        self._connection_processed_traffics_tcp = prometheus_client.Counter(
+        self._connection_processed_traffics_tcp = SafeCounter(
             name="appproxy_connection_processed_traffics_tcp",
             documentation="Number of bytes transferred from each TCP connection bidirectionally, updated on-the-fly",
         )
         self._connection_processed_traffics_tcp.inc(0)
-        self._connection_total_traffics_tcp = prometheus_client.Histogram(
+        self._connection_total_traffics_tcp = SafeHistogram(
             name="appproxy_connection_total_traffics_tcp",
             documentation="Number of bytes transferred from each TCP connection bidirectionally, updated on-the-fly",
         )
@@ -245,13 +250,13 @@ class CircuitMetricObserver:
     _alive_circuits: prometheus_client.Gauge
 
     def __init__(self) -> None:
-        self._circuits_created = prometheus_client.Counter(
+        self._circuits_created = SafeCounter(
             name="appproxy_circuits_created",
             labelnames=["protocol"],
             documentation="Total number of AppProxy circuits created on this Worker. `endpoint_id` is provided only when circuit is INFERENCE type. `user_id` is provided only when circuit is INTERACTIVE type.",
         )
         self._circuits_created.labels(protocol="").inc(0)
-        self._alive_circuits = prometheus_client.Gauge(
+        self._alive_circuits = SafeGauge(
             name="appproxy_alive_circuits",
             labelnames=["protocol"],
             documentation="Total number of AppProxy circuits created on this Worker. `endpoint_id` is provided only when circuit is INFERENCE type. `user_id` is provided only when circuit is INTERACTIVE type.",
