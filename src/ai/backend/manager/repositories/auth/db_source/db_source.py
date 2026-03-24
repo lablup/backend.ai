@@ -14,21 +14,31 @@ from ai.backend.common.metrics.metric import DomainType, LayerType
 from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPolicy
 from ai.backend.common.resilience.policies.retry import BackoffStrategy, RetryArgs, RetryPolicy
 from ai.backend.common.resilience.resilience import Resilience
+from ai.backend.manager.data.auth.login_session_types import LoginHistoryData, LoginSessionData
 from ai.backend.manager.data.auth.types import GroupMembershipData, UserData
-from ai.backend.manager.errors.auth import GroupMembershipNotFoundError, UserCreationError
+from ai.backend.manager.data.common.types import SearchResult
+from ai.backend.manager.errors.auth import (
+    AuthorizationFailed,
+    GroupMembershipNotFoundError,
+    UserCreationError,
+)
 from ai.backend.manager.errors.common import InternalServerError
 from ai.backend.manager.models.group import association_groups_users, groups
-from ai.backend.manager.models.hasher.types import PasswordInfo
+from ai.backend.manager.models.hasher.types import HashInfo, PasswordInfo
 from ai.backend.manager.models.keypair import keypairs
+from ai.backend.manager.models.login_session.enums import LoginAttemptResult, LoginSessionStatus
+from ai.backend.manager.models.login_session.row import LoginHistoryRow, LoginSessionRow
 from ai.backend.manager.models.user import (
     UserRole,
     UserRow,
     UserStatus,
     check_credential,
-    check_credential_with_migration,
+    compare_to_hashed_password,
     users,
 )
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.manager.repositories.base.querier import BatchQuerier, execute_batch_querier
+from ai.backend.manager.repositories.base.types import SearchScope
 
 auth_db_source_resilience = Resilience(
     policies=[
@@ -281,13 +291,72 @@ class AuthDBSource:
         email: str,
         target_password_info: PasswordInfo,
     ) -> sa.RowMapping:
-        """Verify credentials with password migration support."""
-        return await check_credential_with_migration(
-            db=self._db,
-            domain=domain_name,
-            email=email,
-            target_password_info=target_password_info,
-        )
+        """Verify credentials and atomically record the login attempt in login_history."""
+        async with self._db.begin() as conn:
+            result = await conn.execute(
+                sa.select(users)
+                .select_from(users)
+                .where((users.c.email == email) & (users.c.domain_name == domain_name)),
+            )
+            row = result.first()
+
+            if row is None:
+                raise AuthorizationFailed("User credential mismatch.")
+
+            if row.password is None:
+                await conn.execute(
+                    sa.insert(LoginHistoryRow.__table__).values(
+                        user_id=row.uuid,
+                        domain_name=domain_name,
+                        result=LoginAttemptResult.FAILED_INVALID_CREDENTIALS.value,
+                        fail_reason="Password not set",
+                    )
+                )
+                raise AuthorizationFailed("User credential mismatch.")
+
+            try:
+                if not compare_to_hashed_password(target_password_info.password, row.password):
+                    await conn.execute(
+                        sa.insert(LoginHistoryRow.__table__).values(
+                            user_id=row.uuid,
+                            domain_name=domain_name,
+                            result=LoginAttemptResult.FAILED_INVALID_CREDENTIALS.value,
+                            fail_reason="Password mismatch",
+                        )
+                    )
+                    raise AuthorizationFailed("User credential mismatch.")
+            except ValueError:
+                await conn.execute(
+                    sa.insert(LoginHistoryRow.__table__).values(
+                        user_id=row.uuid,
+                        domain_name=domain_name,
+                        result=LoginAttemptResult.FAILED_INVALID_CREDENTIALS.value,
+                        fail_reason="Password verification error",
+                    )
+                )
+                raise AuthorizationFailed("User credential mismatch.") from None
+
+            # Password is valid — record success
+            await conn.execute(
+                sa.insert(LoginHistoryRow.__table__).values(
+                    user_id=row.uuid,
+                    domain_name=domain_name,
+                    result=LoginAttemptResult.SUCCESS.value,
+                    fail_reason=None,
+                )
+            )
+
+            # Check if we need to migrate the hash
+            current_hash_info = HashInfo.from_hash_string(row.password)
+            if target_password_info.need_migration(current_hash_info):
+                await conn.execute(
+                    sa.update(users)
+                    .where((users.c.email == email) & (users.c.domain_name == domain_name))
+                    .values(password=target_password_info)
+                )
+
+            row_mapping: sa.RowMapping = row._mapping
+            return row_mapping
 
     @auth_db_source_resilience.apply()
     async def verify_credential_without_migration(
@@ -329,3 +398,60 @@ class AuthDBSource:
             if result is None:
                 raise InternalServerError("Failed to retrieve current database timestamp")
             return result
+
+    # --- Login Session ---
+
+    @auth_db_source_resilience.apply()
+    async def invalidate_sessions_by_user(self, user_id: UUID) -> None:
+        """Invalidate all active login sessions for a user."""
+        async with self._db.begin_session() as db_session:
+            query = (
+                sa.update(LoginSessionRow)
+                .where(
+                    (LoginSessionRow.user_id == user_id)
+                    & (LoginSessionRow.status == LoginSessionStatus.ACTIVE)
+                )
+                .values(
+                    status=LoginSessionStatus.INVALIDATED,
+                    invalidated_at=sa.func.now(),
+                )
+            )
+            await db_session.execute(query)
+
+    @auth_db_source_resilience.apply()
+    async def search_login_sessions(
+        self,
+        scope: SearchScope,
+        querier: BatchQuerier,
+    ) -> SearchResult[LoginSessionData]:
+        """Search login sessions with scope and batch querier."""
+        async with self._db.begin_readonly_session() as db_session:
+            query = sa.select(LoginSessionRow)
+            result = await execute_batch_querier(db_session, query, querier, scope=scope)
+            items = [row.LoginSessionRow.to_data() for row in result.rows]
+            return SearchResult(
+                items=items,
+                total_count=result.total_count,
+                has_next_page=result.has_next_page,
+                has_previous_page=result.has_previous_page,
+            )
+
+    # --- Login History ---
+
+    @auth_db_source_resilience.apply()
+    async def search_login_history(
+        self,
+        scope: SearchScope,
+        querier: BatchQuerier,
+    ) -> SearchResult[LoginHistoryData]:
+        """Search login history with scope and batch querier."""
+        async with self._db.begin_readonly_session() as db_session:
+            query = sa.select(LoginHistoryRow)
+            result = await execute_batch_querier(db_session, query, querier, scope=scope)
+            items = [row.LoginHistoryRow.to_data() for row in result.rows]
+            return SearchResult(
+                items=items,
+                total_count=result.total_count,
+                has_next_page=result.has_next_page,
+                has_previous_page=result.has_previous_page,
+            )

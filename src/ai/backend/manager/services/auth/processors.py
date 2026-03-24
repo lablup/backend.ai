@@ -27,6 +27,14 @@ from ai.backend.manager.services.auth.actions.resolve_user_scope import (
     ResolveUserScopeAction,
     ResolveUserScopeResult,
 )
+from ai.backend.manager.services.auth.actions.search_login_history import (
+    SearchLoginHistoryAction,
+    SearchLoginHistoryActionResult,
+)
+from ai.backend.manager.services.auth.actions.search_login_sessions import (
+    SearchLoginSessionsAction,
+    SearchLoginSessionsActionResult,
+)
 from ai.backend.manager.services.auth.actions.signout import SignoutAction, SignoutActionResult
 from ai.backend.manager.services.auth.actions.signup import SignupAction, SignupActionResult
 from ai.backend.manager.services.auth.actions.update_full_name import (
@@ -67,6 +75,10 @@ class AuthProcessors(AbstractProcessorPackage):
         ResolveAccessKeyScopeAction, ResolveAccessKeyScopeResult
     ]
     resolve_user_scope: ActionProcessor[ResolveUserScopeAction, ResolveUserScopeResult]
+    search_login_sessions: ActionProcessor[
+        SearchLoginSessionsAction, SearchLoginSessionsActionResult
+    ]
+    search_login_history: ActionProcessor[SearchLoginHistoryAction, SearchLoginHistoryActionResult]
 
     def __init__(
         self,
@@ -96,6 +108,8 @@ class AuthProcessors(AbstractProcessorPackage):
             service.resolve_access_key_scope, action_monitors
         )
         self.resolve_user_scope = ActionProcessor(service.resolve_user_scope, action_monitors)
+        self.search_login_sessions = ActionProcessor(service.search_login_sessions, action_monitors)
+        self.search_login_history = ActionProcessor(service.search_login_history, action_monitors)
 
     @override
     def supported_actions(self) -> list[ActionSpec]:
@@ -112,4 +126,6 @@ class AuthProcessors(AbstractProcessorPackage):
             UpdatePasswordNoAuthAction.spec(),
             ResolveAccessKeyScopeAction.spec(),
             ResolveUserScopeAction.spec(),
+            SearchLoginSessionsAction.spec(),
+            SearchLoginHistoryAction.spec(),
         ]

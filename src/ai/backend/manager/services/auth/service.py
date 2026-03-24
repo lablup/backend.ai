@@ -63,6 +63,14 @@ from ai.backend.manager.services.auth.actions.resolve_user_scope import (
     ResolveUserScopeAction,
     ResolveUserScopeResult,
 )
+from ai.backend.manager.services.auth.actions.search_login_history import (
+    SearchLoginHistoryAction,
+    SearchLoginHistoryActionResult,
+)
+from ai.backend.manager.services.auth.actions.search_login_sessions import (
+    SearchLoginSessionsAction,
+    SearchLoginSessionsActionResult,
+)
 from ai.backend.manager.services.auth.actions.signout import SignoutAction, SignoutActionResult
 from ai.backend.manager.services.auth.actions.signup import SignupAction, SignupActionResult
 from ai.backend.manager.services.auth.actions.update_full_name import (
@@ -145,6 +153,8 @@ class AuthService:
             user = hook_result.result
         else:
             # No AUTHORIZE hook is defined (proceed with normal login)
+            # Credential check + login history recording happen atomically
+            # inside the repository layer.
             target_password_info = PasswordInfo(
                 password=action.password,
                 algorithm=auth_config.password_hash_algorithm,
@@ -309,6 +319,7 @@ class AuthService:
             email,
             action.password,
         )
+        await self._auth_repository.invalidate_user_login_sessions(action.user_id)
         await self._auth_repository.deactivate_user_and_keypairs(email)
 
         return SignoutActionResult(success=True)
@@ -515,6 +526,22 @@ class AuthService:
             owner_uuid=owner_uuid,
             owner_role=owner_role,
         )
+
+    async def search_login_sessions(
+        self, action: SearchLoginSessionsAction
+    ) -> SearchLoginSessionsActionResult:
+        result = await self._auth_repository.search_login_sessions(
+            scope=action.scope, querier=action.querier
+        )
+        return SearchLoginSessionsActionResult(result=result)
+
+    async def search_login_history(
+        self, action: SearchLoginHistoryAction
+    ) -> SearchLoginHistoryActionResult:
+        result = await self._auth_repository.search_login_history(
+            scope=action.scope, querier=action.querier
+        )
+        return SearchLoginHistoryActionResult(result=result)
 
     async def _check_password_age(self, user: RowMapping, auth_config: AuthConfig | None) -> None:
         if (
