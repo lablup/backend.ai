@@ -1786,21 +1786,17 @@ class VfolderRepository:
                 await conn.execute(del_query)
 
                 # Also clean up new owner's RBAC records from when they were an invitee
-                try:
-                    new_owner_role_id = await self._get_user_role_id(session, user_info.uuid)
-                except ObjectNotFound:
-                    pass
-                else:
-                    revoker = RBACRevoker(
-                        entity_id=ObjectId(
-                            entity_type=EntityType.VFOLDER,
-                            entity_id=str(vfolder_id),
-                        ),
-                        entity_scope_type=RBACElementType.VFOLDER,
-                        target_role_ids=[new_owner_role_id],
-                        operations=None,
-                    )
-                    await execute_rbac_revoker(session, revoker)
+                new_owner_role_id = await self._get_user_role_id(session, user_info.uuid)
+                revoker = RBACRevoker(
+                    entity_id=ObjectId(
+                        entity_type=EntityType.VFOLDER,
+                        entity_id=str(vfolder_id),
+                    ),
+                    entity_scope_type=RBACElementType.VFOLDER,
+                    target_role_ids=[new_owner_role_id],
+                    operations=None,
+                )
+                await execute_rbac_revoker(session, revoker)
                 # Remove new owner's scope-entity mapping
                 await session.execute(
                     sa.delete(AssociationScopesEntitiesRow).where(
