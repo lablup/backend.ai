@@ -1250,7 +1250,7 @@ class TestDefragWithOccupiedDevices:
     @staticmethod
     def _make_map_with_remaining(
         device_remaining: list[Decimal],
-        strategy: AllocationStrategy,
+        strategy: AllocationStrategy = AllocationStrategy.FILL,
     ) -> FractionAllocMap:
         """Create a map where each device has the given remaining capacity.
 
@@ -1258,6 +1258,8 @@ class TestDefragWithOccupiedDevices:
         (``1.0 - remaining``) is pre-allocated sequentially.
         """
         device_capacity = Decimal("1.0")
+        # Pre-occupation always uses FILL so that each amount lands on
+        # the next device in order, producing a deterministic layout.
         alloc_map = FractionAllocMap(
             device_slots={
                 DeviceId(f"gpu{i}"): DeviceSlotInfo(
@@ -1267,7 +1269,7 @@ class TestDefragWithOccupiedDevices:
                 )
                 for i in range(len(device_remaining))
             },
-            allocation_strategy=strategy,
+            allocation_strategy=AllocationStrategy.FILL,
             quantum_size=Decimal("0.1"),
         )
         for remaining in device_remaining:
@@ -1277,17 +1279,19 @@ class TestDefragWithOccupiedDevices:
                     {SlotName("cuda.shares"): occupied},
                     allow_resource_fragmentation=True,
                 )
+        # Switch to the target strategy for the actual test allocation.
+        alloc_map.allocation_strategy = strategy
         return alloc_map
 
     @pytest.mark.parametrize(
         "device_remaining, requested",
         [
-            # 4 GPUs: gpu0 half-free, rest fully free
-            ([Decimal("0.5"), Decimal("1.0"), Decimal("1.0"), Decimal("1.0")], Decimal("1.5")),
-            # 4 GPUs: gpu0, gpu1 mostly free
+            # 4 GPUs: gpu0 half-free, rest free → 2 GPUs × 0.7
+            ([Decimal("0.5"), Decimal("1.0"), Decimal("1.0"), Decimal("1.0")], Decimal("1.4")),
+            # 4 GPUs: gpu0, gpu1 mostly free → 2 GPUs × 1.0
             ([Decimal("0.7"), Decimal("0.7"), Decimal("1.0"), Decimal("1.0")], Decimal("2.0")),
-            # 3 GPUs: all above threshold
-            ([Decimal("0.9"), Decimal("0.7"), Decimal("1.0")], Decimal("1.5")),
+            # 2 GPUs: both above threshold → 2 GPUs × 0.7
+            ([Decimal("0.9"), Decimal("1.0")], Decimal("1.4")),
         ],
     )
     async def test_fill_succeeds(
@@ -1304,12 +1308,12 @@ class TestDefragWithOccupiedDevices:
     @pytest.mark.parametrize(
         "device_remaining, requested",
         [
-            # 4 GPUs: 3 half-free → not enough capacity for greedy fill
-            ([Decimal("0.5"), Decimal("0.5"), Decimal("0.5"), Decimal("1.0")], Decimal("2.5")),
-            # 4 GPUs: all mostly used → fragmented
-            ([Decimal("0.8"), Decimal("0.8"), Decimal("0.8"), Decimal("0.8")], Decimal("3.5")),
-            # 3 GPUs: gpu0=0.2, gpu1=0.3 free → only gpu2 qualifies
-            ([Decimal("0.2"), Decimal("0.3"), Decimal("1.0")], Decimal("1.5")),
+            # 4 GPUs: 2 half-free → 4 GPUs × 0.7, but gpu0,1 only 0.5
+            ([Decimal("0.5"), Decimal("0.5"), Decimal("1.0"), Decimal("1.0")], Decimal("2.8")),
+            # 4 GPUs: all 0.8 free → 4 GPUs × 0.9 needed, but only 0.8 available
+            ([Decimal("0.8"), Decimal("0.8"), Decimal("0.8"), Decimal("0.8")], Decimal("3.6")),
+            # 2 GPUs: gpu0=0.2 free → 2 GPUs × 0.8, but gpu0 below threshold
+            ([Decimal("0.2"), Decimal("1.0")], Decimal("1.6")),
         ],
     )
     async def test_fill_raises(
@@ -1324,17 +1328,15 @@ class TestDefragWithOccupiedDevices:
                 allow_resource_fragmentation=False,
             )
 
-    # ── EVENLY strategy ──
-
     @pytest.mark.parametrize(
         "device_remaining, requested",
         [
-            # 4 GPUs: gpu0 half-free, rest fully free → distributed across 2 devices
-            ([Decimal("0.5"), Decimal("1.0"), Decimal("1.0"), Decimal("1.0")], Decimal("1.5")),
-            # 4 GPUs: gpu0, gpu1 mostly free → distributed across 2 devices
+            # 4 GPUs: gpu0 half-free, rest free → 2 GPUs × 0.7
+            ([Decimal("0.5"), Decimal("1.0"), Decimal("1.0"), Decimal("1.0")], Decimal("1.4")),
+            # 4 GPUs: gpu0, gpu1 mostly free → 2 GPUs × 1.0
             ([Decimal("0.7"), Decimal("0.7"), Decimal("1.0"), Decimal("1.0")], Decimal("2.0")),
-            # 3 GPUs: all above threshold → distributed across 2 devices
-            ([Decimal("0.9"), Decimal("0.7"), Decimal("1.0")], Decimal("1.5")),
+            # 2 GPUs: both above threshold → 2 GPUs × 0.7
+            ([Decimal("0.9"), Decimal("1.0")], Decimal("1.4")),
         ],
     )
     async def test_evenly_succeeds(
@@ -1351,12 +1353,12 @@ class TestDefragWithOccupiedDevices:
     @pytest.mark.parametrize(
         "device_remaining, requested",
         [
-            # 4 GPUs: 3 half-free → not enough for even distribution
-            ([Decimal("0.5"), Decimal("0.5"), Decimal("0.5"), Decimal("1.0")], Decimal("2.5")),
-            # 4 GPUs: all mostly used → fragmented
-            ([Decimal("0.8"), Decimal("0.8"), Decimal("0.8"), Decimal("0.8")], Decimal("3.5")),
-            # 3 GPUs: gpu0=0.2, gpu1=0.3 free → only gpu2 qualifies
-            ([Decimal("0.2"), Decimal("0.3"), Decimal("1.0")], Decimal("1.5")),
+            # 4 GPUs: 2 half-free → 4 GPUs × 0.7, but gpu0,1 only 0.5
+            ([Decimal("0.5"), Decimal("0.5"), Decimal("1.0"), Decimal("1.0")], Decimal("2.8")),
+            # 4 GPUs: all 0.8 free → 4 GPUs × 0.9 needed, but only 0.8 available
+            ([Decimal("0.8"), Decimal("0.8"), Decimal("0.8"), Decimal("0.8")], Decimal("3.6")),
+            # 2 GPUs: gpu0=0.2 free → 2 GPUs × 0.8, but gpu0 below threshold
+            ([Decimal("0.2"), Decimal("1.0")], Decimal("1.6")),
         ],
     )
     async def test_evenly_raises(
