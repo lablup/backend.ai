@@ -526,9 +526,7 @@ class AddRevisionInput(PydanticInputMixin[AddRevisionGQLInputDTO]):
     image: ImageInput
     model_runtime_config: ModelRuntimeConfigInput
     model_mount_config: ModelMountConfigInput
-    model_definition: JSON = Field(
-        description="Model definition to override the generated definition"
-    )
+    model_definition: JSON
     extra_mounts: list[ExtraVFolderMountInput] | None = Field(
         default=None, description="Extra vfolder mounts"
     )

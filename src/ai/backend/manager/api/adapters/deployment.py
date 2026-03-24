@@ -9,6 +9,7 @@ from pathlib import PurePosixPath
 from uuid import UUID
 
 from ai.backend.common.api_handlers import Sentinel
+from ai.backend.common.config import ModelDefinition
 from ai.backend.common.data.model_deployment.types import (
     DeploymentStrategy,
     RouteStatus,
@@ -352,6 +353,7 @@ class DeploymentAdapter(BaseAdapter):
                 else None,
             ),
             mounts=mounts_creator,
+            model_definition=ModelDefinition(),
             execution=ExecutionSpec(
                 runtime_variant=RuntimeVariant(ir.model_runtime_config.runtime_variant),
                 environ={e.name: e.value for e in ir.model_runtime_config.environ.entries}
