@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from uuid import UUID
 
+from ai.backend.common.dto.manager.auth.response import MyIpResponse as MyIpResponseDTO
 from ai.backend.common.dto.manager.v2.user.response import (
     BulkCreateUsersPayload as BulkCreateUsersPayloadDTO,
 )
@@ -43,6 +44,7 @@ from ai.backend.common.dto.manager.v2.user.response import (
 from ai.backend.common.dto.manager.v2.user.response import (
     UpdateUserPayload as UpdateUserPayloadDTO,
 )
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     gql_field,
@@ -268,3 +270,20 @@ class UpdateMyAllowedClientIPPayloadGQL:
     """Payload for updating the current user's allowed client IP list."""
 
     success: bool = gql_field(description="Whether the update was successful.")
+
+
+# My Client IP Query Payload
+
+
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Query result returning the current client's IP address.",
+    ),
+    model=MyIpResponseDTO,
+    name="MyClientIp",
+)
+class MyClientIpGQL:
+    """Query result returning the current client's IP address."""
+
+    client_ip: str = gql_field(description="The client's IP address as seen by the server.")
