@@ -49,6 +49,7 @@ from ai.backend.common.msgpack import DEFAULT_PACK_OPTS, DEFAULT_UNPACK_OPTS
 from ai.backend.common.utils import env_info
 from ai.backend.logging import BraceStyleAdapter, Logger, LogLevel
 from ai.backend.logging.otel import (
+    OpenTelemetrySpec,
     instrument_aiohttp_client,
     instrument_aiohttp_server,
 )
@@ -371,6 +372,18 @@ async def server_main(
         # instantiated before OTel config is available, so instrument_aiohttp_server()
         # (which patches the class via setattr) cannot take effect automatically.
         if config_provider.config.otel.enabled:
+            meta = dep_resources.system.sd_loop.metadata
+            otel_spec = OpenTelemetrySpec(
+                service_name=meta.service_group,
+                service_version=meta.version,
+                log_level=config_provider.config.otel.log_level,
+                endpoint=config_provider.config.otel.endpoint,
+                service_instance_id=meta.id,
+                service_instance_name=meta.display_name,
+                max_queue_size=config_provider.config.otel.max_queue_size,
+                max_export_batch_size=config_provider.config.otel.max_export_batch_size,
+            )
+            BraceStyleAdapter.apply_otel(otel_spec)
             instrument_aiohttp_server()
             instrument_aiohttp_client()
             root_app.middlewares.insert(0, otel_server_middleware)
