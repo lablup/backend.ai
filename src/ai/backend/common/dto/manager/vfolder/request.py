@@ -158,7 +158,7 @@ class CloneVFolderReq(BaseRequestModel):
 
     @field_validator("target_quota_scope_id", mode="before")
     @classmethod
-    def parse_quota_scope_id(cls, v: str | None) -> QuotaScopeID | None:
+    def parse_quota_scope_id(cls, v: Any) -> QuotaScopeID | None:
         if v is None:
             return None
         if isinstance(v, QuotaScopeID):
