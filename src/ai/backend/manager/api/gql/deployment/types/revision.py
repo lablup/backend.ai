@@ -548,6 +548,10 @@ class ModelRevisionOrderBy(PydanticInputMixin[RevisionOrderDTO]):
 )
 class AddRevisionPayload:
     revision: ModelRevision
+    activated: bool = strawberry.field(
+        default=False,
+        description="Whether the revision was automatically activated after creation.",
+    )
 
 
 @gql_pydantic_input(
@@ -869,6 +873,10 @@ class AddRevisionInput(PydanticInputMixin[AddRevisionGQLInputDTO]):
     extra_mounts: list[ExtraVFolderMountInput] | None = gql_field(
         description="Extra vfolder mounts",
         default=None,
+    )
+    activate: bool = strawberry.field(
+        default=False,
+        description="When true, automatically activate the newly added revision immediately after creation.",
     )
 
 

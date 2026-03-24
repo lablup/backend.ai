@@ -15,6 +15,7 @@ from ai.backend.manager.services.deployment.actions.model_revision.base import (
 class AddModelRevisionAction(ModelRevisionBaseAction):
     model_deployment_id: UUID
     adder: ModelRevisionCreator
+    activate: bool = False
 
     @override
     def entity_id(self) -> str | None:
@@ -29,6 +30,7 @@ class AddModelRevisionAction(ModelRevisionBaseAction):
 @dataclass
 class AddModelRevisionActionResult(BaseActionResult):
     revision: ModelRevisionData
+    activated: bool = False
 
     @override
     def entity_id(self) -> str | None:

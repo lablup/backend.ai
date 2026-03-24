@@ -147,7 +147,10 @@ async def add_model_revision(
 ) -> AddRevisionPayload:
     """Add a model revision to a deployment."""
     payload = await info.context.adapters.deployment.add_revision(input.to_pydantic())
-    return AddRevisionPayload(revision=ModelRevision.from_pydantic(payload.revision))
+    return AddRevisionPayload(
+        revision=ModelRevision.from_pydantic(payload.revision),
+        activated=payload.activated,
+    )
 
 
 @gql_mutation(

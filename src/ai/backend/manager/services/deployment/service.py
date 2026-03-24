@@ -987,13 +987,14 @@ class DeploymentService:
         )
 
         # Auto-activate revision if requested
-        if action.adder.auto_activate:
+        if action.adder.auto_activate or action.activate:
             await self.activate_revision(
                 ActivateRevisionAction(
                     deployment_id=deployment_id,
                     revision_id=revision_data.id,
                 )
             )
+            return AddModelRevisionActionResult(revision=revision_data, activated=True)
 
         return AddModelRevisionActionResult(revision=revision_data)
 

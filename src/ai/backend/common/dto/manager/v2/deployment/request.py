@@ -222,9 +222,9 @@ class AddRevisionGQLInputDTO(BaseRequestModel):
     extra_mounts: list[ExtraVFolderMountInput] | None = Field(
         default=None, description="Additional vfolder mounts"
     )
-    auto_activate: bool = Field(
+    activate: bool = Field(
         default=False,
-        description="If true, automatically activate this revision after creation.",
+        description="When true, automatically activate the newly added revision immediately after creation.",
     )
 
 
