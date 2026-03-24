@@ -571,7 +571,7 @@ class FractionAllocMap(AbstractAllocMap):
         *,
         context_tag: str | None = None,
     ) -> None:
-        if len(sorted_dev_allocs) <= 0:
+        if len(sorted_dev_allocs) == 0:
             raise FractionalResourceFragmented(
                 "FractionAllocMap: no device left for allocation!",
                 context_tag=context_tag,
