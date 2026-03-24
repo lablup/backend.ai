@@ -58,6 +58,15 @@ from ai.backend.manager.data.agent.types import AgentStatus
 from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.data.model_serving.types import EndpointLifecycle
 from ai.backend.manager.data.permission.types import ScopeType
+from ai.backend.manager.models.rbac_models.association_scopes_entities import (
+    AssociationScopesEntitiesRow,
+)
+from ai.backend.manager.models.rbac_models.permission.object_permission import (
+    ObjectPermissionRow,
+)
+from ai.backend.manager.models.rbac_models.permission.permission_group import (
+    PermissionGroupRow,
+)
 from ai.backend.manager.models.storage import StorageSessionManager
 
 from ..errors.api import InvalidAPIParameters
@@ -2738,6 +2747,35 @@ async def change_vfolder_ownership(request: web.Request, params: Any) -> web.Res
                 & (vfolder_permissions.c.user == user_info.uuid)
             )
             await conn.execute(query)
+
+        # Also clean up new owner's RBAC records from when they were an invitee
+        async with root_ctx.db.begin_session() as db_session:
+            # Remove new owner's scope-entity mapping
+            await db_session.execute(
+                sa.delete(AssociationScopesEntitiesRow).where(
+                    sa.and_(
+                        AssociationScopesEntitiesRow.scope_type == ScopeType.USER,
+                        AssociationScopesEntitiesRow.scope_id == str(user_info.uuid),
+                        AssociationScopesEntitiesRow.entity_type == "vfolder",
+                        AssociationScopesEntitiesRow.entity_id == str(vfolder_id),
+                    )
+                )
+            )
+            # Remove new owner's object permissions
+            permission_group = await db_session.scalar(
+                sa.select(PermissionGroupRow).where(
+                    PermissionGroupRow.scope_id == str(user_info.uuid)
+                )
+            )
+            if permission_group is not None:
+                await db_session.execute(
+                    sa.delete(ObjectPermissionRow).where(
+                        sa.and_(
+                            ObjectPermissionRow.role_id == permission_group.role_id,
+                            ObjectPermissionRow.entity_id == str(vfolder_id),
+                        )
+                    )
+                )
 
     await execute_with_retry(_delete_vfolder_related_rows)
 
