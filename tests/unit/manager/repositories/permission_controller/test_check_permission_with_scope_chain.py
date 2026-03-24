@@ -22,6 +22,7 @@ from ai.backend.manager.data.permission.types import (
     RBACElementRef,
     ScopeType,
 )
+from ai.backend.manager.data.user.types import UserStatus
 from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.keypair import KeyPairRow
 from ai.backend.manager.models.rbac_models import UserRoleRow
@@ -111,6 +112,25 @@ class TestCheckPermissionWithScopeChain:
     ) -> ScopeChainFixture:
         """Create a user with an active role (no permissions yet)."""
         async with db_with_rbac_tables.begin_session() as db_sess:
+            policy = UserResourcePolicyRow(
+                name="test-rbac-policy",
+                max_vfolder_count=0,
+                max_quota_scope_size=-1,
+                max_session_count_per_model_session=0,
+                max_customized_image_count=0,
+            )
+            db_sess.add(policy)
+            user = UserRow(
+                uuid=fixture_ids.user_id,
+                email="testuser@test.com",
+                resource_policy="test-rbac-policy",
+                status=UserStatus.ACTIVE,
+                need_password_change=False,
+                sudo_session_enabled=False,
+            )
+            db_sess.add(user)
+            await db_sess.flush()
+
             role = RoleRow(
                 id=fixture_ids.role_id,
                 name="test-role",
@@ -359,6 +379,25 @@ class TestCheckPermissionWithScopeChain:
     ) -> ScopeChainFixture:
         """Create a user with an inactive role."""
         async with db_with_rbac_tables.begin_session() as db_sess:
+            policy = UserResourcePolicyRow(
+                name="test-rbac-policy",
+                max_vfolder_count=0,
+                max_quota_scope_size=-1,
+                max_session_count_per_model_session=0,
+                max_customized_image_count=0,
+            )
+            db_sess.add(policy)
+            user = UserRow(
+                uuid=fixture_ids.user_id,
+                email="testuser@test.com",
+                resource_policy="test-rbac-policy",
+                status=UserStatus.ACTIVE,
+                need_password_change=False,
+                sudo_session_enabled=False,
+            )
+            db_sess.add(user)
+            await db_sess.flush()
+
             role = RoleRow(
                 id=fixture_ids.role_id,
                 name="inactive-role",
@@ -552,6 +591,25 @@ class TestCheckPermissionWithScopeChain:
     ) -> ScopeChainFixture:
         """Create a user with a deleted role."""
         async with db_with_rbac_tables.begin_session() as db_sess:
+            policy = UserResourcePolicyRow(
+                name="test-rbac-policy",
+                max_vfolder_count=0,
+                max_quota_scope_size=-1,
+                max_session_count_per_model_session=0,
+                max_customized_image_count=0,
+            )
+            db_sess.add(policy)
+            user = UserRow(
+                uuid=fixture_ids.user_id,
+                email="testuser@test.com",
+                resource_policy="test-rbac-policy",
+                status=UserStatus.ACTIVE,
+                need_password_change=False,
+                sudo_session_enabled=False,
+            )
+            db_sess.add(user)
+            await db_sess.flush()
+
             role = RoleRow(
                 id=fixture_ids.role_id,
                 name="deleted-role",
@@ -653,6 +711,25 @@ class TestCheckPermissionWithScopeChain:
         """Create a user with two active roles. Returns (fixture, second_role_id)."""
         second_role_id = uuid.uuid4()
         async with db_with_rbac_tables.begin_session() as db_sess:
+            policy = UserResourcePolicyRow(
+                name="test-rbac-policy",
+                max_vfolder_count=0,
+                max_quota_scope_size=-1,
+                max_session_count_per_model_session=0,
+                max_customized_image_count=0,
+            )
+            db_sess.add(policy)
+            user = UserRow(
+                uuid=fixture_ids.user_id,
+                email="testuser@test.com",
+                resource_policy="test-rbac-policy",
+                status=UserStatus.ACTIVE,
+                need_password_change=False,
+                sudo_session_enabled=False,
+            )
+            db_sess.add(user)
+            await db_sess.flush()
+
             role1 = RoleRow(
                 id=fixture_ids.role_id,
                 name="role-1",
@@ -942,6 +1019,25 @@ class TestCheckPermissionWithScopeChain:
         other_role_id = uuid.uuid4()
 
         async with db_with_rbac_tables.begin_session() as db_sess:
+            policy = UserResourcePolicyRow(
+                name="test-rbac-policy",
+                max_vfolder_count=0,
+                max_quota_scope_size=-1,
+                max_session_count_per_model_session=0,
+                max_customized_image_count=0,
+            )
+            db_sess.add(policy)
+            other_user = UserRow(
+                uuid=other_user_id,
+                email="otheruser@test.com",
+                resource_policy="test-rbac-policy",
+                status=UserStatus.ACTIVE,
+                need_password_change=False,
+                sudo_session_enabled=False,
+            )
+            db_sess.add(other_user)
+            await db_sess.flush()
+
             role = RoleRow(
                 id=other_role_id,
                 name="other-user-role",
