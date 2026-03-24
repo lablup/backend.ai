@@ -8347,6 +8347,21 @@ input PermissionFilter
   NOT: [PermissionFilter!] = null
 }
 
+"""
+Added in 26.4.0. Nested filter for permissions within a role assignment. Filters assignments where the assigned role has permissions matching all specified conditions.
+"""
+input PermissionNestedFilter
+  @join__type(graph: STRAWBERRY)
+{
+  scopeId: String = null
+  scopeType: RBACElementType = null
+  entityType: RBACElementType = null
+  operation: OperationType = null
+  AND: [PermissionNestedFilter!] = null
+  OR: [PermissionNestedFilter!] = null
+  NOT: [PermissionNestedFilter!] = null
+}
+
 """Added in 26.3.0. Order by specification for permissions"""
 input PermissionOrderBy
   @join__type(graph: STRAWBERRY)
@@ -11112,6 +11127,7 @@ input RoleAssignmentFilter
 {
   roleId: UUID = null
   role: RoleAssignmentRoleNestedFilter = null
+  permission: PermissionNestedFilter = null
   username: StringFilter = null
   email: StringFilter = null
   AND: [RoleAssignmentFilter!] = null
