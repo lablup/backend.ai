@@ -536,7 +536,9 @@ class TestVFolderOwnershipTransferRBACCleanup:
                 .join(UserRoleRow, UserRoleRow.role_id == PermissionRow.role_id)
                 .where(UserRoleRow.user_id == user_b_id)
             )
-            assert perm_count_b > 0, "User B should have RBAC permissions as invitee"
+            assert perm_count_b is not None and perm_count_b > 0, (
+                "User B should have RBAC permissions as invitee"
+            )
 
         # Transfer ownership A → B (must clean up B's invitee RBAC records)
         await repo.change_vfolder_ownership(vfolder_id, user_b_email)
@@ -571,6 +573,6 @@ class TestVFolderOwnershipTransferRBACCleanup:
                 .join(UserRoleRow, UserRoleRow.role_id == PermissionRow.role_id)
                 .where(UserRoleRow.user_id == user_b_id)
             )
-            assert perm_count_b_final > 0, (
+            assert perm_count_b_final is not None and perm_count_b_final > 0, (
                 "User B should have RBAC permissions after re-accepting invitation"
             )
