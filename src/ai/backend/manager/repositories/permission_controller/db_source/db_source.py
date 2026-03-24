@@ -137,24 +137,6 @@ class PermissionDBSource:
             await db_session.refresh(perm_row)
             return perm_row
 
-    async def create_object_permission(
-        self,
-        creator: Creator[ObjectPermissionRow],
-    ) -> ObjectPermissionRow:
-        """
-        Create an object permission for a role.
-
-        Args:
-            creator: Object permission creator defining the permission to create
-
-        Returns:
-            Created object permission row
-        """
-        async with self._db.begin_session() as db_session:
-            obj_perm_row = await self._add_object_permission_to_role(db_session, creator)
-            await db_session.refresh(obj_perm_row)
-            return obj_perm_row
-
     async def delete_permission(
         self,
         purger: Purger[PermissionRow],
@@ -198,23 +180,6 @@ class PermissionDBSource:
             if result is None:
                 raise ObjectNotFound(f"Permission with ID {updater.pk_value} does not exist.")
             return result.row
-
-    async def delete_object_permission(
-        self,
-        purger: Purger[ObjectPermissionRow],
-    ) -> ObjectPermissionRow | None:
-        """
-        Delete an object permission.
-
-        Args:
-            purger: Purger with object permission ID
-
-        Returns:
-            Deleted object permission row, or None if not found
-        """
-        async with self._db.begin_session() as db_session:
-            result = await execute_purger(db_session, purger)
-            return result.row if result else None
 
     async def _get_role(self, db_session: SASession, role_id: uuid.UUID) -> RoleRow:
         stmt = sa.select(RoleRow).where(RoleRow.id == role_id)
