@@ -138,7 +138,9 @@ class SearchArtifactsPayload(BaseResponseModel):
 class ScanArtifactModelsPayload(BaseResponseModel):
     """Payload for batch scanning models."""
 
-    artifacts: list[ArtifactNode] = Field(description="Scanned model artifacts")
+    artifact_revision: list[ArtifactRevisionNode] = Field(
+        description="Artifact revisions discovered during model scanning."
+    )
 
 
 class RetrieveArtifactModelPayload(BaseResponseModel):

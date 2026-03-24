@@ -11620,7 +11620,7 @@ type ScanArtifactModelsPayload
   @join__type(graph: STRAWBERRY)
 {
   """Artifact revisions discovered during model scanning."""
-  artifactRevisions: ArtifactRevisionConnection!
+  artifactRevision: ArtifactRevisionConnection!
 }
 
 """

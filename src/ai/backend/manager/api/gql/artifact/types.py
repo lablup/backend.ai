@@ -998,7 +998,7 @@ class ArtifactStatusChangedPayload(PydanticOutputMixin[ArtifactStatusChangedGQLP
     model=ScanArtifactModelsGQLPayload,
 )
 class ScanArtifactModelsPayload(PydanticOutputMixin[ScanArtifactModelsGQLPayload]):
-    artifact_revisions: ArtifactRevisionConnection
+    artifact_revision: ArtifactRevisionConnection
 
 
 @gql_pydantic_type(

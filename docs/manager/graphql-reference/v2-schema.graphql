@@ -6839,7 +6839,7 @@ Added in 25.14.0. Response payload for batch model scanning operations. Contains
 """
 type ScanArtifactModelsPayload {
   """Artifact revisions discovered during model scanning."""
-  artifactRevisions: ArtifactRevisionConnection!
+  artifactRevision: ArtifactRevisionConnection!
 }
 
 """
