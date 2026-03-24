@@ -1,6 +1,6 @@
 """
 Unit tests for PermissionControllerService.
-Tests all 21 service methods using mocked repository layer.
+Tests all 18 service methods using mocked repository layer.
 """
 
 from __future__ import annotations
@@ -52,10 +52,6 @@ from ai.backend.manager.services.permission_contoller.actions.get_entity_types i
 from ai.backend.manager.services.permission_contoller.actions.get_role_detail import (
     GetRoleDetailAction,
 )
-from ai.backend.manager.services.permission_contoller.actions.object_permission import (
-    CreateObjectPermissionAction,
-    DeleteObjectPermissionAction,
-)
 from ai.backend.manager.services.permission_contoller.actions.permission import (
     CreatePermissionAction,
     DeletePermissionAction,
@@ -67,9 +63,6 @@ from ai.backend.manager.services.permission_contoller.actions.search_element_ass
 )
 from ai.backend.manager.services.permission_contoller.actions.search_entities import (
     SearchEntitiesAction,
-)
-from ai.backend.manager.services.permission_contoller.actions.search_object_permissions import (
-    SearchObjectPermissionsAction,
 )
 from ai.backend.manager.services.permission_contoller.actions.search_permissions import (
     SearchPermissionsAction,
@@ -739,133 +732,6 @@ class TestSearchPermissions:
 
         assert result.result.has_next_page is True
         assert result.result.has_previous_page is True
-
-
-class TestCreateObjectPermission:
-    @pytest.fixture
-    def mock_repository(self) -> MagicMock:
-        repository = MagicMock()
-        repository.create_object_permission = AsyncMock()
-        return repository
-
-    @pytest.fixture
-    def service(
-        self, mock_repository: PermissionControllerRepository
-    ) -> PermissionControllerService:
-        return PermissionControllerService(repository=mock_repository, rbac_action_registry=[])
-
-    async def test_create_object_permission(
-        self,
-        service: PermissionControllerService,
-        mock_repository: MagicMock,
-    ) -> None:
-        obj_perm = ObjectPermissionData(
-            id=uuid.uuid4(),
-            role_id=uuid.uuid4(),
-            object_id=ObjectId(entity_type=EntityType.USER, entity_id="user-1"),
-            operation=OperationType.READ,
-        )
-        mock_repository.create_object_permission.return_value = obj_perm
-
-        creator = MagicMock()
-        action = CreateObjectPermissionAction(creator=creator)
-        result = await service.create_object_permission(action)
-
-        mock_repository.create_object_permission.assert_called_once_with(creator)
-        assert result.data.object_id.entity_type == EntityType.USER
-
-
-class TestDeleteObjectPermission:
-    @pytest.fixture
-    def mock_repository(self) -> MagicMock:
-        repository = MagicMock()
-        repository.delete_object_permission = AsyncMock()
-        return repository
-
-    @pytest.fixture
-    def service(
-        self, mock_repository: PermissionControllerRepository
-    ) -> PermissionControllerService:
-        return PermissionControllerService(repository=mock_repository, rbac_action_registry=[])
-
-    async def test_delete_object_permission(
-        self,
-        service: PermissionControllerService,
-        mock_repository: MagicMock,
-    ) -> None:
-        obj_perm = ObjectPermissionData(
-            id=uuid.uuid4(),
-            role_id=uuid.uuid4(),
-            object_id=ObjectId(entity_type=EntityType.USER, entity_id="user-1"),
-            operation=OperationType.READ,
-        )
-        mock_repository.delete_object_permission.return_value = obj_perm
-
-        purger = MagicMock()
-        action = DeleteObjectPermissionAction(purger=purger)
-        result = await service.delete_object_permission(action)
-
-        mock_repository.delete_object_permission.assert_called_once_with(purger)
-        assert result.data is not None
-
-
-class TestSearchObjectPermissions:
-    @pytest.fixture
-    def mock_repository(self) -> MagicMock:
-        repository = MagicMock()
-        repository.search_object_permissions = AsyncMock()
-        return repository
-
-    @pytest.fixture
-    def service(
-        self, mock_repository: PermissionControllerRepository
-    ) -> PermissionControllerService:
-        return PermissionControllerService(repository=mock_repository, rbac_action_registry=[])
-
-    async def test_search_object_permissions(
-        self,
-        service: PermissionControllerService,
-        mock_repository: MagicMock,
-    ) -> None:
-        obj_perm = ObjectPermissionData(
-            id=uuid.uuid4(),
-            role_id=uuid.uuid4(),
-            object_id=ObjectId(entity_type=EntityType.USER, entity_id="user-1"),
-            operation=OperationType.READ,
-        )
-        mock_result = SearchResult(
-            items=[obj_perm],
-            total_count=1,
-            has_next_page=False,
-            has_previous_page=False,
-        )
-        mock_repository.search_object_permissions.return_value = mock_result
-
-        querier = _make_querier()
-        action = SearchObjectPermissionsAction(querier=querier)
-        result = await service.search_object_permissions(action)
-
-        mock_repository.search_object_permissions.assert_called_once_with(querier)
-        assert result.result.total_count == 1
-
-    async def test_search_object_permissions_pagination(
-        self,
-        service: PermissionControllerService,
-        mock_repository: MagicMock,
-    ) -> None:
-        mock_result: SearchResult[ObjectPermissionData] = SearchResult(
-            items=[],
-            total_count=25,
-            has_next_page=True,
-            has_previous_page=False,
-        )
-        mock_repository.search_object_permissions.return_value = mock_result
-
-        action = SearchObjectPermissionsAction(querier=_make_querier(limit=10, offset=0))
-        result = await service.search_object_permissions(action)
-
-        assert result.result.total_count == 25
-        assert result.result.has_next_page is True
 
 
 class TestUpdateRolePermissions:
