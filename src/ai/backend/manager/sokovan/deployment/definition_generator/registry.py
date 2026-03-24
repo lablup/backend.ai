@@ -1,8 +1,9 @@
 from __future__ import annotations
 
 import logging
+from collections.abc import Mapping
 from dataclasses import dataclass
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from ai.backend.common.config import ModelDefinition
 from ai.backend.common.exception import RuntimeVariantNotSupportedError
@@ -98,9 +99,10 @@ class ModelDefinitionGeneratorRegistry:
         generated_definition = await generator.generate_model_definition(model_revision)
 
         # Merge revision DB model_definition if present
-        generated_definition = self._apply_revision_model_definition(
-            model_revision, generated_definition
-        )
+        if model_revision.model_definition:
+            generated_definition = self._apply_revision_model_definition(
+                model_revision.model_definition, generated_definition
+            )
 
         # Check if storage file override is enabled and path exists
         if not self._enable_model_definition_override:
@@ -118,31 +120,19 @@ class ModelDefinitionGeneratorRegistry:
 
     def _apply_revision_model_definition(
         self,
-        model_revision: ModelRevisionSpec,
+        revision_model_definition: Mapping[str, Any],
         base_definition: ModelDefinition,
     ) -> ModelDefinition:
         """
         Merge model_definition from the deployment revision DB record into the base definition.
-        Returns the base definition unchanged if no DB model_definition exists.
         """
-        revision_model_definition = model_revision.model_definition
-        if not revision_model_definition:
-            return base_definition
-
         try:
             base_dict = base_definition.model_dump(exclude_none=True, by_alias=True)
             merged_dict = deep_merge(base_dict, dict(revision_model_definition))
-            merged_definition = ModelDefinition.model_validate(merged_dict)
-            log.debug(
-                "Revision DB model_definition merged successfully for revision {}",
-                model_revision.revision_id,
-            )
-            return merged_definition
+            return ModelDefinition.model_validate(merged_dict)
         except Exception:
             log.warning(
-                "Failed to merge revision DB model_definition for revision {}, "
-                "using base definition",
-                model_revision.revision_id,
+                "Failed to merge revision DB model_definition, using base definition",
                 exc_info=True,
             )
             return base_definition
