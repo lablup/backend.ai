@@ -267,10 +267,21 @@ class TestImagePermissionContextNonGlobalRegistry:
             await sess.commit()
         return image_ids
 
+    @pytest.fixture
+    def client_ctx(
+        self, db_with_cleanup: ExtendedAsyncSAEngine, user: UserRow
+    ) -> ClientContext:
+        return ClientContext(
+            db=db_with_cleanup,
+            domain_name=DOMAIN_NAME,
+            user_id=user.uuid,
+            user_role=UserRole.USER,
+        )
+
     async def test_no_keyerror_when_non_global_registry_associated_with_multiple_projects(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        user: UserRow,
+        client_ctx: ClientContext,
         queried_project: UUID,
         other_associated_project: UUID,
         images: dict[str, UUID],
@@ -281,13 +292,6 @@ class TestImagePermissionContextNonGlobalRegistry:
         Before the fix, iterating all associated projects of the registry
         caused a KeyError for projects outside the queried scope.
         """
-        client_ctx = ClientContext(
-            db=db_with_cleanup,
-            domain_name=DOMAIN_NAME,
-            user_id=user.uuid,
-            user_role=UserRole.USER,
-        )
-
         async with db_with_cleanup.begin_readonly_session() as db_session:
             builder = ImagePermissionContextBuilder(db_session)
             # Before the fix, this raised KeyError(str(other_associated_project))
@@ -306,7 +310,7 @@ class TestImagePermissionContextNonGlobalRegistry:
     async def test_unassociated_project_cannot_see_non_global_registry_images(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        user: UserRow,
+        client_ctx: ClientContext,
         queried_project: UUID,
         other_associated_project: UUID,
         unassociated_project: UUID,
@@ -314,13 +318,6 @@ class TestImagePermissionContextNonGlobalRegistry:
     ) -> None:
         """A project with no association to the non-global registry
         should not see its images, but should still see global registry images."""
-        client_ctx = ClientContext(
-            db=db_with_cleanup,
-            domain_name=DOMAIN_NAME,
-            user_id=user.uuid,
-            user_role=UserRole.USER,
-        )
-
         async with db_with_cleanup.begin_readonly_session() as db_session:
             builder = ImagePermissionContextBuilder(db_session)
             perm_ctx = await builder.build(
