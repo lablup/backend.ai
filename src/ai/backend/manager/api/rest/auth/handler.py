@@ -30,6 +30,7 @@ from ai.backend.common.dto.manager.auth.response import (
     AuthorizeResponse,
     GetRoleResponse,
     GetSSHKeypairResponse,
+    MyIpResponse,
     SignoutResponse,
     SignupResponse,
     SSHKeypairResponse,
@@ -77,6 +78,18 @@ class AuthHandler:
         log.info("AUTH.TEST(ak:{})", ctx.access_key)
         resp = VerifyAuthResponse(authorized="yes", echo="")
         return APIResponse.build(HTTPStatus.OK, resp)
+
+    # ------------------------------------------------------------------
+    # get_my_ip (GET /auth/my-ip)
+    # ------------------------------------------------------------------
+
+    async def get_my_ip(self, request_ctx: RequestCtx) -> APIResponse:
+        log.info("AUTH.GET_MY_IP()")
+        raw_client_addr: str | None = (
+            request_ctx.request.headers.get("X-Forwarded-For") or request_ctx.request.remote
+        )
+        client_ip = raw_client_addr.split(",")[0].strip() if raw_client_addr else ""
+        return APIResponse.build(HTTPStatus.OK, MyIpResponse(client_ip=client_ip))
 
     # ------------------------------------------------------------------
     # test_post (POST /auth, /auth/test)
