@@ -573,6 +573,7 @@ async def update_my_allowed_client_ip(
     action = ModifyUserAction(
         email=email,
         updater=Updater(spec=updater_spec, pk_value=email),
+        user_uuid=me.user_id,
     )
     await ctx.adapters.user.modify_user(action)
 
