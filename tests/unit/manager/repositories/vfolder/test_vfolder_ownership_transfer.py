@@ -463,3 +463,114 @@ class TestVFolderOwnershipTransferRBACCleanup:
             assert mapping_count_a_after == 1, (
                 "User A should have scope-entity mapping after ownership returned"
             )
+
+    async def test_invitee_rbac_cleaned_up_on_ownership_transfer(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        test_domain_name: str,
+        test_user_resource_policy_name: str,
+        test_keypair_resource_policy_name: str,
+        test_group: uuid.UUID,
+    ) -> None:
+        """
+        Regression test for BA-5277:
+        1. A owns vfolder, invites B (B accepts → gets RBAC permission as invitee)
+        2. Transfer ownership A → B (B's invitee RBAC records must be cleaned up)
+        3. Transfer ownership B → A
+        4. A invites B again → B accepts (must not hit unique constraint violation)
+        """
+        repo = VfolderRepository(db=db_with_cleanup)
+
+        user_a_id, user_a_email = await self._create_user_with_keypair(
+            db_with_cleanup,
+            test_domain_name,
+            test_user_resource_policy_name,
+            test_keypair_resource_policy_name,
+        )
+        user_b_id, user_b_email = await self._create_user_with_keypair(
+            db_with_cleanup,
+            test_domain_name,
+            test_user_resource_policy_name,
+            test_keypair_resource_policy_name,
+        )
+
+        vfolder_id = uuid.uuid4()
+
+        # Create vfolder owned by A
+        async with db_with_cleanup.begin_session() as db_sess:
+            vfolder_row = VFolderRow(
+                id=vfolder_id,
+                name=f"test-vfolder-{vfolder_id.hex[:8]}",
+                domain_name=test_domain_name,
+                usage_mode=VFolderUsageMode.GENERAL,
+                permission=VFolderMountPermission.OWNER_PERM,
+                host=VFOLDER_HOST,
+                creator=user_a_email,
+                ownership_type=VFolderOwnershipType.USER,
+                user=user_a_id,
+                group=test_group,
+                unmanaged_path=None,
+                cloneable=False,
+                status=VFolderOperationStatus.READY,
+                quota_scope_id=f"user:{user_a_id}",
+            )
+            db_sess.add(vfolder_row)
+            await db_sess.flush()
+
+        # A gets owner permission
+        await repo.create_vfolder_permission(
+            vfolder_id, user_a_id, VFolderMountPermission.OWNER_PERM
+        )
+
+        # B gets invitee permission (simulates accepting an invitation)
+        await repo.create_vfolder_permission(
+            vfolder_id, user_b_id, VFolderMountPermission.READ_ONLY
+        )
+
+        # Verify B has RBAC permission before transfer
+        async with db_with_cleanup.begin_readonly_session() as db_sess:
+            perm_count_b = await db_sess.scalar(
+                sa.select(sa.func.count())
+                .select_from(PermissionRow)
+                .where(PermissionRow.scope_id == str(vfolder_id))
+                .join(UserRoleRow, UserRoleRow.role_id == PermissionRow.role_id)
+                .where(UserRoleRow.user_id == user_b_id)
+            )
+            assert perm_count_b > 0, "User B should have RBAC permissions as invitee"
+
+        # Transfer ownership A → B (must clean up B's invitee RBAC records)
+        await repo.change_vfolder_ownership(vfolder_id, user_b_email)
+
+        # Verify B's invitee RBAC permissions are cleaned up
+        async with db_with_cleanup.begin_readonly_session() as db_sess:
+            perm_count_b_after = await db_sess.scalar(
+                sa.select(sa.func.count())
+                .select_from(PermissionRow)
+                .where(PermissionRow.scope_id == str(vfolder_id))
+                .join(UserRoleRow, UserRoleRow.role_id == PermissionRow.role_id)
+                .where(UserRoleRow.user_id == user_b_id)
+            )
+            assert perm_count_b_after == 0, (
+                "User B's invitee RBAC permissions should be cleaned up after becoming owner"
+            )
+
+        # Transfer ownership B → A
+        await repo.change_vfolder_ownership(vfolder_id, user_a_email)
+
+        # B accepts invitation again (must not raise unique constraint violation)
+        await repo.create_vfolder_permission(
+            vfolder_id, user_b_id, VFolderMountPermission.READ_ONLY
+        )
+
+        # Verify B has new RBAC permission
+        async with db_with_cleanup.begin_readonly_session() as db_sess:
+            perm_count_b_final = await db_sess.scalar(
+                sa.select(sa.func.count())
+                .select_from(PermissionRow)
+                .where(PermissionRow.scope_id == str(vfolder_id))
+                .join(UserRoleRow, UserRoleRow.role_id == PermissionRow.role_id)
+                .where(UserRoleRow.user_id == user_b_id)
+            )
+            assert perm_count_b_final > 0, (
+                "User B should have RBAC permissions after re-accepting invitation"
+            )
