@@ -66,7 +66,7 @@ def _upsert_ref_edges_for_invitations(db_conn: Connection) -> None:
                 INSERT INTO association_scopes_entities
                     (scope_type, scope_id, entity_type, entity_id, relation_type)
                 VALUES ('user', :user_id, :entity_type, :vfolder_id, 'ref')
-                ON CONFLICT (scope_type, scope_id, entity_type, entity_id)
+                ON CONFLICT (scope_type, scope_id, entity_id)
                     DO UPDATE SET relation_type = 'ref'
             """)
             db_conn.execute(
