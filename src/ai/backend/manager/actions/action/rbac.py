@@ -10,6 +10,18 @@ from ai.backend.common.data.permission.types import OperationType, RBACElementTy
 class RBACActionName(enum.StrEnum):
     """All known RBAC action names."""
 
+    CREATE = "create"
+    GET = "get"
+    SEARCH = "search"
+    UPDATE = "update"
+    SOFT_DELETE = "soft_delete"
+    HARD_DELETE = "hard_delete"
+    GRANT_ALL = "grant_all"
+    GRANT_READ = "grant_read"
+    GRANT_UPDATE = "grant_update"
+    GRANT_SOFT_DELETE = "grant_soft_delete"
+    GRANT_HARD_DELETE = "grant_hard_delete"
+
 
 @dataclass(frozen=True)
 class RBACRequiredPermission:
