@@ -359,3 +359,107 @@ class TestVFolderOwnershipTransferRBACCleanup:
                 .where(UserRoleRow.user_id == user_a_id)
             )
             assert perm_count_after == 0, "Old owner's permissions should be removed after transfer"
+
+    async def test_round_trip_ownership_transfer_cleans_up_rbac(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        test_domain_name: str,
+        test_user_resource_policy_name: str,
+        test_keypair_resource_policy_name: str,
+        test_group: uuid.UUID,
+    ) -> None:
+        """
+        Verify the round-trip scenario (A -> B -> A) works correctly:
+        after transferring ownership back to the original owner,
+        the intermediate owner's RBAC records are cleaned up and
+        the original owner has valid RBAC records.
+        """
+        repo = VfolderRepository(db=db_with_cleanup)
+
+        user_a_id, user_a_email = await self._create_user_with_keypair(
+            db_with_cleanup,
+            test_domain_name,
+            test_user_resource_policy_name,
+            test_keypair_resource_policy_name,
+        )
+        user_b_id, user_b_email = await self._create_user_with_keypair(
+            db_with_cleanup,
+            test_domain_name,
+            test_user_resource_policy_name,
+            test_keypair_resource_policy_name,
+        )
+
+        vfolder_id = uuid.uuid4()
+
+        # Create vfolder owned by A with RBAC permission
+        async with db_with_cleanup.begin_session() as db_sess:
+            vfolder_row = VFolderRow(
+                id=vfolder_id,
+                name=f"test-vfolder-{vfolder_id.hex[:8]}",
+                domain_name=test_domain_name,
+                usage_mode=VFolderUsageMode.GENERAL,
+                permission=VFolderMountPermission.OWNER_PERM,
+                host=VFOLDER_HOST,
+                creator=user_a_email,
+                ownership_type=VFolderOwnershipType.USER,
+                user=user_a_id,
+                group=test_group,
+                unmanaged_path=None,
+                cloneable=False,
+                status=VFolderOperationStatus.READY,
+                quota_scope_id=f"user:{user_a_id}",
+            )
+            db_sess.add(vfolder_row)
+            await db_sess.flush()
+
+        await repo.create_vfolder_permission(
+            vfolder_id, user_a_id, VFolderMountPermission.OWNER_PERM
+        )
+
+        # Transfer A -> B
+        await repo.change_vfolder_ownership(vfolder_id, user_b_email)
+
+        # Verify A's RBAC records are cleaned up after first transfer
+        async with db_with_cleanup.begin_readonly_session() as db_sess:
+            mapping_count_a = await db_sess.scalar(
+                sa.select(sa.func.count()).where(
+                    sa.and_(
+                        AssociationScopesEntitiesRow.scope_id == str(user_a_id),
+                        AssociationScopesEntitiesRow.entity_id == str(vfolder_id),
+                    )
+                )
+            )
+            assert mapping_count_a == 0, (
+                "User A's scope-entity mapping should be removed after A -> B transfer"
+            )
+
+        # Transfer B -> A (back to original owner)
+        await repo.change_vfolder_ownership(vfolder_id, user_a_email)
+
+        # Verify B's RBAC records are cleaned up after second transfer
+        async with db_with_cleanup.begin_readonly_session() as db_sess:
+            mapping_count_b = await db_sess.scalar(
+                sa.select(sa.func.count()).where(
+                    sa.and_(
+                        AssociationScopesEntitiesRow.scope_id == str(user_b_id),
+                        AssociationScopesEntitiesRow.entity_id == str(vfolder_id),
+                    )
+                )
+            )
+            assert mapping_count_b == 0, (
+                "User B's scope-entity mapping should be removed after B -> A transfer"
+            )
+
+        # Verify A now has valid RBAC records as the new owner
+        async with db_with_cleanup.begin_readonly_session() as db_sess:
+            mapping_count_a_after = await db_sess.scalar(
+                sa.select(sa.func.count()).where(
+                    sa.and_(
+                        AssociationScopesEntitiesRow.scope_id == str(user_a_id),
+                        AssociationScopesEntitiesRow.entity_id == str(vfolder_id),
+                    )
+                )
+            )
+            assert mapping_count_a_after == 1, (
+                "User A should have scope-entity mapping after ownership returned"
+            )

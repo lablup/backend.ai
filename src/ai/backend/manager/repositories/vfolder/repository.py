@@ -1785,6 +1785,34 @@ class VfolderRepository:
                 )
                 await conn.execute(del_query)
 
+                # Also clean up new owner's RBAC records from when they were an invitee
+                try:
+                    new_owner_role_id = await self._get_user_role_id(session, user_info.uuid)
+                except ObjectNotFound:
+                    pass
+                else:
+                    revoker = RBACRevoker(
+                        entity_id=ObjectId(
+                            entity_type=EntityType.VFOLDER,
+                            entity_id=str(vfolder_id),
+                        ),
+                        entity_scope_type=RBACElementType.VFOLDER,
+                        target_role_ids=[new_owner_role_id],
+                        operations=None,
+                    )
+                    await execute_rbac_revoker(session, revoker)
+                # Remove new owner's scope-entity mapping
+                await session.execute(
+                    sa.delete(AssociationScopesEntitiesRow).where(
+                        sa.and_(
+                            AssociationScopesEntitiesRow.scope_type == ScopeType.USER,
+                            AssociationScopesEntitiesRow.scope_id == str(user_info.uuid),
+                            AssociationScopesEntitiesRow.entity_type == EntityType.VFOLDER,
+                            AssociationScopesEntitiesRow.entity_id == str(vfolder_id),
+                        )
+                    )
+                )
+
         await execute_with_retry(_delete_related_rows)
 
         # Step 5: Clean up old owner's RBAC records for this vfolder
@@ -1793,13 +1821,12 @@ class VfolderRepository:
             async def _cleanup_old_owner_rbac() -> None:
                 async with self._db.begin_session() as session:
                     user_role_id = await self._get_user_role_id(session, old_owner_uuid)
-                    # Revoke permissions
                     revoker = RBACRevoker(
                         entity_id=ObjectId(
                             entity_type=EntityType.VFOLDER,
                             entity_id=str(vfolder_id),
                         ),
-                        entity_scope_type=ScopeType.VFOLDER,
+                        entity_scope_type=RBACElementType.VFOLDER,
                         target_role_ids=[user_role_id],
                         operations=None,
                     )
