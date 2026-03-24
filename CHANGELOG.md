@@ -16,6 +16,12 @@ Changes
 
 <!-- towncrier release notes start -->
 
+## 26.3.3 (2026-03-24)
+
+### Fixes
+* Fix ON CONFLICT column mismatch in vfolder invitation RBAC remigration causing InvalidColumnReferenceError during alembic upgrade. ([#10471](https://github.com/lablup/backend.ai/issues/10471))
+
+
 ## 26.3.2 (2026-03-24)
 
 ### Fixes
