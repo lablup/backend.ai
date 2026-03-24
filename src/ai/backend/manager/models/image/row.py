@@ -1442,9 +1442,9 @@ class ImagePermissionContextBuilder(
                     for assoc in img_row.registry_row.association_container_registries_groups_rows
                 ]
                 for project_id in assoc_project_ids:
-                    image_id_to_permission_map[img_row.id] = project_id_to_permission_map[
-                        str(project_id)
-                    ]
+                    perm = project_id_to_permission_map.get(str(project_id))
+                    if perm is not None:
+                        image_id_to_permission_map[img_row.id] = perm
 
         return ImagePermissionContext(
             object_id_to_additional_permission_map=image_id_to_permission_map
