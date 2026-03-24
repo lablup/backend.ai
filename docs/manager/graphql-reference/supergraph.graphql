@@ -7922,6 +7922,16 @@ type Mutation
   adminBulkRevokeRole(input: BulkRevokeRoleInput!): BulkRevokeRolePayload! @join__field(graph: STRAWBERRY)
 }
 
+"""
+Added in UNRELEASED. Query result returning the current client's IP address.
+"""
+type MyClientIp
+  @join__type(graph: STRAWBERRY)
+{
+  """The client's IP address as seen by the server"""
+  clientIp: String!
+}
+
 """Added in 24.12.0."""
 type NetworkConnection
   @join__type(graph: GRAPHENE)
@@ -9965,6 +9975,11 @@ type Query
   Added in 26.2.0. List users within a specific domain. Requires domain admin privileges or higher.
   """
   domainUsersV2(scope: DomainUserV2Scope!, filter: UserV2Filter = null, orderBy: [UserV2OrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): UserV2Connection @join__field(graph: STRAWBERRY)
+
+  """
+  Added in UNRELEASED. Get the current client's IP address as seen by the server. Useful for configuring IP allowlists.
+  """
+  myClientIp: MyClientIp! @join__field(graph: STRAWBERRY)
 
   """
   Added in 26.2.0. Get the current authenticated user's information. Returns the user associated with the current session. Returns an error if not authenticated.

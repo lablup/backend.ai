@@ -4261,6 +4261,14 @@ type Mutation {
   adminBulkRevokeRole(input: BulkRevokeRoleInput!): BulkRevokeRolePayload!
 }
 
+"""
+Added in UNRELEASED. Query result returning the current client's IP address.
+"""
+type MyClientIp {
+  """The client's IP address as seen by the server"""
+  clientIp: String!
+}
+
 """An object with a Globally Unique ID"""
 interface Node {
   """The Globally Unique ID of this object"""
@@ -5582,6 +5590,11 @@ type Query {
   Added in 26.2.0. List users within a specific domain. Requires domain admin privileges or higher.
   """
   domainUsersV2(scope: DomainUserV2Scope!, filter: UserV2Filter = null, orderBy: [UserV2OrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): UserV2Connection
+
+  """
+  Added in UNRELEASED. Get the current client's IP address as seen by the server. Useful for configuring IP allowlists.
+  """
+  myClientIp: MyClientIp!
 
   """
   Added in 26.2.0. Get the current authenticated user's information. Returns the user associated with the current session. Returns an error if not authenticated.
