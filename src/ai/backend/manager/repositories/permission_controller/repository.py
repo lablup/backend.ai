@@ -12,10 +12,6 @@ from ai.backend.common.resilience.policies.retry import BackoffStrategy, RetryAr
 from ai.backend.common.resilience.resilience import Resilience
 from ai.backend.manager.data.permission.entity import ElementAssociationListResult, EntityListResult
 from ai.backend.manager.data.permission.id import ObjectId
-from ai.backend.manager.data.permission.object_permission import (
-    ObjectPermissionData,
-    ObjectPermissionListResult,
-)
 from ai.backend.manager.data.permission.permission import (
     PermissionData,
     PermissionListResult,
@@ -42,7 +38,6 @@ from ai.backend.manager.data.permission.types import (
     RBACElementRef,
     ScopeListResult,
 )
-from ai.backend.manager.models.rbac_models.permission.object_permission import ObjectPermissionRow
 from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
 from ai.backend.manager.models.rbac_models.role import RoleRow
 from ai.backend.manager.models.rbac_models.user_role import UserRoleRow
@@ -52,10 +47,7 @@ from ai.backend.manager.repositories.base.purger import Purger
 from ai.backend.manager.repositories.base.querier import BatchQuerier
 from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.repositories.permission_controller.creators import UserRoleCreatorSpec
-from ai.backend.manager.repositories.permission_controller.types import (
-    ObjectPermissionSearchScope,
-    PermissionSearchScope,
-)
+from ai.backend.manager.repositories.permission_controller.types import PermissionSearchScope
 
 from .db_source.db_source import CreateRoleInput, PermissionDBSource
 
@@ -138,32 +130,6 @@ class PermissionControllerRepository:
         """
         row = await self._db_source.update_permission(updater)
         return row.to_data()
-
-    @permission_controller_repository_resilience.apply()
-    async def create_object_permission(
-        self,
-        creator: Creator[ObjectPermissionRow],
-    ) -> ObjectPermissionData:
-        """
-        Create a new object permission in the database.
-
-        Returns the created object permission data.
-        """
-        row = await self._db_source.create_object_permission(creator)
-        return row.to_data()
-
-    @permission_controller_repository_resilience.apply()
-    async def delete_object_permission(
-        self,
-        purger: Purger[ObjectPermissionRow],
-    ) -> ObjectPermissionData | None:
-        """
-        Delete an object permission from the database.
-
-        Returns the deleted object permission data, or None if not found.
-        """
-        row = await self._db_source.delete_object_permission(purger)
-        return row.to_data() if row else None
 
     @permission_controller_repository_resilience.apply()
     async def update_role(self, updater: Updater[RoleRow]) -> RoleData:
@@ -275,15 +241,6 @@ class PermissionControllerRepository:
     ) -> PermissionListResult:
         """Searches permissions with pagination and filtering."""
         return await self._db_source.search_permissions(querier=querier, scope=scope)
-
-    @permission_controller_repository_resilience.apply()
-    async def search_object_permissions(
-        self,
-        querier: BatchQuerier,
-        scope: ObjectPermissionSearchScope | None = None,
-    ) -> ObjectPermissionListResult:
-        """Searches object permissions with pagination and filtering."""
-        return await self._db_source.search_object_permissions(querier=querier, scope=scope)
 
     @permission_controller_repository_resilience.apply()
     async def get_role_with_permissions(self, role_id: uuid.UUID) -> RoleDetailData:
