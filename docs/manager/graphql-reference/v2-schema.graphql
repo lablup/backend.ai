@@ -108,7 +108,7 @@ input AddRevisionInput {
   image: ImageInput!
   modelRuntimeConfig: ModelRuntimeConfigInput!
   modelMountConfig: ModelMountConfigInput!
-  modelDefinition: JSON!
+  modelDefinition: ModelDefinitionInput!
   extraMounts: [ExtraVFolderMountInput!]
 }
 
@@ -3547,6 +3547,31 @@ input MetricLabelEntryInput {
 }
 
 """
+Added in 26.4.0. Configuration for a single model within a model definition.
+"""
+input ModelConfigInput {
+  """Name of the model."""
+  name: String!
+
+  """Path to the model file."""
+  modelPath: String!
+
+  """Configuration for the model service."""
+  service: ModelServiceConfigInput = null
+
+  """Metadata about the model."""
+  metadata: ModelMetadataInput = null
+}
+
+"""
+Added in 26.4.0. Model definition containing a list of model configurations.
+"""
+input ModelDefinitionInput {
+  """List of models in the model definition."""
+  models: [ModelConfigInput!]!
+}
+
+"""
 Added in 25.19.0. Represents a model deployment in Backend.AI. A deployment is a long-running inference service that exposes a trained model via HTTP endpoints. Deployments manage the lifecycle of model replicas, handle traffic routing, and provide auto-scaling capabilities based on configured rules.
 """
 type ModelDeployment implements Node {
@@ -3636,6 +3661,71 @@ type ModelDeploymentNetworkAccess {
 input ModelDeploymentNetworkAccessInput {
   preferredDomainName: String = null
   openToPublic: Boolean! = false
+}
+
+"""Added in 26.4.0. Health check configuration for a model service."""
+input ModelHealthCheckInput {
+  """Interval in seconds between health checks."""
+  interval: Float! = 10
+
+  """Path to check for health status."""
+  path: String!
+
+  """Maximum number of retries for health check."""
+  maxRetries: Int! = 10
+
+  """Maximum time in seconds to wait for a health check response."""
+  maxWaitTime: Float! = 15
+
+  """Expected HTTP status code for a healthy response."""
+  expectedStatusCode: Int! = 200
+
+  """Initial delay in seconds before the first health check."""
+  initialDelay: Float! = 60
+}
+
+"""
+Added in 26.4.0. Metadata about a model such as author, title, and resource requirements.
+"""
+input ModelMetadataInput {
+  """Author of the model."""
+  author: String = null
+
+  """Title of the model."""
+  title: String = null
+
+  """Version of the model."""
+  version: String = null
+
+  """Creation date of the model."""
+  created: String = null
+
+  """Last modified date of the model."""
+  lastModified: String = null
+
+  """Description of the model."""
+  description: String = null
+
+  """Task type of the model."""
+  task: String = null
+
+  """Category of the model."""
+  category: String = null
+
+  """Architecture of the model."""
+  architecture: String = null
+
+  """Frameworks used by the model."""
+  framework: [String!] = null
+
+  """Labels for the model."""
+  label: [String!] = null
+
+  """License of the model."""
+  license: String = null
+
+  """Minimum resource requirements for the model."""
+  minResource: JSON = null
 }
 
 """
@@ -3799,6 +3889,28 @@ input ModelRuntimeConfigInput {
 
   """Environment variables for the service."""
   environ: EnvironmentVariablesInput = null
+}
+
+"""
+Added in 26.4.0. Service configuration for a model, including startup command and health check.
+"""
+input ModelServiceConfigInput {
+  """
+  List of pre-start actions to execute before starting the model service.
+  """
+  preStartActions: [PreStartActionInput!]!
+
+  """Command to start the model service."""
+  startCommand: JSON!
+
+  """Shell to use if start_command is a string."""
+  shell: String! = "/bin/bash"
+
+  """Port number for the model service. Must be greater than 1."""
+  port: Int!
+
+  """Health check configuration for the model service."""
+  healthCheck: ModelHealthCheckInput = null
 }
 
 """
@@ -4589,6 +4701,17 @@ input PermissionOrderBy {
 enum PermissionOrderField {
   ID
   ENTITY_TYPE
+}
+
+"""
+Added in 26.4.0. Input for a pre-start action to execute before starting the model service.
+"""
+input PreStartActionInput {
+  """The name of the pre-start action to execute."""
+  action: String!
+
+  """Arguments for the pre-start action."""
+  args: JSON!
 }
 
 """Added in 26.3.0. Preemption configuration for a resource group."""
