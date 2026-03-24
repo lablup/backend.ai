@@ -402,10 +402,7 @@ class PermissionDBSource:
                 sa.and_(
                     RoleRow.status == RoleStatus.ACTIVE,
                     UserRoleRow.user_id == user_id,
-                    sa.or_(
-                        PermissionRow.scope_type == ScopeType.GLOBAL,
-                        PermissionRow.scope_id == scope_id.scope_id,
-                    ),
+                    PermissionRow.scope_id == scope_id.scope_id,
                     PermissionRow.operation == operation,
                 )
             )
