@@ -368,13 +368,21 @@ class Context(metaclass=ABCMeta):
             shutil.copy(Path(output_path), dst_supergraph)
             self.log_header(f"Copied supergraph.graphql -> {dst_supergraph}")
         else:
-            # Package mode: use prebuilt supergraph from resources
-            with self.resource_path(
-                "ai.backend.install.configs", "supergraph.graphql"
-            ) as src_supergraph:
-                dst_supergraph = base_path / "supergraph.graphql"
-                shutil.copy(src_supergraph, dst_supergraph)
-                self.log_header(f"Copied supergraph.graphql -> {dst_supergraph}")
+            # Package mode: download supergraph from GitHub releases
+            from ai.backend.install import __version__
+
+            self.log_header("Downloading supergraph.graphql from GitHub releases...")
+
+            # Construct URL for the release version
+            version_tag = f"v{__version__}"
+            url = (
+                f"https://raw.githubusercontent.com/lablup/backend.ai/{version_tag}/"
+                "docs/manager/graphql-reference/supergraph.graphql"
+            )
+
+            dst_supergraph = base_path / "supergraph.graphql"
+            await wget(url, dst_supergraph)
+            self.log_header(f"Downloaded supergraph.graphql -> {dst_supergraph}")
 
         dst_compose_path = self.copy_config("docker-compose.yml")
         self.copy_config("prometheus.yaml")

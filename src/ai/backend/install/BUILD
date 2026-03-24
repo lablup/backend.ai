@@ -87,7 +87,6 @@ resources(
         "configs/**/*.yaml",
         "configs/**/*.json",
         "configs/**/*.ts",
-        "configs/**/*.graphql",
         "fixtures/**/*.json",
     ],
 )
