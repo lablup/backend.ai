@@ -2741,31 +2741,15 @@ async def change_vfolder_ownership(request: web.Request, params: Any) -> web.Res
                 & (vfolder_permissions.c.user == user_info.uuid)
             )
             await conn.execute(query)
-        # Clean up new owner's RBAC records (invitee) to prevent unique constraint
-        # violation on future re-invite after round-trip transfer.
-        # Both scope-entity mapping and object permissions must be removed because
-        # PostgreSQL aborts the transaction on IntegrityError even if caught in Python.
-        vfolder_entity_id = ObjectId(
-            entity_type=EntityType.VFOLDER,
-            entity_id=str(vfolder_id),
-        )
-        role_manager = RoleManager()
-        async with root_ctx.db.begin_session() as db_session:
-            await role_manager.unmap_entity_from_scope(
-                db_session,
-                entity_id=vfolder_entity_id,
-                scope_id=ScopeId(ScopeType.USER, str(user_info.uuid)),
-            )
-            try:
-                await role_manager.delete_object_permission_of_user(
-                    db_session, user_info.uuid, vfolder_id
-                )
-            except (AttributeError, ValueError):
-                pass  # New owner had no RBAC permission records
 
     await execute_with_retry(_delete_vfolder_related_rows)
 
-    # Clean up old owner's RBAC records
+    # Clean up old owner's RBAC records (scope-entity mapping + object permissions).
+    # This also covers the case where the old owner was previously an invitee,
+    # since the records share the same scope_id (user UUID) regardless of role.
+    # Without this cleanup, re-inviting the old owner after a round-trip transfer
+    # (A→B→A) would hit a unique constraint violation on AssociationScopesEntitiesRow,
+    # which aborts the PostgreSQL transaction and cascades as InFailedSQLTransactionError.
     if old_owner_uuid is not None and old_owner_uuid != user_info.uuid:
         vfolder_entity_id = ObjectId(
             entity_type=EntityType.VFOLDER,
