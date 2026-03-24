@@ -548,10 +548,6 @@ class ModelRevisionOrderBy(PydanticInputMixin[RevisionOrderDTO]):
 )
 class AddRevisionPayload:
     revision: ModelRevision
-    activated: bool = strawberry.field(
-        default=False,
-        description="Whether the revision was automatically activated after creation.",
-    )
 
 
 @gql_pydantic_input(

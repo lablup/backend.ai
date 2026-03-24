@@ -30,7 +30,6 @@ class AddModelRevisionAction(ModelRevisionBaseAction):
 @dataclass
 class AddModelRevisionActionResult(BaseActionResult):
     revision: ModelRevisionData
-    activated: bool = False
 
     @override
     def entity_id(self) -> str | None:

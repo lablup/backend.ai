@@ -994,7 +994,7 @@ class DeploymentService:
                     revision_id=revision_data.id,
                 )
             )
-            return AddModelRevisionActionResult(revision=revision_data, activated=True)
+            return AddModelRevisionActionResult(revision=revision_data)
 
         return AddModelRevisionActionResult(revision=revision_data)
 
