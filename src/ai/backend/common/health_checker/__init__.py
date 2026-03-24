@@ -9,6 +9,7 @@ from .abc import (
 from .checkers import (
     EtcdHealthChecker,
     HttpHealthChecker,
+    PrometheusHealthChecker,
     ValkeyHealthChecker,
 )
 from .exceptions import (
@@ -23,6 +24,7 @@ from .types import (
     CID_DOCKER,
     CID_ETCD,
     CID_POSTGRES,
+    CID_PROMETHEUS_METRICS,
     CID_REDIS_ARTIFACT,
     CID_REDIS_BGTASK,
     CID_REDIS_CONTAINER_LOG,
@@ -36,6 +38,7 @@ from .types import (
     DATABASE,
     ETCD,
     MANAGER,
+    PROMETHEUS,
     REDIS,
     STORAGE_PROXY,
     AllServicesHealth,
@@ -54,6 +57,7 @@ __all__ = [
     # Checkers
     "EtcdHealthChecker",
     "HttpHealthChecker",
+    "PrometheusHealthChecker",
     "ValkeyHealthChecker",
     # Exceptions
     "HealthCheckError",
@@ -72,6 +76,7 @@ __all__ = [
     "APPPROXY",
     "DATABASE",
     "ETCD",
+    "PROMETHEUS",
     "REDIS",
     # Built-in ComponentIds
     "CID_POSTGRES",
@@ -87,6 +92,7 @@ __all__ = [
     "CID_REDIS_CORE_LIVE",
     "CID_ETCD",
     "CID_DOCKER",
+    "CID_PROMETHEUS_METRICS",
     # Probe
     "HealthProbe",
     "HealthProbeOptions",

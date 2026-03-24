@@ -4,11 +4,19 @@ import os
 from typing import Self
 
 import psutil
-from prometheus_client import Counter, Gauge, Histogram
 
 from ai.backend.common.data.permission.types import EntityType
 from ai.backend.common.exception import BackendAIError, ErrorCode
 from ai.backend.common.metrics.multiprocess import generate_latest_multiprocess
+from ai.backend.common.metrics.safe import (
+    SafeCounter as Counter,
+)
+from ai.backend.common.metrics.safe import (
+    SafeGauge as Gauge,
+)
+from ai.backend.common.metrics.safe import (
+    SafeHistogram as Histogram,
+)
 
 
 class APIMetricObserver:
