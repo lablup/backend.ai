@@ -303,11 +303,12 @@ class TestImagePermissionContextNonGlobalRegistry:
         global_image_id: UUID,
         non_global_image_id: UUID,
     ) -> None:
-        """Querying with a single project scope must not KeyError when the
-        non-global registry is also associated with another project.
+        """Regression: querying with a single project scope must not KeyError
+        when the non-global registry is also associated with another project.
 
         Before the fix, iterating all associated projects of the registry
         caused a KeyError for projects outside the queried scope.
+        See: https://github.com/lablup/backend.ai/pull/10482
         """
         async with db_with_cleanup.begin_readonly_session() as db_session:
             builder = ImagePermissionContextBuilder(db_session)
