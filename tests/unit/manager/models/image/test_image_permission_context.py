@@ -246,31 +246,35 @@ class TestImagePermissionContextNonGlobalRegistry:
         )
 
     @pytest.fixture
-    async def images(
+    async def global_image_id(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
         global_registry_id: UUID,
-        non_global_registry_id: UUID,
-    ) -> dict[str, UUID]:
-        image_ids: dict[str, UUID] = {}
+    ) -> UUID:
         async with db_with_cleanup.begin_session() as sess:
-            global_img = self._make_image(global_registry_id, "stable", "python")
-            sess.add(global_img)
+            img = self._make_image(global_registry_id, "stable", "python")
+            sess.add(img)
             await sess.flush()
-            image_ids["global_stable"] = global_img.id
-
-            non_global_img = self._make_image(non_global_registry_id, "community", "custom-env")
-            sess.add(non_global_img)
-            await sess.flush()
-            image_ids["non_global_community"] = non_global_img.id
-
+            image_id = img.id
             await sess.commit()
-        return image_ids
+        return image_id
 
     @pytest.fixture
-    def client_ctx(
-        self, db_with_cleanup: ExtendedAsyncSAEngine, user: UserRow
-    ) -> ClientContext:
+    async def non_global_image_id(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        non_global_registry_id: UUID,
+    ) -> UUID:
+        async with db_with_cleanup.begin_session() as sess:
+            img = self._make_image(non_global_registry_id, "community", "custom-env")
+            sess.add(img)
+            await sess.flush()
+            image_id = img.id
+            await sess.commit()
+        return image_id
+
+    @pytest.fixture
+    def client_ctx(self, db_with_cleanup: ExtendedAsyncSAEngine, user: UserRow) -> ClientContext:
         return ClientContext(
             db=db_with_cleanup,
             domain_name=DOMAIN_NAME,
@@ -284,7 +288,8 @@ class TestImagePermissionContextNonGlobalRegistry:
         client_ctx: ClientContext,
         queried_project: UUID,
         other_associated_project: UUID,
-        images: dict[str, UUID],
+        global_image_id: UUID,
+        non_global_image_id: UUID,
     ) -> None:
         """Querying with a single project scope must not KeyError when the
         non-global registry is also associated with another project.
@@ -304,8 +309,8 @@ class TestImagePermissionContextNonGlobalRegistry:
         assert perm_ctx.query_condition is not None
 
         allowed_ids = set(perm_ctx.object_id_to_additional_permission_map.keys())
-        assert images["global_stable"] in allowed_ids
-        assert images["non_global_community"] in allowed_ids
+        assert global_image_id in allowed_ids
+        assert non_global_image_id in allowed_ids
 
     async def test_unassociated_project_cannot_see_non_global_registry_images(
         self,
@@ -314,7 +319,8 @@ class TestImagePermissionContextNonGlobalRegistry:
         queried_project: UUID,
         other_associated_project: UUID,
         unassociated_project: UUID,
-        images: dict[str, UUID],
+        global_image_id: UUID,
+        non_global_image_id: UUID,
     ) -> None:
         """A project with no association to the non-global registry
         should not see its images, but should still see global registry images."""
@@ -327,5 +333,5 @@ class TestImagePermissionContextNonGlobalRegistry:
             )
 
         allowed_ids = set(perm_ctx.object_id_to_additional_permission_map.keys())
-        assert images["global_stable"] in allowed_ids
-        assert images["non_global_community"] not in allowed_ids
+        assert global_image_id in allowed_ids
+        assert non_global_image_id not in allowed_ids
