@@ -46,7 +46,7 @@ PROJECT_RESOURCE_POLICY_NAME = "test-project-policy"
 
 
 class TestImagePermissionContextNonGlobalRegistry:
-    """Regression tests for non-global registry permission context building."""
+    """Tests for ImagePermissionContextBuilder with non-global registry access control."""
 
     # ------------------------------------------------------------------
     # Helpers
