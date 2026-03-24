@@ -57,7 +57,8 @@ from ai.backend.manager.api.resource import get_watcher_info
 from ai.backend.manager.data.agent.types import AgentStatus
 from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.data.model_serving.types import EndpointLifecycle
-from ai.backend.manager.data.permission.types import ScopeType
+from ai.backend.manager.data.permission.id import ObjectId, ScopeId
+from ai.backend.manager.data.permission.types import EntityType, ScopeType
 from ai.backend.manager.models.storage import StorageSessionManager
 
 from ..errors.api import InvalidAPIParameters
@@ -2740,10 +2741,21 @@ async def change_vfolder_ownership(request: web.Request, params: Any) -> web.Res
                 & (vfolder_permissions.c.user == user_info.uuid)
             )
             await conn.execute(query)
-        # Clean up new owner's RBAC permission (invitee records) to prevent
-        # unique constraint violation on future re-invite after round-trip transfer
+        # Clean up new owner's RBAC records (invitee) to prevent unique constraint
+        # violation on future re-invite after round-trip transfer.
+        # Both scope-entity mapping and object permissions must be removed because
+        # PostgreSQL aborts the transaction on IntegrityError even if caught in Python.
+        vfolder_entity_id = ObjectId(
+            entity_type=EntityType.VFOLDER,
+            entity_id=str(vfolder_id),
+        )
         role_manager = RoleManager()
         async with root_ctx.db.begin_session() as db_session:
+            await role_manager.unmap_entity_from_scope(
+                db_session,
+                entity_id=vfolder_entity_id,
+                scope_id=ScopeId(ScopeType.USER, str(user_info.uuid)),
+            )
             try:
                 await role_manager.delete_object_permission_of_user(
                     db_session, user_info.uuid, vfolder_id
@@ -2753,10 +2765,19 @@ async def change_vfolder_ownership(request: web.Request, params: Any) -> web.Res
 
     await execute_with_retry(_delete_vfolder_related_rows)
 
-    # Clean up old owner's RBAC permission records
+    # Clean up old owner's RBAC records
     if old_owner_uuid is not None and old_owner_uuid != user_info.uuid:
+        vfolder_entity_id = ObjectId(
+            entity_type=EntityType.VFOLDER,
+            entity_id=str(vfolder_id),
+        )
         role_manager = RoleManager()
         async with root_ctx.db.begin_session() as db_session:
+            await role_manager.unmap_entity_from_scope(
+                db_session,
+                entity_id=vfolder_entity_id,
+                scope_id=ScopeId(ScopeType.USER, str(old_owner_uuid)),
+            )
             try:
                 await role_manager.delete_object_permission_of_user(
                     db_session, old_owner_uuid, vfolder_id
