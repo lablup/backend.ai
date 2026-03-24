@@ -436,10 +436,13 @@ class RoleAssignmentRoleNestedFilterGQL(PydanticInputMixin[RoleNestedFilterDTO])
 class RoleAssignmentFilter(PydanticInputMixin[RoleAssignmentFilterDTO], GQLFilter):
     role_id: uuid.UUID | None = None
     role: RoleAssignmentRoleNestedFilterGQL | None = None
-    permission: Annotated[
-        PermissionNestedFilterGQL,
-        strawberry.lazy("ai.backend.manager.api.gql.rbac.types.permission"),
-    ] | None = None
+    permission: (
+        Annotated[
+            PermissionNestedFilterGQL,
+            strawberry.lazy("ai.backend.manager.api.gql.rbac.types.permission"),
+        ]
+        | None
+    ) = None
     username: StringFilter | None = None
     email: StringFilter | None = None
 
