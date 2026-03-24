@@ -1860,6 +1860,7 @@
       "CleaningUpTensorBoardProxy": "Clean up TensorBoard proxy...",
       "ClusterMode": "Cluster mode",
       "ClusterSize": "Cluster size",
+      "ClusterSizeExceedsImmediateCapacity": "With the selected resources, up to {{maxClusterSize}} {{unit}}(s) can start immediately. The session may be pending.",
       "ConfirmAndLaunch": "Confirm and Launch",
       "Container": "Container",
       "Core": "Core",

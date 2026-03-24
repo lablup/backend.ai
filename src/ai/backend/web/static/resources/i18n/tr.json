@@ -1859,6 +1859,7 @@
       "CleaningUpTensorBoardProxy": "TensorBoard proxy'si temizleniyor...",
       "ClusterMode": "küme modu",
       "ClusterSize": "Küme boyutu",
+      "ClusterSizeExceedsImmediateCapacity": "Seçilen kaynaklarla en fazla {{maxClusterSize}} {{unit}} hemen başlatılabilir. Oturum bekleme durumuna geçebilir.",
       "ConfirmAndLaunch": "Onaylayın ve Başlatın",
       "Container": "Konteyner",
       "Core": "çekirdek",

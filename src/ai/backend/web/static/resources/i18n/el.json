@@ -1859,6 +1859,7 @@
       "CleaningUpTensorBoardProxy": "Καθαρισμός proxy του TensorBoard...",
       "ClusterMode": "Λειτουργία συμπλέγματος",
       "ClusterSize": "Μέγεθος συμπλέγματος",
+      "ClusterSizeExceedsImmediateCapacity": "Με τους επιλεγμένους πόρους, έως και {{maxClusterSize}} {{unit}} μπορούν να ξεκινήσουν αμέσως. Η συνεδρία ενδέχεται να βρίσκεται σε αναμονή.",
       "ConfirmAndLaunch": "Επιβεβαίωση και εκκίνηση",
       "Container": "Δοχείο",
       "Core": "Πυρήνας",

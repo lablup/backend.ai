@@ -1861,6 +1861,7 @@
       "CleaningUpTensorBoardProxy": "TensorBoard-Proxy bereinigen...",
       "ClusterMode": "Cluster-Modus",
       "ClusterSize": "Clustergröße",
+      "ClusterSizeExceedsImmediateCapacity": "Mit den ausgewählten Ressourcen können sofort bis zu {{maxClusterSize}} {{unit}} gestartet werden. Die Sitzung könnte in die Warteschlange geraten.",
       "ConfirmAndLaunch": "Bestätigen und starten",
       "Container": "Container",
       "Core": "Ader",

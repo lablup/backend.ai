@@ -1862,6 +1862,7 @@
       "CleaningUpTensorBoardProxy": "TensorBoard 프록시 초기화 중...",
       "ClusterMode": "클러스터 모드 설정",
       "ClusterSize": "클러스터 크기",
+      "ClusterSizeExceedsImmediateCapacity": "선택한 자원으로는 최대 {{maxClusterSize}}개의 {{unit}}만 즉시 시작할 수 있습니다. 세션이 대기 상태가 될 수 있습니다.",
       "ConfirmAndLaunch": "검토 및 시작",
       "Container": "컨테이너",
       "Core": "코어",

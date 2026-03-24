@@ -16,6 +16,14 @@ Changes
 
 <!-- towncrier release notes start -->
 
+## 26.3.2 (2026-03-24)
+
+### Fixes
+* Add safe Prometheus metric wrappers to prevent mmap error propagation into business logic ([#10395](https://github.com/lablup/backend.ai/issues/10395))
+* Remove duplicate `debug` field in the webserver's `config.toml.j2` template ([#10423](https://github.com/lablup/backend.ai/issues/10423))
+* Add missing OpenTelemetrySpec initialization in the manager, enabling trace and log export to the OTEL Collector. ([#10439](https://github.com/lablup/backend.ai/issues/10439))
+
+
 ## 26.3.1 (2026-03-20)
 
 ### Features

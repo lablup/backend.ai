@@ -1860,6 +1860,7 @@
       "CleaningUpTensorBoardProxy": "TensorBoard проксийг цэвэрлэх...",
       "ClusterMode": "Кластер горим",
       "ClusterSize": "Кластерийн хэмжээ",
+      "ClusterSizeExceedsImmediateCapacity": "Сонгосон нөөцөөр дээд тал нь {{maxClusterSize}} {{unit}} шууд эхлэх боломжтой. Сессия хүлээлтийн төлөвт орж болзошгүй.",
       "ConfirmAndLaunch": "Шалгасан тул эхлүүлж болно",
       "Container": "Контейнер",
       "Core": "Цөм",

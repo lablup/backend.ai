@@ -1859,6 +1859,7 @@
       "CleaningUpTensorBoardProxy": "Usuń proxy TensorBoard...",
       "ClusterMode": "Tryb klastra",
       "ClusterSize": "Wielkość klastra",
+      "ClusterSizeExceedsImmediateCapacity": "Przy wybranych zasobach do {{maxClusterSize}} {{unit}} może uruchomić się natychmiast. Sesja może przejść w stan oczekiwania.",
       "ConfirmAndLaunch": "Potwierdź i uruchom",
       "Container": "Pojemnik",
       "Core": "Rdzeń",

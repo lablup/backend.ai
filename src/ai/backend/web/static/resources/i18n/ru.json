@@ -1859,6 +1859,7 @@
       "CleaningUpTensorBoardProxy": "Очистить прокси TensorBoard...",
       "ClusterMode": "Кластерный режим",
       "ClusterSize": "Размер кластера",
+      "ClusterSizeExceedsImmediateCapacity": "При выбранных ресурсах немедленно может запуститься до {{maxClusterSize}} {{unit}}. Сессия может перейти в состояние ожидания.",
       "ConfirmAndLaunch": "Подтверждение и запуск",
       "Container": "Контейнер",
       "Core": "Ядро",
