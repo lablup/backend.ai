@@ -42,7 +42,7 @@ from ai.backend.manager.models.notification.conditions import (
     NotificationRuleConditions,
 )
 from ai.backend.manager.models.notification.orders import NotificationChannelOrders
-from ai.backend.manager.models.rbac_models import UserRoleRow
+from ai.backend.manager.models.rbac_models import RoleRow, UserRoleRow
 from ai.backend.manager.models.rbac_models.association_scopes_entities import (
     AssociationScopesEntitiesRow,
 )
@@ -98,6 +98,7 @@ class TestNotificationRepository:
                 UserResourcePolicyRow,
                 ProjectResourcePolicyRow,
                 KeyPairResourcePolicyRow,
+                RoleRow,
                 UserRoleRow,
                 UserRow,
                 KeyPairRow,

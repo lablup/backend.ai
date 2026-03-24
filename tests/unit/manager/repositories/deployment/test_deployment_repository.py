@@ -58,7 +58,7 @@ from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.image import ImageRow
 from ai.backend.manager.models.kernel import KernelRow, KernelStatus
 from ai.backend.manager.models.keypair import KeyPairRow
-from ai.backend.manager.models.rbac_models import UserRoleRow
+from ai.backend.manager.models.rbac_models import RoleRow, UserRoleRow
 from ai.backend.manager.models.rbac_models.association_scopes_entities import (
     AssociationScopesEntitiesRow,
 )
@@ -139,6 +139,7 @@ class TestDeploymentRepositoryFetchRouteServiceDiscoveryInfo:
                 UserResourcePolicyRow,
                 ProjectResourcePolicyRow,
                 KeyPairResourcePolicyRow,
+                RoleRow,
                 UserRoleRow,  # UserRow relationship dependency
                 UserRow,
                 KeyPairRow,
@@ -1191,6 +1192,7 @@ class TestDeploymentRevisionOperations:
                 ResourcePresetRow,  # ScalingGroupRow relationship dependency
                 UserResourcePolicyRow,
                 ProjectResourcePolicyRow,
+                RoleRow,
                 UserRoleRow,  # UserRow relationship dependency
                 UserRow,
                 GroupRow,
@@ -1860,6 +1862,7 @@ class TestDeploymentAutoScalingPolicyOperations:
                 ResourcePresetRow,  # ScalingGroupRow relationship dependency
                 UserResourcePolicyRow,
                 ProjectResourcePolicyRow,
+                RoleRow,
                 UserRoleRow,  # UserRow relationship dependency
                 UserRow,
                 GroupRow,
@@ -2238,6 +2241,7 @@ class TestDeploymentPolicyOperations:
                 ResourcePresetRow,  # ScalingGroupRow relationship dependency
                 UserResourcePolicyRow,
                 ProjectResourcePolicyRow,
+                RoleRow,
                 UserRoleRow,  # UserRow relationship dependency
                 UserRow,
                 GroupRow,
@@ -2571,6 +2575,7 @@ class TestSearchDeploymentPolicies:
                 ResourcePresetRow,
                 UserResourcePolicyRow,
                 ProjectResourcePolicyRow,
+                RoleRow,
                 UserRoleRow,
                 UserRow,
                 GroupRow,
@@ -2938,6 +2943,7 @@ class TestRouteOperations:
                 ResourcePresetRow,  # ScalingGroupRow relationship dependency
                 UserResourcePolicyRow,
                 ProjectResourcePolicyRow,
+                RoleRow,
                 UserRoleRow,  # UserRow relationship dependency
                 UserRow,
                 GroupRow,
@@ -3304,6 +3310,7 @@ class TestDeploymentRepositoryDuplicateName:
                 UserResourcePolicyRow,
                 ProjectResourcePolicyRow,
                 KeyPairResourcePolicyRow,
+                RoleRow,
                 UserRoleRow,
                 UserRow,
                 KeyPairRow,
