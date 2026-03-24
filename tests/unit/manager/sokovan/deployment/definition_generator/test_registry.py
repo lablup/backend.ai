@@ -32,6 +32,12 @@ class VariantExpectation:
     health_check_path: str | None
 
 
+@dataclass(frozen=True)
+class InvalidModelDefinitionCase:
+    description: str
+    value: dict[str, Any] | None
+
+
 VARIANT_EXPECTATIONS: dict[RuntimeVariant, VariantExpectation] = {
     RuntimeVariant.VLLM: VariantExpectation("vllm-model", 8000, "/health"),
     RuntimeVariant.NIM: VariantExpectation("nim-model", 8000, "/v1/health/ready"),
@@ -137,11 +143,6 @@ def storage_override_definition() -> dict[str, Any]:
             }
         ]
     }
-
-
-@pytest.fixture
-def invalid_model_definition() -> dict[str, Any]:
-    return {"models": "not-a-list"}
 
 
 class TestModelDefinitionGeneratorRegistry:
@@ -285,35 +286,28 @@ class TestModelDefinitionGeneratorRegistry:
         assert model.service is not None
         assert model.service.start_command == "db-overridden-command"
 
-    async def test_revision_db_model_definition_not_applied_when_none(
-        self, mock_repo: MagicMock
+    @pytest.mark.parametrize(
+        "case",
+        [
+            InvalidModelDefinitionCase(description="not provided", value=None),
+            InvalidModelDefinitionCase(description="empty dict", value={}),
+            InvalidModelDefinitionCase(
+                description="malformed models field", value={"models": "not-a-list"}
+            ),
+        ],
+        ids=lambda c: c.description,
+    )
+    async def test_revision_db_model_definition_ignored_when_absent_or_invalid(
+        self, mock_repo: MagicMock, case: InvalidModelDefinitionCase
     ) -> None:
-        """When model_definition is None, generated definition is returned unchanged."""
+        """When model_definition is None, empty, or invalid, generated definition is returned unchanged."""
         registry = ModelDefinitionGeneratorRegistry(
             RegistryArgs(deployment_repository=mock_repo, enable_model_definition_override=False)
         )
         expected = VARIANT_EXPECTATIONS[RuntimeVariant.VLLM]
 
         result = await registry.generate_model_definition(
-            create_revision(RuntimeVariant.VLLM, model_definition=None)
-        )
-
-        model = result.models[0]
-        assert model.name == expected.name
-        assert model.service is not None
-        assert model.service.port == expected.port
-
-    async def test_revision_db_model_definition_not_applied_when_empty(
-        self, mock_repo: MagicMock
-    ) -> None:
-        """When model_definition is empty dict, generated definition is returned unchanged."""
-        registry = ModelDefinitionGeneratorRegistry(
-            RegistryArgs(deployment_repository=mock_repo, enable_model_definition_override=False)
-        )
-        expected = VARIANT_EXPECTATIONS[RuntimeVariant.VLLM]
-
-        result = await registry.generate_model_definition(
-            create_revision(RuntimeVariant.VLLM, model_definition={})
+            create_revision(RuntimeVariant.VLLM, model_definition=case.value)
         )
 
         model = result.models[0]
@@ -344,21 +338,3 @@ class TestModelDefinitionGeneratorRegistry:
         model = result.models[0]
         assert model.service is not None
         assert model.service.start_command == "storage-command"
-
-    async def test_db_model_definition_fallback_on_invalid_data(
-        self, mock_repo: MagicMock, invalid_model_definition: dict[str, Any]
-    ) -> None:
-        """Invalid DB model_definition falls back to generated definition."""
-        registry = ModelDefinitionGeneratorRegistry(
-            RegistryArgs(deployment_repository=mock_repo, enable_model_definition_override=False)
-        )
-        expected = VARIANT_EXPECTATIONS[RuntimeVariant.VLLM]
-
-        result = await registry.generate_model_definition(
-            create_revision(RuntimeVariant.VLLM, model_definition=invalid_model_definition)
-        )
-
-        model = result.models[0]
-        assert model.name == expected.name
-        assert model.service is not None
-        assert model.service.port == expected.port
