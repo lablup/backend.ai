@@ -566,6 +566,7 @@ class DeploymentService:
             execution=revision_creator.execution.model_copy(
                 update={"environ": merged_environ},
             ),
+            model_definition=revision_creator.model_definition,
         )
 
     async def _build_revision(

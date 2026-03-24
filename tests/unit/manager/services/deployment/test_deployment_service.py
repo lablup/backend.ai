@@ -13,6 +13,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
+from ai.backend.common.config import ModelDefinition
 from ai.backend.common.data.endpoint.types import EndpointLifecycle
 from ai.backend.common.data.model_deployment.types import DeploymentStrategy
 from ai.backend.common.types import ClusterMode, ResourceSlot, RuntimeVariant
@@ -374,6 +375,7 @@ class ModelRevisionFixtures(DeploymentServiceBaseFixtures):
                 runtime_variant=RuntimeVariant.VLLM,
                 callback_url=None,
             ),
+            model_definition=ModelDefinition(),
         )
 
     @pytest.fixture
@@ -421,6 +423,7 @@ class ModelRevisionFixtures(DeploymentServiceBaseFixtures):
                 runtime_variant=RuntimeVariant.VLLM,
                 environ=None,
             ),
+            model_definition=ModelDefinition(),
         )
 
 
@@ -473,7 +476,9 @@ class TestAddModelRevision(ModelRevisionFixtures):
         assert spec.cluster_size == revision_creator.resource_spec.cluster_size
         assert spec.model_mount_destination == revision_creator.mounts.model_mount_destination
         assert spec.model_definition_path == revision_creator.mounts.model_definition_path
-        assert spec.model_definition is None
+        assert spec.model_definition == revision_creator.model_definition.model_dump(
+            exclude_none=True, by_alias=True
+        )
         assert spec.startup_command == revision_creator.execution.startup_command
         assert spec.bootstrap_script == revision_creator.execution.bootstrap_script
         assert spec.environ == revision_creator.execution.environ
@@ -497,6 +502,55 @@ class TestAddModelRevision(ModelRevisionFixtures):
         spec = creator_arg.spec
         assert spec.environ == {}
         assert spec.resource_opts == {}
+
+    @pytest.fixture
+    def sample_model_definition(self) -> ModelDefinition:
+        return ModelDefinition.model_validate({
+            "models": [
+                {
+                    "name": "test-model",
+                    "model-path": "/models",
+                    "service": {"start-command": "serve", "port": 8000},
+                }
+            ]
+        })
+
+    @pytest.fixture
+    def revision_creator_with_model_definition(
+        self,
+        image_id: uuid.UUID,
+        model_vfolder_id: uuid.UUID,
+        sample_model_definition: ModelDefinition,
+    ) -> ModelRevisionCreator:
+        return ModelRevisionCreator(
+            image_id=image_id,
+            resource_spec=ResourceSpec(
+                cluster_mode=ClusterMode.SINGLE_NODE,
+                cluster_size=1,
+                resource_slots={"cpu": "4"},
+            ),
+            mounts=VFolderMountsCreator(model_vfolder_id=model_vfolder_id),
+            execution=ExecutionSpec(runtime_variant=RuntimeVariant.VLLM),
+            model_definition=sample_model_definition,
+        )
+
+    async def test_add_model_revision_propagates_model_definition(
+        self,
+        processors: DeploymentProcessors,
+        mock_deployment_repository: MagicMock,
+        deployment_id: uuid.UUID,
+        revision_creator_with_model_definition: ModelRevisionCreator,
+    ) -> None:
+        """model_definition from the creator should be serialized and stored in the DB spec."""
+        action = AddModelRevisionAction(
+            model_deployment_id=deployment_id, adder=revision_creator_with_model_definition
+        )
+        await processors.add_model_revision.wait_for_complete(action)
+
+        spec = mock_deployment_repository.create_revision_with_next_number.call_args[0][0].spec
+        assert spec.model_definition is not None
+        assert spec.model_definition["models"][0]["name"] == "test-model"
+        assert spec.model_definition["models"][0]["service"]["port"] == 8000
 
 
 class TestServiceDefinitionMerge(ModelRevisionFixtures):
