@@ -21,7 +21,6 @@ from ai.backend.manager.data.permission.entity import (
 from ai.backend.manager.data.permission.id import ObjectId, ScopeId
 from ai.backend.manager.data.permission.object_permission import (
     ObjectPermissionCreateInputBeforeRoleCreation,
-    ObjectPermissionListResult,
 )
 from ai.backend.manager.data.permission.permission import (
     PermissionListResult,
@@ -78,7 +77,6 @@ from ai.backend.manager.repositories.permission_controller.creators import (
     UserRoleCreatorSpec,
 )
 from ai.backend.manager.repositories.permission_controller.types import (
-    ObjectPermissionSearchScope,
     PermissionSearchScope,
 )
 
@@ -589,31 +587,6 @@ class PermissionDBSource:
             items = [row.PermissionRow.to_data() for row in result.rows]
 
             return PermissionListResult(
-                items=items,
-                total_count=result.total_count,
-                has_next_page=result.has_next_page,
-                has_previous_page=result.has_previous_page,
-            )
-
-    async def search_object_permissions(
-        self,
-        querier: BatchQuerier,
-        scope: ObjectPermissionSearchScope | None = None,
-    ) -> ObjectPermissionListResult:
-        """Searches object permissions with pagination and filtering."""
-        async with self._db.begin_readonly_session_read_committed() as db_sess:
-            query = sa.select(ObjectPermissionRow)
-
-            result = await execute_batch_querier(
-                db_sess,
-                query,
-                querier,
-                scope,
-            )
-
-            items = [row.ObjectPermissionRow.to_data() for row in result.rows]
-
-            return ObjectPermissionListResult(
                 items=items,
                 total_count=result.total_count,
                 has_next_page=result.has_next_page,
