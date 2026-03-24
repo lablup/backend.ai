@@ -14,6 +14,7 @@ from .types import AuthSuccessResponse
 __all__ = (
     "AuthorizeResponse",
     "GetRoleResponse",
+    "MyIpResponse",
     "SignupResponse",
     "SignoutResponse",
     "UpdateFullNameResponse",
@@ -98,3 +99,9 @@ class VerifyAuthResponse(BaseResponseModel):
 
     authorized: str = Field(description="Authorization status string (always 'yes' when valid)")
     echo: str = Field(description="Echoed input string confirming the auth round-trip succeeded")
+
+
+class MyIpResponse(BaseResponseModel):
+    """Response containing the client's IP address as seen by the server."""
+
+    client_ip: str = Field(description="The client's IP address as seen by the server")
