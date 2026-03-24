@@ -4,8 +4,8 @@ from datetime import UTC, datetime
 
 from ai.backend.common.health_checker.abc import StaticServiceHealthChecker
 from ai.backend.common.health_checker.types import (
-    PROMETHEUS,
     CID_PROMETHEUS_METRICS,
+    PROMETHEUS,
     ComponentHealthStatus,
     ServiceGroup,
     ServiceHealth,

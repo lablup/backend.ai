@@ -159,9 +159,7 @@ class TestSafeCounter:
             name="test_counter_direct",
             documentation="test",
         )
-        with patch.object(
-            type(counter).__bases__[0], "inc", side_effect=ValueError("mmap error")
-        ):
+        with patch.object(type(counter).__bases__[0], "inc", side_effect=ValueError("mmap error")):
             counter.inc()
             assert is_metrics_disabled() is True
 
@@ -182,9 +180,7 @@ class TestSafeGauge:
             documentation="test",
             multiprocess_mode="livesum",
         )
-        with patch.object(
-            type(gauge).__bases__[0], "set", side_effect=ValueError("mmap error")
-        ):
+        with patch.object(type(gauge).__bases__[0], "set", side_effect=ValueError("mmap error")):
             gauge.set(42.0)
             assert is_metrics_disabled() is True
 

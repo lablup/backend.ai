@@ -55,7 +55,6 @@ def _trip(error: Exception) -> None:
         log.warning(
             "Prometheus metric recording disabled due to mmap error: {}",
             error,
-            exc_info=True,
         )
 
 
@@ -139,7 +138,7 @@ class SafeLabeledMetric:
 class SafeCounter(Counter):
     """Counter that becomes no-op on mmap corruption."""
 
-    def labels(self, *args: Any, **kwargs: Any) -> SafeLabeledMetric | _NoopLabeledMetric:
+    def labels(self, *args: Any, **kwargs: Any) -> Any:
         if _metrics_disabled:
             return _NOOP_LABELED
         try:
@@ -148,11 +147,11 @@ class SafeCounter(Counter):
             _trip(e)
             return _NOOP_LABELED
 
-    def inc(self, amount: float = 1) -> None:
+    def inc(self, amount: float = 1, exemplar: dict[str, str] | None = None) -> None:
         if _metrics_disabled:
             return
         try:
-            super().inc(amount)
+            super().inc(amount, exemplar)
         except ValueError as e:
             _trip(e)
 
@@ -160,7 +159,7 @@ class SafeCounter(Counter):
 class SafeGauge(Gauge):
     """Gauge that becomes no-op on mmap corruption."""
 
-    def labels(self, *args: Any, **kwargs: Any) -> SafeLabeledMetric | _NoopLabeledMetric:
+    def labels(self, *args: Any, **kwargs: Any) -> Any:
         if _metrics_disabled:
             return _NOOP_LABELED
         try:
@@ -197,7 +196,7 @@ class SafeGauge(Gauge):
 class SafeHistogram(Histogram):
     """Histogram that becomes no-op on mmap corruption."""
 
-    def labels(self, *args: Any, **kwargs: Any) -> SafeLabeledMetric | _NoopLabeledMetric:
+    def labels(self, *args: Any, **kwargs: Any) -> Any:
         if _metrics_disabled:
             return _NOOP_LABELED
         try:
@@ -206,10 +205,10 @@ class SafeHistogram(Histogram):
             _trip(e)
             return _NOOP_LABELED
 
-    def observe(self, amount: float) -> None:
+    def observe(self, amount: float, exemplar: dict[str, str] | None = None) -> None:
         if _metrics_disabled:
             return
         try:
-            super().observe(amount)
+            super().observe(amount, exemplar)
         except ValueError as e:
             _trip(e)

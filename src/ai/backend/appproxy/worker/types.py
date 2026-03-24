@@ -21,12 +21,6 @@ import aiohttp_cors
 import attrs
 import prometheus_client
 
-from ai.backend.common.metrics.safe import (
-    SafeCounter,
-    SafeGauge,
-    SafeHistogram,
-)
-
 from ai.backend.appproxy.common.types import (
     AppMode,
     FrontendMode,
@@ -43,6 +37,11 @@ from ai.backend.common.metrics.metric import (
     SystemMetricObserver,
 )
 from ai.backend.common.metrics.multiprocess import generate_latest_multiprocess
+from ai.backend.common.metrics.safe import (
+    SafeCounter,
+    SafeGauge,
+    SafeHistogram,
+)
 from ai.backend.common.types import (
     MetricKey,
     MetricValue,
