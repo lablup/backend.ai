@@ -78,9 +78,14 @@ class ModelDefinitionGeneratorRegistry:
         For CUSTOM variant: Always fetches from storage.
         For other variants:
             - Generate programmatically first
+            - If model_definition is stored in the revision DB record, deep merge it
             - If enable_model_definition_override is True and model_definition_path exists,
-              try to fetch from storage and deep merge (override) with generated definition
-            - If fetch fails, use generated definition as fallback
+              try to fetch from storage and deep merge (override) with the result
+
+        Merge priority (later overrides earlier):
+            1. Programmatically generated definition (lowest)
+            2. Revision DB record model_definition
+            3. Storage file override (highest)
         """
         runtime_variant = model_revision.execution.runtime_variant
         generator = self.get(runtime_variant)
@@ -92,7 +97,12 @@ class ModelDefinitionGeneratorRegistry:
         # For other variants, generate first
         generated_definition = await generator.generate_model_definition(model_revision)
 
-        # Check if override is enabled and path exists
+        # Merge revision DB model_definition if present
+        generated_definition = self._apply_revision_model_definition(
+            model_revision, generated_definition
+        )
+
+        # Check if storage file override is enabled and path exists
         if not self._enable_model_definition_override:
             return generated_definition
 
@@ -105,6 +115,37 @@ class ModelDefinitionGeneratorRegistry:
             model_revision=model_revision,
             base_definition=generated_definition,
         )
+
+    def _apply_revision_model_definition(
+        self,
+        model_revision: ModelRevisionSpec,
+        base_definition: ModelDefinition,
+    ) -> ModelDefinition:
+        """
+        Merge model_definition from the deployment revision DB record into the base definition.
+        Returns the base definition unchanged if no DB model_definition exists.
+        """
+        revision_model_definition = model_revision.model_definition
+        if not revision_model_definition:
+            return base_definition
+
+        try:
+            base_dict = base_definition.model_dump(exclude_none=True, by_alias=True)
+            merged_dict = deep_merge(base_dict, dict(revision_model_definition))
+            merged_definition = ModelDefinition.model_validate(merged_dict)
+            log.debug(
+                "Revision DB model_definition merged successfully for revision {}",
+                model_revision.revision_id,
+            )
+            return merged_definition
+        except Exception:
+            log.warning(
+                "Failed to merge revision DB model_definition for revision {}, "
+                "using base definition",
+                model_revision.revision_id,
+                exc_info=True,
+            )
+            return base_definition
 
     async def _try_apply_override(
         self,

@@ -46,7 +46,9 @@ VARIANTS_WITH_HEALTH_CHECK = [v for v in NON_CUSTOM_VARIANTS if v != RuntimeVari
 
 
 def create_revision(
-    variant: RuntimeVariant, model_definition_path: str | None = None
+    variant: RuntimeVariant,
+    model_definition_path: str | None = None,
+    model_definition: dict[str, Any] | None = None,
 ) -> ModelRevisionSpec:
     return ModelRevisionSpec(
         image_identifier=ImageIdentifier(
@@ -70,6 +72,7 @@ def create_revision(
             bootstrap_script=None,
             environ=None,
         ),
+        model_definition=model_definition,
     )
 
 
@@ -219,6 +222,137 @@ class TestModelDefinitionGeneratorRegistry:
         )
 
         mock_repo.fetch_model_definition.assert_called_once()
+        model = result.models[0]
+        assert model.name == expected.name
+        assert model.service is not None
+        assert model.service.port == expected.port
+
+    @pytest.mark.parametrize("variant", VARIANTS_WITH_HEALTH_CHECK)
+    async def test_revision_db_model_definition_merges_with_generated(
+        self, mock_repo: MagicMock, variant: RuntimeVariant
+    ) -> None:
+        """DB model_definition is merged on top of generated definition."""
+        registry = ModelDefinitionGeneratorRegistry(
+            RegistryArgs(deployment_repository=mock_repo, enable_model_definition_override=False)
+        )
+        expected = VARIANT_EXPECTATIONS[variant]
+        db_model_definition: dict[str, Any] = {
+            "models": [
+                {
+                    "name": expected.name,
+                    "model-path": "/models",
+                    "service": {
+                        "start-command": "db-overridden-command",
+                        "port": expected.port,
+                    },
+                }
+            ]
+        }
+
+        result = await registry.generate_model_definition(
+            create_revision(variant, model_definition=db_model_definition)
+        )
+
+        model = result.models[0]
+        assert model.service is not None
+        assert model.service.start_command == "db-overridden-command"
+
+    async def test_revision_db_model_definition_not_applied_when_none(
+        self, mock_repo: MagicMock
+    ) -> None:
+        """When model_definition is None, generated definition is returned unchanged."""
+        registry = ModelDefinitionGeneratorRegistry(
+            RegistryArgs(deployment_repository=mock_repo, enable_model_definition_override=False)
+        )
+        expected = VARIANT_EXPECTATIONS[RuntimeVariant.VLLM]
+
+        result = await registry.generate_model_definition(
+            create_revision(RuntimeVariant.VLLM, model_definition=None)
+        )
+
+        model = result.models[0]
+        assert model.name == expected.name
+        assert model.service is not None
+        assert model.service.port == expected.port
+
+    async def test_revision_db_model_definition_not_applied_when_empty(
+        self, mock_repo: MagicMock
+    ) -> None:
+        """When model_definition is empty dict, generated definition is returned unchanged."""
+        registry = ModelDefinitionGeneratorRegistry(
+            RegistryArgs(deployment_repository=mock_repo, enable_model_definition_override=False)
+        )
+        expected = VARIANT_EXPECTATIONS[RuntimeVariant.VLLM]
+
+        result = await registry.generate_model_definition(
+            create_revision(RuntimeVariant.VLLM, model_definition={})
+        )
+
+        model = result.models[0]
+        assert model.name == expected.name
+        assert model.service is not None
+        assert model.service.port == expected.port
+
+    async def test_storage_override_takes_precedence_over_db_model_definition(
+        self, mock_repo: MagicMock
+    ) -> None:
+        """Storage file override has higher priority than DB model_definition."""
+        registry = ModelDefinitionGeneratorRegistry(
+            RegistryArgs(deployment_repository=mock_repo, enable_model_definition_override=True)
+        )
+        expected = VARIANT_EXPECTATIONS[RuntimeVariant.VLLM]
+        db_model_definition: dict[str, Any] = {
+            "models": [
+                {
+                    "name": expected.name,
+                    "model-path": "/models",
+                    "service": {
+                        "start-command": "db-command",
+                        "port": expected.port,
+                    },
+                }
+            ]
+        }
+        storage_override = {
+            "models": [
+                {
+                    "name": expected.name,
+                    "model-path": "/models",
+                    "service": {
+                        "start-command": "storage-command",
+                        "port": expected.port,
+                    },
+                }
+            ]
+        }
+        mock_repo.fetch_model_definition = AsyncMock(return_value=storage_override)
+
+        result = await registry.generate_model_definition(
+            create_revision(
+                RuntimeVariant.VLLM,
+                model_definition_path="model.yaml",
+                model_definition=db_model_definition,
+            )
+        )
+
+        model = result.models[0]
+        assert model.service is not None
+        assert model.service.start_command == "storage-command"
+
+    async def test_db_model_definition_fallback_on_invalid_data(self, mock_repo: MagicMock) -> None:
+        """Invalid DB model_definition falls back to generated definition."""
+        registry = ModelDefinitionGeneratorRegistry(
+            RegistryArgs(deployment_repository=mock_repo, enable_model_definition_override=False)
+        )
+        expected = VARIANT_EXPECTATIONS[RuntimeVariant.VLLM]
+        invalid_model_definition: dict[str, Any] = {
+            "models": "not-a-list",
+        }
+
+        result = await registry.generate_model_definition(
+            create_revision(RuntimeVariant.VLLM, model_definition=invalid_model_definition)
+        )
+
         model = result.models[0]
         assert model.name == expected.name
         assert model.service is not None

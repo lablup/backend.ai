@@ -327,6 +327,7 @@ class ModelRevisionSpec(ConfiguredModel):
     resource_spec: ResourceSpec
     mounts: MountMetadata
     execution: ExecutionSpec
+    model_definition: Mapping[str, Any] | None = None
 
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
