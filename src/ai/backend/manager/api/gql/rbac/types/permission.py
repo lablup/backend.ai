@@ -22,6 +22,9 @@ from ai.backend.common.dto.manager.v2.rbac.request import (
     PermissionFilter as PermissionFilterDTO,
 )
 from ai.backend.common.dto.manager.v2.rbac.request import (
+    PermissionNestedFilter as PermissionNestedFilterDTO,
+)
+from ai.backend.common.dto.manager.v2.rbac.request import (
     PermissionOrderBy as PermissionOrderByDTO,
 )
 from ai.backend.common.dto.manager.v2.rbac.request import (
@@ -191,6 +194,24 @@ class PermissionGQL(PydanticNodeMixin[PermissionNodeDTO]):
 
 
 # ==================== Filter Types ====================
+
+
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description="Nested filter for permissions within a role assignment. Filters assignments where the assigned role has permissions matching all specified conditions.",
+        added_version="26.4.0",
+    ),
+    name="PermissionNestedFilter",
+)
+class PermissionNestedFilterGQL(PydanticInputMixin[PermissionNestedFilterDTO]):
+    scope_id: str | None = None
+    scope_type: RBACElementTypeGQL | None = None
+    entity_type: RBACElementTypeGQL | None = None
+    operation: OperationTypeGQL | None = None
+
+    AND: list[Self] | None = None
+    OR: list[Self] | None = None
+    NOT: list[Self] | None = None
 
 
 @gql_pydantic_input(
