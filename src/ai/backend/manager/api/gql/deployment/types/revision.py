@@ -14,6 +14,24 @@ from strawberry import ID, Info
 from strawberry.relay import Connection, Edge, NodeID
 from strawberry.scalars import JSON
 
+from ai.backend.common.config import (
+    ModelConfig as ModelConfigDTO,
+)
+from ai.backend.common.config import (
+    ModelDefinition as ModelDefinitionDTO,
+)
+from ai.backend.common.config import (
+    ModelHealthCheck as ModelHealthCheckDTO,
+)
+from ai.backend.common.config import (
+    ModelMetadata as ModelMetadataDTO,
+)
+from ai.backend.common.config import (
+    ModelServiceConfig as ModelServiceConfigDTO,
+)
+from ai.backend.common.config import (
+    PreStartAction as PreStartActionDTO,
+)
 from ai.backend.common.dto.manager.v2.deployment.request import (
     ActivateRevisionInput as ActivateRevisionInputDTO,
 )
@@ -499,6 +517,128 @@ class ExtraVFolderMountInput(PydanticInputMixin[ExtraVFolderMountInputDTO]):
 
 @gql_pydantic_input(
     BackendAIGQLMeta(
+        description="Input for a pre-start action to execute before starting the model service.",
+        added_version="26.4.0",
+    ),
+    name="PreStartActionInput",
+)
+class PreStartActionInputGQL(PydanticInputMixin[PreStartActionDTO]):
+    action: str = gql_field(description="The name of the pre-start action to execute.")
+    args: JSON = gql_field(
+        description="Arguments for the pre-start action.", default=strawberry.UNSET
+    )
+
+
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description="Health check configuration for a model service.",
+        added_version="26.4.0",
+    ),
+    name="ModelHealthCheckInput",
+)
+class ModelHealthCheckInputGQL(PydanticInputMixin[ModelHealthCheckDTO]):
+    interval: float = gql_field(
+        description="Interval in seconds between health checks.", default=10.0
+    )
+    path: str = gql_field(description="Path to check for health status.")
+    max_retries: int = gql_field(
+        description="Maximum number of retries for health check.", default=10
+    )
+    max_wait_time: float = gql_field(
+        description="Maximum time in seconds to wait for a health check response.", default=15.0
+    )
+    expected_status_code: int = gql_field(
+        description="Expected HTTP status code for a healthy response.", default=200
+    )
+    initial_delay: float = gql_field(
+        description="Initial delay in seconds before the first health check.", default=60.0
+    )
+
+
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description="Service configuration for a model, including startup command and health check.",
+        added_version="26.4.0",
+    ),
+    name="ModelServiceConfigInput",
+)
+class ModelServiceConfigInputGQL(PydanticInputMixin[ModelServiceConfigDTO]):
+    pre_start_actions: list[PreStartActionInputGQL] = gql_field(
+        description="List of pre-start actions to execute before starting the model service.",
+        default=strawberry.UNSET,
+    )
+    start_command: JSON = gql_field(description="Command to start the model service.")
+    shell: str = gql_field(
+        description="Shell to use if start_command is a string.", default="/bin/bash"
+    )
+    port: int = gql_field(description="Port number for the model service. Must be greater than 1.")
+    health_check: ModelHealthCheckInputGQL | None = gql_field(
+        description="Health check configuration for the model service.", default=None
+    )
+
+
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description="Metadata about a model such as author, title, and resource requirements.",
+        added_version="26.4.0",
+    ),
+    name="ModelMetadataInput",
+)
+class ModelMetadataInputGQL(PydanticInputMixin[ModelMetadataDTO]):
+    author: str | None = gql_field(description="Author of the model.", default=None)
+    title: str | None = gql_field(description="Title of the model.", default=None)
+    version: str | None = gql_field(description="Version of the model.", default=None)
+    created: str | None = gql_field(description="Creation date of the model.", default=None)
+    last_modified: str | None = gql_field(
+        description="Last modified date of the model.", default=None
+    )
+    description: str | None = gql_field(description="Description of the model.", default=None)
+    task: str | None = gql_field(description="Task type of the model.", default=None)
+    category: str | None = gql_field(description="Category of the model.", default=None)
+    architecture: str | None = gql_field(description="Architecture of the model.", default=None)
+    framework: list[str] | None = gql_field(
+        description="Frameworks used by the model.", default=None
+    )
+    label: list[str] | None = gql_field(description="Labels for the model.", default=None)
+    license: str | None = gql_field(description="License of the model.", default=None)
+    min_resource: JSON | None = gql_field(
+        description="Minimum resource requirements for the model.", default=None
+    )
+
+
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description="Configuration for a single model within a model definition.",
+        added_version="26.4.0",
+    ),
+    name="ModelConfigInput",
+)
+class ModelConfigInputGQL(PydanticInputMixin[ModelConfigDTO]):
+    name: str = gql_field(description="Name of the model.")
+    model_path: str = gql_field(description="Path to the model file.")
+    service: ModelServiceConfigInputGQL | None = gql_field(
+        description="Configuration for the model service.", default=None
+    )
+    metadata: ModelMetadataInputGQL | None = gql_field(
+        description="Metadata about the model.", default=None
+    )
+
+
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description="Model definition containing a list of model configurations.",
+        added_version="26.4.0",
+    ),
+    name="ModelDefinitionInput",
+)
+class ModelDefinitionInputGQL(PydanticInputMixin[ModelDefinitionDTO]):
+    models: list[ModelConfigInputGQL] = gql_field(
+        description="List of models in the model definition."
+    )
+
+
+@gql_pydantic_input(
+    BackendAIGQLMeta(
         description="Input for specifying revision configuration within a deployment.",
         added_version="25.19.0",
     ),
@@ -526,7 +666,7 @@ class AddRevisionInput(PydanticInputMixin[AddRevisionGQLInputDTO]):
     image: ImageInput
     model_runtime_config: ModelRuntimeConfigInput
     model_mount_config: ModelMountConfigInput
-    model_definition: JSON
+    model_definition: ModelDefinitionInputGQL
     extra_mounts: list[ExtraVFolderMountInput] | None = Field(
         default=None, description="Extra vfolder mounts"
     )
