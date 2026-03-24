@@ -28,6 +28,7 @@ from ai.backend.common.types import (
 )
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.config.provider import ManagerConfigProvider
+from ai.backend.manager.data.vfolder.dto import UserIdentity
 from ai.backend.manager.data.vfolder.types import (
     VFolderCreateParams,
     VFolderData,
@@ -725,7 +726,23 @@ class VFolderService:
 
         # Create source and target VFolderID
         source_folder_id = VFolderID(source_vfolder_data.quota_scope_id, source_vfolder_data.id)
-        target_quota_scope_id = "..."  # TODO: implement
+
+        # Resolve target quota scope: use the provided one or default to requester's user scope
+        if action.target_quota_scope_id is not None:
+            target_quota_scope_id = action.target_quota_scope_id
+            if target_quota_scope_id.scope_type != QuotaScopeType.USER:
+                raise VFolderInvalidParameter("Clone target must be a user quota scope.")
+            await self._vfolder_repository.validate_quota_scope_access(
+                target_quota_scope_id,
+                UserIdentity(
+                    user_uuid=action.requester_user_uuid,
+                    user_role=user_role,
+                    user_email=requester_email,
+                    domain_name=user_domain_name,
+                ),
+            )
+        else:
+            target_quota_scope_id = QuotaScopeID(QuotaScopeType.USER, action.requester_user_uuid)
 
         # Create VFolderCloneInfo for the cloning operation
         vfolder_clone_info = VFolderCloneInfo(
