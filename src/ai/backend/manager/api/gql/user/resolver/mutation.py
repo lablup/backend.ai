@@ -5,14 +5,18 @@ from __future__ import annotations
 import ipaddress
 from uuid import UUID
 
-import strawberry
 from strawberry import Info
 
 from ai.backend.common.api_handlers import Sentinel
 from ai.backend.common.contexts.client_ip import current_client_ip
 from ai.backend.common.contexts.user import current_user
+from ai.backend.common.dto.manager.v2.user.request import DeleteUserInput, PurgeUserInput
 from ai.backend.common.exception import InvalidIpAddressValue, UnreachableError
 from ai.backend.common.types import ReadableCIDR
+from ai.backend.manager.api.gql.decorators import (
+    BackendAIGQLMeta,
+    gql_mutation,
+)
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.api.gql.user.types import (
     BulkCreateUsersV2PayloadGQL,
@@ -58,11 +62,10 @@ from ai.backend.manager.types import OptionalState, TriState
 # Create Mutations
 
 
-@strawberry.mutation(
-    description=(
-        "Added in 26.2.0. Create a new user (admin only). "
-        "Requires superadmin privileges. "
-        "Automatically creates a default keypair for the user."
+@gql_mutation(
+    BackendAIGQLMeta(
+        added_version="26.2.0",
+        description="Create a new user (admin only). Requires superadmin privileges. Automatically creates a default keypair for the user",
     )
 )  # type: ignore[misc]
 async def admin_create_user_v2(
@@ -82,14 +85,15 @@ async def admin_create_user_v2(
         NotImplementedError: This mutation is not yet implemented.
     """
     check_admin_only()
-    raise NotImplementedError("admin_create_user_v2 is not yet implemented")
+    ctx = info.context
+    payload = await ctx.adapters.user.create_user(input.to_pydantic())
+    return CreateUserPayloadGQL.from_pydantic(payload)
 
 
-@strawberry.mutation(
-    description=(
-        "Added in 26.2.0. Create multiple users in bulk (admin only). "
-        "Requires superadmin privileges. "
-        "Each user has individual specifications."
+@gql_mutation(
+    BackendAIGQLMeta(
+        added_version="26.2.0",
+        description="Create multiple users in bulk (admin only). Requires superadmin privileges. Each user has individual specifications",
     )
 )  # type: ignore[misc]
 async def admin_bulk_create_users_v2(
@@ -151,11 +155,10 @@ async def admin_bulk_create_users_v2(
 # Update Mutations
 
 
-@strawberry.mutation(
-    description=(
-        "Added in 26.3.0. Update a user's information (admin only). "
-        "Requires superadmin privileges. "
-        "Only provided fields will be updated."
+@gql_mutation(
+    BackendAIGQLMeta(
+        added_version="26.3.0",
+        description="Update a user's information (admin only). Requires superadmin privileges. Only provided fields will be updated",
     )
 )  # type: ignore[misc]
 async def admin_update_user_v2(
@@ -177,14 +180,15 @@ async def admin_update_user_v2(
         NotImplementedError: This mutation is not yet implemented.
     """
     check_admin_only()
-    raise NotImplementedError("admin_update_user_v2 is not yet implemented")
+    ctx = info.context
+    payload = await ctx.adapters.user.modify_user_by_id(user_id, input.to_pydantic())
+    return UpdateUserPayloadGQL.from_pydantic(payload)
 
 
-@strawberry.mutation(
-    description=(
-        "Added in 26.3.0. Update multiple users in bulk (admin only). "
-        "Requires superadmin privileges. "
-        "Each user has individual update specifications."
+@gql_mutation(
+    BackendAIGQLMeta(
+        added_version="26.3.0",
+        description="Update multiple users in bulk (admin only). Requires superadmin privileges. Each user has individual update specifications",
     )
 )  # type: ignore[misc]
 async def admin_bulk_update_users_v2(
@@ -310,11 +314,10 @@ async def admin_bulk_update_users_v2(
     return BulkUpdateUsersV2PayloadGQL.from_pydantic(payload)
 
 
-@strawberry.mutation(
-    description=(
-        "Added in 26.2.0. Update the current user's information. "
-        "Users can only update their own profile. "
-        "Some fields may be restricted based on user role."
+@gql_mutation(
+    BackendAIGQLMeta(
+        added_version="26.2.0",
+        description="Update the current user's information. Users can only update their own profile. Some fields may be restricted based on user role",
     )
 )  # type: ignore[misc]
 async def update_user_v2(
@@ -333,17 +336,21 @@ async def update_user_v2(
     Raises:
         NotImplementedError: This mutation is not yet implemented.
     """
-    raise NotImplementedError("update_user_v2 is not yet implemented")
+    ctx = info.context
+    me = current_user()
+    if me is None:
+        raise UnreachableError("User context is not available")
+    payload = await ctx.adapters.user.modify_user_by_id(me.user_id, input.to_pydantic())
+    return UpdateUserPayloadGQL.from_pydantic(payload)
 
 
 # Delete UpdateUserV2InputGQLlete)
 
 
-@strawberry.mutation(
-    description=(
-        "Added in 26.2.0. Soft-delete a user (admin only). "
-        "Requires superadmin privileges. "
-        "Sets the user status to DELETED but preserves data."
+@gql_mutation(
+    BackendAIGQLMeta(
+        added_version="26.2.0",
+        description="Soft-delete a user (admin only). Requires superadmin privileges. Sets the user status to DELETED but preserves data",
     )
 )  # type: ignore[misc]
 async def admin_delete_user_v2(
@@ -363,14 +370,15 @@ async def admin_delete_user_v2(
         NotImplementedError: This mutation is not yet implemented.
     """
     check_admin_only()
-    raise NotImplementedError("admin_delete_user_v2 is not yet implemented")
+    ctx = info.context
+    await ctx.adapters.user.delete_user_by_id(DeleteUserInput(user_id=user_id))
+    return DeleteUserPayloadGQL(success=True)
 
 
-@strawberry.mutation(
-    description=(
-        "Added in 26.2.0. Soft-delete multiple users (admin only). "
-        "Requires superadmin privileges. "
-        "Sets user status to DELETED but preserves data."
+@gql_mutation(
+    BackendAIGQLMeta(
+        added_version="26.2.0",
+        description="Soft-delete multiple users (admin only). Requires superadmin privileges. Sets user status to DELETED but preserves data",
     )
 )  # type: ignore[misc]
 async def admin_delete_users_v2(
@@ -390,17 +398,20 @@ async def admin_delete_users_v2(
         NotImplementedError: This mutation is not yet implemented.
     """
     check_admin_only()
-    raise NotImplementedError("admin_delete_users_v2 is not yet implemented")
+    ctx = info.context
+    dto = input.to_pydantic()
+    for user_id in dto.user_ids:
+        await ctx.adapters.user.delete_user_by_id(DeleteUserInput(user_id=user_id))
+    return DeleteUsersPayloadGQL(deleted_count=len(dto.user_ids))
 
 
 # Purge Mutations (Hard Delete)
 
 
-@strawberry.mutation(
-    description=(
-        "Added in 26.2.0. Permanently delete a user and all associated data (admin only). "
-        "Requires superadmin privileges. "
-        "This action is IRREVERSIBLE. All user data, sessions, and resources will be deleted."
+@gql_mutation(
+    BackendAIGQLMeta(
+        added_version="26.2.0",
+        description="Permanently delete a user and all associated data (admin only). Requires superadmin privileges. This action is IRREVERSIBLE. All user data, sessions, and resources will be deleted",
     )
 )  # type: ignore[misc]
 async def admin_purge_user_v2(
@@ -420,14 +431,22 @@ async def admin_purge_user_v2(
         NotImplementedError: This mutation is not yet implemented.
     """
     check_admin_only()
-    raise NotImplementedError("admin_purge_user_v2 is not yet implemented")
+    ctx = info.context
+    me = current_user()
+    if me is None:
+        raise UnreachableError("User context is not available after check_admin_only()")
+    dto = input.to_pydantic()
+    await ctx.adapters.user.purge_user_by_id(
+        PurgeUserInput(user_id=dto.user_id),
+        me.user_id,
+    )
+    return PurgeUserPayloadGQL(success=True)
 
 
-@strawberry.mutation(
-    description=(
-        "Added in 26.3.0. Permanently delete multiple users in bulk (admin only). "
-        "Requires superadmin privileges. "
-        "This action is IRREVERSIBLE. All user data will be deleted."
+@gql_mutation(
+    BackendAIGQLMeta(
+        added_version="26.3.0",
+        description="Permanently delete multiple users in bulk (admin only). Requires superadmin privileges. This action is IRREVERSIBLE. All user data will be deleted",
     )
 )  # type: ignore[misc]
 async def admin_bulk_purge_users_v2(
@@ -484,12 +503,10 @@ async def admin_bulk_purge_users_v2(
 # IP Allowlist Mutations
 
 
-@strawberry.mutation(
-    description=(
-        "Added in 26.4.0. Update the current user's allowed client IP list. "
-        "Set allowed_client_ip to null to remove all IP restrictions. "
-        "When force is false, the operation fails if the current request IP "
-        "would be excluded by the new allowlist (lockout prevention)."
+@gql_mutation(
+    BackendAIGQLMeta(
+        added_version="26.4.0",
+        description="Update the current user's allowed client IP list. Set allowed_client_ip to null to remove all IP restrictions. When force is false, the operation fails if the current request IP would be excluded by the new allowlist (lockout prevention)",
     )
 )  # type: ignore[misc]
 async def update_my_allowed_client_ip(

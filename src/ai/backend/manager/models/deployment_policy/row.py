@@ -26,6 +26,7 @@ if TYPE_CHECKING:
 __all__ = (
     "BlueGreenSpec",
     "DeploymentPolicyRow",
+    "DeploymentStrategySpec",
     "RollingUpdateSpec",
 )
 
@@ -59,6 +60,9 @@ class BlueGreenSpec(BaseModel):
 
     auto_promote: bool = False
     promote_delay_seconds: int = 0
+
+
+DeploymentStrategySpec = RollingUpdateSpec | BlueGreenSpec
 
 
 def _get_endpoint_join_condition() -> sa.ColumnElement[bool]:
@@ -103,14 +107,6 @@ class DeploymentPolicyRow(Base):  # type: ignore[misc]
         server_default="{}",
     )
 
-    # Whether to rollback on deployment failure
-    rollback_on_failure: Mapped[bool] = mapped_column(
-        "rollback_on_failure",
-        sa.Boolean,
-        nullable=False,
-        server_default="false",
-    )
-
     # Timestamps
     created_at: Mapped[datetime] = mapped_column(
         "created_at",
@@ -141,7 +137,6 @@ class DeploymentPolicyRow(Base):  # type: ignore[misc]
             endpoint=self.endpoint,
             strategy=self.strategy,
             strategy_spec=self.get_strategy_spec(),
-            rollback_on_failure=self.rollback_on_failure,
             created_at=self.created_at,
             updated_at=self.updated_at,
         )

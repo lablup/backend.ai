@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import uuid
-from datetime import datetime
 from functools import cached_property
 from typing import TYPE_CHECKING
 
@@ -425,18 +424,6 @@ class DataLoaders:
 
             dtos = await adapter.batch_load_by_ids(session_ids)
             return [SG.from_pydantic(dto) if dto is not None else None for dto in dtos]
-
-        return DataLoader(load_fn=load_fn)
-
-    @cached_property
-    def image_last_used_loader(
-        self,
-    ) -> DataLoader[ImageID, datetime | None]:
-        """Load the most recent session creation timestamp for an image."""
-        adapter = self._adapters.image
-
-        async def load_fn(image_ids: list[ImageID]) -> list[datetime | None]:
-            return await adapter.batch_load_last_used_by_ids(image_ids)
 
         return DataLoader(load_fn=load_fn)
 

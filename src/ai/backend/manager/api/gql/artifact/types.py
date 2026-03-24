@@ -105,7 +105,9 @@ from ai.backend.manager.api.gql.base import (
 from ai.backend.manager.api.gql.data_loader.data_loaders import DataLoaders
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
+    gql_added_field,
     gql_connection_type,
+    gql_field,
     gql_node_type,
     gql_pydantic_input,
     gql_pydantic_type,
@@ -125,7 +127,6 @@ from ai.backend.manager.data.artifact.types import (
     ArtifactStatus,
     ArtifactType,
 )
-from ai.backend.manager.defs import ARTIFACT_MAX_SCAN_LIMIT
 from ai.backend.manager.errors.artifact_registry import ArtifactRegistryNotFoundError
 from ai.backend.manager.models.artifact_revision.conditions import ArtifactRevisionConditions
 
@@ -174,7 +175,7 @@ class ArtifactVerifierMetadataEntryGQL:
 class ArtifactVerifierMetadataGQL(PydanticOutputMixin[ArtifactVerifierMetadataDTO]):
     """Metadata containing multiple key-value entries."""
 
-    entries: list[ArtifactVerifierMetadataEntryGQL] = strawberry.field(
+    entries: list[ArtifactVerifierMetadataEntryGQL] = gql_field(
         description="List of metadata entries. Each entry contains a key-value pair."
     )
 
@@ -188,19 +189,17 @@ class ArtifactVerifierMetadataGQL(PydanticOutputMixin[ArtifactVerifierMetadataDT
     name="ArtifactVerifierResult",
 )
 class ArtifactVerifierGQLResult(PydanticOutputMixin[ArtifactVerifierGQLResultDTO]):
-    success: bool = strawberry.field(description="Whether the verification completed successfully")
-    infected_count: int = strawberry.field(
-        description="Number of infected or suspicious files detected"
+    success: bool = gql_field(description="Whether the verification completed successfully")
+    infected_count: int = gql_field(description="Number of infected or suspicious files detected")
+    scanned_at: datetime = gql_field(description="Timestamp when verification started")
+    scan_time: float = gql_field(description="Time taken to complete verification in seconds")
+    scanned_count: int = gql_field(description="Total number of files scanned")
+    metadata: ArtifactVerifierMetadataGQL = gql_added_field(
+        BackendAIGQLMeta(
+            added_version="26.1.0", description="Additional metadata from the verifier."
+        )
     )
-    scanned_at: datetime = strawberry.field(description="Timestamp when verification started")
-    scan_time: float = strawberry.field(
-        description="Time taken to complete verification in seconds"
-    )
-    scanned_count: int = strawberry.field(description="Total number of files scanned")
-    metadata: ArtifactVerifierMetadataGQL = strawberry.field(
-        description="Added in 26.1.0. Additional metadata from the verifier."
-    )
-    error: str | None = strawberry.field(
+    error: str | None = gql_field(
         description="Fatal error message if the verifier failed to complete"
     )
 
@@ -214,10 +213,8 @@ class ArtifactVerifierGQLResult(PydanticOutputMixin[ArtifactVerifierGQLResultDTO
     name="ArtifactVerifierResultEntry",
 )
 class ArtifactVerifierGQLResultEntry(PydanticOutputMixin[ArtifactVerifierGQLResultEntryDTO]):
-    name: str = strawberry.field(description="Name of the verifier (e.g., 'clamav', 'custom')")
-    result: ArtifactVerifierGQLResult = strawberry.field(
-        description="Scan result from this verifier"
-    )
+    name: str = gql_field(description="Name of the verifier (e.g., 'clamav', 'custom')")
+    result: ArtifactVerifierGQLResult = gql_field(description="Scan result from this verifier")
 
 
 @gql_pydantic_type(
@@ -229,7 +226,7 @@ class ArtifactVerifierGQLResultEntry(PydanticOutputMixin[ArtifactVerifierGQLResu
     name="ArtifactVerificationResult",
 )
 class ArtifactVerificationGQLResult(PydanticOutputMixin[ArtifactVerificationGQLResultDTO]):
-    verifiers: list[ArtifactVerifierGQLResultEntry] = strawberry.field(
+    verifiers: list[ArtifactVerifierGQLResultEntry] = gql_field(
         description="Results from each verifier that scanned the artifact"
     )
 
@@ -259,10 +256,12 @@ class ArtifactFilter(PydanticInputMixin[ArtifactGQLFilterInputDTO]):
 
 
 @gql_pydantic_input(
-    BackendAIGQLMeta(description="", added_version="24.09.0"),
-    description=dedent_strip("""
-    Specifies the field and direction for ordering artifacts in queries.
-    """),
+    BackendAIGQLMeta(
+        description=dedent_strip("""
+            Specifies the field and direction for ordering artifacts in queries.
+        """),
+        added_version="24.09.0",
+    ),
 )
 class ArtifactOrderBy(PydanticInputMixin[ArtifactGQLOrderByInputDTO], GQLOrderBy):
     field: ArtifactOrderField
@@ -270,13 +269,17 @@ class ArtifactOrderBy(PydanticInputMixin[ArtifactGQLOrderByInputDTO], GQLOrderBy
 
 
 @gql_pydantic_input(
-    BackendAIGQLMeta(description="", added_version="24.09.0"),
-    description=dedent_strip("""
-    Filter for artifact revision status. Supports exact match or inclusion in a list of statuses.
-    """),
+    BackendAIGQLMeta(
+        description=dedent_strip("""
+            Filter for artifact revision status. Supports exact match or inclusion in a list of statuses.
+        """),
+        added_version="24.09.0",
+    ),
 )
 class ArtifactRevisionStatusFilter(PydanticInputMixin[ArtifactRevisionStatusFilterDTO]):
-    in_: list[ArtifactStatus] | None = strawberry.field(name="in", default=None)
+    in_: list[ArtifactStatus] | None = gql_field(
+        description="The in  field.", name="in", default=None
+    )
     equals: ArtifactStatus | None = None
 
 
@@ -284,7 +287,9 @@ class ArtifactRevisionStatusFilter(PydanticInputMixin[ArtifactRevisionStatusFilt
     BackendAIGQLMeta(description="", added_version="25.16.0"),
 )
 class ArtifactRevisionRemoteStatusFilter(PydanticInputMixin[ArtifactRevisionRemoteStatusFilterDTO]):
-    in_: list[ArtifactRemoteStatus] | None = strawberry.field(name="in", default=None)
+    in_: list[ArtifactRemoteStatus] | None = gql_field(
+        description="The in  field.", name="in", default=None
+    )
     equals: ArtifactRemoteStatus | None = None
 
 
@@ -301,11 +306,15 @@ class ArtifactRevisionRemoteStatusFilter(PydanticInputMixin[ArtifactRevisionRemo
 )
 class ArtifactRevisionFilter(PydanticInputMixin[ArtifactRevisionGQLFilterInputDTO]):
     status: ArtifactRevisionStatusFilter | None = None
-    remote_status: ArtifactRevisionRemoteStatusFilter | None = strawberry.field(
-        default=None, description="Added in 25.16.0"
+    remote_status: ArtifactRevisionRemoteStatusFilter | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version="25.16.0",
+            description="Filter by remote synchronization status.",
+        ),
+        default=None,
     )
     version: StringFilter | None = None
-    artifact_id: UUIDFilter | None = strawberry.field(default=None)
+    artifact_id: UUIDFilter | None = gql_field(description="The artifact id field.", default=None)
     size: IntFilter | None = None
 
     AND: list[Self] | None = None
@@ -314,10 +323,12 @@ class ArtifactRevisionFilter(PydanticInputMixin[ArtifactRevisionGQLFilterInputDT
 
 
 @gql_pydantic_input(
-    BackendAIGQLMeta(description="", added_version="24.09.0"),
-    description=dedent_strip("""
-    Specifies the field and direction for ordering artifact revisions in queries.
-    """),
+    BackendAIGQLMeta(
+        description=dedent_strip("""
+            Specifies the field and direction for ordering artifact revisions in queries.
+        """),
+        added_version="24.09.0",
+    ),
 )
 class ArtifactRevisionOrderBy(PydanticInputMixin[ArtifactRevisionGQLOrderByInputDTO], GQLOrderBy):
     field: ArtifactRevisionOrderField
@@ -325,56 +336,65 @@ class ArtifactRevisionOrderBy(PydanticInputMixin[ArtifactRevisionGQLOrderByInput
 
 
 @gql_pydantic_input(
-    BackendAIGQLMeta(description="", added_version="24.09.0"),
-    description=dedent_strip("""
-    Input for scanning artifacts from external registries (HuggingFace, Reservoir).
+    BackendAIGQLMeta(
+        description=dedent_strip("""
+            Input for scanning artifacts from external registries (HuggingFace, Reservoir).
 
-    Discovers available artifacts and registers their metadata in the system.
-    Artifacts remain in SCANNED status until explicitly imported via import_artifacts.
-    """),
+            Discovers available artifacts and registers their metadata in the system.
+            Artifacts remain in SCANNED status until explicitly imported via import_artifacts.
+        """),
+        added_version="24.09.0",
+    ),
 )
 class ScanArtifactsInput(PydanticInputMixin[ScanArtifactsInputDTO]):
     registry_id: ID | None = None
-    limit: int = strawberry.field(
-        description=f"Maximum number of artifacts to scan (max: {ARTIFACT_MAX_SCAN_LIMIT})"
-    )
+    limit: int = gql_field(description="The limit field.")
     artifact_type: ArtifactType | None = None
     search: str | None = None
 
 
 @gql_pydantic_input(
-    BackendAIGQLMeta(description="", added_version="24.09.0"),
-    description=dedent_strip("""
-    Options for importing artifact revisions.
+    BackendAIGQLMeta(
+        description=dedent_strip("""
+            Options for importing artifact revisions.
 
-    Controls import behavior such as forcing re-download regardless of digest freshness.
-    """),
+            Controls import behavior such as forcing re-download regardless of digest freshness.
+        """),
+        added_version="24.09.0",
+    ),
 )
 class ImportArtifactsOptionsGQL(PydanticInputMixin[ImportArtifactsOptionsInputDTO]):
-    force: bool = strawberry.field(
-        default=False,
-        description="Force re-download regardless of digest freshness check.",
+    force: bool = gql_field(
+        description="Force re-download regardless of digest freshness check.", default=False
     )
 
 
 @gql_pydantic_input(
-    BackendAIGQLMeta(description="", added_version="24.09.0"),
-    description=dedent_strip("""
-    Input for importing scanned artifact revisions from external registries.
+    BackendAIGQLMeta(
+        description=dedent_strip("""
+            Input for importing scanned artifact revisions from external registries.
 
-    Downloads artifact files from the external source and transitions them through:
-    SCANNED → PULLING → PULLED → AVAILABLE status progression.
-    """),
+            Downloads artifact files from the external source and transitions them through:
+            SCANNED → PULLING → PULLED → AVAILABLE status progression.
+        """),
+        added_version="24.09.0",
+    ),
 )
 class ImportArtifactsInput(PydanticInputMixin[ImportArtifactsInputDTO]):
     artifact_revision_ids: list[ID]
-    vfolder_id: ID | None = strawberry.field(
+    vfolder_id: ID | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version="26.1.0",
+            description="Target vfolder ID to store the imported artifacts.",
+        ),
         default=None,
-        description="Target vfolder ID to store the imported artifacts. Added in 26.1.0.",
     )
-    options: ImportArtifactsOptionsGQL | None = strawberry.field(
+    options: ImportArtifactsOptionsGQL | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version="26.1.0",
+            description="Options controlling import behavior such as forcing re-download.",
+        ),
         default=None,
-        description="Options controlling import behavior such as forcing re-download. Added in 26.1.0.",
     )
 
 
@@ -387,61 +407,72 @@ class DelegateeTarget(PydanticInputMixin[DelegateeTargetInputDTO]):
 
 
 @gql_pydantic_input(
-    BackendAIGQLMeta(description="", added_version="24.09.0"),
-    description=dedent_strip("""
-    Input type for delegated scanning of artifacts from a delegatee reservoir registry's remote registry.
-"""),
+    BackendAIGQLMeta(
+        description=dedent_strip("""
+            Input type for delegated scanning of artifacts from a delegatee reservoir registry's remote registry.
+        """),
+        added_version="24.09.0",
+    ),
 )
 class DelegateScanArtifactsInput(PydanticInputMixin[DelegateScanArtifactsInputDTO]):
-    delegator_reservoir_id: ID | None = strawberry.field(
-        default=None, description="ID of the reservoir registry to delegate the scan request to"
+    delegator_reservoir_id: ID | None = gql_field(
+        description="ID of the reservoir registry to delegate the scan request to", default=None
     )
-    delegatee_target: DelegateeTarget | None = strawberry.field(
-        default=None,
+    delegatee_target: DelegateeTarget | None = gql_field(
         description="Target delegatee reservoir registry and its remote registry to scan",
+        default=None,
     )
-    limit: int = strawberry.field(
-        description=f"Maximum number of artifacts to scan (max: {ARTIFACT_MAX_SCAN_LIMIT})"
+    limit: int = gql_field(description="The limit field.")
+    artifact_type: ArtifactType | None = gql_field(
+        description="Filter artifacts by type (e.g., model, image, package)", default=None
     )
-    artifact_type: ArtifactType | None = strawberry.field(
-        default=None, description="Filter artifacts by type (e.g., model, image, package)"
-    )
-    search: str | None = strawberry.field(
-        default=None, description="Search term to filter artifacts by name or description"
+    search: str | None = gql_field(
+        description="Search term to filter artifacts by name or description", default=None
     )
 
 
 @gql_pydantic_input(
-    BackendAIGQLMeta(description="", added_version="24.09.0"),
-    description=dedent_strip("""
-    Input type for delegated import of artifact revisions from a reservoir registry's remote registry.
-    Used to specify which artifact revisions should be imported from the remote registry source
-    into the local reservoir registry storage.
-"""),
+    BackendAIGQLMeta(
+        description=dedent_strip("""
+            Input type for delegated import of artifact revisions from a reservoir registry's remote registry.
+            Used to specify which artifact revisions should be imported from the remote registry source
+            into the local reservoir registry storage.
+        """),
+        added_version="24.09.0",
+    ),
 )
 class DelegateImportArtifactsInput(PydanticInputMixin[DelegateImportArtifactsInputDTO]):
-    artifact_revision_ids: list[ID] = strawberry.field(
+    artifact_revision_ids: list[ID] = gql_field(
         description="List of artifact revision IDs of delegatee artifact registry"
     )
-    delegator_reservoir_id: ID | None = strawberry.field(
-        default=None, description="ID of the reservoir registry to delegate the import request to"
+    delegator_reservoir_id: ID | None = gql_field(
+        description="ID of the reservoir registry to delegate the import request to", default=None
     )
-    artifact_type: ArtifactType | None = strawberry.field(default=None)
-    delegatee_target: DelegateeTarget | None = strawberry.field(default=None)
-    options: ImportArtifactsOptionsGQL | None = strawberry.field(
+    artifact_type: ArtifactType | None = gql_field(
+        description="The artifact type field.", default=None
+    )
+    delegatee_target: DelegateeTarget | None = gql_field(
+        description="The delegatee target field.", default=None
+    )
+    options: ImportArtifactsOptionsGQL | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version="26.1.0",
+            description="Options controlling import behavior such as forcing re-download.",
+        ),
         default=None,
-        description="Options controlling import behavior such as forcing re-download. Added in 26.1.0.",
     )
 
 
 @gql_pydantic_input(
-    BackendAIGQLMeta(description="", added_version="24.09.0"),
-    description=dedent_strip("""
-    Input for updating artifact metadata properties.
+    BackendAIGQLMeta(
+        description=dedent_strip("""
+            Input for updating artifact metadata properties.
 
-    Modifies artifact metadata such as readonly status and description.
-    This operation does not affect the actual artifact files or revisions.
-    """),
+            Modifies artifact metadata such as readonly status and description.
+            This operation does not affect the actual artifact files or revisions.
+        """),
+        added_version="24.09.0",
+    ),
 )
 class UpdateArtifactInput(PydanticInputMixin[UpdateArtifactGQLInputDTO]):
     artifact_id: ID
@@ -450,100 +481,116 @@ class UpdateArtifactInput(PydanticInputMixin[UpdateArtifactGQLInputDTO]):
 
 
 @gql_pydantic_input(
-    BackendAIGQLMeta(description="", added_version="24.09.0"),
-    description=dedent_strip("""
-    Input for canceling an in-progress artifact import operation.
+    BackendAIGQLMeta(
+        description=dedent_strip("""
+            Input for canceling an in-progress artifact import operation.
 
-    Stops the download process and reverts the artifact revision status back to SCANNED.
-    """),
+            Stops the download process and reverts the artifact revision status back to SCANNED.
+        """),
+        added_version="24.09.0",
+    ),
 )
 class CancelArtifactInput(PydanticInputMixin[CancelArtifactInputDTO]):
     artifact_revision_id: ID
 
 
 @gql_pydantic_input(
-    BackendAIGQLMeta(description="", added_version="24.09.0"),
-    description=dedent_strip("""
-    Input for cleaning up stored artifact revision data.
+    BackendAIGQLMeta(
+        description=dedent_strip("""
+            Input for cleaning up stored artifact revision data.
 
-    Removes downloaded files from storage and transitions the artifact revision
-    back to SCANNED status, freeing up storage space.
-    """),
+            Removes downloaded files from storage and transitions the artifact revision
+            back to SCANNED status, freeing up storage space.
+        """),
+        added_version="24.09.0",
+    ),
 )
 class CleanupArtifactRevisionsInput(PydanticInputMixin[CleanupArtifactRevisionsInputDTO]):
     artifact_revision_ids: list[ID]
 
 
 @gql_pydantic_input(
-    BackendAIGQLMeta(description="", added_version="24.09.0"),
-    description=dedent_strip("""
-    Input for soft-deleting artifacts from the system.
+    BackendAIGQLMeta(
+        description=dedent_strip("""
+            Input for soft-deleting artifacts from the system.
 
-    Marks artifacts as deleted without permanently removing them.
-    Deleted artifacts can be restored using restore_artifacts.
-    """),
+            Marks artifacts as deleted without permanently removing them.
+            Deleted artifacts can be restored using restore_artifacts.
+        """),
+        added_version="24.09.0",
+    ),
 )
 class DeleteArtifactsInput(PydanticInputMixin[DeleteArtifactsInputDTO]):
     artifact_ids: list[ID]
 
 
 @gql_pydantic_input(
-    BackendAIGQLMeta(description="", added_version="24.09.0"),
-    description=dedent_strip("""
-    Input for restoring previously deleted artifacts.
+    BackendAIGQLMeta(
+        description=dedent_strip("""
+            Input for restoring previously deleted artifacts.
 
-    Reverses the soft-delete operation, making the artifacts available again.
-    """),
+            Reverses the soft-delete operation, making the artifacts available again.
+        """),
+        added_version="24.09.0",
+    ),
 )
 class RestoreArtifactsInput(PydanticInputMixin[RestoreArtifactsInputDTO]):
     artifact_ids: list[ID]
 
 
 @gql_pydantic_input(
-    BackendAIGQLMeta(description="", added_version="24.09.0"),
-    description=dedent_strip("""
-    Input for approving an artifact revision.
+    BackendAIGQLMeta(
+        description=dedent_strip("""
+            Input for approving an artifact revision.
 
-    Admin-only operation to approve artifact revisions for general use.
-    """),
+            Admin-only operation to approve artifact revisions for general use.
+        """),
+        added_version="24.09.0",
+    ),
 )
 class ApproveArtifactInput(PydanticInputMixin[ApproveArtifactInputDTO]):
     artifact_revision_id: ID
 
 
 @gql_pydantic_input(
-    BackendAIGQLMeta(description="", added_version="24.09.0"),
-    description=dedent_strip("""
-    Input for rejecting an artifact revision.
+    BackendAIGQLMeta(
+        description=dedent_strip("""
+            Input for rejecting an artifact revision.
 
-    Admin-only operation to reject artifact revisions, preventing their use.
-    """),
+            Admin-only operation to reject artifact revisions, preventing their use.
+        """),
+        added_version="24.09.0",
+    ),
 )
 class RejectArtifactInput(PydanticInputMixin[RejectArtifactInputDTO]):
     artifact_revision_id: ID
 
 
 @gql_pydantic_input(
-    BackendAIGQLMeta(description="", added_version="24.09.0"),
-    description=dedent_strip("""
-    Input for subscribing to artifact status change notifications.
+    BackendAIGQLMeta(
+        description=dedent_strip("""
+            Input for subscribing to artifact status change notifications.
 
-    Used with artifact_status_changed subscription to receive real-time updates
-    when artifact revision statuses change.
-    """),
+            Used with artifact_status_changed subscription to receive real-time updates
+            when artifact revision statuses change.
+        """),
+        added_version="24.09.0",
+    ),
 )
 class ArtifactStatusChangedInput(PydanticInputMixin[ArtifactStatusChangedInputDTO]):
     artifact_revision_ids: list[ID]
 
 
 @gql_pydantic_input(
-    BackendAIGQLMeta(description="", added_version="24.09.0"),
-    description=dedent_strip("""
-    Specifies a target model for scanning operations.
+    BackendAIGQLMeta(
+        description=dedent_strip("""
+            Specifies a target model for scanning operations.
 
-    Used to identify specific models in external registries for detailed scanning.
-    If revision is not specified, defaults to 'main' revision.
-    """),
+            Used to identify specific models in external registries for detailed scanning.
+            If revision is not specified, defaults to 'main' revision.
+        """),
+        added_version="24.09.0",
+    ),
 )
 class ModelTarget(PydanticInputMixin[ModelTargetInputDTO]):
     model_id: str
@@ -551,14 +598,16 @@ class ModelTarget(PydanticInputMixin[ModelTargetInputDTO]):
 
 
 @gql_pydantic_input(
-    BackendAIGQLMeta(description="", added_version="24.09.0"),
-    description=dedent_strip("""
-    Input for batch scanning of specific models from external registries.
+    BackendAIGQLMeta(
+        description=dedent_strip("""
+            Input for batch scanning of specific models from external registries.
 
-    Scans multiple specified models and retrieves detailed information including
-    README content and file sizes. This operation performs immediate detailed scanning
-    unlike the general scan_artifacts which only retrieves basic metadata.
-    """),
+            Scans multiple specified models and retrieves detailed information including
+            README content and file sizes. This operation performs immediate detailed scanning
+            unlike the general scan_artifacts which only retrieves basic metadata.
+        """),
+        added_version="24.09.0",
+    ),
 )
 class ScanArtifactModelsInput(PydanticInputMixin[ScanArtifactModelsInputDTO]):
     models: list[ModelTarget]
@@ -597,7 +646,7 @@ class Artifact(PydanticNodeMixin[ArtifactGQLNode]):
     updated_at: datetime
     availability: ArtifactAvailability
 
-    @strawberry.field
+    @gql_field(description="The revisions of this entity.")  # type: ignore[misc]
     async def revisions(
         self,
         info: Info[StrawberryGQLContext],
@@ -672,17 +721,28 @@ class Artifact(PydanticNodeMixin[ArtifactGQLNode]):
 class ArtifactRevision(PydanticNodeMixin[ArtifactRevisionNode]):
     id: NodeID[str]
     status: ArtifactStatus
-    remote_status: ArtifactRemoteStatus | None = strawberry.field(description="Added in 25.15.0")
+    remote_status: ArtifactRemoteStatus | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version="25.15.0",
+            description="Remote synchronization status of the artifact revision.",
+        )
+    )
     version: str
     readme: str | None
     size: ByteSize | None
     created_at: datetime | None
     updated_at: datetime | None
-    digest: str | None = strawberry.field(
-        description="Digest at the time of import. None for models that have not been imported. Added in 25.17.0"
+    digest: str | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version="25.17.0",
+            description="Digest at the time of import. None for models that have not been imported.",
+        )
     )
-    verification_result: ArtifactVerificationGQLResult | None = strawberry.field(
-        description="Verification result containing malware scan results from all verifiers. None if not yet verified. Added in 25.17.0"
+    verification_result: ArtifactVerificationGQLResult | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version="25.17.0",
+            description="Verification result containing malware scan results from all verifiers. None if not yet verified.",
+        )
     )
 
     @classmethod
@@ -701,7 +761,7 @@ class ArtifactRevision(PydanticNodeMixin[ArtifactRevisionNode]):
         ])
         return cast(list[Self | None], results)
 
-    @strawberry.field
+    @gql_field(description="The artifact of this entity.")  # type: ignore[misc]
     async def artifact(self, info: Info[StrawberryGQLContext]) -> Artifact:
         revision_node = await info.context.adapters.artifact.get_revision(uuid.UUID(self.id))
         artifact_node = await info.context.adapters.artifact.get(revision_node.artifact_id)
@@ -794,9 +854,9 @@ class ArtifactRevisionConnection(Connection[ArtifactRevision]):
     model=ArtifactImportProgressUpdatedGQLPayload,
 )
 class ArtifactImportProgressUpdatedPayload:
-    artifact_id: ID = strawberry.field(description="Artifact revision ID.")
-    progress: float = strawberry.field(description="Import progress as a percentage.")
-    status: ArtifactStatus = strawberry.field(description="Current import status.")
+    artifact_id: ID = gql_field(description="Artifact revision ID.")
+    progress: float = gql_field(description="Import progress as a percentage.")
+    status: ArtifactStatus = gql_field(description="Current import status.")
 
 
 @gql_pydantic_type(
@@ -818,7 +878,7 @@ class ScanArtifactsPayload(PydanticOutputMixin[ScanArtifactsGQLPayload]):
     model=DelegateScanArtifactsGQLPayload,
 )
 class DelegateScanArtifactsPayload(PydanticOutputMixin[DelegateScanArtifactsGQLPayload]):
-    artifacts: list[Artifact] = strawberry.field(
+    artifacts: list[Artifact] = gql_field(
         description="List of artifacts discovered during the delegated scan from the reservoir registry's remote registry"
     )
 
@@ -856,10 +916,10 @@ class ImportArtifactsPayload(PydanticOutputMixin[ImportArtifactsGQLPayload]):
     model=DelegateImportArtifactsGQLPayload,
 )
 class DelegateImportArtifactsPayload(PydanticOutputMixin[DelegateImportArtifactsGQLPayload]):
-    artifact_revisions: ArtifactRevisionConnection = strawberry.field(
+    artifact_revisions: ArtifactRevisionConnection = gql_field(
         description="Connection of artifact revisions that were imported from the reservoir registry's remote registry"
     )
-    tasks: list[ArtifactRevisionImportTask] = strawberry.field(
+    tasks: list[ArtifactRevisionImportTask] = gql_field(
         description="List of background tasks created for importing the artifact revisions"
     )
 

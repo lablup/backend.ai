@@ -4,11 +4,15 @@ from __future__ import annotations
 
 from uuid import UUID
 
-import strawberry
 from strawberry import Info
 
 from ai.backend.common.contexts.user import current_user
 from ai.backend.common.exception import UnreachableError
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
+from ai.backend.manager.api.gql.decorators import (
+    BackendAIGQLMeta,
+    gql_mutation,
+)
 from ai.backend.manager.api.gql.keypair.types import (
     IssueMyKeypairPayloadGQL,
     RevokeMyKeypairInputGQL,
@@ -28,11 +32,10 @@ def _get_current_user_id() -> UUID:
     return me.user_id
 
 
-@strawberry.mutation(
-    description=(
-        "Issue a new keypair for the current user. "
-        "Settings (resource_policy, rate_limit, is_admin) are inherited from the main keypair. "
-        "The secret_key is only returned at creation time."
+@gql_mutation(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Issue a new keypair for the current user. Settings (resource_policy, rate_limit, is_admin) are inherited from the main keypair. The secret_key is only returned at creation time.",
     )
 )  # type: ignore[misc]
 async def issue_my_keypair(
@@ -43,10 +46,10 @@ async def issue_my_keypair(
     return IssueMyKeypairPayloadGQL.from_pydantic(payload)
 
 
-@strawberry.mutation(
-    description=(
-        "Revoke a keypair owned by the current user. "
-        "The main access key cannot be revoked — switch it first."
+@gql_mutation(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Revoke a keypair owned by the current user. The main access key cannot be revoked — switch it first.",
     )
 )  # type: ignore[misc]
 async def revoke_my_keypair(
@@ -58,10 +61,10 @@ async def revoke_my_keypair(
     return RevokeMyKeypairPayloadGQL.from_pydantic(payload)
 
 
-@strawberry.mutation(
-    description=(
-        "Update a keypair owned by the current user (e.g. toggle active state). "
-        "The keypair must be owned by the current user."
+@gql_mutation(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Update a keypair owned by the current user (e.g. toggle active state). The keypair must be owned by the current user.",
     )
 )  # type: ignore[misc]
 async def update_my_keypair(
@@ -75,10 +78,10 @@ async def update_my_keypair(
     return UpdateMyKeypairPayloadGQL.from_pydantic(payload)
 
 
-@strawberry.mutation(
-    description=(
-        "Switch the main access key for the current user. "
-        "The target keypair must be active and owned by the user."
+@gql_mutation(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Switch the main access key for the current user. The target keypair must be active and owned by the user.",
     )
 )  # type: ignore[misc]
 async def switch_my_main_access_key(

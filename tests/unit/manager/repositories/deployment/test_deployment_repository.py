@@ -2449,7 +2449,6 @@ class TestDeploymentPolicyOperations:
             endpoint_id=test_endpoint_id,
             strategy=DeploymentStrategy.ROLLING,
             strategy_spec=RollingUpdateSpec(max_surge=1, max_unavailable=0),
-            rollback_on_failure=False,
         )
         result = await deployment_repository.upsert_deployment_policy(Upserter(spec=spec))
         return result.data
@@ -2464,7 +2463,6 @@ class TestDeploymentPolicyOperations:
             endpoint_id=test_endpoint_id,
             strategy=DeploymentStrategy.BLUE_GREEN,
             strategy_spec=BlueGreenSpec(auto_promote=True, promote_delay_seconds=60),
-            rollback_on_failure=False,
         )
 
         result = await deployment_repository.upsert_deployment_policy(Upserter(spec=spec))
@@ -2475,7 +2473,6 @@ class TestDeploymentPolicyOperations:
         assert result.data.strategy_spec == BlueGreenSpec(
             auto_promote=True, promote_delay_seconds=60
         )
-        assert result.data.rollback_on_failure is False
         assert result.created is True
 
     async def test_upsert_deployment_policy_update(
@@ -2489,14 +2486,12 @@ class TestDeploymentPolicyOperations:
             endpoint_id=test_endpoint_id,
             strategy=DeploymentStrategy.BLUE_GREEN,
             strategy_spec=BlueGreenSpec(auto_promote=True, promote_delay_seconds=30),
-            rollback_on_failure=True,
         )
 
         result = await deployment_repository.upsert_deployment_policy(Upserter(spec=spec))
 
         assert result.data.endpoint == test_endpoint_id
         assert result.data.strategy == DeploymentStrategy.BLUE_GREEN
-        assert result.data.rollback_on_failure is True
         assert result.created is False
 
     async def test_get_deployment_policy(
@@ -2761,7 +2756,6 @@ class TestSearchDeploymentPolicies:
                         endpoint_id=eid,
                         strategy=strategy,
                         strategy_spec=spec,
-                        rollback_on_failure=False,
                     )
                 )
             )

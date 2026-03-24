@@ -8,7 +8,6 @@ from datetime import datetime
 from enum import StrEnum
 from typing import Any, Self, cast
 
-import strawberry
 from strawberry import Info
 from strawberry.relay import Connection, Edge, NodeID
 
@@ -27,6 +26,8 @@ from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     PydanticInputMixin,
     gql_connection_type,
+    gql_enum,
+    gql_field,
     gql_node_type,
     gql_pydantic_input,
 )
@@ -38,7 +39,7 @@ from ai.backend.manager.api.gql.types import GQLFilter, GQLOrderBy, StrawberryGQ
 # ==================== Enums ====================
 
 
-@strawberry.enum(description="Added in 26.3.0. Entity ordering field")
+@gql_enum(BackendAIGQLMeta(added_version="26.3.0", description="Entity ordering field"))
 class EntityOrderField(StrEnum):
     ENTITY_TYPE = "entity_type"
     REGISTERED_AT = "registered_at"
@@ -62,9 +63,7 @@ class EntityRefGQL(PydanticNodeMixin[AssociationScopesEntitiesNode]):
     entity_id: str
     registered_at: datetime
 
-    @strawberry.field(  # type: ignore[misc]
-        description="The resolved entity object."
-    )
+    @gql_field(description="The resolved entity object.")  # type: ignore[misc]
     async def entity(
         self,
         *,
@@ -72,7 +71,7 @@ class EntityRefGQL(PydanticNodeMixin[AssociationScopesEntitiesNode]):
     ) -> EntityNode | None:
         from ai.backend.common.types import ImageID, SessionId
 
-        element_type = RBACElementType(self.entity_type.value)
+        element_type = RBACElementType(self.entity_type.value)  # type: ignore[attr-defined]
         data_loaders = info.context.data_loaders
         match element_type:
             case RBACElementType.USER:

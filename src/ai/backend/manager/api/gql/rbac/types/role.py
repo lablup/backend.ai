@@ -88,7 +88,10 @@ from ai.backend.manager.api.gql.base import OrderDirection, StringFilter, encode
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     PydanticInputMixin,
+    gql_added_field,
     gql_connection_type,
+    gql_enum,
+    gql_field,
     gql_node_type,
     gql_pydantic_input,
     gql_pydantic_type,
@@ -106,21 +109,20 @@ if TYPE_CHECKING:
 
 # ==================== Enums ====================
 
-
-RoleSourceGQL: type[RoleSourceDTO] = strawberry.enum(
+RoleSourceGQL: type[RoleSourceDTO] = gql_enum(
+    BackendAIGQLMeta(added_version="26.3.0", description="Role definition source"),
     RoleSourceDTO,
     name="RoleSource",
-    description="Added in 26.3.0. Role definition source",
 )
 
-RoleStatusGQL: type[RoleStatusDTO] = strawberry.enum(
+RoleStatusGQL: type[RoleStatusDTO] = gql_enum(
+    BackendAIGQLMeta(added_version="26.3.0", description="Role status"),
     RoleStatusDTO,
     name="RoleStatus",
-    description="Added in 26.3.0. Role status",
 )
 
 
-@strawberry.enum(description="Added in 26.3.0. Role ordering field")
+@gql_enum(BackendAIGQLMeta(added_version="26.3.0", description="Role ordering field"))
 class RoleOrderField(StrEnum):
     NAME = "name"
     CREATED_AT = "created_at"
@@ -155,7 +157,11 @@ class RoleGQL(PydanticNodeMixin[Any]):
         ])
         return cast(list[Self | None], results)
 
-    @strawberry.field(description="Added in 26.3.0. Permissions associated with this role.")  # type: ignore[misc]
+    @gql_added_field(
+        BackendAIGQLMeta(
+            added_version="26.3.0", description="Permissions associated with this role."
+        )
+    )  # type: ignore[misc]
     async def permissions(
         self,
         info: Info[StrawberryGQLContext],
@@ -182,6 +188,7 @@ class RoleGQL(PydanticNodeMixin[Any]):
         strawberry.lazy("ai.backend.manager.api.gql.rbac.types.permission"),
     ]:
         from ai.backend.manager.api.gql.rbac.types.permission import (
+            PermissionConnection,
             PermissionEdge,
             PermissionFilter,
             PermissionGQL,
@@ -232,7 +239,9 @@ class RoleGQL(PydanticNodeMixin[Any]):
             count=result.total_count,
         )
 
-    @strawberry.field(description="Added in 26.3.0. Users assigned to this role.")  # type: ignore[misc]
+    @gql_added_field(
+        BackendAIGQLMeta(added_version="26.3.0", description="Users assigned to this role.")
+    )  # type: ignore[misc]
     async def users(
         self,
         info: Info[StrawberryGQLContext],
@@ -300,11 +309,9 @@ class RoleGQL(PydanticNodeMixin[Any]):
 )
 class RoleAssignmentGQL(PydanticNodeMixin[RoleAssignmentNode]):
     id: NodeID[str]
-    user_id: uuid.UUID = strawberry.field(description="The assigned user ID.")
-    role_id: uuid.UUID = strawberry.field(description="The assigned role ID.")
-    granted_by: uuid.UUID | None = strawberry.field(
-        description="The user who granted this assignment."
-    )
+    user_id: uuid.UUID = gql_field(description="The assigned user ID.")
+    role_id: uuid.UUID = gql_field(description="The assigned role ID.")
+    granted_by: uuid.UUID | None = gql_field(description="The user who granted this assignment.")
     granted_at: datetime
 
     @classmethod
@@ -321,12 +328,12 @@ class RoleAssignmentGQL(PydanticNodeMixin[RoleAssignmentNode]):
         ])
         return cast(list[Self | None], results)
 
-    @strawberry.field(description="The assigned role.")  # type: ignore[misc]
+    @gql_field(description="The assigned role.")  # type: ignore[misc]
     async def role(self, info: Info[StrawberryGQLContext]) -> RoleGQL | None:
         # DataLoader already returns RoleGQL | None via from_pydantic conversion
         return await info.context.data_loaders.role_loader.load(self.role_id)
 
-    @strawberry.field(description="The assigned user.")  # type: ignore[misc]
+    @gql_field(description="The assigned user.")  # type: ignore[misc]
     async def user(
         self, info: Info[StrawberryGQLContext]
     ) -> (
@@ -351,17 +358,17 @@ class RoleAssignmentGQL(PydanticNodeMixin[RoleAssignmentNode]):
     name="RoleSourceFilter",
 )
 class RoleSourceFilterGQL(PydanticInputMixin[RoleSourceFilterDTO]):
-    equals: RoleSourceGQL | None = strawberry.field(
-        default=None, description="Matches roles with this exact source."
+    equals: RoleSourceGQL | None = gql_field(
+        description="Matches roles with this exact source.", default=None
     )
-    in_: list[RoleSourceGQL] | None = strawberry.field(
-        name="in", default=None, description="Matches roles whose source is in this list."
+    in_: list[RoleSourceGQL] | None = gql_field(
+        description="Matches roles whose source is in this list.", name="in", default=None
     )
-    not_equals: RoleSourceGQL | None = strawberry.field(
-        default=None, description="Excludes roles with this exact source."
+    not_equals: RoleSourceGQL | None = gql_field(
+        description="Excludes roles with this exact source.", default=None
     )
-    not_in: list[RoleSourceGQL] | None = strawberry.field(
-        default=None, description="Excludes roles whose source is in this list."
+    not_in: list[RoleSourceGQL] | None = gql_field(
+        description="Excludes roles whose source is in this list.", default=None
     )
 
 
@@ -373,17 +380,17 @@ class RoleSourceFilterGQL(PydanticInputMixin[RoleSourceFilterDTO]):
     name="RoleStatusFilter",
 )
 class RoleStatusFilterGQL(PydanticInputMixin[RoleStatusFilterDTO]):
-    equals: RoleStatusGQL | None = strawberry.field(
-        default=None, description="Matches roles with this exact status."
+    equals: RoleStatusGQL | None = gql_field(
+        description="Matches roles with this exact status.", default=None
     )
-    in_: list[RoleStatusGQL] | None = strawberry.field(
-        name="in", default=None, description="Matches roles whose status is in this list."
+    in_: list[RoleStatusGQL] | None = gql_field(
+        description="Matches roles whose status is in this list.", name="in", default=None
     )
-    not_equals: RoleStatusGQL | None = strawberry.field(
-        default=None, description="Excludes roles with this exact status."
+    not_equals: RoleStatusGQL | None = gql_field(
+        description="Excludes roles with this exact status.", default=None
     )
-    not_in: list[RoleStatusGQL] | None = strawberry.field(
-        default=None, description="Excludes roles whose status is in this list."
+    not_in: list[RoleStatusGQL] | None = gql_field(
+        description="Excludes roles whose status is in this list.", default=None
     )
 
 
@@ -445,7 +452,7 @@ class RoleOrderBy(PydanticInputMixin[RoleOrderByDTO], GQLOrderBy):
     direction: OrderDirection = OrderDirection.DESC
 
 
-@strawberry.enum(description="Added in 26.3.0. Role assignment ordering field")
+@gql_enum(BackendAIGQLMeta(added_version="26.3.0", description="Role assignment ordering field"))
 class RoleAssignmentOrderField(StrEnum):
     USERNAME = "username"
     EMAIL = "email"
@@ -547,7 +554,7 @@ class PurgeRoleInput(PydanticInputMixin[PurgeRoleInputDTO]):
     name="DeleteRolePayload",
 )
 class DeleteRolePayload(PydanticOutputMixin[DeleteRolePayloadDTO]):
-    id: ID = strawberry.field(description="ID of the deleted role.")
+    id: ID = gql_field(description="ID of the deleted role.")
 
 
 @gql_pydantic_type(
@@ -557,7 +564,7 @@ class DeleteRolePayload(PydanticOutputMixin[DeleteRolePayloadDTO]):
     name="PurgeRolePayload",
 )
 class PurgeRolePayload(PydanticOutputMixin[PurgeRolePayloadDTO]):
-    id: ID = strawberry.field(description="ID of the purged role.")
+    id: ID = gql_field(description="ID of the purged role.")
 
 
 @gql_pydantic_type(
@@ -569,8 +576,8 @@ class PurgeRolePayload(PydanticOutputMixin[PurgeRolePayloadDTO]):
     name="BulkAssignRoleError",
 )
 class BulkAssignRoleErrorGQL(PydanticOutputMixin[BulkRoleOperationFailureInfoDTO]):
-    user_id: uuid.UUID = strawberry.field(description="UUID of the user that failed.")
-    message: str = strawberry.field(description="Error message describing the failure.")
+    user_id: uuid.UUID = gql_field(description="UUID of the user that failed.")
+    message: str = gql_field(description="Error message describing the failure.")
 
 
 @gql_pydantic_type(
@@ -581,10 +588,10 @@ class BulkAssignRoleErrorGQL(PydanticOutputMixin[BulkRoleOperationFailureInfoDTO
     name="BulkAssignRolePayload",
 )
 class BulkAssignRolePayloadGQL(PydanticOutputMixin[BulkAssignRoleResultPayloadDTO]):
-    assigned: list[RoleAssignmentGQL] = strawberry.field(
+    assigned: list[RoleAssignmentGQL] = gql_field(
         description="List of successfully created role assignments."
     )
-    failed: list[BulkAssignRoleErrorGQL] = strawberry.field(
+    failed: list[BulkAssignRoleErrorGQL] = gql_field(
         description="List of errors for users that failed to be assigned."
     )
 
@@ -598,8 +605,8 @@ class BulkAssignRolePayloadGQL(PydanticOutputMixin[BulkAssignRoleResultPayloadDT
     name="BulkRevokeRoleError",
 )
 class BulkRevokeRoleErrorGQL(PydanticOutputMixin[BulkRoleOperationFailureInfoDTO]):
-    user_id: uuid.UUID = strawberry.field(description="UUID of the user that failed.")
-    message: str = strawberry.field(description="Error message describing the failure.")
+    user_id: uuid.UUID = gql_field(description="UUID of the user that failed.")
+    message: str = gql_field(description="Error message describing the failure.")
 
 
 @gql_pydantic_type(
@@ -610,10 +617,10 @@ class BulkRevokeRoleErrorGQL(PydanticOutputMixin[BulkRoleOperationFailureInfoDTO
     name="BulkRevokeRolePayload",
 )
 class BulkRevokeRolePayloadGQL(PydanticOutputMixin[BulkRevokeRoleResultPayloadDTO]):
-    revoked: list[RoleAssignmentGQL] = strawberry.field(
+    revoked: list[RoleAssignmentGQL] = gql_field(
         description="List of successfully revoked role assignments."
     )
-    failed: list[BulkRevokeRoleErrorGQL] = strawberry.field(
+    failed: list[BulkRevokeRoleErrorGQL] = gql_field(
         description="List of errors for users that failed to be revoked."
     )
 

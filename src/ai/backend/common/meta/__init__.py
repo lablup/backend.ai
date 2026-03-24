@@ -5,6 +5,7 @@ and API DTOs across Backend.AI components.
 """
 
 from .meta import (
+    NEXT_RELEASE_VERSION,
     BackendAIAPIMeta,
     BackendAIConfigMeta,
     BackendAIFieldMeta,
@@ -20,6 +21,7 @@ from .meta import (
 )
 
 __all__ = (
+    "NEXT_RELEASE_VERSION",
     "BackendAIAPIMeta",
     "BackendAIConfigMeta",
     "BackendAIFieldMeta",

@@ -5,12 +5,16 @@ from __future__ import annotations
 from collections.abc import AsyncGenerator
 from uuid import UUID
 
-import strawberry
 from strawberry import ID, Info
 from strawberry.relay import PageInfo
 
 from ai.backend.common.dto.manager.v2.deployment.request import SearchReplicasInput
 from ai.backend.manager.api.gql.base import resolve_global_id
+from ai.backend.manager.api.gql.decorators import (
+    BackendAIGQLMeta,
+    gql_root_field,
+    gql_subscription,
+)
 from ai.backend.manager.api.gql.deployment.types.replica import (
     ModelReplica,
     ModelReplicaConnection,
@@ -24,7 +28,12 @@ from ai.backend.manager.api.gql.types import StrawberryGQLContext
 # Query resolvers
 
 
-@strawberry.field(description="Added in 25.16.0")  # type: ignore[misc]
+@gql_root_field(
+    BackendAIGQLMeta(
+        added_version="25.16.0",
+        description="List replicas with optional filtering and pagination (admin, all deployments).",
+    )
+)  # type: ignore[misc]
 async def replicas(
     info: Info[StrawberryGQLContext],
     filter: ReplicaFilter | None = None,
@@ -65,7 +74,9 @@ async def replicas(
     )
 
 
-@strawberry.field(description="Added in 25.16.0")  # type: ignore[misc]
+@gql_root_field(
+    BackendAIGQLMeta(added_version="25.16.0", description="Get a specific replica by ID.")
+)  # type: ignore[misc]
 async def replica(id: ID, info: Info[StrawberryGQLContext]) -> ModelReplica | None:
     """Get a specific replica by ID."""
     _, replica_id = resolve_global_id(id)
@@ -78,7 +89,9 @@ async def replica(id: ID, info: Info[StrawberryGQLContext]) -> ModelReplica | No
 # Subscription resolvers
 
 
-@strawberry.subscription(description="Added in 25.16.0")  # type: ignore[misc]
+@gql_subscription(
+    BackendAIGQLMeta(added_version="25.16.0", description="Subscribe to replica status changes.")
+)  # type: ignore[misc]
 async def replica_status_changed(
     revision_id: ID,
 ) -> AsyncGenerator[ReplicaStatusChangedPayload, None]:

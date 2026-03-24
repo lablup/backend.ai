@@ -86,7 +86,9 @@ from ai.backend.manager.repositories.base import (
 )
 from ai.backend.manager.repositories.base.creator import BulkCreator
 from ai.backend.manager.repositories.base.rbac.entity_creator import (
+    RBACBulkEntityCreator,
     RBACEntityCreator,
+    execute_rbac_bulk_entity_creator,
     execute_rbac_entity_creator,
 )
 from ai.backend.manager.repositories.base.updater import BatchUpdater, execute_batch_updater
@@ -130,6 +132,7 @@ from ai.backend.manager.repositories.scheduling_history import (
     SessionSchedulingHistoryCreatorSpec,
 )
 from ai.backend.manager.repositories.session.creators import (
+    KernelRowCreatorSpec,
     SessionRowCreatorSpec,
 )
 from ai.backend.manager.sokovan.data import (
@@ -1295,7 +1298,7 @@ class ScheduleDBSource:
             )
 
             # Create kernel rows
-            kernels = []
+            kernel_specs = []
             for kernel in session_data.kernels:
                 kernel_row = KernelRow(
                     id=kernel.id,
@@ -1342,7 +1345,7 @@ class ScheduleDBSource:
                     main_gid=kernel.main_gid,
                     gids=kernel.gids,
                 )
-                kernels.append(kernel_row)
+                kernel_specs.append(KernelRowCreatorSpec(row=kernel_row))
 
             # Use RBACEntityCreator to create session with RBAC scope association
             rbac_creator = RBACEntityCreator(
@@ -1361,11 +1364,19 @@ class ScheduleDBSource:
             )
             await execute_rbac_entity_creator(db_sess, rbac_creator)
 
-            db_sess.add_all(kernels)
-            await db_sess.flush()
+            # Use RBACBulkEntityCreator to create kernels with RBAC scope association
+            kernel_rbac_creator = RBACBulkEntityCreator(
+                specs=kernel_specs,
+                element_type=RBACElementType.KERNEL,
+                scope_ref=RBACElementRef(
+                    element_type=RBACElementType.SESSION,
+                    element_id=str(session_data.id),
+                ),
+            )
+            kernel_result = await execute_rbac_bulk_entity_creator(db_sess, kernel_rbac_creator)
 
             # Record requested resources in normalized resource_allocations table
-            for kernel_row in kernels:
+            for kernel_row in kernel_result.rows:
                 quantities = resource_slot_to_quantities(kernel_row.requested_slots)
                 if quantities:
                     await db_sess.execute(

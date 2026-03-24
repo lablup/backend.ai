@@ -18,8 +18,12 @@ from ai.backend.common.dto.manager.v2.image.request import (
 )
 from ai.backend.common.types import ImageID
 from ai.backend.manager.api.gql.base import encode_cursor
+from ai.backend.manager.api.gql.decorators import (
+    BackendAIGQLMeta,
+    gql_root_field,
+)
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
-from ai.backend.manager.api.gql.utils import check_admin_only, dedent_strip
+from ai.backend.manager.api.gql.utils import check_admin_only
 from ai.backend.manager.models.image.conditions import ImageAliasConditions, ImageConditions
 
 from .types import (
@@ -39,19 +43,12 @@ from .types import (
 
 
 # Query Fields
-@strawberry.field(  # type: ignore[misc]
-    description=dedent_strip("""
-    Added in 26.2.0.
-
-    Query images with optional filtering, ordering, and pagination (admin only).
-
-    Returns container images available in the system. Images are container
-    specifications that define runtime environments for compute sessions.
-
-    Use filters to narrow down results by status, name, or architecture.
-    Supports both cursor-based and offset-based pagination.
-    """)
-)
+@gql_root_field(
+    BackendAIGQLMeta(
+        added_version="26.2.0",
+        description="Query images with optional filtering, ordering, and pagination (admin only). Returns container images available in the system. Images are container specifications that define runtime environments for compute sessions. Use filters to narrow down results by status, name, or architecture. Supports both cursor-based and offset-based pagination.",
+    )
+)  # type: ignore[misc]
 async def admin_images_v2(
     info: Info[StrawberryGQLContext],
     filter: ImageV2FilterGQL | None = None,
@@ -94,16 +91,12 @@ async def admin_images_v2(
     return ImageV2ConnectionGQL(count=payload.total_count, edges=edges, page_info=page_info)
 
 
-@strawberry.field(  # type: ignore[misc]
-    description=dedent_strip("""
-    Added in 26.2.0.
-
-    Retrieve a specific image by its ID.
-
-    Returns detailed information about the image including its identity,
-    metadata, resource requirements, and permission settings.
-    """)
-)
+@gql_root_field(
+    BackendAIGQLMeta(
+        added_version="26.2.0",
+        description="Retrieve a specific image by its ID. Returns detailed information about the image including its identity, metadata, resource requirements, and permission settings.",
+    )
+)  # type: ignore[misc]
 async def image_v2(id: ID, info: Info[StrawberryGQLContext]) -> ImageV2GQL | None:
     image_data = await info.context.data_loaders.image_loader.load(ImageID(UUID(id)))
     if image_data is None:
@@ -111,18 +104,12 @@ async def image_v2(id: ID, info: Info[StrawberryGQLContext]) -> ImageV2GQL | Non
     return image_data
 
 
-@strawberry.field(  # type: ignore[misc]
-    description=dedent_strip("""
-    Added in 26.2.0.
-
-    Query images within a specific container registry with optional filtering,
-    ordering, and pagination.
-
-    Returns container images that belong to the specified registry.
-    Use filters to narrow down results by status, name, or architecture.
-    Supports both cursor-based and offset-based pagination.
-    """)
-)
+@gql_root_field(
+    BackendAIGQLMeta(
+        added_version="26.2.0",
+        description="Query images within a specific container registry with optional filtering, ordering, and pagination. Returns container images that belong to the specified registry. Use filters to narrow down results by status, name, or architecture. Supports both cursor-based and offset-based pagination.",
+    )
+)  # type: ignore[misc]
 async def container_registry_images_v2(
     info: Info[StrawberryGQLContext],
     scope: ContainerRegistryScopeGQL,
@@ -168,17 +155,12 @@ async def container_registry_images_v2(
 
 
 # Image Alias Query Fields
-@strawberry.field(  # type: ignore[misc]
-    description=dedent_strip("""
-    Added in 26.2.0.
-
-    Query image aliases with optional filtering, ordering, and pagination.
-
-    Returns image aliases that provide alternative names for container images.
-    Use filters to search by alias string.
-    Supports both cursor-based and offset-based pagination.
-    """)
-)
+@gql_root_field(
+    BackendAIGQLMeta(
+        added_version="26.2.0",
+        description="Query image aliases with optional filtering, ordering, and pagination. Returns image aliases that provide alternative names for container images. Use filters to search by alias string. Supports both cursor-based and offset-based pagination.",
+    )
+)  # type: ignore[misc]
 async def admin_image_aliases(
     info: Info[StrawberryGQLContext],
     filter: ImageV2AliasFilterGQL | None = None,
@@ -221,15 +203,12 @@ async def admin_image_aliases(
     return ImageV2AliasConnectionGQL(count=payload.total_count, edges=edges, page_info=page_info)
 
 
-@strawberry.field(  # type: ignore[misc]
-    description=dedent_strip("""
-    Added in 26.2.0.
-
-    Retrieve a specific image alias by its ID.
-
-    Returns the alias information including the alias string.
-    """)
-)
+@gql_root_field(
+    BackendAIGQLMeta(
+        added_version="26.2.0",
+        description="Retrieve a specific image alias by its ID. Returns the alias information including the alias string.",
+    )
+)  # type: ignore[misc]
 async def image_alias(id: ID, info: Info[StrawberryGQLContext]) -> ImageV2AliasGQL | None:
     alias_data = await info.context.data_loaders.image_alias_loader.load(uuid.UUID(id))
     if alias_data is None:
@@ -237,17 +216,12 @@ async def image_alias(id: ID, info: Info[StrawberryGQLContext]) -> ImageV2AliasG
     return alias_data
 
 
-@strawberry.field(  # type: ignore[misc]
-    description=dedent_strip("""
-    Added in 26.2.0.
-
-    Query image aliases within a specific image with optional filtering,
-    ordering, and pagination.
-
-    Returns image aliases that belong to the specified image.
-    Supports both cursor-based and offset-based pagination.
-    """)
-)
+@gql_root_field(
+    BackendAIGQLMeta(
+        added_version="26.2.0",
+        description="Query image aliases within a specific image with optional filtering, ordering, and pagination. Returns image aliases that belong to the specified image. Supports both cursor-based and offset-based pagination.",
+    )
+)  # type: ignore[misc]
 async def image_scoped_aliases(
     info: Info[StrawberryGQLContext],
     scope: ImageV2ScopeGQL,

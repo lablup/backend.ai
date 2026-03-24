@@ -144,7 +144,6 @@ class DeploymentPolicyInfo(BaseResponseModel):
     """Deployment update policy information."""
 
     strategy: DeploymentStrategy
-    rollback_on_failure: bool
     rolling_update: RollingUpdateConfigInfo | None
     blue_green: BlueGreenConfigInfo | None
 

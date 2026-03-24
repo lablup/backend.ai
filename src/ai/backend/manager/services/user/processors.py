@@ -19,6 +19,8 @@ from ai.backend.manager.services.user.actions.create_user import (
 from ai.backend.manager.services.user.actions.delete_user import (
     DeleteUserAction,
     DeleteUserActionResult,
+    DeleteUserByIdAction,
+    DeleteUserByIdActionResult,
 )
 from ai.backend.manager.services.user.actions.get_user import (
     GetUserAction,
@@ -29,6 +31,8 @@ from ai.backend.manager.services.user.actions.keypair_ops import (
     IssueMyKeypairActionResult,
     RevokeMyKeypairAction,
     RevokeMyKeypairActionResult,
+    SearchMyKeypairsAction,
+    SearchMyKeypairsActionResult,
     SwitchMyMainAccessKeyAction,
     SwitchMyMainAccessKeyActionResult,
     UpdateMyKeypairAction,
@@ -39,12 +43,16 @@ from ai.backend.manager.services.user.actions.modify_user import (
     BulkModifyUserActionResult,
     ModifyUserAction,
     ModifyUserActionResult,
+    ModifyUserByIdAction,
+    ModifyUserByIdActionResult,
 )
 from ai.backend.manager.services.user.actions.purge_user import (
     BulkPurgeUserAction,
     BulkPurgeUserActionResult,
     PurgeUserAction,
     PurgeUserActionResult,
+    PurgeUserByIdAction,
+    PurgeUserByIdActionResult,
 )
 from ai.backend.manager.services.user.actions.search_users import (
     SearchUsersAction,
@@ -82,8 +90,11 @@ class UserProcessors(AbstractProcessorPackage):
     # Single entity actions with RBAC
     get_user: SingleEntityActionProcessor[GetUserAction, GetUserActionResult]
     modify_user: SingleEntityActionProcessor[ModifyUserAction, ModifyUserActionResult]
+    modify_user_by_id: SingleEntityActionProcessor[ModifyUserByIdAction, ModifyUserByIdActionResult]
     delete_user: ActionProcessor[DeleteUserAction, DeleteUserActionResult]
+    delete_user_by_id: SingleEntityActionProcessor[DeleteUserByIdAction, DeleteUserByIdActionResult]
     purge_user: SingleEntityActionProcessor[PurgeUserAction, PurgeUserActionResult]
+    purge_user_by_id: SingleEntityActionProcessor[PurgeUserByIdAction, PurgeUserByIdActionResult]
     # Bulk actions without RBAC (special handling)
     bulk_create_users: ActionProcessor[BulkCreateUserAction, BulkCreateUserActionResult]
     bulk_modify_users: ActionProcessor[BulkModifyUserAction, BulkModifyUserActionResult]
@@ -98,6 +109,7 @@ class UserProcessors(AbstractProcessorPackage):
         SwitchMyMainAccessKeyAction, SwitchMyMainAccessKeyActionResult
     ]
     update_my_keypair: ActionProcessor[UpdateMyKeypairAction, UpdateMyKeypairActionResult]
+    search_my_keypairs: ActionProcessor[SearchMyKeypairsAction, SearchMyKeypairsActionResult]
 
     def __init__(
         self,
@@ -125,9 +137,24 @@ class UserProcessors(AbstractProcessorPackage):
         self.modify_user = SingleEntityActionProcessor(
             user_service.modify_user, action_monitors, validators=[validators.rbac.single_entity]
         )
+        self.modify_user_by_id = SingleEntityActionProcessor(
+            user_service.modify_user_by_id,
+            action_monitors,
+            validators=[validators.rbac.single_entity],
+        )
         self.delete_user = ActionProcessor(user_service.delete_user, action_monitors)
+        self.delete_user_by_id = SingleEntityActionProcessor(
+            user_service.delete_user_by_id,
+            action_monitors,
+            validators=[validators.rbac.single_entity],
+        )
         self.purge_user = SingleEntityActionProcessor(
             user_service.purge_user, action_monitors, validators=[validators.rbac.single_entity]
+        )
+        self.purge_user_by_id = SingleEntityActionProcessor(
+            user_service.purge_user_by_id,
+            action_monitors,
+            validators=[validators.rbac.single_entity],
         )
         # Bulk actions without RBAC (special handling)
         self.bulk_create_users = ActionProcessor(user_service.bulk_create_users, action_monitors)
@@ -143,6 +170,7 @@ class UserProcessors(AbstractProcessorPackage):
             user_service.switch_my_main_access_key, action_monitors
         )
         self.update_my_keypair = ActionProcessor(user_service.update_my_keypair, action_monitors)
+        self.search_my_keypairs = ActionProcessor(user_service.search_my_keypairs, action_monitors)
 
     @override
     def supported_actions(self) -> list[ActionSpec]:
@@ -150,10 +178,13 @@ class UserProcessors(AbstractProcessorPackage):
             CreateUserAction.spec(),
             BulkCreateUserAction.spec(),
             ModifyUserAction.spec(),
+            ModifyUserByIdAction.spec(),
             BulkModifyUserAction.spec(),
             DeleteUserAction.spec(),
+            DeleteUserByIdAction.spec(),
             GetUserAction.spec(),
             PurgeUserAction.spec(),
+            PurgeUserByIdAction.spec(),
             BulkPurgeUserAction.spec(),
             UserMonthStatsAction.spec(),
             AdminMonthStatsAction.spec(),
@@ -165,4 +196,5 @@ class UserProcessors(AbstractProcessorPackage):
             RevokeMyKeypairAction.spec(),
             SwitchMyMainAccessKeyAction.spec(),
             UpdateMyKeypairAction.spec(),
+            SearchMyKeypairsAction.spec(),
         ]

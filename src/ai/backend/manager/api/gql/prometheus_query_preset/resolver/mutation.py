@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from uuid import UUID
 
-import strawberry
 from strawberry import ID, Info
 
 from ai.backend.common.dto.manager.v2.prometheus_query_preset.request import (
@@ -15,6 +14,10 @@ from ai.backend.common.dto.manager.v2.prometheus_query_preset.response import (
 )
 from ai.backend.common.dto.manager.v2.prometheus_query_preset.response import (
     ModifyQueryDefinitionGQLPayload as ModifyQueryDefinitionGQLPayloadDTO,
+)
+from ai.backend.manager.api.gql.decorators import (
+    BackendAIGQLMeta,
+    gql_mutation,
 )
 from ai.backend.manager.api.gql.prometheus_query_preset.types import (
     CreateQueryDefinitionInput,
@@ -27,7 +30,11 @@ from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.api.gql.utils import check_admin_only
 
 
-@strawberry.mutation(description="Added in 26.3.0. Create a new query definition (admin only).")  # type: ignore[misc]
+@gql_mutation(
+    BackendAIGQLMeta(
+        added_version="26.3.0", description="Create a new query definition (admin only)"
+    )
+)  # type: ignore[misc]
 async def admin_create_prometheus_query_preset(
     info: Info[StrawberryGQLContext],
     input: CreateQueryDefinitionInput,
@@ -39,8 +46,10 @@ async def admin_create_prometheus_query_preset(
     )
 
 
-@strawberry.mutation(
-    description="Added in 26.3.0. Modify an existing query definition (admin only)."
+@gql_mutation(
+    BackendAIGQLMeta(
+        added_version="26.3.0", description="Modify an existing query definition (admin only)."
+    )
 )  # type: ignore[misc]
 async def admin_modify_prometheus_query_preset(
     info: Info[StrawberryGQLContext],
@@ -56,7 +65,9 @@ async def admin_modify_prometheus_query_preset(
     )
 
 
-@strawberry.mutation(description="Added in 26.3.0. Delete a query definition (admin only).")  # type: ignore[misc]
+@gql_mutation(
+    BackendAIGQLMeta(added_version="26.3.0", description="Delete a query definition (admin only)")
+)  # type: ignore[misc]
 async def admin_delete_prometheus_query_preset(
     info: Info[StrawberryGQLContext],
     id: ID,

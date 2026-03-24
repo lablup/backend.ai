@@ -2,11 +2,10 @@
 
 from __future__ import annotations
 
-import strawberry
-
 from ai.backend.common.dto.manager.v2.group.types import DomainProjectScopeDTO
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
+    gql_field,
     gql_pydantic_input,
 )
 from ai.backend.manager.api.gql.pydantic_compat import PydanticInputMixin
@@ -22,6 +21,6 @@ from ai.backend.manager.api.gql.pydantic_compat import PydanticInputMixin
 class DomainProjectScope(PydanticInputMixin[DomainProjectScopeDTO]):
     """Scope for domain-level project queries."""
 
-    domain_name: str = strawberry.field(
+    domain_name: str = gql_field(
         description="Domain name to scope the query. Only projects belonging to this domain will be returned."
     )

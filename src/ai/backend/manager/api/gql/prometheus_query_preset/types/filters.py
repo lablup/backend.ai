@@ -4,8 +4,6 @@ from __future__ import annotations
 
 from enum import StrEnum
 
-import strawberry
-
 from ai.backend.common.dto.manager.v2.prometheus_query_preset.request import (
     QueryDefinitionFilter as QueryDefinitionFilterDTO,
 )
@@ -18,6 +16,8 @@ from ai.backend.manager.api.gql.base import (
 )
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
+    gql_enum,
+    gql_field,
     gql_pydantic_input,
 )
 from ai.backend.manager.api.gql.pydantic_compat import PydanticInputMixin
@@ -30,15 +30,15 @@ from ai.backend.manager.api.gql.pydantic_compat import PydanticInputMixin
     name="QueryDefinitionFilter",
 )
 class QueryDefinitionFilter(PydanticInputMixin[QueryDefinitionFilterDTO]):
-    name: StringFilter | None = strawberry.field(
-        default=None,
-        description="Filter by name.",
-    )
+    name: StringFilter | None = gql_field(description="Filter by name.", default=None)
 
 
-@strawberry.enum(
+@gql_enum(
+    BackendAIGQLMeta(
+        added_version="26.3.0",
+        description="Fields available for ordering query definition results.",
+    ),
     name="QueryDefinitionOrderField",
-    description="Added in 26.3.0. Fields available for ordering query definition results.",
 )
 class QueryDefinitionOrderField(StrEnum):
     CREATED_AT = "created_at"
@@ -53,8 +53,7 @@ class QueryDefinitionOrderField(StrEnum):
     name="QueryDefinitionOrderBy",
 )
 class QueryDefinitionOrderBy(PydanticInputMixin[QueryDefinitionOrderDTO]):
-    field: QueryDefinitionOrderField = strawberry.field(description="The field to order by.")
-    direction: OrderDirection = strawberry.field(
-        default=OrderDirection.DESC,
-        description="Sort direction.",
+    field: QueryDefinitionOrderField = gql_field(description="The field to order by.")
+    direction: OrderDirection = gql_field(
+        description="Sort direction.", default=OrderDirection.DESC
     )

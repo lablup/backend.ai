@@ -64,6 +64,10 @@ class ImageNode(BaseResponseModel):
     config_digest: str = Field(description="Image config digest")
     is_local: bool = Field(description="Whether the image is local-only")
     created_at: datetime | None = Field(default=None, description="Image creation timestamp")
+    last_used_at: datetime | None = Field(
+        default=None,
+        description="Timestamp of the most recent session created with this image.",
+    )
     identity: ImageIdentityInfoDTO | None = Field(
         default=None, description="Identity information (name, architecture)."
     )
@@ -154,6 +158,10 @@ class ImageMetadataInfoDTO(BaseResponseModel):
     digest: str | None = Field(default=None, description="Config digest for verification.")
     size_bytes: int = Field(description="Image size in bytes.")
     created_at: datetime | None = Field(default=None, description="Image creation timestamp.")
+    last_used_at: datetime | None = Field(
+        default=None,
+        description="Timestamp of the most recent session created with this image.",
+    )
     tags: list[ImageTagInfo] = Field(default_factory=list, description="Parsed tag components.")
     labels: list[ImageLabelInfo] = Field(default_factory=list, description="Docker labels.")
     status: ImageStatusType = Field(description="Image status (ALIVE or DELETED).")

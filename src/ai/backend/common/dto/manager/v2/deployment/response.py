@@ -211,7 +211,6 @@ class DeploymentPolicyNode(BaseResponseModel):
     strategy_spec: RollingUpdateStrategySpecInfo | BlueGreenStrategySpecInfo = Field(
         description="Deployment strategy specification"
     )
-    rollback_on_failure: bool = Field(description="Roll back on failure")
     created_at: datetime = Field(description="Creation timestamp")
     updated_at: datetime = Field(description="Last update timestamp")
 

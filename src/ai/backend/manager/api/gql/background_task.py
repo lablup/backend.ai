@@ -23,8 +23,14 @@ from ai.backend.common.events.event_types.bgtask.broadcast import (
 )
 from ai.backend.common.events.hub.propagators.cache import WithCachePropagator
 from ai.backend.common.events.types import EventCacheDomain, EventDomain
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.logging import BraceStyleAdapter
-from ai.backend.manager.api.gql.decorators import BackendAIGQLMeta, gql_pydantic_type
+from ai.backend.manager.api.gql.decorators import (
+    BackendAIGQLMeta,
+    gql_enum,
+    gql_pydantic_type,
+    gql_subscription,
+)
 from ai.backend.manager.errors.bgtask import InvalidBgtaskId
 
 if TYPE_CHECKING:
@@ -33,7 +39,7 @@ if TYPE_CHECKING:
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
-@strawberry.enum(description="Type of background task event")
+@gql_enum(BackendAIGQLMeta(added_version="24.3.0", description="Type of background task event"))
 class BgtaskEventType(StrEnum):
     """Enum representing background task event types."""
 
@@ -129,10 +135,15 @@ class BackgroundTaskEventPayloadGQL:
         return cls.from_pydantic(dto)  # type: ignore[attr-defined, no-any-return]
 
 
-@strawberry.subscription(  # type: ignore[misc]
-    description="Subscribe to real-time events for a specific background task. "
-    "Streams progress updates and completion events (done/cancelled/failed) "
-    "for the task lifecycle."
+@gql_subscription(  # type: ignore[misc]
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description=(
+            "Subscribe to real-time events for a specific background task. "
+            "Streams progress updates and completion events (done/cancelled/failed) "
+            "for the task lifecycle."
+        ),
+    )
 )
 async def background_task_events(
     task_id: strawberry.ID,

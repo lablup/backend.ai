@@ -21,7 +21,7 @@ from sqlalchemy.sql.expression import false
 
 from ai.backend.common import msgpack
 from ai.backend.common.types import AccessKey, SecretKey
-from ai.backend.manager.data.keypair.types import GeneratedKeyPairData, KeyPairCreator, KeyPairData
+from ai.backend.manager.data.keypair.types import KeyPairCreator, KeyPairData, KeyPairSecrets
 from ai.backend.manager.defs import RESERVED_DOTFILES
 from ai.backend.manager.models.base import (
     GUID,
@@ -142,7 +142,7 @@ class KeyPairRow(Base):  # type: ignore[misc]
     def from_creator(
         cls,
         creator: KeyPairCreator,
-        generated_data: GeneratedKeyPairData,
+        generated_data: KeyPairSecrets,
         user_id: uuid.UUID,
         email: str,
     ) -> Self:
@@ -177,6 +177,8 @@ class KeyPairRow(Base):  # type: ignore[misc]
             ssh_private_key=self.ssh_private_key,
             dotfiles=self.dotfiles if self.dotfiles else b"\x90",
             bootstrap_script=self.bootstrap_script,
+            last_used=self.last_used,
+            num_queries=self.num_queries if self.num_queries is not None else 0,
         )
 
 
@@ -244,10 +246,10 @@ def prepare_new_keypair(user_email: str, creator: KeyPairCreator) -> dict[str, o
     }
 
 
-def generate_keypair_data() -> GeneratedKeyPairData:
+def generate_keypair_data() -> KeyPairSecrets:
     ak, sk = generate_keypair()
     pubkey, privkey = generate_ssh_keypair()
-    return GeneratedKeyPairData(
+    return KeyPairSecrets(
         access_key=ak,
         secret_key=sk,
         ssh_public_key=pubkey,

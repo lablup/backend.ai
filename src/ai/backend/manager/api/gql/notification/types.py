@@ -108,6 +108,8 @@ from ai.backend.manager.api.gql.base import OrderDirection, StringFilter
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     PydanticInputMixin,
+    gql_enum,
+    gql_field,
     gql_node_type,
     gql_pydantic_input,
     gql_pydantic_interface,
@@ -118,16 +120,16 @@ from ai.backend.manager.api.gql.types import StrawberryGQLContext
 
 # GraphQL enum types
 
-NotificationChannelTypeGQL = strawberry.enum(
+NotificationChannelTypeGQL: type[NotificationChannelTypeDTO] = gql_enum(
+    BackendAIGQLMeta(added_version="26.3.0", description="Notification channel types"),
     NotificationChannelTypeDTO,
     name="NotificationChannelType",
-    description="Notification channel types",
 )
 
-NotificationRuleTypeGQL = strawberry.enum(
+NotificationRuleTypeGQL: type[NotificationRuleTypeDTO] = gql_enum(
+    BackendAIGQLMeta(added_version="26.3.0", description="Notification rule types"),
     NotificationRuleTypeDTO,
     name="NotificationRuleType",
-    description="Notification rule types",
 )
 
 
@@ -252,7 +254,11 @@ class NotificationRule(PydanticNodeMixin[NotificationRuleNode]):
 # Filter and OrderBy types
 
 
-@strawberry.enum
+@gql_enum(
+    BackendAIGQLMeta(
+        added_version="26.3.0", description="Fields available for ordering notification channels"
+    )
+)
 class NotificationChannelOrderField(StrEnum):
     NAME = "name"
     CREATED_AT = "created_at"
@@ -267,17 +273,17 @@ class NotificationChannelOrderField(StrEnum):
     name="NotificationChannelTypeFilter",
 )
 class NotificationChannelTypeFilterGQL(PydanticInputMixin[NotificationChannelTypeFilterDTO]):
-    equals: NotificationChannelTypeGQL | None = strawberry.field(
-        default=None, description="Matches channels with this exact type."
+    equals: NotificationChannelTypeGQL | None = gql_field(
+        description="Matches channels with this exact type.", default=None
     )
-    in_: list[NotificationChannelTypeGQL] | None = strawberry.field(
-        name="in", default=None, description="Matches channels whose type is in this list."
+    in_: list[NotificationChannelTypeGQL] | None = gql_field(
+        description="Matches channels whose type is in this list.", name="in", default=None
     )
-    not_equals: NotificationChannelTypeGQL | None = strawberry.field(
-        default=None, description="Excludes channels with this exact type."
+    not_equals: NotificationChannelTypeGQL | None = gql_field(
+        description="Excludes channels with this exact type.", default=None
     )
-    not_in: list[NotificationChannelTypeGQL] | None = strawberry.field(
-        default=None, description="Excludes channels whose type is in this list."
+    not_in: list[NotificationChannelTypeGQL] | None = gql_field(
+        description="Excludes channels whose type is in this list.", default=None
     )
 
 
@@ -306,7 +312,11 @@ class NotificationChannelOrderBy(PydanticInputMixin[NotificationChannelOrderDTO]
     direction: OrderDirection = OrderDirection.ASC
 
 
-@strawberry.enum
+@gql_enum(
+    BackendAIGQLMeta(
+        added_version="26.3.0", description="Fields available for ordering notification rules"
+    )
+)
 class NotificationRuleOrderField(StrEnum):
     NAME = "name"
     CREATED_AT = "created_at"
@@ -321,17 +331,17 @@ class NotificationRuleOrderField(StrEnum):
     name="NotificationRuleTypeFilter",
 )
 class NotificationRuleTypeFilterGQL(PydanticInputMixin[NotificationRuleTypeFilterDTO]):
-    equals: NotificationRuleTypeGQL | None = strawberry.field(
-        default=None, description="Matches rules with this exact type."
+    equals: NotificationRuleTypeGQL | None = gql_field(
+        description="Matches rules with this exact type.", default=None
     )
-    in_: list[NotificationRuleTypeGQL] | None = strawberry.field(
-        name="in", default=None, description="Matches rules whose type is in this list."
+    in_: list[NotificationRuleTypeGQL] | None = gql_field(
+        description="Matches rules whose type is in this list.", name="in", default=None
     )
-    not_equals: NotificationRuleTypeGQL | None = strawberry.field(
-        default=None, description="Excludes rules with this exact type."
+    not_equals: NotificationRuleTypeGQL | None = gql_field(
+        description="Excludes rules with this exact type.", default=None
     )
-    not_in: list[NotificationRuleTypeGQL] | None = strawberry.field(
-        default=None, description="Excludes rules whose type is in this list."
+    not_in: list[NotificationRuleTypeGQL] | None = gql_field(
+        description="Excludes rules whose type is in this list.", default=None
     )
 
 
@@ -471,7 +481,7 @@ class DeleteNotificationChannelInput(PydanticInputMixin[DeleteNotificationChanne
 class CreateNotificationRuleInput(PydanticInputMixin[CreateNotificationRuleInputDTO]):
     name: str
     description: str | None = None
-    rule_type: NotificationRuleTypeGQL = strawberry.field()
+    rule_type: NotificationRuleTypeGQL = gql_field(description="The rule type field.")
     channel_id: ID
     message_template: str
     enabled: bool = True
@@ -526,7 +536,7 @@ class UpdateNotificationChannelPayload(PydanticOutputMixin[UpdateNotificationCha
     fields=["id"],
 )
 class DeleteNotificationChannelPayload(PydanticOutputMixin[DeleteNotificationChannelPayloadDTO]):
-    id: ID = strawberry.field(description="ID of the deleted notification channel.")
+    id: ID = gql_field(description="ID of the deleted notification channel.")
 
 
 @gql_pydantic_type(
@@ -557,7 +567,7 @@ class UpdateNotificationRulePayload(PydanticOutputMixin[UpdateNotificationRulePa
     fields=["id"],
 )
 class DeleteNotificationRulePayload(PydanticOutputMixin[DeleteNotificationRulePayloadDTO]):
-    id: ID = strawberry.field(description="ID of the deleted notification rule.")
+    id: ID = gql_field(description="ID of the deleted notification rule.")
 
 
 # Validate mutations
@@ -583,7 +593,7 @@ class ValidateNotificationChannelInput(PydanticInputMixin[ValidateNotificationCh
 class ValidateNotificationChannelPayload(
     PydanticOutputMixin[ValidateNotificationChannelPayloadDTO]
 ):
-    id: ID = strawberry.field(description="ID of the validated notification channel.")
+    id: ID = gql_field(description="ID of the validated notification channel.")
 
 
 @gql_pydantic_input(

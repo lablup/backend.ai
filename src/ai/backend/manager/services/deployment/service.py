@@ -508,7 +508,6 @@ class DeploymentService:
             endpoint_id=policy_upserter.deployment_id,
             strategy=policy_upserter.strategy,
             strategy_spec=policy_upserter.strategy_spec,
-            rollback_on_failure=policy_upserter.rollback_on_failure,
         )
         repo_upserter: Upserter[DeploymentPolicyRow] = Upserter(spec=spec)
         result = await self._deployment_repository.upsert_deployment_policy(repo_upserter)

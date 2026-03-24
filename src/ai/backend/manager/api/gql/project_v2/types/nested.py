@@ -4,8 +4,6 @@ from __future__ import annotations
 
 from datetime import datetime
 
-import strawberry
-
 from ai.backend.common.dto.manager.v2.group.response import (
     ProjectBasicInfo as ProjectBasicInfoDTO,
 )
@@ -23,6 +21,7 @@ from ai.backend.common.dto.manager.v2.group.response import (
 )
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
+    gql_field,
     gql_pydantic_type,
 )
 from ai.backend.manager.api.gql.pydantic_compat import PydanticOutputMixin
@@ -47,14 +46,12 @@ from .enums import ProjectTypeEnum, VFolderHostPermissionEnum
 class ProjectBasicInfoGQL:
     """Basic project information."""
 
-    name: str = strawberry.field(description="Project name.")
-    description: str | None = strawberry.field(description="Optional description of the project.")
-    type: ProjectTypeEnum = strawberry.field(
+    name: str = gql_field(description="Project name.")
+    description: str | None = gql_field(description="Optional description of the project.")
+    type: ProjectTypeEnum = gql_field(
         description="Project type determining its purpose. See ProjectTypeV2 enum."
     )
-    integration_id: str | None = strawberry.field(
-        description="External system integration identifier."
-    )
+    integration_id: str | None = gql_field(description="External system integration identifier.")
 
 
 # ============================================================================
@@ -76,8 +73,8 @@ class ProjectBasicInfoGQL:
 class ProjectOrganizationInfoGQL:
     """Project's organizational context."""
 
-    domain_name: str = strawberry.field(description="Name of the domain this project belongs to.")
-    resource_policy: str = strawberry.field(
+    domain_name: str = gql_field(description="Name of the domain this project belongs to.")
+    resource_policy: str = gql_field(
         description="Name of the project resource policy applied to this project."
     )
 
@@ -101,14 +98,9 @@ class ProjectOrganizationInfoGQL:
 class VFolderHostPermissionEntryGQL(PydanticOutputMixin[VFolderHostPermissionEntryDTO]):
     """Storage host permission entry."""
 
-    host: str = strawberry.field(
-        description="Storage host identifier (e.g., 'default', 'storage-01')."
-    )
-    permissions: list[VFolderHostPermissionEnum] = strawberry.field(
-        description=(
-            "List of permissions granted for this host. "
-            "See VFolderHostPermissionV2 enum for available permissions."
-        )
+    host: str = gql_field(description="Storage host identifier (e.g., 'default', 'storage-01').")
+    permissions: list[VFolderHostPermissionEnum] = gql_field(
+        description="List of permissions granted for this host. See VFolderHostPermissionV2 enum for available permissions."
     )
 
 
@@ -126,12 +118,8 @@ class VFolderHostPermissionEntryGQL(PydanticOutputMixin[VFolderHostPermissionEnt
 class ProjectStorageInfoGQL(PydanticOutputMixin[ProjectStorageInfoDTO]):
     """Project storage configuration."""
 
-    allowed_vfolder_hosts: list[VFolderHostPermissionEntryGQL] = strawberry.field(
-        description=(
-            "Storage hosts accessible to this project with their permissions. "
-            "Each entry specifies a host and the operations allowed on it. "
-            "Empty list means no storage access."
-        )
+    allowed_vfolder_hosts: list[VFolderHostPermissionEntryGQL] = gql_field(
+        description="Storage hosts accessible to this project with their permissions. Each entry specifies a host and the operations allowed on it. Empty list means no storage access."
     )
 
 
@@ -153,15 +141,10 @@ class ProjectStorageInfoGQL(PydanticOutputMixin[ProjectStorageInfoDTO]):
 class ProjectLifecycleInfoGQL:
     """Project lifecycle information."""
 
-    is_active: bool | None = strawberry.field(
-        description=(
-            "Whether the project is active. "
-            "Inactive projects cannot create new sessions or perform operations."
-        )
+    is_active: bool | None = gql_field(
+        description="Whether the project is active. Inactive projects cannot create new sessions or perform operations."
     )
-    created_at: datetime | None = strawberry.field(
-        description="Timestamp when the project was created."
-    )
-    modified_at: datetime | None = strawberry.field(
+    created_at: datetime | None = gql_field(description="Timestamp when the project was created.")
+    modified_at: datetime | None = gql_field(
         description="Timestamp when the project was last modified."
     )

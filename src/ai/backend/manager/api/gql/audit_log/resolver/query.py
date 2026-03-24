@@ -12,11 +12,20 @@ from ai.backend.manager.api.gql.audit_log.types import (
     AuditLogV2GQL,
 )
 from ai.backend.manager.api.gql.base import encode_cursor
+from ai.backend.manager.api.gql.decorators import (
+    BackendAIGQLMeta,
+    gql_root_field,
+)
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.api.gql.utils import check_admin_only
 
 
-@strawberry.field(description="Query audit logs with pagination and filtering. (admin only)")  # type: ignore[misc]
+@gql_root_field(
+    BackendAIGQLMeta(
+        added_version="26.3.0",
+        description="Query audit logs with pagination and filtering. (admin only)",
+    )
+)  # type: ignore[misc]
 async def admin_audit_logs_v2(
     info: Info[StrawberryGQLContext],
     filter: AuditLogFilterGQL | None = None,

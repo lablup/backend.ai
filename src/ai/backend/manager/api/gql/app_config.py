@@ -32,8 +32,10 @@ from ai.backend.common.dto.manager.v2.app_config.response import (
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     PydanticInputMixin,
+    gql_mutation,
     gql_pydantic_input,
     gql_pydantic_type,
+    gql_root_field,
 )
 from ai.backend.manager.api.gql.pydantic_compat import PydanticOutputMixin
 from ai.backend.manager.api.gql.utils import check_admin_only, dedent_strip
@@ -56,14 +58,14 @@ class AppConfig(PydanticOutputMixin[AppConfigNode]):
 
 
 @gql_pydantic_input(
-    BackendAIGQLMeta(description="", added_version="24.09.0"),
-    description=dedent_strip(
-        """\
-        Input for creating or updating domain-level app configuration.
-        The provided extra_config object will completely replace the existing configuration;
-        existing keys not present in the new extra_config will be removed.
-        All users in this domain will be affected by these settings when their configurations are merged.
-        """
+    BackendAIGQLMeta(
+        description=dedent_strip("""\
+            Input for creating or updating domain-level app configuration.
+            The provided extra_config object will completely replace the existing configuration;
+            existing keys not present in the new extra_config will be removed.
+            All users in this domain will be affected by these settings when their configurations are merged.
+        """),
+        added_version="24.09.0",
     ),
 )
 class UpsertDomainConfigInput(PydanticInputMixin[UpsertDomainConfigInputDTO]):
@@ -74,15 +76,15 @@ class UpsertDomainConfigInput(PydanticInputMixin[UpsertDomainConfigInputDTO]):
 
 
 @gql_pydantic_input(
-    BackendAIGQLMeta(description="", added_version="24.09.0"),
-    description=dedent_strip(
-        """\
-        Input for creating or updating user-level app configuration.
-        The provided extra_config object will completely replace the existing configuration;
-        existing keys not present in the new extra_config will be removed.
-        These settings will override domain-level settings when configurations are merged for this user.
-        If user_id is not provided, the current user's configuration will be updated.
-        """
+    BackendAIGQLMeta(
+        description=dedent_strip("""\
+            Input for creating or updating user-level app configuration.
+            The provided extra_config object will completely replace the existing configuration;
+            existing keys not present in the new extra_config will be removed.
+            These settings will override domain-level settings when configurations are merged for this user.
+            If user_id is not provided, the current user's configuration will be updated.
+        """),
+        added_version="24.09.0",
     ),
 )
 class UpsertUserConfigInput(PydanticInputMixin[UpsertUserConfigInputDTO]):
@@ -104,12 +106,12 @@ class DeleteDomainConfigInput(PydanticInputMixin[DeleteDomainConfigInputDTO]):
 
 
 @gql_pydantic_input(
-    BackendAIGQLMeta(description="", added_version="24.09.0"),
-    description=dedent_strip(
-        """\
-        Input for deleting user-level app configuration.
-        If user_id is not provided, the current user's configuration will be deleted.
-        """
+    BackendAIGQLMeta(
+        description=dedent_strip("""\
+            Input for deleting user-level app configuration.
+            If user_id is not provided, the current user's configuration will be deleted.
+        """),
+        added_version="24.09.0",
     ),
 )
 class DeleteUserConfigInput(PydanticInputMixin[DeleteUserConfigInputDTO]):
@@ -170,18 +172,12 @@ class DeleteUserConfigPayload:
     deleted: strawberry.auto
 
 
-@strawberry.field(  # type: ignore[misc]
-    description=dedent_strip(
-        """\
-        Added in 26.2.0.
-        Retrieve domain-level app configuration (admin only).
-        Returns only the configuration set specifically for the domain, without merging.
-        This query is useful for checking what values are configured at the domain level
-        when you want to modify domain or user configurations separately.
-        For actual configuration values to be applied, use mergedAppConfig instead.
-        """
+@gql_root_field(
+    BackendAIGQLMeta(
+        added_version="26.2.0",
+        description="Retrieve domain-level app configuration (admin only). Returns only the configuration set specifically for the domain, without merging. This query is useful for checking what values are configured at the domain level when you want to modify domain or user configurations separately. For actual configuration values to be applied, use mergedAppConfig instead.",
     )
-)
+)  # type: ignore[misc]
 async def admin_domain_app_config(
     domain_name: str,
     info: Info[StrawberryGQLContext],
@@ -194,23 +190,13 @@ async def admin_domain_app_config(
     return AppConfig.from_pydantic(result)
 
 
-@strawberry.field(  # type: ignore[misc]
-    description=dedent_strip(
-        """\
-        Added in 25.16.0.
-        Retrieve domain-level app configuration.
-        Returns only the configuration set specifically for the domain, without merging.
-        This query is useful for checking what values are configured at the domain level
-        when you want to modify domain or user configurations separately.
-        For actual configuration values to be applied, use mergedAppConfig instead.
-        Requires admin privileges.
-        """
+@gql_root_field(
+    BackendAIGQLMeta(
+        added_version="25.16.0",
+        description="Retrieve domain-level app configuration. Returns only the configuration set specifically for the domain, without merging. This query is useful for checking what values are configured at the domain level when you want to modify domain or user configurations separately. For actual configuration values to be applied, use mergedAppConfig instead. Requires admin privileges.",
     ),
-    deprecation_reason=(
-        "Use admin_domain_app_config instead. "
-        "This API will be removed after v26.3.0. See BEP-1041 for migration guide."
-    ),
-)
+    deprecation_reason="Use admin_domain_app_config instead. This API will be removed after v26.3.0. See BEP-1041 for migration guide.",
+)  # type: ignore[misc]
 async def domain_app_config(
     domain_name: str,
     info: Info[StrawberryGQLContext],
@@ -226,20 +212,12 @@ async def domain_app_config(
     return AppConfig.from_pydantic(result)
 
 
-@strawberry.field(  # type: ignore[misc]
-    description=dedent_strip(
-        """\
-        Added in 25.16.0.
-        Retrieve user-level app configuration.
-        Returns only the configuration set specifically for the user, without merging with domain config.
-        This query is useful for checking what values are configured at the user level
-        when you want to modify domain or user configurations separately.
-        For actual configuration values to be applied, use mergedAppConfig instead.
-        If user_id is not provided, returns the current user's configuration.
-        Users can only access their own configuration, but admins can access any user's configuration.
-        """
+@gql_root_field(
+    BackendAIGQLMeta(
+        added_version="25.16.0",
+        description="Retrieve user-level app configuration. Returns only the configuration set specifically for the user, without merging with domain config. This query is useful for checking what values are configured at the user level when you want to modify domain or user configurations separately. For actual configuration values to be applied, use mergedAppConfig instead. If user_id is not provided, returns the current user's configuration. Users can only access their own configuration, but admins can access any user's configuration.",
     )
-)
+)  # type: ignore[misc]
 async def user_app_config(
     info: Info[StrawberryGQLContext],
     user_id: ID | None = None,
@@ -261,18 +239,12 @@ async def user_app_config(
     return AppConfig.from_pydantic(result)
 
 
-@strawberry.field(  # type: ignore[misc]
-    description=dedent_strip(
-        """\
-        Added in 25.16.0.
-        Retrieve merged app configuration for the current user.
-        The result combines domain-level and user-level configurations,
-        where user settings override domain settings for the same keys.
-        This query should be used when working with user app configurations
-        to get the actual configuration values that will be applied.
-        """
+@gql_root_field(
+    BackendAIGQLMeta(
+        added_version="25.16.0",
+        description="Retrieve merged app configuration for the current user. The result combines domain-level and user-level configurations, where user settings override domain settings for the same keys. This query should be used when working with user app configurations to get the actual configuration values that will be applied.",
     )
-)
+)  # type: ignore[misc]
 async def merged_app_config(
     info: Info[StrawberryGQLContext],
 ) -> AppConfig:
@@ -285,19 +257,13 @@ async def merged_app_config(
     return AppConfig.from_pydantic(result)
 
 
-@strawberry.mutation(  # type: ignore[misc]
-    name="adminUpsertDomainAppConfig",
-    description=dedent_strip(
-        """\
-        Added in 26.2.0.
-        Create or update domain-level app configuration (admin only).
-        The provided extra_config object will completely replace the existing configuration;
-        existing keys not present in the new extra_config will be removed.
-        All users in this domain will be affected by these settings when their configurations are merged,
-        unless they have user-level configurations that override specific keys.
-        """
+@gql_mutation(
+    BackendAIGQLMeta(
+        added_version="26.2.0",
+        description="Create or update domain-level app configuration (admin only). The provided extra_config object will completely replace the existing configuration; existing keys not present in the new extra_config will be removed. All users in this domain will be affected by these settings when their configurations are merged, unless they have user-level configurations that override specific keys",
     ),
-)
+    name="adminUpsertDomainAppConfig",
+)  # type: ignore[misc]
 async def admin_upsert_domain_app_config(
     input: UpsertDomainConfigInput,
     info: Info[StrawberryGQLContext],
@@ -310,24 +276,14 @@ async def admin_upsert_domain_app_config(
     return UpsertDomainConfigPayload(app_config=AppConfig.from_pydantic(result))
 
 
-@strawberry.mutation(  # type: ignore[misc]
+@gql_mutation(
+    BackendAIGQLMeta(
+        added_version="25.16.0",
+        description="Create or update domain-level app configuration. The provided extra_config object will completely replace the existing configuration; existing keys not present in the new extra_config will be removed. All users in this domain will be affected by these settings when their configurations are merged, unless they have user-level configurations that override specific keys. Requires admin privileges",
+    ),
     name="upsertDomainAppConfig",
-    description=dedent_strip(
-        """\
-        Added in 25.16.0.
-        Create or update domain-level app configuration.
-        The provided extra_config object will completely replace the existing configuration;
-        existing keys not present in the new extra_config will be removed.
-        All users in this domain will be affected by these settings when their configurations are merged,
-        unless they have user-level configurations that override specific keys.
-        Requires admin privileges.
-        """
-    ),
-    deprecation_reason=(
-        "Use admin_upsert_domain_app_config instead. "
-        "This API will be removed after v26.3.0. See BEP-1041 for migration guide."
-    ),
-)
+    deprecation_reason="Use admin_upsert_domain_app_config instead. This API will be removed after v26.3.0. See BEP-1041 for migration guide.",
+)  # type: ignore[misc]
 async def upsert_domain_app_config(
     input: UpsertDomainConfigInput,
     info: Info[StrawberryGQLContext],
@@ -343,20 +299,13 @@ async def upsert_domain_app_config(
     return UpsertDomainConfigPayload(app_config=AppConfig.from_pydantic(result))
 
 
-@strawberry.mutation(  # type: ignore[misc]
-    name="upsertUserAppConfig",
-    description=dedent_strip(
-        """\
-        Added in 25.16.0.
-        Create or update user-level app configuration.
-        The provided extra_config object will completely replace the existing configuration;
-        existing keys not present in the new extra_config will be removed.
-        These settings will override domain-level settings when configurations are merged for this user.
-        If user_id is not provided, the current user's configuration will be updated.
-        Users can only modify their own configuration, but admins can modify any user's configuration.
-        """
+@gql_mutation(
+    BackendAIGQLMeta(
+        added_version="25.16.0",
+        description="Create or update user-level app configuration. The provided extra_config object will completely replace the existing configuration; existing keys not present in the new extra_config will be removed. These settings will override domain-level settings when configurations are merged for this user. If user_id is not provided, the current user's configuration will be updated. Users can only modify their own configuration, but admins can modify any user's configuration",
     ),
-)
+    name="upsertUserAppConfig",
+)  # type: ignore[misc]
 async def upsert_user_app_config(
     input: UpsertUserConfigInput,
     info: Info[StrawberryGQLContext],
@@ -378,18 +327,13 @@ async def upsert_user_app_config(
     return UpsertUserConfigPayload(app_config=AppConfig.from_pydantic(result))
 
 
-@strawberry.mutation(  # type: ignore[misc]
-    name="adminDeleteDomainAppConfig",
-    description=dedent_strip(
-        """\
-        Added in 26.2.0.
-        Delete domain-level app configuration (admin only).
-        All users in this domain may be affected by this deletion.
-        After deletion, users will only receive their user-level configurations
-        when configurations are merged, with no domain-level defaults.
-        """
+@gql_mutation(
+    BackendAIGQLMeta(
+        added_version="26.2.0",
+        description="Delete domain-level app configuration (admin only). All users in this domain may be affected by this deletion. After deletion, users will only receive their user-level configurations when configurations are merged, with no domain-level defaults",
     ),
-)
+    name="adminDeleteDomainAppConfig",
+)  # type: ignore[misc]
 async def admin_delete_domain_app_config(
     input: DeleteDomainConfigInput,
     info: Info[StrawberryGQLContext],
@@ -400,23 +344,14 @@ async def admin_delete_domain_app_config(
     return DeleteDomainConfigPayload(deleted=result.deleted)
 
 
-@strawberry.mutation(  # type: ignore[misc]
+@gql_mutation(
+    BackendAIGQLMeta(
+        added_version="25.16.0",
+        description="Delete domain-level app configuration. All users in this domain may be affected by this deletion. After deletion, users will only receive their user-level configurations when configurations are merged, with no domain-level defaults. Requires admin privileges",
+    ),
     name="deleteDomainAppConfig",
-    description=dedent_strip(
-        """\
-        Added in 25.16.0.
-        Delete domain-level app configuration.
-        All users in this domain may be affected by this deletion.
-        After deletion, users will only receive their user-level configurations
-        when configurations are merged, with no domain-level defaults.
-        Requires admin privileges.
-        """
-    ),
-    deprecation_reason=(
-        "Use admin_delete_domain_app_config instead. "
-        "This API will be removed after v26.3.0. See BEP-1041 for migration guide."
-    ),
-)
+    deprecation_reason="Use admin_delete_domain_app_config instead. This API will be removed after v26.3.0. See BEP-1041 for migration guide.",
+)  # type: ignore[misc]
 async def delete_domain_app_config(
     input: DeleteDomainConfigInput,
     info: Info[StrawberryGQLContext],
@@ -430,19 +365,13 @@ async def delete_domain_app_config(
     return DeleteDomainConfigPayload(deleted=result.deleted)
 
 
-@strawberry.mutation(  # type: ignore[misc]
-    name="deleteUserAppConfig",
-    description=dedent_strip(
-        """\
-        Added in 25.16.0.
-        Delete user-level app configuration.
-        After deletion, the user will still receive domain-level configuration values
-        when configurations are merged, as domain settings remain unaffected.
-        If user_id is not provided, the current user's configuration will be deleted.
-        Users can only delete their own configuration, but admins can delete any user's configuration.
-        """
+@gql_mutation(
+    BackendAIGQLMeta(
+        added_version="25.16.0",
+        description="Delete user-level app configuration. After deletion, the user will still receive domain-level configuration values when configurations are merged, as domain settings remain unaffected. If user_id is not provided, the current user's configuration will be deleted. Users can only delete their own configuration, but admins can delete any user's configuration",
     ),
-)
+    name="deleteUserAppConfig",
+)  # type: ignore[misc]
 async def delete_user_app_config(
     input: DeleteUserConfigInput,
     info: Info[StrawberryGQLContext],

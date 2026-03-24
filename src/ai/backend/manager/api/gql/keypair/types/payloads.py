@@ -14,7 +14,12 @@ from ai.backend.common.dto.manager.v2.keypair.response import (
 from ai.backend.common.dto.manager.v2.keypair.response import (
     UpdateMyKeypairPayload as UpdateMyKeypairPayloadDTO,
 )
-from ai.backend.manager.api.gql.decorators import BackendAIGQLMeta, gql_pydantic_type
+from ai.backend.manager.api.gql.decorators import (
+    BackendAIGQLMeta,
+    gql_field,
+    gql_pydantic_type,
+)
+from ai.backend.manager.api.gql.keypair.types.node import KeyPairGQL
 from ai.backend.manager.api.gql.pydantic_compat import PydanticOutputMixin
 
 
@@ -24,11 +29,11 @@ from ai.backend.manager.api.gql.pydantic_compat import PydanticOutputMixin
         description="Payload returned after issuing a new keypair. The secret_key is only shown once.",
     ),
     model=IssueMyKeypairPayloadDTO,
-    all_fields=True,
+    fields=["secret_key"],
     name="IssueMyKeypairPayload",
 )
 class IssueMyKeypairPayloadGQL(PydanticOutputMixin[IssueMyKeypairPayloadDTO]):
-    pass
+    keypair: KeyPairGQL = gql_field(description="The newly created keypair.")
 
 
 @gql_pydantic_type(
@@ -63,8 +68,8 @@ class SwitchMyMainAccessKeyPayloadGQL(PydanticOutputMixin[SwitchMyMainAccessKeyP
         description="Payload returned after updating a keypair.",
     ),
     model=UpdateMyKeypairPayloadDTO,
-    all_fields=True,
+    fields=[],
     name="UpdateMyKeypairPayload",
 )
 class UpdateMyKeypairPayloadGQL(PydanticOutputMixin[UpdateMyKeypairPayloadDTO]):
-    pass
+    keypair: KeyPairGQL = gql_field(description="The updated keypair.")

@@ -17,7 +17,10 @@ from ai.backend.common.dto.manager.v2.fair_share.types import (
 from ai.backend.common.dto.manager.v2.group.response import ProjectNode
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
+    gql_added_field,
     gql_connection_type,
+    gql_federation_type,
+    gql_field,
     gql_pydantic_input,
 )
 from ai.backend.manager.api.gql.fair_share.types import ProjectFairShareGQL
@@ -52,9 +55,7 @@ if TYPE_CHECKING:
 class ProjectFairShareScopeGQL(PydanticInputMixin[ProjectFairShareScopeDTO]):
     """Scope parameters for filtering project fair shares."""
 
-    resource_group_name: str = strawberry.field(
-        description="Resource group to filter fair shares by."
-    )
+    resource_group_name: str = gql_field(description="Resource group to filter fair shares by.")
 
 
 @gql_pydantic_input(
@@ -66,48 +67,44 @@ class ProjectFairShareScopeGQL(PydanticInputMixin[ProjectFairShareScopeDTO]):
 class ProjectUsageScopeGQL(PydanticInputMixin[ProjectUsageScopeDTO]):
     """Scope parameters for filtering project usage buckets."""
 
-    resource_group_name: str = strawberry.field(
-        description="Resource group to filter usage buckets by."
-    )
+    resource_group_name: str = gql_field(description="Resource group to filter usage buckets by.")
 
 
-@strawberry.federation.type(
-    keys=["id"],
-    name="ProjectV2",
-    description=(
-        "Added in 26.2.0. Project entity with structured field groups. "
-        "Formerly GroupNode. Provides comprehensive project information organized "
-        "into logical categories: basic_info (identity), organization (domain/policy), "
-        "storage (vfolders), and lifecycle (status/timestamps). "
-        "All fields use typed structures instead of JSON scalars. "
-        "Resource allocation and container registry are provided through separate dedicated APIs."
+@gql_federation_type(
+    BackendAIGQLMeta(
+        added_version="26.2.0",
+        description=(
+            "Project entity with structured field groups. "
+            "Formerly GroupNode. Provides comprehensive project information organized "
+            "into logical categories: basic_info (identity), organization (domain/policy), "
+            "storage (vfolders), and lifecycle (status/timestamps). "
+            "All fields use typed structures instead of JSON scalars. "
+            "Resource allocation and container registry are provided through separate dedicated APIs."
+        ),
     ),
+    name="ProjectV2",
+    keys=["id"],
 )
 class ProjectV2GQL(PydanticNodeMixin[ProjectNode]):
     """Project entity with structured field groups."""
 
-    id: NodeID[str] = strawberry.field(description="Unique identifier for the project (UUID).")
-    basic_info: ProjectBasicInfoGQL = strawberry.field(
+    id: NodeID[str] = gql_field(description="Unique identifier for the project (UUID).")
+    basic_info: ProjectBasicInfoGQL = gql_field(
         description="Basic project information including name, type, and description."
     )
-    organization: ProjectOrganizationInfoGQL = strawberry.field(
+    organization: ProjectOrganizationInfoGQL = gql_field(
         description="Organizational context including domain membership and resource policy."
     )
-    storage: ProjectStorageInfoGQL = strawberry.field(
+    storage: ProjectStorageInfoGQL = gql_field(
         description="Storage configuration and vfolder host permissions."
     )
-    lifecycle: ProjectLifecycleInfoGQL = strawberry.field(
+    lifecycle: ProjectLifecycleInfoGQL = gql_field(
         description="Lifecycle information including activation status and timestamps."
     )
 
-    @strawberry.field(  # type: ignore[misc]
-        description=(
-            "Fair share record for this project in the specified resource group. "
-            "Returns the scheduling priority configuration for this project. "
-            "Always returns an object, even if no explicit configuration exists "
-            "(in which case default values are used)."
-        )
-    )
+    @gql_field(
+        description="Fair share record for this project in the specified resource group. Returns the scheduling priority configuration for this project. Always returns an object, even if no explicit configuration exists (in which case default values are used)."
+    )  # type: ignore[misc]
     async def fair_share(
         self,
         info: Info,
@@ -124,12 +121,12 @@ class ProjectV2GQL(PydanticNodeMixin[ProjectNode]):
 
         return ProjectFairShareGQL.from_pydantic(payload.item)
 
-    @strawberry.field(  # type: ignore[misc]
-        description=(
-            "Added in 26.4.0. Active resource usage overview for this project. "
-            "Returns the currently occupied resource slots and the number of active sessions."
+    @gql_added_field(
+        BackendAIGQLMeta(
+            added_version="26.4.0",
+            description="Active resource usage overview for this project. Returns the currently occupied resource slots and the number of active sessions.",
         )
-    )
+    )  # type: ignore[misc]
     async def active_resource_overview(
         self,
         info: Info,
@@ -139,12 +136,9 @@ class ProjectV2GQL(PydanticNodeMixin[ProjectNode]):
         )
         return ActiveResourceOverviewGQL.from_pydantic(dto)
 
-    @strawberry.field(  # type: ignore[misc]
-        description=(
-            "Usage buckets for this project, filtered by resource group. "
-            "Returns aggregated resource usage statistics over time."
-        )
-    )
+    @gql_field(
+        description="Usage buckets for this project, filtered by resource group. Returns aggregated resource usage statistics over time."
+    )  # type: ignore[misc]
     async def usage_buckets(
         self,
         info: Info,
@@ -200,9 +194,7 @@ class ProjectV2GQL(PydanticNodeMixin[ProjectNode]):
             count=payload.total_count,
         )
 
-    @strawberry.field(  # type: ignore[misc]
-        description="The domain this project belongs to.",
-    )
+    @gql_field(description="The domain this project belongs to.")  # type: ignore[misc]
     async def domain(
         self,
         info: Info,
@@ -219,9 +211,7 @@ class ProjectV2GQL(PydanticNodeMixin[ProjectNode]):
             raise DomainNotFound(self.organization.domain_name)
         return domain
 
-    @strawberry.field(  # type: ignore[misc]
-        description="Users who are members of this project.",
-    )
+    @gql_field(description="Users who are members of this project.")  # type: ignore[misc]
     async def users(
         self,
         info: Info,
@@ -315,7 +305,7 @@ ProjectV2Edge = Edge[ProjectV2GQL]
 class ProjectV2Connection(Connection[ProjectV2GQL]):
     """Paginated connection for project records."""
 
-    count: int = strawberry.field(
+    count: int = gql_field(
         description="Total number of project records matching the query criteria."
     )
 

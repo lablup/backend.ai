@@ -2,11 +2,14 @@
 
 from __future__ import annotations
 
-import strawberry
 from strawberry import Info
 
 from ai.backend.common.dto.manager.v2.service_catalog.request import (
     AdminSearchServiceCatalogsInput,
+)
+from ai.backend.manager.api.gql.decorators import (
+    BackendAIGQLMeta,
+    gql_root_field,
 )
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.api.gql.utils import check_admin_only
@@ -16,9 +19,11 @@ from .types import ServiceCatalogFilterGQL, ServiceCatalogGQL, ServiceCatalogOrd
 __all__ = ("admin_service_catalogs",)
 
 
-@strawberry.field(  # type: ignore[misc]
-    description="Added in 26.3.0. Query service catalog entries. Admin only.",
-)
+@gql_root_field(
+    BackendAIGQLMeta(
+        added_version="26.3.0", description="Query service catalog entries. Admin only."
+    )
+)  # type: ignore[misc]
 async def admin_service_catalogs(
     info: Info[StrawberryGQLContext],
     filter: ServiceCatalogFilterGQL | None = None,

@@ -9,7 +9,16 @@ from pydantic import BaseModel as PydanticBaseModel
 if TYPE_CHECKING:
     from pydantic import BaseModel
 
+NEXT_RELEASE_VERSION = "UNRELEASED"
+"""Placeholder for the next release version.
+
+Used in GQL type decorators for newly added types/fields that have not yet
+been included in a release.  At release time, ``scripts/release.sh`` replaces
+every occurrence of ``NEXT_RELEASE_VERSION`` with the actual version string.
+"""
+
 __all__ = (
+    "NEXT_RELEASE_VERSION",
     "ConfigEnvironment",
     "CompositeType",
     "ConfigExample",

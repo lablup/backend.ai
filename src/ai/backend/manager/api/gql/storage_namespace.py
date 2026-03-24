@@ -23,6 +23,8 @@ from ai.backend.common.dto.manager.v2.storage_namespace.response import (
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     gql_connection_type,
+    gql_field,
+    gql_mutation,
     gql_node_type,
     gql_pydantic_input,
     gql_pydantic_type,
@@ -75,7 +77,7 @@ StorageNamespaceEdge = Edge[StorageNamespace]
     ),
 )
 class StorageNamespaceConnection(Connection[StorageNamespace]):
-    @strawberry.field
+    @gql_field(description="The count of this entity.")  # type: ignore[misc]
     def count(self) -> int:
         return len(self.edges)
 
@@ -126,13 +128,11 @@ class UnregisterStorageNamespacePayload:
     id: strawberry.auto
 
 
-@strawberry.mutation(  # type: ignore[misc]
-    description=dedent_strip("""
-    Added in 25.15.0.
-
-    Registers a new namespace within a storage.
-    """)
-)
+@gql_mutation(
+    BackendAIGQLMeta(
+        added_version="25.15.0", description="Registers a new namespace within a storage"
+    )
+)  # type: ignore[misc]
 async def register_storage_namespace(
     input: RegisterStorageNamespaceInput, info: Info[StrawberryGQLContext]
 ) -> RegisterStorageNamespacePayload:
@@ -140,13 +140,11 @@ async def register_storage_namespace(
     return RegisterStorageNamespacePayload(id=payload.namespace.storage_id)
 
 
-@strawberry.mutation(  # type: ignore[misc]
-    description=dedent_strip("""
-    Added in 25.15.0.
-
-    Unregisters an existing namespace from a storage.
-    """)
-)
+@gql_mutation(
+    BackendAIGQLMeta(
+        added_version="25.15.0", description="Unregisters an existing namespace from a storage"
+    )
+)  # type: ignore[misc]
 async def unregister_storage_namespace(
     input: UnregisterStorageNamespaceInput, info: Info[StrawberryGQLContext]
 ) -> UnregisterStorageNamespacePayload:

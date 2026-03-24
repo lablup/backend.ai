@@ -16,6 +16,8 @@ from ai.backend.common.dto.manager.v2.audit_log.response import AuditLogNode
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     gql_connection_type,
+    gql_enum,
+    gql_field,
     gql_node_type,
 )
 from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin
@@ -25,9 +27,9 @@ if TYPE_CHECKING:
     from ai.backend.manager.api.gql.user.types.node import UserV2GQL
 
 
-@strawberry.enum(
+@gql_enum(
+    BackendAIGQLMeta(added_version="26.3.0", description="Status of an audit log entry."),
     name="AuditLogStatus",
-    description="Status of an audit log entry.",
 )
 class AuditLogStatusGQL(StrEnum):
     SUCCESS = "success"
@@ -44,34 +46,26 @@ class AuditLogStatusGQL(StrEnum):
     name="AuditLogV2",
 )
 class AuditLogV2GQL(PydanticNodeMixin[AuditLogNode]):
-    id: NodeID[str] = strawberry.field(
-        description="Unique identifier of the audit log entry (UUID)."
-    )
+    id: NodeID[str] = gql_field(description="Unique identifier of the audit log entry (UUID).")
 
-    action_id: UUID = strawberry.field(description="UUID of the action that generated this log.")
-    entity_type: str = strawberry.field(description="Type of entity this log relates to.")
-    operation: str = strawberry.field(
-        description="Operation performed (create, update, delete, etc.)."
-    )
-    entity_id: str | None = strawberry.field(
-        description="ID of the affected entity, if applicable."
-    )
-    created_at: datetime = strawberry.field(description="Timestamp when the audit log was created.")
-    request_id: str | None = strawberry.field(
-        description="Request ID that triggered this operation."
-    )
-    triggered_by: str | None = strawberry.field(
+    action_id: UUID = gql_field(description="UUID of the action that generated this log.")
+    entity_type: str = gql_field(description="Type of entity this log relates to.")
+    operation: str = gql_field(description="Operation performed (create, update, delete, etc.).")
+    entity_id: str | None = gql_field(description="ID of the affected entity, if applicable.")
+    created_at: datetime = gql_field(description="Timestamp when the audit log was created.")
+    request_id: str | None = gql_field(description="Request ID that triggered this operation.")
+    triggered_by: str | None = gql_field(
         description="UUID string of the user who triggered the action."
     )
-    description: str = strawberry.field(description="Human-readable description of the operation.")
-    duration: str | None = strawberry.field(
+    description: str = gql_field(description="Human-readable description of the operation.")
+    duration: str | None = gql_field(
         description="Duration of the operation as a string representation."
     )
-    status: AuditLogStatusGQL = strawberry.field(description="Status of the operation.")
+    status: AuditLogStatusGQL = gql_field(description="Status of the operation.")
 
-    @strawberry.field(  # type: ignore[misc]
+    @gql_field(
         description="The user who triggered this audit log entry, resolved from triggered_by UUID."
-    )
+    )  # type: ignore[misc]
     async def user(
         self,
         info: Info[StrawberryGQLContext],
@@ -118,9 +112,7 @@ AuditLogV2EdgeGQL = Edge[AuditLogV2GQL]
     name="AuditLogV2Connection",
 )
 class AuditLogV2ConnectionGQL(Connection[AuditLogV2GQL]):
-    count: int = strawberry.field(
-        description="Total number of audit log entries matching the query."
-    )
+    count: int = gql_field(description="Total number of audit log entries matching the query.")
 
     def __init__(self, *args: Any, count: int, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)

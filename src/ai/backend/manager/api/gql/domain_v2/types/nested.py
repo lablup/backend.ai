@@ -4,8 +4,6 @@ from __future__ import annotations
 
 from datetime import datetime
 
-import strawberry
-
 from ai.backend.common.dto.manager.v2.domain.response import (
     DomainBasicInfo as DomainBasicInfoDTO,
 )
@@ -15,7 +13,11 @@ from ai.backend.common.dto.manager.v2.domain.response import (
 from ai.backend.common.dto.manager.v2.domain.response import (
     DomainRegistryInfo as DomainRegistryInfoDTO,
 )
-from ai.backend.manager.api.gql.decorators import BackendAIGQLMeta, gql_pydantic_type
+from ai.backend.manager.api.gql.decorators import (
+    BackendAIGQLMeta,
+    gql_field,
+    gql_pydantic_type,
+)
 
 # ============================================================================
 # Basic Information
@@ -35,11 +37,9 @@ from ai.backend.manager.api.gql.decorators import BackendAIGQLMeta, gql_pydantic
 class DomainBasicInfoGQL:
     """Basic domain information."""
 
-    name: str = strawberry.field(description="Domain name (primary key).")
-    description: str | None = strawberry.field(description="Optional description of the domain.")
-    integration_id: str | None = strawberry.field(
-        description="External system integration identifier."
-    )
+    name: str = gql_field(description="Domain name (primary key).")
+    description: str | None = gql_field(description="Optional description of the domain.")
+    integration_id: str | None = gql_field(description="External system integration identifier.")
 
 
 # ============================================================================
@@ -61,11 +61,8 @@ class DomainBasicInfoGQL:
 class DomainRegistryInfoGQL:
     """Domain container registry configuration."""
 
-    allowed_docker_registries: list[str] = strawberry.field(
-        description=(
-            "List of allowed container registry URLs. "
-            "Empty list means no restrictions on registry access."
-        )
+    allowed_docker_registries: list[str] = gql_field(
+        description="List of allowed container registry URLs. Empty list means no restrictions on registry access."
     )
 
 
@@ -87,13 +84,8 @@ class DomainRegistryInfoGQL:
 class DomainLifecycleInfoGQL:
     """Domain lifecycle information."""
 
-    is_active: bool = strawberry.field(
-        description=(
-            "Whether the domain is active. "
-            "Inactive domains cannot create new projects or perform operations."
-        )
+    is_active: bool = gql_field(
+        description="Whether the domain is active. Inactive domains cannot create new projects or perform operations."
     )
-    created_at: datetime = strawberry.field(description="Timestamp when the domain was created.")
-    modified_at: datetime = strawberry.field(
-        description="Timestamp when the domain was last modified."
-    )
+    created_at: datetime = gql_field(description="Timestamp when the domain was created.")
+    modified_at: datetime = gql_field(description="Timestamp when the domain was last modified.")

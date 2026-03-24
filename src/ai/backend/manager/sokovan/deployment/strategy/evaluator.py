@@ -25,9 +25,16 @@ from ai.backend.manager.errors.deployment import (
     InvalidDeploymentStrategy,
     InvalidDeploymentStrategySpec,
 )
-from ai.backend.manager.models.deployment_policy.conditions import DeploymentPolicyConditions
-from ai.backend.manager.models.routing.conditions import RouteConditions
-from ai.backend.manager.repositories.base import BatchQuerier, NoPagination
+from ai.backend.manager.repositories.base import (
+    BatchQuerier,
+    NoPagination,
+    QueryCondition,
+    combine_conditions_or,
+)
+from ai.backend.manager.repositories.deployment.options import (
+    DeploymentPolicyConditions,
+    RouteConditions,
+)
 from ai.backend.manager.repositories.deployment.repository import DeploymentRepository
 from ai.backend.manager.sokovan.deployment.recorder import DeploymentRecorderContext
 
@@ -79,15 +86,33 @@ class DeploymentStrategyEvaluator:
             )
         )
         policy_map = {policy.endpoint: policy for policy in policy_search.items}
-        # Fetch all non-terminated routes so the strategy can detect rollback
-        # conditions (e.g. FAILED_TO_START routes after a coordinator crash).
+        # Fetch non-terminated routes + terminated routes belonging to a
+        # deploying revision.  The FSM needs terminated new-revision routes
+        # to count accumulated failures for rollback detection, but old
+        # terminated routes are irrelevant and would bloat the result set.
+        deploying_revision_ids = {
+            deployment.deploying_revision_id
+            for deployment in deployments
+            if deployment.deploying_revision_id is not None
+        }
+        route_conditions: list[QueryCondition] = [
+            RouteConditions.by_endpoint_ids(endpoint_ids),
+        ]
+        if deploying_revision_ids:
+            route_conditions.append(
+                combine_conditions_or([
+                    RouteConditions.exclude_statuses([RouteStatus.TERMINATED]),
+                    RouteConditions.by_revision_ids(deploying_revision_ids),
+                ])
+            )
+        else:
+            route_conditions.append(
+                RouteConditions.exclude_statuses([RouteStatus.TERMINATED]),
+            )
         route_search = await self._deployment_repo.search_routes(
             BatchQuerier(
                 pagination=NoPagination(),
-                conditions=[
-                    RouteConditions.by_endpoint_ids(endpoint_ids),
-                    RouteConditions.exclude_statuses([RouteStatus.TERMINATED]),
-                ],
+                conditions=route_conditions,
             )
         )
         route_map: defaultdict[UUID, list[RouteInfo]] = defaultdict(list)
@@ -108,7 +133,7 @@ class DeploymentStrategyEvaluator:
 
             try:
                 strategy = self._create_strategy(policy.strategy, policy)
-                cycle_result = strategy.evaluate_cycle(deployment, routes)
+                cycle_result = strategy.evaluate_cycle(deployment, routes, policy.strategy_spec)
             except BackendAIError as e:
                 log.warning("deployment {}: evaluation error — {}", deployment.id, e)
                 result.errors.append(EvaluationErrorData(deployment=deployment, reason=str(e)))
@@ -170,4 +195,4 @@ class DeploymentStrategyEvaluator:
                     f" got {type(spec).__name__}"
                 ),
             )
-        return entry.strategy_cls(spec)
+        return entry.strategy_cls()

@@ -4,13 +4,22 @@ from __future__ import annotations
 
 import uuid
 from collections.abc import Sequence
-from typing import cast
+from typing import TYPE_CHECKING, cast
 from uuid import UUID
 
+from ai.backend.common.api_handlers import Sentinel
+from ai.backend.common.contexts.user import current_user
 from ai.backend.common.data.filter_specs import UUIDInMatchSpec
 from ai.backend.common.data.user.types import UserRole
 from ai.backend.common.data.user.types import UserRole as DataUserRole
 from ai.backend.common.dto.manager.pagination import PaginationInfo
+from ai.backend.common.dto.manager.v2.keypair import (
+    KeypairFilter,
+    KeypairNode,
+    KeypairOrderBy,
+    KeypairOrderField,
+    SearchMyKeypairsGQLInput,
+)
 from ai.backend.common.dto.manager.v2.keypair.response import (
     IssueMyKeypairPayload,
     RevokeMyKeypairPayload,
@@ -19,7 +28,11 @@ from ai.backend.common.dto.manager.v2.keypair.response import (
 )
 from ai.backend.common.dto.manager.v2.user.request import (
     AdminSearchUsersInput,
+    CreateUserInput,
+    DeleteUserInput,
+    PurgeUserInput,
     SearchUsersRequest,
+    UpdateUserInput,
     UserFilter,
     UserOrder,
 )
@@ -31,9 +44,13 @@ from ai.backend.common.dto.manager.v2.user.response import (
     BulkPurgeUserV2Error,
     BulkUpdateUsersPayload,
     BulkUpdateUserV2Error,
+    CreateUserPayload,
+    DeleteUserPayload,
     EntityTimestamps,
+    PurgeUserPayload,
     SearchUsersPayload,
     UpdateMyAllowedClientIPPayload,
+    UpdateUserPayload,
     UserBasicInfo,
     UserContainerSettings,
     UserNode,
@@ -56,12 +73,19 @@ from ai.backend.common.dto.manager.v2.user.types import (
 from ai.backend.common.dto.manager.v2.user.types import (
     UserStatus as UserStatusDTO,
 )
+from ai.backend.common.exception import UnreachableError
+from ai.backend.manager.data.common.types import SearchResult
+from ai.backend.manager.data.keypair.types import KeyPairData
 from ai.backend.manager.data.user.types import UserData, UserStatus
 from ai.backend.manager.data.user.types import UserStatus as DataUserStatus
 from ai.backend.manager.models.domain.conditions import DomainConditions
 from ai.backend.manager.models.group.conditions import GroupConditions
+from ai.backend.manager.models.hasher.types import PasswordInfo
+from ai.backend.manager.models.keypair.conditions import KeypairConditions, KeypairOrders
+from ai.backend.manager.models.keypair.row import KeyPairRow
 from ai.backend.manager.models.user.conditions import UserConditions
 from ai.backend.manager.models.user.orders import UserOrders
+from ai.backend.manager.models.user.row import UserRole as UserRoleModel
 from ai.backend.manager.models.user.row import UserRow
 from ai.backend.manager.repositories.base import (
     BatchQuerier,
@@ -72,25 +96,39 @@ from ai.backend.manager.repositories.base import (
     combine_conditions_or,
     negate_conditions,
 )
+from ai.backend.manager.repositories.base.creator import Creator
+from ai.backend.manager.repositories.base.updater import Updater
+from ai.backend.manager.repositories.keypair.types import UserKeypairSearchScope
+from ai.backend.manager.repositories.keypair.updaters import KeyPairUpdaterSpec
 from ai.backend.manager.repositories.user.creators import UserCreatorSpec
 from ai.backend.manager.repositories.user.types import (
     DomainUserSearchScope,
     ProjectUserSearchScope,
     RoleUserSearchScope,
 )
-from ai.backend.manager.services.user.actions.create_user import BulkCreateUserAction
+from ai.backend.manager.repositories.user.updaters import UserUpdaterSpec
+from ai.backend.manager.services.user.actions.create_user import (
+    BulkCreateUserAction,
+    CreateUserAction,
+)
+from ai.backend.manager.services.user.actions.delete_user import DeleteUserByIdAction
 from ai.backend.manager.services.user.actions.get_user import GetUserAction
 from ai.backend.manager.services.user.actions.keypair_ops import (
     IssueMyKeypairAction,
     RevokeMyKeypairAction,
+    SearchMyKeypairsAction,
     SwitchMyMainAccessKeyAction,
     UpdateMyKeypairAction,
 )
 from ai.backend.manager.services.user.actions.modify_user import (
     BulkModifyUserAction,
     ModifyUserAction,
+    ModifyUserByIdAction,
 )
-from ai.backend.manager.services.user.actions.purge_user import BulkPurgeUserAction
+from ai.backend.manager.services.user.actions.purge_user import (
+    BulkPurgeUserAction,
+    PurgeUserByIdAction,
+)
 from ai.backend.manager.services.user.actions.search_users import SearchUsersAction
 from ai.backend.manager.services.user.actions.search_users_by_domain import (
     SearchUsersByDomainAction,
@@ -101,6 +139,11 @@ from ai.backend.manager.services.user.actions.search_users_by_project import (
 from ai.backend.manager.services.user.actions.search_users_by_role import (
     SearchUsersByRoleAction,
 )
+from ai.backend.manager.types import OptionalState, TriState
+
+if TYPE_CHECKING:
+    from ai.backend.manager.config.unified import AuthConfig
+    from ai.backend.manager.services.processors import Processors
 
 from .base import BaseAdapter
 from .pagination import PaginationSpec
@@ -113,15 +156,21 @@ _USER_PAGINATION_SPEC = PaginationSpec(
     tiebreaker_order=UserRow.uuid.asc(),
 )
 
+_KEYPAIR_PAGINATION_SPEC = PaginationSpec(
+    forward_order=KeypairOrders.access_key(ascending=True),
+    backward_order=KeypairOrders.access_key(ascending=False),
+    forward_condition_factory=KeypairConditions.by_cursor_forward,
+    backward_condition_factory=KeypairConditions.by_cursor_backward,
+    tiebreaker_order=KeyPairRow.access_key.asc(),
+)
+
 
 class UserAdapter(BaseAdapter):
-    """Adapter for user domain operations.
+    """Adapter for user domain operations."""
 
-    Intentionally omits: create, update, delete, purge.
-    - create: requires PasswordInfo (password hashing) from auth config (caller responsibility)
-    - update/delete/purge: require email-based action signatures not yet bridged;
-      the corresponding GQL mutations currently raise NotImplementedError
-    """
+    def __init__(self, processors: Processors, auth_config: AuthConfig) -> None:
+        super().__init__(processors)
+        self._auth_config = auth_config
 
     # ------------------------------------------------------------------ batch load (DataLoader)
 
@@ -321,6 +370,170 @@ class UserAdapter(BaseAdapter):
         )
         return UserPayload(user=self._user_data_to_node(action_result.user))
 
+    # ------------------------------------------------------------------ single CRUD
+
+    async def create_user(self, input: CreateUserInput) -> CreateUserPayload:
+        """Create a single user."""
+        password_info = PasswordInfo(
+            password=input.password,
+            algorithm=self._auth_config.password_hash_algorithm,
+            rounds=self._auth_config.password_hash_rounds,
+            salt_size=self._auth_config.password_hash_salt_size,
+        )
+        spec = UserCreatorSpec(
+            email=input.email,
+            username=input.username,
+            password=password_info,
+            need_password_change=input.need_password_change,
+            domain_name=input.domain_name,
+            full_name=input.full_name,
+            description=input.description,
+            status=UserStatus(input.status),
+            role=str(UserRoleModel(input.role)),
+            allowed_client_ip=input.allowed_client_ip,
+            totp_activated=input.totp_activated,
+            resource_policy=input.resource_policy,
+            sudo_session_enabled=input.sudo_session_enabled,
+            container_uid=input.container_uid,
+            container_main_gid=input.container_main_gid,
+            container_gids=input.container_gids,
+        )
+        group_ids = [str(gid) for gid in input.group_ids] if input.group_ids else None
+        result = await self._processors.user.create_user.wait_for_complete(
+            CreateUserAction(creator=Creator(spec=spec), group_ids=group_ids)
+        )
+        return CreateUserPayload(user=self._user_data_to_node(result.data.user))
+
+    async def modify_user_by_id(self, user_id: UUID, input: UpdateUserInput) -> UpdateUserPayload:
+        """Update a user by UUID."""
+        updater_spec = UserUpdaterSpec(
+            username=(
+                OptionalState.update(input.username)
+                if input.username is not None
+                else OptionalState.nop()
+            ),
+            password=(
+                OptionalState.update(
+                    PasswordInfo(
+                        password=input.password,
+                        algorithm=self._auth_config.password_hash_algorithm,
+                        rounds=self._auth_config.password_hash_rounds,
+                        salt_size=self._auth_config.password_hash_salt_size,
+                    )
+                )
+                if input.password is not None
+                else OptionalState.nop()
+            ),
+            need_password_change=(
+                OptionalState.update(input.need_password_change)
+                if input.need_password_change is not None
+                else OptionalState.nop()
+            ),
+            full_name=(
+                TriState.nop()
+                if isinstance(input.full_name, Sentinel)
+                else TriState.nullify()
+                if input.full_name is None
+                else TriState.update(input.full_name)
+            ),
+            description=(
+                TriState.nop()
+                if isinstance(input.description, Sentinel)
+                else TriState.nullify()
+                if input.description is None
+                else TriState.update(input.description)
+            ),
+            status=(
+                OptionalState.update(UserStatus(input.status))
+                if input.status is not None
+                else OptionalState.nop()
+            ),
+            domain_name=(
+                OptionalState.update(input.domain_name)
+                if input.domain_name is not None
+                else OptionalState.nop()
+            ),
+            role=(
+                OptionalState.update(UserRoleModel(input.role))
+                if input.role is not None
+                else OptionalState.nop()
+            ),
+            allowed_client_ip=(
+                TriState.nop()
+                if isinstance(input.allowed_client_ip, Sentinel)
+                else TriState.from_graphql(input.allowed_client_ip)
+            ),
+            resource_policy=(
+                OptionalState.update(input.resource_policy)
+                if input.resource_policy is not None
+                else OptionalState.nop()
+            ),
+            sudo_session_enabled=(
+                OptionalState.update(input.sudo_session_enabled)
+                if input.sudo_session_enabled is not None
+                else OptionalState.nop()
+            ),
+            main_access_key=(
+                TriState.nop()
+                if isinstance(input.main_access_key, Sentinel)
+                else TriState.from_graphql(input.main_access_key)
+            ),
+            container_uid=(
+                TriState.nop()
+                if isinstance(input.container_uid, Sentinel)
+                else TriState.from_graphql(input.container_uid)
+            ),
+            container_main_gid=(
+                TriState.nop()
+                if isinstance(input.container_main_gid, Sentinel)
+                else TriState.from_graphql(input.container_main_gid)
+            ),
+            container_gids=(
+                TriState.nop()
+                if isinstance(input.container_gids, Sentinel)
+                else TriState.from_graphql(input.container_gids)
+            ),
+            group_ids=(
+                OptionalState.nop()
+                if isinstance(input.group_ids, Sentinel) or input.group_ids is None
+                else OptionalState.update([str(gid) for gid in input.group_ids])
+            ),
+        )
+        updater: Updater[UserRow] = Updater(spec=updater_spec, pk_value=user_id)
+        result = await self._processors.user.modify_user_by_id.wait_for_complete(
+            ModifyUserByIdAction(user_id=user_id, updater=updater)
+        )
+        return UpdateUserPayload(user=self._user_data_to_node(result.data))
+
+    async def delete_user_by_id(self, input: DeleteUserInput) -> DeleteUserPayload:
+        """Soft-delete a user by UUID."""
+        await self._processors.user.delete_user_by_id.wait_for_complete(
+            DeleteUserByIdAction(user_id=input.user_id)
+        )
+        return DeleteUserPayload(success=True)
+
+    async def purge_user_by_id(
+        self, input: PurgeUserInput, admin_user_id: UUID
+    ) -> PurgeUserPayload:
+        """Permanently purge a user by UUID."""
+        await self._processors.user.purge_user_by_id.wait_for_complete(
+            PurgeUserByIdAction(
+                user_id=input.user_id,
+                admin_user_id=admin_user_id,
+                purge_shared_vfolders=(
+                    OptionalState.update(input.purge_shared_vfolders)
+                    if input.purge_shared_vfolders
+                    else OptionalState.nop()
+                ),
+                delegate_endpoint_ownership=(
+                    OptionalState.update(input.delegate_endpoint_ownership)
+                    if input.delegate_endpoint_ownership
+                    else OptionalState.nop()
+                ),
+            )
+        )
+        return PurgeUserPayload(success=True)
+
     # ------------------------------------------------------------------ bulk create/update/purge
 
     async def bulk_create_users(self, action: BulkCreateUserAction) -> BulkCreateUsersPayload:
@@ -379,9 +592,8 @@ class UserAdapter(BaseAdapter):
             IssueMyKeypairAction(user_uuid=user_id)
         )
         return IssueMyKeypairPayload(
-            access_key=result.generated_data.access_key,
-            secret_key=result.generated_data.secret_key,
-            ssh_public_key=result.generated_data.ssh_public_key,
+            keypair=self._keypair_data_to_node(result.generated_data.keypair),
+            secret_key=str(result.generated_data.keypair.secret_key),
         )
 
     async def revoke_my_keypair(self, user_id: UUID, access_key: str) -> RevokeMyKeypairPayload:
@@ -396,9 +608,15 @@ class UserAdapter(BaseAdapter):
     ) -> UpdateMyKeypairPayload:
         """Update a keypair owned by the current user."""
         result = await self._processors.user.update_my_keypair.wait_for_complete(
-            UpdateMyKeypairAction(user_uuid=user_id, access_key=access_key, is_active=is_active)
+            UpdateMyKeypairAction(
+                user_uuid=user_id,
+                updater=Updater(
+                    spec=KeyPairUpdaterSpec(is_active=OptionalState.update(is_active)),
+                    pk_value=access_key,
+                ),
+            )
         )
-        return UpdateMyKeypairPayload(success=result.success)
+        return UpdateMyKeypairPayload(keypair=self._keypair_data_to_node(result.keypair))
 
     async def switch_my_main_access_key(
         self, user_id: UUID, access_key: str
@@ -408,6 +626,144 @@ class UserAdapter(BaseAdapter):
             SwitchMyMainAccessKeyAction(user_uuid=user_id, access_key=access_key)
         )
         return SwitchMyMainAccessKeyPayload(success=result.success)
+
+    async def search_my_keypairs(
+        self,
+        input: SearchMyKeypairsGQLInput,
+    ) -> SearchResult[KeypairNode]:
+        """Search keypairs owned by the current user.
+
+        Calls current_user() internally — the caller does not need to pass scope.
+        """
+        me = current_user()
+        if me is None:
+            raise UnreachableError("User context is not available")
+        scope = UserKeypairSearchScope(user_uuid=me.user_id)
+        conditions = self._convert_keypair_filter(input.filter) if input.filter else []
+        orders = self._convert_keypair_orders(input.order) if input.order else []
+        querier = self._build_querier(
+            conditions=conditions,
+            orders=orders,
+            pagination_spec=_KEYPAIR_PAGINATION_SPEC,
+            first=input.first,
+            after=input.after,
+            last=input.last,
+            before=input.before,
+            limit=input.limit,
+            offset=input.offset,
+        )
+        action_result = await self._processors.user.search_my_keypairs.wait_for_complete(
+            SearchMyKeypairsAction(scope=scope, querier=querier)
+        )
+        return SearchResult(
+            items=[self._keypair_data_to_node(item) for item in action_result.result.items],
+            total_count=action_result.result.total_count,
+            has_next_page=action_result.result.has_next_page,
+            has_previous_page=action_result.result.has_previous_page,
+        )
+
+    @staticmethod
+    def _keypair_data_to_node(data: KeyPairData) -> KeypairNode:
+        """Convert KeyPairData to KeypairNode DTO."""
+        return KeypairNode(
+            id=str(data.access_key),
+            access_key=str(data.access_key),
+            is_active=data.is_active,
+            is_admin=data.is_admin,
+            created_at=data.created_at,
+            modified_at=data.modified_at,
+            last_used=data.last_used,
+            rate_limit=data.rate_limit,
+            num_queries=data.num_queries,
+            resource_policy=data.resource_policy_name,
+            ssh_public_key=data.ssh_public_key,
+            user_id=data.user_id,
+        )
+
+    def _convert_keypair_filter(self, filter_req: KeypairFilter) -> list[QueryCondition]:
+        conditions: list[QueryCondition] = []
+
+        if filter_req.is_active is not None:
+            conditions.append(KeypairConditions.by_is_active(filter_req.is_active))
+
+        if filter_req.is_admin is not None:
+            conditions.append(KeypairConditions.by_is_admin(filter_req.is_admin))
+
+        if filter_req.access_key is not None:
+            condition = self.convert_string_filter(
+                filter_req.access_key,
+                contains_factory=KeypairConditions.by_access_key_contains,
+                equals_factory=KeypairConditions.by_access_key_equals,
+                starts_with_factory=KeypairConditions.by_access_key_starts_with,
+                ends_with_factory=KeypairConditions.by_access_key_ends_with,
+            )
+            if condition is not None:
+                conditions.append(condition)
+
+        if filter_req.resource_policy is not None:
+            condition = self.convert_string_filter(
+                filter_req.resource_policy,
+                contains_factory=KeypairConditions.by_resource_policy_contains,
+                equals_factory=KeypairConditions.by_resource_policy_equals,
+                starts_with_factory=KeypairConditions.by_resource_policy_starts_with,
+                ends_with_factory=KeypairConditions.by_resource_policy_ends_with,
+            )
+            if condition is not None:
+                conditions.append(condition)
+
+        if filter_req.created_at is not None:
+            condition = filter_req.created_at.build_query_condition(
+                before_factory=KeypairConditions.by_created_at_before,
+                after_factory=KeypairConditions.by_created_at_after,
+            )
+            if condition is not None:
+                conditions.append(condition)
+
+        if filter_req.last_used is not None:
+            condition = filter_req.last_used.build_query_condition(
+                before_factory=KeypairConditions.by_last_used_before,
+                after_factory=KeypairConditions.by_last_used_after,
+            )
+            if condition is not None:
+                conditions.append(condition)
+
+        if filter_req.AND:
+            for sub_filter in filter_req.AND:
+                conditions.extend(self._convert_keypair_filter(sub_filter))
+
+        if filter_req.OR:
+            or_sub_conditions: list[QueryCondition] = []
+            for sub_filter in filter_req.OR:
+                or_sub_conditions.extend(self._convert_keypair_filter(sub_filter))
+            if or_sub_conditions:
+                conditions.append(combine_conditions_or(or_sub_conditions))
+
+        if filter_req.NOT:
+            not_sub_conditions: list[QueryCondition] = []
+            for sub_filter in filter_req.NOT:
+                not_sub_conditions.extend(self._convert_keypair_filter(sub_filter))
+            if not_sub_conditions:
+                conditions.append(negate_conditions(not_sub_conditions))
+
+        return conditions
+
+    def _convert_keypair_orders(self, orders: list[KeypairOrderBy]) -> list[QueryOrder]:
+        return [self._convert_keypair_order(o) for o in orders]
+
+    @staticmethod
+    def _convert_keypair_order(order: KeypairOrderBy) -> QueryOrder:
+        ascending = order.direction == OrderDirection.ASC
+        match order.field:
+            case KeypairOrderField.CREATED_AT:
+                return KeypairOrders.created_at(ascending=ascending)
+            case KeypairOrderField.LAST_USED:
+                return KeypairOrders.last_used(ascending=ascending)
+            case KeypairOrderField.ACCESS_KEY:
+                return KeypairOrders.access_key(ascending=ascending)
+            case KeypairOrderField.IS_ACTIVE:
+                return KeypairOrders.is_active(ascending=ascending)
+            case KeypairOrderField.RESOURCE_POLICY:
+                return KeypairOrders.resource_policy(ascending=ascending)
 
     # ------------------------------------------------------------------ GQL filter/order helpers
 

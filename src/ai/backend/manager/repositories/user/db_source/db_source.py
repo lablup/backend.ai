@@ -19,7 +19,12 @@ from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeySta
 from ai.backend.common.data.permission.types import RBACElementType
 from ai.backend.common.types import AccessKey, VFolderID
 from ai.backend.logging.utils import BraceStyleAdapter
-from ai.backend.manager.data.keypair.types import GeneratedKeyPairData, KeyPairCreator
+from ai.backend.manager.data.common.types import SearchResult
+from ai.backend.manager.data.keypair.types import (
+    GeneratedKeyPairData,
+    KeyPairCreator,
+    KeyPairData,
+)
 from ai.backend.manager.data.permission.types import RBACElementRef
 from ai.backend.manager.data.user.types import (
     BulkUserCreateResultData,
@@ -89,8 +94,9 @@ from ai.backend.manager.repositories.base.rbac.entity_creator import (
     RBACEntityCreator,
     execute_rbac_entity_creator,
 )
-from ai.backend.manager.repositories.base.updater import BulkUpdaterError, Updater
+from ai.backend.manager.repositories.base.updater import BulkUpdaterError, Updater, execute_updater
 from ai.backend.manager.repositories.keypair.creators import KeyPairCreatorSpec
+from ai.backend.manager.repositories.keypair.types import UserKeypairSearchScope
 from ai.backend.manager.repositories.permission_controller.creators import UserRoleCreatorSpec
 from ai.backend.manager.repositories.permission_controller.role_manager import RoleManager
 from ai.backend.manager.repositories.user.creators import UserCreatorSpec
@@ -551,14 +557,44 @@ class UserDBSource:
             )
         return UserData.from_row(updated_user)
 
+    async def update_user_by_uuid_validated(
+        self,
+        user_uuid: UUID,
+        updater: Updater[UserRow],
+    ) -> UserData:
+        """Update user by UUID with validation and handle role/group changes."""
+        updater_spec = cast(UserUpdaterSpec, updater.spec)
+        async with self._db.begin() as conn:
+            return await self._update_single_user_validated(conn, user_uuid, updater_spec)
+
+    async def delete_user_by_uuid_validated(self, user_uuid: UUID) -> None:
+        """Soft delete user by UUID, setting status to DELETED and deactivating keypairs."""
+        async with self._db.begin() as conn:
+            await conn.execute(
+                sa.update(keypairs).values(is_active=False).where(keypairs.c.user == user_uuid)
+            )
+            await conn.execute(
+                sa.update(users)
+                .values(status=UserStatus.DELETED, status_info="admin-requested")
+                .where(users.c.uuid == user_uuid)
+            )
+
     async def soft_delete_user_validated(self, email: str) -> None:
         """
         Soft delete user by setting status to DELETED and deactivating keypairs.
+        Idempotent: silently succeeds if the user does not exist.
         """
         async with self._db.begin() as conn:
-            # Deactivate all user keypairs
+            # Resolve email to UUID for the correct FK column (keypairs.c.user).
+            # Return early if the user doesn't exist — soft delete is idempotent.
+            result = await conn.execute(sa.select(users.c.uuid).where(users.c.email == email))
+            row = result.first()
+            if not row:
+                return
+            user_uuid = cast(UUID, row.uuid)
+            # Deactivate all user keypairs via UUID FK
             await conn.execute(
-                sa.update(keypairs).values(is_active=False).where(keypairs.c.user_id == email)
+                sa.update(keypairs).values(is_active=False).where(keypairs.c.user == user_uuid)
             )
             # Soft delete user
             await conn.execute(
@@ -955,6 +991,14 @@ class UserDBSource:
             raise UserNotFound()
         return cast(UUID, row.uuid)
 
+    async def _get_user_uuid_by_email_with_conn(self, conn: AsyncConnection, email: str) -> UUID:
+        """Get user UUID by email using an existing connection."""
+        result = await conn.execute(sa.select(users.c.uuid).where(users.c.email == email))
+        row = result.first()
+        if not row:
+            raise UserNotFound()
+        return cast(UUID, row.uuid)
+
     async def _user_vfolder_mounted_to_active_kernels(
         self,
         conn: AsyncConnection,
@@ -1238,16 +1282,16 @@ class UserDBSource:
                     rate_limit=DEFAULT_KEYPAIR_RATE_LIMIT,
                 )
 
-            generated = generate_keypair_data()
+            secrets = generate_keypair_data()
             kp_spec = KeyPairCreatorSpec(
                 creator=keypair_creator,
-                generated_data=generated,
+                generated_data=secrets,
                 user_id=user_uuid,
                 email=user_row.email,
             )
             kp_creator = Creator(spec=kp_spec)
-            await execute_creator(session, kp_creator)
-            return generated
+            result = await execute_creator(session, kp_creator)
+            return GeneratedKeyPairData(keypair=result.row.to_data())
 
     async def revoke_my_keypair(self, user_uuid: UUID, access_key: str) -> None:
         """Revoke a keypair owned by the current user."""
@@ -1307,23 +1351,48 @@ class UserDBSource:
                 sa.update(users).where(users.c.uuid == user_uuid).values(main_access_key=access_key)
             )
 
-    async def update_my_keypair(self, user_uuid: UUID, access_key: str, is_active: bool) -> None:
-        """Update the active state of a keypair owned by the current user."""
+    async def update_my_keypair(self, user_uuid: UUID, updater: Updater[KeyPairRow]) -> KeyPairData:
+        """Update a keypair owned by the current user."""
+        access_key = str(updater.pk_value)
         async with self._db.begin_session() as session:
-            kp_row = (
-                await session.scalars(
-                    sa.select(KeyPairRow)
-                    .where(KeyPairRow.access_key == access_key)
-                    .options(noload("*"))
-                )
-            ).first()
-            if not kp_row:
+            # Use a scalar-only query to avoid loading the full ORM object into the
+            # session identity map. Loading the full row here would cause execute_updater's
+            # UPDATE...RETURNING to return the stale cached object instead of the fresh
+            # post-update values.
+            user_of_keypair = await session.scalar(
+                sa.select(KeyPairRow.user).where(KeyPairRow.access_key == access_key)
+            )
+            if user_of_keypair is None:
                 raise KeyPairNotFound(f"Keypair {access_key} not found")
-            if kp_row.user != user_uuid:
+            if user_of_keypair != user_uuid:
                 raise KeyPairForbidden("Cannot update another user's keypair")
 
-            await session.execute(
-                sa.update(keypairs)
-                .where(keypairs.c.access_key == access_key)
-                .values(is_active=is_active)
+            update_result = await execute_updater(session, updater)
+            if update_result is None:
+                raise KeyPairNotFound(f"Keypair {access_key} not found after update")
+            return update_result.row.to_data()
+
+    async def search_my_keypairs(
+        self,
+        scope: UserKeypairSearchScope,
+        querier: BatchQuerier,
+    ) -> SearchResult[KeyPairData]:
+        """Search keypairs owned by the scoped user.
+
+        Args:
+            scope: Search scope containing the user UUID whose keypairs to retrieve.
+            querier: BatchQuerier containing conditions, orders, and pagination.
+
+        Returns:
+            SearchResult with matching keypairs and pagination info.
+        """
+        async with self._db.begin_readonly_session() as db_session:
+            query = sa.select(KeyPairRow)
+            result = await execute_batch_querier(db_session, query, querier, scope=scope)
+            items = [row.KeyPairRow.to_data() for row in result.rows]
+            return SearchResult(
+                items=items,
+                total_count=result.total_count,
+                has_next_page=result.has_next_page,
+                has_previous_page=result.has_previous_page,
             )

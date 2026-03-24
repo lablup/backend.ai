@@ -18,8 +18,13 @@ from ai.backend.common.dto.manager.v2.artifact.request import (
 from ai.backend.manager.api.gql.base import (
     encode_cursor,
 )
+from ai.backend.manager.api.gql.decorators import (
+    BackendAIGQLMeta,
+    gql_mutation,
+    gql_root_field,
+    gql_subscription,
+)
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
-from ai.backend.manager.api.gql.utils import dedent_strip
 from ai.backend.manager.data.artifact.types import ArtifactAvailability
 from ai.backend.manager.defs import ARTIFACT_MAX_SCAN_LIMIT
 from ai.backend.manager.errors.artifact import (
@@ -74,20 +79,12 @@ from .types import (
 
 
 # Query Fields
-@strawberry.field(  # type: ignore[misc]
-    description=dedent_strip("""
-    Added in 25.14.0.
-
-    Query artifacts with optional filtering, ordering, and pagination.
-
-    Returns artifacts that are available in the system, discovered through scanning
-    external registries like HuggingFace or Reservoir. By default, only shows
-    ALIVE (non-deleted) artifacts.
-
-    Use filters to narrow down results by type, name, registry, or availability.
-    Supports cursor-based pagination for efficient browsing of large datasets.
-    """)
-)
+@gql_root_field(
+    BackendAIGQLMeta(
+        added_version="25.14.0",
+        description="Query artifacts with optional filtering, ordering, and pagination. Returns artifacts that are available in the system, discovered through scanning external registries like HuggingFace or Reservoir. By default, only shows ALIVE (non-deleted) artifacts. Use filters to narrow down results by type, name, registry, or availability. Supports cursor-based pagination for efficient browsing of large datasets.",
+    )
+)  # type: ignore[misc]
 async def artifacts(
     info: Info[StrawberryGQLContext],
     filter: ArtifactFilter | None = None,
@@ -141,16 +138,12 @@ async def artifacts(
     )
 
 
-@strawberry.field(  # type: ignore[misc]
-    description=dedent_strip("""
-    Added in 25.14.0.
-
-    Retrieve a specific artifact by its ID.
-
-    Returns detailed information about the artifact including its metadata,
-    registry information, and availability status.
-    """)
-)
+@gql_root_field(
+    BackendAIGQLMeta(
+        added_version="25.14.0",
+        description="Retrieve a specific artifact by its ID. Returns detailed information about the artifact including its metadata, registry information, and availability status.",
+    )
+)  # type: ignore[misc]
 async def artifact(id: ID, info: Info[StrawberryGQLContext]) -> Artifact | None:
     artifact_id = UUID(id)
     artifact_node = await info.context.adapters.artifact.get(artifact_id)
@@ -168,19 +161,12 @@ async def artifact(id: ID, info: Info[StrawberryGQLContext]) -> Artifact | None:
     return Artifact.from_pydantic(to_artifact_gql_node(artifact_node, registry_url, source_url))
 
 
-@strawberry.field(  # type: ignore[misc]
-    description=dedent_strip("""
-    Added in 25.14.0.
-
-    Query artifact revisions with optional filtering, ordering, and pagination.
-
-    Returns specific versions/revisions of artifacts. Each revision represents
-    a specific version of an artifact with its own status, file data, and metadata.
-
-    Use filters to find revisions by status, version, or artifact ID.
-    Supports cursor-based pagination for efficient browsing.
-    """)
-)
+@gql_root_field(
+    BackendAIGQLMeta(
+        added_version="25.14.0",
+        description="Query artifact revisions with optional filtering, ordering, and pagination. Returns specific versions/revisions of artifacts. Each revision represents a specific version of an artifact with its own status, file data, and metadata. Use filters to find revisions by status, version, or artifact ID. Supports cursor-based pagination for efficient browsing.",
+    )
+)  # type: ignore[misc]
 async def artifact_revisions(
     info: Info[StrawberryGQLContext],
     filter: ArtifactRevisionFilter | None = None,
@@ -227,34 +213,23 @@ async def artifact_revisions(
     )
 
 
-@strawberry.field(  # type: ignore[misc]
-    description=dedent_strip("""
-    Added in 25.14.0.
-
-    Retrieve a specific artifact revision by its ID.
-
-    Returns detailed information about the revision including its status,
-    version, file size, and README content.
-    """)
-)
+@gql_root_field(
+    BackendAIGQLMeta(
+        added_version="25.14.0",
+        description="Retrieve a specific artifact revision by its ID. Returns detailed information about the revision including its status, version, file size, and README content.",
+    )
+)  # type: ignore[misc]
 async def artifact_revision(id: ID, info: Info[StrawberryGQLContext]) -> ArtifactRevision | None:
     revision_node = await info.context.adapters.artifact.get_revision(UUID(id))
     return make_artifact_revision_from_node(revision_node)
 
 
-@strawberry.mutation(  # type: ignore[misc]
-    description=dedent_strip("""
-    Added in 25.14.0.
-
-    Scan external registries to discover available artifacts.
-
-    Searches HuggingFace or Reservoir registries for artifacts matching the specified
-    criteria and registers them in the system with SCANNED status. The artifacts
-    become available for import but are not downloaded until explicitly imported.
-
-    This is the first step in the artifact workflow: Scan → Import → Use.
-    """)
-)
+@gql_mutation(
+    BackendAIGQLMeta(
+        added_version="25.14.0",
+        description="Scan external registries to discover available artifacts. Searches HuggingFace or Reservoir registries for artifacts matching the specified criteria and registers them in the system with SCANNED status. The artifacts become available for import but are not downloaded until explicitly imported. This is the first step in the artifact workflow: Scan → Import → Use",
+    )
+)  # type: ignore[misc]
 async def scan_artifacts(
     input: ScanArtifactsInput, info: Info[StrawberryGQLContext]
 ) -> ScanArtifactsPayload:
@@ -285,19 +260,12 @@ async def scan_artifacts(
 
 
 # Mutations
-@strawberry.mutation(  # type: ignore[misc]
-    description=dedent_strip("""
-    Added in 25.14.0.
-
-    Import scanned artifact revisions from external registries.
-
-    Downloads the actual files for the specified artifact revisions, transitioning
-    them from SCANNED → PULLING → VERIFYING → AVAILABLE status.
-
-    Returns background tasks that can be monitored for import progress.
-    Once AVAILABLE, artifacts can be used by users in their sessions.
-    """)
-)
+@gql_mutation(
+    BackendAIGQLMeta(
+        added_version="25.14.0",
+        description="Import scanned artifact revisions from external registries. Downloads the actual files for the specified artifact revisions, transitioning them from SCANNED → PULLING → VERIFYING → AVAILABLE status. Returns background tasks that can be monitored for import progress. Once AVAILABLE, artifacts can be used by users in their sessions",
+    )
+)  # type: ignore[misc]
 async def import_artifacts(
     input: ImportArtifactsInput, info: Info[StrawberryGQLContext]
 ) -> ImportArtifactsPayload:
@@ -343,22 +311,12 @@ async def import_artifacts(
     return ImportArtifactsPayload(artifact_revisions=artifacts_connection, tasks=tasks)
 
 
-@strawberry.mutation(  # type: ignore[misc]
-    description=dedent_strip("""
-    Added in 25.15.0.
-
-    Triggers artifact scanning on a remote reservoir registry.
-
-    This mutation instructs a reservoir-type registry to initiate a scan of artifacts
-    from its associated remote reservoir registry source. The scan process will discover and
-    catalog artifacts available in the remote reservoir, making them accessible
-    through the local reservoir registry.
-
-    Requirements:
-    - The delegator registry must be of type 'reservoir'
-    - The delegator reservoir registry must have a valid remote registry configuration
-""")
-)
+@gql_mutation(
+    BackendAIGQLMeta(
+        added_version="25.15.0",
+        description="Triggers artifact scanning on a remote reservoir registry. This mutation instructs a reservoir-type registry to initiate a scan of artifacts from its associated remote reservoir registry source. The scan process will discover and catalog artifacts available in the remote reservoir, making them accessible through the local reservoir registry. Requirements: - The delegator registry must be of type 'reservoir' - The delegator reservoir registry must have a valid remote registry configuration",
+    )
+)  # type: ignore[misc]
 async def delegate_scan_artifacts(
     input: DelegateScanArtifactsInput, info: Info[StrawberryGQLContext]
 ) -> DelegateScanArtifactsPayload:
@@ -392,21 +350,12 @@ async def delegate_scan_artifacts(
     return DelegateScanArtifactsPayload(artifacts=artifacts)
 
 
-@strawberry.mutation(  # type: ignore[misc]
-    description=dedent_strip("""
-    Added in 25.15.0.
-
-    Trigger import of artifact revisions from a remote reservoir registry.
-
-    This mutation instructs a reservoir-type registry to import specific artifact revisions
-    that were previously discovered during a scan from its remote registry.
-    Note that this operation does not import the artifacts directly into the local registry, but only into the delegator reservoir's storage.
-
-    Requirements:
-    - The delegator registry must be of type 'reservoir'
-    - The delegator registry must have a valid remote registry configuration
-""")
-)
+@gql_mutation(
+    BackendAIGQLMeta(
+        added_version="25.15.0",
+        description="Trigger import of artifact revisions from a remote reservoir registry. This mutation instructs a reservoir-type registry to import specific artifact revisions that were previously discovered during a scan from its remote registry. Note that this operation does not import the artifacts directly into the local registry, but only into the delegator reservoir's storage. Requirements: - The delegator registry must be of type 'reservoir' - The delegator registry must have a valid remote registry configuration",
+    )
+)  # type: ignore[misc]
 async def delegate_import_artifacts(
     input: DelegateImportArtifactsInput, info: Info[StrawberryGQLContext]
 ) -> DelegateImportArtifactsPayload:
@@ -459,16 +408,12 @@ async def delegate_import_artifacts(
     return DelegateImportArtifactsPayload(artifact_revisions=artifacts_connection, tasks=tasks)
 
 
-@strawberry.mutation(  # type: ignore[misc]
-    description=dedent_strip("""
-    Added in 25.14.0.
-
-    Update artifact metadata properties.
-
-    Modifies artifact metadata such as readonly status and description.
-    This operation does not affect the actual artifact files or revisions.
-    """)
-)
+@gql_mutation(
+    BackendAIGQLMeta(
+        added_version="25.14.0",
+        description="Update artifact metadata properties. Modifies artifact metadata such as readonly status and description. This operation does not affect the actual artifact files or revisions",
+    )
+)  # type: ignore[misc]
 async def update_artifact(
     input: UpdateArtifactInput, info: Info[StrawberryGQLContext]
 ) -> UpdateArtifactPayload:
@@ -495,19 +440,12 @@ async def update_artifact(
     )
 
 
-@strawberry.mutation(  # type: ignore[misc]
-    description=dedent_strip("""
-    Added in 25.14.0.
-
-    Clean up stored artifact revision data to free storage space.
-
-    Removes the downloaded files for the specified artifact revisions and
-    transitions them back to SCANNED status. The metadata remains, allowing
-    the artifacts to be re-imported later if needed.
-
-    Use this operation to manage storage usage by removing unused artifacts.
-    """)
-)
+@gql_mutation(
+    BackendAIGQLMeta(
+        added_version="25.14.0",
+        description="Clean up stored artifact revision data to free storage space. Removes the downloaded files for the specified artifact revisions and transitions them back to SCANNED status. The metadata remains, allowing the artifacts to be re-imported later if needed. Use this operation to manage storage usage by removing unused artifacts",
+    )
+)  # type: ignore[misc]
 async def cleanup_artifact_revisions(
     input: CleanupArtifactRevisionsInput, info: Info[StrawberryGQLContext]
 ) -> CleanupArtifactRevisionsPayload:
@@ -537,16 +475,12 @@ async def cleanup_artifact_revisions(
     return CleanupArtifactRevisionsPayload(artifact_revisions=artifacts_connection)
 
 
-@strawberry.mutation(  # type: ignore[misc]
-    description=dedent_strip("""
-    Added in 25.15.0.
-
-    Soft-delete artifacts from the system.
-
-    Marks artifacts as deleted without permanently removing them.
-    Deleted artifacts can be restored using the restore_artifacts mutation.
-    """)
-)
+@gql_mutation(
+    BackendAIGQLMeta(
+        added_version="25.15.0",
+        description="Soft-delete artifacts from the system. Marks artifacts as deleted without permanently removing them. Deleted artifacts can be restored using the restore_artifacts mutation",
+    )
+)  # type: ignore[misc]
 async def delete_artifacts(
     input: DeleteArtifactsInput, info: Info[StrawberryGQLContext]
 ) -> DeleteArtifactsPayload:
@@ -568,16 +502,12 @@ async def delete_artifacts(
     return DeleteArtifactsPayload(artifacts=artifacts)
 
 
-@strawberry.mutation(  # type: ignore[misc]
-    description=dedent_strip("""
-    Added in 25.15.0.
-
-    Restore previously deleted artifacts.
-
-    Reverses the soft-delete operation, making the artifacts available again
-    for use in the system.
-    """)
-)
+@gql_mutation(
+    BackendAIGQLMeta(
+        added_version="25.15.0",
+        description="Restore previously deleted artifacts. Reverses the soft-delete operation, making the artifacts available again for use in the system",
+    )
+)  # type: ignore[misc]
 async def restore_artifacts(
     input: RestoreArtifactsInput, info: Info[StrawberryGQLContext]
 ) -> RestoreArtifactsPayload:
@@ -600,16 +530,12 @@ async def restore_artifacts(
     return RestoreArtifactsPayload(artifacts=artifacts)
 
 
-@strawberry.mutation(  # type: ignore[misc]
-    description=dedent_strip("""
-    Added in 25.14.0.
-
-    Cancel an in-progress artifact import operation.
-
-    Stops the download process for the specified artifact revision and
-    reverts its status back to SCANNED. The partially downloaded data is cleaned up.
-    """)
-)
+@gql_mutation(
+    BackendAIGQLMeta(
+        added_version="25.14.0",
+        description="Cancel an in-progress artifact import operation. Stops the download process for the specified artifact revision and reverts its status back to SCANNED. The partially downloaded data is cleaned up",
+    )
+)  # type: ignore[misc]
 async def cancel_import_artifact(
     input: CancelArtifactInput, info: Info[StrawberryGQLContext]
 ) -> CancelImportArtifactPayload:
@@ -624,16 +550,12 @@ async def cancel_import_artifact(
 
 
 # TODO: Make this available when only having super-admin privileges
-@strawberry.mutation(  # type: ignore[misc]
-    description=dedent_strip("""
-    Added in 25.14.0.
-
-    Approve an artifact revision for general use.
-
-    Admin-only operation to approve artifact revisions, typically used
-    in environments with approval workflows for artifact deployment.
-    """)
-)
+@gql_mutation(
+    BackendAIGQLMeta(
+        added_version="25.14.0",
+        description="Approve an artifact revision for general use. Admin-only operation to approve artifact revisions, typically used in environments with approval workflows for artifact deployment",
+    )
+)  # type: ignore[misc]
 async def approve_artifact_revision(
     input: ApproveArtifactInput, info: Info[StrawberryGQLContext]
 ) -> ApproveArtifactPayload:
@@ -643,16 +565,12 @@ async def approve_artifact_revision(
     return ApproveArtifactPayload(artifact_revision=make_artifact_revision_from_node(revision_node))
 
 
-@strawberry.mutation(  # type: ignore[misc]
-    description=dedent_strip("""
-    Added in 25.14.0.
-
-    Reject an artifact revision, preventing its use.
-
-    Admin-only operation to reject artifact revisions, typically used
-    in environments with approval workflows for artifact deployment.
-    """)
-)
+@gql_mutation(
+    BackendAIGQLMeta(
+        added_version="25.14.0",
+        description="Reject an artifact revision, preventing its use. Admin-only operation to reject artifact revisions, typically used in environments with approval workflows for artifact deployment",
+    )
+)  # type: ignore[misc]
 async def reject_artifact_revision(
     input: RejectArtifactInput, info: Info[StrawberryGQLContext]
 ) -> RejectArtifactPayload:
@@ -662,17 +580,12 @@ async def reject_artifact_revision(
     return RejectArtifactPayload(artifact_revision=make_artifact_revision_from_node(revision_node))
 
 
-@strawberry.mutation(  # type: ignore[misc]
-    description=dedent_strip("""
-    Added in 25.14.0.
-
-    Perform detailed scanning of specific models.
-
-    Unlike the general scan_artifacts operation, this performs immediate detailed
-    scanning of specified models including README content and file sizes.
-    Returns artifact revisions with complete metadata ready for use.
-    """)
-)
+@gql_mutation(
+    BackendAIGQLMeta(
+        added_version="25.14.0",
+        description="Perform detailed scanning of specific models. Unlike the general scan_artifacts operation, this performs immediate detailed scanning of specified models including README content and file sizes. Returns artifact revisions with complete metadata ready for use",
+    )
+)  # type: ignore[misc]
 async def scan_artifact_models(
     input: ScanArtifactModelsInput, info: Info[StrawberryGQLContext]
 ) -> ScanArtifactModelsPayload:
@@ -706,16 +619,15 @@ async def scan_artifact_models(
 
 
 # Subscriptions
-@strawberry.subscription(  # type: ignore[misc]
-    description=dedent_strip("""
-    Added in 25.14.0.
-
-    Subscribe to real-time artifact status change notifications.
-
-    Receives updates when artifact revision statuses change during import,
-    cleanup, or other operations. Useful for building reactive UIs that
-    show live progress of artifact operations.
-    """)
+@gql_subscription(  # type: ignore[misc]
+    BackendAIGQLMeta(
+        added_version="25.14.0",
+        description=(
+            "Subscribe to real-time artifact status change notifications. "
+            "Receives updates when artifact revision statuses change during import, "
+            "cleanup, or other operations."
+        ),
+    )
 )
 async def artifact_status_changed(
     input: ArtifactStatusChangedInput,
@@ -725,16 +637,15 @@ async def artifact_status_changed(
     yield  # type: ignore[unreachable]  # Makes this an async generator
 
 
-@strawberry.subscription(  # type: ignore[misc]
-    description=dedent_strip("""
-    Added in 25.14.0.
-
-    Subscribe to real-time artifact import progress updates.
-
-    Receives progress notifications during artifact import operations,
-    including percentage completed and current status. Useful for displaying
-    progress bars and real-time import status to users.
-    """)
+@gql_subscription(  # type: ignore[misc]
+    BackendAIGQLMeta(
+        added_version="25.14.0",
+        description=(
+            "Subscribe to real-time artifact import progress updates. "
+            "Receives progress notifications during artifact import operations, "
+            "including percentage completed and current status."
+        ),
+    )
 )
 async def artifact_import_progress_updated(
     artifact_revision_id: ID,

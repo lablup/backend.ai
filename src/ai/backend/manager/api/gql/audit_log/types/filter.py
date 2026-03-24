@@ -4,8 +4,6 @@ from __future__ import annotations
 
 from typing import Self
 
-import strawberry
-
 from ai.backend.common.dto.manager.v2.audit_log.request import (
     AuditLogFilter,
     AuditLogStatusFilter,
@@ -13,6 +11,7 @@ from ai.backend.common.dto.manager.v2.audit_log.request import (
 from ai.backend.manager.api.gql.base import DateTimeFilter, StringFilter
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
+    gql_field,
     gql_pydantic_input,
 )
 from ai.backend.manager.api.gql.pydantic_compat import PydanticInputMixin
@@ -25,7 +24,9 @@ from .node import AuditLogStatusGQL
     name="AuditLogStatusFilter",
 )
 class AuditLogStatusFilterGQL(PydanticInputMixin[AuditLogStatusFilter]):
-    in_: list[AuditLogStatusGQL] | None = strawberry.field(name="in", default=None)
+    in_: list[AuditLogStatusGQL] | None = gql_field(
+        description="The in  field.", name="in", default=None
+    )
     not_in: list[AuditLogStatusGQL] | None = None
 
 

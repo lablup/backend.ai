@@ -15,7 +15,7 @@ import pytest
 
 from ai.backend.common.container_registry import ContainerRegistryType
 from ai.backend.common.data.filter_specs import StringMatchSpec
-from ai.backend.common.types import BinarySize, ImageID, KernelId, ResourceSlot, SessionId
+from ai.backend.common.types import BinarySize, KernelId, ResourceSlot, SessionId
 from ai.backend.manager.models.agent import AgentRow
 from ai.backend.manager.models.container_registry import ContainerRegistryRow
 from ai.backend.manager.models.domain import DomainRow
@@ -35,6 +35,7 @@ from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.base import BatchQuerier, OffsetPagination
 from ai.backend.manager.repositories.image.repository import ImageRepository
+from ai.backend.manager.repositories.session.repository import SessionRepository
 from ai.backend.testutils.db import with_tables
 
 CreateKernelForImageFunc = Callable[[ImageRow, datetime], Coroutine[Any, Any, None]]
@@ -430,8 +431,8 @@ class TestImageRepositorySearch:
         assert "python:3.9" in str(result.items[0].name)
 
 
-class TestImageRepositoryLoadLastUsed:
-    """Test cases for ImageRepository.load_image_last_used()"""
+class TestImageRepositoryLastUsedAt:
+    """Test cases for last_used_at column updates via SessionRepository."""
 
     @pytest.fixture
     async def db_with_cleanup(
@@ -472,6 +473,13 @@ class TestImageRepositoryLoadLastUsed:
             valkey_image=mock_valkey,
             config_provider=mock_config,
         )
+
+    @pytest.fixture
+    async def session_repository(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+    ) -> SessionRepository:
+        return SessionRepository(db=db_with_cleanup)
 
     @pytest.fixture
     async def domain(
@@ -657,42 +665,37 @@ class TestImageRepositoryLoadLastUsed:
 
         return _create
 
-    async def test_load_image_last_used_returns_most_recent(
+    async def test_update_image_last_used_at_sets_timestamp(
         self,
         image_repository: ImageRepository,
+        session_repository: SessionRepository,
         sample_images: list[ImageRow],
-        create_kernel_for_image: CreateKernelForImageFunc,
     ) -> None:
-        """Test that load_image_last_used returns the most recent kernel created_at."""
+        """Test that update_image_last_used_at persists the given timestamp."""
+        img = sample_images[0]
+        ts = datetime(2025, 6, 1, 12, 0, 0, tzinfo=UTC)
+
+        await session_repository.update_image_last_used_at(img.id, ts)
+
+        result = await image_repository.fetch_image_by_id(img.id)
+        assert result.last_used_at is not None
+        assert abs(result.last_used_at.timestamp() - ts.timestamp()) < 1.0
+
+    async def test_update_image_last_used_at_overwrites_previous(
+        self,
+        image_repository: ImageRepository,
+        session_repository: SessionRepository,
+        sample_images: list[ImageRow],
+    ) -> None:
+        """Test that calling update_image_last_used_at twice keeps the latest value."""
+        img = sample_images[0]
         now = datetime.now(UTC)
         older = now - timedelta(hours=2)
         newer = now - timedelta(hours=1)
-        img = sample_images[0]
 
-        await create_kernel_for_image(img, older)
-        await create_kernel_for_image(img, newer)
+        await session_repository.update_image_last_used_at(img.id, older)
+        await session_repository.update_image_last_used_at(img.id, newer)
 
-        result = await image_repository.load_image_last_used([ImageID(img.id)])
-
-        assert ImageID(img.id) in result
-        assert abs(result[ImageID(img.id)].timestamp() - newer.timestamp()) < 1.0
-
-    async def test_load_image_last_used_excludes_unused_images(
-        self,
-        image_repository: ImageRepository,
-        sample_images: list[ImageRow],
-        create_kernel_for_image: CreateKernelForImageFunc,
-    ) -> None:
-        """Test that only used images appear in the result; unused ones are excluded."""
-        now = datetime.now(UTC)
-
-        await create_kernel_for_image(sample_images[0], now - timedelta(hours=3))
-        await create_kernel_for_image(sample_images[1], now - timedelta(hours=1))
-
-        image_ids = [ImageID(img.id) for img in sample_images]
-        result = await image_repository.load_image_last_used(image_ids)
-
-        assert len(result) == 2
-        assert ImageID(sample_images[0].id) in result
-        assert ImageID(sample_images[1].id) in result
-        assert ImageID(sample_images[2].id) not in result
+        result = await image_repository.fetch_image_by_id(img.id)
+        assert result.last_used_at is not None
+        assert abs(result.last_used_at.timestamp() - newer.timestamp()) < 1.0

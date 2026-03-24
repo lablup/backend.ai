@@ -185,10 +185,16 @@ ignore = [
 
 [tool.ruff.lint.flake8-tidy-imports.banned-api]
 "pytest.mark.asyncio" = {msg = "asyncio_mode = 'auto' is set; @pytest.mark.asyncio is unnecessary."}
-"strawberry.type" = {msg = "Use gql_node_type (PydanticNodeMixin), gql_output_type (other output types), or gql_connection_type from ai.backend.manager.api.gql.decorators instead of @strawberry.type."}
-"strawberry.input" = {msg = "Use gql_pydantic_input from ai.backend.manager.api.gql.decorators instead of @strawberry.input."}
-"strawberry.experimental.pydantic.type" = {msg = "Use gql_pydantic_type from ai.backend.manager.api.gql.decorators instead of @strawberry.experimental.pydantic.type."}
-"strawberry.experimental.pydantic.input" = {msg = "Use gql_pydantic_input from ai.backend.manager.api.gql.decorators instead of @strawberry.experimental.pydantic.input."}
+"strawberry.type" = {msg = "Use gql_node_type, gql_connection_type, or gql_federation_type from decorators.py."}
+"strawberry.input" = {msg = "Use gql_pydantic_input from decorators.py."}
+"strawberry.field" = {msg = "Use gql_field, gql_added_field, or gql_root_field from decorators.py."}
+"strawberry.enum" = {msg = "Use gql_enum from decorators.py."}
+"strawberry.mutation" = {msg = "Use gql_mutation from decorators.py."}
+"strawberry.subscription" = {msg = "Use gql_subscription from decorators.py."}
+"strawberry.federation.type" = {msg = "Use gql_federation_type from decorators.py."}
+"strawberry.experimental.pydantic.type" = {msg = "Use gql_pydantic_type from decorators.py."}
+"strawberry.experimental.pydantic.input" = {msg = "Use gql_pydantic_input from decorators.py."}
+"strawberry.experimental.pydantic.interface" = {msg = "Use gql_pydantic_interface from decorators.py."}
 
 [tool.ruff.lint.isort]
 known-first-party = ["ai.backend"]
@@ -342,6 +348,12 @@ module = [
     "ai.backend.install.*",
 ]
 disable_error_code = ["union-attr", "misc"]
+
+# gql_enum() function-call results are valid types at runtime (strawberry handles them)
+# but mypy cannot recognise dynamically-wrapped enum variables as types
+[[tool.mypy.overrides]]
+module = "ai.backend.manager.api.gql.*"
+disable_error_code = ["valid-type"]
 
 # Ignore errors in vendor code, accelerators, and build tools
 # These are external/generated code or low-priority plugins

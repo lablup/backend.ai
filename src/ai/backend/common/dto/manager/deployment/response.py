@@ -254,9 +254,6 @@ class DeploymentPolicyDTO(BaseModel):
     strategy_spec: dict[str, Any] = Field(
         description="Raw strategy-specific parameters stored as a dictionary; contains rolling update or blue-green fields depending on the active strategy"
     )
-    rollback_on_failure: bool = Field(
-        description="Whether the system automatically reverts to the previous stable revision when health checks fail during rollout"
-    )
     created_at: datetime = Field(
         description="UTC timestamp when this deployment policy was created"
     )

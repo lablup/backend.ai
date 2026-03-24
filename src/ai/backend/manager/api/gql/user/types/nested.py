@@ -4,8 +4,6 @@ from __future__ import annotations
 
 from datetime import datetime
 
-import strawberry
-
 from ai.backend.common.dto.manager.v2.user.response import (
     EntityTimestamps as EntityTimestampsDTO,
 )
@@ -24,7 +22,11 @@ from ai.backend.common.dto.manager.v2.user.response import (
 from ai.backend.common.dto.manager.v2.user.response import (
     UserStatusInfo as UserStatusInfoDTO,
 )
-from ai.backend.manager.api.gql.decorators import BackendAIGQLMeta, gql_pydantic_type
+from ai.backend.manager.api.gql.decorators import (
+    BackendAIGQLMeta,
+    gql_field,
+    gql_pydantic_type,
+)
 
 from .enums import UserRoleEnumGQL, UserStatusEnumGQL
 
@@ -43,16 +45,12 @@ from .enums import UserRoleEnumGQL, UserStatusEnumGQL
 class UserBasicInfoGQL:
     """Basic user profile information."""
 
-    username: str | None = strawberry.field(
+    username: str | None = gql_field(
         description="Unique username for login. May be null if only email-based login is used."
     )
-    email: str = strawberry.field(
-        description="User's email address. Used for login and notifications."
-    )
-    full_name: str | None = strawberry.field(description="User's full display name.")
-    description: str | None = strawberry.field(
-        description="Optional description or notes about the user."
-    )
+    email: str = gql_field(description="User's email address. Used for login and notifications.")
+    full_name: str | None = gql_field(description="User's full display name.")
+    description: str | None = gql_field(description="Optional description or notes about the user.")
 
 
 @gql_pydantic_type(
@@ -68,16 +66,13 @@ class UserBasicInfoGQL:
 class UserStatusInfoGQL:
     """User account status information."""
 
-    status: UserStatusEnumGQL = strawberry.field(
-        description=(
-            "Current account status. See UserStatusV2 enum for possible values. "
-            "Replaces the deprecated is_active field."
-        )
+    status: UserStatusEnumGQL = gql_field(
+        description="Current account status. See UserStatusV2 enum for possible values. Replaces the deprecated is_active field."
     )
-    status_info: str | None = strawberry.field(
+    status_info: str | None = gql_field(
         description="Additional information about the current status, such as reason for deactivation."
     )
-    need_password_change: bool | None = strawberry.field(
+    need_password_change: bool | None = gql_field(
         description="If true, user must change password on next login."
     )
 
@@ -96,18 +91,14 @@ class UserStatusInfoGQL:
 class UserOrganizationInfoGQL:
     """User's organizational context and permissions."""
 
-    domain_name: str | None = strawberry.field(
-        description="Name of the domain this user belongs to."
-    )
-    role: UserRoleEnumGQL | None = strawberry.field(
+    domain_name: str | None = gql_field(description="Name of the domain this user belongs to.")
+    role: UserRoleEnumGQL | None = gql_field(
         description="User's role determining access permissions. See UserRoleV2 enum."
     )
-    resource_policy: str = strawberry.field(
+    resource_policy: str = gql_field(
         description="Name of the user resource policy applied to this user."
     )
-    main_access_key: str | None = strawberry.field(
-        description="Primary API access key for this user."
-    )
+    main_access_key: str | None = gql_field(description="Primary API access key for this user.")
 
 
 @gql_pydantic_type(
@@ -124,21 +115,14 @@ class UserOrganizationInfoGQL:
 class UserSecurityInfoGQL:
     """User security settings and authentication configuration."""
 
-    allowed_client_ip: list[str] | None = strawberry.field(
-        description=(
-            "List of allowed client IP addresses or CIDR ranges. "
-            "If set, login is restricted to these IP addresses."
-        )
+    allowed_client_ip: list[str] | None = gql_field(
+        description="List of allowed client IP addresses or CIDR ranges. If set, login is restricted to these IP addresses."
     )
-    totp_activated: bool | None = strawberry.field(
-        description=(
-            "Whether TOTP (Time-based One-Time Password) two-factor authentication is enabled."
-        )
+    totp_activated: bool | None = gql_field(
+        description="Whether TOTP (Time-based One-Time Password) two-factor authentication is enabled."
     )
-    totp_activated_at: datetime | None = strawberry.field(
-        description="Timestamp when TOTP was activated."
-    )
-    sudo_session_enabled: bool = strawberry.field(
+    totp_activated_at: datetime | None = gql_field(description="Timestamp when TOTP was activated.")
+    sudo_session_enabled: bool = gql_field(
         description="Whether this user can create sudo (privileged) sessions."
     )
 
@@ -157,15 +141,13 @@ class UserSecurityInfoGQL:
 class UserContainerSettingsGQL:
     """Container execution settings for the user."""
 
-    container_uid: int | None = strawberry.field(
+    container_uid: int | None = gql_field(
         description="User ID (UID) to use inside containers. If null, system default is used."
     )
-    container_main_gid: int | None = strawberry.field(
-        description=(
-            "Primary group ID (GID) to use inside containers. If null, system default is used."
-        )
+    container_main_gid: int | None = gql_field(
+        description="Primary group ID (GID) to use inside containers. If null, system default is used."
     )
-    container_gids: list[int] | None = strawberry.field(
+    container_gids: list[int] | None = gql_field(
         description="Additional supplementary group IDs for container processes."
     )
 
@@ -184,9 +166,7 @@ class UserContainerSettingsGQL:
 class EntityTimestampsGQL:
     """Common timestamp fields for entity lifecycle tracking."""
 
-    created_at: datetime | None = strawberry.field(
-        description="Timestamp when this entity was created."
-    )
-    modified_at: datetime | None = strawberry.field(
+    created_at: datetime | None = gql_field(description="Timestamp when this entity was created.")
+    modified_at: datetime | None = gql_field(
         description="Timestamp when this entity was last modified."
     )

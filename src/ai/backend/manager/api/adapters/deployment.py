@@ -359,47 +359,46 @@ class DeploymentAdapter(BaseAdapter):
                 else None,
             ),
         )
+        strategy = input.default_deployment_strategy
         policy: DeploymentPolicyConfig | None = None
-        if input.rolling_update is not None:
+        if strategy.rolling_update is not None:
             policy = DeploymentPolicyConfig(
                 strategy=DeploymentStrategy.ROLLING,
                 strategy_spec=RollingUpdateSpec(
-                    max_surge=input.rolling_update.max_surge,
-                    max_unavailable=input.rolling_update.max_unavailable,
+                    max_surge=strategy.rolling_update.max_surge,
+                    max_unavailable=strategy.rolling_update.max_unavailable,
                 ),
-                rollback_on_failure=input.rollback_on_failure,
             )
-        elif input.blue_green is not None:
+        elif strategy.blue_green is not None:
             policy = DeploymentPolicyConfig(
                 strategy=DeploymentStrategy.BLUE_GREEN,
                 strategy_spec=BlueGreenSpec(
-                    auto_promote=input.blue_green.auto_promote,
-                    promote_delay_seconds=input.blue_green.promote_delay_seconds,
+                    auto_promote=strategy.blue_green.auto_promote,
+                    promote_delay_seconds=strategy.blue_green.promote_delay_seconds,
                 ),
-                rollback_on_failure=input.rollback_on_failure,
             )
         else:
             policy = DeploymentPolicyConfig(
-                strategy=input.strategy,
+                strategy=strategy.type,
                 strategy_spec=RollingUpdateSpec(),
-                rollback_on_failure=input.rollback_on_failure,
             )
+        meta = input.metadata
         creator = NewDeploymentCreator(
             metadata=DeploymentMetadata(
-                name=input.name or f"deployment-{created_user_id.hex[:8]}",
-                domain=input.domain_name,
-                project=input.project_id,
+                name=meta.name or f"deployment-{created_user_id.hex[:8]}",
+                domain=meta.domain_name,
+                project=meta.project_id,
                 resource_group=ir.resource_config.resource_group.name,
                 created_user=created_user_id,
                 session_owner=created_user_id,
                 created_at=None,
                 revision_history_limit=10,
-                tag=",".join(input.tags) if input.tags else None,
+                tag=",".join(meta.tags) if meta.tags else None,
             ),
             replica_spec=ReplicaSpec(replica_count=input.desired_replica_count),
             network=DeploymentNetworkSpec(
-                open_to_public=input.open_to_public,
-                preferred_domain_name=input.preferred_domain_name,
+                open_to_public=input.network_access.open_to_public,
+                preferred_domain_name=input.network_access.preferred_domain_name,
             ),
             model_revision=model_revision_creator,
             policy=policy,
@@ -724,7 +723,6 @@ class DeploymentAdapter(BaseAdapter):
             deployment_id=input.deployment_id,
             strategy=input.strategy,
             strategy_spec=strategy_spec,
-            rollback_on_failure=input.rollback_on_failure,
         )
         action_result = (
             await self._processors.deployment.upsert_deployment_policy.wait_for_complete(
@@ -1142,53 +1140,15 @@ class DeploymentAdapter(BaseAdapter):
             if scope is None and f.deployment_id is not None:
                 conditions.append(RouteConditions.by_endpoint_id(f.deployment_id))
             if f.status is not None:
-                st = f.status
-                if st.equals is not None:
-                    conditions.append(
-                        RouteConditions.by_status_equals(ManagerRouteStatus(st.equals.value))
-                    )
-                if st.in_ is not None:
-                    conditions.append(
-                        RouteConditions.by_statuses([ManagerRouteStatus(s.value) for s in st.in_])
-                    )
-                if st.not_equals is not None:
-                    conditions.append(
-                        RouteConditions.by_status_not_equals(
-                            ManagerRouteStatus(st.not_equals.value)
-                        )
-                    )
-                if st.not_in is not None:
-                    conditions.append(
-                        RouteConditions.by_status_not_in([
-                            ManagerRouteStatus(s.value) for s in st.not_in
-                        ])
-                    )
+                conditions.append(
+                    RouteConditions.by_statuses([ManagerRouteStatus(s.value) for s in f.status])
+                )
             if f.traffic_status is not None:
-                ts = f.traffic_status
-                if ts.equals is not None:
-                    conditions.append(
-                        RouteConditions.by_traffic_status_equals(
-                            ManagerRouteTrafficStatus(ts.equals.value)
-                        )
-                    )
-                if ts.in_ is not None:
-                    conditions.append(
-                        RouteConditions.by_traffic_statuses([
-                            ManagerRouteTrafficStatus(s.value) for s in ts.in_
-                        ])
-                    )
-                if ts.not_equals is not None:
-                    conditions.append(
-                        RouteConditions.by_traffic_status_not_equals(
-                            ManagerRouteTrafficStatus(ts.not_equals.value)
-                        )
-                    )
-                if ts.not_in is not None:
-                    conditions.append(
-                        RouteConditions.by_traffic_status_not_in([
-                            ManagerRouteTrafficStatus(s.value) for s in ts.not_in
-                        ])
-                    )
+                conditions.append(
+                    RouteConditions.by_traffic_statuses([
+                        ManagerRouteTrafficStatus(s.value) for s in f.traffic_status
+                    ])
+                )
         orders: list[QueryOrder] = self._convert_route_orders(input.order) if input.order else []
         return self._build_querier(
             conditions=conditions,
@@ -1406,7 +1366,6 @@ class DeploymentAdapter(BaseAdapter):
                 )
             policy_info = DeploymentPolicyInfo(
                 strategy=data.policy.strategy,
-                rollback_on_failure=data.policy.rollback_on_failure,
                 rolling_update=rolling,
                 blue_green=blue_green,
             )
@@ -1567,7 +1526,6 @@ class DeploymentAdapter(BaseAdapter):
             id=data.id,
             deployment_id=data.endpoint,
             strategy_spec=strategy_spec,
-            rollback_on_failure=data.rollback_on_failure,
             created_at=data.created_at,
             updated_at=data.updated_at,
         )

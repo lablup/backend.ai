@@ -36,6 +36,14 @@ never Processors or Services directly. Adapters are shared with the GQL layer.
 - HTTP request/response translation only.
 - Auth decorators (`@auth_required_for_method`).
 
+## Adapter `my_` Pattern
+
+For self-service (`my_`) endpoints, the Adapter method handles authentication internally:
+- The Adapter calls `current_user()` internally to obtain the user context.
+- The Adapter constructs the `SearchScope` from the user context.
+- The GQL resolver / REST handler does NOT pass scope — only the search input DTO.
+- This keeps authentication logic inside the adapter, not scattered across resolvers.
+
 ## What Does NOT Belong Here
 
 - Business logic or domain rules.

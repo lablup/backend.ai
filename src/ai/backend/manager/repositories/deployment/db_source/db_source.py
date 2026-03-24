@@ -259,7 +259,6 @@ class DeploymentDBSource:
                     endpoint_id=endpoint.id,
                     strategy=policy_config.strategy,
                     strategy_spec=policy_config.strategy_spec,
-                    rollback_on_failure=policy_config.rollback_on_failure,
                 )
                 policy_creator = RBACEntityCreator(
                     spec=policy_spec,

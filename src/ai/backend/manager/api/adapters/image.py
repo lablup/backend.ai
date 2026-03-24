@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import uuid
 from collections.abc import Sequence
-from datetime import datetime
 from decimal import Decimal
 from functools import lru_cache
 
@@ -51,7 +50,6 @@ from ai.backend.manager.repositories.base import (
     combine_conditions_or,
     negate_conditions,
 )
-from ai.backend.manager.services.image.actions.load_image_last_used import LoadImageLastUsedAction
 from ai.backend.manager.services.image.actions.search_aliases import SearchAliasesAction
 from ai.backend.manager.services.image.actions.search_images import SearchImagesAction
 
@@ -129,20 +127,6 @@ class ImageAdapter(BaseAdapter):
             item.id: self._alias_data_to_dto(item) for item in action_result.data
         }
         return [alias_map.get(alias_id) for alias_id in alias_ids]
-
-    async def batch_load_last_used_by_ids(
-        self, image_ids: Sequence[ImageID]
-    ) -> list[datetime | None]:
-        """Batch load last used timestamps for images by ID for DataLoader use.
-
-        Returns datetime values (or None if never used) in the same order as image_ids.
-        """
-        if not image_ids:
-            return []
-        action_result = await self._processors.image.load_image_last_used.wait_for_complete(
-            LoadImageLastUsedAction(image_ids=image_ids)
-        )
-        return [action_result.last_used_map.get(image_id) for image_id in image_ids]
 
     # ------------------------------------------------------------------ search
 
@@ -448,6 +432,7 @@ class ImageAdapter(BaseAdapter):
             config_digest=data.config_digest,
             is_local=data.is_local,
             created_at=data.created_at,
+            last_used_at=data.last_used_at,
             identity=ImageIdentityInfoDTO(
                 canonical_name=str(data.name),
                 namespace=data.image,
@@ -457,6 +442,7 @@ class ImageAdapter(BaseAdapter):
                 digest=data.config_digest,
                 size_bytes=data.size_bytes,
                 created_at=data.created_at,
+                last_used_at=data.last_used_at,
                 tags=tags,
                 labels=labels,
                 status=status,

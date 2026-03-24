@@ -36,7 +36,10 @@ from ai.backend.manager.api.gql.common.types import (
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     PydanticInputMixin,
+    gql_added_field,
     gql_connection_type,
+    gql_enum,
+    gql_field,
     gql_node_type,
     gql_pydantic_input,
     gql_pydantic_type,
@@ -62,9 +65,9 @@ from ai.backend.manager.api.gql.user.types.node import UserV2GQL
 from ai.backend.manager.errors.user import UserNotFound
 
 
-@strawberry.enum(
+@gql_enum(
+    BackendAIGQLMeta(added_version="26.3.0", description="Status of a session in its lifecycle."),
     name="SessionV2Status",
-    description="Added in 26.3.0. Status of a session in its lifecycle.",
 )
 class SessionV2StatusGQL(StrEnum):
     """GraphQL enum for session status."""
@@ -84,9 +87,9 @@ class SessionV2StatusGQL(StrEnum):
 # ========== Order and Filter Types ==========
 
 
-@strawberry.enum(
+@gql_enum(
+    BackendAIGQLMeta(added_version="26.3.0", description="Fields available for ordering sessions."),
     name="SessionV2OrderField",
-    description="Added in 26.3.0. Fields available for ordering sessions.",
 )
 class SessionV2OrderFieldGQL(StrEnum):
     CREATED_AT = "created_at"
@@ -101,7 +104,9 @@ class SessionV2OrderFieldGQL(StrEnum):
     name="SessionV2StatusFilter",
 )
 class SessionV2StatusFilterGQL(PydanticInputMixin[SessionStatusFilter]):
-    in_: list[SessionV2StatusGQL] | None = strawberry.field(name="in", default=None)
+    in_: list[SessionV2StatusGQL] | None = gql_field(
+        description="The in  field.", name="in", default=None
+    )
     not_in: list[SessionV2StatusGQL] | None = None
 
 
@@ -146,23 +151,23 @@ class SessionV2OrderByGQL(PydanticInputMixin[SessionOrder]):
     name="SessionV2MetadataInfo",
 )
 class SessionV2MetadataInfoGQL:
-    creation_id: str = strawberry.field(
+    creation_id: str = gql_field(
         description="Server-generated unique token for tracking session creation."
     )
-    name: str = strawberry.field(description="Human-readable name of the session.")
-    session_type: SessionV2TypeGQL = strawberry.field(
+    name: str = gql_field(description="Human-readable name of the session.")
+    session_type: SessionV2TypeGQL = gql_field(
         description="Type of the session (interactive, batch, inference)."
     )
-    access_key: str = strawberry.field(description="Access key used to create this session.")
-    cluster_mode: ClusterModeGQL = strawberry.field(
+    access_key: str = gql_field(description="Access key used to create this session.")
+    cluster_mode: ClusterModeGQL = gql_field(
         description="Cluster mode for distributed sessions (single-node, multi-node)."
     )
-    cluster_size: int = strawberry.field(description="Number of nodes in the cluster.")
-    priority: int = strawberry.field(description="Scheduling priority of the session.")
-    is_preemptible: bool = strawberry.field(
+    cluster_size: int = gql_field(description="Number of nodes in the cluster.")
+    priority: int = gql_field(description="Scheduling priority of the session.")
+    is_preemptible: bool = gql_field(
         description="Whether this session is eligible for preemption by higher-priority sessions."
     )
-    tag: str | None = strawberry.field(description="Optional user-provided tag for the session.")
+    tag: str | None = gql_field(description="Optional user-provided tag for the session.")
 
 
 @gql_pydantic_type(
@@ -174,13 +179,13 @@ class SessionV2MetadataInfoGQL:
     name="SessionV2ResourceInfo",
 )
 class SessionV2ResourceInfoGQL:
-    allocation: ResourceAllocationGQL = strawberry.field(
+    allocation: ResourceAllocationGQL = gql_field(
         description="Resource allocation with requested and occupied slots."
     )
-    resource_group_name: str | None = strawberry.field(
+    resource_group_name: str | None = gql_field(
         description="The resource group (scaling group) this session is assigned to."
     )
-    target_resource_group_names: list[str] | None = strawberry.field(
+    target_resource_group_names: list[str] | None = gql_field(
         description="Candidate resource group names considered during scheduling."
     )
 
@@ -194,20 +199,18 @@ class SessionV2ResourceInfoGQL:
     name="SessionV2LifecycleInfo",
 )
 class SessionV2LifecycleInfoGQL:
-    status: SessionV2StatusGQL = strawberry.field(description="Current status of the session.")
-    result: SessionV2ResultGQL = strawberry.field(
+    status: SessionV2StatusGQL = gql_field(description="Current status of the session.")
+    result: SessionV2ResultGQL = gql_field(
         description="Result of the session execution (success, failure, etc.)."
     )
-    created_at: datetime | None = strawberry.field(
-        description="Timestamp when the session was created."
-    )
-    terminated_at: datetime | None = strawberry.field(
+    created_at: datetime | None = gql_field(description="Timestamp when the session was created.")
+    terminated_at: datetime | None = gql_field(
         description="Timestamp when the session was terminated. Null if still active."
     )
-    starts_at: datetime | None = strawberry.field(
+    starts_at: datetime | None = gql_field(
         description="Scheduled start time for the session, if applicable."
     )
-    batch_timeout: int | None = strawberry.field(
+    batch_timeout: int | None = gql_field(
         description="Batch execution timeout in seconds. Applicable to batch sessions."
     )
 
@@ -221,16 +224,16 @@ class SessionV2LifecycleInfoGQL:
     name="SessionV2RuntimeInfo",
 )
 class SessionV2RuntimeInfoGQL:
-    environ: EnvironmentVariablesGQL | None = strawberry.field(
+    environ: EnvironmentVariablesGQL | None = gql_field(
         description="Environment variables for the session."
     )
-    bootstrap_script: str | None = strawberry.field(
+    bootstrap_script: str | None = gql_field(
         description="Bootstrap script to run before the main process."
     )
-    startup_command: str | None = strawberry.field(
+    startup_command: str | None = gql_field(
         description="Startup command to execute when the session starts."
     )
-    callback_url: str | None = strawberry.field(
+    callback_url: str | None = gql_field(
         description="URL to call back when the session completes (e.g., for batch sessions)."
     )
 
@@ -269,38 +272,34 @@ class SessionV2GQL(PydanticNodeMixin[SessionNode]):
     user_id: ID
     project_id: ID
 
-    metadata: SessionV2MetadataInfoGQL = strawberry.field(
+    metadata: SessionV2MetadataInfoGQL = gql_field(
         description="Metadata including domain, project, and user information."
     )
-    resource: SessionV2ResourceInfoGQL = strawberry.field(
+    resource: SessionV2ResourceInfoGQL = gql_field(
         description="Resource allocation and cluster information."
     )
-    lifecycle: SessionV2LifecycleInfoGQL = strawberry.field(
-        description="Lifecycle status and timestamps."
-    )
-    runtime: SessionV2RuntimeInfoGQL = strawberry.field(
-        description="Runtime execution configuration."
-    )
-    network: SessionV2NetworkInfoGQL = strawberry.field(description="Network configuration.")
+    lifecycle: SessionV2LifecycleInfoGQL = gql_field(description="Lifecycle status and timestamps.")
+    runtime: SessionV2RuntimeInfoGQL = gql_field(description="Runtime execution configuration.")
+    network: SessionV2NetworkInfoGQL = gql_field(description="Network configuration.")
 
-    @strawberry.field(  # type: ignore[misc]
-        description="Added in 26.3.0. The domain this session belongs to."
-    )
+    @gql_added_field(
+        BackendAIGQLMeta(added_version="26.3.0", description="The domain this session belongs to.")
+    )  # type: ignore[misc]
     async def domain(self, info: Info[StrawberryGQLContext]) -> DomainV2GQL | None:
         return await info.context.data_loaders.domain_loader.load(self.domain_name)
 
-    @strawberry.field(  # type: ignore[misc]
-        description="Added in 26.3.0. The user who owns this session."
-    )
+    @gql_added_field(
+        BackendAIGQLMeta(added_version="26.3.0", description="The user who owns this session.")
+    )  # type: ignore[misc]
     async def user(self, info: Info[StrawberryGQLContext]) -> UserV2GQL | None:
         user_data = await info.context.data_loaders.user_loader.load(UUID(str(self.user_id)))
         if user_data is None:
             return None
         return user_data
 
-    @strawberry.field(  # type: ignore[misc]
-        description="Added in 26.3.0. The project this session belongs to."
-    )
+    @gql_added_field(
+        BackendAIGQLMeta(added_version="26.3.0", description="The project this session belongs to.")
+    )  # type: ignore[misc]
     async def project(self, info: Info[StrawberryGQLContext]) -> ProjectV2GQL | None:
         project_data = await info.context.data_loaders.project_loader.load(
             UUID(str(self.project_id))
@@ -309,9 +308,11 @@ class SessionV2GQL(PydanticNodeMixin[SessionNode]):
             return None
         return project_data
 
-    @strawberry.field(  # type: ignore[misc]
-        description="Added in 26.3.0. The resource group this session is assigned to."
-    )
+    @gql_added_field(
+        BackendAIGQLMeta(
+            added_version="26.3.0", description="The resource group this session is assigned to."
+        )
+    )  # type: ignore[misc]
     async def resource_group(self, info: Info[StrawberryGQLContext]) -> ResourceGroupGQL | None:
         if self.resource.resource_group_name is None:
             return None
@@ -322,9 +323,12 @@ class SessionV2GQL(PydanticNodeMixin[SessionNode]):
             return None
         return resource_group_data
 
-    @strawberry.field(  # type: ignore[misc]
-        description="Added in 26.3.0. The candidate resource groups considered during scheduling."
-    )
+    @gql_added_field(
+        BackendAIGQLMeta(
+            added_version="26.3.0",
+            description="The candidate resource groups considered during scheduling.",
+        )
+    )  # type: ignore[misc]
     async def target_resource_groups(
         self, info: Info[StrawberryGQLContext]
     ) -> ResourceGroupConnection | None:
@@ -345,15 +349,20 @@ class SessionV2GQL(PydanticNodeMixin[SessionNode]):
             count=len(nodes),
         )
 
-    @strawberry.field(  # type: ignore[misc]
-        description="Added in 26.3.0. The images used by this session. Multiple images are possible in multi-kernel (cluster) sessions."
-    )
+    @gql_added_field(
+        BackendAIGQLMeta(
+            added_version="26.3.0",
+            description="The images used by this session. Multiple images are possible in multi-kernel (cluster) sessions.",
+        )
+    )  # type: ignore[misc]
     async def images(self) -> ImageV2ConnectionGQL:
         raise NotImplementedError
 
-    @strawberry.field(  # type: ignore[misc]
-        description="Added in 26.3.0. The kernels belonging to this session."
-    )
+    @gql_added_field(
+        BackendAIGQLMeta(
+            added_version="26.3.0", description="The kernels belonging to this session."
+        )
+    )  # type: ignore[misc]
     async def kernels(self, info: Info[StrawberryGQLContext]) -> KernelV2ConnectionGQL:
         user = current_user()
         if user is None:

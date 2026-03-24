@@ -15,6 +15,7 @@ from ai.backend.manager.data.deployment.types import (
     DeploymentLifecycleSubStep,
     RouteInfo,
 )
+from ai.backend.manager.models.deployment_policy import DeploymentStrategySpec
 from ai.backend.manager.models.routing import RoutingRow
 from ai.backend.manager.repositories.base.rbac.entity_creator import RBACEntityCreator
 
@@ -69,17 +70,15 @@ class AbstractDeploymentStrategy(ABC):
     """Base interface for deployment strategy cycle evaluation.
 
     Each concrete strategy (Blue-Green, Rolling Update) implements this interface.
-    The spec is injected via ``__init__`` — one instance per deployment.
+    The spec is passed per-cycle via ``evaluate_cycle``.
     """
-
-    def __init__(self, spec: BaseModel) -> None:
-        self._spec = spec
 
     @abstractmethod
     def evaluate_cycle(
         self,
         deployment: DeploymentInfo,
         routes: Sequence[RouteInfo],
+        spec: DeploymentStrategySpec,
     ) -> StrategyCycleResult: ...
 
 
