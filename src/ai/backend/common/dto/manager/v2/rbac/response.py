@@ -20,9 +20,10 @@ from .types import (
 
 __all__ = (
     "AssociationScopesEntitiesNode",
+    "BulkAssignRoleFailureInfo",
     "BulkAssignRoleResultPayload",
+    "BulkRevokeRoleFailureInfo",
     "BulkRevokeRoleResultPayload",
-    "BulkRoleOperationFailureInfo",
     "CreateRolePayload",
     "DeletePermissionPayload",
     "DeleteRolePayload",
@@ -89,8 +90,15 @@ class RoleAssignmentNode(BaseResponseModel):
     granted_at: datetime = Field(description="Timestamp when the assignment was created")
 
 
-class BulkRoleOperationFailureInfo(BaseResponseModel):
-    """Failure detail for a single user in a bulk role operation."""
+class BulkAssignRoleFailureInfo(BaseResponseModel):
+    """Failure detail for a single user in a bulk role assignment."""
+
+    user_id: UUID = Field(description="UUID of the user that failed")
+    message: str = Field(description="Error message describing the failure")
+
+
+class BulkRevokeRoleFailureInfo(BaseResponseModel):
+    """Failure detail for a single user in a bulk role revocation."""
 
     user_id: UUID = Field(description="UUID of the user that failed")
     message: str = Field(description="Error message describing the failure")
@@ -102,7 +110,7 @@ class BulkAssignRoleResultPayload(BaseResponseModel):
     assigned: list[RoleAssignmentNode] = Field(
         default_factory=list, description="Successfully created role assignments"
     )
-    failed: list[BulkRoleOperationFailureInfo] = Field(
+    failed: list[BulkAssignRoleFailureInfo] = Field(
         default_factory=list, description="Users that failed to be assigned"
     )
 
@@ -113,7 +121,7 @@ class BulkRevokeRoleResultPayload(BaseResponseModel):
     revoked: list[RoleAssignmentNode] = Field(
         default_factory=list, description="Successfully revoked role assignments"
     )
-    failed: list[BulkRoleOperationFailureInfo] = Field(
+    failed: list[BulkRevokeRoleFailureInfo] = Field(
         default_factory=list, description="Users that failed to be revoked"
     )
 

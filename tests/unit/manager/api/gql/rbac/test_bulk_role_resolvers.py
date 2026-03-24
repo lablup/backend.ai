@@ -10,9 +10,10 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 from ai.backend.common.dto.manager.v2.rbac.response import (
+    BulkAssignRoleFailureInfo,
     BulkAssignRoleResultPayload,
+    BulkRevokeRoleFailureInfo,
     BulkRevokeRoleResultPayload,
-    BulkRoleOperationFailureInfo,
     RoleAssignmentNode,
 )
 from ai.backend.manager.api.gql.rbac.resolver import role as role_resolver
@@ -62,7 +63,7 @@ class TestAdminBulkAssignRole:
                 )
             ],
             failed=[
-                BulkRoleOperationFailureInfo(user_id=user_id_fail, message="Role already assigned")
+                BulkAssignRoleFailureInfo(user_id=user_id_fail, message="Role already assigned")
             ],
         )
 
@@ -137,9 +138,7 @@ class TestAdminBulkRevokeRole:
                     granted_at=datetime(2025, 1, 1, tzinfo=UTC),
                 )
             ],
-            failed=[
-                BulkRoleOperationFailureInfo(user_id=user_id_fail, message="Role not assigned")
-            ],
+            failed=[BulkRevokeRoleFailureInfo(user_id=user_id_fail, message="Role not assigned")],
         )
 
         input_data = BulkRevokeRoleInputGQL(

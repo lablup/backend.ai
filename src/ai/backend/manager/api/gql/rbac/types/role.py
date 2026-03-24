@@ -57,13 +57,16 @@ from ai.backend.common.dto.manager.v2.rbac.request import (
     UpdateRoleInput as UpdateRoleInputDTO,
 )
 from ai.backend.common.dto.manager.v2.rbac.response import (
+    BulkAssignRoleFailureInfo as BulkAssignRoleFailureInfoDTO,
+)
+from ai.backend.common.dto.manager.v2.rbac.response import (
     BulkAssignRoleResultPayload as BulkAssignRoleResultPayloadDTO,
 )
 from ai.backend.common.dto.manager.v2.rbac.response import (
-    BulkRevokeRoleResultPayload as BulkRevokeRoleResultPayloadDTO,
+    BulkRevokeRoleFailureInfo as BulkRevokeRoleFailureInfoDTO,
 )
 from ai.backend.common.dto.manager.v2.rbac.response import (
-    BulkRoleOperationFailureInfo as BulkRoleOperationFailureInfoDTO,
+    BulkRevokeRoleResultPayload as BulkRevokeRoleResultPayloadDTO,
 )
 from ai.backend.common.dto.manager.v2.rbac.response import (
     DeleteRolePayload as DeleteRolePayloadDTO,
@@ -572,10 +575,10 @@ class PurgeRolePayload(PydanticOutputMixin[PurgeRolePayloadDTO]):
         added_version="26.3.0",
         description="Error information for a failed user in bulk role assignment.",
     ),
-    model=BulkRoleOperationFailureInfoDTO,
+    model=BulkAssignRoleFailureInfoDTO,
     name="BulkAssignRoleError",
 )
-class BulkAssignRoleErrorGQL(PydanticOutputMixin[BulkRoleOperationFailureInfoDTO]):
+class BulkAssignRoleErrorGQL(PydanticOutputMixin[BulkAssignRoleFailureInfoDTO]):
     user_id: uuid.UUID = gql_field(description="UUID of the user that failed.")
     message: str = gql_field(description="Error message describing the failure.")
 
@@ -601,10 +604,10 @@ class BulkAssignRolePayloadGQL(PydanticOutputMixin[BulkAssignRoleResultPayloadDT
         added_version="26.3.0",
         description="Error information for a failed user in bulk role revocation.",
     ),
-    model=BulkRoleOperationFailureInfoDTO,
+    model=BulkRevokeRoleFailureInfoDTO,
     name="BulkRevokeRoleError",
 )
-class BulkRevokeRoleErrorGQL(PydanticOutputMixin[BulkRoleOperationFailureInfoDTO]):
+class BulkRevokeRoleErrorGQL(PydanticOutputMixin[BulkRevokeRoleFailureInfoDTO]):
     user_id: uuid.UUID = gql_field(description="UUID of the user that failed.")
     message: str = gql_field(description="Error message describing the failure.")
 

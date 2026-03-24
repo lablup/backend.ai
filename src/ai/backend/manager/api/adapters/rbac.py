@@ -26,9 +26,10 @@ from ai.backend.common.dto.manager.rbac import (
 from ai.backend.common.dto.manager.rbac.response import PaginationInfo
 from ai.backend.common.dto.manager.v2.rbac import (
     AssociationScopesEntitiesNode,
+    BulkAssignRoleFailureInfo,
     BulkAssignRoleResultPayload,
+    BulkRevokeRoleFailureInfo,
     BulkRevokeRoleResultPayload,
-    BulkRoleOperationFailureInfo,
     CreateRoleInput,
     CreateRolePayload,
     DeleteRolePayload,
@@ -791,7 +792,7 @@ class RBACAdapter(BaseAdapter):
                 for s in result.successes
             ],
             failed=[
-                BulkRoleOperationFailureInfo(user_id=f.user_id, message=f.message)
+                BulkAssignRoleFailureInfo(user_id=f.user_id, message=f.message)
                 for f in result.failures
             ],
         )
@@ -821,7 +822,7 @@ class RBACAdapter(BaseAdapter):
                 for s in result.successes
             ],
             failed=[
-                BulkRoleOperationFailureInfo(user_id=f.user_id, message=f.message)
+                BulkRevokeRoleFailureInfo(user_id=f.user_id, message=f.message)
                 for f in result.failures
             ],
         )

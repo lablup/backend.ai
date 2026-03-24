@@ -30,9 +30,10 @@ from ai.backend.common.dto.manager.v2.rbac.request import (
 )
 from ai.backend.common.dto.manager.v2.rbac.response import (
     AssociationScopesEntitiesNode,
+    BulkAssignRoleFailureInfo,
     BulkAssignRoleResultPayload,
+    BulkRevokeRoleFailureInfo,
     BulkRevokeRoleResultPayload,
-    BulkRoleOperationFailureInfo,
     CreateRolePayload,
     DeletePermissionPayload,
     DeleteRolePayload,
@@ -110,9 +111,10 @@ __all__ = (
     "UpdateRoleInput",
     # Node and Payload models (response)
     "AssociationScopesEntitiesNode",
+    "BulkAssignRoleFailureInfo",
     "BulkAssignRoleResultPayload",
+    "BulkRevokeRoleFailureInfo",
     "BulkRevokeRoleResultPayload",
-    "BulkRoleOperationFailureInfo",
     "CreateRolePayload",
     "DeletePermissionPayload",
     "DeleteRolePayload",
