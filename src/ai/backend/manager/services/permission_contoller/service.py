@@ -46,12 +46,6 @@ from ai.backend.manager.services.permission_contoller.actions.get_scope_types im
     GetScopeTypesAction,
     GetScopeTypesActionResult,
 )
-from ai.backend.manager.services.permission_contoller.actions.object_permission import (
-    CreateObjectPermissionAction,
-    CreateObjectPermissionActionResult,
-    DeleteObjectPermissionAction,
-    DeleteObjectPermissionActionResult,
-)
 from ai.backend.manager.services.permission_contoller.actions.permission import (
     CreatePermissionAction,
     CreatePermissionActionResult,
@@ -73,10 +67,6 @@ from ai.backend.manager.services.permission_contoller.actions.search_element_ass
 from ai.backend.manager.services.permission_contoller.actions.search_entities import (
     SearchEntitiesAction,
     SearchEntitiesActionResult,
-)
-from ai.backend.manager.services.permission_contoller.actions.search_object_permissions import (
-    SearchObjectPermissionsAction,
-    SearchObjectPermissionsActionResult,
 )
 from ai.backend.manager.services.permission_contoller.actions.search_permissions import (
     SearchPermissionsAction,
@@ -162,24 +152,6 @@ class PermissionControllerService:
         result = await self._repository.update_permission(action.updater)
         return UpdatePermissionActionResult(data=result)
 
-    async def create_object_permission(
-        self, action: CreateObjectPermissionAction
-    ) -> CreateObjectPermissionActionResult:
-        """
-        Creates a new object permission in the repository.
-        """
-        result = await self._repository.create_object_permission(action.creator)
-        return CreateObjectPermissionActionResult(data=result)
-
-    async def delete_object_permission(
-        self, action: DeleteObjectPermissionAction
-    ) -> DeleteObjectPermissionActionResult:
-        """
-        Deletes an object permission from the repository.
-        """
-        result = await self._repository.delete_object_permission(action.purger)
-        return DeleteObjectPermissionActionResult(data=result)
-
     async def update_role(self, action: UpdateRoleAction) -> UpdateRoleActionResult:
         """
         Updates an existing role in the repository.
@@ -245,13 +217,6 @@ class PermissionControllerService:
         """Search scoped permissions with pagination and filtering."""
         result = await self._repository.search_permissions(action.querier)
         return SearchPermissionsActionResult(result=result)
-
-    async def search_object_permissions(
-        self, action: SearchObjectPermissionsAction
-    ) -> SearchObjectPermissionsActionResult:
-        """Search object permissions with pagination and filtering."""
-        result = await self._repository.search_object_permissions(action.querier)
-        return SearchObjectPermissionsActionResult(result=result)
 
     async def search_users_assigned_to_role(
         self, action: SearchUsersAssignedToRoleAction
