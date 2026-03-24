@@ -113,6 +113,62 @@ class TestTestGet:
         assert data["echo"] == ""
 
 
+class TestGetMyIp:
+    """Tests for get_my_ip handler (GET /auth/my-ip)."""
+
+    async def test_returns_client_ip_from_x_forwarded_for(
+        self,
+        handler: AuthHandler,
+    ) -> None:
+        """Verify get_my_ip returns IP from X-Forwarded-For header."""
+        mock_request = MagicMock(spec=web.Request)
+        mock_request.headers.get.return_value = "1.2.3.4"
+        request_ctx = RequestCtx(request=mock_request)
+
+        response = await handler.get_my_ip(request_ctx)
+
+        assert response.status_code == HTTPStatus.OK
+        data = response.to_json
+        assert data is not None
+        assert isinstance(data, dict)
+        assert data["client_ip"] == "1.2.3.4"
+
+    async def test_returns_client_ip_from_request_remote(
+        self,
+        handler: AuthHandler,
+    ) -> None:
+        """Verify get_my_ip falls back to request.remote when no X-Forwarded-For header."""
+        mock_request = MagicMock(spec=web.Request)
+        mock_request.headers.get.return_value = None
+        mock_request.remote = "5.6.7.8"
+        request_ctx = RequestCtx(request=mock_request)
+
+        response = await handler.get_my_ip(request_ctx)
+
+        assert response.status_code == HTTPStatus.OK
+        data = response.to_json
+        assert data is not None
+        assert isinstance(data, dict)
+        assert data["client_ip"] == "5.6.7.8"
+
+    async def test_returns_first_ip_from_multiple_x_forwarded_for(
+        self,
+        handler: AuthHandler,
+    ) -> None:
+        """Verify get_my_ip returns the first IP from comma-separated X-Forwarded-For."""
+        mock_request = MagicMock(spec=web.Request)
+        mock_request.headers.get.return_value = "1.2.3.4, 5.6.7.8"
+        request_ctx = RequestCtx(request=mock_request)
+
+        response = await handler.get_my_ip(request_ctx)
+
+        assert response.status_code == HTTPStatus.OK
+        data = response.to_json
+        assert data is not None
+        assert isinstance(data, dict)
+        assert data["client_ip"] == "1.2.3.4"
+
+
 class TestTestPost:
     """Tests for test_post handler (POST /auth)."""
 
