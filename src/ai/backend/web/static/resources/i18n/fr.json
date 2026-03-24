@@ -1859,6 +1859,7 @@
       "CleaningUpTensorBoardProxy": "Nettoyage du proxy TensorBoard...",
       "ClusterMode": "Mode cluster",
       "ClusterSize": "Taille de cluster",
+      "ClusterSizeExceedsImmediateCapacity": "Avec les ressources sélectionnées, jusqu'à {{maxClusterSize}} {{unit}}(s) peuvent démarrer immédiatement. La session peut être en attente.",
       "ConfirmAndLaunch": "Confirmer et lancer",
       "Container": "Container",
       "Core": "Cœur",

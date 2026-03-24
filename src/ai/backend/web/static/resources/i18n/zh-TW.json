@@ -1863,6 +1863,7 @@
       "CleaningUpTensorBoardProxy": "清理 TensorBoard 代理...",
       "ClusterMode": "集群模式",
       "ClusterSize": "簇的大小",
+      "ClusterSizeExceedsImmediateCapacity": "使用所選資源，最多可立即啟動 {{maxClusterSize}} 個{{unit}}。工作階段可能處於待處理狀態。",
       "ConfirmAndLaunch": "确认并启动",
       "Container": "容器",
       "Core": "核",

@@ -1859,6 +1859,7 @@
       "CleaningUpTensorBoardProxy": "Siivotaan TensorBoard-välityspalvelinta...",
       "ClusterMode": "Cluster-tila",
       "ClusterSize": "Klusterin koko",
+      "ClusterSizeExceedsImmediateCapacity": "Valituilla resursseilla enintään {{maxClusterSize}} {{unit}} voi käynnistyä välittömästi. Istunto saattaa jäädä odotustilaan.",
       "ConfirmAndLaunch": "Vahvista ja käynnistä",
       "Container": "Kontti",
       "Core": "Ydin",

@@ -1859,6 +1859,7 @@
       "CleaningUpTensorBoardProxy": "Pulisci il proxy di TensorBoard...",
       "ClusterMode": "Modalità cluster",
       "ClusterSize": "Dimensione del cluster",
+      "ClusterSizeExceedsImmediateCapacity": "Con le risorse selezionate, fino a {{maxClusterSize}} {{unit}} possono avviarsi immediatamente. La sessione potrebbe essere in attesa.",
       "ConfirmAndLaunch": "Confermare e lanciare",
       "Container": "Contenitore",
       "Core": "Nucleo",

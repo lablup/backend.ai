@@ -1861,6 +1861,7 @@
       "CleaningUpTensorBoardProxy": "TensorBoard プロキシをクリーンアップ中...",
       "ClusterMode": "クラスターモード",
       "ClusterSize": "クラスターサイズ",
+      "ClusterSizeExceedsImmediateCapacity": "選択したリソースでは、最大 {{maxClusterSize}} 個の{{unit}}をすぐに起動できます。セッションが保留状態になる可能性があります。",
       "ConfirmAndLaunch": "レビューと開始",
       "Container": "コンテナ",
       "Core": "芯",

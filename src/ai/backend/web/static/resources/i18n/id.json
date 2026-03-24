@@ -1861,6 +1861,7 @@
       "CleaningUpTensorBoardProxy": "Membersihkan proxy TensorBoard...",
       "ClusterMode": "Modus klaster",
       "ClusterSize": "Ukuran klaster",
+      "ClusterSizeExceedsImmediateCapacity": "Dengan sumber daya yang dipilih, hingga {{maxClusterSize}} {{unit}} dapat langsung dimulai. Sesi mungkin akan berada dalam status tertunda.",
       "ConfirmAndLaunch": "Konfirmasi dan luncurkan",
       "Container": "Kontainer",
       "Core": "Core",

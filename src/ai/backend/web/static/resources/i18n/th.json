@@ -1861,6 +1861,7 @@
       "CleaningUpTensorBoardProxy": "กำลังล้างพร็อกซีของ TensorBoard...",
       "ClusterMode": "โหมดคลัสเตอร์",
       "ClusterSize": "ขนาดคลัสเตอร์",
+      "ClusterSizeExceedsImmediateCapacity": "ด้วยทรัพยากรที่เลือก สามารถเริ่มต้นได้สูงสุด {{maxClusterSize}} {{unit}}ทันที เซสชันอาจอยู่ในสถานะรอดำเนินการ",
       "ConfirmAndLaunch": "ยืนยันและเริ่ม",
       "Container": "คอนเทนเนอร์",
       "Core": "คอร์",
