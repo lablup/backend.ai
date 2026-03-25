@@ -4,7 +4,9 @@ from datetime import datetime
 from enum import StrEnum
 from pathlib import PurePosixPath
 
-from pydantic import BaseModel, ConfigDict, Field, field_serializer
+import re
+
+from pydantic import BaseModel, ConfigDict, Field, field_serializer, field_validator
 
 from ai.backend.common.api_handlers import BaseRequestModel
 from ai.backend.common.data.storage.registries.types import ModelSortKey, ModelTarget
@@ -544,9 +546,23 @@ class TokenOperationType(StrEnum):
     UPLOAD = "upload"
 
 
-# Rejects path separators (/ \), exact traversal segments (. or ..),
-# control characters (0x00-0x1F, 0x7F), and whitespace-only strings.
-_SAFE_FILENAME_PATTERN = r"^(?!\s*$)(?!\.\.?$)[^\x00-\x1f\x7f/\\]+$"
+# Matches control characters (0x00-0x1F, 0x7F) and path separators (/ \).
+_UNSAFE_FILENAME_RE = re.compile(r"[\x00-\x1f\x7f/\\]")
+
+
+def _validate_archive_filename(v: str | None) -> str | None:
+    """Validate archive download filename for safety."""
+    if v is None:
+        return v
+    if not v.strip():
+        raise ValueError("Filename must not be empty or whitespace-only.")
+    if v in (".", ".."):
+        raise ValueError("Filename must not be a relative path segment ('.' or '..').")
+    if _UNSAFE_FILENAME_RE.search(v):
+        raise ValueError(
+            "Filename must not contain control characters or path separators (/ or \\)."
+        )
+    return v
 
 
 # Client-facing API request models for download archive endpoint
@@ -569,13 +585,14 @@ class ArchiveDownloadTokenData(BaseModel):
     filename: str | None = Field(
         default=None,
         max_length=255,
-        pattern=_SAFE_FILENAME_PATTERN,
         description="Custom filename for the downloaded ZIP archive. Defaults to 'archive.zip' when omitted.",
     )
     exp: datetime = Field(
         description="Token expiration time as a Unix timestamp.",
     )
     model_config = ConfigDict(extra="allow")  # allow JWT-intrinsic keys
+
+    _check_filename = field_validator("filename")(_validate_archive_filename)
 
     @field_serializer("exp")
     def serialize_exp(self, exp: datetime) -> int:
@@ -605,7 +622,7 @@ class CreateArchiveDownloadSessionRequest(BaseRequestModel):
     filename: str | None = Field(
         default=None,
         max_length=255,
-        pattern=_SAFE_FILENAME_PATTERN,
         description="Custom filename for the downloaded ZIP archive. Defaults to 'archive.zip' when omitted.",
     )
 
+    _check_filename = field_validator("filename")(_validate_archive_filename)
