@@ -546,7 +546,6 @@ class AuthDBSource:
     # --- Login Session ---
 
     @auth_db_source_resilience.apply()
-    @auth_db_source_resilience.apply()
     async def invalidate_session_by_token(self, session_token: str) -> None:
         """Invalidate a single login session by its token."""
         async with self._db.begin_session() as db_session:
