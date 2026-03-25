@@ -126,7 +126,7 @@ class ScalingGroupService:
         sgroup = sgroup_filtered[0]
 
         if not sgroup.network.wsproxy_addr:
-            raise ObjectNotFound(object_name="AppProxy address")
+            return GetWsproxyVersionActionResult(wsproxy_version=WSPROXY_V1_VERSION)
         client = self._appproxy_client_pool.load_client(
             sgroup.network.wsproxy_addr, sgroup.network.wsproxy_api_token or ""
         )
