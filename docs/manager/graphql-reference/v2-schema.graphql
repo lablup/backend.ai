@@ -5311,6 +5311,20 @@ Added in 26.2.0. Input for permanently deleting a user and all associated data. 
 input PurgeUserV2Input {
   """UUID of the user to purge."""
   userId: UUID!
+
+  """Added in UNRELEASED. Options for the purge operation."""
+  options: PurgeUserV2Options = null
+}
+
+"""Added in UNRELEASED. Options for single user purge operation."""
+input PurgeUserV2Options {
+  """
+  If true, migrate shared virtual folders to the admin user before purging.
+  """
+  purgeSharedVfolders: Boolean! = false
+
+  """If true, delegate endpoint ownership to the admin user before purging."""
+  delegateEndpointOwnership: Boolean! = false
 }
 
 """Added in 26.2.0. Payload for single user permanent deletion mutation."""
