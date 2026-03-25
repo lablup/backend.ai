@@ -107,7 +107,7 @@ class TestResolveGroupNameOrId:
         test_group_uuid: uuid.UUID,
     ) -> None:
         """Test resolve_group_name_or_id() with uuid.UUID object input."""
-        async with db_with_cleanup.begin_readonly_session() as conn:
+        async with db_with_cleanup.begin_readonly() as conn:
             result = await resolve_group_name_or_id(conn, test_domain, test_group_uuid)
             assert result == test_group_uuid
 
@@ -119,7 +119,7 @@ class TestResolveGroupNameOrId:
     ) -> None:
         """Test resolve_group_name_or_id() with UUID string input (BA-5411 fix)."""
         uuid_string = str(test_group_uuid)
-        async with db_with_cleanup.begin_readonly_session() as conn:
+        async with db_with_cleanup.begin_readonly() as conn:
             result = await resolve_group_name_or_id(conn, test_domain, uuid_string)
             # Should resolve by ID, not by name
             assert result == test_group_uuid
@@ -132,7 +132,7 @@ class TestResolveGroupNameOrId:
     ) -> None:
         """Test resolve_group_name_or_id() with plain group name input."""
         group_name = "test-group"
-        async with db_with_cleanup.begin_readonly_session() as conn:
+        async with db_with_cleanup.begin_readonly() as conn:
             result = await resolve_group_name_or_id(conn, test_domain, group_name)
             # Should resolve by name
             assert result == test_group_uuid
@@ -145,7 +145,7 @@ class TestResolveGroupNameOrId:
     ) -> None:
         """Test resolve_group_name_or_id() with invalid UUID-like string (treated as name)."""
         invalid_uuid_string = "550e8400-xxxx-41d4-a716-446655440000"
-        async with db_with_cleanup.begin_readonly_session() as conn:
+        async with db_with_cleanup.begin_readonly() as conn:
             result = await resolve_group_name_or_id(conn, test_domain, invalid_uuid_string)
             # Should be treated as a name (not found)
             assert result is None
@@ -157,7 +157,7 @@ class TestResolveGroupNameOrId:
         test_group_uuid: uuid.UUID,
     ) -> None:
         """Test resolve_group_name_or_id() with nonexistent group name."""
-        async with db_with_cleanup.begin_readonly_session() as conn:
+        async with db_with_cleanup.begin_readonly() as conn:
             result = await resolve_group_name_or_id(conn, test_domain, "nonexistent-group")
             # Should return None for nonexistent group
             assert result is None
@@ -170,7 +170,7 @@ class TestResolveGroupNameOrId:
     ) -> None:
         """Test resolve_group_name_or_id() with nonexistent UUID."""
         nonexistent_uuid = uuid.uuid4()
-        async with db_with_cleanup.begin_readonly_session() as conn:
+        async with db_with_cleanup.begin_readonly() as conn:
             result = await resolve_group_name_or_id(conn, test_domain, nonexistent_uuid)
             # Should return None for nonexistent UUID
             assert result is None
@@ -183,7 +183,7 @@ class TestResolveGroupNameOrId:
     ) -> None:
         """Test resolve_group_name_or_id() with nonexistent UUID string (BA-5411)."""
         nonexistent_uuid_string = str(uuid.uuid4())
-        async with db_with_cleanup.begin_readonly_session() as conn:
+        async with db_with_cleanup.begin_readonly() as conn:
             result = await resolve_group_name_or_id(conn, test_domain, nonexistent_uuid_string)
             # Should return None for nonexistent UUID string
             assert result is None
