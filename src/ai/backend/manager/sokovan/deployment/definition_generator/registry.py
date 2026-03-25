@@ -102,7 +102,7 @@ class ModelDefinitionGeneratorRegistry:
                 generated_definition = generated_definition.merge(model_revision.model_definition)
             except Exception:
                 log.error(
-                    "Failed to merge revision DB model_definition, using base definition",
+                    "Failed to merge revision DB model_definition, using server-generated definition",
                     exc_info=True,
                 )
 
@@ -134,7 +134,7 @@ class ModelDefinitionGeneratorRegistry:
                 vfolder_id=model_revision.mounts.model_vfolder_id,
                 model_definition_path=model_revision.mounts.model_definition_path,
             )
-            merged_definition = base_definition.merge(override_dict)
+            merged_definition = base_definition.merge(ModelDefinition.model_validate(override_dict))
             log.debug(
                 "Model definition override applied successfully for vfolder {}",
                 model_revision.mounts.model_vfolder_id,

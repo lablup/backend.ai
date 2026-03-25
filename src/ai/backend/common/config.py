@@ -340,10 +340,11 @@ class ModelDefinition(BaseConfigModel):
         description="List of models in the model definition.",
     )
 
-    def merge(self, override: Mapping[str, Any]) -> ModelDefinition:
-        """Deep merge the given override mapping into this definition, returning a new instance."""
+    def merge(self, override: ModelDefinition) -> ModelDefinition:
+        """Deep merge the given override into this definition, returning a new instance."""
         base_dict = self.model_dump(exclude_none=True, by_alias=True)
-        merged_dict = deep_merge(base_dict, dict(override))
+        override_dict = override.model_dump(exclude_none=True, by_alias=True)
+        merged_dict = deep_merge(base_dict, override_dict)
         return ModelDefinition.model_validate(merged_dict)
 
     def health_check_config(self) -> ModelHealthCheck | None:

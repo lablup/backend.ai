@@ -36,7 +36,7 @@ from sqlalchemy.orm import (
     selectinload,
 )
 
-from ai.backend.common.config import model_definition_iv
+from ai.backend.common.config import ModelDefinition, model_definition_iv
 from ai.backend.common.types import (
     AccessKey,
     AutoScalingMetricComparator,
@@ -821,7 +821,9 @@ class EndpointRow(Base):  # type: ignore[misc]
                 runtime_variant=revision.runtime_variant,
                 callback_url=yarl.URL(revision.callback_url) if revision.callback_url else None,
             ),
-            model_definition=revision.model_definition,
+            model_definition=ModelDefinition.model_validate(revision.model_definition)
+            if revision.model_definition
+            else None,
         )
 
     def _to_deployment_info_with_revisions(
