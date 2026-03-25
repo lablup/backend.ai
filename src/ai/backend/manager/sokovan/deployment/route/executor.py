@@ -403,6 +403,8 @@ class RouteExecutor:
                     or deployment.deploying_revision_id
                     or deployment.current_revision_id
                 )
+                if target_revision_id is None:
+                    return None
 
                 deployment_context = await self._deployment_repo.fetch_deployment_context(
                     deployment,
