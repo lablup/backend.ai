@@ -26,9 +26,12 @@ class ScalingGroupClient(BaseDomainClient):
     async def get_wsproxy_version(
         self,
         scaling_group: str,
+        group: str | None = None,
     ) -> GetWsproxyVersionResponse:
+        params = {"group": group} if group is not None else {}
         return await self._client.typed_request(
             "GET",
             f"{API_PREFIX}/{scaling_group}/wsproxy-version",
+            params=params,
             response_model=GetWsproxyVersionResponse,
         )
