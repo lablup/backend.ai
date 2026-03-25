@@ -458,7 +458,7 @@ async def resolve_group_name_or_id(
         case uuid.UUID():
             cond = groups.c.id == value
         case str():
-            # Try to parse as UUID first (fixes BA-5411)
+            # Try to parse as UUID first
             # If successful, query by ID; otherwise treat as group name
             try:
                 parsed_uuid = uuid.UUID(value)
