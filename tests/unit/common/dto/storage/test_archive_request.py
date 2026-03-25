@@ -29,21 +29,21 @@ class TestCreateArchiveDownloadSessionRequestFilename:
             "files": ["a.txt"],
         }
 
-    def test_filename_omitted_defaults_to_none(self, valid_body: dict[str, Any]) -> None:
-        req = CreateArchiveDownloadSessionRequest(**valid_body)
-        assert req.filename is None
-
-    def test_filename_accepted_when_valid(self, valid_body: dict[str, Any]) -> None:
-        req = CreateArchiveDownloadSessionRequest(**valid_body, filename="export.zip")
-        assert req.filename == "export.zip"
-
-    def test_filename_unicode_accepted(self, valid_body: dict[str, Any]) -> None:
-        req = CreateArchiveDownloadSessionRequest(**valid_body, filename="데이터-export.zip")
-        assert req.filename == "데이터-export.zip"
-
-    def test_filename_with_double_dots_in_name_accepted(self, valid_body: dict[str, Any]) -> None:
-        req = CreateArchiveDownloadSessionRequest(**valid_body, filename="report..final.zip")
-        assert req.filename == "report..final.zip"
+    @pytest.mark.parametrize(
+        ("filename", "expected"),
+        [
+            (None, None),
+            ("export.zip", "export.zip"),
+            ("데이터-export.zip", "데이터-export.zip"),
+            ("report..final.zip", "report..final.zip"),
+        ],
+        ids=["omitted", "ascii", "unicode", "double_dots_in_name"],
+    )
+    def test_filename_accepted(
+        self, valid_body: dict[str, Any], filename: str | None, expected: str | None
+    ) -> None:
+        req = CreateArchiveDownloadSessionRequest(**valid_body, filename=filename)
+        assert req.filename == expected
 
     @pytest.mark.parametrize(
         "bad_filename",
@@ -60,7 +60,7 @@ class TestCreateArchiveDownloadSessionRequestFilename:
         ],
         ids=["slash", "backslash", "dotdot", "dot", "null_byte", "newline", "cr", "empty", "whitespace"],
     )
-    def test_filename_rejected_for_unsafe_values(
+    def test_filename_rejected(
         self, valid_body: dict[str, Any], bad_filename: str
     ) -> None:
         with pytest.raises(ValidationError):
