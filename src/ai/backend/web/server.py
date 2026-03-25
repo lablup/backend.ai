@@ -487,8 +487,9 @@ async def login_handler(request: web.Request) -> web.Response:
             "details": e.data.get("msg"),
         }
         session["authenticated"] = False
-        login_fail_count += 1
-        await _set_login_history(last_login_attempt, login_fail_count)
+        if e.status == 401:
+            login_fail_count += 1
+            await _set_login_history(last_login_attempt, login_fail_count)
         return web.json_response(result, status=e.status)
     return web.json_response(result)
 
