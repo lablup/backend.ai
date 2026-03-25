@@ -163,8 +163,8 @@ class TestSignup:
                             association_groups_users.c.user_id == user_uuid
                         )
                     )
-                await conn.execute(keypairs.delete().where(keypairs.c.user == user_uuid))
-                await conn.execute(users.delete().where(users.c.uuid == user_uuid))
+                    await conn.execute(keypairs.delete().where(keypairs.c.user == user_uuid))
+                    await conn.execute(users.delete().where(users.c.uuid == user_uuid))
 
     async def test_duplicate_email_returns_400(
         self,
