@@ -9,7 +9,7 @@ from typing import TYPE_CHECKING
 import sqlalchemy as sa
 from pydantic import BaseModel, Field, model_validator
 from sqlalchemy.dialects import postgresql as pgsql
-from sqlalchemy.orm import Mapped, foreign, mapped_column, relationship
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from ai.backend.common.data.model_deployment.types import DeploymentStrategy
 from ai.backend.common.dto.manager.v2.deployment.types import IntOrPercent
@@ -91,14 +91,6 @@ class BlueGreenSpec(BaseModel):
 
 
 DeploymentStrategySpec = RollingUpdateSpec | BlueGreenSpec
-
-
-def _get_endpoint_join_condition() -> sa.ColumnElement[bool]:
-    """Legacy join condition kept for reference. The canonical FK is now
-    ``endpoints.deployment_policy_id -> deployment_policies.id``."""
-    from ai.backend.manager.models.endpoint import EndpointRow
-
-    return foreign(DeploymentPolicyRow.endpoint) == EndpointRow.id
 
 
 class DeploymentPolicyRow(Base):  # type: ignore[misc]
