@@ -640,7 +640,12 @@ class DeploymentDBSource:
                     EndpointRow.session_owner == session_owner_id,
                     EndpointRow.lifecycle_stage == EndpointLifecycle.CREATED,
                 )
-                .options(selectinload(EndpointRow.image_row))
+                .options(
+                    selectinload(EndpointRow.image_row),
+                    selectinload(EndpointRow.revisions).selectinload(
+                        DeploymentRevisionRow.image_row
+                    ),
+                )
             )
 
             # Add name filter if provided
@@ -689,7 +694,12 @@ class DeploymentDBSource:
             query = (
                 sa.select(EndpointRow)
                 .where(EndpointRow.id == endpoint_id)
-                .options(selectinload(EndpointRow.image_row))
+                .options(
+                    selectinload(EndpointRow.image_row),
+                    selectinload(EndpointRow.revisions).selectinload(
+                        DeploymentRevisionRow.image_row
+                    ),
+                )
             )
             result = await db_sess.execute(query)
             existing_row: EndpointRow | None = result.scalar_one_or_none()
@@ -1356,6 +1366,11 @@ class DeploymentDBSource:
                 .join(
                     EndpointAutoScalingRuleRow,
                     EndpointRow.id == EndpointAutoScalingRuleRow.endpoint_id,
+                )
+                .options(
+                    selectinload(EndpointRow.revisions).selectinload(
+                        DeploymentRevisionRow.image_row
+                    ),
                 )
                 .distinct()
             )
