@@ -549,21 +549,6 @@ class TokenOperationType(StrEnum):
 _UNSAFE_FILENAME_RE = re.compile(r"[\x00-\x1f\x7f/\\]")
 
 
-def _validate_archive_filename(v: str | None) -> str | None:
-    """Validate archive download filename for safety."""
-    if v is None:
-        return v
-    if not v.strip():
-        raise ValueError("Filename must not be empty or whitespace-only.")
-    if v in (".", ".."):
-        raise ValueError("Filename must not be a relative path segment ('.' or '..').")
-    if _UNSAFE_FILENAME_RE.search(v):
-        raise ValueError(
-            "Filename must not contain control characters or path separators (/ or \\)."
-        )
-    return v
-
-
 # Client-facing API request models for download archive endpoint
 class ArchiveDownloadTokenData(BaseModel):
     """Pydantic model for validating the JWT payload of archive download tokens."""
@@ -591,7 +576,20 @@ class ArchiveDownloadTokenData(BaseModel):
     )
     model_config = ConfigDict(extra="allow")  # allow JWT-intrinsic keys
 
-    _check_filename = field_validator("filename")(_validate_archive_filename)
+    @field_validator("filename", mode="after")
+    @classmethod
+    def _validate_filename(cls, v: str | None) -> str | None:
+        if v is None:
+            return v
+        if not v.strip():
+            raise ValueError("Filename must not be empty or whitespace-only.")
+        if v in (".", ".."):
+            raise ValueError("Filename must not be a relative path segment ('.' or '..').")
+        if _UNSAFE_FILENAME_RE.search(v):
+            raise ValueError(
+                "Filename must not contain control characters or path separators (/ or \\)."
+            )
+        return v
 
     @field_serializer("exp")
     def serialize_exp(self, exp: datetime) -> int:
@@ -624,4 +622,17 @@ class CreateArchiveDownloadSessionRequest(BaseRequestModel):
         description="Custom filename for the downloaded ZIP archive. Defaults to 'archive.zip' when omitted.",
     )
 
-    _check_filename = field_validator("filename")(_validate_archive_filename)
+    @field_validator("filename", mode="after")
+    @classmethod
+    def _validate_filename(cls, v: str | None) -> str | None:
+        if v is None:
+            return v
+        if not v.strip():
+            raise ValueError("Filename must not be empty or whitespace-only.")
+        if v in (".", ".."):
+            raise ValueError("Filename must not be a relative path segment ('.' or '..').")
+        if _UNSAFE_FILENAME_RE.search(v):
+            raise ValueError(
+                "Filename must not contain control characters or path separators (/ or \\)."
+            )
+        return v
