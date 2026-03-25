@@ -58,11 +58,19 @@ class TestCreateArchiveDownloadSessionRequestFilename:
             "",
             "   ",
         ],
-        ids=["slash", "backslash", "dotdot", "dot", "null_byte", "newline", "cr", "empty", "whitespace"],
+        ids=[
+            "slash",
+            "backslash",
+            "dotdot",
+            "dot",
+            "null_byte",
+            "newline",
+            "cr",
+            "empty",
+            "whitespace",
+        ],
     )
-    def test_filename_rejected(
-        self, valid_body: dict[str, Any], bad_filename: str
-    ) -> None:
+    def test_filename_rejected(self, valid_body: dict[str, Any], bad_filename: str) -> None:
         with pytest.raises(ValidationError):
             CreateArchiveDownloadSessionRequest(**valid_body, filename=bad_filename)
 
@@ -107,9 +115,7 @@ class TestArchiveDownloadTokenDataFilename:
     ) -> None:
         assert token_data_without_filename.filename is None
 
-    def test_filename_set(
-        self, token_data_with_filename: ArchiveDownloadTokenData
-    ) -> None:
+    def test_filename_set(self, token_data_with_filename: ArchiveDownloadTokenData) -> None:
         assert token_data_with_filename.filename == "custom.zip"
 
     def test_jwt_roundtrip_preserves_filename(
