@@ -176,9 +176,7 @@ class TestImageNodeRoundTrip:
         node = make_image_node(
             labels=[ImageLabelInfo(key="k", value="v")],
             tags=[ImageTagInfo(key="t", value="tv")],
-            resource_limits=[
-                ImageResourceLimitInfo(key="cpu", min="0.5", max="4")
-            ],
+            resource_limits=[ImageResourceLimitInfo(key="cpu", min="0.5", max="4")],
         )
         json_str = node.model_dump_json()
         restored = ImageNode.model_validate_json(json_str)
@@ -191,9 +189,7 @@ class TestImageNodeRoundTrip:
 
     def test_round_trip_preserves_decimal_precision(self) -> None:
         node = make_image_node(
-            resource_limits=[
-                ImageResourceLimitInfo(key="mem", min="0.25", max="16.75")
-            ]
+            resource_limits=[ImageResourceLimitInfo(key="mem", min="0.25", max="16.75")]
         )
         json_str = node.model_dump_json()
         restored = ImageNode.model_validate_json(json_str)
