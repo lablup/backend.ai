@@ -253,34 +253,7 @@ class DeploymentDBSource:
             rbac_result = await execute_rbac_entity_creator(db_sess, creator)
             endpoint = rbac_result.row
 
-            # Create the initial deployment revision and link it to the endpoint
-            if spec.revision.image_id is not None:
-                initial_revision = DeploymentRevisionRow(
-                    endpoint=endpoint.id,
-                    revision_number=1,
-                    image=spec.revision.image_id,
-                    model=spec.revision.mounts.model_vfolder_id,
-                    model_mount_destination=spec.revision.mounts.model_mount_destination,
-                    model_definition_path=spec.revision.mounts.model_definition_path,
-                    resource_group=spec.metadata.resource_group,
-                    resource_slots=spec.revision.resource.resource_slots,
-                    resource_opts=spec.revision.resource.resource_opts or {},
-                    cluster_mode=spec.revision.resource.cluster_mode,
-                    cluster_size=spec.revision.resource.cluster_size,
-                    startup_command=spec.revision.execution.startup_command,
-                    bootstrap_script=spec.revision.execution.bootstrap_script,
-                    environ=dict(spec.revision.execution.environ)
-                    if spec.revision.execution.environ
-                    else {},
-                    callback_url=spec.revision.execution.callback_url,
-                    runtime_variant=spec.revision.execution.runtime_variant,
-                    extra_mounts=list(spec.revision.mounts.extra_mounts),
-                )
-                db_sess.add(initial_revision)
-                await db_sess.flush()
-                endpoint.current_revision = initial_revision.id
-
-            # Create deployment policy (use provided config or default rolling policy)
+            # Create deployment policy if provided
             if policy_config is not None:
                 policy_creator_spec = DeploymentPolicyCreatorSpec(
                     endpoint_id=endpoint.id,
@@ -306,9 +279,6 @@ class DeploymentDBSource:
                 .options(
                     selectinload(EndpointRow.image_row),
                     selectinload(EndpointRow.deployment_policy),
-                    selectinload(EndpointRow.revisions).selectinload(
-                        DeploymentRevisionRow.image_row
-                    ),
                 )
             )
             result = await db_sess.execute(stmt)
@@ -339,33 +309,7 @@ class DeploymentDBSource:
             rbac_result = await execute_rbac_entity_creator(db_sess, creator)
             endpoint = rbac_result.row
 
-            # Create the initial deployment revision and link it to the endpoint
-            if spec.image_id is None:
-                raise InvalidAPIParameters("image_id is required for legacy endpoint creation")
-            initial_revision = DeploymentRevisionRow(
-                endpoint=endpoint.id,
-                revision_number=1,
-                image=spec.image_id,
-                model=spec.model,
-                model_mount_destination=spec.model_mount_destination,
-                model_definition_path=spec.model_definition_path,
-                resource_group=spec.resource_group,
-                resource_slots=spec.resource_slots,
-                resource_opts=dict(spec.resource_opts) if spec.resource_opts else {},
-                cluster_mode=spec.cluster_mode.value,
-                cluster_size=spec.cluster_size,
-                startup_command=spec.startup_command,
-                bootstrap_script=spec.bootstrap_script,
-                environ=dict(spec.environ) if spec.environ else {},
-                callback_url=spec.callback_url,
-                runtime_variant=spec.runtime_variant,
-                extra_mounts=list(spec.extra_mounts),
-            )
-            db_sess.add(initial_revision)
-            await db_sess.flush()
-            endpoint.current_revision = initial_revision.id
-
-            # Create deployment policy (use provided spec or default rolling policy)
+            # Create deployment policy if provided
             if spec.policy is not None:
                 policy_spec = spec.policy
             else:
@@ -387,9 +331,6 @@ class DeploymentDBSource:
                 .options(
                     selectinload(EndpointRow.image_row),
                     selectinload(EndpointRow.deployment_policy),
-                    selectinload(EndpointRow.revisions).selectinload(
-                        DeploymentRevisionRow.image_row
-                    ),
                 )
             )
             result = await db_sess.execute(stmt)

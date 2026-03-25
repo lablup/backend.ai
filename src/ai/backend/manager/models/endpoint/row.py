@@ -819,6 +819,7 @@ class EndpointRow(Base):  # type: ignore[misc]
             current_revision_id=self.current_revision,
             deploying_revision_id=self.deploying_revision,
             sub_step=self.sub_step,
+            policy=self.deployment_policy.to_data() if self.deployment_policy is not None else None,
         )
 
 
