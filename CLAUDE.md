@@ -73,11 +73,6 @@ API Handler → Processor → Service → Repository → DB
 - For detailed API patterns: `/api-guide`
 - For SDK/CLI patterns: `/cli-sdk-guide`
 
-**After implementing new API endpoints, verify with the live server:**
-1. Restart server: `./dev restart mgr`
-2. Test each operation via `./bai` CLI (see `/local-dev` skill for setup and commands)
-3. Verify both admin and non-admin scenarios
-
 ## Development Guidelines
 
 **README-First:** Always read component README (`src/ai/backend/{component}/README.md`) before making changes.
