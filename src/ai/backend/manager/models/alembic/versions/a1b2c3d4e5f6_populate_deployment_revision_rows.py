@@ -6,7 +6,6 @@ Create Date: 2026-03-25
 
 """
 
-import sqlalchemy as sa
 from alembic import op
 
 # revision identifiers, used by Alembic.
@@ -77,31 +76,35 @@ def upgrade() -> None:
         """
     )
 
-    # Step 3: Mark endpoints with no image and no current_revision as destroyed.
-    # These are invalid/incomplete endpoints that cannot have a valid revision.
-    op.execute(
-        """
-        UPDATE endpoints
-        SET lifecycle_stage = 'destroyed',
-            destroyed_at = COALESCE(destroyed_at, now())
-        WHERE current_revision IS NULL
-          AND image IS NULL
-        """
-    )
-
-    # Step 4: Make current_revision non-nullable.
-    op.alter_column(
-        "endpoints",
-        "current_revision",
-        existing_type=sa.Uuid(),
-        nullable=False,
-    )
+    # Note: Endpoints with image IS NULL are left as-is.
+    # They cannot have a revision row (deployment_revisions.image is NOT NULL),
+    # so current_revision remains nullable.
 
 
 def downgrade() -> None:
-    op.alter_column(
-        "endpoints",
-        "current_revision",
-        existing_type=sa.Uuid(),
-        nullable=True,
+    # Remove current_revision for endpoints that were populated by this migration.
+    # (No schema change to revert since we did not alter the column nullability.)
+    op.execute(
+        """
+        DELETE FROM deployment_revisions dr
+        USING endpoints e
+        WHERE dr.endpoint = e.id
+          AND dr.revision_number = (
+              SELECT MAX(dr2.revision_number)
+              FROM deployment_revisions dr2
+              WHERE dr2.endpoint = e.id
+          )
+          AND dr.id = e.current_revision
+        """
+    )
+    op.execute(
+        """
+        UPDATE endpoints
+        SET current_revision = NULL
+        WHERE current_revision IS NOT NULL
+          AND NOT EXISTS (
+              SELECT 1 FROM deployment_revisions dr
+              WHERE dr.id = endpoints.current_revision
+          )
+        """
     )
