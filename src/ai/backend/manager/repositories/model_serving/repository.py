@@ -41,6 +41,7 @@ from ai.backend.manager.data.model_serving.types import (
     ServiceSearchResult,
     UserData,
 )
+from ai.backend.manager.data.permission.types import RBACElementRef
 from ai.backend.manager.data.vfolder.types import VFolderOwnershipType
 from ai.backend.manager.errors.auth import InvalidAuthParameters
 from ai.backend.manager.errors.common import ObjectNotFound
@@ -77,7 +78,6 @@ from ai.backend.manager.repositories.base import (
     execute_creator,
     execute_updater,
 )
-from ai.backend.manager.repositories.base.rbac.element_ref import RBACElementRef
 from ai.backend.manager.repositories.base.rbac.entity_creator import (
     RBACEntityCreator,
     execute_rbac_entity_creator,

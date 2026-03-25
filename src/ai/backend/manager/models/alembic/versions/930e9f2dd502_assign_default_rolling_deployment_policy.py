@@ -1,7 +1,7 @@
 """assign default rolling deployment policy and add FK to endpoints
 
 Revision ID: 930e9f2dd502
-Revises: 19e48e70b86a
+Revises: 3727dd0927cf
 Create Date: 2026-03-25
 
 """
@@ -13,7 +13,7 @@ from ai.backend.manager.models.base import GUID
 
 # revision identifiers, used by Alembic.
 revision = "930e9f2dd502"
-down_revision = "19e48e70b86a"
+down_revision = "3727dd0927cf"
 branch_labels = None
 depends_on = None
 
