@@ -144,7 +144,7 @@ def parse_order_options(
     for spec in order_by:
         parts = spec.split(":", 1)
         field_name = parts[0]
-        direction_str = parts[1].lower() if len(parts) > 1 else "asc"
+        direction_str = parts[1].upper() if len(parts) > 1 else "ASC"
         orders.append(
             order_class(
                 field=order_field_enum(field_name),
