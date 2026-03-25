@@ -1,7 +1,7 @@
 """add fk constraints to rbac tables
 
 Revision ID: 3727dd0927cf
-Revises: 3b6297b1bd75
+Revises: 19e48e70b86a
 Create Date: 2026-03-24 00:00:00.000000
 
 """
@@ -13,7 +13,7 @@ from alembic import op
 
 # revision identifiers, used by Alembic.
 revision = "3727dd0927cf"
-down_revision = "3b6297b1bd75"
+down_revision = "19e48e70b86a"
 branch_labels = None
 depends_on = None
 
