@@ -1,4 +1,3 @@
-from dataclasses import dataclass
 from typing import override
 
 from ai.backend.common.data.permission.types import EntityType
@@ -11,7 +10,6 @@ from ai.backend.manager.actions.action.single_entity import (
 from ai.backend.manager.actions.action.types import FieldData
 
 
-@dataclass
 class ArtifactRegistryAction(BaseAction):
     @override
     @classmethod
@@ -19,7 +17,6 @@ class ArtifactRegistryAction(BaseAction):
         return EntityType.ARTIFACT_REGISTRY
 
 
-@dataclass
 class ArtifactBatchRegistryAction(BaseBatchAction):
     @override
     @classmethod

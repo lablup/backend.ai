@@ -66,16 +66,22 @@ from ai.backend.common.dto.manager.v2.fair_share.response import (
 from ai.backend.common.dto.manager.v2.fair_share.types import (
     DomainFairShareOrderField,
     DomainUsageBucketOrderField,
+    DomainUsageBucketScopeDTO,
     FairShareCalculationSnapshotInfo,
     FairShareSpecInfo,
     OrderDirection,
     ProjectFairShareOrderField,
     ProjectUsageBucketOrderField,
+    ProjectUsageBucketScopeDTO,
+    ResourceGroupDomainScopeDTO,
+    ResourceGroupProjectScopeDTO,
+    ResourceGroupUserScopeDTO,
     ResourceSlotEntryInfo,
     ResourceSlotInfo,
     UsageBucketMetadataInfo,
     UserFairShareOrderField,
     UserUsageBucketOrderField,
+    UserUsageBucketScopeDTO,
 )
 
 __all__ = (
@@ -93,6 +99,13 @@ __all__ = (
     "FairShareSpecInfo",
     "FairShareCalculationSnapshotInfo",
     "UsageBucketMetadataInfo",
+    # Scope DTOs
+    "ResourceGroupDomainScopeDTO",
+    "ResourceGroupProjectScopeDTO",
+    "ResourceGroupUserScopeDTO",
+    "DomainUsageBucketScopeDTO",
+    "ProjectUsageBucketScopeDTO",
+    "UserUsageBucketScopeDTO",
     # Request (filter models)
     "DomainFairShareFilter",
     "ProjectFairShareFilter",

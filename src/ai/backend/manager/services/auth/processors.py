@@ -19,6 +19,7 @@ from ai.backend.manager.services.auth.actions.get_ssh_keypair import (
     GetSSHKeypairAction,
     GetSSHKeypairActionResult,
 )
+from ai.backend.manager.services.auth.actions.logout import LogoutAction, LogoutActionResult
 from ai.backend.manager.services.auth.actions.resolve_access_key_scope import (
     ResolveAccessKeyScopeAction,
     ResolveAccessKeyScopeResult,
@@ -26,6 +27,14 @@ from ai.backend.manager.services.auth.actions.resolve_access_key_scope import (
 from ai.backend.manager.services.auth.actions.resolve_user_scope import (
     ResolveUserScopeAction,
     ResolveUserScopeResult,
+)
+from ai.backend.manager.services.auth.actions.search_login_history import (
+    SearchLoginHistoryAction,
+    SearchLoginHistoryActionResult,
+)
+from ai.backend.manager.services.auth.actions.search_login_sessions import (
+    SearchLoginSessionsAction,
+    SearchLoginSessionsActionResult,
 )
 from ai.backend.manager.services.auth.actions.signout import SignoutAction, SignoutActionResult
 from ai.backend.manager.services.auth.actions.signup import SignupAction, SignupActionResult
@@ -49,6 +58,7 @@ from ai.backend.manager.services.auth.service import AuthService
 
 
 class AuthProcessors(AbstractProcessorPackage):
+    logout: ActionProcessor[LogoutAction, LogoutActionResult]
     signout: ActionProcessor[SignoutAction, SignoutActionResult]
     update_full_name: ActionProcessor[UpdateFullNameAction, UpdateFullNameActionResult]
     get_ssh_keypair: SingleEntityActionProcessor[GetSSHKeypairAction, GetSSHKeypairActionResult]
@@ -67,6 +77,10 @@ class AuthProcessors(AbstractProcessorPackage):
         ResolveAccessKeyScopeAction, ResolveAccessKeyScopeResult
     ]
     resolve_user_scope: ActionProcessor[ResolveUserScopeAction, ResolveUserScopeResult]
+    search_login_sessions: ActionProcessor[
+        SearchLoginSessionsAction, SearchLoginSessionsActionResult
+    ]
+    search_login_history: ActionProcessor[SearchLoginHistoryAction, SearchLoginHistoryActionResult]
 
     def __init__(
         self,
@@ -74,6 +88,7 @@ class AuthProcessors(AbstractProcessorPackage):
         action_monitors: list[ActionMonitor],
         validators: ActionValidators,
     ) -> None:
+        self.logout = ActionProcessor(service.logout, action_monitors)
         self.signout = ActionProcessor(service.signout, action_monitors)
         self.update_full_name = ActionProcessor(service.update_full_name, action_monitors)
         self.get_ssh_keypair = SingleEntityActionProcessor(
@@ -96,10 +111,13 @@ class AuthProcessors(AbstractProcessorPackage):
             service.resolve_access_key_scope, action_monitors
         )
         self.resolve_user_scope = ActionProcessor(service.resolve_user_scope, action_monitors)
+        self.search_login_sessions = ActionProcessor(service.search_login_sessions, action_monitors)
+        self.search_login_history = ActionProcessor(service.search_login_history, action_monitors)
 
     @override
     def supported_actions(self) -> list[ActionSpec]:
         return [
+            LogoutAction.spec(),
             SignoutAction.spec(),
             UpdateFullNameAction.spec(),
             GetSSHKeypairAction.spec(),
@@ -112,4 +130,6 @@ class AuthProcessors(AbstractProcessorPackage):
             UpdatePasswordNoAuthAction.spec(),
             ResolveAccessKeyScopeAction.spec(),
             ResolveUserScopeAction.spec(),
+            SearchLoginSessionsAction.spec(),
+            SearchLoginHistoryAction.spec(),
         ]

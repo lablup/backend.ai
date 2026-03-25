@@ -10,8 +10,10 @@ from pydantic import Field
 
 from ai.backend.common.api_handlers import BaseRequestModel
 from ai.backend.common.dto.manager.query import StringFilter
+from ai.backend.common.dto.manager.v2.common import OrderDirection
 
 __all__ = (
+    "ClusterModeDTO",
     "ComputeSessionFilter",
     "ComputeSessionOrder",
     "ComputeSessionOrderField",
@@ -19,18 +21,18 @@ __all__ = (
 )
 
 
+class ClusterModeDTO(StrEnum):
+    """Cluster mode enum for DTO layer (matches GQL schema values)."""
+
+    SINGLE_NODE = "SINGLE_NODE"
+    MULTI_NODE = "MULTI_NODE"
+
+
 class ComputeSessionOrderField(StrEnum):
     """Fields available for ordering compute sessions."""
 
     CREATED_AT = "created_at"
     ID = "id"
-
-
-class OrderDirection(StrEnum):
-    """Order direction for sorting."""
-
-    ASC = "asc"
-    DESC = "desc"
 
 
 class ComputeSessionFilter(BaseRequestModel):

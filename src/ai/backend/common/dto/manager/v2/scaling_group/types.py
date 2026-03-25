@@ -6,6 +6,8 @@ from __future__ import annotations
 
 from enum import StrEnum
 
+from ai.backend.common.dto.manager.v2.common import OrderDirection
+
 __all__ = (
     "OrderDirection",
     "PreemptionMode",
@@ -13,13 +15,6 @@ __all__ = (
     "ScalingGroupOrderField",
     "SchedulerType",
 )
-
-
-class OrderDirection(StrEnum):
-    """Order direction for sorting."""
-
-    ASC = "asc"
-    DESC = "desc"
 
 
 class ScalingGroupOrderField(StrEnum):

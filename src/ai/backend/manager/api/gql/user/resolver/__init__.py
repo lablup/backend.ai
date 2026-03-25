@@ -16,6 +16,7 @@ from .query import (
     admin_user_v2,
     admin_users_v2,
     domain_users_v2,
+    my_client_ip,
     my_user_v2,
     project_users_v2,
 )
@@ -25,6 +26,7 @@ __all__ = [
     "admin_user_v2",
     "admin_users_v2",
     "domain_users_v2",
+    "my_client_ip",
     "my_user_v2",
     "project_users_v2",
     # Mutations

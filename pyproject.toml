@@ -185,6 +185,16 @@ ignore = [
 
 [tool.ruff.lint.flake8-tidy-imports.banned-api]
 "pytest.mark.asyncio" = {msg = "asyncio_mode = 'auto' is set; @pytest.mark.asyncio is unnecessary."}
+"strawberry.type" = {msg = "Use gql_node_type, gql_connection_type, or gql_federation_type from decorators.py."}
+"strawberry.input" = {msg = "Use gql_pydantic_input from decorators.py."}
+"strawberry.field" = {msg = "Use gql_field, gql_added_field, or gql_root_field from decorators.py."}
+"strawberry.enum" = {msg = "Use gql_enum from decorators.py."}
+"strawberry.mutation" = {msg = "Use gql_mutation from decorators.py."}
+"strawberry.subscription" = {msg = "Use gql_subscription from decorators.py."}
+"strawberry.federation.type" = {msg = "Use gql_federation_type from decorators.py."}
+"strawberry.experimental.pydantic.type" = {msg = "Use gql_pydantic_type from decorators.py."}
+"strawberry.experimental.pydantic.input" = {msg = "Use gql_pydantic_input from decorators.py."}
+"strawberry.experimental.pydantic.interface" = {msg = "Use gql_pydantic_interface from decorators.py."}
 
 [tool.ruff.lint.isort]
 known-first-party = ["ai.backend"]
@@ -193,6 +203,12 @@ known-third-party = ["alembic", "redis", "kubernetes"]
 split-on-trailing-comma = true
 
 [tool.ruff.lint.per-file-ignores]
+# decorators.py wraps strawberry.type and strawberry.experimental.pydantic.type directly
+"src/ai/backend/manager/api/gql/decorators.py" = ["TID251"]
+# schema.py defines GQL schema roots (Query, Mutation, Subscription) using @strawberry.type
+"src/ai/backend/manager/api/gql/schema.py" = ["TID251"]
+# test_pydantic_compat.py defines fixture types without BackendAIGQLMeta metadata
+"tests/unit/manager/api/gql/test_pydantic_compat.py" = ["TID251"]
 "src/ai/backend/manager/config.py" = ["E402"]
 "src/ai/backend/manager/models/alembic/env.py" = ["E402"]
 "src/ai/backend/logging/otel.py" = ["LOG015"]  # root logger usage is intentional for OTEL initialization
@@ -289,6 +305,10 @@ split-on-trailing-comma = true
 "src/ai/backend/manager/api/rest/tree.py" = ["PLC0415"]
 "src/ai/backend/manager/api/rest/*/registry.py" = ["PLC0415"]
 "src/ai/backend/manager/api/rest/*/__init__.py" = ["PLC0415"]
+# - REST v2 API module tree and registries use the same lazy import pattern
+"src/ai/backend/manager/api/rest/v2/tree.py" = ["PLC0415"]
+"src/ai/backend/manager/api/rest/v2/*/registry.py" = ["PLC0415"]
+"src/ai/backend/manager/api/rest/v2/*/__init__.py" = ["PLC0415"]
 
 [tool.ruff.format]
 preview = true  # enable the black's preview style
@@ -335,11 +355,14 @@ disable_error_code = ["union-attr", "misc"]
 
 # PyInfra is an optional dependency for production deployment
 # Skip import checking when pyinfra is not installed
+# gql_enum() function-call results are valid types at runtime (strawberry handles them)
+# but mypy cannot recognise dynamically-wrapped enum variables as types
 [[tool.mypy.overrides]]
 module = [
     "ai.backend.install.pyinfra.*",
+    "ai.backend.manager.api.gql.*",
 ]
-disable_error_code = ["import-not-found", "no-any-return", "attr-defined", "arg-type", "return-value", "type-arg", "func-returns-value"]
+disable_error_code = ["valide-type", "import-not-found", "no-any-return", "attr-defined", "arg-type", "return-value", "type-arg", "func-returns-value"]
 follow_imports = "skip"
 
 # Ignore errors in vendor code, accelerators, and build tools

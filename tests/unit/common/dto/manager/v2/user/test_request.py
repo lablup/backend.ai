@@ -12,6 +12,8 @@ from ai.backend.common.dto.manager.v2.user.request import (
     CreateUserInput,
     DeleteUserInput,
     PurgeUserInput,
+    PurgeUserV2Input,
+    PurgeUserV2Options,
     SearchUsersRequest,
     UpdateUserInput,
     UserFilter,
@@ -21,7 +23,9 @@ from ai.backend.common.dto.manager.v2.user.types import (
     OrderDirection,
     UserOrderField,
     UserRole,
+    UserRoleFilter,
     UserStatus,
+    UserStatusFilter,
 )
 
 
@@ -302,6 +306,128 @@ class TestPurgeUserInput:
         assert restored.purge_shared_vfolders is True
 
 
+class TestPurgeUserV2Options:
+    """Tests for PurgeUserV2Options model."""
+
+    def test_default_values_are_false(self) -> None:
+        opts = PurgeUserV2Options()
+        assert opts.purge_shared_vfolders is False
+        assert opts.delegate_endpoint_ownership is False
+
+    def test_purge_shared_vfolders_true(self) -> None:
+        opts = PurgeUserV2Options(purge_shared_vfolders=True)
+        assert opts.purge_shared_vfolders is True
+        assert opts.delegate_endpoint_ownership is False
+
+    def test_delegate_endpoint_ownership_true(self) -> None:
+        opts = PurgeUserV2Options(delegate_endpoint_ownership=True)
+        assert opts.purge_shared_vfolders is False
+        assert opts.delegate_endpoint_ownership is True
+
+    def test_both_flags_true(self) -> None:
+        opts = PurgeUserV2Options(purge_shared_vfolders=True, delegate_endpoint_ownership=True)
+        assert opts.purge_shared_vfolders is True
+        assert opts.delegate_endpoint_ownership is True
+
+    def test_round_trip(self) -> None:
+        opts = PurgeUserV2Options(purge_shared_vfolders=True, delegate_endpoint_ownership=False)
+        json_data = opts.model_dump_json()
+        restored = PurgeUserV2Options.model_validate_json(json_data)
+        assert restored.purge_shared_vfolders is True
+        assert restored.delegate_endpoint_ownership is False
+
+    def test_from_dict(self) -> None:
+        opts = PurgeUserV2Options.model_validate({
+            "purge_shared_vfolders": True,
+            "delegate_endpoint_ownership": True,
+        })
+        assert opts.purge_shared_vfolders is True
+        assert opts.delegate_endpoint_ownership is True
+
+
+class TestPurgeUserV2Input:
+    """Tests for PurgeUserV2Input model with and without options."""
+
+    def test_valid_creation_with_only_user_id(self) -> None:
+        user_id = uuid.uuid4()
+        req = PurgeUserV2Input(user_id=user_id)
+        assert req.user_id == user_id
+        assert req.options is None
+
+    def test_options_defaults_to_none(self) -> None:
+        user_id = uuid.uuid4()
+        req = PurgeUserV2Input(user_id=user_id)
+        assert req.options is None
+
+    def test_with_options_purge_shared_vfolders(self) -> None:
+        user_id = uuid.uuid4()
+        opts = PurgeUserV2Options(purge_shared_vfolders=True)
+        req = PurgeUserV2Input(user_id=user_id, options=opts)
+        assert req.options is not None
+        assert req.options.purge_shared_vfolders is True
+        assert req.options.delegate_endpoint_ownership is False
+
+    def test_with_options_delegate_endpoint_ownership(self) -> None:
+        user_id = uuid.uuid4()
+        opts = PurgeUserV2Options(delegate_endpoint_ownership=True)
+        req = PurgeUserV2Input(user_id=user_id, options=opts)
+        assert req.options is not None
+        assert req.options.purge_shared_vfolders is False
+        assert req.options.delegate_endpoint_ownership is True
+
+    def test_with_explicit_null_options(self) -> None:
+        user_id = uuid.uuid4()
+        req = PurgeUserV2Input(user_id=user_id, options=None)
+        assert req.options is None
+
+    def test_missing_user_id_raises(self) -> None:
+        with pytest.raises(ValidationError):
+            PurgeUserV2Input.model_validate({})
+
+    def test_invalid_user_id_raises(self) -> None:
+        with pytest.raises(ValidationError):
+            PurgeUserV2Input.model_validate({"user_id": "not-a-uuid"})
+
+    def test_round_trip_without_options(self) -> None:
+        user_id = uuid.uuid4()
+        req = PurgeUserV2Input(user_id=user_id)
+        json_data = req.model_dump_json()
+        restored = PurgeUserV2Input.model_validate_json(json_data)
+        assert restored.user_id == user_id
+        assert restored.options is None
+
+    def test_round_trip_with_options(self) -> None:
+        user_id = uuid.uuid4()
+        opts = PurgeUserV2Options(purge_shared_vfolders=True, delegate_endpoint_ownership=True)
+        req = PurgeUserV2Input(user_id=user_id, options=opts)
+        json_data = req.model_dump_json()
+        restored = PurgeUserV2Input.model_validate_json(json_data)
+        assert restored.user_id == user_id
+        assert restored.options is not None
+        assert restored.options.purge_shared_vfolders is True
+        assert restored.options.delegate_endpoint_ownership is True
+
+    def test_from_dict_with_options(self) -> None:
+        user_id = uuid.uuid4()
+        req = PurgeUserV2Input.model_validate({
+            "user_id": str(user_id),
+            "options": {
+                "purge_shared_vfolders": True,
+                "delegate_endpoint_ownership": False,
+            },
+        })
+        assert req.user_id == user_id
+        assert req.options is not None
+        assert req.options.purge_shared_vfolders is True
+        assert req.options.delegate_endpoint_ownership is False
+
+    def test_from_dict_without_options(self) -> None:
+        user_id = uuid.uuid4()
+        req = PurgeUserV2Input.model_validate({"user_id": str(user_id)})
+        assert req.user_id == user_id
+        assert req.options is None
+
+
 class TestUserFilter:
     """Tests for UserFilter model."""
 
@@ -314,13 +440,15 @@ class TestUserFilter:
         assert f.status is None
         assert f.role is None
 
-    def test_status_list_filter(self) -> None:
-        f = UserFilter(status=[UserStatus.ACTIVE, UserStatus.INACTIVE])
-        assert f.status == [UserStatus.ACTIVE, UserStatus.INACTIVE]
+    def test_status_filter(self) -> None:
+        f = UserFilter(status=UserStatusFilter(in_=[UserStatus.ACTIVE, UserStatus.INACTIVE]))
+        assert f.status is not None
+        assert f.status.in_ == [UserStatus.ACTIVE, UserStatus.INACTIVE]
 
-    def test_role_list_filter(self) -> None:
-        f = UserFilter(role=[UserRole.ADMIN, UserRole.SUPERADMIN])
-        assert f.role == [UserRole.ADMIN, UserRole.SUPERADMIN]
+    def test_role_filter(self) -> None:
+        f = UserFilter(role=UserRoleFilter(in_=[UserRole.ADMIN, UserRole.SUPERADMIN]))
+        assert f.role is not None
+        assert f.role.in_ == [UserRole.ADMIN, UserRole.SUPERADMIN]
 
 
 class TestUserOrder:
@@ -366,13 +494,14 @@ class TestSearchUsersRequest:
 
     def test_with_filter_and_order(self) -> None:
         req = SearchUsersRequest(
-            filter=UserFilter(status=[UserStatus.ACTIVE]),
+            filter=UserFilter(status=UserStatusFilter(equals=UserStatus.ACTIVE)),
             order=[UserOrder(field=UserOrderField.EMAIL, direction=OrderDirection.ASC)],
             limit=10,
             offset=5,
         )
         assert req.filter is not None
-        assert req.filter.status == [UserStatus.ACTIVE]
+        assert req.filter.status is not None
+        assert req.filter.status.equals == UserStatus.ACTIVE
         assert req.order is not None
         assert len(req.order) == 1
         assert req.limit == 10
@@ -380,12 +509,13 @@ class TestSearchUsersRequest:
 
     def test_round_trip(self) -> None:
         req = SearchUsersRequest(
-            filter=UserFilter(role=[UserRole.ADMIN]),
+            filter=UserFilter(role=UserRoleFilter(equals=UserRole.ADMIN)),
             limit=20,
             offset=0,
         )
         json_data = req.model_dump_json()
         restored = SearchUsersRequest.model_validate_json(json_data)
         assert restored.filter is not None
-        assert restored.filter.role == [UserRole.ADMIN]
+        assert restored.filter.role is not None
+        assert restored.filter.role.equals == UserRole.ADMIN
         assert restored.limit == 20

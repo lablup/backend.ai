@@ -3,6 +3,7 @@ from typing import override
 
 from ai.backend.common.data.permission.types import EntityType
 from ai.backend.manager.actions.action import BaseAction, BaseBatchAction
+from ai.backend.manager.actions.action.scope import BaseScopeAction, BaseScopeActionResult
 
 
 @dataclass
@@ -19,3 +20,22 @@ class SessionBatchAction(BaseBatchAction):
     @classmethod
     def entity_type(cls) -> EntityType:
         return EntityType.SESSION
+
+
+@dataclass
+class SessionScopeAction(BaseScopeAction):
+    """Base class for session actions that operate within a scope.
+
+    Used for operations like creating or searching sessions within a specific scope.
+    Subclasses must implement scope_type(), scope_id(), and target_element() methods.
+    """
+
+    @override
+    @classmethod
+    def entity_type(cls) -> EntityType:
+        return EntityType.SESSION
+
+
+@dataclass
+class SessionScopeActionResult(BaseScopeActionResult):
+    pass

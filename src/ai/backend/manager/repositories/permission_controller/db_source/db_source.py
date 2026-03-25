@@ -9,6 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession as SASession
 from sqlalchemy.orm import contains_eager, selectinload
 
 from ai.backend.common.data.permission.types import (
+    RBACElementType,
     RelationType,
 )
 from ai.backend.logging.utils import BraceStyleAdapter
@@ -20,7 +21,6 @@ from ai.backend.manager.data.permission.entity import (
 from ai.backend.manager.data.permission.id import ObjectId, ScopeId
 from ai.backend.manager.data.permission.object_permission import (
     ObjectPermissionCreateInputBeforeRoleCreation,
-    ObjectPermissionListResult,
 )
 from ai.backend.manager.data.permission.permission import (
     PermissionListResult,
@@ -77,7 +77,6 @@ from ai.backend.manager.repositories.permission_controller.creators import (
     UserRoleCreatorSpec,
 )
 from ai.backend.manager.repositories.permission_controller.types import (
-    ObjectPermissionSearchScope,
     PermissionSearchScope,
 )
 
@@ -136,24 +135,6 @@ class PermissionDBSource:
             await db_session.refresh(perm_row)
             return perm_row
 
-    async def create_object_permission(
-        self,
-        creator: Creator[ObjectPermissionRow],
-    ) -> ObjectPermissionRow:
-        """
-        Create an object permission for a role.
-
-        Args:
-            creator: Object permission creator defining the permission to create
-
-        Returns:
-            Created object permission row
-        """
-        async with self._db.begin_session() as db_session:
-            obj_perm_row = await self._add_object_permission_to_role(db_session, creator)
-            await db_session.refresh(obj_perm_row)
-            return obj_perm_row
-
     async def delete_permission(
         self,
         purger: Purger[PermissionRow],
@@ -197,23 +178,6 @@ class PermissionDBSource:
             if result is None:
                 raise ObjectNotFound(f"Permission with ID {updater.pk_value} does not exist.")
             return result.row
-
-    async def delete_object_permission(
-        self,
-        purger: Purger[ObjectPermissionRow],
-    ) -> ObjectPermissionRow | None:
-        """
-        Delete an object permission.
-
-        Args:
-            purger: Purger with object permission ID
-
-        Returns:
-            Deleted object permission row, or None if not found
-        """
-        async with self._db.begin_session() as db_session:
-            result = await execute_purger(db_session, purger)
-            return result.row if result else None
 
     async def _get_role(self, db_session: SASession, role_id: uuid.UUID) -> RoleRow:
         stmt = sa.select(RoleRow).where(RoleRow.id == role_id)
@@ -338,9 +302,9 @@ class PermissionDBSource:
                 perm_creator = Creator(
                     spec=PermissionCreatorSpec(
                         role_id=input_data.role_id,
-                        scope_type=scoped_perm_input.scope_type,
+                        scope_type=RBACElementType(scoped_perm_input.scope_type.value),
                         scope_id=scoped_perm_input.scope_id,
-                        entity_type=scoped_perm_input.entity_type,
+                        entity_type=RBACElementType(scoped_perm_input.entity_type.value),
                         operation=scoped_perm_input.operation,
                     )
                 )
@@ -356,7 +320,7 @@ class PermissionDBSource:
                 obj_perm_creator = Creator(
                     spec=ObjectPermissionCreatorSpec(
                         role_id=input_data.role_id,
-                        entity_type=obj_perm_input.entity_type,
+                        entity_type=RBACElementType(obj_perm_input.entity_type.value),
                         entity_id=obj_perm_input.entity_id,
                         operation=obj_perm_input.operation,
                         status=obj_perm_input.status,
@@ -623,31 +587,6 @@ class PermissionDBSource:
             items = [row.PermissionRow.to_data() for row in result.rows]
 
             return PermissionListResult(
-                items=items,
-                total_count=result.total_count,
-                has_next_page=result.has_next_page,
-                has_previous_page=result.has_previous_page,
-            )
-
-    async def search_object_permissions(
-        self,
-        querier: BatchQuerier,
-        scope: ObjectPermissionSearchScope | None = None,
-    ) -> ObjectPermissionListResult:
-        """Searches object permissions with pagination and filtering."""
-        async with self._db.begin_readonly_session_read_committed() as db_sess:
-            query = sa.select(ObjectPermissionRow)
-
-            result = await execute_batch_querier(
-                db_sess,
-                query,
-                querier,
-                scope,
-            )
-
-            items = [row.ObjectPermissionRow.to_data() for row in result.rows]
-
-            return ObjectPermissionListResult(
                 items=items,
                 total_count=result.total_count,
                 has_next_page=result.has_next_page,

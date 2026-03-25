@@ -10,6 +10,7 @@ import pytest
 from dateutil.tz import tzutc
 
 from ai.backend.common.data.endpoint.types import EndpointLifecycle
+from ai.backend.common.types import RuntimeVariant
 from ai.backend.manager.data.deployment.types import (
     DeploymentInfo,
     DeploymentMetadata,
@@ -41,6 +42,9 @@ def mock_deployment_repo() -> AsyncMock:
     repo.fetch_auto_scaling_rules_by_endpoint_ids = AsyncMock(return_value={})
     repo.fetch_metrics_for_autoscaling = AsyncMock(return_value=MagicMock())
     repo.calculate_desired_replicas_for_deployment = AsyncMock(return_value=None)
+    mock_revision_spec = MagicMock()
+    mock_revision_spec.execution.runtime_variant = RuntimeVariant.CUSTOM
+    repo.get_revision_spec_from_endpoint = AsyncMock(return_value=mock_revision_spec)
     return repo
 
 

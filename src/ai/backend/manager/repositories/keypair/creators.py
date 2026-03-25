@@ -6,7 +6,7 @@ import uuid
 from dataclasses import dataclass
 from typing import override
 
-from ai.backend.manager.data.keypair.types import GeneratedKeyPairData, KeyPairCreator
+from ai.backend.manager.data.keypair.types import KeyPairCreator, KeyPairSecrets
 from ai.backend.manager.models.keypair import KeyPairRow
 from ai.backend.manager.repositories.base import CreatorSpec
 
@@ -16,7 +16,7 @@ class KeyPairCreatorSpec(CreatorSpec[KeyPairRow]):
     """CreatorSpec for keypair creation with RBAC support."""
 
     creator: KeyPairCreator
-    generated_data: GeneratedKeyPairData
+    generated_data: KeyPairSecrets
     user_id: uuid.UUID
     email: str
 

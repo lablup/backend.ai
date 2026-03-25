@@ -2,8 +2,9 @@
 
 from __future__ import annotations
 
-from datetime import datetime
-from typing import Any, cast
+import uuid as uuid_mod
+from datetime import UTC, datetime, timedelta
+from typing import Any, NamedTuple, cast
 from uuid import UUID
 
 import sqlalchemy as sa
@@ -14,21 +15,32 @@ from ai.backend.common.metrics.metric import DomainType, LayerType
 from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPolicy
 from ai.backend.common.resilience.policies.retry import BackoffStrategy, RetryArgs, RetryPolicy
 from ai.backend.common.resilience.resilience import Resilience
+from ai.backend.manager.data.auth.login_session_types import LoginHistoryData, LoginSessionData
 from ai.backend.manager.data.auth.types import GroupMembershipData, UserData
-from ai.backend.manager.errors.auth import GroupMembershipNotFoundError, UserCreationError
+from ai.backend.manager.data.common.types import SearchResult
+from ai.backend.manager.errors.auth import (
+    ActiveLoginSessionExistsError,
+    AuthorizationFailed,
+    GroupMembershipNotFoundError,
+    UserCreationError,
+)
 from ai.backend.manager.errors.common import InternalServerError
 from ai.backend.manager.models.group import association_groups_users, groups
-from ai.backend.manager.models.hasher.types import PasswordInfo
+from ai.backend.manager.models.hasher.types import HashInfo, PasswordInfo
 from ai.backend.manager.models.keypair import keypairs
+from ai.backend.manager.models.login_session.enums import LoginAttemptResult, LoginSessionStatus
+from ai.backend.manager.models.login_session.row import LoginHistoryRow, LoginSessionRow
 from ai.backend.manager.models.user import (
     UserRole,
     UserRow,
     UserStatus,
     check_credential,
-    check_credential_with_migration,
+    compare_to_hashed_password,
     users,
 )
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.manager.repositories.base.querier import BatchQuerier, execute_batch_querier
+from ai.backend.manager.repositories.base.types import SearchScope
 
 auth_db_source_resilience = Resilience(
     policies=[
@@ -43,6 +55,17 @@ auth_db_source_resilience = Resilience(
         ),
     ]
 )
+
+
+class LoginSessionCreationResult(NamedTuple):
+    session_token: str
+    expires_at: datetime
+
+
+class CredentialVerificationResult(NamedTuple):
+    user: sa.RowMapping
+    session_token: str
+    expires_at: datetime
 
 
 class AuthDBSource:
@@ -274,19 +297,209 @@ class AuthDBSource:
                 raise ValueError("Cannot delegate an unknown user")
             return row.uuid, row.role, row.domain_name
 
+    async def _check_password(
+        self,
+        conn: sa.ext.asyncio.AsyncConnection,
+        row: sa.Row[Any],
+        target_password_info: PasswordInfo,
+    ) -> None:
+        """Verify password against stored hash. Raises AuthorizationFailed on mismatch."""
+        if row.password is None:
+            raise AuthorizationFailed("User credential mismatch.")
+        try:
+            if not compare_to_hashed_password(target_password_info.password, row.password):
+                raise AuthorizationFailed("User credential mismatch.")
+        except ValueError:
+            raise AuthorizationFailed("User credential mismatch.") from None
+
+    async def _check_active_session(
+        self,
+        conn: sa.ext.asyncio.AsyncConnection,
+        user_id: UUID,
+        force: bool,
+    ) -> None:
+        """Check for unexpired active sessions.
+
+        Raises ActiveLoginSessionExistsError if an active session exists and force is False.
+        If force is True, invalidates existing active sessions instead.
+        """
+        active_cond = (
+            (LoginSessionRow.__table__.c.user_id == user_id)
+            & (LoginSessionRow.__table__.c.status == LoginSessionStatus.ACTIVE)
+            & (LoginSessionRow.__table__.c.expires_at > sa.func.now())
+        )
+        result = await conn.execute(
+            sa.select(sa.func.count()).select_from(LoginSessionRow.__table__).where(active_cond)
+        )
+        active_count = result.scalar() or 0
+
+        if active_count > 0 and not force:
+            raise ActiveLoginSessionExistsError(
+                extra_msg="An active login session already exists. Use force=true to override."
+            )
+
+        if active_count > 0 and force:
+            await self._invalidate_active_sessions(conn, user_id)
+
+    async def _invalidate_active_sessions(
+        self,
+        conn: sa.ext.asyncio.AsyncConnection,
+        user_id: UUID,
+    ) -> None:
+        """Invalidate all unexpired active sessions for a user."""
+        await conn.execute(
+            sa.update(LoginSessionRow.__table__)
+            .where(
+                (LoginSessionRow.__table__.c.user_id == user_id)
+                & (LoginSessionRow.__table__.c.status == LoginSessionStatus.ACTIVE)
+                & (LoginSessionRow.__table__.c.expires_at > sa.func.now())
+            )
+            .values(
+                status=LoginSessionStatus.INVALIDATED,
+                invalidated_at=sa.func.now(),
+            )
+        )
+
+    async def _migrate_password_hash(
+        self,
+        conn: sa.ext.asyncio.AsyncConnection,
+        row: sa.Row[Any],
+        domain_name: str,
+        email: str,
+        target_password_info: PasswordInfo,
+    ) -> None:
+        """Migrate password hash if the current algorithm differs from the target."""
+        current_hash_info = HashInfo.from_hash_string(row.password)
+        if target_password_info.need_migration(current_hash_info):
+            await conn.execute(
+                sa.update(users)
+                .where((users.c.email == email) & (users.c.domain_name == domain_name))
+                .values(password=target_password_info)
+            )
+
+    async def _record_login_history(
+        self,
+        conn: sa.ext.asyncio.AsyncConnection,
+        user_id: UUID,
+        domain_name: str,
+        result: LoginAttemptResult,
+        fail_reason: str | None,
+    ) -> None:
+        """Insert a login history record."""
+        await conn.execute(
+            sa.insert(LoginHistoryRow.__table__).values(
+                user_id=user_id,
+                domain_name=domain_name,
+                result=result,
+                fail_reason=fail_reason,
+            )
+        )
+
     @auth_db_source_resilience.apply()
     async def verify_credential_with_migration(
         self,
         domain_name: str,
         email: str,
         target_password_info: PasswordInfo,
-    ) -> sa.RowMapping:
-        """Verify credentials with password migration support."""
-        return await check_credential_with_migration(
-            db=self._db,
-            domain=domain_name,
-            email=email,
-            target_password_info=target_password_info,
+        *,
+        force: bool = False,
+        max_session_age: int = 604800,
+    ) -> CredentialVerificationResult:
+        """Verify credentials, check active sessions, create login session, and record attempt.
+
+        All DB operations happen atomically. Returns user row, session_token, and expires_at.
+        Caller is responsible for writing session data to Valkey after this returns.
+        """
+        async with self._db.connect() as conn:
+            result = await conn.execute(
+                sa.select(users)
+                .select_from(users)
+                .where((users.c.email == email) & (users.c.domain_name == domain_name)),
+            )
+            row = result.first()
+
+            if row is None:
+                raise AuthorizationFailed("User credential mismatch.")
+
+            try:
+                await self._check_password(conn, row, target_password_info)
+                await self._check_active_session(conn, row.uuid, force)
+                await self._migrate_password_hash(
+                    conn, row, domain_name, email, target_password_info
+                )
+            except AuthorizationFailed:
+                await self._record_login_history(
+                    conn,
+                    row.uuid,
+                    domain_name,
+                    LoginAttemptResult.FAILED_INVALID_CREDENTIALS,
+                    fail_reason="Invalid credentials",
+                )
+                await conn.commit()
+                raise
+            except ActiveLoginSessionExistsError:
+                await self._record_login_history(
+                    conn,
+                    row.uuid,
+                    domain_name,
+                    LoginAttemptResult.FAILED_SESSION_ALREADY_EXISTS,
+                    fail_reason="Active login session already exists",
+                )
+                await conn.commit()
+                raise
+
+            await self._record_login_history(
+                conn, row.uuid, domain_name, LoginAttemptResult.SUCCESS, fail_reason=None
+            )
+
+            # Create login session
+            session_token = uuid_mod.uuid4().hex
+            now = datetime.now(UTC)
+            expires_at = now + timedelta(seconds=max_session_age)
+            access_key = row.main_access_key or ""
+            await conn.execute(
+                sa.insert(LoginSessionRow.__table__).values(
+                    user_id=row.uuid,
+                    access_key=access_key,
+                    session_token=session_token,
+                    status=LoginSessionStatus.ACTIVE,
+                    expires_at=expires_at,
+                )
+            )
+
+            await conn.commit()
+            row_mapping: sa.RowMapping = row._mapping
+            return CredentialVerificationResult(
+                user=row_mapping,
+                session_token=session_token,
+                expires_at=expires_at,
+            )
+
+    @auth_db_source_resilience.apply()
+    async def create_login_session(
+        self,
+        user_id: UUID,
+        access_key: str,
+        max_session_age: int = 604800,
+    ) -> LoginSessionCreationResult:
+        """Create a login session for hook-based authentication paths."""
+        session_token = uuid_mod.uuid4().hex
+        now = datetime.now(UTC)
+        expires_at = now + timedelta(seconds=max_session_age)
+        async with self._db.connect() as conn:
+            await conn.execute(
+                sa.insert(LoginSessionRow.__table__).values(
+                    user_id=user_id,
+                    access_key=access_key,
+                    session_token=session_token,
+                    status=LoginSessionStatus.ACTIVE,
+                    expires_at=expires_at,
+                )
+            )
+            await conn.commit()
+        return LoginSessionCreationResult(
+            session_token=session_token,
+            expires_at=expires_at,
         )
 
     @auth_db_source_resilience.apply()
@@ -329,3 +542,77 @@ class AuthDBSource:
             if result is None:
                 raise InternalServerError("Failed to retrieve current database timestamp")
             return result
+
+    # --- Login Session ---
+
+    @auth_db_source_resilience.apply()
+    @auth_db_source_resilience.apply()
+    async def invalidate_session_by_token(self, session_token: str) -> None:
+        """Invalidate a single login session by its token."""
+        async with self._db.begin_session() as db_session:
+            query = (
+                sa.update(LoginSessionRow)
+                .where(
+                    (LoginSessionRow.session_token == session_token)
+                    & (LoginSessionRow.status == LoginSessionStatus.ACTIVE)
+                )
+                .values(
+                    status=LoginSessionStatus.INVALIDATED,
+                    invalidated_at=sa.func.now(),
+                )
+            )
+            await db_session.execute(query)
+
+    async def invalidate_sessions_by_user(self, user_id: UUID) -> None:
+        """Invalidate all active login sessions for a user."""
+        async with self._db.begin_session() as db_session:
+            query = (
+                sa.update(LoginSessionRow)
+                .where(
+                    (LoginSessionRow.user_id == user_id)
+                    & (LoginSessionRow.status == LoginSessionStatus.ACTIVE)
+                )
+                .values(
+                    status=LoginSessionStatus.INVALIDATED,
+                    invalidated_at=sa.func.now(),
+                )
+            )
+            await db_session.execute(query)
+
+    @auth_db_source_resilience.apply()
+    async def search_login_sessions(
+        self,
+        scope: SearchScope,
+        querier: BatchQuerier,
+    ) -> SearchResult[LoginSessionData]:
+        """Search login sessions with scope and batch querier."""
+        async with self._db.begin_readonly_session() as db_session:
+            query = sa.select(LoginSessionRow)
+            result = await execute_batch_querier(db_session, query, querier, scope=scope)
+            items = [row.LoginSessionRow.to_data() for row in result.rows]
+            return SearchResult(
+                items=items,
+                total_count=result.total_count,
+                has_next_page=result.has_next_page,
+                has_previous_page=result.has_previous_page,
+            )
+
+    # --- Login History ---
+
+    @auth_db_source_resilience.apply()
+    async def search_login_history(
+        self,
+        scope: SearchScope,
+        querier: BatchQuerier,
+    ) -> SearchResult[LoginHistoryData]:
+        """Search login history with scope and batch querier."""
+        async with self._db.begin_readonly_session() as db_session:
+            query = sa.select(LoginHistoryRow)
+            result = await execute_batch_querier(db_session, query, querier, scope=scope)
+            items = [row.LoginHistoryRow.to_data() for row in result.rows]
+            return SearchResult(
+                items=items,
+                total_count=result.total_count,
+                has_next_page=result.has_next_page,
+                has_previous_page=result.has_previous_page,
+            )

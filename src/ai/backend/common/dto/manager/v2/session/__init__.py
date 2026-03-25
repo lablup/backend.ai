@@ -3,6 +3,7 @@ Session DTOs v2 for Manager API.
 """
 
 from ai.backend.common.dto.manager.v2.session.request import (
+    AdminSearchSessionsInput,
     CommitSessionInput,
     DestroySessionInput,
     DownloadFilesInput,
@@ -20,6 +21,7 @@ from ai.backend.common.dto.manager.v2.session.request import (
     UploadFilesInput,
 )
 from ai.backend.common.dto.manager.v2.session.response import (
+    AdminSearchSessionsPayload,
     CommitSessionPayload,
     DestroySessionPayload,
     ExecutePayload,
@@ -51,6 +53,7 @@ __all__ = (
     "SessionStatusFilter",
     "SessionTypeEnum",
     # Input models (request)
+    "AdminSearchSessionsInput",
     "CommitSessionInput",
     "DestroySessionInput",
     "DownloadFilesInput",
@@ -67,6 +70,7 @@ __all__ = (
     "StartServiceInput",
     "UploadFilesInput",
     # Node and Payload models (response)
+    "AdminSearchSessionsPayload",
     "CommitSessionPayload",
     "DestroySessionPayload",
     "ExecutePayload",

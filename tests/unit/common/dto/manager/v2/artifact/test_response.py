@@ -84,12 +84,12 @@ class TestArtifactRevisionNode:
             id=uuid.uuid4(),
             artifact_id=uuid.uuid4(),
             version="v2.0",
-            size=2048,
+            size="2048",
             status=ArtifactStatus.PULLED,
             created_at=now,
             updated_at=now,
         )
-        assert node.size == 2048
+        assert node.size == "2048"
 
     def test_serialization_round_trip(self) -> None:
         node = _make_revision_node()

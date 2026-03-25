@@ -1,3 +1,14 @@
+from ai.backend.manager.actions.action.rbac_session import (
+    SessionCreateRBACAction,
+    SessionGetRBACAction,
+    SessionGrantAllRBACAction,
+    SessionGrantHardDeleteRBACAction,
+    SessionGrantReadRBACAction,
+    SessionGrantUpdateRBACAction,
+    SessionHardDeleteRBACAction,
+    SessionSearchRBACAction,
+    SessionUpdateRBACAction,
+)
 from ai.backend.manager.actions.monitors.monitor import ActionMonitor
 from ai.backend.manager.actions.validators import ActionValidators
 from ai.backend.manager.services.agent.processors import AgentProcessors
@@ -264,6 +275,7 @@ def create_services(args: ServiceArgs) -> Services:
             hook_plugin_ctx=args.hook_plugin_ctx,
             auth_repository=repositories.auth.repository,
             config_provider=args.config_provider,
+            valkey_session_client=args.valkey_session_client,
         ),
         notification=NotificationService(
             repository=repositories.notification.repository,
@@ -278,6 +290,17 @@ def create_services(args: ServiceArgs) -> Services:
         ),
         permission_controller=PermissionControllerService(
             repository=repositories.permission_controller.repository,
+            rbac_action_registry=[
+                SessionCreateRBACAction,
+                SessionGetRBACAction,
+                SessionSearchRBACAction,
+                SessionUpdateRBACAction,
+                SessionHardDeleteRBACAction,
+                SessionGrantAllRBACAction,
+                SessionGrantReadRBACAction,
+                SessionGrantUpdateRBACAction,
+                SessionGrantHardDeleteRBACAction,
+            ],
         ),
         vfs_storage=VFSStorageService(
             vfs_storage_repository=repositories.vfs_storage.repository,

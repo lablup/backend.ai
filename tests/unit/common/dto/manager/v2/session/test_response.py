@@ -14,11 +14,15 @@ from ai.backend.common.dto.manager.v2.session.response import (
     RestartSessionPayload,
     SearchSessionsPayload,
     SessionLifecycleInfo,
+    SessionLifecycleInfoGQLDTO,
     SessionMetadataInfo,
+    SessionMetadataInfoGQLDTO,
     SessionNetworkInfo,
     SessionNode,
     SessionResourceInfo,
+    SessionResourceInfoGQLDTO,
     SessionRuntimeInfo,
+    SessionRuntimeInfoGQLDTO,
     StartServicePayload,
 )
 
@@ -39,16 +43,46 @@ def _make_metadata(
     )
 
 
+def _make_metadata_gql_dto(
+    session_type: str = "interactive",
+    cluster_mode: str = "single-node",
+    cluster_size: int = 1,
+    priority: int = 0,
+    is_preemptible: bool = False,
+) -> SessionMetadataInfoGQLDTO:
+    return SessionMetadataInfoGQLDTO(
+        session_type=session_type,
+        cluster_mode=cluster_mode,
+        cluster_size=cluster_size,
+        priority=priority,
+        is_preemptible=is_preemptible,
+    )
+
+
 def _make_resource() -> SessionResourceInfo:
     return SessionResourceInfo()
+
+
+def _make_resource_gql_dto() -> SessionResourceInfoGQLDTO:
+    return SessionResourceInfoGQLDTO(allocation=None)
 
 
 def _make_lifecycle(status: str = "RUNNING", result: str = "undefined") -> SessionLifecycleInfo:
     return SessionLifecycleInfo(status=status, result=result)
 
 
+def _make_lifecycle_gql_dto(
+    status: str = "RUNNING", result: str = "undefined"
+) -> SessionLifecycleInfoGQLDTO:
+    return SessionLifecycleInfoGQLDTO(status=status, result=result)
+
+
 def _make_runtime() -> SessionRuntimeInfo:
     return SessionRuntimeInfo()
+
+
+def _make_runtime_gql_dto() -> SessionRuntimeInfoGQLDTO:
+    return SessionRuntimeInfoGQLDTO()
 
 
 def _make_network(use_host_network: bool = False) -> SessionNetworkInfo:
@@ -58,10 +92,13 @@ def _make_network(use_host_network: bool = False) -> SessionNetworkInfo:
 def _make_session_node() -> SessionNode:
     return SessionNode(
         id=uuid.uuid4(),
-        metadata=_make_metadata(),
-        resource=_make_resource(),
-        lifecycle=_make_lifecycle(),
-        runtime=_make_runtime(),
+        domain_name="default",
+        user_id=uuid.uuid4(),
+        project_id=uuid.uuid4(),
+        metadata=_make_metadata_gql_dto(),
+        resource=_make_resource_gql_dto(),
+        lifecycle=_make_lifecycle_gql_dto(),
+        runtime=_make_runtime_gql_dto(),
         network=_make_network(),
     )
 
@@ -267,10 +304,13 @@ class TestSessionNode:
         session_id = uuid.uuid4()
         node = SessionNode(
             id=session_id,
-            metadata=_make_metadata(),
-            resource=_make_resource(),
-            lifecycle=_make_lifecycle(),
-            runtime=_make_runtime(),
+            domain_name="default",
+            user_id=uuid.uuid4(),
+            project_id=uuid.uuid4(),
+            metadata=_make_metadata_gql_dto(),
+            resource=_make_resource_gql_dto(),
+            lifecycle=_make_lifecycle_gql_dto(),
+            runtime=_make_runtime_gql_dto(),
             network=_make_network(),
         )
         assert node.id == session_id

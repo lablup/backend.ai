@@ -4,7 +4,12 @@ from __future__ import annotations
 
 from typing import Self
 
-from prometheus_client import Counter, Histogram
+from ai.backend.common.metrics.safe import (
+    SafeCounter as Counter,
+)
+from ai.backend.common.metrics.safe import (
+    SafeHistogram as Histogram,
+)
 
 
 class VolumeStatsMetricObserver:

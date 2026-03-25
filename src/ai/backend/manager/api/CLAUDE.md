@@ -11,13 +11,15 @@
 
 ## Calling Services
 
-- Handlers MUST invoke services through a Processor, not directly:
+**New API (v2):** Handlers MUST call Adapters (`self._adapters.{domain}.method(dto_input)`),
+never Processors or Services directly. Adapters are shared with the GQL layer.
+
+**Legacy REST (v1):** Handlers call Processors directly:
   ```python
-  # CORRECT — handler receives specific processor via constructor DI
   await self._foo.wait_for_complete(FooAction(...))
-  # WRONG — never call service methods directly
-  await self._foo_service.do_something(...)
   ```
+
+**All new API endpoints MUST follow the v2 pattern.**
 
 ## Naming
 
@@ -33,6 +35,14 @@
 
 - HTTP request/response translation only.
 - Auth decorators (`@auth_required_for_method`).
+
+## Adapter `my_` Pattern
+
+For self-service (`my_`) endpoints, the Adapter method handles authentication internally:
+- The Adapter calls `current_user()` internally to obtain the user context.
+- The Adapter constructs the `SearchScope` from the user context.
+- The GQL resolver / REST handler does NOT pass scope — only the search input DTO.
+- This keeps authentication logic inside the adapter, not scattered across resolvers.
 
 ## What Does NOT Belong Here
 

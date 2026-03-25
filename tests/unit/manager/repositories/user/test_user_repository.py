@@ -13,7 +13,7 @@ import pytest
 import sqlalchemy as sa
 
 from ai.backend.common.data.permission.types import EntityType, ScopeType
-from ai.backend.common.types import ResourceSlot
+from ai.backend.common.types import ReadableCIDR, ResourceSlot
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.user.types import UserData
 from ai.backend.manager.errors.user import UserConflict, UserCreationBadRequest, UserNotFound
@@ -52,7 +52,7 @@ from ai.backend.manager.repositories.user.creators import UserCreatorSpec
 from ai.backend.manager.repositories.user.repository import UserRepository
 from ai.backend.manager.repositories.user.updaters import UserUpdaterSpec
 from ai.backend.manager.services.user.types import UserCreateSpec, UserUpdateSpec
-from ai.backend.manager.types import OptionalState
+from ai.backend.manager.types import OptionalState, TriState
 from ai.backend.testutils.db import with_tables
 
 
@@ -650,8 +650,8 @@ class TestUserRepository:
     ) -> None:
         """Test successful user update"""
         updater_spec = UserUpdaterSpec(
-            full_name=OptionalState.update("Updated Name"),
-            description=OptionalState.update("Updated Description"),
+            full_name=TriState.update("Updated Name"),
+            description=TriState.update("Updated Description"),
         )
         updater = Updater(spec=updater_spec, pk_value=sample_user_email)
 
@@ -736,7 +736,7 @@ class TestUserRepository:
     ) -> None:
         """Test user update when user not found"""
         updater_spec = UserUpdaterSpec(
-            full_name=OptionalState.update("Updated Name"),
+            full_name=TriState.update("Updated Name"),
         )
         updater = Updater(spec=updater_spec, pk_value="nonexistent@example.com")
 
@@ -899,8 +899,8 @@ class TestUserRepository:
         update_items: list[UserUpdateSpec] = []
         for i, user_data in enumerate(create_result.successes):
             updater_spec = UserUpdaterSpec(
-                full_name=OptionalState.update(f"Updated Name {i}"),
-                description=OptionalState.update(f"Updated Description {i}"),
+                full_name=TriState.update(f"Updated Name {i}"),
+                description=TriState.update(f"Updated Description {i}"),
             )
             update_items.append(UserUpdateSpec(user_id=user_data.uuid, updater_spec=updater_spec))
 
@@ -956,13 +956,13 @@ class TestUserRepository:
             UserUpdateSpec(
                 user_id=real_user.uuid,
                 updater_spec=UserUpdaterSpec(
-                    full_name=OptionalState.update("Updated Name"),
+                    full_name=TriState.update("Updated Name"),
                 ),
             ),
             UserUpdateSpec(
                 user_id=non_existent_user_id,
                 updater_spec=UserUpdaterSpec(
-                    full_name=OptionalState.update("Should Fail"),
+                    full_name=TriState.update("Should Fail"),
                 ),
             ),
         ]
@@ -1028,6 +1028,70 @@ class TestUserDataConversion:
         assert user_data.role == user_row.role
         assert user_data.status == user_row.status
         assert user_data.domain_name == user_row.domain_name
+
+    def test_user_data_from_row_converts_readable_cidr_to_str(self) -> None:
+        """Test that UserData.from_row() converts ReadableCIDR objects to str for allowed_client_ip."""
+        user_row = UserRow(
+            uuid=uuid.uuid4(),
+            username="testuser",
+            email="test@example.com",
+            password="hashed_password",
+            need_password_change=False,
+            full_name="Test User",
+            description="Test Description",
+            status=UserStatus.ACTIVE,
+            status_info="admin-requested",
+            domain_name="default",
+            role=UserRole.USER,
+            resource_policy="default",
+            allowed_client_ip=[
+                ReadableCIDR("192.168.1.0/24"),
+                ReadableCIDR("10.0.0.0/8"),
+            ],
+            totp_activated=False,
+            totp_activated_at=None,
+            sudo_session_enabled=False,
+            main_access_key="test_access_key",
+            container_uid=None,
+            container_main_gid=None,
+            container_gids=None,
+        )
+
+        user_data = UserData.from_row(user_row)
+
+        assert user_data.allowed_client_ip is not None
+        assert user_data.allowed_client_ip == ["192.168.1.0/24", "10.0.0.0/8"]
+        for ip in user_data.allowed_client_ip:
+            assert isinstance(ip, str)
+
+    def test_user_data_from_row_with_none_allowed_client_ip(self) -> None:
+        """Test that UserData.from_row() passes through None for allowed_client_ip."""
+        user_row = UserRow(
+            uuid=uuid.uuid4(),
+            username="testuser",
+            email="test@example.com",
+            password="hashed_password",
+            need_password_change=False,
+            full_name="Test User",
+            description="Test Description",
+            status=UserStatus.ACTIVE,
+            status_info="admin-requested",
+            domain_name="default",
+            role=UserRole.USER,
+            resource_policy="default",
+            allowed_client_ip=None,
+            totp_activated=False,
+            totp_activated_at=None,
+            sudo_session_enabled=False,
+            main_access_key="test_access_key",
+            container_uid=None,
+            container_main_gid=None,
+            container_gids=None,
+        )
+
+        user_data = UserData.from_row(user_row)
+
+        assert user_data.allowed_client_ip is None
 
     def test_user_status_validation(self) -> None:
         """Test user status validation"""

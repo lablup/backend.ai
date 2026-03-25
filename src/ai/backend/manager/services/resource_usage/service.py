@@ -50,6 +50,8 @@ class ResourceUsageService:
         return SearchDomainUsageBucketsActionResult(
             items=result.items,
             total_count=result.total_count,
+            has_next_page=result.has_next_page,
+            has_previous_page=result.has_previous_page,
         )
 
     # Project Usage Buckets
@@ -67,6 +69,8 @@ class ResourceUsageService:
         return SearchProjectUsageBucketsActionResult(
             items=result.items,
             total_count=result.total_count,
+            has_next_page=result.has_next_page,
+            has_previous_page=result.has_previous_page,
         )
 
     # User Usage Buckets
@@ -84,6 +88,8 @@ class ResourceUsageService:
         return SearchUserUsageBucketsActionResult(
             items=result.items,
             total_count=result.total_count,
+            has_next_page=result.has_next_page,
+            has_previous_page=result.has_previous_page,
         )
 
     # Scoped Usage Bucket Searches
@@ -100,6 +106,8 @@ class ResourceUsageService:
         return SearchScopedDomainUsageBucketsActionResult(
             items=result.items,
             total_count=result.total_count,
+            has_next_page=result.has_next_page,
+            has_previous_page=result.has_previous_page,
         )
 
     async def search_scoped_project_usage_buckets(
@@ -114,6 +122,8 @@ class ResourceUsageService:
         return SearchScopedProjectUsageBucketsActionResult(
             items=result.items,
             total_count=result.total_count,
+            has_next_page=result.has_next_page,
+            has_previous_page=result.has_previous_page,
         )
 
     async def search_scoped_user_usage_buckets(
@@ -128,4 +138,6 @@ class ResourceUsageService:
         return SearchScopedUserUsageBucketsActionResult(
             items=result.items,
             total_count=result.total_count,
+            has_next_page=result.has_next_page,
+            has_previous_page=result.has_previous_page,
         )

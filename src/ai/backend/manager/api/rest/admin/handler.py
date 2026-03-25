@@ -207,13 +207,13 @@ class AdminHandler:
         params = body.parsed
         gql_deps = self._gql_deps
         gql_ctx = StrawberryGQLContext(
-            processors=gql_deps.processors,
             config_provider=gql_deps.config_provider,
             event_hub=gql_deps.processors.events.event_hub,
             event_fetcher=gql_deps.processors.events.event_fetcher,
             gql_adapter=gql_deps.strawberry_gql_adapter,
             data_loaders=gql_deps.strawberry_data_loaders,
             metric_observer=gql_deps.metric_observer,
+            adapters=gql_deps.adapters,
         )
         result = await self._strawberry_schema.execute(
             params.query,

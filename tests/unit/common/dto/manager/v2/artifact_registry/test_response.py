@@ -275,18 +275,18 @@ class TestSearchArtifactsPayload:
 class TestScanArtifactModelsPayload:
     """Tests for ScanArtifactModelsPayload model."""
 
-    def test_creation_with_artifacts(self) -> None:
-        node = _make_artifact_node()
-        payload = ScanArtifactModelsPayload(artifacts=[node])
-        assert len(payload.artifacts) == 1
+    def test_creation_with_artifact_revision(self) -> None:
+        node = _make_artifact_revision_node()
+        payload = ScanArtifactModelsPayload(artifact_revision=[node])
+        assert len(payload.artifact_revision) == 1
 
     def test_round_trip_serialization(self) -> None:
-        node = _make_artifact_node()
-        payload = ScanArtifactModelsPayload(artifacts=[node])
+        node = _make_artifact_revision_node()
+        payload = ScanArtifactModelsPayload(artifact_revision=[node])
         json_str = payload.model_dump_json()
         restored = ScanArtifactModelsPayload.model_validate_json(json_str)
-        assert len(restored.artifacts) == 1
-        assert restored.artifacts[0].id == node.id
+        assert len(restored.artifact_revision) == 1
+        assert restored.artifact_revision[0].id == node.id
 
 
 class TestRetrieveArtifactModelPayload:

@@ -54,6 +54,7 @@ class AuthSuccessResponse(AuthResponse):
     secret_key: str
     role: str
     status: str
+    session_token: str
     type: AuthTokenType = AuthTokenType.KEYPAIR
 
     def to_dict(self) -> dict[str, str]:

@@ -1,4 +1,6 @@
+import json
 import logging
+import time
 from collections import ChainMap
 from collections.abc import Mapping
 from datetime import datetime
@@ -7,6 +9,7 @@ from typing import Any, cast
 from aiohttp import web
 from sqlalchemy import RowMapping
 
+from ai.backend.common.clients.valkey_client.valkey_session.client import ValkeySessionClient
 from ai.backend.common.dto.manager.auth.types import AuthTokenType
 from ai.backend.common.exception import InvalidAPIParameters
 from ai.backend.common.plugin.hook import ALL_COMPLETED, FIRST_COMPLETED, PASSED, HookPluginContext
@@ -55,6 +58,7 @@ from ai.backend.manager.services.auth.actions.get_ssh_keypair import (
     GetSSHKeypairAction,
     GetSSHKeypairActionResult,
 )
+from ai.backend.manager.services.auth.actions.logout import LogoutAction, LogoutActionResult
 from ai.backend.manager.services.auth.actions.resolve_access_key_scope import (
     ResolveAccessKeyScopeAction,
     ResolveAccessKeyScopeResult,
@@ -62,6 +66,14 @@ from ai.backend.manager.services.auth.actions.resolve_access_key_scope import (
 from ai.backend.manager.services.auth.actions.resolve_user_scope import (
     ResolveUserScopeAction,
     ResolveUserScopeResult,
+)
+from ai.backend.manager.services.auth.actions.search_login_history import (
+    SearchLoginHistoryAction,
+    SearchLoginHistoryActionResult,
+)
+from ai.backend.manager.services.auth.actions.search_login_sessions import (
+    SearchLoginSessionsAction,
+    SearchLoginSessionsActionResult,
 )
 from ai.backend.manager.services.auth.actions.signout import SignoutAction, SignoutActionResult
 from ai.backend.manager.services.auth.actions.signup import SignupAction, SignupActionResult
@@ -90,16 +102,19 @@ class AuthService:
     _hook_plugin_ctx: HookPluginContext
     _auth_repository: AuthRepository
     _config_provider: ManagerConfigProvider
+    _valkey_session_client: ValkeySessionClient
 
     def __init__(
         self,
         hook_plugin_ctx: HookPluginContext,
         auth_repository: AuthRepository,
         config_provider: ManagerConfigProvider,
+        valkey_session_client: ValkeySessionClient,
     ) -> None:
         self._hook_plugin_ctx = hook_plugin_ctx
         self._auth_repository = auth_repository
         self._config_provider = config_provider
+        self._valkey_session_client = valkey_session_client
 
     async def get_role(self, action: GetRoleAction) -> GetRoleActionResult:
         group_role = None
@@ -140,22 +155,31 @@ class AuthService:
         auth_config = self._config_provider.config.auth
         if hook_result.status != PASSED:
             raise RejectedByHook.from_hook_result(hook_result)
+        expires_at: datetime | None = None
+        session_token = ""
         if hook_result.result:
             # Passed one of AUTHORIZED hook
             user = hook_result.result
         else:
             # No AUTHORIZE hook is defined (proceed with normal login)
+            # Credential check + login history recording happen atomically
+            # inside the repository layer.
             target_password_info = PasswordInfo(
                 password=action.password,
                 algorithm=auth_config.password_hash_algorithm,
                 rounds=auth_config.password_hash_rounds,
                 salt_size=auth_config.password_hash_salt_size,
             )
-            user = await self._auth_repository.check_credential_with_migration(
+            cred_result = await self._auth_repository.check_credential_with_migration(
                 action.domain_name,
                 action.email,
                 target_password_info=target_password_info,
+                force=action.force,
+                max_session_age=auth_config.login_session_max_age,
             )
+            user = cred_result.user
+            session_token = cred_result.session_token
+            expires_at = cred_result.expires_at
         if user.status == UserStatus.BEFORE_VERIFICATION:
             raise AuthorizationFailed("This account needs email verification.")
         if user.status in INACTIVE_USER_STATUSES:
@@ -180,6 +204,38 @@ class AuthService:
                 authorization_result=None,
             )
 
+        # Create login session for hook-based auth (normal path already creates in repository)
+        if not session_token:
+            session_result = await self._auth_repository.create_login_session(
+                user_id=user.uuid,
+                access_key=main_keypair_row.access_key,
+                max_session_age=auth_config.login_session_max_age,
+            )
+            session_token = session_result.session_token
+            expires_at = session_result.expires_at
+
+        # Store session data in Valkey (same format as Webserver's RedisStorage)
+        if session_token and expires_at:
+            valkey_session_data = json.dumps({
+                "created": int(time.time()),
+                "expiration_dt": int(expires_at.timestamp()),
+                "session": {
+                    "authenticated": True,
+                    "token": {
+                        "type": "keypair",
+                        "access_key": main_keypair_row.access_key,
+                        "secret_key": main_keypair_row.secret_key or "",
+                        "role": user.role,
+                        "status": user.status,
+                    },
+                },
+            })
+            await self._valkey_session_client.set_session_data(
+                f"AIOHTTP_SESSION_{session_token}",
+                valkey_session_data,
+                auth_config.login_session_max_age,
+            )
+
         return AuthorizeActionResult(
             stream_response=None,
             authorization_result=AuthorizationResult(
@@ -188,6 +244,7 @@ class AuthService:
                 user_id=user.uuid,
                 role=user.role,
                 status=user.status,
+                session_token=session_token,
             ),
         )
 
@@ -300,6 +357,10 @@ class AuthService:
             secret_key=sk,
         )
 
+    async def logout(self, action: LogoutAction) -> LogoutActionResult:
+        await self._auth_repository.invalidate_login_session_by_token(action.session_token)
+        return LogoutActionResult(success=True)
+
     async def signout(self, action: SignoutAction) -> SignoutActionResult:
         if action.email != action.requester_email:
             raise GenericForbidden("Not the account owner")
@@ -309,6 +370,7 @@ class AuthService:
             email,
             action.password,
         )
+        await self._auth_repository.invalidate_user_login_sessions(action.user_id)
         await self._auth_repository.deactivate_user_and_keypairs(email)
 
         return SignoutActionResult(success=True)
@@ -515,6 +577,22 @@ class AuthService:
             owner_uuid=owner_uuid,
             owner_role=owner_role,
         )
+
+    async def search_login_sessions(
+        self, action: SearchLoginSessionsAction
+    ) -> SearchLoginSessionsActionResult:
+        result = await self._auth_repository.search_login_sessions(
+            scope=action.scope, querier=action.querier
+        )
+        return SearchLoginSessionsActionResult(result=result)
+
+    async def search_login_history(
+        self, action: SearchLoginHistoryAction
+    ) -> SearchLoginHistoryActionResult:
+        result = await self._auth_repository.search_login_history(
+            scope=action.scope, querier=action.querier
+        )
+        return SearchLoginHistoryActionResult(result=result)
 
     async def _check_password_age(self, user: RowMapping, auth_config: AuthConfig | None) -> None:
         if (

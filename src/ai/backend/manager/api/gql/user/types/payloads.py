@@ -4,51 +4,107 @@ from __future__ import annotations
 
 from uuid import UUID
 
-import strawberry
+from ai.backend.common.dto.manager.auth.response import MyIpResponse as MyIpResponseDTO
+from ai.backend.common.dto.manager.v2.user.response import (
+    BulkCreateUsersPayload as BulkCreateUsersPayloadDTO,
+)
+from ai.backend.common.dto.manager.v2.user.response import (
+    BulkCreateUserV2Error as BulkCreateUserV2ErrorDTO,
+)
+from ai.backend.common.dto.manager.v2.user.response import (
+    BulkPurgeUsersPayload as BulkPurgeUsersPayloadDTO,
+)
+from ai.backend.common.dto.manager.v2.user.response import (
+    BulkPurgeUserV2Error as BulkPurgeUserV2ErrorDTO,
+)
+from ai.backend.common.dto.manager.v2.user.response import (
+    BulkUpdateUsersPayload as BulkUpdateUsersPayloadDTO,
+)
+from ai.backend.common.dto.manager.v2.user.response import (
+    BulkUpdateUserV2Error as BulkUpdateUserV2ErrorDTO,
+)
+from ai.backend.common.dto.manager.v2.user.response import (
+    CreateUserPayload as CreateUserPayloadDTO,
+)
+from ai.backend.common.dto.manager.v2.user.response import (
+    DeleteUserPayload as DeleteUserPayloadDTO,
+)
+from ai.backend.common.dto.manager.v2.user.response import (
+    DeleteUsersPayload as DeleteUsersPayloadDTO,
+)
+from ai.backend.common.dto.manager.v2.user.response import (
+    PurgeUserPayload as PurgeUserPayloadDTO,
+)
+from ai.backend.common.dto.manager.v2.user.response import (
+    PurgeUsersPayload as PurgeUsersPayloadDTO,
+)
+from ai.backend.common.dto.manager.v2.user.response import (
+    UpdateMyAllowedClientIPPayload as UpdateMyAllowedClientIPPayloadDTO,
+)
+from ai.backend.common.dto.manager.v2.user.response import (
+    UpdateUserPayload as UpdateUserPayloadDTO,
+)
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
+from ai.backend.manager.api.gql.decorators import (
+    BackendAIGQLMeta,
+    gql_field,
+    gql_pydantic_type,
+)
+from ai.backend.manager.api.gql.pydantic_compat import PydanticOutputMixin
 
 from .node import UserV2GQL
 
 # Create User Payloads
 
 
-@strawberry.type(
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version="26.2.0",
+        description="Payload for user creation mutation.",
+    ),
+    model=CreateUserPayloadDTO,
     name="CreateUserV2Payload",
-    description="Added in 26.2.0. Payload for user creation mutation.",
 )
-class CreateUserPayloadGQL:
+class CreateUserPayloadGQL(PydanticOutputMixin[CreateUserPayloadDTO]):
     """Payload for single user creation."""
 
-    user: UserV2GQL = strawberry.field(description="The newly created user.")
+    user: UserV2GQL = gql_field(description="The newly created user.")
     # Note: keypair field can be added when KeyPairGQL is available
     # keypair: KeyPairGQL = strawberry.field(
     #     description="The automatically generated keypair for the user."
     # )
 
 
-@strawberry.type(
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version="26.2.0",
+        description="Error information for a failed user in bulk creation.",
+    ),
+    model=BulkCreateUserV2ErrorDTO,
     name="BulkCreateUserV2Error",
-    description="Added in 26.2.0. Error information for a failed user in bulk creation.",
 )
 class BulkCreateUserV2ErrorGQL:
     """Error information for a single user that failed during bulk creation."""
 
-    index: int = strawberry.field(description="Original position in the input list.")
-    username: str = strawberry.field(description="Username of the user that failed.")
-    email: str = strawberry.field(description="Email of the user that failed.")
-    message: str = strawberry.field(description="Error message describing the failure.")
+    index: int = gql_field(description="Original position in the input list.")
+    username: str = gql_field(description="Username of the user that failed.")
+    email: str = gql_field(description="Email of the user that failed.")
+    message: str = gql_field(description="Error message describing the failure.")
 
 
-@strawberry.type(
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version="26.2.0",
+        description="Payload for bulk user creation mutation.",
+    ),
+    model=BulkCreateUsersPayloadDTO,
     name="BulkCreateUsersV2Payload",
-    description="Added in 26.2.0. Payload for bulk user creation mutation.",
 )
-class BulkCreateUsersV2PayloadGQL:
+class BulkCreateUsersV2PayloadGQL(PydanticOutputMixin[BulkCreateUsersPayloadDTO]):
     """Payload for bulk user creation."""
 
-    created_users: list[UserV2GQL] = strawberry.field(
-        description="List of successfully created users."
-    )
-    failed: list[BulkCreateUserV2ErrorGQL] = strawberry.field(
+    created_users: list[UserV2GQL] = gql_field(description="List of successfully created users.")
+    failed: list[BulkCreateUserV2ErrorGQL] = gql_field(
         description="List of errors for users that failed to create."
     )
 
@@ -56,38 +112,48 @@ class BulkCreateUsersV2PayloadGQL:
 # Update User Payloads
 
 
-@strawberry.type(
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version="26.3.0",
+        description="Payload for user update mutation.",
+    ),
+    model=UpdateUserPayloadDTO,
     name="UpdateUserV2Payload",
-    description="Added in 26.3.0. Payload for user update mutation.",
 )
-class UpdateUserPayloadGQL:
+class UpdateUserPayloadGQL(PydanticOutputMixin[UpdateUserPayloadDTO]):
     """Payload for user update."""
 
-    user: UserV2GQL = strawberry.field(description="The updated user.")
+    user: UserV2GQL = gql_field(description="The updated user.")
 
 
-@strawberry.type(
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version="26.3.0",
+        description="Error information for a failed user in bulk update.",
+    ),
+    model=BulkUpdateUserV2ErrorDTO,
     name="BulkUpdateUserV2Error",
-    description="Added in 26.3.0. Error information for a failed user in bulk update.",
 )
 class BulkUpdateUserV2ErrorGQL:
     """Error information for a single user that failed during bulk update."""
 
-    user_id: UUID = strawberry.field(description="UUID of the user that failed to update.")
-    message: str = strawberry.field(description="Error message describing the failure.")
+    user_id: UUID = gql_field(description="UUID of the user that failed to update.")
+    message: str = gql_field(description="Error message describing the failure.")
 
 
-@strawberry.type(
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version="26.3.0",
+        description="Payload for bulk user update mutation.",
+    ),
+    model=BulkUpdateUsersPayloadDTO,
     name="BulkUpdateUsersV2Payload",
-    description="Added in 26.3.0. Payload for bulk user update mutation.",
 )
-class BulkUpdateUsersV2PayloadGQL:
+class BulkUpdateUsersV2PayloadGQL(PydanticOutputMixin[BulkUpdateUsersPayloadDTO]):
     """Payload for bulk user update."""
 
-    updated_users: list[UserV2GQL] = strawberry.field(
-        description="List of successfully updated users."
-    )
-    failed: list[BulkUpdateUserV2ErrorGQL] = strawberry.field(
+    updated_users: list[UserV2GQL] = gql_field(description="List of successfully updated users.")
+    failed: list[BulkUpdateUserV2ErrorGQL] = gql_field(
         description="List of errors for users that failed to update."
     )
 
@@ -95,72 +161,96 @@ class BulkUpdateUsersV2PayloadGQL:
 # Delete User Payloads
 
 
-@strawberry.type(
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version="26.2.0",
+        description="Payload for single user soft-delete mutation.",
+    ),
+    model=DeleteUserPayloadDTO,
     name="DeleteUserV2Payload",
-    description="Added in 26.2.0. Payload for single user soft-delete mutation.",
 )
 class DeleteUserPayloadGQL:
     """Payload for single user soft-delete."""
 
-    success: bool = strawberry.field(description="Whether the deletion was successful.")
+    success: bool = gql_field(description="Whether the deletion was successful.")
 
 
-@strawberry.type(
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version="26.2.0",
+        description="Payload for bulk user soft-delete mutation.",
+    ),
+    model=DeleteUsersPayloadDTO,
     name="DeleteUsersV2Payload",
-    description="Added in 26.2.0. Payload for bulk user soft-delete mutation.",
 )
 class DeleteUsersPayloadGQL:
     """Payload for bulk user soft-delete."""
 
-    deleted_count: int = strawberry.field(description="Number of users successfully soft-deleted.")
+    deleted_count: int = gql_field(description="Number of users successfully soft-deleted.")
 
 
 # Purge User Payloads
 
 
-@strawberry.type(
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version="26.2.0",
+        description="Payload for single user permanent deletion mutation.",
+    ),
+    model=PurgeUserPayloadDTO,
     name="PurgeUserV2Payload",
-    description="Added in 26.2.0. Payload for single user permanent deletion mutation.",
 )
 class PurgeUserPayloadGQL:
     """Payload for single user permanent deletion."""
 
-    success: bool = strawberry.field(description="Whether the purge was successful.")
+    success: bool = gql_field(description="Whether the purge was successful.")
 
 
-@strawberry.type(
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version="26.2.0",
+        description="Payload for bulk user permanent deletion mutation.",
+    ),
+    model=PurgeUsersPayloadDTO,
     name="PurgeUsersV2Payload",
-    description="Added in 26.2.0. Payload for bulk user permanent deletion mutation.",
 )
 class PurgeUsersPayloadGQL:
     """Payload for bulk user permanent deletion."""
 
-    purged_count: int = strawberry.field(description="Number of users successfully purged.")
-    failed_user_ids: list[UUID] = strawberry.field(
+    purged_count: int = gql_field(description="Number of users successfully purged.")
+    failed_user_ids: list[UUID] = gql_field(
         description="List of user UUIDs that failed to purge, if any."
     )
 
 
-@strawberry.type(
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version="26.3.0",
+        description="Error information for a failed user in bulk purge.",
+    ),
+    model=BulkPurgeUserV2ErrorDTO,
     name="BulkPurgeUserV2Error",
-    description="Added in 26.3.0. Error information for a failed user in bulk purge.",
 )
 class BulkPurgeUserV2ErrorGQL:
     """Error information for a single user that failed during bulk purge."""
 
-    user_id: UUID = strawberry.field(description="UUID of the user that failed to purge.")
-    message: str = strawberry.field(description="Error message describing the failure.")
+    user_id: UUID = gql_field(description="UUID of the user that failed to purge.")
+    message: str = gql_field(description="Error message describing the failure.")
 
 
-@strawberry.type(
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version="26.3.0",
+        description="Payload for bulk user permanent deletion mutation.",
+    ),
+    model=BulkPurgeUsersPayloadDTO,
     name="BulkPurgeUsersV2Payload",
-    description="Added in 26.3.0. Payload for bulk user permanent deletion mutation.",
 )
 class BulkPurgeUsersV2PayloadGQL:
     """Payload for bulk user permanent deletion."""
 
-    purged_count: int = strawberry.field(description="Number of users successfully purged.")
-    failed: list[BulkPurgeUserV2ErrorGQL] = strawberry.field(
+    purged_count: int = gql_field(description="Number of users successfully purged.")
+    failed: list[BulkPurgeUserV2ErrorGQL] = gql_field(
         description="List of errors for users that failed to purge."
     )
 
@@ -168,11 +258,32 @@ class BulkPurgeUsersV2PayloadGQL:
 # IP Allowlist Payloads
 
 
-@strawberry.type(
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version="26.4.0",
+        description="Payload for updating the current user's allowed client IP list.",
+    ),
+    model=UpdateMyAllowedClientIPPayloadDTO,
     name="UpdateMyAllowedClientIPPayload",
-    description="Added in 26.4.0. Payload for updating the current user's allowed client IP list.",
 )
 class UpdateMyAllowedClientIPPayloadGQL:
     """Payload for updating the current user's allowed client IP list."""
 
-    success: bool = strawberry.field(description="Whether the update was successful.")
+    success: bool = gql_field(description="Whether the update was successful.")
+
+
+# My Client IP Query Payload
+
+
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Query result returning the current client's IP address.",
+    ),
+    model=MyIpResponseDTO,
+    name="MyClientIp",
+)
+class MyClientIpGQL:
+    """Query result returning the current client's IP address."""
+
+    client_ip: str = gql_field(description="The client's IP address as seen by the server.")

@@ -19,6 +19,7 @@ class AuthorizeAction(AuthAction):
     password: str
     stoken: str | None
     otp: str | None
+    force: bool = False
 
     @override
     def entity_id(self) -> str | None:

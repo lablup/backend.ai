@@ -121,7 +121,7 @@ class ArtifactRegistryProcessors(AbstractProcessorPackage):
     search_reservoir_registries: ActionProcessor[
         SearchReservoirRegistriesAction, SearchReservoirRegistriesActionResult
     ]
-    get_registry_meta: ActionProcessor[
+    get_registry_meta: SingleEntityActionProcessor[
         GetArtifactRegistryMetaAction, GetArtifactRegistryMetaActionResult
     ]
     get_registry_metas: ActionProcessor[
@@ -192,6 +192,12 @@ class ArtifactRegistryProcessors(AbstractProcessorPackage):
             validators=[validators.rbac.single_entity],
         )
 
+        self.get_registry_meta = SingleEntityActionProcessor(
+            service.get_registry_meta,
+            action_monitors,
+            validators=[validators.rbac.single_entity],
+        )
+
         # Internal/batch actions without RBAC
         self.get_huggingface_registries = ActionProcessor(
             service.get_huggingface_registries, action_monitors
@@ -199,7 +205,6 @@ class ArtifactRegistryProcessors(AbstractProcessorPackage):
         self.get_reservoir_registries = ActionProcessor(
             service.get_reservoir_registries, action_monitors
         )
-        self.get_registry_meta = ActionProcessor(service.get_registry_meta, action_monitors)
         self.get_registry_metas = ActionProcessor(service.get_registry_metas, action_monitors)
 
     @override

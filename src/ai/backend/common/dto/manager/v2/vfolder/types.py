@@ -14,6 +14,7 @@ from ai.backend.common.dto.manager.field import (
     VFolderOwnershipTypeField,
     VFolderPermissionField,
 )
+from ai.backend.common.dto.manager.v2.common import OrderDirection
 from ai.backend.common.types import VFolderUsageMode
 
 __all__ = (
@@ -29,13 +30,6 @@ __all__ = (
     "VFolderUsageInfo",
     "VFolderUsageMode",
 )
-
-
-class OrderDirection(StrEnum):
-    """Order direction for sorting."""
-
-    ASC = "asc"
-    DESC = "desc"
 
 
 class VFolderOrderField(StrEnum):

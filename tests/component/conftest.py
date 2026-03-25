@@ -38,6 +38,7 @@ from ai.backend.common.clients.valkey_client.valkey_image.client import ValkeyIm
 from ai.backend.common.clients.valkey_client.valkey_live.client import ValkeyLiveClient
 from ai.backend.common.clients.valkey_client.valkey_rate_limit.client import ValkeyRateLimitClient
 from ai.backend.common.clients.valkey_client.valkey_schedule.client import ValkeyScheduleClient
+from ai.backend.common.clients.valkey_client.valkey_session.client import ValkeySessionClient
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
 from ai.backend.common.clients.valkey_client.valkey_stream.client import ValkeyStreamClient
 from ai.backend.common.configs.etcd import EtcdConfig
@@ -1015,6 +1016,11 @@ async def valkey_clients(
             db_id=REDIS_RATE_LIMIT_DB,
             human_readable_name="test_ratelimit",
         ),
+        session=await ValkeySessionClient.create(
+            valkey_profile_target.profile_target(RedisRole.STATISTICS),
+            db_id=REDIS_STATISTICS_DB,
+            human_readable_name="test_session",
+        ),
     )
     try:
         yield clients
@@ -1181,6 +1187,7 @@ def auth_processors(
     database_engine: ExtendedAsyncSAEngine,
     config_provider: ManagerConfigProvider,
     hook_plugin_ctx: HookPluginContext,
+    valkey_clients: ValkeyClients,
 ) -> AuthProcessors:
     """Real AuthProcessors wired with real AuthService and AuthRepository."""
     repo = AuthRepository(database_engine)
@@ -1188,6 +1195,7 @@ def auth_processors(
         hook_plugin_ctx=hook_plugin_ctx,
         auth_repository=repo,
         config_provider=config_provider,
+        valkey_session_client=valkey_clients.session,
     )
     return AuthProcessors(
         service=service,

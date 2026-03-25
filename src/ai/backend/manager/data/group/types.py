@@ -7,6 +7,7 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any, override
 
+from ai.backend.common.data.permission.types import RBACElementType
 from ai.backend.common.types import ResourceSlot, VFolderHostPermissionMap
 from ai.backend.manager.data.permission.id import ScopeId
 from ai.backend.manager.data.permission.types import (
@@ -63,9 +64,9 @@ class GroupData:
     def role_name(self) -> str:
         return f"project-{str(self.id)[:8]}-admin"
 
-    def entity_operations(self) -> Mapping[EntityType, Iterable[OperationType]]:
+    def entity_operations(self) -> Mapping[RBACElementType, Iterable[OperationType]]:
         return {
-            entity: OperationType.admin_operations()
+            entity.to_element(): OperationType.admin_operations()
             for entity in EntityType.admin_accessible_entity_types_in_project()
         }
 

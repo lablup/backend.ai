@@ -55,13 +55,19 @@ def build_api_metric_middleware(metric: APIMetricObserverProtocol) -> Middleware
         finally:
             end = time.perf_counter()
             elapsed = end - start
-            metric.observe_request(
-                method=method,
-                endpoint=endpoint,
-                error_code=error_code,
-                status_code=status_code,
-                duration=elapsed,
-            )
+            try:
+                metric.observe_request(
+                    method=method,
+                    endpoint=endpoint,
+                    error_code=error_code,
+                    status_code=status_code,
+                    duration=elapsed,
+                )
+            except Exception:
+                # Defense-in-depth: safe metric types handle mmap errors
+                # internally, but this ensures metric failures never mask
+                # the original request exception in the finally block.
+                pass
 
     return metric_middleware
 

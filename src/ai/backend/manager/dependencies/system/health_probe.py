@@ -18,6 +18,7 @@ from ai.backend.common.health_checker import (
     EtcdHealthChecker,
     HealthProbe,
     HealthProbeOptions,
+    PrometheusHealthChecker,
     ServiceHealthChecker,
     ValkeyHealthChecker,
 )
@@ -48,6 +49,7 @@ class HealthProbeDependency(DependencyProvider[HealthProbeInput, HealthProbe]):
 
         await probe.register(DatabaseHealthChecker(db=setup_input.db))
         await probe.register(EtcdHealthChecker(etcd=setup_input.etcd))
+        await probe.register(PrometheusHealthChecker())
         await probe.register(
             ValkeyHealthChecker(
                 clients={

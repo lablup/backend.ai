@@ -10,6 +10,10 @@ import strawberry
 from strawberry import Info
 
 from ai.backend.common.bgtask.types import BgtaskStatus
+from ai.backend.common.dto.manager.v2.background_task import (
+    BackgroundTaskEventPayloadNode,
+    BgtaskEventTypeDTO,
+)
 from ai.backend.common.events.event_types.bgtask.broadcast import (
     BgtaskAlreadyDoneEvent,
     BgtaskCancelledEvent,
@@ -19,7 +23,14 @@ from ai.backend.common.events.event_types.bgtask.broadcast import (
 )
 from ai.backend.common.events.hub.propagators.cache import WithCachePropagator
 from ai.backend.common.events.types import EventCacheDomain, EventDomain
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.logging import BraceStyleAdapter
+from ai.backend.manager.api.gql.decorators import (
+    BackendAIGQLMeta,
+    gql_enum,
+    gql_pydantic_type,
+    gql_subscription,
+)
 from ai.backend.manager.errors.bgtask import InvalidBgtaskId
 
 if TYPE_CHECKING:
@@ -28,7 +39,7 @@ if TYPE_CHECKING:
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
-@strawberry.enum(description="Type of background task event")
+@gql_enum(BackendAIGQLMeta(added_version="24.3.0", description="Type of background task event"))
 class BgtaskEventType(StrEnum):
     """Enum representing background task event types."""
 
@@ -38,10 +49,17 @@ class BgtaskEventType(StrEnum):
     FAILED = "FAILED"
 
 
-@strawberry.type(description="Background task event payload")
-class BackgroundTaskEventPayload:
-    """
-    Unified payload for all background task events.
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version="24.3.0",
+        description="Background task event payload.",
+    ),
+    model=BackgroundTaskEventPayloadNode,
+    name="BackgroundTaskEventPayload",
+)
+class BackgroundTaskEventPayloadGQL:
+    """Unified payload for all background task events.
+
     Progress fields (current_progress, total_progress) are only populated for UPDATED events.
     """
 
@@ -52,77 +70,88 @@ class BackgroundTaskEventPayload:
     total_progress: float | None = None
 
     @classmethod
-    def from_updated_event(cls, event: BgtaskUpdatedEvent) -> BackgroundTaskEventPayload:
+    def from_updated_event(cls, event: BgtaskUpdatedEvent) -> BackgroundTaskEventPayloadGQL:
         """Create payload from BgtaskUpdatedEvent."""
-        return cls(
-            task_id=strawberry.ID(str(event.task_id)),
-            event_type=BgtaskEventType.UPDATED,
+        dto = BackgroundTaskEventPayloadNode(
+            task_id=str(event.task_id),
+            event_type=BgtaskEventTypeDTO.UPDATED,
             message=event.message or "",
             current_progress=event.current_progress,
             total_progress=event.total_progress,
         )
+        return cls.from_pydantic(dto)  # type: ignore[attr-defined, no-any-return]
 
     @classmethod
-    def from_done_event(cls, event: BgtaskDoneEvent) -> BackgroundTaskEventPayload:
+    def from_done_event(cls, event: BgtaskDoneEvent) -> BackgroundTaskEventPayloadGQL:
         """Create payload from BgtaskDoneEvent."""
-        return cls(
-            task_id=strawberry.ID(str(event.task_id)),
-            event_type=BgtaskEventType.DONE,
+        dto = BackgroundTaskEventPayloadNode(
+            task_id=str(event.task_id),
+            event_type=BgtaskEventTypeDTO.DONE,
             message=event.message or "",
         )
+        return cls.from_pydantic(dto)  # type: ignore[attr-defined, no-any-return]
 
     @classmethod
-    def from_cancelled_event(cls, event: BgtaskCancelledEvent) -> BackgroundTaskEventPayload:
+    def from_cancelled_event(cls, event: BgtaskCancelledEvent) -> BackgroundTaskEventPayloadGQL:
         """Create payload from BgtaskCancelledEvent."""
-        return cls(
-            task_id=strawberry.ID(str(event.task_id)),
-            event_type=BgtaskEventType.CANCELLED,
+        dto = BackgroundTaskEventPayloadNode(
+            task_id=str(event.task_id),
+            event_type=BgtaskEventTypeDTO.CANCELLED,
             message=event.message or "",
         )
+        return cls.from_pydantic(dto)  # type: ignore[attr-defined, no-any-return]
 
     @classmethod
-    def from_failed_event(cls, event: BgtaskFailedEvent) -> BackgroundTaskEventPayload:
+    def from_failed_event(cls, event: BgtaskFailedEvent) -> BackgroundTaskEventPayloadGQL:
         """Create payload from BgtaskFailedEvent."""
-        return cls(
-            task_id=strawberry.ID(str(event.task_id)),
-            event_type=BgtaskEventType.FAILED,
+        dto = BackgroundTaskEventPayloadNode(
+            task_id=str(event.task_id),
+            event_type=BgtaskEventTypeDTO.FAILED,
             message=event.message or "",
         )
+        return cls.from_pydantic(dto)  # type: ignore[attr-defined, no-any-return]
 
     @classmethod
-    def from_already_done_event(cls, event: BgtaskAlreadyDoneEvent) -> BackgroundTaskEventPayload:
+    def from_already_done_event(
+        cls, event: BgtaskAlreadyDoneEvent
+    ) -> BackgroundTaskEventPayloadGQL:
         """Create payload from BgtaskAlreadyDoneEvent based on its status."""
         match event.task_status:
             case BgtaskStatus.DONE | BgtaskStatus.PARTIAL_SUCCESS:
-                event_type = BgtaskEventType.DONE
+                event_type_dto = BgtaskEventTypeDTO.DONE
             case BgtaskStatus.CANCELLED:
-                event_type = BgtaskEventType.CANCELLED
+                event_type_dto = BgtaskEventTypeDTO.CANCELLED
             case BgtaskStatus.FAILED:
-                event_type = BgtaskEventType.FAILED
+                event_type_dto = BgtaskEventTypeDTO.FAILED
             case _:
                 log.warning("Unknown task status in BgtaskAlreadyDoneEvent: {}", event.task_status)
-                event_type = BgtaskEventType.FAILED
+                event_type_dto = BgtaskEventTypeDTO.FAILED
 
-        return cls(
-            task_id=strawberry.ID(str(event.task_id)),
-            event_type=event_type,
+        dto = BackgroundTaskEventPayloadNode(
+            task_id=str(event.task_id),
+            event_type=event_type_dto,
             message=event.message or "",
         )
+        return cls.from_pydantic(dto)  # type: ignore[attr-defined, no-any-return]
 
 
-@strawberry.subscription(  # type: ignore[misc]
-    description="Subscribe to real-time events for a specific background task. "
-    "Streams progress updates and completion events (done/cancelled/failed) "
-    "for the task lifecycle."
+@gql_subscription(  # type: ignore[misc]
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description=(
+            "Subscribe to real-time events for a specific background task. "
+            "Streams progress updates and completion events (done/cancelled/failed) "
+            "for the task lifecycle."
+        ),
+    )
 )
 async def background_task_events(
     task_id: strawberry.ID,
     info: Info[StrawberryGQLContext],
-) -> AsyncGenerator[BackgroundTaskEventPayload, None]:
-    """
-    Subscribe to background task events for a specific task.
+) -> AsyncGenerator[BackgroundTaskEventPayloadGQL, None]:
+    """Subscribe to background task events for a specific task.
 
-    This subscription streams events for a background task, including:
+    Streams events for a background task, including:
     - Progress updates (UPDATED events with current/total progress)
     - Completion events (DONE/CANCELLED/FAILED)
 
@@ -133,7 +162,7 @@ async def background_task_events(
         info: GraphQL context containing event hub and other services
 
     Yields:
-        BackgroundTaskEventPayload: Event payload for progress updates or completion
+        BackgroundTaskEventPayloadGQL: Event payload for progress updates or completion
     """
     # Parse and validate task_id
     try:
@@ -157,22 +186,22 @@ async def background_task_events(
         # Stream events from propagator
         async for event in propagator.receive(cache_id):
             # Convert event to payload
-            payload: BackgroundTaskEventPayload | None = None
+            payload: BackgroundTaskEventPayloadGQL | None = None
             is_close_event = False
 
             if isinstance(event, BgtaskUpdatedEvent):
-                payload = BackgroundTaskEventPayload.from_updated_event(event)
+                payload = BackgroundTaskEventPayloadGQL.from_updated_event(event)
             elif isinstance(event, BgtaskDoneEvent):
-                payload = BackgroundTaskEventPayload.from_done_event(event)
+                payload = BackgroundTaskEventPayloadGQL.from_done_event(event)
                 is_close_event = True
             elif isinstance(event, BgtaskCancelledEvent):
-                payload = BackgroundTaskEventPayload.from_cancelled_event(event)
+                payload = BackgroundTaskEventPayloadGQL.from_cancelled_event(event)
                 is_close_event = True
             elif isinstance(event, BgtaskFailedEvent):
-                payload = BackgroundTaskEventPayload.from_failed_event(event)
+                payload = BackgroundTaskEventPayloadGQL.from_failed_event(event)
                 is_close_event = True
             elif isinstance(event, BgtaskAlreadyDoneEvent):
-                payload = BackgroundTaskEventPayload.from_already_done_event(event)
+                payload = BackgroundTaskEventPayloadGQL.from_already_done_event(event)
                 is_close_event = True
             else:
                 log.warning(

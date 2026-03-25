@@ -16,6 +16,7 @@ from ai.backend.common.dto.manager.v2.fair_share.types import (
     ProjectUsageBucketOrderField,
     ResourceSlotEntryInfo,
     ResourceSlotInfo,
+    ResourceWeightEntryInfo,
     UsageBucketMetadataInfo,
     UserFairShareOrderField,
     UserUsageBucketOrderField,
@@ -26,10 +27,10 @@ class TestOrderDirection:
     """Tests for OrderDirection enum."""
 
     def test_asc_value(self) -> None:
-        assert OrderDirection.ASC.value == "asc"
+        assert OrderDirection.ASC.value == "ASC"
 
     def test_desc_value(self) -> None:
-        assert OrderDirection.DESC.value == "desc"
+        assert OrderDirection.DESC.value == "DESC"
 
     def test_member_count(self) -> None:
         assert len(OrderDirection) == 2
@@ -39,10 +40,10 @@ class TestOrderDirection:
         assert isinstance(OrderDirection.DESC, str)
 
     def test_from_string_asc(self) -> None:
-        assert OrderDirection("asc") is OrderDirection.ASC
+        assert OrderDirection("ASC") is OrderDirection.ASC
 
     def test_from_string_desc(self) -> None:
-        assert OrderDirection("desc") is OrderDirection.DESC
+        assert OrderDirection("DESC") is OrderDirection.DESC
 
 
 class TestDomainFairShareOrderField:
@@ -58,7 +59,7 @@ class TestDomainFairShareOrderField:
         assert DomainFairShareOrderField.CREATED_AT.value == "created_at"
 
     def test_member_count(self) -> None:
-        assert len(DomainFairShareOrderField) == 3
+        assert len(DomainFairShareOrderField) == 4
 
     def test_from_string(self) -> None:
         assert (
@@ -77,7 +78,7 @@ class TestProjectFairShareOrderField:
         assert ProjectFairShareOrderField.CREATED_AT.value == "created_at"
 
     def test_member_count(self) -> None:
-        assert len(ProjectFairShareOrderField) == 2
+        assert len(ProjectFairShareOrderField) == 4
 
 
 class TestUserFairShareOrderField:
@@ -90,7 +91,7 @@ class TestUserFairShareOrderField:
         assert UserFairShareOrderField.CREATED_AT.value == "created_at"
 
     def test_member_count(self) -> None:
-        assert len(UserFairShareOrderField) == 2
+        assert len(UserFairShareOrderField) == 4
 
 
 class TestDomainUsageBucketOrderField:
@@ -127,24 +128,24 @@ class TestResourceSlotEntryInfo:
     """Tests for ResourceSlotEntryInfo sub-model."""
 
     def test_creation_with_all_fields(self) -> None:
-        entry = ResourceSlotEntryInfo(resource_type="cpu", quantity="4")
+        entry = ResourceSlotEntryInfo(resource_type="cpu", quantity=Decimal("4"))
         assert entry.resource_type == "cpu"
-        assert entry.quantity == "4"
+        assert entry.quantity == Decimal("4")
 
     def test_cuda_resource_type(self) -> None:
-        entry = ResourceSlotEntryInfo(resource_type="cuda.shares", quantity="2.5")
+        entry = ResourceSlotEntryInfo(resource_type="cuda.shares", quantity=Decimal("2.5"))
         assert entry.resource_type == "cuda.shares"
-        assert entry.quantity == "2.5"
+        assert entry.quantity == Decimal("2.5")
 
     def test_round_trip_serialization(self) -> None:
-        entry = ResourceSlotEntryInfo(resource_type="mem", quantity="8192")
+        entry = ResourceSlotEntryInfo(resource_type="mem", quantity=Decimal("8192"))
         json_str = entry.model_dump_json()
         restored = ResourceSlotEntryInfo.model_validate_json(json_str)
         assert restored.resource_type == "mem"
-        assert restored.quantity == "8192"
+        assert restored.quantity == Decimal("8192")
 
     def test_model_dump_json(self) -> None:
-        entry = ResourceSlotEntryInfo(resource_type="cpu", quantity="2")
+        entry = ResourceSlotEntryInfo(resource_type="cpu", quantity=Decimal("2"))
         data = json.loads(entry.model_dump_json())
         assert data["resource_type"] == "cpu"
         assert data["quantity"] == "2"
@@ -159,8 +160,8 @@ class TestResourceSlotInfo:
 
     def test_creation_with_entries(self) -> None:
         entries = [
-            ResourceSlotEntryInfo(resource_type="cpu", quantity="4"),
-            ResourceSlotEntryInfo(resource_type="mem", quantity="8192"),
+            ResourceSlotEntryInfo(resource_type="cpu", quantity=Decimal("4")),
+            ResourceSlotEntryInfo(resource_type="mem", quantity=Decimal("8192")),
         ]
         info = ResourceSlotInfo(entries=entries)
         assert len(info.entries) == 2
@@ -168,20 +169,22 @@ class TestResourceSlotInfo:
         assert info.entries[1].resource_type == "mem"
 
     def test_round_trip_serialization(self) -> None:
-        entries = [ResourceSlotEntryInfo(resource_type="cpu", quantity="4")]
+        entries = [ResourceSlotEntryInfo(resource_type="cpu", quantity=Decimal("4"))]
         info = ResourceSlotInfo(entries=entries)
         json_str = info.model_dump_json()
         restored = ResourceSlotInfo.model_validate_json(json_str)
         assert len(restored.entries) == 1
         assert restored.entries[0].resource_type == "cpu"
-        assert restored.entries[0].quantity == "4"
+        assert restored.entries[0].quantity == Decimal("4")
 
 
 class TestFairShareSpecInfo:
     """Tests for FairShareSpecInfo sub-model."""
 
-    def _make_resource_slot(self) -> ResourceSlotInfo:
-        return ResourceSlotInfo(entries=[ResourceSlotEntryInfo(resource_type="cpu", quantity="1")])
+    def _make_resource_weights(self) -> list[ResourceWeightEntryInfo]:
+        return [
+            ResourceWeightEntryInfo(resource_type="cpu", weight=Decimal("1.0"), uses_default=False)
+        ]
 
     def test_creation_with_all_fields(self) -> None:
         spec = FairShareSpecInfo(
@@ -189,41 +192,44 @@ class TestFairShareSpecInfo:
             half_life_days=30,
             lookback_days=90,
             decay_unit_days=1,
-            resource_weights=self._make_resource_slot(),
+            resource_weights=self._make_resource_weights(),
         )
         assert spec.weight == Decimal("1.5")
         assert spec.half_life_days == 30
         assert spec.lookback_days == 90
         assert spec.decay_unit_days == 1
 
-    def test_weight_none_is_valid(self) -> None:
+    def test_uses_default_false_by_default(self) -> None:
         spec = FairShareSpecInfo(
-            weight=None,
+            weight=Decimal("1.0"),
             half_life_days=30,
             lookback_days=90,
             decay_unit_days=1,
-            resource_weights=self._make_resource_slot(),
+            resource_weights=self._make_resource_weights(),
         )
-        assert spec.weight is None
+        assert spec.uses_default is False
 
-    def test_default_weight_is_none(self) -> None:
+    def test_uses_default_true(self) -> None:
         spec = FairShareSpecInfo(
+            weight=Decimal("1.0"),
             half_life_days=30,
             lookback_days=90,
             decay_unit_days=1,
-            resource_weights=self._make_resource_slot(),
+            resource_weights=self._make_resource_weights(),
+            uses_default=True,
         )
-        assert spec.weight is None
+        assert spec.uses_default is True
 
     def test_nested_resource_weights(self) -> None:
         spec = FairShareSpecInfo(
+            weight=Decimal("1.0"),
             half_life_days=30,
             lookback_days=90,
             decay_unit_days=1,
-            resource_weights=self._make_resource_slot(),
+            resource_weights=self._make_resource_weights(),
         )
-        assert isinstance(spec.resource_weights, ResourceSlotInfo)
-        assert len(spec.resource_weights.entries) == 1
+        assert isinstance(spec.resource_weights, list)
+        assert len(spec.resource_weights) == 1
 
     def test_round_trip_serialization(self) -> None:
         spec = FairShareSpecInfo(
@@ -231,7 +237,7 @@ class TestFairShareSpecInfo:
             half_life_days=14,
             lookback_days=60,
             decay_unit_days=1,
-            resource_weights=self._make_resource_slot(),
+            resource_weights=self._make_resource_weights(),
         )
         json_str = spec.model_dump_json()
         restored = FairShareSpecInfo.model_validate_json(json_str)
@@ -244,7 +250,9 @@ class TestFairShareCalculationSnapshotInfo:
     """Tests for FairShareCalculationSnapshotInfo sub-model."""
 
     def _make_resource_slot(self) -> ResourceSlotInfo:
-        return ResourceSlotInfo(entries=[ResourceSlotEntryInfo(resource_type="cpu", quantity="4")])
+        return ResourceSlotInfo(
+            entries=[ResourceSlotEntryInfo(resource_type="cpu", quantity=Decimal("4"))]
+        )
 
     def test_creation_with_all_fields(self) -> None:
         snapshot = FairShareCalculationSnapshotInfo(
@@ -292,7 +300,7 @@ class TestUsageBucketMetadataInfo:
 
     def _make_resource_slot(self) -> ResourceSlotInfo:
         return ResourceSlotInfo(
-            entries=[ResourceSlotEntryInfo(resource_type="mem", quantity="2048")]
+            entries=[ResourceSlotEntryInfo(resource_type="mem", quantity=Decimal("2048"))]
         )
 
     def test_creation_with_all_fields(self) -> None:

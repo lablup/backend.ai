@@ -5,11 +5,11 @@ from .enums import (
     UserStatusEnumGQL,
 )
 from .filters import (
-    UserDomainNestedFilter,
+    UserDomainNestedFilterGQL,
     UserFilterGQL,
     UserOrderByGQL,
     UserOrderFieldGQL,
-    UserProjectNestedFilter,
+    UserProjectNestedFilterGQL,
     UserRoleEnumFilterGQL,
     UserStatusEnumFilterGQL,
 )
@@ -22,6 +22,7 @@ from .inputs import (
     CreateUserInputGQL,
     DeleteUsersInputGQL,
     PurgeUserInputGQL,
+    PurgeUserV2OptionsGQL,
     UpdateMyAllowedClientIPInputGQL,
     UpdateUserV2InputGQL,
 )
@@ -48,6 +49,7 @@ from .payloads import (
     CreateUserPayloadGQL,
     DeleteUserPayloadGQL,
     DeleteUsersPayloadGQL,
+    MyClientIpGQL,
     PurgeUserPayloadGQL,
     PurgeUsersPayloadGQL,
     UpdateMyAllowedClientIPPayloadGQL,
@@ -74,8 +76,8 @@ __all__ = [
     "UserV2Edge",
     "UserV2Connection",
     # Filters
-    "UserDomainNestedFilter",
-    "UserProjectNestedFilter",
+    "UserDomainNestedFilterGQL",
+    "UserProjectNestedFilterGQL",
     "UserFilterGQL",
     "UserOrderFieldGQL",
     "UserOrderByGQL",
@@ -93,6 +95,7 @@ __all__ = [
     "UpdateMyAllowedClientIPInputGQL",
     "DeleteUsersInputGQL",
     "PurgeUserInputGQL",
+    "PurgeUserV2OptionsGQL",
     "BulkPurgeUsersV2InputGQL",
     "BulkPurgeUsersV2OptionsGQL",
     # Payloads
@@ -109,4 +112,5 @@ __all__ = [
     "PurgeUsersPayloadGQL",
     "BulkPurgeUserV2ErrorGQL",
     "BulkPurgeUsersV2PayloadGQL",
+    "MyClientIpGQL",
 ]

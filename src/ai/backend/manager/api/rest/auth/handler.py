@@ -18,6 +18,7 @@ from ai.backend.common.api_handlers import APIResponse, BodyParam, QueryParam
 from ai.backend.common.dto.manager.auth.request import (
     AuthorizeRequest,
     GetRoleRequest,
+    LogoutRequest,
     SignoutRequest,
     SignupRequest,
     UpdateFullNameRequest,
@@ -30,6 +31,8 @@ from ai.backend.common.dto.manager.auth.response import (
     AuthorizeResponse,
     GetRoleResponse,
     GetSSHKeypairResponse,
+    LogoutResponse,
+    MyIpResponse,
     SignoutResponse,
     SignupResponse,
     SSHKeypairResponse,
@@ -50,6 +53,7 @@ from ai.backend.manager.services.auth.actions.authorize import AuthorizeAction
 from ai.backend.manager.services.auth.actions.generate_ssh_keypair import GenerateSSHKeypairAction
 from ai.backend.manager.services.auth.actions.get_role import GetRoleAction
 from ai.backend.manager.services.auth.actions.get_ssh_keypair import GetSSHKeypairAction
+from ai.backend.manager.services.auth.actions.logout import LogoutAction
 from ai.backend.manager.services.auth.actions.signout import SignoutAction
 from ai.backend.manager.services.auth.actions.signup import SignupAction
 from ai.backend.manager.services.auth.actions.update_full_name import UpdateFullNameAction
@@ -77,6 +81,18 @@ class AuthHandler:
         log.info("AUTH.TEST(ak:{})", ctx.access_key)
         resp = VerifyAuthResponse(authorized="yes", echo="")
         return APIResponse.build(HTTPStatus.OK, resp)
+
+    # ------------------------------------------------------------------
+    # get_my_ip (GET /auth/my-ip)
+    # ------------------------------------------------------------------
+
+    async def get_my_ip(self, request_ctx: RequestCtx) -> APIResponse:
+        log.info("AUTH.GET_MY_IP()")
+        raw_client_addr: str | None = (
+            request_ctx.request.headers.get("X-Forwarded-For") or request_ctx.request.remote
+        )
+        client_ip = raw_client_addr.split(",")[0].strip() if raw_client_addr else ""
+        return APIResponse.build(HTTPStatus.OK, MyIpResponse(client_ip=client_ip))
 
     # ------------------------------------------------------------------
     # test_post (POST /auth, /auth/test)
@@ -136,6 +152,7 @@ class AuthHandler:
             password=params.password,
             stoken=params.stoken,
             otp=params.otp,
+            force=params.force,
         )
         result = await self._auth.authorize.wait_for_complete(action)
 
@@ -151,9 +168,21 @@ class AuthHandler:
             secret_key=auth_result.secret_key,
             role=auth_result.role,
             status=auth_result.status,
+            session_token=auth_result.session_token,
         )
         resp = AuthorizeResponse(data=data)
         return APIResponse.build(HTTPStatus.OK, resp)
+
+    # ------------------------------------------------------------------
+    # logout (POST /auth/logout)
+    # ------------------------------------------------------------------
+
+    async def logout(self, body: BodyParam[LogoutRequest], ctx: RequestCtx) -> APIResponse:
+        params = body.parsed
+        log.info("AUTH.LOGOUT(session_token:{}...)", params.session_token[:8])
+        action = LogoutAction(session_token=params.session_token)
+        await self._auth.logout.wait_for_complete(action)
+        return APIResponse.build(HTTPStatus.OK, LogoutResponse())
 
     # ------------------------------------------------------------------
     # signup (POST /auth/signup)

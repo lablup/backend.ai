@@ -56,8 +56,7 @@ def create_deployment_cmd(
             "preferred_domain_name": "optional string"
         },
         "default_deployment_strategy": {
-            "type": "ROLLING",
-            "rollback_on_failure": false
+            "type": "ROLLING"
         },
         "desired_replica_count": 1,
         "initial_revision": {
@@ -134,7 +133,6 @@ def list_deployments_cmd(
                 if dep.deployment_policy:
                     pol = dep.deployment_policy
                     print(f"Policy Strategy: {pol.strategy}")
-                    print(f"Policy Rollback on Failure: {pol.rollback_on_failure}")
                     if pol.strategy_spec:
                         for key, value in pol.strategy_spec.items():
                             print(f"  {key}: {value}")
@@ -543,14 +541,6 @@ def info_policy_cmd(ctx: CLIContext, deployment_id: UUID) -> None:
     ),
 )
 @click.option(
-    "--rollback-on-failure",
-    is_flag=True,
-    default=False,
-    help=(
-        "Automatically revert to the previous stable revision if health checks fail during rollout."
-    ),
-)
-@click.option(
     "--max-surge",
     type=int,
     default=None,
@@ -590,7 +580,6 @@ def update_policy_cmd(
     ctx: CLIContext,
     deployment_id: UUID,
     strategy: DeploymentStrategy,
-    rollback_on_failure: bool,
     max_surge: int | None,
     max_unavailable: int | None,
     auto_promote: bool | None,
@@ -644,7 +633,6 @@ def update_policy_cmd(
         try:
             request = UpsertDeploymentPolicyRequest(
                 strategy=strategy,
-                rollback_on_failure=rollback_on_failure,
                 rolling_update=rolling_update,
                 blue_green=blue_green,
             )

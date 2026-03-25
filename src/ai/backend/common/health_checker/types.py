@@ -45,6 +45,10 @@ CID_ETCD: ComponentId = ComponentId("etcd")
 # Built-in component IDs for container
 CID_DOCKER: ComponentId = ComponentId("docker")
 
+# Prometheus metrics
+PROMETHEUS: ServiceGroup = ServiceGroup("prometheus")
+CID_PROMETHEUS_METRICS: ComponentId = ComponentId("metrics")
+
 
 @dataclass(frozen=True)
 class HealthCheckKey:

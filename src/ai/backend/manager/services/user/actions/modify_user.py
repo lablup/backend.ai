@@ -21,6 +21,8 @@ from ai.backend.manager.services.user.types import UserUpdateSpec
 __all__ = (
     "ModifyUserAction",
     "ModifyUserActionResult",
+    "ModifyUserByIdAction",
+    "ModifyUserByIdActionResult",
     "UserUpdateSpec",
     "BulkModifyUserAction",
     "BulkModifyUserActionResult",
@@ -53,6 +55,40 @@ class ModifyUserAction(UserSingleEntityAction):
 
 @dataclass
 class ModifyUserActionResult(UserSingleEntityActionResult):
+    data: UserData
+
+    @override
+    def entity_id(self) -> str | None:
+        return str(self.data.id)
+
+    @override
+    def target_entity_id(self) -> str:
+        return str(self.data.id)
+
+
+@dataclass
+class ModifyUserByIdAction(UserSingleEntityAction):
+    """UUID-based user update action for Strawberry v2 mutations."""
+
+    user_id: UUID
+    updater: Updater[UserRow]
+
+    @override
+    @classmethod
+    def operation_type(cls) -> ActionOperationType:
+        return ActionOperationType.UPDATE
+
+    @override
+    def target_entity_id(self) -> str:
+        return str(self.user_id)
+
+    @override
+    def target_element(self) -> RBACElementRef:
+        return RBACElementRef(RBACElementType.USER, str(self.user_id))
+
+
+@dataclass
+class ModifyUserByIdActionResult(UserSingleEntityActionResult):
     data: UserData
 
     @override

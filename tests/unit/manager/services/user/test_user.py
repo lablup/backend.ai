@@ -32,7 +32,7 @@ from ai.backend.manager.services.user.actions.purge_user import PurgeUserAction
 from ai.backend.manager.services.user.actions.user_month_stats import UserMonthStatsAction
 from ai.backend.manager.services.user.processors import UserProcessors
 from ai.backend.manager.services.user.service import UserService
-from ai.backend.manager.types import OptionalState
+from ai.backend.manager.types import OptionalState, TriState
 
 
 class TestUserServiceCompatibility:
@@ -173,8 +173,8 @@ class TestUserServiceCompatibility:
             email="user@example.com",
             updater=Updater(
                 spec=UserUpdaterSpec(
-                    full_name=OptionalState.update("Updated Name"),
-                    description=OptionalState.update("Senior Developer"),
+                    full_name=TriState.update("Updated Name"),
+                    description=TriState.update("Senior Developer"),
                 ),
                 pk_value="user@example.com",
             ),
@@ -308,8 +308,8 @@ class TestUserServiceCompatibility:
     def test_user_updater_spec_fields(self) -> None:
         """Test that UserUpdaterSpec supports expected modification fields."""
         spec = UserUpdaterSpec(
-            full_name=OptionalState.update("Updated Name"),
-            description=OptionalState.update("Updated Description"),
+            full_name=TriState.update("Updated Name"),
+            description=TriState.update("Updated Description"),
             role=OptionalState.update(UserRole.ADMIN),
             status=OptionalState.update(UserStatus.INACTIVE),
             totp_activated=OptionalState.update(True),

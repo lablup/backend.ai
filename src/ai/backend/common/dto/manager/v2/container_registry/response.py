@@ -17,7 +17,7 @@ __all__ = (
     "ContainerRegistryNode",
     "CreateContainerRegistryPayload",
     "DeleteContainerRegistryPayload",
-    "ListContainerRegistriesPayload",
+    "AdminSearchContainerRegistriesPayload",
     "UpdateContainerRegistryPayload",
 )
 
@@ -64,7 +64,10 @@ class DeleteContainerRegistryPayload(BaseResponseModel):
     id: UUID = Field(description="ID of the deleted container registry.")
 
 
-class ListContainerRegistriesPayload(BaseResponseModel):
-    """Payload for listing container registries."""
+class AdminSearchContainerRegistriesPayload(BaseResponseModel):
+    """Payload for listing container registries with pagination info."""
 
     items: list[ContainerRegistryNode] = Field(description="List of container registries.")
+    total_count: int = Field(description="Total number of matching registries.")
+    has_next_page: bool = Field(description="Whether more items exist after this page.")
+    has_previous_page: bool = Field(description="Whether items exist before this page.")

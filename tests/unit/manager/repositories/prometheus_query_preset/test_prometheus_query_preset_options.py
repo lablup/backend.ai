@@ -12,6 +12,10 @@ import pytest
 
 from ai.backend.common.data.filter_specs import StringMatchSpec
 from ai.backend.manager.models.prometheus_query_preset import PrometheusQueryPresetRow
+from ai.backend.manager.models.prometheus_query_preset.conditions import (
+    PrometheusQueryPresetConditions,
+)
+from ai.backend.manager.models.prometheus_query_preset.orders import PrometheusQueryPresetOrders
 from ai.backend.manager.models.prometheus_query_preset.row import PresetOptions
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.base import (
@@ -20,10 +24,6 @@ from ai.backend.manager.repositories.base import (
 )
 from ai.backend.manager.repositories.prometheus_query_preset import (
     PrometheusQueryPresetRepository,
-)
-from ai.backend.manager.repositories.prometheus_query_preset.options import (
-    PrometheusQueryPresetConditions,
-    PrometheusQueryPresetOrders,
 )
 from ai.backend.testutils.db import with_tables
 

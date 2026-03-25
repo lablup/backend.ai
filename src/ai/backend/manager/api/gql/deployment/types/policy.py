@@ -3,129 +3,162 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Self
 
-import strawberry
 from strawberry import ID
-from strawberry.relay import Node, NodeID
+from strawberry.relay import NodeID
 
 from ai.backend.common.data.model_deployment.types import DeploymentStrategy
-from ai.backend.manager.data.deployment.types import DeploymentPolicyData
-from ai.backend.manager.errors.deployment import InvalidDeploymentStrategySpec
-from ai.backend.manager.models.deployment_policy import BlueGreenSpec, RollingUpdateSpec
+from ai.backend.common.dto.manager.v2.deployment.request import (
+    BlueGreenConfigInput as BlueGreenConfigInputDTO,
+)
+from ai.backend.common.dto.manager.v2.deployment.request import (
+    RollingUpdateConfigInput as RollingUpdateConfigInputDTO,
+)
+from ai.backend.common.dto.manager.v2.deployment.request import (
+    UpsertDeploymentPolicyInput as UpsertDeploymentPolicyInputDTO,
+)
+from ai.backend.common.dto.manager.v2.deployment.response import (
+    DeploymentPolicyNode as DeploymentPolicyNodeDTO,
+)
+from ai.backend.common.dto.manager.v2.deployment.response import (
+    UpdateDeploymentPolicyPayloadDTO,
+)
+from ai.backend.common.dto.manager.v2.deployment.types import (
+    BlueGreenStrategySpecInfo,
+    DeploymentStrategySpecInfo,
+    RollingUpdateStrategySpecInfo,
+)
+from ai.backend.manager.api.gql.decorators import (
+    BackendAIGQLMeta,
+    PydanticInputMixin,
+    gql_enum,
+    gql_node_type,
+    gql_pydantic_input,
+    gql_pydantic_interface,
+    gql_pydantic_type,
+)
+from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin, PydanticOutputMixin
+from ai.backend.manager.api.gql.utils import dedent_strip
 
 # Enum defined here to avoid circular import with deployment.py
-DeploymentStrategyTypeGQL: type[DeploymentStrategy] = strawberry.enum(
+DeploymentStrategyTypeGQL: type[DeploymentStrategy] = gql_enum(
+    BackendAIGQLMeta(
+        added_version="25.19.0",
+        description="This enum represents the deployment strategy type of a model deployment, indicating the strategy used for deployment.",
+    ),
     DeploymentStrategy,
     name="DeploymentStrategyType",
-    description="Added in 25.19.0. This enum represents the deployment strategy type of a model deployment, indicating the strategy used for deployment.",
 )
 
 # ========== Output Types (Response) ==========
 
 
-@strawberry.interface(
+@gql_pydantic_interface(
+    BackendAIGQLMeta(
+        added_version="25.19.0",
+        description="Base interface for deployment strategy specifications.",
+    ),
+    model=DeploymentStrategySpecInfo,
     name="DeploymentStrategySpec",
-    description="Added in 25.19.0. Base interface for deployment strategy specifications.",
 )
 class DeploymentStrategySpecGQL:
     strategy: DeploymentStrategyTypeGQL
 
 
-@strawberry.type(
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version="25.19.0",
+        description="Rolling update strategy specification.",
+    ),
+    model=RollingUpdateStrategySpecInfo,
     name="RollingUpdateStrategySpec",
-    description="Added in 25.19.0. Rolling update strategy specification.",
 )
 class RollingUpdateStrategySpecGQL(DeploymentStrategySpecGQL):
+    strategy: DeploymentStrategyTypeGQL
     max_surge: int
     max_unavailable: int
 
 
-@strawberry.type(
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version="25.19.0",
+        description="Blue-green deployment strategy specification.",
+    ),
+    model=BlueGreenStrategySpecInfo,
     name="BlueGreenStrategySpec",
-    description="Added in 25.19.0. Blue-green deployment strategy specification.",
 )
 class BlueGreenStrategySpecGQL(DeploymentStrategySpecGQL):
+    strategy: DeploymentStrategyTypeGQL
     auto_promote: bool
     promote_delay_seconds: int
 
 
-@strawberry.type(
+@gql_node_type(
+    BackendAIGQLMeta(added_version="25.19.0", description="Deployment policy configuration."),
     name="DeploymentPolicy",
-    description="Added in 25.19.0. Deployment policy configuration.",
 )
-class DeploymentPolicyGQL(Node):
+class DeploymentPolicyGQL(PydanticNodeMixin[DeploymentPolicyNodeDTO]):
     id: NodeID[str]
     strategy_spec: DeploymentStrategySpecGQL
-    rollback_on_failure: bool
     created_at: datetime
     updated_at: datetime
-
-    @classmethod
-    def from_data(cls, data: DeploymentPolicyData) -> Self:
-        match data.strategy:
-            case DeploymentStrategy.ROLLING:
-                if not isinstance(data.strategy_spec, RollingUpdateSpec):
-                    raise InvalidDeploymentStrategySpec(
-                        "Expected RollingUpdateSpec for ROLLING strategy"
-                    )
-                return cls(
-                    id=ID(str(data.id)),
-                    strategy_spec=RollingUpdateStrategySpecGQL(
-                        strategy=DeploymentStrategyTypeGQL.ROLLING,
-                        max_surge=data.strategy_spec.max_surge,
-                        max_unavailable=data.strategy_spec.max_unavailable,
-                    ),
-                    rollback_on_failure=data.rollback_on_failure,
-                    created_at=data.created_at,
-                    updated_at=data.updated_at,
-                )
-            case DeploymentStrategy.BLUE_GREEN:
-                if not isinstance(data.strategy_spec, BlueGreenSpec):
-                    raise InvalidDeploymentStrategySpec(
-                        "Expected BlueGreenSpec for BLUE_GREEN strategy"
-                    )
-                return cls(
-                    id=ID(str(data.id)),
-                    strategy_spec=BlueGreenStrategySpecGQL(
-                        strategy=DeploymentStrategyTypeGQL.BLUE_GREEN,
-                        auto_promote=data.strategy_spec.auto_promote,
-                        promote_delay_seconds=data.strategy_spec.promote_delay_seconds,
-                    ),
-                    rollback_on_failure=data.rollback_on_failure,
-                    created_at=data.created_at,
-                    updated_at=data.updated_at,
-                )
 
 
 # ========== Input Types ==========
 
 
-@strawberry.input(
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description="Configuration for rolling update strategy.", added_version="25.19.0"
+    ),
     name="RollingUpdateConfigInput",
-    description="Added in 25.19.0. Configuration for rolling update strategy.",
 )
-class RollingUpdateConfigInputGQL:
+class RollingUpdateConfigInputGQL(PydanticInputMixin[RollingUpdateConfigInputDTO]):
     max_surge: int = 1
     max_unavailable: int = 0
 
-    def to_spec(self) -> RollingUpdateSpec:
-        return RollingUpdateSpec(
-            max_surge=self.max_surge,
-            max_unavailable=self.max_unavailable,
-        )
 
-
-@strawberry.input(
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description="Configuration for blue-green deployment strategy.", added_version="25.19.0"
+    ),
     name="BlueGreenConfigInput",
-    description="Added in 25.19.0. Configuration for blue-green deployment strategy.",
 )
-class BlueGreenConfigInputGQL:
+class BlueGreenConfigInputGQL(PydanticInputMixin[BlueGreenConfigInputDTO]):
     auto_promote: bool = False
     promote_delay_seconds: int = 0
 
-    def to_spec(self) -> BlueGreenSpec:
-        return BlueGreenSpec(
-            auto_promote=self.auto_promote,
-            promote_delay_seconds=self.promote_delay_seconds,
-        )
+
+# ========== Mutation Input/Payload Types ==========
+
+
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description=dedent_strip("""
+            Input for creating or updating a deployment policy (upsert semantics).
+            Specify the target deployment_id and the desired strategy type.
+            Exactly one of rolling_update or blue_green must be provided,
+            matching the chosen strategy type.
+            If a policy already exists for the deployment, it is replaced entirely.
+        """),
+        added_version="26.4.0",
+    ),
+    name="UpdateDeploymentPolicyInput",
+)
+class UpdateDeploymentPolicyInputGQL(PydanticInputMixin[UpsertDeploymentPolicyInputDTO]):
+    deployment_id: ID
+    strategy: DeploymentStrategyTypeGQL
+    rolling_update: RollingUpdateConfigInputGQL | None = None
+    blue_green: BlueGreenConfigInputGQL | None = None
+
+
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version="26.4.0",
+        description="Result payload returned after creating or updating a deployment policy. Contains the full deployment_policy object reflecting the applied configuration.",
+    ),
+    model=UpdateDeploymentPolicyPayloadDTO,
+    name="UpdateDeploymentPolicyPayload",
+)
+class UpdateDeploymentPolicyPayloadGQL(PydanticOutputMixin[UpdateDeploymentPolicyPayloadDTO]):
+    deployment_policy: DeploymentPolicyGQL

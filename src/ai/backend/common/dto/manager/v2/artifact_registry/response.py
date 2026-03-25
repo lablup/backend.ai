@@ -25,6 +25,7 @@ from .types import (
 
 __all__ = (
     # Node models defined in this module
+    "ArtifactRegistryGQLNode",
     "ArtifactRevisionDataNode",
     "ArtifactWithRevisionsNode",
     # Re-exported from v2/artifact for convenience
@@ -44,6 +45,15 @@ __all__ = (
 # ---------------------------------------------------------------------------
 # Node models
 # ---------------------------------------------------------------------------
+
+
+class ArtifactRegistryGQLNode(BaseResponseModel):
+    """DTO for ArtifactRegistry GQL type."""
+
+    id: UUID = Field(description="Internal identifier of the artifact registry metadata record.")
+    registry_id: UUID = Field(description="Identifier of the actual registry implementation.")
+    name: str = Field(description="Name of the artifact registry.")
+    type: ArtifactRegistryType = Field(description="Type of the artifact registry.")
 
 
 class ArtifactRevisionDataNode(BaseResponseModel):
@@ -128,7 +138,9 @@ class SearchArtifactsPayload(BaseResponseModel):
 class ScanArtifactModelsPayload(BaseResponseModel):
     """Payload for batch scanning models."""
 
-    artifacts: list[ArtifactNode] = Field(description="Scanned model artifacts")
+    artifact_revision: list[ArtifactRevisionNode] = Field(
+        description="Artifact revisions discovered during model scanning."
+    )
 
 
 class RetrieveArtifactModelPayload(BaseResponseModel):

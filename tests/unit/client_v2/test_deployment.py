@@ -11,6 +11,7 @@ from yarl import URL
 from ai.backend.client.v2.base_client import BackendAIAuthClient
 from ai.backend.client.v2.config import ClientConfig
 from ai.backend.client.v2.domains.deployment import DeploymentClient
+from ai.backend.common.config import ModelDefinition
 from ai.backend.common.data.model_deployment.types import (
     DeploymentStrategy,
     RouteTrafficStatus,
@@ -178,6 +179,7 @@ class TestDeploymentCRUD:
                     vfolder_id=_SAMPLE_VFOLDER_ID,
                     definition_path="model.py",
                 ),
+                model_definition=ModelDefinition(),
             ),
         )
 
@@ -372,7 +374,6 @@ _SAMPLE_POLICY_DTO: dict[str, Any] = {
     "deployment_id": str(_SAMPLE_DEPLOYMENT_ID),
     "strategy": "ROLLING",
     "strategy_spec": {"max_surge": 1, "max_unavailable": 0},
-    "rollback_on_failure": False,
     "created_at": "2025-01-01T00:00:00",
     "updated_at": "2025-01-01T00:00:00",
 }
@@ -401,7 +402,6 @@ class TestDeploymentPolicyOperations:
 
         request = UpsertDeploymentPolicyRequest(
             strategy=DeploymentStrategy.ROLLING,
-            rollback_on_failure=False,
         )
         result = await dc.upsert_policy(_SAMPLE_DEPLOYMENT_ID, request)
 
@@ -415,22 +415,19 @@ class TestDeploymentPolicyOperations:
         assert body["strategy"] == "ROLLING"
 
     async def test_upsert_policy_update_existing(self) -> None:
-        updated_dto = {**_SAMPLE_POLICY_DTO, "rollback_on_failure": True}
+        updated_dto = {**_SAMPLE_POLICY_DTO}
         resp = _json_response({"deployment_policy": updated_dto, "created": False})
         mock_session = _make_request_session(resp)
         dc = _make_deployment_client(mock_session)
 
         request = UpsertDeploymentPolicyRequest(
             strategy=DeploymentStrategy.ROLLING,
-            rollback_on_failure=True,
         )
         result = await dc.upsert_policy(_SAMPLE_DEPLOYMENT_ID, request)
 
         assert isinstance(result, UpsertDeploymentPolicyResponse)
-        assert result.deployment_policy.rollback_on_failure is True
         assert result.created is False
         method, url, body = _last_request_call(mock_session)
         assert method == "PUT"
         assert f"/deployments/{_SAMPLE_DEPLOYMENT_ID}/policy" in url
         assert body is not None
-        assert body["rollback_on_failure"] is True

@@ -5,9 +5,11 @@ and API DTOs across Backend.AI components.
 """
 
 from .meta import (
+    NEXT_RELEASE_VERSION,
     BackendAIAPIMeta,
     BackendAIConfigMeta,
     BackendAIFieldMeta,
+    BackendAIGQLMeta,
     CompositeType,
     ConfigEnvironment,
     ConfigExample,
@@ -19,9 +21,11 @@ from .meta import (
 )
 
 __all__ = (
+    "NEXT_RELEASE_VERSION",
     "BackendAIAPIMeta",
     "BackendAIConfigMeta",
     "BackendAIFieldMeta",
+    "BackendAIGQLMeta",
     "CompositeType",
     "ConfigEnvironment",
     "ConfigExample",

@@ -4,16 +4,19 @@ from __future__ import annotations
 
 from enum import StrEnum
 
-import strawberry
+from ai.backend.manager.api.gql.decorators import BackendAIGQLMeta, gql_enum
 
 
-@strawberry.enum(
-    name="ProjectTypeV2",
-    description=(
-        "Added in 26.2.0. Project type determining its purpose and behavior. "
-        "GENERAL: Standard project for general computation. "
-        "MODEL_STORE: Project for model storage and management."
+@gql_enum(
+    BackendAIGQLMeta(
+        added_version="26.2.0",
+        description=(
+            "Project type determining its purpose and behavior. "
+            "GENERAL: Standard project for general computation. "
+            "MODEL_STORE: Project for model storage and management."
+        ),
     ),
+    name="ProjectTypeV2",
 )
 class ProjectTypeEnum(StrEnum):
     """Project type enum."""
@@ -22,9 +25,12 @@ class ProjectTypeEnum(StrEnum):
     MODEL_STORE = "model-store"
 
 
-@strawberry.enum(
+@gql_enum(
+    BackendAIGQLMeta(
+        added_version="26.2.0",
+        description="Atomic permissions for virtual folders on a storage host.",
+    ),
     name="VFolderHostPermissionV2",
-    description=("Added in 26.2.0. Atomic permissions for virtual folders on a storage host."),
 )
 class VFolderHostPermissionEnum(StrEnum):
     """Virtual folder host permission enum."""

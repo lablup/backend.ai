@@ -12,6 +12,7 @@ from uuid import UUID
 from pydantic import Field
 
 from ai.backend.common.api_handlers import BaseRequestModel
+from ai.backend.common.config import ModelDefinition
 from ai.backend.common.data.model_deployment.types import (
     DeploymentStrategy,
     ModelDeploymentStatus,
@@ -199,7 +200,6 @@ class DeploymentStrategyInput(BaseRequestModel):
     """Deployment strategy input."""
 
     type: DeploymentStrategy = Field(description="Strategy type (ROLLING or BLUE_GREEN)")
-    rollback_on_failure: bool = Field(default=False, description="Rollback on failure")
     rolling_update: RollingUpdateConfigInput | None = Field(
         default=None, description="Rolling update configuration"
     )
@@ -269,6 +269,9 @@ class RevisionInput(BaseRequestModel):
     image: ImageInput = Field(description="Container image")
     model_runtime_config: ModelRuntimeConfigInput = Field(description="Model runtime configuration")
     model_mount_config: ModelMountConfigInput = Field(description="Model mount configuration")
+    model_definition: ModelDefinition = Field(
+        description="Model definition to override the generated definition"
+    )
     extra_mounts: list[ExtraVFolderMountInput] | None = Field(
         default=None, description="Extra vfolder mounts"
     )
@@ -301,10 +304,6 @@ class UpsertDeploymentPolicyRequest(BaseRequestModel):
 
     strategy: DeploymentStrategy = Field(
         description="Rollout strategy: ROLLING replaces replicas gradually with configurable concurrency limits; BLUE_GREEN runs two parallel environments and switches traffic atomically"
-    )
-    rollback_on_failure: bool = Field(
-        default=False,
-        description="When true, the system automatically reverts to the previous stable revision if health checks fail during rollout",
     )
     rolling_update: RollingUpdateConfigInput | None = Field(
         default=None,

@@ -299,6 +299,7 @@ class ManagerDependencyComposer(DependencyComposer[DependencyInput, DependencyRe
                 etcd=bootstrap.etcd,
                 valkey_live=infrastructure.valkey.live,
                 valkey_artifact_client=infrastructure.valkey.artifact,
+                valkey_session_client=infrastructure.valkey.session,
                 event_fetcher=messaging.event_fetcher,
                 background_task_manager=system.background_task_manager,
                 error_monitor=monitoring.error_monitor,

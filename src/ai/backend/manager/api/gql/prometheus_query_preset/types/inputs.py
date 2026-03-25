@@ -3,136 +3,127 @@
 from __future__ import annotations
 
 from datetime import datetime
-from uuid import UUID
 
-import strawberry
 from strawberry import UNSET
 
-from ai.backend.common.dto.clients.prometheus.request import QueryTimeRange
-from ai.backend.manager.data.prometheus_query_preset import ExecutePresetOptions
-from ai.backend.manager.models.prometheus_query_preset import PrometheusQueryPresetRow
-from ai.backend.manager.repositories.base.creator import Creator
-from ai.backend.manager.repositories.base.updater import Updater
-from ai.backend.manager.repositories.prometheus_query_preset.creators import (
-    PrometheusQueryPresetCreatorSpec,
+from ai.backend.common.dto.manager.v2.prometheus_query_preset.request import (
+    CreateQueryDefinitionInput as CreateQueryDefinitionInputDTO,
 )
-from ai.backend.manager.repositories.prometheus_query_preset.updaters import (
-    PrometheusQueryPresetUpdaterSpec,
+from ai.backend.common.dto.manager.v2.prometheus_query_preset.request import (
+    CreateQueryDefinitionOptionsInput as CreateQueryDefinitionOptionsInputDTO,
 )
-from ai.backend.manager.types import OptionalState, TriState
+from ai.backend.common.dto.manager.v2.prometheus_query_preset.request import (
+    ExecuteQueryDefinitionOptionsInput as ExecuteQueryDefinitionOptionsInputDTO,
+)
+from ai.backend.common.dto.manager.v2.prometheus_query_preset.request import (
+    MetricLabelEntry as MetricLabelEntryDTO,
+)
+from ai.backend.common.dto.manager.v2.prometheus_query_preset.request import (
+    ModifyQueryDefinitionInput as ModifyQueryDefinitionInputDTO,
+)
+from ai.backend.common.dto.manager.v2.prometheus_query_preset.request import (
+    ModifyQueryDefinitionOptionsInput as ModifyQueryDefinitionOptionsInputDTO,
+)
+from ai.backend.common.dto.manager.v2.prometheus_query_preset.request import (
+    QueryTimeRangeInputDTO,
+)
+from ai.backend.manager.api.gql.decorators import (
+    BackendAIGQLMeta,
+    gql_field,
+    gql_pydantic_input,
+)
+from ai.backend.manager.api.gql.pydantic_compat import PydanticInputMixin
 
 
-@strawberry.input(
+@gql_pydantic_input(
+    BackendAIGQLMeta(description="Options for query definition labels.", added_version="26.3.0"),
     name="QueryDefinitionOptionsInput",
-    description="Added in 26.3.0. Options for query definition labels.",
 )
-class QueryDefinitionOptionsInput:
-    filter_labels: list[str] = strawberry.field(description="Allowed filter label keys.")
-    group_labels: list[str] = strawberry.field(description="Allowed group-by label keys.")
+class QueryDefinitionOptionsInput(PydanticInputMixin[CreateQueryDefinitionOptionsInputDTO]):
+    filter_labels: list[str] = gql_field(description="Allowed filter label keys.")
+    group_labels: list[str] = gql_field(description="Allowed group-by label keys.")
 
 
-@strawberry.input(
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description="Input for creating a new query definition.", added_version="26.3.0"
+    ),
     name="CreateQueryDefinitionInput",
-    description="Added in 26.3.0. Input for creating a new query definition.",
 )
-class CreateQueryDefinitionInput:
-    name: str = strawberry.field(description="Human-readable identifier (must be unique).")
-    metric_name: str = strawberry.field(description="Prometheus metric name.")
-    query_template: str = strawberry.field(
+class CreateQueryDefinitionInput(PydanticInputMixin[CreateQueryDefinitionInputDTO]):
+    name: str = gql_field(description="Human-readable identifier (must be unique).")
+    metric_name: str = gql_field(description="Prometheus metric name.")
+    query_template: str = gql_field(
         description="PromQL template with {labels}, {window}, {group_by} placeholders."
     )
-    time_window: str | None = strawberry.field(default=None, description="Default time window.")
-    options: QueryDefinitionOptionsInput = strawberry.field(
+    time_window: str | None = gql_field(description="Default time window.", default=None)
+    options: QueryDefinitionOptionsInput = gql_field(
         description="Query definition options including filter and group labels."
     )
 
-    def to_creator(self) -> Creator[PrometheusQueryPresetRow]:
-        return Creator(
-            spec=PrometheusQueryPresetCreatorSpec(
-                name=self.name,
-                metric_name=self.metric_name,
-                query_template=self.query_template,
-                time_window=self.time_window,
-                filter_labels=self.options.filter_labels,
-                group_labels=self.options.group_labels,
-            )
-        )
+
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description="Options for modifying an existing query definition.", added_version="26.3.0"
+    ),
+    name="ModifyQueryDefinitionOptionsInput",
+)
+class ModifyQueryDefinitionOptionsInputGQL(
+    PydanticInputMixin[ModifyQueryDefinitionOptionsInputDTO]
+):
+    filter_labels: list[str] | None = gql_field(
+        description="Allowed filter label keys.", default=None
+    )
+    group_labels: list[str] | None = gql_field(
+        description="Allowed group-by label keys.", default=None
+    )
 
 
-@strawberry.input(
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description="Input for modifying an existing query definition.", added_version="26.3.0"
+    ),
     name="ModifyQueryDefinitionInput",
-    description="Added in 26.3.0. Input for modifying an existing query definition.",
 )
-class ModifyQueryDefinitionInput:
-    name: str | None = strawberry.field(default=UNSET, description="New name.")
-    metric_name: str | None = strawberry.field(default=UNSET, description="New metric name.")
-    query_template: str | None = strawberry.field(default=UNSET, description="New PromQL template.")
-    time_window: str | None = strawberry.field(
-        default=UNSET, description="New default time window."
-    )
-    options: QueryDefinitionOptionsInput | None = strawberry.field(
-        default=UNSET, description="New query definition options."
+class ModifyQueryDefinitionInput(PydanticInputMixin[ModifyQueryDefinitionInputDTO]):
+    name: str | None = gql_field(description="New name.", default=UNSET)
+    metric_name: str | None = gql_field(description="New metric name.", default=UNSET)
+    query_template: str | None = gql_field(description="New PromQL template.", default=UNSET)
+    time_window: str | None = gql_field(description="New default time window.", default=UNSET)
+    options: ModifyQueryDefinitionOptionsInputGQL | None = gql_field(
+        description="New query definition options.", default=UNSET
     )
 
-    def to_updater(self, preset_id: UUID) -> Updater[PrometheusQueryPresetRow]:
-        spec = PrometheusQueryPresetUpdaterSpec(
-            name=OptionalState[str].from_graphql(self.name),
-            metric_name=OptionalState[str].from_graphql(self.metric_name),
-            query_template=OptionalState[str].from_graphql(self.query_template),
-            time_window=TriState[str].from_graphql(self.time_window),
-        )
 
-        if self.options is not UNSET and self.options is not None:
-            spec.filter_labels = OptionalState.update(self.options.filter_labels)
-            spec.group_labels = OptionalState.update(self.options.group_labels)
-
-        return Updater(pk_value=preset_id, spec=spec)
-
-
-@strawberry.input(
+@gql_pydantic_input(
+    BackendAIGQLMeta(description="Time range for Prometheus query.", added_version="26.3.0"),
     name="QueryTimeRangeInput",
-    description="Added in 26.3.0. Time range for Prometheus query.",
 )
-class QueryTimeRangeInput:
-    start: datetime = strawberry.field(description="Start of the time range.")
-    end: datetime = strawberry.field(description="End of the time range.")
-    step: str = strawberry.field(description="Query resolution step (e.g., '60s').")
-
-    def to_internal(self) -> QueryTimeRange:
-        return QueryTimeRange(
-            start=self.start.isoformat(),
-            end=self.end.isoformat(),
-            step=self.step,
-        )
+class QueryTimeRangeInput(PydanticInputMixin[QueryTimeRangeInputDTO]):
+    start: datetime = gql_field(description="Start of the time range.")
+    end: datetime = gql_field(description="End of the time range.")
+    step: str = gql_field(description="Query resolution step (e.g., '60s').")
 
 
-@strawberry.input(
+@gql_pydantic_input(
+    BackendAIGQLMeta(description="Key-value label entry for queries.", added_version="26.3.0"),
     name="MetricLabelEntryInput",
-    description="Added in 26.3.0. Key-value label entry for queries.",
 )
-class MetricLabelEntryInput:
-    key: str = strawberry.field(description="Label key.")
-    value: str = strawberry.field(description="Label value.")
+class MetricLabelEntryInput(PydanticInputMixin[MetricLabelEntryDTO]):
+    key: str = gql_field(description="Label key.")
+    value: str = gql_field(description="Label value.")
 
 
-@strawberry.input(
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description="Options for executing a query definition.", added_version="26.3.0"
+    ),
     name="ExecuteQueryDefinitionOptionsInput",
-    description="Added in 26.3.0. Options for executing a query definition.",
 )
-class ExecuteQueryDefinitionOptionsInput:
-    filter_labels: list[MetricLabelEntryInput] | None = strawberry.field(
-        default=None, description="Label key-value pairs to filter by."
+class ExecuteQueryDefinitionOptionsInput(PydanticInputMixin[ExecuteQueryDefinitionOptionsInputDTO]):
+    filter_labels: list[MetricLabelEntryInput] | None = gql_field(
+        description="Label key-value pairs to filter by.", default=None
     )
-    group_labels: list[str] | None = strawberry.field(
-        default=None, description="Label keys to group results by."
+    group_labels: list[str] | None = gql_field(
+        description="Label keys to group results by.", default=None
     )
-
-    def to_internal(self) -> ExecutePresetOptions:
-        filter_labels: dict[str, str] = {}
-        if self.filter_labels:
-            for entry in self.filter_labels:
-                filter_labels[entry.key] = entry.value
-        return ExecutePresetOptions(
-            filter_labels=filter_labels,
-            group_labels=self.group_labels or [],
-        )

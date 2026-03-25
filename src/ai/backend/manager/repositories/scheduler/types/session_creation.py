@@ -21,8 +21,7 @@ from ai.backend.common.types import (
     SessionTypes,
     VFolderMount,
 )
-from ai.backend.manager.data.deployment.types import DeploymentInfo
-from ai.backend.manager.errors.deployment import DeploymentHasNoTargetRevision
+from ai.backend.manager.data.deployment.types import DeploymentInfo, ModelRevisionSpec
 from ai.backend.manager.models.network import NetworkRow, NetworkType
 from ai.backend.manager.models.scaling_group import ScalingGroupOpts
 from ai.backend.manager.types import UserScope
@@ -113,14 +112,9 @@ class SessionCreationSpec:
         deployment_info: DeploymentInfo,
         context: DeploymentContext,
         route_id: UUID,
-        revision_id: UUID,
+        target_revision: ModelRevisionSpec,
     ) -> Self:
         session_creation_id = secrets.token_urlsafe(16)
-        target_revision = deployment_info.resolve_revision_spec(revision_id)
-        if target_revision is None:
-            raise DeploymentHasNoTargetRevision(
-                f"Revision {revision_id} not found in model_revisions"
-            )
 
         # Prepare mount spec
         mount_spec = target_revision.mounts.to_mount_spec()

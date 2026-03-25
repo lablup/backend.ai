@@ -20,7 +20,7 @@ class TestContainerRegistryTypeEnumSync:
             f"Add them to ContainerRegistryTypeGQL to keep the enums in sync."
         )
 
-    def test_from_enum_roundtrip_for_all_members(self) -> None:
+    def test_value_based_conversion_for_all_members(self) -> None:
         for member in ContainerRegistryType:
-            gql_member = ContainerRegistryTypeGQL.from_enum(member)
+            gql_member = ContainerRegistryTypeGQL(member.value)
             assert gql_member.value == member.value

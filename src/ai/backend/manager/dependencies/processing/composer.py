@@ -13,6 +13,7 @@ from ai.backend.common.clients.valkey_client.valkey_container_log.client import 
     ValkeyContainerLogClient,
 )
 from ai.backend.common.clients.valkey_client.valkey_live.client import ValkeyLiveClient
+from ai.backend.common.clients.valkey_client.valkey_session.client import ValkeySessionClient
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
 from ai.backend.common.clients.valkey_client.valkey_stream.client import ValkeyStreamClient
 from ai.backend.common.dependencies import DependencyComposer, DependencyStack
@@ -108,6 +109,7 @@ class ProcessingInput:
     etcd: AsyncEtcd
     valkey_live: ValkeyLiveClient
     valkey_artifact_client: ValkeyArtifactDownloadTrackingClient
+    valkey_session_client: ValkeySessionClient
     event_fetcher: EventFetcher
     background_task_manager: BackgroundTaskManager
     error_monitor: ErrorPluginContext
@@ -227,6 +229,7 @@ class ProcessingComposer(DependencyComposer[ProcessingInput, ProcessingResources
             valkey_stat_client=setup_input.valkey_stat,
             valkey_live=setup_input.valkey_live,
             valkey_artifact_client=setup_input.valkey_artifact_client,
+            valkey_session_client=setup_input.valkey_session_client,
             event_fetcher=setup_input.event_fetcher,
             background_task_manager=setup_input.background_task_manager,
             event_hub=setup_input.event_hub,

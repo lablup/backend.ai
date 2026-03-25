@@ -9,10 +9,10 @@ import pytest
 from pydantic import ValidationError
 
 from ai.backend.common.dto.manager.v2.container_registry.response import (
+    AdminSearchContainerRegistriesPayload,
     ContainerRegistryNode,
     CreateContainerRegistryPayload,
     DeleteContainerRegistryPayload,
-    ListContainerRegistriesPayload,
     UpdateContainerRegistryPayload,
 )
 from ai.backend.common.dto.manager.v2.container_registry.types import ContainerRegistryType
@@ -201,21 +201,29 @@ class TestDeleteContainerRegistryPayload:
         assert restored.id == reg_id
 
 
-class TestListContainerRegistriesPayload:
-    """Tests for ListContainerRegistriesPayload model."""
+class TestAdminSearchContainerRegistriesPayload:
+    """Tests for AdminSearchContainerRegistriesPayload model."""
 
     def test_creation_with_items(self) -> None:
         nodes = [_make_registry_node(), _make_registry_node(ContainerRegistryType.HARBOR)]
-        payload = ListContainerRegistriesPayload(items=nodes)
+        payload = AdminSearchContainerRegistriesPayload(
+            items=nodes, total_count=2, has_next_page=False, has_previous_page=False
+        )
         assert len(payload.items) == 2
+        assert payload.total_count == 2
 
     def test_empty_items_list(self) -> None:
-        payload = ListContainerRegistriesPayload(items=[])
+        payload = AdminSearchContainerRegistriesPayload(
+            items=[], total_count=0, has_next_page=False, has_previous_page=False
+        )
         assert payload.items == []
+        assert payload.total_count == 0
 
     def test_items_no_password_field(self) -> None:
         nodes = [_make_registry_node()]
-        payload = ListContainerRegistriesPayload(items=nodes)
+        payload = AdminSearchContainerRegistriesPayload(
+            items=nodes, total_count=1, has_next_page=False, has_previous_page=False
+        )
         data = payload.model_dump()
         assert "password" not in data["items"][0]
 
@@ -224,18 +232,25 @@ class TestListContainerRegistriesPayload:
             _make_registry_node(),
             _make_registry_node(ContainerRegistryType.GITLAB),
         ]
-        payload = ListContainerRegistriesPayload(items=nodes)
+        payload = AdminSearchContainerRegistriesPayload(
+            items=nodes, total_count=2, has_next_page=True, has_previous_page=False
+        )
         json_str = payload.model_dump_json()
-        restored = ListContainerRegistriesPayload.model_validate_json(json_str)
+        restored = AdminSearchContainerRegistriesPayload.model_validate_json(json_str)
         assert len(restored.items) == 2
         assert restored.items[0].id == nodes[0].id
         assert restored.items[1].type == ContainerRegistryType.GITLAB
+        assert restored.has_next_page is True
+        assert restored.has_previous_page is False
 
     def test_json_structure(self) -> None:
         node = _make_registry_node()
-        payload = ListContainerRegistriesPayload(items=[node])
+        payload = AdminSearchContainerRegistriesPayload(
+            items=[node], total_count=1, has_next_page=False, has_previous_page=False
+        )
         parsed = json.loads(payload.model_dump_json())
         assert "items" in parsed
         assert isinstance(parsed["items"], list)
         assert len(parsed["items"]) == 1
         assert parsed["items"][0]["type"] == "docker"
+        assert parsed["total_count"] == 1

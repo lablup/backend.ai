@@ -354,17 +354,15 @@ class Context(metaclass=ABCMeta):
         self.log_header(f"Wrote supergraph schema to {output_path}")
 
         base_path = self.install_info.base_path
-        project_root = Path(__file__).resolve().parents[4]
 
-        src_gateway = project_root / "configs/graphql/gateway.config.ts"
-        dst_gateway = base_path / "gateway.config.ts"
-        shutil.copy2(src_gateway, dst_gateway)
-        self.log_header(f"Copied {src_gateway} -> {dst_gateway}")
+        with self.resource_path("ai.backend.install.configs", "gateway.config.ts") as src_gateway:
+            dst_gateway = base_path / "gateway.config.ts"
+            shutil.copy(src_gateway, dst_gateway)
+            self.log_header(f"Copied gateway.config.ts -> {dst_gateway}")
 
-        src_supergraph = project_root / "docs/manager/graphql-reference/supergraph.graphql"
         dst_supergraph = base_path / "supergraph.graphql"
-        shutil.copy2(src_supergraph, dst_supergraph)
-        self.log_header(f"Copied {src_supergraph} -> {dst_supergraph}")
+        shutil.copy(Path(output_path), dst_supergraph)
+        self.log_header(f"Copied supergraph.graphql -> {dst_supergraph}")
 
         dst_compose_path = self.copy_config("docker-compose.yml")
         self.copy_config("prometheus.yaml")

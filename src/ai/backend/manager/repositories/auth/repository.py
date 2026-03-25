@@ -7,11 +7,19 @@ import sqlalchemy as sa
 from ai.backend.common.metrics.metric import DomainType, LayerType
 from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPolicy
 from ai.backend.common.resilience.resilience import Resilience
+from ai.backend.manager.data.auth.login_session_types import LoginHistoryData, LoginSessionData
 from ai.backend.manager.data.auth.types import GroupMembershipData, UserData
+from ai.backend.manager.data.common.types import SearchResult
 from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.user import UserRole, UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.manager.repositories.auth.db_source.db_source import AuthDBSource
+from ai.backend.manager.repositories.auth.db_source.db_source import (
+    AuthDBSource,
+    CredentialVerificationResult,
+    LoginSessionCreationResult,
+)
+from ai.backend.manager.repositories.base.querier import BatchQuerier
+from ai.backend.manager.repositories.base.types import SearchScope
 
 auth_repository_resilience = Resilience(
     policies=[
@@ -86,10 +94,26 @@ class AuthRepository:
         domain_name: str,
         email: str,
         target_password_info: PasswordInfo,
-    ) -> sa.RowMapping:
+        *,
+        force: bool = False,
+        max_session_age: int = 604800,
+    ) -> CredentialVerificationResult:
         return await self._db_source.verify_credential_with_migration(
-            domain_name, email, target_password_info
+            domain_name,
+            email,
+            target_password_info,
+            force=force,
+            max_session_age=max_session_age,
         )
+
+    @auth_repository_resilience.apply()
+    async def create_login_session(
+        self,
+        user_id: UUID,
+        access_key: str,
+        max_session_age: int = 604800,
+    ) -> LoginSessionCreationResult:
+        return await self._db_source.create_login_session(user_id, access_key, max_session_age)
 
     @auth_repository_resilience.apply()
     async def check_credential_without_migration(
@@ -110,3 +134,31 @@ class AuthRepository:
     @auth_repository_resilience.apply()
     async def get_current_time(self) -> datetime:
         return await self._db_source.fetch_current_time()
+
+    # --- Login Session ---
+
+    @auth_repository_resilience.apply()
+    async def invalidate_login_session_by_token(self, session_token: str) -> None:
+        await self._db_source.invalidate_session_by_token(session_token)
+
+    @auth_repository_resilience.apply()
+    async def invalidate_user_login_sessions(self, user_id: UUID) -> None:
+        await self._db_source.invalidate_sessions_by_user(user_id)
+
+    @auth_repository_resilience.apply()
+    async def search_login_sessions(
+        self,
+        scope: SearchScope,
+        querier: BatchQuerier,
+    ) -> SearchResult[LoginSessionData]:
+        return await self._db_source.search_login_sessions(scope, querier)
+
+    # --- Login History ---
+
+    @auth_repository_resilience.apply()
+    async def search_login_history(
+        self,
+        scope: SearchScope,
+        querier: BatchQuerier,
+    ) -> SearchResult[LoginHistoryData]:
+        return await self._db_source.search_login_history(scope, querier)

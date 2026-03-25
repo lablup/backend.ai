@@ -15,6 +15,7 @@ from ai.backend.common.dto.manager.operations.types import (
     ManagerStatus,
     SchedulerOps,
 )
+from ai.backend.common.dto.manager.v2.common import OrderDirection
 
 __all__ = (
     "ErrorLogContextInfo",
@@ -25,13 +26,6 @@ __all__ = (
     "OrderDirection",
     "SchedulerOps",
 )
-
-
-class OrderDirection(StrEnum):
-    """Order direction for sorting."""
-
-    ASC = "asc"
-    DESC = "desc"
 
 
 class ErrorLogOrderField(StrEnum):

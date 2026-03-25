@@ -44,14 +44,15 @@ from ai.backend.manager.data.deployment.types import (
     DeploymentInfo,
     DeploymentInfoSearchResult,
     DeploymentInfoWithAutoScalingRules,
+    DeploymentLifecycleSubStep,
     DeploymentPolicyData,
     DeploymentPolicySearchResult,
     DeploymentPolicyUpsertResult,
-    DeploymentSubStep,
     DeploymentWithHistory,
     ModelDeploymentAccessTokenData,
     ModelDeploymentAutoScalingRuleData,
     ModelRevisionData,
+    ModelRevisionSpec,
     RevisionSearchResult,
     RouteInfo,
     RouteSearchResult,
@@ -258,7 +259,6 @@ class DeploymentDBSource:
                     endpoint_id=endpoint.id,
                     strategy=policy_config.strategy,
                     strategy_spec=policy_config.strategy_spec,
-                    rollback_on_failure=policy_config.rollback_on_failure,
                 )
                 policy_creator = RBACEntityCreator(
                     spec=policy_spec,
@@ -495,7 +495,7 @@ class DeploymentDBSource:
     async def get_endpoints_by_statuses(
         self,
         statuses: list[EndpointLifecycle],
-        sub_steps: list[DeploymentSubStep] | None = None,
+        sub_steps: list[DeploymentLifecycleSubStep] | None = None,
     ) -> list[DeploymentInfo]:
         """Get endpoints by lifecycle statuses, optionally filtered by sub_steps."""
         async with self._begin_readonly_session_read_committed() as db_sess:
@@ -506,6 +506,7 @@ class DeploymentDBSource:
         self,
         statuses: list[EndpointLifecycle],
         handler_name: str,
+        sub_steps: list[DeploymentLifecycleSubStep] | None = None,
     ) -> list[DeploymentWithHistory]:
         """Fetch deployments for handler execution with history populated.
 
@@ -518,12 +519,13 @@ class DeploymentDBSource:
         Args:
             statuses: Endpoint lifecycle statuses to include
             handler_name: Current handler phase name for history matching
+            sub_steps: Optional sub-step filter for deployment handlers
 
         Returns:
             List of DeploymentWithHistory with history fields populated.
         """
         async with self._begin_readonly_session_read_committed() as db_sess:
-            rows = await self._get_endpoints_by_statuses(db_sess, statuses)
+            rows = await self._get_endpoints_by_statuses(db_sess, statuses, sub_steps)
             if not rows:
                 return []
 
@@ -549,7 +551,7 @@ class DeploymentDBSource:
         self,
         db_sess: SASession,
         statuses: list[EndpointLifecycle],
-        sub_steps: list[DeploymentSubStep] | None = None,
+        sub_steps: list[DeploymentLifecycleSubStep] | None = None,
     ) -> list[EndpointRow]:
         """Fetch endpoints by lifecycle statuses, optionally filtered by sub_steps."""
         where_clause: sa.ColumnElement[bool] = EndpointRow.lifecycle_stage.in_(statuses)
@@ -1890,6 +1892,100 @@ class DeploymentDBSource:
                 ),
             )
 
+    async def fetch_deployment_context_from_endpoint(
+        self,
+        deployment_info: DeploymentInfo,
+    ) -> DeploymentContext:
+        """Fetch deployment context using endpoint-level fields as image source.
+
+        Used when no revision exists yet (e.g., newly created deployments
+        before any revision is explicitly added/activated).
+        """
+        async with self._begin_readonly_session_read_committed() as db_sess:
+            created_user_query = (
+                sa.select(UserRow, keypairs.c.access_key)
+                .select_from(sa.join(UserRow, keypairs, UserRow.uuid == keypairs.c.user))
+                .where(UserRow.uuid == deployment_info.metadata.created_user)
+            )
+            created_user_result = await db_sess.execute(created_user_query)
+            created_user_row = created_user_result.first()
+            if not created_user_row:
+                raise UserNotFoundInDeployment(
+                    f"Created user {deployment_info.metadata.created_user} not found"
+                )
+
+            if deployment_info.metadata.session_owner != deployment_info.metadata.created_user:
+                session_owner_query = (
+                    sa.select(UserRow, keypairs.c.access_key)
+                    .select_from(sa.join(UserRow, keypairs, UserRow.uuid == keypairs.c.user))
+                    .where(UserRow.uuid == deployment_info.metadata.session_owner)
+                )
+                session_owner_result = await db_sess.execute(session_owner_query)
+                session_owner_row = session_owner_result.first()
+                if not session_owner_row:
+                    raise UserNotFoundInDeployment(
+                        f"Session owner {deployment_info.metadata.session_owner} not found"
+                    )
+            else:
+                session_owner_row = created_user_row
+
+            _owner_uuid, group_id, resource_policy = await query_userinfo_from_session(
+                db_sess,
+                created_user_row.UserRow.uuid,
+                AccessKey(created_user_row.access_key),
+                created_user_row.UserRow.role,
+                created_user_row.UserRow.domain_name,
+                None,
+                deployment_info.metadata.domain,
+                deployment_info.metadata.project,
+                query_on_behalf_of=AccessKey(session_owner_row.access_key)
+                if session_owner_row != created_user_row
+                else None,
+            )
+
+            endpoint_query = (
+                sa.select(EndpointRow)
+                .where(EndpointRow.id == deployment_info.id)
+                .options(selectinload(EndpointRow.image_row))
+            )
+            endpoint_result = await db_sess.execute(endpoint_query)
+            endpoint_row = endpoint_result.scalar_one_or_none()
+            if endpoint_row is None or endpoint_row.image_row is None:
+                raise DeploymentHasNoTargetRevision(
+                    f"Endpoint {deployment_info.id} not found or has no image"
+                )
+            image_identifier = ImageIdentifier(
+                canonical=endpoint_row.image_row.name,
+                architecture=endpoint_row.image_row.architecture,
+            )
+            image_row = await ImageRow.resolve(db_sess, [image_identifier])
+
+            return DeploymentContext(
+                created_user=UserContext(
+                    uuid=created_user_row.UserRow.uuid,
+                    access_key=AccessKey(created_user_row.access_key),
+                    role=str(created_user_row.UserRow.role),
+                    sudo_session_enabled=created_user_row.UserRow.sudo_session_enabled or False,
+                ),
+                session_owner=UserContext(
+                    uuid=session_owner_row.UserRow.uuid,
+                    access_key=AccessKey(session_owner_row.access_key),
+                    role=str(session_owner_row.UserRow.role),
+                    sudo_session_enabled=session_owner_row.UserRow.sudo_session_enabled or False,
+                ),
+                container_user=ContainerUserContext(
+                    uid=session_owner_row.UserRow.container_uid,
+                    main_gid=session_owner_row.UserRow.container_main_gid,
+                    supplementary_gids=session_owner_row.UserRow.container_gids or [],
+                ),
+                group_id=group_id,
+                resource_policy=dict(resource_policy),
+                image=ImageContext(
+                    ref=image_row.image_ref,
+                    labels=image_row.labels or {},
+                ),
+            )
+
     async def fetch_session_statuses_by_route_ids(
         self,
         route_ids: set[uuid.UUID],
@@ -2185,6 +2281,27 @@ class DeploymentDBSource:
                 )
             return row.to_data()
 
+    async def get_revision_spec_from_endpoint(
+        self,
+        endpoint_id: uuid.UUID,
+    ) -> ModelRevisionSpec:
+        """Build a ModelRevisionSpec from the endpoint-level fields.
+
+        Used when no deployment_revisions record exists yet (e.g., newly
+        created deployments before any revision is explicitly added/activated).
+        """
+        async with self._db.begin_readonly_session() as db_sess:
+            query = (
+                sa.select(EndpointRow)
+                .where(EndpointRow.id == endpoint_id)
+                .options(selectinload(EndpointRow.image_row))
+            )
+            result = await db_sess.execute(query)
+            endpoint = result.scalar_one_or_none()
+            if endpoint is None:
+                raise EndpointNotFound(f"Endpoint {endpoint_id} not found")
+            return endpoint.build_revision_spec_from_endpoint()
+
     async def search_revisions(
         self,
         querier: BatchQuerier,
@@ -2266,6 +2383,7 @@ class DeploymentDBSource:
                 .values(
                     deploying_revision=revision_id,
                     lifecycle_stage=EndpointLifecycle.DEPLOYING,
+                    sub_step=DeploymentLifecycleSubStep.DEPLOYING_PROVISIONING,
                 )
                 .returning(EndpointRow.current_revision)
             )
@@ -2519,38 +2637,22 @@ class DeploymentDBSource:
 
     async def apply_strategy_mutations(
         self,
-        assignments: Mapping[uuid.UUID, DeploymentSubStep],
         rollout: Sequence[RBACEntityCreator[RoutingRow]],
         drain: BatchUpdater[RoutingRow] | None,
         completed_ids: set[uuid.UUID],
-        rolled_back_ids: set[uuid.UUID],
     ) -> int:
-        """Apply all DB mutations from a strategy evaluation cycle in a single transaction.
+        """Apply route mutations from a strategy evaluation cycle in a single transaction.
+
+        Sub-step transitions are handled exclusively by the coordinator
+        via ``EndpointLifecycleBatchUpdaterSpec``.
 
         Returns:
             Number of deployments whose revision was swapped.
         """
         async with self._begin_session_read_committed() as db_sess:
-            await self._update_sub_steps(db_sess, assignments)
             await self._create_routes(db_sess, rollout)
             await self._drain_routes(db_sess, drain)
-            swapped = await self._complete_deployment_revision_swap(db_sess, completed_ids)
-            await self._clear_deploying_revision(db_sess, rolled_back_ids)
-            return swapped
-
-    @staticmethod
-    async def _update_sub_steps(
-        db_sess: SASession,
-        assignments: Mapping[uuid.UUID, DeploymentSubStep],
-    ) -> None:
-        """Update deployment sub-step assignments."""
-        for endpoint_id, sub_step in assignments.items():
-            query = (
-                sa.update(EndpointRow)
-                .where(EndpointRow.id == endpoint_id)
-                .values(sub_step=sub_step)
-            )
-            await db_sess.execute(query)
+            return await self._complete_deployment_revision_swap(db_sess, completed_ids)
 
     @staticmethod
     async def _create_routes(
@@ -2593,20 +2695,24 @@ class DeploymentDBSource:
         result = await db_sess.execute(query)
         return cast(CursorResult[Any], result).rowcount
 
-    @staticmethod
-    async def _clear_deploying_revision(
-        db_sess: SASession,
-        rolled_back_ids: set[uuid.UUID],
+    async def clear_deploying_revision(
+        self,
+        deployment_ids: set[uuid.UUID],
     ) -> None:
-        """Clear deploying_revision for rolled-back deployments."""
-        if not rolled_back_ids:
+        """Clear deploying_revision and sub_step for rolled-back deployments.
+
+        This is called explicitly by ``DeployingRollingBackHandler`` after
+        rollback completes, NOT automatically by apply_strategy_mutations.
+        """
+        if not deployment_ids:
             return
-        query = (
-            sa.update(EndpointRow)
-            .where(EndpointRow.id.in_(rolled_back_ids))
-            .values(
-                deploying_revision=None,
-                sub_step=None,
+        async with self._begin_session_read_committed() as db_sess:
+            query = (
+                sa.update(EndpointRow)
+                .where(EndpointRow.id.in_(deployment_ids))
+                .values(
+                    deploying_revision=None,
+                    sub_step=None,
+                )
             )
-        )
-        await db_sess.execute(query)
+            await db_sess.execute(query)

@@ -15,19 +15,21 @@ from ai.backend.common.dto.manager.rbac.response import ScopeDTO
 from ai.backend.common.dto.manager.rbac.types import OrderDirection, ScopeOrderField
 from ai.backend.manager.api.rest.adapter import BaseFilterAdapter
 from ai.backend.manager.data.permission.types import ScopeData
+from ai.backend.manager.models.rbac_models.conditions import (
+    DomainScopeConditions,
+    ProjectScopeConditions,
+    UserScopeConditions,
+)
+from ai.backend.manager.models.rbac_models.orders import (
+    DomainScopeOrders,
+    ProjectScopeOrders,
+    UserScopeOrders,
+)
 from ai.backend.manager.repositories.base import (
     BatchQuerier,
     OffsetPagination,
     QueryCondition,
     QueryOrder,
-)
-from ai.backend.manager.repositories.permission_controller.options import (
-    DomainScopeConditions,
-    DomainScopeOrders,
-    ProjectScopeConditions,
-    ProjectScopeOrders,
-    UserScopeConditions,
-    UserScopeOrders,
 )
 
 __all__ = ("ScopeAdapter",)
@@ -39,8 +41,6 @@ class ScopeAdapter(BaseFilterAdapter):
     def build_querier(self, scope_type: ScopeType, request: SearchScopesRequest) -> BatchQuerier:
         """Build a BatchQuerier based on scope type."""
         match scope_type:
-            case ScopeType.GLOBAL:
-                return self._build_global_scope_querier(request)
             case ScopeType.DOMAIN:
                 return self._build_domain_scope_querier(request)
             case ScopeType.PROJECT:
@@ -75,11 +75,6 @@ class ScopeAdapter(BaseFilterAdapter):
         pagination = OffsetPagination(limit=request.limit, offset=request.offset)
 
         return BatchQuerier(conditions=conditions, orders=orders, pagination=pagination)
-
-    def _build_global_scope_querier(self, request: SearchScopesRequest) -> BatchQuerier:
-        """Build a BatchQuerier for global scope (no filtering needed)."""
-        pagination = OffsetPagination(limit=request.limit, offset=request.offset)
-        return BatchQuerier(conditions=[], orders=[], pagination=pagination)
 
     def _convert_domain_filter(self, filter: ScopeFilter) -> list[QueryCondition]:
         """Convert scope filter to domain query conditions."""

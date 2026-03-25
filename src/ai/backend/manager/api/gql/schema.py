@@ -1,7 +1,9 @@
 import strawberry
+from graphql.pyutils.undefined import Undefined as GraphQLUndefined
 from strawberry.federation import Schema
 from strawberry.schema.config import StrawberryConfig
 
+from ai.backend.common.api_handlers import Sentinel as BackendSentinel
 from ai.backend.manager.api.gql.extensions import (
     GQLExceptionHandlerExtension,
     GQLLoggingExtension,
@@ -76,6 +78,7 @@ from .deployment import (
     routes,
     sync_replicas,
     update_auto_scaling_rule,
+    update_deployment_policy,
     update_model_deployment,
     update_route_traffic_status,
 )
@@ -134,6 +137,7 @@ from .image import (
 from .kernel.resolver import admin_kernels_v2, kernel_v2, session_kernels_v2
 from .keypair import (
     issue_my_keypair,
+    my_keypairs,
     revoke_my_keypair,
     switch_my_main_access_key,
     update_my_keypair,
@@ -268,6 +272,7 @@ from .user import (
     admin_user_v2,
     admin_users_v2,
     domain_users_v2,
+    my_client_ip,
     my_user_v2,
     project_users_v2,
     update_my_allowed_client_ip,
@@ -347,6 +352,8 @@ class Query:
     admin_permissions = admin_permissions
     admin_role_assignments = admin_role_assignments
     admin_entities = admin_entities
+    # Keypair self-service queries
+    my_keypairs = my_keypairs
     # RBAC User APIs
     my_roles = my_roles
     rbac_scope_entity_combinations = rbac_scope_entity_combinations
@@ -398,6 +405,7 @@ class Query:
     admin_user_v2 = admin_user_v2
     admin_users_v2 = admin_users_v2
     domain_users_v2 = domain_users_v2
+    my_client_ip = my_client_ip
     my_user_v2 = my_user_v2
     project_users_v2 = project_users_v2
     # Domain V2 APIs
@@ -430,6 +438,7 @@ class Mutation:
     delete_model_deployment = delete_model_deployment
     sync_replicas = sync_replicas
     add_model_revision = add_model_revision
+    update_deployment_policy = update_deployment_policy
     # Notification - Admin APIs
     admin_create_notification_channel = admin_create_notification_channel
     admin_update_notification_channel = admin_update_notification_channel
@@ -544,6 +553,15 @@ class Subscription:
 
 class CustomizedSchema(Schema):
     def as_str(self) -> str:
+        # Strawberry picks up pydantic field defaults (including SENTINEL) as GraphQL
+        # schema field default_values.  SENTINEL is not a valid GraphQL scalar value, so
+        # replace any SENTINEL default with Undefined (= "no default" in the schema SDL).
+        for type_def in self._schema.type_map.values():
+            if not hasattr(type_def, "fields"):
+                continue
+            for field in type_def.fields.values():
+                if isinstance(getattr(field, "default_value", None), BackendSentinel):
+                    field.default_value = GraphQLUndefined
         sdl = super().as_str()
         sdl = sdl.replace("type PageInfo", "type PageInfo @shareable").replace(
             'import: ["@external", "@key"]', 'import: ["@external", "@key", "@shareable"]'

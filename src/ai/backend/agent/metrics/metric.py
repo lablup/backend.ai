@@ -7,8 +7,15 @@ import uuid
 from collections.abc import Iterable, MutableMapping
 from typing import TYPE_CHECKING, Any, Self
 
-from prometheus_client import Counter, Gauge, Histogram
-
+from ai.backend.common.metrics.safe import (
+    SafeCounter as Counter,
+)
+from ai.backend.common.metrics.safe import (
+    SafeGauge as Gauge,
+)
+from ai.backend.common.metrics.safe import (
+    SafeHistogram as Histogram,
+)
 from ai.backend.common.metrics.types import (
     CONTAINER_UTILIZATION_METRIC_LABEL_NAME,
     DEVICE_UTILIZATION_METRIC_LABEL_NAME,

@@ -31,6 +31,7 @@ def make_image_node(**kwargs: object) -> ImageNode:
     defaults: dict[str, object] = {
         "id": uuid.uuid4(),
         "name": "python:3.11-cuda12",
+        "image": "stable/python",
         "registry": "registry.example.com",
         "registry_id": uuid.uuid4(),
         "architecture": "x86_64",
@@ -64,6 +65,7 @@ class TestImageNodeCreation:
         node = ImageNode(
             id=image_id,
             name="python:3.11",
+            image="stable/python",
             registry="registry.example.com",
             registry_id=registry_id,
             project="myproject",

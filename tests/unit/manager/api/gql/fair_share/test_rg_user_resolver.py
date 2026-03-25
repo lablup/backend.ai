@@ -4,12 +4,17 @@ from __future__ import annotations
 
 from datetime import UTC, date, datetime
 from decimal import Decimal
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 from uuid import UUID
 
 import pytest
 
+from ai.backend.common.dto.manager.v2.fair_share.response import (
+    GetUserFairSharePayload,
+    SearchUserFairSharesPayload,
+)
 from ai.backend.common.types import ResourceSlot, SlotQuantity
+from ai.backend.manager.api.adapters.fair_share import FairShareAdapter
 from ai.backend.manager.api.gql.fair_share.resolver import user as user_resolver
 from ai.backend.manager.api.gql.fair_share.types import (
     UserFairShareGQL,
@@ -23,7 +28,6 @@ from ai.backend.manager.data.fair_share import (
     UserFairShareData,
 )
 from ai.backend.manager.errors.user import UserNotFound
-from ai.backend.manager.services.fair_share.actions import GetUserFairShareAction
 
 
 class TestRGUserFairShare:
@@ -77,11 +81,10 @@ class TestRGUserFairShare:
         self, user_fair_share_data: UserFairShareData
     ) -> MagicMock:
         """Info context where user fair share exists."""
+        user_node = FairShareAdapter._user_data_to_dto(user_fair_share_data)
         info = MagicMock()
-        action_result = MagicMock()
-        action_result.data = user_fair_share_data
-        info.context.processors.fair_share.get_user_fair_share.wait_for_complete = AsyncMock(
-            return_value=action_result
+        info.context.adapters.fair_share.get_user = AsyncMock(
+            return_value=GetUserFairSharePayload(item=user_node)
         )
         return info
 
@@ -109,11 +112,11 @@ class TestRGUserFairShare:
         assert result.resource_group_name == "default"
         assert result.domain_name == "test-domain"
 
-    async def test_calls_action_with_correct_params(
+    async def test_calls_adapter_with_correct_params(
         self,
         info_with_user_fair_share_exists: MagicMock,
     ) -> None:
-        """Should call action with correct resource_group, project_id, and user_uuid."""
+        """Should call adapter with correct resource_group, project_id, and user_uuid."""
         project_id = "11111111-2222-3333-4444-555555555555"
         user_uuid = UUID("66666666-7777-8888-9999-aaaaaaaaaaaa")
 
@@ -130,20 +133,18 @@ class TestRGUserFairShare:
             user_uuid,
         )
 
-        call_args = info_with_user_fair_share_exists.context.processors.fair_share.get_user_fair_share.wait_for_complete.call_args
-        action = call_args[0][0]
-        assert isinstance(action, GetUserFairShareAction)
-        assert action.resource_group == "custom-rg"
-        assert action.project_id == UUID(project_id)
-        assert action.user_uuid == user_uuid
+        call_arg = info_with_user_fair_share_exists.context.adapters.fair_share.get_user.call_args[
+            0
+        ][0]
+        assert call_arg.resource_group == "custom-rg"
+        assert call_arg.project_id == UUID(project_id)
+        assert call_arg.user_uuid == user_uuid
 
     @pytest.fixture
     def info_with_user_not_found(self) -> MagicMock:
         """Info context where user does not exist."""
         info = MagicMock()
-        info.context.processors.fair_share.get_user_fair_share.wait_for_complete = AsyncMock(
-            side_effect=UserNotFound()
-        )
+        info.context.adapters.fair_share.get_user = AsyncMock(side_effect=UserNotFound())
         return info
 
     async def test_raises_user_not_found_when_user_does_not_exist(
@@ -170,39 +171,34 @@ class TestRGUserFairShare:
 class TestRGUserFairShares:
     """Tests for rg_user_fair_shares resolver."""
 
-    async def test_calls_fetch_rg_user_fair_shares(self) -> None:
-        """Should call fetch_rg_user_fair_shares with correct scope."""
+    async def test_calls_adapter_with_correct_scope(self) -> None:
+        """Should call adapter with correct resource_group, domain_name, and project_id."""
         info = MagicMock()
+        info.context.adapters.fair_share.search_rg_user = AsyncMock(
+            return_value=SearchUserFairSharesPayload(items=[], total_count=0)
+        )
         scope = ResourceGroupUserScope(
             resource_group_name="default",
             domain_name="test-domain",
             project_id="aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
         )
-        mock_connection = MagicMock()
 
-        with patch(
-            "ai.backend.manager.api.gql.fair_share.resolver.user.fetch_rg_user_fair_shares",
-            new_callable=AsyncMock,
-            return_value=mock_connection,
-        ) as mock_fetch:
-            resolver_fn = user_resolver.rg_user_fair_shares.base_resolver
-            result = await resolver_fn(
-                info,
-                scope,
-                None,  # filter
-                None,  # order_by
-                None,  # before
-                None,  # after
-                10,  # first
-                None,  # last
-                None,  # limit
-                None,  # offset
-            )
+        resolver_fn = user_resolver.rg_user_fair_shares.base_resolver
+        await resolver_fn(
+            info,
+            scope,
+            None,  # filter
+            None,  # order_by
+            None,  # before
+            None,  # after
+            10,  # first
+            None,  # last
+            None,  # limit
+            None,  # offset
+        )
 
-            assert result == mock_connection
-            mock_fetch.assert_called_once()
-            call_kwargs = mock_fetch.call_args.kwargs
-            assert call_kwargs["info"] == info
-            assert call_kwargs["scope"].resource_group == "default"
-            assert call_kwargs["scope"].domain_name == "test-domain"
-            assert call_kwargs["first"] == 10
+        info.context.adapters.fair_share.search_rg_user.assert_called_once()
+        call_args = info.context.adapters.fair_share.search_rg_user.call_args
+        assert call_args[0][0].first == 10
+        assert call_args.kwargs["resource_group"] == "default"
+        assert call_args.kwargs["domain_name"] == "test-domain"

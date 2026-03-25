@@ -7,10 +7,6 @@ from .delete_role import DeleteRoleAction, DeleteRoleActionResult
 from .get_role_detail import GetRoleDetailAction, GetRoleDetailActionResult
 from .purge_role import PurgeRoleAction, PurgeRoleActionResult
 from .revoke_role import RevokeRoleAction, RevokeRoleActionResult
-from .search_object_permissions import (
-    SearchObjectPermissionsAction,
-    SearchObjectPermissionsActionResult,
-)
 from .search_permissions import (
     SearchPermissionsAction,
     SearchPermissionsActionResult,
@@ -46,8 +42,6 @@ __all__ = [
     "PurgeRoleActionResult",
     "RevokeRoleAction",
     "RevokeRoleActionResult",
-    "SearchObjectPermissionsAction",
-    "SearchObjectPermissionsActionResult",
     "SearchRolesAction",
     "SearchRolesActionResult",
     "SearchPermissionsAction",

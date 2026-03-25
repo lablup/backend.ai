@@ -226,7 +226,6 @@ class DeploymentPolicyUpdaterSpec(UpdaterSpec[DeploymentPolicyRow]):
     strategy_spec: OptionalState[RollingUpdateSpec | BlueGreenSpec] = field(
         default_factory=OptionalState[RollingUpdateSpec | BlueGreenSpec].nop
     )
-    rollback_on_failure: OptionalState[bool] = field(default_factory=OptionalState[bool].nop)
 
     @property
     @override
@@ -241,7 +240,6 @@ class DeploymentPolicyUpdaterSpec(UpdaterSpec[DeploymentPolicyRow]):
         spec_value = self.strategy_spec.optional_value()
         if spec_value is not None:
             to_update["strategy_spec"] = spec_value.model_dump()
-        self.rollback_on_failure.update_dict(to_update, "rollback_on_failure")
         return to_update
 
 

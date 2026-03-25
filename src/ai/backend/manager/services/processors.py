@@ -15,6 +15,9 @@ if TYPE_CHECKING:
     from ai.backend.common.clients.valkey_client.valkey_live.client import (
         ValkeyLiveClient,  # pants: no-infer-dep
     )
+    from ai.backend.common.clients.valkey_client.valkey_session.client import (
+        ValkeySessionClient,  # pants: no-infer-dep
+    )
     from ai.backend.common.clients.valkey_client.valkey_stat.client import (
         ValkeyStatClient,  # pants: no-infer-dep
     )
@@ -283,6 +286,7 @@ class ServiceArgs:
     valkey_stat_client: ValkeyStatClient
     valkey_live: ValkeyLiveClient
     valkey_artifact_client: ValkeyArtifactDownloadTrackingClient
+    valkey_session_client: ValkeySessionClient
     event_fetcher: EventFetcher
     background_task_manager: BackgroundTaskManager
     event_hub: EventHub

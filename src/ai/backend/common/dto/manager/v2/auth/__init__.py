@@ -5,8 +5,10 @@ Auth DTOs v2 for Manager API.
 from ai.backend.common.dto.manager.v2.auth.request import (
     AuthorizeInput,
     GetRoleInput,
+    RevokeMyKeypairInput,
     SignoutInput,
     SignupInput,
+    SwitchMyMainAccessKeyInput,
     UpdateFullNameInput,
     UpdatePasswordInput,
     UpdatePasswordNoAuthInput,
@@ -49,8 +51,10 @@ __all__ = (
     # Input models (request)
     "AuthorizeInput",
     "GetRoleInput",
+    "RevokeMyKeypairInput",
     "SignoutInput",
     "SignupInput",
+    "SwitchMyMainAccessKeyInput",
     "UpdateFullNameInput",
     "UpdatePasswordInput",
     "UpdatePasswordNoAuthInput",

@@ -14,6 +14,7 @@ import pytest
 
 from ai.backend.client.v2.exceptions import NotFoundError
 from ai.backend.client.v2.registry import BackendAIClientRegistry
+from ai.backend.common.config import ModelDefinition
 from ai.backend.common.data.endpoint.types import EndpointLifecycle
 from ai.backend.common.data.model_deployment.types import DeploymentStrategy, ModelDeploymentStatus
 from ai.backend.common.dto.manager.deployment import (
@@ -108,6 +109,7 @@ class TestSearchDeployments:
                         mount_destination="/models",
                         definition_path="model-definition.yaml",
                     ),
+                    model_definition=ModelDefinition(),
                 ),
             )
             response = await admin_registry.deployment.create_deployment(request)
@@ -167,6 +169,7 @@ class TestGetDeployment:
                     mount_destination="/models",
                     definition_path="model-definition.yaml",
                 ),
+                model_definition=ModelDefinition(),
             ),
         )
         response = await admin_registry.deployment.create_deployment(request)
@@ -278,6 +281,7 @@ class TestSearchRoutes:
                     mount_destination="/models",
                     definition_path="model-definition.yaml",
                 ),
+                model_definition=ModelDefinition(),
             ),
         )
         response = await admin_registry.deployment.create_deployment(request)

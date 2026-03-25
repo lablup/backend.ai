@@ -7,7 +7,7 @@ from uuid import UUID, uuid4
 
 import pytest
 
-from ai.backend.manager.data.deployment.types import DeploymentSubStep
+from ai.backend.manager.data.deployment.types import DeploymentLifecycleSubStep
 from ai.backend.manager.sokovan.deployment.strategy.applier import (
     StrategyApplyResult,
     StrategyResultApplier,
@@ -23,7 +23,7 @@ from ai.backend.manager.sokovan.deployment.strategy.types import (
 
 
 def _build_summary(
-    assignments: dict[UUID, DeploymentSubStep] | None = None,
+    assignments: dict[UUID, DeploymentLifecycleSubStep] | None = None,
     route_changes: RouteChanges | None = None,
 ) -> StrategyEvaluationSummary:
     return StrategyEvaluationSummary(
@@ -56,13 +56,13 @@ def empty_summary() -> StrategyEvaluationSummary:
 
 @pytest.fixture
 def provisioning_summary() -> StrategyEvaluationSummary:
-    return _build_summary({uuid4(): DeploymentSubStep.PROVISIONING})
+    return _build_summary({uuid4(): DeploymentLifecycleSubStep.DEPLOYING_PROVISIONING})
 
 
 @pytest.fixture
 def summary_with_rollout() -> StrategyEvaluationSummary:
     return _build_summary(
-        {uuid4(): DeploymentSubStep.PROVISIONING},
+        {uuid4(): DeploymentLifecycleSubStep.DEPLOYING_PROVISIONING},
         route_changes=RouteChanges(rollout_specs=[MagicMock()]),
     )
 
@@ -70,7 +70,7 @@ def summary_with_rollout() -> StrategyEvaluationSummary:
 @pytest.fixture
 def summary_with_drain() -> StrategyEvaluationSummary:
     return _build_summary(
-        {uuid4(): DeploymentSubStep.PROGRESSING},
+        {uuid4(): DeploymentLifecycleSubStep.DEPLOYING_PROVISIONING},
         route_changes=RouteChanges(drain_route_ids=[uuid4()]),
     )
 
@@ -81,8 +81,8 @@ def completed_summary() -> tuple[StrategyEvaluationSummary, set[UUID]]:
     ep_id_2 = uuid4()
     completed_ids = {ep_id_1, ep_id_2}
     summary = _build_summary({
-        ep_id_1: DeploymentSubStep.COMPLETED,
-        ep_id_2: DeploymentSubStep.COMPLETED,
+        ep_id_1: DeploymentLifecycleSubStep.DEPLOYING_COMPLETED,
+        ep_id_2: DeploymentLifecycleSubStep.DEPLOYING_COMPLETED,
     })
     return summary, completed_ids
 
@@ -90,7 +90,7 @@ def completed_summary() -> tuple[StrategyEvaluationSummary, set[UUID]]:
 @pytest.fixture
 def rolled_back_summary() -> tuple[StrategyEvaluationSummary, set[UUID]]:
     ep_id = uuid4()
-    summary = _build_summary({ep_id: DeploymentSubStep.ROLLED_BACK})
+    summary = _build_summary({ep_id: DeploymentLifecycleSubStep.DEPLOYING_PROVISIONING})
     return summary, {ep_id}
 
 
@@ -101,9 +101,9 @@ def mixed_summary() -> tuple[StrategyEvaluationSummary, UUID, UUID, UUID]:
     rolled_back_id = uuid4()
     summary = _build_summary(
         {
-            provisioning_id: DeploymentSubStep.PROVISIONING,
-            completed_id: DeploymentSubStep.COMPLETED,
-            rolled_back_id: DeploymentSubStep.ROLLED_BACK,
+            provisioning_id: DeploymentLifecycleSubStep.DEPLOYING_PROVISIONING,
+            completed_id: DeploymentLifecycleSubStep.DEPLOYING_COMPLETED,
+            rolled_back_id: DeploymentLifecycleSubStep.DEPLOYING_PROVISIONING,
         },
         route_changes=RouteChanges(
             rollout_specs=[MagicMock()],
@@ -131,24 +131,22 @@ class TestStrategyResultApplier:
 
         mock_deployment_repo.apply_strategy_mutations.assert_not_called()
         assert result.completed_ids == set()
-        assert result.rolled_back_ids == set()
         assert result.routes_created == 0
         assert result.routes_drained == 0
 
-    async def test_assignments_only(
+    async def test_assignments_only_no_db_call(
         self,
         applier: StrategyResultApplier,
         mock_deployment_repo: AsyncMock,
         provisioning_summary: StrategyEvaluationSummary,
     ) -> None:
+        """Assignments without route changes should not trigger DB mutations.
+
+        Sub-step transitions are handled exclusively by the coordinator.
+        """
         result = await applier.apply(provisioning_summary)
 
-        mock_deployment_repo.apply_strategy_mutations.assert_called_once()
-        kwargs = mock_deployment_repo.apply_strategy_mutations.call_args.kwargs
-        assert kwargs["completed_ids"] == set()
-        assert kwargs["rolled_back_ids"] == set()
-        assert kwargs["drain"] is None
-        assert not kwargs["rollout"]
+        mock_deployment_repo.apply_strategy_mutations.assert_not_called()
         assert result.routes_created == 0
         assert result.routes_drained == 0
 
@@ -182,10 +180,15 @@ class TestStrategyResultApplier:
         self,
         applier: StrategyResultApplier,
         mock_deployment_repo: AsyncMock,
-        provisioning_summary: StrategyEvaluationSummary,
     ) -> None:
-        await applier.apply(provisioning_summary)
+        """Summary with only rollout should pass drain=None."""
+        summary = _build_summary(
+            {uuid4(): DeploymentLifecycleSubStep.DEPLOYING_PROVISIONING},
+            route_changes=RouteChanges(rollout_specs=[MagicMock()]),
+        )
+        await applier.apply(summary)
 
+        mock_deployment_repo.apply_strategy_mutations.assert_called_once()
         kwargs = mock_deployment_repo.apply_strategy_mutations.call_args.kwargs
         assert kwargs["drain"] is None
 
@@ -202,23 +205,7 @@ class TestStrategyResultApplier:
 
         kwargs = mock_deployment_repo.apply_strategy_mutations.call_args.kwargs
         assert kwargs["completed_ids"] == completed_ids
-        assert kwargs["rolled_back_ids"] == set()
         assert result.completed_ids == completed_ids
-
-    async def test_rolled_back_passes_rolled_back_ids(
-        self,
-        applier: StrategyResultApplier,
-        mock_deployment_repo: AsyncMock,
-        rolled_back_summary: tuple[StrategyEvaluationSummary, set[UUID]],
-    ) -> None:
-        summary, rolled_back_ids = rolled_back_summary
-
-        result = await applier.apply(summary)
-
-        kwargs = mock_deployment_repo.apply_strategy_mutations.call_args.kwargs
-        assert kwargs["rolled_back_ids"] == rolled_back_ids
-        assert kwargs["completed_ids"] == set()
-        assert result.rolled_back_ids == rolled_back_ids
 
     async def test_mixed_assignments_handles_all(
         self,
@@ -226,7 +213,7 @@ class TestStrategyResultApplier:
         mock_deployment_repo: AsyncMock,
         mixed_summary: tuple[StrategyEvaluationSummary, UUID, UUID, UUID],
     ) -> None:
-        summary, _provisioning_id, completed_id, rolled_back_id = mixed_summary
+        summary, _provisioning_id, completed_id, _rolled_back_id = mixed_summary
         mock_deployment_repo.apply_strategy_mutations.return_value = 1
 
         result = await applier.apply(summary)
@@ -234,11 +221,9 @@ class TestStrategyResultApplier:
         mock_deployment_repo.apply_strategy_mutations.assert_called_once()
         kwargs = mock_deployment_repo.apply_strategy_mutations.call_args.kwargs
         assert kwargs["completed_ids"] == {completed_id}
-        assert kwargs["rolled_back_ids"] == {rolled_back_id}
         assert len(kwargs["rollout"]) == 1
         assert kwargs["drain"] is not None
         assert result.completed_ids == {completed_id}
-        assert result.rolled_back_ids == {rolled_back_id}
         assert result.routes_created == 1
         assert result.routes_drained == 1
 

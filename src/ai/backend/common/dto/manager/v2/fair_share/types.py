@@ -10,7 +10,8 @@ from enum import StrEnum
 
 from pydantic import Field
 
-from ai.backend.common.api_handlers import BaseResponseModel
+from ai.backend.common.api_handlers import BaseRequestModel, BaseResponseModel
+from ai.backend.common.dto.manager.v2.common import OrderDirection
 
 __all__ = (
     # Enums
@@ -24,17 +25,24 @@ __all__ = (
     # Sub-models
     "ResourceSlotEntryInfo",
     "ResourceSlotInfo",
+    "ResourceWeightEntryInfo",
     "FairShareSpecInfo",
     "FairShareCalculationSnapshotInfo",
     "UsageBucketMetadataInfo",
+    # Scope DTOs
+    "ResourceGroupDomainScopeDTO",
+    "ResourceGroupProjectScopeDTO",
+    "ResourceGroupUserScopeDTO",
+    "DomainFairShareScopeDTO",
+    "ProjectFairShareScopeDTO",
+    "UserFairShareScopeDTO",
+    "ProjectUsageScopeDTO",
+    "DomainUsageScopeDTO",
+    "UserUsageScopeDTO",
+    "DomainUsageBucketScopeDTO",
+    "ProjectUsageBucketScopeDTO",
+    "UserUsageBucketScopeDTO",
 )
-
-
-class OrderDirection(StrEnum):
-    """Order direction for sorting."""
-
-    ASC = "asc"
-    DESC = "desc"
 
 
 class DomainFairShareOrderField(StrEnum):
@@ -43,6 +51,7 @@ class DomainFairShareOrderField(StrEnum):
     FAIR_SHARE_FACTOR = "fair_share_factor"
     DOMAIN_NAME = "domain_name"
     CREATED_AT = "created_at"
+    DOMAIN_IS_ACTIVE = "domain_is_active"
 
 
 class ProjectFairShareOrderField(StrEnum):
@@ -50,6 +59,8 @@ class ProjectFairShareOrderField(StrEnum):
 
     FAIR_SHARE_FACTOR = "fair_share_factor"
     CREATED_AT = "created_at"
+    PROJECT_NAME = "project_name"
+    PROJECT_IS_ACTIVE = "project_is_active"
 
 
 class UserFairShareOrderField(StrEnum):
@@ -57,6 +68,8 @@ class UserFairShareOrderField(StrEnum):
 
     FAIR_SHARE_FACTOR = "fair_share_factor"
     CREATED_AT = "created_at"
+    USER_USERNAME = "user_username"
+    USER_EMAIL = "user_email"
 
 
 class DomainUsageBucketOrderField(StrEnum):
@@ -81,7 +94,7 @@ class ResourceSlotEntryInfo(BaseResponseModel):
     """A single resource slot entry with resource type and quantity."""
 
     resource_type: str = Field(description="Resource type identifier (e.g., cpu, mem, cuda.shares)")
-    quantity: str = Field(description="Quantity as a decimal string to preserve precision")
+    quantity: Decimal = Field(description="Quantity of the resource")
 
 
 class ResourceSlotInfo(BaseResponseModel):
@@ -90,19 +103,38 @@ class ResourceSlotInfo(BaseResponseModel):
     entries: list[ResourceSlotEntryInfo] = Field(description="List of resource allocations")
 
 
+class ResourceWeightEntryInfo(BaseResponseModel):
+    """A single resource weight entry with default indicator."""
+
+    resource_type: str = Field(description="Resource type identifier")
+    weight: Decimal = Field(description="Weight multiplier for this resource type")
+    uses_default: bool = Field(
+        description="Whether this resource uses the resource group's default weight"
+    )
+
+
 class FairShareSpecInfo(BaseResponseModel):
     """Fair share specification parameters."""
 
-    weight: Decimal | None = Field(
-        default=None,
+    weight: Decimal = Field(
         description=(
-            "Base weight for this entity. None means use resource group's default_weight."
+            "Effective weight for this entity. Always the resolved value "
+            "(either the explicitly set weight or the resource group's default_weight)."
+        ),
+    )
+    uses_default: bool = Field(
+        default=False,
+        description=(
+            "Whether this entity uses the resource group's default_weight. "
+            "True means no explicit weight was set."
         ),
     )
     half_life_days: int = Field(description="Half-life for exponential decay in days")
     lookback_days: int = Field(description="Total lookback period in days")
     decay_unit_days: int = Field(description="Granularity of decay buckets in days")
-    resource_weights: ResourceSlotInfo = Field(description="Weights for each resource type")
+    resource_weights: list[ResourceWeightEntryInfo] = Field(
+        description="Weights for each resource type with default indicators"
+    )
 
 
 class FairShareCalculationSnapshotInfo(BaseResponseModel):
@@ -130,3 +162,87 @@ class UsageBucketMetadataInfo(BaseResponseModel):
     usage_capacity_ratio: ResourceSlotInfo = Field(
         description="Ratio of usage to capacity (usage / total capacity available)"
     )
+
+
+# Scope DTOs for resource group and usage bucket scoped APIs
+
+
+class DomainFairShareScopeDTO(BaseRequestModel):
+    """Scope for domain fair share queries within a resource group."""
+
+    resource_group_name: str = Field(description="Resource group to filter fair shares by.")
+
+
+class ProjectFairShareScopeDTO(BaseRequestModel):
+    """Scope for project fair share queries within a resource group."""
+
+    resource_group_name: str = Field(description="Resource group to filter fair shares by.")
+
+
+class UserFairShareScopeDTO(BaseRequestModel):
+    """Scope for user fair share queries within a resource group."""
+
+    resource_group_name: str = Field(description="Resource group to filter fair shares by.")
+
+
+class DomainUsageScopeDTO(BaseRequestModel):
+    """Scope for domain usage bucket queries within a resource group (node-level context)."""
+
+    resource_group_name: str = Field(description="Resource group to filter usage buckets by.")
+
+
+class ProjectUsageScopeDTO(BaseRequestModel):
+    """Scope for project usage bucket queries within a resource group (node-level context)."""
+
+    resource_group_name: str = Field(description="Resource group to filter usage buckets by.")
+
+
+class UserUsageScopeDTO(BaseRequestModel):
+    """Scope for user usage bucket queries within a resource group (node-level context)."""
+
+    resource_group_name: str = Field(description="Resource group to filter usage buckets by.")
+
+
+class ResourceGroupDomainScopeDTO(BaseRequestModel):
+    """Scope for domain-level APIs within a resource group context."""
+
+    resource_group_name: str = Field(description="Resource group name to scope the operation.")
+
+
+class ResourceGroupProjectScopeDTO(BaseRequestModel):
+    """Scope for project-level APIs within a resource group and domain context."""
+
+    resource_group_name: str = Field(description="Resource group name to scope the operation.")
+    domain_name: str = Field(description="Domain name to scope the operation.")
+
+
+class ResourceGroupUserScopeDTO(BaseRequestModel):
+    """Scope for user-level APIs within a resource group, domain, and project context."""
+
+    resource_group_name: str = Field(description="Resource group name to scope the operation.")
+    domain_name: str = Field(description="Domain name to scope the operation.")
+    project_id: str = Field(description="Project ID to scope the operation.")
+
+
+class DomainUsageBucketScopeDTO(BaseRequestModel):
+    """Scope for domain-level usage bucket APIs."""
+
+    resource_group_name: str = Field(description="Resource group name.")
+    domain_name: str = Field(description="Domain name to retrieve usage buckets for.")
+
+
+class ProjectUsageBucketScopeDTO(BaseRequestModel):
+    """Scope for project-level usage bucket APIs."""
+
+    resource_group_name: str = Field(description="Resource group name.")
+    domain_name: str = Field(description="Domain name.")
+    project_id: str = Field(description="Project ID (will be converted to UUID).")
+
+
+class UserUsageBucketScopeDTO(BaseRequestModel):
+    """Scope for user-level usage bucket APIs."""
+
+    resource_group_name: str = Field(description="Resource group name.")
+    domain_name: str = Field(description="Domain name.")
+    project_id: str = Field(description="Project ID (will be converted to UUID).")
+    user_uuid: str = Field(description="User UUID (will be converted to UUID).")

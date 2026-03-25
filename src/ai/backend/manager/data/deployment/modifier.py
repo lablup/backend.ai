@@ -22,12 +22,10 @@ class DeploymentPolicyModifier(PartialModifier):
     strategy_spec: OptionalState[RollingUpdateSpec | BlueGreenSpec] = field(
         default_factory=OptionalState[RollingUpdateSpec | BlueGreenSpec].nop
     )
-    rollback_on_failure: OptionalState[bool] = field(default_factory=OptionalState[bool].nop)
 
     @override
     def fields_to_update(self) -> dict[str, Any]:
         to_update: dict[str, Any] = {}
         self.strategy.update_dict(to_update, "strategy")
         self.strategy_spec.update_dict(to_update, "strategy_spec")
-        self.rollback_on_failure.update_dict(to_update, "rollback_on_failure")
         return to_update

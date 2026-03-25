@@ -13,6 +13,10 @@ from ai.backend.manager.config.unified import AuthConfig, ManagerConfig
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.errors.auth import AuthorizationFailed, PasswordExpired
 from ai.backend.manager.models.user import UserRole, UserStatus
+from ai.backend.manager.repositories.auth.db_source.db_source import (
+    CredentialVerificationResult,
+    LoginSessionCreationResult,
+)
 from ai.backend.manager.repositories.auth.repository import AuthRepository
 from ai.backend.manager.services.auth.actions.authorize import (
     AuthorizeAction,
@@ -39,6 +43,7 @@ def mock_config_provider() -> MagicMock:
         password_hash_algorithm=PasswordHashAlgorithm.PBKDF2_SHA256,
         password_hash_rounds=100_000,
         password_hash_salt_size=32,
+        login_session_max_age=604800,
     )
     return mock_provider
 
@@ -53,6 +58,7 @@ def auth_service(
         hook_plugin_ctx=mock_hook_plugin_ctx,
         auth_repository=mock_auth_repository,
         config_provider=mock_config_provider,
+        valkey_session_client=AsyncMock(),
     )
 
 
@@ -71,7 +77,13 @@ def setup_successful_auth(
     mock_user.status = UserStatus.ACTIVE
     mock_user.password_changed_at = None
     mock_user.__getitem__ = lambda self, key: getattr(self, key)
-    mock_auth_repository.check_credential_with_migration.return_value = mock_user
+    mock_auth_repository.check_credential_with_migration.return_value = (
+        CredentialVerificationResult(
+            user=mock_user,
+            session_token="test_session_token",
+            expires_at=datetime.now(UTC) + timedelta(days=7),
+        )
+    )
     mock_user_row = MagicMock()
     mock_user_row.get_main_keypair_row.return_value = MagicMock(
         access_key="test_access_key",
@@ -188,6 +200,11 @@ async def test_authorize_with_hook_authorization(
     )
     mock_auth_repository.get_user_row_by_uuid.return_value = mock_user_row
 
+    mock_auth_repository.create_login_session.return_value = LoginSessionCreationResult(
+        session_token="hook_session_token",
+        expires_at=datetime.now(UTC) + timedelta(days=7),
+    )
+
     result = await auth_service.authorize(action)
 
     assert result.authorization_result is not None
@@ -224,7 +241,13 @@ async def test_authorize_with_password_expiry(
     mock_user.status = UserStatus.ACTIVE
     mock_user.password_changed_at = password_changed_at
     mock_user.__getitem__ = lambda self, key: getattr(self, key)
-    mock_auth_repository.check_credential_with_migration.return_value = mock_user
+    mock_auth_repository.check_credential_with_migration.return_value = (
+        CredentialVerificationResult(
+            user=mock_user,
+            session_token="test_session_token",
+            expires_at=datetime.now(UTC) + timedelta(days=7),
+        )
+    )
     mock_auth_repository.get_current_time.return_value = datetime.now(tz=UTC)
 
     mock_hook_plugin_ctx.dispatch.return_value = HookResult(
@@ -261,7 +284,13 @@ async def test_authorize_with_post_hook_response(
     mock_user.status = UserStatus.ACTIVE
     mock_user.password_changed_at = None
     mock_user.__getitem__ = lambda self, key: getattr(self, key)
-    mock_auth_repository.check_credential_with_migration.return_value = mock_user
+    mock_auth_repository.check_credential_with_migration.return_value = (
+        CredentialVerificationResult(
+            user=mock_user,
+            session_token="test_session_token",
+            expires_at=datetime.now(UTC) + timedelta(days=7),
+        )
+    )
 
     # Mock user row
     mock_user_row = MagicMock()

@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from uuid import UUID
 
+from ai.backend.common.config import ModelDefinition
 from ai.backend.common.data.model_deployment.types import DeploymentStrategy
 from ai.backend.manager.data.deployment.types import (
     DeploymentMetadata,
@@ -39,6 +40,7 @@ class ModelRevisionCreator:
     resource_spec: ResourceSpec
     mounts: VFolderMountsCreator
     execution: ExecutionSpec
+    model_definition: ModelDefinition
 
 
 @dataclass
@@ -117,7 +119,6 @@ class DeploymentPolicyConfig:
 
     strategy: DeploymentStrategy
     strategy_spec: RollingUpdateSpec | BlueGreenSpec
-    rollback_on_failure: bool = False
 
 
 @dataclass
@@ -127,7 +128,6 @@ class DeploymentPolicyCreator:
     deployment_id: UUID
     strategy: DeploymentStrategy
     strategy_spec: RollingUpdateSpec | BlueGreenSpec
-    rollback_on_failure: bool = False
 
 
 @dataclass

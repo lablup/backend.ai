@@ -1,5 +1,11 @@
 # DTO v2 Rules
 
+## Single Source of Truth
+
+DTOs in this package are the shared schema for both GraphQL (Strawberry) and REST v2 APIs.
+Field names, enum values, and structure must remain stable — both APIs depend on them.
+Any breaking change here requires coordinated updates in GQL types and REST v2 handlers.
+
 ## Naming
 
 - Input (request): `Create{Entity}Input`, `Update{Entity}Input`, `Delete{Entity}Input`, `Purge{Entity}Input`
@@ -37,5 +43,5 @@ Per domain: `v2/{domain}/types.py`, `request.py`, `response.py`, `__init__.py`
 ## Conversion
 
 - DTO is a pure data structure — no conversion logic inside DTOs
-- Conversion from domain Data types to DTOs is performed in the Adapter layer (`manager/api/rest/{domain}/adapter.py`)
+- Conversion from domain Data types to DTOs is performed in the Adapter layer (`manager/api/adapters/{domain}.py`)
 - No direct DB model or domain Data type imports in DTO modules

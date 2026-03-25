@@ -20,6 +20,7 @@ if TYPE_CHECKING:
         ValkeyRateLimitClient,
     )
     from ai.backend.common.plugin.monitor import ErrorPluginContext
+    from ai.backend.manager.api.adapters.registry import Adapters
     from ai.backend.manager.config.provider import ManagerConfigProvider
     from ai.backend.manager.event_dispatcher.handlers.stream_cleanup import (
         StreamCleanupEventHandler,
@@ -32,6 +33,7 @@ if TYPE_CHECKING:
 def build_api_routes(
     *,
     processors: Processors,
+    adapters: Adapters,
     cors_options: CORSOptions,
     config_provider: ManagerConfigProvider,
     error_monitor: ErrorPluginContext,
@@ -132,6 +134,7 @@ def build_api_routes(
     from .user.registry import register_user_routes
     from .userconfig.handler import UserConfigHandler
     from .userconfig.registry import register_userconfig_routes
+    from .v2.tree import build_v2_routes
     from .vfolder.handler import VFolderHandler
     from .vfolder.registry import register_vfolder_routes
     from .vfs_storage.handler import VFSStorageHandler
@@ -283,8 +286,12 @@ def build_api_routes(
     prometheus_processor = processors.prometheus_query_preset
     prometheus_query_preset_handler = PrometheusQueryPresetHandler(processor=prometheus_processor)
 
+    # v2 REST API routes
+    v2_registry = build_v2_routes(adapters=adapters, route_deps=route_deps)
+
     # 3. Build all registries
     return [
+        v2_registry,
         register_auth_routes(auth_handler, route_deps),
         register_acl_routes(acl_handler, route_deps),
         register_admin_routes(
