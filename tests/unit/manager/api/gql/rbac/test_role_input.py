@@ -1,13 +1,73 @@
-"""Unit tests for UpdateRoleInput.to_pydantic()."""
+"""Unit tests for CreateRoleInput and UpdateRoleInput to_pydantic()."""
 
 from __future__ import annotations
 
 import uuid
 
 from ai.backend.common.api_handlers import SENTINEL
-from ai.backend.common.data.permission.types import RoleStatus
-from ai.backend.common.dto.manager.v2.rbac.request import UpdateRoleInput as UpdateRoleInputDTO
-from ai.backend.manager.api.gql.rbac.types.role import RoleStatusGQL, UpdateRoleInput
+from ai.backend.common.data.permission.types import RoleSource, RoleStatus
+from ai.backend.common.dto.manager.v2.rbac.request import (
+    CreateRoleInput as CreateRoleInputDTO,
+)
+from ai.backend.common.dto.manager.v2.rbac.request import (
+    UpdateRoleInput as UpdateRoleInputDTO,
+)
+from ai.backend.manager.api.gql.rbac.types.role import (
+    CreateRoleInput,
+    RoleSourceGQL,
+    RoleStatusGQL,
+    UpdateRoleInput,
+)
+
+
+class TestCreateRoleInputToPydantic:
+    """Tests for CreateRoleInput.to_pydantic() method."""
+
+    def test_source_omitted_defaults_to_custom(self) -> None:
+        """CreateRoleInput with source omitted → dto.source == RoleSource.CUSTOM."""
+        role_input = CreateRoleInput(name="MyRole")
+
+        dto = role_input.to_pydantic()
+        assert isinstance(dto, CreateRoleInputDTO)
+        assert dto.source == RoleSource.CUSTOM
+
+    def test_source_explicit_system(self) -> None:
+        """CreateRoleInput with source=SYSTEM → dto.source == RoleSource.SYSTEM."""
+        role_input = CreateRoleInput(name="SystemRole", source=RoleSourceGQL.SYSTEM)
+
+        dto = role_input.to_pydantic()
+        assert isinstance(dto, CreateRoleInputDTO)
+        assert dto.source == RoleSource.SYSTEM
+
+    def test_source_explicit_custom(self) -> None:
+        """CreateRoleInput with source=CUSTOM → dto.source == RoleSource.CUSTOM."""
+        role_input = CreateRoleInput(name="CustomRole", source=RoleSourceGQL.CUSTOM)
+
+        dto = role_input.to_pydantic()
+        assert isinstance(dto, CreateRoleInputDTO)
+        assert dto.source == RoleSource.CUSTOM
+
+    def test_description_omitted_defaults_to_none(self) -> None:
+        """CreateRoleInput with description omitted → dto.description is None."""
+        role_input = CreateRoleInput(name="MyRole")
+
+        dto = role_input.to_pydantic()
+        assert isinstance(dto, CreateRoleInputDTO)
+        assert dto.description is None
+
+    def test_all_fields_provided(self) -> None:
+        """CreateRoleInput with all fields → dto has matching values."""
+        role_input = CreateRoleInput(
+            name="Admin",
+            description="Admin role",
+            source=RoleSourceGQL.SYSTEM,
+        )
+
+        dto = role_input.to_pydantic()
+        assert isinstance(dto, CreateRoleInputDTO)
+        assert dto.name == "Admin"
+        assert dto.description == "Admin role"
+        assert dto.source == RoleSource.SYSTEM
 
 
 class TestUpdateRoleInputToPydantic:
