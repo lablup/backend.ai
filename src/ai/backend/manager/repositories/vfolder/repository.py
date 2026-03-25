@@ -5,6 +5,7 @@ from typing import Any, cast
 
 import sqlalchemy as sa
 from sqlalchemy import exc as sa_exc
+from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
 from sqlalchemy.orm import contains_eager, selectinload
 
@@ -24,6 +25,7 @@ from ai.backend.manager.data.permission.types import (
     OperationType,
     RBACElementRef,
     RBACElementType,
+    RelationType,
     RoleSource,
     ScopeType,
 )
@@ -57,6 +59,7 @@ from ai.backend.manager.models.keypair import KeyPairRow, keypairs
 from ai.backend.manager.models.rbac_models.association_scopes_entities import (
     AssociationScopesEntitiesRow,
 )
+from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
 from ai.backend.manager.models.rbac_models.role import RoleRow
 from ai.backend.manager.models.rbac_models.user_role import UserRoleRow
 from ai.backend.manager.models.resource_policy import keypair_resource_policies
@@ -1779,11 +1782,6 @@ class VfolderRepository:
                     & (vfolder_invitations.c.vfolder == vfolder_id)
                 )
                 await conn.execute(del_query)
-                del_query = sa.delete(vfolder_permissions).where(
-                    (vfolder_permissions.c.vfolder == vfolder_id)
-                    & (vfolder_permissions.c.user == user_info.uuid)
-                )
-                await conn.execute(del_query)
 
                 # Also clean up new owner's RBAC records from when they were an invitee
                 new_owner_role_id = await self._get_user_role_id(session, user_info.uuid)
@@ -1829,6 +1827,48 @@ class VfolderRepository:
                     )
 
             await execute_with_retry(_cleanup_old_owner_rbac)
+
+        # Step 6: Create owner RBAC records for new owner
+        async def _grant_new_owner_rbac() -> None:
+            async with self._db.begin_session() as session:
+                user_role_id = await self._get_user_role_id(session, user_info.uuid)
+
+                # Upsert scope-entity mapping (AUTO relation for owner)
+                # If new owner was previously invitee, upgrade REF -> AUTO
+                upsert_stmt = (
+                    pg_insert(AssociationScopesEntitiesRow)
+                    .values(
+                        scope_type=ScopeType.USER,
+                        scope_id=str(user_info.uuid),
+                        entity_type=EntityType.VFOLDER,
+                        entity_id=str(vfolder_id),
+                        relation_type=RelationType.AUTO,
+                    )
+                    .on_conflict_do_update(
+                        constraint="uq_scope_id_entity_id",
+                        set_={"relation_type": RelationType.AUTO},
+                    )
+                )
+                await session.execute(upsert_stmt)
+
+                # Grant owner permission (ON CONFLICT DO NOTHING in case
+                # new owner already had permission as invitee)
+                perm_stmt = (
+                    pg_insert(PermissionRow)
+                    .values(
+                        role_id=user_role_id,
+                        scope_type=ScopeType.VFOLDER,
+                        scope_id=str(vfolder_id),
+                        entity_type=EntityType.VFOLDER,
+                        operation=OperationType.READ,
+                    )
+                    .on_conflict_do_nothing(
+                        constraint="uq_permissions_role_scope_entity_op",
+                    )
+                )
+                await session.execute(perm_stmt)
+
+        await execute_with_retry(_grant_new_owner_rbac)
 
     @vfolder_repository_resilience.apply()
     async def get_alive_agent_ids(

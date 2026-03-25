@@ -23,7 +23,12 @@ from ai.backend.common.types import (
 )
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.group.types import ProjectType
-from ai.backend.manager.data.permission.types import EntityType, RoleSource
+from ai.backend.manager.data.permission.types import (
+    EntityType,
+    OperationType,
+    RelationType,
+    RoleSource,
+)
 from ai.backend.manager.data.vfolder.types import (
     VFolderMountPermission,
     VFolderOperationStatus,
@@ -360,6 +365,35 @@ class TestVFolderOwnershipTransferRBACCleanup:
             )
             assert perm_count_after == 0, "Old owner's permissions should be removed after transfer"
 
+            # Verify new owner B's RBAC records are created
+            b_mapping_count = await db_sess.scalar(
+                sa.select(sa.func.count()).where(
+                    sa.and_(
+                        AssociationScopesEntitiesRow.scope_id == str(user_b_id),
+                        AssociationScopesEntitiesRow.entity_id == str(vfolder_id),
+                        AssociationScopesEntitiesRow.relation_type == RelationType.AUTO,
+                    )
+                )
+            )
+            assert b_mapping_count == 1, (
+                "New owner should have AUTO scope-entity mapping after transfer"
+            )
+
+            b_perm_count = await db_sess.scalar(
+                sa.select(sa.func.count())
+                .select_from(PermissionRow)
+                .where(
+                    sa.and_(
+                        PermissionRow.scope_id == str(vfolder_id),
+                        PermissionRow.entity_type == EntityType.VFOLDER,
+                        PermissionRow.operation == OperationType.READ,
+                    )
+                )
+                .join(UserRoleRow, UserRoleRow.role_id == PermissionRow.role_id)
+                .where(UserRoleRow.user_id == user_b_id)
+            )
+            assert b_perm_count == 1, "New owner should have READ permission after transfer"
+
     async def test_round_trip_ownership_transfer_cleans_up_rbac(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
@@ -474,10 +508,10 @@ class TestVFolderOwnershipTransferRBACCleanup:
     ) -> None:
         """
         Regression test for BA-5277:
-        1. A owns vfolder, invites B (B accepts → gets RBAC permission as invitee)
-        2. Transfer ownership A → B (B's invitee RBAC records must be cleaned up)
-        3. Transfer ownership B → A
-        4. A invites B again → B accepts (must not hit unique constraint violation)
+        1. A owns vfolder, invites B (B accepts -> gets RBAC permission as invitee)
+        2. Transfer ownership A -> B (B gets owner RBAC, invitee permission preserved)
+        3. Transfer ownership B -> A
+        4. A invites B again -> B accepts (must not hit unique constraint violation)
         """
         repo = VfolderRepository(db=db_with_cleanup)
 
@@ -540,23 +574,24 @@ class TestVFolderOwnershipTransferRBACCleanup:
                 "User B should have RBAC permissions as invitee"
             )
 
-        # Transfer ownership A → B (must clean up B's invitee RBAC records)
+        # Transfer ownership A -> B (B gets owner RBAC via Step 6)
         await repo.change_vfolder_ownership(vfolder_id, user_b_email)
 
-        # Verify B's invitee RBAC permissions are cleaned up
+        # Verify B has owner RBAC after becoming owner
         async with db_with_cleanup.begin_readonly_session() as db_sess:
-            perm_count_b_after = await db_sess.scalar(
-                sa.select(sa.func.count())
-                .select_from(PermissionRow)
-                .where(PermissionRow.scope_id == str(vfolder_id))
-                .join(UserRoleRow, UserRoleRow.role_id == PermissionRow.role_id)
-                .where(UserRoleRow.user_id == user_b_id)
+            b_mapping_after = await db_sess.scalar(
+                sa.select(AssociationScopesEntitiesRow.relation_type).where(
+                    sa.and_(
+                        AssociationScopesEntitiesRow.scope_id == str(user_b_id),
+                        AssociationScopesEntitiesRow.entity_id == str(vfolder_id),
+                    )
+                )
             )
-            assert perm_count_b_after == 0, (
-                "User B's invitee RBAC permissions should be cleaned up after becoming owner"
+            assert b_mapping_after == RelationType.AUTO, (
+                "User B's mapping should be upgraded to AUTO after becoming owner"
             )
 
-        # Transfer ownership B → A
+        # Transfer ownership B -> A
         await repo.change_vfolder_ownership(vfolder_id, user_a_email)
 
         # B accepts invitation again (must not raise unique constraint violation)
@@ -575,4 +610,197 @@ class TestVFolderOwnershipTransferRBACCleanup:
             )
             assert perm_count_b_final is not None and perm_count_b_final > 0, (
                 "User B should have RBAC permissions after re-accepting invitation"
+            )
+
+    async def test_ownership_transfer_grants_new_owner_rbac(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        test_domain_name: str,
+        test_user_resource_policy_name: str,
+        test_keypair_resource_policy_name: str,
+        test_group: uuid.UUID,
+    ) -> None:
+        """
+        Verify that when B was previously an invitee (REF scope-entity mapping),
+        ownership transfer upgrades B's mapping to AUTO and grants owner permissions.
+        """
+        repo = VfolderRepository(db=db_with_cleanup)
+
+        user_a_id, user_a_email = await self._create_user_with_keypair(
+            db_with_cleanup,
+            test_domain_name,
+            test_user_resource_policy_name,
+            test_keypair_resource_policy_name,
+        )
+        user_b_id, user_b_email = await self._create_user_with_keypair(
+            db_with_cleanup,
+            test_domain_name,
+            test_user_resource_policy_name,
+            test_keypair_resource_policy_name,
+        )
+
+        vfolder_id = uuid.uuid4()
+
+        # Create vfolder owned by A
+        async with db_with_cleanup.begin_session() as db_sess:
+            vfolder_row = VFolderRow(
+                id=vfolder_id,
+                name=f"test-vfolder-{vfolder_id.hex[:8]}",
+                domain_name=test_domain_name,
+                usage_mode=VFolderUsageMode.GENERAL,
+                permission=VFolderMountPermission.OWNER_PERM,
+                host=VFOLDER_HOST,
+                creator=user_a_email,
+                ownership_type=VFolderOwnershipType.USER,
+                user=user_a_id,
+                group=test_group,
+                unmanaged_path=None,
+                cloneable=False,
+                status=VFolderOperationStatus.READY,
+                quota_scope_id=f"user:{user_a_id}",
+            )
+            db_sess.add(vfolder_row)
+            await db_sess.flush()
+
+        # Grant A owner permission
+        await repo.create_vfolder_permission(
+            vfolder_id, user_a_id, VFolderMountPermission.OWNER_PERM
+        )
+
+        # Grant B invitee permission (creates REF scope-entity mapping)
+        await repo.create_vfolder_permission(
+            vfolder_id, user_b_id, VFolderMountPermission.READ_ONLY
+        )
+
+        # Verify B has REF mapping before transfer
+        async with db_with_cleanup.begin_readonly_session() as db_sess:
+            b_mapping = await db_sess.scalar(
+                sa.select(AssociationScopesEntitiesRow.relation_type).where(
+                    sa.and_(
+                        AssociationScopesEntitiesRow.scope_id == str(user_b_id),
+                        AssociationScopesEntitiesRow.entity_id == str(vfolder_id),
+                    )
+                )
+            )
+            assert b_mapping == RelationType.REF, "Invitee should have REF mapping before transfer"
+
+        # Transfer ownership to B
+        await repo.change_vfolder_ownership(vfolder_id, user_b_email)
+
+        # Verify B's mapping is upgraded to AUTO
+        async with db_with_cleanup.begin_readonly_session() as db_sess:
+            b_mapping_after = await db_sess.scalar(
+                sa.select(AssociationScopesEntitiesRow.relation_type).where(
+                    sa.and_(
+                        AssociationScopesEntitiesRow.scope_id == str(user_b_id),
+                        AssociationScopesEntitiesRow.entity_id == str(vfolder_id),
+                    )
+                )
+            )
+            assert b_mapping_after == RelationType.AUTO, (
+                "New owner's mapping should be upgraded from REF to AUTO"
+            )
+
+            # Verify B has owner-level READ permission
+            b_perm_count = await db_sess.scalar(
+                sa.select(sa.func.count())
+                .select_from(PermissionRow)
+                .where(
+                    sa.and_(
+                        PermissionRow.scope_id == str(vfolder_id),
+                        PermissionRow.entity_type == EntityType.VFOLDER,
+                        PermissionRow.operation == OperationType.READ,
+                    )
+                )
+                .join(UserRoleRow, UserRoleRow.role_id == PermissionRow.role_id)
+                .where(UserRoleRow.user_id == user_b_id)
+            )
+            assert (b_perm_count or 0) >= 1, "New owner should have READ permission after transfer"
+
+    async def test_ownership_transfer_preserves_invitee_legacy_permission(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        test_domain_name: str,
+        test_user_resource_policy_name: str,
+        test_keypair_resource_policy_name: str,
+        test_group: uuid.UUID,
+    ) -> None:
+        """
+        Verify that after ownership transfer, the new owner's legacy
+        vfolder_permissions record is preserved (not deleted).
+        """
+        repo = VfolderRepository(db=db_with_cleanup)
+
+        user_a_id, user_a_email = await self._create_user_with_keypair(
+            db_with_cleanup,
+            test_domain_name,
+            test_user_resource_policy_name,
+            test_keypair_resource_policy_name,
+        )
+        user_b_id, user_b_email = await self._create_user_with_keypair(
+            db_with_cleanup,
+            test_domain_name,
+            test_user_resource_policy_name,
+            test_keypair_resource_policy_name,
+        )
+
+        vfolder_id = uuid.uuid4()
+
+        # Create vfolder owned by A
+        async with db_with_cleanup.begin_session() as db_sess:
+            vfolder_row = VFolderRow(
+                id=vfolder_id,
+                name=f"test-vfolder-{vfolder_id.hex[:8]}",
+                domain_name=test_domain_name,
+                usage_mode=VFolderUsageMode.GENERAL,
+                permission=VFolderMountPermission.OWNER_PERM,
+                host=VFOLDER_HOST,
+                creator=user_a_email,
+                ownership_type=VFolderOwnershipType.USER,
+                user=user_a_id,
+                group=test_group,
+                unmanaged_path=None,
+                cloneable=False,
+                status=VFolderOperationStatus.READY,
+                quota_scope_id=f"user:{user_a_id}",
+            )
+            db_sess.add(vfolder_row)
+            await db_sess.flush()
+
+        # Grant B invitee permission (legacy vfolder_permissions record)
+        await repo.create_vfolder_permission(
+            vfolder_id, user_b_id, VFolderMountPermission.READ_ONLY
+        )
+
+        # Verify B has legacy permission before transfer
+        async with db_with_cleanup.begin_readonly_session() as db_sess:
+            perm_count_before = await db_sess.scalar(
+                sa.select(sa.func.count())
+                .select_from(VFolderPermissionRow)
+                .where(
+                    sa.and_(
+                        VFolderPermissionRow.vfolder == vfolder_id,
+                        VFolderPermissionRow.user == user_b_id,
+                    )
+                )
+            )
+            assert perm_count_before == 1, "Invitee should have legacy permission before transfer"
+
+        # Transfer ownership to B
+        await repo.change_vfolder_ownership(vfolder_id, user_b_email)
+
+        # Verify B's legacy permission is preserved
+        async with db_with_cleanup.begin_readonly_session() as db_sess:
+            perm_count_after = await db_sess.scalar(
+                sa.select(sa.func.count())
+                .select_from(VFolderPermissionRow)
+                .where(
+                    sa.and_(
+                        VFolderPermissionRow.vfolder == vfolder_id,
+                        VFolderPermissionRow.user == user_b_id,
+                    )
+                )
+            )
+            assert perm_count_after == 1, (
+                "New owner's legacy vfolder_permissions should be preserved after transfer"
             )
