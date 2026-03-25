@@ -7,9 +7,12 @@ from uuid import UUID
 
 import click
 
-from ai.backend.client.cli.extensions import pass_ctx_obj
-from ai.backend.client.cli.types import CLIContext
-from ai.backend.client.cli.v2.helpers import create_v2_registry, parse_order_options, print_result
+from ai.backend.client.cli.v2.helpers import (
+    create_v2_registry,
+    load_v2_config,
+    parse_order_options,
+    print_result,
+)
 
 
 @click.group()
@@ -28,9 +31,7 @@ def assignment() -> None:
 @click.option("--role-id", type=str, default=None, help="Filter by role UUID.")
 @click.option("--username-contains", type=str, default=None, help="Filter by username (contains).")
 @click.option("--email-contains", type=str, default=None, help="Filter by email (contains).")
-@pass_ctx_obj
 def search(
-    ctx: CLIContext,
     limit: int | None,
     offset: int | None,
     order_by: tuple[str, ...],
@@ -66,7 +67,7 @@ def search(
     )
 
     async def _run() -> None:
-        registry = await create_v2_registry(ctx)
+        registry = await create_v2_registry(load_v2_config())
         try:
             result = await registry.rbac.search_assignments(
                 AdminSearchRoleAssignmentsGQLInput(
@@ -86,13 +87,12 @@ def search(
 @assignment.command()
 @click.option("--user-id", required=True, help="User UUID to assign the role to.")
 @click.option("--role-id", required=True, help="Role UUID to assign.")
-@pass_ctx_obj
-def assign(ctx: CLIContext, user_id: str, role_id: str) -> None:
+def assign(user_id: str, role_id: str) -> None:
     """Assign a role to a user."""
     from ai.backend.common.dto.manager.v2.rbac.request import AssignRoleInput
 
     async def _run() -> None:
-        registry = await create_v2_registry(ctx)
+        registry = await create_v2_registry(load_v2_config())
         try:
             result = await registry.rbac.assign_role(
                 AssignRoleInput(user_id=UUID(user_id), role_id=UUID(role_id)),
@@ -107,13 +107,12 @@ def assign(ctx: CLIContext, user_id: str, role_id: str) -> None:
 @assignment.command()
 @click.option("--user-id", required=True, help="User UUID to revoke the role from.")
 @click.option("--role-id", required=True, help="Role UUID to revoke.")
-@pass_ctx_obj
-def revoke(ctx: CLIContext, user_id: str, role_id: str) -> None:
+def revoke(user_id: str, role_id: str) -> None:
     """Revoke a role from a user."""
     from ai.backend.common.dto.manager.v2.rbac.request import RevokeRoleInput
 
     async def _run() -> None:
-        registry = await create_v2_registry(ctx)
+        registry = await create_v2_registry(load_v2_config())
         try:
             result = await registry.rbac.revoke_role(
                 RevokeRoleInput(user_id=UUID(user_id), role_id=UUID(role_id)),

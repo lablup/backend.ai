@@ -6,9 +6,12 @@ import asyncio
 
 import click
 
-from ai.backend.client.cli.extensions import pass_ctx_obj
-from ai.backend.client.cli.types import CLIContext
-from ai.backend.client.cli.v2.helpers import create_v2_registry, parse_order_options, print_result
+from ai.backend.client.cli.v2.helpers import (
+    create_v2_registry,
+    load_v2_config,
+    parse_order_options,
+    print_result,
+)
 
 
 @click.group(name="audit-log")
@@ -51,9 +54,7 @@ def audit_log() -> None:
         "Fields: created_at, entity_type, operation, status."
     ),
 )
-@pass_ctx_obj
 def search(
-    ctx: CLIContext,
     limit: int | None,
     offset: int | None,
     entity_type: str | None,
@@ -93,7 +94,7 @@ def search(
     orders = parse_order_options(order_by, AuditLogOrderField, AuditLogOrder) if order_by else None
 
     async def _run() -> None:
-        registry = await create_v2_registry(ctx)
+        registry = await create_v2_registry(load_v2_config())
         try:
             result = await registry.audit_log.search(
                 AdminSearchAuditLogsInput(

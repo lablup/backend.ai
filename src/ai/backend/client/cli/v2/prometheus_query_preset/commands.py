@@ -7,9 +7,12 @@ from uuid import UUID
 
 import click
 
-from ai.backend.client.cli.extensions import pass_ctx_obj
-from ai.backend.client.cli.types import CLIContext
-from ai.backend.client.cli.v2.helpers import create_v2_registry, parse_order_options, print_result
+from ai.backend.client.cli.v2.helpers import (
+    create_v2_registry,
+    load_v2_config,
+    parse_order_options,
+    print_result,
+)
 
 
 @click.group(name="prometheus-query-preset")
@@ -31,9 +34,7 @@ def prometheus_query_preset() -> None:
     multiple=True,
     help="Order by field:direction (e.g., name:asc, created_at:desc, updated_at:desc).",
 )
-@pass_ctx_obj
 def search(
-    ctx: CLIContext,
     limit: int,
     offset: int,
     name_contains: str | None,
@@ -66,7 +67,7 @@ def search(
     )
 
     async def _run() -> None:
-        registry = await create_v2_registry(ctx)
+        registry = await create_v2_registry(load_v2_config())
         try:
             result = await registry.prometheus_query_preset.search(
                 SearchQueryDefinitionsInput(
@@ -85,12 +86,11 @@ def search(
 
 @prometheus_query_preset.command()
 @click.argument("preset_id", type=str)
-@pass_ctx_obj
-def get(ctx: CLIContext, preset_id: str) -> None:
+def get(preset_id: str) -> None:
     """Get a query definition by ID."""
 
     async def _run() -> None:
-        registry = await create_v2_registry(ctx)
+        registry = await create_v2_registry(load_v2_config())
         try:
             result = await registry.prometheus_query_preset.get(UUID(preset_id))
             print_result(result)
@@ -105,9 +105,7 @@ def get(ctx: CLIContext, preset_id: str) -> None:
 @click.option("--metric-name", required=True, help="Prometheus metric name.")
 @click.option("--query-template", required=True, help="PromQL template with placeholders.")
 @click.option("--time-window", default=None, help="Default time window (e.g. '5m', '1h').")
-@pass_ctx_obj
 def create(
-    ctx: CLIContext,
     name: str,
     metric_name: str,
     query_template: str,
@@ -120,7 +118,7 @@ def create(
     )
 
     async def _run() -> None:
-        registry = await create_v2_registry(ctx)
+        registry = await create_v2_registry(load_v2_config())
         try:
             result = await registry.prometheus_query_preset.create(
                 CreateQueryDefinitionInput(
@@ -143,15 +141,14 @@ def create(
 
 @prometheus_query_preset.command()
 @click.argument("preset_id", type=str)
-@pass_ctx_obj
-def delete(ctx: CLIContext, preset_id: str) -> None:
+def delete(preset_id: str) -> None:
     """Delete a query definition by ID."""
     from ai.backend.common.dto.manager.v2.prometheus_query_preset.request import (
         DeleteQueryDefinitionInput,
     )
 
     async def _run() -> None:
-        registry = await create_v2_registry(ctx)
+        registry = await create_v2_registry(load_v2_config())
         try:
             result = await registry.prometheus_query_preset.delete(
                 DeleteQueryDefinitionInput(id=UUID(preset_id)),

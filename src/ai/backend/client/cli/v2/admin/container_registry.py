@@ -6,9 +6,12 @@ import asyncio
 
 import click
 
-from ai.backend.client.cli.extensions import pass_ctx_obj
-from ai.backend.client.cli.types import CLIContext
-from ai.backend.client.cli.v2.helpers import create_v2_registry, parse_order_options, print_result
+from ai.backend.client.cli.v2.helpers import (
+    create_v2_registry,
+    load_v2_config,
+    parse_order_options,
+    print_result,
+)
 
 
 @click.group()
@@ -17,7 +20,6 @@ def container_registry() -> None:
 
 
 @container_registry.command()
-@pass_ctx_obj
 @click.option("--limit", type=int, default=20, help="Maximum number of items to return.")
 @click.option("--offset", type=int, default=0, help="Number of items to skip.")
 @click.option(
@@ -44,7 +46,6 @@ def container_registry() -> None:
     help="Order by field:direction (e.g., registry_name:asc, type:desc).",
 )
 def search(
-    ctx: CLIContext,
     limit: int,
     offset: int,
     registry_name: str | None,
@@ -94,7 +95,7 @@ def search(
     )
 
     async def _run() -> None:
-        registry = await create_v2_registry(ctx)
+        registry = await create_v2_registry(load_v2_config())
         try:
             request = AdminSearchContainerRegistriesInput(
                 filter=filter_dto,

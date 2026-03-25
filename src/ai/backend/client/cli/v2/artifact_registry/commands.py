@@ -6,9 +6,7 @@ import asyncio
 
 import click
 
-from ai.backend.client.cli.extensions import pass_ctx_obj
-from ai.backend.client.cli.types import CLIContext
-from ai.backend.client.cli.v2.helpers import create_v2_registry, print_result
+from ai.backend.client.cli.v2.helpers import create_v2_registry, load_v2_config, print_result
 
 
 @click.group(name="artifact-registry")
@@ -18,13 +16,12 @@ def artifact_registry() -> None:
 
 @artifact_registry.command()
 @click.argument("registry_id")
-@pass_ctx_obj
-def get(ctx: CLIContext, registry_id: str) -> None:
+def get(registry_id: str) -> None:
     """Get metadata for a single artifact registry by ID."""
     from uuid import UUID
 
     async def _run() -> None:
-        registry = await create_v2_registry(ctx)
+        registry = await create_v2_registry(load_v2_config())
         try:
             result = await registry.artifact_registry.get_registry_meta(UUID(registry_id))
             print_result(result)

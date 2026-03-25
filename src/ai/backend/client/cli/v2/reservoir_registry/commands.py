@@ -6,9 +6,7 @@ import asyncio
 
 import click
 
-from ai.backend.client.cli.extensions import pass_ctx_obj
-from ai.backend.client.cli.types import CLIContext
-from ai.backend.client.cli.v2.helpers import create_v2_registry, print_result
+from ai.backend.client.cli.v2.helpers import create_v2_registry, load_v2_config, print_result
 
 
 @click.group(name="reservoir-registry")
@@ -22,9 +20,7 @@ def reservoir_registry() -> None:
 @click.option("--access-key", required=True, help="Access key for authentication.")
 @click.option("--secret-key", required=True, help="Secret key for authentication.")
 @click.option("--api-version", required=True, help="API version string.")
-@pass_ctx_obj
 def create(
-    ctx: CLIContext,
     name: str,
     endpoint: str,
     access_key: str,
@@ -37,7 +33,7 @@ def create(
     )
 
     async def _run() -> None:
-        registry = await create_v2_registry(ctx)
+        registry = await create_v2_registry(load_v2_config())
         try:
             result = await registry.reservoir_registry.create(
                 CreateReservoirRegistryInput(
@@ -58,15 +54,14 @@ def create(
 @reservoir_registry.command()
 @click.option("--limit", default=None, type=int, help="Max results per page.")
 @click.option("--offset", default=None, type=int, help="Pagination offset.")
-@pass_ctx_obj
-def search(ctx: CLIContext, limit: int | None, offset: int | None) -> None:
+def search(limit: int | None, offset: int | None) -> None:
     """Search Reservoir registries with pagination."""
     from ai.backend.common.dto.manager.v2.reservoir_registry.request import (
         AdminSearchReservoirRegistriesInput,
     )
 
     async def _run() -> None:
-        registry = await create_v2_registry(ctx)
+        registry = await create_v2_registry(load_v2_config())
         try:
             result = await registry.reservoir_registry.search(
                 AdminSearchReservoirRegistriesInput(limit=limit, offset=offset),
@@ -80,13 +75,12 @@ def search(ctx: CLIContext, limit: int | None, offset: int | None) -> None:
 
 @reservoir_registry.command()
 @click.argument("registry_id")
-@pass_ctx_obj
-def get(ctx: CLIContext, registry_id: str) -> None:
+def get(registry_id: str) -> None:
     """Get a single Reservoir registry by ID."""
     from uuid import UUID
 
     async def _run() -> None:
-        registry = await create_v2_registry(ctx)
+        registry = await create_v2_registry(load_v2_config())
         try:
             result = await registry.reservoir_registry.get(UUID(registry_id))
             print_result(result)
@@ -103,9 +97,7 @@ def get(ctx: CLIContext, registry_id: str) -> None:
 @click.option("--access-key", default=None, help="Updated access key.")
 @click.option("--secret-key", default=None, help="Updated secret key.")
 @click.option("--api-version", default=None, help="Updated API version.")
-@pass_ctx_obj
 def update(
-    ctx: CLIContext,
     registry_id: str,
     name: str | None,
     endpoint: str | None,
@@ -121,7 +113,7 @@ def update(
     )
 
     async def _run() -> None:
-        registry = await create_v2_registry(ctx)
+        registry = await create_v2_registry(load_v2_config())
         try:
             result = await registry.reservoir_registry.update(
                 UpdateReservoirRegistryInput(
@@ -142,8 +134,7 @@ def update(
 
 @reservoir_registry.command()
 @click.option("--id", "registry_id", required=True, help="Registry ID to delete.")
-@pass_ctx_obj
-def delete(ctx: CLIContext, registry_id: str) -> None:
+def delete(registry_id: str) -> None:
     """Delete a Reservoir registry."""
     from uuid import UUID
 
@@ -152,7 +143,7 @@ def delete(ctx: CLIContext, registry_id: str) -> None:
     )
 
     async def _run() -> None:
-        registry = await create_v2_registry(ctx)
+        registry = await create_v2_registry(load_v2_config())
         try:
             result = await registry.reservoir_registry.delete(
                 DeleteReservoirRegistryInput(id=UUID(registry_id)),

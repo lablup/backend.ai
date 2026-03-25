@@ -7,9 +7,12 @@ from uuid import UUID
 
 import click
 
-from ai.backend.client.cli.extensions import pass_ctx_obj
-from ai.backend.client.cli.types import CLIContext
-from ai.backend.client.cli.v2.helpers import create_v2_registry, parse_order_options, print_result
+from ai.backend.client.cli.v2.helpers import (
+    create_v2_registry,
+    load_v2_config,
+    parse_order_options,
+    print_result,
+)
 
 
 @click.group()
@@ -38,9 +41,7 @@ def role() -> None:
     default=None,
     help="Filter by role status.",
 )
-@pass_ctx_obj
 def search(
-    ctx: CLIContext,
     limit: int | None,
     offset: int | None,
     order_by: tuple[str, ...],
@@ -74,7 +75,7 @@ def search(
     orders = parse_order_options(order_by, RoleOrderField, RoleOrderBy) if order_by else None
 
     async def _run() -> None:
-        registry = await create_v2_registry(ctx)
+        registry = await create_v2_registry(load_v2_config())
         try:
             result = await registry.rbac.search_roles(
                 AdminSearchRolesGQLInput(
@@ -93,12 +94,11 @@ def search(
 
 @role.command()
 @click.argument("role_id", type=str)
-@pass_ctx_obj
-def get(ctx: CLIContext, role_id: str) -> None:
+def get(role_id: str) -> None:
     """Get a role by UUID."""
 
     async def _run() -> None:
-        registry = await create_v2_registry(ctx)
+        registry = await create_v2_registry(load_v2_config())
         try:
             result = await registry.rbac.get_role(UUID(role_id))
             print_result(result)
@@ -111,13 +111,12 @@ def get(ctx: CLIContext, role_id: str) -> None:
 @role.command()
 @click.option("--name", required=True, help="Role name.")
 @click.option("--description", default=None, help="Role description.")
-@pass_ctx_obj
-def create(ctx: CLIContext, name: str, description: str | None) -> None:
+def create(name: str, description: str | None) -> None:
     """Create a new role."""
     from ai.backend.common.dto.manager.v2.rbac.request import CreateRoleInput
 
     async def _run() -> None:
-        registry = await create_v2_registry(ctx)
+        registry = await create_v2_registry(load_v2_config())
         try:
             result = await registry.rbac.create_role(
                 CreateRoleInput(name=name, description=description),
@@ -131,13 +130,12 @@ def create(ctx: CLIContext, name: str, description: str | None) -> None:
 
 @role.command()
 @click.argument("role_id", type=str)
-@pass_ctx_obj
-def delete(ctx: CLIContext, role_id: str) -> None:
+def delete(role_id: str) -> None:
     """Soft-delete a role."""
     from ai.backend.common.dto.manager.v2.rbac.request import DeleteRoleInput
 
     async def _run() -> None:
-        registry = await create_v2_registry(ctx)
+        registry = await create_v2_registry(load_v2_config())
         try:
             result = await registry.rbac.delete_role(
                 DeleteRoleInput(id=UUID(role_id)),

@@ -6,9 +6,12 @@ import asyncio
 
 import click
 
-from ai.backend.client.cli.extensions import pass_ctx_obj
-from ai.backend.client.cli.types import CLIContext
-from ai.backend.client.cli.v2.helpers import create_v2_registry, parse_order_options, print_result
+from ai.backend.client.cli.v2.helpers import (
+    create_v2_registry,
+    load_v2_config,
+    parse_order_options,
+    print_result,
+)
 
 
 @click.group(name="object-storage")
@@ -23,9 +26,7 @@ def object_storage() -> None:
 @click.option("--secret-key", required=True, help="Secret key for authentication.")
 @click.option("--endpoint", required=True, help="Endpoint URL of the object storage.")
 @click.option("--region", required=True, help="Region of the object storage.")
-@pass_ctx_obj
 def create(
-    ctx: CLIContext,
     name: str,
     host: str,
     access_key: str,
@@ -37,7 +38,7 @@ def create(
     from ai.backend.common.dto.manager.v2.object_storage.request import CreateObjectStorageInput
 
     async def _run() -> None:
-        registry = await create_v2_registry(ctx)
+        registry = await create_v2_registry(load_v2_config())
         try:
             result = await registry.object_storage.create(
                 CreateObjectStorageInput(
@@ -58,13 +59,12 @@ def create(
 
 @object_storage.command()
 @click.argument("storage_id")
-@pass_ctx_obj
-def get(ctx: CLIContext, storage_id: str) -> None:
+def get(storage_id: str) -> None:
     """Get a single object storage by ID."""
     from uuid import UUID
 
     async def _run() -> None:
-        registry = await create_v2_registry(ctx)
+        registry = await create_v2_registry(load_v2_config())
         try:
             result = await registry.object_storage.get(UUID(storage_id))
             print_result(result)
@@ -82,9 +82,7 @@ def get(ctx: CLIContext, storage_id: str) -> None:
 @click.option("--secret-key", default=None, help="Updated secret key.")
 @click.option("--endpoint", default=None, help="Updated endpoint URL.")
 @click.option("--region", default=None, help="Updated region. Pass empty string to clear.")
-@pass_ctx_obj
 def update(
-    ctx: CLIContext,
     storage_id: str,
     name: str | None,
     host: str | None,
@@ -107,7 +105,7 @@ def update(
         region_value = region if region else None
 
     async def _run() -> None:
-        registry = await create_v2_registry(ctx)
+        registry = await create_v2_registry(load_v2_config())
         try:
             result = await registry.object_storage.update(
                 UpdateObjectStorageInput(
@@ -147,9 +145,7 @@ def update(
     multiple=True,
     help="Order by field:direction (e.g., name:asc, created_at:desc).",
 )
-@pass_ctx_obj
 def search(
-    ctx: CLIContext,
     limit: int | None,
     offset: int | None,
     name_contains: str | None,
@@ -182,7 +178,7 @@ def search(
     )
 
     async def _run() -> None:
-        registry = await create_v2_registry(ctx)
+        registry = await create_v2_registry(load_v2_config())
         try:
             result = await registry.object_storage.search(
                 AdminSearchObjectStoragesInput(
@@ -201,15 +197,14 @@ def search(
 
 @object_storage.command()
 @click.option("--id", "storage_id", required=True, help="Object storage ID to delete.")
-@pass_ctx_obj
-def delete(ctx: CLIContext, storage_id: str) -> None:
+def delete(storage_id: str) -> None:
     """Delete an object storage."""
     from uuid import UUID
 
     from ai.backend.common.dto.manager.v2.object_storage.request import DeleteObjectStorageInput
 
     async def _run() -> None:
-        registry = await create_v2_registry(ctx)
+        registry = await create_v2_registry(load_v2_config())
         try:
             result = await registry.object_storage.delete(
                 DeleteObjectStorageInput(id=UUID(storage_id)),

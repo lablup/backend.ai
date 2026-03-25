@@ -6,9 +6,7 @@ import asyncio
 
 import click
 
-from ai.backend.client.cli.extensions import pass_ctx_obj
-from ai.backend.client.cli.types import CLIContext
-from ai.backend.client.cli.v2.helpers import create_v2_registry, print_result
+from ai.backend.client.cli.v2.helpers import create_v2_registry, load_v2_config, print_result
 
 
 @click.group()
@@ -17,13 +15,12 @@ def domain() -> None:
 
 
 @domain.command()
-@pass_ctx_obj
 @click.argument("domain_name")
-def get(ctx: CLIContext, domain_name: str) -> None:
+def get(domain_name: str) -> None:
     """Get a domain by name."""
 
     async def _run() -> None:
-        registry = await create_v2_registry(ctx)
+        registry = await create_v2_registry(load_v2_config())
         try:
             result = await registry.domain.get(domain_name)
             print_result(result)

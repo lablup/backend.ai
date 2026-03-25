@@ -42,6 +42,7 @@ from ai.backend.common.dto.manager.v2.deployment.response import (
     GetAutoScalingRulePayload,
     GetDeploymentPolicyPayload,
     ReplicaNode,
+    RevisionNode,
     SearchAccessTokensPayload,
     SearchAutoScalingRulesPayload,
     SearchDeploymentPoliciesPayload,
@@ -144,12 +145,12 @@ class V2DeploymentClient(BaseDomainClient):
     async def get_revision(
         self,
         revision_id: UUID,
-    ) -> AdminSearchRevisionsPayload:
+    ) -> RevisionNode:
         """Retrieve a single revision by ID."""
         return await self._client.typed_request(
             "GET",
             _PATH + f"/revisions/{revision_id}",
-            response_model=AdminSearchRevisionsPayload,
+            response_model=RevisionNode,
         )
 
     async def search_revisions(

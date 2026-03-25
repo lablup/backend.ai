@@ -6,9 +6,12 @@ import asyncio
 
 import click
 
-from ai.backend.client.cli.extensions import pass_ctx_obj
-from ai.backend.client.cli.types import CLIContext
-from ai.backend.client.cli.v2.helpers import create_v2_registry, parse_order_options, print_result
+from ai.backend.client.cli.v2.helpers import (
+    create_v2_registry,
+    load_v2_config,
+    parse_order_options,
+    print_result,
+)
 
 
 @click.group()
@@ -27,9 +30,7 @@ def project() -> None:
     multiple=True,
     help="Order by field:direction (e.g., period_start:desc).",
 )
-@pass_ctx_obj
 def search(
-    ctx: CLIContext,
     limit: int | None,
     offset: int | None,
     domain_name: str | None,
@@ -56,7 +57,7 @@ def search(
         _ = _orders
 
     async def _run() -> None:
-        registry = await create_v2_registry(ctx)
+        registry = await create_v2_registry(load_v2_config())
         try:
             result = await registry.resource_usage.search_project_usage(
                 AdminSearchProjectUsageBucketsInput(

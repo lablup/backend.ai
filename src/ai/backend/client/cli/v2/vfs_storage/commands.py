@@ -6,9 +6,7 @@ import asyncio
 
 import click
 
-from ai.backend.client.cli.extensions import pass_ctx_obj
-from ai.backend.client.cli.types import CLIContext
-from ai.backend.client.cli.v2.helpers import create_v2_registry, print_result
+from ai.backend.client.cli.v2.helpers import create_v2_registry, load_v2_config, print_result
 
 
 @click.group(name="vfs-storage")
@@ -20,13 +18,12 @@ def vfs_storage() -> None:
 @click.option("--name", required=True, help="Storage name.")
 @click.option("--host", required=True, help="Storage host address.")
 @click.option("--base-path", required=True, help="Base path on the storage host.")
-@pass_ctx_obj
-def create(ctx: CLIContext, name: str, host: str, base_path: str) -> None:
+def create(name: str, host: str, base_path: str) -> None:
     """Create a new VFS storage."""
     from ai.backend.common.dto.manager.v2.vfs_storage.request import CreateVFSStorageInput
 
     async def _run() -> None:
-        registry = await create_v2_registry(ctx)
+        registry = await create_v2_registry(load_v2_config())
         try:
             result = await registry.vfs_storage.create(
                 CreateVFSStorageInput(name=name, host=host, base_path=base_path),
@@ -39,12 +36,11 @@ def create(ctx: CLIContext, name: str, host: str, base_path: str) -> None:
 
 
 @vfs_storage.command(name="list-all")
-@pass_ctx_obj
-def list_all(ctx: CLIContext) -> None:
+def list_all() -> None:
     """List all VFS storages without pagination."""
 
     async def _run() -> None:
-        registry = await create_v2_registry(ctx)
+        registry = await create_v2_registry(load_v2_config())
         try:
             result = await registry.vfs_storage.list_all()
             print_result(result)
@@ -56,13 +52,12 @@ def list_all(ctx: CLIContext) -> None:
 
 @vfs_storage.command()
 @click.argument("storage_id")
-@pass_ctx_obj
-def get(ctx: CLIContext, storage_id: str) -> None:
+def get(storage_id: str) -> None:
     """Get a single VFS storage by ID."""
     from uuid import UUID
 
     async def _run() -> None:
-        registry = await create_v2_registry(ctx)
+        registry = await create_v2_registry(load_v2_config())
         try:
             result = await registry.vfs_storage.get(UUID(storage_id))
             print_result(result)
@@ -77,9 +72,7 @@ def get(ctx: CLIContext, storage_id: str) -> None:
 @click.option("--name", default=None, help="Updated storage name.")
 @click.option("--host", default=None, help="Updated host address.")
 @click.option("--base-path", default=None, help="Updated base path.")
-@pass_ctx_obj
 def update(
-    ctx: CLIContext,
     storage_id: str,
     name: str | None,
     host: str | None,
@@ -91,7 +84,7 @@ def update(
     from ai.backend.common.dto.manager.v2.vfs_storage.request import UpdateVFSStorageInput
 
     async def _run() -> None:
-        registry = await create_v2_registry(ctx)
+        registry = await create_v2_registry(load_v2_config())
         try:
             result = await registry.vfs_storage.update(
                 UpdateVFSStorageInput(
@@ -111,13 +104,12 @@ def update(
 @vfs_storage.command()
 @click.option("--limit", default=None, type=int, help="Max results per page.")
 @click.option("--offset", default=None, type=int, help="Pagination offset.")
-@pass_ctx_obj
-def search(ctx: CLIContext, limit: int | None, offset: int | None) -> None:
+def search(limit: int | None, offset: int | None) -> None:
     """Search VFS storages with pagination."""
     from ai.backend.common.dto.manager.v2.vfs_storage.request import AdminSearchVFSStoragesInput
 
     async def _run() -> None:
-        registry = await create_v2_registry(ctx)
+        registry = await create_v2_registry(load_v2_config())
         try:
             result = await registry.vfs_storage.search(
                 AdminSearchVFSStoragesInput(limit=limit, offset=offset),
@@ -131,15 +123,14 @@ def search(ctx: CLIContext, limit: int | None, offset: int | None) -> None:
 
 @vfs_storage.command()
 @click.option("--id", "storage_id", required=True, help="Storage ID to delete.")
-@pass_ctx_obj
-def delete(ctx: CLIContext, storage_id: str) -> None:
+def delete(storage_id: str) -> None:
     """Delete a VFS storage."""
     from uuid import UUID
 
     from ai.backend.common.dto.manager.v2.vfs_storage.request import DeleteVFSStorageInput
 
     async def _run() -> None:
-        registry = await create_v2_registry(ctx)
+        registry = await create_v2_registry(load_v2_config())
         try:
             result = await registry.vfs_storage.delete(
                 DeleteVFSStorageInput(id=UUID(storage_id)),

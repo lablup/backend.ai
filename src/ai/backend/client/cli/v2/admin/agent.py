@@ -6,9 +6,12 @@ import asyncio
 
 import click
 
-from ai.backend.client.cli.extensions import pass_ctx_obj
-from ai.backend.client.cli.types import CLIContext
-from ai.backend.client.cli.v2.helpers import create_v2_registry, parse_order_options, print_result
+from ai.backend.client.cli.v2.helpers import (
+    create_v2_registry,
+    load_v2_config,
+    parse_order_options,
+    print_result,
+)
 
 
 @click.group()
@@ -17,7 +20,6 @@ def agent() -> None:
 
 
 @agent.command()
-@pass_ctx_obj
 @click.option("--limit", default=20, help="Maximum number of results to return.")
 @click.option("--offset", default=0, help="Number of results to skip.")
 @click.option(
@@ -43,7 +45,6 @@ def agent() -> None:
     help="Order by field:direction (e.g., status:asc, first_contact:desc).",
 )
 def search(
-    ctx: CLIContext,
     limit: int,
     offset: int,
     status: str | None,
@@ -81,7 +82,7 @@ def search(
     orders = parse_order_options(order_by, AgentOrderField, AgentOrder) if order_by else None
 
     async def _run() -> None:
-        registry = await create_v2_registry(ctx)
+        registry = await create_v2_registry(load_v2_config())
         try:
             result = await registry.agent.admin_search(
                 AdminSearchAgentsInput(
@@ -99,12 +100,11 @@ def search(
 
 
 @agent.command(name="total-resources")
-@pass_ctx_obj
-def total_resources(ctx: CLIContext) -> None:
+def total_resources() -> None:
     """Get aggregate resource statistics across all agents (superadmin only)."""
 
     async def _run() -> None:
-        registry = await create_v2_registry(ctx)
+        registry = await create_v2_registry(load_v2_config())
         try:
             result = await registry.agent.get_total_resources()
             print_result(result)

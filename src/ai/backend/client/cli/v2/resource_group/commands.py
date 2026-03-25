@@ -6,9 +6,12 @@ import asyncio
 
 import click
 
-from ai.backend.client.cli.extensions import pass_ctx_obj
-from ai.backend.client.cli.types import CLIContext
-from ai.backend.client.cli.v2.helpers import create_v2_registry, parse_order_options, print_result
+from ai.backend.client.cli.v2.helpers import (
+    create_v2_registry,
+    load_v2_config,
+    parse_order_options,
+    print_result,
+)
 
 
 @click.group(name="resource-group")
@@ -35,9 +38,7 @@ def resource_group() -> None:
     multiple=True,
     help="Order by field:direction (e.g., name:asc, created_at:desc).",
 )
-@pass_ctx_obj
 def search(
-    ctx: CLIContext,
     limit: int | None,
     offset: int | None,
     name_contains: str | None,
@@ -70,7 +71,7 @@ def search(
     )
 
     async def _run() -> None:
-        registry = await create_v2_registry(ctx)
+        registry = await create_v2_registry(load_v2_config())
         try:
             result = await registry.resource_group.search(
                 AdminSearchResourceGroupsInput(
@@ -89,12 +90,11 @@ def search(
 
 @resource_group.command()
 @click.argument("name", type=str)
-@pass_ctx_obj
-def get(ctx: CLIContext, name: str) -> None:
+def get(name: str) -> None:
     """Get a resource group by name."""
 
     async def _run() -> None:
-        registry = await create_v2_registry(ctx)
+        registry = await create_v2_registry(load_v2_config())
         try:
             result = await registry.resource_group.get(name)
             print_result(result)
@@ -108,13 +108,12 @@ def get(ctx: CLIContext, name: str) -> None:
 @click.option("--name", required=True, help="Resource group name.")
 @click.option("--domain-name", required=True, help="Domain name.")
 @click.option("--description", default=None, help="Description.")
-@pass_ctx_obj
-def create(ctx: CLIContext, name: str, domain_name: str, description: str | None) -> None:
+def create(name: str, domain_name: str, description: str | None) -> None:
     """Create a new resource group."""
     from ai.backend.common.dto.manager.v2.resource_group.request import CreateResourceGroupInput
 
     async def _run() -> None:
-        registry = await create_v2_registry(ctx)
+        registry = await create_v2_registry(load_v2_config())
         try:
             result = await registry.resource_group.create(
                 CreateResourceGroupInput(
@@ -132,12 +131,11 @@ def create(ctx: CLIContext, name: str, domain_name: str, description: str | None
 
 @resource_group.command()
 @click.argument("name", type=str)
-@pass_ctx_obj
-def delete(ctx: CLIContext, name: str) -> None:
+def delete(name: str) -> None:
     """Delete a resource group by name."""
 
     async def _run() -> None:
-        registry = await create_v2_registry(ctx)
+        registry = await create_v2_registry(load_v2_config())
         try:
             result = await registry.resource_group.delete(name)
             print_result(result)
@@ -149,12 +147,11 @@ def delete(ctx: CLIContext, name: str) -> None:
 
 @resource_group.command(name="resource-info")
 @click.argument("name", type=str)
-@pass_ctx_obj
-def resource_info(ctx: CLIContext, name: str) -> None:
+def resource_info(name: str) -> None:
     """Get resource information for a resource group."""
 
     async def _run() -> None:
-        registry = await create_v2_registry(ctx)
+        registry = await create_v2_registry(load_v2_config())
         try:
             result = await registry.resource_group.get_resource_info(name)
             print_result(result)

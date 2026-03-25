@@ -6,19 +6,17 @@ from uuid import UUID
 
 from ai.backend.client.v2.base_domain import BaseDomainClient
 from ai.backend.common.dto.manager.v2.user.request import (
-    AdminSearchUsersInput,
     CreateUserInput,
     DeleteUserInput,
     SearchUsersRequest,
     UpdateUserInput,
 )
 from ai.backend.common.dto.manager.v2.user.response import (
-    AdminSearchUsersPayload,
     CreateUserPayload,
     DeleteUserPayload,
     SearchUsersPayload,
     UpdateUserPayload,
-    UserNode,
+    UserPayload,
 )
 
 _PATH = "/v2/users"
@@ -29,22 +27,22 @@ class V2UserClient(BaseDomainClient):
 
     async def admin_search(
         self,
-        request: AdminSearchUsersInput,
-    ) -> AdminSearchUsersPayload:
+        request: SearchUsersRequest,
+    ) -> SearchUsersPayload:
         """Search users with filters, orders, and pagination (superadmin only)."""
         return await self._client.typed_request(
             "POST",
             f"{_PATH}/search",
             request=request,
-            response_model=AdminSearchUsersPayload,
+            response_model=SearchUsersPayload,
         )
 
-    async def get(self, user_id: UUID) -> UserNode:
+    async def get(self, user_id: UUID) -> UserPayload:
         """Retrieve a single user by UUID."""
         return await self._client.typed_request(
             "GET",
             f"{_PATH}/{user_id}",
-            response_model=UserNode,
+            response_model=UserPayload,
         )
 
     async def create(self, request: CreateUserInput) -> CreateUserPayload:

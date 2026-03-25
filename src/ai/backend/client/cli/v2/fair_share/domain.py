@@ -6,9 +6,12 @@ import asyncio
 
 import click
 
-from ai.backend.client.cli.extensions import pass_ctx_obj
-from ai.backend.client.cli.types import CLIContext
-from ai.backend.client.cli.v2.helpers import create_v2_registry, parse_order_options, print_result
+from ai.backend.client.cli.v2.helpers import (
+    create_v2_registry,
+    load_v2_config,
+    parse_order_options,
+    print_result,
+)
 
 
 @click.group()
@@ -26,9 +29,7 @@ def domain() -> None:
     multiple=True,
     help="Order by field:direction (e.g., fair_share_factor:desc, domain_name:asc).",
 )
-@pass_ctx_obj
 def search(
-    ctx: CLIContext,
     limit: int | None,
     offset: int | None,
     resource_group: str | None,
@@ -63,7 +64,7 @@ def search(
     )
 
     async def _run() -> None:
-        registry = await create_v2_registry(ctx)
+        registry = await create_v2_registry(load_v2_config())
         try:
             result = await registry.fair_share.search_domain(
                 SearchDomainFairSharesInput(
@@ -83,13 +84,12 @@ def search(
 @domain.command()
 @click.option("--resource-group", required=True, help="Scaling group name.")
 @click.option("--domain-name", required=True, help="Domain name.")
-@pass_ctx_obj
-def get(ctx: CLIContext, resource_group: str, domain_name: str) -> None:
+def get(resource_group: str, domain_name: str) -> None:
     """Get a single domain fair share record."""
     from ai.backend.common.dto.manager.v2.fair_share.request import GetDomainFairShareInput
 
     async def _run() -> None:
-        registry = await create_v2_registry(ctx)
+        registry = await create_v2_registry(load_v2_config())
         try:
             result = await registry.fair_share.get_domain(
                 GetDomainFairShareInput(

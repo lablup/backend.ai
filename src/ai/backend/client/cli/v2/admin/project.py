@@ -6,9 +6,12 @@ import asyncio
 
 import click
 
-from ai.backend.client.cli.extensions import pass_ctx_obj
-from ai.backend.client.cli.types import CLIContext
-from ai.backend.client.cli.v2.helpers import create_v2_registry, parse_order_options, print_result
+from ai.backend.client.cli.v2.helpers import (
+    create_v2_registry,
+    load_v2_config,
+    parse_order_options,
+    print_result,
+)
 
 
 @click.group()
@@ -17,7 +20,6 @@ def project() -> None:
 
 
 @project.command()
-@pass_ctx_obj
 @click.option("--limit", default=20, help="Maximum number of results to return.")
 @click.option("--offset", default=0, help="Number of results to skip.")
 @click.option(
@@ -38,7 +40,6 @@ def project() -> None:
     help="Order by field:direction (e.g., name:asc, created_at:desc).",
 )
 def search(
-    ctx: CLIContext,
     limit: int,
     offset: int,
     name_contains: str | None,
@@ -69,7 +70,7 @@ def search(
     orders = parse_order_options(order_by, GroupOrderField, GroupOrder) if order_by else None
 
     async def _run() -> None:
-        registry = await create_v2_registry(ctx)
+        registry = await create_v2_registry(load_v2_config())
         try:
             result = await registry.project.admin_search(
                 AdminSearchGroupsInput(

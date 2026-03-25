@@ -6,9 +6,12 @@ import asyncio
 
 import click
 
-from ai.backend.client.cli.extensions import pass_ctx_obj
-from ai.backend.client.cli.types import CLIContext
-from ai.backend.client.cli.v2.helpers import create_v2_registry, parse_order_options, print_result
+from ai.backend.client.cli.v2.helpers import (
+    create_v2_registry,
+    load_v2_config,
+    parse_order_options,
+    print_result,
+)
 
 
 @click.group()
@@ -26,9 +29,7 @@ def user() -> None:
     multiple=True,
     help="Order by field:direction (e.g., fair_share_factor:desc, user_username:asc).",
 )
-@pass_ctx_obj
 def search(
-    ctx: CLIContext,
     limit: int | None,
     offset: int | None,
     resource_group: str | None,
@@ -63,7 +64,7 @@ def search(
     )
 
     async def _run() -> None:
-        registry = await create_v2_registry(ctx)
+        registry = await create_v2_registry(load_v2_config())
         try:
             result = await registry.fair_share.search_user(
                 SearchUserFairSharesInput(
@@ -84,15 +85,14 @@ def search(
 @click.option("--resource-group", required=True, help="Scaling group name.")
 @click.option("--project-id", required=True, help="Project UUID.")
 @click.option("--user-uuid", required=True, help="User UUID.")
-@pass_ctx_obj
-def get(ctx: CLIContext, resource_group: str, project_id: str, user_uuid: str) -> None:
+def get(resource_group: str, project_id: str, user_uuid: str) -> None:
     """Get a single user fair share record."""
     from uuid import UUID
 
     from ai.backend.common.dto.manager.v2.fair_share.request import GetUserFairShareInput
 
     async def _run() -> None:
-        registry = await create_v2_registry(ctx)
+        registry = await create_v2_registry(load_v2_config())
         try:
             result = await registry.fair_share.get_user(
                 GetUserFairShareInput(

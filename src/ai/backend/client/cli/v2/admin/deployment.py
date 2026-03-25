@@ -7,9 +7,12 @@ from uuid import UUID
 
 import click
 
-from ai.backend.client.cli.extensions import pass_ctx_obj
-from ai.backend.client.cli.types import CLIContext
-from ai.backend.client.cli.v2.helpers import create_v2_registry, parse_order_options, print_result
+from ai.backend.client.cli.v2.helpers import (
+    create_v2_registry,
+    load_v2_config,
+    parse_order_options,
+    print_result,
+)
 
 
 @click.group()
@@ -45,9 +48,7 @@ def deployment() -> None:
     default=None,
     help="Filter by endpoint URL (contains).",
 )
-@pass_ctx_obj
 def search(
-    ctx: CLIContext,
     limit: int | None,
     offset: int | None,
     order_by: tuple[str, ...],
@@ -94,7 +95,7 @@ def search(
     )
 
     async def _run() -> None:
-        registry = await create_v2_registry(ctx)
+        registry = await create_v2_registry(load_v2_config())
         try:
             result = await registry.deployment.admin_search(
                 AdminSearchDeploymentsInput(
@@ -136,9 +137,7 @@ def revision() -> None:
 @click.option(
     "--name-contains", type=str, default=None, help="Filter revisions by name (contains)."
 )
-@pass_ctx_obj
 def revision_search(
-    ctx: CLIContext,
     deployment_id: str | None,
     limit: int | None,
     offset: int | None,
@@ -172,7 +171,7 @@ def revision_search(
             limit=limit,
             offset=offset,
         )
-        registry = await create_v2_registry(ctx)
+        registry = await create_v2_registry(load_v2_config())
         try:
             if deployment_id is not None:
                 result = await registry.deployment.search_revisions(UUID(deployment_id), body)
@@ -219,9 +218,7 @@ def replica() -> None:
     default=None,
     help="Filter replicas by exact traffic status (e.g., ACTIVE, INACTIVE).",
 )
-@pass_ctx_obj
 def replica_search(
-    ctx: CLIContext,
     deployment_id: str | None,
     limit: int | None,
     offset: int | None,
@@ -274,7 +271,7 @@ def replica_search(
             limit=limit,
             offset=offset,
         )
-        registry = await create_v2_registry(ctx)
+        registry = await create_v2_registry(load_v2_config())
         try:
             if deployment_id is not None:
                 result = await registry.deployment.search_replicas(UUID(deployment_id), body)
@@ -304,9 +301,7 @@ def policy() -> None:
 )
 @click.option("--limit", type=int, default=None, help="Maximum items to return.")
 @click.option("--offset", type=int, default=None, help="Number of items to skip.")
-@pass_ctx_obj
 def policy_search(
-    ctx: CLIContext,
     deployment_id: str | None,
     limit: int | None,
     offset: int | None,
@@ -330,7 +325,7 @@ def policy_search(
             limit=limit,
             offset=offset,
         )
-        registry = await create_v2_registry(ctx)
+        registry = await create_v2_registry(load_v2_config())
         try:
             result = await registry.deployment.search_deployment_policies(body)
             print_result(result)

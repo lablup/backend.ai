@@ -6,9 +6,7 @@ import asyncio
 
 import click
 
-from ai.backend.client.cli.extensions import pass_ctx_obj
-from ai.backend.client.cli.types import CLIContext
-from ai.backend.client.cli.v2.helpers import create_v2_registry, print_result
+from ai.backend.client.cli.v2.helpers import create_v2_registry, load_v2_config, print_result
 
 
 @click.group(name="storage-namespace")
@@ -19,8 +17,7 @@ def storage_namespace() -> None:
 @storage_namespace.command()
 @click.option("--storage-id", required=True, help="Storage ID to register namespace for.")
 @click.option("--namespace", required=True, help="Namespace bucket or path prefix.")
-@pass_ctx_obj
-def register(ctx: CLIContext, storage_id: str, namespace: str) -> None:
+def register(storage_id: str, namespace: str) -> None:
     """Register a new namespace within a storage."""
     from uuid import UUID
 
@@ -29,7 +26,7 @@ def register(ctx: CLIContext, storage_id: str, namespace: str) -> None:
     )
 
     async def _run() -> None:
-        registry = await create_v2_registry(ctx)
+        registry = await create_v2_registry(load_v2_config())
         try:
             result = await registry.storage_namespace.register(
                 RegisterStorageNamespaceInput(
@@ -47,8 +44,7 @@ def register(ctx: CLIContext, storage_id: str, namespace: str) -> None:
 @storage_namespace.command()
 @click.option("--storage-id", required=True, help="Storage ID of the namespace to unregister.")
 @click.option("--namespace", required=True, help="Namespace bucket or path prefix to unregister.")
-@pass_ctx_obj
-def unregister(ctx: CLIContext, storage_id: str, namespace: str) -> None:
+def unregister(storage_id: str, namespace: str) -> None:
     """Unregister a namespace from a storage."""
     from uuid import UUID
 
@@ -57,7 +53,7 @@ def unregister(ctx: CLIContext, storage_id: str, namespace: str) -> None:
     )
 
     async def _run() -> None:
-        registry = await create_v2_registry(ctx)
+        registry = await create_v2_registry(load_v2_config())
         try:
             result = await registry.storage_namespace.unregister(
                 UnregisterStorageNamespaceInput(
@@ -75,15 +71,14 @@ def unregister(ctx: CLIContext, storage_id: str, namespace: str) -> None:
 @storage_namespace.command()
 @click.option("--limit", default=None, type=int, help="Max results per page.")
 @click.option("--offset", default=None, type=int, help="Pagination offset.")
-@pass_ctx_obj
-def search(ctx: CLIContext, limit: int | None, offset: int | None) -> None:
+def search(limit: int | None, offset: int | None) -> None:
     """Search storage namespaces with pagination."""
     from ai.backend.common.dto.manager.v2.storage_namespace.request import (
         AdminSearchStorageNamespacesInput,
     )
 
     async def _run() -> None:
-        registry = await create_v2_registry(ctx)
+        registry = await create_v2_registry(load_v2_config())
         try:
             result = await registry.storage_namespace.search(
                 AdminSearchStorageNamespacesInput(limit=limit, offset=offset),
@@ -97,13 +92,12 @@ def search(ctx: CLIContext, limit: int | None, offset: int | None) -> None:
 
 @storage_namespace.command(name="get-by-storage")
 @click.argument("storage_id")
-@pass_ctx_obj
-def get_by_storage(ctx: CLIContext, storage_id: str) -> None:
+def get_by_storage(storage_id: str) -> None:
     """Get all namespaces for a given storage."""
     from uuid import UUID
 
     async def _run() -> None:
-        registry = await create_v2_registry(ctx)
+        registry = await create_v2_registry(load_v2_config())
         try:
             result = await registry.storage_namespace.get_by_storage(UUID(storage_id))
             print_result(result)

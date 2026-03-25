@@ -383,10 +383,12 @@ class ImageAdapter(BaseAdapter):
         return result
 
     @staticmethod
-    def _convert_max(value: Decimal | str) -> Decimal | None:
-        if isinstance(value, str):
-            value = Decimal(value)
-        return None if value.is_infinite() else value
+    def _convert_max(value: Decimal | str | None) -> str | None:
+        if value is None:
+            return None
+        if isinstance(value, Decimal):
+            return None if value.is_infinite() else str(value)
+        return str(value)
 
     def _data_to_dto(self, data: ImageData) -> ImageNode:
         """Convert data layer type to Pydantic DTO."""
@@ -396,7 +398,7 @@ class ImageAdapter(BaseAdapter):
         resource_limits_flat = [
             ImageResourceLimitInfo(
                 key=rl.key,
-                min=rl.min,
+                min=str(rl.min),
                 max=self._convert_max(rl.max),
             )
             for rl in data.resource_limits

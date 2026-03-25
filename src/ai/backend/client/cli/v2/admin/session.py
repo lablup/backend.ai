@@ -6,9 +6,12 @@ import asyncio
 
 import click
 
-from ai.backend.client.cli.extensions import pass_ctx_obj
-from ai.backend.client.cli.types import CLIContext
-from ai.backend.client.cli.v2.helpers import create_v2_registry, parse_order_options, print_result
+from ai.backend.client.cli.v2.helpers import (
+    create_v2_registry,
+    load_v2_config,
+    parse_order_options,
+    print_result,
+)
 
 
 @click.group()
@@ -17,7 +20,6 @@ def session() -> None:
 
 
 @session.command(name="search")
-@pass_ctx_obj
 @click.option("--limit", type=int, default=20, help="Maximum number of items to return.")
 @click.option("--offset", type=int, default=0, help="Number of items to skip.")
 @click.option("--name-contains", type=str, default=None, help="Filter sessions by name (contains).")
@@ -45,7 +47,6 @@ def session() -> None:
     ),
 )
 def search(
-    ctx: CLIContext,
     limit: int,
     offset: int,
     name_contains: str | None,
@@ -85,7 +86,7 @@ def search(
     orders = parse_order_options(order_by, SessionOrderField, SessionOrder) if order_by else None
 
     async def _run() -> None:
-        registry = await create_v2_registry(ctx)
+        registry = await create_v2_registry(load_v2_config())
         try:
             request = AdminSearchSessionsInput(
                 filter=filter_dto,
@@ -113,7 +114,6 @@ def kernel() -> None:
 
 
 @kernel.command(name="search")
-@pass_ctx_obj
 @click.option("--limit", type=int, default=20, help="Maximum number of items to return.")
 @click.option("--offset", type=int, default=0, help="Number of items to skip.")
 @click.option(
@@ -143,7 +143,6 @@ def kernel() -> None:
     ),
 )
 def kernel_search(
-    ctx: CLIContext,
     limit: int,
     offset: int,
     status: tuple[str, ...],
@@ -178,7 +177,7 @@ def kernel_search(
     orders = parse_order_options(order_by, KernelOrderField, KernelOrder) if order_by else None
 
     async def _run() -> None:
-        registry = await create_v2_registry(ctx)
+        registry = await create_v2_registry(load_v2_config())
         try:
             request = AdminSearchKernelsInput(
                 filter=filter_dto,

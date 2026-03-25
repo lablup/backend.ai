@@ -4,7 +4,6 @@ Common types for image DTO v2.
 
 from __future__ import annotations
 
-from decimal import Decimal
 from enum import StrEnum
 
 from ai.backend.common.api_handlers import BaseResponseModel
@@ -64,8 +63,8 @@ class ImageResourceLimitInfo(BaseResponseModel):
     """Resource limit definition for a specific resource slot of an image."""
 
     key: str
-    min: Decimal
-    max: Decimal | None
+    min: str
+    max: str | None
 
 
 class ImageResourceLimitGQLInfo(BaseResponseModel):

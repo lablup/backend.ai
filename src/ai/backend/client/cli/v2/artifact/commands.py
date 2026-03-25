@@ -7,9 +7,7 @@ import json
 
 import click
 
-from ai.backend.client.cli.extensions import pass_ctx_obj
-from ai.backend.client.cli.types import CLIContext
-from ai.backend.client.cli.v2.helpers import create_v2_registry, print_result
+from ai.backend.client.cli.v2.helpers import create_v2_registry, load_v2_config, print_result
 
 from .revision import revision
 
@@ -25,13 +23,12 @@ artifact.add_command(revision)
 
 @artifact.command()
 @click.argument("artifact_id")
-@pass_ctx_obj
-def get(ctx: CLIContext, artifact_id: str) -> None:
+def get(artifact_id: str) -> None:
     """Get a single artifact by ID."""
     from uuid import UUID
 
     async def _run() -> None:
-        registry = await create_v2_registry(ctx)
+        registry = await create_v2_registry(load_v2_config())
         try:
             result = await registry.artifact.get(UUID(artifact_id))
             print_result(result)
@@ -49,9 +46,7 @@ def get(ctx: CLIContext, artifact_id: str) -> None:
 @click.option(
     "--description", default=None, help="Updated description. Pass empty string to clear."
 )
-@pass_ctx_obj
 def update(
-    ctx: CLIContext,
     artifact_id: str,
     readonly: bool | None,
     description: str | None,
@@ -69,7 +64,7 @@ def update(
         desc_value = description
 
     async def _run() -> None:
-        registry = await create_v2_registry(ctx)
+        registry = await create_v2_registry(load_v2_config())
         try:
             result = await registry.artifact.update(
                 UUID(artifact_id),
@@ -88,8 +83,7 @@ def update(
     required=True,
     help="JSON array of artifact IDs to delete.",
 )
-@pass_ctx_obj
-def delete(ctx: CLIContext, artifact_ids: str) -> None:
+def delete(artifact_ids: str) -> None:
     """Delete multiple artifacts by ID."""
     from uuid import UUID
 
@@ -98,7 +92,7 @@ def delete(ctx: CLIContext, artifact_ids: str) -> None:
     parsed_ids = [UUID(aid) for aid in json.loads(artifact_ids)]
 
     async def _run() -> None:
-        registry = await create_v2_registry(ctx)
+        registry = await create_v2_registry(load_v2_config())
         try:
             result = await registry.artifact.delete(
                 DeleteArtifactsInput(artifact_ids=parsed_ids),
@@ -116,8 +110,7 @@ def delete(ctx: CLIContext, artifact_ids: str) -> None:
     required=True,
     help="JSON array of artifact IDs to restore.",
 )
-@pass_ctx_obj
-def restore(ctx: CLIContext, artifact_ids: str) -> None:
+def restore(artifact_ids: str) -> None:
     """Restore previously deleted artifacts."""
     from uuid import UUID
 
@@ -126,7 +119,7 @@ def restore(ctx: CLIContext, artifact_ids: str) -> None:
     parsed_ids = [UUID(aid) for aid in json.loads(artifact_ids)]
 
     async def _run() -> None:
-        registry = await create_v2_registry(ctx)
+        registry = await create_v2_registry(load_v2_config())
         try:
             result = await registry.artifact.restore(
                 RestoreArtifactsInput(artifact_ids=parsed_ids),

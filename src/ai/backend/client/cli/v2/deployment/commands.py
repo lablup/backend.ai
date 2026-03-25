@@ -8,9 +8,7 @@ from uuid import UUID
 
 import click
 
-from ai.backend.client.cli.extensions import pass_ctx_obj
-from ai.backend.client.cli.types import CLIContext
-from ai.backend.client.cli.v2.helpers import create_v2_registry, print_result
+from ai.backend.client.cli.v2.helpers import create_v2_registry, load_v2_config, print_result
 
 
 @click.group()
@@ -20,12 +18,11 @@ def deployment() -> None:
 
 @deployment.command()
 @click.argument("deployment_id", type=str)
-@pass_ctx_obj
-def get(ctx: CLIContext, deployment_id: str) -> None:
+def get(deployment_id: str) -> None:
     """Get a deployment by ID."""
 
     async def _run() -> None:
-        registry = await create_v2_registry(ctx)
+        registry = await create_v2_registry(load_v2_config())
         try:
             result = await registry.deployment.get(UUID(deployment_id))
             print_result(result)
@@ -37,8 +34,7 @@ def get(ctx: CLIContext, deployment_id: str) -> None:
 
 @deployment.command()
 @click.argument("payload", type=str)
-@pass_ctx_obj
-def create(ctx: CLIContext, payload: str) -> None:
+def create(payload: str) -> None:
     """Create a deployment from a JSON payload.
 
     PAYLOAD is a JSON string or @file path containing the CreateDeploymentInput body.
@@ -58,7 +54,7 @@ def create(ctx: CLIContext, payload: str) -> None:
     body = CreateDeploymentInput.model_validate(data)
 
     async def _run() -> None:
-        registry = await create_v2_registry(ctx)
+        registry = await create_v2_registry(load_v2_config())
         try:
             result = await registry.deployment.create(body)
             print_result(result)
@@ -70,8 +66,7 @@ def create(ctx: CLIContext, payload: str) -> None:
 
 @deployment.command()
 @click.argument("deployment_id", type=str)
-@pass_ctx_obj
-def delete(ctx: CLIContext, deployment_id: str) -> None:
+def delete(deployment_id: str) -> None:
     """Delete a deployment by ID."""
 
     async def _run() -> None:
@@ -80,7 +75,7 @@ def delete(ctx: CLIContext, deployment_id: str) -> None:
         )
 
         body = DeleteDeploymentInput(id=UUID(deployment_id))
-        registry = await create_v2_registry(ctx)
+        registry = await create_v2_registry(load_v2_config())
         try:
             result = await registry.deployment.delete(body)
             print_result(result)
