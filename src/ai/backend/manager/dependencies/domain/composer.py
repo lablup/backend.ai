@@ -22,6 +22,7 @@ if TYPE_CHECKING:
     from ai.backend.common.clients.valkey_client.valkey_schedule.client import (
         ValkeyScheduleClient,
     )
+    from ai.backend.common.clients.valkey_client.valkey_session.client import ValkeySessionClient
     from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
     from ai.backend.common.etcd import AsyncEtcd
     from ai.backend.manager.config.provider import ManagerConfigProvider
@@ -44,6 +45,7 @@ class DomainInput:
     valkey_live: ValkeyLiveClient
     valkey_schedule: ValkeyScheduleClient
     valkey_image: ValkeyImageClient
+    valkey_session: ValkeySessionClient
 
 
 @dataclass
@@ -110,6 +112,7 @@ class DomainComposer(DependencyComposer[DomainInput, DomainResources]):
             valkey_live=setup_input.valkey_live,
             valkey_schedule=setup_input.valkey_schedule,
             valkey_image=setup_input.valkey_image,
+            valkey_session=setup_input.valkey_session,
         )
         repositories = await stack.enter_dependency(repositories_dep, repositories_input)
 

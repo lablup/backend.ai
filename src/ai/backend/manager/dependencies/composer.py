@@ -176,6 +176,7 @@ class ManagerDependencyComposer(DependencyComposer[DependencyInput, DependencyRe
                 valkey_live=infrastructure.valkey.live,
                 valkey_schedule=infrastructure.valkey.schedule,
                 valkey_image=infrastructure.valkey.image,
+                valkey_session=infrastructure.valkey.session,
             ),
         )
 

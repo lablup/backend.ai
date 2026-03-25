@@ -16,6 +16,7 @@ if TYPE_CHECKING:
     from ai.backend.common.clients.valkey_client.valkey_schedule.client import (
         ValkeyScheduleClient,
     )
+    from ai.backend.common.clients.valkey_client.valkey_session.client import ValkeySessionClient
     from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
     from ai.backend.manager.config.provider import ManagerConfigProvider
     from ai.backend.manager.models.storage import StorageSessionManager
@@ -33,6 +34,7 @@ class RepositoriesInput:
     valkey_live: ValkeyLiveClient
     valkey_schedule: ValkeyScheduleClient
     valkey_image: ValkeyImageClient
+    valkey_session: ValkeySessionClient
 
 
 class RepositoriesDependency(DomainDependency[RepositoriesInput, Repositories]):
@@ -67,6 +69,7 @@ class RepositoriesDependency(DomainDependency[RepositoriesInput, Repositories]):
                 valkey_live_client=setup_input.valkey_live,
                 valkey_schedule_client=setup_input.valkey_schedule,
                 valkey_image_client=setup_input.valkey_image,
+                valkey_session_client=setup_input.valkey_session,
             )
         )
         yield repositories
