@@ -54,8 +54,8 @@ def upgrade() -> None:
         """
     )
 
-    # Set NOT NULL
-    op.alter_column("endpoints", "deployment_policy_id", nullable=False)
+    # Column stays nullable — endpoint is inserted before its policy
+    # in the same transaction, so NOT NULL is not feasible here.
 
     # Add DEFERRABLE FK constraint
     op.create_foreign_key(
