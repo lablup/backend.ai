@@ -24,6 +24,8 @@ if TYPE_CHECKING:
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
+WSPROXY_V1_VERSION = "v1"
+
 
 @dataclass(unsafe_hash=True)
 class WSProxyVersionQueryParams:
