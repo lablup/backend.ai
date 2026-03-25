@@ -206,18 +206,17 @@ class TestImagePermissionContextNonGlobalRegistry:
 
     @pytest.fixture
     async def global_registry_id(self, db_with_cleanup: ExtendedAsyncSAEngine) -> UUID:
-        registry_id = uuid4()
         async with db_with_cleanup.begin_session() as sess:
-            sess.add(
-                ContainerRegistryRow(
-                    id=registry_id,
-                    url=REGISTRY_URL,
-                    registry_name=REGISTRY_NAME,
-                    type=ContainerRegistryType.HARBOR2,
-                    project="stable",
-                    is_global=True,
-                )
+            row = ContainerRegistryRow(
+                url=REGISTRY_URL,
+                registry_name=REGISTRY_NAME,
+                type=ContainerRegistryType.HARBOR2,
+                project="stable",
+                is_global=True,
             )
+            sess.add(row)
+            await sess.flush()
+            registry_id = row.id
             await sess.commit()
         return registry_id
 
@@ -229,19 +228,17 @@ class TestImagePermissionContextNonGlobalRegistry:
         other_associated_project: UUID,
     ) -> UUID:
         """A non-global registry associated with both queried_project and other_associated_project."""
-        registry_id = uuid4()
         async with db_with_cleanup.begin_session() as sess:
-            sess.add(
-                ContainerRegistryRow(
-                    id=registry_id,
-                    url=REGISTRY_URL,
-                    registry_name=REGISTRY_NAME,
-                    type=ContainerRegistryType.HARBOR2,
-                    project="community",
-                    is_global=False,
-                )
+            row = ContainerRegistryRow(
+                url=REGISTRY_URL,
+                registry_name=REGISTRY_NAME,
+                type=ContainerRegistryType.HARBOR2,
+                project="community",
+                is_global=False,
             )
+            sess.add(row)
             await sess.flush()
+            registry_id = row.id
             for project_id in [queried_project, other_associated_project]:
                 sess.add(
                     AssociationContainerRegistriesGroupsRow(
