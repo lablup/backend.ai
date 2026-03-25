@@ -31,13 +31,18 @@ from ai.backend.common.dto.manager.v2.user.request import (
     PurgeUserV2Input as PurgeUserV2InputDTO,
 )
 from ai.backend.common.dto.manager.v2.user.request import (
+    PurgeUserV2Options as PurgeUserV2OptionsDTO,
+)
+from ai.backend.common.dto.manager.v2.user.request import (
     UpdateMyAllowedClientIPInput as UpdateMyAllowedClientIPInputDTO,
 )
 from ai.backend.common.dto.manager.v2.user.request import (
     UpdateUserInput as UpdateUserInputDTO,
 )
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
+    gql_added_field,
     gql_field,
     gql_pydantic_input,
 )
@@ -205,6 +210,26 @@ class DeleteUsersInputGQL(PydanticInputMixin[DeleteUsersInputDTO]):
 
 @gql_pydantic_input(
     BackendAIGQLMeta(
+        description="Options for single user purge operation.",
+        added_version=NEXT_RELEASE_VERSION,
+    ),
+    name="PurgeUserV2Options",
+)
+class PurgeUserV2OptionsGQL(PydanticInputMixin[PurgeUserV2OptionsDTO]):
+    """Options for single user purge operation."""
+
+    purge_shared_vfolders: bool = gql_field(
+        description="If true, migrate shared virtual folders to the admin user before purging.",
+        default=False,
+    )
+    delegate_endpoint_ownership: bool = gql_field(
+        description="If true, delegate endpoint ownership to the admin user before purging.",
+        default=False,
+    )
+
+
+@gql_pydantic_input(
+    BackendAIGQLMeta(
         description="Input for permanently deleting a user and all associated data. This action is irreversible.",
         added_version="26.2.0",
     ),
@@ -214,6 +239,13 @@ class PurgeUserInputGQL(PydanticInputMixin[PurgeUserV2InputDTO]):
     """Input for permanently deleting a single user."""
 
     user_id: UUID = gql_field(description="UUID of the user to purge.")
+    options: PurgeUserV2OptionsGQL | None = gql_added_field(
+        BackendAIGQLMeta(
+            description="Options for the purge operation.",
+            added_version=NEXT_RELEASE_VERSION,
+        ),
+        default=None,
+    )
 
 
 @gql_pydantic_input(
