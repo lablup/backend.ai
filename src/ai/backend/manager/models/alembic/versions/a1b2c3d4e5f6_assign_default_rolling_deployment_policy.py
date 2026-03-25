@@ -19,23 +19,7 @@ depends_on = None
 
 
 def upgrade() -> None:
-    # Track which policies are auto-created for clean downgrade.
-    op.create_table(
-        "_migration_a1b2c3d4e5f6_created_policies",
-        sa.Column("endpoint_id", GUID(), nullable=False, primary_key=True),
-    )
-
-    op.execute(
-        """
-        INSERT INTO _migration_a1b2c3d4e5f6_created_policies (endpoint_id)
-        SELECT e.id
-        FROM endpoints e
-        LEFT JOIN deployment_policies dp ON dp.endpoint = e.id
-        WHERE dp.id IS NULL
-          AND e.lifecycle_stage != 'destroyed'
-        """
-    )
-
+    # Create default rolling policies for all endpoints without one.
     op.execute(
         """
         INSERT INTO deployment_policies (
@@ -43,12 +27,14 @@ def upgrade() -> None:
         )
         SELECT
             uuid_generate_v4(),
-            endpoint_id,
+            e.id,
             'ROLLING',
             '{"max_surge": 1, "max_unavailable": 0}'::jsonb,
             NOW(),
             NOW()
-        FROM _migration_a1b2c3d4e5f6_created_policies
+        FROM endpoints e
+        LEFT JOIN deployment_policies dp ON dp.endpoint = e.id
+        WHERE dp.id IS NULL
         """
     )
 
@@ -115,15 +101,3 @@ def downgrade() -> None:
     op.drop_constraint("uq_endpoints_deployment_policy_id", "endpoints", type_="unique")
     op.drop_constraint("fk_endpoints_deployment_policy_id", "endpoints", type_="foreignkey")
     op.drop_column("endpoints", "deployment_policy_id")
-
-    op.execute(
-        """
-        DELETE FROM deployment_policies
-        WHERE endpoint IN (
-            SELECT endpoint_id
-            FROM _migration_a1b2c3d4e5f6_created_policies
-        )
-        """
-    )
-
-    op.drop_table("_migration_a1b2c3d4e5f6_created_policies")
