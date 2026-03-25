@@ -517,7 +517,9 @@ async def logout_handler(request: web.Request) -> web.Response:
                     ssl=config.api.ssl_verify,
                 )
         except Exception:
-            log.warning("Failed to invalidate login session in Manager DB")
+            log.exception(
+                "Failed to invalidate login session in Manager DB (token={})", session_token
+            )
 
     return web.HTTPOk()
 
