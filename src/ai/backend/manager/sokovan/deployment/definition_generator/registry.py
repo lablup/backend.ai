@@ -1,14 +1,12 @@
 from __future__ import annotations
 
 import logging
-from collections.abc import Mapping
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 
 from ai.backend.common.config import ModelDefinition
 from ai.backend.common.exception import RuntimeVariantNotSupportedError
 from ai.backend.common.types import RuntimeVariant
-from ai.backend.common.utils import deep_merge
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.errors.deployment import DefinitionFileNotFound
 from ai.backend.manager.repositories.deployment import DeploymentRepository
@@ -100,9 +98,13 @@ class ModelDefinitionGeneratorRegistry:
 
         # Merge revision DB model_definition if present
         if model_revision.model_definition:
-            generated_definition = self._apply_revision_model_definition(
-                model_revision.model_definition, generated_definition
-            )
+            try:
+                generated_definition = generated_definition.merge(model_revision.model_definition)
+            except Exception:
+                log.error(
+                    "Failed to merge revision DB model_definition, using base definition",
+                    exc_info=True,
+                )
 
         # Check if storage file override is enabled and path exists
         if not self._enable_model_definition_override:
@@ -118,25 +120,6 @@ class ModelDefinitionGeneratorRegistry:
             base_definition=generated_definition,
         )
 
-    def _apply_revision_model_definition(
-        self,
-        revision_model_definition: Mapping[str, Any],
-        base_definition: ModelDefinition,
-    ) -> ModelDefinition:
-        """
-        Merge model_definition from the deployment revision DB record into the base definition.
-        """
-        try:
-            base_dict = base_definition.model_dump(exclude_none=True, by_alias=True)
-            merged_dict = deep_merge(base_dict, dict(revision_model_definition))
-            return ModelDefinition.model_validate(merged_dict)
-        except Exception:
-            log.warning(
-                "Failed to merge revision DB model_definition, using base definition",
-                exc_info=True,
-            )
-            return base_definition
-
     async def _try_apply_override(
         self,
         model_revision: ModelRevisionSpec,
@@ -151,9 +134,7 @@ class ModelDefinitionGeneratorRegistry:
                 vfolder_id=model_revision.mounts.model_vfolder_id,
                 model_definition_path=model_revision.mounts.model_definition_path,
             )
-            base_dict = base_definition.model_dump(exclude_none=True, by_alias=True)
-            merged_dict = deep_merge(base_dict, override_dict)
-            merged_definition = ModelDefinition.model_validate(merged_dict)
+            merged_definition = base_definition.merge(override_dict)
             log.debug(
                 "Model definition override applied successfully for vfolder {}",
                 model_revision.mounts.model_vfolder_id,
