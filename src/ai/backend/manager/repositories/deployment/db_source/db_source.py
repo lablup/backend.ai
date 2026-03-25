@@ -18,6 +18,7 @@ from sqlalchemy.orm import selectinload
 
 from ai.backend.common.config import ModelHealthCheck
 from ai.backend.common.data.endpoint.types import EndpointLifecycle
+from ai.backend.common.data.model_deployment.types import DeploymentStrategy
 from ai.backend.common.data.permission.types import RBACElementType
 from ai.backend.common.exception import DeploymentNameAlreadyExists
 from ai.backend.common.types import (
@@ -83,7 +84,7 @@ from ai.backend.manager.models.deployment_auto_scaling_policy import (
     DeploymentAutoScalingPolicyData,
     DeploymentAutoScalingPolicyRow,
 )
-from ai.backend.manager.models.deployment_policy import DeploymentPolicyRow
+from ai.backend.manager.models.deployment_policy import DeploymentPolicyRow, RollingUpdateSpec
 from ai.backend.manager.models.deployment_revision import DeploymentRevisionRow
 from ai.backend.manager.models.endpoint import (
     EndpointAutoScalingRuleRow,
@@ -253,22 +254,28 @@ class DeploymentDBSource:
             rbac_result = await execute_rbac_entity_creator(db_sess, creator)
             endpoint = rbac_result.row
 
-            # Create deployment policy if provided
+            # Create deployment policy (use provided config or default rolling policy)
             if policy_config is not None:
-                policy_spec = DeploymentPolicyCreatorSpec(
+                policy_creator_spec = DeploymentPolicyCreatorSpec(
                     endpoint_id=endpoint.id,
                     strategy=policy_config.strategy,
                     strategy_spec=policy_config.strategy_spec,
                 )
-                policy_creator = RBACEntityCreator(
-                    spec=policy_spec,
-                    element_type=RBACElementType.DEPLOYMENT_POLICY,
-                    scope_ref=RBACElementRef(
-                        element_type=RBACElementType.MODEL_DEPLOYMENT,
-                        element_id=str(endpoint.id),
-                    ),
+            else:
+                policy_creator_spec = DeploymentPolicyCreatorSpec(
+                    endpoint_id=endpoint.id,
+                    strategy=DeploymentStrategy.ROLLING,
+                    strategy_spec=RollingUpdateSpec(max_surge=1, max_unavailable=0),
                 )
-                await execute_rbac_entity_creator(db_sess, policy_creator)
+            policy_creator = RBACEntityCreator(
+                spec=policy_creator_spec,
+                element_type=RBACElementType.DEPLOYMENT_POLICY,
+                scope_ref=RBACElementRef(
+                    element_type=RBACElementType.MODEL_DEPLOYMENT,
+                    element_id=str(endpoint.id),
+                ),
+            )
+            await execute_rbac_entity_creator(db_sess, policy_creator)
 
             stmt = (
                 sa.select(EndpointRow)
@@ -335,17 +342,24 @@ class DeploymentDBSource:
             await db_sess.flush()
             endpoint.current_revision = initial_revision.id
 
-            # Create deployment policy if provided
+            # Create deployment policy (use provided spec or default rolling policy)
             if spec.policy is not None:
-                policy_creator = RBACEntityCreator(
-                    spec=spec.policy,
-                    element_type=RBACElementType.DEPLOYMENT_POLICY,
-                    scope_ref=RBACElementRef(
-                        element_type=RBACElementType.MODEL_DEPLOYMENT,
-                        element_id=str(endpoint.id),
-                    ),
+                policy_spec = spec.policy
+            else:
+                policy_spec = DeploymentPolicyCreatorSpec(
+                    endpoint_id=endpoint.id,
+                    strategy=DeploymentStrategy.ROLLING,
+                    strategy_spec=RollingUpdateSpec(max_surge=1, max_unavailable=0),
                 )
-                await execute_rbac_entity_creator(db_sess, policy_creator)
+            policy_creator = RBACEntityCreator(
+                spec=policy_spec,
+                element_type=RBACElementType.DEPLOYMENT_POLICY,
+                scope_ref=RBACElementRef(
+                    element_type=RBACElementType.MODEL_DEPLOYMENT,
+                    element_id=str(endpoint.id),
+                ),
+            )
+            await execute_rbac_entity_creator(db_sess, policy_creator)
 
             stmt = (
                 sa.select(EndpointRow)
