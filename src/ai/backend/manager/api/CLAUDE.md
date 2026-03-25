@@ -68,9 +68,23 @@ v2 DTOs (`common/dto/manager/v2/`) are the shared schema for:
 
 ## Testing v2 Endpoints
 
-Use `./bai` (= `./backend.ai v2`) to test REST v2 endpoints directly.
-After server-side changes, restart with `./dev restart mgr` and verify with `./bai`.
-See `/local-dev` skill for detailed usage patterns.
+**After implementing new API endpoints, verify them with the live server before committing:**
+
+1. Restart the server: `./dev restart mgr` (add `./dev restart web` if GQL schema changed)
+2. Login if needed: `./bai login`
+3. Test each new operation via `./bai` CLI commands
+4. Verify both success cases and expected error cases (e.g., 403 for non-admin)
+
+```bash
+# Example: after adding domain CRUD
+./dev restart mgr && sleep 5
+./bai admin domain create '{"name":"test-domain"}'
+./bai domain get test-domain
+./bai admin domain update test-domain '{"description":"updated"}'
+./bai admin domain delete test-domain
+```
+
+See `/local-dev` skill for full setup, `./bai` command patterns, and regular user testing.
 
 ## What Does NOT Belong Here
 

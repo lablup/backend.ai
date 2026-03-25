@@ -4,22 +4,30 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 
+from ai.backend.common.api_handlers import Sentinel
 from ai.backend.common.dto.manager.query import StringFilter
 from ai.backend.common.dto.manager.v2.domain.request import (
     AdminSearchDomainsInput,
+    CreateDomainInput,
+    DeleteDomainInput,
     DomainFilter,
     DomainOrder,
+    PurgeDomainInput,
+    UpdateDomainInput,
 )
 from ai.backend.common.dto.manager.v2.domain.response import (
     AdminSearchDomainsPayload,
+    DeleteDomainPayload,
     DomainBasicInfo,
     DomainLifecycleInfo,
     DomainNode,
+    DomainPayload,
     DomainRegistryInfo,
+    PurgeDomainPayload,
 )
 from ai.backend.common.dto.manager.v2.domain.types import DomainOrderField, OrderDirection
 from ai.backend.manager.api.adapters.pagination import PaginationSpec
-from ai.backend.manager.data.domain.types import DomainData
+from ai.backend.manager.data.domain.types import DomainData, UserInfo
 from ai.backend.manager.models.domain.conditions import DomainConditions
 from ai.backend.manager.models.domain.orders import DomainOrders
 from ai.backend.manager.models.domain.row import DomainRow
@@ -31,10 +39,19 @@ from ai.backend.manager.repositories.base import (
     combine_conditions_or,
     negate_conditions,
 )
+from ai.backend.manager.repositories.base.creator import Creator
+from ai.backend.manager.repositories.base.updater import Updater
+from ai.backend.manager.repositories.domain.creators import DomainCreatorSpec
 from ai.backend.manager.repositories.domain.types import DomainSearchScope
+from ai.backend.manager.repositories.domain.updaters import DomainNodeUpdaterSpec
+from ai.backend.manager.services.domain.actions.create_domain_node import CreateDomainNodeAction
+from ai.backend.manager.services.domain.actions.delete_domain import DeleteDomainAction
 from ai.backend.manager.services.domain.actions.get_domain import GetDomainAction
+from ai.backend.manager.services.domain.actions.modify_domain_node import ModifyDomainNodeAction
+from ai.backend.manager.services.domain.actions.purge_domain import PurgeDomainAction
 from ai.backend.manager.services.domain.actions.search_domains import SearchDomainsAction
 from ai.backend.manager.services.domain.actions.search_rg_domains import SearchRGDomainsAction
+from ai.backend.manager.types import OptionalState, TriState
 
 from .base import BaseAdapter
 
@@ -136,6 +153,93 @@ class DomainAdapter(BaseAdapter):
             has_next_page=action_result.has_next_page,
             has_previous_page=action_result.has_previous_page,
         )
+
+    async def admin_create(
+        self,
+        input: CreateDomainInput,
+        user_info: UserInfo,
+    ) -> DomainPayload:
+        """Create a new domain (superadmin only)."""
+        spec = DomainCreatorSpec(
+            name=input.name,
+            description=input.description,
+            is_active=input.is_active,
+            allowed_docker_registries=input.allowed_docker_registries,
+            integration_id=input.integration_id,
+        )
+        result = await self._processors.domain.create_domain_node.wait_for_complete(
+            CreateDomainNodeAction(
+                user_info=user_info,
+                creator=Creator(spec=spec),
+            )
+        )
+        return DomainPayload(domain=self._domain_data_to_node(result.domain_data))
+
+    async def admin_update(
+        self,
+        domain_name: str,
+        input: UpdateDomainInput,
+        user_info: UserInfo,
+    ) -> DomainPayload:
+        """Update an existing domain (superadmin only)."""
+        spec = DomainNodeUpdaterSpec(
+            description=(
+                TriState.nop()
+                if isinstance(input.description, Sentinel)
+                else TriState.nullify()
+                if input.description is None
+                else TriState.update(input.description)
+            ),
+            is_active=(
+                OptionalState.update(input.is_active)
+                if input.is_active is not None
+                else OptionalState.nop()
+            ),
+            allowed_docker_registries=(
+                OptionalState.nop()
+                if isinstance(input.allowed_docker_registries, Sentinel)
+                else OptionalState.update(input.allowed_docker_registries)
+                if input.allowed_docker_registries is not None
+                else OptionalState.nop()
+            ),
+            integration_id=(
+                TriState.nop()
+                if isinstance(input.integration_id, Sentinel)
+                else TriState.nullify()
+                if input.integration_id is None
+                else TriState.update(input.integration_id)
+            ),
+        )
+        updater: Updater[DomainRow] = Updater(spec=spec, pk_value=domain_name)
+        result = await self._processors.domain.modify_domain_node.wait_for_complete(
+            ModifyDomainNodeAction(
+                user_info=user_info,
+                updater=updater,
+            )
+        )
+        return DomainPayload(domain=self._domain_data_to_node(result.domain_data))
+
+    async def admin_delete(
+        self,
+        input: DeleteDomainInput,
+        user_info: UserInfo,
+    ) -> DeleteDomainPayload:
+        """Soft-delete a domain (superadmin only)."""
+        await self._processors.domain.delete_domain.wait_for_complete(
+            DeleteDomainAction(name=input.name, user_info=user_info)
+        )
+        return DeleteDomainPayload(deleted=True)
+
+    async def admin_purge(
+        self,
+        input: PurgeDomainInput,
+        user_info: UserInfo,
+    ) -> PurgeDomainPayload:
+        """Permanently purge a domain (superadmin only)."""
+        await self._processors.domain.purge_domain.wait_for_complete(
+            PurgeDomainAction(name=input.name, user_info=user_info)
+        )
+        return PurgeDomainPayload(purged=True)
 
     def _convert_domain_filter(self, filter: DomainFilter) -> list[QueryCondition]:
         conditions: list[QueryCondition] = []
