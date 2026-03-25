@@ -19,6 +19,10 @@ from .types import (
 )
 
 __all__ = (
+    "AdminSearchAssociationsPayload",
+    "AdminSearchPermissionsPayload",
+    "AdminSearchRoleAssignmentsPayload",
+    "AdminSearchRolesPayload",
     "AssociationScopesEntitiesNode",
     "BulkAssignRoleFailureInfo",
     "BulkAssignRoleResultPayload",
@@ -154,6 +158,42 @@ class AssociationScopesEntitiesNode(BaseResponseModel):
     entity_id: str = Field(description="Entity identifier")
     relation_type: str = Field(description="Relation type value")
     registered_at: datetime = Field(description="Registration timestamp")
+
+
+class AdminSearchRolesPayload(BaseResponseModel):
+    """Paginated result for role search."""
+
+    items: list[RoleNode] = Field(description="List of role nodes.")
+    total_count: int = Field(description="Total number of roles matching the filter.")
+    has_next_page: bool = Field(description="Whether there is a next page.")
+    has_previous_page: bool = Field(description="Whether there is a previous page.")
+
+
+class AdminSearchPermissionsPayload(BaseResponseModel):
+    """Paginated result for permission search."""
+
+    items: list[PermissionNode] = Field(description="List of permission nodes.")
+    total_count: int = Field(description="Total number of permissions matching the filter.")
+    has_next_page: bool = Field(description="Whether there is a next page.")
+    has_previous_page: bool = Field(description="Whether there is a previous page.")
+
+
+class AdminSearchRoleAssignmentsPayload(BaseResponseModel):
+    """Paginated result for role assignment search."""
+
+    items: list[RoleAssignmentNode] = Field(description="List of role assignment nodes.")
+    total_count: int = Field(description="Total number of assignments matching the filter.")
+    has_next_page: bool = Field(description="Whether there is a next page.")
+    has_previous_page: bool = Field(description="Whether there is a previous page.")
+
+
+class AdminSearchAssociationsPayload(BaseResponseModel):
+    """Paginated result for scope-entity association search."""
+
+    items: list[AssociationScopesEntitiesNode] = Field(description="List of association nodes.")
+    total_count: int = Field(description="Total number of associations matching the filter.")
+    has_next_page: bool = Field(description="Whether there is a next page.")
+    has_previous_page: bool = Field(description="Whether there is a previous page.")
 
 
 class ScopeEntityCombinationInfo(BaseResponseModel):

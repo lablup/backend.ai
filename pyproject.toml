@@ -305,6 +305,10 @@ split-on-trailing-comma = true
 "src/ai/backend/manager/api/rest/tree.py" = ["PLC0415"]
 "src/ai/backend/manager/api/rest/*/registry.py" = ["PLC0415"]
 "src/ai/backend/manager/api/rest/*/__init__.py" = ["PLC0415"]
+# - REST v2 API module tree and registries use the same lazy import pattern
+"src/ai/backend/manager/api/rest/v2/tree.py" = ["PLC0415"]
+"src/ai/backend/manager/api/rest/v2/*/registry.py" = ["PLC0415"]
+"src/ai/backend/manager/api/rest/v2/*/__init__.py" = ["PLC0415"]
 
 [tool.ruff.format]
 preview = true  # enable the black's preview style

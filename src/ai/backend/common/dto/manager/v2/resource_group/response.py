@@ -97,7 +97,7 @@ class DeleteResourceGroupPayload(BaseResponseModel):
 class AdminSearchResourceGroupsPayload(BaseResponseModel):
     """Payload for admin-scoped paginated resource group search results."""
 
-    items: list[ResourceGroupNode] = Field(description="List of resource group nodes.")
+    items: list[ResourceGroupDetailNode] = Field(description="List of resource group nodes.")
     total_count: int = Field(description="Total number of resource groups matching the filter.")
     has_next_page: bool = Field(description="Whether there is a next page.")
     has_previous_page: bool = Field(description="Whether there is a previous page.")

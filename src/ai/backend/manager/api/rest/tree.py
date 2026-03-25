@@ -48,8 +48,6 @@ def build_api_routes(
     This is the composition root: all handlers are constructed here and
     passed to pure routing registrar functions.
     """
-    _ = adapters  # Will be wired to REST handlers as domain adapters are added
-
     # Lazy imports to avoid circular dependencies at module level
     from ai.backend.manager.api.gql.schema import schema as strawberry_schema
     from ai.backend.manager.api.gql_legacy.schema import graphene_schema
@@ -136,6 +134,7 @@ def build_api_routes(
     from .user.registry import register_user_routes
     from .userconfig.handler import UserConfigHandler
     from .userconfig.registry import register_userconfig_routes
+    from .v2.tree import build_v2_routes
     from .vfolder.handler import VFolderHandler
     from .vfolder.registry import register_vfolder_routes
     from .vfs_storage.handler import VFSStorageHandler
@@ -287,8 +286,12 @@ def build_api_routes(
     prometheus_processor = processors.prometheus_query_preset
     prometheus_query_preset_handler = PrometheusQueryPresetHandler(processor=prometheus_processor)
 
+    # v2 REST API routes
+    v2_registry = build_v2_routes(adapters=adapters, route_deps=route_deps)
+
     # 3. Build all registries
     return [
+        v2_registry,
         register_auth_routes(auth_handler, route_deps),
         register_acl_routes(acl_handler, route_deps),
         register_admin_routes(
