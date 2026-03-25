@@ -309,7 +309,7 @@ class EndpointRow(Base):  # type: ignore[misc]
     )
 
     # Revision management columns
-    current_revision: Mapped[UUID] = mapped_column("current_revision", GUID, nullable=False)
+    current_revision: Mapped[UUID | None] = mapped_column("current_revision", GUID, nullable=True)
     deploying_revision: Mapped[UUID | None] = mapped_column(
         "deploying_revision", GUID, nullable=True
     )
