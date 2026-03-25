@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import urllib.parse
 from datetime import UTC, datetime, timedelta
 from typing import Any
 from uuid import uuid4

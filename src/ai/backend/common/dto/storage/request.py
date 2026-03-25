@@ -1,10 +1,9 @@
+import re
 import uuid
 from collections.abc import Mapping
 from datetime import datetime
 from enum import StrEnum
 from pathlib import PurePosixPath
-
-import re
 
 from pydantic import BaseModel, ConfigDict, Field, field_serializer, field_validator
 
