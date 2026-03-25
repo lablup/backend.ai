@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING
 
 import sqlalchemy as sa
 
+from ai.backend.manager.actions.types import OperationStatus
 from ai.backend.manager.models.audit_log import AuditLogRow
 from ai.backend.manager.repositories.base import QueryCondition, QueryOrder
 
@@ -135,14 +136,14 @@ class AuditLogConditions:
     # --- status enum filters ---
 
     @staticmethod
-    def by_status_in(statuses: Collection[str]) -> QueryCondition:
+    def by_status_in(statuses: Collection[str | OperationStatus]) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
             return AuditLogRow.status.in_(statuses)
 
         return inner
 
     @staticmethod
-    def by_status_not_in(statuses: Collection[str]) -> QueryCondition:
+    def by_status_not_in(statuses: Collection[str | OperationStatus]) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
             return AuditLogRow.status.notin_(statuses)
 

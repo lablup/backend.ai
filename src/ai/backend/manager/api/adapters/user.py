@@ -929,6 +929,8 @@ class UserAdapter(BaseAdapter):
                 return UserOrders.email(ascending=ascending)
             case UserOrderField.STATUS:
                 return UserOrders.status(ascending=ascending)
+            case UserOrderField.ROLE:
+                return UserOrders.role(ascending=ascending)
             case UserOrderField.DOMAIN_NAME:
                 return UserOrders.domain_name(ascending=ascending)
             case UserOrderField.PROJECT_NAME:
@@ -1051,6 +1053,8 @@ class UserAdapter(BaseAdapter):
                 return UserOrders.email(ascending=ascending)
             case UserOrderField.STATUS:
                 return UserOrders.status(ascending=ascending)
+            case UserOrderField.ROLE:
+                return UserOrders.role(ascending=ascending)
             case UserOrderField.DOMAIN_NAME:
                 return UserOrders.domain_name(ascending=ascending)
         raise ValueError(f"Unknown order field: {order.field}")
