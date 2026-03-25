@@ -4,7 +4,7 @@ from datetime import datetime
 from enum import StrEnum
 from pathlib import PurePosixPath
 
-from pydantic import BaseModel, ConfigDict, Field, field_serializer
+from pydantic import BaseModel, ConfigDict, Field, field_serializer, field_validator
 
 from ai.backend.common.api_handlers import BaseRequestModel
 from ai.backend.common.data.storage.registries.types import ModelSortKey, ModelTarget
@@ -561,6 +561,10 @@ class ArchiveDownloadTokenData(BaseModel):
         min_length=1,
         description="List of relative file paths within the virtual folder to include in the archive.",
     )
+    filename: str | None = Field(
+        default=None,
+        description="Custom filename for the downloaded ZIP archive. Defaults to 'archive.zip' when omitted.",
+    )
     exp: datetime = Field(
         description="Token expiration time as a Unix timestamp.",
     )
@@ -591,3 +595,22 @@ class CreateArchiveDownloadSessionRequest(BaseRequestModel):
         min_length=1,
         description="List of relative file paths within the virtual folder to include in the archive.",
     )
+    filename: str | None = Field(
+        default=None,
+        description="Custom filename for the downloaded ZIP archive. Defaults to 'archive.zip' when omitted.",
+    )
+
+    @field_validator("filename")
+    @classmethod
+    def _validate_filename(cls, v: str | None) -> str | None:
+        if v is None:
+            return v
+        if not v.strip():
+            raise ValueError("Filename must not be empty or whitespace-only.")
+        if "\x00" in v:
+            raise ValueError("Filename must not contain null bytes.")
+        if "/" in v or "\\" in v:
+            raise ValueError("Filename must not contain path separators (/ or \\).")
+        if ".." in v:
+            raise ValueError("Filename must not contain path traversal sequences (..).")
+        return v
