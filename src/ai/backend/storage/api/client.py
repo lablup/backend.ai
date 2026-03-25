@@ -509,7 +509,7 @@ class DownloadHandler:
             reader = ZipArchiveStreamReader(vfolder_root)
             reader.add_entries(sanitized)
 
-            filename = token_data.filename if token_data.filename else reader.filename()
+            filename = token_data.filename if token_data.filename is not None else reader.filename()
             headers = build_attachment_headers(filename, reader.content_type())
             return APIStreamResponse(body=reader, status=HTTPStatus.OK, headers=headers)
 

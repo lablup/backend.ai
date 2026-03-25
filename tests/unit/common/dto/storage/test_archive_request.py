@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime, timedelta
+from typing import Any
 from uuid import uuid4
 
 import jwt
@@ -20,7 +21,7 @@ from ai.backend.common.types import VFolderID
 class TestCreateArchiveDownloadSessionRequestFilename:
     """Validate the filename field on CreateArchiveDownloadSessionRequest."""
 
-    VALID_BODY: dict = {
+    VALID_BODY: dict[str, Any] = {
         "volume": "vol1",
         "virtual_folder_id": str(VFolderID(None, uuid4())),
         "files": ["a.txt"],
