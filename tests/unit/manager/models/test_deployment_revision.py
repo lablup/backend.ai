@@ -296,7 +296,7 @@ class TestDeploymentRevisionRow:
             initial_revision = DeploymentRevisionRow(
                 id=revision_id,
                 endpoint=endpoint.id,
-                revision_number=0,
+                revision_number=1,
                 image=test_image.id,
                 model=None,
                 model_mount_destination="/models",
@@ -324,7 +324,7 @@ class TestDeploymentRevisionRow:
         async with db_with_cleanup.begin_session() as db_sess:
             revision = DeploymentRevisionRow(
                 endpoint=test_endpoint.id,
-                revision_number=1,
+                revision_number=2,
                 image=test_image.id,
                 model=None,
                 model_mount_destination="/models",
@@ -342,7 +342,7 @@ class TestDeploymentRevisionRow:
 
             assert revision.id is not None
             assert revision.endpoint == test_endpoint.id
-            assert revision.revision_number == 1
+            assert revision.revision_number == 2
 
     async def test_to_data(
         self,
@@ -355,7 +355,7 @@ class TestDeploymentRevisionRow:
         async with db_with_cleanup.begin_session() as db_sess:
             revision = DeploymentRevisionRow(
                 endpoint=test_endpoint.id,
-                revision_number=1,
+                revision_number=2,
                 image=test_image.id,
                 model=model_id,
                 model_mount_destination="/models",
@@ -380,7 +380,7 @@ class TestDeploymentRevisionRow:
             data = revision.to_data()
             assert isinstance(data, ModelRevisionData)
             assert data.id == revision.id
-            assert data.name == "revision-1"
+            assert data.name == "revision-2"
             assert data.cluster_config.mode == ClusterMode.SINGLE_NODE
             assert data.cluster_config.size == 1
             assert data.resource_config.resource_group_name == "default"
@@ -401,7 +401,7 @@ class TestDeploymentRevisionRow:
         async with db_with_cleanup.begin_session() as db_sess:
             revision1 = DeploymentRevisionRow(
                 endpoint=test_endpoint.id,
-                revision_number=1,
+                revision_number=2,
                 image=test_image.id,
                 model=None,
                 model_mount_destination="/models",
@@ -420,7 +420,7 @@ class TestDeploymentRevisionRow:
             # Try to create another revision with same endpoint + revision_number
             revision2 = DeploymentRevisionRow(
                 endpoint=test_endpoint.id,
-                revision_number=1,  # Same as revision1
+                revision_number=2,  # Same as revision1
                 image=test_image.id,
                 model=None,
                 model_mount_destination="/models",
