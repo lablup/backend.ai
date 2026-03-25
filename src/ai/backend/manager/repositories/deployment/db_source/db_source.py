@@ -253,31 +253,32 @@ class DeploymentDBSource:
             rbac_result = await execute_rbac_entity_creator(db_sess, creator)
             endpoint = rbac_result.row
 
-            # Create the initial deployment revision
-            initial_revision = DeploymentRevisionRow(
-                id=spec._initial_revision_id,
-                endpoint=endpoint.id,
-                revision_number=1,
-                image=spec.revision.image_id,
-                model=spec.revision.mounts.model_vfolder_id,
-                model_mount_destination=spec.revision.mounts.model_mount_destination,
-                model_definition_path=spec.revision.mounts.model_definition_path,
-                resource_group=spec.metadata.resource_group,
-                resource_slots=spec.revision.resource.resource_slots,
-                resource_opts=spec.revision.resource.resource_opts or {},
-                cluster_mode=spec.revision.resource.cluster_mode,
-                cluster_size=spec.revision.resource.cluster_size,
-                startup_command=spec.revision.execution.startup_command,
-                bootstrap_script=spec.revision.execution.bootstrap_script,
-                environ=dict(spec.revision.execution.environ)
-                if spec.revision.execution.environ
-                else {},
-                callback_url=spec.revision.execution.callback_url,
-                runtime_variant=spec.revision.execution.runtime_variant,
-                extra_mounts=list(spec.revision.mounts.extra_mounts),
-            )
-            db_sess.add(initial_revision)
-            await db_sess.flush()
+            # Create the initial deployment revision and link it to the endpoint
+            if spec.revision.image_id is not None:
+                initial_revision = DeploymentRevisionRow(
+                    endpoint=endpoint.id,
+                    revision_number=1,
+                    image=spec.revision.image_id,
+                    model=spec.revision.mounts.model_vfolder_id,
+                    model_mount_destination=spec.revision.mounts.model_mount_destination,
+                    model_definition_path=spec.revision.mounts.model_definition_path,
+                    resource_group=spec.metadata.resource_group,
+                    resource_slots=spec.revision.resource.resource_slots,
+                    resource_opts=spec.revision.resource.resource_opts or {},
+                    cluster_mode=spec.revision.resource.cluster_mode,
+                    cluster_size=spec.revision.resource.cluster_size,
+                    startup_command=spec.revision.execution.startup_command,
+                    bootstrap_script=spec.revision.execution.bootstrap_script,
+                    environ=dict(spec.revision.execution.environ)
+                    if spec.revision.execution.environ
+                    else {},
+                    callback_url=spec.revision.execution.callback_url,
+                    runtime_variant=spec.revision.execution.runtime_variant,
+                    extra_mounts=list(spec.revision.mounts.extra_mounts),
+                )
+                db_sess.add(initial_revision)
+                await db_sess.flush()
+                endpoint.current_revision = initial_revision.id
 
             # Create deployment policy (use provided config or default rolling policy)
             if policy_config is not None:
@@ -342,7 +343,6 @@ class DeploymentDBSource:
             if spec.image_id is None:
                 raise InvalidAPIParameters("image_id is required for legacy endpoint creation")
             initial_revision = DeploymentRevisionRow(
-                id=spec._initial_revision_id,
                 endpoint=endpoint.id,
                 revision_number=1,
                 image=spec.image_id,
@@ -363,6 +363,7 @@ class DeploymentDBSource:
             )
             db_sess.add(initial_revision)
             await db_sess.flush()
+            endpoint.current_revision = initial_revision.id
 
             # Create deployment policy (use provided spec or default rolling policy)
             if spec.policy is not None:
