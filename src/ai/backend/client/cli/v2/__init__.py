@@ -1,6 +1,7 @@
 """V2 REST API CLI command group.
 
-Registers all domain sub-groups under ``backend.ai v2 {domain} {command}``.
+Registers config/login commands and all domain sub-groups
+under ``backend.ai v2 {domain} {command}``.
 """
 
 from __future__ import annotations
@@ -9,10 +10,19 @@ import click
 
 from ai.backend.common.cli import LazyGroup
 
+from .config_cmd import config
+from .login_cmd import login, logout
+
 
 @click.group()
 def v2() -> None:
     """V2 REST API commands."""
+
+
+# Infrastructure commands
+v2.add_command(config)
+v2.add_command(login)
+v2.add_command(logout)
 
 
 # Domain sub-groups — lazy loaded to avoid heavy imports at startup.
@@ -49,7 +59,8 @@ def sessions() -> None:
 
 
 @v2.group(
-    cls=LazyGroup, import_name="ai.backend.client.cli.v2.container_registry:container_registries"
+    cls=LazyGroup,
+    import_name="ai.backend.client.cli.v2.container_registry:container_registries",
 )
 def container_registries() -> None:
     """Container registry commands."""

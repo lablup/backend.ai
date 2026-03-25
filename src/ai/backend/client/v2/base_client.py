@@ -30,6 +30,12 @@ def _create_aiohttp_session(config: ClientConfig) -> aiohttp.ClientSession:
         sock_connect=config.connection_timeout or None,
         sock_read=config.read_timeout or None,
     )
+    if config.cookie_jar is not None:
+        return aiohttp.ClientSession(
+            connector=connector,
+            timeout=timeout,
+            cookie_jar=config.cookie_jar,
+        )
     return aiohttp.ClientSession(
         connector=connector,
         timeout=timeout,
