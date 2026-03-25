@@ -60,6 +60,11 @@ def resource_usage() -> None:
     """Resource usage history operations (superadmin only)"""
 
 
+@cli_main.group(cls=LazyGroup, import_name="ai.backend.client.cli.v2:v2")
+def v2() -> None:
+    """V2 REST API commands."""
+
+
 # Groups with aliases in subcommands - still eager load
 from . import admin  # noqa  # type: ignore
 from . import vfolder  # noqa  # type: ignore
