@@ -1,4 +1,4 @@
-"""assign default rolling deployment policy to existing deployments
+"""assign default rolling deployment policy and add FK to endpoints
 
 Revision ID: a1b2c3d4e5f6
 Revises: 19e48e70b86a
@@ -19,14 +19,12 @@ depends_on = None
 
 
 def upgrade() -> None:
-    # Create a tracking table to record which policies were auto-created
-    # by this migration, enabling a clean downgrade.
+    # Track which policies are auto-created for clean downgrade.
     op.create_table(
         "_migration_a1b2c3d4e5f6_created_policies",
         sa.Column("endpoint_id", GUID(), nullable=False, primary_key=True),
     )
 
-    # Record endpoints that currently lack a deployment policy.
     op.execute(
         """
         INSERT INTO _migration_a1b2c3d4e5f6_created_policies (endpoint_id)
@@ -38,7 +36,6 @@ def upgrade() -> None:
         """
     )
 
-    # Insert a default rolling deployment policy for those endpoints.
     op.execute(
         """
         INSERT INTO deployment_policies (
@@ -55,9 +52,58 @@ def upgrade() -> None:
         """
     )
 
+    # Add nullable column
+    op.add_column(
+        "endpoints",
+        sa.Column("deployment_policy_id", GUID(), nullable=True),
+    )
+
+    # Backfill from deployment_policies
+    op.execute(
+        """
+        UPDATE endpoints e
+        SET deployment_policy_id = dp.id
+        FROM deployment_policies dp
+        WHERE dp.endpoint = e.id
+        """
+    )
+
+    # Set NOT NULL
+    op.alter_column("endpoints", "deployment_policy_id", nullable=False)
+
+    # Add DEFERRABLE FK constraint
+    op.create_foreign_key(
+        "fk_endpoints_deployment_policy_id",
+        "endpoints",
+        "deployment_policies",
+        ["deployment_policy_id"],
+        ["id"],
+        ondelete="RESTRICT",
+        deferrable=True,
+        initially="DEFERRED",
+    )
+
+    # Unique constraint (1:1 relationship)
+    op.create_unique_constraint(
+        "uq_endpoints_deployment_policy_id",
+        "endpoints",
+        ["deployment_policy_id"],
+    )
+
+    # Index
+    op.create_index(
+        "ix_endpoints_deployment_policy_id",
+        "endpoints",
+        ["deployment_policy_id"],
+    )
+
 
 def downgrade() -> None:
-    # Remove only the deployment policies that were created by this migration.
+    op.drop_index("ix_endpoints_deployment_policy_id", table_name="endpoints")
+    op.drop_constraint("uq_endpoints_deployment_policy_id", "endpoints", type_="unique")
+    op.drop_constraint("fk_endpoints_deployment_policy_id", "endpoints", type_="foreignkey")
+    op.drop_column("endpoints", "deployment_policy_id")
+
     op.execute(
         """
         DELETE FROM deployment_policies
