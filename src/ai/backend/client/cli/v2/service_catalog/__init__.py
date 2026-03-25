@@ -1,3 +1,3 @@
-from .commands import service_catalogs as service_catalogs
+from .commands import service_catalog as service_catalog
 
-__all__ = ("service_catalogs",)
+__all__ = ("service_catalog",)

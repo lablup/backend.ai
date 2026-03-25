@@ -15,112 +15,11 @@ from ai.backend.client.cli.v2.helpers import create_v2_registry, parse_order_opt
 
 
 @click.group()
-def users() -> None:
-    """User management commands."""
+def user() -> None:
+    """User commands."""
 
 
-@users.command(name="admin-search")
-@pass_ctx_obj
-@click.option("--limit", default=20, help="Maximum number of results to return.")
-@click.option("--offset", default=0, help="Number of results to skip.")
-@click.option(
-    "--username-contains",
-    default=None,
-    type=str,
-    help="Filter users whose username contains this substring.",
-)
-@click.option(
-    "--email-contains",
-    default=None,
-    type=str,
-    help="Filter users whose email contains this substring.",
-)
-@click.option(
-    "--status",
-    default=None,
-    type=click.Choice(
-        ["active", "inactive", "deleted", "before-verification"], case_sensitive=False
-    ),
-    help="Filter by user status.",
-)
-@click.option(
-    "--role",
-    default=None,
-    type=click.Choice(["superadmin", "admin", "user", "monitor"], case_sensitive=False),
-    help="Filter by user role.",
-)
-@click.option("--domain-name", default=None, type=str, help="Filter by exact domain name.")
-@click.option(
-    "--order-by",
-    multiple=True,
-    help="Order by field:direction (e.g., username:asc, created_at:desc).",
-)
-def admin_search(
-    ctx: CLIContext,
-    limit: int,
-    offset: int,
-    username_contains: str | None,
-    email_contains: str | None,
-    status: str | None,
-    role: str | None,
-    domain_name: str | None,
-    order_by: tuple[str, ...],
-) -> None:
-    """Search users (superadmin only)."""
-    from ai.backend.common.dto.manager.v2.user.request import (
-        AdminSearchUsersInput,
-        UserFilter,
-        UserOrder,
-    )
-    from ai.backend.common.dto.manager.v2.user.types import UserOrderField
-
-    # Build filter only if any filter option is provided
-    filter_dto: UserFilter | None = None
-    if any(
-        opt is not None for opt in (username_contains, email_contains, status, role, domain_name)
-    ):
-        from ai.backend.common.dto.manager.query import StringFilter
-        from ai.backend.common.dto.manager.v2.user.types import (
-            UserRole as UserRoleEnum,
-        )
-        from ai.backend.common.dto.manager.v2.user.types import (
-            UserRoleFilter,
-            UserStatus,
-            UserStatusFilter,
-        )
-
-        filter_dto = UserFilter(
-            username=(
-                StringFilter(contains=username_contains) if username_contains is not None else None
-            ),
-            email=StringFilter(contains=email_contains) if email_contains is not None else None,
-            status=UserStatusFilter(equals=UserStatus(status)) if status is not None else None,
-            role=UserRoleFilter(equals=UserRoleEnum(role)) if role is not None else None,
-            domain_name=(StringFilter(equals=domain_name) if domain_name is not None else None),
-        )
-
-    # Build order only if --order-by is provided
-    orders = parse_order_options(order_by, UserOrderField, UserOrder) if order_by else None
-
-    async def _run() -> None:
-        registry = await create_v2_registry(ctx)
-        try:
-            result = await registry.user.admin_search(
-                AdminSearchUsersInput(
-                    filter=filter_dto,
-                    order=orders,
-                    limit=limit,
-                    offset=offset,
-                ),
-            )
-            print_result(result)
-        finally:
-            await registry.close()
-
-    asyncio.run(_run())
-
-
-@users.command()
+@user.command()
 @pass_ctx_obj
 @click.argument("user_id", type=click.UUID)
 def get(ctx: CLIContext, user_id: UUID) -> None:
@@ -137,7 +36,7 @@ def get(ctx: CLIContext, user_id: UUID) -> None:
     asyncio.run(_run())
 
 
-@users.command()
+@user.command()
 @pass_ctx_obj
 @click.argument("body", type=str)
 def create(ctx: CLIContext, body: str) -> None:
@@ -164,7 +63,7 @@ def create(ctx: CLIContext, body: str) -> None:
     asyncio.run(_run())
 
 
-@users.command()
+@user.command()
 @pass_ctx_obj
 @click.argument("user_id", type=click.UUID)
 @click.argument("body", type=str)
@@ -192,7 +91,7 @@ def update(ctx: CLIContext, user_id: UUID, body: str) -> None:
     asyncio.run(_run())
 
 
-@users.command()
+@user.command()
 @pass_ctx_obj
 @click.argument("user_id", type=click.UUID)
 def delete(ctx: CLIContext, user_id: UUID) -> None:
@@ -210,53 +109,28 @@ def delete(ctx: CLIContext, user_id: UUID) -> None:
     asyncio.run(_run())
 
 
-@users.command(name="search-by-domain")
+@user.command()
 @pass_ctx_obj
-@click.argument("domain_name")
 @click.option("--limit", default=20, help="Maximum number of results to return.")
 @click.option("--offset", default=0, help="Number of results to skip.")
 @click.option(
-    "--order-by",
-    multiple=True,
-    help="Order by field:direction (e.g., username:asc, created_at:desc).",
+    "--scope-domain",
+    default=None,
+    type=str,
+    help="Search users within a specific domain (by domain name).",
 )
-def search_by_domain(
-    ctx: CLIContext,
-    domain_name: str,
-    limit: int,
-    offset: int,
-    order_by: tuple[str, ...],
-) -> None:
-    """Search users within a specific domain."""
-    from ai.backend.common.dto.manager.v2.user.request import SearchUsersRequest, UserOrder
-    from ai.backend.common.dto.manager.v2.user.types import UserOrderField
-
-    # Build order only if --order-by is provided
-    orders = parse_order_options(order_by, UserOrderField, UserOrder) if order_by else None
-
-    async def _run() -> None:
-        registry = await create_v2_registry(ctx)
-        try:
-            result = await registry.user.search_by_domain(
-                domain_name,
-                SearchUsersRequest(
-                    order=orders,
-                    limit=limit,
-                    offset=offset,
-                ),
-            )
-            print_result(result)
-        finally:
-            await registry.close()
-
-    asyncio.run(_run())
-
-
-@users.command(name="search-by-project")
-@pass_ctx_obj
-@click.argument("project_id", type=click.UUID)
-@click.option("--limit", default=20, help="Maximum number of results to return.")
-@click.option("--offset", default=0, help="Number of results to skip.")
+@click.option(
+    "--scope-project",
+    default=None,
+    type=click.UUID,
+    help="Search users within a specific project (by project UUID).",
+)
+@click.option(
+    "--scope-role",
+    default=None,
+    type=click.UUID,
+    help="Search users with a specific role (by role UUID).",
+)
 @click.option(
     "--username-contains",
     default=None,
@@ -288,24 +162,40 @@ def search_by_domain(
     multiple=True,
     help="Order by field:direction (e.g., username:asc, created_at:desc).",
 )
-def search_by_project(
+def search(
     ctx: CLIContext,
-    project_id: UUID,
     limit: int,
     offset: int,
+    scope_domain: str | None,
+    scope_project: UUID | None,
+    scope_role: UUID | None,
     username_contains: str | None,
     email_contains: str | None,
     status: str | None,
     role: str | None,
     order_by: tuple[str, ...],
 ) -> None:
-    """Search users within a specific project."""
+    """Search users with optional scope filtering.
+
+    Use --scope-domain, --scope-project, or --scope-role to narrow the search
+    to a specific domain, project, or role. Without scope options, searches
+    all accessible users.
+    """
     from ai.backend.common.dto.manager.v2.user.request import (
         SearchUsersRequest,
         UserFilter,
         UserOrder,
     )
     from ai.backend.common.dto.manager.v2.user.types import UserOrderField
+
+    # Validate that at most one scope option is provided
+    scope_count = sum(opt is not None for opt in (scope_domain, scope_project, scope_role))
+    if scope_count > 1:
+        click.echo(
+            "Error: Only one of --scope-domain, --scope-project, --scope-role can be specified.",
+            err=True,
+        )
+        sys.exit(1)
 
     # Build filter only if any filter option is provided
     filter_dto: UserFilter | None = None
@@ -332,107 +222,60 @@ def search_by_project(
     # Build order only if --order-by is provided
     orders = parse_order_options(order_by, UserOrderField, UserOrder) if order_by else None
 
-    async def _run() -> None:
+    # Validate that a scope is specified
+    if scope_domain is None and scope_project is None and scope_role is None:
+        click.echo(
+            "Error: At least one of --scope-domain, --scope-project, "
+            "or --scope-role must be specified.",
+            err=True,
+        )
+        sys.exit(1)
+
+    async def _search_by_domain(domain_name: str) -> None:
         registry = await create_v2_registry(ctx)
         try:
-            result = await registry.user.search_by_project(
-                project_id,
-                SearchUsersRequest(
-                    filter=filter_dto,
-                    order=orders,
-                    limit=limit,
-                    offset=offset,
-                ),
+            request = SearchUsersRequest(
+                filter=filter_dto,
+                order=orders,
+                limit=limit,
+                offset=offset,
             )
+            result = await registry.user.search_by_domain(domain_name, request)
             print_result(result)
         finally:
             await registry.close()
 
-    asyncio.run(_run())
-
-
-@users.command(name="search-by-role")
-@pass_ctx_obj
-@click.argument("role_id", type=click.UUID)
-@click.option("--limit", default=20, help="Maximum number of results to return.")
-@click.option("--offset", default=0, help="Number of results to skip.")
-@click.option(
-    "--username-contains",
-    default=None,
-    type=str,
-    help="Filter users whose username contains this substring.",
-)
-@click.option(
-    "--email-contains",
-    default=None,
-    type=str,
-    help="Filter users whose email contains this substring.",
-)
-@click.option(
-    "--status",
-    default=None,
-    type=click.Choice(
-        ["active", "inactive", "deleted", "before-verification"], case_sensitive=False
-    ),
-    help="Filter by user status.",
-)
-@click.option(
-    "--order-by",
-    multiple=True,
-    help="Order by field:direction (e.g., username:asc, created_at:desc).",
-)
-def search_by_role(
-    ctx: CLIContext,
-    role_id: UUID,
-    limit: int,
-    offset: int,
-    username_contains: str | None,
-    email_contains: str | None,
-    status: str | None,
-    order_by: tuple[str, ...],
-) -> None:
-    """Search users with a specific role."""
-    from ai.backend.common.dto.manager.v2.user.request import (
-        SearchUsersRequest,
-        UserFilter,
-        UserOrder,
-    )
-    from ai.backend.common.dto.manager.v2.user.types import UserOrderField
-
-    # Build filter only if any filter option is provided
-    filter_dto: UserFilter | None = None
-    if any(opt is not None for opt in (username_contains, email_contains, status)):
-        from ai.backend.common.dto.manager.query import StringFilter
-        from ai.backend.common.dto.manager.v2.user.types import (
-            UserStatus,
-            UserStatusFilter,
-        )
-
-        filter_dto = UserFilter(
-            username=(
-                StringFilter(contains=username_contains) if username_contains is not None else None
-            ),
-            email=StringFilter(contains=email_contains) if email_contains is not None else None,
-            status=UserStatusFilter(equals=UserStatus(status)) if status is not None else None,
-        )
-
-    # Build order only if --order-by is provided
-    orders = parse_order_options(order_by, UserOrderField, UserOrder) if order_by else None
-
-    async def _run() -> None:
+    async def _search_by_project(project_id: UUID) -> None:
         registry = await create_v2_registry(ctx)
         try:
-            result = await registry.user.search_by_role(
-                role_id,
-                SearchUsersRequest(
-                    filter=filter_dto,
-                    order=orders,
-                    limit=limit,
-                    offset=offset,
-                ),
+            request = SearchUsersRequest(
+                filter=filter_dto,
+                order=orders,
+                limit=limit,
+                offset=offset,
             )
+            result = await registry.user.search_by_project(project_id, request)
             print_result(result)
         finally:
             await registry.close()
 
-    asyncio.run(_run())
+    async def _search_by_role(role_id: UUID) -> None:
+        registry = await create_v2_registry(ctx)
+        try:
+            request = SearchUsersRequest(
+                filter=filter_dto,
+                order=orders,
+                limit=limit,
+                offset=offset,
+            )
+            result = await registry.user.search_by_role(role_id, request)
+            print_result(result)
+        finally:
+            await registry.close()
+
+    if scope_domain is not None:
+        asyncio.run(_search_by_domain(scope_domain))
+    elif scope_project is not None:
+        asyncio.run(_search_by_project(scope_project))
+    elif scope_role is not None:
+        asyncio.run(_search_by_role(scope_role))

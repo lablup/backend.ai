@@ -1,3 +1,3 @@
-from .commands import object_storages as object_storages
+from .commands import object_storage as object_storage
 
-__all__ = ("object_storages",)
+__all__ = ("object_storage",)

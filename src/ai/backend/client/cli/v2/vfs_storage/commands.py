@@ -11,12 +11,12 @@ from ai.backend.client.cli.types import CLIContext
 from ai.backend.client.cli.v2.helpers import create_v2_registry, print_result
 
 
-@click.group()
-def vfs_storages() -> None:
+@click.group(name="vfs-storage")
+def vfs_storage() -> None:
     """VFS storage management commands."""
 
 
-@vfs_storages.command()
+@vfs_storage.command()
 @click.option("--name", required=True, help="Storage name.")
 @click.option("--host", required=True, help="Storage host address.")
 @click.option("--base-path", required=True, help="Base path on the storage host.")
@@ -38,7 +38,7 @@ def create(ctx: CLIContext, name: str, host: str, base_path: str) -> None:
     asyncio.run(_run())
 
 
-@vfs_storages.command(name="list-all")
+@vfs_storage.command(name="list-all")
 @pass_ctx_obj
 def list_all(ctx: CLIContext) -> None:
     """List all VFS storages without pagination."""
@@ -54,7 +54,7 @@ def list_all(ctx: CLIContext) -> None:
     asyncio.run(_run())
 
 
-@vfs_storages.command()
+@vfs_storage.command()
 @click.argument("storage_id")
 @pass_ctx_obj
 def get(ctx: CLIContext, storage_id: str) -> None:
@@ -72,7 +72,7 @@ def get(ctx: CLIContext, storage_id: str) -> None:
     asyncio.run(_run())
 
 
-@vfs_storages.command()
+@vfs_storage.command()
 @click.option("--id", "storage_id", required=True, help="Storage ID to update.")
 @click.option("--name", default=None, help="Updated storage name.")
 @click.option("--host", default=None, help="Updated host address.")
@@ -108,7 +108,7 @@ def update(
     asyncio.run(_run())
 
 
-@vfs_storages.command()
+@vfs_storage.command()
 @click.option("--limit", default=None, type=int, help="Max results per page.")
 @click.option("--offset", default=None, type=int, help="Pagination offset.")
 @pass_ctx_obj
@@ -129,7 +129,7 @@ def search(ctx: CLIContext, limit: int | None, offset: int | None) -> None:
     asyncio.run(_run())
 
 
-@vfs_storages.command()
+@vfs_storage.command()
 @click.option("--id", "storage_id", required=True, help="Storage ID to delete.")
 @pass_ctx_obj
 def delete(ctx: CLIContext, storage_id: str) -> None:

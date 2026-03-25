@@ -1,3 +1,3 @@
-from .commands import storage_namespaces as storage_namespaces
+from .commands import storage_namespace as storage_namespace
 
-__all__ = ("storage_namespaces",)
+__all__ = ("storage_namespace",)

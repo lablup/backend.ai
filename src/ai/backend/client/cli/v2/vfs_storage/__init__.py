@@ -1,3 +1,3 @@
-from .commands import vfs_storages as vfs_storages
+from .commands import vfs_storage as vfs_storage
 
-__all__ = ("vfs_storages",)
+__all__ = ("vfs_storage",)

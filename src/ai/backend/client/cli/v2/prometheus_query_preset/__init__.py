@@ -1,3 +1,3 @@
-from .commands import prometheus_query_presets as prometheus_query_presets
+from .commands import prometheus_query_preset as prometheus_query_preset
 
-__all__ = ("prometheus_query_presets",)
+__all__ = ("prometheus_query_preset",)

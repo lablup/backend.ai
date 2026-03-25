@@ -1,3 +1,3 @@
-from .commands import artifacts as artifacts
+from .commands import artifact as artifact
 
-__all__ = ("artifacts",)
+__all__ = ("artifact",)

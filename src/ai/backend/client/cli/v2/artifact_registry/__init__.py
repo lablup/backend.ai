@@ -1,3 +1,3 @@
-from .commands import artifact_registries as artifact_registries
+from .commands import artifact_registry as artifact_registry
 
-__all__ = ("artifact_registries",)
+__all__ = ("artifact_registry",)

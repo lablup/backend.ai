@@ -11,12 +11,12 @@ from ai.backend.client.cli.types import CLIContext
 from ai.backend.client.cli.v2.helpers import create_v2_registry, print_result
 
 
-@click.group()
-def huggingface_registries() -> None:
+@click.group(name="huggingface-registry")
+def huggingface_registry() -> None:
     """HuggingFace registry management commands."""
 
 
-@huggingface_registries.command()
+@huggingface_registry.command()
 @click.option("--name", required=True, help="Registry name.")
 @click.option("--url", required=True, help="HuggingFace Hub URL.")
 @click.option("--token", default=None, help="Access token for the registry.")
@@ -40,7 +40,7 @@ def create(ctx: CLIContext, name: str, url: str, token: str | None) -> None:
     asyncio.run(_run())
 
 
-@huggingface_registries.command()
+@huggingface_registry.command()
 @click.option("--limit", default=None, type=int, help="Max results per page.")
 @click.option("--offset", default=None, type=int, help="Pagination offset.")
 @pass_ctx_obj
@@ -63,7 +63,7 @@ def search(ctx: CLIContext, limit: int | None, offset: int | None) -> None:
     asyncio.run(_run())
 
 
-@huggingface_registries.command()
+@huggingface_registry.command()
 @click.argument("registry_id")
 @pass_ctx_obj
 def get(ctx: CLIContext, registry_id: str) -> None:
@@ -81,7 +81,7 @@ def get(ctx: CLIContext, registry_id: str) -> None:
     asyncio.run(_run())
 
 
-@huggingface_registries.command()
+@huggingface_registry.command()
 @click.option("--id", "registry_id", required=True, help="Registry ID to update.")
 @click.option("--name", default=None, help="Updated registry name.")
 @click.option("--url", default=None, help="Updated HuggingFace Hub URL.")
@@ -119,7 +119,7 @@ def update(
     asyncio.run(_run())
 
 
-@huggingface_registries.command()
+@huggingface_registry.command()
 @click.option("--id", "registry_id", required=True, help="Registry ID to delete.")
 @pass_ctx_obj
 def delete(ctx: CLIContext, registry_id: str) -> None:

@@ -1,3 +1,3 @@
-from .commands import container_registries as container_registries
+from .commands import container_registry as container_registry
 
-__all__ = ("container_registries",)
+__all__ = ("container_registry",)

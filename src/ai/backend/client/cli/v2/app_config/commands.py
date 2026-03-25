@@ -11,15 +11,15 @@ from ai.backend.client.cli.types import CLIContext
 from ai.backend.client.cli.v2.helpers import create_v2_registry, print_result
 
 
-@click.group()
-def app_configs() -> None:
+@click.group(name="app-config")
+def app_config() -> None:
     """App configuration commands."""
 
 
 # ------------------------------------------------------------------ Domain config
 
 
-@app_configs.command()
+@app_config.command(name="get-domain")
 @click.argument("domain_name", type=str)
 @pass_ctx_obj
 def get_domain(ctx: CLIContext, domain_name: str) -> None:
@@ -36,7 +36,7 @@ def get_domain(ctx: CLIContext, domain_name: str) -> None:
     asyncio.run(_run())
 
 
-@app_configs.command()
+@app_config.command(name="delete-domain")
 @click.argument("domain_name", type=str)
 @pass_ctx_obj
 def delete_domain(ctx: CLIContext, domain_name: str) -> None:
@@ -56,7 +56,7 @@ def delete_domain(ctx: CLIContext, domain_name: str) -> None:
 # ------------------------------------------------------------------ User config
 
 
-@app_configs.command()
+@app_config.command(name="get-user")
 @click.argument("user_id", type=str)
 @pass_ctx_obj
 def get_user(ctx: CLIContext, user_id: str) -> None:
@@ -73,7 +73,7 @@ def get_user(ctx: CLIContext, user_id: str) -> None:
     asyncio.run(_run())
 
 
-@app_configs.command()
+@app_config.command(name="delete-user")
 @click.argument("user_id", type=str)
 @pass_ctx_obj
 def delete_user(ctx: CLIContext, user_id: str) -> None:
@@ -93,7 +93,7 @@ def delete_user(ctx: CLIContext, user_id: str) -> None:
 # ------------------------------------------------------------------ Merged config
 
 
-@app_configs.command()
+@app_config.command(name="get-merged")
 @click.argument("user_id", type=str)
 @pass_ctx_obj
 def get_merged(ctx: CLIContext, user_id: str) -> None:

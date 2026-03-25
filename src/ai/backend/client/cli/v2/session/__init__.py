@@ -1,3 +1,3 @@
-from .commands import sessions as sessions
+from .commands import session as session
 
-__all__ = ("sessions",)
+__all__ = ("session",)

@@ -1,3 +1,3 @@
-from .commands import notifications as notifications
+from .commands import notification as notification
 
-__all__ = ("notifications",)
+__all__ = ("notification",)

@@ -1,3 +1,3 @@
-from .commands import audit_logs as audit_logs
+from .commands import audit_log as audit_log
 
-__all__ = ("audit_logs",)
+__all__ = ("audit_log",)

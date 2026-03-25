@@ -1,3 +1,3 @@
-from .commands import agents as agents
+from .commands import agent as agent
 
-__all__ = ("agents",)
+__all__ = ("agent",)

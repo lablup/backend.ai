@@ -11,12 +11,12 @@ from ai.backend.client.cli.types import CLIContext
 from ai.backend.client.cli.v2.helpers import create_v2_registry, print_result
 
 
-@click.group()
-def artifact_registries() -> None:
+@click.group(name="artifact-registry")
+def artifact_registry() -> None:
     """Artifact registry management commands."""
 
 
-@artifact_registries.command()
+@artifact_registry.command()
 @click.argument("registry_id")
 @pass_ctx_obj
 def get(ctx: CLIContext, registry_id: str) -> None:

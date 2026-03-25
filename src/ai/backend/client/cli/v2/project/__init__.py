@@ -1,3 +1,3 @@
-from .commands import projects as projects
+from .commands import project as project
 
-__all__ = ("projects",)
+__all__ = ("project",)

@@ -11,12 +11,12 @@ from ai.backend.client.cli.types import CLIContext
 from ai.backend.client.cli.v2.helpers import create_v2_registry, print_result
 
 
-@click.group()
-def storage_namespaces() -> None:
+@click.group(name="storage-namespace")
+def storage_namespace() -> None:
     """Storage namespace management commands."""
 
 
-@storage_namespaces.command()
+@storage_namespace.command()
 @click.option("--storage-id", required=True, help="Storage ID to register namespace for.")
 @click.option("--namespace", required=True, help="Namespace bucket or path prefix.")
 @pass_ctx_obj
@@ -44,7 +44,7 @@ def register(ctx: CLIContext, storage_id: str, namespace: str) -> None:
     asyncio.run(_run())
 
 
-@storage_namespaces.command()
+@storage_namespace.command()
 @click.option("--storage-id", required=True, help="Storage ID of the namespace to unregister.")
 @click.option("--namespace", required=True, help="Namespace bucket or path prefix to unregister.")
 @pass_ctx_obj
@@ -72,7 +72,7 @@ def unregister(ctx: CLIContext, storage_id: str, namespace: str) -> None:
     asyncio.run(_run())
 
 
-@storage_namespaces.command()
+@storage_namespace.command()
 @click.option("--limit", default=None, type=int, help="Max results per page.")
 @click.option("--offset", default=None, type=int, help="Pagination offset.")
 @pass_ctx_obj
@@ -95,7 +95,7 @@ def search(ctx: CLIContext, limit: int | None, offset: int | None) -> None:
     asyncio.run(_run())
 
 
-@storage_namespaces.command(name="get-by-storage")
+@storage_namespace.command(name="get-by-storage")
 @click.argument("storage_id")
 @pass_ctx_obj
 def get_by_storage(ctx: CLIContext, storage_id: str) -> None:

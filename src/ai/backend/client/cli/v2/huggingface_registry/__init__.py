@@ -1,3 +1,3 @@
-from .commands import huggingface_registries as huggingface_registries
+from .commands import huggingface_registry as huggingface_registry
 
-__all__ = ("huggingface_registries",)
+__all__ = ("huggingface_registry",)

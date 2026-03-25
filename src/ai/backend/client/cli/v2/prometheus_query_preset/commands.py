@@ -12,12 +12,12 @@ from ai.backend.client.cli.types import CLIContext
 from ai.backend.client.cli.v2.helpers import create_v2_registry, parse_order_options, print_result
 
 
-@click.group()
-def prometheus_query_presets() -> None:
+@click.group(name="prometheus-query-preset")
+def prometheus_query_preset() -> None:
     """Prometheus query preset commands."""
 
 
-@prometheus_query_presets.command()
+@prometheus_query_preset.command()
 @click.option("--limit", type=int, default=50, help="Maximum items to return.")
 @click.option("--offset", type=int, default=0, help="Number of items to skip.")
 @click.option(
@@ -83,7 +83,7 @@ def search(
     asyncio.run(_run())
 
 
-@prometheus_query_presets.command()
+@prometheus_query_preset.command()
 @click.argument("preset_id", type=str)
 @pass_ctx_obj
 def get(ctx: CLIContext, preset_id: str) -> None:
@@ -100,7 +100,7 @@ def get(ctx: CLIContext, preset_id: str) -> None:
     asyncio.run(_run())
 
 
-@prometheus_query_presets.command()
+@prometheus_query_preset.command()
 @click.option("--name", required=True, help="Human-readable name.")
 @click.option("--metric-name", required=True, help="Prometheus metric name.")
 @click.option("--query-template", required=True, help="PromQL template with placeholders.")
@@ -141,7 +141,7 @@ def create(
     asyncio.run(_run())
 
 
-@prometheus_query_presets.command()
+@prometheus_query_preset.command()
 @click.argument("preset_id", type=str)
 @pass_ctx_obj
 def delete(ctx: CLIContext, preset_id: str) -> None:

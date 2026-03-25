@@ -11,12 +11,12 @@ from ai.backend.client.cli.types import CLIContext
 from ai.backend.client.cli.v2.helpers import create_v2_registry, print_result
 
 
-@click.group()
-def reservoir_registries() -> None:
+@click.group(name="reservoir-registry")
+def reservoir_registry() -> None:
     """Reservoir registry management commands."""
 
 
-@reservoir_registries.command()
+@reservoir_registry.command()
 @click.option("--name", required=True, help="Registry name.")
 @click.option("--endpoint", required=True, help="Reservoir endpoint URL.")
 @click.option("--access-key", required=True, help="Access key for authentication.")
@@ -55,7 +55,7 @@ def create(
     asyncio.run(_run())
 
 
-@reservoir_registries.command()
+@reservoir_registry.command()
 @click.option("--limit", default=None, type=int, help="Max results per page.")
 @click.option("--offset", default=None, type=int, help="Pagination offset.")
 @pass_ctx_obj
@@ -78,7 +78,7 @@ def search(ctx: CLIContext, limit: int | None, offset: int | None) -> None:
     asyncio.run(_run())
 
 
-@reservoir_registries.command()
+@reservoir_registry.command()
 @click.argument("registry_id")
 @pass_ctx_obj
 def get(ctx: CLIContext, registry_id: str) -> None:
@@ -96,7 +96,7 @@ def get(ctx: CLIContext, registry_id: str) -> None:
     asyncio.run(_run())
 
 
-@reservoir_registries.command()
+@reservoir_registry.command()
 @click.option("--id", "registry_id", required=True, help="Registry ID to update.")
 @click.option("--name", default=None, help="Updated registry name.")
 @click.option("--endpoint", default=None, help="Updated endpoint URL.")
@@ -140,7 +140,7 @@ def update(
     asyncio.run(_run())
 
 
-@reservoir_registries.command()
+@reservoir_registry.command()
 @click.option("--id", "registry_id", required=True, help="Registry ID to delete.")
 @pass_ctx_obj
 def delete(ctx: CLIContext, registry_id: str) -> None:

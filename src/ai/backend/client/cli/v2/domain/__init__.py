@@ -1,3 +1,3 @@
-from .commands import domains as domains
+from .commands import domain as domain
 
-__all__ = ("domains",)
+__all__ = ("domain",)

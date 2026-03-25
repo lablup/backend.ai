@@ -11,12 +11,12 @@ from ai.backend.client.cli.types import CLIContext
 from ai.backend.client.cli.v2.helpers import create_v2_registry, parse_order_options, print_result
 
 
-@click.group()
-def resource_groups() -> None:
+@click.group(name="resource-group")
+def resource_group() -> None:
     """Resource group management commands."""
 
 
-@resource_groups.command()
+@resource_group.command()
 @click.option("--limit", type=int, default=None, help="Maximum items to return.")
 @click.option("--offset", type=int, default=None, help="Number of items to skip.")
 @click.option(
@@ -87,7 +87,7 @@ def search(
     asyncio.run(_run())
 
 
-@resource_groups.command()
+@resource_group.command()
 @click.argument("name", type=str)
 @pass_ctx_obj
 def get(ctx: CLIContext, name: str) -> None:
@@ -104,7 +104,7 @@ def get(ctx: CLIContext, name: str) -> None:
     asyncio.run(_run())
 
 
-@resource_groups.command()
+@resource_group.command()
 @click.option("--name", required=True, help="Resource group name.")
 @click.option("--domain-name", required=True, help="Domain name.")
 @click.option("--description", default=None, help="Description.")
@@ -130,7 +130,7 @@ def create(ctx: CLIContext, name: str, domain_name: str, description: str | None
     asyncio.run(_run())
 
 
-@resource_groups.command()
+@resource_group.command()
 @click.argument("name", type=str)
 @pass_ctx_obj
 def delete(ctx: CLIContext, name: str) -> None:
@@ -147,7 +147,7 @@ def delete(ctx: CLIContext, name: str) -> None:
     asyncio.run(_run())
 
 
-@resource_groups.command()
+@resource_group.command(name="resource-info")
 @click.argument("name", type=str)
 @pass_ctx_obj
 def resource_info(ctx: CLIContext, name: str) -> None:

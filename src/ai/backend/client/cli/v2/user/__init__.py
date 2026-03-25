@@ -1,3 +1,3 @@
-from .commands import users as users
+from .commands import user as user
 
-__all__ = ("users",)
+__all__ = ("user",)

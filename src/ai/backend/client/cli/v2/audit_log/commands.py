@@ -11,12 +11,12 @@ from ai.backend.client.cli.types import CLIContext
 from ai.backend.client.cli.v2.helpers import create_v2_registry, parse_order_options, print_result
 
 
-@click.group()
-def audit_logs() -> None:
+@click.group(name="audit-log")
+def audit_log() -> None:
     """Audit log commands."""
 
 
-@audit_logs.command()
+@audit_log.command()
 @click.option("--limit", type=int, default=None, help="Maximum items to return.")
 @click.option("--offset", type=int, default=None, help="Number of items to skip.")
 @click.option(

@@ -9,87 +9,21 @@ import click
 
 from ai.backend.client.cli.extensions import pass_ctx_obj
 from ai.backend.client.cli.types import CLIContext
-from ai.backend.client.cli.v2.helpers import create_v2_registry, parse_order_options, print_result
+from ai.backend.client.cli.v2.helpers import create_v2_registry, print_result
+
+from .revision import revision
 
 
 @click.group()
-def artifacts() -> None:
+def artifact() -> None:
     """Artifact management commands."""
 
 
-@artifacts.command(name="admin-search")
-@click.option("--limit", default=None, type=int, help="Max results per page.")
-@click.option("--offset", default=None, type=int, help="Pagination offset.")
-@click.option(
-    "--name-contains",
-    default=None,
-    type=str,
-    help="Filter artifacts whose name contains this substring.",
-)
-@click.option(
-    "--type",
-    "artifact_type",
-    default=None,
-    type=str,
-    help="Filter by artifact type (e.g., MODEL, PACKAGE, IMAGE).",
-)
-@click.option(
-    "--order-by",
-    multiple=True,
-    help="Order by field:direction (e.g., NAME:asc, UPDATED_AT:desc).",
-)
-@pass_ctx_obj
-def admin_search(
-    ctx: CLIContext,
-    limit: int | None,
-    offset: int | None,
-    name_contains: str | None,
-    artifact_type: str | None,
-    order_by: tuple[str, ...],
-) -> None:
-    """Search artifacts with admin scope."""
-    from ai.backend.common.dto.manager.v2.artifact.request import (
-        AdminSearchArtifactsInput,
-        ArtifactFilter,
-        ArtifactOrder,
-    )
-    from ai.backend.common.dto.manager.v2.artifact.types import ArtifactOrderField
-
-    # Build filter only if any filter option is provided
-    filter_dto: ArtifactFilter | None = None
-    if name_contains is not None or artifact_type is not None:
-        from ai.backend.common.dto.manager.query import StringFilter
-        from ai.backend.common.dto.manager.v2.artifact.types import ArtifactType, ArtifactTypeFilter
-
-        filter_dto = ArtifactFilter(
-            name=StringFilter(contains=name_contains) if name_contains is not None else None,
-            type=ArtifactTypeFilter(equals=ArtifactType(artifact_type))
-            if artifact_type is not None
-            else None,
-        )
-
-    # Build order only if --order-by is provided
-    orders = parse_order_options(order_by, ArtifactOrderField, ArtifactOrder) if order_by else None
-
-    async def _run() -> None:
-        registry = await create_v2_registry(ctx)
-        try:
-            result = await registry.artifact.admin_search(
-                AdminSearchArtifactsInput(
-                    filter=filter_dto,
-                    order=orders,
-                    limit=limit,
-                    offset=offset,
-                ),
-            )
-            print_result(result)
-        finally:
-            await registry.close()
-
-    asyncio.run(_run())
+# Register revision sub-group
+artifact.add_command(revision)
 
 
-@artifacts.command()
+@artifact.command()
 @click.argument("artifact_id")
 @pass_ctx_obj
 def get(ctx: CLIContext, artifact_id: str) -> None:
@@ -107,7 +41,7 @@ def get(ctx: CLIContext, artifact_id: str) -> None:
     asyncio.run(_run())
 
 
-@artifacts.command()
+@artifact.command()
 @click.argument("artifact_id")
 @click.option(
     "--readonly", default=None, type=bool, help="Whether the artifact should be readonly."
@@ -148,7 +82,7 @@ def update(
     asyncio.run(_run())
 
 
-@artifacts.command()
+@artifact.command()
 @click.option(
     "--artifact-ids",
     required=True,
@@ -176,7 +110,7 @@ def delete(ctx: CLIContext, artifact_ids: str) -> None:
     asyncio.run(_run())
 
 
-@artifacts.command()
+@artifact.command()
 @click.option(
     "--artifact-ids",
     required=True,
@@ -197,96 +131,6 @@ def restore(ctx: CLIContext, artifact_ids: str) -> None:
             result = await registry.artifact.restore(
                 RestoreArtifactsInput(artifact_ids=parsed_ids),
             )
-            print_result(result)
-        finally:
-            await registry.close()
-
-    asyncio.run(_run())
-
-
-@artifacts.command(name="get-revision")
-@click.argument("revision_id")
-@pass_ctx_obj
-def get_revision(ctx: CLIContext, revision_id: str) -> None:
-    """Get a single artifact revision by ID."""
-    from uuid import UUID
-
-    async def _run() -> None:
-        registry = await create_v2_registry(ctx)
-        try:
-            result = await registry.artifact.get_revision(UUID(revision_id))
-            print_result(result)
-        finally:
-            await registry.close()
-
-    asyncio.run(_run())
-
-
-@artifacts.command(name="approve-revision")
-@click.argument("revision_id")
-@pass_ctx_obj
-def approve_revision(ctx: CLIContext, revision_id: str) -> None:
-    """Approve an artifact revision."""
-    from uuid import UUID
-
-    async def _run() -> None:
-        registry = await create_v2_registry(ctx)
-        try:
-            result = await registry.artifact.approve_revision(UUID(revision_id))
-            print_result(result)
-        finally:
-            await registry.close()
-
-    asyncio.run(_run())
-
-
-@artifacts.command(name="reject-revision")
-@click.argument("revision_id")
-@pass_ctx_obj
-def reject_revision(ctx: CLIContext, revision_id: str) -> None:
-    """Reject an artifact revision."""
-    from uuid import UUID
-
-    async def _run() -> None:
-        registry = await create_v2_registry(ctx)
-        try:
-            result = await registry.artifact.reject_revision(UUID(revision_id))
-            print_result(result)
-        finally:
-            await registry.close()
-
-    asyncio.run(_run())
-
-
-@artifacts.command(name="cancel-import")
-@click.argument("revision_id")
-@pass_ctx_obj
-def cancel_import(ctx: CLIContext, revision_id: str) -> None:
-    """Cancel an in-progress artifact import."""
-    from uuid import UUID
-
-    async def _run() -> None:
-        registry = await create_v2_registry(ctx)
-        try:
-            result = await registry.artifact.cancel_import(UUID(revision_id))
-            print_result(result)
-        finally:
-            await registry.close()
-
-    asyncio.run(_run())
-
-
-@artifacts.command(name="cleanup-revision")
-@click.argument("revision_id")
-@pass_ctx_obj
-def cleanup_revision(ctx: CLIContext, revision_id: str) -> None:
-    """Clean up stored artifact revision data."""
-    from uuid import UUID
-
-    async def _run() -> None:
-        registry = await create_v2_registry(ctx)
-        try:
-            result = await registry.artifact.cleanup_revision(UUID(revision_id))
             print_result(result)
         finally:
             await registry.close()

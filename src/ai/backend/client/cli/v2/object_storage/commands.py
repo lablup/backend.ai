@@ -11,12 +11,12 @@ from ai.backend.client.cli.types import CLIContext
 from ai.backend.client.cli.v2.helpers import create_v2_registry, parse_order_options, print_result
 
 
-@click.group()
-def object_storages() -> None:
+@click.group(name="object-storage")
+def object_storage() -> None:
     """Object storage management commands."""
 
 
-@object_storages.command()
+@object_storage.command()
 @click.option("--name", required=True, help="Object storage name.")
 @click.option("--host", required=True, help="Host address of the object storage.")
 @click.option("--access-key", required=True, help="Access key for authentication.")
@@ -56,7 +56,7 @@ def create(
     asyncio.run(_run())
 
 
-@object_storages.command()
+@object_storage.command()
 @click.argument("storage_id")
 @pass_ctx_obj
 def get(ctx: CLIContext, storage_id: str) -> None:
@@ -74,7 +74,7 @@ def get(ctx: CLIContext, storage_id: str) -> None:
     asyncio.run(_run())
 
 
-@object_storages.command()
+@object_storage.command()
 @click.option("--id", "storage_id", required=True, help="Object storage ID to update.")
 @click.option("--name", default=None, help="Updated name.")
 @click.option("--host", default=None, help="Updated host address.")
@@ -127,7 +127,7 @@ def update(
     asyncio.run(_run())
 
 
-@object_storages.command()
+@object_storage.command()
 @click.option("--limit", default=None, type=int, help="Max results per page.")
 @click.option("--offset", default=None, type=int, help="Pagination offset.")
 @click.option(
@@ -199,7 +199,7 @@ def search(
     asyncio.run(_run())
 
 
-@object_storages.command()
+@object_storage.command()
 @click.option("--id", "storage_id", required=True, help="Object storage ID to delete.")
 @pass_ctx_obj
 def delete(ctx: CLIContext, storage_id: str) -> None:

@@ -1,3 +1,3 @@
-from .commands import images as images
+from .commands import image as image
 
-__all__ = ("images",)
+__all__ = ("image",)
