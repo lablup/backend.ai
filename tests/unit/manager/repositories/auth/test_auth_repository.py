@@ -7,7 +7,7 @@ from __future__ import annotations
 import uuid
 from collections.abc import AsyncGenerator
 from dataclasses import dataclass
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from unittest.mock import AsyncMock, create_autospec
 from uuid import UUID
 
@@ -32,6 +32,8 @@ from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.image import ImageRow
 from ai.backend.manager.models.kernel import KernelRow
 from ai.backend.manager.models.keypair import KeyPairRow
+from ai.backend.manager.models.login_session.enums import LoginSessionStatus
+from ai.backend.manager.models.login_session.row import LoginHistoryRow, LoginSessionRow
 from ai.backend.manager.models.rbac_models import RoleRow, UserRoleRow
 from ai.backend.manager.models.resource_policy import (
     KeyPairResourcePolicyRow,
@@ -524,3 +526,257 @@ class TestAuthRepository:
         now_utc = datetime.now(UTC)
         time_diff = abs((now_utc - result).total_seconds())
         assert time_diff < 1.0
+
+
+@dataclass
+class SessionTestUser:
+    """Minimal user test data for session-related tests."""
+
+    user_id: UUID
+    email: str
+    password: str
+    domain_name: str
+    access_key: str
+
+
+@dataclass
+class RepoWithMock:
+    """AuthRepository paired with its mock ValkeySessionClient for assertion."""
+
+    repository: AuthRepository
+    mock_valkey: AsyncMock
+
+
+class TestAuthRepositoryValkeyCleanup:
+    """Tests that AuthRepository deletes Valkey keys when sessions are invalidated."""
+
+    @pytest.fixture
+    async def db_with_session_tables(
+        self, database_connection: ExtendedAsyncSAEngine
+    ) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
+        async with with_tables(
+            database_connection,
+            [
+                DomainRow,
+                UserResourcePolicyRow,
+                KeyPairResourcePolicyRow,
+                UserRow,
+                KeyPairRow,
+                LoginSessionRow,
+                LoginHistoryRow,
+            ],
+        ):
+            yield database_connection
+
+    @pytest.fixture
+    def repo_with_mock(self, db_with_session_tables: ExtendedAsyncSAEngine) -> RepoWithMock:
+        mock_valkey = AsyncMock(spec=ValkeySessionClient)
+        mock_valkey.delete_session_data_batch = AsyncMock(return_value=None)
+        repository = AuthRepository(db=db_with_session_tables, valkey_session_client=mock_valkey)
+        return RepoWithMock(repository=repository, mock_valkey=mock_valkey)
+
+    @pytest.fixture
+    async def session_user(
+        self, db_with_session_tables: ExtendedAsyncSAEngine
+    ) -> AsyncGenerator[SessionTestUser, None]:
+        """Create a user with credentials for session-related tests."""
+        domain_name = f"test-domain-{uuid.uuid4()}"
+        user_uuid = uuid.uuid4()
+        email = f"test-{uuid.uuid4()}@example.com"
+        password = "test_password"
+        access_key = f"AKIA{uuid.uuid4().hex[:16]}"
+        urp_name = f"urp-{uuid.uuid4()}"
+        kprp_name = f"kprp-{uuid.uuid4()}"
+
+        async with db_with_session_tables.begin_session() as db_sess:
+            db_sess.add(
+                DomainRow(
+                    name=domain_name,
+                    description="test",
+                    is_active=True,
+                    total_resource_slots=ResourceSlot(),
+                    allowed_vfolder_hosts={},
+                    allowed_docker_registries=[],
+                )
+            )
+            await db_sess.flush()
+
+            db_sess.add(
+                UserResourcePolicyRow(
+                    name=urp_name,
+                    max_vfolder_count=10,
+                    max_quota_scope_size=-1,
+                    max_session_count_per_model_session=10,
+                    max_customized_image_count=10,
+                )
+            )
+            db_sess.add(
+                KeyPairResourcePolicyRow(
+                    name=kprp_name,
+                    max_concurrent_sessions=10,
+                    max_concurrent_sftp_sessions=2,
+                    max_containers_per_session=10,
+                    idle_timeout=3600,
+                )
+            )
+            await db_sess.flush()
+
+            password_info = PasswordInfo(
+                password=password,
+                algorithm=PasswordHashAlgorithm.PBKDF2_SHA256,
+                rounds=100_000,
+                salt_size=32,
+            )
+            user = UserRow(
+                uuid=user_uuid,
+                username=email,
+                email=email,
+                password=password_info,
+                domain_name=domain_name,
+                role=UserRole.USER,
+                resource_policy=urp_name,
+                need_password_change=False,
+            )
+            db_sess.add(user)
+            await db_sess.flush()
+
+            keypair = KeyPairRow(
+                access_key=access_key,
+                secret_key="test_secret_key",
+                user_id=email,
+                user=user_uuid,
+                is_active=True,
+                resource_policy=kprp_name,
+            )
+            db_sess.add(keypair)
+            await db_sess.flush()
+
+            user.main_access_key = access_key
+            await db_sess.commit()
+
+        yield SessionTestUser(
+            user_id=user_uuid,
+            email=email,
+            password=password,
+            domain_name=domain_name,
+            access_key=access_key,
+        )
+
+    async def _insert_active_session(
+        self,
+        db: ExtendedAsyncSAEngine,
+        user_id: UUID,
+        access_key: str,
+    ) -> str:
+        """Insert an active login session and return its token."""
+        session_token = uuid.uuid4().hex
+        async with db.begin() as conn:
+            await conn.execute(
+                sa.insert(LoginSessionRow.__table__).values(
+                    user_id=user_id,
+                    access_key=access_key,
+                    session_token=session_token,
+                    status=LoginSessionStatus.ACTIVE,
+                    expires_at=datetime.now(UTC) + timedelta(hours=1),
+                )
+            )
+        return session_token
+
+    async def _count_active_sessions(self, db: ExtendedAsyncSAEngine, user_id: UUID) -> int:
+        async with db.begin_readonly() as conn:
+            query = (
+                sa.select(sa.func.count())
+                .select_from(LoginSessionRow.__table__)
+                .where(
+                    (LoginSessionRow.__table__.c.user_id == user_id)
+                    & (LoginSessionRow.__table__.c.status == LoginSessionStatus.ACTIVE)
+                )
+            )
+            return await conn.scalar(query) or 0
+
+    async def test_force_login_deletes_old_valkey_key(
+        self,
+        repo_with_mock: RepoWithMock,
+        db_with_session_tables: ExtendedAsyncSAEngine,
+        session_user: SessionTestUser,
+    ) -> None:
+        """When force=True invalidates an existing session, its Valkey key must be deleted."""
+        old_token = await self._insert_active_session(
+            db_with_session_tables, session_user.user_id, session_user.access_key
+        )
+
+        password_info = PasswordInfo(
+            password=session_user.password,
+            algorithm=PasswordHashAlgorithm.PBKDF2_SHA256,
+            rounds=100_000,
+            salt_size=32,
+        )
+        await repo_with_mock.repository.check_credential_with_migration(
+            domain_name=session_user.domain_name,
+            email=session_user.email,
+            target_password_info=password_info,
+            force=True,
+        )
+
+        repo_with_mock.mock_valkey.delete_session_data_batch.assert_called_once_with([
+            f"AIOHTTP_SESSION_{old_token}"
+        ])
+
+    async def test_logout_deletes_valkey_key(
+        self,
+        repo_with_mock: RepoWithMock,
+        db_with_session_tables: ExtendedAsyncSAEngine,
+        session_user: SessionTestUser,
+    ) -> None:
+        """invalidate_login_session_by_token must delete the corresponding Valkey key."""
+        token = await self._insert_active_session(
+            db_with_session_tables, session_user.user_id, session_user.access_key
+        )
+
+        await repo_with_mock.repository.invalidate_login_session_by_token(token)
+
+        repo_with_mock.mock_valkey.delete_session_data_batch.assert_called_once_with([
+            f"AIOHTTP_SESSION_{token}"
+        ])
+
+    async def test_invalidate_user_login_sessions_deletes_all_valkey_keys(
+        self,
+        repo_with_mock: RepoWithMock,
+        db_with_session_tables: ExtendedAsyncSAEngine,
+        session_user: SessionTestUser,
+    ) -> None:
+        """invalidate_user_login_sessions must delete all Valkey keys for the user's sessions."""
+        token1 = await self._insert_active_session(
+            db_with_session_tables, session_user.user_id, session_user.access_key
+        )
+        token2 = await self._insert_active_session(
+            db_with_session_tables, session_user.user_id, session_user.access_key
+        )
+
+        await repo_with_mock.repository.invalidate_user_login_sessions(session_user.user_id)
+
+        expected_keys = {f"AIOHTTP_SESSION_{token1}", f"AIOHTTP_SESSION_{token2}"}
+        call_args = repo_with_mock.mock_valkey.delete_session_data_batch.call_args
+        assert call_args is not None
+        actual_keys = set(call_args.args[0])
+        assert actual_keys == expected_keys
+
+    async def test_valkey_failure_does_not_prevent_db_operation(
+        self,
+        repo_with_mock: RepoWithMock,
+        db_with_session_tables: ExtendedAsyncSAEngine,
+        session_user: SessionTestUser,
+    ) -> None:
+        """If Valkey deletion raises, the DB invalidation must still complete successfully."""
+        token = await self._insert_active_session(
+            db_with_session_tables, session_user.user_id, session_user.access_key
+        )
+        repo_with_mock.mock_valkey.delete_session_data_batch.side_effect = Exception(
+            "Valkey connection failed"
+        )
+
+        # Must not raise — Valkey error is swallowed
+        await repo_with_mock.repository.invalidate_login_session_by_token(token)
+
+        # DB session must still be invalidated
+        assert await self._count_active_sessions(db_with_session_tables, session_user.user_id) == 0
