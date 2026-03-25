@@ -4,11 +4,12 @@ Request DTOs for image DTO v2.
 
 from __future__ import annotations
 
+from typing import Any
 from uuid import UUID
 
 from pydantic import Field, field_validator
 
-from ai.backend.common.api_handlers import BaseRequestModel
+from ai.backend.common.api_handlers import SENTINEL, BaseRequestModel, Sentinel
 from ai.backend.common.dto.manager.query import DateTimeFilter, StringFilter, UUIDFilter
 
 from .types import ImageOrderField, ImageStatusType, OrderDirection
@@ -32,6 +33,7 @@ __all__ = (
     "PurgeImageInput",
     "RescanImagesInput",
     "SearchImagesInput",
+    "UpdateImageInput",
     "UUIDFilter",
 )
 
@@ -218,3 +220,27 @@ class AdminSearchImageAliasesInput(BaseRequestModel):
     before: str | None = Field(default=None, description="Cursor pagination: before cursor.")
     limit: int | None = Field(default=None, description="Offset pagination: maximum items.")
     offset: int | None = Field(default=None, description="Offset pagination: number to skip.")
+
+
+class UpdateImageInput(BaseRequestModel):
+    """Input for updating an image by ID. All fields optional -- only provided fields will be updated."""
+
+    image_id: UUID = Field(description="ID of the image to update.")
+    name: str | None = Field(default=None, description="Updated canonical name.")
+    registry: str | None = Field(default=None, description="Updated registry hostname.")
+    image: str | None = Field(default=None, description="Updated namespace/path within registry.")
+    tag: str | None = Field(default=None, description="Updated image tag.")
+    architecture: str | None = Field(default=None, description="Updated CPU architecture.")
+    is_local: bool | None = Field(default=None, description="Updated local-only status.")
+    size_bytes: int | None = Field(default=None, description="Updated image size in bytes.")
+    type: str | None = Field(
+        default=None, description="Updated image type (compute, system, service)."
+    )
+    config_digest: str | None = Field(default=None, description="Updated config digest.")
+    labels: dict[str, str] | None = Field(default=None, description="Updated labels dict.")
+    supported_accelerators: str | Sentinel | None = Field(
+        default=SENTINEL, description="Updated accelerator string. Set to null to clear."
+    )
+    resource_limits: dict[str, Any] | None = Field(
+        default=None, description="Updated resource limits dict."
+    )

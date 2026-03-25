@@ -102,6 +102,10 @@ from ai.backend.manager.services.image.actions.untag_image_from_registry import 
     UntagImageFromRegistryAction,
     UntagImageFromRegistryActionResult,
 )
+from ai.backend.manager.services.image.actions.update_image_by_id import (
+    UpdateImageByIdAction,
+    UpdateImageByIdActionResult,
+)
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -265,6 +269,13 @@ class ImageService:
             raise ModifyImageActionUnknownImageReferenceError from e
 
         return ModifyImageActionResult(image=updated_image_data)
+
+    async def update_image_by_id(
+        self, action: UpdateImageByIdAction
+    ) -> UpdateImageByIdActionResult:
+        updater: Updater[ImageRow] = Updater(spec=action.updater_spec, pk_value=action.image_id)
+        updated_image_data = await self._image_repository.update_image_properties(updater)
+        return UpdateImageByIdActionResult(image=updated_image_data)
 
     async def purge_image_by_id(self, action: PurgeImageByIdAction) -> PurgeImageByIdActionResult:
         # Regular users need ownership validation

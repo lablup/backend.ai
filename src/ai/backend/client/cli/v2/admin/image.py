@@ -192,6 +192,35 @@ def purge(image_id: str) -> None:
     asyncio.run(_run())
 
 
+@image.command()
+@click.argument("body", type=str)
+def update(body: str) -> None:
+    """Update an image by ID (superadmin only).
+
+    BODY is a JSON string with image_id and fields to update.
+    """
+    import json
+    import sys
+
+    from ai.backend.common.dto.manager.v2.image.request import UpdateImageInput
+
+    try:
+        data = json.loads(body)
+    except json.JSONDecodeError as e:
+        click.echo(f"Invalid JSON: {e}", err=True)
+        sys.exit(1)
+
+    async def _run() -> None:
+        registry = await create_v2_registry(load_v2_config())
+        try:
+            result = await registry.image.admin_update(UpdateImageInput(**data))
+            print_result(result)
+        finally:
+            await registry.close()
+
+    asyncio.run(_run())
+
+
 @alias.command(name="create")
 @click.argument("image_id", type=click.UUID)
 @click.argument("alias_name")

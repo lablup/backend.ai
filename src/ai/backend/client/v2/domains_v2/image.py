@@ -10,6 +10,7 @@ from ai.backend.common.dto.manager.v2.image.request import (
     DealiasImageInput,
     ForgetImageInput,
     PurgeImageInput,
+    UpdateImageInput,
 )
 from ai.backend.common.dto.manager.v2.image.response import (
     AdminSearchImageAliasesPayload,
@@ -17,6 +18,7 @@ from ai.backend.common.dto.manager.v2.image.response import (
     AliasImagePayload,
     ForgetImagePayload,
     PurgeImagePayload,
+    UpdateImagePayload,
 )
 
 _PATH = "/v2/images"
@@ -83,4 +85,13 @@ class V2ImageClient(BaseDomainClient):
             f"{_PATH}/dealias",
             request=request,
             response_model=AliasImagePayload,
+        )
+
+    async def admin_update(self, request: UpdateImageInput) -> UpdateImagePayload:
+        """Update an image by ID (superadmin only)."""
+        return await self._client.typed_request(
+            "PATCH",
+            _PATH,
+            request=request,
+            response_model=UpdateImagePayload,
         )

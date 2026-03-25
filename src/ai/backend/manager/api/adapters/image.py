@@ -7,6 +7,7 @@ from collections.abc import Sequence
 from decimal import Decimal
 from functools import lru_cache
 
+from ai.backend.common.api_handlers import Sentinel
 from ai.backend.common.dto.manager.v2.image.request import (
     AdminSearchImageAliasesInput,
     AdminSearchImagesInput,
@@ -18,6 +19,7 @@ from ai.backend.common.dto.manager.v2.image.request import (
     ImageFilterInputDTO,
     ImageOrderByInputDTO,
     PurgeImageInput,
+    UpdateImageInput,
 )
 from ai.backend.common.dto.manager.v2.image.response import (
     AdminSearchImageAliasesPayload,
@@ -30,6 +32,7 @@ from ai.backend.common.dto.manager.v2.image.response import (
     ImageNode,
     ImageRequirementsInfoDTO,
     PurgeImagePayload,
+    UpdateImagePayload,
 )
 from ai.backend.common.dto.manager.v2.image.types import (
     ImageLabelInfo,
@@ -42,6 +45,7 @@ from ai.backend.common.dto.manager.v2.image.types import (
 )
 from ai.backend.common.types import ImageID
 from ai.backend.manager.data.image.types import ImageAliasData, ImageData, ImageStatus
+from ai.backend.manager.models.image import ImageType
 from ai.backend.manager.models.image.conditions import (
     ImageAliasConditions,
     ImageConditions,
@@ -57,12 +61,15 @@ from ai.backend.manager.repositories.base import (
     combine_conditions_or,
     negate_conditions,
 )
+from ai.backend.manager.repositories.image.updaters import ImageUpdaterSpec
 from ai.backend.manager.services.image.actions.alias_image import AliasImageByIdAction
 from ai.backend.manager.services.image.actions.dealias_image import DealiasImageAction
 from ai.backend.manager.services.image.actions.forget_image import ForgetImageByIdAction
 from ai.backend.manager.services.image.actions.purge_images import PurgeImageByIdAction
 from ai.backend.manager.services.image.actions.search_aliases import SearchAliasesAction
 from ai.backend.manager.services.image.actions.search_images import SearchImagesAction
+from ai.backend.manager.services.image.actions.update_image_by_id import UpdateImageByIdAction
+from ai.backend.manager.types import OptionalState, TriState
 
 from .base import BaseAdapter
 from .pagination import PaginationSpec
@@ -257,6 +264,71 @@ class ImageAdapter(BaseAdapter):
             alias=result.image_alias.alias,
             image_id=result.image_id,
         )
+
+    async def admin_update(self, input: UpdateImageInput) -> UpdateImagePayload:
+        """Update an image by ID (superadmin only)."""
+        spec = ImageUpdaterSpec(
+            name=(
+                OptionalState.update(input.name) if input.name is not None else OptionalState.nop()
+            ),
+            registry=(
+                OptionalState.update(input.registry)
+                if input.registry is not None
+                else OptionalState.nop()
+            ),
+            image=(
+                OptionalState.update(input.image)
+                if input.image is not None
+                else OptionalState.nop()
+            ),
+            tag=(OptionalState.update(input.tag) if input.tag is not None else OptionalState.nop()),
+            architecture=(
+                OptionalState.update(input.architecture)
+                if input.architecture is not None
+                else OptionalState.nop()
+            ),
+            is_local=(
+                OptionalState.update(input.is_local)
+                if input.is_local is not None
+                else OptionalState.nop()
+            ),
+            size_bytes=(
+                OptionalState.update(input.size_bytes)
+                if input.size_bytes is not None
+                else OptionalState.nop()
+            ),
+            image_type=(
+                OptionalState.update(ImageType(input.type))
+                if input.type is not None
+                else OptionalState.nop()
+            ),
+            config_digest=(
+                OptionalState.update(input.config_digest)
+                if input.config_digest is not None
+                else OptionalState.nop()
+            ),
+            labels=(
+                OptionalState.update(input.labels)
+                if input.labels is not None
+                else OptionalState.nop()
+            ),
+            accelerators=(
+                TriState.nop()
+                if isinstance(input.supported_accelerators, Sentinel)
+                else TriState.nullify()
+                if input.supported_accelerators is None
+                else TriState.update(input.supported_accelerators)
+            ),
+            resources=(
+                OptionalState.update(input.resource_limits)
+                if input.resource_limits is not None
+                else OptionalState.nop()
+            ),
+        )
+        result = await self._processors.image.update_image_by_id.wait_for_complete(
+            UpdateImageByIdAction(image_id=ImageID(input.image_id), updater_spec=spec)
+        )
+        return UpdateImagePayload(item=self._data_to_dto(result.image))
 
     # ------------------------------------------------------------------ querier builders
 

@@ -14,6 +14,7 @@ from ai.backend.common.dto.manager.v2.image.request import (
     DealiasImageInput,
     ForgetImageInput,
     PurgeImageInput,
+    UpdateImageInput,
 )
 from ai.backend.logging import BraceStyleAdapter
 
@@ -63,4 +64,9 @@ class V2ImageHandler:
     async def admin_dealias(self, body: BodyParam[DealiasImageInput]) -> APIResponse:
         """Remove an image alias."""
         result = await self._adapter.admin_dealias(body.parsed)
+        return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
+
+    async def admin_update(self, body: BodyParam[UpdateImageInput]) -> APIResponse:
+        """Update an image by ID."""
+        result = await self._adapter.admin_update(body.parsed)
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)

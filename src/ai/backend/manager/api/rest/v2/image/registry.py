@@ -56,5 +56,11 @@ def register_v2_image_routes(
         handler.admin_dealias,
         middlewares=[superadmin_required],
     )
+    registry.add(
+        "PATCH",
+        "",
+        handler.admin_update,
+        middlewares=[superadmin_required],
+    )
 
     return registry
