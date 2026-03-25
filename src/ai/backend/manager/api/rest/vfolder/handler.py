@@ -860,6 +860,7 @@ class VFolderHandler:
         # body to maintain backward compatibility.
         raw_body = await req.request.json()
         files: list[str] = raw_body.get("files", [])
+        filename: str | None = raw_body.get("filename", None)
         log.info(
             "VFOLDER.CREATE_ARCHIVE_DOWNLOAD_SESSION"
             "(email:{}, ak:{}, vf:{} (resolved-from:{!r}), files:{})",
@@ -874,6 +875,7 @@ class VFolderHandler:
                 keypair_resource_policy=req.request["keypair"]["resource_policy"],
                 vfolder_uuid=row["id"],
                 files=files,
+                filename=filename,
             )
         )
         resp = CreateDownloadSessionResponse(token=result.token, url=result.url)
