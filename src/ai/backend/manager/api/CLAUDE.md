@@ -44,6 +44,23 @@ For self-service (`my_`) endpoints, the Adapter method handles authentication in
 - The GQL resolver / REST handler does NOT pass scope — only the search input DTO.
 - This keeps authentication logic inside the adapter, not scattered across resolvers.
 
+## V2 DTO — Single Source of Truth
+
+v2 DTOs (`common/dto/manager/v2/`) are the shared schema for:
+- REST v2 handlers (`api/rest/v2/`)
+- GraphQL (Strawberry) types (`api/gql/`)
+- Client SDK (`client/v2/domains_v2/`)
+- CLI (`client/cli/v2/`)
+
+**Any DTO change affects all four layers.** Coordinate updates across:
+1. DTO definition → 2. Adapter → 3. REST handler → 4. GQL type → 5. SDK client → 6. CLI command
+
+## Testing v2 Endpoints
+
+Use `./bai` (= `./backend.ai v2`) to test REST v2 endpoints directly.
+After server-side changes, restart with `./dev restart mgr` and verify with `./bai`.
+See `/local-dev` skill for detailed usage patterns.
+
 ## What Does NOT Belong Here
 
 - Business logic or domain rules.

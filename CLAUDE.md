@@ -14,7 +14,7 @@ This file contains core rules for AI coding agents. For detailed patterns and wo
 
 Design: `/bep-guide`
 Development: `/repository-guide`, `/service-guide`, `/api-guide`, `/tdd-guide`
-Utilities: `/cli-executor`, `/db-status`, `/db-migrate`
+Utilities: `/cli-executor`, `/db-status`, `/db-migrate`, `/local-dev`
 
 Skills are in `.claude/skills/{name}/SKILL.md`. See `.claude/skills/README.md` for complete documentation.
 

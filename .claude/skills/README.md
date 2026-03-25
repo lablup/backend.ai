@@ -25,6 +25,12 @@ This directory contains Claude Code skills for Backend.AI development tasks.
 | `/db-status` | Check schema version and migration status |
 | `/db-migrate` | Apply migrations (upgrade/downgrade) |
 
+## Local Development
+
+| Skill | Purpose | Use When |
+|-------|---------|----------|
+| `/local-dev` | Service management (`./dev`) and v2 CLI testing (`./bai`) | Restarting services, testing v2 REST endpoints locally |
+
 ## Component Execution
 
 | Skill | Purpose |
