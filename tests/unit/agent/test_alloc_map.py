@@ -1331,6 +1331,25 @@ class TestDefragWithOccupiedDevices:
     @pytest.mark.parametrize(
         "device_remaining, requested",
         [
+            # 2 GPUs: both can hold D=0.7 share
+            ([Decimal("0.7"), Decimal("0.8")], Decimal("1.4")),
+        ],
+    )
+    async def test_fill_succeeds_with_non_uniform_free(
+        self,
+        device_remaining: list[Decimal],
+        requested: Decimal,
+    ) -> None:
+        """Fill strategy succeeds when each device can hold its per-device share D."""
+        alloc_map = self._make_map_with_remaining(device_remaining, AllocationStrategy.FILL)
+        alloc_map.allocate(
+            {SlotName("cuda.shares"): requested},
+            allow_resource_fragmentation=False,
+        )
+
+    @pytest.mark.parametrize(
+        "device_remaining, requested",
+        [
             # 4 GPUs: gpu0 half-free, rest free → 2 GPUs × 0.7
             ([Decimal("0.5"), Decimal("1.0"), Decimal("1.0"), Decimal("1.0")], Decimal("1.4")),
             # 4 GPUs: gpu0, gpu1 mostly free → 2 GPUs × 1.0
@@ -1375,9 +1394,10 @@ class TestDefragWithOccupiedDevices:
 
 
 class TestDefragEdgeCases:
-    """Edge cases for the anti-fragmentation guard."""
+    """Edge cases for the anti-fragmentation guard, verified for both strategies."""
 
-    async def test_zero_request_is_pruned(self) -> None:
+    @pytest.mark.parametrize("strategy", [AllocationStrategy.FILL, AllocationStrategy.EVENLY])
+    async def test_zero_request_is_pruned(self, strategy: AllocationStrategy) -> None:
         """Zero request is pruned before reaching the guard."""
         alloc_map = FractionAllocMap(
             device_slots={
@@ -1387,7 +1407,7 @@ class TestDefragEdgeCases:
                     amount=Decimal("1.0"),
                 ),
             },
-            allocation_strategy=AllocationStrategy.FILL,
+            allocation_strategy=strategy,
             quantum_size=Decimal("0.1"),
         )
 
@@ -1397,7 +1417,8 @@ class TestDefragEdgeCases:
         )
         assert SlotName("cuda.shares") not in result
 
-    async def test_insufficient_total_devices(self) -> None:
+    @pytest.mark.parametrize("strategy", [AllocationStrategy.FILL, AllocationStrategy.EVENLY])
+    async def test_insufficient_total_devices(self, strategy: AllocationStrategy) -> None:
         """Raises FractionalResourceFragmented when total devices are insufficient."""
         alloc_map = FractionAllocMap(
             device_slots={
@@ -1408,7 +1429,7 @@ class TestDefragEdgeCases:
                 )
                 for i in range(2)
             },
-            allocation_strategy=AllocationStrategy.FILL,
+            allocation_strategy=strategy,
             quantum_size=Decimal("0.1"),
         )
 
@@ -1418,7 +1439,8 @@ class TestDefragEdgeCases:
                 allow_resource_fragmentation=False,
             )
 
-    async def test_exact_capacity_boundary(self) -> None:
+    @pytest.mark.parametrize("strategy", [AllocationStrategy.FILL, AllocationStrategy.EVENLY])
+    async def test_exact_capacity_boundary(self, strategy: AllocationStrategy) -> None:
         """Request exactly matching device capacity (boundary value)."""
         alloc_map = FractionAllocMap(
             device_slots={
@@ -1429,7 +1451,7 @@ class TestDefragEdgeCases:
                 )
                 for i in range(4)
             },
-            allocation_strategy=AllocationStrategy.FILL,
+            allocation_strategy=strategy,
             quantum_size=Decimal("0.1"),
         )
 
@@ -1442,7 +1464,8 @@ class TestDefragEdgeCases:
         used = sum(1 for v in result[SlotName("cuda.shares")].values() if v > 0)
         assert used == 1
 
-    async def test_all_capacity_allocation(self) -> None:
+    @pytest.mark.parametrize("strategy", [AllocationStrategy.FILL, AllocationStrategy.EVENLY])
+    async def test_all_capacity_allocation(self, strategy: AllocationStrategy) -> None:
         """Requesting full capacity uses all devices."""
         alloc_map = FractionAllocMap(
             device_slots={
@@ -1453,7 +1476,7 @@ class TestDefragEdgeCases:
                 )
                 for i in range(4)
             },
-            allocation_strategy=AllocationStrategy.FILL,
+            allocation_strategy=strategy,
             quantum_size=Decimal("0.1"),
         )
 
@@ -1464,7 +1487,8 @@ class TestDefragEdgeCases:
         total = sum(result[SlotName("cuda.shares")].values())
         assert total == Decimal("4.0")
 
-    async def test_single_device_map(self) -> None:
+    @pytest.mark.parametrize("strategy", [AllocationStrategy.FILL, AllocationStrategy.EVENLY])
+    async def test_single_device_map(self, strategy: AllocationStrategy) -> None:
         """Single device: allocation within capacity succeeds."""
         alloc_map = FractionAllocMap(
             device_slots={
@@ -1474,7 +1498,7 @@ class TestDefragEdgeCases:
                     amount=Decimal("1.0"),
                 ),
             },
-            allocation_strategy=AllocationStrategy.FILL,
+            allocation_strategy=strategy,
             quantum_size=Decimal("0.1"),
         )
 
@@ -1484,7 +1508,8 @@ class TestDefragEdgeCases:
         )
         assert result[SlotName("cuda.shares")][DeviceId("gpu0")] == Decimal("0.7")
 
-    async def test_single_device_over_capacity_raises(self) -> None:
+    @pytest.mark.parametrize("strategy", [AllocationStrategy.FILL, AllocationStrategy.EVENLY])
+    async def test_single_device_over_capacity_raises(self, strategy: AllocationStrategy) -> None:
         """Single device: request exceeding capacity raises."""
         alloc_map = FractionAllocMap(
             device_slots={
@@ -1494,7 +1519,7 @@ class TestDefragEdgeCases:
                     amount=Decimal("1.0"),
                 ),
             },
-            allocation_strategy=AllocationStrategy.FILL,
+            allocation_strategy=strategy,
             quantum_size=Decimal("0.1"),
         )
 
@@ -1503,6 +1528,150 @@ class TestDefragEdgeCases:
                 {SlotName("cuda.shares"): Decimal("1.1")},
                 allow_resource_fragmentation=False,
             )
+
+
+class TestDefragGuardWithNonUniformFreeCapacity:
+    """Verify both strategies succeed with Algorithm 2's N-increment guard.
+
+    When the minimum N devices can't each hold D = R/N, the guard tries N+1, N+2...
+    with a smaller D until it finds enough devices.
+    """
+
+    @staticmethod
+    def _make_map_with_remaining(
+        device_remaining: list[Decimal],
+        strategy: AllocationStrategy,
+    ) -> FractionAllocMap:
+        device_capacity = Decimal("1.0")
+        alloc_map = FractionAllocMap(
+            device_slots={
+                DeviceId(f"gpu{i}"): DeviceSlotInfo(
+                    slot_type=SlotTypes.COUNT,
+                    slot_name=SlotName("cuda.shares"),
+                    amount=device_capacity,
+                )
+                for i in range(len(device_remaining))
+            },
+            allocation_strategy=AllocationStrategy.FILL,
+            quantum_size=Decimal("0.1"),
+        )
+        for remaining in device_remaining:
+            occupied = device_capacity - remaining
+            if occupied > 0:
+                alloc_map.allocate(
+                    {SlotName("cuda.shares"): occupied},
+                    allow_resource_fragmentation=True,
+                )
+        alloc_map.allocation_strategy = strategy
+        return alloc_map
+
+    @pytest.mark.parametrize("strategy", [AllocationStrategy.FILL, AllocationStrategy.EVENLY])
+    @pytest.mark.parametrize(
+        "device_remaining, requested",
+        [
+            # 2 GPUs: both can hold D=0.7, shortfall 0.1 covered by gpu1(0.8)
+            ([Decimal("0.7"), Decimal("0.8")], Decimal("1.5")),
+            # 3 GPUs: N=2, D=0.8, gpu1(0.8) + gpu2(1.0) qualify
+            ([Decimal("0.4"), Decimal("0.8"), Decimal("1.0")], Decimal("1.6")),
+            # 4 GPUs: N=2 succeeds, both 1.0-free devices can hold D=0.8
+            ([Decimal("0.5"), Decimal("0.5"), Decimal("1.0"), Decimal("1.0")], Decimal("1.6")),
+        ],
+    )
+    async def test_succeeds_with_non_uniform_free(
+        self,
+        strategy: AllocationStrategy,
+        device_remaining: list[Decimal],
+        requested: Decimal,
+    ) -> None:
+        alloc_map = self._make_map_with_remaining(device_remaining, strategy)
+        result = alloc_map.allocate(
+            {SlotName("cuda.shares"): requested},
+            allow_resource_fragmentation=False,
+        )
+        total = sum(result[SlotName("cuda.shares")].values())
+        assert total == requested
+
+
+class TestDefragNIncrement:
+    """Verify Algorithm 2: guard increments N when min-N can't hold per-device share D."""
+
+    @staticmethod
+    def _make_map_with_remaining(
+        device_remaining: list[Decimal],
+        strategy: AllocationStrategy,
+    ) -> FractionAllocMap:
+        device_capacity = Decimal("1.0")
+        alloc_map = FractionAllocMap(
+            device_slots={
+                DeviceId(f"gpu{i}"): DeviceSlotInfo(
+                    slot_type=SlotTypes.COUNT,
+                    slot_name=SlotName("cuda.shares"),
+                    amount=device_capacity,
+                )
+                for i in range(len(device_remaining))
+            },
+            allocation_strategy=AllocationStrategy.FILL,
+            quantum_size=Decimal("0.1"),
+        )
+        for remaining in device_remaining:
+            occupied = device_capacity - remaining
+            if occupied > 0:
+                alloc_map.allocate(
+                    {SlotName("cuda.shares"): occupied},
+                    allow_resource_fragmentation=True,
+                )
+        alloc_map.allocation_strategy = strategy
+        return alloc_map
+
+    @pytest.mark.parametrize("strategy", [AllocationStrategy.FILL, AllocationStrategy.EVENLY])
+    async def test_n_increment_passes(self, strategy: AllocationStrategy) -> None:
+        """4 GPUs each free=0.5, R=1.5.
+        N=2: D=0.7, need 2 with 0.7 free → 0 → fail
+        N=3: D=0.5, shortfall=0, need 3 with 0.5 free → 4 have 0.5 → pass
+        """
+        alloc_map = self._make_map_with_remaining(
+            [Decimal("0.5")] * 4,
+            strategy,
+        )
+        result = alloc_map.allocate(
+            {SlotName("cuda.shares"): Decimal("1.5")},
+            allow_resource_fragmentation=False,
+        )
+        total = sum(result[SlotName("cuda.shares")].values())
+        assert total == Decimal("1.5")
+
+    @pytest.mark.parametrize("strategy", [AllocationStrategy.FILL, AllocationStrategy.EVENLY])
+    async def test_n_increment_exhausted_rejects(self, strategy: AllocationStrategy) -> None:
+        """4 GPUs each free=0.2, R=1.4.
+        N=2: D=0.7 → fail, N=3: D=0.4 → fail, N=4: D=0.3 → fail (0.2 < 0.3)
+        """
+        alloc_map = self._make_map_with_remaining(
+            [Decimal("0.2")] * 4,
+            strategy,
+        )
+        with pytest.raises(FractionalResourceFragmented):
+            alloc_map.allocate(
+                {SlotName("cuda.shares"): Decimal("1.4")},
+                allow_resource_fragmentation=False,
+            )
+
+    @pytest.mark.parametrize("strategy", [AllocationStrategy.FILL, AllocationStrategy.EVENLY])
+    async def test_n_increment_to_max_devices(self, strategy: AllocationStrategy) -> None:
+        """8 GPUs each free=0.3, R=0.8.
+        N=1: D=0.8 → fail (0.3 < 0.8)
+        N=2: D=0.4 → fail (0.3 < 0.4)
+        N=3: D=0.2, shortfall=0.2, extra=2 → need 2 with 0.3 + 1 with 0.2 → all have 0.3 → pass
+        """
+        alloc_map = self._make_map_with_remaining(
+            [Decimal("0.3")] * 8,
+            strategy,
+        )
+        result = alloc_map.allocate(
+            {SlotName("cuda.shares"): Decimal("0.8")},
+            allow_resource_fragmentation=False,
+        )
+        total = sum(result[SlotName("cuda.shares")].values())
+        assert total == Decimal("0.8")
 
 
 class TestShortfallRemainder:

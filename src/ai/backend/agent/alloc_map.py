@@ -586,39 +586,37 @@ class FractionAllocMap(AbstractAllocMap):
         # NOTE: This logic assumes a single node with homogeneous devices (same capacity).
         # Heterogeneous device mixes or multi-node setups require a separate strategy.
         device_capacity = self.device_slots[sorted_dev_allocs[0][0]].amount
+        quantum = self.quantum_size
+        min_n = math.ceil(alloc / device_capacity)
+        total_devices = len(sorted_dev_allocs)
 
-        # Minimum number of devices needed: ceil(requested / per-device capacity)
-        num_devices_needed = math.ceil(alloc / device_capacity)
+        # Pre-compute free capacity for each device (sorted by free desc).
+        dev_free = [
+            self.device_slots[dev_id].amount - current_alloc
+            for dev_id, current_alloc in sorted_dev_allocs
+        ]
 
-        # Per-device density rounded down to the quantum size to match distribute_evenly behavior
-        per_device_density = alloc / Decimal(num_devices_needed)
-        quantized_per_device_alloc = round_down(per_device_density, self.quantum_size)
-
-        # Remainder calculation: matches distribute_evenly logic
-        # num_devices_with_extra_quantum: devices that receive +Q due to round_down remainder
-        shortfall = alloc - (quantized_per_device_alloc * num_devices_needed)
-        num_devices_with_extra_quantum = round(shortfall / self.quantum_size)
-
-        # Two-tier availability check:
-        # - num_devices_with_extra_quantum devices need (D_q + Q) free capacity
-        # - remaining devices need D_q free capacity
-        high_alloc = quantized_per_device_alloc + self.quantum_size
-        low_alloc = quantized_per_device_alloc
-
-        high_satisfied = 0
-        low_satisfied = 0
-        for dev_id, current_alloc in sorted_dev_allocs:
-            free_capacity = self.device_slots[dev_id].amount - current_alloc
-            if free_capacity >= high_alloc:
-                high_satisfied += 1
-            elif free_capacity >= low_alloc:
-                low_satisfied += 1
-
-        if (
-            high_satisfied >= num_devices_with_extra_quantum
-            and (high_satisfied + low_satisfied) >= num_devices_needed
-        ):
-            return
+        """
+        For each N, compute per-device share D = round_down(alloc / N, quantum).
+        Some devices receive D + quantum (to cover the shortfall from rounding).
+        Accept if enough devices can hold their respective share.
+        This prevents tiny useless fragments while allowing more requests to succeed
+        by incrementally increasing the device count.
+        """
+        for n in range(min_n, total_devices + 1):
+            per_device_share = round_down(alloc / Decimal(n), quantum)
+            shortfall = alloc - per_device_share * n
+            extra_devices = math.ceil(shortfall / quantum) if shortfall > 0 else 0
+            high_share = per_device_share + quantum
+            high_count = 0
+            low_count = 0
+            for free in dev_free:
+                if free >= high_share:
+                    high_count += 1
+                elif free >= per_device_share:
+                    low_count += 1
+            if high_count >= extra_devices and (high_count + low_count) >= n:
+                return
 
         raise FractionalResourceFragmented(
             "FractionAllocMap: refusing to create kernel with fractional resource fragmented!",
