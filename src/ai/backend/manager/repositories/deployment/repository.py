@@ -55,7 +55,6 @@ from ai.backend.manager.data.deployment.types import (
     DeploymentWithHistory,
     ModelDeploymentAutoScalingRuleData,
     ModelRevisionData,
-    ModelRevisionSpec,
     RevisionSearchResult,
     RouteInfo,
     RouteSearchResult,
@@ -725,18 +724,6 @@ class DeploymentRepository:
         """
         return await self._db_source.fetch_deployment_context(deployment_info, revision_id)
 
-    @deployment_repository_resilience.apply()
-    async def fetch_deployment_context_from_endpoint(
-        self,
-        deployment_info: DeploymentInfo,
-    ) -> DeploymentContext:
-        """Fetch deployment context using endpoint-level fields as image source.
-
-        Used when no revision exists yet (e.g., newly created deployments
-        before any revision is explicitly added/activated).
-        """
-        return await self._db_source.fetch_deployment_context_from_endpoint(deployment_info)
-
     # Auto-scaling operations
 
     @deployment_repository_resilience.apply()
@@ -1136,17 +1123,6 @@ class DeploymentRepository:
             DeploymentRevisionNotFound: If the endpoint has no current revision.
         """
         return await self._db_source.get_current_revision(endpoint_id)
-
-    @deployment_repository_resilience.apply()
-    async def get_revision_spec_from_endpoint(
-        self,
-        endpoint_id: uuid.UUID,
-    ) -> ModelRevisionSpec:
-        """Get a ModelRevisionSpec built from endpoint-level fields.
-
-        Used when no deployment_revisions record exists yet.
-        """
-        return await self._db_source.get_revision_spec_from_endpoint(endpoint_id)
 
     @deployment_repository_resilience.apply()
     async def search_revisions(

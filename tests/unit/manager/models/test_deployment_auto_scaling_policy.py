@@ -288,6 +288,7 @@ class TestDeploymentAutoScalingPolicyRow:
                 resource_slots=ResourceSlot({"cpu": Decimal("1"), "mem": Decimal("1024")}),
                 url=f"https://test-{uuid.uuid4().hex[:8]}.example.com",
                 lifecycle_stage=EndpointLifecycle.CREATED,
+                current_revision=uuid.uuid4(),
                 model_mount_destination="/models",
                 cluster_mode=ClusterMode.SINGLE_NODE.name,
                 cluster_size=1,

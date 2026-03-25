@@ -293,6 +293,7 @@ class TestGroupPurgersIntegration:
                     project=sample_group.id,
                     resource_group=sample_scaling_group,
                     lifecycle_stage=EndpointLifecycle.DESTROYED,
+                    current_revision=uuid.uuid4(),
                     replicas=0,
                     model_mount_destination="/models",
                     cluster_mode="single-node",

@@ -453,6 +453,7 @@ def create_full_featured_endpoint(
         cluster_size=3,
         extra_mounts=[],
         created_user=sample_user.uuid,
+        current_revision=uuid.uuid4(),
     )
 
     # Set attributes normally set by database

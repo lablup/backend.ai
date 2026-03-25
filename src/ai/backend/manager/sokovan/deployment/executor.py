@@ -437,14 +437,7 @@ class DeploymentExecutor:
 
         with recorder.phase("register_endpoint"):
             with recorder.step("check_target_revision"):
-                if deployment.current_revision_id is not None:
-                    target_revision = deployment.resolve_revision_spec(
-                        deployment.current_revision_id
-                    )
-                else:
-                    target_revision = await self._deployment_repo.get_revision_spec_from_endpoint(
-                        deployment.id
-                    )
+                target_revision = deployment.resolve_revision_spec(deployment.current_revision_id)
 
             with recorder.step("generate_model_definition"):
                 model_definition = (

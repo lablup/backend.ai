@@ -433,6 +433,7 @@ class TestScalingGroupRepositoryDB:
                     resource_group=sgroup_name,
                     image=None,  # Allowed when lifecycle_stage=DESTROYED
                     lifecycle_stage=EndpointLifecycle.DESTROYED,
+                    current_revision=uuid.uuid4(),
                     session_owner=test_user_uuid,
                     created_user=test_user_uuid,
                 )
@@ -1336,6 +1337,7 @@ class TestScalingGroupRepositoryDB:
                     resource_group=sample_scaling_group_for_hierarchy,
                     image=None,
                     lifecycle_stage=EndpointLifecycle.DESTROYED,
+                    current_revision=uuid.uuid4(),
                     session_owner=test_user_uuid,
                     created_user=test_user_uuid,
                 )

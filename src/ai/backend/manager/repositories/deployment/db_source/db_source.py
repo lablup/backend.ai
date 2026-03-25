@@ -52,7 +52,6 @@ from ai.backend.manager.data.deployment.types import (
     ModelDeploymentAccessTokenData,
     ModelDeploymentAutoScalingRuleData,
     ModelRevisionData,
-    ModelRevisionSpec,
     RevisionSearchResult,
     RouteInfo,
     RouteSearchResult,
@@ -253,6 +252,32 @@ class DeploymentDBSource:
             rbac_result = await execute_rbac_entity_creator(db_sess, creator)
             endpoint = rbac_result.row
 
+            # Create the initial deployment revision
+            initial_revision = DeploymentRevisionRow(
+                id=spec._initial_revision_id,
+                endpoint=endpoint.id,
+                revision_number=1,
+                image=spec.revision.image_id,
+                model=spec.revision.mounts.model_vfolder_id,
+                model_mount_destination=spec.revision.mounts.model_mount_destination,
+                model_definition_path=spec.revision.mounts.model_definition_path,
+                resource_group=spec.metadata.resource_group,
+                resource_slots=spec.revision.resource.resource_slots,
+                resource_opts=spec.revision.resource.resource_opts or {},
+                cluster_mode=spec.revision.resource.cluster_mode,
+                cluster_size=spec.revision.resource.cluster_size,
+                startup_command=spec.revision.execution.startup_command,
+                bootstrap_script=spec.revision.execution.bootstrap_script,
+                environ=dict(spec.revision.execution.environ)
+                if spec.revision.execution.environ
+                else {},
+                callback_url=spec.revision.execution.callback_url,
+                runtime_variant=spec.revision.execution.runtime_variant,
+                extra_mounts=list(spec.revision.mounts.extra_mounts),
+            )
+            db_sess.add(initial_revision)
+            await db_sess.flush()
+
             # Create deployment policy if provided
             if policy_config is not None:
                 policy_spec = DeploymentPolicyCreatorSpec(
@@ -276,6 +301,9 @@ class DeploymentDBSource:
                 .options(
                     selectinload(EndpointRow.image_row),
                     selectinload(EndpointRow.deployment_policy),
+                    selectinload(EndpointRow.revisions).selectinload(
+                        DeploymentRevisionRow.image_row
+                    ),
                 )
             )
             result = await db_sess.execute(stmt)
@@ -306,6 +334,30 @@ class DeploymentDBSource:
             rbac_result = await execute_rbac_entity_creator(db_sess, creator)
             endpoint = rbac_result.row
 
+            # Create the initial deployment revision
+            initial_revision = DeploymentRevisionRow(
+                id=spec._initial_revision_id,
+                endpoint=endpoint.id,
+                revision_number=1,
+                image=spec.image_id,
+                model=spec.model,
+                model_mount_destination=spec.model_mount_destination,
+                model_definition_path=spec.model_definition_path,
+                resource_group=spec.resource_group,
+                resource_slots=spec.resource_slots,
+                resource_opts=dict(spec.resource_opts) if spec.resource_opts else {},
+                cluster_mode=spec.cluster_mode.value,
+                cluster_size=spec.cluster_size,
+                startup_command=spec.startup_command,
+                bootstrap_script=spec.bootstrap_script,
+                environ=dict(spec.environ) if spec.environ else {},
+                callback_url=spec.callback_url,
+                runtime_variant=spec.runtime_variant,
+                extra_mounts=list(spec.extra_mounts),
+            )
+            db_sess.add(initial_revision)
+            await db_sess.flush()
+
             # Create deployment policy if provided
             if spec.policy is not None:
                 policy_creator = RBACEntityCreator(
@@ -324,6 +376,9 @@ class DeploymentDBSource:
                 .options(
                     selectinload(EndpointRow.image_row),
                     selectinload(EndpointRow.deployment_policy),
+                    selectinload(EndpointRow.revisions).selectinload(
+                        DeploymentRevisionRow.image_row
+                    ),
                 )
             )
             result = await db_sess.execute(stmt)
@@ -1892,100 +1947,6 @@ class DeploymentDBSource:
                 ),
             )
 
-    async def fetch_deployment_context_from_endpoint(
-        self,
-        deployment_info: DeploymentInfo,
-    ) -> DeploymentContext:
-        """Fetch deployment context using endpoint-level fields as image source.
-
-        Used when no revision exists yet (e.g., newly created deployments
-        before any revision is explicitly added/activated).
-        """
-        async with self._begin_readonly_session_read_committed() as db_sess:
-            created_user_query = (
-                sa.select(UserRow, keypairs.c.access_key)
-                .select_from(sa.join(UserRow, keypairs, UserRow.uuid == keypairs.c.user))
-                .where(UserRow.uuid == deployment_info.metadata.created_user)
-            )
-            created_user_result = await db_sess.execute(created_user_query)
-            created_user_row = created_user_result.first()
-            if not created_user_row:
-                raise UserNotFoundInDeployment(
-                    f"Created user {deployment_info.metadata.created_user} not found"
-                )
-
-            if deployment_info.metadata.session_owner != deployment_info.metadata.created_user:
-                session_owner_query = (
-                    sa.select(UserRow, keypairs.c.access_key)
-                    .select_from(sa.join(UserRow, keypairs, UserRow.uuid == keypairs.c.user))
-                    .where(UserRow.uuid == deployment_info.metadata.session_owner)
-                )
-                session_owner_result = await db_sess.execute(session_owner_query)
-                session_owner_row = session_owner_result.first()
-                if not session_owner_row:
-                    raise UserNotFoundInDeployment(
-                        f"Session owner {deployment_info.metadata.session_owner} not found"
-                    )
-            else:
-                session_owner_row = created_user_row
-
-            _owner_uuid, group_id, resource_policy = await query_userinfo_from_session(
-                db_sess,
-                created_user_row.UserRow.uuid,
-                AccessKey(created_user_row.access_key),
-                created_user_row.UserRow.role,
-                created_user_row.UserRow.domain_name,
-                None,
-                deployment_info.metadata.domain,
-                deployment_info.metadata.project,
-                query_on_behalf_of=AccessKey(session_owner_row.access_key)
-                if session_owner_row != created_user_row
-                else None,
-            )
-
-            endpoint_query = (
-                sa.select(EndpointRow)
-                .where(EndpointRow.id == deployment_info.id)
-                .options(selectinload(EndpointRow.image_row))
-            )
-            endpoint_result = await db_sess.execute(endpoint_query)
-            endpoint_row = endpoint_result.scalar_one_or_none()
-            if endpoint_row is None or endpoint_row.image_row is None:
-                raise DeploymentHasNoTargetRevision(
-                    f"Endpoint {deployment_info.id} not found or has no image"
-                )
-            image_identifier = ImageIdentifier(
-                canonical=endpoint_row.image_row.name,
-                architecture=endpoint_row.image_row.architecture,
-            )
-            image_row = await ImageRow.resolve(db_sess, [image_identifier])
-
-            return DeploymentContext(
-                created_user=UserContext(
-                    uuid=created_user_row.UserRow.uuid,
-                    access_key=AccessKey(created_user_row.access_key),
-                    role=str(created_user_row.UserRow.role),
-                    sudo_session_enabled=created_user_row.UserRow.sudo_session_enabled or False,
-                ),
-                session_owner=UserContext(
-                    uuid=session_owner_row.UserRow.uuid,
-                    access_key=AccessKey(session_owner_row.access_key),
-                    role=str(session_owner_row.UserRow.role),
-                    sudo_session_enabled=session_owner_row.UserRow.sudo_session_enabled or False,
-                ),
-                container_user=ContainerUserContext(
-                    uid=session_owner_row.UserRow.container_uid,
-                    main_gid=session_owner_row.UserRow.container_main_gid,
-                    supplementary_gids=session_owner_row.UserRow.container_gids or [],
-                ),
-                group_id=group_id,
-                resource_policy=dict(resource_policy),
-                image=ImageContext(
-                    ref=image_row.image_ref,
-                    labels=image_row.labels or {},
-                ),
-            )
-
     async def fetch_session_statuses_by_route_ids(
         self,
         route_ids: set[uuid.UUID],
@@ -2280,27 +2241,6 @@ class DeploymentDBSource:
                     f"Deployment revision {current_revision_id} not found"
                 )
             return row.to_data()
-
-    async def get_revision_spec_from_endpoint(
-        self,
-        endpoint_id: uuid.UUID,
-    ) -> ModelRevisionSpec:
-        """Build a ModelRevisionSpec from the endpoint-level fields.
-
-        Used when no deployment_revisions record exists yet (e.g., newly
-        created deployments before any revision is explicitly added/activated).
-        """
-        async with self._db.begin_readonly_session() as db_sess:
-            query = (
-                sa.select(EndpointRow)
-                .where(EndpointRow.id == endpoint_id)
-                .options(selectinload(EndpointRow.image_row))
-            )
-            result = await db_sess.execute(query)
-            endpoint = result.scalar_one_or_none()
-            if endpoint is None:
-                raise EndpointNotFound(f"Endpoint {endpoint_id} not found")
-            return endpoint.build_revision_spec_from_endpoint()
 
     async def search_revisions(
         self,
