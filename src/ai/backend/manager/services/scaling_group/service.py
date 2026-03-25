@@ -79,6 +79,8 @@ from ai.backend.manager.types import TriState
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
+WSPROXY_V1_VERSION = "v1"
+
 
 class ScalingGroupService:
     _repository: ScalingGroupRepository
