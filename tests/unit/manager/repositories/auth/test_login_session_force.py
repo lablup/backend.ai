@@ -224,7 +224,7 @@ class TestLoginSessionForce:
             target_password_info=self._make_password_info(),
             force=False,
         )
-        assert result.uuid == sample_user.user_id
+        assert result.user.uuid == sample_user.user_id
         success_count = await self._count_login_history(
             db_with_cleanup,
             sample_user.user_id,
@@ -246,7 +246,7 @@ class TestLoginSessionForce:
             target_password_info=self._make_password_info(),
             force=True,
         )
-        assert result.uuid == sample_user.user_id
+        assert result.user.uuid == sample_user.user_id
         success_count = await self._count_login_history(
             db_with_cleanup,
             sample_user.user_id,
@@ -273,10 +273,12 @@ class TestLoginSessionForce:
             target_password_info=self._make_password_info(),
             force=True,
         )
-        assert result.uuid == user_id
+        assert result.user.uuid == user_id
 
-        # Existing session should be invalidated
-        assert await self._count_active_sessions(db_with_cleanup, user_id) == 0
+        # Old session invalidated, new session created → 1 active
+        assert await self._count_active_sessions(db_with_cleanup, user_id) == 1
+        # The new session_token should differ from the original
+        assert result.session_token
         # History should show SUCCESS
         success_count = await self._count_login_history(
             db_with_cleanup,
@@ -339,7 +341,7 @@ class TestLoginSessionForce:
             target_password_info=self._make_password_info(),
             force=False,
         )
-        assert result.uuid == sample_user.user_id
+        assert result.user.uuid == sample_user.user_id
 
         success_count = await self._count_login_history(
             db_with_cleanup, sample_user.user_id, LoginAttemptResult.SUCCESS

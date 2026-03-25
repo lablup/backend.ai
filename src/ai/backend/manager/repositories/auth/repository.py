@@ -13,7 +13,11 @@ from ai.backend.manager.data.common.types import SearchResult
 from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.user import UserRole, UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.manager.repositories.auth.db_source.db_source import AuthDBSource
+from ai.backend.manager.repositories.auth.db_source.db_source import (
+    AuthDBSource,
+    CredentialVerificationResult,
+    LoginSessionCreationResult,
+)
 from ai.backend.manager.repositories.base.querier import BatchQuerier
 from ai.backend.manager.repositories.base.types import SearchScope
 
@@ -92,10 +96,24 @@ class AuthRepository:
         target_password_info: PasswordInfo,
         *,
         force: bool = False,
-    ) -> sa.RowMapping:
+        max_session_age: int = 604800,
+    ) -> CredentialVerificationResult:
         return await self._db_source.verify_credential_with_migration(
-            domain_name, email, target_password_info, force=force
+            domain_name,
+            email,
+            target_password_info,
+            force=force,
+            max_session_age=max_session_age,
         )
+
+    @auth_repository_resilience.apply()
+    async def create_login_session(
+        self,
+        user_id: UUID,
+        access_key: str,
+        max_session_age: int = 604800,
+    ) -> LoginSessionCreationResult:
+        return await self._db_source.create_login_session(user_id, access_key, max_session_age)
 
     @auth_repository_resilience.apply()
     async def check_credential_without_migration(

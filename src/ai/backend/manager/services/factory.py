@@ -275,6 +275,7 @@ def create_services(args: ServiceArgs) -> Services:
             hook_plugin_ctx=args.hook_plugin_ctx,
             auth_repository=repositories.auth.repository,
             config_provider=args.config_provider,
+            valkey_session_client=args.valkey_session_client,
         ),
         notification=NotificationService(
             repository=repositories.notification.repository,

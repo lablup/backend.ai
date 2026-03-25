@@ -165,6 +165,7 @@ class AuthHandler:
             secret_key=auth_result.secret_key,
             role=auth_result.role,
             status=auth_result.status,
+            session_token=auth_result.session_token,
         )
         resp = AuthorizeResponse(data=data)
         return APIResponse.build(HTTPStatus.OK, resp)

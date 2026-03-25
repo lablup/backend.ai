@@ -15,6 +15,7 @@ from ai.backend.common.clients.valkey_client.valkey_image.client import ValkeyIm
 from ai.backend.common.clients.valkey_client.valkey_live.client import ValkeyLiveClient
 from ai.backend.common.clients.valkey_client.valkey_rate_limit.client import ValkeyRateLimitClient
 from ai.backend.common.clients.valkey_client.valkey_schedule.client import ValkeyScheduleClient
+from ai.backend.common.clients.valkey_client.valkey_session.client import ValkeySessionClient
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
 from ai.backend.common.clients.valkey_client.valkey_stream.client import ValkeyStreamClient
 from ai.backend.common.defs import (
@@ -57,6 +58,7 @@ class ValkeyClients:
     schedule: ValkeyScheduleClient
     bgtask: ValkeyBgtaskClient
     rate_limit: ValkeyRateLimitClient
+    session: ValkeySessionClient
 
     async def close(self) -> None:
         """Close all Valkey client connections."""
@@ -70,6 +72,7 @@ class ValkeyClients:
         await self.stream.close()
         await self.schedule.close()
         await self.bgtask.close()
+        await self.session.close()
 
 
 class ValkeyDependency(InfrastructureDependency[ValkeyClients]):
@@ -137,6 +140,11 @@ class ValkeyDependency(InfrastructureDependency[ValkeyClients]):
                 valkey_profile_target.profile_target(RedisRole.RATE_LIMIT),
                 db_id=REDIS_RATE_LIMIT_DB,
                 human_readable_name="ratelimit",
+            ),
+            session=await ValkeySessionClient.create(
+                valkey_profile_target.profile_target(RedisRole.STATISTICS),
+                db_id=REDIS_STATISTICS_DB,
+                human_readable_name="session",
             ),
         )
 

@@ -2,8 +2,9 @@
 
 from __future__ import annotations
 
-from datetime import datetime
-from typing import Any, cast
+import uuid as uuid_mod
+from datetime import UTC, datetime, timedelta
+from typing import Any, NamedTuple, cast
 from uuid import UUID
 
 import sqlalchemy as sa
@@ -54,6 +55,17 @@ auth_db_source_resilience = Resilience(
         ),
     ]
 )
+
+
+class LoginSessionCreationResult(NamedTuple):
+    session_token: str
+    expires_at: datetime
+
+
+class CredentialVerificationResult(NamedTuple):
+    user: sa.RowMapping
+    session_token: str
+    expires_at: datetime
 
 
 class AuthDBSource:
@@ -391,8 +403,13 @@ class AuthDBSource:
         target_password_info: PasswordInfo,
         *,
         force: bool = False,
-    ) -> sa.RowMapping:
-        """Verify credentials, check active sessions, and record login attempt atomically."""
+        max_session_age: int = 604800,
+    ) -> CredentialVerificationResult:
+        """Verify credentials, check active sessions, create login session, and record attempt.
+
+        All DB operations happen atomically. Returns user row, session_token, and expires_at.
+        Caller is responsible for writing session data to Valkey after this returns.
+        """
         async with self._db.connect() as conn:
             result = await conn.execute(
                 sa.select(users)
@@ -434,9 +451,56 @@ class AuthDBSource:
             await self._record_login_history(
                 conn, row.uuid, domain_name, LoginAttemptResult.SUCCESS, fail_reason=None
             )
+
+            # Create login session
+            session_token = uuid_mod.uuid4().hex
+            now = datetime.now(UTC)
+            expires_at = now + timedelta(seconds=max_session_age)
+            access_key = row.main_access_key or ""
+            await conn.execute(
+                sa.insert(LoginSessionRow.__table__).values(
+                    user_id=row.uuid,
+                    access_key=access_key,
+                    session_token=session_token,
+                    status=LoginSessionStatus.ACTIVE,
+                    expires_at=expires_at,
+                )
+            )
+
             await conn.commit()
             row_mapping: sa.RowMapping = row._mapping
-            return row_mapping
+            return CredentialVerificationResult(
+                user=row_mapping,
+                session_token=session_token,
+                expires_at=expires_at,
+            )
+
+    @auth_db_source_resilience.apply()
+    async def create_login_session(
+        self,
+        user_id: UUID,
+        access_key: str,
+        max_session_age: int = 604800,
+    ) -> LoginSessionCreationResult:
+        """Create a login session for hook-based authentication paths."""
+        session_token = uuid_mod.uuid4().hex
+        now = datetime.now(UTC)
+        expires_at = now + timedelta(seconds=max_session_age)
+        async with self._db.connect() as conn:
+            await conn.execute(
+                sa.insert(LoginSessionRow.__table__).values(
+                    user_id=user_id,
+                    access_key=access_key,
+                    session_token=session_token,
+                    status=LoginSessionStatus.ACTIVE,
+                    expires_at=expires_at,
+                )
+            )
+            await conn.commit()
+        return LoginSessionCreationResult(
+            session_token=session_token,
+            expires_at=expires_at,
+        )
 
     @auth_db_source_resilience.apply()
     async def verify_credential_without_migration(
