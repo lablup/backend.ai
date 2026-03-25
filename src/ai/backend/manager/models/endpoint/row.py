@@ -35,6 +35,7 @@ from sqlalchemy.orm import (
     relationship,
     selectinload,
 )
+from sqlalchemy.orm.attributes import instance_state
 
 from ai.backend.common.config import model_definition_iv
 from ai.backend.common.types import (
@@ -67,10 +68,13 @@ from ai.backend.manager.data.deployment.types import (
     DeploymentMetadata,
     DeploymentNetworkSpec,
     DeploymentState,
+    ExecutionSpec,
     ModelDeploymentAutoScalingRuleData,
     ModelRevisionSpec,
     ReplicaSpec,
+    ResourceSpec,
 )
+from ai.backend.manager.data.image.types import ImageIdentifier
 from ai.backend.manager.data.model_serving.types import (
     EndpointAutoScalingRuleData,
     EndpointData,
@@ -305,7 +309,7 @@ class EndpointRow(Base):  # type: ignore[misc]
     )
 
     # Revision management columns
-    current_revision: Mapped[UUID | None] = mapped_column("current_revision", GUID, nullable=True)
+    current_revision: Mapped[UUID] = mapped_column("current_revision", GUID, nullable=False)
     deploying_revision: Mapped[UUID | None] = mapped_column(
         "deploying_revision", GUID, nullable=True
     )
@@ -770,11 +774,12 @@ class EndpointRow(Base):  # type: ignore[misc]
             policy_data = self.deployment_policy.to_data()
 
         model_revisions: list[ModelRevisionSpec] = []
-        for rev_row in self.revisions:
-            if rev_row.image_row is None:
-                continue
-            if rev_row.id == self.current_revision or rev_row.id == self.deploying_revision:
-                model_revisions.append(rev_row.to_model_revision_spec())
+        if "revisions" in instance_state(self).dict and self.revisions:
+            for rev_row in self.revisions:
+                if rev_row.image_row is None:
+                    continue
+                if rev_row.id == self.current_revision or rev_row.id == self.deploying_revision:
+                    model_revisions.append(rev_row.to_model_revision_spec())
 
         info = self._to_deployment_info_with_revisions(model_revisions)
         info.policy = policy_data
@@ -810,11 +815,10 @@ class EndpointRow(Base):  # type: ignore[misc]
                 open_to_public=self.open_to_public if self.open_to_public is not None else False,
                 url=self.url,
             ),
-            model_revisions=model_revisions,
+            model_revisions=list(model_revisions),
             current_revision_id=self.current_revision,
             deploying_revision_id=self.deploying_revision,
             sub_step=self.sub_step,
-            policy=self.deployment_policy.to_data() if self.deployment_policy is not None else None,
         )
 
 

@@ -265,7 +265,8 @@ class TestDeploymentRevisionRow:
         test_image: ImageRow,
         test_scaling_group: ScalingGroupRow,
     ) -> AsyncGenerator[EndpointRow, None]:
-        """Create test endpoint without an initial revision."""
+        """Create test endpoint with an initial deployment revision."""
+        revision_id = uuid.uuid4()
         async with db_with_cleanup.begin_session() as db_sess:
             endpoint = EndpointRow(
                 name=f"test-endpoint-{uuid.uuid4().hex[:8]}",
@@ -286,8 +287,29 @@ class TestDeploymentRevisionRow:
                 environ={},
                 resource_opts={},
                 extra_mounts=[],
+                current_revision=revision_id,
             )
             db_sess.add(endpoint)
+            await db_sess.flush()
+
+            # Create the initial revision that current_revision points to
+            initial_revision = DeploymentRevisionRow(
+                id=revision_id,
+                endpoint=endpoint.id,
+                revision_number=0,
+                image=test_image.id,
+                model=None,
+                model_mount_destination="/models",
+                resource_group=test_scaling_group.name,
+                resource_slots=ResourceSlot({"cpu": Decimal("1"), "mem": Decimal("1024")}),
+                resource_opts={},
+                cluster_mode=ClusterMode.SINGLE_NODE.name,
+                cluster_size=1,
+                runtime_variant=RuntimeVariant.CUSTOM,
+                environ={},
+                extra_mounts=[],
+            )
+            db_sess.add(initial_revision)
             await db_sess.flush()
 
         yield endpoint
