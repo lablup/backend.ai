@@ -1,6 +1,6 @@
 """populate deployment revision rows from endpoint data
 
-Revision ID: a1b2c3d4e5f6
+Revision ID: 0a200d0fc480
 Revises: 3727dd0927cf
 Create Date: 2026-03-25
 
@@ -9,7 +9,7 @@ Create Date: 2026-03-25
 from alembic import op
 
 # revision identifiers, used by Alembic.
-revision = "a1b2c3d4e5f6"
+revision = "0a200d0fc480"
 down_revision = "3727dd0927cf"
 branch_labels = None
 depends_on = None
@@ -82,29 +82,9 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    # Remove current_revision for endpoints that were populated by this migration.
-    # (No schema change to revert since we did not alter the column nullability.)
-    op.execute(
-        """
-        DELETE FROM deployment_revisions dr
-        USING endpoints e
-        WHERE dr.endpoint = e.id
-          AND dr.revision_number = (
-              SELECT MAX(dr2.revision_number)
-              FROM deployment_revisions dr2
-              WHERE dr2.endpoint = e.id
-          )
-          AND dr.id = e.current_revision
-        """
-    )
-    op.execute(
-        """
-        UPDATE endpoints
-        SET current_revision = NULL
-        WHERE current_revision IS NOT NULL
-          AND NOT EXISTS (
-              SELECT 1 FROM deployment_revisions dr
-              WHERE dr.id = endpoints.current_revision
-          )
-        """
-    )
+    # Data-only migration: downgrade is intentionally a no-op.
+    # The created revision rows and current_revision pointers are harmless
+    # to keep, and there is no reliable way to distinguish revisions created
+    # by this migration from those created by the original 25ac68cb28ba or
+    # by normal application usage.
+    pass
