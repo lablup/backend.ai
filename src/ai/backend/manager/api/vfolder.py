@@ -57,7 +57,8 @@ from ai.backend.manager.api.resource import get_watcher_info
 from ai.backend.manager.data.agent.types import AgentStatus
 from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.data.model_serving.types import EndpointLifecycle
-from ai.backend.manager.data.permission.types import ScopeType
+from ai.backend.manager.data.permission.id import ObjectId, ScopeId
+from ai.backend.manager.data.permission.types import EntityType, ScopeType
 from ai.backend.manager.models.storage import StorageSessionManager
 
 from ..errors.api import InvalidAPIParameters
@@ -107,6 +108,7 @@ from ..models.vfolder import (
     is_unmanaged,
 )
 from ..models.vfolder import VFolderRow as VFolderDBRow
+from ..repositories.permission_controller.role_manager import RoleManager
 from ..services.vfolder.actions.base import (
     CloneVFolderAction,
     CreateVFolderAction,
@@ -2694,14 +2696,17 @@ async def change_vfolder_ownership(request: web.Request, params: Any) -> web.Res
     )
     async with root_ctx.db.begin_readonly() as conn:
         query = (
-            sa.select([vfolders.c.host])
+            sa.select([vfolders.c.host, vfolders.c.user])
             .select_from(vfolders)
             .where(
                 (vfolders.c.id == vfolder_id)
                 & (vfolders.c.ownership_type == VFolderOwnershipType.USER)
             )
         )
-        folder_host = await conn.scalar(query)
+        result = await conn.execute(query)
+        row = result.first()
+        folder_host = row.host if row else None
+        old_owner_uuid = row.user if row else None
     if folder_host not in allowed_hosts_by_user:
         raise VFolderOperationFailed("User to migrate vfolder needs an access to the storage host.")
 
@@ -2738,6 +2743,31 @@ async def change_vfolder_ownership(request: web.Request, params: Any) -> web.Res
             await conn.execute(query)
 
     await execute_with_retry(_delete_vfolder_related_rows)
+
+    # Clean up old owner's RBAC records (scope-entity mapping + object permissions).
+    # This also covers the case where the old owner was previously an invitee,
+    # since the records share the same scope_id (user UUID) regardless of role.
+    # Without this cleanup, re-inviting the old owner after a round-trip transfer
+    # (A→B→A) would hit a unique constraint violation on AssociationScopesEntitiesRow,
+    # which aborts the PostgreSQL transaction and cascades as InFailedSQLTransactionError.
+    if old_owner_uuid is not None and old_owner_uuid != user_info.uuid:
+        vfolder_entity_id = ObjectId(
+            entity_type=EntityType.VFOLDER,
+            entity_id=str(vfolder_id),
+        )
+        role_manager = RoleManager()
+        async with root_ctx.db.begin_session() as db_session:
+            await role_manager.unmap_entity_from_scope(
+                db_session,
+                entity_id=vfolder_entity_id,
+                scope_id=ScopeId(ScopeType.USER, str(old_owner_uuid)),
+            )
+            try:
+                await role_manager.delete_object_permission_of_user(
+                    db_session, old_owner_uuid, vfolder_id
+                )
+            except (AttributeError, ValueError):
+                pass  # Old owner had no RBAC permission records
 
     return web.json_response({}, status=HTTPStatus.OK)
 
