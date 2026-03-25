@@ -8,7 +8,7 @@ import click
 
 from ai.backend.client.cli.extensions import pass_ctx_obj
 from ai.backend.client.cli.types import CLIContext
-from ai.backend.client.cli.v2.helpers import create_v2_registry, print_result
+from ai.backend.client.cli.v2.helpers import create_v2_registry, parse_order_options, print_result
 
 
 @click.group()
@@ -21,6 +21,11 @@ def resource_usage() -> None:
 @click.option("--offset", type=int, default=None, help="Number of items to skip.")
 @click.option("--domain-name", default=None, help="Filter by domain name.")
 @click.option("--resource-group", default=None, help="Filter by resource group.")
+@click.option(
+    "--order-by",
+    multiple=True,
+    help="Order by field:direction (e.g., period_start:desc).",
+)
 @pass_ctx_obj
 def search_domain(
     ctx: CLIContext,
@@ -28,21 +33,35 @@ def search_domain(
     offset: int | None,
     domain_name: str | None,
     resource_group: str | None,
+    order_by: tuple[str, ...],
 ) -> None:
     """Search domain usage buckets."""
     from ai.backend.common.dto.manager.v2.resource_usage.request import (
         AdminSearchDomainUsageBucketsInput,
     )
 
+    # Note: AdminSearchDomainUsageBucketsInput does not support order;
+    # --order-by is accepted for forward compatibility but currently ignored
+    # when the DTO does not expose an order field.
+    if order_by:
+        from ai.backend.common.dto.manager.v2.resource_usage.request import (
+            DomainUsageBucketOrderBy,
+        )
+        from ai.backend.common.dto.manager.v2.resource_usage.types import UsageBucketOrderField
+
+        _orders = parse_order_options(order_by, UsageBucketOrderField, DomainUsageBucketOrderBy)
+        # The admin search input does not accept order yet; silently drop.
+        _ = _orders
+
     async def _run() -> None:
         registry = await create_v2_registry(ctx)
         try:
             result = await registry.resource_usage.search_domain_usage(
                 AdminSearchDomainUsageBucketsInput(
-                    limit=limit,
-                    offset=offset,
                     domain_name=domain_name,
                     resource_group=resource_group,
+                    limit=limit,
+                    offset=offset,
                 ),
             )
             print_result(result)
@@ -58,6 +77,11 @@ def search_domain(
 @click.option("--domain-name", default=None, help="Filter by domain name.")
 @click.option("--resource-group", default=None, help="Filter by resource group.")
 @click.option("--project-id", default=None, help="Filter by project ID.")
+@click.option(
+    "--order-by",
+    multiple=True,
+    help="Order by field:direction (e.g., period_start:desc).",
+)
 @pass_ctx_obj
 def search_project(
     ctx: CLIContext,
@@ -66,6 +90,7 @@ def search_project(
     domain_name: str | None,
     resource_group: str | None,
     project_id: str | None,
+    order_by: tuple[str, ...],
 ) -> None:
     """Search project usage buckets."""
     from uuid import UUID
@@ -74,16 +99,27 @@ def search_project(
         AdminSearchProjectUsageBucketsInput,
     )
 
+    # Note: AdminSearchProjectUsageBucketsInput does not support order;
+    # --order-by is accepted for forward compatibility but currently ignored.
+    if order_by:
+        from ai.backend.common.dto.manager.v2.resource_usage.request import (
+            ProjectUsageBucketOrderBy,
+        )
+        from ai.backend.common.dto.manager.v2.resource_usage.types import UsageBucketOrderField
+
+        _orders = parse_order_options(order_by, UsageBucketOrderField, ProjectUsageBucketOrderBy)
+        _ = _orders
+
     async def _run() -> None:
         registry = await create_v2_registry(ctx)
         try:
             result = await registry.resource_usage.search_project_usage(
                 AdminSearchProjectUsageBucketsInput(
-                    limit=limit,
-                    offset=offset,
                     domain_name=domain_name,
                     resource_group=resource_group,
                     project_id=UUID(project_id) if project_id else None,
+                    limit=limit,
+                    offset=offset,
                 ),
             )
             print_result(result)
@@ -100,6 +136,11 @@ def search_project(
 @click.option("--resource-group", default=None, help="Filter by resource group.")
 @click.option("--project-id", default=None, help="Filter by project ID.")
 @click.option("--user-uuid", default=None, help="Filter by user UUID.")
+@click.option(
+    "--order-by",
+    multiple=True,
+    help="Order by field:direction (e.g., period_start:desc).",
+)
 @pass_ctx_obj
 def search_user(
     ctx: CLIContext,
@@ -109,6 +150,7 @@ def search_user(
     resource_group: str | None,
     project_id: str | None,
     user_uuid: str | None,
+    order_by: tuple[str, ...],
 ) -> None:
     """Search user usage buckets."""
     from uuid import UUID
@@ -117,17 +159,26 @@ def search_user(
         AdminSearchUserUsageBucketsInput,
     )
 
+    # Note: AdminSearchUserUsageBucketsInput does not support order;
+    # --order-by is accepted for forward compatibility but currently ignored.
+    if order_by:
+        from ai.backend.common.dto.manager.v2.resource_usage.request import UserUsageBucketOrderBy
+        from ai.backend.common.dto.manager.v2.resource_usage.types import UsageBucketOrderField
+
+        _orders = parse_order_options(order_by, UsageBucketOrderField, UserUsageBucketOrderBy)
+        _ = _orders
+
     async def _run() -> None:
         registry = await create_v2_registry(ctx)
         try:
             result = await registry.resource_usage.search_user_usage(
                 AdminSearchUserUsageBucketsInput(
-                    limit=limit,
-                    offset=offset,
                     domain_name=domain_name,
                     resource_group=resource_group,
                     project_id=UUID(project_id) if project_id else None,
                     user_uuid=UUID(user_uuid) if user_uuid else None,
+                    limit=limit,
+                    offset=offset,
                 ),
             )
             print_result(result)

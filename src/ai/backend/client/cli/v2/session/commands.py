@@ -3,13 +3,12 @@
 from __future__ import annotations
 
 import asyncio
-from typing import Any
 
 import click
 
 from ai.backend.client.cli.extensions import pass_ctx_obj
 from ai.backend.client.cli.types import CLIContext
-from ai.backend.client.cli.v2.helpers import create_v2_registry, print_result
+from ai.backend.client.cli.v2.helpers import create_v2_registry, parse_order_options, print_result
 
 
 @click.group()
@@ -17,24 +16,73 @@ def sessions() -> None:
     """Session management commands."""
 
 
-@sessions.command()
+@sessions.command(name="admin-search")
 @pass_ctx_obj
 @click.option("--limit", type=int, default=20, help="Maximum number of items to return.")
 @click.option("--offset", type=int, default=0, help="Number of items to skip.")
-@click.option("--filter", "filter_json", default=None, help="JSON filter expression.")
-def search(ctx: CLIContext, limit: int, offset: int, filter_json: str | None) -> None:
+@click.option("--name-contains", type=str, default=None, help="Filter sessions by name (contains).")
+@click.option(
+    "--status",
+    type=str,
+    multiple=True,
+    help="Filter sessions by status (repeatable, e.g., --status RUNNING --status PENDING).",
+)
+@click.option(
+    "--domain-name", type=str, default=None, help="Filter sessions by domain name (contains)."
+)
+@click.option(
+    "--order-by",
+    multiple=True,
+    help=(
+        "Order by field:direction (e.g., created_at:desc). "
+        "Fields: created_at, terminated_at, status, id, name."
+    ),
+)
+def admin_search(
+    ctx: CLIContext,
+    limit: int,
+    offset: int,
+    name_contains: str | None,
+    status: tuple[str, ...],
+    domain_name: str | None,
+    order_by: tuple[str, ...],
+) -> None:
     """Search sessions with admin scope."""
-    from ai.backend.common.dto.manager.v2.session.request import AdminSearchSessionsInput
+    from ai.backend.common.dto.manager.query import StringFilter
+    from ai.backend.common.dto.manager.v2.session.request import (
+        AdminSearchSessionsInput,
+        SessionFilter,
+        SessionOrder,
+    )
+    from ai.backend.common.dto.manager.v2.session.types import (
+        SessionOrderField,
+        SessionStatusEnum,
+        SessionStatusFilter,
+    )
+
+    # Build filter only if any filter option is provided
+    filter_dto: SessionFilter | None = None
+    if name_contains is not None or status or domain_name is not None:
+        filter_dto = SessionFilter(
+            name=StringFilter(contains=name_contains) if name_contains is not None else None,
+            status=(
+                SessionStatusFilter(in_=[SessionStatusEnum(s) for s in status]) if status else None
+            ),
+            domain_name=(StringFilter(contains=domain_name) if domain_name is not None else None),
+        )
+
+    # Build order only if --order-by is provided
+    orders = parse_order_options(order_by, SessionOrderField, SessionOrder) if order_by else None
 
     async def _run() -> None:
         registry = await create_v2_registry(ctx)
         try:
-            kwargs: dict[str, Any] = {"limit": limit, "offset": offset}
-            if filter_json is not None:
-                import json
-
-                kwargs["filter"] = json.loads(filter_json)
-            request = AdminSearchSessionsInput(**kwargs)
+            request = AdminSearchSessionsInput(
+                filter=filter_dto,
+                order=orders,
+                limit=limit,
+                offset=offset,
+            )
             result = await registry.session.admin_search(request)
             print_result(result)
         finally:
@@ -43,24 +91,62 @@ def search(ctx: CLIContext, limit: int, offset: int, filter_json: str | None) ->
     asyncio.run(_run())
 
 
-@sessions.command(name="search-kernels")
+@sessions.command(name="admin-search-kernels")
 @pass_ctx_obj
 @click.option("--limit", type=int, default=20, help="Maximum number of items to return.")
 @click.option("--offset", type=int, default=0, help="Number of items to skip.")
-@click.option("--filter", "filter_json", default=None, help="JSON filter expression.")
-def search_kernels(ctx: CLIContext, limit: int, offset: int, filter_json: str | None) -> None:
+@click.option(
+    "--status",
+    type=str,
+    multiple=True,
+    help="Filter kernels by status (repeatable, e.g., --status RUNNING --status TERMINATED).",
+)
+@click.option(
+    "--order-by",
+    multiple=True,
+    help=(
+        "Order by field:direction (e.g., created_at:desc). "
+        "Fields: cluster_idx, created_at, terminated_at, status."
+    ),
+)
+def admin_search_kernels(
+    ctx: CLIContext,
+    limit: int,
+    offset: int,
+    status: tuple[str, ...],
+    order_by: tuple[str, ...],
+) -> None:
     """Search kernels with admin scope."""
-    from ai.backend.common.dto.manager.v2.kernel.request import AdminSearchKernelsInput
+    from ai.backend.common.dto.manager.v2.kernel.request import (
+        AdminSearchKernelsInput,
+        KernelFilter,
+        KernelOrder,
+    )
+    from ai.backend.common.dto.manager.v2.kernel.types import KernelOrderField, KernelStatusFilter
+
+    # Build filter only if status option is provided
+    filter_dto: KernelFilter | None = None
+    if status:
+        from ai.backend.common.dto.manager.v2.kernel.types import KernelStatusEnum
+
+        filter_dto = KernelFilter(
+            status=KernelStatusFilter(
+                in_=[KernelStatusEnum(s) for s in status],
+            ),
+        )
+
+    # Build order only if --order-by is provided
+    orders = parse_order_options(order_by, KernelOrderField, KernelOrder) if order_by else None
 
     async def _run() -> None:
         registry = await create_v2_registry(ctx)
         try:
-            kwargs: dict[str, Any] = {"limit": limit, "offset": offset}
-            if filter_json is not None:
-                import json
-
-                kwargs["filter"] = json.loads(filter_json)
-            request = AdminSearchKernelsInput(**kwargs)
+            request = AdminSearchKernelsInput(
+                filter=filter_dto,
+                order=orders,
+                limit=limit,
+                offset=offset,
+            )
             result = await registry.session.admin_search_kernels(request)
             print_result(result)
         finally:
@@ -74,14 +160,39 @@ def search_kernels(ctx: CLIContext, limit: int, offset: int, filter_json: str | 
 @click.argument("agent_id")
 @click.option("--limit", type=int, default=20, help="Maximum number of items to return.")
 @click.option("--offset", type=int, default=0, help="Number of items to skip.")
-def search_by_agent(ctx: CLIContext, agent_id: str, limit: int, offset: int) -> None:
+@click.option(
+    "--order-by",
+    multiple=True,
+    help=(
+        "Order by field:direction (e.g., created_at:desc). "
+        "Fields: created_at, terminated_at, status, id, name."
+    ),
+)
+def search_by_agent(
+    ctx: CLIContext,
+    agent_id: str,
+    limit: int,
+    offset: int,
+    order_by: tuple[str, ...],
+) -> None:
     """Search sessions scoped to a specific agent."""
-    from ai.backend.common.dto.manager.v2.session.request import AdminSearchSessionsInput
+    from ai.backend.common.dto.manager.v2.session.request import (
+        AdminSearchSessionsInput,
+        SessionOrder,
+    )
+    from ai.backend.common.dto.manager.v2.session.types import SessionOrderField
+
+    # Build order only if --order-by is provided
+    orders = parse_order_options(order_by, SessionOrderField, SessionOrder) if order_by else None
 
     async def _run() -> None:
         registry = await create_v2_registry(ctx)
         try:
-            request = AdminSearchSessionsInput(limit=limit, offset=offset)
+            request = AdminSearchSessionsInput(
+                order=orders,
+                limit=limit,
+                offset=offset,
+            )
             result = await registry.session.search_sessions_by_agent(agent_id, request)
             print_result(result)
         finally:
@@ -95,14 +206,39 @@ def search_by_agent(ctx: CLIContext, agent_id: str, limit: int, offset: int) -> 
 @click.argument("agent_id")
 @click.option("--limit", type=int, default=20, help="Maximum number of items to return.")
 @click.option("--offset", type=int, default=0, help="Number of items to skip.")
-def search_kernels_by_agent(ctx: CLIContext, agent_id: str, limit: int, offset: int) -> None:
+@click.option(
+    "--order-by",
+    multiple=True,
+    help=(
+        "Order by field:direction (e.g., created_at:desc). "
+        "Fields: cluster_idx, created_at, terminated_at, status."
+    ),
+)
+def search_kernels_by_agent(
+    ctx: CLIContext,
+    agent_id: str,
+    limit: int,
+    offset: int,
+    order_by: tuple[str, ...],
+) -> None:
     """Search kernels scoped to a specific agent."""
-    from ai.backend.common.dto.manager.v2.kernel.request import AdminSearchKernelsInput
+    from ai.backend.common.dto.manager.v2.kernel.request import (
+        AdminSearchKernelsInput,
+        KernelOrder,
+    )
+    from ai.backend.common.dto.manager.v2.kernel.types import KernelOrderField
+
+    # Build order only if --order-by is provided
+    orders = parse_order_options(order_by, KernelOrderField, KernelOrder) if order_by else None
 
     async def _run() -> None:
         registry = await create_v2_registry(ctx)
         try:
-            request = AdminSearchKernelsInput(limit=limit, offset=offset)
+            request = AdminSearchKernelsInput(
+                order=orders,
+                limit=limit,
+                offset=offset,
+            )
             result = await registry.session.search_kernels_by_agent(agent_id, request)
             print_result(result)
         finally:
@@ -116,14 +252,59 @@ def search_kernels_by_agent(ctx: CLIContext, agent_id: str, limit: int, offset: 
 @click.argument("session_id")
 @click.option("--limit", type=int, default=20, help="Maximum number of items to return.")
 @click.option("--offset", type=int, default=0, help="Number of items to skip.")
-def search_kernels_by_session(ctx: CLIContext, session_id: str, limit: int, offset: int) -> None:
+@click.option(
+    "--status",
+    type=str,
+    multiple=True,
+    help="Filter kernels by status (repeatable, e.g., --status RUNNING --status TERMINATED).",
+)
+@click.option(
+    "--order-by",
+    multiple=True,
+    help=(
+        "Order by field:direction (e.g., created_at:desc). "
+        "Fields: cluster_idx, created_at, terminated_at, status."
+    ),
+)
+def search_kernels_by_session(
+    ctx: CLIContext,
+    session_id: str,
+    limit: int,
+    offset: int,
+    status: tuple[str, ...],
+    order_by: tuple[str, ...],
+) -> None:
     """Search kernels scoped to a specific session."""
-    from ai.backend.common.dto.manager.v2.kernel.request import AdminSearchKernelsInput
+    from ai.backend.common.dto.manager.v2.kernel.request import (
+        AdminSearchKernelsInput,
+        KernelFilter,
+        KernelOrder,
+    )
+    from ai.backend.common.dto.manager.v2.kernel.types import KernelOrderField, KernelStatusFilter
+
+    # Build filter only if status option is provided
+    filter_dto: KernelFilter | None = None
+    if status:
+        from ai.backend.common.dto.manager.v2.kernel.types import KernelStatusEnum
+
+        filter_dto = KernelFilter(
+            status=KernelStatusFilter(
+                in_=[KernelStatusEnum(s) for s in status],
+            ),
+        )
+
+    # Build order only if --order-by is provided
+    orders = parse_order_options(order_by, KernelOrderField, KernelOrder) if order_by else None
 
     async def _run() -> None:
         registry = await create_v2_registry(ctx)
         try:
-            request = AdminSearchKernelsInput(limit=limit, offset=offset)
+            request = AdminSearchKernelsInput(
+                filter=filter_dto,
+                order=orders,
+                limit=limit,
+                offset=offset,
+            )
             result = await registry.session.search_kernels_by_session(session_id, request)
             print_result(result)
         finally:

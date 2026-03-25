@@ -8,7 +8,7 @@ import click
 
 from ai.backend.client.cli.extensions import pass_ctx_obj
 from ai.backend.client.cli.types import CLIContext
-from ai.backend.client.cli.v2.helpers import create_v2_registry, print_result
+from ai.backend.client.cli.v2.helpers import create_v2_registry, parse_order_options, print_result
 
 
 @click.group()
@@ -19,18 +19,66 @@ def resource_groups() -> None:
 @resource_groups.command()
 @click.option("--limit", type=int, default=None, help="Maximum items to return.")
 @click.option("--offset", type=int, default=None, help="Number of items to skip.")
+@click.option(
+    "--name-contains",
+    default=None,
+    type=str,
+    help="Filter resource groups whose name contains this substring.",
+)
+@click.option(
+    "--is-active/--no-is-active",
+    default=None,
+    help="Filter by active status.",
+)
+@click.option(
+    "--order-by",
+    multiple=True,
+    help="Order by field:direction (e.g., name:asc, created_at:desc).",
+)
 @pass_ctx_obj
-def search(ctx: CLIContext, limit: int | None, offset: int | None) -> None:
+def search(
+    ctx: CLIContext,
+    limit: int | None,
+    offset: int | None,
+    name_contains: str | None,
+    is_active: bool | None,
+    order_by: tuple[str, ...],
+) -> None:
     """Search resource groups."""
     from ai.backend.common.dto.manager.v2.resource_group.request import (
         AdminSearchResourceGroupsInput,
+        ResourceGroupFilter,
+        ResourceGroupOrder,
+    )
+    from ai.backend.common.dto.manager.v2.resource_group.types import ResourceGroupOrderField
+
+    # Build filter only if any filter option is provided
+    filter_dto: ResourceGroupFilter | None = None
+    if name_contains is not None or is_active is not None:
+        from ai.backend.common.dto.manager.query import StringFilter
+
+        filter_dto = ResourceGroupFilter(
+            name=StringFilter(contains=name_contains) if name_contains is not None else None,
+            is_active=is_active,
+        )
+
+    # Build order only if --order-by is provided
+    orders = (
+        parse_order_options(order_by, ResourceGroupOrderField, ResourceGroupOrder)
+        if order_by
+        else None
     )
 
     async def _run() -> None:
         registry = await create_v2_registry(ctx)
         try:
             result = await registry.resource_group.search(
-                AdminSearchResourceGroupsInput(limit=limit, offset=offset),
+                AdminSearchResourceGroupsInput(
+                    filter=filter_dto,
+                    order=orders,
+                    limit=limit,
+                    offset=offset,
+                ),
             )
             print_result(result)
         finally:

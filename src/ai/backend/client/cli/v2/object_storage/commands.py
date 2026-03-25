@@ -8,7 +8,7 @@ import click
 
 from ai.backend.client.cli.extensions import pass_ctx_obj
 from ai.backend.client.cli.types import CLIContext
-from ai.backend.client.cli.v2.helpers import create_v2_registry, print_result
+from ai.backend.client.cli.v2.helpers import create_v2_registry, parse_order_options, print_result
 
 
 @click.group()
@@ -130,18 +130,67 @@ def update(
 @object_storages.command()
 @click.option("--limit", default=None, type=int, help="Max results per page.")
 @click.option("--offset", default=None, type=int, help="Pagination offset.")
+@click.option(
+    "--name-contains",
+    default=None,
+    type=str,
+    help="Filter storages whose name contains this substring.",
+)
+@click.option(
+    "--host-contains",
+    default=None,
+    type=str,
+    help="Filter storages whose host contains this substring.",
+)
+@click.option(
+    "--order-by",
+    multiple=True,
+    help="Order by field:direction (e.g., name:asc, created_at:desc).",
+)
 @pass_ctx_obj
-def search(ctx: CLIContext, limit: int | None, offset: int | None) -> None:
+def search(
+    ctx: CLIContext,
+    limit: int | None,
+    offset: int | None,
+    name_contains: str | None,
+    host_contains: str | None,
+    order_by: tuple[str, ...],
+) -> None:
     """Search object storages with admin scope."""
     from ai.backend.common.dto.manager.v2.object_storage.request import (
         AdminSearchObjectStoragesInput,
+        ObjectStorageFilter,
+        ObjectStorageOrder,
+    )
+    from ai.backend.common.dto.manager.v2.object_storage.types import ObjectStorageOrderField
+
+    # Build filter only if any filter option is provided
+    filter_dto: ObjectStorageFilter | None = None
+    if name_contains is not None or host_contains is not None:
+        from ai.backend.common.dto.manager.query import StringFilter
+
+        filter_dto = ObjectStorageFilter(
+            name=StringFilter(contains=name_contains) if name_contains is not None else None,
+            host=StringFilter(contains=host_contains) if host_contains is not None else None,
+        )
+
+    # Build order only if --order-by is provided
+    orders = (
+        parse_order_options(order_by, ObjectStorageOrderField, ObjectStorageOrder)
+        if order_by
+        else None
     )
 
     async def _run() -> None:
         registry = await create_v2_registry(ctx)
         try:
             result = await registry.object_storage.search(
-                AdminSearchObjectStoragesInput(limit=limit, offset=offset),
+                AdminSearchObjectStoragesInput(
+                    filter=filter_dto,
+                    order=orders,
+                    limit=limit,
+                    offset=offset,
+                ),
             )
             print_result(result)
         finally:

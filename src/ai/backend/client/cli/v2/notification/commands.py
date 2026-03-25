@@ -9,7 +9,7 @@ import click
 
 from ai.backend.client.cli.extensions import pass_ctx_obj
 from ai.backend.client.cli.types import CLIContext
-from ai.backend.client.cli.v2.helpers import create_v2_registry, print_result
+from ai.backend.client.cli.v2.helpers import create_v2_registry, parse_order_options, print_result
 
 
 @click.group()
@@ -23,18 +23,59 @@ def notifications() -> None:
 @notifications.command()
 @click.option("--limit", type=int, default=None, help="Maximum items to return.")
 @click.option("--offset", type=int, default=None, help="Number of items to skip.")
+@click.option(
+    "--name-contains",
+    default=None,
+    type=str,
+    help="Filter channels whose name contains this substring.",
+)
+@click.option(
+    "--order-by",
+    multiple=True,
+    help="Order by field:direction (e.g., name:asc, created_at:desc).",
+)
 @pass_ctx_obj
-def search_channels(ctx: CLIContext, limit: int | None, offset: int | None) -> None:
+def search_channels(
+    ctx: CLIContext,
+    limit: int | None,
+    offset: int | None,
+    name_contains: str | None,
+    order_by: tuple[str, ...],
+) -> None:
     """Search notification channels."""
     from ai.backend.common.dto.manager.v2.notification.request import (
+        NotificationChannelFilter,
+        NotificationChannelOrder,
         SearchNotificationChannelsInput,
+    )
+    from ai.backend.common.dto.manager.v2.notification.types import NotificationChannelOrderField
+
+    # Build filter only if any filter option is provided
+    filter_dto: NotificationChannelFilter | None = None
+    if name_contains is not None:
+        from ai.backend.common.dto.manager.query import StringFilter
+
+        filter_dto = NotificationChannelFilter(
+            name=StringFilter(contains=name_contains),
+        )
+
+    # Build order only if --order-by is provided
+    orders = (
+        parse_order_options(order_by, NotificationChannelOrderField, NotificationChannelOrder)
+        if order_by
+        else None
     )
 
     async def _run() -> None:
         registry = await create_v2_registry(ctx)
         try:
             result = await registry.notification.search_channels(
-                SearchNotificationChannelsInput(limit=limit, offset=offset),
+                SearchNotificationChannelsInput(
+                    filter=filter_dto,
+                    order=orders,
+                    limit=limit,
+                    offset=offset,
+                ),
             )
             print_result(result)
         finally:
@@ -88,18 +129,59 @@ def delete_channel(ctx: CLIContext, channel_id: str) -> None:
 @notifications.command()
 @click.option("--limit", type=int, default=None, help="Maximum items to return.")
 @click.option("--offset", type=int, default=None, help="Number of items to skip.")
+@click.option(
+    "--name-contains",
+    default=None,
+    type=str,
+    help="Filter rules whose name contains this substring.",
+)
+@click.option(
+    "--order-by",
+    multiple=True,
+    help="Order by field:direction (e.g., name:asc, created_at:desc).",
+)
 @pass_ctx_obj
-def search_rules(ctx: CLIContext, limit: int | None, offset: int | None) -> None:
+def search_rules(
+    ctx: CLIContext,
+    limit: int | None,
+    offset: int | None,
+    name_contains: str | None,
+    order_by: tuple[str, ...],
+) -> None:
     """Search notification rules."""
     from ai.backend.common.dto.manager.v2.notification.request import (
+        NotificationRuleFilter,
+        NotificationRuleOrder,
         SearchNotificationRulesInput,
+    )
+    from ai.backend.common.dto.manager.v2.notification.types import NotificationRuleOrderField
+
+    # Build filter only if any filter option is provided
+    filter_dto: NotificationRuleFilter | None = None
+    if name_contains is not None:
+        from ai.backend.common.dto.manager.query import StringFilter
+
+        filter_dto = NotificationRuleFilter(
+            name=StringFilter(contains=name_contains),
+        )
+
+    # Build order only if --order-by is provided
+    orders = (
+        parse_order_options(order_by, NotificationRuleOrderField, NotificationRuleOrder)
+        if order_by
+        else None
     )
 
     async def _run() -> None:
         registry = await create_v2_registry(ctx)
         try:
             result = await registry.notification.search_rules(
-                SearchNotificationRulesInput(limit=limit, offset=offset),
+                SearchNotificationRulesInput(
+                    filter=filter_dto,
+                    order=orders,
+                    limit=limit,
+                    offset=offset,
+                ),
             )
             print_result(result)
         finally:

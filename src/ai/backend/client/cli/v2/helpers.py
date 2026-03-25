@@ -124,6 +124,36 @@ async def create_v2_registry(config: V2ConnectionConfig) -> V2ClientRegistry:
     return await V2ClientRegistry.create(client_config, auth)
 
 
+def parse_order_options(
+    order_by: tuple[str, ...],
+    order_field_enum: type,
+    order_class: type,
+) -> list[Any]:
+    """Parse ``--order-by field:direction`` options into Order DTO instances.
+
+    Each element in *order_by* is ``"field"`` (defaults to ASC) or
+    ``"field:asc"`` / ``"field:desc"``.
+
+    *order_field_enum* is the domain-specific ``OrderField`` enum,
+    *order_class* is the corresponding ``Order`` dataclass/model that
+    takes ``field`` and ``direction`` keyword arguments.
+    """
+    from ai.backend.common.dto.manager.v2.common import OrderDirection
+
+    orders: list[Any] = []
+    for spec in order_by:
+        parts = spec.split(":", 1)
+        field_name = parts[0]
+        direction_str = parts[1].lower() if len(parts) > 1 else "asc"
+        orders.append(
+            order_class(
+                field=order_field_enum(field_name),
+                direction=OrderDirection(direction_str),
+            )
+        )
+    return orders
+
+
 def print_result(data: Any) -> None:
     """Print a Pydantic model or dict as formatted JSON."""
     if hasattr(data, "model_dump"):

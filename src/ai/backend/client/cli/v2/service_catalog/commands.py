@@ -3,13 +3,12 @@
 from __future__ import annotations
 
 import asyncio
-from typing import Any
 
 import click
 
 from ai.backend.client.cli.extensions import pass_ctx_obj
 from ai.backend.client.cli.types import CLIContext
-from ai.backend.client.cli.v2.helpers import create_v2_registry, print_result
+from ai.backend.client.cli.v2.helpers import create_v2_registry, parse_order_options, print_result
 
 
 @click.group()
@@ -17,26 +16,61 @@ def service_catalogs() -> None:
     """Service catalog management commands."""
 
 
-@service_catalogs.command()
+@service_catalogs.command(name="admin-search")
 @pass_ctx_obj
 @click.option("--limit", type=int, default=20, help="Maximum number of items to return.")
 @click.option("--offset", type=int, default=0, help="Number of items to skip.")
-@click.option("--filter", "filter_json", default=None, help="JSON filter expression.")
-def search(ctx: CLIContext, limit: int, offset: int, filter_json: str | None) -> None:
+@click.option(
+    "--service-group",
+    default=None,
+    type=str,
+    help="Filter catalogs whose service group contains this substring.",
+)
+@click.option(
+    "--order-by",
+    multiple=True,
+    help="Order by field:direction (e.g., service_group:asc, display_name:desc, registered_at:desc).",
+)
+def admin_search(
+    ctx: CLIContext,
+    limit: int,
+    offset: int,
+    service_group: str | None,
+    order_by: tuple[str, ...],
+) -> None:
     """Search service catalog entries with admin scope."""
     from ai.backend.common.dto.manager.v2.service_catalog.request import (
         AdminSearchServiceCatalogsInput,
+        ServiceCatalogFilter,
+        ServiceCatalogOrder,
+    )
+    from ai.backend.common.dto.manager.v2.service_catalog.types import ServiceCatalogOrderField
+
+    # Build filter only if any filter option is provided
+    filter_dto: ServiceCatalogFilter | None = None
+    if service_group is not None:
+        from ai.backend.common.dto.manager.query import StringFilter
+
+        filter_dto = ServiceCatalogFilter(
+            service_group=StringFilter(contains=service_group),
+        )
+
+    # Build order only if --order-by is provided
+    orders = (
+        parse_order_options(order_by, ServiceCatalogOrderField, ServiceCatalogOrder)
+        if order_by
+        else None
     )
 
     async def _run() -> None:
         registry = await create_v2_registry(ctx)
         try:
-            kwargs: dict[str, Any] = {"limit": limit, "offset": offset}
-            if filter_json is not None:
-                import json
-
-                kwargs["filter"] = json.loads(filter_json)
-            request = AdminSearchServiceCatalogsInput(**kwargs)
+            request = AdminSearchServiceCatalogsInput(
+                filter=filter_dto,
+                order=orders,
+                limit=limit,
+                offset=offset,
+            )
             result = await registry.service_catalog.admin_search(request)
             print_result(result)
         finally:

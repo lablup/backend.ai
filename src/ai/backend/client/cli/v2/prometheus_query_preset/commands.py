@@ -9,7 +9,7 @@ import click
 
 from ai.backend.client.cli.extensions import pass_ctx_obj
 from ai.backend.client.cli.types import CLIContext
-from ai.backend.client.cli.v2.helpers import create_v2_registry, print_result
+from ai.backend.client.cli.v2.helpers import create_v2_registry, parse_order_options, print_result
 
 
 @click.group()
@@ -20,18 +20,61 @@ def prometheus_query_presets() -> None:
 @prometheus_query_presets.command()
 @click.option("--limit", type=int, default=50, help="Maximum items to return.")
 @click.option("--offset", type=int, default=0, help="Number of items to skip.")
+@click.option(
+    "--name-contains",
+    default=None,
+    type=str,
+    help="Filter presets whose name contains this substring.",
+)
+@click.option(
+    "--order-by",
+    multiple=True,
+    help="Order by field:direction (e.g., name:asc, created_at:desc, updated_at:desc).",
+)
 @pass_ctx_obj
-def search(ctx: CLIContext, limit: int, offset: int) -> None:
+def search(
+    ctx: CLIContext,
+    limit: int,
+    offset: int,
+    name_contains: str | None,
+    order_by: tuple[str, ...],
+) -> None:
     """Search prometheus query definitions."""
     from ai.backend.common.dto.manager.v2.prometheus_query_preset.request import (
+        QueryDefinitionFilter,
+        QueryDefinitionOrder,
         SearchQueryDefinitionsInput,
+    )
+    from ai.backend.common.dto.manager.v2.prometheus_query_preset.types import (
+        QueryDefinitionOrderField,
+    )
+
+    # Build filter only if any filter option is provided
+    filter_dto: QueryDefinitionFilter | None = None
+    if name_contains is not None:
+        from ai.backend.common.dto.manager.query import StringFilter
+
+        filter_dto = QueryDefinitionFilter(
+            name=StringFilter(contains=name_contains),
+        )
+
+    # Build order only if --order-by is provided
+    orders = (
+        parse_order_options(order_by, QueryDefinitionOrderField, QueryDefinitionOrder)
+        if order_by
+        else None
     )
 
     async def _run() -> None:
         registry = await create_v2_registry(ctx)
         try:
             result = await registry.prometheus_query_preset.search(
-                SearchQueryDefinitionsInput(limit=limit, offset=offset),
+                SearchQueryDefinitionsInput(
+                    filter=filter_dto,
+                    order=orders,
+                    limit=limit,
+                    offset=offset,
+                ),
             )
             print_result(result)
         finally:

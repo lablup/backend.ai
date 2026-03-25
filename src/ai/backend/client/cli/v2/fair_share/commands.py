@@ -8,7 +8,7 @@ import click
 
 from ai.backend.client.cli.extensions import pass_ctx_obj
 from ai.backend.client.cli.types import CLIContext
-from ai.backend.client.cli.v2.helpers import create_v2_registry, print_result
+from ai.backend.client.cli.v2.helpers import create_v2_registry, parse_order_options, print_result
 
 
 @click.group()
@@ -22,16 +22,59 @@ def fair_share() -> None:
 @fair_share.command()
 @click.option("--limit", type=int, default=None, help="Maximum items to return.")
 @click.option("--offset", type=int, default=None, help="Number of items to skip.")
+@click.option("--resource-group", default=None, type=str, help="Filter by resource group name.")
+@click.option("--domain-name", default=None, type=str, help="Filter by domain name.")
+@click.option(
+    "--order-by",
+    multiple=True,
+    help="Order by field:direction (e.g., fair_share_factor:desc, domain_name:asc).",
+)
 @pass_ctx_obj
-def search_domain(ctx: CLIContext, limit: int | None, offset: int | None) -> None:
+def search_domain(
+    ctx: CLIContext,
+    limit: int | None,
+    offset: int | None,
+    resource_group: str | None,
+    domain_name: str | None,
+    order_by: tuple[str, ...],
+) -> None:
     """Search domain fair shares."""
-    from ai.backend.common.dto.manager.v2.fair_share.request import SearchDomainFairSharesInput
+    from ai.backend.common.dto.manager.v2.fair_share.request import (
+        DomainFairShareFilter,
+        DomainFairShareOrder,
+        SearchDomainFairSharesInput,
+    )
+    from ai.backend.common.dto.manager.v2.fair_share.types import DomainFairShareOrderField
+
+    # Build filter only if any filter option is provided
+    filter_dto: DomainFairShareFilter | None = None
+    if resource_group is not None or domain_name is not None:
+        from ai.backend.common.dto.manager.query import StringFilter
+
+        filter_dto = DomainFairShareFilter(
+            resource_group=StringFilter(contains=resource_group)
+            if resource_group is not None
+            else None,
+            domain_name=StringFilter(contains=domain_name) if domain_name is not None else None,
+        )
+
+    # Build order only if --order-by is provided
+    orders = (
+        parse_order_options(order_by, DomainFairShareOrderField, DomainFairShareOrder)
+        if order_by
+        else None
+    )
 
     async def _run() -> None:
         registry = await create_v2_registry(ctx)
         try:
             result = await registry.fair_share.search_domain(
-                SearchDomainFairSharesInput(limit=limit, offset=offset),
+                SearchDomainFairSharesInput(
+                    filter=filter_dto,
+                    order=orders,
+                    limit=limit,
+                    offset=offset,
+                ),
             )
             print_result(result)
         finally:
@@ -70,16 +113,59 @@ def get_domain(ctx: CLIContext, resource_group: str, domain_name: str) -> None:
 @fair_share.command()
 @click.option("--limit", type=int, default=None, help="Maximum items to return.")
 @click.option("--offset", type=int, default=None, help="Number of items to skip.")
+@click.option("--resource-group", default=None, type=str, help="Filter by resource group name.")
+@click.option("--domain-name", default=None, type=str, help="Filter by domain name.")
+@click.option(
+    "--order-by",
+    multiple=True,
+    help="Order by field:direction (e.g., fair_share_factor:desc, project_name:asc).",
+)
 @pass_ctx_obj
-def search_project(ctx: CLIContext, limit: int | None, offset: int | None) -> None:
+def search_project(
+    ctx: CLIContext,
+    limit: int | None,
+    offset: int | None,
+    resource_group: str | None,
+    domain_name: str | None,
+    order_by: tuple[str, ...],
+) -> None:
     """Search project fair shares."""
-    from ai.backend.common.dto.manager.v2.fair_share.request import SearchProjectFairSharesInput
+    from ai.backend.common.dto.manager.v2.fair_share.request import (
+        ProjectFairShareFilter,
+        ProjectFairShareOrder,
+        SearchProjectFairSharesInput,
+    )
+    from ai.backend.common.dto.manager.v2.fair_share.types import ProjectFairShareOrderField
+
+    # Build filter only if any filter option is provided
+    filter_dto: ProjectFairShareFilter | None = None
+    if resource_group is not None or domain_name is not None:
+        from ai.backend.common.dto.manager.query import StringFilter
+
+        filter_dto = ProjectFairShareFilter(
+            resource_group=StringFilter(contains=resource_group)
+            if resource_group is not None
+            else None,
+            domain_name=StringFilter(contains=domain_name) if domain_name is not None else None,
+        )
+
+    # Build order only if --order-by is provided
+    orders = (
+        parse_order_options(order_by, ProjectFairShareOrderField, ProjectFairShareOrder)
+        if order_by
+        else None
+    )
 
     async def _run() -> None:
         registry = await create_v2_registry(ctx)
         try:
             result = await registry.fair_share.search_project(
-                SearchProjectFairSharesInput(limit=limit, offset=offset),
+                SearchProjectFairSharesInput(
+                    filter=filter_dto,
+                    order=orders,
+                    limit=limit,
+                    offset=offset,
+                ),
             )
             print_result(result)
         finally:
@@ -120,16 +206,59 @@ def get_project(ctx: CLIContext, resource_group: str, project_id: str) -> None:
 @fair_share.command()
 @click.option("--limit", type=int, default=None, help="Maximum items to return.")
 @click.option("--offset", type=int, default=None, help="Number of items to skip.")
+@click.option("--resource-group", default=None, type=str, help="Filter by resource group name.")
+@click.option("--domain-name", default=None, type=str, help="Filter by domain name.")
+@click.option(
+    "--order-by",
+    multiple=True,
+    help="Order by field:direction (e.g., fair_share_factor:desc, user_username:asc).",
+)
 @pass_ctx_obj
-def search_user(ctx: CLIContext, limit: int | None, offset: int | None) -> None:
+def search_user(
+    ctx: CLIContext,
+    limit: int | None,
+    offset: int | None,
+    resource_group: str | None,
+    domain_name: str | None,
+    order_by: tuple[str, ...],
+) -> None:
     """Search user fair shares."""
-    from ai.backend.common.dto.manager.v2.fair_share.request import SearchUserFairSharesInput
+    from ai.backend.common.dto.manager.v2.fair_share.request import (
+        SearchUserFairSharesInput,
+        UserFairShareFilter,
+        UserFairShareOrder,
+    )
+    from ai.backend.common.dto.manager.v2.fair_share.types import UserFairShareOrderField
+
+    # Build filter only if any filter option is provided
+    filter_dto: UserFairShareFilter | None = None
+    if resource_group is not None or domain_name is not None:
+        from ai.backend.common.dto.manager.query import StringFilter
+
+        filter_dto = UserFairShareFilter(
+            resource_group=StringFilter(contains=resource_group)
+            if resource_group is not None
+            else None,
+            domain_name=StringFilter(contains=domain_name) if domain_name is not None else None,
+        )
+
+    # Build order only if --order-by is provided
+    orders = (
+        parse_order_options(order_by, UserFairShareOrderField, UserFairShareOrder)
+        if order_by
+        else None
+    )
 
     async def _run() -> None:
         registry = await create_v2_registry(ctx)
         try:
             result = await registry.fair_share.search_user(
-                SearchUserFairSharesInput(limit=limit, offset=offset),
+                SearchUserFairSharesInput(
+                    filter=filter_dto,
+                    order=orders,
+                    limit=limit,
+                    offset=offset,
+                ),
             )
             print_result(result)
         finally:
