@@ -1109,6 +1109,7 @@ class ArchiveDownloadHandler:
             volume=body.parsed.volume,
             virtual_folder_id=body.parsed.virtual_folder_id,
             files=body.parsed.files,
+            filename=body.parsed.filename,
             exp=datetime.now(UTC) + ctx.root_ctx.local_config.storage_proxy.session_expire,
         )
         payload = token_payload.model_dump(mode="json")
