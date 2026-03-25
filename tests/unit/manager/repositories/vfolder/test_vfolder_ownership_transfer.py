@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import uuid
 from collections.abc import AsyncGenerator
+from typing import NamedTuple
 
 import pytest
 import sqlalchemy as sa
@@ -63,6 +64,11 @@ from ai.backend.testutils.db import with_tables
 VFOLDER_HOST = "local:volume1"
 
 
+class UserWithKeypair(NamedTuple):
+    user_id: uuid.UUID
+    email: str
+
+
 class TestVFolderOwnershipTransferRBACCleanup:
     """Test that ownership transfer cleans up old owner's RBAC records."""
 
@@ -93,6 +99,13 @@ class TestVFolderOwnershipTransferRBACCleanup:
             ],
         ):
             yield database_connection
+
+    @pytest.fixture
+    def vfolder_repository(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+    ) -> VfolderRepository:
+        return VfolderRepository(db=db_with_cleanup)
 
     @pytest.fixture
     async def test_domain_name(
@@ -202,13 +215,45 @@ class TestVFolderOwnershipTransferRBACCleanup:
             await db_sess.flush()
         return group_uuid
 
+    @pytest.fixture
+    async def old_owner(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        test_domain_name: str,
+        test_user_resource_policy_name: str,
+        test_keypair_resource_policy_name: str,
+    ) -> UserWithKeypair:
+        """Create old owner with keypair. Returns (user_uuid, email)."""
+        return await self._create_user_with_keypair(
+            db_with_cleanup,
+            test_domain_name,
+            test_user_resource_policy_name,
+            test_keypair_resource_policy_name,
+        )
+
+    @pytest.fixture
+    async def new_owner(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        test_domain_name: str,
+        test_user_resource_policy_name: str,
+        test_keypair_resource_policy_name: str,
+    ) -> UserWithKeypair:
+        """Create new owner with keypair. Returns (user_uuid, email)."""
+        return await self._create_user_with_keypair(
+            db_with_cleanup,
+            test_domain_name,
+            test_user_resource_policy_name,
+            test_keypair_resource_policy_name,
+        )
+
     async def _create_user_with_keypair(
         self,
         db: ExtendedAsyncSAEngine,
         domain_name: str,
         user_policy_name: str,
         kp_policy_name: str,
-    ) -> tuple[uuid.UUID, str]:
+    ) -> UserWithKeypair:
         """Create a user with RBAC role and keypair. Returns (user_uuid, email)."""
         user_uuid = uuid.uuid4()
         email = f"test-{user_uuid.hex[:8]}@example.com"
@@ -233,23 +278,21 @@ class TestVFolderOwnershipTransferRBACCleanup:
                 resource_policy=user_policy_name,
             )
             db_sess.add(user)
-            await db_sess.flush()
 
+            role_id = uuid.uuid4()
             role_row = RoleRow(
-                id=uuid.uuid4(),
+                id=role_id,
                 name=f"user-role-{user_uuid.hex[:8]}",
                 source=RoleSource.SYSTEM,
             )
             db_sess.add(role_row)
-            await db_sess.flush()
 
             user_role_row = UserRoleRow(
                 id=uuid.uuid4(),
                 user_id=user_uuid,
-                role_id=role_row.id,
+                role_id=role_id,
             )
             db_sess.add(user_role_row)
-            await db_sess.flush()
 
             keypair = KeyPairRow(
                 user_id=email,
@@ -264,35 +307,24 @@ class TestVFolderOwnershipTransferRBACCleanup:
             db_sess.add(keypair)
             await db_sess.flush()
 
-        return user_uuid, email
+        return UserWithKeypair(user_id=user_uuid, email=email)
 
     async def test_ownership_transfer_cleans_up_old_owner_rbac(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
+        vfolder_repository: VfolderRepository,
         test_domain_name: str,
-        test_user_resource_policy_name: str,
-        test_keypair_resource_policy_name: str,
         test_group: uuid.UUID,
+        old_owner: UserWithKeypair,
+        new_owner: UserWithKeypair,
     ) -> None:
         """
         Verify that after ownership transfer, the old owner's RBAC records
         (scope-entity mapping and permissions) are cleaned up.
         """
-        repo = VfolderRepository(db=db_with_cleanup)
-
-        # Create user A (old owner) and user B (new owner) with keypairs
-        user_a_id, user_a_email = await self._create_user_with_keypair(
-            db_with_cleanup,
-            test_domain_name,
-            test_user_resource_policy_name,
-            test_keypair_resource_policy_name,
-        )
-        user_b_id, user_b_email = await self._create_user_with_keypair(
-            db_with_cleanup,
-            test_domain_name,
-            test_user_resource_policy_name,
-            test_keypair_resource_policy_name,
-        )
+        repo = vfolder_repository
+        user_a_id, user_a_email = old_owner.user_id, old_owner.email
+        user_b_id, user_b_email = new_owner.user_id, new_owner.email
 
         vfolder_id = uuid.uuid4()
 
@@ -397,10 +429,11 @@ class TestVFolderOwnershipTransferRBACCleanup:
     async def test_round_trip_ownership_transfer_cleans_up_rbac(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
+        vfolder_repository: VfolderRepository,
         test_domain_name: str,
-        test_user_resource_policy_name: str,
-        test_keypair_resource_policy_name: str,
         test_group: uuid.UUID,
+        old_owner: UserWithKeypair,
+        new_owner: UserWithKeypair,
     ) -> None:
         """
         Verify the round-trip scenario (A -> B -> A) works correctly:
@@ -408,20 +441,9 @@ class TestVFolderOwnershipTransferRBACCleanup:
         the intermediate owner's RBAC records are cleaned up and
         the original owner has valid RBAC records.
         """
-        repo = VfolderRepository(db=db_with_cleanup)
-
-        user_a_id, user_a_email = await self._create_user_with_keypair(
-            db_with_cleanup,
-            test_domain_name,
-            test_user_resource_policy_name,
-            test_keypair_resource_policy_name,
-        )
-        user_b_id, user_b_email = await self._create_user_with_keypair(
-            db_with_cleanup,
-            test_domain_name,
-            test_user_resource_policy_name,
-            test_keypair_resource_policy_name,
-        )
+        repo = vfolder_repository
+        user_a_id, user_a_email = old_owner.user_id, old_owner.email
+        user_b_id, user_b_email = new_owner.user_id, new_owner.email
 
         vfolder_id = uuid.uuid4()
 
@@ -501,10 +523,11 @@ class TestVFolderOwnershipTransferRBACCleanup:
     async def test_invitee_rbac_cleaned_up_on_ownership_transfer(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
+        vfolder_repository: VfolderRepository,
         test_domain_name: str,
-        test_user_resource_policy_name: str,
-        test_keypair_resource_policy_name: str,
         test_group: uuid.UUID,
+        old_owner: UserWithKeypair,
+        new_owner: UserWithKeypair,
     ) -> None:
         """
         Regression test for BA-5277:
@@ -513,20 +536,9 @@ class TestVFolderOwnershipTransferRBACCleanup:
         3. Transfer ownership B -> A
         4. A invites B again -> B accepts (must not hit unique constraint violation)
         """
-        repo = VfolderRepository(db=db_with_cleanup)
-
-        user_a_id, user_a_email = await self._create_user_with_keypair(
-            db_with_cleanup,
-            test_domain_name,
-            test_user_resource_policy_name,
-            test_keypair_resource_policy_name,
-        )
-        user_b_id, user_b_email = await self._create_user_with_keypair(
-            db_with_cleanup,
-            test_domain_name,
-            test_user_resource_policy_name,
-            test_keypair_resource_policy_name,
-        )
+        repo = vfolder_repository
+        user_a_id, user_a_email = old_owner.user_id, old_owner.email
+        user_b_id, user_b_email = new_owner.user_id, new_owner.email
 
         vfolder_id = uuid.uuid4()
 
@@ -615,29 +627,19 @@ class TestVFolderOwnershipTransferRBACCleanup:
     async def test_ownership_transfer_grants_new_owner_rbac(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
+        vfolder_repository: VfolderRepository,
         test_domain_name: str,
-        test_user_resource_policy_name: str,
-        test_keypair_resource_policy_name: str,
         test_group: uuid.UUID,
+        old_owner: UserWithKeypair,
+        new_owner: UserWithKeypair,
     ) -> None:
         """
         Verify that when B was previously an invitee (REF scope-entity mapping),
         ownership transfer upgrades B's mapping to AUTO and grants owner permissions.
         """
-        repo = VfolderRepository(db=db_with_cleanup)
-
-        user_a_id, user_a_email = await self._create_user_with_keypair(
-            db_with_cleanup,
-            test_domain_name,
-            test_user_resource_policy_name,
-            test_keypair_resource_policy_name,
-        )
-        user_b_id, user_b_email = await self._create_user_with_keypair(
-            db_with_cleanup,
-            test_domain_name,
-            test_user_resource_policy_name,
-            test_keypair_resource_policy_name,
-        )
+        repo = vfolder_repository
+        user_a_id, user_a_email = old_owner.user_id, old_owner.email
+        user_b_id, user_b_email = new_owner.user_id, new_owner.email
 
         vfolder_id = uuid.uuid4()
 
@@ -720,29 +722,19 @@ class TestVFolderOwnershipTransferRBACCleanup:
     async def test_ownership_transfer_preserves_invitee_legacy_permission(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
+        vfolder_repository: VfolderRepository,
         test_domain_name: str,
-        test_user_resource_policy_name: str,
-        test_keypair_resource_policy_name: str,
         test_group: uuid.UUID,
+        old_owner: UserWithKeypair,
+        new_owner: UserWithKeypair,
     ) -> None:
         """
         Verify that after ownership transfer, the new owner's legacy
         vfolder_permissions record is preserved (not deleted).
         """
-        repo = VfolderRepository(db=db_with_cleanup)
-
-        user_a_id, user_a_email = await self._create_user_with_keypair(
-            db_with_cleanup,
-            test_domain_name,
-            test_user_resource_policy_name,
-            test_keypair_resource_policy_name,
-        )
-        user_b_id, user_b_email = await self._create_user_with_keypair(
-            db_with_cleanup,
-            test_domain_name,
-            test_user_resource_policy_name,
-            test_keypair_resource_policy_name,
-        )
+        repo = vfolder_repository
+        user_a_id, user_a_email = old_owner.user_id, old_owner.email
+        user_b_id, user_b_email = new_owner.user_id, new_owner.email
 
         vfolder_id = uuid.uuid4()
 
