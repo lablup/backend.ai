@@ -436,8 +436,13 @@ async def admin_purge_user_v2(
     if me is None:
         raise UnreachableError("User context is not available after check_admin_only()")
     dto = input.to_pydantic()
+    options = dto.options
     await ctx.adapters.user.purge_user_by_id(
-        PurgeUserInput(user_id=dto.user_id),
+        PurgeUserInput(
+            user_id=dto.user_id,
+            purge_shared_vfolders=options.purge_shared_vfolders if options else False,
+            delegate_endpoint_ownership=options.delegate_endpoint_ownership if options else False,
+        ),
         me.user_id,
     )
     return PurgeUserPayloadGQL(success=True)
