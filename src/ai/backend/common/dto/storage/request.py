@@ -544,8 +544,9 @@ class TokenOperationType(StrEnum):
     UPLOAD = "upload"
 
 
-# Rejects path separators (/ \), traversal (..), null bytes, and whitespace-only strings.
-_SAFE_FILENAME_PATTERN = r"^(?!.*[/\\])(?!.*\.\.)(?!\s*$)[^\x00]+$"
+# Rejects path separators (/ \), exact traversal segments (. or ..),
+# control characters (0x00-0x1F, 0x7F), and whitespace-only strings.
+_SAFE_FILENAME_PATTERN = r"^(?!\s*$)(?!\.\.?$)[^\x00-\x1f\x7f/\\]+$"
 
 
 # Client-facing API request models for download archive endpoint

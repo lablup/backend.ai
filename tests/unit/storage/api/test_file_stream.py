@@ -9,6 +9,7 @@ This test suite covers:
 
 from __future__ import annotations
 
+import urllib.parse
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any, cast
@@ -312,7 +313,7 @@ class TestDownloadArchiveHandler:
         reader = api_response.body
         assert reader._base_path == tmp_path
 
-    async def test_handler_uses_default_filename_when_token_has_no_filename(
+    async def test_handler_uses_default_filename_when_token_filename_is_absent_or_null(
         self,
         mock_context: MagicMock,
         mock_query_param: MagicMock,
@@ -320,10 +321,10 @@ class TestDownloadArchiveHandler:
         tmp_path: Path,
     ) -> None:
         """
-        Test that handler uses reader.filename() when token has no custom filename.
+        Test that handler uses reader.filename() when token filename is absent or null.
 
         Scenario:
-        1. Call download_archive with token that has no filename field
+        1. Call download_archive with token whose filename is null
         2. Verify Content-Disposition header contains reader.filename() default
         """
         # Create test files matching token_data.files
@@ -424,5 +425,6 @@ class TestDownloadArchiveHandler:
 
         content_disposition = response.headers.get("Content-Disposition")
         assert content_disposition is not None
-        # RFC-5987 encoded Unicode filename should be present
-        assert "UTF-8''" in content_disposition
+        # Verify RFC-5987 encoded Unicode filename matches expected percent-encoding
+        expected_encoded = urllib.parse.quote(unicode_filename, encoding="utf-8")
+        assert f"filename*=UTF-8''{expected_encoded}" in content_disposition

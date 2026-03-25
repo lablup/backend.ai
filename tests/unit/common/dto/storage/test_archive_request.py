@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import urllib.parse
 from datetime import UTC, datetime, timedelta
 from typing import Any
 from uuid import uuid4
@@ -21,82 +22,121 @@ from ai.backend.common.types import VFolderID
 class TestCreateArchiveDownloadSessionRequestFilename:
     """Validate the filename field on CreateArchiveDownloadSessionRequest."""
 
-    VALID_BODY: dict[str, Any] = {
-        "volume": "vol1",
-        "virtual_folder_id": str(VFolderID(None, uuid4())),
-        "files": ["a.txt"],
-    }
+    @pytest.fixture
+    def valid_body(self) -> dict[str, Any]:
+        return {
+            "volume": "vol1",
+            "virtual_folder_id": str(VFolderID(None, uuid4())),
+            "files": ["a.txt"],
+        }
 
-    def test_filename_omitted_defaults_to_none(self) -> None:
-        req = CreateArchiveDownloadSessionRequest(**self.VALID_BODY)
+    def test_filename_omitted_defaults_to_none(self, valid_body: dict[str, Any]) -> None:
+        req = CreateArchiveDownloadSessionRequest(**valid_body)
         assert req.filename is None
 
-    def test_filename_accepted_when_valid(self) -> None:
-        req = CreateArchiveDownloadSessionRequest(**self.VALID_BODY, filename="export.zip")
+    def test_filename_accepted_when_valid(self, valid_body: dict[str, Any]) -> None:
+        req = CreateArchiveDownloadSessionRequest(**valid_body, filename="export.zip")
         assert req.filename == "export.zip"
 
-    def test_filename_unicode_accepted(self) -> None:
-        req = CreateArchiveDownloadSessionRequest(**self.VALID_BODY, filename="데이터-export.zip")
+    def test_filename_unicode_accepted(self, valid_body: dict[str, Any]) -> None:
+        req = CreateArchiveDownloadSessionRequest(**valid_body, filename="데이터-export.zip")
         assert req.filename == "데이터-export.zip"
 
+    def test_filename_with_double_dots_in_name_accepted(self, valid_body: dict[str, Any]) -> None:
+        req = CreateArchiveDownloadSessionRequest(**valid_body, filename="report..final.zip")
+        assert req.filename == "report..final.zip"
+
     @pytest.mark.parametrize(
-        "bad_filename,reason",
+        "bad_filename",
         [
-            ("path/file.zip", "contains /"),
-            ("path\\file.zip", "contains \\"),
-            ("..secret.zip", "contains .."),
-            ("foo\x00bar.zip", "contains null byte"),
-            ("", "empty string"),
-            ("   ", "whitespace-only"),
+            "path/file.zip",
+            "path\\file.zip",
+            "..",
+            ".",
+            "foo\x00bar.zip",
+            "foo\nbar.zip",
+            "foo\rbar.zip",
+            "",
+            "   ",
         ],
-        ids=["slash", "backslash", "dotdot", "null_byte", "empty", "whitespace"],
+        ids=["slash", "backslash", "dotdot", "dot", "null_byte", "newline", "cr", "empty", "whitespace"],
     )
-    def test_filename_rejected_for_unsafe_values(self, bad_filename: str, reason: str) -> None:
+    def test_filename_rejected_for_unsafe_values(
+        self, valid_body: dict[str, Any], bad_filename: str
+    ) -> None:
         with pytest.raises(ValidationError):
-            CreateArchiveDownloadSessionRequest(**self.VALID_BODY, filename=bad_filename)
+            CreateArchiveDownloadSessionRequest(**valid_body, filename=bad_filename)
 
 
 class TestArchiveDownloadTokenDataFilename:
     """Verify filename field on ArchiveDownloadTokenData and JWT roundtrip."""
 
-    def _make_token_data(self, filename: str | None = None) -> ArchiveDownloadTokenData:
+    @pytest.fixture
+    def token_data_without_filename(self) -> ArchiveDownloadTokenData:
         return ArchiveDownloadTokenData(
             operation=TokenOperationType.DOWNLOAD,
             volume="vol1",
             virtual_folder_id=VFolderID(None, uuid4()),
             files=["a.txt"],
-            filename=filename,
             exp=datetime.now(UTC) + timedelta(hours=1),
         )
 
-    def test_filename_defaults_to_none(self) -> None:
-        data = self._make_token_data()
-        assert data.filename is None
+    @pytest.fixture
+    def token_data_with_filename(self) -> ArchiveDownloadTokenData:
+        return ArchiveDownloadTokenData(
+            operation=TokenOperationType.DOWNLOAD,
+            volume="vol1",
+            virtual_folder_id=VFolderID(None, uuid4()),
+            files=["a.txt"],
+            filename="custom.zip",
+            exp=datetime.now(UTC) + timedelta(hours=1),
+        )
 
-    def test_filename_set(self) -> None:
-        data = self._make_token_data(filename="my-export.zip")
-        assert data.filename == "my-export.zip"
+    @pytest.fixture
+    def token_data_with_unicode_filename(self) -> ArchiveDownloadTokenData:
+        return ArchiveDownloadTokenData(
+            operation=TokenOperationType.DOWNLOAD,
+            volume="vol1",
+            virtual_folder_id=VFolderID(None, uuid4()),
+            files=["a.txt"],
+            filename="데이터-export.zip",
+            exp=datetime.now(UTC) + timedelta(hours=1),
+        )
 
-    def test_jwt_roundtrip_preserves_filename(self) -> None:
+    def test_filename_defaults_to_none(
+        self, token_data_without_filename: ArchiveDownloadTokenData
+    ) -> None:
+        assert token_data_without_filename.filename is None
+
+    def test_filename_set(
+        self, token_data_with_filename: ArchiveDownloadTokenData
+    ) -> None:
+        assert token_data_with_filename.filename == "custom.zip"
+
+    def test_jwt_roundtrip_preserves_filename(
+        self, token_data_with_filename: ArchiveDownloadTokenData
+    ) -> None:
         secret = "test-secret"
-        data = self._make_token_data(filename="custom.zip")
-        payload = data.model_dump(mode="json")
+        payload = token_data_with_filename.model_dump(mode="json")
         token = jwt.encode(payload, secret, algorithm="HS256")
         decoded = jwt.decode(token, secret, algorithms=["HS256"])
         assert decoded["filename"] == "custom.zip"
 
-    def test_jwt_roundtrip_without_filename(self) -> None:
+    def test_jwt_roundtrip_filename_absent_or_null(
+        self, token_data_without_filename: ArchiveDownloadTokenData
+    ) -> None:
         secret = "test-secret"
-        data = self._make_token_data()
-        payload = data.model_dump(mode="json")
+        payload = token_data_without_filename.model_dump(mode="json")
         token = jwt.encode(payload, secret, algorithm="HS256")
         decoded = jwt.decode(token, secret, algorithms=["HS256"])
         assert decoded["filename"] is None
 
-    def test_jwt_roundtrip_unicode_filename(self) -> None:
+    def test_jwt_roundtrip_unicode_filename(
+        self, token_data_with_unicode_filename: ArchiveDownloadTokenData
+    ) -> None:
         secret = "test-secret"
-        data = self._make_token_data(filename="데이터-export.zip")
-        payload = data.model_dump(mode="json")
+        unicode_filename = "데이터-export.zip"
+        payload = token_data_with_unicode_filename.model_dump(mode="json")
         token = jwt.encode(payload, secret, algorithm="HS256")
         decoded = jwt.decode(token, secret, algorithms=["HS256"])
-        assert decoded["filename"] == "데이터-export.zip"
+        assert decoded["filename"] == unicode_filename
