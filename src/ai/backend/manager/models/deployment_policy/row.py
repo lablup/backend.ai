@@ -94,6 +94,8 @@ DeploymentStrategySpec = RollingUpdateSpec | BlueGreenSpec
 
 
 def _get_endpoint_join_condition() -> sa.ColumnElement[bool]:
+    """Legacy join condition kept for reference. The canonical FK is now
+    ``endpoints.deployment_policy_id -> deployment_policies.id``."""
     from ai.backend.manager.models.endpoint import EndpointRow
 
     return foreign(DeploymentPolicyRow.endpoint) == EndpointRow.id
@@ -150,11 +152,11 @@ class DeploymentPolicyRow(Base):  # type: ignore[misc]
         nullable=False,
     )
 
-    # Relationships (without FK constraints)
+    # Relationship via FK on EndpointRow.deployment_policy_id
     endpoint_row: Mapped[EndpointRow | None] = relationship(
         "EndpointRow",
         back_populates="deployment_policy",
-        primaryjoin=_get_endpoint_join_condition,
+        foreign_keys="[EndpointRow.deployment_policy_id]",
         uselist=False,
     )
 

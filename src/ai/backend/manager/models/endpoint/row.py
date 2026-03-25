@@ -137,6 +137,8 @@ def _get_endpoint_auto_scaling_policy_join_condition() -> Any:
 
 
 def _get_endpoint_deployment_policy_join_condition() -> Any:
+    """Legacy join condition kept for reference. The canonical FK is now
+    ``endpoints.deployment_policy_id -> deployment_policies.id``."""
     from ai.backend.manager.models.deployment_policy import DeploymentPolicyRow
 
     return EndpointRow.id == foreign(DeploymentPolicyRow.endpoint)
@@ -322,6 +324,22 @@ class EndpointRow(Base):  # type: ignore[misc]
         server_default=sa.text("10"),
     )
 
+    # FK to deployment_policies — DEFERRABLE so that within a transaction the
+    # endpoint row can be inserted before the policy row exists.
+    deployment_policy_id: Mapped[UUID | None] = mapped_column(
+        "deployment_policy_id",
+        GUID,
+        sa.ForeignKey(
+            "deployment_policies.id",
+            name="fk_endpoints_deployment_policy_id",
+            ondelete="RESTRICT",
+            deferrable=True,
+            initially="deferred",
+        ),
+        nullable=False,
+        unique=True,
+    )
+
     routings = relationship("RoutingRow", back_populates="endpoint_row")
     tokens = relationship(
         "EndpointTokenRow",
@@ -367,7 +385,7 @@ class EndpointRow(Base):  # type: ignore[misc]
     deployment_policy = relationship(
         "DeploymentPolicyRow",
         back_populates="endpoint_row",
-        primaryjoin=_get_endpoint_deployment_policy_join_condition,
+        foreign_keys=[deployment_policy_id],
         uselist=False,
     )
 
