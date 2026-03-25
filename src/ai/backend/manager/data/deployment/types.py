@@ -327,6 +327,9 @@ class ModelRevisionSpec(ConfiguredModel):
     resource_spec: ResourceSpec
     mounts: MountMetadata
     execution: ExecutionSpec
+    # Kept as Mapping (not ModelDefinition) because this holds a partial override
+    # from the DB JSONB column. It may lack required fields and is only valid
+    # after being deep-merged into a fully generated ModelDefinition.
     model_definition: Mapping[str, Any] | None = None
 
     model_config = ConfigDict(arbitrary_types_allowed=True)
