@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import getpass
 import json
+import os
 
 import aiohttp
 import click
@@ -31,8 +32,8 @@ def login() -> None:
         )
         raise SystemExit(1)
 
-    user_id = input("User ID: ")
-    password = getpass.getpass("Password: ")
+    user_id = os.environ.get("BACKEND_USER") or input("User ID: ")
+    password = os.environ.get("BACKEND_PASSWORD") or getpass.getpass("Password: ")
 
     async def _run() -> None:
         connector = aiohttp.TCPConnector(ssl=not config.skip_ssl_verification)

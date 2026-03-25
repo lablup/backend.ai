@@ -64,6 +64,12 @@ environment where users access Backend.AI through the web console:
 ./bai config show
 ```
 
+For non-interactive environments (CI, Claude Code), use environment variables:
+
+```bash
+BACKEND_USER=admin@lablup.com BACKEND_PASSWORD=changeme ./bai login
+```
+
 This stores a session cookie in `~/.backend.ai/session/cookie.dat`.
 
 ### Setup (Direct API — Alternative)
