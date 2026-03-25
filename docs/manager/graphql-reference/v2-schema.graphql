@@ -1413,6 +1413,24 @@ type CreateDeploymentPayload {
   deployment: ModelDeployment!
 }
 
+"""Added in UNRELEASED. Input for creating a new domain."""
+input CreateDomainInputGQL {
+  """Domain name. Must be unique across the system."""
+  name: String!
+
+  """Optional description."""
+  description: String = null
+
+  """Whether the domain is active."""
+  isActive: Boolean! = true
+
+  """Allowed Docker registry URLs."""
+  allowedDockerRegistries: [String!] = null
+
+  """External integration identifier."""
+  integrationId: String = null
+}
+
 """Added in 25.14.0. """
 input CreateHuggingFaceRegistryInput {
   name: String!
@@ -1482,6 +1500,24 @@ input CreatePermissionInput {
   scopeId: String!
   entityType: RBACElementType!
   operation: OperationType!
+}
+
+"""Added in UNRELEASED. Input for creating a new project."""
+input CreateProjectInputGQL {
+  """Project name. Must be unique within the domain."""
+  name: String!
+
+  """Name of the domain this project belongs to."""
+  domainName: String!
+
+  """Optional description."""
+  description: String = null
+
+  """External integration identifier."""
+  integrationId: String = null
+
+  """Name of the resource policy to apply."""
+  resourcePolicy: String = null
 }
 
 """Added in 26.3.0. Input for creating a new query definition."""
@@ -1771,6 +1807,12 @@ type DeleteDomainConfigPayload {
   deleted: Boolean!
 }
 
+"""Added in UNRELEASED. Payload for domain deletion mutation."""
+type DeleteDomainPayloadGQL {
+  """Whether the deletion was successful."""
+  deleted: Boolean!
+}
+
 """Added in 25.14.0. """
 input DeleteHuggingFaceRegistryInput {
   id: ID!
@@ -1824,6 +1866,12 @@ input DeletePermissionInput {
 type DeletePermissionPayload {
   """ID of the deleted permission"""
   id: UUID!
+}
+
+"""Added in UNRELEASED. Payload for project deletion mutation."""
+type DeleteProjectPayloadGQL {
+  """Whether the deletion was successful."""
+  deleted: Boolean!
 }
 
 """Added in 26.3.0. Payload returned after deleting a query definition."""
@@ -2226,6 +2274,12 @@ type DomainLifecycleInfo {
 
 extend type DomainNode @key(fields: "id") {
   id: ID! @external
+}
+
+"""Added in UNRELEASED. Payload for domain mutation responses."""
+type DomainPayloadGQL {
+  """The domain entity."""
+  domain: DomainV2!
 }
 
 """
@@ -4262,6 +4316,46 @@ type Mutation {
   updateResourceGroupFairShareSpec(input: UpdateResourceGroupFairShareSpecInput!): UpdateResourceGroupFairShareSpecPayload! @deprecated(reason: "Use admin_update_resource_group_fair_share_spec instead. This API will be removed after v26.3.0. See BEP-1041 for migration guide.")
 
   """
+  Added in UNRELEASED. Create a new domain (admin only). Requires superadmin privileges.
+  """
+  adminCreateDomainV2(input: CreateDomainInputGQL!): DomainPayloadGQL!
+
+  """
+  Added in UNRELEASED. Update a domain (admin only). Requires superadmin privileges. Only provided fields will be updated.
+  """
+  adminUpdateDomainV2(domainName: String!, input: UpdateDomainInputGQL!): DomainPayloadGQL!
+
+  """
+  Added in UNRELEASED. Soft-delete a domain (admin only). Requires superadmin privileges.
+  """
+  adminDeleteDomainV2(domainName: String!): DeleteDomainPayloadGQL!
+
+  """
+  Added in UNRELEASED. Permanently purge a domain and all associated data (admin only). Requires superadmin privileges.
+  """
+  adminPurgeDomainV2(domainName: String!): PurgeDomainPayloadGQL!
+
+  """
+  Added in UNRELEASED. Create a new project (admin only). Requires superadmin privileges.
+  """
+  adminCreateProjectV2(input: CreateProjectInputGQL!): ProjectPayloadGQL!
+
+  """
+  Added in UNRELEASED. Update a project (admin only). Requires superadmin privileges. Only provided fields will be updated.
+  """
+  adminUpdateProjectV2(projectId: UUID!, input: UpdateProjectInputGQL!): ProjectPayloadGQL!
+
+  """
+  Added in UNRELEASED. Soft-delete a project (admin only). Requires superadmin privileges.
+  """
+  adminDeleteProjectV2(projectId: UUID!): DeleteProjectPayloadGQL!
+
+  """
+  Added in UNRELEASED. Permanently purge a project and all associated data (admin only). Requires superadmin privileges.
+  """
+  adminPurgeProjectV2(projectId: UUID!): PurgeProjectPayloadGQL!
+
+  """
   Added in 26.2.0. Create a new user (admin only). Requires superadmin privileges. Automatically creates a default keypair for the user
   """
   adminCreateUserV2(input: CreateUserV2Input!): CreateUserV2Payload!
@@ -4993,6 +5087,12 @@ type ProjectOrganizationInfo {
   resourcePolicy: String!
 }
 
+"""Added in UNRELEASED. Payload for project mutation responses."""
+type ProjectPayloadGQL {
+  """The project entity."""
+  project: ProjectV2!
+}
+
 """
 Added in 26.2.0. Project storage configuration. Contains allowed virtual folder hosts and their permissions.
 """
@@ -5292,6 +5392,18 @@ input ProjectWeightInputItem {
   Priority weight multiplier. Higher weight = higher priority allocation ratio. Set to null to use resource group's default_weight.
   """
   weight: Decimal = null
+}
+
+"""Added in UNRELEASED. Payload for domain permanent deletion mutation."""
+type PurgeDomainPayloadGQL {
+  """Whether the purge was successful."""
+  purged: Boolean!
+}
+
+"""Added in UNRELEASED. Payload for project permanent deletion mutation."""
+type PurgeProjectPayloadGQL {
+  """Whether the purge was successful."""
+  purged: Boolean!
 }
 
 """Added in 26.3.0. Input for purging a role"""
@@ -7833,6 +7945,26 @@ type UpdateDeploymentPolicyPayload {
   deploymentPolicy: DeploymentPolicy!
 }
 
+"""
+Added in UNRELEASED. Input for updating domain information. All fields optional.
+"""
+input UpdateDomainInputGQL {
+  """New domain name."""
+  name: String = null
+
+  """New description."""
+  description: String = null
+
+  """Updated active status."""
+  isActive: Boolean = null
+
+  """New allowed Docker registry URLs."""
+  allowedDockerRegistries: [String!] = null
+
+  """New external integration identifier."""
+  integrationId: String = null
+}
+
 """Added in 25.14.0. """
 input UpdateHuggingFaceRegistryInput {
   id: ID!
@@ -7943,6 +8075,26 @@ input UpdatePermissionInput {
   scopeId: String = null
   entityType: RBACElementType = null
   operation: OperationType = null
+}
+
+"""
+Added in UNRELEASED. Input for updating project information. All fields optional.
+"""
+input UpdateProjectInputGQL {
+  """New project name."""
+  name: String = null
+
+  """New description."""
+  description: String = null
+
+  """Updated active status."""
+  isActive: Boolean = null
+
+  """New external integration identifier."""
+  integrationId: String = null
+
+  """New resource policy name."""
+  resourcePolicy: String = null
 }
 
 """Added in 25.14.0. """
