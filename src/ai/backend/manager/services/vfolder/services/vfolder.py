@@ -730,6 +730,10 @@ class VFolderService:
         # Resolve target quota scope: use the provided one or default to requester's user scope
         if action.target_quota_scope_id is not None:
             target_quota_scope_id = action.target_quota_scope_id
+            # TODO: Support cloning to project quota scope.
+            #  Project quota scopes exist and project vfolders can be cloned,
+            #  but cloning *into* a project folder is not yet supported
+            #  the clone result is always created as a user-owned vfolder
             if target_quota_scope_id.scope_type != QuotaScopeType.USER:
                 raise VFolderInvalidParameter("Clone target must be a user quota scope.")
             await self._vfolder_repository.validate_quota_scope_access(
