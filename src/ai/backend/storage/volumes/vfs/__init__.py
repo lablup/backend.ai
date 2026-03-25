@@ -455,9 +455,15 @@ class BaseVolume(AbstractVolume):
         if vfolder_usage.used_bytes > fs_usage.capacity_bytes - fs_usage.used_bytes:
             raise ProcessExecutionError("Not enough space available for clone.")
 
-        # create the target vfolder
+        # create the target vfolder (auto-create quota scope if missing)
         src_vfpath = self.mangle_vfpath(src_vfid)
-        await self.create_vfolder(dst_vfid)
+        try:
+            await self.create_vfolder(dst_vfid)
+        except QuotaScopeNotFoundError:
+            if dst_vfid.quota_scope_id is None:
+                raise
+            await self.quota_model.create_quota_scope(dst_vfid.quota_scope_id)
+            await self.create_vfolder(dst_vfid)
         dst_vfpath = self.mangle_vfpath(dst_vfid)
 
         # perform the file-tree copy
