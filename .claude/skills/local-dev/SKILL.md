@@ -99,16 +99,20 @@ Config is stored in `~/.backend.ai/config.toml` and `credentials.toml`.
 ### Common Commands
 
 ```bash
-# Admin search with filters and ordering
+# Admin search with filters and ordering (superadmin only)
 ./bai admin domain search --limit 5 --name-contains default
 ./bai admin user search --status active --order-by created_at:desc
 ./bai admin agent search --limit 10
 ./bai admin image search --name-contains python
 ./bai admin session search --limit 5
 
-# Get single entity
+# Get single entity (any authenticated user)
 ./bai domain get default
 ./bai user get <uuid>
+
+# User-scoped search (any authenticated user)
+./bai user search --scope-domain default --limit 5
+./bai user search --scope-project <project-id> --limit 5
 
 # Sub-entity operations
 ./bai admin deployment revision search
@@ -161,6 +165,38 @@ sleep 5                  # Wait for initialization
 ./bai resource-group search --limit 1
 ./bai audit-log search --limit 1
 ```
+
+### Testing as a Regular User
+
+Switch credentials to a non-admin user to verify permission boundaries.
+
+Default user accounts and passwords are in `fixtures/manager/example-users.json`.
+API keypairs (access_key, secret_key) are in the `keypairs` DB table.
+
+```bash
+# Direct API — switch to regular user keypair
+./bai config set endpoint-type api
+./bai config set access-key AKIANABBDUSEREXAMPLE
+./bai config set secret-key <secret_key from keypairs table for user@lablup.com>
+
+# Or session login as regular user
+./bai config set endpoint-type session
+BACKEND_USER=user@lablup.com BACKEND_PASSWORD=C8qnIo29 ./bai login
+```
+
+Regular user test scenarios:
+
+```bash
+# These should succeed (user-facing endpoints)
+./bai domain get default
+./bai user search --scope-domain default --limit 5
+
+# These should fail with 403 (admin-only)
+./bai admin domain search --limit 1   # expect: forbidden
+./bai admin user search --limit 1     # expect: forbidden
+```
+
+Remember to switch back to admin credentials after testing.
 
 ## Smoke Test Script
 
