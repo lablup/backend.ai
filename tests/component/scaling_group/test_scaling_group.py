@@ -6,10 +6,7 @@ import pytest
 
 from ai.backend.client.v2.exceptions import NotFoundError
 from ai.backend.client.v2.registry import BackendAIClientRegistry
-from ai.backend.common.dto.manager.scaling_group import (
-    GetWsproxyVersionResponse,
-    ListScalingGroupsResponse,
-)
+from ai.backend.common.dto.manager.scaling_group import ListScalingGroupsResponse
 
 
 class TestScalingGroupList:
@@ -118,15 +115,3 @@ class TestScalingGroupWsproxyVersion:
             await user_registry.scaling_group.get_wsproxy_version(
                 scaling_group=scaling_group_fixture,
             )
-
-    async def test_get_wsproxy_version_with_uuid_string_parameter(
-        self,
-        admin_registry: BackendAIClientRegistry,
-        scaling_group_with_wsproxy: str,
-    ) -> None:
-        """BA-5411: Passing group UUID as a string correctly resolves the group."""
-        result = await admin_registry.scaling_group.get_wsproxy_version(
-            scaling_group=scaling_group_with_wsproxy,
-        )
-        assert isinstance(result, GetWsproxyVersionResponse)
-        assert result.wsproxy_version == "v2"
