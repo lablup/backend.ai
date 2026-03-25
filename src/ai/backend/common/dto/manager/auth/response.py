@@ -52,6 +52,12 @@ class SignupResponse(BaseResponseModel):
     secret_key: str = Field(description="Auto-generated API secret key paired with access_key")
 
 
+class LogoutResponse(BaseResponseModel):
+    """Response for logout. Login session has been invalidated."""
+
+    pass
+
+
 class SignoutResponse(BaseResponseModel):
     """Response for signout. Empty body; user and keypairs are now INACTIVE."""
 

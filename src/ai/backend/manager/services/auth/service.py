@@ -58,6 +58,7 @@ from ai.backend.manager.services.auth.actions.get_ssh_keypair import (
     GetSSHKeypairAction,
     GetSSHKeypairActionResult,
 )
+from ai.backend.manager.services.auth.actions.logout import LogoutAction, LogoutActionResult
 from ai.backend.manager.services.auth.actions.resolve_access_key_scope import (
     ResolveAccessKeyScopeAction,
     ResolveAccessKeyScopeResult,
@@ -355,6 +356,10 @@ class AuthService:
             access_key=ak,
             secret_key=sk,
         )
+
+    async def logout(self, action: LogoutAction) -> LogoutActionResult:
+        await self._auth_repository.invalidate_login_session_by_token(action.session_token)
+        return LogoutActionResult(success=True)
 
     async def signout(self, action: SignoutAction) -> SignoutActionResult:
         if action.email != action.requester_email:

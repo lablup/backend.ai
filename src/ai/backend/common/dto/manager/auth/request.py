@@ -16,6 +16,7 @@ from .types import AuthTokenType
 __all__ = (
     "AuthorizeRequest",
     "GetRoleRequest",
+    "LogoutRequest",
     "SignupRequest",
     "SignoutRequest",
     "UpdateFullNameRequest",
@@ -86,6 +87,14 @@ class SignupRequest(BaseRequestModel):
     description: str | None = Field(
         default=None,
         description="Free-text account description; defaults to empty string",
+    )
+
+
+class LogoutRequest(BaseRequestModel):
+    """Request to invalidate a login session."""
+
+    session_token: str = Field(
+        description="The session token to invalidate",
     )
 
 

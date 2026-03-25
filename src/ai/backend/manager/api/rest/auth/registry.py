@@ -25,6 +25,7 @@ def register_auth_routes(handler: AuthHandler, route_deps: RouteDeps) -> RouteRe
 
     # Public endpoints (no auth_required)
     reg.add("POST", "/authorize", handler.authorize)
+    reg.add("POST", "/logout", handler.logout)
     reg.add("POST", "/signup", handler.signup)
     reg.add("POST", "/update-password-no-auth", handler.update_password_no_auth)
 

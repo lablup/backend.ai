@@ -497,7 +497,23 @@ async def logout_handler(request: web.Request) -> web.Response:
     stats: WebStats = request.app["stats"]
     stats.active_logout_handlers.add(asyncio.current_task())
     session = await get_session(request)
+    session_token = session.identity
     session.invalidate()
+
+    # Invalidate login session in Manager DB
+    if session_token:
+        config = cast(WebServerUnifiedConfig, request.app["config"])
+        try:
+            endpoint = str(config.api.endpoint[0])
+            async with aiohttp.ClientSession() as http_session:
+                await http_session.post(
+                    f"{endpoint}/auth/logout",
+                    json={"session_token": session_token},
+                    ssl=config.api.ssl_verify,
+                )
+        except Exception:
+            log.warning("Failed to invalidate login session in Manager DB")
+
     return web.HTTPOk()
 
 

@@ -19,6 +19,7 @@ from ai.backend.manager.services.auth.actions.get_ssh_keypair import (
     GetSSHKeypairAction,
     GetSSHKeypairActionResult,
 )
+from ai.backend.manager.services.auth.actions.logout import LogoutAction, LogoutActionResult
 from ai.backend.manager.services.auth.actions.resolve_access_key_scope import (
     ResolveAccessKeyScopeAction,
     ResolveAccessKeyScopeResult,
@@ -57,6 +58,7 @@ from ai.backend.manager.services.auth.service import AuthService
 
 
 class AuthProcessors(AbstractProcessorPackage):
+    logout: ActionProcessor[LogoutAction, LogoutActionResult]
     signout: ActionProcessor[SignoutAction, SignoutActionResult]
     update_full_name: ActionProcessor[UpdateFullNameAction, UpdateFullNameActionResult]
     get_ssh_keypair: SingleEntityActionProcessor[GetSSHKeypairAction, GetSSHKeypairActionResult]
@@ -86,6 +88,7 @@ class AuthProcessors(AbstractProcessorPackage):
         action_monitors: list[ActionMonitor],
         validators: ActionValidators,
     ) -> None:
+        self.logout = ActionProcessor(service.logout, action_monitors)
         self.signout = ActionProcessor(service.signout, action_monitors)
         self.update_full_name = ActionProcessor(service.update_full_name, action_monitors)
         self.get_ssh_keypair = SingleEntityActionProcessor(
@@ -114,6 +117,7 @@ class AuthProcessors(AbstractProcessorPackage):
     @override
     def supported_actions(self) -> list[ActionSpec]:
         return [
+            LogoutAction.spec(),
             SignoutAction.spec(),
             UpdateFullNameAction.spec(),
             GetSSHKeypairAction.spec(),

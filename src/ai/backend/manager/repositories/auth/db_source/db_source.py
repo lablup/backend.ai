@@ -546,6 +546,23 @@ class AuthDBSource:
     # --- Login Session ---
 
     @auth_db_source_resilience.apply()
+    @auth_db_source_resilience.apply()
+    async def invalidate_session_by_token(self, session_token: str) -> None:
+        """Invalidate a single login session by its token."""
+        async with self._db.begin_session() as db_session:
+            query = (
+                sa.update(LoginSessionRow)
+                .where(
+                    (LoginSessionRow.session_token == session_token)
+                    & (LoginSessionRow.status == LoginSessionStatus.ACTIVE)
+                )
+                .values(
+                    status=LoginSessionStatus.INVALIDATED,
+                    invalidated_at=sa.func.now(),
+                )
+            )
+            await db_session.execute(query)
+
     async def invalidate_sessions_by_user(self, user_id: UUID) -> None:
         """Invalidate all active login sessions for a user."""
         async with self._db.begin_session() as db_session:

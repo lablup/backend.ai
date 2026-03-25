@@ -18,6 +18,7 @@ from ai.backend.common.api_handlers import APIResponse, BodyParam, QueryParam
 from ai.backend.common.dto.manager.auth.request import (
     AuthorizeRequest,
     GetRoleRequest,
+    LogoutRequest,
     SignoutRequest,
     SignupRequest,
     UpdateFullNameRequest,
@@ -30,6 +31,7 @@ from ai.backend.common.dto.manager.auth.response import (
     AuthorizeResponse,
     GetRoleResponse,
     GetSSHKeypairResponse,
+    LogoutResponse,
     MyIpResponse,
     SignoutResponse,
     SignupResponse,
@@ -51,6 +53,7 @@ from ai.backend.manager.services.auth.actions.authorize import AuthorizeAction
 from ai.backend.manager.services.auth.actions.generate_ssh_keypair import GenerateSSHKeypairAction
 from ai.backend.manager.services.auth.actions.get_role import GetRoleAction
 from ai.backend.manager.services.auth.actions.get_ssh_keypair import GetSSHKeypairAction
+from ai.backend.manager.services.auth.actions.logout import LogoutAction
 from ai.backend.manager.services.auth.actions.signout import SignoutAction
 from ai.backend.manager.services.auth.actions.signup import SignupAction
 from ai.backend.manager.services.auth.actions.update_full_name import UpdateFullNameAction
@@ -169,6 +172,17 @@ class AuthHandler:
         )
         resp = AuthorizeResponse(data=data)
         return APIResponse.build(HTTPStatus.OK, resp)
+
+    # ------------------------------------------------------------------
+    # logout (POST /auth/logout)
+    # ------------------------------------------------------------------
+
+    async def logout(self, body: BodyParam[LogoutRequest], ctx: RequestCtx) -> APIResponse:
+        params = body.parsed
+        log.info("AUTH.LOGOUT(session_token:{}...)", params.session_token[:8])
+        action = LogoutAction(session_token=params.session_token)
+        await self._auth.logout.wait_for_complete(action)
+        return APIResponse.build(HTTPStatus.OK, LogoutResponse())
 
     # ------------------------------------------------------------------
     # signup (POST /auth/signup)

@@ -370,3 +370,36 @@ class TestLoginSessionForce:
             LoginAttemptResult.FAILED_INVALID_CREDENTIALS,
         )
         assert fail_count == 1
+
+    # --- Scenario 7: login → logout → re-login without force succeeds ---
+
+    async def test_login_logout_relogin_succeeds(
+        self,
+        auth_db_source: AuthDBSource,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        sample_user: SampleUserData,
+    ) -> None:
+        """After logout (session invalidated), re-login should succeed without force."""
+        # First login
+        result1 = await auth_db_source.verify_credential_with_migration(
+            domain_name=sample_user.domain_name,
+            email=sample_user.email,
+            target_password_info=self._make_password_info(),
+        )
+        assert result1.session_token
+        assert await self._count_active_sessions(db_with_cleanup, sample_user.user_id) == 1
+
+        # Logout (invalidate session by token)
+        await auth_db_source.invalidate_session_by_token(result1.session_token)
+        assert await self._count_active_sessions(db_with_cleanup, sample_user.user_id) == 0
+
+        # Re-login without force should succeed
+        result2 = await auth_db_source.verify_credential_with_migration(
+            domain_name=sample_user.domain_name,
+            email=sample_user.email,
+            target_password_info=self._make_password_info(),
+            force=False,
+        )
+        assert result2.user.uuid == sample_user.user_id
+        assert result2.session_token != result1.session_token
+        assert await self._count_active_sessions(db_with_cleanup, sample_user.user_id) == 1

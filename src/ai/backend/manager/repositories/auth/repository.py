@@ -138,6 +138,10 @@ class AuthRepository:
     # --- Login Session ---
 
     @auth_repository_resilience.apply()
+    async def invalidate_login_session_by_token(self, session_token: str) -> None:
+        await self._db_source.invalidate_session_by_token(session_token)
+
+    @auth_repository_resilience.apply()
     async def invalidate_user_login_sessions(self, user_id: UUID) -> None:
         await self._db_source.invalidate_sessions_by_user(user_id)
 
