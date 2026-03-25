@@ -312,7 +312,7 @@ class TestDownloadArchiveHandler:
         reader = api_response.body
         assert reader._base_path == tmp_path
 
-    async def test_handler_uses_filename_from_reader(
+    async def test_handler_uses_default_filename_when_token_has_no_filename(
         self,
         mock_context: MagicMock,
         mock_query_param: MagicMock,
@@ -320,12 +320,11 @@ class TestDownloadArchiveHandler:
         tmp_path: Path,
     ) -> None:
         """
-        Test that handler uses filename from StreamReader (not hardcoded).
+        Test that handler uses reader.filename() when token has no custom filename.
 
         Scenario:
-        1. Call download_archive
-        2. Verify response headers contain filename from reader.filename()
-        3. Verify filename is not hardcoded "archive.zip"
+        1. Call download_archive with token that has no filename field
+        2. Verify Content-Disposition header contains reader.filename() default
         """
         # Create test files matching token_data.files
         (tmp_path / "file1.txt").write_text("content1")
@@ -338,15 +337,92 @@ class TestDownloadArchiveHandler:
         unwrapped = cast(Any, DownloadHandler.download_archive).__wrapped__
         response = await unwrapped(handler, mock_query_param, mock_context)
 
-        # Verify response has headers
-        assert response.headers is not None
-
-        # Verify Content-Disposition header exists and contains filename
+        # Verify Content-Disposition header contains the default filename
         content_disposition = response.headers.get("Content-Disposition")
         assert content_disposition is not None
-
-        # Verify filename comes from reader.filename() (default is "archive.zip")
         api_response = cast(APIStreamResponse, response)
         reader = cast(ZipArchiveStreamReader, api_response.body)
-        expected_filename = reader.filename()
-        assert expected_filename in content_disposition
+        assert reader.filename() in content_disposition
+
+    async def test_handler_uses_custom_filename_from_token(
+        self,
+        mock_context: MagicMock,
+        secret: str,
+        tmp_path: Path,
+    ) -> None:
+        """
+        Test that handler uses custom filename from JWT token in Content-Disposition.
+
+        Scenario:
+        1. Create JWT token with filename="my-export.zip"
+        2. Call download_archive
+        3. Verify Content-Disposition header contains "my-export.zip"
+        """
+        custom_filename = "my-export.zip"
+        token_data_with_filename = ArchiveDownloadTokenData(
+            operation=TokenOperationType.DOWNLOAD,
+            volume="test-volume",
+            virtual_folder_id=VFolderID(None, uuid4()),
+            files=["file1.txt"],
+            filename=custom_filename,
+            exp=datetime.now(UTC) + timedelta(hours=1),
+        )
+
+        payload = token_data_with_filename.model_dump(mode="json")
+        payload["exp"] = int(token_data_with_filename.exp.timestamp())
+        token = jwt.encode(payload, secret, algorithm="HS256")
+
+        query = MagicMock()
+        query.parsed.token = token
+
+        (tmp_path / "file1.txt").write_text("content1")
+
+        handler = DownloadHandler(secret=secret)
+        unwrapped = cast(Any, DownloadHandler.download_archive).__wrapped__
+        response = await unwrapped(handler, query, mock_context)
+
+        content_disposition = response.headers.get("Content-Disposition")
+        assert content_disposition is not None
+        assert custom_filename in content_disposition
+
+    async def test_handler_uses_unicode_filename_from_token(
+        self,
+        mock_context: MagicMock,
+        secret: str,
+        tmp_path: Path,
+    ) -> None:
+        """
+        Test that handler correctly encodes Unicode filename in Content-Disposition.
+
+        Scenario:
+        1. Create JWT token with filename="데이터-export.zip"
+        2. Call download_archive
+        3. Verify Content-Disposition contains RFC-5987 encoded filename
+        """
+        unicode_filename = "데이터-export.zip"
+        token_data_with_filename = ArchiveDownloadTokenData(
+            operation=TokenOperationType.DOWNLOAD,
+            volume="test-volume",
+            virtual_folder_id=VFolderID(None, uuid4()),
+            files=["file1.txt"],
+            filename=unicode_filename,
+            exp=datetime.now(UTC) + timedelta(hours=1),
+        )
+
+        payload = token_data_with_filename.model_dump(mode="json")
+        payload["exp"] = int(token_data_with_filename.exp.timestamp())
+        token = jwt.encode(payload, secret, algorithm="HS256")
+
+        query = MagicMock()
+        query.parsed.token = token
+
+        (tmp_path / "file1.txt").write_text("content1")
+
+        handler = DownloadHandler(secret=secret)
+        unwrapped = cast(Any, DownloadHandler.download_archive).__wrapped__
+        response = await unwrapped(handler, query, mock_context)
+
+        content_disposition = response.headers.get("Content-Disposition")
+        assert content_disposition is not None
+        # RFC-5987 encoded Unicode filename should be present
+        assert "UTF-8''" in content_disposition

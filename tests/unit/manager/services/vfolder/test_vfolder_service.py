@@ -274,3 +274,35 @@ class TestVFolderFileServiceCreateArchiveDownload:
         call_kwargs = mock_client.create_archive_download_token.call_args.kwargs
         assert call_kwargs["volume"] == self.VOLUME_NAME
         assert call_kwargs["files"] == sample_action.files
+
+    async def test_download_archive_passes_filename_to_storage_proxy(
+        self,
+        file_service: VFolderFileService,
+        mock_storage_manager: MagicMock,
+        sample_vfolder_uuid: uuid.UUID,
+    ) -> None:
+        """Test that custom filename is forwarded to storage proxy client."""
+        action_with_filename = CreateArchiveDownloadSessionAction(
+            keypair_resource_policy={"default": {}},
+            vfolder_uuid=sample_vfolder_uuid,
+            files=self.SAMPLE_FILES,
+            filename="my-export.zip",
+        )
+        await file_service.create_archive_download_session(action_with_filename)
+
+        mock_client = mock_storage_manager.get_manager_facing_client.return_value
+        call_kwargs = mock_client.create_archive_download_token.call_args.kwargs
+        assert call_kwargs["filename"] == "my-export.zip"
+
+    async def test_download_archive_passes_none_filename_when_omitted(
+        self,
+        file_service: VFolderFileService,
+        mock_storage_manager: MagicMock,
+        sample_action: CreateArchiveDownloadSessionAction,
+    ) -> None:
+        """Test that filename=None is passed when not specified in action."""
+        await file_service.create_archive_download_session(sample_action)
+
+        mock_client = mock_storage_manager.get_manager_facing_client.return_value
+        call_kwargs = mock_client.create_archive_download_token.call_args.kwargs
+        assert call_kwargs["filename"] is None
