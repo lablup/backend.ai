@@ -596,14 +596,13 @@ class FractionAllocMap(AbstractAllocMap):
             for dev_id, current_alloc in sorted_dev_allocs
         ]
 
-        """
-        For each N, compute per-device share D = round_down(alloc / N, quantum).
-        Some devices receive D + quantum (to cover the shortfall from rounding).
-        Accept if enough devices can hold their respective share.
-        This prevents tiny useless fragments while allowing more requests to succeed
-        by incrementally increasing the device count.
-        """
-        for n in range(min_n, total_devices + 1):
+        # - Single-device requests (alloc <= capacity): must fit on 1 device, no splitting.
+        # - Multi-device requests (alloc > capacity): try N = min_n, min_n+1, ..., total_devices.
+        #   For each N, compute per-device share D = round_down(alloc / N, quantum).
+        #   Some devices receive D + quantum (to cover the shortfall from rounding).
+        #   Accept if enough devices can hold their respective share.
+        max_n = min_n if alloc <= device_capacity else total_devices
+        for n in range(min_n, max_n + 1):
             per_device_share = round_down(alloc / Decimal(n), quantum)
             shortfall = alloc - per_device_share * n
             extra_devices = math.ceil(shortfall / quantum) if shortfall > 0 else 0

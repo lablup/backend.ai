@@ -1656,22 +1656,38 @@ class TestDefragNIncrement:
             )
 
     @pytest.mark.parametrize("strategy", [AllocationStrategy.FILL, AllocationStrategy.EVENLY])
-    async def test_n_increment_to_max_devices(self, strategy: AllocationStrategy) -> None:
-        """8 GPUs each free=0.3, R=0.8.
-        N=1: D=0.8 → fail (0.3 < 0.8)
-        N=2: D=0.4 → fail (0.3 < 0.4)
-        N=3: D=0.2, shortfall=0.2, extra=2 → need 2 with 0.3 + 1 with 0.2 → all have 0.3 → pass
+    async def test_n_increment_to_higher_n(self, strategy: AllocationStrategy) -> None:
+        """8 GPUs each free=0.3, R=1.8.
+        N=2: D=0.9 → fail (0.3 < 0.9)
+        N=3: D=0.6 → fail (0.3 < 0.6)
+        ...
+        N=6: D=0.3 → 8 have 0.3 → pass
         """
         alloc_map = self._make_map_with_remaining(
             [Decimal("0.3")] * 8,
             strategy,
         )
         result = alloc_map.allocate(
-            {SlotName("cuda.shares"): Decimal("0.8")},
+            {SlotName("cuda.shares"): Decimal("1.8")},
             allow_resource_fragmentation=False,
         )
         total = sum(result[SlotName("cuda.shares")].values())
-        assert total == Decimal("0.8")
+        assert total == Decimal("1.8")
+
+    @pytest.mark.parametrize("strategy", [AllocationStrategy.FILL, AllocationStrategy.EVENLY])
+    async def test_single_device_request_no_increment(self, strategy: AllocationStrategy) -> None:
+        """R <= capacity: N is fixed at 1, no increment allowed.
+        8 GPUs each free=0.3, R=0.8 → N=1 only, 0.3 < 0.8 → reject.
+        """
+        alloc_map = self._make_map_with_remaining(
+            [Decimal("0.3")] * 8,
+            strategy,
+        )
+        with pytest.raises(FractionalResourceFragmented):
+            alloc_map.allocate(
+                {SlotName("cuda.shares"): Decimal("0.8")},
+                allow_resource_fragmentation=False,
+            )
 
 
 class TestShortfallRemainder:
