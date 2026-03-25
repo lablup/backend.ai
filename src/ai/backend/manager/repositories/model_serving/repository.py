@@ -10,7 +10,6 @@ from sqlalchemy.orm import selectinload
 
 from ai.backend.common.clients.valkey_client.valkey_live.client import ValkeyLiveClient
 from ai.backend.common.contexts.user import current_user
-from ai.backend.common.data.model_deployment.types import DeploymentStrategy
 from ai.backend.common.data.permission.types import RBACElementType
 from ai.backend.common.docker import ImageRef
 from ai.backend.common.exception import BackendAIError, VFolderNotFound
@@ -47,7 +46,6 @@ from ai.backend.manager.errors.auth import InvalidAuthParameters
 from ai.backend.manager.errors.common import ObjectNotFound
 from ai.backend.manager.errors.resource import DatabaseConnectionUnavailable
 from ai.backend.manager.errors.service import EndpointNotFound
-from ai.backend.manager.models.deployment_policy import RollingUpdateSpec
 from ai.backend.manager.models.endpoint import (
     AutoScalingMetricComparator,
     AutoScalingMetricSource,
@@ -227,11 +225,7 @@ class ModelServingRepository:
             endpoint = result.row
 
             # Create default rolling deployment policy
-            policy_creator_spec = DeploymentPolicyCreatorSpec(
-                endpoint_id=endpoint.id,
-                strategy=DeploymentStrategy.ROLLING,
-                strategy_spec=RollingUpdateSpec(max_surge=1, max_unavailable=0),
-            )
+            policy_creator_spec = DeploymentPolicyCreatorSpec.build_default(endpoint.id)
             policy_creator = RBACEntityCreator(
                 spec=policy_creator_spec,
                 element_type=RBACElementType.DEPLOYMENT_POLICY,

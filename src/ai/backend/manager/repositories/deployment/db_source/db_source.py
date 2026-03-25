@@ -18,7 +18,6 @@ from sqlalchemy.orm import selectinload
 
 from ai.backend.common.config import ModelHealthCheck
 from ai.backend.common.data.endpoint.types import EndpointLifecycle
-from ai.backend.common.data.model_deployment.types import DeploymentStrategy
 from ai.backend.common.data.permission.types import RBACElementType
 from ai.backend.common.exception import DeploymentNameAlreadyExists
 from ai.backend.common.types import (
@@ -84,7 +83,7 @@ from ai.backend.manager.models.deployment_auto_scaling_policy import (
     DeploymentAutoScalingPolicyData,
     DeploymentAutoScalingPolicyRow,
 )
-from ai.backend.manager.models.deployment_policy import DeploymentPolicyRow, RollingUpdateSpec
+from ai.backend.manager.models.deployment_policy import DeploymentPolicyRow
 from ai.backend.manager.models.deployment_revision import DeploymentRevisionRow
 from ai.backend.manager.models.endpoint import (
     EndpointAutoScalingRuleRow,
@@ -262,11 +261,7 @@ class DeploymentDBSource:
                     strategy_spec=policy_config.strategy_spec,
                 )
             else:
-                policy_creator_spec = DeploymentPolicyCreatorSpec(
-                    endpoint_id=endpoint.id,
-                    strategy=DeploymentStrategy.ROLLING,
-                    strategy_spec=RollingUpdateSpec(max_surge=1, max_unavailable=0),
-                )
+                policy_creator_spec = DeploymentPolicyCreatorSpec.build_default(endpoint.id)
             policy_creator = RBACEntityCreator(
                 spec=policy_creator_spec,
                 element_type=RBACElementType.DEPLOYMENT_POLICY,
@@ -350,11 +345,7 @@ class DeploymentDBSource:
             if spec.policy is not None:
                 policy_spec = spec.policy
             else:
-                policy_spec = DeploymentPolicyCreatorSpec(
-                    endpoint_id=endpoint.id,
-                    strategy=DeploymentStrategy.ROLLING,
-                    strategy_spec=RollingUpdateSpec(max_surge=1, max_unavailable=0),
-                )
+                policy_spec = DeploymentPolicyCreatorSpec.build_default(endpoint.id)
             policy_creator = RBACEntityCreator(
                 spec=policy_spec,
                 element_type=RBACElementType.DEPLOYMENT_POLICY,
