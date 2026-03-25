@@ -8,11 +8,13 @@ import uuid
 from collections.abc import AsyncGenerator
 from dataclasses import dataclass
 from datetime import UTC, datetime
+from unittest.mock import AsyncMock, create_autospec
 from uuid import UUID
 
 import pytest
 import sqlalchemy as sa
 
+from ai.backend.common.clients.valkey_client.valkey_session.client import ValkeySessionClient
 from ai.backend.common.exception import UserNotFound
 from ai.backend.common.types import ResourceSlot, VFolderHostPermissionMap
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
@@ -109,7 +111,9 @@ class TestAuthRepository:
 
     @pytest.fixture
     async def auth_repository(self, db_with_cleanup: ExtendedAsyncSAEngine) -> AuthRepository:
-        return AuthRepository(db=db_with_cleanup)
+        mock_valkey = create_autospec(ValkeySessionClient, instance=True)
+        mock_valkey.delete_session_data_batch = AsyncMock(return_value=None)
+        return AuthRepository(db=db_with_cleanup, valkey_session_client=mock_valkey)
 
     @pytest.fixture
     async def default_domain(

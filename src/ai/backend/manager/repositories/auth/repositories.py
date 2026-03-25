@@ -11,7 +11,7 @@ class AuthRepositories:
 
     @classmethod
     def create(cls, args: RepositoryArgs) -> Self:
-        repository = AuthRepository(args.db)
+        repository = AuthRepository(args.db, args.valkey_session_client)
 
         return cls(
             repository=repository,
