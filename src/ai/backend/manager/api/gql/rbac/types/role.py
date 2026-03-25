@@ -490,7 +490,7 @@ class RoleAssignmentOrderBy(PydanticInputMixin[RoleAssignmentOrderByDTO], GQLOrd
 class CreateRoleInput(PydanticInputMixin[CreateRoleInputDTO]):
     name: str
     description: str | None = None
-    source: RoleSourceGQL | None = None
+    source: RoleSourceGQL = RoleSourceGQL.CUSTOM
 
 
 @gql_pydantic_input(
