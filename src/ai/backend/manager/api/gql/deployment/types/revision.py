@@ -650,6 +650,7 @@ class CreateRevisionInput(PydanticInputMixin[CreateRevisionInputDTO]):
     image: ImageInput
     model_runtime_config: ModelRuntimeConfigInput
     model_mount_config: ModelMountConfigInput
+    model_definition: ModelDefinitionInputGQL
     extra_mounts: list[ExtraVFolderMountInput] | None = Field(
         default=None, description="Extra vfolder mounts"
     )

@@ -9,7 +9,6 @@ from pathlib import PurePosixPath
 from uuid import UUID
 
 from ai.backend.common.api_handlers import Sentinel
-from ai.backend.common.config import ModelDefinition
 from ai.backend.common.data.model_deployment.types import (
     DeploymentStrategy,
     RouteStatus,
@@ -338,37 +337,44 @@ class DeploymentAdapter(BaseAdapter):
         created_user_id: UUID,
     ) -> CreateDeploymentPayload:
         """Create a new deployment."""
-        ir = input.initial_revision
+        initial_revision = input.initial_revision
         mounts_creator = VFolderMountsCreator(
-            model_vfolder_id=ir.model_mount_config.vfolder_id,
-            model_definition_path=ir.model_mount_config.definition_path,
-            model_mount_destination=ir.model_mount_config.mount_destination,
+            model_vfolder_id=initial_revision.model_mount_config.vfolder_id,
+            model_definition_path=initial_revision.model_mount_config.definition_path,
+            model_mount_destination=initial_revision.model_mount_config.mount_destination,
             extra_mounts=[
                 MountInfo(
                     vfolder_id=m.vfolder_id,
                     kernel_path=PurePosixPath(m.mount_destination) if m.mount_destination else None,
                 )
-                for m in (ir.extra_mounts or [])
+                for m in (initial_revision.extra_mounts or [])
             ],
         )
         model_revision_creator = ModelRevisionCreator(
-            image_id=ir.image.id,
+            image_id=initial_revision.image.id,
             resource_spec=ResourceSpec(
-                cluster_mode=ir.cluster_config.mode,
-                cluster_size=ir.cluster_config.size,
+                cluster_mode=initial_revision.cluster_config.mode,
+                cluster_size=initial_revision.cluster_config.size,
                 resource_slots={
-                    e.resource_type: e.quantity for e in ir.resource_config.resource_slots.entries
+                    e.resource_type: e.quantity
+                    for e in initial_revision.resource_config.resource_slots.entries
                 },
-                resource_opts={e.name: e.value for e in ir.resource_config.resource_opts.entries}
-                if ir.resource_config.resource_opts
+                resource_opts={
+                    e.name: e.value for e in initial_revision.resource_config.resource_opts.entries
+                }
+                if initial_revision.resource_config.resource_opts
                 else None,
             ),
             mounts=mounts_creator,
-            model_definition=ModelDefinition(),
+            model_definition=initial_revision.model_definition,
             execution=ExecutionSpec(
-                runtime_variant=RuntimeVariant(ir.model_runtime_config.runtime_variant),
-                environ={e.name: e.value for e in ir.model_runtime_config.environ.entries}
-                if ir.model_runtime_config.environ
+                runtime_variant=RuntimeVariant(
+                    initial_revision.model_runtime_config.runtime_variant
+                ),
+                environ={
+                    e.name: e.value for e in initial_revision.model_runtime_config.environ.entries
+                }
+                if initial_revision.model_runtime_config.environ
                 else None,
             ),
         )
@@ -401,7 +407,7 @@ class DeploymentAdapter(BaseAdapter):
                 name=meta.name or f"deployment-{created_user_id.hex[:8]}",
                 domain=meta.domain_name,
                 project=meta.project_id,
-                resource_group=ir.resource_config.resource_group.name,
+                resource_group=initial_revision.resource_config.resource_group.name,
                 created_user=created_user_id,
                 session_owner=created_user_id,
                 created_at=None,

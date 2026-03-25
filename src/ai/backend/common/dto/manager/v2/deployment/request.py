@@ -187,6 +187,9 @@ class CreateRevisionInputDTO(BaseRequestModel):
     image: ImageInput = Field(description="Container image")
     model_runtime_config: ModelRuntimeConfigInput = Field(description="Runtime configuration")
     model_mount_config: ModelMountConfigInput = Field(description="Model mount configuration")
+    model_definition: ModelDefinition = Field(
+        description="Model definition to override the generated definition"
+    )
     extra_mounts: list[ExtraVFolderMountInput] | None = Field(
         default=None, description="Additional vfolder mounts"
     )
