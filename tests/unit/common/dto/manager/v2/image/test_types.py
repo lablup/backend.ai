@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import json
-from decimal import Decimal
 
 from ai.backend.common.dto.manager.v2.image.types import (
     ImageLabelInfo,
@@ -156,19 +155,19 @@ class TestImageResourceLimitInfo:
     """Tests for ImageResourceLimitInfo Pydantic model."""
 
     def test_basic_creation_with_max(self) -> None:
-        limit = ImageResourceLimitInfo(key="cpu", min=Decimal("0.1"), max=Decimal("8.0"))
+        limit = ImageResourceLimitInfo(key="cpu", min="0.1", max="8.0")
         assert limit.key == "cpu"
-        assert limit.min == Decimal("0.1")
-        assert limit.max == Decimal("8.0")
+        assert limit.min == "0.1"
+        assert limit.max == "8.0"
 
     def test_creation_with_null_max(self) -> None:
-        limit = ImageResourceLimitInfo(key="mem", min=Decimal("256"), max=None)
+        limit = ImageResourceLimitInfo(key="mem", min="256", max=None)
         assert limit.key == "mem"
-        assert limit.min == Decimal("256")
+        assert limit.min == "256"
         assert limit.max is None
 
     def test_serialization_round_trip_with_max(self) -> None:
-        limit = ImageResourceLimitInfo(key="gpu", min=Decimal("1"), max=Decimal("4"))
+        limit = ImageResourceLimitInfo(key="gpu", min="1", max="4")
         json_str = limit.model_dump_json()
         restored = ImageResourceLimitInfo.model_validate_json(json_str)
         assert restored.key == limit.key
@@ -176,16 +175,14 @@ class TestImageResourceLimitInfo:
         assert restored.max == limit.max
 
     def test_serialization_round_trip_null_max(self) -> None:
-        limit = ImageResourceLimitInfo(key="gpu", min=Decimal("0"), max=None)
+        limit = ImageResourceLimitInfo(key="gpu", min="0", max=None)
         json_str = limit.model_dump_json()
         restored = ImageResourceLimitInfo.model_validate_json(json_str)
         assert restored.key == limit.key
         assert restored.min == limit.min
         assert restored.max is None
 
-    def test_decimal_precision_preserved(self) -> None:
-        limit = ImageResourceLimitInfo(key="mem", min=Decimal("0.5"), max=Decimal("16.25"))
-        json_str = limit.model_dump_json()
-        restored = ImageResourceLimitInfo.model_validate_json(json_str)
-        assert restored.min == Decimal("0.5")
-        assert restored.max == Decimal("16.25")
+    def test_suffixed_values_accepted(self) -> None:
+        limit = ImageResourceLimitInfo(key="mem", min="256m", max="16g")
+        assert limit.min == "256m"
+        assert limit.max == "16g"
