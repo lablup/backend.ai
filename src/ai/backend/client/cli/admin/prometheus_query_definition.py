@@ -1,36 +1,18 @@
-import asyncio
-import json
 import sys
-from uuid import UUID
+from collections.abc import Sequence
 
 import click
 
 from ai.backend.cli.types import ExitCode
 from ai.backend.client.cli.extensions import pass_ctx_obj
-from ai.backend.client.cli.pretty import print_done
 from ai.backend.client.cli.types import CLIContext
-from ai.backend.client.config import get_config
-from ai.backend.client.v2.auth import HMACAuth
-from ai.backend.client.v2.config import ClientConfig
-from ai.backend.client.v2.registry import BackendAIClientRegistry
-from ai.backend.common.dto.clients.prometheus.request import QueryTimeRange
-from ai.backend.common.dto.manager.prometheus_query_preset import (
-    CreateQueryDefinitionOptionsRequest,
-    CreateQueryDefinitionRequest,
-    ExecuteQueryDefinitionOptionsRequest,
-    ExecuteQueryDefinitionRequest,
-    MetricLabelEntry,
-    ModifyQueryDefinitionOptionsRequest,
-    ModifyQueryDefinitionRequest,
-    QueryDefinitionFilter,
-    SearchQueryDefinitionsRequest,
-)
-from ai.backend.common.dto.manager.query import StringFilter
 
 from . import admin
 
 
-def _parse_label_filters(labels: tuple[str, ...]) -> list[MetricLabelEntry]:
+def _parse_label_filters(labels: tuple[str, ...]) -> Sequence[object]:
+    from ai.backend.common.dto.manager.prometheus_query_preset import MetricLabelEntry
+
     parsed: list[MetricLabelEntry] = []
     for label in labels:
         if "=" not in label:
@@ -61,6 +43,17 @@ def prometheus_query_definition() -> None:
 @click.option("--limit", type=int, default=20, help="Maximum items to return.")
 def search(ctx: CLIContext, filter_name: str | None, offset: int, limit: int) -> None:
     """Search prometheus query definitions."""
+    import asyncio
+
+    from ai.backend.client.config import get_config
+    from ai.backend.client.v2.auth import HMACAuth
+    from ai.backend.client.v2.config import ClientConfig
+    from ai.backend.client.v2.registry import BackendAIClientRegistry
+    from ai.backend.common.dto.manager.prometheus_query_preset import (
+        QueryDefinitionFilter,
+        SearchQueryDefinitionsRequest,
+    )
+    from ai.backend.common.dto.manager.query import StringFilter
 
     async def _run() -> None:
         api_config = get_config()
@@ -106,6 +99,13 @@ def search(ctx: CLIContext, filter_name: str | None, offset: int, limit: int) ->
 @click.argument("definition_id", type=str)
 def info(ctx: CLIContext, definition_id: str) -> None:
     """Show details of a prometheus query definition."""
+    import asyncio
+    from uuid import UUID
+
+    from ai.backend.client.config import get_config
+    from ai.backend.client.v2.auth import HMACAuth
+    from ai.backend.client.v2.config import ClientConfig
+    from ai.backend.client.v2.registry import BackendAIClientRegistry
 
     async def _run() -> None:
         api_config = get_config()
@@ -162,6 +162,17 @@ def add(
     group_labels: str,
 ) -> None:
     """Create a new prometheus query definition."""
+    import asyncio
+
+    from ai.backend.client.cli.pretty import print_done
+    from ai.backend.client.config import get_config
+    from ai.backend.client.v2.auth import HMACAuth
+    from ai.backend.client.v2.config import ClientConfig
+    from ai.backend.client.v2.registry import BackendAIClientRegistry
+    from ai.backend.common.dto.manager.prometheus_query_preset import (
+        CreateQueryDefinitionOptionsRequest,
+        CreateQueryDefinitionRequest,
+    )
 
     async def _run() -> None:
         api_config = get_config()
@@ -224,6 +235,19 @@ def modify(
     group_labels: str | None,
 ) -> None:
     """Modify an existing prometheus query definition."""
+    import asyncio
+    from uuid import UUID
+
+    from ai.backend.client.cli.pretty import print_done
+    from ai.backend.client.config import get_config
+    from ai.backend.client.v2.auth import HMACAuth
+    from ai.backend.client.v2.config import ClientConfig
+    from ai.backend.client.v2.registry import BackendAIClientRegistry
+    from ai.backend.common.dto.manager.prometheus_query_preset import (
+        ModifyQueryDefinitionOptionsRequest,
+        ModifyQueryDefinitionRequest,
+    )
+
     if all(
         v is None
         for v in (name, metric_name, query_template, time_window, filter_labels, group_labels)
@@ -281,6 +305,14 @@ def modify(
 @click.confirmation_option(prompt="Are you sure you want to delete this definition?")
 def delete(ctx: CLIContext, definition_id: str) -> None:
     """Delete a prometheus query definition."""
+    import asyncio
+    from uuid import UUID
+
+    from ai.backend.client.cli.pretty import print_done
+    from ai.backend.client.config import get_config
+    from ai.backend.client.v2.auth import HMACAuth
+    from ai.backend.client.v2.config import ClientConfig
+    from ai.backend.client.v2.registry import BackendAIClientRegistry
 
     async def _run() -> None:
         api_config = get_config()
@@ -332,6 +364,19 @@ def execute(
     time_window: str | None,
 ) -> None:
     """Execute a prometheus query definition."""
+    import asyncio
+    import json
+    from uuid import UUID
+
+    from ai.backend.client.config import get_config
+    from ai.backend.client.v2.auth import HMACAuth
+    from ai.backend.client.v2.config import ClientConfig
+    from ai.backend.client.v2.registry import BackendAIClientRegistry
+    from ai.backend.common.dto.clients.prometheus.request import QueryTimeRange
+    from ai.backend.common.dto.manager.prometheus_query_preset import (
+        ExecuteQueryDefinitionOptionsRequest,
+        ExecuteQueryDefinitionRequest,
+    )
 
     async def _run() -> None:
         api_config = get_config()
