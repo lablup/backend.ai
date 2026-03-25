@@ -142,6 +142,7 @@ from ai.backend.manager.data.deployment.types import (
 from ai.backend.manager.data.deployment.upserter import DeploymentPolicyUpserter
 from ai.backend.manager.models.deployment_policy import BlueGreenSpec, RollingUpdateSpec
 from ai.backend.manager.models.deployment_policy.conditions import DeploymentPolicyConditions
+from ai.backend.manager.models.deployment_policy.row import DeploymentPolicyRow
 from ai.backend.manager.models.deployment_revision import DeploymentRevisionRow
 from ai.backend.manager.models.deployment_revision.conditions import RevisionConditions
 from ai.backend.manager.models.deployment_revision.orders import RevisionOrders
@@ -256,6 +257,16 @@ def _get_deployment_pagination_spec() -> PaginationSpec:
         forward_condition_factory=DeploymentConditions.by_cursor_forward,
         backward_condition_factory=DeploymentConditions.by_cursor_backward,
         tiebreaker_order=EndpointRow.name.asc(),
+    )
+
+
+def _get_deployment_policy_pagination_spec() -> PaginationSpec:
+    return PaginationSpec(
+        forward_order=DeploymentPolicyRow.created_at.desc(),
+        backward_order=DeploymentPolicyRow.created_at.asc(),
+        forward_condition_factory=DeploymentConditions.by_cursor_forward,
+        backward_condition_factory=DeploymentConditions.by_cursor_backward,
+        tiebreaker_order=DeploymentPolicyRow.id.asc(),
     )
 
 
@@ -1236,7 +1247,7 @@ class DeploymentAdapter(BaseAdapter):
         return self._build_querier(
             conditions=conditions,
             orders=[],
-            pagination_spec=_get_deployment_pagination_spec(),
+            pagination_spec=_get_deployment_policy_pagination_spec(),
             limit=input.limit,
             offset=input.offset,
         )
