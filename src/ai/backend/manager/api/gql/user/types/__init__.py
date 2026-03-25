@@ -22,6 +22,7 @@ from .inputs import (
     CreateUserInputGQL,
     DeleteUsersInputGQL,
     PurgeUserInputGQL,
+    PurgeUserV2OptionsGQL,
     UpdateMyAllowedClientIPInputGQL,
     UpdateUserV2InputGQL,
 )
@@ -94,6 +95,7 @@ __all__ = [
     "UpdateMyAllowedClientIPInputGQL",
     "DeleteUsersInputGQL",
     "PurgeUserInputGQL",
+    "PurgeUserV2OptionsGQL",
     "BulkPurgeUsersV2InputGQL",
     "BulkPurgeUsersV2OptionsGQL",
     # Payloads
