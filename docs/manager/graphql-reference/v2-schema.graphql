@@ -1569,6 +1569,7 @@ input CreateRevisionInput {
   image: ImageInput!
   modelRuntimeConfig: ModelRuntimeConfigInput!
   modelMountConfig: ModelMountConfigInput!
+  modelDefinition: ModelDefinitionInput!
   extraMounts: [ExtraVFolderMountInput!]
 }
 
