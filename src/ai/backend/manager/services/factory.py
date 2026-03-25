@@ -122,6 +122,12 @@ from ai.backend.manager.services.vfolder.services.sharing import VFolderSharingS
 from ai.backend.manager.services.vfolder.services.vfolder import VFolderService
 from ai.backend.manager.services.vfs_storage.processors import VFSStorageProcessors
 from ai.backend.manager.services.vfs_storage.service import VFSStorageService
+from ai.backend.manager.sokovan.deployment.definition_generator.registry import (
+    ModelDefinitionGeneratorRegistry,
+)
+from ai.backend.manager.sokovan.deployment.definition_generator.registry import (
+    RegistryArgs as ModelDefinitionRegistryArgs,
+)
 
 
 def create_services(args: ServiceArgs) -> Services:
@@ -339,6 +345,12 @@ def create_services(args: ServiceArgs) -> Services:
             args.deployment_controller,
             args.deployment_controller._deployment_repository,
             args.revision_generator_registry,
+            ModelDefinitionGeneratorRegistry(
+                ModelDefinitionRegistryArgs(
+                    deployment_repository=args.deployment_controller._deployment_repository,
+                    enable_model_definition_override=args.config_provider.config.deployment.enable_model_definition_override,
+                )
+            ),
         ),
         storage_namespace=StorageNamespaceService(repositories.storage_namespace.repository),
         audit_log=AuditLogService(repositories.audit_log.repository),

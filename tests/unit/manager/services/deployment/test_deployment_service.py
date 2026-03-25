@@ -88,10 +88,13 @@ class DeploymentServiceBaseFixtures:
         mock_revision_generator_registry: MagicMock,
     ) -> DeploymentService:
         """Create DeploymentService with mock dependencies."""
+        mock_model_def_registry = AsyncMock()
+        mock_model_def_registry.generate_model_definition.return_value = ModelDefinition()
         return DeploymentService(
             deployment_controller=mock_deployment_controller,
             deployment_repository=mock_deployment_repository,
             revision_generator_registry=mock_revision_generator_registry,
+            model_definition_generator_registry=mock_model_def_registry,
         )
 
     @pytest.fixture
@@ -476,9 +479,7 @@ class TestAddModelRevision(ModelRevisionFixtures):
         assert spec.cluster_size == revision_creator.resource_spec.cluster_size
         assert spec.model_mount_destination == revision_creator.mounts.model_mount_destination
         assert spec.model_definition_path == revision_creator.mounts.model_definition_path
-        assert spec.model_definition == revision_creator.model_definition.model_dump(
-            exclude_none=True, by_alias=True
-        )
+        assert spec.model_definition == revision_creator.model_definition
         assert spec.startup_command == revision_creator.execution.startup_command
         assert spec.bootstrap_script == revision_creator.execution.bootstrap_script
         assert spec.environ == revision_creator.execution.environ
@@ -534,14 +535,28 @@ class TestAddModelRevision(ModelRevisionFixtures):
             model_definition=sample_model_definition,
         )
 
-    async def test_add_model_revision_propagates_model_definition(
+    async def test_add_model_revision_stores_resolved_model_definition(
         self,
+        deployment_service: DeploymentService,
         processors: DeploymentProcessors,
         mock_deployment_repository: MagicMock,
         deployment_id: uuid.UUID,
         revision_creator_with_model_definition: ModelRevisionCreator,
+        sample_model_definition: ModelDefinition,
     ) -> None:
-        """model_definition from the creator should be serialized and stored in the DB spec."""
+        """Resolved model_definition (from generator registry) should be stored in the DB spec."""
+        # Configure the mock registry to return a specific resolved definition
+        resolved_definition = ModelDefinition.model_validate({
+            "models": [
+                {
+                    "name": "resolved-model",
+                    "model-path": "/models",
+                    "service": {"start-command": "resolved-cmd", "port": 9000},
+                }
+            ]
+        })
+        deployment_service._model_definition_generator_registry.generate_model_definition.return_value = resolved_definition
+
         action = AddModelRevisionAction(
             model_deployment_id=deployment_id, adder=revision_creator_with_model_definition
         )
@@ -549,8 +564,7 @@ class TestAddModelRevision(ModelRevisionFixtures):
 
         spec = mock_deployment_repository.create_revision_with_next_number.call_args[0][0].spec
         assert spec.model_definition is not None
-        assert spec.model_definition["models"][0]["name"] == "test-model"
-        assert spec.model_definition["models"][0]["service"]["port"] == 8000
+        assert spec.model_definition == resolved_definition
 
 
 class TestServiceDefinitionMerge(ModelRevisionFixtures):

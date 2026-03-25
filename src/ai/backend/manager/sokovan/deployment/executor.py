@@ -48,10 +48,6 @@ from ai.backend.manager.repositories.deployment.repository import (
     AutoScalingMetricsData,
     DeploymentRepository,
 )
-from ai.backend.manager.sokovan.deployment.definition_generator.registry import (
-    ModelDefinitionGeneratorRegistry,
-    RegistryArgs,
-)
 from ai.backend.manager.sokovan.deployment.recorder.context import DeploymentRecorderContext
 from ai.backend.manager.sokovan.scheduling_controller import SchedulingController
 
@@ -103,12 +99,6 @@ class DeploymentExecutor:
         self._config_provider = config_provider
         self._client_pool = client_pool
         self._valkey_stat = valkey_stat
-        self._model_definition_generator_registry = ModelDefinitionGeneratorRegistry(
-            RegistryArgs(
-                deployment_repository=self._deployment_repo,
-                enable_model_definition_override=self._config_provider.config.deployment.enable_model_definition_override,
-            )
-        )
 
     async def check_pending_deployments(
         self, deployments: Sequence[DeploymentWithHistory]
@@ -452,13 +442,10 @@ class DeploymentExecutor:
             with recorder.step("check_target_revision"):
                 target_revision = deployment.resolve_revision_spec(revision_id)
 
-            with recorder.step("generate_model_definition"):
-                model_definition = (
-                    await self._model_definition_generator_registry.generate_model_definition(
-                        target_revision
-                    )
-                )
-                health_check_config = model_definition.health_check_config()
+            with recorder.step("extract_health_check_config"):
+                health_check_config = None
+                if target_revision.model_definition:
+                    health_check_config = target_revision.model_definition.health_check_config()
                 if not health_check_config:
                     log.debug(
                         "No health check configuration found in model definition for deployment {}",

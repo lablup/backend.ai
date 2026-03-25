@@ -97,6 +97,7 @@ class DeploymentCRUDBaseFixtures:
             deployment_controller=mock_deployment_controller,
             deployment_repository=mock_deployment_repository,
             revision_generator_registry=mock_revision_generator_registry,
+            model_definition_generator_registry=MagicMock(),
         )
 
     @pytest.fixture

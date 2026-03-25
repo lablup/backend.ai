@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
-from typing import TYPE_CHECKING
 
 from ai.backend.common.config import ModelDefinition
 from ai.backend.common.exception import RuntimeVariantNotSupportedError
@@ -10,7 +9,10 @@ from ai.backend.common.types import RuntimeVariant
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.errors.deployment import DefinitionFileNotFound
 from ai.backend.manager.repositories.deployment import DeploymentRepository
-from ai.backend.manager.sokovan.deployment.definition_generator.base import ModelDefinitionGenerator
+from ai.backend.manager.sokovan.deployment.definition_generator.base import (
+    ModelDefinitionContext,
+    ModelDefinitionGenerator,
+)
 from ai.backend.manager.sokovan.deployment.definition_generator.cmd import (
     CMDModelDefinitionGenerator,
 )
@@ -32,9 +34,6 @@ from ai.backend.manager.sokovan.deployment.definition_generator.sglang import (
 from ai.backend.manager.sokovan.deployment.definition_generator.vllm import (
     VLLMModelDefinitionGenerator,
 )
-
-if TYPE_CHECKING:
-    from ai.backend.manager.data.deployment.types import ModelRevisionSpec
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -70,88 +69,83 @@ class ModelDefinitionGeneratorRegistry:
             raise RuntimeVariantNotSupportedError(runtime_variant)
         return generator
 
-    async def generate_model_definition(self, model_revision: ModelRevisionSpec) -> ModelDefinition:
+    async def generate_model_definition(self, context: ModelDefinitionContext) -> ModelDefinition:
         """
-        Generate a model definition for the given model revision.
+        Generate the final model definition for a revision.
 
-        For CUSTOM variant: Always fetches from storage.
+        Called at revision creation time to produce the fully-resolved definition
+        that is stored in the DB. Subsequent PROVISIONING reads the stored value
+        directly — no vfolder access at runtime.
+
+        For CUSTOM variant:
+            - Generator fetches the complete definition from vfolder storage
         For other variants:
-            - Generate programmatically first
-            - If model_definition is stored in the revision DB record, deep merge it
-            - If enable_model_definition_override is True and model_definition_path exists,
-              try to fetch from storage and deep merge (override) with the result
+            - Generator produces a programmatic definition
+            - If enable_model_definition_override is True and model_definition_path
+              exists, fetch from vfolder and deep merge (partial override)
+
+        In all cases, user-provided model_definition override is applied last.
 
         Merge priority (later overrides earlier):
-            1. Programmatically generated definition (lowest)
-            2. Revision DB record model_definition
-            3. Storage file override (highest)
+            1. Generator-produced definition (lowest)
+            2. Vfolder file override (non-CUSTOM only, requires flag)
+            3. User-provided model_definition override (highest)
         """
-        runtime_variant = model_revision.execution.runtime_variant
+        runtime_variant = context.execution.runtime_variant
         generator = self.get(runtime_variant)
+        generated_definition = await generator.generate_model_definition(context)
 
-        # For CUSTOM variant, always use the generator (which fetches from storage)
-        if runtime_variant == RuntimeVariant.CUSTOM:
-            return await generator.generate_model_definition(model_revision)
+        # For non-CUSTOM variants, optionally apply vfolder file override
+        if runtime_variant != RuntimeVariant.CUSTOM and self._enable_model_definition_override:
+            model_definition_path = context.mounts.model_definition_path
+            if model_definition_path:
+                generated_definition = await self._try_merge_vfolder_definition(
+                    context=context,
+                    base_definition=generated_definition,
+                )
 
-        # For other variants, generate first
-        generated_definition = await generator.generate_model_definition(model_revision)
-
-        # Merge revision DB model_definition if present
-        if model_revision.model_definition:
+        # Merge user-provided model_definition override if present
+        if context.model_definition:
             try:
-                generated_definition = generated_definition.merge(model_revision.model_definition)
+                generated_definition = generated_definition.merge(context.model_definition)
             except Exception:
                 log.error(
-                    "Failed to merge revision DB model_definition, using server-generated definition",
+                    "Failed to merge user-provided model_definition, using server-generated definition",
                     exc_info=True,
                 )
 
-        # Check if storage file override is enabled and path exists
-        if not self._enable_model_definition_override:
-            return generated_definition
+        return generated_definition
 
-        model_definition_path = model_revision.mounts.model_definition_path
-        if not model_definition_path:
-            return generated_definition
-
-        # Try to fetch override from storage and merge
-        return await self._try_apply_override(
-            model_revision=model_revision,
-            base_definition=generated_definition,
-        )
-
-    async def _try_apply_override(
+    async def _try_merge_vfolder_definition(
         self,
-        model_revision: ModelRevisionSpec,
+        context: ModelDefinitionContext,
         base_definition: ModelDefinition,
     ) -> ModelDefinition:
         """
-        Try to fetch model definition from storage and deep merge with base definition.
+        Try to fetch model definition from vfolder storage and deep merge with base definition.
         Falls back to base definition on failure.
         """
         try:
-            override_dict = await self._deployment_repository.fetch_model_definition(
-                vfolder_id=model_revision.mounts.model_vfolder_id,
-                model_definition_path=model_revision.mounts.model_definition_path,
+            vfolder_dict = await self._deployment_repository.fetch_model_definition(
+                vfolder_id=context.mounts.model_vfolder_id,
+                model_definition_path=context.mounts.model_definition_path,
             )
-            merged_definition = base_definition.merge(ModelDefinition.model_validate(override_dict))
+            merged_definition = base_definition.merge(ModelDefinition.model_validate(vfolder_dict))
             log.debug(
-                "Model definition override applied successfully for vfolder {}",
-                model_revision.mounts.model_vfolder_id,
+                "Vfolder model definition merged successfully for vfolder {}",
+                context.mounts.model_vfolder_id,
             )
             return merged_definition
         except DefinitionFileNotFound:
             log.debug(
-                "Model definition override file not found for vfolder {}, "
-                "using generated definition",
-                model_revision.mounts.model_vfolder_id,
+                "Model definition file not found in vfolder {}, using generated definition",
+                context.mounts.model_vfolder_id,
             )
             return base_definition
         except Exception:
             log.warning(
-                "Failed to apply model definition override for vfolder {}, "
-                "using generated definition",
-                model_revision.mounts.model_vfolder_id,
+                "Failed to read model definition from vfolder {}, using generated definition",
+                context.mounts.model_vfolder_id,
                 exc_info=True,
             )
             return base_definition
