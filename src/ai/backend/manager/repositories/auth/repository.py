@@ -1,12 +1,15 @@
+import logging
 from datetime import datetime
 from typing import Any
 from uuid import UUID
 
 import sqlalchemy as sa
 
+from ai.backend.common.clients.valkey_client.valkey_session.client import ValkeySessionClient
 from ai.backend.common.metrics.metric import DomainType, LayerType
 from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPolicy
 from ai.backend.common.resilience.resilience import Resilience
+from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.data.auth.login_session_types import LoginHistoryData, LoginSessionData
 from ai.backend.manager.data.auth.types import GroupMembershipData, UserData
 from ai.backend.manager.data.common.types import SearchResult
@@ -21,6 +24,8 @@ from ai.backend.manager.repositories.auth.db_source.db_source import (
 from ai.backend.manager.repositories.base.querier import BatchQuerier
 from ai.backend.manager.repositories.base.types import SearchScope
 
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+
 auth_repository_resilience = Resilience(
     policies=[
         MetricPolicy(MetricArgs(domain=DomainType.REPOSITORY, layer=LayerType.AUTH_REPOSITORY)),
@@ -30,9 +35,26 @@ auth_repository_resilience = Resilience(
 
 class AuthRepository:
     _db_source: AuthDBSource
+    _valkey_session_client: ValkeySessionClient
 
-    def __init__(self, db: ExtendedAsyncSAEngine) -> None:
+    def __init__(
+        self, db: ExtendedAsyncSAEngine, valkey_session_client: ValkeySessionClient
+    ) -> None:
         self._db_source = AuthDBSource(db)
+        self._valkey_session_client = valkey_session_client
+
+    async def _delete_valkey_sessions(self, session_tokens: list[str]) -> None:
+        """Delete Valkey session keys for the given session tokens.
+
+        Valkey errors are caught and logged — they must not roll back DB transactions.
+        """
+        if not session_tokens:
+            return
+        keys = [f"AIOHTTP_SESSION_{t}" for t in session_tokens]
+        try:
+            await self._valkey_session_client.delete_session_data_batch(keys)
+        except Exception:
+            log.exception("Failed to delete Valkey session keys; DB transaction is unaffected")
 
     @auth_repository_resilience.apply()
     async def get_group_membership(self, group_id: UUID, user_id: UUID) -> GroupMembershipData:
@@ -98,13 +120,15 @@ class AuthRepository:
         force: bool = False,
         max_session_age: int = 604800,
     ) -> CredentialVerificationResult:
-        return await self._db_source.verify_credential_with_migration(
+        result = await self._db_source.verify_credential_with_migration(
             domain_name,
             email,
             target_password_info,
             force=force,
             max_session_age=max_session_age,
         )
+        await self._delete_valkey_sessions(result.invalidated_session_tokens)
+        return result
 
     @auth_repository_resilience.apply()
     async def create_login_session(
@@ -140,10 +164,12 @@ class AuthRepository:
     @auth_repository_resilience.apply()
     async def invalidate_login_session_by_token(self, session_token: str) -> None:
         await self._db_source.invalidate_session_by_token(session_token)
+        await self._delete_valkey_sessions([session_token])
 
     @auth_repository_resilience.apply()
     async def invalidate_user_login_sessions(self, user_id: UUID) -> None:
-        await self._db_source.invalidate_sessions_by_user(user_id)
+        tokens = await self._db_source.invalidate_sessions_by_user(user_id)
+        await self._delete_valkey_sessions(tokens)
 
     @auth_repository_resilience.apply()
     async def search_login_sessions(
