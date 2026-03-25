@@ -435,6 +435,10 @@ async def login_handler(request: web.Request) -> web.Response:
                         "role": token.role,
                         "status": token.status,
                     }
+                    # Use Manager's session_token as session identity
+                    # so Valkey key matches DB session_token
+                    if token.session_token:
+                        session.set_new_identity(token.session_token)
                     session["authenticated"] = True
                     session["token"] = stored_token  # store full token
                     result["authenticated"] = True
