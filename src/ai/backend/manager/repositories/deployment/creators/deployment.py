@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import uuid
 from collections.abc import Mapping, Sequence
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import datetime
 from typing import Any, override
 
@@ -131,9 +131,6 @@ class DeploymentCreatorSpec(CreatorSpec[EndpointRow]):
     network: DeploymentNetworkFields
     revision: ModelRevisionFields
 
-    # Auto-generated revision ID for the initial revision
-    _initial_revision_id: uuid.UUID = field(default_factory=uuid.uuid4, init=False)
-
     @override
     def build_row(self) -> EndpointRow:
         return EndpointRow(
@@ -175,8 +172,6 @@ class DeploymentCreatorSpec(CreatorSpec[EndpointRow]):
             # Default state fields
             lifecycle_stage=EndpointLifecycle.PENDING,
             retries=0,
-            # Initial revision reference
-            current_revision=self._initial_revision_id,
         )
 
 

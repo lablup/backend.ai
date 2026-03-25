@@ -2,9 +2,8 @@
 
 from __future__ import annotations
 
-import uuid as uuid_mod
 from collections.abc import Mapping, Sequence
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Any, Self, override
 from uuid import UUID
 
@@ -73,9 +72,6 @@ class LegacyEndpointCreatorSpec(CreatorSpec[EndpointRow]):
     callback_url: yarl.URL | None
 
     policy: DeploymentPolicyCreatorSpec | None
-
-    # Auto-generated revision ID for the initial revision
-    _initial_revision_id: UUID = field(default_factory=uuid_mod.uuid4, init=False)
 
     @classmethod
     def from_deployment_creator(
@@ -169,6 +165,4 @@ class LegacyEndpointCreatorSpec(CreatorSpec[EndpointRow]):
             # Default state fields
             lifecycle_stage=EndpointLifecycle.PENDING,
             retries=0,
-            # Initial revision reference
-            current_revision=self._initial_revision_id,
         )
