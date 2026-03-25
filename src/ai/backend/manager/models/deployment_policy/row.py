@@ -120,7 +120,12 @@ class DeploymentPolicyRow(Base):  # type: ignore[misc]
     id: Mapped[uuid.UUID] = mapped_column(
         "id", GUID, primary_key=True, server_default=sa.text("uuid_generate_v4()")
     )
-    endpoint: Mapped[uuid.UUID] = mapped_column("endpoint", GUID, nullable=False)
+    endpoint: Mapped[uuid.UUID] = mapped_column(
+        "endpoint",
+        GUID,
+        sa.ForeignKey("endpoints.id", name="fk_deployment_policies_endpoint", ondelete="CASCADE"),
+        nullable=False,
+    )
 
     # Deployment strategy
     strategy: Mapped[DeploymentStrategy] = mapped_column(

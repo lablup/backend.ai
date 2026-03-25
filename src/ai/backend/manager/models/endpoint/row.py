@@ -326,7 +326,7 @@ class EndpointRow(Base):  # type: ignore[misc]
 
     # FK to deployment_policies — DEFERRABLE so that within a transaction the
     # endpoint row can be inserted before the policy row exists.
-    deployment_policy_id: Mapped[UUID | None] = mapped_column(
+    deployment_policy_id: Mapped[UUID] = mapped_column(
         "deployment_policy_id",
         GUID,
         sa.ForeignKey(

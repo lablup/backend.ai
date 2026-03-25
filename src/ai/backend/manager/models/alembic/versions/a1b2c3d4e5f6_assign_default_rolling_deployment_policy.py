@@ -97,8 +97,20 @@ def upgrade() -> None:
         ["deployment_policy_id"],
     )
 
+    # Add CASCADE FK from deployment_policies.endpoint → endpoints.id
+    # so that deleting an endpoint automatically deletes its policy.
+    op.create_foreign_key(
+        "fk_deployment_policies_endpoint",
+        "deployment_policies",
+        "endpoints",
+        ["endpoint"],
+        ["id"],
+        ondelete="CASCADE",
+    )
+
 
 def downgrade() -> None:
+    op.drop_constraint("fk_deployment_policies_endpoint", "deployment_policies", type_="foreignkey")
     op.drop_index("ix_endpoints_deployment_policy_id", table_name="endpoints")
     op.drop_constraint("uq_endpoints_deployment_policy_id", "endpoints", type_="unique")
     op.drop_constraint("fk_endpoints_deployment_policy_id", "endpoints", type_="foreignkey")

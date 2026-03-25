@@ -10,6 +10,8 @@ from sqlalchemy.orm import selectinload
 
 from ai.backend.common.clients.valkey_client.valkey_live.client import ValkeyLiveClient
 from ai.backend.common.contexts.user import current_user
+from ai.backend.common.data.model_deployment.types import DeploymentStrategy
+from ai.backend.common.data.permission.types import RBACElementType
 from ai.backend.common.docker import ImageRef
 from ai.backend.common.exception import BackendAIError, VFolderNotFound
 from ai.backend.common.metrics.metric import DomainType, LayerType
@@ -44,6 +46,7 @@ from ai.backend.manager.errors.auth import InvalidAuthParameters
 from ai.backend.manager.errors.common import ObjectNotFound
 from ai.backend.manager.errors.resource import DatabaseConnectionUnavailable
 from ai.backend.manager.errors.service import EndpointNotFound
+from ai.backend.manager.models.deployment_policy import RollingUpdateSpec
 from ai.backend.manager.models.endpoint import (
     AutoScalingMetricComparator,
     AutoScalingMetricSource,
@@ -74,10 +77,12 @@ from ai.backend.manager.repositories.base import (
     execute_creator,
     execute_updater,
 )
+from ai.backend.manager.repositories.base.rbac.element_ref import RBACElementRef
 from ai.backend.manager.repositories.base.rbac.entity_creator import (
     RBACEntityCreator,
     execute_rbac_entity_creator,
 )
+from ai.backend.manager.repositories.deployment.creators import DeploymentPolicyCreatorSpec
 from ai.backend.manager.repositories.model_serving.updaters import EndpointUpdaterSpec
 from ai.backend.manager.services.model_serving.actions.modify_endpoint import ModifyEndpointAction
 from ai.backend.manager.services.model_serving.exceptions import (
@@ -219,9 +224,29 @@ class ModelServingRepository:
         """
         async with self._db.begin_session() as db_sess:
             result = await execute_rbac_entity_creator(db_sess, creator)
+            endpoint = result.row
+
+            # Create default rolling deployment policy
+            policy_creator_spec = DeploymentPolicyCreatorSpec(
+                endpoint_id=endpoint.id,
+                strategy=DeploymentStrategy.ROLLING,
+                strategy_spec=RollingUpdateSpec(max_surge=1, max_unavailable=0),
+            )
+            policy_creator = RBACEntityCreator(
+                spec=policy_creator_spec,
+                element_type=RBACElementType.DEPLOYMENT_POLICY,
+                scope_ref=RBACElementRef(
+                    element_type=RBACElementType.MODEL_DEPLOYMENT,
+                    element_id=str(endpoint.id),
+                ),
+            )
+            policy_rbac_result = await execute_rbac_entity_creator(db_sess, policy_creator)
+            endpoint.deployment_policy_id = policy_rbac_result.row.id
+            await db_sess.flush()
+
             endpoint_row = await EndpointRow.get(
                 db_sess,
-                result.row.id,
+                endpoint.id,
                 load_created_user=True,
                 load_session_owner=True,
                 load_image=True,
