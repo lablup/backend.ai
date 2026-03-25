@@ -66,6 +66,7 @@ class CredentialVerificationResult(NamedTuple):
     user: sa.RowMapping
     session_token: str
     expires_at: datetime
+    invalidated_session_tokens: list[str] = []
 
 
 class AuthDBSource:
@@ -317,11 +318,12 @@ class AuthDBSource:
         conn: sa.ext.asyncio.AsyncConnection,
         user_id: UUID,
         force: bool,
-    ) -> None:
+    ) -> list[str]:
         """Check for unexpired active sessions.
 
         Raises ActiveLoginSessionExistsError if an active session exists and force is False.
         If force is True, invalidates existing active sessions instead.
+        Returns a list of invalidated session tokens (empty if none were invalidated).
         """
         active_cond = (
             (LoginSessionRow.__table__.c.user_id == user_id)
@@ -339,15 +341,20 @@ class AuthDBSource:
             )
 
         if active_count > 0 and force:
-            await self._invalidate_active_sessions(conn, user_id)
+            return await self._invalidate_active_sessions(conn, user_id)
+
+        return []
 
     async def _invalidate_active_sessions(
         self,
         conn: sa.ext.asyncio.AsyncConnection,
         user_id: UUID,
-    ) -> None:
-        """Invalidate all unexpired active sessions for a user."""
-        await conn.execute(
+    ) -> list[str]:
+        """Invalidate all unexpired active sessions for a user.
+
+        Returns a list of session tokens that were invalidated.
+        """
+        result = await conn.execute(
             sa.update(LoginSessionRow.__table__)
             .where(
                 (LoginSessionRow.__table__.c.user_id == user_id)
@@ -358,7 +365,9 @@ class AuthDBSource:
                 status=LoginSessionStatus.INVALIDATED,
                 invalidated_at=sa.func.now(),
             )
+            .returning(LoginSessionRow.__table__.c.session_token)
         )
+        return [row.session_token for row in result]
 
     async def _migrate_password_hash(
         self,
@@ -421,9 +430,10 @@ class AuthDBSource:
             if row is None:
                 raise AuthorizationFailed("User credential mismatch.")
 
+            invalidated_tokens: list[str] = []
             try:
                 await self._check_password(conn, row, target_password_info)
-                await self._check_active_session(conn, row.uuid, force)
+                invalidated_tokens = await self._check_active_session(conn, row.uuid, force)
                 await self._migrate_password_hash(
                     conn, row, domain_name, email, target_password_info
                 )
@@ -473,6 +483,7 @@ class AuthDBSource:
                 user=row_mapping,
                 session_token=session_token,
                 expires_at=expires_at,
+                invalidated_session_tokens=invalidated_tokens,
             )
 
     @auth_db_source_resilience.apply()
@@ -562,8 +573,12 @@ class AuthDBSource:
             )
             await db_session.execute(query)
 
-    async def invalidate_sessions_by_user(self, user_id: UUID) -> None:
-        """Invalidate all active login sessions for a user."""
+    @auth_db_source_resilience.apply()
+    async def invalidate_sessions_by_user(self, user_id: UUID) -> list[str]:
+        """Invalidate all active login sessions for a user.
+
+        Returns a list of session tokens that were invalidated.
+        """
         async with self._db.begin_session() as db_session:
             query = (
                 sa.update(LoginSessionRow)
@@ -575,8 +590,10 @@ class AuthDBSource:
                     status=LoginSessionStatus.INVALIDATED,
                     invalidated_at=sa.func.now(),
                 )
+                .returning(LoginSessionRow.session_token)
             )
-            await db_session.execute(query)
+            result = await db_session.execute(query)
+            return [row.session_token for row in result]
 
     @auth_db_source_resilience.apply()
     async def search_login_sessions(
