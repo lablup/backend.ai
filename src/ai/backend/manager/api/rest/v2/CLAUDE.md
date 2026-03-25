@@ -41,10 +41,20 @@ class V2DomainHandler:
 - Never import from `common/dto/manager/` (those are v1 DTOs used by legacy REST handlers).
 - Never define REST-specific request/response models — use the shared v2 DTOs.
 
-## Naming
+## Naming & Scope Rules
 
-- Scoped endpoints: `{scope}_operation` prefix (e.g., `domain_search_users`).
 - Superadmin-only endpoints: `admin_` prefix + `superadmin_required` middleware.
+- Scoped endpoints: `{scope}_` prefix (e.g., `domain_search_users`).
+
+**search — always two variants:**
+- `POST /v2/admin/{entity}/search`: superadmin only, no scope — queries entire system.
+- `POST /v2/domains/{domain}/{entity}/search`: non-admin, scope in URL path — queries within the given scope only.
+- There is NO "search everything without scope" for non-admin users.
+
+**create / update / get / delete / purge — when to separate `admin_` vs non-admin:**
+- **Admin-only entity** (e.g., Domain, ContainerRegistry): single `admin_` endpoint.
+- **Both admin and users, behavior differs** (e.g., admin sets more fields): separate `admin_` and non-admin endpoints with different DTOs.
+- **Both admin and users, only permission check differs**: single endpoint — admin already has entity access permissions, no separate `admin_` variant needed.
 
 ## Routing
 

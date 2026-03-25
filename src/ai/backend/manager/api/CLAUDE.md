@@ -21,10 +21,21 @@ never Processors or Services directly. Adapters are shared with the GQL layer.
 
 **All new API endpoints MUST follow the v2 pattern.**
 
-## Naming
+## Naming & Scope Rules
 
-- Scoped endpoints: `{scope}_create_`, `{scope}_search_`, `{scope}_update_`, ... prefix.
-- Superadmin-only endpoints (no scope): `admin_` prefix + call `_check_superadmin(request)` first.
+- Superadmin-only endpoints: `admin_` prefix + call `_check_superadmin(request)` first.
+- Scoped endpoints: `{scope}_` prefix (e.g., `domain_search_users`).
+- Self-service endpoints: `my_` prefix (e.g., `my_keypairs`). Adapter resolves user internally.
+
+**search — always two variants:**
+- `admin_search_*`: superadmin only, no scope — queries entire system.
+- `{scope}_search_*`: non-admin, scope parameter required — queries within the given scope only.
+- There is NO "search everything without scope" for non-admin users.
+
+**create / update / get / delete / purge — when to separate `admin_` vs non-admin:**
+- **Admin-only entity** (e.g., Domain, ContainerRegistry): single `admin_` endpoint.
+- **Both admin and users, behavior differs** (e.g., admin sets more fields): separate `admin_` and non-admin endpoints with different DTOs.
+- **Both admin and users, only permission check differs**: single endpoint — admin already has entity access permissions, no separate `admin_` variant needed.
 
 ## Routing
 
