@@ -156,3 +156,74 @@ def alias_search(
             await registry.close()
 
     asyncio.run(_run())
+
+
+@image.command()
+@click.argument("image_id", type=click.UUID)
+def forget(image_id: str) -> None:
+    """Forget (soft-delete) an image by ID."""
+    from ai.backend.common.dto.manager.v2.image.request import ForgetImageInput
+
+    async def _run() -> None:
+        registry = await create_v2_registry(load_v2_config())
+        try:
+            result = await registry.image.admin_forget(ForgetImageInput(image_id=image_id))
+            print_result(result)
+        finally:
+            await registry.close()
+
+    asyncio.run(_run())
+
+
+@image.command()
+@click.argument("image_id", type=click.UUID)
+def purge(image_id: str) -> None:
+    """Purge (hard-delete) an image by ID."""
+    from ai.backend.common.dto.manager.v2.image.request import PurgeImageInput
+
+    async def _run() -> None:
+        registry = await create_v2_registry(load_v2_config())
+        try:
+            result = await registry.image.admin_purge(PurgeImageInput(image_id=image_id))
+            print_result(result)
+        finally:
+            await registry.close()
+
+    asyncio.run(_run())
+
+
+@alias.command(name="create")
+@click.argument("image_id", type=click.UUID)
+@click.argument("alias_name")
+def alias_create(image_id: str, alias_name: str) -> None:
+    """Create an alias for an image."""
+    from ai.backend.common.dto.manager.v2.image.request import AliasImageInput
+
+    async def _run() -> None:
+        registry = await create_v2_registry(load_v2_config())
+        try:
+            result = await registry.image.admin_alias(
+                AliasImageInput(image_id=image_id, alias=alias_name)
+            )
+            print_result(result)
+        finally:
+            await registry.close()
+
+    asyncio.run(_run())
+
+
+@alias.command(name="remove")
+@click.argument("alias_name")
+def alias_remove(alias_name: str) -> None:
+    """Remove an image alias."""
+    from ai.backend.common.dto.manager.v2.image.request import DealiasImageInput
+
+    async def _run() -> None:
+        registry = await create_v2_registry(load_v2_config())
+        try:
+            result = await registry.image.admin_dealias(DealiasImageInput(alias=alias_name))
+            print_result(result)
+        finally:
+            await registry.close()
+
+    asyncio.run(_run())

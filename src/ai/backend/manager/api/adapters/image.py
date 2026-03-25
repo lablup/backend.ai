@@ -10,19 +10,26 @@ from functools import lru_cache
 from ai.backend.common.dto.manager.v2.image.request import (
     AdminSearchImageAliasesInput,
     AdminSearchImagesInput,
+    AliasImageInput,
+    DealiasImageInput,
+    ForgetImageInput,
     ImageAliasFilterInputDTO,
     ImageAliasOrderByInputDTO,
     ImageFilterInputDTO,
     ImageOrderByInputDTO,
+    PurgeImageInput,
 )
 from ai.backend.common.dto.manager.v2.image.response import (
     AdminSearchImageAliasesPayload,
     AdminSearchImagesPayload,
+    AliasImagePayload,
+    ForgetImagePayload,
     ImageAliasNode,
     ImageIdentityInfoDTO,
     ImageMetadataInfoDTO,
     ImageNode,
     ImageRequirementsInfoDTO,
+    PurgeImagePayload,
 )
 from ai.backend.common.dto.manager.v2.image.types import (
     ImageLabelInfo,
@@ -50,6 +57,10 @@ from ai.backend.manager.repositories.base import (
     combine_conditions_or,
     negate_conditions,
 )
+from ai.backend.manager.services.image.actions.alias_image import AliasImageByIdAction
+from ai.backend.manager.services.image.actions.dealias_image import DealiasImageAction
+from ai.backend.manager.services.image.actions.forget_image import ForgetImageByIdAction
+from ai.backend.manager.services.image.actions.purge_images import PurgeImageByIdAction
 from ai.backend.manager.services.image.actions.search_aliases import SearchAliasesAction
 from ai.backend.manager.services.image.actions.search_images import SearchImagesAction
 
@@ -208,6 +219,46 @@ class ImageAdapter(BaseAdapter):
             has_next_page=action_result.has_next_page,
             has_previous_page=action_result.has_previous_page,
         )
+
+    # ------------------------------------------------------------------ mutations
+
+    async def admin_forget(self, input: ForgetImageInput) -> ForgetImagePayload:
+        """Forget (soft-delete) an image by ID."""
+        result = await self._processors.image.forget_image_by_id.wait_for_complete(
+            ForgetImageByIdAction(image_id=ImageID(input.image_id))
+        )
+        return ForgetImagePayload(item=self._data_to_dto(result.image))
+
+    async def admin_purge(self, input: PurgeImageInput) -> PurgeImagePayload:
+        """Purge (hard-delete) an image by ID."""
+        result = await self._processors.image.purge_image_by_id.wait_for_complete(
+            PurgeImageByIdAction(image_id=ImageID(input.image_id))
+        )
+        return PurgeImagePayload(item=self._data_to_dto(result.image))
+
+    async def admin_alias(self, input: AliasImageInput) -> AliasImagePayload:
+        """Create an alias for an image."""
+        result = await self._processors.image.alias_image_by_id.wait_for_complete(
+            AliasImageByIdAction(image_id=ImageID(input.image_id), alias=input.alias)
+        )
+        return AliasImagePayload(
+            alias_id=result.image_alias.id,
+            alias=result.image_alias.alias,
+            image_id=result.image_id,
+        )
+
+    async def admin_dealias(self, input: DealiasImageInput) -> AliasImagePayload:
+        """Remove an image alias."""
+        result = await self._processors.image.dealias_image.wait_for_complete(
+            DealiasImageAction(alias=input.alias)
+        )
+        return AliasImagePayload(
+            alias_id=result.image_alias.id,
+            alias=result.image_alias.alias,
+            image_id=result.image_id,
+        )
+
+    # ------------------------------------------------------------------ querier builders
 
     def _build_offset_querier(self, input: AdminSearchImagesInput) -> BatchQuerier:
         """Build a BatchQuerier with offset pagination from the search input DTO."""
