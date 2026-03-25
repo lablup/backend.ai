@@ -90,9 +90,11 @@ class AuthRepository:
         domain_name: str,
         email: str,
         target_password_info: PasswordInfo,
+        *,
+        force: bool = False,
     ) -> sa.RowMapping:
         return await self._db_source.verify_credential_with_migration(
-            domain_name, email, target_password_info
+            domain_name, email, target_password_info, force=force
         )
 
     @auth_repository_resilience.apply()

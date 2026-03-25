@@ -5,7 +5,6 @@ import enum
 
 class LoginSessionStatus(enum.StrEnum):
     ACTIVE = "active"
-    EXPIRED = "expired"
     INVALIDATED = "invalidated"
     REVOKED = "revoked"
 
@@ -17,3 +16,4 @@ class LoginAttemptResult(enum.StrEnum):
     FAILED_BLOCKED = "failed_blocked"
     FAILED_PASSWORD_EXPIRED = "failed_password_expired"
     FAILED_REJECTED_BY_HOOK = "failed_rejected_by_hook"
+    FAILED_SESSION_ALREADY_EXISTS = "failed_session_already_exists"

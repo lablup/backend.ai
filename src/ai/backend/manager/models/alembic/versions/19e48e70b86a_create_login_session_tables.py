@@ -1,8 +1,8 @@
 """create login_session tables
 
-Revision ID: a1b2c3d4e5f6
+Revision ID: 19e48e70b86a
 Revises: 3b6297b1bd75
-Create Date: 2026-03-24 00:00:00.000000
+Create Date: 2026-03-25 10:00:00.000000
 
 """
 
@@ -11,7 +11,7 @@ from alembic import op
 
 from ai.backend.manager.models.base import GUID
 
-revision = "a1b2c3d4e5f6"
+revision = "19e48e70b86a"
 down_revision = "3b6297b1bd75"
 branch_labels = None
 depends_on = None

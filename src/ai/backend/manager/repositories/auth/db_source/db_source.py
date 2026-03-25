@@ -18,6 +18,7 @@ from ai.backend.manager.data.auth.login_session_types import LoginHistoryData, L
 from ai.backend.manager.data.auth.types import GroupMembershipData, UserData
 from ai.backend.manager.data.common.types import SearchResult
 from ai.backend.manager.errors.auth import (
+    ActiveLoginSessionExistsError,
     AuthorizationFailed,
     GroupMembershipNotFoundError,
     UserCreationError,
@@ -284,15 +285,115 @@ class AuthDBSource:
                 raise ValueError("Cannot delegate an unknown user")
             return row.uuid, row.role, row.domain_name
 
+    async def _check_password(
+        self,
+        conn: sa.ext.asyncio.AsyncConnection,
+        row: sa.Row[Any],
+        target_password_info: PasswordInfo,
+    ) -> None:
+        """Verify password against stored hash. Raises AuthorizationFailed on mismatch."""
+        if row.password is None:
+            raise AuthorizationFailed("User credential mismatch.")
+        try:
+            if not compare_to_hashed_password(target_password_info.password, row.password):
+                raise AuthorizationFailed("User credential mismatch.")
+        except ValueError:
+            raise AuthorizationFailed("User credential mismatch.") from None
+
+    async def _check_active_session(
+        self,
+        conn: sa.ext.asyncio.AsyncConnection,
+        user_id: UUID,
+        force: bool,
+    ) -> None:
+        """Check for unexpired active sessions.
+
+        Raises ActiveLoginSessionExistsError if an active session exists and force is False.
+        If force is True, invalidates existing active sessions instead.
+        """
+        active_cond = (
+            (LoginSessionRow.__table__.c.user_id == user_id)
+            & (LoginSessionRow.__table__.c.status == LoginSessionStatus.ACTIVE)
+            & (LoginSessionRow.__table__.c.expires_at > sa.func.now())
+        )
+        result = await conn.execute(
+            sa.select(sa.func.count()).select_from(LoginSessionRow.__table__).where(active_cond)
+        )
+        active_count = result.scalar() or 0
+
+        if active_count > 0 and not force:
+            raise ActiveLoginSessionExistsError(
+                extra_msg="An active login session already exists. Use force=true to override."
+            )
+
+        if active_count > 0 and force:
+            await self._invalidate_active_sessions(conn, user_id)
+
+    async def _invalidate_active_sessions(
+        self,
+        conn: sa.ext.asyncio.AsyncConnection,
+        user_id: UUID,
+    ) -> None:
+        """Invalidate all unexpired active sessions for a user."""
+        await conn.execute(
+            sa.update(LoginSessionRow.__table__)
+            .where(
+                (LoginSessionRow.__table__.c.user_id == user_id)
+                & (LoginSessionRow.__table__.c.status == LoginSessionStatus.ACTIVE)
+                & (LoginSessionRow.__table__.c.expires_at > sa.func.now())
+            )
+            .values(
+                status=LoginSessionStatus.INVALIDATED,
+                invalidated_at=sa.func.now(),
+            )
+        )
+
+    async def _migrate_password_hash(
+        self,
+        conn: sa.ext.asyncio.AsyncConnection,
+        row: sa.Row[Any],
+        domain_name: str,
+        email: str,
+        target_password_info: PasswordInfo,
+    ) -> None:
+        """Migrate password hash if the current algorithm differs from the target."""
+        current_hash_info = HashInfo.from_hash_string(row.password)
+        if target_password_info.need_migration(current_hash_info):
+            await conn.execute(
+                sa.update(users)
+                .where((users.c.email == email) & (users.c.domain_name == domain_name))
+                .values(password=target_password_info)
+            )
+
+    async def _record_login_history(
+        self,
+        conn: sa.ext.asyncio.AsyncConnection,
+        user_id: UUID,
+        domain_name: str,
+        result: LoginAttemptResult,
+        fail_reason: str | None,
+    ) -> None:
+        """Insert a login history record."""
+        await conn.execute(
+            sa.insert(LoginHistoryRow.__table__).values(
+                user_id=user_id,
+                domain_name=domain_name,
+                result=result,
+                fail_reason=fail_reason,
+            )
+        )
+
     @auth_db_source_resilience.apply()
     async def verify_credential_with_migration(
         self,
         domain_name: str,
         email: str,
         target_password_info: PasswordInfo,
+        *,
+        force: bool = False,
     ) -> sa.RowMapping:
-        """Verify credentials and atomically record the login attempt in login_history."""
-        async with self._db.begin() as conn:
+        """Verify credentials, check active sessions, and record login attempt atomically."""
+        async with self._db.connect() as conn:
             result = await conn.execute(
                 sa.select(users)
                 .select_from(users)
@@ -303,58 +404,37 @@ class AuthDBSource:
             if row is None:
                 raise AuthorizationFailed("User credential mismatch.")
 
-            if row.password is None:
-                await conn.execute(
-                    sa.insert(LoginHistoryRow.__table__).values(
-                        user_id=row.uuid,
-                        domain_name=domain_name,
-                        result=LoginAttemptResult.FAILED_INVALID_CREDENTIALS.value,
-                        fail_reason="Password not set",
-                    )
-                )
-                raise AuthorizationFailed("User credential mismatch.")
-
             try:
-                if not compare_to_hashed_password(target_password_info.password, row.password):
-                    await conn.execute(
-                        sa.insert(LoginHistoryRow.__table__).values(
-                            user_id=row.uuid,
-                            domain_name=domain_name,
-                            result=LoginAttemptResult.FAILED_INVALID_CREDENTIALS.value,
-                            fail_reason="Password mismatch",
-                        )
-                    )
-                    raise AuthorizationFailed("User credential mismatch.")
-            except ValueError:
-                await conn.execute(
-                    sa.insert(LoginHistoryRow.__table__).values(
-                        user_id=row.uuid,
-                        domain_name=domain_name,
-                        result=LoginAttemptResult.FAILED_INVALID_CREDENTIALS.value,
-                        fail_reason="Password verification error",
-                    )
+                await self._check_password(conn, row, target_password_info)
+                await self._check_active_session(conn, row.uuid, force)
+                await self._migrate_password_hash(
+                    conn, row, domain_name, email, target_password_info
                 )
-                raise AuthorizationFailed("User credential mismatch.") from None
+            except AuthorizationFailed:
+                await self._record_login_history(
+                    conn,
+                    row.uuid,
+                    domain_name,
+                    LoginAttemptResult.FAILED_INVALID_CREDENTIALS,
+                    fail_reason="Invalid credentials",
+                )
+                await conn.commit()
+                raise
+            except ActiveLoginSessionExistsError:
+                await self._record_login_history(
+                    conn,
+                    row.uuid,
+                    domain_name,
+                    LoginAttemptResult.FAILED_SESSION_ALREADY_EXISTS,
+                    fail_reason="Active login session already exists",
+                )
+                await conn.commit()
+                raise
 
-            # Password is valid — record success
-            await conn.execute(
-                sa.insert(LoginHistoryRow.__table__).values(
-                    user_id=row.uuid,
-                    domain_name=domain_name,
-                    result=LoginAttemptResult.SUCCESS.value,
-                    fail_reason=None,
-                )
+            await self._record_login_history(
+                conn, row.uuid, domain_name, LoginAttemptResult.SUCCESS, fail_reason=None
             )
-
-            # Check if we need to migrate the hash
-            current_hash_info = HashInfo.from_hash_string(row.password)
-            if target_password_info.need_migration(current_hash_info):
-                await conn.execute(
-                    sa.update(users)
-                    .where((users.c.email == email) & (users.c.domain_name == domain_name))
-                    .values(password=target_password_info)
-                )
-
+            await conn.commit()
             row_mapping: sa.RowMapping = row._mapping
             return row_mapping
 

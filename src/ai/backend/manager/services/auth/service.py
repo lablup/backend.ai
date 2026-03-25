@@ -165,6 +165,7 @@ class AuthService:
                 action.domain_name,
                 action.email,
                 target_password_info=target_password_info,
+                force=action.force,
             )
         if user.status == UserStatus.BEFORE_VERIFICATION:
             raise AuthorizationFailed("This account needs email verification.")

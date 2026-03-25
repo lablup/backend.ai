@@ -149,6 +149,7 @@ class AuthHandler:
             password=params.password,
             stoken=params.stoken,
             otp=params.otp,
+            force=params.force,
         )
         result = await self._auth.authorize.wait_for_complete(action)
 

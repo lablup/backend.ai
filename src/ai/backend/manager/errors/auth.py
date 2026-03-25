@@ -169,3 +169,15 @@ class LoginBlockedError(BackendAIError, web.HTTPTooManyRequests):
             operation=ErrorOperation.AUTH,
             error_detail=ErrorDetail.FORBIDDEN,
         )
+
+
+class ActiveLoginSessionExistsError(BackendAIError, web.HTTPConflict):
+    error_type = "https://api.backend.ai/probs/active-login-session-exists"
+    error_title = "An active login session already exists."
+
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.AUTH,
+            operation=ErrorOperation.AUTH,
+            error_detail=ErrorDetail.CONFLICT,
+        )

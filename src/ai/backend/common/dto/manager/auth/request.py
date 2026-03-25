@@ -50,6 +50,10 @@ class AuthorizeRequest(BaseRequestModel):
         default=None,
         description="One-time password for TOTP-based two-factor authentication",
     )
+    force: bool = Field(
+        default=False,
+        description="If true, invalidate existing active sessions and proceed with login",
+    )
 
 
 class GetRoleRequest(BaseRequestModel):
