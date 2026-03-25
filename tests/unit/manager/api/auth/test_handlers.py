@@ -204,6 +204,7 @@ class TestAuthorize:
                 secret_key="TESTSECRET",
                 role=UserRole.USER,
                 status=UserStatus.ACTIVE,
+                session_token="test_session_token",
             ),
         )
 
