@@ -163,6 +163,26 @@ class ValkeySessionClient:
         seconds_bytes, _ = result
         return int(seconds_bytes)
 
+    @valkey_session_resilience.apply()
+    async def delete_session_data(self, session_key: str) -> None:
+        """
+        Delete session data by session key.
+
+        :param session_key: The session key to delete.
+        """
+        await self._client.client.delete([session_key])
+
+    @valkey_session_resilience.apply()
+    async def delete_session_data_batch(self, session_keys: list[str]) -> None:
+        """
+        Delete multiple session data entries by session keys.
+
+        :param session_keys: The list of session keys to delete.
+        """
+        if not session_keys:
+            return
+        await self._client.client.delete(session_keys)
+
     async def ping(self) -> None:
         """
         Ping the Valkey server to check connection.
