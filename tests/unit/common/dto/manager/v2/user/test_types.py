@@ -117,11 +117,14 @@ class TestUserOrderField:
     def test_status_value(self) -> None:
         assert UserOrderField.STATUS.value == "status"
 
+    def test_role_value(self) -> None:
+        assert UserOrderField.ROLE.value == "role"
+
     def test_domain_name_value(self) -> None:
         assert UserOrderField.DOMAIN_NAME.value == "domain_name"
 
     def test_enum_members_count(self) -> None:
-        assert len(list(UserOrderField)) == 7
+        assert len(list(UserOrderField)) == 8
 
     def test_all_values_are_strings(self) -> None:
         for member in UserOrderField:
