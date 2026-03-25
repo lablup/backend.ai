@@ -91,6 +91,19 @@ def upgrade() -> None:
         """
     )
 
+    # Step 3: Backfill routings.revision from the endpoint's current_revision
+    # for any routes that still have revision IS NULL.
+    op.execute(
+        """
+        UPDATE routings r
+        SET revision = e.current_revision
+        FROM endpoints e
+        WHERE r.endpoint = e.id
+          AND r.revision IS NULL
+          AND e.current_revision IS NOT NULL
+        """
+    )
+
     # Note: Endpoints with image IS NULL are left as-is.
     # They cannot have a revision row (deployment_revisions.image is NOT NULL),
     # so current_revision remains nullable.

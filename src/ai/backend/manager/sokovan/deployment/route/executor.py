@@ -405,10 +405,7 @@ class RouteExecutor:
                     or deployment.current_revision_id
                 )
                 if target_revision_id is None:
-                    raise DeploymentHasNoTargetRevision(
-                        f"No target revision found for route {route.route_id} "
-                        f"(endpoint {route.endpoint_id})"
-                    )
+                    return None
 
                 deployment_context = await self._deployment_repo.fetch_deployment_context(
                     deployment,
