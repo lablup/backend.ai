@@ -110,6 +110,24 @@ def mock_repo() -> MagicMock:
 
 
 @pytest.fixture
+def definition_generator_registry(mock_repo: MagicMock) -> ModelDefinitionGeneratorRegistry:
+    """Registry with storage file override disabled (default production behavior)."""
+    return ModelDefinitionGeneratorRegistry(
+        RegistryArgs(deployment_repository=mock_repo, enable_model_definition_override=False)
+    )
+
+
+@pytest.fixture
+def definition_generator_registry_with_storage_override(
+    mock_repo: MagicMock,
+) -> ModelDefinitionGeneratorRegistry:
+    """Registry with storage file override enabled, allowing model-definition.yaml in storage to override generated definitions."""
+    return ModelDefinitionGeneratorRegistry(
+        RegistryArgs(deployment_repository=mock_repo, enable_model_definition_override=True)
+    )
+
+
+@pytest.fixture
 def db_model_definition() -> dict[str, Any]:
     """Model definition dict simulating what is stored in the DB revision record."""
     expected = VARIANT_EXPECTATIONS[RuntimeVariant.VLLM]
@@ -146,23 +164,22 @@ def storage_override_definition() -> dict[str, Any]:
 
 
 class TestModelDefinitionGeneratorRegistry:
-    def test_initializes_all_generators(self, mock_repo: MagicMock) -> None:
-        registry = ModelDefinitionGeneratorRegistry(
-            RegistryArgs(deployment_repository=mock_repo, enable_model_definition_override=False)
-        )
+    def test_initializes_all_generators(
+        self, definition_generator_registry: ModelDefinitionGeneratorRegistry
+    ) -> None:
         for variant in RuntimeVariant:
-            assert registry.get(variant) is not None
+            assert definition_generator_registry.get(variant) is not None
 
     @pytest.mark.parametrize("variant", NON_CUSTOM_VARIANTS)
     async def test_generates_definition_without_override(
-        self, mock_repo: MagicMock, variant: RuntimeVariant
+        self,
+        definition_generator_registry: ModelDefinitionGeneratorRegistry,
+        mock_repo: MagicMock,
+        variant: RuntimeVariant,
     ) -> None:
-        registry = ModelDefinitionGeneratorRegistry(
-            RegistryArgs(deployment_repository=mock_repo, enable_model_definition_override=False)
-        )
         expected = VARIANT_EXPECTATIONS[variant]
 
-        result = await registry.generate_model_definition(
+        result = await definition_generator_registry.generate_model_definition(
             create_revision(variant, model_definition_path="model.yaml")
         )
 
@@ -178,7 +195,8 @@ class TestModelDefinitionGeneratorRegistry:
     ) -> None:
         registry = ModelDefinitionGeneratorRegistry(
             RegistryArgs(
-                deployment_repository=mock_repo, enable_model_definition_override=enable_override
+                deployment_repository=mock_repo,
+                enable_model_definition_override=enable_override,
             )
         )
         mock_repo.fetch_model_definition = AsyncMock(
@@ -204,16 +222,19 @@ class TestModelDefinitionGeneratorRegistry:
         ids=["none", "empty", "exists"],
     )
     async def test_override_requires_path(
-        self, mock_repo: MagicMock, path: str | None, should_fetch: bool
+        self,
+        definition_generator_registry_with_storage_override: ModelDefinitionGeneratorRegistry,
+        mock_repo: MagicMock,
+        path: str | None,
+        should_fetch: bool,
     ) -> None:
-        registry = ModelDefinitionGeneratorRegistry(
-            RegistryArgs(deployment_repository=mock_repo, enable_model_definition_override=True)
-        )
         expected = VARIANT_EXPECTATIONS[RuntimeVariant.VLLM]
         mock_repo.fetch_model_definition = AsyncMock(return_value=create_override_dict(expected))
 
-        result = await registry.generate_model_definition(
-            create_revision(RuntimeVariant.VLLM, model_definition_path=path)
+        result = (
+            await definition_generator_registry_with_storage_override.generate_model_definition(
+                create_revision(RuntimeVariant.VLLM, model_definition_path=path)
+            )
         )
 
         model = result.models[0]
@@ -227,16 +248,18 @@ class TestModelDefinitionGeneratorRegistry:
 
     @pytest.mark.parametrize("variant", VARIANTS_WITH_HEALTH_CHECK)
     async def test_override_merges_with_generated(
-        self, mock_repo: MagicMock, variant: RuntimeVariant
+        self,
+        definition_generator_registry_with_storage_override: ModelDefinitionGeneratorRegistry,
+        mock_repo: MagicMock,
+        variant: RuntimeVariant,
     ) -> None:
-        registry = ModelDefinitionGeneratorRegistry(
-            RegistryArgs(deployment_repository=mock_repo, enable_model_definition_override=True)
-        )
         expected = VARIANT_EXPECTATIONS[variant]
         mock_repo.fetch_model_definition = AsyncMock(return_value=create_override_dict(expected))
 
-        result = await registry.generate_model_definition(
-            create_revision(variant, model_definition_path="model.yaml")
+        result = (
+            await definition_generator_registry_with_storage_override.generate_model_definition(
+                create_revision(variant, model_definition_path="model.yaml")
+            )
         )
 
         model = result.models[0]
@@ -252,15 +275,19 @@ class TestModelDefinitionGeneratorRegistry:
         [DefinitionFileNotFound, RuntimeError("error"), ValueError("error")],
         ids=["not_found", "runtime", "value"],
     )
-    async def test_fallback_on_exception(self, mock_repo: MagicMock, exception: Exception) -> None:
-        registry = ModelDefinitionGeneratorRegistry(
-            RegistryArgs(deployment_repository=mock_repo, enable_model_definition_override=True)
-        )
+    async def test_fallback_on_exception(
+        self,
+        definition_generator_registry_with_storage_override: ModelDefinitionGeneratorRegistry,
+        mock_repo: MagicMock,
+        exception: Exception,
+    ) -> None:
         mock_repo.fetch_model_definition = AsyncMock(side_effect=exception)
         expected = VARIANT_EXPECTATIONS[RuntimeVariant.VLLM]
 
-        result = await registry.generate_model_definition(
-            create_revision(RuntimeVariant.VLLM, model_definition_path="model.yaml")
+        result = (
+            await definition_generator_registry_with_storage_override.generate_model_definition(
+                create_revision(RuntimeVariant.VLLM, model_definition_path="model.yaml")
+            )
         )
 
         mock_repo.fetch_model_definition.assert_called_once()
@@ -271,14 +298,13 @@ class TestModelDefinitionGeneratorRegistry:
 
     @pytest.mark.parametrize("variant", VARIANTS_WITH_HEALTH_CHECK)
     async def test_revision_db_model_definition_merges_with_generated(
-        self, mock_repo: MagicMock, variant: RuntimeVariant, db_model_definition: dict[str, Any]
+        self,
+        definition_generator_registry: ModelDefinitionGeneratorRegistry,
+        variant: RuntimeVariant,
+        db_model_definition: dict[str, Any],
     ) -> None:
         """DB model_definition is merged on top of generated definition."""
-        registry = ModelDefinitionGeneratorRegistry(
-            RegistryArgs(deployment_repository=mock_repo, enable_model_definition_override=False)
-        )
-
-        result = await registry.generate_model_definition(
+        result = await definition_generator_registry.generate_model_definition(
             create_revision(variant, model_definition=db_model_definition)
         )
 
@@ -298,15 +324,14 @@ class TestModelDefinitionGeneratorRegistry:
         ids=lambda c: c.description,
     )
     async def test_revision_db_model_definition_ignored_when_absent_or_invalid(
-        self, mock_repo: MagicMock, case: InvalidModelDefinitionCase
+        self,
+        definition_generator_registry: ModelDefinitionGeneratorRegistry,
+        case: InvalidModelDefinitionCase,
     ) -> None:
         """When model_definition is None, empty, or invalid, generated definition is returned unchanged."""
-        registry = ModelDefinitionGeneratorRegistry(
-            RegistryArgs(deployment_repository=mock_repo, enable_model_definition_override=False)
-        )
         expected = VARIANT_EXPECTATIONS[RuntimeVariant.VLLM]
 
-        result = await registry.generate_model_definition(
+        result = await definition_generator_registry.generate_model_definition(
             create_revision(RuntimeVariant.VLLM, model_definition=case.value)
         )
 
@@ -317,21 +342,21 @@ class TestModelDefinitionGeneratorRegistry:
 
     async def test_storage_override_takes_precedence_over_db_model_definition(
         self,
+        definition_generator_registry_with_storage_override: ModelDefinitionGeneratorRegistry,
         mock_repo: MagicMock,
         db_model_definition: dict[str, Any],
         storage_override_definition: dict[str, Any],
     ) -> None:
         """Storage file override has higher priority than DB model_definition."""
-        registry = ModelDefinitionGeneratorRegistry(
-            RegistryArgs(deployment_repository=mock_repo, enable_model_definition_override=True)
-        )
         mock_repo.fetch_model_definition = AsyncMock(return_value=storage_override_definition)
 
-        result = await registry.generate_model_definition(
-            create_revision(
-                RuntimeVariant.VLLM,
-                model_definition_path="model.yaml",
-                model_definition=db_model_definition,
+        result = (
+            await definition_generator_registry_with_storage_override.generate_model_definition(
+                create_revision(
+                    RuntimeVariant.VLLM,
+                    model_definition_path="model.yaml",
+                    model_definition=db_model_definition,
+                )
             )
         )
 
