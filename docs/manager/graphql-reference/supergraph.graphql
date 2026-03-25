@@ -2816,7 +2816,7 @@ input CreateRoleInput
 {
   name: String!
   description: String = null
-  source: RoleSource = null
+  source: RoleSource! = CUSTOM
 }
 
 type CreateScalingGroup
