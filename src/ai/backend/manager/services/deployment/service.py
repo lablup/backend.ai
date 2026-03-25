@@ -987,7 +987,7 @@ class DeploymentService:
         )
 
         # Auto-activate revision if requested
-        if action.adder.auto_activate or action.activate:
+        if action.adder.auto_activate or action.options.activate:
             await self.activate_revision(
                 ActivateRevisionAction(
                     deployment_id=deployment_id,

@@ -178,10 +178,6 @@ class AddRevisionPayload(BaseResponseModel):
     """Payload for add revision mutation result."""
 
     revision: RevisionNode = Field(description="Added revision")
-    activated: bool = Field(
-        default=False,
-        description="Whether the revision was automatically activated after creation.",
-    )
 
 
 # ---------------------------------------------------------------------------

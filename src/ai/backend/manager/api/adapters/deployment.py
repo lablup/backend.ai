@@ -27,6 +27,7 @@ from ai.backend.common.dto.manager.v2.auto_scaling_rule.request import (
 from ai.backend.common.dto.manager.v2.deployment.request import (
     ActivateRevisionInput,
     AddRevisionGQLInputDTO,
+    AddRevisionOptions,
     AdminSearchDeploymentsInput,
     AdminSearchRevisionsInput,
     BulkDeleteAccessTokensInput,
@@ -261,6 +262,9 @@ from ai.backend.manager.services.deployment.actions.get_replica_by_id import (
 )
 from ai.backend.manager.services.deployment.actions.model_revision.add_model_revision import (
     AddModelRevisionAction,
+)
+from ai.backend.manager.services.deployment.actions.model_revision.add_model_revision import (
+    AddModelRevisionOptions as ActionAddRevisionOptions,
 )
 from ai.backend.manager.services.deployment.actions.model_revision.get_revision_by_id import (
     GetRevisionByIdAction,
@@ -983,6 +987,7 @@ class DeploymentAdapter(BaseAdapter):
     async def add_revision(
         self,
         input: AddRevisionGQLInputDTO,
+        options: AddRevisionOptions,
     ) -> AddRevisionPayload:
         """Add a new model revision to a deployment."""
         mounts_creator = VFolderMountsCreator(
@@ -1022,8 +1027,15 @@ class DeploymentAdapter(BaseAdapter):
             revision_preset_id=input.revision_preset_id,
             auto_activate=input.auto_activate,
         )
+        action_options = ActionAddRevisionOptions(
+            activate=options.activate,
+        )
         action_result = await self._processors.deployment.add_model_revision.wait_for_complete(
-            AddModelRevisionAction(model_deployment_id=input.deployment_id, adder=adder)
+            AddModelRevisionAction(
+                model_deployment_id=input.deployment_id,
+                adder=adder,
+                options=action_options,
+            )
         )
         return AddRevisionPayload(revision=self._revision_data_to_dto(action_result.revision))
 

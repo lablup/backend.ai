@@ -68,6 +68,7 @@ from ai.backend.manager.services.deployment.actions.get_deployment_by_id import 
 )
 from ai.backend.manager.services.deployment.actions.model_revision.add_model_revision import (
     AddModelRevisionAction,
+    AddModelRevisionOptions,
 )
 from ai.backend.manager.services.deployment.actions.model_revision.get_revision_by_id import (
     GetRevisionByIdAction,
@@ -253,6 +254,9 @@ class DeploymentAPIHandler:
             AddModelRevisionAction(
                 model_deployment_id=path.parsed.deployment_id,
                 adder=revision_creator,
+                options=AddModelRevisionOptions(
+                    activate=body.parsed.options.activate,
+                ),
             )
         )
 

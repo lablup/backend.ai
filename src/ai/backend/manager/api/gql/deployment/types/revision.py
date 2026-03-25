@@ -39,6 +39,9 @@ from ai.backend.common.dto.manager.v2.deployment.request import (
     CreateRevisionInputDTO,
 )
 from ai.backend.common.dto.manager.v2.deployment.request import (
+    AddRevisionOptions as AddRevisionOptionsDTO,
+)
+from ai.backend.common.dto.manager.v2.deployment.request import (
     ClusterConfigInput as ClusterConfigInputDTO,
 )
 from ai.backend.common.dto.manager.v2.deployment.request import (
@@ -842,6 +845,20 @@ class CreateRevisionInput(PydanticInputMixin[CreateRevisionInputDTO]):
 
 
 @gql_pydantic_input(
+    BackendAIGQLMeta(
+        description="Options for the add_model_revision mutation.",
+        added_version="26.4.0",
+    ),
+    name="AddRevisionOptions",
+)
+class AddRevisionOptionsGQL(PydanticInputMixin[AddRevisionOptionsDTO]):
+    activate: bool = gql_field(
+        default=False,
+        description="When true, automatically activate the newly added revision immediately after creation.",
+    )
+
+
+@gql_pydantic_input(
     BackendAIGQLMeta(description="", added_version="25.19.0"),
 )
 class AddRevisionInput(PydanticInputMixin[AddRevisionGQLInputDTO]):
@@ -869,10 +886,6 @@ class AddRevisionInput(PydanticInputMixin[AddRevisionGQLInputDTO]):
     extra_mounts: list[ExtraVFolderMountInput] | None = gql_field(
         description="Extra vfolder mounts",
         default=None,
-    )
-    activate: bool = strawberry.field(
-        default=False,
-        description="When true, automatically activate the newly added revision immediately after creation.",
     )
 
 
