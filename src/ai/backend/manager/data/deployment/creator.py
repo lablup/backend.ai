@@ -40,7 +40,7 @@ class ModelRevisionCreator:
     resource_spec: ResourceSpec
     mounts: VFolderMountsCreator
     execution: ExecutionSpec
-    model_definition: ModelDefinition | None = None
+    model_definition: ModelDefinition | None
 
 
 @dataclass

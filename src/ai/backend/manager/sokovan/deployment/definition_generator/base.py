@@ -19,7 +19,7 @@ class ModelDefinitionContext:
 
     mounts: MountMetadata
     execution: ExecutionSpec
-    model_definition: ModelDefinition | None = None
+    model_definition: ModelDefinition | None
 
 
 class ModelDefinitionGenerator(ABC):
