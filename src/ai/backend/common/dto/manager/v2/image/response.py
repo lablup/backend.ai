@@ -36,6 +36,7 @@ __all__ = (
     "PurgeImagePayload",
     "RescanImagesPayload",
     "SearchImagesPayload",
+    "UpdateImagePayload",
 )
 
 
@@ -117,6 +118,12 @@ class PurgeImagePayload(BaseResponseModel):
     """Payload for image purge (hard-delete) result."""
 
     item: ImageNode = Field(description="Purged image")
+
+
+class UpdateImagePayload(BaseResponseModel):
+    """Payload for image update result."""
+
+    item: ImageNode = Field(description="Updated image")
 
 
 class AdminSearchImagesPayload(BaseResponseModel):

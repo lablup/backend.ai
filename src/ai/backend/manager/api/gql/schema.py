@@ -83,7 +83,11 @@ from .deployment import (
     update_route_traffic_status,
 )
 from .domain_v2 import (
+    admin_create_domain_v2,
+    admin_delete_domain_v2,
     admin_domains_v2,
+    admin_purge_domain_v2,
+    admin_update_domain_v2,
     domain_v2,
     rg_domains_v2,
 )
@@ -179,7 +183,11 @@ from .object_storage import (
     update_object_storage,
 )
 from .project_v2 import (
+    admin_create_project_v2,
+    admin_delete_project_v2,
     admin_projects_v2,
+    admin_purge_project_v2,
+    admin_update_project_v2,
     domain_projects_v2,
     project_domain_v2,
     project_v2,
@@ -506,6 +514,16 @@ class Mutation:
     admin_update_resource_group = admin_update_resource_group
     # Resource Group - Legacy (deprecated)
     update_resource_group_fair_share_spec = update_resource_group_fair_share_spec
+    # Domain V2 APIs
+    admin_create_domain_v2 = admin_create_domain_v2
+    admin_update_domain_v2 = admin_update_domain_v2
+    admin_delete_domain_v2 = admin_delete_domain_v2
+    admin_purge_domain_v2 = admin_purge_domain_v2
+    # Project V2 APIs
+    admin_create_project_v2 = admin_create_project_v2
+    admin_update_project_v2 = admin_update_project_v2
+    admin_delete_project_v2 = admin_delete_project_v2
+    admin_purge_project_v2 = admin_purge_project_v2
     # User V2 APIs
     admin_create_user_v2 = admin_create_user_v2
     admin_bulk_create_users_v2 = admin_bulk_create_users_v2

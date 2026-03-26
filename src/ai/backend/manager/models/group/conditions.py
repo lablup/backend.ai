@@ -217,6 +217,15 @@ class GroupConditions:
         return inner
 
     @staticmethod
+    def by_created_at_equals(dt: datetime) -> QueryCondition:
+        """Filter by created_at == datetime."""
+
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return GroupRow.created_at == dt
+
+        return inner
+
+    @staticmethod
     def by_modified_at_before(dt: datetime) -> QueryCondition:
         """Filter by modified_at < datetime."""
 
@@ -231,6 +240,15 @@ class GroupConditions:
 
         def inner() -> sa.sql.expression.ColumnElement[bool]:
             return GroupRow.modified_at > dt
+
+        return inner
+
+    @staticmethod
+    def by_modified_at_equals(dt: datetime) -> QueryCondition:
+        """Filter by modified_at == datetime."""
+
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return GroupRow.modified_at == dt
 
         return inner
 

@@ -10,6 +10,11 @@ from ai.backend.common.api_handlers import APIResponse, BodyParam
 from ai.backend.common.dto.manager.v2.image.request import (
     AdminSearchImageAliasesInput,
     AdminSearchImagesInput,
+    AliasImageInput,
+    DealiasImageInput,
+    ForgetImageInput,
+    PurgeImageInput,
+    UpdateImageInput,
 )
 from ai.backend.logging import BraceStyleAdapter
 
@@ -39,4 +44,29 @@ class V2ImageHandler:
     ) -> APIResponse:
         """Search image aliases with admin scope."""
         result = await self._adapter.admin_search_image_aliases(body.parsed)
+        return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
+
+    async def admin_forget(self, body: BodyParam[ForgetImageInput]) -> APIResponse:
+        """Forget (soft-delete) an image."""
+        result = await self._adapter.admin_forget(body.parsed)
+        return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
+
+    async def admin_purge(self, body: BodyParam[PurgeImageInput]) -> APIResponse:
+        """Purge (hard-delete) an image."""
+        result = await self._adapter.admin_purge(body.parsed)
+        return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
+
+    async def admin_alias(self, body: BodyParam[AliasImageInput]) -> APIResponse:
+        """Create an alias for an image."""
+        result = await self._adapter.admin_alias(body.parsed)
+        return APIResponse.build(status_code=HTTPStatus.CREATED, response_model=result)
+
+    async def admin_dealias(self, body: BodyParam[DealiasImageInput]) -> APIResponse:
+        """Remove an image alias."""
+        result = await self._adapter.admin_dealias(body.parsed)
+        return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
+
+    async def admin_update(self, body: BodyParam[UpdateImageInput]) -> APIResponse:
+        """Update an image by ID."""
+        result = await self._adapter.admin_update(body.parsed)
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)

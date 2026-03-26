@@ -139,6 +139,7 @@ class PermissionNode(BaseResponseModel):
     scope_id: str = Field(description="Scope element ID")
     entity_type: RBACElementTypeDTO = Field(description="Entity element type")
     operation: OperationTypeDTO = Field(description="Operation type")
+    created_at: datetime = Field(description="Creation timestamp")
 
 
 class EntityNode(BaseResponseModel):

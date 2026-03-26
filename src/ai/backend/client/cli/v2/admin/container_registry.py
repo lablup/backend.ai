@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import uuid
 
 import click
 
@@ -104,6 +105,93 @@ def search(
                 offset=offset,
             )
             result = await registry.container_registry.admin_search(request)
+            print_result(result)
+        finally:
+            await registry.close()
+
+    asyncio.run(_run())
+
+
+@container_registry.command()
+@click.argument("body", type=str)
+def create(body: str) -> None:
+    """Create a new container registry (superadmin only).
+
+    BODY is a JSON string with container registry creation fields.
+    """
+    import json
+    import sys
+
+    from ai.backend.common.dto.manager.v2.container_registry.request import (
+        CreateContainerRegistryInput,
+    )
+
+    try:
+        data = json.loads(body)
+    except json.JSONDecodeError as e:
+        click.echo(f"Invalid JSON: {e}", err=True)
+        sys.exit(1)
+
+    async def _run() -> None:
+        registry = await create_v2_registry(load_v2_config())
+        try:
+            result = await registry.container_registry.admin_create(
+                CreateContainerRegistryInput(**data)
+            )
+            print_result(result)
+        finally:
+            await registry.close()
+
+    asyncio.run(_run())
+
+
+@container_registry.command()
+@click.argument("body", type=str)
+def update(body: str) -> None:
+    """Update a container registry (superadmin only).
+
+    BODY is a JSON string with fields to update. Must include "id" (UUID).
+    """
+    import json
+    import sys
+
+    from ai.backend.common.dto.manager.v2.container_registry.request import (
+        UpdateContainerRegistryInput,
+    )
+
+    try:
+        data = json.loads(body)
+    except json.JSONDecodeError as e:
+        click.echo(f"Invalid JSON: {e}", err=True)
+        sys.exit(1)
+
+    async def _run() -> None:
+        registry = await create_v2_registry(load_v2_config())
+        try:
+            result = await registry.container_registry.admin_update(
+                UpdateContainerRegistryInput(**data)
+            )
+            print_result(result)
+        finally:
+            await registry.close()
+
+    asyncio.run(_run())
+
+
+@container_registry.command()
+@click.argument("registry_id", type=click.UUID)
+def delete(registry_id: uuid.UUID) -> None:
+    """Delete a container registry (superadmin only). This is a hard delete."""
+    from ai.backend.common.dto.manager.v2.container_registry.request import (
+        DeleteContainerRegistryInput,
+    )
+
+    async def _run() -> None:
+        registry = await create_v2_registry(load_v2_config())
+        try:
+            result = await registry.container_registry.admin_delete(
+                DeleteContainerRegistryInput(id=registry_id)
+            )
             print_result(result)
         finally:
             await registry.close()

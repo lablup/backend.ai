@@ -26,5 +26,23 @@ def register_v2_container_registry_routes(
         handler.admin_search_container_registries,
         middlewares=[superadmin_required],
     )
+    registry.add(
+        "POST",
+        "",
+        handler.admin_create,
+        middlewares=[superadmin_required],
+    )
+    registry.add(
+        "PATCH",
+        "",
+        handler.admin_update,
+        middlewares=[superadmin_required],
+    )
+    registry.add(
+        "POST",
+        "/delete",
+        handler.admin_delete,
+        middlewares=[superadmin_required],
+    )
 
     return registry

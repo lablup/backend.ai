@@ -46,6 +46,8 @@ def build_v2_routes(
     from .huggingface_registry.registry import register_v2_huggingface_registry_routes
     from .image.handler import V2ImageHandler
     from .image.registry import register_v2_image_routes
+    from .keypair.handler import V2KeypairHandler
+    from .keypair.registry import register_v2_keypair_routes
     from .notification.handler import V2NotificationHandler
     from .notification.registry import register_v2_notification_routes
     from .object_storage.handler import V2ObjectStorageHandler
@@ -91,6 +93,7 @@ def build_v2_routes(
         adapter=adapters.huggingface_registry
     )
     image_handler = V2ImageHandler(adapter=adapters.image)
+    keypair_handler = V2KeypairHandler(adapter=adapters.user)
     notification_handler = V2NotificationHandler(adapter=adapters.notification)
     object_storage_handler = V2ObjectStorageHandler(adapter=adapters.object_storage)
     project_handler = V2ProjectHandler(adapter=adapters.project)
@@ -130,6 +133,7 @@ def build_v2_routes(
         register_v2_huggingface_registry_routes(huggingface_registry_handler, route_deps)
     )
     v2_reg.add_subregistry(register_v2_image_routes(image_handler, route_deps))
+    v2_reg.add_subregistry(register_v2_keypair_routes(keypair_handler, route_deps))
     v2_reg.add_subregistry(register_v2_notification_routes(notification_handler, route_deps))
     v2_reg.add_subregistry(register_v2_object_storage_routes(object_storage_handler, route_deps))
     v2_reg.add_subregistry(register_v2_project_routes(project_handler, route_deps))

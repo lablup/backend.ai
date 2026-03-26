@@ -1,4 +1,7 @@
-"""CLI commands for the v2 domain resource."""
+"""CLI commands for the v2 domain resource.
+
+User-facing commands only. Admin commands are in admin/domain.py.
+"""
 
 from __future__ import annotations
 
