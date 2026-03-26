@@ -30,7 +30,7 @@ from .rbac_session import (
     SessionUpdateRBACAction,
 )
 
-RBAC_ACTION_REGISTRY: list[type[BaseRBACAction]] = [
+RBAC_ACTION_REGISTRY: tuple[type[BaseRBACAction], ...] = (
     SessionCreateRBACAction,
     SessionGetRBACAction,
     SessionSearchRBACAction,
@@ -40,7 +40,7 @@ RBAC_ACTION_REGISTRY: list[type[BaseRBACAction]] = [
     SessionGrantReadRBACAction,
     SessionGrantUpdateRBACAction,
     SessionGrantHardDeleteRBACAction,
-]
+)
 
 __all__ = (
     "BaseAction",
