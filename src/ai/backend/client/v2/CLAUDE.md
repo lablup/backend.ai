@@ -12,8 +12,14 @@ Each client class inherits `BaseDomainClient` and uses `self._client.typed_reque
 ## Naming Conventions
 
 - Admin methods: `admin_search()`, `admin_create()`, `admin_update()`, `admin_delete()`, `admin_purge()`
-- User-facing methods: `get()`, `search_by_domain()`, `search_by_project()`
-- Self-service methods: methods without scope prefix (adapter resolves user internally)
+- Scoped search methods: `{scope}_search()` — e.g., `project_search(project_id, request)`, `domain_search(domain_name, request)`
+- Self-service methods: `my_search()`, `my_issue()` — maps to `/v2/{entity}/my/{operation}`
+- User-facing methods: `get()`, `enqueue()`
+
+**Scoped search URL pattern:**
+- SDK method calls `POST /v2/{entity}/{scope_type}/{scope_id}/search`
+- Example: `f"{_PATH}/projects/{project_id}/search"` (not `f"{_PATH}/search-by-project/{id}"`)
+- Do NOT use `search-by-{scope}` URL pattern.
 
 ## typed_request Pattern
 

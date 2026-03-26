@@ -17,7 +17,13 @@
 - `create`, `update`, `delete`, `purge` for admin-only entities (Domain, ContainerRegistry, etc.) → `admin/`
 - `search` without scope (queries entire system) → `admin/`
 - `get` by ID (any authenticated user) → `{entity}/commands.py`
-- Scoped search (e.g., `--scope-domain`) → `{entity}/commands.py`
+- Scoped search → `{entity}/commands.py` with scope as a required argument
+
+**Scoped search CLI pattern:**
+- Command name reflects the scope: `./bai session project-search {project_id}`
+- Scope ID is a required positional argument, not an optional flag.
+- Maps to REST `POST /v2/{entity}/{scope_type}/{scope_id}/search`.
+- Do NOT use `--scope-{type}` optional flags for scoped search (those are filters, not scopes).
 
 **Self-service operations (`my_` prefix on the server) MUST go in `my/{entity}.py`.**
 
