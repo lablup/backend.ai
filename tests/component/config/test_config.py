@@ -113,6 +113,42 @@ class TestUserDotfileGet:
         assert f".list-a-{unique1}" in paths
         assert f".list-b-{unique2}" in paths
 
+    async def test_list_user_dotfiles_returns_plain_array_json(
+        self,
+        admin_registry: BackendAIClientRegistry,
+        user_dotfile_factory: UserDotfileFactory,
+    ) -> None:
+        """Verify the API returns a plain JSON array with 'permission' field.
+
+        This is a regression test for BA-5420 to ensure the response format
+        matches the legacy behavior (plain array with 'permission' field,
+        not {"items": [...]} with 'perm' field).
+        """
+        unique = secrets.token_hex(4)
+        path = f".list-test-{unique}"
+        await user_dotfile_factory(path=path, data="test-data", permission="755")
+        try:
+            result = await admin_registry.config.list_user_dotfiles()
+            # The response should be a plain array
+            assert isinstance(result.root, list)
+            # Verify model_dump returns the plain array (not wrapped)
+            dumped = result.model_dump()
+            assert isinstance(dumped, list)
+            # Find the test item and verify it has 'permission' field
+            test_items = [
+                item for item in dumped if isinstance(item, dict) and item.get("path") == path
+            ]
+            assert len(test_items) == 1
+            test_item = test_items[0]
+            # Verify field name is 'permission' (not 'perm')
+            assert "permission" in test_item
+            assert test_item["permission"] == "755"
+            # Verify no 'perm' field (should be renamed to 'permission')
+            assert "perm" not in test_item
+        finally:
+            # Cleanup
+            await admin_registry.config.delete_user_dotfile(DeleteUserDotfileRequest(path=path))
+
     async def test_get_nonexistent_user_dotfile(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -311,6 +347,47 @@ class TestGroupDotfileGet:
         assert f".glist-a-{unique1}" in paths
         assert f".glist-b-{unique2}" in paths
 
+    async def test_list_group_dotfiles_returns_plain_array_json(
+        self,
+        admin_registry: BackendAIClientRegistry,
+        group_fixture: uuid.UUID,
+        group_dotfile_factory: GroupDotfileFactory,
+    ) -> None:
+        """Verify the API returns a plain JSON array with 'permission' field.
+
+        This is a regression test for BA-5420 to ensure the response format
+        matches the legacy behavior (plain array with 'permission' field,
+        not {"items": [...]} with 'perm' field).
+        """
+        unique = secrets.token_hex(4)
+        path = f".glist-test-{unique}"
+        await group_dotfile_factory(path=path, data="test-data", permission="755")
+        try:
+            result = await admin_registry.config.list_group_dotfiles(
+                GetGroupDotfileRequest(group=str(group_fixture))
+            )
+            # The response should be a plain array
+            assert isinstance(result.root, list)
+            # Verify model_dump returns the plain array (not wrapped)
+            dumped = result.model_dump()
+            assert isinstance(dumped, list)
+            # Find the test item and verify it has 'permission' field
+            test_items = [
+                item for item in dumped if isinstance(item, dict) and item.get("path") == path
+            ]
+            assert len(test_items) == 1
+            test_item = test_items[0]
+            # Verify field name is 'permission' (not 'perm')
+            assert "permission" in test_item
+            assert test_item["permission"] == "755"
+            # Verify no 'perm' field (should be renamed to 'permission')
+            assert "perm" not in test_item
+        finally:
+            # Cleanup
+            await admin_registry.config.delete_group_dotfile(
+                DeleteGroupDotfileRequest(group=str(group_fixture), path=path)
+            )
+
 
 class TestGroupDotfileUpdate:
     async def test_admin_updates_group_dotfile(
@@ -431,6 +508,47 @@ class TestDomainDotfileGet:
         paths = [item.path for item in result.root]
         assert f".dlist-a-{unique1}" in paths
         assert f".dlist-b-{unique2}" in paths
+
+    async def test_list_domain_dotfiles_returns_plain_array_json(
+        self,
+        admin_registry: BackendAIClientRegistry,
+        domain_fixture: str,
+        domain_dotfile_factory: DomainDotfileFactory,
+    ) -> None:
+        """Verify the API returns a plain JSON array with 'permission' field.
+
+        This is a regression test for BA-5420 to ensure the response format
+        matches the legacy behavior (plain array with 'permission' field,
+        not {"items": [...]} with 'perm' field).
+        """
+        unique = secrets.token_hex(4)
+        path = f".dlist-test-{unique}"
+        await domain_dotfile_factory(path=path, data="test-data", permission="755")
+        try:
+            result = await admin_registry.config.list_domain_dotfiles(
+                GetDomainDotfileRequest(domain=domain_fixture)
+            )
+            # The response should be a plain array
+            assert isinstance(result.root, list)
+            # Verify model_dump returns the plain array (not wrapped)
+            dumped = result.model_dump()
+            assert isinstance(dumped, list)
+            # Find the test item and verify it has 'permission' field
+            test_items = [
+                item for item in dumped if isinstance(item, dict) and item.get("path") == path
+            ]
+            assert len(test_items) == 1
+            test_item = test_items[0]
+            # Verify field name is 'permission' (not 'perm')
+            assert "permission" in test_item
+            assert test_item["permission"] == "755"
+            # Verify no 'perm' field (should be renamed to 'permission')
+            assert "perm" not in test_item
+        finally:
+            # Cleanup
+            await admin_registry.config.delete_domain_dotfile(
+                DeleteDomainDotfileRequest(domain=domain_fixture, path=path)
+            )
 
 
 class TestDomainDotfileUpdate:
