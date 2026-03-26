@@ -213,6 +213,7 @@ class OperationInfo(BaseResponseModel):
 
     operation: str = Field(description="Operation name")
     description: str = Field(description="Human-readable description")
+    required_permission: OperationTypeDTO = Field(description="Required RBAC permission")
 
 
 class EntityOperationCombinationInfo(BaseResponseModel):
