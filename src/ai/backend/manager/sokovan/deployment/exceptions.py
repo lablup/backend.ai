@@ -93,3 +93,17 @@ class DeploymentAlreadyInProgress(DeploymentError):
             operation=ErrorOperation.UPDATE,
             error_detail=ErrorDetail.BAD_REQUEST,
         )
+
+
+class InsufficientSurgeResources(DeploymentError):
+    """Raised when rolling update max_surge requires more resources than available."""
+
+    error_type = "https://api.backend.ai/probs/insufficient-surge-resources"
+    error_title = "Insufficient resources for rolling update surge."
+
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.MODEL_DEPLOYMENT,
+            operation=ErrorOperation.UPDATE,
+            error_detail=ErrorDetail.BAD_REQUEST,
+        )

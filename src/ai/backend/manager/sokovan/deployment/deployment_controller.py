@@ -3,10 +3,13 @@
 import logging
 import uuid
 from dataclasses import dataclass
+from decimal import Decimal
 
 from ai.backend.common.clients.valkey_client.valkey_schedule import ValkeyScheduleClient
+from ai.backend.common.data.model_deployment.types import DeploymentStrategy
 from ai.backend.common.data.permission.types import RBACElementType
 from ai.backend.common.events.dispatcher import EventProducer
+from ai.backend.common.types import ResourceSlot
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.deployment.creator import DeploymentCreationDraft
@@ -20,6 +23,7 @@ from ai.backend.manager.data.deployment.types import (
     RouteTrafficStatus,
 )
 from ai.backend.manager.data.permission.types import RBACElementRef
+from ai.backend.manager.models.deployment_policy import RollingUpdateSpec
 from ai.backend.manager.models.endpoint import EndpointRow
 from ai.backend.manager.models.routing import RoutingRow
 from ai.backend.manager.models.routing.conditions import RouteConditions
@@ -33,6 +37,7 @@ from ai.backend.manager.repositories.deployment.updaters import (
     DeploymentUpdaterSpec,
     RouteUpdaterSpec,
 )
+from ai.backend.manager.sokovan.deployment.exceptions import InsufficientSurgeResources
 from ai.backend.manager.sokovan.deployment.revision_generator.registry import (
     RevisionGeneratorRegistry,
 )
@@ -223,6 +228,65 @@ class DeploymentController:
             lifecycle_type.value,
             sub_step_value,
         )
+
+    # ========== Rolling Update Validation ==========
+
+    async def validate_rolling_update_resources(
+        self,
+        deployment_info: DeploymentInfo,
+        revision_id: uuid.UUID,
+    ) -> None:
+        """Validate that the rolling update max_surge can be satisfied by available resources.
+
+        During a rolling update, up to ``max_surge`` additional routes are created
+        beyond the desired count.  Each extra route requires the same resources as
+        defined in the revision spec.  This method checks that the scaling group has
+        enough free resources to accommodate the surge.
+
+        Args:
+            deployment_info: Current deployment information
+            revision_id: ID of the revision being activated
+
+        Raises:
+            InsufficientSurgeResources: If available resources cannot satisfy the surge
+        """
+        policy = await self._deployment_repository.get_deployment_policy(deployment_info.id)
+        if policy.strategy != DeploymentStrategy.ROLLING:
+            return
+
+        spec = policy.strategy_spec
+        if not isinstance(spec, RollingUpdateSpec):
+            return
+
+        if spec.max_surge == 0:
+            return
+
+        revision = deployment_info.resolve_revision_spec(revision_id)
+        per_route_slots = ResourceSlot(dict(revision.resource_spec.resource_slots))
+        surge_slots = ResourceSlot({k: v * spec.max_surge for k, v in per_route_slots.data.items()})
+
+        scaling_group = deployment_info.metadata.resource_group
+        available_resources = (
+            await self._scheduling_controller.get_available_resources_for_scaling_group(
+                scaling_group
+            )
+        )
+        free_slots = available_resources.total_free_slots
+
+        if not (surge_slots <= free_slots):
+            insufficient_details = []
+            for slot_name in surge_slots.keys():
+                required = surge_slots.get(slot_name, Decimal(0))
+                available = free_slots.get(slot_name, Decimal(0))
+                if required > available:
+                    insufficient_details.append(
+                        f"{slot_name}: required={required}, available={available}"
+                    )
+            raise InsufficientSurgeResources(
+                f"Rolling update max_surge={spec.max_surge} requires additional resources "
+                f"that exceed the available capacity in scaling group '{scaling_group}'. "
+                f"Insufficient resources: {', '.join(insufficient_details)}"
+            )
 
     # ========== Deployment Policy Methods ==========
 

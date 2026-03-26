@@ -717,6 +717,17 @@ class SchedulerRepository:
 
         return total_resource_data
 
+    @scheduler_repository_resilience.apply()
+    async def get_resource_slots_for_scaling_group(self, scaling_group: str) -> TotalResourceData:
+        """
+        Get resource slots for a specific scaling group.
+        Queries the DB directly (no cache).
+
+        :param scaling_group: Name of the scaling group
+        :return: TotalResourceData with used, free, and capacity slots
+        """
+        return await self._db_source.calculate_resource_slots_for_scaling_group(scaling_group)
+
     # =========================================================================
     # Handler-specific methods for SessionLifecycleHandler pattern
     # =========================================================================

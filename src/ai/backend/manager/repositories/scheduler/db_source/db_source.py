@@ -3395,6 +3395,55 @@ class ScheduleDBSource:
             total_capacity_slots=total_capacity_slots,
         )
 
+    async def calculate_resource_slots_for_scaling_group(
+        self, scaling_group: str
+    ) -> TotalResourceData:
+        """
+        Calculate resource slots for a specific scaling group from the
+        normalized agent_resources table.
+
+        Only considers agents that are ALIVE and schedulable within the
+        given scaling group.
+
+        :param scaling_group: Name of the scaling group to query
+        :return: TotalResourceData with used, free, and capacity slots
+        """
+        ar = AgentResourceRow.__table__
+        ag = AgentRow.__table__
+
+        async with self._begin_readonly_read_committed() as conn:
+            stmt = (
+                sa.select(
+                    ar.c.slot_name,
+                    sa.func.sum(ar.c.capacity).label("total_capacity"),
+                    sa.func.sum(ar.c.used).label("total_used"),
+                )
+                .select_from(ar.join(ag, ar.c.agent_id == ag.c.id))
+                .where(
+                    ag.c.status == AgentStatus.ALIVE,
+                    ag.c.schedulable == sa.true(),
+                    ag.c.scaling_group == scaling_group,
+                )
+                .group_by(ar.c.slot_name)
+            )
+            result = await conn.execute(stmt)
+
+            capacity: dict[str, Decimal] = {}
+            used: dict[str, Decimal] = {}
+            for row in result:
+                capacity[row.slot_name] = row.total_capacity
+                used[row.slot_name] = row.total_used
+
+        total_capacity_slots = ResourceSlot(capacity)
+        total_used_slots = ResourceSlot(used)
+        total_free_slots = total_capacity_slots - total_used_slots
+
+        return TotalResourceData(
+            total_used_slots=total_used_slots,
+            total_free_slots=total_free_slots,
+            total_capacity_slots=total_capacity_slots,
+        )
+
     # =========================================================================
     # Normalized resource allocation write operations
     # =========================================================================

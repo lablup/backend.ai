@@ -835,7 +835,12 @@ class DeploymentService:
                 f"of deployment {action.deployment_id}."
             )
 
-        # 3. Set deploying_revision and transition to DEPLOYING lifecycle.
+        # 3. Validate rolling update surge resource availability
+        await self._deployment_controller.validate_rolling_update_resources(
+            deployment_info, action.revision_id
+        )
+
+        # 4. Set deploying_revision and transition to DEPLOYING lifecycle.
         # The DB WHERE clause includes ``deploying_revision IS NULL`` to guard
         # against concurrent activations; updated=False means the guard fired.
         previous_revision_id, updated = await self._deployment_repository.set_deploying_revision(
@@ -847,7 +852,7 @@ class DeploymentService:
                 f"(concurrent activation detected)."
             )
 
-        # 4. Trigger DEPLOYING lifecycle to start strategy execution
+        # 5. Trigger DEPLOYING lifecycle to start strategy execution
         await self._deployment_controller.mark_lifecycle_needed(
             DeploymentLifecycleType.DEPLOYING,
             sub_step=DeploymentLifecycleSubStep.DEPLOYING_PROVISIONING,
@@ -860,7 +865,7 @@ class DeploymentService:
             previous_revision_id,
         )
 
-        # 5. Get updated deployment info and policy
+        # 6. Get updated deployment info and policy
         deployment_info = await self._deployment_repository.get_endpoint_info(action.deployment_id)
         deployment_policy = await self._deployment_controller.get_deployment_policy(
             action.deployment_id
