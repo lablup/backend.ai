@@ -24,6 +24,7 @@ from ai.backend.common.dto.manager.vfolder.request import (
     AcceptInvitationReq,
     ChangeVFolderOwnershipReq,
     CloneVFolderReq,
+    CreateArchiveDownloadSessionReq,
     CreateDownloadSessionReq,
     CreateUploadSessionReq,
     DeleteFilesAsyncBodyParam,
@@ -843,24 +844,15 @@ class VFolderHandler:
 
     async def create_archive_download_session(
         self,
-        body: BodyParam[CreateDownloadSessionReq],
+        body: BodyParam[CreateArchiveDownloadSessionReq],
         vfctx: VFolderAuthContext,
         req: RequestCtx,
     ) -> APIResponse:
-        """Create a download session for archived files.
-
-        Reuses CreateDownloadSessionReq body param -- the caller must supply
-        ``files`` in the JSON body.  Since the existing legacy handler read
-        ``params["files"]`` from a trafaret schema, we fall back to reading
-        ``files`` from the raw request body when the DTO does not carry it.
-        """
+        """Create a download session for archived files."""
+        params = body.parsed
         row = vfctx.vfolder_row
-        # The legacy endpoint expects a "files" list, not the single-file "path"
-        # used by the normal download session.  Read directly from the request
-        # body to maintain backward compatibility.
-        raw_body = await req.request.json()
-        files: list[str] = raw_body.get("files", [])
-        filename: str | None = raw_body.get("filename", None)
+        files = params.files
+        filename = params.filename
         log.info(
             "VFOLDER.CREATE_ARCHIVE_DOWNLOAD_SESSION"
             "(email:{}, ak:{}, vf:{} (resolved-from:{!r}), files:{})",
