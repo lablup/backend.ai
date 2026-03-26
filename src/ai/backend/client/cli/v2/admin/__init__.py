@@ -91,7 +91,7 @@ def service_catalog() -> None:
 @admin.group(
     cls=LazyGroup,
     import_name="ai.backend.client.cli.v2.admin.prometheus_query_preset:prometheus_query_preset",
-    name="prometheus-query-preset",
+    name="prometheus-query-definition",
 )
 def prometheus_query_preset() -> None:
-    """Admin prometheus query preset commands."""
+    """Admin prometheus query definition commands."""

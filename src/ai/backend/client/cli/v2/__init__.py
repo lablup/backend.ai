@@ -203,6 +203,7 @@ def app_config() -> None:
 @v2.group(
     cls=LazyGroup,
     import_name="ai.backend.client.cli.v2.prometheus_query_preset:prometheus_query_preset",
+    name="prometheus-query-definition",
 )
 def prometheus_query_preset() -> None:
-    """Prometheus query preset commands."""
+    """Prometheus query definition commands."""

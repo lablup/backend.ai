@@ -1,4 +1,4 @@
-"""Admin CLI commands for the v2 prometheus query preset resource."""
+"""Admin CLI commands for the v2 prometheus query definition resource."""
 
 from __future__ import annotations
 
@@ -17,7 +17,7 @@ from ai.backend.client.cli.v2.helpers import (
 
 @click.group()
 def prometheus_query_preset() -> None:
-    """Admin prometheus query preset commands."""
+    """Admin prometheus query definition commands."""
 
 
 @prometheus_query_preset.command()

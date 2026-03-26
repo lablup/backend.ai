@@ -22,9 +22,9 @@ from ai.backend.client.cli.v2.helpers import (
 )
 
 
-@click.group(name="prometheus-query-preset")
+@click.group(name="prometheus-query-definition")
 def prometheus_query_preset() -> None:
-    """Prometheus query preset commands."""
+    """Prometheus query definition commands."""
 
 
 @prometheus_query_preset.command()
