@@ -3581,6 +3581,24 @@ input IntFilter {
 }
 
 """
+Added in 26.4.0. Input for a rolling-update budget value.
+Set type to COUNT and provide 'count', or set type to PERCENT and provide 'percent' (0.0-1.0).
+"""
+input IntOrPercentInput {
+  type: IntOrPercentType!
+  count: Int
+  percent: Float
+}
+
+"""
+Added in 26.4.0. Type of a surge value: 'count' for an absolute replica count, 'percent' for a fraction of desired replicas (0.0-1.0).
+"""
+enum IntOrPercentType {
+  COUNT
+  PERCENT
+}
+
+"""
 Added in 26.2.0. Payload returned after issuing a new keypair. The secret_key is only shown once.
 """
 type IssueMyKeypairPayload {
@@ -8030,8 +8048,8 @@ input RoleStatusFilter {
 
 """Added in 25.19.0. Configuration for rolling update strategy."""
 input RollingUpdateConfigInput {
-  maxSurge: Int! = 1
-  maxUnavailable: Int! = 0
+  maxSurge: IntOrPercentInput
+  maxUnavailable: IntOrPercentInput
 }
 
 """Added in 25.19.0. Represents a route for a model deployment."""
