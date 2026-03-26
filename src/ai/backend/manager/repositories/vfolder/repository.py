@@ -16,16 +16,16 @@ from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPoli
 from ai.backend.common.resilience.policies.retry import BackoffStrategy, RetryArgs, RetryPolicy
 from ai.backend.common.resilience.resilience import Resilience
 from ai.backend.common.types import VFolderHostPermission, VFolderHostPermissionMap, VFolderID
+from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.data.permission.id import ObjectId, ScopeId
 from ai.backend.manager.data.permission.types import (
     EntityType,
     OperationType,
-    RBACElementRef,
-    RBACElementType,
     RelationType,
     RoleSource,
     ScopeType,
 )
+from ai.backend.manager.data.user.types import UserStatus
 from ai.backend.manager.data.vfolder.types import (
     VFolderAccessInfo,
     VFolderCreateParams,
@@ -35,6 +35,7 @@ from ai.backend.manager.data.vfolder.types import (
     VFolderMountPermission,
     VFolderPermissionData,
 )
+from ai.backend.manager.errors.api import InvalidAPIParameters
 from ai.backend.manager.errors.common import ObjectNotFound
 from ai.backend.manager.errors.resource import ProjectNotFound
 from ai.backend.manager.errors.storage import (
@@ -42,8 +43,10 @@ from ai.backend.manager.errors.storage import (
     VFolderFilterStatusFailed,
     VFolderInvalidParameter,
     VFolderNotFound,
+    VFolderOperationFailed,
 )
 from ai.backend.manager.errors.user import UserNotFound
+from ai.backend.manager.models.agent import AgentStatus, agents
 from ai.backend.manager.models.group import GroupRow, ProjectType
 from ai.backend.manager.models.group import association_groups_users as agus
 from ai.backend.manager.models.kernel import kernels
@@ -51,11 +54,12 @@ from ai.backend.manager.models.keypair import KeyPairRow, keypairs
 from ai.backend.manager.models.rbac_models.association_scopes_entities import (
     AssociationScopesEntitiesRow,
 )
-from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
+from ai.backend.manager.models.rbac_models.permission.object_permission import ObjectPermissionRow
 from ai.backend.manager.models.rbac_models.role import RoleRow
 from ai.backend.manager.models.rbac_models.user_role import UserRoleRow
+from ai.backend.manager.models.resource_policy import keypair_resource_policies
 from ai.backend.manager.models.storage import StorageSessionManager
-from ai.backend.manager.models.user import UserRole, UserRow
+from ai.backend.manager.models.user import ACTIVE_USER_STATUSES, UserRole, UserRow, users
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine, execute_with_retry
 from ai.backend.manager.models.vfolder import (
     HARD_DELETED_VFOLDER_STATUSES,
@@ -67,13 +71,18 @@ from ai.backend.manager.models.vfolder import (
     VFolderOwnershipType,
     VFolderPermission,
     VFolderPermissionRow,
+    VFolderPermissionSetAlias,
     VFolderRow,
     VFolderStatusSet,
     delete_vfolder_relation_rows,
     ensure_host_permission_allowed,
+    get_allowed_vfolder_hosts_by_group,
+    get_allowed_vfolder_hosts_by_user,
     get_sessions_by_mounted_folder,
     is_unmanaged,
     query_accessible_vfolders,
+    vfolder_invitations,
+    vfolder_permissions,
     vfolder_status_map,
     vfolders,
 )
@@ -1687,7 +1696,6 @@ class VfolderRepository:
                         entity_type=EntityType.VFOLDER,
                         entity_id=str(vfolder_id),
                     ),
-                    entity_scope_type=RBACElementType.VFOLDER,
                     target_role_ids=[new_owner_role_id],
                     operations=None,
                 )
@@ -1706,7 +1714,6 @@ class VfolderRepository:
                             entity_type=EntityType.VFOLDER,
                             entity_id=str(vfolder_id),
                         ),
-                        entity_scope_type=RBACElementType.VFOLDER,
                         target_role_ids=[user_role_id],
                         operations=None,
                     )
@@ -1751,16 +1758,15 @@ class VfolderRepository:
                 # Grant owner permission (ON CONFLICT DO NOTHING in case
                 # new owner already had permission as invitee)
                 perm_stmt = (
-                    pg_insert(PermissionRow)
+                    pg_insert(ObjectPermissionRow)
                     .values(
                         role_id=user_role_id,
-                        scope_type=ScopeType.VFOLDER,
-                        scope_id=str(vfolder_id),
                         entity_type=EntityType.VFOLDER,
+                        entity_id=str(vfolder_id),
                         operation=OperationType.READ,
                     )
                     .on_conflict_do_nothing(
-                        constraint="uq_permissions_role_scope_entity_op",
+                        constraint="uq_object_permissions_role_entity_op",
                     )
                 )
                 await session.execute(perm_stmt)

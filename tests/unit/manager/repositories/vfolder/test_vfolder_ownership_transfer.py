@@ -29,6 +29,7 @@ from ai.backend.manager.data.permission.types import (
     OperationType,
     RelationType,
     RoleSource,
+    ScopeType,
 )
 from ai.backend.manager.data.vfolder.types import (
     VFolderMountPermission,
@@ -44,7 +45,6 @@ from ai.backend.manager.models.rbac_models.association_scopes_entities import (
     AssociationScopesEntitiesRow,
 )
 from ai.backend.manager.models.rbac_models.permission.object_permission import ObjectPermissionRow
-from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
 from ai.backend.manager.models.rbac_models.role import RoleRow
 from ai.backend.manager.models.resource_policy import (
     KeyPairResourcePolicyRow,
@@ -95,7 +95,6 @@ class TestVFolderOwnershipTransferRBACCleanup:
                 VFolderPermissionRow,
                 AssociationScopesEntitiesRow,
                 ObjectPermissionRow,
-                PermissionRow,
             ],
         ):
             yield database_connection
@@ -311,6 +310,27 @@ class TestVFolderOwnershipTransferRBACCleanup:
 
         return UserWithKeypair(user_id=user_uuid, email=email)
 
+    async def _create_scope_entity_mapping(
+        self,
+        db: ExtendedAsyncSAEngine,
+        scope_type: ScopeType,
+        scope_id: uuid.UUID,
+        entity_type: EntityType,
+        entity_id: uuid.UUID,
+        relation_type: RelationType,
+    ) -> None:
+        """Create an AssociationScopesEntitiesRow (simulating RBAC entity creation)."""
+        async with db.begin_session() as db_sess:
+            mapping = AssociationScopesEntitiesRow(
+                scope_type=scope_type,
+                scope_id=str(scope_id),
+                entity_type=entity_type,
+                entity_id=str(entity_id),
+                relation_type=relation_type,
+            )
+            db_sess.add(mapping)
+            await db_sess.flush()
+
     async def test_ownership_transfer_cleans_up_old_owner_rbac(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
@@ -351,9 +371,19 @@ class TestVFolderOwnershipTransferRBACCleanup:
             db_sess.add(vfolder_row)
             await db_sess.flush()
 
-        # Grant A owner permission (creates scope-entity mapping + permissions)
+        # Grant A owner permission (creates ObjectPermissionRow via RBACGranter)
         await repo.create_vfolder_permission(
             vfolder_id, user_a_id, VFolderMountPermission.OWNER_PERM
+        )
+
+        # Create scope-entity mapping for A (simulating RBAC entity creation flow)
+        await self._create_scope_entity_mapping(
+            db_with_cleanup,
+            ScopeType.USER,
+            user_a_id,
+            EntityType.VFOLDER,
+            vfolder_id,
+            RelationType.AUTO,
         )
 
         # Verify A's RBAC records exist before transfer
@@ -387,14 +417,14 @@ class TestVFolderOwnershipTransferRBACCleanup:
 
             perm_count_after = await db_sess.scalar(
                 sa.select(sa.func.count())
-                .select_from(PermissionRow)
+                .select_from(ObjectPermissionRow)
                 .where(
                     sa.and_(
-                        PermissionRow.scope_id == str(vfolder_id),
-                        PermissionRow.entity_type == EntityType.VFOLDER,
+                        ObjectPermissionRow.entity_id == str(vfolder_id),
+                        ObjectPermissionRow.entity_type == EntityType.VFOLDER,
                     )
                 )
-                .join(UserRoleRow, UserRoleRow.role_id == PermissionRow.role_id)
+                .join(UserRoleRow, UserRoleRow.role_id == ObjectPermissionRow.role_id)
                 .where(UserRoleRow.user_id == user_a_id)
             )
             assert perm_count_after == 0, "Old owner's permissions should be removed after transfer"
@@ -415,15 +445,15 @@ class TestVFolderOwnershipTransferRBACCleanup:
 
             b_perm_count = await db_sess.scalar(
                 sa.select(sa.func.count())
-                .select_from(PermissionRow)
+                .select_from(ObjectPermissionRow)
                 .where(
                     sa.and_(
-                        PermissionRow.scope_id == str(vfolder_id),
-                        PermissionRow.entity_type == EntityType.VFOLDER,
-                        PermissionRow.operation == OperationType.READ,
+                        ObjectPermissionRow.entity_id == str(vfolder_id),
+                        ObjectPermissionRow.entity_type == EntityType.VFOLDER,
+                        ObjectPermissionRow.operation == OperationType.READ,
                     )
                 )
-                .join(UserRoleRow, UserRoleRow.role_id == PermissionRow.role_id)
+                .join(UserRoleRow, UserRoleRow.role_id == ObjectPermissionRow.role_id)
                 .where(UserRoleRow.user_id == user_b_id)
             )
             assert b_perm_count == 1, "New owner should have READ permission after transfer"
@@ -472,6 +502,16 @@ class TestVFolderOwnershipTransferRBACCleanup:
 
         await repo.create_vfolder_permission(
             vfolder_id, user_a_id, VFolderMountPermission.OWNER_PERM
+        )
+
+        # Create scope-entity mapping for A (simulating RBAC entity creation flow)
+        await self._create_scope_entity_mapping(
+            db_with_cleanup,
+            ScopeType.USER,
+            user_a_id,
+            EntityType.VFOLDER,
+            vfolder_id,
+            RelationType.AUTO,
         )
 
         # Transfer A -> B
@@ -570,18 +610,38 @@ class TestVFolderOwnershipTransferRBACCleanup:
             vfolder_id, user_a_id, VFolderMountPermission.OWNER_PERM
         )
 
+        # Create scope-entity mappings (simulating RBAC entity creation flow)
+        await self._create_scope_entity_mapping(
+            db_with_cleanup,
+            ScopeType.USER,
+            user_a_id,
+            EntityType.VFOLDER,
+            vfolder_id,
+            RelationType.AUTO,
+        )
+
         # B gets invitee permission (simulates accepting an invitation)
         await repo.create_vfolder_permission(
             vfolder_id, user_b_id, VFolderMountPermission.READ_ONLY
+        )
+
+        # Create scope-entity mapping for B as invitee
+        await self._create_scope_entity_mapping(
+            db_with_cleanup,
+            ScopeType.USER,
+            user_b_id,
+            EntityType.VFOLDER,
+            vfolder_id,
+            RelationType.REF,
         )
 
         # Verify B has RBAC permission before transfer
         async with db_with_cleanup.begin_readonly_session() as db_sess:
             perm_count_b = await db_sess.scalar(
                 sa.select(sa.func.count())
-                .select_from(PermissionRow)
-                .where(PermissionRow.scope_id == str(vfolder_id))
-                .join(UserRoleRow, UserRoleRow.role_id == PermissionRow.role_id)
+                .select_from(ObjectPermissionRow)
+                .where(ObjectPermissionRow.entity_id == str(vfolder_id))
+                .join(UserRoleRow, UserRoleRow.role_id == ObjectPermissionRow.role_id)
                 .where(UserRoleRow.user_id == user_b_id)
             )
             assert perm_count_b is not None and perm_count_b > 0, (
@@ -617,9 +677,9 @@ class TestVFolderOwnershipTransferRBACCleanup:
         async with db_with_cleanup.begin_readonly_session() as db_sess:
             perm_count_b_final = await db_sess.scalar(
                 sa.select(sa.func.count())
-                .select_from(PermissionRow)
-                .where(PermissionRow.scope_id == str(vfolder_id))
-                .join(UserRoleRow, UserRoleRow.role_id == PermissionRow.role_id)
+                .select_from(ObjectPermissionRow)
+                .where(ObjectPermissionRow.entity_id == str(vfolder_id))
+                .join(UserRoleRow, UserRoleRow.role_id == ObjectPermissionRow.role_id)
                 .where(UserRoleRow.user_id == user_b_id)
             )
             assert perm_count_b_final is not None and perm_count_b_final > 0, (
@@ -671,9 +731,29 @@ class TestVFolderOwnershipTransferRBACCleanup:
             vfolder_id, user_a_id, VFolderMountPermission.OWNER_PERM
         )
 
-        # Grant B invitee permission (creates REF scope-entity mapping)
+        # Create scope-entity mapping for A (simulating RBAC entity creation flow)
+        await self._create_scope_entity_mapping(
+            db_with_cleanup,
+            ScopeType.USER,
+            user_a_id,
+            EntityType.VFOLDER,
+            vfolder_id,
+            RelationType.AUTO,
+        )
+
+        # Grant B invitee permission (creates ObjectPermissionRow via RBACGranter)
         await repo.create_vfolder_permission(
             vfolder_id, user_b_id, VFolderMountPermission.READ_ONLY
+        )
+
+        # Create scope-entity mapping for B as invitee (REF relation)
+        await self._create_scope_entity_mapping(
+            db_with_cleanup,
+            ScopeType.USER,
+            user_b_id,
+            EntityType.VFOLDER,
+            vfolder_id,
+            RelationType.REF,
         )
 
         # Verify B has REF mapping before transfer
@@ -708,15 +788,15 @@ class TestVFolderOwnershipTransferRBACCleanup:
             # Verify B has owner-level READ permission
             b_perm_count = await db_sess.scalar(
                 sa.select(sa.func.count())
-                .select_from(PermissionRow)
+                .select_from(ObjectPermissionRow)
                 .where(
                     sa.and_(
-                        PermissionRow.scope_id == str(vfolder_id),
-                        PermissionRow.entity_type == EntityType.VFOLDER,
-                        PermissionRow.operation == OperationType.READ,
+                        ObjectPermissionRow.entity_id == str(vfolder_id),
+                        ObjectPermissionRow.entity_type == EntityType.VFOLDER,
+                        ObjectPermissionRow.operation == OperationType.READ,
                     )
                 )
-                .join(UserRoleRow, UserRoleRow.role_id == PermissionRow.role_id)
+                .join(UserRoleRow, UserRoleRow.role_id == ObjectPermissionRow.role_id)
                 .where(UserRoleRow.user_id == user_b_id)
             )
             assert (b_perm_count or 0) >= 1, "New owner should have READ permission after transfer"
