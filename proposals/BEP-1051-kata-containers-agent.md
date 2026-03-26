@@ -88,43 +88,44 @@ This section describes the end-to-end component interactions when Backend.AI cre
 sequenceDiagram
     participant M as Manager
     participant A as KataAgent
-    participant C as containerd<br/>+ Kata shim
-    participant G as Guest VM<br/>(CoCo TEE)
+    participant C as containerd + Kata shim
+    participant G as Guest VM (CoCo TEE)
 
-    M->>A: create_kernels(RPC)<br/>(session_id, kernel_configs,<br/>cluster_info, image_refs)
+    M->>A: create_kernels(RPC)
 
-    Note over A: [1] init_kernel_context()<br/>→ KataKernelCreationContext<br/>(containerd gRPC client, no Docker)
-
-    Note over A: [2] check_image()<br/>⚠️ No host-side image check<br/>(CoCo: host must not see image).<br/>Image ref passed to shim;<br/>image-rs pulls inside guest after boot.
-
-    Note over A: [3] allocate_resources()<br/>→ CUDAVFIOPlugin: VFIO devices + clique_id<br/>→ RDMAVFIOPlugin: auto-attach co-located HCA
-
-    Note over A: [4] prepare_scratch()<br/>→ write environ.txt, resource.txt<br/>⚠️ write storage-mounts.json<br/>(volume specs + storage NIC IP)<br/>All to /home/config via virtio-fs
-
-    Note over A: [5] apply_network()<br/>→ Calico CNI, /etc/hosts, SSH keypair
-
-    Note over A: [6] mount_vfolders()<br/>⚠️ Same Mount(BIND) objects,<br/>but become guest-internal bind mounts<br/>(volume already mounted by boot script)
-
-    Note over A: [7] prepare_container()<br/>→ OCI spec: image ref, env vars,<br/>bind mounts, VFIO annotations,<br/>clique-id, CoCo attestation config
+    Note over A: [1] init_kernel_context()
+    Note over A: [2] check_image() - no host-side check (CoCo)
+    Note over A: [3] allocate_resources() - VFIO + RDMA
+    Note over A: [4] prepare_scratch() - write storage-mounts.json
+    Note over A: [5] apply_network() - Calico CNI
+    Note over A: [6] mount_vfolders() - guest-internal bind mounts
+    Note over A: [7] prepare_container() - OCI spec + VFIO annotations
 
     A->>C: [8] CreateSandbox()
-
-    Note over C: [8a] Kata shim:<br/>• Configure VFIO (GPU + HCA + clique-id)<br/>• Set up virtio-fs (/home/config)<br/>• Boot VM with TDX/SEV-SNP
-
+    Note over C: Configure VFIO devices, virtio-fs, boot VM with TDX/SEV-SNP
     C->>G: Boot VM
 
-    Note over G: [8b] VM Boot:<br/>• TEE attestation<br/>• kata-agent starts<br/>• Boot script reads storage-mounts.json<br/>• Configure storage NIC IP (IPoIB)<br/>• Mount NFS/Lustre (native client, RDMA)
+    rect rgb(240, 248, 255)
+        Note over G: [8b] VM Boot
+        Note over G: TEE attestation
+        Note over G: Read storage-mounts.json
+        Note over G: Configure storage NIC IP (IPoIB)
+        Note over G: Mount NFS/Lustre (native, RDMA)
+    end
 
     C->>G: [8c] CreateContainer()
 
-    Note over G: [8d] Container start:<br/>• image-rs pulls encrypted OCI image<br/> (decrypted via KBS after attestation)<br/>• Bind-mount vfolder subdirs from<br/> /mnt/vfstore/&lt;vfid&gt;<br/>• entrypoint.sh → kernel runner
+    rect rgb(240, 248, 255)
+        Note over G: [8d] Container start
+        Note over G: image-rs pulls encrypted OCI image
+        Note over G: Bind-mount vfolder subdirs
+        Note over G: entrypoint.sh, kernel runner starts
+    end
 
-    G-->>A: [9] ZMQ TCP connect<br/>(repl_in_port / repl_out_port<br/>via Calico network)
-
+    G-->>A: [9] ZMQ TCP connect (via Calico network)
     A->>G: [10] check_status() poll
     G-->>A: kernel runner ready + service metadata
-
-    A-->>M: return kernel_data<br/>(container_id, ports, services)
+    A-->>M: return kernel_data
 ```
 
 ### Key Differences from DockerAgent
