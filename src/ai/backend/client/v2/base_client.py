@@ -33,10 +33,15 @@ def _create_aiohttp_session(config: ClientConfig) -> aiohttp.ClientSession:
     cookie_jar = config.cookie_jar
     if cookie_jar is None and config.endpoint_type == "session":
         cookie_jar = aiohttp.CookieJar(unsafe=True)
+    if cookie_jar is not None:
+        return aiohttp.ClientSession(
+            connector=connector,
+            timeout=timeout,
+            cookie_jar=cookie_jar,
+        )
     return aiohttp.ClientSession(
         connector=connector,
         timeout=timeout,
-        **({"cookie_jar": cookie_jar} if cookie_jar is not None else {}),
     )
 
 
