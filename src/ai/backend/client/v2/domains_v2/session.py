@@ -7,11 +7,11 @@ from ai.backend.common.dto.manager.v2.kernel.request import AdminSearchKernelsIn
 from ai.backend.common.dto.manager.v2.kernel.response import AdminSearchKernelsPayload
 from ai.backend.common.dto.manager.v2.session.request import (
     AdminSearchSessionsInput,
-    CreateSessionInput,
+    EnqueueSessionInput,
 )
 from ai.backend.common.dto.manager.v2.session.response import (
     AdminSearchSessionsPayload,
-    CreateSessionPayload,
+    EnqueueSessionPayload,
 )
 
 _PATH = "/v2/sessions"
@@ -20,16 +20,16 @@ _PATH = "/v2/sessions"
 class V2SessionClient(BaseDomainClient):
     """SDK client for the ``/v2/sessions`` REST endpoints."""
 
-    async def create(
+    async def enqueue(
         self,
-        request: CreateSessionInput,
-    ) -> CreateSessionPayload:
-        """Create a new compute session."""
+        request: EnqueueSessionInput,
+    ) -> EnqueueSessionPayload:
+        """Enqueue a new compute session."""
         return await self._client.typed_request(
             "POST",
-            _PATH,
+            f"{_PATH}/enqueue",
             request=request,
-            response_model=CreateSessionPayload,
+            response_model=EnqueueSessionPayload,
         )
 
     async def admin_search(

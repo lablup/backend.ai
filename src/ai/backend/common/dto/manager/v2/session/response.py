@@ -171,8 +171,8 @@ class SessionNode(BaseResponseModel):
 # ---------------------------------------------------------------------------
 
 
-class CreateSessionPayload(BaseResponseModel):
-    """Payload for session creation. Returns the full session node."""
+class EnqueueSessionPayload(BaseResponseModel):
+    """Payload for session enqueue. Returns the full session node."""
 
     session: SessionNode = Field(description="Created session details.")
 

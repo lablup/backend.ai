@@ -22,8 +22,8 @@ def register_v2_session_routes(
 
     registry.add(
         "POST",
-        "/",
-        handler.create,
+        "/enqueue",
+        handler.enqueue,
         middlewares=[auth_required],
     )
     registry.add(

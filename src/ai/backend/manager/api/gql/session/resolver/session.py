@@ -13,8 +13,8 @@ from ai.backend.manager.api.gql.decorators import (
     gql_root_field,
 )
 from ai.backend.manager.api.gql.session.types import (
-    CreateSessionInputGQL,
-    CreateSessionPayloadGQL,
+    EnqueueSessionInputGQL,
+    EnqueueSessionPayloadGQL,
     SessionV2ConnectionGQL,
     SessionV2EdgeGQL,
     SessionV2FilterGQL,
@@ -73,18 +73,18 @@ async def admin_sessions_v2(
 @gql_mutation(
     BackendAIGQLMeta(
         added_version=NEXT_RELEASE_VERSION,
-        description="Create a new compute session.",
+        description="Enqueue a new compute session.",
     ),
 )  # type: ignore[misc]
-async def create_session(
-    input: CreateSessionInputGQL,
+async def enqueue_session(
+    input: EnqueueSessionInputGQL,
     info: Info[StrawberryGQLContext],
-) -> CreateSessionPayloadGQL:
-    """Create a new compute session (interactive or batch)."""
+) -> EnqueueSessionPayloadGQL:
+    """Enqueue a new compute session (interactive or batch)."""
     user_data = current_user()
     if user_data is None:
         raise UserNotFound("User not found in context")
-    payload = await info.context.adapters.session.create(
+    payload = await info.context.adapters.session.enqueue(
         input.to_pydantic(),
         user_id=user_data.user_id,
         user_role=user_data.role,
@@ -92,6 +92,6 @@ async def create_session(
         domain_name=user_data.domain_name,
         group_id=input.project_id or user_data.user_id,
     )
-    return CreateSessionPayloadGQL(
+    return EnqueueSessionPayloadGQL(
         session=SessionV2GQL.from_pydantic(payload.session),
     )

@@ -10,7 +10,7 @@ from ai.backend.common.api_handlers import APIResponse, BodyParam, PathParam
 from ai.backend.common.dto.manager.v2.kernel.request import AdminSearchKernelsInput
 from ai.backend.common.dto.manager.v2.session.request import (
     AdminSearchSessionsInput,
-    CreateSessionInput,
+    EnqueueSessionInput,
 )
 from ai.backend.common.types import AgentId, SessionId
 from ai.backend.logging import BraceStyleAdapter
@@ -29,13 +29,13 @@ class V2SessionHandler:
     def __init__(self, *, adapter: SessionAdapter) -> None:
         self._adapter = adapter
 
-    async def create(
+    async def enqueue(
         self,
         user_ctx: UserContext,
-        body: BodyParam[CreateSessionInput],
+        body: BodyParam[EnqueueSessionInput],
     ) -> APIResponse:
-        """Create a new compute session."""
-        result = await self._adapter.create(
+        """Enqueue a new compute session."""
+        result = await self._adapter.enqueue(
             body.parsed,
             user_id=user_ctx.user_uuid,
             user_role=user_ctx.user_role,

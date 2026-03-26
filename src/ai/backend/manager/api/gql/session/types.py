@@ -21,7 +21,7 @@ from ai.backend.common.dto.manager.v2.session.request import (
     BatchConfigInput as BatchConfigInputDTO,
 )
 from ai.backend.common.dto.manager.v2.session.request import (
-    CreateSessionInput as CreateSessionInputDTO,
+    EnqueueSessionInput as EnqueueSessionInputDTO,
 )
 from ai.backend.common.dto.manager.v2.session.request import (
     MountItemInput as MountItemInputDTO,
@@ -34,7 +34,7 @@ from ai.backend.common.dto.manager.v2.session.request import (
     SessionOrder,
 )
 from ai.backend.common.dto.manager.v2.session.response import (
-    CreateSessionPayload as CreateSessionPayloadDTO,
+    EnqueueSessionPayload as EnqueueSessionPayloadDTO,
 )
 from ai.backend.common.dto.manager.v2.session.response import (
     SessionLifecycleInfoGQLDTO,
@@ -525,9 +525,9 @@ class SessionBatchConfigInputGQL(PydanticInputMixin[BatchConfigInputDTO]):
         description="Input for creating a new compute session.",
         added_version=NEXT_RELEASE_VERSION,
     ),
-    name="CreateSessionInput",
+    name="EnqueueSessionInput",
 )
-class CreateSessionInputGQL(PydanticInputMixin[CreateSessionInputDTO]):
+class EnqueueSessionInputGQL(PydanticInputMixin[EnqueueSessionInputDTO]):
     session_name: str = gql_field(description="Session name.")
     session_type: CreateSessionTypeGQL = gql_field(description="Session type.")
     image_id: ID = gql_field(description="Image UUID.")
@@ -577,8 +577,8 @@ class CreateSessionInputGQL(PydanticInputMixin[CreateSessionInputDTO]):
         added_version=NEXT_RELEASE_VERSION,
         description="Payload returned after creating a session.",
     ),
-    model=CreateSessionPayloadDTO,
-    name="CreateSessionPayload",
+    model=EnqueueSessionPayloadDTO,
+    name="EnqueueSessionPayload",
 )
-class CreateSessionPayloadGQL:
+class EnqueueSessionPayloadGQL:
     session: SessionV2GQL = gql_field(description="Created session details.")

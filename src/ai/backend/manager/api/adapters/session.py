@@ -39,13 +39,13 @@ from ai.backend.common.dto.manager.v2.resource_slot.types import (
 )
 from ai.backend.common.dto.manager.v2.session.request import (
     AdminSearchSessionsInput,
-    CreateSessionInput,
+    EnqueueSessionInput,
     SessionFilter,
     SessionOrder,
 )
 from ai.backend.common.dto.manager.v2.session.response import (
     AdminSearchSessionsPayload,
-    CreateSessionPayload,
+    EnqueueSessionPayload,
     SessionLifecycleInfoGQLDTO,
     SessionMetadataInfoGQLDTO,
     SessionNetworkInfo,
@@ -180,16 +180,16 @@ class SessionAdapter(BaseAdapter):
     # Create
     # -------------------------------------------------------------------------
 
-    async def create(
+    async def enqueue(
         self,
-        input: CreateSessionInput,
+        input: EnqueueSessionInput,
         user_id: UUID,
         user_role: str,
         access_key: str,
         domain_name: str,
         group_id: UUID,
-    ) -> CreateSessionPayload:
-        """Create a new session by enqueuing it for scheduling."""
+    ) -> EnqueueSessionPayload:
+        """Enqueue a new session for scheduling."""
         batch_spec: SessionBatchSpec | None = None
         if input.batch is not None:
             starts_at = None
@@ -268,7 +268,7 @@ class SessionAdapter(BaseAdapter):
         )
 
         result = await self._processors.session.enqueue_session.wait_for_complete(action)
-        return CreateSessionPayload(
+        return EnqueueSessionPayload(
             session=self._session_data_to_node(result.session_data),
         )
 

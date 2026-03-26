@@ -27,7 +27,7 @@ __all__ = (
     "AdminSearchSessionsInput",
     "BatchConfigInput",
     "CommitSessionInput",
-    "CreateSessionInput",
+    "EnqueueSessionInput",
     "DestroySessionInput",
     "DownloadFilesInput",
     "ExecuteInput",
@@ -264,8 +264,8 @@ class BatchConfigInput(BaseRequestModel):
     )
 
 
-class CreateSessionInput(BaseRequestModel):
-    """Input for creating a new compute session (interactive or batch)."""
+class EnqueueSessionInput(BaseRequestModel):
+    """Input for enqueuing a new compute session (interactive or batch)."""
 
     session_name: str = Field(
         description="Session name. Must be unique per user among active sessions.",
