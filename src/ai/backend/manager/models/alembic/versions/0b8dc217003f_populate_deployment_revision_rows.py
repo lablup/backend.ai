@@ -1,15 +1,15 @@
-"""populate deployment revision rows from endpoint data
+"""populate deployment revision rows and make routings.revision non-nullable
 
-Revision ID: 0a200d0fc480
-Revises: 3727dd0927cf
-Create Date: 2026-03-25
+Revision ID: 0b8dc217003f
+Revises: f5338adb2de1
+Create Date: 2026-03-26
 
 """
 
 from alembic import op
 
 # revision identifiers, used by Alembic.
-revision = "0a200d0fc480"
+revision = "0b8dc217003f"
 down_revision = "f5338adb2de1"
 branch_labels = None
 depends_on = None
@@ -75,19 +75,6 @@ def upgrade() -> None:
         WHERE e.current_revision IS NULL
           AND e.image IS NOT NULL
           AND e.lifecycle_stage != 'destroyed'
-        """
-    )
-
-    # Step 3: Backfill routings.revision from the endpoint's current_revision
-    # for any routes that still have revision IS NULL.
-    op.execute(
-        """
-        UPDATE routings r
-        SET revision = e.current_revision
-        FROM endpoints e
-        WHERE r.endpoint = e.id
-          AND r.revision IS NULL
-          AND e.current_revision IS NOT NULL
         """
     )
 
