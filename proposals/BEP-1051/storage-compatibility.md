@@ -154,19 +154,16 @@ Each mount is evaluated against the fundamental difference: Docker containers sh
 
 **Core dump mount**: In Docker, the host kernel's `/proc/sys/kernel/core_pattern` governs container processes because they share the host kernel. The agent bind-mounts the host's coredump directory so dumps land on the host filesystem. In Kata, the **guest kernel** has its own `core_pattern` — host-side configuration doesn't affect guest processes. To capture guest core dumps: configure the guest kernel's `core_pattern` to write to a guest-local path (e.g., `/home/work/.coredumps` on the guest disk). Low priority.
 
-**Agent socket** (`/opt/kernel/agent.sock`): This ZMQ REP socket is **not used by the Python kernel runner** — it serves requests from C binaries inside the container: `host-pid-to-container-pid` and `container-pid-to-host-pid` (PID namespace translation for the jail sandbox) and `is-jail-enabled` (jail status query). The socket is relayed via a socat sidecar (UDS inside container → TCP on host). For Kata, **both the jail sandbox and PID translation are irrelevant** (VM boundary provides stronger isolation, guest PIDs are isolated by KVM). The agent socket mount, socat relay, and `handle_agent_socket()` handler are all skipped. Note: the primary agent↔kernel-runner communication channel (ZMQ PUSH/PULL for code execution commands) is already TCP-based and works across the VM boundary without any changes.
-
 #### Mounts That Are Skipped (SKIP)
 
-**lxcfs** (`/proc/cpuinfo`, `/proc/meminfo`, `/proc/stat`, `/sys/devices/system/cpu`, etc.): lxcfs exists because Docker containers share the host kernel — `cat /proc/meminfo` shows host RAM, `nproc` shows all host CPUs. lxcfs intercepts these reads via FUSE and returns cgroup-scoped values. In a Kata VM, the guest kernel's `/proc` and `/sys` **already reflect the VM's allocated resources** (vCPU count, memory limit). lxcfs is both unnecessary (native guest kernel does this) and non-functional (host-side FUSE filesystem callbacks cannot cross the VM boundary).
+All of the following are Docker-specific mechanisms that are unnecessary or incompatible with the Kata VM model:
 
-**`libbaihook.so`** (LD_PRELOAD): This shared library hooks `sysconf(_SC_NPROCESSORS_ONLN)` and related calls to return cgroup-scoped values instead of host-wide values. It solves the same problem as lxcfs but at the userspace level — making `os.cpu_count()` in Python and `nproc` in shell return the container's allocated CPU count. In a Kata VM, `sysconf(_SC_NPROCESSORS_ONLN)` **already returns the VM's vCPU count** because the guest kernel only sees allocated vCPUs. The hook is redundant. Skip the mount and do not set `LD_PRELOAD=/opt/kernel/libbaihook.so`.
-
-**`jail` sandbox** (`/opt/kernel/jail`): The jail binary is a ptrace-based syscall tracer that filters dangerous syscalls inside Docker containers. It provides an additional security layer on top of namespaces/cgroups. In a Kata VM, the **VM boundary (KVM hypervisor)** is a fundamentally stronger isolation boundary than ptrace sandboxing — guest processes cannot escape the VM regardless of syscalls. The jail sandbox is redundant, adds latency (ptrace overhead), and ptrace inside a guest VM may have complications. Skip unconditionally for Kata.
-
-**Domain socket proxies**: Used only for special service containers (e.g., image importer) that need host-side Unix socket access. Same UDS-cannot-cross-VM-boundary limitation as the agent socket. Niche feature — defer to a future phase. If needed, a TCP-based proxy through virtio-net can replace it.
-
-**Deep learning samples volume** (`/home/work/samples`): Docker named volume `deeplearning-samples` mounted for TensorFlow/Caffe/Keras/Torch/MXNet/Theano images. Already deprecated in the new provisioner pipeline. Docker named volumes are not available with containerd. Skip.
+- **Agent socket** (`/opt/kernel/agent.sock`): ZMQ REP socket for jail/C binaries (PID translation, jail status). Irrelevant — jail is not used and the VM boundary isolates PIDs. The primary agent↔kernel-runner channel (ZMQ PUSH/PULL) is TCP-based and works over the Calico network.
+- **lxcfs** (`/proc/cpuinfo`, `/proc/meminfo`, etc.): Provides cgroup-scoped `/proc` for Docker containers that share the host kernel. Unnecessary — the guest kernel's `/proc` already reflects the VM's allocated resources.
+- **`libbaihook.so`** (LD_PRELOAD): Hooks `sysconf()` to return cgroup-scoped CPU count. Unnecessary — the guest kernel already returns the VM's vCPU count.
+- **`jail` sandbox** (`/opt/kernel/jail`): ptrace-based syscall tracer. Redundant — the VM boundary (KVM) is a stronger isolation layer.
+- **Domain socket proxies**: Host-side Unix socket access for service containers. UDS cannot cross the VM boundary.
+- **Deep learning samples volume**: Deprecated Docker named volume. Not available with containerd.
 
 #### Mounts That Differ Entirely (DIFFERENT)
 

@@ -101,17 +101,9 @@ The agent writes several files to `scratch_dir/config/` before container creatio
 
 **Key insight for Kata**: `environ.txt` and `intrinsic-ports.json` must be present **before** the kernel runner process starts — they are read during initialization. `resource.txt` is read only by the agent (host-side) for recovery after restarts and for tracking resource usage — it never crosses into the guest's runtime.
 
-### Agent Socket (agent.sock)
+### Agent Socket (agent.sock) — Skipped for Kata
 
-The agent socket (`/opt/kernel/agent.sock`) is a ZMQ REP socket that serves requests from **C binaries inside the container** — not from the Python kernel runner. It handles three operations (`docker/agent.py:1733-1822`):
-
-1. `host-pid-to-container-pid` — PID namespace translation (used by jail sandbox)
-2. `container-pid-to-host-pid` — reverse PID translation (used by jail sandbox)
-3. `is-jail-enabled` — queries whether jail sandbox is active
-
-The socket is relayed via socat: agent binds TCP on `agent_sock_port`, a relay container proxies it to a Unix domain socket mounted inside the container. This exists solely for the jail sandbox and krunner C binaries.
-
-**For Kata**: The jail sandbox is skipped (VM boundary is stronger isolation), and PID translation is irrelevant (guest PIDs are isolated by the VM). The agent socket mount and socat relay are **not needed**.
+The Docker agent socket (`/opt/kernel/agent.sock`) is a ZMQ REP socket for jail/C binaries (PID translation, jail status). **Not used for Kata** — the jail sandbox is not applicable (VM boundary is stronger) and PID translation is irrelevant (guest PIDs are isolated). The primary agent↔kernel-runner communication (ZMQ PUSH/PULL) is TCP-based and works over the Calico network without any changes.
 
 ## Proposed Design
 
