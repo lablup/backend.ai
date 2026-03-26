@@ -1,14 +1,4 @@
-from ai.backend.manager.actions.action.rbac_session import (
-    SessionCreateRBACAction,
-    SessionGetRBACAction,
-    SessionGrantAllRBACAction,
-    SessionGrantHardDeleteRBACAction,
-    SessionGrantReadRBACAction,
-    SessionGrantUpdateRBACAction,
-    SessionHardDeleteRBACAction,
-    SessionSearchRBACAction,
-    SessionUpdateRBACAction,
-)
+from ai.backend.manager.actions.action import RBAC_ACTION_REGISTRY
 from ai.backend.manager.actions.monitors.monitor import ActionMonitor
 from ai.backend.manager.actions.validators import ActionValidators
 from ai.backend.manager.services.agent.processors import AgentProcessors
@@ -290,17 +280,7 @@ def create_services(args: ServiceArgs) -> Services:
         ),
         permission_controller=PermissionControllerService(
             repository=repositories.permission_controller.repository,
-            rbac_action_registry=[
-                SessionCreateRBACAction,
-                SessionGetRBACAction,
-                SessionSearchRBACAction,
-                SessionUpdateRBACAction,
-                SessionHardDeleteRBACAction,
-                SessionGrantAllRBACAction,
-                SessionGrantReadRBACAction,
-                SessionGrantUpdateRBACAction,
-                SessionGrantHardDeleteRBACAction,
-            ],
+            rbac_action_registry=RBAC_ACTION_REGISTRY,
         ),
         vfs_storage=VFSStorageService(
             vfs_storage_repository=repositories.vfs_storage.repository,
