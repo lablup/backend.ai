@@ -50,7 +50,7 @@ def _make_request_session(resp: AsyncMock) -> MagicMock:
     return mock_session
 
 
-def _ok_response(data: dict[str, object]) -> AsyncMock:
+def _ok_response(data: dict[str, object] | list[object] | str) -> AsyncMock:
     resp = AsyncMock()
     resp.status = 200
     resp.json = AsyncMock(return_value=data)
@@ -90,12 +90,10 @@ class TestConfigClientUserDotfiles:
         assert result.data == "alias ll='ls -la'"
 
     async def test_list_user_dotfiles(self) -> None:
-        mock_resp = _ok_response({
-            "items": [
-                {"path": ".bashrc", "perm": "644", "data": "content1"},
-                {"path": ".vimrc", "perm": "644", "data": "content2"},
-            ]
-        })
+        mock_resp = _ok_response([
+            {"path": ".bashrc", "permission": "644", "data": "content1"},
+            {"path": ".vimrc", "permission": "644", "data": "content2"},
+        ])
         mock_session = _make_request_session(mock_resp)
         client = _make_client(mock_session)
         config_client = ConfigClient(client)
@@ -103,8 +101,8 @@ class TestConfigClientUserDotfiles:
         result = await config_client.list_user_dotfiles()
 
         assert isinstance(result, ListDotfilesResponse)
-        assert len(result.items) == 2
-        assert result.items[0].path == ".bashrc"
+        assert len(result.root) == 2
+        assert result.root[0].path == ".bashrc"
         call_args = mock_session.request.call_args
         assert call_args[0][0] == "GET"
         assert call_args.kwargs["json"] is None
@@ -139,7 +137,7 @@ class TestConfigClientUserDotfiles:
 
 class TestConfigClientBootstrap:
     async def test_get_bootstrap_script(self) -> None:
-        resp = _ok_response({"script": "#!/bin/bash\necho hello"})
+        resp = _ok_response("#!/bin/bash\necho hello")
         mock_session = _make_request_session(resp)
         client = _make_client(mock_session)
         config_client = ConfigClient(client)
@@ -147,7 +145,7 @@ class TestConfigClientBootstrap:
         result = await config_client.get_bootstrap_script()
 
         assert isinstance(result, GetBootstrapScriptResponse)
-        assert result.script == "#!/bin/bash\necho hello"
+        assert result.root == "#!/bin/bash\necho hello"
         call_args = mock_session.request.call_args
         assert call_args[0][0] == "GET"
         assert "/user-config/bootstrap-script" in str(call_args[0][1])
@@ -198,7 +196,7 @@ class TestConfigClientGroupDotfiles:
         assert result.path == ".bashrc"
 
     async def test_list_group_dotfiles(self) -> None:
-        mock_resp = _ok_response({"items": [{"path": ".bashrc", "perm": "644", "data": "content"}]})
+        mock_resp = _ok_response([{"path": ".bashrc", "permission": "644", "data": "content"}])
         mock_session = _make_request_session(mock_resp)
         client = _make_client(mock_session)
         config_client = ConfigClient(client)
@@ -207,7 +205,7 @@ class TestConfigClientGroupDotfiles:
         result = await config_client.list_group_dotfiles(request)
 
         assert isinstance(result, ListDotfilesResponse)
-        assert len(result.items) == 1
+        assert len(result.root) == 1
 
     async def test_update_group_dotfile(self) -> None:
         mock_resp = _ok_response({})
@@ -267,7 +265,7 @@ class TestConfigClientDomainDotfiles:
         assert result.data == "domain content"
 
     async def test_list_domain_dotfiles(self) -> None:
-        mock_resp = _ok_response({"items": [{"path": ".bashrc", "perm": "644", "data": "content"}]})
+        mock_resp = _ok_response([{"path": ".bashrc", "permission": "644", "data": "content"}])
         mock_session = _make_request_session(mock_resp)
         client = _make_client(mock_session)
         config_client = ConfigClient(client)
@@ -276,7 +274,7 @@ class TestConfigClientDomainDotfiles:
         result = await config_client.list_domain_dotfiles(request)
 
         assert isinstance(result, ListDotfilesResponse)
-        assert len(result.items) == 1
+        assert len(result.root) == 1
 
     async def test_update_domain_dotfile(self) -> None:
         mock_resp = _ok_response({})

@@ -108,7 +108,7 @@ class BackendAIAuthClient:
         json: Any | None = None,
         params: dict[str, str] | None = None,
         extra_headers: Mapping[str, str] | None = None,
-    ) -> dict[str, Any] | list[Any] | None:
+    ) -> dict[str, Any] | list[Any] | str | None:
         session = self._session
         content_type = "application/json"
         rel_url = "/" + path.lstrip("/")
@@ -134,7 +134,7 @@ class BackendAIAuthClient:
                 raise map_status_to_exception(resp.status, resp.reason or "", data)
             if resp.status == 204:
                 return None
-            result: dict[str, Any] | list[Any] = await resp.json()
+            result: dict[str, Any] | list[Any] | str = await resp.json()
             return result
 
     async def typed_request(
@@ -376,7 +376,7 @@ class BackendAIAnonymousClient:
         json: Any | None = None,
         params: dict[str, str] | None = None,
         extra_headers: Mapping[str, str] | None = None,
-    ) -> dict[str, Any] | list[Any] | None:
+    ) -> dict[str, Any] | list[Any] | str | None:
         content_type = "application/json"
         rel_url = "/" + path.lstrip("/")
         headers = self._build_headers(method, rel_url, content_type)
@@ -398,7 +398,7 @@ class BackendAIAnonymousClient:
                 raise map_status_to_exception(resp.status, resp.reason or "", data)
             if resp.status == 204:
                 return None
-            result: dict[str, Any] | list[Any] = await resp.json()
+            result: dict[str, Any] | list[Any] | str = await resp.json()
             return result
 
     async def typed_request(
