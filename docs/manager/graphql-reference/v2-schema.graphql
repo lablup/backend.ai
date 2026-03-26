@@ -3582,6 +3582,184 @@ enum LivenessStatus {
   DEGRADED
 }
 
+"""Added in UNRELEASED. Result of a login attempt."""
+enum LoginAttemptResult {
+  SUCCESS
+  FAILED_INVALID_CREDENTIALS
+  FAILED_USER_INACTIVE
+  FAILED_BLOCKED
+  FAILED_PASSWORD_EXPIRED
+  FAILED_REJECTED_BY_HOOK
+  FAILED_SESSION_ALREADY_EXISTS
+}
+
+"""Added in UNRELEASED. Filter criteria for querying login history."""
+input LoginHistoryFilter {
+  domainName: StringFilter = null
+  result: LoginHistoryResultFilter = null
+  createdAt: DateTimeFilter = null
+  AND: [LoginHistoryFilter!] = null
+  OR: [LoginHistoryFilter!] = null
+  NOT: [LoginHistoryFilter!] = null
+}
+
+"""Added in UNRELEASED. Ordering specification for login history."""
+input LoginHistoryOrderBy {
+  field: LoginHistoryOrderField!
+  direction: OrderDirection! = DESC
+}
+
+"""Added in UNRELEASED. Fields available for ordering login history."""
+enum LoginHistoryOrderField {
+  CREATED_AT
+  RESULT
+  DOMAIN_NAME
+}
+
+"""Added in UNRELEASED. Filter for login attempt result field."""
+input LoginHistoryResultFilter {
+  equals: LoginAttemptResult = null
+
+  """The in field."""
+  in: [LoginAttemptResult!] = null
+  notIn: [LoginAttemptResult!] = null
+}
+
+"""
+Added in UNRELEASED. Represents a login history entry tracking user authentication attempts.
+"""
+type LoginHistoryV2 implements Node {
+  """The Globally Unique ID of this object"""
+  id: ID!
+
+  """UUID of the user who attempted to log in."""
+  userId: UUID!
+
+  """Domain name of the user at the time of the attempt."""
+  domainName: String!
+
+  """Result of the login attempt."""
+  result: LoginAttemptResult!
+
+  """Detailed reason for the login failure."""
+  failReason: String
+
+  """Timestamp when the login attempt occurred."""
+  createdAt: DateTime!
+}
+
+"""
+Added in UNRELEASED. Connection type for paginated login history results.
+"""
+type LoginHistoryV2Connection {
+  """Pagination data for this connection"""
+  pageInfo: PageInfo!
+
+  """Contains the nodes in this connection"""
+  edges: [LoginHistoryV2Edge!]!
+
+  """Total number of login history entries matching the query."""
+  count: Int!
+}
+
+"""An edge in a connection."""
+type LoginHistoryV2Edge {
+  """A cursor for use in pagination"""
+  cursor: String!
+
+  """The item at the end of the edge"""
+  node: LoginHistoryV2!
+}
+
+"""Added in UNRELEASED. Filter criteria for querying login sessions."""
+input LoginSessionFilter {
+  status: LoginSessionStatusFilter = null
+  accessKey: StringFilter = null
+  createdAt: DateTimeFilter = null
+  lastAccessedAt: DateTimeFilter = null
+  AND: [LoginSessionFilter!] = null
+  OR: [LoginSessionFilter!] = null
+  NOT: [LoginSessionFilter!] = null
+}
+
+"""Added in UNRELEASED. Ordering specification for login sessions."""
+input LoginSessionOrderBy {
+  field: LoginSessionOrderField!
+  direction: OrderDirection! = DESC
+}
+
+"""Added in UNRELEASED. Fields available for ordering login sessions."""
+enum LoginSessionOrderField {
+  CREATED_AT
+  STATUS
+  LAST_ACCESSED_AT
+}
+
+"""Added in UNRELEASED. Status of a login session."""
+enum LoginSessionStatus {
+  ACTIVE
+  INVALIDATED
+  REVOKED
+}
+
+"""Added in UNRELEASED. Filter for login session status field."""
+input LoginSessionStatusFilter {
+  equals: LoginSessionStatus = null
+
+  """The in field."""
+  in: [LoginSessionStatus!] = null
+  notIn: [LoginSessionStatus!] = null
+}
+
+"""
+Added in UNRELEASED. Represents a login session entry tracking user authentication sessions.
+"""
+type LoginSessionV2 implements Node {
+  """The Globally Unique ID of this object"""
+  id: ID!
+
+  """UUID of the user who owns the session."""
+  userId: UUID!
+
+  """Access key associated with the session."""
+  accessKey: String!
+
+  """Current status of the login session."""
+  status: LoginSessionStatus!
+
+  """Timestamp when the session was created."""
+  createdAt: DateTime!
+
+  """Timestamp when the session was last accessed."""
+  lastAccessedAt: DateTime
+
+  """Timestamp when the session was invalidated."""
+  invalidatedAt: DateTime
+}
+
+"""
+Added in UNRELEASED. Connection type for paginated login session results.
+"""
+type LoginSessionV2Connection {
+  """Pagination data for this connection"""
+  pageInfo: PageInfo!
+
+  """Contains the nodes in this connection"""
+  edges: [LoginSessionV2Edge!]!
+
+  """Total number of login sessions matching the query."""
+  count: Int!
+}
+
+"""An edge in a connection."""
+type LoginSessionV2Edge {
+  """A cursor for use in pagination"""
+  cursor: String!
+
+  """The item at the end of the edge"""
+  node: LoginSessionV2!
+}
+
 """Added in 26.3.0. Key-value label entry from Prometheus result."""
 type MetricLabelEntry {
   """Label key"""
@@ -4419,6 +4597,12 @@ type Mutation {
   Added in UNRELEASED. Update a keypair owned by the current user (e.g. toggle active state). The keypair must be owned by the current user.
   """
   updateMyKeypair(input: UpdateMyKeypairInput!): UpdateMyKeypairPayload!
+
+  """Added in UNRELEASED. Revoke a login session. (admin only)"""
+  adminRevokeLoginSession(sessionId: UUID!): RevokeLoginSessionPayload!
+
+  """Added in UNRELEASED. Revoke a login session owned by the current user."""
+  myRevokeLoginSession(sessionId: UUID!): RevokeLoginSessionPayload!
 
   """
   Added in 26.4.0. Update the current user's allowed client IP list. Set allowed_client_ip to null to remove all IP restrictions. When force is false, the operation fails if the current request IP would be excluded by the new allowlist (lockout prevention)
@@ -5627,6 +5811,16 @@ type Query {
   adminAuditLogsV2(filter: AuditLogFilter = null, orderBy: [AuditLogOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): AuditLogV2Connection!
 
   """
+  Added in UNRELEASED. Query login sessions with pagination and filtering. (admin only)
+  """
+  adminLoginSessionsV2(filter: LoginSessionFilter = null, orderBy: [LoginSessionOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): LoginSessionV2Connection!
+
+  """
+  Added in UNRELEASED. Query login history with pagination and filtering. (admin only)
+  """
+  adminLoginHistoryV2(filter: LoginHistoryFilter = null, orderBy: [LoginHistoryOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): LoginHistoryV2Connection!
+
+  """
   Added in 26.3.0. Query sessions with pagination and filtering. (admin only)
   """
   adminSessionsV2(filter: SessionV2Filter = null, orderBy: [SessionV2OrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): SessionV2Connection!
@@ -5686,6 +5880,16 @@ type Query {
   Added in UNRELEASED. List keypairs owned by the current authenticated user. Supports filtering, ordering, and both cursor-based and offset-based pagination.
   """
   myKeypairs(filter: KeypairFilter = null, orderBy: [KeypairOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): KeyPairConnection!
+
+  """
+  Added in UNRELEASED. Query login sessions of the current user with pagination and filtering.
+  """
+  myLoginSessionsV2(filter: LoginSessionFilter = null, orderBy: [LoginSessionOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): LoginSessionV2Connection!
+
+  """
+  Added in UNRELEASED. Query login history of the current user with pagination and filtering.
+  """
+  myLoginHistoryV2(filter: LoginHistoryFilter = null, orderBy: [LoginHistoryOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): LoginHistoryV2Connection!
 
   """
   Added in 26.3.0. List roles assigned to the current authenticated user.
@@ -6696,6 +6900,12 @@ Added in 25.15.0. Response payload for artifact restoration operations. Contains
 type RestoreArtifactsPayload {
   """List of restored artifacts."""
   artifacts: [Artifact!]!
+}
+
+"""Added in UNRELEASED. Payload returned after revoking a login session."""
+type RevokeLoginSessionPayload {
+  """Whether the revocation was successful"""
+  success: Boolean!
 }
 
 """

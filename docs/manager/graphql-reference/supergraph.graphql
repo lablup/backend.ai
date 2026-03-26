@@ -6299,6 +6299,218 @@ enum LivenessStatus
   DEGRADED @join__enumValue(graph: STRAWBERRY)
 }
 
+"""Added in UNRELEASED. Result of a login attempt."""
+enum LoginAttemptResult
+  @join__type(graph: STRAWBERRY)
+{
+  SUCCESS @join__enumValue(graph: STRAWBERRY)
+  FAILED_INVALID_CREDENTIALS @join__enumValue(graph: STRAWBERRY)
+  FAILED_USER_INACTIVE @join__enumValue(graph: STRAWBERRY)
+  FAILED_BLOCKED @join__enumValue(graph: STRAWBERRY)
+  FAILED_PASSWORD_EXPIRED @join__enumValue(graph: STRAWBERRY)
+  FAILED_REJECTED_BY_HOOK @join__enumValue(graph: STRAWBERRY)
+  FAILED_SESSION_ALREADY_EXISTS @join__enumValue(graph: STRAWBERRY)
+}
+
+"""Added in UNRELEASED. Filter criteria for querying login history."""
+input LoginHistoryFilter
+  @join__type(graph: STRAWBERRY)
+{
+  domainName: StringFilter = null
+  result: LoginHistoryResultFilter = null
+  createdAt: DateTimeFilter = null
+  AND: [LoginHistoryFilter!] = null
+  OR: [LoginHistoryFilter!] = null
+  NOT: [LoginHistoryFilter!] = null
+}
+
+"""Added in UNRELEASED. Ordering specification for login history."""
+input LoginHistoryOrderBy
+  @join__type(graph: STRAWBERRY)
+{
+  field: LoginHistoryOrderField!
+  direction: OrderDirection! = DESC
+}
+
+"""Added in UNRELEASED. Fields available for ordering login history."""
+enum LoginHistoryOrderField
+  @join__type(graph: STRAWBERRY)
+{
+  CREATED_AT @join__enumValue(graph: STRAWBERRY)
+  RESULT @join__enumValue(graph: STRAWBERRY)
+  DOMAIN_NAME @join__enumValue(graph: STRAWBERRY)
+}
+
+"""Added in UNRELEASED. Filter for login attempt result field."""
+input LoginHistoryResultFilter
+  @join__type(graph: STRAWBERRY)
+{
+  equals: LoginAttemptResult = null
+
+  """The in field."""
+  in: [LoginAttemptResult!] = null
+  notIn: [LoginAttemptResult!] = null
+}
+
+"""
+Added in UNRELEASED. Represents a login history entry tracking user authentication attempts.
+"""
+type LoginHistoryV2 implements Node
+  @join__implements(graph: STRAWBERRY, interface: "Node")
+  @join__type(graph: STRAWBERRY)
+{
+  """The Globally Unique ID of this object"""
+  id: ID!
+
+  """UUID of the user who attempted to log in."""
+  userId: UUID!
+
+  """Domain name of the user at the time of the attempt."""
+  domainName: String!
+
+  """Result of the login attempt."""
+  result: LoginAttemptResult!
+
+  """Detailed reason for the login failure."""
+  failReason: String
+
+  """Timestamp when the login attempt occurred."""
+  createdAt: DateTime!
+}
+
+"""
+Added in UNRELEASED. Connection type for paginated login history results.
+"""
+type LoginHistoryV2Connection
+  @join__type(graph: STRAWBERRY)
+{
+  """Pagination data for this connection"""
+  pageInfo: PageInfo!
+
+  """Contains the nodes in this connection"""
+  edges: [LoginHistoryV2Edge!]!
+
+  """Total number of login history entries matching the query."""
+  count: Int!
+}
+
+"""An edge in a connection."""
+type LoginHistoryV2Edge
+  @join__type(graph: STRAWBERRY)
+{
+  """A cursor for use in pagination"""
+  cursor: String!
+
+  """The item at the end of the edge"""
+  node: LoginHistoryV2!
+}
+
+"""Added in UNRELEASED. Filter criteria for querying login sessions."""
+input LoginSessionFilter
+  @join__type(graph: STRAWBERRY)
+{
+  status: LoginSessionStatusFilter = null
+  accessKey: StringFilter = null
+  createdAt: DateTimeFilter = null
+  lastAccessedAt: DateTimeFilter = null
+  AND: [LoginSessionFilter!] = null
+  OR: [LoginSessionFilter!] = null
+  NOT: [LoginSessionFilter!] = null
+}
+
+"""Added in UNRELEASED. Ordering specification for login sessions."""
+input LoginSessionOrderBy
+  @join__type(graph: STRAWBERRY)
+{
+  field: LoginSessionOrderField!
+  direction: OrderDirection! = DESC
+}
+
+"""Added in UNRELEASED. Fields available for ordering login sessions."""
+enum LoginSessionOrderField
+  @join__type(graph: STRAWBERRY)
+{
+  CREATED_AT @join__enumValue(graph: STRAWBERRY)
+  STATUS @join__enumValue(graph: STRAWBERRY)
+  LAST_ACCESSED_AT @join__enumValue(graph: STRAWBERRY)
+}
+
+"""Added in UNRELEASED. Status of a login session."""
+enum LoginSessionStatus
+  @join__type(graph: STRAWBERRY)
+{
+  ACTIVE @join__enumValue(graph: STRAWBERRY)
+  INVALIDATED @join__enumValue(graph: STRAWBERRY)
+  REVOKED @join__enumValue(graph: STRAWBERRY)
+}
+
+"""Added in UNRELEASED. Filter for login session status field."""
+input LoginSessionStatusFilter
+  @join__type(graph: STRAWBERRY)
+{
+  equals: LoginSessionStatus = null
+
+  """The in field."""
+  in: [LoginSessionStatus!] = null
+  notIn: [LoginSessionStatus!] = null
+}
+
+"""
+Added in UNRELEASED. Represents a login session entry tracking user authentication sessions.
+"""
+type LoginSessionV2 implements Node
+  @join__implements(graph: STRAWBERRY, interface: "Node")
+  @join__type(graph: STRAWBERRY)
+{
+  """The Globally Unique ID of this object"""
+  id: ID!
+
+  """UUID of the user who owns the session."""
+  userId: UUID!
+
+  """Access key associated with the session."""
+  accessKey: String!
+
+  """Current status of the login session."""
+  status: LoginSessionStatus!
+
+  """Timestamp when the session was created."""
+  createdAt: DateTime!
+
+  """Timestamp when the session was last accessed."""
+  lastAccessedAt: DateTime
+
+  """Timestamp when the session was invalidated."""
+  invalidatedAt: DateTime
+}
+
+"""
+Added in UNRELEASED. Connection type for paginated login session results.
+"""
+type LoginSessionV2Connection
+  @join__type(graph: STRAWBERRY)
+{
+  """Pagination data for this connection"""
+  pageInfo: PageInfo!
+
+  """Contains the nodes in this connection"""
+  edges: [LoginSessionV2Edge!]!
+
+  """Total number of login sessions matching the query."""
+  count: Int!
+}
+
+"""An edge in a connection."""
+type LoginSessionV2Edge
+  @join__type(graph: STRAWBERRY)
+{
+  """A cursor for use in pagination"""
+  cursor: String!
+
+  """The item at the end of the edge"""
+  node: LoginSessionV2!
+}
+
 """Added in 26.3.0. Key-value label entry from Prometheus result."""
 type MetricLabelEntry
   @join__type(graph: STRAWBERRY)
@@ -8100,6 +8312,12 @@ type Mutation
   Added in UNRELEASED. Update a keypair owned by the current user (e.g. toggle active state). The keypair must be owned by the current user.
   """
   updateMyKeypair(input: UpdateMyKeypairInput!): UpdateMyKeypairPayload! @join__field(graph: STRAWBERRY)
+
+  """Added in UNRELEASED. Revoke a login session. (admin only)"""
+  adminRevokeLoginSession(sessionId: UUID!): RevokeLoginSessionPayload! @join__field(graph: STRAWBERRY)
+
+  """Added in UNRELEASED. Revoke a login session owned by the current user."""
+  myRevokeLoginSession(sessionId: UUID!): RevokeLoginSessionPayload! @join__field(graph: STRAWBERRY)
 
   """
   Added in 26.4.0. Update the current user's allowed client IP list. Set allowed_client_ip to null to remove all IP restrictions. When force is false, the operation fails if the current request IP would be excluded by the new allowlist (lockout prevention)
@@ -10042,6 +10260,16 @@ type Query
   adminAuditLogsV2(filter: AuditLogFilter = null, orderBy: [AuditLogOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): AuditLogV2Connection! @join__field(graph: STRAWBERRY)
 
   """
+  Added in UNRELEASED. Query login sessions with pagination and filtering. (admin only)
+  """
+  adminLoginSessionsV2(filter: LoginSessionFilter = null, orderBy: [LoginSessionOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): LoginSessionV2Connection! @join__field(graph: STRAWBERRY)
+
+  """
+  Added in UNRELEASED. Query login history with pagination and filtering. (admin only)
+  """
+  adminLoginHistoryV2(filter: LoginHistoryFilter = null, orderBy: [LoginHistoryOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): LoginHistoryV2Connection! @join__field(graph: STRAWBERRY)
+
+  """
   Added in 26.3.0. Query sessions with pagination and filtering. (admin only)
   """
   adminSessionsV2(filter: SessionV2Filter = null, orderBy: [SessionV2OrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): SessionV2Connection! @join__field(graph: STRAWBERRY)
@@ -10101,6 +10329,16 @@ type Query
   Added in UNRELEASED. List keypairs owned by the current authenticated user. Supports filtering, ordering, and both cursor-based and offset-based pagination.
   """
   myKeypairs(filter: KeypairFilter = null, orderBy: [KeypairOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): KeyPairConnection! @join__field(graph: STRAWBERRY)
+
+  """
+  Added in UNRELEASED. Query login sessions of the current user with pagination and filtering.
+  """
+  myLoginSessionsV2(filter: LoginSessionFilter = null, orderBy: [LoginSessionOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): LoginSessionV2Connection! @join__field(graph: STRAWBERRY)
+
+  """
+  Added in UNRELEASED. Query login history of the current user with pagination and filtering.
+  """
+  myLoginHistoryV2(filter: LoginHistoryFilter = null, orderBy: [LoginHistoryOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): LoginHistoryV2Connection! @join__field(graph: STRAWBERRY)
 
   """
   Added in 26.3.0. List roles assigned to the current authenticated user.
@@ -11237,6 +11475,14 @@ type RestoreArtifactsPayload
 {
   """List of restored artifacts."""
   artifacts: [Artifact!]!
+}
+
+"""Added in UNRELEASED. Payload returned after revoking a login session."""
+type RevokeLoginSessionPayload
+  @join__type(graph: STRAWBERRY)
+{
+  """Whether the revocation was successful"""
+  success: Boolean!
 }
 
 """
