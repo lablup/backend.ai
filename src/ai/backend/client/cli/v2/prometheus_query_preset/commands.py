@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+from datetime import datetime
 from uuid import UUID
 
 import click
@@ -167,6 +168,97 @@ def update(preset_id: str, body: str) -> None:
                 UUID(preset_id), ModifyQueryDefinitionInput(**data)
             )
             print_result(result)
+        finally:
+            await registry.close()
+
+    asyncio.run(_run())
+
+
+def _parse_label_filters(labels: tuple[str, ...]) -> list:
+    """Parse ``--label key=value`` options into MetricLabelEntry list."""
+    import sys
+
+    from ai.backend.common.dto.manager.v2.prometheus_query_preset.request import MetricLabelEntry
+
+    parsed: list[MetricLabelEntry] = []
+    for label in labels:
+        if "=" not in label:
+            click.echo(f"Invalid label format: {label} (expected key=value)", err=True)
+            sys.exit(1)
+        key, value = label.split("=", 1)
+        key = key.strip()
+        value = value.strip()
+        if not key or not value:
+            click.echo(
+                f"Invalid label key or value: {label} (both key and value must be non-empty)",
+                err=True,
+            )
+            sys.exit(1)
+        parsed.append(MetricLabelEntry(key=key, value=value))
+    return parsed
+
+
+@prometheus_query_preset.command()
+@click.argument("preset_id", type=str)
+@click.option("--start", type=click.DateTime(), default=None, help="Start time (ISO8601).")
+@click.option("--end", type=click.DateTime(), default=None, help="End time (ISO8601).")
+@click.option("--step", type=str, default=None, help="Step duration (e.g. 60s).")
+@click.option(
+    "--label",
+    "labels",
+    multiple=True,
+    type=str,
+    help="Label filter in key=value format (repeatable).",
+)
+@click.option(
+    "--group-labels",
+    type=str,
+    default=None,
+    help="Comma-separated group labels.",
+)
+@click.option("--time-window", type=str, default=None, help="Time window override.")
+def execute(
+    preset_id: str,
+    start: datetime | None,
+    end: datetime | None,
+    step: str | None,
+    labels: tuple[str, ...],
+    group_labels: str | None,
+    time_window: str | None,
+) -> None:
+    """Execute a prometheus query definition."""
+    import json
+
+    from ai.backend.common.dto.manager.v2.prometheus_query_preset.request import (
+        ExecuteQueryDefinitionInput,
+        ExecuteQueryDefinitionOptionsInput,
+        QueryTimeRangeInputDTO,
+    )
+
+    filter_label_entries = _parse_label_filters(labels)
+
+    group_labels_list: list[str] = []
+    if group_labels is not None:
+        group_labels_list = [gl.strip() for gl in group_labels.split(",") if gl.strip()]
+
+    time_range: QueryTimeRangeInputDTO | None = None
+    if start is not None and end is not None and step is not None:
+        time_range = QueryTimeRangeInputDTO(start=start, end=end, step=step)
+
+    request = ExecuteQueryDefinitionInput(
+        options=ExecuteQueryDefinitionOptionsInput(
+            filter_labels=filter_label_entries,
+            group_labels=group_labels_list,
+        ),
+        time_window=time_window,
+        time_range=time_range,
+    )
+
+    async def _run() -> None:
+        registry = await create_v2_registry(load_v2_config())
+        try:
+            result = await registry.prometheus_query_preset.execute(UUID(preset_id), request)
+            print(json.dumps(result.model_dump(mode="json"), indent=2, default=str))
         finally:
             await registry.close()
 
