@@ -1,7 +1,7 @@
 """drop expires_at from login_sessions
 
 Revision ID: 17b679c98b50
-Revises: cff56a8381dd, d7879c511ea1
+Revises: 21ce28a1c771
 Create Date: 2026-03-26 10:00:00.000000
 
 """
@@ -10,7 +10,7 @@ import sqlalchemy as sa
 from alembic import op
 
 revision = "17b679c98b50"
-down_revision = ("cff56a8381dd", "d7879c511ea1")
+down_revision = "21ce28a1c771"
 branch_labels = None
 depends_on = None
 
