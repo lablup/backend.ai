@@ -604,7 +604,7 @@ class ServiceHandler:
             requester_uuid=request["user"]["uuid"],
             requester_role=request["user"]["role"],
             requester_domain=request["user"]["domain_name"],
-            keypair_resource_policy=request["user"]["resource_policy"],
+            keypair_resource_policy=request["keypair"]["resource_policy"],
             domain_name=params.domain_name,
             group_name=params.group_name,
             config=ServiceConfig(
