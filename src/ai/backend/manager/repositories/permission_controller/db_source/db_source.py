@@ -33,6 +33,7 @@ from ai.backend.manager.data.permission.role import (
     BulkUserRoleRevocationInput,
     RoleListResult,
     RolePermissionsUpdateInput,
+    ScopeChainPermissionCheckInput,
     UserRoleAssignmentInput,
     UserRoleRevocationData,
     UserRoleRevocationInput,
@@ -920,11 +921,7 @@ class PermissionDBSource:
 
     async def check_permission_with_scope_chain(
         self,
-        user_id: uuid.UUID,
-        target_element_ref: RBACElementRef,
-        operation: OperationType,
-        *,
-        permission_entity_type: EntityType | None = None,
+        data: ScopeChainPermissionCheckInput,
     ) -> bool:
         """CTE-based permission check that traverses the scope chain.
 
@@ -933,30 +930,36 @@ class PermissionDBSource:
         2. Scope chain traversal — walks AUTO edges upward via CTE.
 
         Args:
-            permission_entity_type: When provided, used as the entity_type filter
-                for permission matching instead of deriving it from target_element_ref.
-                This enables cross-scope entity type checks (e.g., checking
-                MODEL_DEPLOYMENT:READ permission at PROJECT scope).
+            data: Permission check input containing user_id, target_element_ref,
+                operation, and optional permission_entity_type override.
+                When permission_entity_type is provided, it is used as the
+                entity_type filter for permission matching instead of deriving
+                it from target_element_ref. This enables cross-scope entity type
+                checks (e.g., checking MODEL_DEPLOYMENT:READ permission at
+                PROJECT scope).
         """
         target_entity_type = (
-            permission_entity_type or target_element_ref.element_type.to_entity_type()
+            data.permission_entity_type or data.target_element_ref.element_type.to_entity_type()
         )
-        target_scope_type = target_element_ref.element_type.to_scope_type()
+        target_scope_type = data.target_element_ref.element_type.to_scope_type()
 
         combined_query = sa.select(
             sa.or_(
                 sa.exists(
                     self._build_scope_chain_permission_query(
-                        user_id, target_element_ref, target_entity_type, operation
+                        data.user_id,
+                        data.target_element_ref,
+                        target_entity_type,
+                        data.operation,
                     )
                 ),
                 sa.exists(
                     self._build_self_scope_permission_query(
-                        user_id,
-                        target_element_ref,
+                        data.user_id,
+                        data.target_element_ref,
                         target_entity_type,
                         target_scope_type,
-                        operation,
+                        data.operation,
                     )
                 ),
             )

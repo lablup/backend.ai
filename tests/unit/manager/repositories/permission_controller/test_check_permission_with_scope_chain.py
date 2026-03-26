@@ -15,6 +15,7 @@ from ai.backend.common.data.permission.types import (
     RBACElementType,
     RelationType,
 )
+from ai.backend.manager.data.permission.role import ScopeChainPermissionCheckInput
 from ai.backend.manager.data.permission.status import RoleStatus
 from ai.backend.manager.data.permission.types import (
     EntityType,
@@ -255,12 +256,14 @@ class TestCheckPermissionWithScopeChain:
         """VFOLDER in PROJECT (auto): direct scope permission checks."""
         fixture = user_with_active_role
         result = await db_source.check_permission_with_scope_chain(
-            user_id=fixture.user_id,
-            target_element_ref=RBACElementRef(
-                element_type=RBACElementType.VFOLDER,
-                element_id=fixture.vfolder_id,
-            ),
-            operation=check_op,
+            ScopeChainPermissionCheckInput(
+                user_id=fixture.user_id,
+                target_element_ref=RBACElementRef(
+                    element_type=RBACElementType.VFOLDER,
+                    element_id=fixture.vfolder_id,
+                ),
+                operation=check_op,
+            )
         )
         assert result is expected
 
@@ -289,12 +292,14 @@ class TestCheckPermissionWithScopeChain:
         """AUTO edge delegates all operations from parent scope."""
         fixture = user_with_active_role
         result = await db_source.check_permission_with_scope_chain(
-            user_id=fixture.user_id,
-            target_element_ref=RBACElementRef(
-                element_type=RBACElementType.VFOLDER,
-                element_id=fixture.vfolder_id,
-            ),
-            operation=check_op,
+            ScopeChainPermissionCheckInput(
+                user_id=fixture.user_id,
+                target_element_ref=RBACElementRef(
+                    element_type=RBACElementType.VFOLDER,
+                    element_id=fixture.vfolder_id,
+                ),
+                operation=check_op,
+            )
         )
         assert result is expected
 
@@ -328,12 +333,14 @@ class TestCheckPermissionWithScopeChain:
         """REF edge is not traversed; no operation passes through."""
         fixture = user_with_active_role
         result = await db_source.check_permission_with_scope_chain(
-            user_id=fixture.user_id,
-            target_element_ref=RBACElementRef(
-                element_type=RBACElementType.VFOLDER,
-                element_id=fixture.vfolder_id,
-            ),
-            operation=check_op,
+            ScopeChainPermissionCheckInput(
+                user_id=fixture.user_id,
+                target_element_ref=RBACElementRef(
+                    element_type=RBACElementType.VFOLDER,
+                    element_id=fixture.vfolder_id,
+                ),
+                operation=check_op,
+            )
         )
         assert result is expected
 
@@ -362,12 +369,14 @@ class TestCheckPermissionWithScopeChain:
         """REF edge terminates scope chain; scopes beyond REF are unreachable."""
         fixture = user_with_active_role
         result = await db_source.check_permission_with_scope_chain(
-            user_id=fixture.user_id,
-            target_element_ref=RBACElementRef(
-                element_type=RBACElementType.VFOLDER,
-                element_id=fixture.vfolder_id,
-            ),
-            operation=check_op,
+            ScopeChainPermissionCheckInput(
+                user_id=fixture.user_id,
+                target_element_ref=RBACElementRef(
+                    element_type=RBACElementType.VFOLDER,
+                    element_id=fixture.vfolder_id,
+                ),
+                operation=check_op,
+            )
         )
         assert result is expected
 
@@ -432,12 +441,14 @@ class TestCheckPermissionWithScopeChain:
         """Inactive role does not grant any permission."""
         fixture = user_with_inactive_role
         result = await db_source.check_permission_with_scope_chain(
-            user_id=fixture.user_id,
-            target_element_ref=RBACElementRef(
-                element_type=RBACElementType.VFOLDER,
-                element_id=fixture.vfolder_id,
-            ),
-            operation=OperationType.READ,
+            ScopeChainPermissionCheckInput(
+                user_id=fixture.user_id,
+                target_element_ref=RBACElementRef(
+                    element_type=RBACElementType.VFOLDER,
+                    element_id=fixture.vfolder_id,
+                ),
+                operation=OperationType.READ,
+            )
         )
         assert result is False
 
@@ -471,12 +482,14 @@ class TestCheckPermissionWithScopeChain:
         """Permission scoped directly to the target entity itself is honored."""
         fixture = user_with_active_role
         result = await db_source.check_permission_with_scope_chain(
-            user_id=fixture.user_id,
-            target_element_ref=RBACElementRef(
-                element_type=RBACElementType.VFOLDER,
-                element_id=fixture.vfolder_id,
-            ),
-            operation=check_op,
+            ScopeChainPermissionCheckInput(
+                user_id=fixture.user_id,
+                target_element_ref=RBACElementRef(
+                    element_type=RBACElementType.VFOLDER,
+                    element_id=fixture.vfolder_id,
+                ),
+                operation=check_op,
+            )
         )
         assert result is expected
 
@@ -503,12 +516,14 @@ class TestCheckPermissionWithScopeChain:
         """Self-scope permission works even without any association edges."""
         fixture = user_with_active_role
         result = await db_source.check_permission_with_scope_chain(
-            user_id=fixture.user_id,
-            target_element_ref=RBACElementRef(
-                element_type=RBACElementType.VFOLDER,
-                element_id=fixture.vfolder_id,
-            ),
-            operation=check_op,
+            ScopeChainPermissionCheckInput(
+                user_id=fixture.user_id,
+                target_element_ref=RBACElementRef(
+                    element_type=RBACElementType.VFOLDER,
+                    element_id=fixture.vfolder_id,
+                ),
+                operation=check_op,
+            )
         )
         assert result is expected
 
@@ -538,12 +553,14 @@ class TestCheckPermissionWithScopeChain:
         """Permission exists but for a different operation; check should fail."""
         fixture = user_with_active_role
         result = await db_source.check_permission_with_scope_chain(
-            user_id=fixture.user_id,
-            target_element_ref=RBACElementRef(
-                element_type=RBACElementType.VFOLDER,
-                element_id=fixture.vfolder_id,
-            ),
-            operation=check_op,
+            ScopeChainPermissionCheckInput(
+                user_id=fixture.user_id,
+                target_element_ref=RBACElementRef(
+                    element_type=RBACElementType.VFOLDER,
+                    element_id=fixture.vfolder_id,
+                ),
+                operation=check_op,
+            )
         )
         assert result is expected
 
@@ -572,12 +589,14 @@ class TestCheckPermissionWithScopeChain:
         """Operation mismatch at chain-traversed scope still returns False."""
         fixture = user_with_active_role
         result = await db_source.check_permission_with_scope_chain(
-            user_id=fixture.user_id,
-            target_element_ref=RBACElementRef(
-                element_type=RBACElementType.VFOLDER,
-                element_id=fixture.vfolder_id,
-            ),
-            operation=check_op,
+            ScopeChainPermissionCheckInput(
+                user_id=fixture.user_id,
+                target_element_ref=RBACElementRef(
+                    element_type=RBACElementType.VFOLDER,
+                    element_id=fixture.vfolder_id,
+                ),
+                operation=check_op,
+            )
         )
         assert result is expected
 
@@ -644,12 +663,14 @@ class TestCheckPermissionWithScopeChain:
         """Deleted role does not grant any permission."""
         fixture = user_with_deleted_role
         result = await db_source.check_permission_with_scope_chain(
-            user_id=fixture.user_id,
-            target_element_ref=RBACElementRef(
-                element_type=RBACElementType.VFOLDER,
-                element_id=fixture.vfolder_id,
-            ),
-            operation=OperationType.READ,
+            ScopeChainPermissionCheckInput(
+                user_id=fixture.user_id,
+                target_element_ref=RBACElementRef(
+                    element_type=RBACElementType.VFOLDER,
+                    element_id=fixture.vfolder_id,
+                ),
+                operation=OperationType.READ,
+            )
         )
         assert result is False
 
@@ -691,12 +712,14 @@ class TestCheckPermissionWithScopeChain:
         """User with no role assignment gets no permission."""
         fixture = user_with_unassigned_role
         result = await db_source.check_permission_with_scope_chain(
-            user_id=fixture.user_id,
-            target_element_ref=RBACElementRef(
-                element_type=RBACElementType.VFOLDER,
-                element_id=fixture.vfolder_id,
-            ),
-            operation=OperationType.READ,
+            ScopeChainPermissionCheckInput(
+                user_id=fixture.user_id,
+                target_element_ref=RBACElementRef(
+                    element_type=RBACElementType.VFOLDER,
+                    element_id=fixture.vfolder_id,
+                ),
+                operation=OperationType.READ,
+            )
         )
         assert result is False
 
@@ -819,12 +842,14 @@ class TestCheckPermissionWithScopeChain:
         """Multiple roles: succeeds if any role matches, fails if none does."""
         fixture, _ = user_with_two_roles
         result = await db_source.check_permission_with_scope_chain(
-            user_id=fixture.user_id,
-            target_element_ref=RBACElementRef(
-                element_type=RBACElementType.VFOLDER,
-                element_id=fixture.vfolder_id,
-            ),
-            operation=check_op,
+            ScopeChainPermissionCheckInput(
+                user_id=fixture.user_id,
+                target_element_ref=RBACElementRef(
+                    element_type=RBACElementType.VFOLDER,
+                    element_id=fixture.vfolder_id,
+                ),
+                operation=check_op,
+            )
         )
         assert result is expected
 
@@ -873,12 +898,14 @@ class TestCheckPermissionWithScopeChain:
         """VFOLDER→(AUTO)→PROJECT→(REF)→DOMAIN: REF in the middle blocks chain."""
         fixture = user_with_active_role
         result = await db_source.check_permission_with_scope_chain(
-            user_id=fixture.user_id,
-            target_element_ref=RBACElementRef(
-                element_type=RBACElementType.VFOLDER,
-                element_id=fixture.vfolder_id,
-            ),
-            operation=check_op,
+            ScopeChainPermissionCheckInput(
+                user_id=fixture.user_id,
+                target_element_ref=RBACElementRef(
+                    element_type=RBACElementType.VFOLDER,
+                    element_id=fixture.vfolder_id,
+                ),
+                operation=check_op,
+            )
         )
         assert result is expected
 
@@ -907,12 +934,14 @@ class TestCheckPermissionWithScopeChain:
         """VFOLDER→(AUTO)→PROJECT→(REF)→DOMAIN: PROJECT scope is still reachable."""
         fixture = user_with_active_role
         result = await db_source.check_permission_with_scope_chain(
-            user_id=fixture.user_id,
-            target_element_ref=RBACElementRef(
-                element_type=RBACElementType.VFOLDER,
-                element_id=fixture.vfolder_id,
-            ),
-            operation=check_op,
+            ScopeChainPermissionCheckInput(
+                user_id=fixture.user_id,
+                target_element_ref=RBACElementRef(
+                    element_type=RBACElementType.VFOLDER,
+                    element_id=fixture.vfolder_id,
+                ),
+                operation=check_op,
+            )
         )
         assert result is expected
 
@@ -962,12 +991,14 @@ class TestCheckPermissionWithScopeChain:
         """VFOLDER→(AUTO)→PROJECT→(AUTO)→DOMAIN→(AUTO)→USER: 3-level chain traversal."""
         fixture = user_with_active_role
         result = await db_source.check_permission_with_scope_chain(
-            user_id=fixture.user_id,
-            target_element_ref=RBACElementRef(
-                element_type=RBACElementType.VFOLDER,
-                element_id=fixture.vfolder_id,
-            ),
-            operation=check_op,
+            ScopeChainPermissionCheckInput(
+                user_id=fixture.user_id,
+                target_element_ref=RBACElementRef(
+                    element_type=RBACElementType.VFOLDER,
+                    element_id=fixture.vfolder_id,
+                ),
+                operation=check_op,
+            )
         )
         assert result is expected
 
@@ -997,12 +1028,14 @@ class TestCheckPermissionWithScopeChain:
         """Self-scope permission works regardless of AUTO edge presence."""
         fixture = user_with_active_role
         result = await db_source.check_permission_with_scope_chain(
-            user_id=fixture.user_id,
-            target_element_ref=RBACElementRef(
-                element_type=RBACElementType.VFOLDER,
-                element_id=fixture.vfolder_id,
-            ),
-            operation=check_op,
+            ScopeChainPermissionCheckInput(
+                user_id=fixture.user_id,
+                target_element_ref=RBACElementRef(
+                    element_type=RBACElementType.VFOLDER,
+                    element_id=fixture.vfolder_id,
+                ),
+                operation=check_op,
+            )
         )
         assert result is expected
 
@@ -1071,12 +1104,14 @@ class TestCheckPermissionWithScopeChain:
     ) -> None:
         """Permission granted to another user does not affect the target user."""
         result = await db_source.check_permission_with_scope_chain(
-            user_id=fixture_ids.user_id,
-            target_element_ref=RBACElementRef(
-                element_type=RBACElementType.VFOLDER,
-                element_id=fixture_ids.vfolder_id,
-            ),
-            operation=OperationType.READ,
+            ScopeChainPermissionCheckInput(
+                user_id=fixture_ids.user_id,
+                target_element_ref=RBACElementRef(
+                    element_type=RBACElementType.VFOLDER,
+                    element_id=fixture_ids.vfolder_id,
+                ),
+                operation=OperationType.READ,
+            )
         )
         assert result is False
 
@@ -1118,12 +1153,14 @@ class TestCheckPermissionWithScopeChain:
         """Role with READ+UPDATE: READ matches, SOFT_DELETE does not."""
         fixture = user_with_active_role
         result = await db_source.check_permission_with_scope_chain(
-            user_id=fixture.user_id,
-            target_element_ref=RBACElementRef(
-                element_type=RBACElementType.VFOLDER,
-                element_id=fixture.vfolder_id,
-            ),
-            operation=check_op,
+            ScopeChainPermissionCheckInput(
+                user_id=fixture.user_id,
+                target_element_ref=RBACElementRef(
+                    element_type=RBACElementType.VFOLDER,
+                    element_id=fixture.vfolder_id,
+                ),
+                operation=check_op,
+            )
         )
         assert result is expected
 
@@ -1153,13 +1190,15 @@ class TestCheckPermissionWithScopeChain:
         """MODEL_DEPLOYMENT:READ permission at PROJECT scope, checked from PROJECT via CTE Layer 1."""
         fixture = user_with_active_role
         result = await db_source.check_permission_with_scope_chain(
-            user_id=fixture.user_id,
-            target_element_ref=RBACElementRef(
-                element_type=RBACElementType.VFOLDER,
-                element_id=fixture.vfolder_id,
-            ),
-            operation=check_op,
-            permission_entity_type=EntityType.MODEL_DEPLOYMENT,
+            ScopeChainPermissionCheckInput(
+                user_id=fixture.user_id,
+                target_element_ref=RBACElementRef(
+                    element_type=RBACElementType.VFOLDER,
+                    element_id=fixture.vfolder_id,
+                ),
+                operation=check_op,
+                permission_entity_type=EntityType.MODEL_DEPLOYMENT,
+            )
         )
         assert result is expected
 
@@ -1188,13 +1227,15 @@ class TestCheckPermissionWithScopeChain:
         """MODEL_DEPLOYMENT:READ at DOMAIN scope, checked from PROJECT via CTE Layer 2."""
         fixture = user_with_active_role
         result = await db_source.check_permission_with_scope_chain(
-            user_id=fixture.user_id,
-            target_element_ref=RBACElementRef(
-                element_type=RBACElementType.VFOLDER,
-                element_id=fixture.vfolder_id,
-            ),
-            operation=check_op,
-            permission_entity_type=EntityType.MODEL_DEPLOYMENT,
+            ScopeChainPermissionCheckInput(
+                user_id=fixture.user_id,
+                target_element_ref=RBACElementRef(
+                    element_type=RBACElementType.VFOLDER,
+                    element_id=fixture.vfolder_id,
+                ),
+                operation=check_op,
+                permission_entity_type=EntityType.MODEL_DEPLOYMENT,
+            )
         )
         assert result is expected
 
@@ -1222,13 +1263,15 @@ class TestCheckPermissionWithScopeChain:
         """SESSION:READ permission exists, but MODEL_DEPLOYMENT:READ requested — denied."""
         fixture = user_with_active_role
         result = await db_source.check_permission_with_scope_chain(
-            user_id=fixture.user_id,
-            target_element_ref=RBACElementRef(
-                element_type=RBACElementType.VFOLDER,
-                element_id=fixture.vfolder_id,
-            ),
-            operation=check_op,
-            permission_entity_type=EntityType.MODEL_DEPLOYMENT,
+            ScopeChainPermissionCheckInput(
+                user_id=fixture.user_id,
+                target_element_ref=RBACElementRef(
+                    element_type=RBACElementType.VFOLDER,
+                    element_id=fixture.vfolder_id,
+                ),
+                operation=check_op,
+                permission_entity_type=EntityType.MODEL_DEPLOYMENT,
+            )
         )
         assert result is expected
 
@@ -1258,11 +1301,13 @@ class TestCheckPermissionWithScopeChain:
         """SESSION entity permission does not match VFOLDER entity check."""
         fixture = user_with_active_role
         result = await db_source.check_permission_with_scope_chain(
-            user_id=fixture.user_id,
-            target_element_ref=RBACElementRef(
-                element_type=RBACElementType.VFOLDER,
-                element_id=fixture.vfolder_id,
-            ),
-            operation=check_op,
+            ScopeChainPermissionCheckInput(
+                user_id=fixture.user_id,
+                target_element_ref=RBACElementRef(
+                    element_type=RBACElementType.VFOLDER,
+                    element_id=fixture.vfolder_id,
+                ),
+                operation=check_op,
+            )
         )
         assert result is expected

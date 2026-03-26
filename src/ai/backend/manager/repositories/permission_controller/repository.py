@@ -4,7 +4,7 @@ import uuid
 from collections.abc import Mapping
 from typing import cast
 
-from ai.backend.common.data.permission.types import EntityType, OperationType, RBACElementType
+from ai.backend.common.data.permission.types import RBACElementType
 from ai.backend.common.exception import BackendAIError
 from ai.backend.common.metrics.metric import DomainType, LayerType
 from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPolicy
@@ -27,6 +27,7 @@ from ai.backend.manager.data.permission.role import (
     RoleDetailData,
     RoleListResult,
     RolePermissionsUpdateInput,
+    ScopeChainPermissionCheckInput,
     ScopePermissionCheckInput,
     SingleEntityPermissionCheckInput,
     UserRoleAssignmentData,
@@ -35,7 +36,6 @@ from ai.backend.manager.data.permission.role import (
     UserRoleRevocationInput,
 )
 from ai.backend.manager.data.permission.types import (
-    RBACElementRef,
     ScopeListResult,
 )
 from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
@@ -318,11 +318,7 @@ class PermissionControllerRepository:
     @permission_controller_repository_resilience.apply()
     async def check_permission_with_scope_chain(
         self,
-        user_id: uuid.UUID,
-        target_element_ref: RBACElementRef,
-        operation: OperationType,
-        *,
-        permission_entity_type: EntityType | None = None,
+        data: ScopeChainPermissionCheckInput,
     ) -> bool:
         """Permission check that traverses the scope chain via AUTO edges only.
 
@@ -330,9 +326,4 @@ class PermissionControllerRepository:
         entity, checking if the user has the requested operation at any ancestor
         scope. REF edges are not traversed.
         """
-        return await self._db_source.check_permission_with_scope_chain(
-            user_id=user_id,
-            target_element_ref=target_element_ref,
-            operation=operation,
-            permission_entity_type=permission_entity_type,
-        )
+        return await self._db_source.check_permission_with_scope_chain(data)
