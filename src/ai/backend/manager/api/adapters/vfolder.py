@@ -30,7 +30,7 @@ class VFolderAdapter(BaseAdapter):
     """Adapter for VFolder domain operations."""
 
     @staticmethod
-    def _service_info_to_node(
+    def _to_vfolder_node(
         base_info: VFolderBaseInfo,
         ownership_info: VFolderOwnershipInfo,
         usage_info: VFolderUsageInfo | None = None,
