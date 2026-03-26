@@ -32,6 +32,16 @@ class VariantExpectation:
 
 
 @dataclass(frozen=True)
+class OverridePathCase:
+    # Human-readable label used as the pytest test ID
+    description: str
+    # model_definition_path passed to the context (None, empty, or a real filename)
+    path: str | None
+    # Whether the registry should attempt to fetch the definition from vfolder storage
+    should_fetch: bool
+
+
+@dataclass(frozen=True)
 class InvalidModelDefinitionCase:
     description: str
     value: ModelDefinition | None
@@ -205,27 +215,30 @@ class TestModelDefinitionGeneratorRegistry:
         assert result.models[0].name == "custom-model"
 
     @pytest.mark.parametrize(
-        ("path", "should_fetch"),
-        [(None, False), ("", False), ("model.yaml", True)],
-        ids=["none", "empty", "exists"],
+        "case",
+        [
+            OverridePathCase(description="none", path=None, should_fetch=False),
+            OverridePathCase(description="empty", path="", should_fetch=False),
+            OverridePathCase(description="exists", path="model.yaml", should_fetch=True),
+        ],
+        ids=lambda c: c.description,
     )
     async def test_override_requires_path(
         self,
         definition_generator_registry_with_override: ModelDefinitionGeneratorRegistry,
         mock_repo: MagicMock,
-        path: str | None,
-        should_fetch: bool,
+        case: OverridePathCase,
     ) -> None:
         expected = VARIANT_EXPECTATIONS[RuntimeVariant.VLLM]
         mock_repo.fetch_model_definition = AsyncMock(return_value=create_override_dict(expected))
 
         result = await definition_generator_registry_with_override.generate_model_definition(
-            create_context(RuntimeVariant.VLLM, model_definition_path=path)
+            create_context(RuntimeVariant.VLLM, model_definition_path=case.path)
         )
 
         model = result.models[0]
         assert model.service is not None
-        if should_fetch:
+        if case.should_fetch:
             mock_repo.fetch_model_definition.assert_called_once()
             assert model.service.start_command == "overridden-command"
         else:
