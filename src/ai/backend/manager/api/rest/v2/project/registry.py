@@ -21,4 +21,8 @@ def register_v2_project_routes(
     reg = RouteRegistry.create("projects", route_deps.cors_options)
     reg.add("GET", "/{project_id}", handler.get, middlewares=[auth_required])
     reg.add("POST", "/search", handler.admin_search, middlewares=[superadmin_required])
+    reg.add("POST", "", handler.admin_create, middlewares=[superadmin_required])
+    reg.add("PATCH", "/{project_id}", handler.admin_update, middlewares=[superadmin_required])
+    reg.add("POST", "/delete", handler.admin_delete, middlewares=[superadmin_required])
+    reg.add("POST", "/purge", handler.admin_purge, middlewares=[superadmin_required])
     return reg

@@ -195,6 +195,38 @@ class ImageConditions:
 
         return inner
 
+    @staticmethod
+    def by_cursor_forward(cursor_id: str) -> QueryCondition:
+        """Cursor condition for forward pagination (after cursor).
+
+        Uses subquery to look up created_at of the cursor row (default order: created_at DESC).
+        """
+        cursor_uuid = uuid.UUID(cursor_id)
+
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            subquery = (
+                sa.select(ImageRow.created_at).where(ImageRow.id == cursor_uuid).scalar_subquery()
+            )
+            return ImageRow.created_at < subquery
+
+        return inner
+
+    @staticmethod
+    def by_cursor_backward(cursor_id: str) -> QueryCondition:
+        """Cursor condition for backward pagination (before cursor).
+
+        Uses subquery to look up created_at of the cursor row (default order: created_at DESC).
+        """
+        cursor_uuid = uuid.UUID(cursor_id)
+
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            subquery = (
+                sa.select(ImageRow.created_at).where(ImageRow.id == cursor_uuid).scalar_subquery()
+            )
+            return ImageRow.created_at > subquery
+
+        return inner
+
     # String filter factories for alias (exists subquery-based)
     @staticmethod
     def by_alias_contains(spec: StringMatchSpec) -> QueryCondition:
@@ -324,5 +356,41 @@ class ImageAliasConditions:
             if spec.negated:
                 condition = sa.not_(condition)
             return condition
+
+        return inner
+
+    @staticmethod
+    def by_cursor_forward(cursor_id: str) -> QueryCondition:
+        """Cursor condition for forward pagination (after cursor).
+
+        Uses subquery to look up alias of the cursor row (default order: alias ASC).
+        """
+        cursor_uuid = uuid.UUID(cursor_id)
+
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            subquery = (
+                sa.select(ImageAliasRow.alias)
+                .where(ImageAliasRow.id == cursor_uuid)
+                .scalar_subquery()
+            )
+            return ImageAliasRow.alias > subquery
+
+        return inner
+
+    @staticmethod
+    def by_cursor_backward(cursor_id: str) -> QueryCondition:
+        """Cursor condition for backward pagination (before cursor).
+
+        Uses subquery to look up alias of the cursor row (default order: alias ASC).
+        """
+        cursor_uuid = uuid.UUID(cursor_id)
+
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            subquery = (
+                sa.select(ImageAliasRow.alias)
+                .where(ImageAliasRow.id == cursor_uuid)
+                .scalar_subquery()
+            )
+            return ImageAliasRow.alias < subquery
 
         return inner

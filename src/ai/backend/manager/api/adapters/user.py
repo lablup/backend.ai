@@ -18,7 +18,7 @@ from ai.backend.common.dto.manager.v2.keypair import (
     KeypairNode,
     KeypairOrderBy,
     KeypairOrderField,
-    SearchMyKeypairsGQLInput,
+    SearchMyKeypairsRequest,
 )
 from ai.backend.common.dto.manager.v2.keypair.response import (
     IssueMyKeypairPayload,
@@ -157,8 +157,8 @@ _USER_PAGINATION_SPEC = PaginationSpec(
 )
 
 _KEYPAIR_PAGINATION_SPEC = PaginationSpec(
-    forward_order=KeypairOrders.access_key(ascending=True),
-    backward_order=KeypairOrders.access_key(ascending=False),
+    forward_order=KeypairOrders.created_at(ascending=False),
+    backward_order=KeypairOrders.created_at(ascending=True),
     forward_condition_factory=KeypairConditions.by_cursor_forward,
     backward_condition_factory=KeypairConditions.by_cursor_backward,
     tiebreaker_order=KeyPairRow.access_key.asc(),
@@ -629,11 +629,13 @@ class UserAdapter(BaseAdapter):
 
     async def search_my_keypairs(
         self,
-        input: SearchMyKeypairsGQLInput,
+        input: SearchMyKeypairsRequest,
     ) -> SearchResult[KeypairNode]:
         """Search keypairs owned by the current user.
 
         Calls current_user() internally — the caller does not need to pass scope.
+        Supports both cursor-based and offset-based pagination.
+        Used by both GQL and REST layers.
         """
         me = current_user()
         if me is None:
@@ -715,6 +717,7 @@ class UserAdapter(BaseAdapter):
             condition = filter_req.created_at.build_query_condition(
                 before_factory=KeypairConditions.by_created_at_before,
                 after_factory=KeypairConditions.by_created_at_after,
+                equals_factory=KeypairConditions.by_created_at_equals,
             )
             if condition is not None:
                 conditions.append(condition)
@@ -723,6 +726,7 @@ class UserAdapter(BaseAdapter):
             condition = filter_req.last_used.build_query_condition(
                 before_factory=KeypairConditions.by_last_used_before,
                 after_factory=KeypairConditions.by_last_used_after,
+                equals_factory=KeypairConditions.by_last_used_equals,
             )
             if condition is not None:
                 conditions.append(condition)
@@ -822,6 +826,7 @@ class UserAdapter(BaseAdapter):
             condition = filter_req.created_at.build_query_condition(
                 before_factory=UserConditions.by_created_at_before,
                 after_factory=UserConditions.by_created_at_after,
+                equals_factory=UserConditions.by_created_at_equals,
             )
             if condition is not None:
                 conditions.append(condition)

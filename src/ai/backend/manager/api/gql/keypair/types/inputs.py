@@ -2,13 +2,13 @@
 
 from __future__ import annotations
 
-from ai.backend.common.dto.manager.v2.auth.request import (
+from ai.backend.common.dto.manager.v2.keypair.request import (
     RevokeMyKeypairInput as RevokeMyKeypairInputDTO,
 )
-from ai.backend.common.dto.manager.v2.auth.request import (
+from ai.backend.common.dto.manager.v2.keypair.request import (
     SwitchMyMainAccessKeyInput as SwitchMyMainAccessKeyInputDTO,
 )
-from ai.backend.common.dto.manager.v2.auth.request import (
+from ai.backend.common.dto.manager.v2.keypair.request import (
     UpdateMyKeypairInput as UpdateMyKeypairInputDTO,
 )
 from ai.backend.manager.api.gql.decorators import (

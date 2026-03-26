@@ -59,6 +59,25 @@ API Handler → Processor → Service → Repository → DB
 - NEVER import from a lower layer to a higher layer
 - For detailed patterns, read skill files: `/repository-guide`, `/service-guide`, `/api-guide`
 
+## API Development Rules
+
+**All new features MUST use v2 patterns across the full stack:**
+- REST API: `api/rest/v2/{entity}/` (NEVER add new endpoints to REST v1)
+- DTOs: `common/dto/manager/v2/{entity}/` (shared across GQL and REST v2)
+- GraphQL: Strawberry-based `api/gql/{entity}/` (NEVER add to `gql_legacy/`)
+- Adapter: `api/adapters/{entity}.py` (shared between GQL and REST v2)
+- Client SDK: `client/v2/domains_v2/{entity}.py` (typed Pydantic request/response)
+- CLI: `client/cli/v2/{entity}/` (calls SDK v2)
+
+**Standard 6 operations per entity:** create, get, search, update, delete, purge
+- For detailed API patterns: `/api-guide`
+- For SDK/CLI patterns: `/cli-sdk-guide`
+
+**After implementing new API endpoints, verify with the live server:**
+1. Restart server: `./dev restart mgr`
+2. Test each operation via `./bai` CLI (see `/local-dev` skill for setup and commands)
+3. Verify both admin and non-admin scenarios
+
 ## Development Guidelines
 
 **README-First:** Always read component README (`src/ai/backend/{component}/README.md`) before making changes.

@@ -222,8 +222,8 @@ from .base import BaseAdapter
 @lru_cache(maxsize=1)
 def _permission_pagination_spec() -> PaginationSpec:
     return PaginationSpec(
-        forward_order=ScopedPermissionOrders.id(ascending=False),
-        backward_order=ScopedPermissionOrders.id(ascending=True),
+        forward_order=ScopedPermissionOrders.created_at(ascending=False),
+        backward_order=ScopedPermissionOrders.created_at(ascending=True),
         forward_condition_factory=ScopedPermissionConditions.by_cursor_forward,
         backward_condition_factory=ScopedPermissionConditions.by_cursor_backward,
         tiebreaker_order=PermissionRow.id.asc(),
@@ -255,8 +255,8 @@ def _assignment_pagination_spec() -> PaginationSpec:
 @lru_cache(maxsize=1)
 def _entity_pagination_spec() -> PaginationSpec:
     return PaginationSpec(
-        forward_order=EntityScopeOrders.id(ascending=False),
-        backward_order=EntityScopeOrders.id(ascending=True),
+        forward_order=EntityScopeOrders.registered_at(ascending=False),
+        backward_order=EntityScopeOrders.registered_at(ascending=True),
         forward_condition_factory=EntityScopeConditions.by_cursor_forward,
         backward_condition_factory=EntityScopeConditions.by_cursor_backward,
         tiebreaker_order=AssociationScopesEntitiesRow.id.asc(),
@@ -889,6 +889,14 @@ class RBACAdapter(BaseAdapter):
             conditions.append(
                 ScopedPermissionConditions.by_entity_type(RBACElementType(f.entity_type))
             )
+        if f.created_at is not None:
+            cond = f.created_at.build_query_condition(
+                before_factory=ScopedPermissionConditions.by_created_at_before,
+                after_factory=ScopedPermissionConditions.by_created_at_after,
+                equals_factory=ScopedPermissionConditions.by_created_at_equals,
+            )
+            if cond is not None:
+                conditions.append(cond)
         if f.AND:
             for sub in f.AND:
                 conditions.extend(self._convert_permission_filter(sub))
@@ -915,6 +923,8 @@ class RBACAdapter(BaseAdapter):
                 result.append(ScopedPermissionOrders.id(ascending))
             elif o.field == "entity_type":
                 result.append(ScopedPermissionOrders.entity_type(ascending))
+            elif o.field == "created_at":
+                result.append(ScopedPermissionOrders.created_at(ascending))
         return result
 
     def _convert_role_filter_gql(self, f: RoleFilterDTO) -> list[QueryCondition]:
@@ -1247,6 +1257,7 @@ class RBACAdapter(BaseAdapter):
             scope_id=data.scope_id,
             entity_type=RBACElementTypeDTO(data.entity_type.to_element().value),
             operation=OperationTypeDTO(data.operation.value),
+            created_at=data.created_at,
         )
 
     @staticmethod

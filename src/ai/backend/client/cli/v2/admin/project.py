@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+from uuid import UUID
 
 import click
 
@@ -80,6 +81,99 @@ def search(
                     offset=offset,
                 ),
             )
+            print_result(result)
+        finally:
+            await registry.close()
+
+    asyncio.run(_run())
+
+
+@project.command()
+@click.argument("body", type=str)
+def create(body: str) -> None:
+    """Create a new project (superadmin only).
+
+    BODY is a JSON string with project creation fields.
+    """
+    import json
+    import sys
+
+    from ai.backend.common.dto.manager.v2.group.request import CreateGroupInput
+
+    try:
+        data = json.loads(body)
+    except json.JSONDecodeError as e:
+        click.echo(f"Invalid JSON: {e}", err=True)
+        sys.exit(1)
+
+    async def _run() -> None:
+        registry = await create_v2_registry(load_v2_config())
+        try:
+            result = await registry.project.admin_create(CreateGroupInput(**data))
+            print_result(result)
+        finally:
+            await registry.close()
+
+    asyncio.run(_run())
+
+
+@project.command()
+@click.argument("project_id", type=click.UUID)
+@click.argument("body", type=str)
+def update(project_id: UUID, body: str) -> None:
+    """Update a project (superadmin only).
+
+    BODY is a JSON string with fields to update.
+    """
+    import json
+    import sys
+
+    from ai.backend.common.dto.manager.v2.group.request import UpdateGroupInput
+
+    try:
+        data = json.loads(body)
+    except json.JSONDecodeError as e:
+        click.echo(f"Invalid JSON: {e}", err=True)
+        sys.exit(1)
+
+    async def _run() -> None:
+        registry = await create_v2_registry(load_v2_config())
+        try:
+            result = await registry.project.admin_update(project_id, UpdateGroupInput(**data))
+            print_result(result)
+        finally:
+            await registry.close()
+
+    asyncio.run(_run())
+
+
+@project.command()
+@click.argument("project_id", type=click.UUID)
+def delete(project_id: UUID) -> None:
+    """Soft-delete a project (superadmin only)."""
+    from ai.backend.common.dto.manager.v2.group.request import DeleteGroupInput
+
+    async def _run() -> None:
+        registry = await create_v2_registry(load_v2_config())
+        try:
+            result = await registry.project.admin_delete(DeleteGroupInput(group_id=project_id))
+            print_result(result)
+        finally:
+            await registry.close()
+
+    asyncio.run(_run())
+
+
+@project.command()
+@click.argument("project_id", type=click.UUID)
+def purge(project_id: UUID) -> None:
+    """Permanently purge a project (superadmin only)."""
+    from ai.backend.common.dto.manager.v2.group.request import PurgeGroupInput
+
+    async def _run() -> None:
+        registry = await create_v2_registry(load_v2_config())
+        try:
+            result = await registry.project.admin_purge(PurgeGroupInput(group_id=project_id))
             print_result(result)
         finally:
             await registry.close()
