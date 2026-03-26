@@ -792,8 +792,8 @@ class EndpointRow(Base):  # type: ignore[misc]
                 info.policy = policy_data
                 return info
 
-        # Fallback: use endpoint-level fields (legacy)
-        info = self._to_deployment_info_legacy()
+        # Fallback: no revisions available
+        info = self._to_deployment_info_with_revisions([])
         info.policy = policy_data
         return info
 
@@ -835,7 +835,7 @@ class EndpointRow(Base):  # type: ignore[misc]
 
     def _to_deployment_info_with_revisions(
         self,
-        model_revisions: Sequence[ModelRevisionSpec],
+        model_revisions: list[ModelRevisionSpec],
     ) -> DeploymentInfo:
         """Build DeploymentInfo with pre-built model_revisions dict."""
         return DeploymentInfo(
