@@ -12,9 +12,16 @@ from ai.backend.common.dto.manager.v2.session.request import (
     AdminSearchSessionsInput,
     EnqueueSessionInput,
 )
+from ai.backend.common.dto.manager.v2.session.request import (
+    SessionIdPathParam as SessionIdPathParamDTO,
+)
 from ai.backend.common.types import AgentId, SessionId
 from ai.backend.logging import BraceStyleAdapter
-from ai.backend.manager.api.rest.v2.path_params import AgentIdPathParam, SessionIdPathParam
+from ai.backend.manager.api.rest.v2.path_params import (
+    AgentIdPathParam,
+    ProjectIdPathParam,
+    SessionIdPathParam,
+)
 from ai.backend.manager.dto.context import UserContext
 
 if TYPE_CHECKING:
@@ -92,4 +99,29 @@ class V2SessionHandler:
         result = await self._adapter.search_kernels_by_session(
             SessionId(path.parsed.session_id), body.parsed
         )
+        return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
+
+    async def get(
+        self,
+        path: PathParam[SessionIdPathParamDTO],
+    ) -> APIResponse:
+        """Get a single session by ID."""
+        result = await self._adapter.get(path.parsed.session_id)
+        return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
+
+    async def my_search(
+        self,
+        body: BodyParam[AdminSearchSessionsInput],
+    ) -> APIResponse:
+        """Search sessions owned by the current user."""
+        result = await self._adapter.my_search(body.parsed)
+        return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
+
+    async def project_search(
+        self,
+        path: PathParam[ProjectIdPathParam],
+        body: BodyParam[AdminSearchSessionsInput],
+    ) -> APIResponse:
+        """Search sessions within a project."""
+        result = await self._adapter.project_search(path.parsed.project_id, body.parsed)
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)

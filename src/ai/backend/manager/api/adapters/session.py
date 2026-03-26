@@ -7,6 +7,8 @@ from datetime import datetime, timedelta
 from decimal import Decimal
 from uuid import UUID
 
+import sqlalchemy as sa
+
 from ai.backend.common.contexts.user import current_user
 from ai.backend.common.dto.manager.v2.deployment.types import (
     EnvironmentVariableEntryInfoDTO,
@@ -66,6 +68,7 @@ from ai.backend.common.types import (
 from ai.backend.manager.api.adapters.pagination import PaginationSpec
 from ai.backend.manager.data.kernel.types import KernelInfo, KernelStatus, KernelStatusInMatchSpec
 from ai.backend.manager.data.session.types import SessionData, SessionStatus
+from ai.backend.manager.errors.kernel import SessionNotFound
 from ai.backend.manager.models.kernel.conditions import KernelConditions
 from ai.backend.manager.models.kernel.orders import (
     DEFAULT_BACKWARD_ORDER as KERNEL_DEFAULT_BACKWARD_ORDER,
@@ -92,6 +95,7 @@ from ai.backend.manager.models.session.orders import (
 from ai.backend.manager.models.session.orders import (
     resolve_order as resolve_session_order,
 )
+from ai.backend.manager.models.session.row import SessionRow
 from ai.backend.manager.models.user import UserRole
 from ai.backend.manager.repositories.base import (
     BatchQuerier,
@@ -273,6 +277,24 @@ class SessionAdapter(BaseAdapter):
         )
 
     # -------------------------------------------------------------------------
+    # Get single session
+    # -------------------------------------------------------------------------
+
+    async def get(self, session_id: UUID) -> SessionNode:
+        """Get a single session by ID."""
+        conditions = [SessionConditions.by_ids([SessionId(session_id)])]
+        querier = BatchQuerier(
+            pagination=NoPagination(),
+            conditions=conditions,
+        )
+        action_result = await self._processors.session.search_sessions.wait_for_complete(
+            SearchSessionsAction(querier=querier, user_id=self._require_user_id())
+        )
+        if not action_result.data:
+            raise SessionNotFound(f"Session not found: {session_id}")
+        return self._session_data_to_node(action_result.data[0])
+
+    # -------------------------------------------------------------------------
     # Batch load (DataLoader)
     # -------------------------------------------------------------------------
 
@@ -376,6 +398,72 @@ class SessionAdapter(BaseAdapter):
             SearchSessionsAction(querier=querier, user_id=self._require_user_id())
         )
 
+        return AdminSearchSessionsPayload(
+            items=[self._session_data_to_node(item) for item in action_result.data],
+            total_count=action_result.total_count,
+            has_next_page=action_result.has_next_page,
+            has_previous_page=action_result.has_previous_page,
+        )
+
+    async def my_search(self, input: AdminSearchSessionsInput) -> AdminSearchSessionsPayload:
+        """Search sessions owned by the current user."""
+        user = current_user()
+        if user is None:
+            raise RuntimeError("No authenticated user in context")
+
+        conditions = self._convert_session_filter(input.filter) if input.filter else []
+        orders = self._convert_session_orders(input.order) if input.order else []
+
+        def _by_user_uuid() -> sa.sql.expression.ColumnElement[bool]:
+            return SessionRow.user_uuid == user.user_id
+
+        querier = self._build_querier(
+            conditions=conditions,
+            orders=orders,
+            pagination_spec=_SESSION_PAGINATION_SPEC,
+            first=input.first,
+            after=input.after,
+            last=input.last,
+            before=input.before,
+            limit=input.limit,
+            offset=input.offset,
+            base_conditions=[_by_user_uuid],
+        )
+        action_result = await self._processors.session.search_sessions.wait_for_complete(
+            SearchSessionsAction(querier=querier, user_id=user.user_id)
+        )
+        return AdminSearchSessionsPayload(
+            items=[self._session_data_to_node(item) for item in action_result.data],
+            total_count=action_result.total_count,
+            has_next_page=action_result.has_next_page,
+            has_previous_page=action_result.has_previous_page,
+        )
+
+    async def project_search(
+        self, project_id: UUID, input: AdminSearchSessionsInput
+    ) -> AdminSearchSessionsPayload:
+        """Search sessions within a specific project."""
+        conditions = self._convert_session_filter(input.filter) if input.filter else []
+        orders = self._convert_session_orders(input.order) if input.order else []
+
+        def _by_project_id() -> sa.sql.expression.ColumnElement[bool]:
+            return SessionRow.group_id == project_id
+
+        querier = self._build_querier(
+            conditions=conditions,
+            orders=orders,
+            pagination_spec=_SESSION_PAGINATION_SPEC,
+            first=input.first,
+            after=input.after,
+            last=input.last,
+            before=input.before,
+            limit=input.limit,
+            offset=input.offset,
+            base_conditions=[_by_project_id],
+        )
+        action_result = await self._processors.session.search_sessions.wait_for_complete(
+            SearchSessionsAction(querier=querier, user_id=self._require_user_id())
+        )
         return AdminSearchSessionsPayload(
             items=[self._session_data_to_node(item) for item in action_result.data],
             total_count=action_result.total_count,

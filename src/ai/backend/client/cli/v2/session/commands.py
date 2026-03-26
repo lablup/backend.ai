@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import json
 from pathlib import Path
+from uuid import UUID
 
 import click
 
@@ -37,6 +38,43 @@ def enqueue(payload: str) -> None:
         registry = await create_v2_registry(load_v2_config())
         try:
             result = await registry.session.enqueue(body)
+            print_result(result)
+        finally:
+            await registry.close()
+
+    asyncio.run(_run())
+
+
+@session.command()
+@click.argument("session_id", type=str)
+def get(session_id: str) -> None:
+    """Get a session by ID."""
+
+    async def _run() -> None:
+        registry = await create_v2_registry(load_v2_config())
+        try:
+            result = await registry.session.get(UUID(session_id))
+            print_result(result)
+        finally:
+            await registry.close()
+
+    asyncio.run(_run())
+
+
+@session.command(name="project-search")
+@click.argument("project_id", type=str)
+@click.option("--limit", type=int, default=20)
+@click.option("--offset", type=int, default=0)
+def project_search(project_id: str, limit: int, offset: int) -> None:
+    """Search sessions within a project."""
+
+    from ai.backend.common.dto.manager.v2.session.request import AdminSearchSessionsInput
+
+    async def _run() -> None:
+        registry = await create_v2_registry(load_v2_config())
+        try:
+            request = AdminSearchSessionsInput(limit=limit, offset=offset)
+            result = await registry.session.project_search(UUID(project_id), request)
             print_result(result)
         finally:
             await registry.close()

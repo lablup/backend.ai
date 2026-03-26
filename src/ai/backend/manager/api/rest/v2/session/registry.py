@@ -56,5 +56,23 @@ def register_v2_session_routes(
         handler.admin_search_kernels_by_session,
         middlewares=[superadmin_required],
     )
+    registry.add(
+        "GET",
+        "/{session_id}",
+        handler.get,
+        middlewares=[auth_required],
+    )
+    registry.add(
+        "POST",
+        "/my/search",
+        handler.my_search,
+        middlewares=[auth_required],
+    )
+    registry.add(
+        "POST",
+        "/projects/{project_id}/search",
+        handler.project_search,
+        middlewares=[auth_required],
+    )
 
     return registry

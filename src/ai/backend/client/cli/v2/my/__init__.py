@@ -35,3 +35,8 @@ def login_history() -> None:
 )
 def login_session() -> None:
     """My login session commands."""
+
+
+@my.group(cls=LazyGroup, import_name="ai.backend.client.cli.v2.my.session:session")
+def session() -> None:
+    """My session commands."""

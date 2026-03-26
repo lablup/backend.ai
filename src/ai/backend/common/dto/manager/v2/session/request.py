@@ -40,6 +40,7 @@ __all__ = (
     "RestartSessionInput",
     "SearchSessionsInput",
     "SessionFilter",
+    "SessionIdPathParam",
     "SessionOrder",
     "SessionPathParam",
     "ShutdownServiceInput",
@@ -57,6 +58,12 @@ class SessionPathParam(BaseRequestModel):
     """Path parameter for session-scoped endpoints."""
 
     session_name: str
+
+
+class SessionIdPathParam(BaseRequestModel):
+    """Path parameter for session ID-based endpoints."""
+
+    session_id: UUID
 
 
 # ---------------------------------------------------------------------------
