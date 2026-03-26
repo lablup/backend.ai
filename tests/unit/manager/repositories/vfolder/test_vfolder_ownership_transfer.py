@@ -278,6 +278,7 @@ class TestVFolderOwnershipTransferRBACCleanup:
                 resource_policy=user_policy_name,
             )
             db_sess.add(user)
+            await db_sess.flush()
 
             role_id = uuid.uuid4()
             role_row = RoleRow(
@@ -286,6 +287,7 @@ class TestVFolderOwnershipTransferRBACCleanup:
                 source=RoleSource.SYSTEM,
             )
             db_sess.add(role_row)
+            await db_sess.flush()
 
             user_role_row = UserRoleRow(
                 id=uuid.uuid4(),
