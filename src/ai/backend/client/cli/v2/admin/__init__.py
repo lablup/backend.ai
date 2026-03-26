@@ -86,3 +86,12 @@ def login_session() -> None:
 )
 def service_catalog() -> None:
     """Admin service catalog commands."""
+
+
+@admin.group(
+    cls=LazyGroup,
+    import_name="ai.backend.client.cli.v2.admin.prometheus_query_preset:prometheus_query_preset",
+    name="prometheus-query-preset",
+)
+def prometheus_query_preset() -> None:
+    """Admin prometheus query preset commands."""
