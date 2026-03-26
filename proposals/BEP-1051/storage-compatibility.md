@@ -20,7 +20,7 @@ key-decisions:
 
 ## Summary
 
-Backend.AI's existing `Mount` abstraction (bind mount with source path, target path, and permission) works unchanged for KataAgent. The Kata runtime shim automatically translates host-side bind mounts into virtio-fs shares exposed to the guest VM — no new storage management interface is required. This document details the compatibility layer, identifies mounts that require Kata-specific handling, and analyzes the I/O performance implications.
+Backend.AI's existing `Mount` abstraction (bind mount with source path, target path, and permission) works unchanged for KataAgent at the container level. Storage mounts are split into two paths: (1) VFolder data is mounted directly inside the guest VM using the guest's own NFS/Lustre/WekaFS kernel client (preserving RDMA, 100% native throughput), and containers bind-mount vfolder subdirectories from this guest-side mount — identical to Docker's model. (2) Scratch/config directories (`/home/config`) use virtio-fs for host→guest sharing of non-performance-critical, host-originated configuration data. No new storage management interface is required. This document details the mount compatibility layer, identifies mounts that require Kata-specific handling, and analyzes the I/O performance implications.
 
 ## Current Design: Docker Bind Mount Path
 
@@ -146,15 +146,13 @@ Each mount is evaluated against the fundamental difference: Docker containers sh
 - `resource.txt` — read only by the **agent** (host-side) for recovery/resource tracking; NOT consumed by the kernel runner
 - `ssh/` — cluster SSH keys and port mappings, read by the kernel runner's `init_sshd_service()`
 
-`/home/work` is the user's persistent workspace and vfolder mount point. Bidirectional sync is inherent to virtio-fs — agent writes are immediately visible in the guest, and user writes are immediately visible on the host.
+`/home/work` is the user's persistent workspace and vfolder mount point. In the Kata design, this path is provided by a **direct guest-side mount** of the underlying storage system (NFS/Lustre/WekaFS) into the VM. The guest kernel's own filesystem client mounts the storage volume (preserving RDMA), and containers bind-mount vfolder subdirectories from the guest filesystem — identical to Docker's host-level mount model.
 
-**Timezone files** (`/etc/localtime`, `/etc/timezone`): Docker containers need these because they share the host kernel but not its timezone configuration files. Kata VMs also need them — the guest rootfs ships with UTC as default, but the container should match the host's timezone. Sharing via virtio-fs overrides the guest default.
+**Timezone files** (`/etc/localtime`, `/etc/timezone`): Baked into the attested guest rootfs with the host's timezone. The guest rootfs is a managed infrastructure image, so timezone configuration is set at build time.
 
-**VFolder mounts** (`/home/work/{vfolder}`): User storage mounts pass through virtio-fs transparently. Same `Mount(BIND, host_path, target, permission)` spec. See [Direct Storage Access](#direct-storage-access-from-guest-vms) for why virtio-fs is preferred over direct guest mount.
+**VFolder mounts** (`/home/work/{vfolder}`): User storage is **not** exposed via virtio-fs, because that breaks RDMA and adds FUSE overhead on high-performance storage backends. Instead, the storage volume is mounted natively inside the guest using the NFS/Lustre/WekaFS kernel client. Containers bind-mount vfolder subdirectories from this guest-side path. The same `Mount(BIND, host_path, target, permission)` spec is used at the container level, but `host_path` refers to the guest-visible path (e.g., `/mnt/vfstore/<vfid>/subpath`). Mount specs are delivered to the guest via `storage-mounts.json` in `/home/config/` (virtio-fs config channel).
 
-**krunner binaries** (`/opt/kernel/su-exec`, `entrypoint.sh`, `dropbearmulti`, `sftp-server`, `tmux`, `ttyd`, `yank.sh`, `all-smi`, `bssh`, `extract_dotfiles.py`, `fantompass.py`, `hash_phrase.py`, `words.json`, `DO_NOT_STORE_PERSISTENT_FILES_HERE.md`, `terminfo.*`): These 15+ individual file bind mounts are translated to virtio-fs shares. All are still functionally required inside the guest container — SSH access, terminal multiplexing, GPU monitoring, entrypoint bootstrapping, etc. For Phase 1, share via virtio-fs from the host. For production, consider consolidating into a single directory mount or baking into the guest rootfs to reduce the per-file virtio-fs share count.
-
-**Python library mounts** (`ai.backend.kernel`, `ai.backend.helpers`): The kernel runner Python packages are injected into `/opt/backend.ai/lib/python{ver}/site-packages/`. Still required — the container inside the VM runs the same kernel runner process.
+**krunner binaries** (`/opt/kernel/su-exec`, `entrypoint.sh`, `dropbearmulti`, `sftp-server`, `tmux`, `ttyd`, etc.) and **Python libraries** (`ai.backend.kernel`, `ai.backend.helpers`): All executables and libraries are **baked into the attested guest rootfs**. Under CoCo-by-default, the host is untrusted and must not be a source of executables — no host→guest sharing of binaries via virtio-fs. These are present in the guest rootfs at the expected paths (`/opt/kernel/`, `/opt/backend.ai/lib/...`).
 
 #### Mounts That Change Mechanism (CHANGE)
 
@@ -370,19 +368,14 @@ Even where technically feasible, direct guest NFS mount has significant practica
 
 ### Recommendation
 
-**Use virtio-fs for all storage backends.** The double-hop overhead is acceptable because:
+**Use direct guest-side mounts for VFolder data; reserve virtio-fs for scratch/config only.** This aligns with the CoCo-by-default trust model and preserves RDMA performance:
 
-- virtio-fs + DAX provides 90-98% native read performance — the dominant I/O pattern for AI/ML workloads (reading training data)
-- The host page cache is shared with the guest via DAX, effectively giving the guest "free" caching
-- The architecture remains simple — one storage path for all backends, no guest-side storage configuration
-- No vendor offers built-in Kata/Firecracker integration that would justify a separate code path
+- VFolder data is mounted **inside the guest VM** via the native NFS/Lustre/WekaFS kernel client, achieving 100% native throughput with RDMA preserved end-to-end
+- Containers bind-mount vfolder subdirectories from the guest filesystem — the same model as Docker
+- virtio-fs is retained only for non-performance-critical, host-originated paths (scratch/config directories), where the FUSE overhead is acceptable and simplifies host→guest config file delivery
+- Storage topology visible in guest `/proc/mounts` — acceptable per the same isolation model as Docker (vfolder permissions enforce access control, not mount concealment)
 
-Direct guest mount (NFS or native client) could be revisited as a future optimization if specific workloads demonstrate that the virtio-fs write overhead (2-5x for random writes with DAX) is a bottleneck. This would require:
-- Custom guest kernel with NFS/client modules
-- A new mount type or annotation to signal "direct guest mount" for specific vfolders
-- Guest-side mount credential provisioning via kata-agent
-
-This is **not proposed for the initial implementation**.
+The earlier analysis of virtio-fs performance (DAX, throughput benchmarks) remains relevant as background context for understanding the I/O characteristics of scratch/config mounts, but **virtio-fs is not used for VFolder data I/O** in the final design.
 
 ## Per-VM Cloned Disk: Hybrid Storage Model
 

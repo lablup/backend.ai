@@ -137,7 +137,7 @@ Before deploying any Backend.AI changes:
    - VM boot times (target: < 500ms)
    - Memory overhead (should match `kata.vm-overhead-mb` config)
    - GPU compute performance (should be near-native via VFIO)
-   - I/O performance on vfolder mounts (virtio-fs overhead)
+   - I/O performance on vfolder mounts (direct guest-side NFS/Lustre)
 4. **Scale out**: Add more Kata agents as confidence grows
 
 ## Rollback Plan
@@ -153,16 +153,15 @@ The `backend` column, `AgentBackend.KATA` enum value, and `cuda_vfio` plugin are
 
 ## Future Extensibility
 
-### Phase 4: Confidential Computing
+### CoCo Architecture (Built-In from Phase 1)
 
-When implementing CoCo (Confidential Containers) support:
+CoCo (Confidential Containers) is enabled by default for all Kata workloads — there is no non-CoCo Kata mode. The following are part of the baseline architecture, not a future phase:
 
-- Add `confidential_guest = true` and `guest_attestation = "tdx"` to Kata config
-- Guest image pull: images downloaded and decrypted inside the TEE
-- Key Broker Service (KBS) integration for sealed secrets
+- `confidential_guest = true` and `guest_attestation = "tdx"` (or `"sev-snp"`) in Kata config — defaults
+- Guest-side image pull via `image-rs` — images downloaded and decrypted inside the TEE
+- Key Broker Service (KBS) integration for sealed secrets and registry credentials
 - Remote attestation endpoint exposed via the manager API
-- Dedicated scaling group: `kata-confidential` with CoCo-enabled agents
-- No changes to the scheduler or resource accounting model
+- All executables baked into the attested guest rootfs — no host→guest sharing of binaries
 
 #### VFolder Storage: Direct Guest-Side NFS/Lustre Mount
 

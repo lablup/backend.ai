@@ -245,21 +245,21 @@ Host-side GPU metrics are limited when devices are bound to `vfio-pci`:
 
 **Container-level metrics** (from inside guest VM):
 - The guest VM has the `nvidia` driver loaded and NVML is functional inside the guest
-- Metrics must be collected via the kata-agent running inside the guest, forwarded over VSOCK
-- The agent can periodically query guest-side `nvidia-smi` or NVML via a metrics endpoint exposed by kata-agent
+- CoCo-by-default: kata-agent `ExecProcessRequest` is blocked by policy — `containerd exec nvidia-smi` does **not** work
+- Metrics are exposed by **DCGM Exporter** (`:9400`) and **Node Exporter** (`:9100`) running inside the guest as systemd services (baked into the attested rootfs)
+- Prometheus scrapes these exporters over the Calico network — standard HTTP, no kata-agent involvement
+- The CoCo policy controls tRPC API calls (exec, copy file), NOT network traffic
 
 ```python
 async def gather_container_measures(
     self, stat_ctx, container_ids,
 ) -> Sequence[ContainerMeasurement]:
-    # Query guest-side nvidia-smi via containerd exec
-    for container_id in container_ids:
-        result = await self._containerd.exec_in_container(
-            container_id,
-            ["nvidia-smi", "--query-gpu=utilization.gpu,memory.used,memory.total",
-             "--format=csv,noheader,nounits"],
-        )
-        # Parse CSV output into ContainerMeasurement objects
+    # CoCo: ExecProcessRequest is blocked by kata-agent policy.
+    # GPU metrics are collected by Prometheus scraping DCGM Exporter
+    # inside the guest over the Calico network (port 9400).
+    # This plugin does NOT collect per-container GPU metrics directly.
+    # Backend.AI reads GPU metrics from Prometheus/Grafana instead.
+    return []
 ```
 
 ### restore_from_container()

@@ -6,7 +6,8 @@ depends-on: [configuration-deployment.md, storage-compatibility.md]
 key-decisions:
   - Full AbstractAgent implementation with Kata-specific lifecycle
   - Container management via containerd gRPC with Kata shim
-  - virtio-fs for storage sharing (scratch dirs, vfolders, krunner binaries)
+  - VFolder storage via direct guest-side NFS/Lustre mount (RDMA-preserving); virtio-fs only for scratch/config
+  - All executables (krunner, Python libs) baked into attested guest rootfs (CoCo — host untrusted)
   - ZMQ TCP for agent↔kernel-runner communication (already TCP-based, works across VM boundary)
   - Agent socket (/opt/kernel/agent.sock) not needed for Kata (only used by jail/C binaries, both skipped)
   - entrypoint.sh requires Kata-specific variant (skip LD_PRELOAD/libbaihook, skip jail references)
@@ -16,7 +17,7 @@ key-decisions:
 
 ## Summary
 
-KataAgent is the third `AbstractAgent` implementation that manages containers inside lightweight VMs via Kata Containers 3.x. It communicates with containerd's gRPC API to create containers using the Kata runtime shim, replacing Docker API calls with containerd CRI operations.
+KataAgent is the third `AbstractAgent` implementation that manages containers inside lightweight VMs via Kata Containers 3.x. It communicates with containerd's gRPC API to create containers using the Kata runtime shim, replacing Docker API calls with containerd's native client API (containers, tasks, and sandbox services).
 
 ## Current Design
 
@@ -167,9 +168,10 @@ class KataAgentDiscovery(AbstractAgentDiscovery):
         return await scan_available_resources(compute_device_types)
 
     async def prepare_krunner_env(self, local_config):
-        # Kata approach: krunner binaries are shared into the guest via
-        # virtio-fs from a host directory, or baked into the guest rootfs.
-        # No Docker volumes needed.
+        # CoCo: all krunner binaries and Python libraries are baked into
+        # the attested guest rootfs. The host is untrusted and must not
+        # be a source of executables. No Docker volumes or virtio-fs
+        # binary sharing needed.
         return await prepare_krunner_env_kata(local_config)
 
 def get_agent_discovery() -> AbstractAgentDiscovery:
@@ -313,25 +315,22 @@ async def get_intrinsic_mounts(self) -> Sequence[Mount]:
     return mounts
 ```
 
-**`mount_krunner()`** — Skip jail, libbaihook, accelerator LD_PRELOAD hooks:
+**`mount_krunner()`** — No-op under CoCo; all executables in attested rootfs:
 
 ```python
 async def mount_krunner(self, resource_spec, environ):
-    # KEEP: krunner binaries (su-exec, entrypoint.sh, dropbearmulti, etc.)
-    # Shared from host via virtio-fs as individual file mounts.
-    for binary_name, target_path in KRUNNER_BINARY_MAP.items():
-        resource_spec.mounts.append(
-            Mount(MountTypes.BIND, self._krunner_dir / binary_name,
-                  Path(f"/opt/kernel/{target_path}"), MountPermission.READ_ONLY)
-        )
-    # KEEP: Python libraries (ai.backend.kernel, ai.backend.helpers)
-    resource_spec.mounts.extend(self._python_lib_mounts())
-
-    # SKIP: libbaihook.so + LD_PRELOAD — guest kernel provides accurate
-    # sysconf(_SC_NPROCESSORS_ONLN) natively
+    # CoCo-by-default: all krunner executables (su-exec, entrypoint.sh,
+    # dropbearmulti, etc.) and Python libraries (ai.backend.kernel,
+    # ai.backend.helpers) are baked into the attested guest rootfs.
+    # The host is untrusted — no host→guest executable sharing via virtio-fs.
+    #
+    # SKIP: krunner binary mounts — already in guest rootfs
+    # SKIP: Python library mounts — already in guest rootfs
+    # SKIP: libbaihook.so + LD_PRELOAD — guest kernel provides accurate sysconf
     # SKIP: jail binary — VM boundary is stronger isolation
     # SKIP: accelerator LD_PRELOAD hooks — VFIO passthrough makes GPU
-    # natively visible in guest; no hook libraries needed
+    #        natively visible in guest; no hook libraries needed
+    pass
 ```
 
 **`apply_accelerator_allocation()`** — Collect VFIO device info from plugins:

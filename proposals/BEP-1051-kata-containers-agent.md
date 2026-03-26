@@ -59,7 +59,7 @@ Additionally, Kata's integration with Confidential Containers (CoCo) and TEE har
 |----------|-------------|-------|
 | [Configuration & Deployment](BEP-1051/configuration-deployment.md) | `[kata]` config section, hypervisor selection, host requirements | 1 |
 | [KataAgent Backend](BEP-1051/kata-agent-backend.md) | KataAgent, KataKernel, KataKernelCreationContext | 1 |
-| [Storage Compatibility](BEP-1051/storage-compatibility.md) | virtio-fs mount translation, lxcfs/socket exceptions, I/O analysis | 1 |
+| [Storage Compatibility](BEP-1051/storage-compatibility.md) | Direct guest-side NFS/Lustre/WekaFS mounts for VFolders, virtio-fs for scratch/config, I/O analysis | 1 |
 | [Networking](BEP-1051/networking.md) | Calico CNI integration, inter-VM networking, network policy, hostname resolution | 1 |
 | [VFIO Accelerator Plugin](BEP-1051/vfio-accelerator-plugin.md) | CUDAVFIOPlugin, IOMMU group detection, device passthrough | 2 |
 | [Scheduler Integration](BEP-1051/scheduler-integration.md) | Agent backend tracking, scaling group policy, VM overhead | 3 |

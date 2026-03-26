@@ -74,9 +74,9 @@ hotplug-vfio = "root-port"      # "root-port" | "bridge-port" | "no-port"
 containerd-socket = "/run/containerd/containerd.sock"
 kata-runtime-class = "kata"     # RuntimeClass name registered in containerd
 
-# --- Confidential Computing (Phase 4) ---
-confidential-guest = false
-guest-attestation = ""          # "tdx" | "sev-snp" | ""
+# --- Confidential Computing (CoCo-by-default) ---
+confidential-guest = true       # CoCo is always enabled; no non-CoCo mode
+guest-attestation = "tdx"       # "tdx" | "sev-snp" (required)
 ```
 
 ### Guest VM Image vs Container Image
@@ -85,59 +85,109 @@ Kata Containers uses **two separate filesystem layers** that must not be confuse
 
 1. **Guest VM rootfs** (`rootfs-path` above): A minimal mini-OS image containing only the kata-agent, systemd, and essential utilities. This is the VM's boot disk — shared across all VMs, read-only, and mounted via DAX on a `/dev/pmem*` device inside the guest. It is **not** the user's container image. This is an infrastructure-level asset analogous to a VM template.
 
-2. **Container image** (e.g., `cr.backend.ai/stable/python-tensorflow:2.15-py312-cuda12.3`): The user-selected OCI image that Backend.AI's image management system resolves. containerd pulls this on the host (same as Docker), and the Kata shim mounts it into the guest via virtio-fs or block device passthrough. The kata-agent inside the guest uses it as the container's root filesystem.
+2. **Container image** (e.g., `cr.backend.ai/stable/python-tensorflow:2.15-py312-cuda12.3`): The user-selected OCI image that Backend.AI's image management system resolves. Under CoCo-by-default, images are pulled and decrypted **inside the guest** using `image-rs` — the host is untrusted and must not see image contents. Registry credentials are delivered via KBS (Key Broker Service) after remote attestation.
 
 ```
-Host: containerd pulls OCI image (e.g., tensorflow:latest)
+Guest VM boots from kata-containers.img (attested rootfs)
   │
-  ├─ Kata shim detects image storage backend:
-  │   ├─ overlayfs snapshotter → share via virtio-fs
-  │   └─ devicemapper snapshotter → attach as virtio-blk block device
-  │
-  └─ Guest VM boots from kata-containers.img (mini-OS)
-       └─ kata-agent mounts container rootfs inside the guest
-           └─ Container process runs on the OCI image filesystem
+  ├─ TEE attestation completes
+  ├─ image-rs pulls encrypted OCI image from registry
+  ├─ Decrypts image with keys from KBS (attestation-gated)
+  └─ kata-agent mounts container rootfs inside the guest
+       └─ Container process runs on the OCI image filesystem
 ```
 
-**No changes to Backend.AI's image management are needed.** The image registry, image selection, and containerd pull flow are identical to Docker. Only the last mile differs — Kata transports the image into the guest VM instead of using a host-kernel bind mount.
-
-For **confidential computing** (Phase 4), images are pulled and decrypted **inside the guest** using `image-rs` (the host is untrusted and must not see image contents). This is not the standard flow and requires additional CoCo components.
+**Image management changes for CoCo:** The image registry and image selection flow are unchanged (manager resolves image references identically). The pull mechanism differs — instead of host-side containerd pull, `image-rs` inside the guest TEE handles pull + integrity verification + decryption. The agent cannot verify image presence on the host; it passes the image reference to the Kata shim and waits for the kernel runner ZMQ connection.
 
 ### Pydantic Config Model
 
 ```python
 class KataConfig(BaseConfigSchema):
-    hypervisor: Literal["cloud-hypervisor", "qemu", "dragonball"] = "cloud-hypervisor"
+    hypervisor: Literal["cloud-hypervisor", "qemu", "dragonball"] = Field(
+        default="cloud-hypervisor",
+        validation_alias=AliasChoices("hypervisor"),
+    )
 
     # VM defaults
-    default_vcpus: int = 2
-    default_memory_mb: int = 2048
-    vm_overhead_mb: int = 64  # VMM process + guest kernel + kata-agent (on top of guest memory)
+    default_vcpus: int = Field(
+        default=2,
+        validation_alias=AliasChoices("default_vcpus", "default-vcpus"),
+    )
+    default_memory_mb: int = Field(
+        default=2048,
+        validation_alias=AliasChoices("default_memory_mb", "default-memory-mb"),
+    )
+    vm_overhead_mb: int = Field(
+        default=64,
+        description="VMM process + guest kernel + kata-agent overhead (MB)",
+        validation_alias=AliasChoices("vm_overhead_mb", "vm-overhead-mb"),
+    )
 
     # Guest image
-    kernel_path: Path = Path("/opt/kata/share/kata-containers/vmlinux.container")
-    initrd_path: Path | None = None
-    rootfs_path: Path = Path("/opt/kata/share/kata-containers/kata-containers.img")
+    kernel_path: Path = Field(
+        default=Path("/opt/kata/share/kata-containers/vmlinux.container"),
+        validation_alias=AliasChoices("kernel_path", "kernel-path"),
+    )
+    initrd_path: Path | None = Field(
+        default=None,
+        validation_alias=AliasChoices("initrd_path", "initrd-path"),
+    )
+    rootfs_path: Path = Field(
+        default=Path("/opt/kata/share/kata-containers/kata-containers.img"),
+        validation_alias=AliasChoices("rootfs_path", "rootfs-path"),
+    )
 
     # Storage
-    shared_fs: Literal["virtio-fs", "virtio-9p"] = "virtio-fs"
-    virtiofsd_path: Path = Path("/opt/kata/libexec/virtiofsd")
-    virtio_fs_cache_size: int = 0
+    shared_fs: Literal["virtio-fs", "virtio-9p"] = Field(
+        default="virtio-fs",
+        validation_alias=AliasChoices("shared_fs", "shared-fs"),
+    )
+    virtiofsd_path: Path = Field(
+        default=Path("/opt/kata/libexec/virtiofsd"),
+        validation_alias=AliasChoices("virtiofsd_path", "virtiofsd-path"),
+    )
+    virtio_fs_cache_size: int = Field(
+        default=0,
+        validation_alias=AliasChoices("virtio_fs_cache_size", "virtio-fs-cache-size"),
+    )
 
     # Networking
-    network_model: Literal["tcfilter", "macvtap"] = "tcfilter"
+    network_model: Literal["tcfilter", "macvtap"] = Field(
+        default="tcfilter",
+        validation_alias=AliasChoices("network_model", "network-model"),
+    )
 
     # VFIO
-    enable_iommu: bool = True
-    hotplug_vfio: Literal["root-port", "bridge-port", "no-port"] = "root-port"
+    enable_iommu: bool = Field(
+        default=True,
+        validation_alias=AliasChoices("enable_iommu", "enable-iommu"),
+    )
+    hotplug_vfio: Literal["root-port", "bridge-port", "no-port"] = Field(
+        default="root-port",
+        validation_alias=AliasChoices("hotplug_vfio", "hotplug-vfio"),
+    )
 
     # Containerd
-    containerd_socket: Path = Path("/run/containerd/containerd.sock")
-    kata_runtime_class: str = "kata"
+    containerd_socket: Path = Field(
+        default=Path("/run/containerd/containerd.sock"),
+        validation_alias=AliasChoices("containerd_socket", "containerd-socket"),
+    )
+    kata_runtime_class: str = Field(
+        default="kata",
+        validation_alias=AliasChoices("kata_runtime_class", "kata-runtime-class"),
+    )
 
-    # Confidential computing (Phase 4)
-    confidential_guest: bool = False
-    guest_attestation: Literal["tdx", "sev-snp", ""] = ""
+    # Confidential computing (CoCo-by-default)
+    confidential_guest: bool = Field(
+        default=True,
+        description="CoCo is always enabled; no non-CoCo Kata mode",
+        validation_alias=AliasChoices("confidential_guest", "confidential-guest"),
+    )
+    guest_attestation: Literal["tdx", "sev-snp"] = Field(
+        default="tdx",
+        description="TEE attestation type (required)",
+        validation_alias=AliasChoices("guest_attestation", "guest-attestation"),
+    )
 ```
 
 Integration in `AgentUnifiedConfig`:
