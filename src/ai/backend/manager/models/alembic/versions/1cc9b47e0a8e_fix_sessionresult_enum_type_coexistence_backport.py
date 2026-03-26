@@ -11,7 +11,8 @@ from alembic import op
 # revision identifiers, used by Alembic.
 revision = "1cc9b47e0a8e"
 down_revision = "ffcf0ed13a26"
-branch_labels = ("26.2.6",)
+# This migration is intended as a backport target for the 26.2 release branch.
+branch_labels = None
 depends_on = None
 
 
