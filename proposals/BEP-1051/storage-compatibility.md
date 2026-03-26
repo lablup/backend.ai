@@ -130,7 +130,9 @@ Each mount is evaluated against the fundamental difference: Docker containers sh
 
 #### Mounts That Work Transparently (KEEP)
 
-**Scratch directories** (`/home/config` RO, `/home/work` RW): The agent creates these on the host and the Kata shim shares them via virtio-fs. `/home/config` contains per-session configuration files written by the agent before container start:
+**Scratch config directory** (`/home/config` RO): The agent creates this on the host and the Kata shim shares it via virtio-fs. `/home/config` contains per-session configuration files written by the agent before container start:
+
+**Work directory** (`/home/work` RW): This is a directory on the guest VM's own disk (part of the guest rootfs). It is NOT a virtio-fs mount. VFolder subdirectories are bind-mounted into `/home/work/{vfolder}` from guest-side NFS/Lustre mounts. `/home/config` contains:
 - `environ.txt` — read by `BaseRunner.__init__()` to populate the child process environment (`child_env` and `os.environ`)
 - `intrinsic-ports.json` — read by `BaseRunner._init()` for ZMQ socket binding and intrinsic service port assignment
 - `resource.txt` — read only by the **agent** (host-side) for recovery/resource tracking; NOT consumed by the kernel runner
@@ -150,7 +152,7 @@ Each mount is evaluated against the fundamental difference: Docker containers sh
 
 **krunner volume** (`/opt/backend.ai`): This Docker named volume contains the pre-built Python runtime environment (distro-matched libc, interpreter, packages). Docker named volumes are not available with containerd. **Phase 1**: extract krunner to a host directory and share via virtio-fs bind mount (transparent translation). **Production**: bake into the guest rootfs image (faster startup, eliminates one virtio-fs share; requires rebuild on krunner update).
 
-**Core dump mount**: In Docker, the host kernel's `/proc/sys/kernel/core_pattern` governs container processes because they share the host kernel. The agent bind-mounts the host's coredump directory so dumps land on the host filesystem. In Kata, the **guest kernel** has its own `core_pattern` — host-side configuration doesn't affect guest processes. To capture guest core dumps: configure the guest kernel's `core_pattern` to write to a virtio-fs-shared path (e.g., `/home/work/.coredumps`). Low priority for Phase 1.
+**Core dump mount**: In Docker, the host kernel's `/proc/sys/kernel/core_pattern` governs container processes because they share the host kernel. The agent bind-mounts the host's coredump directory so dumps land on the host filesystem. In Kata, the **guest kernel** has its own `core_pattern` — host-side configuration doesn't affect guest processes. To capture guest core dumps: configure the guest kernel's `core_pattern` to write to a guest-local path (e.g., `/home/work/.coredumps` on the guest disk). Low priority.
 
 **Agent socket** (`/opt/kernel/agent.sock`): This ZMQ REP socket is **not used by the Python kernel runner** — it serves requests from C binaries inside the container: `host-pid-to-container-pid` and `container-pid-to-host-pid` (PID namespace translation for the jail sandbox) and `is-jail-enabled` (jail status query). The socket is relayed via a socat sidecar (UDS inside container → TCP on host). For Kata, **both the jail sandbox and PID translation are irrelevant** (VM boundary provides stronger isolation, guest PIDs are isolated by KVM). The agent socket mount, socat relay, and `handle_agent_socket()` handler are all skipped. Note: the primary agent↔kernel-runner communication channel (ZMQ PUSH/PULL for code execution commands) is already TCP-based and works across the VM boundary without any changes.
 
@@ -179,7 +181,7 @@ Each mount is evaluated against the fundamental difference: Docker containers sh
 | Mount | Docker | Kata | Verdict |
 |-------|--------|------|---------|
 | `/home/config` (scratch) | Bind mount | virtio-fs | **KEEP** — same spec |
-| `/home/work` (scratch) | Bind mount | virtio-fs | **KEEP** — same spec |
+| `/home/work` (workspace) | Bind mount | Guest disk directory | **CHANGE** — on guest rootfs, not virtio-fs |
 | `/tmp` (tmpfs) | Host tmpfs bind | Guest-side tmpfs | **CHANGE** — `TMPFS` type |
 | `/etc/localtime`, `/etc/timezone` | Bind mount | virtio-fs | **KEEP** — same spec |
 | lxcfs `/proc/*`, `/sys/*` | Bind mount | N/A | **SKIP** — guest kernel provides |
@@ -193,7 +195,7 @@ Each mount is evaluated against the fundamental difference: Docker containers sh
 | krunner binaries (15+ files) | Bind mount | virtio-fs | **KEEP** — same spec |
 | Python libs (`kernel`, `helpers`) | Bind mount | virtio-fs | **KEEP** — same spec |
 | Accelerator hooks | Plugin `.so` | VFIO PCI config | **DIFFERENT** — new plugin |
-| VFolders | Bind mount | virtio-fs | **KEEP** — same spec |
+| VFolders | Bind mount | Guest-side NFS/Lustre bind mount | **CHANGE** — NOT virtio-fs; mounted via guest kernel client |
 
 ### I/O Performance Characteristics
 
@@ -290,7 +292,7 @@ No new storage interfaces are introduced. The existing abstractions are reused:
 
 ### Motivation
 
-Backend.AI supports 12+ storage backends (`vfs`, `xfs`, `netapp`, `dellemc-onefs`, `weka`, `gpfs`, `cephfs`, `vast`, `exascaler`, `purestorage`, `hammerspace`, etc.), each exposing vfolders to agent hosts via different protocols. The default design passes all storage through virtio-fs — the host mounts the storage, and virtiofsd shares it into the guest. This section evaluates whether any storage providers could be mounted **directly inside the guest VM**, bypassing the virtio-fs layer.
+Backend.AI supports 12+ storage backends (`vfs`, `xfs`, `netapp`, `dellemc-onefs`, `weka`, `gpfs`, `cephfs`, `vast`, `exascaler`, `purestorage`, `hammerspace`, etc.), each exposing vfolders to agent hosts via different protocols. The adopted design mounts storage volumes **directly inside the guest VM** using the guest's own NFS/Lustre/WekaFS kernel client (preserving RDMA), then bind-mounts vfolder subdirectories into the container at `/home/work/{vfolder}`. This section documents the analysis that led to this decision, including why virtio-fs was rejected for vfolder data I/O.
 
 ### Storage Provider Protocol Survey
 
@@ -446,7 +448,7 @@ Block devices (qcow2 clones, virtio-blk) are **guest-local** — the host cannot
 
 ### Recommended Hybrid Approach
 
-Use block devices for **read-only infrastructure** (VM rootfs, container image, krunner binaries, Python libraries) and virtio-fs for **bidirectional data exchange** (scratch dirs, vfolders):
+Use block devices for **read-only infrastructure** (VM rootfs, container image, krunner binaries, Python libraries), virtio-fs for **config delivery** (scratch/config dirs), and direct guest-side NFS/Lustre mounts for **vfolder data**:
 
 | Mount Category | Transport | Rationale |
 |---------------|-----------|-----------|

@@ -200,7 +200,7 @@ flowchart LR
     end
     subgraph Kata["KataAgent"]
         k1["containerd.create_container()"] --> k2["containerd.create_task()"] --> k3["task.start()"]
-        k3 -.->|internally| k4["Kata shim boots VM"] --> k5["virtio-fs setup"] --> k6["kata-agent"] --> k7["container"]
+        k3 -.->|internally| k4["Kata shim boots VM"] --> k5["config share setup"] --> k6["kata-agent"] --> k7["container"]
     end
 ```
 
@@ -321,16 +321,17 @@ The guest prestart hook (`/usr/share/oci/hooks/prestart/setup-storage.sh`, baked
 ```python
 async def get_intrinsic_mounts(self) -> Sequence[Mount]:
     mounts = []
-    # KEEP: scratch dirs (bidirectional sharing via virtio-fs)
+    # KEEP: config dir via virtio-fs (host-originated config delivery)
     mounts.append(Mount(MountTypes.BIND, self.config_dir, Path("/home/config"),
                         MountPermission.READ_ONLY))
-    mounts.append(Mount(MountTypes.BIND, self.work_dir, Path("/home/work"),
-                        MountPermission.READ_WRITE))
-    # KEEP: timezone (guest rootfs ships UTC; override with host timezone)
-    mounts.extend(self._timezone_mounts())
+    # /home/work is on the guest disk (part of guest rootfs), NOT a virtio-fs mount.
+    # VFolder subdirectories are bind-mounted into /home/work/{vfolder}
+    # from guest-side NFS/Lustre mounts by the OCI prestart hook.
     # CHANGE: /tmp as guest-side tmpfs (no need to cross VM boundary)
     mounts.append(Mount(MountTypes.TMPFS, None, Path("/tmp"),
                         MountPermission.READ_WRITE))
+    # SKIP: /home/work — already exists on guest disk
+    # SKIP: timezone — baked into guest rootfs
     # SKIP: lxcfs — guest kernel provides accurate /proc and /sys
     # SKIP: agent.sock — only used by jail/C binaries, both skipped for Kata
     # SKIP: domain socket proxies — UDS cannot cross VM boundary
@@ -378,7 +379,7 @@ async def spawn(self):
         "image": self.image_ref,
         "runtime": {"name": "io.containerd.kata.v2"},
         "env": self.environ,
-        "mounts": self._build_virtio_fs_mounts(),
+        "mounts": self._build_container_mounts(),  # config via virtio-fs + vfolder bind mounts (guest-internal)
         "labels": self._build_labels(),
         "annotations": {
             "io.katacontainers.config.hypervisor.hotplug_vfio_on_root_bus": "true",
