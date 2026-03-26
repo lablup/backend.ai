@@ -3,13 +3,18 @@ from __future__ import annotations
 import strawberry
 from strawberry import Info
 
+from ai.backend.common.contexts.user import current_user
 from ai.backend.common.dto.manager.v2.session.request import AdminSearchSessionsInput
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.base import encode_cursor
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
+    gql_mutation,
     gql_root_field,
 )
 from ai.backend.manager.api.gql.session.types import (
+    CreateSessionInputGQL,
+    CreateSessionPayloadGQL,
     SessionV2ConnectionGQL,
     SessionV2EdgeGQL,
     SessionV2FilterGQL,
@@ -18,6 +23,7 @@ from ai.backend.manager.api.gql.session.types import (
 )
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.api.gql.utils import check_admin_only
+from ai.backend.manager.errors.user import UserNotFound
 
 
 @gql_root_field(
@@ -61,4 +67,31 @@ async def admin_sessions_v2(
             end_cursor=edges[-1].cursor if edges else None,
         ),
         count=payload.total_count,
+    )
+
+
+@gql_mutation(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Create a new compute session.",
+    ),
+)  # type: ignore[misc]
+async def create_session(
+    input: CreateSessionInputGQL,
+    info: Info[StrawberryGQLContext],
+) -> CreateSessionPayloadGQL:
+    """Create a new compute session (interactive or batch)."""
+    user_data = current_user()
+    if user_data is None:
+        raise UserNotFound("User not found in context")
+    payload = await info.context.adapters.session.create(
+        input.to_pydantic(),
+        user_id=user_data.user_id,
+        user_role=user_data.role,
+        access_key=user_data.access_key,
+        domain_name=user_data.domain_name,
+        group_id=input.project_id or user_data.user_id,
+    )
+    return CreateSessionPayloadGQL(
+        session=SessionV2GQL.from_pydantic(payload.session),
     )

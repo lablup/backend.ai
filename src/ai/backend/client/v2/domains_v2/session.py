@@ -5,14 +5,32 @@ from __future__ import annotations
 from ai.backend.client.v2.base_domain import BaseDomainClient
 from ai.backend.common.dto.manager.v2.kernel.request import AdminSearchKernelsInput
 from ai.backend.common.dto.manager.v2.kernel.response import AdminSearchKernelsPayload
-from ai.backend.common.dto.manager.v2.session.request import AdminSearchSessionsInput
-from ai.backend.common.dto.manager.v2.session.response import AdminSearchSessionsPayload
+from ai.backend.common.dto.manager.v2.session.request import (
+    AdminSearchSessionsInput,
+    CreateSessionInput,
+)
+from ai.backend.common.dto.manager.v2.session.response import (
+    AdminSearchSessionsPayload,
+    CreateSessionPayload,
+)
 
 _PATH = "/v2/sessions"
 
 
 class V2SessionClient(BaseDomainClient):
     """SDK client for the ``/v2/sessions`` REST endpoints."""
+
+    async def create(
+        self,
+        request: CreateSessionInput,
+    ) -> CreateSessionPayload:
+        """Create a new compute session."""
+        return await self._client.typed_request(
+            "POST",
+            _PATH,
+            request=request,
+            response_model=CreateSessionPayload,
+        )
 
     async def admin_search(
         self,
