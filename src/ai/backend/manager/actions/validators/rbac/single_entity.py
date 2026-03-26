@@ -27,5 +27,4 @@ class SingleEntityActionRBACValidator(SingleEntityActionValidator):
             user_id=user.user_id,
             target_element_ref=action.target_element(),
             operation=action.operation_type().to_permission_operation(),
-            permission_entity_type=action.entity_type(),
         )
