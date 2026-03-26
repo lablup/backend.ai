@@ -24,6 +24,7 @@ if TYPE_CHECKING:
     from .domains_v2.deployment import V2DeploymentClient
     from .domains_v2.domain import V2DomainClient
     from .domains_v2.fair_share import V2FairShareClient
+    from .domains_v2.gql import V2GQLClient
     from .domains_v2.huggingface_registry import V2HuggingFaceRegistryClient
     from .domains_v2.image import V2ImageClient
     from .domains_v2.keypair import V2KeypairClient
@@ -119,6 +120,12 @@ class V2ClientRegistry:
         from .domains_v2.fair_share import V2FairShareClient
 
         return V2FairShareClient(self._client)
+
+    @cached_property
+    def gql(self) -> V2GQLClient:
+        from .domains_v2.gql import V2GQLClient
+
+        return V2GQLClient(self._client)
 
     @cached_property
     def huggingface_registry(self) -> V2HuggingFaceRegistryClient:

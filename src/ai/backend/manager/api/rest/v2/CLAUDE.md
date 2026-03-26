@@ -63,6 +63,23 @@ class V2DomainHandler:
 - **Both admin and users, behavior differs** (e.g., admin sets more fields): separate `admin_` and non-admin endpoints with different DTOs.
 - **Both admin and users, only permission check differs**: single endpoint — admin already has entity access permissions, no separate `admin_` variant needed.
 
+## Pagination Mode Behavior
+
+Search endpoints accept both cursor-based and offset-based pagination arguments.
+
+**Default (no pagination args):** Falls back to offset pagination (`limit=10, offset=0`).
+
+**Offset pagination (`limit`/`offset`):**
+- User-specified `order` is applied. If no `order`, the entity's default order is used.
+- Use this mode when custom ordering is needed.
+
+**Cursor pagination (`first`/`after` or `last`/`before`):**
+- Ordering is fixed to the entity's cursor key (typically `created_at` or the primary key).
+- User-specified `order` is **ignored** — cursor consistency requires a fixed sort order.
+- Use this mode for infinite scrolling / "load more" UX where stable page boundaries matter.
+
+Only one pagination mode is allowed per request. Combining `first` with `limit` raises an error.
+
 ## Routing
 
 - Use `RouteRegistry` for route registration (same framework as REST v1).

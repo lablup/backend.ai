@@ -15,6 +15,7 @@ from ai.backend.common.cli import LazyGroup
 
 from .admin import admin
 from .config_cmd import config
+from .gql_cmd import gql
 from .login_cmd import login, logout
 from .my import my
 
@@ -28,6 +29,7 @@ def v2() -> None:
 v2.add_command(config)
 v2.add_command(login)
 v2.add_command(logout)
+v2.add_command(gql)
 
 # Admin group — contains admin-only commands per entity
 v2.add_command(admin)

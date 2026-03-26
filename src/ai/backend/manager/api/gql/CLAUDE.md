@@ -103,6 +103,21 @@ All search/list queries MUST provide ALL of the following argument groups — do
 
 Clients must be able to choose between cursor and offset pagination freely.
 
+### Pagination Mode Behavior
+
+**Default (no pagination args):** Falls back to offset pagination (`limit=10, offset=0`).
+
+**Offset pagination (`limit`/`offset`):**
+- User-specified `order_by` is applied. If no `order_by`, the entity's default order is used.
+- Use this mode when custom ordering is needed.
+
+**Cursor pagination (`first`/`after` or `last`/`before`):**
+- Ordering is fixed to the entity's cursor key (typically `created_at` or the primary key).
+- User-specified `order_by` is **ignored** — cursor consistency requires a fixed sort order.
+- Use this mode for infinite scrolling / "load more" UX where stable page boundaries matter.
+
+Only one pagination mode is allowed per request. Combining `first` with `limit` raises an error.
+
 ## `my_` Resolver Pattern
 
 For self-service queries (`my_keypairs`, `my_roles`, etc.):
