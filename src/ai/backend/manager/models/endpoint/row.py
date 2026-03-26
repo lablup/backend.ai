@@ -770,19 +770,43 @@ class EndpointRow(Base):  # type: ignore[misc]
 
     def to_deployment_info(self) -> DeploymentInfo:
         """Convert EndpointRow to DeploymentInfo dataclass using revision data."""
-        policy_data = None
-        if self.deployment_policy is not None:
-            policy_data = self.deployment_policy.to_data()
-
         model_revisions: list[ModelRevisionSpec] = []
         for rev_row in self.revisions:
             if rev_row.image_row is None:
                 continue
             model_revisions.append(self._build_revision_spec(rev_row))
 
-        info = self._to_deployment_info_with_revisions(model_revisions)
-        info.policy = policy_data
-        return info
+        return DeploymentInfo(
+            id=self.id,
+            metadata=DeploymentMetadata(
+                name=self.name,
+                domain=self.domain,
+                project=self.project,
+                resource_group=self.resource_group,
+                created_user=self.created_user,
+                session_owner=self.session_owner,
+                created_at=self.created_at,
+                revision_history_limit=self.revision_history_limit,
+                tag=self.tag,
+            ),
+            state=DeploymentState(
+                lifecycle=self.lifecycle_stage,
+                retry_count=self.retries,
+            ),
+            replica_spec=ReplicaSpec(
+                replica_count=self.replicas,
+                desired_replica_count=self.desired_replicas,
+            ),
+            network=DeploymentNetworkSpec(
+                open_to_public=self.open_to_public if self.open_to_public is not None else False,
+                url=self.url,
+            ),
+            model_revisions=model_revisions,
+            current_revision_id=self.current_revision,
+            deploying_revision_id=self.deploying_revision,
+            sub_step=self.sub_step,
+            policy=self.deployment_policy.to_data() if self.deployment_policy is not None else None,
+        )
 
     def _build_revision_spec(
         self,
@@ -815,42 +839,6 @@ class EndpointRow(Base):  # type: ignore[misc]
                 runtime_variant=revision.runtime_variant,
                 callback_url=yarl.URL(revision.callback_url) if revision.callback_url else None,
             ),
-        )
-
-    def _to_deployment_info_with_revisions(
-        self,
-        model_revisions: Sequence[ModelRevisionSpec],
-    ) -> DeploymentInfo:
-        """Build DeploymentInfo with pre-built model_revisions dict."""
-        return DeploymentInfo(
-            id=self.id,
-            metadata=DeploymentMetadata(
-                name=self.name,
-                domain=self.domain,
-                project=self.project,
-                resource_group=self.resource_group,
-                created_user=self.created_user,
-                session_owner=self.session_owner,
-                created_at=self.created_at,
-                revision_history_limit=self.revision_history_limit,
-                tag=self.tag,
-            ),
-            state=DeploymentState(
-                lifecycle=self.lifecycle_stage,
-                retry_count=self.retries,
-            ),
-            replica_spec=ReplicaSpec(
-                replica_count=self.replicas,
-                desired_replica_count=self.desired_replicas,
-            ),
-            network=DeploymentNetworkSpec(
-                open_to_public=self.open_to_public if self.open_to_public is not None else False,
-                url=self.url,
-            ),
-            model_revisions=list(model_revisions),
-            current_revision_id=self.current_revision,
-            deploying_revision_id=self.deploying_revision,
-            sub_step=self.sub_step,
         )
 
 
