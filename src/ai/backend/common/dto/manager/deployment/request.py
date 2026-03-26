@@ -290,7 +290,9 @@ class CreateDeploymentRequest(BaseRequestModel):
         description="Default deployment strategy"
     )
     desired_replica_count: int = Field(ge=0, description="Desired number of replicas")
-    initial_revision: RevisionInput = Field(description="Initial revision configuration")
+    initial_revision: RevisionInput | None = Field(
+        default=None, description="Initial revision configuration"
+    )
 
 
 # ========== Deployment Policy Requests ==========
