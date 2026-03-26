@@ -33,12 +33,11 @@ class VariantExpectation:
 
 @dataclass(frozen=True)
 class OverridePathCase:
-    # Human-readable label used as the pytest test ID
     description: str
     # model_definition_path passed to the context (None, empty, or a real filename)
     path: str | None
-    # Whether the registry should attempt to fetch the definition from vfolder storage
-    should_fetch: bool
+    # Whether the registry is expected to fetch the definition from vfolder storage
+    expect_vfolder_fetch: bool
 
 
 @dataclass(frozen=True)
@@ -217,9 +216,9 @@ class TestModelDefinitionGeneratorRegistry:
     @pytest.mark.parametrize(
         "case",
         [
-            OverridePathCase(description="none", path=None, should_fetch=False),
-            OverridePathCase(description="empty", path="", should_fetch=False),
-            OverridePathCase(description="exists", path="model.yaml", should_fetch=True),
+            OverridePathCase(description="none", path=None, expect_vfolder_fetch=False),
+            OverridePathCase(description="empty", path="", expect_vfolder_fetch=False),
+            OverridePathCase(description="exists", path="model.yaml", expect_vfolder_fetch=True),
         ],
         ids=lambda c: c.description,
     )
@@ -238,7 +237,7 @@ class TestModelDefinitionGeneratorRegistry:
 
         model = result.models[0]
         assert model.service is not None
-        if case.should_fetch:
+        if case.expect_vfolder_fetch:
             mock_repo.fetch_model_definition.assert_called_once()
             assert model.service.start_command == "overridden-command"
         else:
@@ -374,14 +373,10 @@ class TestModelDefinitionGeneratorRegistry:
             ]
         }
 
-    async def test_custom_variant_merges_vfolder_and_user_override(
-        self,
-        definition_generator_registry: ModelDefinitionGeneratorRegistry,
-        mock_repo: MagicMock,
-        custom_vfolder_definition: dict[str, Any],
-    ) -> None:
-        """CUSTOM variant: vfolder base + user override deep merged into DB."""
-        user_override = ModelDefinition.model_validate({
+    @pytest.fixture
+    def custom_user_override(self) -> ModelDefinition:
+        """User-provided override that changes port and health check for CUSTOM variant."""
+        return ModelDefinition.model_validate({
             "models": [
                 {
                     "name": "test-model",
@@ -397,13 +392,22 @@ class TestModelDefinitionGeneratorRegistry:
                 }
             ]
         })
+
+    async def test_custom_variant_merges_vfolder_and_user_override(
+        self,
+        definition_generator_registry: ModelDefinitionGeneratorRegistry,
+        mock_repo: MagicMock,
+        custom_vfolder_definition: dict[str, Any],
+        custom_user_override: ModelDefinition,
+    ) -> None:
+        """CUSTOM variant: vfolder base + user override deep merged into DB."""
         mock_repo.fetch_model_definition = AsyncMock(return_value=custom_vfolder_definition)
 
         result = await definition_generator_registry.generate_model_definition(
             create_context(
                 RuntimeVariant.CUSTOM,
                 model_definition_path="model-definition.yaml",
-                model_definition=user_override,
+                model_definition=custom_user_override,
             )
         )
 
@@ -470,14 +474,10 @@ class TestModelDefinitionGeneratorRegistry:
             ]
         }
 
-    async def test_three_layer_merge_preserves_each_layer(
-        self,
-        definition_generator_registry_with_override: ModelDefinitionGeneratorRegistry,
-        mock_repo: MagicMock,
-        vllm_vfolder_definition: dict[str, Any],
-    ) -> None:
-        """Non-CUSTOM: generator base → vfolder override → user override, each layer preserved."""
-        user_override = ModelDefinition.model_validate({
+    @pytest.fixture
+    def vllm_user_override(self) -> ModelDefinition:
+        """User-provided override that only changes max-retries for VLLM variant."""
+        return ModelDefinition.model_validate({
             "models": [
                 {
                     "name": "vllm-model",
@@ -494,13 +494,23 @@ class TestModelDefinitionGeneratorRegistry:
                 }
             ]
         })
+
+    async def test_vfolder_and_user_override_merged_on_generated_definition(
+        self,
+        definition_generator_registry_with_override: ModelDefinitionGeneratorRegistry,
+        mock_repo: MagicMock,
+        vllm_vfolder_definition: dict[str, Any],
+        vllm_user_override: ModelDefinition,
+    ) -> None:
+        """Non-CUSTOM with override enabled: vfolder file and user override are both
+        deep-merged on top of the generator-produced definition."""
         mock_repo.fetch_model_definition = AsyncMock(return_value=vllm_vfolder_definition)
 
         result = await definition_generator_registry_with_override.generate_model_definition(
             create_context(
                 RuntimeVariant.VLLM,
                 model_definition_path="model.yaml",
-                model_definition=user_override,
+                model_definition=vllm_user_override,
             )
         )
 
