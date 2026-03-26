@@ -75,11 +75,18 @@ from ai.backend.manager.services.auth.actions.resolve_user_scope import (
     ResolveUserScopeAction,
     ResolveUserScopeResult,
 )
+from ai.backend.manager.services.auth.actions.revoke_login_session import (
+    AdminRevokeLoginSessionAction,
+    MyRevokeLoginSessionAction,
+    RevokeLoginSessionActionResult,
+)
 from ai.backend.manager.services.auth.actions.search_login_history import (
+    AdminSearchLoginHistoryAction,
     SearchLoginHistoryAction,
     SearchLoginHistoryActionResult,
 )
 from ai.backend.manager.services.auth.actions.search_login_sessions import (
+    AdminSearchLoginSessionsAction,
     SearchLoginSessionsAction,
     SearchLoginSessionsActionResult,
 )
@@ -448,6 +455,23 @@ class AuthService:
         await self._valkey_session_client.delete_login_session(action.session_token)
         return LogoutActionResult(success=True)
 
+    async def admin_revoke_login_session(
+        self, action: AdminRevokeLoginSessionAction
+    ) -> RevokeLoginSessionActionResult:
+        session_token = await self._auth_repository.revoke_login_session(action.session_id)
+        await self._valkey_session_client.delete_login_session(session_token)
+        return RevokeLoginSessionActionResult(success=True)
+
+    async def my_revoke_login_session(
+        self, action: MyRevokeLoginSessionAction
+    ) -> RevokeLoginSessionActionResult:
+        session_data = await self._auth_repository.get_login_session_by_id(action.session_id)
+        if session_data.user_id != action.user_id:
+            raise GenericForbidden("You can only revoke your own login sessions.")
+        session_token = await self._auth_repository.revoke_login_session(action.session_id)
+        await self._valkey_session_client.delete_login_session(session_token)
+        return RevokeLoginSessionActionResult(success=True)
+
     async def signout(self, action: SignoutAction) -> SignoutActionResult:
         if action.email != action.requester_email:
             raise GenericForbidden("Not the account owner")
@@ -669,6 +693,12 @@ class AuthService:
             owner_role=owner_role,
         )
 
+    async def admin_search_login_sessions(
+        self, action: AdminSearchLoginSessionsAction
+    ) -> SearchLoginSessionsActionResult:
+        result = await self._auth_repository.admin_search_login_sessions(querier=action.querier)
+        return SearchLoginSessionsActionResult(result=result)
+
     async def search_login_sessions(
         self, action: SearchLoginSessionsAction
     ) -> SearchLoginSessionsActionResult:
@@ -676,6 +706,12 @@ class AuthService:
             scope=action.scope, querier=action.querier
         )
         return SearchLoginSessionsActionResult(result=result)
+
+    async def admin_search_login_history(
+        self, action: AdminSearchLoginHistoryAction
+    ) -> SearchLoginHistoryActionResult:
+        result = await self._auth_repository.admin_search_login_history(querier=action.querier)
+        return SearchLoginHistoryActionResult(result=result)
 
     async def search_login_history(
         self, action: SearchLoginHistoryAction

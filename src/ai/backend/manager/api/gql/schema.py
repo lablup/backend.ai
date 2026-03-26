@@ -146,6 +146,13 @@ from .keypair import (
     switch_my_main_access_key,
     update_my_keypair,
 )
+from .login_history import admin_login_history_v2, my_login_history_v2
+from .login_session import (
+    admin_login_sessions_v2,
+    admin_revoke_login_session,
+    my_login_sessions_v2,
+    my_revoke_login_session,
+)
 from .notification import (
     admin_create_notification_channel,
     admin_create_notification_rule,
@@ -346,6 +353,8 @@ class Query:
     admin_images_v2 = admin_images_v2
     admin_kernels_v2 = admin_kernels_v2
     admin_audit_logs_v2 = admin_audit_logs_v2
+    admin_login_sessions_v2 = admin_login_sessions_v2
+    admin_login_history_v2 = admin_login_history_v2
     admin_sessions_v2 = admin_sessions_v2
     resource_slot_type = resource_slot_type
     resource_slot_types = resource_slot_types
@@ -362,6 +371,9 @@ class Query:
     admin_entities = admin_entities
     # Keypair self-service queries
     my_keypairs = my_keypairs
+    # Login session/history self-service queries
+    my_login_sessions_v2 = my_login_sessions_v2
+    my_login_history_v2 = my_login_history_v2
     # RBAC User APIs
     my_roles = my_roles
     rbac_scope_entity_combinations = rbac_scope_entity_combinations
@@ -539,6 +551,9 @@ class Mutation:
     revoke_my_keypair = revoke_my_keypair
     switch_my_main_access_key = switch_my_main_access_key
     update_my_keypair = update_my_keypair
+    # Login session mutations
+    admin_revoke_login_session = admin_revoke_login_session
+    my_revoke_login_session = my_revoke_login_session
     # IP allowlist self-service mutation
     update_my_allowed_client_ip = update_my_allowed_client_ip
     # Prometheus Query Preset - Admin APIs

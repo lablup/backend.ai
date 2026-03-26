@@ -66,6 +66,22 @@ def container_registry() -> None:
 
 @admin.group(
     cls=LazyGroup,
+    import_name="ai.backend.client.cli.v2.admin.login_history:login_history",
+)
+def login_history() -> None:
+    """Admin login history commands."""
+
+
+@admin.group(
+    cls=LazyGroup,
+    import_name="ai.backend.client.cli.v2.admin.login_session:login_session",
+)
+def login_session() -> None:
+    """Admin login session commands."""
+
+
+@admin.group(
+    cls=LazyGroup,
     import_name="ai.backend.client.cli.v2.admin.service_catalog:service_catalog",
 )
 def service_catalog() -> None:

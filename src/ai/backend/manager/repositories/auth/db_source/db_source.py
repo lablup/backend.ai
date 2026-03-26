@@ -23,6 +23,7 @@ from ai.backend.manager.errors.auth import (
     ActiveLoginSessionExistsError,
     AuthorizationFailed,
     GroupMembershipNotFoundError,
+    LoginSessionNotFoundError,
     UserCreationError,
 )
 from ai.backend.manager.errors.common import InternalServerError
@@ -598,12 +599,29 @@ class AuthDBSource:
             await db_session.execute(query)
 
     @auth_db_source_resilience.apply()
+    async def admin_search_login_sessions(
+        self,
+        querier: BatchQuerier,
+    ) -> SearchResult[LoginSessionData]:
+        """Search all login sessions without scope restriction (admin only)."""
+        async with self._db.begin_readonly_session() as db_session:
+            query = sa.select(LoginSessionRow)
+            result = await execute_batch_querier(db_session, query, querier, scope=None)
+            items = [row.LoginSessionRow.to_data() for row in result.rows]
+            return SearchResult(
+                items=items,
+                total_count=result.total_count,
+                has_next_page=result.has_next_page,
+                has_previous_page=result.has_previous_page,
+            )
+
+    @auth_db_source_resilience.apply()
     async def search_login_sessions(
         self,
         scope: SearchScope,
         querier: BatchQuerier,
     ) -> SearchResult[LoginSessionData]:
-        """Search login sessions with scope and batch querier."""
+        """Search login sessions within a given scope."""
         async with self._db.begin_readonly_session() as db_session:
             query = sa.select(LoginSessionRow)
             result = await execute_batch_querier(db_session, query, querier, scope=scope)
@@ -615,7 +633,66 @@ class AuthDBSource:
                 has_previous_page=result.has_previous_page,
             )
 
+    @auth_db_source_resilience.apply()
+    async def fetch_login_session_by_id(self, session_id: UUID) -> LoginSessionData:
+        """Fetch a single login session by its ID.
+
+        Raises LoginSessionNotFoundError if the session does not exist.
+        """
+        async with self._db.begin_readonly_session() as db_session:
+            query = sa.select(LoginSessionRow).where(LoginSessionRow.id == session_id)
+            row = await db_session.scalar(query)
+            if row is None:
+                raise LoginSessionNotFoundError(extra_msg=f"Login session not found: {session_id}")
+            return row.to_data()
+
+    @auth_db_source_resilience.apply()
+    async def revoke_session_by_id(self, session_id: UUID) -> str:
+        """Revoke an active login session by its ID.
+
+        Sets status to REVOKED and invalidated_at to current time.
+        Returns the session_token of the revoked session.
+        Raises LoginSessionNotFoundError if no matching active session is found.
+        """
+        async with self._db.begin_session() as db_session:
+            query = (
+                sa.update(LoginSessionRow)
+                .where(
+                    (LoginSessionRow.id == session_id)
+                    & (LoginSessionRow.status == LoginSessionStatus.ACTIVE)
+                )
+                .values(
+                    status=LoginSessionStatus.REVOKED,
+                    invalidated_at=sa.func.now(),
+                )
+                .returning(LoginSessionRow.session_token)
+            )
+            result = await db_session.execute(query)
+            session_token = result.scalar()
+            if session_token is None:
+                raise LoginSessionNotFoundError(
+                    extra_msg=f"No active login session found with id: {session_id}"
+                )
+            return session_token
+
     # --- Login History ---
+
+    @auth_db_source_resilience.apply()
+    async def admin_search_login_history(
+        self,
+        querier: BatchQuerier,
+    ) -> SearchResult[LoginHistoryData]:
+        """Search all login history without scope restriction (admin only)."""
+        async with self._db.begin_readonly_session() as db_session:
+            query = sa.select(LoginHistoryRow)
+            result = await execute_batch_querier(db_session, query, querier, scope=None)
+            items = [row.LoginHistoryRow.to_data() for row in result.rows]
+            return SearchResult(
+                items=items,
+                total_count=result.total_count,
+                has_next_page=result.has_next_page,
+                has_previous_page=result.has_previous_page,
+            )
 
     @auth_db_source_resilience.apply()
     async def search_login_history(
@@ -623,7 +700,7 @@ class AuthDBSource:
         scope: SearchScope,
         querier: BatchQuerier,
     ) -> SearchResult[LoginHistoryData]:
-        """Search login history with scope and batch querier."""
+        """Search login history within a given scope."""
         async with self._db.begin_readonly_session() as db_session:
             query = sa.select(LoginHistoryRow)
             result = await execute_batch_querier(db_session, query, querier, scope=scope)

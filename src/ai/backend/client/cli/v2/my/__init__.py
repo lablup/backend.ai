@@ -19,3 +19,19 @@ def my() -> None:
 @my.group(cls=LazyGroup, import_name="ai.backend.client.cli.v2.my.keypair:keypair")
 def keypair() -> None:
     """My keypair commands."""
+
+
+@my.group(
+    cls=LazyGroup,
+    import_name="ai.backend.client.cli.v2.my.login_history:login_history",
+)
+def login_history() -> None:
+    """My login history commands."""
+
+
+@my.group(
+    cls=LazyGroup,
+    import_name="ai.backend.client.cli.v2.my.login_session:login_session",
+)
+def login_session() -> None:
+    """My login session commands."""

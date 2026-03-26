@@ -28,6 +28,8 @@ if TYPE_CHECKING:
     from .domains_v2.huggingface_registry import V2HuggingFaceRegistryClient
     from .domains_v2.image import V2ImageClient
     from .domains_v2.keypair import V2KeypairClient
+    from .domains_v2.login_history import V2LoginHistoryClient
+    from .domains_v2.login_session import V2LoginSessionClient
     from .domains_v2.notification import V2NotificationClient
     from .domains_v2.object_storage import V2ObjectStorageClient
     from .domains_v2.project import V2ProjectClient
@@ -144,6 +146,18 @@ class V2ClientRegistry:
         from .domains_v2.keypair import V2KeypairClient
 
         return V2KeypairClient(self._client)
+
+    @cached_property
+    def login_history(self) -> V2LoginHistoryClient:
+        from .domains_v2.login_history import V2LoginHistoryClient
+
+        return V2LoginHistoryClient(self._client)
+
+    @cached_property
+    def login_session(self) -> V2LoginSessionClient:
+        from .domains_v2.login_session import V2LoginSessionClient
+
+        return V2LoginSessionClient(self._client)
 
     @cached_property
     def notification(self) -> V2NotificationClient:

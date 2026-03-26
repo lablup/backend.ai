@@ -30,15 +30,13 @@ def _create_aiohttp_session(config: ClientConfig) -> aiohttp.ClientSession:
         sock_connect=config.connection_timeout or None,
         sock_read=config.read_timeout or None,
     )
-    if config.cookie_jar is not None:
-        return aiohttp.ClientSession(
-            connector=connector,
-            timeout=timeout,
-            cookie_jar=config.cookie_jar,
-        )
+    cookie_jar = config.cookie_jar
+    if cookie_jar is None and config.endpoint_type == "session":
+        cookie_jar = aiohttp.CookieJar(unsafe=True)
     return aiohttp.ClientSession(
         connector=connector,
         timeout=timeout,
+        **({"cookie_jar": cookie_jar} if cookie_jar is not None else {}),
     )
 
 
@@ -75,13 +73,28 @@ class BackendAIAuthClient:
         session = _create_aiohttp_session(config)
         return cls(config, auth, session)
 
+    @property
+    def session(self) -> aiohttp.ClientSession:
+        return self._session
+
+    @property
+    def config(self) -> ClientConfig:
+        return self._config
+
     async def close(self) -> None:
         await self._session.close()
 
     def _build_url(self, path: str) -> str:
         base = str(self._config.endpoint).rstrip("/")
         path = path.lstrip("/")
+        if self._config.endpoint_type == "session":
+            return f"{base}/func/{path}"
         return f"{base}/{path}"
+
+    def build_url_raw(self, path: str) -> str:
+        """Build URL without /func/ prefix (for webserver-native endpoints like /server/login)."""
+        base = str(self._config.endpoint).rstrip("/")
+        return f"{base}/{path.lstrip('/')}"
 
     def _sign(self, method: str, rel_url: str, content_type: str) -> Mapping[str, str]:
         now = datetime.now(UTC)
@@ -359,6 +372,8 @@ class BackendAIAnonymousClient:
     def _build_url(self, path: str) -> str:
         base = str(self._config.endpoint).rstrip("/")
         path = path.lstrip("/")
+        if self._config.endpoint_type == "session":
+            return f"{base}/func/{path}"
         return f"{base}/{path}"
 
     def _build_headers(self, method: str, rel_url: str, content_type: str) -> CIMultiDict[str]:

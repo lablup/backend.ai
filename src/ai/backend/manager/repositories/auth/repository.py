@@ -160,12 +160,28 @@ class AuthRepository:
         await self._db_source.invalidate_sessions_by_user(user_id)
 
     @auth_repository_resilience.apply()
+    async def admin_search_login_sessions(
+        self,
+        querier: BatchQuerier,
+    ) -> SearchResult[LoginSessionData]:
+        return await self._db_source.admin_search_login_sessions(querier)
+
+    @auth_repository_resilience.apply()
     async def search_login_sessions(
         self,
         scope: SearchScope,
         querier: BatchQuerier,
     ) -> SearchResult[LoginSessionData]:
         return await self._db_source.search_login_sessions(scope, querier)
+
+    @auth_repository_resilience.apply()
+    async def get_login_session_by_id(self, session_id: UUID) -> LoginSessionData:
+        return await self._db_source.fetch_login_session_by_id(session_id)
+
+    @auth_repository_resilience.apply()
+    async def revoke_login_session(self, session_id: UUID) -> str:
+        """Revoke an active login session and return its session_token."""
+        return await self._db_source.revoke_session_by_id(session_id)
 
     @auth_repository_resilience.apply()
     async def record_login_history(
@@ -178,6 +194,13 @@ class AuthRepository:
         await self._db_source.record_login_history(user_id, domain_name, result, fail_reason)
 
     # --- Login History ---
+
+    @auth_repository_resilience.apply()
+    async def admin_search_login_history(
+        self,
+        querier: BatchQuerier,
+    ) -> SearchResult[LoginHistoryData]:
+        return await self._db_source.admin_search_login_history(querier)
 
     @auth_repository_resilience.apply()
     async def search_login_history(

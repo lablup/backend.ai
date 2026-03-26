@@ -10,6 +10,16 @@ from ai.backend.manager.services.auth.actions.base import AuthAction
 
 
 @dataclass
+class AdminSearchLoginHistoryAction(AuthAction):
+    querier: BatchQuerier
+
+    @override
+    @classmethod
+    def operation_type(cls) -> ActionOperationType:
+        return ActionOperationType.SEARCH
+
+
+@dataclass
 class SearchLoginHistoryAction(AuthAction):
     scope: SearchScope
     querier: BatchQuerier
