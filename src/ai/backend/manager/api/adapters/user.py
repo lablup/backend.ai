@@ -19,10 +19,12 @@ from ai.backend.common.dto.manager.v2.keypair import (
     KeypairOrderBy,
     KeypairOrderField,
     SearchMyKeypairsGQLInput,
+    SearchMyKeypairsRequest,
 )
 from ai.backend.common.dto.manager.v2.keypair.response import (
     IssueMyKeypairPayload,
     RevokeMyKeypairPayload,
+    SearchMyKeypairsPayload,
     SwitchMyMainAccessKeyPayload,
     UpdateMyKeypairPayload,
 )
@@ -660,6 +662,44 @@ class UserAdapter(BaseAdapter):
             total_count=action_result.result.total_count,
             has_next_page=action_result.result.has_next_page,
             has_previous_page=action_result.result.has_previous_page,
+        )
+
+    async def search_my_keypairs_rest(
+        self,
+        input: SearchMyKeypairsRequest,
+    ) -> SearchMyKeypairsPayload:
+        """Search keypairs owned by the current user (REST).
+
+        Calls current_user() internally — the caller does not need to pass scope.
+        Supports both cursor-based and offset-based pagination.
+        """
+        me = current_user()
+        if me is None:
+            raise UnreachableError("User context is not available")
+        scope = UserKeypairSearchScope(user_uuid=me.user_id)
+        conditions = self._convert_keypair_filter(input.filter) if input.filter else []
+        orders = self._convert_keypair_orders(input.order) if input.order else []
+        querier = self._build_querier(
+            conditions=conditions,
+            orders=orders,
+            pagination_spec=_KEYPAIR_PAGINATION_SPEC,
+            first=input.first,
+            after=input.after,
+            last=input.last,
+            before=input.before,
+            limit=input.limit,
+            offset=input.offset,
+        )
+        action_result = await self._processors.user.search_my_keypairs.wait_for_complete(
+            SearchMyKeypairsAction(scope=scope, querier=querier)
+        )
+        return SearchMyKeypairsPayload(
+            items=[self._keypair_data_to_node(item) for item in action_result.result.items],
+            pagination=PaginationInfo(
+                total=action_result.result.total_count,
+                offset=input.offset or 0,
+                limit=input.limit,
+            ),
         )
 
     @staticmethod

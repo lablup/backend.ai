@@ -45,11 +45,18 @@ class V2DomainHandler:
 
 - Superadmin-only endpoints: `admin_` prefix + `superadmin_required` middleware.
 - Scoped endpoints: `{scope}_` prefix (e.g., `domain_search_users`).
+- Self-service endpoints: `/v2/{entity}/my/` — entity first, `my` as scope qualifier.
 
 **search — always two variants:**
 - `POST /v2/admin/{entity}/search`: superadmin only, no scope — queries entire system.
 - `POST /v2/domains/{domain}/{entity}/search`: non-admin, scope in URL path — queries within the given scope only.
 - There is NO "search everything without scope" for non-admin users.
+
+**Self-service (`my`) endpoints:**
+- URL pattern: `POST /v2/{entity}/my/{operation}` (entity is the primary resource, `my` is a scope qualifier).
+- Example: `POST /v2/keypairs/my/search`, `POST /v2/keypairs/my/issue`.
+- The adapter resolves the current user internally via `current_user()`.
+- All `my` routes use `auth_required` middleware.
 
 **create / update / get / delete / purge — when to separate `admin_` vs non-admin:**
 - **Admin-only entity** (e.g., Domain, ContainerRegistry): single `admin_` endpoint.

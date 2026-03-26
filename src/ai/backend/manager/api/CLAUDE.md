@@ -26,6 +26,7 @@ never Processors or Services directly. Adapters are shared with the GQL layer.
 - Superadmin-only endpoints: `admin_` prefix + call `_check_superadmin(request)` first.
 - Scoped endpoints: `{scope}_` prefix (e.g., `domain_search_users`).
 - Self-service endpoints: `my_` prefix (e.g., `my_keypairs`). Adapter resolves user internally.
+  - REST URL pattern: `/v2/{entity}/my/{operation}` — entity first, `my` as scope qualifier.
 
 **search — always two variants:**
 - `admin_search_*`: superadmin only, no scope — queries entire system.

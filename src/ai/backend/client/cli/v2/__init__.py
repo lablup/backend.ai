@@ -16,6 +16,7 @@ from ai.backend.common.cli import LazyGroup
 from .admin import admin
 from .config_cmd import config
 from .login_cmd import login, logout
+from .my import my
 
 
 @click.group()
@@ -30,6 +31,9 @@ v2.add_command(logout)
 
 # Admin group — contains admin-only commands per entity
 v2.add_command(admin)
+
+# My group — contains self-service commands per entity
+v2.add_command(my)
 
 
 # Entity sub-groups — lazy loaded to avoid heavy imports at startup.

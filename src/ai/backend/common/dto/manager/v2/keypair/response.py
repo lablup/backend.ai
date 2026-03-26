@@ -10,11 +10,13 @@ from datetime import datetime
 from pydantic import Field
 
 from ai.backend.common.api_handlers import BaseResponseModel
+from ai.backend.common.dto.manager.pagination import PaginationInfo
 
 __all__ = (
     "IssueMyKeypairPayload",
     "KeypairNode",
     "RevokeMyKeypairPayload",
+    "SearchMyKeypairsPayload",
     "SwitchMyMainAccessKeyPayload",
     "UpdateMyKeypairPayload",
 )
@@ -72,3 +74,14 @@ class SwitchMyMainAccessKeyPayload(BaseResponseModel):
     """Payload returned after switching the main access key."""
 
     success: bool = Field(description="Whether the switch was successful.")
+
+
+class SearchMyKeypairsPayload(BaseResponseModel):
+    """Payload for keypair search responses."""
+
+    items: list[KeypairNode] = Field(
+        description="List of keypair entities matching the search criteria.",
+    )
+    pagination: PaginationInfo = Field(
+        description="Pagination information for the result set.",
+    )

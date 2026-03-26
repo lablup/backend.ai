@@ -3,13 +3,14 @@
 ## Command Hierarchy
 
 ```
-./bai [admin] {entity} [{sub-entity}] {command} [options]
+./bai [admin|my] {entity} [{sub-entity}] {command} [options]
 ```
 
 - `cli/v2/{entity}/commands.py` — user-facing commands (any authenticated user)
 - `cli/v2/admin/{entity}.py` — admin-only commands (superadmin required)
+- `cli/v2/my/{entity}.py` — self-service commands (current user's own resources)
 
-## Admin vs Non-admin Placement
+## Admin vs Non-admin vs My Placement
 
 **Admin-only operations MUST go in `admin/{entity}.py`, NOT in `{entity}/commands.py`.**
 
@@ -17,7 +18,12 @@
 - `search` without scope (queries entire system) → `admin/`
 - `get` by ID (any authenticated user) → `{entity}/commands.py`
 - Scoped search (e.g., `--scope-domain`) → `{entity}/commands.py`
-- Self-service operations (`my_` prefix) → `{entity}/commands.py`
+
+**Self-service operations (`my_` prefix on the server) MUST go in `my/{entity}.py`.**
+
+- Self-service operations that act on the current user's own resources → `my/`
+- Maps to `my_` prefix server APIs and `/v2/{entity}/my/` REST endpoints (`my` is a scope qualifier, entity comes first)
+- Examples: `./bai my keypair search`, `./bai my keypair issue`
 
 If both admin and non-admin variants exist for the same operation (different behavior, not just permissions), put admin in `admin/` and non-admin in `{entity}/commands.py`.
 
@@ -40,5 +46,7 @@ If both admin and non-admin variants exist for the same operation (different beh
 
 1. Create `cli/v2/{entity}/commands.py` with user-facing commands + `__init__.py`
 2. Create `cli/v2/admin/{entity}.py` with admin-only commands
-3. Register user-facing group in `cli/v2/__init__.py`
-4. Register admin group in `cli/v2/admin/__init__.py`
+3. Create `cli/v2/my/{entity}.py` with self-service commands (if applicable)
+4. Register user-facing group in `cli/v2/__init__.py`
+5. Register admin group in `cli/v2/admin/__init__.py`
+6. Register my group in `cli/v2/my/__init__.py` (if applicable)
