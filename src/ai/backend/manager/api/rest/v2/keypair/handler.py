@@ -24,7 +24,7 @@ if TYPE_CHECKING:
 log: Final = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
-class V2MyKeypairHandler:
+class V2KeypairHandler:
     """REST v2 handler for self-service keypair operations."""
 
     def __init__(self, *, adapter: UserAdapter) -> None:

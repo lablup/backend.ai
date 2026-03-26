@@ -90,7 +90,7 @@ def search(
                 limit=limit,
                 offset=offset,
             )
-            result = await registry.my_keypair.search(request)
+            result = await registry.keypair.search(request)
             print_result(result)
         finally:
             await registry.close()
@@ -105,7 +105,7 @@ def issue() -> None:
     async def _run() -> None:
         registry = await create_v2_registry(load_v2_config())
         try:
-            result = await registry.my_keypair.issue()
+            result = await registry.keypair.issue()
             print_result(result)
         finally:
             await registry.close()
@@ -122,7 +122,7 @@ def revoke(access_key: str) -> None:
     async def _run() -> None:
         registry = await create_v2_registry(load_v2_config())
         try:
-            result = await registry.my_keypair.revoke(
+            result = await registry.keypair.revoke(
                 RevokeMyKeypairInput(access_key=access_key),
             )
             print_result(result)
@@ -147,7 +147,7 @@ def update(access_key: str, is_active: bool) -> None:
     async def _run() -> None:
         registry = await create_v2_registry(load_v2_config())
         try:
-            result = await registry.my_keypair.update(
+            result = await registry.keypair.update(
                 UpdateMyKeypairInput(access_key=access_key, is_active=is_active),
             )
             print_result(result)
@@ -166,7 +166,7 @@ def switch_main(access_key: str) -> None:
     async def _run() -> None:
         registry = await create_v2_registry(load_v2_config())
         try:
-            result = await registry.my_keypair.switch_main(
+            result = await registry.keypair.switch_main(
                 SwitchMyMainAccessKeyInput(access_key=access_key),
             )
             print_result(result)

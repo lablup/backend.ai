@@ -1,4 +1,4 @@
-"""V2 REST SDK client for self-service keypair operations."""
+"""V2 REST SDK client for keypair operations."""
 
 from __future__ import annotations
 
@@ -22,7 +22,7 @@ from ai.backend.common.dto.manager.v2.keypair.response import (
 _PATH: Final = "/v2/keypairs/my"
 
 
-class V2MyKeypairClient(BaseDomainClient):
+class V2KeypairClient(BaseDomainClient):
     """SDK client for ``/v2/keypairs/my`` endpoints."""
 
     async def search(

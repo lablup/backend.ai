@@ -26,7 +26,7 @@ if TYPE_CHECKING:
     from .domains_v2.fair_share import V2FairShareClient
     from .domains_v2.huggingface_registry import V2HuggingFaceRegistryClient
     from .domains_v2.image import V2ImageClient
-    from .domains_v2.my_keypair import V2MyKeypairClient
+    from .domains_v2.keypair import V2KeypairClient
     from .domains_v2.notification import V2NotificationClient
     from .domains_v2.object_storage import V2ObjectStorageClient
     from .domains_v2.project import V2ProjectClient
@@ -133,10 +133,10 @@ class V2ClientRegistry:
         return V2ImageClient(self._client)
 
     @cached_property
-    def my_keypair(self) -> V2MyKeypairClient:
-        from .domains_v2.my_keypair import V2MyKeypairClient
+    def keypair(self) -> V2KeypairClient:
+        from .domains_v2.keypair import V2KeypairClient
 
-        return V2MyKeypairClient(self._client)
+        return V2KeypairClient(self._client)
 
     @cached_property
     def notification(self) -> V2NotificationClient:
