@@ -86,5 +86,13 @@ resources(
     sources=[
         "**/py.typed",
         "app.tcss",
+        "configs/**/*.toml",
+        "configs/**/*.yml",
+        "configs/**/*.yaml",
+        "configs/**/*.json",
+        "configs/**/*.conf",
+        "configs/**/*.ini",
+        "configs/**/*.ts",
+        "fixtures/**/*.json",
     ],
 )
