@@ -261,6 +261,7 @@ class DomainAdapter(BaseAdapter):
             condition = filter.created_at.build_query_condition(
                 before_factory=DomainConditions.by_created_at_before,
                 after_factory=DomainConditions.by_created_at_after,
+                equals_factory=DomainConditions.by_created_at_equals,
             )
             if condition is not None:
                 conditions.append(condition)
@@ -269,6 +270,7 @@ class DomainAdapter(BaseAdapter):
             condition = filter.modified_at.build_query_condition(
                 before_factory=DomainConditions.by_modified_at_before,
                 after_factory=DomainConditions.by_modified_at_after,
+                equals_factory=DomainConditions.by_modified_at_equals,
             )
             if condition is not None:
                 conditions.append(condition)

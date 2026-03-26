@@ -402,6 +402,7 @@ class ProjectAdapter(BaseAdapter):
         return dt_filter.build_query_condition(
             before_factory=GroupConditions.by_created_at_before,
             after_factory=GroupConditions.by_created_at_after,
+            equals_factory=GroupConditions.by_created_at_equals,
         )
 
     @staticmethod
@@ -409,6 +410,7 @@ class ProjectAdapter(BaseAdapter):
         return dt_filter.build_query_condition(
             before_factory=GroupConditions.by_modified_at_before,
             after_factory=GroupConditions.by_modified_at_after,
+            equals_factory=GroupConditions.by_modified_at_equals,
         )
 
     @staticmethod

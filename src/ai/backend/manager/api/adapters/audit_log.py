@@ -128,6 +128,7 @@ class AuditLogAdapter(BaseAdapter):
             condition = f.created_at.build_query_condition(
                 before_factory=AuditLogConditions.by_created_at_before,
                 after_factory=AuditLogConditions.by_created_at_after,
+                equals_factory=AuditLogConditions.by_created_at_equals,
             )
             if condition is not None:
                 conditions.append(condition)

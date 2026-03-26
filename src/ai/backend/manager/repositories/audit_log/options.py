@@ -165,6 +165,13 @@ class AuditLogConditions:
 
         return inner
 
+    @staticmethod
+    def by_created_at_equals(dt: datetime) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return AuditLogRow.created_at == dt
+
+        return inner
+
     # --- triggered_by string filters ---
 
     @staticmethod
