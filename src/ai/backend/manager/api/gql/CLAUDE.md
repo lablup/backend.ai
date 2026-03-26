@@ -54,9 +54,19 @@
 - Never call individual fetch functions inside resolvers for related entities.
 - Always use `info.context.data_loaders.*` for cross-entity data loading.
 
-## Admin Check
+## Admin Check & Scope Rules
 
 - Superadmin-only resolvers: call `check_admin_only(info)` as the first statement.
+
+**search — always two variants:**
+- `adminFoosV2`: superadmin only, no scope — queries entire system.
+- `domainFoosV2` / `projectFoosV2`: non-admin, scope parameter required — queries within the given scope only.
+- There is NO "search everything without scope" for non-admin users.
+
+**create / update / get / delete / purge — when to separate `admin_` vs non-admin:**
+- **Admin-only entity** (e.g., Domain, ContainerRegistry): single `admin_` mutation/query.
+- **Both admin and users, behavior differs** (e.g., admin sets more fields): separate `admin_` and non-admin mutations with different input types.
+- **Both admin and users, only permission check differs**: single mutation/query — admin already has entity access permissions, no separate `admin_` variant needed.
 
 ## Calling Services
 

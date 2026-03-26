@@ -606,6 +606,7 @@ class TestCreatePermission:
             scope_id="test-domain",
             entity_type=EntityType.USER,
             operation=OperationType.READ,
+            created_at=datetime.now(UTC),
         )
         mock_repository.create_permission.return_value = perm_data
 
@@ -628,6 +629,7 @@ class TestCreatePermission:
             scope_id="global",
             entity_type=EntityType.USER,
             operation=OperationType.CREATE,
+            created_at=datetime.now(UTC),
         )
         mock_repository.create_permission.return_value = perm_data
 
@@ -662,6 +664,7 @@ class TestDeletePermission:
             scope_id="test-domain",
             entity_type=EntityType.USER,
             operation=OperationType.READ,
+            created_at=datetime.now(UTC),
         )
         mock_repository.delete_permission.return_value = perm_data
 
@@ -698,6 +701,7 @@ class TestSearchPermissions:
             scope_id="test-domain",
             entity_type=EntityType.USER,
             operation=OperationType.READ,
+            created_at=datetime.now(UTC),
         )
         mock_result = SearchResult(
             items=[perm],

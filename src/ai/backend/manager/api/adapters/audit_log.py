@@ -128,6 +128,7 @@ class AuditLogAdapter(BaseAdapter):
             condition = f.created_at.build_query_condition(
                 before_factory=AuditLogConditions.by_created_at_before,
                 after_factory=AuditLogConditions.by_created_at_after,
+                equals_factory=AuditLogConditions.by_created_at_equals,
             )
             if condition is not None:
                 conditions.append(condition)
@@ -151,11 +152,11 @@ class AuditLogAdapter(BaseAdapter):
     @staticmethod
     def _apply_status_filter(s: AuditLogStatusFilter, conditions: list[QueryCondition]) -> None:
         if s.equals is not None:
-            conditions.append(AuditLogConditions.by_status_in([s.equals.value]))
+            conditions.append(AuditLogConditions.by_status_in([s.equals]))
         elif s.in_ is not None:
-            conditions.append(AuditLogConditions.by_status_in([v.value for v in s.in_]))
+            conditions.append(AuditLogConditions.by_status_in(list(s.in_)))
         elif s.not_in is not None:
-            conditions.append(AuditLogConditions.by_status_not_in([v.value for v in s.not_in]))
+            conditions.append(AuditLogConditions.by_status_not_in(list(s.not_in)))
 
     @staticmethod
     def _convert_orders(orders: list[AuditLogOrder]) -> list[QueryOrder]:

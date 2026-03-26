@@ -5,7 +5,7 @@ from __future__ import annotations
 from strawberry import Info
 from strawberry.relay import PageInfo
 
-from ai.backend.common.dto.manager.v2.keypair.request import SearchMyKeypairsGQLInput
+from ai.backend.common.dto.manager.v2.keypair.request import SearchMyKeypairsRequest
 from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.base import encode_cursor
 from ai.backend.manager.api.gql.decorators import (
@@ -35,7 +35,7 @@ async def my_keypairs(
     offset: int | None = None,
 ) -> KeyPairConnection:
     result = await info.context.adapters.user.search_my_keypairs(
-        SearchMyKeypairsGQLInput(
+        SearchMyKeypairsRequest(
             filter=filter.to_pydantic() if filter is not None else None,
             order=[o.to_pydantic() for o in order_by] if order_by is not None else None,
             first=first,

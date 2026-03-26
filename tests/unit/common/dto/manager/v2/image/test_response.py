@@ -5,7 +5,6 @@ from __future__ import annotations
 import json
 import uuid
 from datetime import UTC, datetime
-from decimal import Decimal
 
 from ai.backend.common.dto.manager.pagination import PaginationInfo
 from ai.backend.common.dto.manager.v2.image.response import (
@@ -76,9 +75,7 @@ class TestImageNodeCreation:
             status=ImageStatusType.ALIVE,
             labels=[ImageLabelInfo(key="maintainer", value="team")],
             tags=[ImageTagInfo(key="version", value="3.11")],
-            resource_limits=[
-                ImageResourceLimitInfo(key="cpu", min=Decimal("0.1"), max=Decimal("8.0"))
-            ],
+            resource_limits=[ImageResourceLimitInfo(key="cpu", min="0.1", max="8.0")],
             accelerators="cuda>=11",
             config_digest="sha256:abc123",
             is_local=False,
@@ -137,8 +134,8 @@ class TestImageNodeNestedFields:
 
     def test_resource_limits_multiple(self) -> None:
         limits = [
-            ImageResourceLimitInfo(key="cpu", min=Decimal("0"), max=Decimal("8")),
-            ImageResourceLimitInfo(key="mem", min=Decimal("256"), max=None),
+            ImageResourceLimitInfo(key="cpu", min="0", max="8"),
+            ImageResourceLimitInfo(key="mem", min="256", max=None),
         ]
         node = make_image_node(resource_limits=limits)
         assert len(node.resource_limits) == 2
@@ -154,7 +151,7 @@ class TestImageNodeNestedFields:
         assert data["labels"][0]["value"] == "v"
 
     def test_nested_resource_limits_serialize_to_json(self) -> None:
-        limits = [ImageResourceLimitInfo(key="cpu", min=Decimal("0.1"), max=Decimal("4"))]
+        limits = [ImageResourceLimitInfo(key="cpu", min="0.1", max="4")]
         node = make_image_node(resource_limits=limits)
         data = json.loads(node.model_dump_json())
         assert isinstance(data["resource_limits"], list)
@@ -179,9 +176,7 @@ class TestImageNodeRoundTrip:
         node = make_image_node(
             labels=[ImageLabelInfo(key="k", value="v")],
             tags=[ImageTagInfo(key="t", value="tv")],
-            resource_limits=[
-                ImageResourceLimitInfo(key="cpu", min=Decimal("0.5"), max=Decimal("4"))
-            ],
+            resource_limits=[ImageResourceLimitInfo(key="cpu", min="0.5", max="4")],
         )
         json_str = node.model_dump_json()
         restored = ImageNode.model_validate_json(json_str)
@@ -190,18 +185,16 @@ class TestImageNodeRoundTrip:
         assert len(restored.tags) == 1
         assert restored.tags[0].key == "t"
         assert len(restored.resource_limits) == 1
-        assert restored.resource_limits[0].min == Decimal("0.5")
+        assert restored.resource_limits[0].min == "0.5"
 
     def test_round_trip_preserves_decimal_precision(self) -> None:
         node = make_image_node(
-            resource_limits=[
-                ImageResourceLimitInfo(key="mem", min=Decimal("0.25"), max=Decimal("16.75"))
-            ]
+            resource_limits=[ImageResourceLimitInfo(key="mem", min="0.25", max="16.75")]
         )
         json_str = node.model_dump_json()
         restored = ImageNode.model_validate_json(json_str)
-        assert restored.resource_limits[0].min == Decimal("0.25")
-        assert restored.resource_limits[0].max == Decimal("16.75")
+        assert restored.resource_limits[0].min == "0.25"
+        assert restored.resource_limits[0].max == "16.75"
 
 
 class TestSearchImagesPayload:

@@ -55,6 +55,7 @@ class UserOrderField(StrEnum):
     USERNAME = "username"
     EMAIL = "email"
     STATUS = "status"
+    ROLE = "role"
     DOMAIN_NAME = "domain_name"
     PROJECT_NAME = "project_name"
 

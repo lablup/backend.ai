@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import uuid
 from collections.abc import Generator
+from datetime import UTC, datetime
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -35,6 +36,7 @@ def _make_permission_node(
         scope_id=scope_id,
         entity_type=entity_type,
         operation=operation,
+        created_at=datetime.now(UTC),
     )
 
 

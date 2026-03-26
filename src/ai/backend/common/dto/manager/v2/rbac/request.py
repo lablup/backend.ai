@@ -9,7 +9,7 @@ from uuid import UUID
 from pydantic import Field, field_validator
 
 from ai.backend.common.api_handlers import SENTINEL, BaseRequestModel, Sentinel
-from ai.backend.common.dto.manager.query import StringFilter
+from ai.backend.common.dto.manager.query import DateTimeFilter, StringFilter
 
 from .types import OrderDirection, RoleSource, RoleSourceFilter, RoleStatus, RoleStatusFilter
 
@@ -222,6 +222,7 @@ class PermissionFilter(BaseRequestModel):
     role_id: UUID | None = None
     scope_type: str | None = None
     entity_type: str | None = None
+    created_at: DateTimeFilter | None = None
     AND: list[PermissionFilter] | None = None
     OR: list[PermissionFilter] | None = None
     NOT: list[PermissionFilter] | None = None

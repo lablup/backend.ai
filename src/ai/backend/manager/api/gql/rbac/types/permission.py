@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import uuid
 from collections.abc import Iterable
+from datetime import datetime
 from enum import StrEnum
 from typing import TYPE_CHECKING, Annotated, Any, Self, cast
 
@@ -44,7 +45,7 @@ from ai.backend.common.dto.manager.v2.rbac.types import (
     RBACElementTypeDTO,
 )
 from ai.backend.common.types import SessionId
-from ai.backend.manager.api.gql.base import OrderDirection
+from ai.backend.manager.api.gql.base import DateTimeFilter, OrderDirection
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     PydanticInputMixin,
@@ -84,6 +85,7 @@ OperationTypeGQL: type[OperationTypeDTO] = gql_enum(
 class PermissionOrderField(StrEnum):
     ID = "id"
     ENTITY_TYPE = "entity_type"
+    CREATED_AT = "created_at"
 
 
 # ==================== Node Types ====================
@@ -100,6 +102,7 @@ class PermissionGQL(PydanticNodeMixin[PermissionNodeDTO]):
     scope_id: str
     entity_type: RBACElementTypeGQL
     operation: OperationTypeGQL
+    created_at: datetime
 
     @classmethod
     async def resolve_nodes(  # type: ignore[override]
@@ -222,6 +225,7 @@ class PermissionFilter(PydanticInputMixin[PermissionFilterDTO], GQLFilter):
     role_id: uuid.UUID | None = None
     scope_type: RBACElementTypeGQL | None = None
     entity_type: RBACElementTypeGQL | None = None
+    created_at: DateTimeFilter | None = None
     AND: list[Self] | None = None
     OR: list[Self] | None = None
     NOT: list[Self] | None = None
