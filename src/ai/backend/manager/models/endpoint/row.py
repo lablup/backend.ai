@@ -778,8 +778,7 @@ class EndpointRow(Base):  # type: ignore[misc]
         for rev_row in self.revisions:
             if rev_row.image_row is None:
                 continue
-            if rev_row.id == self.current_revision or rev_row.id == self.deploying_revision:
-                model_revisions.append(self._build_revision_spec(rev_row))
+            model_revisions.append(self._build_revision_spec(rev_row))
 
         info = self._to_deployment_info_with_revisions(model_revisions)
         info.policy = policy_data
