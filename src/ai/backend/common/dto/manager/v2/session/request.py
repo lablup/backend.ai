@@ -347,9 +347,7 @@ class EnqueueSessionInput(BaseRequestModel):
     )
 
     # Project scope
-    project_id: UUID | None = Field(
-        default=None, description="Project (group) UUID. Uses default project if omitted."
-    )
+    project_id: UUID = Field(description="Project (group) UUID.")
 
 
 # ---------------------------------------------------------------------------

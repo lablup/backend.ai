@@ -53,7 +53,7 @@ class V2SessionHandler:
             user_role=user_ctx.user_role,
             access_key=user_ctx.access_key,
             domain_name=user_ctx.user_domain,
-            group_id=body.parsed.project_id or user_ctx.user_uuid,
+            group_id=body.parsed.project_id,
         )
         return APIResponse.build(status_code=HTTPStatus.CREATED, response_model=result)
 
