@@ -77,15 +77,6 @@ class ModelDefinitionGeneratorRegistry:
         that is stored in the DB. Subsequent PROVISIONING reads the stored value
         directly — no vfolder access at runtime.
 
-        For CUSTOM variant:
-            - Generator fetches the complete definition from vfolder storage
-        For other variants:
-            - Generator produces a programmatic definition
-            - If enable_model_definition_override is True and model_definition_path
-              exists, fetch from vfolder and deep merge (partial override)
-
-        In all cases, user-provided model_definition override is applied last.
-
         Merge priority (later overrides earlier):
             1. Generator-produced definition (lowest)
             2. Vfolder file override (non-CUSTOM only, requires flag)
@@ -93,28 +84,45 @@ class ModelDefinitionGeneratorRegistry:
         """
         runtime_variant = context.execution.runtime_variant
         generator = self.get(runtime_variant)
-        generated_definition = await generator.generate_model_definition(context)
+        definition = await generator.generate_model_definition(context)
+        definition = await self._apply_vfolder_override(context, runtime_variant, definition)
+        return self._apply_user_override(context, definition)
 
-        # For non-CUSTOM variants, optionally apply vfolder file override
-        if runtime_variant != RuntimeVariant.CUSTOM and self._enable_model_definition_override:
-            model_definition_path = context.mounts.model_definition_path
-            if model_definition_path:
-                generated_definition = await self._try_merge_vfolder_definition(
-                    context=context,
-                    base_definition=generated_definition,
-                )
+    async def _apply_vfolder_override(
+        self,
+        context: ModelDefinitionContext,
+        runtime_variant: RuntimeVariant,
+        base_definition: ModelDefinition,
+    ) -> ModelDefinition:
+        """For non-CUSTOM variants, optionally merge the vfolder file on top of
+        the generator-produced definition. CUSTOM variants already read from
+        vfolder in the generator, so this step is skipped to avoid redundancy."""
+        if runtime_variant == RuntimeVariant.CUSTOM or not self._enable_model_definition_override:
+            return base_definition
+        model_definition_path = context.mounts.model_definition_path
+        if not model_definition_path:
+            return base_definition
+        return await self._try_merge_vfolder_definition(
+            context=context,
+            base_definition=base_definition,
+        )
 
-        # Merge user-provided model_definition override if present
-        if context.model_definition:
-            try:
-                generated_definition = generated_definition.merge(context.model_definition)
-            except Exception:
-                log.error(
-                    "Failed to merge user-provided model_definition, using server-generated definition",
-                    exc_info=True,
-                )
-
-        return generated_definition
+    def _apply_user_override(
+        self,
+        context: ModelDefinitionContext,
+        base_definition: ModelDefinition,
+    ) -> ModelDefinition:
+        """Merge user-provided model_definition override if present."""
+        if not context.model_definition:
+            return base_definition
+        try:
+            return base_definition.merge(context.model_definition)
+        except Exception:
+            log.error(
+                "Failed to merge user-provided model_definition, using server-generated definition",
+                exc_info=True,
+            )
+            return base_definition
 
     async def _try_merge_vfolder_definition(
         self,
