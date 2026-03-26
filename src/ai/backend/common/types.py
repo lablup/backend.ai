@@ -147,9 +147,7 @@ __all__ = (
     "aobject",
     "check_typed_dict",
     "check_typed_tuple",
-    "resolve_int_or_percent",
     "safe_print_redis_config",
-    "validate_int_or_percent",
 )
 
 
@@ -2107,53 +2105,3 @@ class StreamReader(ABC):
     @abstractmethod
     def content_type(self) -> str | None:
         raise GenericNotImplementedError
-
-
-def validate_int_or_percent(v: int | str) -> int | str:
-    """Validate and normalize an integer-or-percentage value.
-
-    Accepts:
-      - Non-negative int (e.g. 1, 0)
-      - Percentage string (e.g. "25%") with value between 0 and 100
-      - Integer string (e.g. "1") which is normalized to int
-
-    Returns int for absolute values, str for percentage values.
-    """
-    if isinstance(v, int):
-        if v < 0:
-            raise ValueError("Value must be non-negative")
-        return v
-    if isinstance(v, str):
-        if v.endswith("%"):
-            try:
-                pct = int(v[:-1])
-            except ValueError:
-                raise ValueError(f"Invalid percentage value: {v}") from None
-            if not (0 <= pct <= 100):
-                raise ValueError(f"Percentage must be between 0 and 100, got {pct}")
-            return v
-        try:
-            parsed = int(v)
-        except ValueError:
-            raise ValueError(f"Expected integer or percentage string, got: {v}") from None
-        if parsed < 0:
-            raise ValueError("Value must be non-negative")
-        return parsed
-    raise TypeError(f"Expected int or str, got {type(v).__name__}")
-
-
-def resolve_int_or_percent(value: int | str, total: int, *, round_up: bool) -> int:
-    """Resolve an integer-or-percentage value to an absolute count.
-
-    Args:
-        value: Absolute int or percentage string (e.g. "25%").
-        total: The base count to compute percentages against (e.g. desired replicas).
-        round_up: If True, round up (for max_surge); if False, round down (for max_unavailable).
-    """
-    if isinstance(value, int):
-        return value
-    if isinstance(value, str) and value.endswith("%"):
-        pct = int(value[:-1])
-        result = total * pct / 100
-        return math.ceil(result) if round_up else math.floor(result)
-    raise ValueError(f"Invalid int-or-percent value: {value}")

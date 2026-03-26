@@ -9,6 +9,8 @@ from enum import StrEnum
 from typing import Any
 from uuid import UUID
 
+from pydantic import BaseModel, Field, model_validator
+
 from ai.backend.common.api_handlers import BaseResponseModel
 from ai.backend.common.data.endpoint.types import EndpointLifecycle
 from ai.backend.common.data.model_deployment.types import (
@@ -57,6 +59,8 @@ __all__ = (
     "RouteStatus",
     "RouteTrafficStatus",
     "RuntimeVariant",
+    "IntOrPercent",
+    "IntOrPercentType",
 )
 
 
@@ -81,6 +85,41 @@ class RouteOrderField(StrEnum):
     CREATED_AT = "created_at"
     STATUS = "status"
     TRAFFIC_RATIO = "traffic_ratio"
+
+
+class IntOrPercentType(StrEnum):
+    """Discriminator for :class:`IntOrPercent`."""
+
+    COUNT = "count"
+    PERCENT = "percent"
+
+
+class IntOrPercent(BaseModel):
+    """A rolling-update budget value: either an absolute count or a percentage.
+
+    - ``{"type": "count", "count": 2}``      — absolute replica count
+    - ``{"type": "percent", "percent": 0.5}`` — fraction of desired replicas (0.0-1.0)
+
+    Exactly one of ``count`` or ``percent`` must be provided, matching ``type``.
+    """
+
+    type: IntOrPercentType
+    count: int | None = Field(default=None, ge=0)
+    percent: float | None = Field(default=None, ge=0.0, le=1.0)
+
+    @model_validator(mode="after")
+    def _validate_fields(self) -> IntOrPercent:
+        if self.type == IntOrPercentType.COUNT:
+            if self.count is None:
+                raise ValueError("'count' is required when type is 'count'")
+            if self.percent is not None:
+                raise ValueError("'percent' must not be set when type is 'count'")
+        else:
+            if self.percent is None:
+                raise ValueError("'percent' is required when type is 'percent'")
+            if self.count is not None:
+                raise ValueError("'count' must not be set when type is 'percent'")
+        return self
 
 
 class DeploymentBasicInfo(BaseResponseModel):
@@ -129,8 +168,8 @@ class ReplicaStateInfo(BaseResponseModel):
 class RollingUpdateConfigInfo(BaseResponseModel):
     """Rolling update policy configuration."""
 
-    max_surge: int | str
-    max_unavailable: int | str
+    max_surge: IntOrPercent
+    max_unavailable: IntOrPercent
 
 
 class BlueGreenConfigInfo(BaseResponseModel):
@@ -162,8 +201,8 @@ class DeploymentStrategySpecInfo(BaseResponseModel):
 class RollingUpdateStrategySpecInfo(DeploymentStrategySpecInfo):
     """Rolling update strategy spec — matches RollingUpdateStrategySpecGQL structure."""
 
-    max_surge: int | str
-    max_unavailable: int | str
+    max_surge: IntOrPercent
+    max_unavailable: IntOrPercent
 
 
 class BlueGreenStrategySpecInfo(DeploymentStrategySpecInfo):

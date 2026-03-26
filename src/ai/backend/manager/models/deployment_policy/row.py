@@ -1,17 +1,18 @@
 from __future__ import annotations
 
 import logging
+import math
 import uuid
 from datetime import datetime
-from typing import TYPE_CHECKING, Annotated
+from typing import TYPE_CHECKING
 
 import sqlalchemy as sa
-from pydantic import BaseModel, BeforeValidator, Field, model_validator
+from pydantic import BaseModel, Field, model_validator
 from sqlalchemy.dialects import postgresql as pgsql
 from sqlalchemy.orm import Mapped, foreign, mapped_column, relationship
 
 from ai.backend.common.data.model_deployment.types import DeploymentStrategy
-from ai.backend.common.types import resolve_int_or_percent, validate_int_or_percent
+from ai.backend.common.dto.manager.v2.deployment.types import IntOrPercent, IntOrPercentType
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.deployment.types import DeploymentPolicyData
 from ai.backend.manager.errors.deployment import InvalidDeploymentStrategy
@@ -34,35 +35,40 @@ __all__ = (
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
-IntOrPercent = Annotated[int | str, BeforeValidator(validate_int_or_percent)]
-
-
 class RollingUpdateSpec(BaseModel):
     """Specification for rolling update deployment strategy.
 
-    ``max_surge`` and ``max_unavailable`` accept either an absolute integer
-    (e.g. ``1``) or a percentage string (e.g. ``"25%"``).  Percentage values
-    are resolved to absolute counts at execution time via
+    ``max_surge`` and ``max_unavailable`` are :class:`IntOrPercent` objects.
+    Percentage values are resolved to absolute counts at execution time via
     :meth:`resolve_max_surge` / :meth:`resolve_max_unavailable`.
     """
 
-    max_surge: IntOrPercent = Field(default=1)
-    max_unavailable: IntOrPercent = Field(default=0)
+    max_surge: IntOrPercent = Field(
+        default_factory=lambda: IntOrPercent(type=IntOrPercentType.PERCENT, percent=0.5)
+    )
+    max_unavailable: IntOrPercent = Field(
+        default_factory=lambda: IntOrPercent(type=IntOrPercentType.PERCENT, percent=0.0)
+    )
 
     @model_validator(mode="after")
     def _validate_progress_is_possible(self) -> RollingUpdateSpec:
         """Ensure at least one of max_surge or max_unavailable is positive.
 
-        If both are zero (or "0%"), the rolling update FSM cannot make
-        progress: it cannot create new routes (would exceed max_total)
-        nor terminate old routes (would fall below min_available), causing
-        a deadlock.
-
-        When either value is a percentage string we cannot fully validate
-        at definition time (the resolved count depends on the replica count
-        at execution time), so we only reject the obvious ``0 + 0`` case.
+        If both are zero the rolling update FSM cannot make progress:
+        it cannot create new routes (would exceed max_total) nor terminate
+        old routes (would fall below min_available), causing a deadlock.
         """
-        if self.max_surge in (0, "0%") and self.max_unavailable in (0, "0%"):
+        surge_zero = (
+            (self.max_surge.count == 0)
+            if self.max_surge.type == IntOrPercentType.COUNT
+            else (self.max_surge.percent == 0.0)
+        )
+        unavail_zero = (
+            (self.max_unavailable.count == 0)
+            if self.max_unavailable.type == IntOrPercentType.COUNT
+            else (self.max_unavailable.percent == 0.0)
+        )
+        if surge_zero and unavail_zero:
             raise ValueError(
                 "At least one of max_surge or max_unavailable must be positive; "
                 "otherwise the rolling update cannot make progress."
@@ -71,11 +77,20 @@ class RollingUpdateSpec(BaseModel):
 
     def resolve_max_surge(self, desired_replicas: int) -> int:
         """Resolve max_surge to an absolute count (rounds up for percentages)."""
-        return resolve_int_or_percent(self.max_surge, desired_replicas, round_up=True)
+        return self._resolve(self.max_surge, desired_replicas, round_up=True)
 
     def resolve_max_unavailable(self, desired_replicas: int) -> int:
         """Resolve max_unavailable to an absolute count (rounds down for percentages)."""
-        return resolve_int_or_percent(self.max_unavailable, desired_replicas, round_up=False)
+        return self._resolve(self.max_unavailable, desired_replicas, round_up=False)
+
+    @staticmethod
+    def _resolve(surge: IntOrPercent, total: int, *, round_up: bool) -> int:
+        if surge.type == IntOrPercentType.COUNT:
+            # count is guaranteed non-None by IntOrPercent._validate_fields
+            return surge.count or 0
+        # percent is guaranteed non-None by IntOrPercent._validate_fields
+        result = total * (surge.percent or 0.0)
+        return math.ceil(result) if round_up else math.floor(result)
 
 
 class BlueGreenSpec(BaseModel):

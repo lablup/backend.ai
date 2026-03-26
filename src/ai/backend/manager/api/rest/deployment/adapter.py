@@ -47,6 +47,7 @@ from ai.backend.common.dto.manager.deployment.types import (
     RevisionOrderField,
     RouteOrderField,
 )
+from ai.backend.common.dto.manager.v2.deployment.types import IntOrPercent, IntOrPercentType
 from ai.backend.common.types import ClusterMode, RuntimeVariant
 from ai.backend.manager.api.rest.adapter import BaseFilterAdapter
 from ai.backend.manager.data.deployment.creator import (
@@ -508,11 +509,17 @@ class CreateDeploymentAdapter:
         match strategy:
             case DeploymentStrategy.ROLLING:
                 if strategy_input.rolling_update is None:
-                    strategy_spec = RollingUpdateSpec(max_surge=1, max_unavailable=0)
+                    strategy_spec = RollingUpdateSpec()
                 else:
                     strategy_spec = RollingUpdateSpec(
-                        max_surge=strategy_input.rolling_update.max_surge,
-                        max_unavailable=strategy_input.rolling_update.max_unavailable,
+                        max_surge=IntOrPercent(
+                            type=IntOrPercentType.COUNT,
+                            count=strategy_input.rolling_update.max_surge,
+                        ),
+                        max_unavailable=IntOrPercent(
+                            type=IntOrPercentType.COUNT,
+                            count=strategy_input.rolling_update.max_unavailable,
+                        ),
                     )
             case DeploymentStrategy.BLUE_GREEN:
                 if strategy_input.blue_green is None:
@@ -570,11 +577,17 @@ class DeploymentPolicyAdapter:
             case DeploymentStrategy.ROLLING:
                 if request.rolling_update is not None:
                     strategy_spec = RollingUpdateSpec(
-                        max_surge=request.rolling_update.max_surge,
-                        max_unavailable=request.rolling_update.max_unavailable,
+                        max_surge=IntOrPercent(
+                            type=IntOrPercentType.COUNT,
+                            count=request.rolling_update.max_surge,
+                        ),
+                        max_unavailable=IntOrPercent(
+                            type=IntOrPercentType.COUNT,
+                            count=request.rolling_update.max_unavailable,
+                        ),
                     )
                 else:
-                    strategy_spec = RollingUpdateSpec(max_surge=1, max_unavailable=0)
+                    strategy_spec = RollingUpdateSpec()
             case DeploymentStrategy.BLUE_GREEN:
                 if request.blue_green is not None:
                     strategy_spec = BlueGreenSpec(

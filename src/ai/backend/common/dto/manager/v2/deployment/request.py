@@ -7,10 +7,10 @@ from __future__ import annotations
 from collections.abc import Mapping
 from datetime import datetime
 from decimal import Decimal
-from typing import Annotated, Any
+from typing import Any
 from uuid import UUID
 
-from pydantic import BeforeValidator, Field, field_validator
+from pydantic import Field, field_validator
 
 from ai.backend.common.api_handlers import SENTINEL, BaseRequestModel, Sentinel
 from ai.backend.common.config import ModelDefinition
@@ -25,18 +25,15 @@ from ai.backend.common.dto.manager.v2.deployment.types import (
     AccessTokenOrderField,
     AutoScalingRuleOrderField,
     DeploymentOrderField,
+    IntOrPercent,
+    IntOrPercentType,
     OrderDirection,
     ReplicaOrderField,
     RevisionOrderField,
     RouteOrderField,
 )
 from ai.backend.common.dto.manager.v2.resource_slot.types import ResourceOptsDTOInput
-from ai.backend.common.types import (
-    AutoScalingMetricSource,
-    ClusterMode,
-    RuntimeVariant,
-    validate_int_or_percent,
-)
+from ai.backend.common.types import AutoScalingMetricSource, ClusterMode, RuntimeVariant
 
 __all__ = (
     "AccessTokenFilter",
@@ -247,23 +244,22 @@ class ModelDeploymentNetworkAccessInput(BaseRequestModel):
     open_to_public: bool = Field(default=False, description="Whether the deployment is public")
 
 
-IntOrPercent = Annotated[int | str, BeforeValidator(validate_int_or_percent)]
-
-
 class RollingUpdateConfigInput(BaseRequestModel):
     """Input for rolling update configuration.
 
-    ``max_surge`` and ``max_unavailable`` accept either an absolute non-negative
-    integer (e.g. ``1``) or a percentage string between 0% and 100% (e.g. ``"25%"``).
+    ``max_surge`` and ``max_unavailable`` are :class:`IntOrPercent` objects:
+
+    - ``{"type": "count", "count": 2}``      — absolute replica count
+    - ``{"type": "percent", "percent": 0.25}`` — fraction of desired replicas (0.0-1.0)
     """
 
     max_surge: IntOrPercent = Field(
-        default=1,
-        description="Maximum number of extra replicas during update (integer or percentage string)",
+        default_factory=lambda: IntOrPercent(type=IntOrPercentType.PERCENT, percent=0.5),
+        description='{"type": "count", "count": 2} or {"type": "percent", "percent": 0.25}',
     )
     max_unavailable: IntOrPercent = Field(
-        default=0,
-        description="Maximum number of unavailable replicas during update (integer or percentage string)",
+        default_factory=lambda: IntOrPercent(type=IntOrPercentType.PERCENT, percent=0.0),
+        description='{"type": "count", "count": 0} or {"type": "percent", "percent": 0.0}',
     )
 
 

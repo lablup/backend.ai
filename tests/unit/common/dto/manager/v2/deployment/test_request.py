@@ -35,6 +35,7 @@ from ai.backend.common.dto.manager.v2.deployment.request import (
     ScaleDeploymentInput,
     UpdateDeploymentInput,
 )
+from ai.backend.common.dto.manager.v2.deployment.types import IntOrPercent, IntOrPercentType
 from ai.backend.common.types import ClusterMode, RuntimeVariant
 
 
@@ -160,62 +161,56 @@ class TestExtraVFolderMountInput:
 class TestRollingUpdateConfigInput:
     """Tests for RollingUpdateConfigInput model."""
 
-    def test_valid_creation(self) -> None:
-        config = RollingUpdateConfigInput(max_surge=2, max_unavailable=1)
-        assert config.max_surge == 2
-        assert config.max_unavailable == 1
+    def test_count_surge(self) -> None:
+        config = RollingUpdateConfigInput(
+            max_surge=IntOrPercent(type=IntOrPercentType.COUNT, count=2),
+            max_unavailable=IntOrPercent(type=IntOrPercentType.COUNT, count=1),
+        )
+        assert config.max_surge.type == IntOrPercentType.COUNT
+        assert config.max_surge.count == 2
+        assert config.max_unavailable.count == 1
+
+    def test_percent_surge(self) -> None:
+        config = RollingUpdateConfigInput(
+            max_surge=IntOrPercent(type=IntOrPercentType.PERCENT, percent=0.25),
+            max_unavailable=IntOrPercent(type=IntOrPercentType.PERCENT, percent=0.5),
+        )
+        assert config.max_surge.type == IntOrPercentType.PERCENT
+        assert config.max_surge.percent == 0.25
+        assert config.max_unavailable.percent == 0.5
 
     def test_defaults(self) -> None:
         config = RollingUpdateConfigInput()
-        assert config.max_surge == 1
-        assert config.max_unavailable == 0
+        assert config.max_surge.type == IntOrPercentType.PERCENT
+        assert config.max_surge.percent == 0.5
+        assert config.max_unavailable.type == IntOrPercentType.PERCENT
+        assert config.max_unavailable.percent == 0.0
 
-    def test_negative_max_surge_raises_validation_error(self) -> None:
+    def test_negative_count_raises_error(self) -> None:
         with pytest.raises(ValidationError):
-            RollingUpdateConfigInput(max_surge=-1)
+            RollingUpdateConfigInput.model_validate({"max_surge": {"type": "count", "count": -1}})
 
-    def test_negative_max_unavailable_raises_validation_error(self) -> None:
+    def test_percent_over_1_raises_error(self) -> None:
         with pytest.raises(ValidationError):
-            RollingUpdateConfigInput(max_unavailable=-1)
+            RollingUpdateConfigInput.model_validate({
+                "max_surge": {"type": "percent", "percent": 1.5}
+            })
 
-    def test_percentage_max_surge(self) -> None:
-        config = RollingUpdateConfigInput(max_surge="25%", max_unavailable=0)
-        assert config.max_surge == "25%"
-        assert config.max_unavailable == 0
-
-    def test_percentage_max_unavailable(self) -> None:
-        config = RollingUpdateConfigInput(max_surge=1, max_unavailable="50%")
-        assert config.max_unavailable == "50%"
-
-    def test_both_percentage(self) -> None:
-        config = RollingUpdateConfigInput(max_surge="30%", max_unavailable="20%")
-        assert config.max_surge == "30%"
-        assert config.max_unavailable == "20%"
-
-    def test_percentage_boundary_0_percent(self) -> None:
-        config = RollingUpdateConfigInput(max_surge="0%", max_unavailable=1)
-        assert config.max_surge == "0%"
-
-    def test_percentage_boundary_100_percent(self) -> None:
-        config = RollingUpdateConfigInput(max_surge="100%", max_unavailable=0)
-        assert config.max_surge == "100%"
-
-    def test_invalid_percentage_over_100_raises_error(self) -> None:
+    def test_negative_percent_raises_error(self) -> None:
         with pytest.raises(ValidationError):
-            RollingUpdateConfigInput(max_surge="101%")
+            RollingUpdateConfigInput.model_validate({
+                "max_surge": {"type": "percent", "percent": -0.1}
+            })
 
-    def test_invalid_percentage_negative_raises_error(self) -> None:
+    def test_count_without_count_field_raises_error(self) -> None:
         with pytest.raises(ValidationError):
-            RollingUpdateConfigInput(max_surge="-1%")
+            RollingUpdateConfigInput.model_validate({
+                "max_surge": {"type": "count", "percent": 0.5}
+            })
 
-    def test_invalid_string_raises_error(self) -> None:
+    def test_percent_without_percent_field_raises_error(self) -> None:
         with pytest.raises(ValidationError):
-            RollingUpdateConfigInput(max_surge="abc")
-
-    def test_integer_string_normalized_to_int(self) -> None:
-        config = RollingUpdateConfigInput(max_surge="3")
-        assert config.max_surge == 3
-        assert isinstance(config.max_surge, int)
+            RollingUpdateConfigInput.model_validate({"max_surge": {"type": "percent", "count": 2}})
 
 
 class TestBlueGreenConfigInput:
@@ -317,7 +312,10 @@ class TestCreateDeploymentInput:
         assert inp.default_deployment_strategy.type == DeploymentStrategy.BLUE_GREEN
 
     def test_with_rolling_update_config(self) -> None:
-        rolling = RollingUpdateConfigInput(max_surge=2, max_unavailable=1)
+        rolling = RollingUpdateConfigInput(
+            max_surge=IntOrPercent(type=IntOrPercentType.COUNT, count=2),
+            max_unavailable=IntOrPercent(type=IntOrPercentType.COUNT, count=1),
+        )
         inp = self._make_input(
             default_deployment_strategy=DeploymentStrategyInput(
                 type=DeploymentStrategy.ROLLING,
@@ -325,7 +323,7 @@ class TestCreateDeploymentInput:
             ),
         )
         assert inp.default_deployment_strategy.rolling_update is not None
-        assert inp.default_deployment_strategy.rolling_update.max_surge == 2
+        assert inp.default_deployment_strategy.rolling_update.max_surge.count == 2
 
     def test_with_blue_green_config(self) -> None:
         bg = BlueGreenConfigInput(auto_promote=True, promote_delay_seconds=30)

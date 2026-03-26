@@ -4,9 +4,8 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from strawberry import ID
+from strawberry import ID, UNSET
 from strawberry.relay import NodeID
-from strawberry.scalars import JSON
 
 from ai.backend.common.data.model_deployment.types import DeploymentStrategy
 from ai.backend.common.dto.manager.v2.deployment.request import (
@@ -27,7 +26,11 @@ from ai.backend.common.dto.manager.v2.deployment.response import (
 from ai.backend.common.dto.manager.v2.deployment.types import (
     BlueGreenStrategySpecInfo,
     DeploymentStrategySpecInfo,
+    IntOrPercentType,
     RollingUpdateStrategySpecInfo,
+)
+from ai.backend.common.dto.manager.v2.deployment.types import (
+    IntOrPercent as IntOrPercentDTO,
 )
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
@@ -50,6 +53,53 @@ DeploymentStrategyTypeGQL: type[DeploymentStrategy] = gql_enum(
     DeploymentStrategy,
     name="DeploymentStrategyType",
 )
+
+IntOrPercentTypeGQL: type[IntOrPercentType] = gql_enum(
+    BackendAIGQLMeta(
+        added_version="26.4.0",
+        description="Type of a surge value: 'count' for an absolute replica count, 'percent' for a fraction of desired replicas (0.0-1.0).",
+    ),
+    IntOrPercentType,
+    name="IntOrPercentType",
+)
+
+
+# ========== IntOrPercent types ==========
+
+
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version="26.4.0",
+        description=dedent_strip("""
+            A rolling-update budget value: either an absolute count or a percentage.
+            When type is COUNT, 'count' holds the value.
+            When type is PERCENT, 'percent' holds the value (0.0-1.0).
+        """),
+    ),
+    model=IntOrPercentDTO,
+    name="IntOrPercent",
+)
+class IntOrPercentGQL:
+    type: IntOrPercentTypeGQL
+    count: int | None
+    percent: float | None
+
+
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        added_version="26.4.0",
+        description=dedent_strip("""
+            Input for a rolling-update budget value.
+            Set type to COUNT and provide 'count', or set type to PERCENT and provide 'percent' (0.0-1.0).
+        """),
+    ),
+    name="IntOrPercentInput",
+)
+class IntOrPercentInputGQL(PydanticInputMixin[IntOrPercentDTO]):
+    type: IntOrPercentTypeGQL
+    count: int | None = UNSET
+    percent: float | None = UNSET
+
 
 # ========== Output Types (Response) ==========
 
@@ -76,8 +126,8 @@ class DeploymentStrategySpecGQL:
 )
 class RollingUpdateStrategySpecGQL(DeploymentStrategySpecGQL):
     strategy: DeploymentStrategyTypeGQL
-    max_surge: JSON
-    max_unavailable: JSON
+    max_surge: IntOrPercentGQL
+    max_unavailable: IntOrPercentGQL
 
 
 @gql_pydantic_type(
@@ -110,13 +160,14 @@ class DeploymentPolicyGQL(PydanticNodeMixin[DeploymentPolicyNodeDTO]):
 
 @gql_pydantic_input(
     BackendAIGQLMeta(
-        description="Configuration for rolling update strategy.", added_version="25.19.0"
+        description="Configuration for rolling update strategy.",
+        added_version="25.19.0",
     ),
     name="RollingUpdateConfigInput",
 )
 class RollingUpdateConfigInputGQL(PydanticInputMixin[RollingUpdateConfigInputDTO]):
-    max_surge: JSON = 1
-    max_unavailable: JSON = 0
+    max_surge: IntOrPercentInputGQL | None = UNSET
+    max_unavailable: IntOrPercentInputGQL | None = UNSET
 
 
 @gql_pydantic_input(

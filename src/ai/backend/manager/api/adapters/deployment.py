@@ -728,10 +728,13 @@ class DeploymentAdapter(BaseAdapter):
         match input.strategy:
             case DeploymentStrategy.ROLLING:
                 rolling = input.rolling_update
-                strategy_spec = RollingUpdateSpec(
-                    max_surge=rolling.max_surge if rolling is not None else 1,
-                    max_unavailable=rolling.max_unavailable if rolling is not None else 0,
-                )
+                if rolling is not None:
+                    strategy_spec = RollingUpdateSpec(
+                        max_surge=rolling.max_surge,
+                        max_unavailable=rolling.max_unavailable,
+                    )
+                else:
+                    strategy_spec = RollingUpdateSpec()
             case DeploymentStrategy.BLUE_GREEN:
                 bg = input.blue_green
                 strategy_spec = BlueGreenSpec(

@@ -26,6 +26,8 @@ from ai.backend.common.dto.manager.v2.deployment.response import (
 from ai.backend.common.dto.manager.v2.deployment.types import (
     BlueGreenConfigInfo,
     BlueGreenStrategySpecInfo,
+    IntOrPercent,
+    IntOrPercentType,
     RollingUpdateConfigInfo,
     RollingUpdateStrategySpecInfo,
 )
@@ -33,12 +35,20 @@ from ai.backend.manager.api.gql import utils as gql_utils
 from ai.backend.manager.api.gql.deployment.resolver import policy as policy_resolver
 from ai.backend.manager.api.gql.deployment.types.policy import (
     BlueGreenConfigInputGQL,
+    IntOrPercentInputGQL,
     RollingUpdateConfigInputGQL,
     UpdateDeploymentPolicyInputGQL,
     UpdateDeploymentPolicyPayloadGQL,
 )
 
 SAMPLE_DEPLOYMENT_ID = "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"
+
+
+def _iop(value: int | float) -> IntOrPercent:
+    """Build an IntOrPercent from a plain int or float for test brevity."""
+    if isinstance(value, float):
+        return IntOrPercent(type=IntOrPercentType.PERCENT, percent=value)
+    return IntOrPercent(type=IntOrPercentType.COUNT, count=value)
 
 
 # --- Test scenarios ---
@@ -92,7 +102,10 @@ def rolling_update_input() -> UpdateDeploymentPolicyInputGQL:
     return UpdateDeploymentPolicyInputGQL(
         deployment_id=ID(SAMPLE_DEPLOYMENT_ID),
         strategy=DeploymentStrategy.ROLLING,
-        rolling_update=RollingUpdateConfigInputGQL(max_surge=2, max_unavailable=1),
+        rolling_update=RollingUpdateConfigInputGQL(
+            max_surge=IntOrPercentInputGQL(type=IntOrPercentType.COUNT, count=2),
+            max_unavailable=IntOrPercentInputGQL(type=IntOrPercentType.COUNT, count=1),
+        ),
     )
 
 
@@ -104,8 +117,8 @@ def _make_policy_node_dto(
 ) -> DeploymentPolicyNodeDTO:
     """Create a DeploymentPolicyNode DTO for mock results."""
     if strategy == DeploymentStrategy.ROLLING:
-        surge = rolling_update.max_surge if rolling_update is not None else 1
-        unavailable = rolling_update.max_unavailable if rolling_update is not None else 0
+        surge = rolling_update.max_surge if rolling_update is not None else _iop(1)
+        unavailable = rolling_update.max_unavailable if rolling_update is not None else _iop(0)
         strategy_spec: RollingUpdateStrategySpecInfo | BlueGreenStrategySpecInfo = (
             RollingUpdateStrategySpecInfo(
                 strategy=strategy,
@@ -144,10 +157,15 @@ class TestToPydanticConversion:
                     input=UpdateDeploymentPolicyInputGQL(
                         deployment_id=ID(SAMPLE_DEPLOYMENT_ID),
                         strategy=DeploymentStrategy.ROLLING,
-                        rolling_update=RollingUpdateConfigInputGQL(max_surge=2, max_unavailable=1),
+                        rolling_update=RollingUpdateConfigInputGQL(
+                            max_surge=IntOrPercentInputGQL(type=IntOrPercentType.COUNT, count=2),
+                            max_unavailable=IntOrPercentInputGQL(
+                                type=IntOrPercentType.COUNT, count=1
+                            ),
+                        ),
                     ),
                     expected_rolling_update=RollingUpdateConfigInput(
-                        max_surge=2, max_unavailable=1
+                        max_surge=_iop(2), max_unavailable=_iop(1)
                     ),
                     expected_blue_green=None,
                 ),
@@ -209,7 +227,7 @@ class TestAdminUpdateDeploymentPolicyResolver:
         # Given
         policy_node = _make_policy_node_dto(
             strategy=DeploymentStrategy.ROLLING,
-            rolling_update=RollingUpdateConfigInfo(max_surge=2, max_unavailable=1),
+            rolling_update=RollingUpdateConfigInfo(max_surge=_iop(2), max_unavailable=_iop(1)),
         )
         mock_upsert_policy.return_value = UpsertDeploymentPolicyPayloadDTO(policy=policy_node)
 
