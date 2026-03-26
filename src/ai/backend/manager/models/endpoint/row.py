@@ -35,7 +35,6 @@ from sqlalchemy.orm import (
     relationship,
     selectinload,
 )
-from sqlalchemy.orm.attributes import instance_state
 
 from ai.backend.common.config import model_definition_iv
 from ai.backend.common.types import (
@@ -776,12 +775,11 @@ class EndpointRow(Base):  # type: ignore[misc]
             policy_data = self.deployment_policy.to_data()
 
         model_revisions: list[ModelRevisionSpec] = []
-        if "revisions" in instance_state(self).dict and self.revisions:
-            for rev_row in self.revisions:
-                if rev_row.image_row is None:
-                    continue
-                if rev_row.id == self.current_revision or rev_row.id == self.deploying_revision:
-                    model_revisions.append(self._build_revision_spec(rev_row))
+        for rev_row in self.revisions:
+            if rev_row.image_row is None:
+                continue
+            if rev_row.id == self.current_revision or rev_row.id == self.deploying_revision:
+                model_revisions.append(self._build_revision_spec(rev_row))
 
         info = self._to_deployment_info_with_revisions(model_revisions)
         info.policy = policy_data
