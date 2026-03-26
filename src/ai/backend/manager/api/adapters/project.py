@@ -36,6 +36,7 @@ from ai.backend.common.dto.manager.v2.group.types import (
     ProjectType,
     ProjectTypeFilter,
 )
+from ai.backend.common.exception import UnreachableError
 from ai.backend.manager.api.adapters.pagination import PaginationSpec
 from ai.backend.manager.data.group.types import GroupData
 from ai.backend.manager.data.group.types import ProjectType as DataProjectType
@@ -159,6 +160,8 @@ class ProjectAdapter(BaseAdapter):
         result = await self._processors.group.create_group.wait_for_complete(
             CreateGroupAction(creator=Creator(spec=spec), _domain_name=input.domain_name)
         )
+        if result.data is None:
+            raise UnreachableError("create_group must return data")
         return ProjectPayload(project=self._group_data_to_node(result.data))
 
     async def admin_update(self, project_id: UUID, input: UpdateGroupInput) -> ProjectPayload:
@@ -196,6 +199,8 @@ class ProjectAdapter(BaseAdapter):
         result = await self._processors.group.modify_group.wait_for_complete(
             ModifyGroupAction(updater=updater)
         )
+        if result.data is None:
+            raise UnreachableError("modify_group must return data")
         return ProjectPayload(project=self._group_data_to_node(result.data))
 
     async def admin_delete(self, input: DeleteGroupInput) -> DeleteProjectPayload:
