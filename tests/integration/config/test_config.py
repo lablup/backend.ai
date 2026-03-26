@@ -81,7 +81,7 @@ class TestBootstrapScriptLifecycle:
             UpdateBootstrapScriptRequest(script=script_v1)
         )
         result_v1 = await admin_registry.config.get_bootstrap_script()
-        assert result_v1.script == script_v1
+        assert result_v1.root == script_v1
 
         # Second update
         script_v2 = f"#!/bin/bash\necho 'v2-{unique}'\nexit 0"
@@ -89,7 +89,7 @@ class TestBootstrapScriptLifecycle:
             UpdateBootstrapScriptRequest(script=script_v2)
         )
         result_v2 = await admin_registry.config.get_bootstrap_script()
-        assert result_v2.script == script_v2
+        assert result_v2.root == script_v2
 
         # Cleanup: reset to empty
         await admin_registry.config.update_bootstrap_script(UpdateBootstrapScriptRequest(script=""))
