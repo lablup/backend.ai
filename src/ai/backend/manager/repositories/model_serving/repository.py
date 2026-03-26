@@ -1007,12 +1007,8 @@ class ModelServingRepository:
         scope: ProjectEndpointSearchScope,
     ) -> ServiceSearchResult:
         """Search model serving services scoped to a project."""
-        async with self._db.begin_readonly_session() as session:
-            query = (
-                sa.select(EndpointRow)
-                .where(EndpointRow.lifecycle_stage == EndpointLifecycle.CREATED)
-                .options(selectinload(EndpointRow.routings))
-            )
+        async with self._db.begin_readonly_session_read_committed() as session:
+            query = sa.select(EndpointRow).options(selectinload(EndpointRow.routings))
 
             result = await execute_batch_querier(session, query, querier, scope=scope)
 
