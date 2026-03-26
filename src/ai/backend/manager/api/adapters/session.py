@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Sequence
+from datetime import datetime, timedelta
 from decimal import Decimal
 from uuid import UUID
 
@@ -38,11 +39,13 @@ from ai.backend.common.dto.manager.v2.resource_slot.types import (
 )
 from ai.backend.common.dto.manager.v2.session.request import (
     AdminSearchSessionsInput,
+    CreateSessionInput,
     SessionFilter,
     SessionOrder,
 )
 from ai.backend.common.dto.manager.v2.session.response import (
     AdminSearchSessionsPayload,
+    CreateSessionPayload,
     SessionLifecycleInfoGQLDTO,
     SessionMetadataInfoGQLDTO,
     SessionNetworkInfo,
@@ -50,7 +53,16 @@ from ai.backend.common.dto.manager.v2.session.response import (
     SessionResourceInfoGQLDTO,
     SessionRuntimeInfoGQLDTO,
 )
-from ai.backend.common.types import AgentId, KernelId, SessionId
+from ai.backend.common.dto.manager.v2.session.types import ClusterModeEnum
+from ai.backend.common.types import (
+    AccessKey,
+    AgentId,
+    ClusterMode,
+    KernelId,
+    MountPermission,
+    SessionId,
+    SessionTypes,
+)
 from ai.backend.manager.api.adapters.pagination import PaginationSpec
 from ai.backend.manager.data.kernel.types import KernelInfo, KernelStatus, KernelStatusInMatchSpec
 from ai.backend.manager.data.session.types import SessionData, SessionStatus
@@ -80,6 +92,7 @@ from ai.backend.manager.models.session.orders import (
 from ai.backend.manager.models.session.orders import (
     resolve_order as resolve_session_order,
 )
+from ai.backend.manager.models.user import UserRole
 from ai.backend.manager.repositories.base import (
     BatchQuerier,
     NoPagination,
@@ -87,6 +100,15 @@ from ai.backend.manager.repositories.base import (
     QueryOrder,
     combine_conditions_or,
     negate_conditions,
+)
+from ai.backend.manager.services.session.actions.enqueue_session import (
+    EnqueueSessionAction,
+    ResourceSlotEntry,
+    SessionBatchSpec,
+    SessionExecutionSpec,
+    SessionResourceSpec,
+    SessionSchedulingSpec,
+    VFolderMountItem,
 )
 from ai.backend.manager.services.session.actions.search import SearchSessionsAction
 from ai.backend.manager.services.session.actions.search_kernel import SearchKernelsAction
@@ -153,6 +175,102 @@ class SessionAdapter(BaseAdapter):
         if user is None:
             raise RuntimeError("SessionAdapter requires an authenticated user in context")
         return user.user_id
+
+    # -------------------------------------------------------------------------
+    # Create
+    # -------------------------------------------------------------------------
+
+    async def create(
+        self,
+        input: CreateSessionInput,
+        user_id: UUID,
+        user_role: str,
+        access_key: str,
+        domain_name: str,
+        group_id: UUID,
+    ) -> CreateSessionPayload:
+        """Create a new session by enqueuing it for scheduling."""
+        batch_spec: SessionBatchSpec | None = None
+        if input.batch is not None:
+            starts_at = None
+            if input.batch.starts_at is not None:
+                starts_at = datetime.fromisoformat(input.batch.starts_at)
+
+            batch_timeout = (
+                timedelta(seconds=input.batch.batch_timeout)
+                if input.batch.batch_timeout is not None
+                else None
+            )
+
+            batch_spec = SessionBatchSpec(
+                startup_command=input.batch.startup_command,
+                starts_at=starts_at,
+                batch_timeout=batch_timeout,
+            )
+
+        mounts: list[VFolderMountItem] | None = None
+        if input.mounts is not None:
+            mounts = [
+                VFolderMountItem(
+                    vfolder_id=m.vfolder_id,
+                    mount_path=m.mount_path,
+                    permission=(MountPermission(m.permission) if m.permission else None),
+                )
+                for m in input.mounts
+            ]
+
+        execution_spec: SessionExecutionSpec | None = None
+        if input.environ or input.preopen_ports or input.bootstrap_script:
+            execution_spec = SessionExecutionSpec(
+                environ=input.environ,
+                preopen_ports=input.preopen_ports,
+                bootstrap_script=input.bootstrap_script,
+            )
+
+        action = EnqueueSessionAction(
+            session_name=input.session_name,
+            session_type=SessionTypes(input.session_type.value),
+            image_id=input.image_id,
+            resource=SessionResourceSpec(
+                entries=[
+                    ResourceSlotEntry(
+                        resource_type=e.resource_type,
+                        quantity=e.quantity,
+                    )
+                    for e in input.resource_entries
+                ],
+                resource_group=input.resource_group,
+                shmem=input.resource_opts.shmem if input.resource_opts else None,
+                cluster_mode=(
+                    ClusterMode.MULTI_NODE
+                    if input.cluster_mode == ClusterModeEnum.MULTI_NODE
+                    else ClusterMode.SINGLE_NODE
+                ),
+                cluster_size=input.cluster_size,
+            ),
+            mounts=mounts,
+            execution=execution_spec,
+            scheduling=SessionSchedulingSpec(
+                priority=input.priority,
+                is_preemptible=input.is_preemptible,
+                dependencies=input.dependencies,
+                agent_list=input.agent_list,
+                attach_network=input.attach_network,
+            ),
+            batch=batch_spec,
+            tag=input.tag,
+            callback_url=input.callback_url,
+            user_id=user_id,
+            user_role=UserRole(user_role),
+            access_key=AccessKey(access_key),
+            domain_name=domain_name,
+            group_id=group_id,
+        )
+
+        result = await self._processors.session.enqueue_session.wait_for_complete(action)
+        return CreateSessionPayload(
+            session=self._session_data_to_node(result.session_data),
+        )
 
     # -------------------------------------------------------------------------
     # Batch load (DataLoader)

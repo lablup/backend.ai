@@ -171,6 +171,12 @@ class SessionNode(BaseResponseModel):
 # ---------------------------------------------------------------------------
 
 
+class CreateSessionPayload(BaseResponseModel):
+    """Payload for session creation. Returns the full session node."""
+
+    session: SessionNode = Field(description="Created session details.")
+
+
 class RestartSessionPayload(BaseResponseModel):
     """Payload for session restart action (204 No Content in practice)."""
 
