@@ -149,11 +149,10 @@ class DeploymentPolicyRow(Base):  # type: ignore[misc]
         nullable=False,
     )
 
-    # Relationship via FK on EndpointRow.deployment_policy_id
     endpoint_row: Mapped[EndpointRow | None] = relationship(
         "EndpointRow",
         back_populates="deployment_policy",
-        foreign_keys="[EndpointRow.deployment_policy_id]",
+        foreign_keys=[endpoint],
         uselist=False,
     )
 

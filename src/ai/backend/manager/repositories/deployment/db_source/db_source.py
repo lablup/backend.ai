@@ -270,10 +270,7 @@ class DeploymentDBSource:
                     element_id=str(endpoint.id),
                 ),
             )
-            policy_rbac_result = await execute_rbac_entity_creator(db_sess, policy_creator)
-
-            # Link the endpoint to the newly created policy via FK
-            endpoint.deployment_policy_id = policy_rbac_result.row.id
+            await execute_rbac_entity_creator(db_sess, policy_creator)
             await db_sess.flush()
 
             stmt = (
@@ -354,10 +351,7 @@ class DeploymentDBSource:
                     element_id=str(endpoint.id),
                 ),
             )
-            policy_rbac_result = await execute_rbac_entity_creator(db_sess, policy_creator)
-
-            # Link the endpoint to the newly created policy via FK
-            endpoint.deployment_policy_id = policy_rbac_result.row.id
+            await execute_rbac_entity_creator(db_sess, policy_creator)
             await db_sess.flush()
 
             stmt = (

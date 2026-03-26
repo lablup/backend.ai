@@ -234,8 +234,7 @@ class ModelServingRepository:
                     element_id=str(endpoint.id),
                 ),
             )
-            policy_rbac_result = await execute_rbac_entity_creator(db_sess, policy_creator)
-            endpoint.deployment_policy_id = policy_rbac_result.row.id
+            await execute_rbac_entity_creator(db_sess, policy_creator)
             await db_sess.flush()
 
             endpoint_row = await EndpointRow.get(

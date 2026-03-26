@@ -316,24 +316,6 @@ class EndpointRow(Base):  # type: ignore[misc]
         server_default=sa.text("10"),
     )
 
-    # FK to deployment_policies — DEFERRABLE so that within a transaction the
-    # endpoint row can be inserted before the policy row exists.
-    # Nullable because endpoint is inserted before its policy in the same transaction.
-    # Application code always sets this immediately after policy creation.
-    deployment_policy_id: Mapped[UUID | None] = mapped_column(
-        "deployment_policy_id",
-        GUID,
-        sa.ForeignKey(
-            "deployment_policies.id",
-            name="fk_endpoints_deployment_policy_id",
-            ondelete="RESTRICT",
-            deferrable=True,
-            initially="deferred",
-        ),
-        nullable=True,
-        unique=True,
-    )
-
     routings = relationship("RoutingRow", back_populates="endpoint_row")
     tokens = relationship(
         "EndpointTokenRow",
@@ -379,7 +361,7 @@ class EndpointRow(Base):  # type: ignore[misc]
     deployment_policy = relationship(
         "DeploymentPolicyRow",
         back_populates="endpoint_row",
-        foreign_keys=[deployment_policy_id],
+        foreign_keys="[DeploymentPolicyRow.endpoint]",
         uselist=False,
     )
 
