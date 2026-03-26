@@ -15,6 +15,7 @@ from dateutil.tz import tzutc
 from ai.backend.common.data.endpoint.types import EndpointLifecycle
 from ai.backend.common.data.model_deployment.types import DeploymentStrategy
 from ai.backend.common.data.permission.types import RBACElementType
+from ai.backend.common.dto.manager.v2.deployment.types import IntOrPercent, IntOrPercentType
 from ai.backend.common.exception import DeploymentNameAlreadyExists
 from ai.backend.common.types import (
     AccessKey,
@@ -2457,7 +2458,10 @@ class TestDeploymentPolicyOperations:
         spec = DeploymentPolicyUpserterSpec(
             endpoint_id=test_endpoint_id,
             strategy=DeploymentStrategy.ROLLING,
-            strategy_spec=RollingUpdateSpec(max_surge=1, max_unavailable=0),
+            strategy_spec=RollingUpdateSpec(
+                max_surge=IntOrPercent(type=IntOrPercentType.COUNT, count=1),
+                max_unavailable=IntOrPercent(type=IntOrPercentType.COUNT, count=0),
+            ),
         )
         result = await deployment_repository.upsert_deployment_policy(Upserter(spec=spec))
         return result.data
@@ -2515,7 +2519,10 @@ class TestDeploymentPolicyOperations:
         assert result.id == test_deployment_policy_data.id
         assert result.endpoint == test_endpoint_id
         assert result.strategy == DeploymentStrategy.ROLLING
-        assert result.strategy_spec == RollingUpdateSpec(max_surge=1, max_unavailable=0)
+        assert result.strategy_spec == RollingUpdateSpec(
+            max_surge=IntOrPercent(type=IntOrPercentType.COUNT, count=1),
+            max_unavailable=IntOrPercent(type=IntOrPercentType.COUNT, count=0),
+        )
 
     async def test_get_deployment_policy_not_found(
         self,
@@ -2755,10 +2762,28 @@ class TestSearchDeploymentPolicies:
         """Create deployment policies for all sample endpoints."""
         policies: list[DeploymentPolicyData] = []
         strategies: list[tuple[DeploymentStrategy, RollingUpdateSpec | BlueGreenSpec]] = [
-            (DeploymentStrategy.ROLLING, RollingUpdateSpec(max_surge=1, max_unavailable=0)),
-            (DeploymentStrategy.ROLLING, RollingUpdateSpec(max_surge=2, max_unavailable=1)),
+            (
+                DeploymentStrategy.ROLLING,
+                RollingUpdateSpec(
+                    max_surge=IntOrPercent(type=IntOrPercentType.COUNT, count=1),
+                    max_unavailable=IntOrPercent(type=IntOrPercentType.COUNT, count=0),
+                ),
+            ),
+            (
+                DeploymentStrategy.ROLLING,
+                RollingUpdateSpec(
+                    max_surge=IntOrPercent(type=IntOrPercentType.COUNT, count=2),
+                    max_unavailable=IntOrPercent(type=IntOrPercentType.COUNT, count=1),
+                ),
+            ),
             (DeploymentStrategy.BLUE_GREEN, BlueGreenSpec(auto_promote=True)),
-            (DeploymentStrategy.ROLLING, RollingUpdateSpec(max_surge=0, max_unavailable=1)),
+            (
+                DeploymentStrategy.ROLLING,
+                RollingUpdateSpec(
+                    max_surge=IntOrPercent(type=IntOrPercentType.COUNT, count=0),
+                    max_unavailable=IntOrPercent(type=IntOrPercentType.COUNT, count=1),
+                ),
+            ),
         ]
         for eid, (strategy, spec) in zip(sample_endpoint_ids, strategies, strict=False):
             result = await deployment_repository.upsert_deployment_policy(
