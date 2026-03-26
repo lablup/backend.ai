@@ -40,13 +40,13 @@ def register_v2_session_routes(
     )
     registry.add(
         "POST",
-        "/search-by-agent/{agent_id}",
+        "/agents/{agent_id}/search",
         handler.admin_search_sessions_by_agent,
         middlewares=[superadmin_required],
     )
     registry.add(
         "POST",
-        "/kernels/search-by-agent/{agent_id}",
+        "/kernels/agents/{agent_id}/search",
         handler.admin_search_kernels_by_agent,
         middlewares=[superadmin_required],
     )

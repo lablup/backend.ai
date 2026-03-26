@@ -64,7 +64,7 @@ class V2SessionClient(BaseDomainClient):
         """Search sessions scoped to a specific agent."""
         return await self._client.typed_request(
             "POST",
-            f"{_PATH}/search-by-agent/{agent_id}",
+            f"{_PATH}/agents/{agent_id}/search",
             request=request,
             response_model=AdminSearchSessionsPayload,
         )
@@ -77,7 +77,7 @@ class V2SessionClient(BaseDomainClient):
         """Search kernels scoped to a specific agent."""
         return await self._client.typed_request(
             "POST",
-            f"{_PATH}/kernels/search-by-agent/{agent_id}",
+            f"{_PATH}/kernels/agents/{agent_id}/search",
             request=request,
             response_model=AdminSearchKernelsPayload,
         )
