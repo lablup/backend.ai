@@ -108,7 +108,8 @@ class TestUserDotfileGet:
         await user_dotfile_factory(path=f".list-b-{unique2}", data="b", permission="644")
         result = await admin_registry.config.list_user_dotfiles()
         assert isinstance(result, ListDotfilesResponse)
-        paths = [item.path for item in result.items]
+        # List response is a plain array (via BaseRootResponseModel)
+        paths = [item.path for item in result.root]
         assert f".list-a-{unique1}" in paths
         assert f".list-b-{unique2}" in paths
 
@@ -190,7 +191,8 @@ class TestBootstrapScript:
     ) -> None:
         result = await admin_registry.config.get_bootstrap_script()
         assert isinstance(result, GetBootstrapScriptResponse)
-        assert result.script == ""
+        # Bootstrap script response is a plain string (via BaseRootResponseModel)
+        assert result.root == ""
 
     async def test_update_and_get_bootstrap_script(
         self,
@@ -203,9 +205,37 @@ class TestBootstrapScript:
         )
         assert isinstance(update_result, UpdateBootstrapScriptResponse)
         get_result = await admin_registry.config.get_bootstrap_script()
-        assert get_result.script == script_content
+        assert get_result.root == script_content
         # Reset to empty for cleanup
         await admin_registry.config.update_bootstrap_script(UpdateBootstrapScriptRequest(script=""))
+
+    async def test_get_bootstrap_script_returns_plain_string_json(
+        self,
+        admin_registry: BackendAIClientRegistry,
+    ) -> None:
+        """Verify the API returns a plain JSON string, not wrapped in an object.
+
+        This is a regression test for BA-5420 to ensure the response format
+        matches the legacy behavior (plain string, not {"script": "..."}).
+        """
+        unique = secrets.token_hex(4)
+        script_content = f"echo test-{unique}"
+        await admin_registry.config.update_bootstrap_script(
+            UpdateBootstrapScriptRequest(script=script_content)
+        )
+        try:
+            result = await admin_registry.config.get_bootstrap_script()
+            # The response should be a plain string
+            assert result.root == script_content
+            # Verify model_dump returns the plain string (not wrapped)
+            dumped = result.model_dump()
+            assert dumped == script_content
+            assert isinstance(dumped, str)
+        finally:
+            # Cleanup
+            await admin_registry.config.update_bootstrap_script(
+                UpdateBootstrapScriptRequest(script="")
+            )
 
 
 # ---------------------------------------------------------------------------
@@ -276,7 +306,8 @@ class TestGroupDotfileGet:
             GetGroupDotfileRequest(group=str(group_fixture))
         )
         assert isinstance(result, ListDotfilesResponse)
-        paths = [item.path for item in result.items]
+        # List response is a plain array (via BaseRootResponseModel)
+        paths = [item.path for item in result.root]
         assert f".glist-a-{unique1}" in paths
         assert f".glist-b-{unique2}" in paths
 
@@ -396,7 +427,8 @@ class TestDomainDotfileGet:
             GetDomainDotfileRequest(domain=domain_fixture)
         )
         assert isinstance(result, ListDotfilesResponse)
-        paths = [item.path for item in result.items]
+        # List response is a plain array (via BaseRootResponseModel)
+        paths = [item.path for item in result.root]
         assert f".dlist-a-{unique1}" in paths
         assert f".dlist-b-{unique2}" in paths
 
