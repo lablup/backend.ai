@@ -458,6 +458,11 @@ class CreateDeploymentAdapter:
         Returns:
             NewDeploymentCreator for service layer
         """
+        if request.initial_revision is None:
+            raise InvalidAPIParameters("initial_revision is required to create a deployment")
+
+        initial_revision = request.initial_revision
+
         # Generate name if not provided
         name = request.metadata.name or f"deployment-{uuid4().hex[:8]}"
         tag = ",".join(request.metadata.tags) if request.metadata.tags else None
@@ -467,7 +472,7 @@ class CreateDeploymentAdapter:
             name=name,
             domain=request.metadata.domain_name,
             project=request.metadata.project_id,
-            resource_group=request.initial_revision.resource_config.resource_group,
+            resource_group=initial_revision.resource_config.resource_group,
             created_user=user_uuid,
             session_owner=user_uuid,
             created_at=None,
@@ -485,7 +490,7 @@ class CreateDeploymentAdapter:
         )
 
         # Build model revision creator
-        model_revision = build_revision_creator(request.initial_revision)
+        model_revision = build_revision_creator(initial_revision)
 
         # Build policy config
         policy = self._build_policy_config(request.default_deployment_strategy)
