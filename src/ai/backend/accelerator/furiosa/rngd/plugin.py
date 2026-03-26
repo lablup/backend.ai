@@ -184,6 +184,7 @@ class RngdPlugin(AbstractComputePlugin):
         return {
             "HostConfig": {
                 "CapAdd": ["IPC_LOCK"],
+                "SecurityOpt": ["seccomp=unconfined"],
                 "IpcMode": "host",
                 "Ulimits": [{"Name": "memlock", "Hard": -1, "Soft": -1}],
                 "Sysctls": {"net.ipv6.conf.all.disable_ipv6": "0"},
