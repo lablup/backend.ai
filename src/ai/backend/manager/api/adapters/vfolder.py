@@ -61,6 +61,7 @@ class VFolderAdapter(BaseAdapter):
             usage=VFolderUsageInfoDTO(
                 num_files=usage_info.num_files,
                 used_bytes=usage_info.used_bytes,
+                # TODO: Populate from quota scope settings once quota info is available in the service layer.
                 max_size=None,
                 max_files=0,
             )
