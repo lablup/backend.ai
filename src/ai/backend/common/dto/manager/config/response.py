@@ -11,6 +11,7 @@ from ai.backend.common.api_handlers import BaseResponseModel, BaseRootResponseMo
 
 __all__ = (
     "DotfileItem",
+    "DotfileListItem",
     "CreateDotfileResponse",
     "UpdateDotfileResponse",
     "DeleteDotfileResponse",
@@ -26,6 +27,14 @@ class DotfileItem(BaseModel):
 
     path: str = Field(description="Dotfile path")
     perm: str = Field(description="Unix file permission in octal notation")
+    data: str = Field(description="Dotfile content")
+
+
+class DotfileListItem(BaseModel):
+    """A dotfile entry for list responses (backward compatible field names)."""
+
+    path: str = Field(description="Dotfile path")
+    permission: str = Field(description="Unix file permission in octal notation")
     data: str = Field(description="Dotfile content")
 
 
@@ -51,10 +60,8 @@ class GetDotfileResponse(BaseResponseModel):
     data: str = Field(description="Dotfile content")
 
 
-class ListDotfilesResponse(BaseResponseModel):
-    """Response for listing dotfiles."""
-
-    items: list[DotfileItem] = Field(description="List of dotfile entries")
+class ListDotfilesResponse(BaseRootResponseModel[list[DotfileListItem]]):
+    """Response for listing dotfiles (plain array for backward compatibility)."""
 
 
 class GetBootstrapScriptResponse(BaseRootResponseModel[str]):
