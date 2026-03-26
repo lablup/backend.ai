@@ -104,6 +104,7 @@ from ai.backend.manager.types import MountOptionModel, UserScope
 
 if TYPE_CHECKING:
     from ai.backend.manager.data.deployment.creator import DeploymentCreator
+    from ai.backend.manager.models.deployment_revision import DeploymentRevisionRow
 
 __all__ = (
     "EndpointAutoScalingRuleRow",

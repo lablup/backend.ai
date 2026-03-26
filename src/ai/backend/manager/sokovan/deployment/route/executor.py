@@ -18,7 +18,6 @@ from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.deployment.types import DeploymentInfo, RouteStatus
 from ai.backend.manager.errors.deployment import (
-    DeploymentHasNoTargetRevision,
     EndpointNotFound,
     RouteSessionNotFound,
     RouteSessionTerminated,
