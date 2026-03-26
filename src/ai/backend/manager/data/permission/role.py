@@ -91,7 +91,7 @@ class ScopeChainPermissionCheckInput:
     user_id: uuid.UUID
     target_element_ref: RBACElementRef
     operation: OperationType
-    permission_entity_type: EntityType | None = None
+    permission_entity_type: EntityType | None
 
 
 @dataclass(frozen=True)

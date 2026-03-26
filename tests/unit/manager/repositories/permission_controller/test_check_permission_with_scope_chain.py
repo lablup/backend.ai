@@ -263,6 +263,7 @@ class TestCheckPermissionWithScopeChain:
                     element_id=fixture.vfolder_id,
                 ),
                 operation=check_op,
+                permission_entity_type=None,
             )
         )
         assert result is expected
@@ -299,6 +300,7 @@ class TestCheckPermissionWithScopeChain:
                     element_id=fixture.vfolder_id,
                 ),
                 operation=check_op,
+                permission_entity_type=None,
             )
         )
         assert result is expected
@@ -340,6 +342,7 @@ class TestCheckPermissionWithScopeChain:
                     element_id=fixture.vfolder_id,
                 ),
                 operation=check_op,
+                permission_entity_type=None,
             )
         )
         assert result is expected
@@ -376,6 +379,7 @@ class TestCheckPermissionWithScopeChain:
                     element_id=fixture.vfolder_id,
                 ),
                 operation=check_op,
+                permission_entity_type=None,
             )
         )
         assert result is expected
@@ -448,6 +452,7 @@ class TestCheckPermissionWithScopeChain:
                     element_id=fixture.vfolder_id,
                 ),
                 operation=OperationType.READ,
+                permission_entity_type=None,
             )
         )
         assert result is False
@@ -489,6 +494,7 @@ class TestCheckPermissionWithScopeChain:
                     element_id=fixture.vfolder_id,
                 ),
                 operation=check_op,
+                permission_entity_type=None,
             )
         )
         assert result is expected
@@ -523,6 +529,7 @@ class TestCheckPermissionWithScopeChain:
                     element_id=fixture.vfolder_id,
                 ),
                 operation=check_op,
+                permission_entity_type=None,
             )
         )
         assert result is expected
@@ -560,6 +567,7 @@ class TestCheckPermissionWithScopeChain:
                     element_id=fixture.vfolder_id,
                 ),
                 operation=check_op,
+                permission_entity_type=None,
             )
         )
         assert result is expected
@@ -596,6 +604,7 @@ class TestCheckPermissionWithScopeChain:
                     element_id=fixture.vfolder_id,
                 ),
                 operation=check_op,
+                permission_entity_type=None,
             )
         )
         assert result is expected
@@ -670,6 +679,7 @@ class TestCheckPermissionWithScopeChain:
                     element_id=fixture.vfolder_id,
                 ),
                 operation=OperationType.READ,
+                permission_entity_type=None,
             )
         )
         assert result is False
@@ -719,6 +729,7 @@ class TestCheckPermissionWithScopeChain:
                     element_id=fixture.vfolder_id,
                 ),
                 operation=OperationType.READ,
+                permission_entity_type=None,
             )
         )
         assert result is False
@@ -849,6 +860,7 @@ class TestCheckPermissionWithScopeChain:
                     element_id=fixture.vfolder_id,
                 ),
                 operation=check_op,
+                permission_entity_type=None,
             )
         )
         assert result is expected
@@ -905,6 +917,7 @@ class TestCheckPermissionWithScopeChain:
                     element_id=fixture.vfolder_id,
                 ),
                 operation=check_op,
+                permission_entity_type=None,
             )
         )
         assert result is expected
@@ -941,6 +954,7 @@ class TestCheckPermissionWithScopeChain:
                     element_id=fixture.vfolder_id,
                 ),
                 operation=check_op,
+                permission_entity_type=None,
             )
         )
         assert result is expected
@@ -998,6 +1012,7 @@ class TestCheckPermissionWithScopeChain:
                     element_id=fixture.vfolder_id,
                 ),
                 operation=check_op,
+                permission_entity_type=None,
             )
         )
         assert result is expected
@@ -1035,6 +1050,7 @@ class TestCheckPermissionWithScopeChain:
                     element_id=fixture.vfolder_id,
                 ),
                 operation=check_op,
+                permission_entity_type=None,
             )
         )
         assert result is expected
@@ -1111,6 +1127,7 @@ class TestCheckPermissionWithScopeChain:
                     element_id=fixture_ids.vfolder_id,
                 ),
                 operation=OperationType.READ,
+                permission_entity_type=None,
             )
         )
         assert result is False
@@ -1160,6 +1177,7 @@ class TestCheckPermissionWithScopeChain:
                     element_id=fixture.vfolder_id,
                 ),
                 operation=check_op,
+                permission_entity_type=None,
             )
         )
         assert result is expected
@@ -1308,6 +1326,7 @@ class TestCheckPermissionWithScopeChain:
                     element_id=fixture.vfolder_id,
                 ),
                 operation=check_op,
+                permission_entity_type=None,
             )
         )
         assert result is expected
