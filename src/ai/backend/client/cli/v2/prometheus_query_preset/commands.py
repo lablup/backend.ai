@@ -141,6 +141,40 @@ def create(
 
 @prometheus_query_preset.command()
 @click.argument("preset_id", type=str)
+@click.argument("body", type=str)
+def update(preset_id: str, body: str) -> None:
+    """Update a prometheus query definition.
+
+    BODY is a JSON string with fields to update.
+    """
+    import json
+    import sys
+
+    from ai.backend.common.dto.manager.v2.prometheus_query_preset.request import (
+        ModifyQueryDefinitionInput,
+    )
+
+    try:
+        data = json.loads(body)
+    except json.JSONDecodeError as e:
+        click.echo(f"Invalid JSON: {e}", err=True)
+        sys.exit(1)
+
+    async def _run() -> None:
+        registry = await create_v2_registry(load_v2_config())
+        try:
+            result = await registry.prometheus_query_preset.update(
+                UUID(preset_id), ModifyQueryDefinitionInput(**data)
+            )
+            print_result(result)
+        finally:
+            await registry.close()
+
+    asyncio.run(_run())
+
+
+@prometheus_query_preset.command()
+@click.argument("preset_id", type=str)
 def delete(preset_id: str) -> None:
     """Delete a query definition by ID."""
     from ai.backend.common.dto.manager.v2.prometheus_query_preset.request import (
