@@ -9,28 +9,28 @@ class RngdAPI:
 
     @classmethod
     async def is_furiosa_device(cls, idx: int) -> bool:
-        platform_type_path = Path("/sys/class/rngd_mgmt") / f"rngd!npu{idx}_mgmt" / "platform_type"
+        platform_type_path = Path("/sys/class/rngd_mgmt") / f"rngd!npu{idx}mgmt" / "platform_type"
         if not (platform_type_path.exists() and platform_type_path.is_file()):
             return False
 
         contents = await asyncio.get_running_loop().run_in_executor(
             None, platform_type_path.read_text
         )
-        return contents in ["FuriosaAI"]
+        return contents.strip() in ["FuriosaAI"]
 
     @classmethod
     async def list_devices(cls) -> AsyncIterable[Mapping[str, str]]:
         async def _read_prop(path: Path) -> str:
-            return await asyncio.get_running_loop().run_in_executor(None, path.read_text)
+            return (await asyncio.get_running_loop().run_in_executor(None, path.read_text)).strip()
 
         candidates = await asyncio.get_running_loop().run_in_executor(
-            None, glob.glob, "/dev/rngd/npu?"
+            None, glob.glob, "/dev/rngd/npu?mgmt"
         )
         for idx in range(len(candidates)):
             if not await cls.is_furiosa_device(idx):
                 continue
 
-            mgmt_path = Path("/sys/class/rngd_mgmt") / f"rngd!npu{idx}_mgmt"
+            mgmt_path = Path("/sys/class/rngd_mgmt") / f"rngd!npu{idx}mgmt"
             device_uuid = await _read_prop(mgmt_path / "device_uuid")
             device_sn = await _read_prop(mgmt_path / "device_sn")
             model = await _read_prop(mgmt_path / "device_type")

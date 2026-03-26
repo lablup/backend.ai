@@ -174,7 +174,7 @@ class RngdPlugin(AbstractComputePlugin):
         devices: dict[str, str] = {}
         for alloc_idx, device_id in enumerate(device_ids):
             source_paths = await asyncio.get_running_loop().run_in_executor(
-                None, glob.glob, f"/dev/rngd/npu{device_id}"
+                None, glob.glob, f"/dev/rngd/npu{device_id}*"
             )
             for source_path in source_paths:
                 devices[str(source_path)] = str(source_path).replace(
@@ -300,7 +300,7 @@ class RngdPlugin(AbstractComputePlugin):
             "slot_name": "rngd.device",
             "description": "RNGD",
             "human_readable_name": "Furiosa RNGD Device",
-            "display_unit": "Core",
+            "display_unit": "NPU",
             "number_format": {"binary": False, "round_length": 0},
             "display_icon": "npu3",
         }
