@@ -104,9 +104,12 @@ class TestBaseVolume:
         assert written_path.exists()
         assert written_path.read_bytes() == test_content
 
-    @pytest.mark.parametrize("file_name, file_content", [
-        ("data.txt", "clone me"),
-    ])
+    @pytest.mark.parametrize(
+        "file_name, file_content",
+        [
+            ("data.txt", "clone me"),
+        ],
+    )
     async def test_clone_vfolder_auto_creates_quota_scope(
         self,
         base_volume: BaseVolume,
@@ -138,9 +141,12 @@ class TestBaseVolume:
         dst_vfpath = base_volume.mangle_vfpath(dst_vfolder_id)
         assert (dst_vfpath / file_name).read_text() == file_content
 
-    @pytest.mark.parametrize("file_name, file_content", [
-        ("existing.txt", "hello"),
-    ])
+    @pytest.mark.parametrize(
+        "file_name, file_content",
+        [
+            ("existing.txt", "hello"),
+        ],
+    )
     async def test_clone_vfolder_existing_quota_scope(
         self,
         base_volume: BaseVolume,
