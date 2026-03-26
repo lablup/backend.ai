@@ -136,6 +136,12 @@ def _get_endpoint_auto_scaling_policy_join_condition() -> Any:
     return EndpointRow.id == foreign(DeploymentAutoScalingPolicyRow.endpoint)
 
 
+def _get_deployment_policy_join_condition() -> Any:
+    from ai.backend.manager.models.deployment_policy import DeploymentPolicyRow
+
+    return EndpointRow.id == foreign(DeploymentPolicyRow.endpoint)
+
+
 def _get_image_row_join_condition() -> Any:
     from ai.backend.manager.models.image import ImageRow
 
@@ -361,7 +367,7 @@ class EndpointRow(Base):  # type: ignore[misc]
     deployment_policy = relationship(
         "DeploymentPolicyRow",
         back_populates="endpoint_row",
-        foreign_keys="[DeploymentPolicyRow.endpoint]",
+        primaryjoin=_get_deployment_policy_join_condition,
         uselist=False,
     )
 
