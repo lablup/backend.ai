@@ -7,6 +7,7 @@ from uuid import uuid4
 import pytest
 from pydantic import ValidationError
 
+from ai.backend.common.dto.manager.v2.common import ResourceSlotEntryInput
 from ai.backend.common.dto.manager.v2.session.request import (
     BatchConfigInput,
     EnqueueSessionInput,
@@ -34,8 +35,8 @@ class TestEnqueueSessionInput:
             session_type=CreateSessionTypeEnum.INTERACTIVE,
             image_id=uuid4(),
             resource_entries=[
-                {"resource_type": "cpu", "quantity": "1"},
-                {"resource_type": "mem", "quantity": "1g"},
+                ResourceSlotEntryInput(resource_type="cpu", quantity="1"),
+                ResourceSlotEntryInput(resource_type="mem", quantity="1g"),
             ],
             project_id=uuid4(),
         )
@@ -54,8 +55,8 @@ class TestEnqueueSessionInput:
             session_type=CreateSessionTypeEnum.BATCH,
             image_id=uuid4(),
             resource_entries=[
-                {"resource_type": "cpu", "quantity": "2"},
-                {"resource_type": "mem", "quantity": "4g"},
+                ResourceSlotEntryInput(resource_type="cpu", quantity="2"),
+                ResourceSlotEntryInput(resource_type="mem", quantity="4g"),
             ],
             project_id=uuid4(),
             batch=BatchConfigInput(
@@ -74,7 +75,7 @@ class TestEnqueueSessionInput:
                 session_name="x" * 65,
                 session_type=CreateSessionTypeEnum.INTERACTIVE,
                 image_id=uuid4(),
-                resource_entries=[{"resource_type": "cpu", "quantity": "1"}],
+                resource_entries=[ResourceSlotEntryInput(resource_type="cpu", quantity="1")],
                 project_id=uuid4(),
             )
 
@@ -85,7 +86,7 @@ class TestEnqueueSessionInput:
                 session_name="",
                 session_type=CreateSessionTypeEnum.INTERACTIVE,
                 image_id=uuid4(),
-                resource_entries=[{"resource_type": "cpu", "quantity": "1"}],
+                resource_entries=[ResourceSlotEntryInput(resource_type="cpu", quantity="1")],
                 project_id=uuid4(),
             )
 
@@ -96,7 +97,7 @@ class TestEnqueueSessionInput:
                 session_name="test",
                 session_type=CreateSessionTypeEnum.INTERACTIVE,
                 image_id=uuid4(),
-                resource_entries=[{"resource_type": "cpu", "quantity": "1"}],
+                resource_entries=[ResourceSlotEntryInput(resource_type="cpu", quantity="1")],
                 project_id=uuid4(),
                 cluster_size=0,
             )
@@ -108,7 +109,7 @@ class TestEnqueueSessionInput:
                 session_name="test",
                 session_type=CreateSessionTypeEnum.INTERACTIVE,
                 image_id=uuid4(),
-                resource_entries=[{"resource_type": "cpu", "quantity": "1"}],
+                resource_entries=[ResourceSlotEntryInput(resource_type="cpu", quantity="1")],
                 project_id=uuid4(),
                 priority=101,
             )
@@ -120,7 +121,7 @@ class TestEnqueueSessionInput:
             session_name="mounted-session",
             session_type=CreateSessionTypeEnum.INTERACTIVE,
             image_id=uuid4(),
-            resource_entries=[{"resource_type": "cpu", "quantity": "1"}],
+            resource_entries=[ResourceSlotEntryInput(resource_type="cpu", quantity="1")],
             project_id=uuid4(),
             mounts=[
                 MountItemInput(vfolder_id=vfolder_id, mount_path="/data", permission="ro"),
@@ -137,7 +138,7 @@ class TestEnqueueSessionInput:
             session_name="shmem-session",
             session_type=CreateSessionTypeEnum.INTERACTIVE,
             image_id=uuid4(),
-            resource_entries=[{"resource_type": "cpu", "quantity": "1"}],
+            resource_entries=[ResourceSlotEntryInput(resource_type="cpu", quantity="1")],
             project_id=uuid4(),
             resource_opts=ResourceOptsInput(shmem="2g"),
         )
@@ -151,7 +152,7 @@ class TestEnqueueSessionInput:
                 "session_name": "test",
                 "session_type": "interactive",
                 "image_id": str(uuid4()),
-                "resource_entries": [{"resource_type": "cpu", "quantity": "1"}],
+                "resource_entries": [ResourceSlotEntryInput(resource_type="cpu", quantity="1")],
             })
 
     def test_multi_node_cluster(self) -> None:
@@ -160,7 +161,7 @@ class TestEnqueueSessionInput:
             session_name="cluster-session",
             session_type=CreateSessionTypeEnum.INTERACTIVE,
             image_id=uuid4(),
-            resource_entries=[{"resource_type": "cpu", "quantity": "1"}],
+            resource_entries=[ResourceSlotEntryInput(resource_type="cpu", quantity="1")],
             project_id=uuid4(),
             cluster_mode=ClusterModeEnum.MULTI_NODE,
             cluster_size=4,
@@ -297,8 +298,8 @@ class TestCreateSessionTypeEnum:
     """Tests for CreateSessionTypeEnum values."""
 
     def test_only_interactive_and_batch(self) -> None:
-        assert CreateSessionTypeEnum.INTERACTIVE == "interactive"
-        assert CreateSessionTypeEnum.BATCH == "batch"
+        assert CreateSessionTypeEnum.INTERACTIVE.value == "interactive"
+        assert CreateSessionTypeEnum.BATCH.value == "batch"
         assert len(CreateSessionTypeEnum) == 2
 
 
@@ -306,8 +307,8 @@ class TestClusterModeEnum:
     """Tests for ClusterModeEnum values."""
 
     def test_values(self) -> None:
-        assert ClusterModeEnum.SINGLE_NODE == "single-node"
-        assert ClusterModeEnum.MULTI_NODE == "multi-node"
+        assert ClusterModeEnum.SINGLE_NODE.value == "single-node"
+        assert ClusterModeEnum.MULTI_NODE.value == "multi-node"
 
 
 class TestMountItemInput:

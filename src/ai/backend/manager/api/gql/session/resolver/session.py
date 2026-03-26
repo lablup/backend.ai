@@ -84,13 +84,14 @@ async def enqueue_session(
     user_data = current_user()
     if user_data is None:
         raise UserNotFound("User not found in context")
+    pydantic_input = input.to_pydantic()
     payload = await info.context.adapters.session.enqueue(
-        input.to_pydantic(),
+        pydantic_input,
         user_id=user_data.user_id,
-        user_role=user_data.role,
-        access_key=user_data.access_key,
+        user_role=str(user_data.role),
+        access_key="",
         domain_name=user_data.domain_name,
-        group_id=input.project_id or user_data.user_id,
+        group_id=pydantic_input.project_id,
     )
     return EnqueueSessionPayloadGQL(
         session=SessionV2GQL.from_pydantic(payload.session),

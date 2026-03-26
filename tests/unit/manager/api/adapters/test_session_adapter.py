@@ -9,6 +9,7 @@ from uuid import UUID, uuid4
 
 import pytest
 
+from ai.backend.common.dto.manager.v2.common import ResourceSlotEntryInput
 from ai.backend.common.dto.manager.v2.session.request import (
     BatchConfigInput,
     EnqueueSessionInput,
@@ -166,8 +167,8 @@ class TestEnqueueActionBuilding:
             session_type=CreateSessionTypeEnum.INTERACTIVE,
             image_id=uuid4(),
             resource_entries=[
-                {"resource_type": "cpu", "quantity": "1"},
-                {"resource_type": "mem", "quantity": "1g"},
+                ResourceSlotEntryInput(resource_type="cpu", quantity="1"),
+                ResourceSlotEntryInput(resource_type="mem", quantity="1g"),
             ],
             project_id=project_id,
         )
@@ -195,7 +196,7 @@ class TestEnqueueActionBuilding:
             session_name="batch-job",
             session_type=CreateSessionTypeEnum.BATCH,
             image_id=uuid4(),
-            resource_entries=[{"resource_type": "cpu", "quantity": "2"}],
+            resource_entries=[ResourceSlotEntryInput(resource_type="cpu", quantity="2")],
             project_id=uuid4(),
             batch=BatchConfigInput(startup_command="python train.py", batch_timeout=3600),
         )
@@ -222,7 +223,7 @@ class TestEnqueueActionBuilding:
             session_name="cluster-session",
             session_type=CreateSessionTypeEnum.INTERACTIVE,
             image_id=uuid4(),
-            resource_entries=[{"resource_type": "cpu", "quantity": "1"}],
+            resource_entries=[ResourceSlotEntryInput(resource_type="cpu", quantity="1")],
             project_id=uuid4(),
             cluster_mode=ClusterModeEnum.MULTI_NODE,
             cluster_size=4,
