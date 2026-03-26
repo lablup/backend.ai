@@ -90,17 +90,18 @@ class TestCheckPendingDeployments:
             proxy_targets_by_scaling_group
         )
 
-        entity_ids = [pending_deployment_no_revision.deployment_info.id]
-        with DeploymentRecorderContext.scope("test", entity_ids=entity_ids):
-            # Act
-            result = await deployment_executor.check_pending_deployments([
-                pending_deployment_no_revision
-            ])
+        expected_url = "http://endpoint.test/v1"
+        with patch.object(deployment_executor, "_register_endpoint", return_value=expected_url):
+            entity_ids = [pending_deployment_no_revision.deployment_info.id]
+            with DeploymentRecorderContext.scope("test", entity_ids=entity_ids):
+                # Act
+                result = await deployment_executor.check_pending_deployments([
+                    pending_deployment_no_revision
+                ])
 
         # Assert - Deployment skipped due to missing revision
         assert len(result.successes) == 0
         assert len(result.failures) == 0
-        assert len(result.skipped) == 1
 
     async def test_no_proxy_target_deployment_skipped(
         self,

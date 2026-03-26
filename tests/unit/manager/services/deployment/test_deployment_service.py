@@ -555,7 +555,9 @@ class TestAddModelRevision(ModelRevisionFixtures):
                 }
             ]
         })
-        deployment_service._model_definition_generator_registry.generate_model_definition.return_value = resolved_definition
+        deployment_service._model_definition_generator_registry.generate_model_definition = (
+            AsyncMock(return_value=resolved_definition)
+        )
 
         action = AddModelRevisionAction(
             model_deployment_id=deployment_id, adder=revision_creator_with_model_definition
