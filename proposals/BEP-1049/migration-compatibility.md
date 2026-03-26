@@ -7,6 +7,7 @@ key-decisions:
   - All changes are additive; no existing behavior modified
   - Kata agents deployed alongside Docker agents in separate scaling groups
   - Rollback is trivial (remove Kata agents, keep schema)
+  - VFolder storage via direct guest-side NFS/Lustre/WekaFS mount (native kernel client, RDMA-preserving; mirrors Docker's host-level mount model)
 -->
 
 # BEP-1049: Migration and Compatibility
@@ -162,6 +163,64 @@ When implementing CoCo (Confidential Containers) support:
 - Remote attestation endpoint exposed via the manager API
 - Dedicated scaling group: `kata-confidential` with CoCo-enabled agents
 - No changes to the scheduler or resource accounting model
+
+#### VFolder Storage: Direct Guest-Side NFS/Lustre Mount
+
+virtio-fs introduces FUSE overhead on the host side and — critically — breaks RDMA data paths for high-performance storage backends (Lustre over InfiniBand, WekaFS RDMA, GPFS). Since Backend.AI's target deployments use RDMA-capable network-attached storage, virtio-fs is unsuitable for vfolder data I/O.
+
+The correct architecture mirrors Docker: mount the **storage volume** directly inside the guest VM using the guest's own NFS/Lustre/WekaFS kernel client (preserving RDMA, 100% native throughput), then bind-mount the specific vfolder subdirectory into the container.
+
+```
+Docker (current):
+  Storage cluster ──(NFS/Lustre/RDMA)──→ Host: /mnt/vfstore
+    └── DockerAgent bind-mounts /mnt/vfstore/<vfid>/subpath → container:/home/work/data
+
+Kata (proposed):
+  Storage cluster ──(NFS/Lustre/RDMA)──→ Guest VM: /mnt/vfstore (direct mount)
+    └── Container bind-mounts /mnt/vfstore/<vfid>/subpath → /home/work/data
+  (Guest VM's own filesystem client mounts storage directly — RDMA preserved, 100% native)
+```
+
+**How mount specs and storage network config reach the guest:**
+
+1. The KataAgent's `[kata]` config lists storage volume mount points with filesystem type, server address, export path, and mount options. It also includes the storage NIC's IP configuration (address, subnet, gateway) for the VFIO-passthrough storage network interface.
+2. Before VM boot, the agent writes `storage-mounts.json` to `/home/config/` (virtio-fs config channel — the same mechanism used for environ.txt and intrinsic-ports.json). This file includes both volume mount specs and storage NIC IP configuration.
+3. A guest boot script (systemd unit, `Before=local-fs.target`) reads `storage-mounts.json`, configures the storage NIC IP (IPoIB or dedicated Ethernet), and performs the volume mounts using the guest kernel's native NFS/Lustre client. Alternatively, cloud-init can handle network configuration if the guest image includes it.
+4. The OCI container spec includes standard bind mounts from `/mnt/vfstore/<vfid>/subpath` to `/home/work/data` — identical to Docker. These operate as guest-internal bind mounts since the volume is already mounted inside the guest.
+
+**Storage NIC IP allocation:** The storage NIC (InfiniBand HCA or dedicated Ethernet NIC) is VFIO-passthrough to the VM as a whole device. In single-tenancy deployments (one VM per agent node — the target for Phase 1), the VM simply takes the static storage IP that would otherwise belong to the host. The IP, subnet, and gateway are configured in the agent's `[kata]` config and written into `storage-mounts.json`. No dynamic IP allocation is needed — the storage network topology is static infrastructure-level configuration. For future multi-tenancy (multiple VMs per node via SR-IOV VFs), each VF would need its own IP, requiring DHCP or an IP pool manager — this is deferred along with SR-IOV support.
+
+**Storage topology visibility:** Container users can see mount info in `/proc/mounts` (server addresses, export paths). This is acceptable — the same isolation model as Docker. Backend.AI's security boundary is the vfolder permission model (users can only access vfolders they're authorized for), not mount concealment. Container users cannot mount their own disks (no `CAP_SYS_ADMIN`).
+
+**What uses virtio-fs (still):**
+- Scratch/config directories: `/home/config` (environ.txt, intrinsic-ports.json, storage-mounts.json)
+- These are small, non-performance-critical, host-originated configuration data
+
+**Guest VM base image requirements:**
+
+The Kata guest rootfs (or initrd) must include filesystem client drivers for every storage backend that Backend.AI claims to support. This is a build-time dependency — the base image is a managed infrastructure artifact, not a user-provided image.
+
+| Storage Backend | Required Guest Kernel Module / Userspace | Notes |
+|-----------------|------------------------------------------|-------|
+| NFS (VAST, NetApp, Pure, Dell EMC, Hammerspace) | `nfs`, `nfsv4` kernel modules; `mount.nfs` helper | Most universal; covers majority of supported backends |
+| Lustre (DDN EXAScaler) | `lustre` kernel module (out-of-tree, DKMS) | Must match Lustre server version; RDMA (o2ib) requires OFED |
+| WekaFS | `wekafs` kernel module + userspace agent | Proprietary; requires WekaFS client package and DPDK for RDMA |
+| CephFS | `ceph` kernel module | Native kernel client; alternatively use NFS gateway |
+| GPFS (IBM Storage Scale) | `mmfs` kernel module + userspace daemon | Proprietary; requires cluster membership config |
+
+The base image build pipeline must:
+1. Start from a minimal Linux rootfs (same as the standard Kata guest rootfs)
+2. Install a storage mount boot script as a systemd service (`Before=local-fs.target`) that reads `/home/config/storage-mounts.json` and mounts volumes
+3. Include kernel modules for all supported storage backends (compiled against the guest kernel version)
+4. Include any required userspace helpers (`mount.nfs`, `mount.lustre`, WekaFS agent, etc.)
+5. Version the image: `kata-rootfs-{krunner_version}-{storage_version}.qcow2` to enable atomic rollover when drivers are updated
+
+Not all deployments need all drivers. A modular approach (base image + per-backend overlay or module loading) can reduce image size, but the simplest initial approach is a single "fat" image with all supported clients.
+
+**Limitations:**
+- Guest kernel must include storage client modules (managed via the base image build pipeline above)
+- Only applicable to network-attached storage — host-local storage still requires virtio-fs
+- Proprietary storage clients (WekaFS, GPFS) require vendor licensing and may have distribution restrictions for guest images
 
 ### BEP-1016 Alignment
 

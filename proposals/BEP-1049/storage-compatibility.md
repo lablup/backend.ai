@@ -1,24 +1,19 @@
 <!-- context-for-ai
 type: detail-doc
 parent: BEP-1049 (Kata Containers Agent Backend)
-scope: Volume mount compatibility between host filesystem and Kata guest VM via virtio-fs; intrinsic mount evaluation
+scope: Volume mount compatibility between host filesystem and Kata guest VM; intrinsic mount evaluation; storage I/O analysis
 depends-on: [kata-agent-backend.md, configuration-deployment.md]
 key-decisions:
-  - No new storage interface needed; virtio-fs is the transparent compatibility layer
-  - Existing Mount abstraction (BIND, source, target, permission) reused unchanged
-  - Kata shim translates bind mounts to virtio-fs shares automatically
+  - VFolder data does NOT use virtio-fs (RDMA breakage); storage volumes mounted directly inside guest VM via native NFS/Lustre kernel client; container bind-mounts vfolder subdirs — same model as Docker
+  - virtio-fs retained only for scratch/config directories (non-performance-critical, host-originated data)
+  - Existing Mount abstraction (BIND, source, target, permission) reused unchanged for container-level bind mounts
   - lxcfs mounts skipped (guest kernel provides accurate /proc and /sys natively)
   - libbaihook.so LD_PRELOAD skipped (guest kernel provides accurate sysconf natively)
   - jail ptrace sandbox skipped (VM boundary is stronger isolation)
   - Agent socket skipped entirely (only used by jail/C binaries, both irrelevant for Kata)
-  - Domain socket proxies deferred (UDS limitation; niche feature)
   - /tmp uses guest-side tmpfs (no need to cross VM boundary)
-  - Core dump requires guest-side core_pattern configuration
-  - Docker named volumes (krunner, deeplearning-samples) not available with containerd; use virtio-fs bind mount or guest rootfs
   - Accelerator plugin mounts differ entirely (VFIO PCI passthrough replaces Docker DeviceRequests)
-  - virtio-fs for all storage backends; direct guest mount not proposed (no vendor Kata integration, CephFS benchmarks favor virtio-fs)
-  - Hybrid storage model recommended: block devices (virtio-blk) for read-only infrastructure, virtio-fs only for bidirectional data exchange (scratch, vfolders)
-  - Phase 1 uses virtio-fs for everything; hybrid model deferred to Phase 2
+  - krunner binaries baked into attested guest rootfs (CoCo — host is untrusted, no virtio-fs sharing of executables)
 -->
 
 # BEP-1049: Storage and Volume Mount Compatibility
@@ -301,7 +296,7 @@ No new storage interfaces are introduced. The existing abstractions are reused:
 - File locking (flock, fcntl) works with virtio-fs but may have different semantics for distributed filesystems (CephFS, NFS) that are already mounted on the host.
 - `KataKernelCreationContext.mount_krunner()` should consolidate the 15+ individual krunner binary mounts into a single directory mount (e.g., bind-mount the entire `runner/` directory to `/opt/kernel/`) to simplify the OCI mount spec and reduce kata-agent's mount setup time inside the guest. While virtiofsd is shared per sandbox (not per mount), fewer mount entries reduce guest-side setup overhead. Docker uses individual file mounts to overlay binaries into an existing container filesystem; Kata can use a directory mount since the guest rootfs is purpose-built.
 - The `ContainerSandboxType` config option is irrelevant for Kata — always use `DOCKER` (no-op sandbox) or introduce a `VM` type. Never use `JAIL` with Kata.
-- For confidential computing (Phase 4), bind mounts are **NOT sync'd back** — files are copied into the guest at mount time and changes are lost. This is a fundamental CoCo limitation documented in [TR-2026-001](../../docs/reports/kata-containers-feature-parity-analysis.md). Non-confidential Kata mode does not have this limitation.
+- **VFolder data does NOT use virtio-fs.** virtio-fs introduces FUSE overhead and breaks RDMA data paths for high-performance storage backends (Lustre over IB, WekaFS RDMA, GPFS). Instead, storage volumes are mounted directly inside the guest VM using the guest's own NFS/Lustre/WekaFS kernel client (preserving RDMA, 100% native throughput). The agent writes `storage-mounts.json` to `/home/config/` (virtio-fs config channel) containing volume mount specs; a guest boot script reads this and performs the mounts before the container starts. Vfolder subdirectories are then bind-mounted into the container — identical to Docker's host-level mount model. Storage topology is visible in guest `/proc/mounts` (acceptable — same isolation model as Docker; users can see mount info but cannot mount their own disks). virtio-fs is retained only for scratch/config directories (`/home/config`). See [migration-compatibility.md](migration-compatibility.md) "VFolder Storage" section for full architecture.
 
 ## Direct Storage Access from Guest VMs
 

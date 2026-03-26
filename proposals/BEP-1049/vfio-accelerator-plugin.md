@@ -8,6 +8,8 @@ key-decisions:
   - DiscretePropertyAllocMap only (no FractionAllocMap)
   - Device discovery via sysfs PCI scan (not NVML)
   - IOMMU group validation at device scan time
+  - GPUDirect RDMA support via Kata VRA: PCIe topology replication (switch-port mode), clique-id P2P grouping, GPU+NIC co-passthrough
+  - InfiniBand HCA passthrough alongside GPU requires BAR sizing fix (Kata 3.8+) and RDMA device plugin
 -->
 
 # BEP-1049: VFIO Accelerator Plugin
@@ -289,6 +291,130 @@ async def restore_from_container(self, container, alloc_map):
 | `gather_node_measures()` | Limited sysfs metrics (no NVML on host) |
 | `gather_container_measures()` | Guest-side NVML via containerd exec |
 | `restore_from_container()` | Reconstruct allocations from container labels |
+
+## Multi-Node GPU Interconnect: GPUDirect RDMA
+
+### Overview
+
+Multi-node GPU workloads (distributed training, multi-node inference) require **GPUDirect RDMA** — direct memory access between a GPU and an RDMA-capable NIC (InfiniBand HCA or RoCE adapter) without CPU involvement. This enables NCCL-based collective operations across nodes at near-wire-speed InfiniBand bandwidth.
+
+For Kata VMs, this means **both the GPU and the InfiniBand HCA must be VFIO-passthrough to the same VM**, and peer-to-peer DMA between them must work across the VM boundary.
+
+### Requirements for GPUDirect RDMA in Kata VMs
+
+| Requirement | Details |
+|---|---|
+| **GPU + NIC co-passthrough** | Both the NVIDIA GPU and InfiniBand HCA (ConnectX-5+) must be VFIO-assigned to the same Kata VM |
+| **IOMMU pass-through mode** | GPUDirect RDMA requires physical addresses to be identical from both devices' perspective. The IOMMU must be in 1:1 pass-through mode (`iommu=pt`), not performing address translation. Inside the guest, vIOMMU (if present) must also be in pass-through or both devices must share an IOMMU domain |
+| **Same PCIe root complex** | GPU and NIC must share an upstream PCIe root complex. Cross-socket (QPI/UPI) P2P is unreliable or non-functional |
+| **ACS/ATS for Direct Translated P2P** | Access Control Services (ACS) normally forces all DMA through the root complex. Address Translation Services (ATS, available on ConnectX-5+ and Volta+ GPUs) allows endpoints to prefetch IOVA→PA translations and DMA directly to peers, bypassing the IOMMU for P2P |
+| **PCIe topology replication** | NVIDIA's driver uses PCIe topology to determine P2P capability. Default virtualization flattens topology (all devices on root bus), which disables P2P. The guest must replicate the host's PCIe switch hierarchy |
+| **Guest driver stack** | Full NVIDIA + Mellanox stack inside the guest: `nvidia` driver, `mlx5_core`/`mlx5_ib`, `ib_core`, `ib_uverbs`, `nvidia-peermem` (bridges GPU and IB subsystems), MLNX_OFED |
+
+### Kata VRA (Virtualization Reference Architecture)
+
+The Kata project's [VRA design document](https://github.com/kata-containers/kata-containers/blob/main/docs/design/kata-vra.md) explicitly addresses GPUDirect P2P and RDMA with three key mechanisms:
+
+**1. PCIe topology replication via switch ports:**
+
+```toml
+# kata configuration.toml
+hotplug_vfio = "switch-port"    # Replicate host PCIe switch topology in guest
+pcie_switch_port = 8            # Number of switch downstream ports
+```
+
+This creates PCIe switch structures inside the guest that mirror the host topology. Devices that were under the same PCIe switch on the host are placed under the same virtual switch in the guest, enabling the NVIDIA driver to recognize P2P capability.
+
+**2. Clique-ID annotation for P2P device grouping:**
+
+Devices with the same `clique-id` form a P2P group. Configured via Container Device Interface (CDI):
+
+```yaml
+# GPU on PCIe switch
+- annotations:
+    bdf: "41:00.0"
+    clique-id: "0"
+
+# InfiniBand HCA on same PCIe switch
+- annotations:
+    bdf: "42:00.0"
+    clique-id: "0"    # Same clique → P2P enabled between GPU and NIC
+```
+
+The hypervisor uses clique-id to provide topology metadata that the NVIDIA driver reads to enable GPUDirect P2P, even if the virtualized PCIe topology doesn't perfectly match the host.
+
+**3. Multi-function IOMMU group handling:**
+
+NVIDIA datacenter GPUs often contain multiple functions (GPU + audio + USB) in a single IOMMU group. VRA handles this by selectively attaching:
+- GPU: PCIe root/switch port (requires express protocol, consumes 4K IO range)
+- Audio/USB companions: PCI bridge (standard PCI, no IO range consumption)
+
+This conserves scarce PCIe IO space (64K total, 4K per port, max ~16 ports).
+
+### NVLink / NVSwitch (Intra-Node GPU-GPU)
+
+NVLink connects GPUs directly, bypassing PCIe. NVSwitch enables all-to-all NVLink in DGX/HGX systems.
+
+When GPUs are VFIO-passthrough to a Kata VM:
+- NVLink hardware connections remain physically present
+- The NVIDIA driver inside the guest detects NVLink via GPU registers accessible through VFIO BAR mapping
+- P2P over NVLink works if both GPUs are in the same guest and the driver detects NVLink topology
+- This has been demonstrated in VMware vSphere (GPU-passthrough with NVLink), suggesting KVM/VFIO works similarly
+
+For Backend.AI multi-container sessions (clusters on a single host), all GPUs can be passed through to a single Kata sandbox (VM) via the containerd Sandbox API, enabling NVLink communication between containers sharing the VM.
+
+### Current Upstream Status
+
+| Component | Status | Reference |
+|---|---|---|
+| kata-vra.md design | Written, covers GPUDirect P2P + RDMA | [kata-vra.md](https://github.com/kata-containers/kata-containers/blob/main/docs/design/kata-vra.md) |
+| GPU VFIO passthrough | Working (A100, H100 with caveats) | [#12723](https://github.com/kata-containers/kata-containers/issues/12723) |
+| InfiniBand HCA passthrough | Partially working; BAR allocation fixed in Kata 3.8+ | [#10392](https://github.com/kata-containers/kata-containers/issues/10392) |
+| SR-IOV VF passthrough | Broken — "No PCI mapping found" | [#11910](https://github.com/kata-containers/kata-containers/issues/11910) |
+| GPUDirect RDMA end-to-end | Not yet demonstrated in Kata | [#10796](https://github.com/kata-containers/kata-containers/issues/10796) (open, high-priority) |
+
+### InfiniBand HCA BAR Allocation Fix
+
+Kata 3.8+ added `getBARsMaxAddressableMemory()` to auto-size PCIe BAR windows for large-BAR devices. However, this function initially only detected NVIDIA GPUs (via `IsGPU()` check), skipping InfiniBand HCAs. ConnectX-6 requires 32MB+ BAR0 but the default 2MB allocation caused `"BAR0: no space for [mem size 32MB 64bit pref]"`. The fix: include Mellanox device detection alongside GPU detection in BAR sizing logic ([#10392](https://github.com/kata-containers/kata-containers/issues/10392)).
+
+### Impact on CUDAVFIOPlugin
+
+For GPUDirect RDMA support, the `CUDAVFIOPlugin` needs awareness of co-located InfiniBand HCAs:
+
+```python
+async def generate_docker_args(self, docker, device_alloc):
+    vfio_devices = []
+    for device_id, alloc in per_device_alloc.items():
+        dev = self._device_map[DeviceId(device_id)]
+        vfio_devices.append({
+            "pci_address": dev.pci_address,
+            "iommu_group": dev.iommu_group,
+            "vfio_device": dev.vfio_device_path,
+            "model_name": dev.model_name,
+            "clique_id": dev.clique_id,          # NEW: P2P group identifier
+        })
+    return {
+        "_kata_vfio_devices": vfio_devices,
+        "_kata_rdma_devices": self._get_colocated_rdma_devices(vfio_devices),  # NEW
+    }
+```
+
+A separate **RDMAVFIOPlugin** (or extension to `CUDAVFIOPlugin`) would handle InfiniBand HCA discovery, IOMMU group validation, and VFIO device configuration for the NIC side. The `clique_id` links GPU and NIC devices for P2P topology replication.
+
+### Guest VM Base Image Requirements (GPUDirect RDMA)
+
+In addition to storage filesystem clients (see [migration-compatibility.md](migration-compatibility.md)), the guest rootfs must include:
+
+| Component | Purpose |
+|---|---|
+| NVIDIA GPU driver + CUDA toolkit | GPU compute + `nvidia-peermem` module |
+| MLNX_OFED | InfiniBand/RoCE driver stack (`mlx5_core`, `mlx5_ib`) |
+| `nvidia-peermem` kernel module | Registers GPU memory with IB subsystem for GPUDirect RDMA |
+| `libibverbs`, `librdmacm` | RDMA userspace libraries |
+| NCCL | Multi-GPU collective communication (uses GPUDirect RDMA for inter-node) |
+| Guest kernel with `CONFIG_INFINIBAND=y`, `CONFIG_MLX5_CORE=y`, `CONFIG_VFIO=y` | InfiniBand + VFIO kernel support |
+
+**Note:** MLNX_OFED must be installed before or alongside the NVIDIA GPU driver. If the GPU driver is installed first, it must be reinstalled after OFED to build `nvidia-peermem` correctly.
 
 ## Implementation Notes
 
