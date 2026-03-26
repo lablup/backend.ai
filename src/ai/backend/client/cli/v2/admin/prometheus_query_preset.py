@@ -116,9 +116,9 @@ def create(body: str) -> None:
 
 
 @prometheus_query_preset.command()
-@click.argument("preset_id", type=str)
+@click.argument("preset_id", type=click.UUID)
 @click.argument("body", type=str)
-def update(preset_id: str, body: str) -> None:
+def update(preset_id: UUID, body: str) -> None:
     """Update a prometheus query definition (superadmin only).
 
     BODY is a JSON string with fields to update.
@@ -140,7 +140,7 @@ def update(preset_id: str, body: str) -> None:
         registry = await create_v2_registry(load_v2_config())
         try:
             result = await registry.prometheus_query_preset.update(
-                UUID(preset_id), ModifyQueryDefinitionInput(**data)
+                preset_id, ModifyQueryDefinitionInput(**data)
             )
             print_result(result)
         finally:
@@ -150,8 +150,8 @@ def update(preset_id: str, body: str) -> None:
 
 
 @prometheus_query_preset.command()
-@click.argument("preset_id", type=str)
-def delete(preset_id: str) -> None:
+@click.argument("preset_id", type=click.UUID)
+def delete(preset_id: UUID) -> None:
     """Delete a prometheus query definition (superadmin only)."""
     from ai.backend.common.dto.manager.v2.prometheus_query_preset.request import (
         DeleteQueryDefinitionInput,
@@ -161,7 +161,7 @@ def delete(preset_id: str) -> None:
         registry = await create_v2_registry(load_v2_config())
         try:
             result = await registry.prometheus_query_preset.delete(
-                DeleteQueryDefinitionInput(id=UUID(preset_id)),
+                DeleteQueryDefinitionInput(id=preset_id),
             )
             print_result(result)
         finally:

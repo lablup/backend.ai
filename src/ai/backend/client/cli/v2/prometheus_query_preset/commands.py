@@ -1,4 +1,4 @@
-"""CLI commands for prometheus query preset management."""
+"""CLI commands for prometheus query definition management."""
 
 from __future__ import annotations
 
@@ -92,14 +92,14 @@ def search(
 
 
 @prometheus_query_preset.command()
-@click.argument("preset_id", type=str)
-def get(preset_id: str) -> None:
+@click.argument("preset_id", type=click.UUID)
+def get(preset_id: UUID) -> None:
     """Get a query definition by ID."""
 
     async def _run() -> None:
         registry = await create_v2_registry(load_v2_config())
         try:
-            result = await registry.prometheus_query_preset.get(UUID(preset_id))
+            result = await registry.prometheus_query_preset.get(preset_id)
             print_result(result)
         finally:
             await registry.close()
@@ -147,9 +147,9 @@ def create(
 
 
 @prometheus_query_preset.command()
-@click.argument("preset_id", type=str)
+@click.argument("preset_id", type=click.UUID)
 @click.argument("body", type=str)
-def update(preset_id: str, body: str) -> None:
+def update(preset_id: UUID, body: str) -> None:
     """Update a prometheus query definition.
 
     BODY is a JSON string with fields to update.
@@ -171,7 +171,7 @@ def update(preset_id: str, body: str) -> None:
         registry = await create_v2_registry(load_v2_config())
         try:
             result = await registry.prometheus_query_preset.update(
-                UUID(preset_id), ModifyQueryDefinitionInput(**data)
+                preset_id, ModifyQueryDefinitionInput(**data)
             )
             print_result(result)
         finally:
@@ -205,7 +205,7 @@ def _parse_label_filters(labels: tuple[str, ...]) -> list[MetricLabelEntry]:
 
 
 @prometheus_query_preset.command()
-@click.argument("preset_id", type=str)
+@click.argument("preset_id", type=click.UUID)
 @click.option("--start", type=click.DateTime(), default=None, help="Start time (ISO8601).")
 @click.option("--end", type=click.DateTime(), default=None, help="End time (ISO8601).")
 @click.option("--step", type=str, default=None, help="Step duration (e.g. 60s).")
@@ -224,7 +224,7 @@ def _parse_label_filters(labels: tuple[str, ...]) -> list[MetricLabelEntry]:
 )
 @click.option("--time-window", type=str, default=None, help="Time window override.")
 def execute(
-    preset_id: str,
+    preset_id: UUID,
     start: datetime | None,
     end: datetime | None,
     step: str | None,
@@ -247,8 +247,15 @@ def execute(
     if group_labels is not None:
         group_labels_list = [gl.strip() for gl in group_labels.split(",") if gl.strip()]
 
+    provided_time_args = sum(value is not None for value in (start, end, step))
+    if 0 < provided_time_args < 3:
+        raise click.UsageError(
+            "Options --start, --end, and --step must be provided together, "
+            "or none of them should be specified."
+        )
+
     time_range: QueryTimeRangeInputDTO | None = None
-    if start is not None and end is not None and step is not None:
+    if provided_time_args == 3:
         time_range = QueryTimeRangeInputDTO(start=start, end=end, step=step)
 
     request = ExecuteQueryDefinitionInput(
@@ -263,7 +270,7 @@ def execute(
     async def _run() -> None:
         registry = await create_v2_registry(load_v2_config())
         try:
-            result = await registry.prometheus_query_preset.execute(UUID(preset_id), request)
+            result = await registry.prometheus_query_preset.execute(preset_id, request)
             print(json.dumps(result.model_dump(mode="json"), indent=2, default=str))
         finally:
             await registry.close()
@@ -272,8 +279,8 @@ def execute(
 
 
 @prometheus_query_preset.command()
-@click.argument("preset_id", type=str)
-def delete(preset_id: str) -> None:
+@click.argument("preset_id", type=click.UUID)
+def delete(preset_id: UUID) -> None:
     """Delete a query definition by ID."""
     from ai.backend.common.dto.manager.v2.prometheus_query_preset.request import (
         DeleteQueryDefinitionInput,
@@ -283,7 +290,7 @@ def delete(preset_id: str) -> None:
         registry = await create_v2_registry(load_v2_config())
         try:
             result = await registry.prometheus_query_preset.delete(
-                DeleteQueryDefinitionInput(id=UUID(preset_id)),
+                DeleteQueryDefinitionInput(id=preset_id),
             )
             print_result(result)
         finally:
