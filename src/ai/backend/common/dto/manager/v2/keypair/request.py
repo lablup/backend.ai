@@ -18,7 +18,6 @@ __all__ = (
     "KeypairFilter",
     "KeypairOrderBy",
     "RevokeMyKeypairInput",
-    "SearchMyKeypairsGQLInput",
     "SearchMyKeypairsRequest",
     "SwitchMyMainAccessKeyInput",
     "UpdateMyKeypairInput",
@@ -50,21 +49,8 @@ class KeypairOrderBy(BaseRequestModel):
     direction: OrderDirection = OrderDirection.DESC
 
 
-class SearchMyKeypairsGQLInput(BaseRequestModel):
-    """GQL pagination search input for current user's keypairs."""
-
-    filter: KeypairFilter | None = None
-    order: list[KeypairOrderBy] | None = None
-    first: int | None = None
-    after: str | None = None
-    last: int | None = None
-    before: str | None = None
-    limit: int | None = None
-    offset: int | None = None
-
-
 class SearchMyKeypairsRequest(BaseRequestModel):
-    """REST request body for searching current user's keypairs."""
+    """Search input for current user's keypairs. Shared by GQL and REST."""
 
     filter: KeypairFilter | None = Field(default=None, description="Filter conditions.")
     order: list[KeypairOrderBy] | None = Field(default=None, description="Order specifications.")

@@ -7,12 +7,14 @@ from http import HTTPStatus
 from typing import TYPE_CHECKING, Final
 
 from ai.backend.common.api_handlers import APIResponse, BodyParam
+from ai.backend.common.dto.manager.pagination import PaginationInfo
 from ai.backend.common.dto.manager.v2.keypair.request import (
     RevokeMyKeypairInput,
     SearchMyKeypairsRequest,
     SwitchMyMainAccessKeyInput,
     UpdateMyKeypairInput,
 )
+from ai.backend.common.dto.manager.v2.keypair.response import SearchMyKeypairsPayload
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.dto.context import UserContext
 
@@ -33,8 +35,16 @@ class V2MyKeypairHandler:
         body: BodyParam[SearchMyKeypairsRequest],
     ) -> APIResponse:
         """Search keypairs owned by the current user."""
-        result = await self._adapter.search_my_keypairs_rest(body.parsed)
-        return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
+        search_result = await self._adapter.search_my_keypairs(body.parsed)
+        payload = SearchMyKeypairsPayload(
+            items=search_result.items,
+            pagination=PaginationInfo(
+                total=search_result.total_count,
+                offset=body.parsed.offset or 0,
+                limit=body.parsed.limit,
+            ),
+        )
+        return APIResponse.build(status_code=HTTPStatus.OK, response_model=payload)
 
     async def issue(
         self,
