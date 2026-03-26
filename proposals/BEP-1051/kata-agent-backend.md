@@ -291,7 +291,41 @@ async def write_config_files(self, environ, resource_spec):
     (self.config_dir / "intrinsic-ports.json").write_bytes(
         json.dumps(ports).encode("utf8")
     )
+
+    # storage-mounts.json — consumed by the guest prestart hook
+    # (OCI hook at /usr/share/oci/hooks/prestart/setup-storage.sh).
+    # Contains volume mount specs and storage NIC IP for the guest
+    # boot script to configure before the container starts.
+    kata_config = self.local_config.kata
+    storage_config = {
+        "storage_nic": (
+            {
+                "device": kata_config.storage_nic.device,
+                "address": kata_config.storage_nic.address,
+                "gateway": kata_config.storage_nic.gateway,
+            }
+            if kata_config.storage_nic
+            else None
+        ),
+        "volumes": [
+            {
+                "fs_type": m.fs_type,
+                "source": m.source,
+                "mountpoint": m.mountpoint,
+                "options": m.options,
+            }
+            for m in kata_config.storage_mounts
+        ],
+    }
+    (self.config_dir / "storage-mounts.json").write_bytes(
+        json.dumps(storage_config).encode("utf8")
+    )
 ```
+
+The guest prestart hook (`/usr/share/oci/hooks/prestart/setup-storage.sh`, baked into the attested guest rootfs) reads this file during `create_container()` and:
+1. Configures the storage NIC IP (IPoIB or Ethernet) via `ip addr add`
+2. Mounts each volume using the guest kernel's native NFS/Lustre client
+3. Volumes are then available for container bind mounts at the specified mount points
 
 **`get_intrinsic_mounts()`** — Skip mounts that are unnecessary or incompatible with Kata:
 

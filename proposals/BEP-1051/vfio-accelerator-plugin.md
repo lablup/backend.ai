@@ -101,6 +101,7 @@ class CUDAVFIODevice(AbstractComputeDevice):
     model_name: str            # Mapped from PCI device ID
     memory_size: int           # GPU memory in bytes (from PCI BAR or lookup table)
     numa_node: int             # NUMA node affinity
+    clique_id: str | None      # PCIe P2P group ID from Kata VRA (e.g., "clusterUUID.0")
 ```
 
 ### Device Discovery via sysfs
@@ -229,6 +230,9 @@ async def generate_docker_args(
                     "iommu_group": dev.iommu_group,
                     "vfio_device": dev.vfio_device_path,
                     "model_name": dev.model_name,
+                    "clique_id": dev.clique_id,      # P2P group for Kata VRA topology
+                    "memory_size": dev.memory_size,   # GPU memory in bytes
+                    "numa_node": dev.numa_node,       # NUMA affinity for CPU pinning
                 })
     return {"_kata_vfio_devices": vfio_devices}
 ```

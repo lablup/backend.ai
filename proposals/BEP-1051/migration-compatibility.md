@@ -182,10 +182,72 @@ Kata (proposed):
 
 **How mount specs and storage network config reach the guest:**
 
-1. The KataAgent's `[kata]` config lists storage volume mount points with filesystem type, server address, export path, and mount options. It also includes the storage NIC's IP configuration (address, subnet, gateway) for the VFIO-passthrough storage network interface.
-2. Before VM boot, the agent writes `storage-mounts.json` to `/home/config/` (virtio-fs config channel — the same mechanism used for environ.txt and intrinsic-ports.json). This file includes both volume mount specs and storage NIC IP configuration.
-3. A guest boot script (systemd unit, `Before=local-fs.target`) reads `storage-mounts.json`, configures the storage NIC IP (IPoIB or dedicated Ethernet), and performs the volume mounts using the guest kernel's native NFS/Lustre client. Alternatively, cloud-init can handle network configuration if the guest image includes it.
-4. The OCI container spec includes standard bind mounts from `/mnt/vfstore/<vfid>/subpath` to `/home/work/data` — identical to Docker. These operate as guest-internal bind mounts since the volume is already mounted inside the guest.
+1. The KataAgent's `[kata]` config lists storage volume mount points (`[[kata.storage-mounts]]`) and storage NIC IP (`[kata.storage-nic]`). See [configuration-deployment.md](configuration-deployment.md) for the full schema.
+2. Before VM boot, `KataKernelCreationContext.write_config_files()` writes `storage-mounts.json` to `/home/config/` (virtio-fs config channel — same mechanism as environ.txt and intrinsic-ports.json).
+3. During `create_sandbox()`, the Kata shim loads kernel modules specified in `kernel-modules` config (e.g., `["nfs", "nfsv4"]`) via `modprobe`, and the `guest_hook_path` is scanned for OCI prestart hooks.
+4. During `create_container()`, the OCI prestart hook (`/usr/share/oci/hooks/prestart/setup-storage.sh`, baked into the attested guest rootfs) executes and:
+   - Reads `storage-mounts.json` from the virtio-fs shared `/home/config/`
+   - Configures the storage NIC IP via `ip addr add`
+   - Mounts each storage volume using the guest kernel's native NFS/Lustre client
+5. After the hook completes, the OCI container spec's bind mounts (`/mnt/vfstore/<vfid>/subpath` → `/home/work/data`) are applied as guest-internal bind mounts — identical to Docker.
+
+**`storage-mounts.json` format:**
+
+```json
+{
+  "storage_nic": {
+    "device": "ib0",
+    "address": "10.0.100.5/24",
+    "gateway": "10.0.100.1"
+  },
+  "volumes": [
+    {
+      "fs_type": "nfs4",
+      "source": "storage-server:/exports/vfstore",
+      "mountpoint": "/mnt/vfstore",
+      "options": "vers=4.1,rsize=1048576,wsize=1048576"
+    }
+  ]
+}
+```
+
+**Guest prestart hook** (`/usr/share/oci/hooks/prestart/setup-storage.sh`, baked into attested rootfs):
+
+```bash
+#!/bin/bash
+# Baked into attested guest rootfs — tamper-proof under CoCo.
+# Executed by kata-agent as an OCI prestart hook during create_container().
+# Kernel modules (nfs, nfsv4, lustre) are already loaded by create_sandbox().
+
+CONFIG="/run/kata-containers/shared/containers/*/rootfs/home/config/storage-mounts.json"
+# Resolve the glob — virtio-fs shared directory has one container entry
+CONFIG_FILE=$(ls $CONFIG 2>/dev/null | head -1)
+[ -z "$CONFIG_FILE" ] && exit 0
+
+# Configure storage NIC IP (IPoIB or Ethernet)
+NIC_DEV=$(jq -r '.storage_nic.device // empty' "$CONFIG_FILE")
+if [ -n "$NIC_DEV" ]; then
+    NIC_ADDR=$(jq -r '.storage_nic.address' "$CONFIG_FILE")
+    NIC_GW=$(jq -r '.storage_nic.gateway // empty' "$CONFIG_FILE")
+    ip addr add "$NIC_ADDR" dev "$NIC_DEV" 2>/dev/null
+    ip link set "$NIC_DEV" up
+    [ -n "$NIC_GW" ] && ip route add default via "$NIC_GW" dev "$NIC_DEV" table 100
+fi
+
+# Mount each storage volume
+jq -c '.volumes[]' "$CONFIG_FILE" | while read -r vol; do
+    FS_TYPE=$(echo "$vol" | jq -r '.fs_type')
+    SOURCE=$(echo "$vol" | jq -r '.source')
+    MOUNTPOINT=$(echo "$vol" | jq -r '.mountpoint')
+    OPTIONS=$(echo "$vol" | jq -r '.options // empty')
+    mkdir -p "$MOUNTPOINT"
+    if [ -n "$OPTIONS" ]; then
+        mount -t "$FS_TYPE" -o "$OPTIONS" "$SOURCE" "$MOUNTPOINT"
+    else
+        mount -t "$FS_TYPE" "$SOURCE" "$MOUNTPOINT"
+    fi
+done
+```
 
 **Storage NIC IP allocation:** The storage NIC (InfiniBand HCA or dedicated Ethernet NIC) is VFIO-passthrough to the VM as a whole device. In single-tenancy deployments (one VM per agent node — the target for Phase 1), the VM simply takes the static storage IP that would otherwise belong to the host. The IP, subnet, and gateway are configured in the agent's `[kata]` config and written into `storage-mounts.json`. No dynamic IP allocation is needed — the storage network topology is static infrastructure-level configuration. For future multi-tenancy (multiple VMs per node via SR-IOV VFs), each VF would need its own IP, requiring DHCP or an IP pool manager — this is deferred along with SR-IOV support.
 

@@ -460,14 +460,14 @@ Use block devices for **read-only infrastructure** (VM rootfs, container image, 
 | Container OCI image | virtio-blk (devicemapper/EROFS) | Read-only layers; eliminates largest virtiofsd share |
 | krunner + Python libs | Baked into guest rootfs template **or** virtio-blk overlay | Eliminates 15+ individual virtio-fs shares |
 | Timezone | Baked into guest rootfs template | Static config, no runtime changes |
-| Scratch dirs (`/home/config`, `/home/work`) | virtio-fs | Bidirectional sharing required |
-| VFolders | virtio-fs | Bidirectional sharing required |
+| Scratch dirs (`/home/config`) | virtio-fs | Bidirectional sharing required for config delivery |
+| VFolders | **Direct guest-side NFS/Lustre mount** | RDMA-preserving; NOT virtio-fs |
 
-Since virtiofsd is already one process per sandbox, the hybrid model does not reduce process count. Its benefit is **I/O performance**: read-only infrastructure content (krunner, Python libs, timezone) is served via direct block I/O instead of the FUSE protocol, eliminating per-operation VM boundary crossings for static files.
+Since virtiofsd is already one process per sandbox, the hybrid model does not reduce process count. Its benefit is **I/O performance**: read-only infrastructure content is served via direct block I/O instead of the FUSE protocol.
 
 ### Implementation Considerations
 
-- **Template lifecycle**: The guest rootfs template containing krunner binaries and Python libraries must be rebuilt when these components are updated. This is analogous to rebuilding a VM template in conventional hypervisor environments. A versioned template naming scheme (`kata-rootfs-{krunner_version}.qcow2`) enables atomic rollover.
+- **Template lifecycle**: The guest rootfs template containing krunner binaries, Python libraries, DCGM/Node Exporter, and storage mount scripts must be rebuilt when these components are updated. Versioned template naming (`kata-rootfs-{version}.qcow2`) enables atomic rollover.
 - **devicemapper setup**: Requires a dedicated thin pool on the host (LVM thin provisioning or loopback device). containerd's devicemapper snapshotter handles pool management, but initial setup is more complex than the default overlayfs snapshotter.
 - **EROFS availability**: Requires containerd >= 2.1 and the `nydus-snapshotter` plugin. EROFS support is maturing but not yet the default in most distributions.
-- **Phase 1 recommendation**: Start with Model A (virtio-fs for everything) for simplicity. Transition to the hybrid model in Phase 2 once the basic Kata backend is validated. The mount abstraction change is internal to `KataKernelCreationContext` — no API or scheduler changes needed.
+- **Phase 1 storage model**: VFolders use direct guest-side NFS/Lustre mounts from day one (RDMA required). virtio-fs is used only for scratch/config directories (`/home/config`). krunner binaries and Python libraries are baked into the attested guest rootfs (CoCo — host untrusted). The hybrid block device model (virtio-blk for container rootfs) is a future optimization.

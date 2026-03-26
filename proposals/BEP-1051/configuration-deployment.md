@@ -77,6 +77,28 @@ kata-runtime-class = "kata"     # RuntimeClass name registered in containerd
 # --- Confidential Computing (CoCo-by-default) ---
 confidential-guest = true       # CoCo is always enabled; no non-CoCo mode
 guest-attestation = "tdx"       # "tdx" | "sev-snp" (required)
+kbs-endpoint = "http://kbs.internal:8080"  # Key Broker Service for sealed secrets
+
+# --- Storage (guest-side direct mount) ---
+kernel-modules = ["nfs", "nfsv4"]  # Modules loaded during create_sandbox()
+guest-hook-path = "/usr/share/oci/hooks"  # OCI prestart hook path in guest rootfs
+
+[[kata.storage-mounts]]
+fs-type = "nfs4"
+source = "storage-server:/exports/vfstore"
+mountpoint = "/mnt/vfstore"
+options = "vers=4.1,rsize=1048576,wsize=1048576"
+
+[[kata.storage-mounts]]
+fs-type = "lustre"
+source = "lustre-mgs@tcp:/scratch"
+mountpoint = "/mnt/lustre"
+options = ""
+
+[kata.storage-nic]
+device = "ib0"
+address = "10.0.100.5/24"
+gateway = "10.0.100.1"
 ```
 
 ### Guest VM Image vs Container Image
@@ -188,6 +210,50 @@ class KataConfig(BaseConfigSchema):
         description="TEE attestation type (required)",
         validation_alias=AliasChoices("guest_attestation", "guest-attestation"),
     )
+    kbs_endpoint: str = Field(
+        default="",
+        description="Key Broker Service endpoint for sealed secrets and image decryption keys",
+        validation_alias=AliasChoices("kbs_endpoint", "kbs-endpoint"),
+    )
+
+    # Storage (guest-side direct mount)
+    storage_mounts: list[StorageMountSpec] = Field(
+        default_factory=list,
+        description="Storage volumes to mount inside the guest VM via native NFS/Lustre client",
+        validation_alias=AliasChoices("storage_mounts", "storage-mounts"),
+    )
+    storage_nic: StorageNicSpec | None = Field(
+        default=None,
+        description="Storage network interface (VFIO passthrough IPoIB/Ethernet) IP configuration",
+        validation_alias=AliasChoices("storage_nic", "storage-nic"),
+    )
+
+    # Guest hooks
+    guest_hook_path: str = Field(
+        default="/usr/share/oci/hooks",
+        description="Path inside guest rootfs where OCI prestart hooks are scanned",
+        validation_alias=AliasChoices("guest_hook_path", "guest-hook-path"),
+    )
+    kernel_modules: list[str] = Field(
+        default_factory=lambda: ["nfs", "nfsv4"],
+        description="Kernel modules to load inside guest during sandbox creation",
+        validation_alias=AliasChoices("kernel_modules", "kernel-modules"),
+    )
+
+
+class StorageMountSpec(BaseConfigSchema):
+    """A storage volume to mount directly inside the guest VM."""
+    fs_type: str = Field(description="Filesystem type: nfs, nfs4, lustre, wekafs")
+    source: str = Field(description="Mount source (e.g., 'storage-server:/exports/vfstore')")
+    mountpoint: str = Field(description="Guest-side mount point (e.g., '/mnt/vfstore')")
+    options: str = Field(default="", description="Mount options (e.g., 'vers=4.1,rdma')")
+
+
+class StorageNicSpec(BaseConfigSchema):
+    """Storage network interface IP configuration for guest VM."""
+    device: str = Field(description="Guest-side network device name (e.g., 'ib0', 'eth1')")
+    address: str = Field(description="IP address with prefix (e.g., '10.0.100.5/24')")
+    gateway: str = Field(default="", description="Gateway address (optional)")
 ```
 
 Integration in `AgentUnifiedConfig`:
