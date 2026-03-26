@@ -4,7 +4,7 @@ import uuid
 from collections.abc import Mapping
 from typing import cast
 
-from ai.backend.common.data.permission.types import OperationType, RBACElementType
+from ai.backend.common.data.permission.types import EntityType, OperationType, RBACElementType
 from ai.backend.common.exception import BackendAIError
 from ai.backend.common.metrics.metric import DomainType, LayerType
 from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPolicy
@@ -321,6 +321,8 @@ class PermissionControllerRepository:
         user_id: uuid.UUID,
         target_element_ref: RBACElementRef,
         operation: OperationType,
+        *,
+        permission_entity_type: EntityType | None = None,
     ) -> bool:
         """Permission check that traverses the scope chain via AUTO edges only.
 
@@ -332,4 +334,5 @@ class PermissionControllerRepository:
             user_id=user_id,
             target_element_ref=target_element_ref,
             operation=operation,
+            permission_entity_type=permission_entity_type,
         )

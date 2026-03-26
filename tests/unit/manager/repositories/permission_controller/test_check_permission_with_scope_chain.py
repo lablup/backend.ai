@@ -1127,7 +1127,112 @@ class TestCheckPermissionWithScopeChain:
         )
         assert result is expected
 
-    # ── J. Different entity_type permission ──
+    # ── J. Cross-scope entity type (permission_entity_type override) ──
+
+    @pytest.mark.parametrize(
+        ("permission_setup", "check_op", "expected"),
+        [
+            pytest.param(
+                [PermissionEntry("project", OperationType.READ, EntityType.MODEL_DEPLOYMENT)],
+                OperationType.READ,
+                True,
+                id="cross-scope-direct-match",
+            ),
+        ],
+        indirect=["permission_setup"],
+    )
+    async def test_cross_scope_entity_type_direct_match(
+        self,
+        db_source: PermissionDBSource,
+        user_with_active_role: ScopeChainFixture,
+        vfolder_in_project_auto: None,
+        permission_setup: None,
+        check_op: OperationType,
+        expected: bool,
+    ) -> None:
+        """MODEL_DEPLOYMENT:READ permission at PROJECT scope, checked from PROJECT via CTE Layer 1."""
+        fixture = user_with_active_role
+        result = await db_source.check_permission_with_scope_chain(
+            user_id=fixture.user_id,
+            target_element_ref=RBACElementRef(
+                element_type=RBACElementType.VFOLDER,
+                element_id=fixture.vfolder_id,
+            ),
+            operation=check_op,
+            permission_entity_type=EntityType.MODEL_DEPLOYMENT,
+        )
+        assert result is expected
+
+    @pytest.mark.parametrize(
+        ("permission_setup", "check_op", "expected"),
+        [
+            pytest.param(
+                [PermissionEntry("domain", OperationType.READ, EntityType.MODEL_DEPLOYMENT)],
+                OperationType.READ,
+                True,
+                id="cross-scope-chain-to-domain",
+            ),
+        ],
+        indirect=["permission_setup"],
+    )
+    async def test_cross_scope_entity_type_chain_to_domain(
+        self,
+        db_source: PermissionDBSource,
+        user_with_active_role: ScopeChainFixture,
+        vfolder_in_project_auto: None,
+        project_in_domain_auto: None,
+        permission_setup: None,
+        check_op: OperationType,
+        expected: bool,
+    ) -> None:
+        """MODEL_DEPLOYMENT:READ at DOMAIN scope, checked from PROJECT via CTE Layer 2."""
+        fixture = user_with_active_role
+        result = await db_source.check_permission_with_scope_chain(
+            user_id=fixture.user_id,
+            target_element_ref=RBACElementRef(
+                element_type=RBACElementType.VFOLDER,
+                element_id=fixture.vfolder_id,
+            ),
+            operation=check_op,
+            permission_entity_type=EntityType.MODEL_DEPLOYMENT,
+        )
+        assert result is expected
+
+    @pytest.mark.parametrize(
+        ("permission_setup", "check_op", "expected"),
+        [
+            pytest.param(
+                [PermissionEntry("project", OperationType.READ, EntityType.SESSION)],
+                OperationType.READ,
+                False,
+                id="cross-scope-mismatch-denied",
+            ),
+        ],
+        indirect=["permission_setup"],
+    )
+    async def test_cross_scope_entity_type_mismatch_denied(
+        self,
+        db_source: PermissionDBSource,
+        user_with_active_role: ScopeChainFixture,
+        vfolder_in_project_auto: None,
+        permission_setup: None,
+        check_op: OperationType,
+        expected: bool,
+    ) -> None:
+        """SESSION:READ permission exists, but MODEL_DEPLOYMENT:READ requested — denied."""
+        fixture = user_with_active_role
+        result = await db_source.check_permission_with_scope_chain(
+            user_id=fixture.user_id,
+            target_element_ref=RBACElementRef(
+                element_type=RBACElementType.VFOLDER,
+                element_id=fixture.vfolder_id,
+            ),
+            operation=check_op,
+            permission_entity_type=EntityType.MODEL_DEPLOYMENT,
+        )
+        assert result is expected
+
+    # ── K. Different entity_type permission (legacy, no override) ──
 
     @pytest.mark.parametrize(
         ("permission_setup", "check_op", "expected"),
