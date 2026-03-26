@@ -340,3 +340,164 @@ class TestModelDefinitionGeneratorRegistry:
         model = result.models[0]
         assert model.service is not None
         assert model.service.start_command == "db-overridden-command"
+
+    @pytest.fixture
+    def custom_vfolder_definition(self) -> dict[str, Any]:
+        """Model definition simulating vfolder model-definition.yaml for CUSTOM variant."""
+        return {
+            "models": [
+                {
+                    "name": "test-model",
+                    "model-path": "/models",
+                    "service": {
+                        "start-command": ["python3", "-m", "http.server", "8080"],
+                        "port": 8080,
+                        "health-check": {
+                            "path": "/",
+                            "max-retries": 10,
+                        },
+                    },
+                }
+            ]
+        }
+
+    async def test_custom_variant_merges_vfolder_and_user_override(
+        self,
+        definition_generator_registry: ModelDefinitionGeneratorRegistry,
+        mock_repo: MagicMock,
+        custom_vfolder_definition: dict[str, Any],
+    ) -> None:
+        """CUSTOM variant: vfolder base + user override deep merged into DB."""
+        user_override = ModelDefinition.model_validate({
+            "models": [
+                {
+                    "name": "test-model",
+                    "model-path": "/models",
+                    "service": {
+                        "start-command": ["python3", "-m", "http.server", "8080"],
+                        "port": 9999,
+                        "health-check": {
+                            "path": "/healthz",
+                            "max-retries": 3,
+                        },
+                    },
+                }
+            ]
+        })
+        mock_repo.fetch_model_definition = AsyncMock(return_value=custom_vfolder_definition)
+
+        result = await definition_generator_registry.generate_model_definition(
+            create_context(
+                RuntimeVariant.CUSTOM,
+                model_definition_path="model-definition.yaml",
+                model_definition=user_override,
+            )
+        )
+
+        model = result.models[0]
+        assert model.name == "test-model"
+        assert model.model_path == "/models"  # preserved from vfolder
+        assert model.service is not None
+        assert model.service.start_command == [  # preserved from vfolder
+            "python3",
+            "-m",
+            "http.server",
+            "8080",
+        ]
+        assert model.service.port == 9999  # overridden by user
+        assert model.service.health_check is not None
+        assert model.service.health_check.path == "/healthz"  # overridden by user
+        assert model.service.health_check.max_retries == 3  # overridden by user
+
+    async def test_custom_variant_without_user_override_stores_vfolder_as_is(
+        self,
+        definition_generator_registry: ModelDefinitionGeneratorRegistry,
+        mock_repo: MagicMock,
+        custom_vfolder_definition: dict[str, Any],
+    ) -> None:
+        """CUSTOM variant without user override: vfolder definition stored unchanged."""
+        mock_repo.fetch_model_definition = AsyncMock(return_value=custom_vfolder_definition)
+
+        result = await definition_generator_registry.generate_model_definition(
+            create_context(
+                RuntimeVariant.CUSTOM,
+                model_definition_path="model-definition.yaml",
+                model_definition=None,
+            )
+        )
+
+        model = result.models[0]
+        assert model.name == "test-model"
+        assert model.model_path == "/models"
+        assert model.service is not None
+        assert model.service.start_command == ["python3", "-m", "http.server", "8080"]
+        assert model.service.port == 8080
+        assert model.service.health_check is not None
+        assert model.service.health_check.path == "/"
+        assert model.service.health_check.max_retries == 10
+
+    @pytest.fixture
+    def vllm_vfolder_definition(self) -> dict[str, Any]:
+        """Model definition simulating vfolder file for VLLM variant override."""
+        return {
+            "models": [
+                {
+                    "name": "vllm-model",
+                    "model-path": "/models",
+                    "service": {
+                        "start-command": "vfolder-command",
+                        "port": 8000,
+                        "health-check": {
+                            "path": "/health",
+                            "max-retries": 20,
+                            "initial-delay": 300.0,
+                        },
+                    },
+                }
+            ]
+        }
+
+    async def test_three_layer_merge_preserves_each_layer(
+        self,
+        definition_generator_registry_with_override: ModelDefinitionGeneratorRegistry,
+        mock_repo: MagicMock,
+        vllm_vfolder_definition: dict[str, Any],
+    ) -> None:
+        """Non-CUSTOM: generator base → vfolder override → user override, each layer preserved."""
+        user_override = ModelDefinition.model_validate({
+            "models": [
+                {
+                    "name": "vllm-model",
+                    "model-path": "/models",
+                    "service": {
+                        "start-command": "vfolder-command",
+                        "port": 8000,
+                        "health-check": {
+                            "path": "/health",
+                            "max-retries": 5,
+                            "initial-delay": 300.0,
+                        },
+                    },
+                }
+            ]
+        })
+        mock_repo.fetch_model_definition = AsyncMock(return_value=vllm_vfolder_definition)
+
+        result = await definition_generator_registry_with_override.generate_model_definition(
+            create_context(
+                RuntimeVariant.VLLM,
+                model_definition_path="model.yaml",
+                model_definition=user_override,
+            )
+        )
+
+        model = result.models[0]
+        assert model.service is not None
+        # from vfolder (overrode generator)
+        assert model.service.start_command == "vfolder-command"
+        assert model.service.health_check is not None
+        # from vfolder (preserved through user override)
+        assert model.service.health_check.initial_delay == 300.0
+        assert model.service.health_check.path == "/health"
+        # from user override (overrode vfolder)
+        assert model.service.health_check.max_retries == 5

@@ -9,6 +9,7 @@ from __future__ import annotations
 import uuid
 from collections.abc import Callable
 from datetime import UTC, datetime
+from typing import cast
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
@@ -555,9 +556,10 @@ class TestAddModelRevision(ModelRevisionFixtures):
                 }
             ]
         })
-        deployment_service._model_definition_generator_registry.generate_model_definition = (
-            AsyncMock(return_value=resolved_definition)
-        )
+        cast(
+            AsyncMock,
+            deployment_service._model_definition_generator_registry.generate_model_definition,
+        ).return_value = resolved_definition
 
         action = AddModelRevisionAction(
             model_deployment_id=deployment_id, adder=revision_creator_with_model_definition
