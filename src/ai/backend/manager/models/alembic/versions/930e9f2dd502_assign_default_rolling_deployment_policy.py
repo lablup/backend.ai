@@ -35,6 +35,16 @@ def upgrade() -> None:
         """
     )
 
+    # Remove orphaned policies referencing non-existent endpoints
+    op.execute(
+        """
+        DELETE FROM deployment_policies dp
+        WHERE NOT EXISTS (
+            SELECT 1 FROM endpoints e WHERE e.id = dp.endpoint
+        )
+        """
+    )
+
     # Add CASCADE FK from deployment_policies.endpoint → endpoints.id
     # so that deleting an endpoint automatically deletes its policy.
     op.create_foreign_key(
