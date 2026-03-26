@@ -36,6 +36,7 @@ from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.base import BatchQuerier, execute_batch_querier
 from ai.backend.manager.repositories.base.updater import Updater, execute_updater
 from ai.backend.manager.repositories.session.dependency_graph import find_dependency_sessions
+from ai.backend.manager.repositories.session.types import ProjectSessionSearchScope
 from ai.backend.manager.utils import query_userinfo
 
 
@@ -513,6 +514,41 @@ class SessionDBSource:
                 db_sess,
                 query,
                 querier,
+            )
+
+            session_rows = [row.SessionRow for row in result.rows]
+            await batch_populate_session_occupied_slots(db_sess, session_rows)
+            items = [row.to_dataclass() for row in session_rows]
+
+            return SessionListResult(
+                items=items,
+                total_count=result.total_count,
+                has_next_page=result.has_next_page,
+                has_previous_page=result.has_previous_page,
+            )
+
+    async def search_in_project(
+        self,
+        querier: BatchQuerier,
+        scope: ProjectSessionSearchScope,
+    ) -> SessionListResult:
+        """Search sessions scoped to a project.
+
+        Args:
+            querier: BatchQuerier for filtering, ordering, and pagination
+            scope: ProjectSessionSearchScope that filters by project and validates existence
+
+        Returns:
+            SessionListResult with items, total count, and pagination info
+        """
+        async with self._db.begin_readonly_session() as db_sess:
+            query = sa.select(SessionRow).options(selectinload(SessionRow.kernels))
+
+            result = await execute_batch_querier(
+                db_sess,
+                query,
+                querier,
+                scope=scope,
             )
 
             session_rows = [row.SessionRow for row in result.rows]

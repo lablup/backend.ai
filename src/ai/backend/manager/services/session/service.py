@@ -74,6 +74,7 @@ from ai.backend.manager.models.user import UserRole
 from ai.backend.manager.registry import AgentRegistry
 from ai.backend.manager.repositories.scheduler.types.session_creation import SessionCreationSpec
 from ai.backend.manager.repositories.session.repository import SessionRepository
+from ai.backend.manager.repositories.session.types import ProjectSessionSearchScope
 from ai.backend.manager.repositories.session.updaters import SessionUpdaterSpec
 from ai.backend.manager.services.session.actions.check_and_transit_status import (
     CheckAndTransitStatusAction,
@@ -180,6 +181,10 @@ from ai.backend.manager.services.session.actions.restart_session import (
 from ai.backend.manager.services.session.actions.search import (
     SearchSessionsAction,
     SearchSessionsActionResult,
+)
+from ai.backend.manager.services.session.actions.search_in_project import (
+    SearchSessionsInProjectAction,
+    SearchSessionsInProjectActionResult,
 )
 from ai.backend.manager.services.session.actions.search_kernel import (
     SearchKernelsAction,
@@ -1523,6 +1528,19 @@ class SessionService:
         """Search sessions with querier pattern."""
         result = await self._session_repository.search(action.querier)
         return SearchSessionsActionResult(
+            data=result.items,
+            total_count=result.total_count,
+            has_next_page=result.has_next_page,
+            has_previous_page=result.has_previous_page,
+        )
+
+    async def search_in_project(
+        self, action: SearchSessionsInProjectAction
+    ) -> SearchSessionsInProjectActionResult:
+        """Search sessions scoped to a project."""
+        scope = ProjectSessionSearchScope(project_id=action.project_id)
+        result = await self._session_repository.search_in_project(action.querier, scope)
+        return SearchSessionsInProjectActionResult(
             data=result.items,
             total_count=result.total_count,
             has_next_page=result.has_next_page,

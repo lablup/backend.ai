@@ -109,6 +109,10 @@ from ai.backend.manager.services.session.actions.search import (
     SearchSessionsAction,
     SearchSessionsActionResult,
 )
+from ai.backend.manager.services.session.actions.search_in_project import (
+    SearchSessionsInProjectAction,
+    SearchSessionsInProjectActionResult,
+)
 from ai.backend.manager.services.session.actions.search_kernel import (
     SearchKernelsAction,
     SearchKernelsActionResult,
@@ -168,6 +172,9 @@ class SessionProcessors(AbstractProcessorPackage):
     restart_session: ActionProcessor[RestartSessionAction, RestartSessionActionResult]
     search_kernels: ActionProcessor[SearchKernelsAction, SearchKernelsActionResult]
     search_sessions: ActionProcessor[SearchSessionsAction, SearchSessionsActionResult]
+    search_sessions_in_project: ActionProcessor[
+        SearchSessionsInProjectAction, SearchSessionsInProjectActionResult
+    ]
     shutdown_service: ActionProcessor[ShutdownServiceAction, ShutdownServiceActionResult]
     start_service: ActionProcessor[StartServiceAction, StartServiceActionResult]
     terminate_sessions: ActionProcessor[TerminateSessionsAction, TerminateSessionsActionResult]
@@ -248,6 +255,11 @@ class SessionProcessors(AbstractProcessorPackage):
         self.search_sessions = ActionProcessor(
             service.search, action_monitors, validators=[cast(ActionValidator, scope_validator)]
         )
+        self.search_sessions_in_project = ActionProcessor(
+            service.search_in_project,
+            action_monitors,
+            validators=[cast(ActionValidator, scope_validator)],
+        )
 
         # Single entity actions with RBAC validation
         self.destroy_session = ActionProcessor(
@@ -299,6 +311,7 @@ class SessionProcessors(AbstractProcessorPackage):
             RestartSessionAction.spec(),
             SearchKernelsAction.spec(),
             SearchSessionsAction.spec(),
+            SearchSessionsInProjectAction.spec(),
             ShutdownServiceAction.spec(),
             StartServiceAction.spec(),
             TerminateSessionsAction.spec(),

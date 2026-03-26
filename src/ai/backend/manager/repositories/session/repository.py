@@ -26,6 +26,7 @@ from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.base import BatchQuerier
 from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.repositories.session.db_source import SessionDBSource
+from ai.backend.manager.repositories.session.types import ProjectSessionSearchScope
 
 session_repository_resilience = Resilience(
     policies=[
@@ -270,6 +271,23 @@ class SessionRepository:
             SessionListResult with items, total count, and pagination info
         """
         return await self._db_source.search(querier)
+
+    @session_repository_resilience.apply()
+    async def search_in_project(
+        self,
+        querier: BatchQuerier,
+        scope: ProjectSessionSearchScope,
+    ) -> SessionListResult:
+        """Search sessions scoped to a project.
+
+        Args:
+            querier: BatchQuerier for filtering, ordering, and pagination
+            scope: ProjectSessionSearchScope that filters by project and validates existence
+
+        Returns:
+            SessionListResult with items, total count, and pagination info
+        """
+        return await self._db_source.search_in_project(querier, scope)
 
     @session_repository_resilience.apply()
     async def search_kernels(
