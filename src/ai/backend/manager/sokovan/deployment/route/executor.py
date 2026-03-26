@@ -18,6 +18,7 @@ from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.deployment.types import DeploymentInfo, RouteStatus
 from ai.backend.manager.errors.deployment import (
+    DeploymentHasNoTargetRevision,
     EndpointNotFound,
     RouteSessionNotFound,
     RouteSessionTerminated,
@@ -382,7 +383,7 @@ class RouteExecutor:
 
         Returns:
             SessionId: newly created session ID
-            None: route already has a session (skipped)
+            None: route already has a session, skipped
         """
         pool = RouteRecorderContext.current_pool()
         recorder = pool.recorder(route.route_id)
@@ -404,7 +405,10 @@ class RouteExecutor:
                     or deployment.current_revision_id
                 )
                 if target_revision_id is None:
-                    return None
+                    raise DeploymentHasNoTargetRevision(
+                        f"No target revision found for route {route.route_id} "
+                        f"(endpoint {route.endpoint_id})"
+                    )
 
                 deployment_context = await self._deployment_repo.fetch_deployment_context(
                     deployment,
