@@ -24,6 +24,7 @@ class TestRepositoriesDependency:
         valkey_live = MagicMock()
         valkey_schedule = MagicMock()
         valkey_image = MagicMock()
+        valkey_session = MagicMock()
 
         dependency = RepositoriesDependency()
         repos_input = RepositoriesInput(
@@ -34,6 +35,7 @@ class TestRepositoriesDependency:
             valkey_live=valkey_live,
             valkey_schedule=valkey_schedule,
             valkey_image=valkey_image,
+            valkey_session=valkey_session,
         )
 
         async with dependency.provide(repos_input) as repos:
@@ -48,6 +50,7 @@ class TestRepositoriesDependency:
             assert args_obj.valkey_live_client is valkey_live
             assert args_obj.valkey_schedule_client is valkey_schedule
             assert args_obj.valkey_image_client is valkey_image
+            assert args_obj.valkey_session_client is valkey_session
 
     def test_stage_name(self) -> None:
         """Dependency should have correct stage name."""

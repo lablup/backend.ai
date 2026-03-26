@@ -54,6 +54,7 @@ class TestDomainComposer:
             valkey_live=MagicMock(),
             valkey_schedule=MagicMock(),
             valkey_image=MagicMock(),
+            valkey_session=MagicMock(),
         )
 
         composer = DomainComposer()
