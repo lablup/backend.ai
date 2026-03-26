@@ -1,6 +1,6 @@
 <!-- context-for-ai
 type: detail-doc
-parent: BEP-1049 (Kata Containers Agent Backend)
+parent: BEP-1051 (Kata Containers Agent Backend)
 scope: Volume mount compatibility between host filesystem and Kata guest VM; intrinsic mount evaluation; storage I/O analysis
 depends-on: [kata-agent-backend.md, configuration-deployment.md]
 key-decisions:
@@ -16,7 +16,7 @@ key-decisions:
   - krunner binaries baked into attested guest rootfs (CoCo — host is untrusted, no virtio-fs sharing of executables)
 -->
 
-# BEP-1049: Storage and Volume Mount Compatibility
+# BEP-1051: Storage and Volume Mount Compatibility
 
 ## Summary
 

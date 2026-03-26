@@ -1,6 +1,6 @@
 <!-- context-for-ai
 type: detail-doc
-parent: BEP-1049 (Kata Containers Agent Backend)
+parent: BEP-1051 (Kata Containers Agent Backend)
 scope: Migration strategy and backward compatibility guarantees
 depends-on: [kata-agent-backend.md, vfio-accelerator-plugin.md, scheduler-integration.md, configuration-deployment.md]
 key-decisions:
@@ -10,7 +10,7 @@ key-decisions:
   - VFolder storage via direct guest-side NFS/Lustre/WekaFS mount (native kernel client, RDMA-preserving; mirrors Docker's host-level mount model)
 -->
 
-# BEP-1049: Migration and Compatibility
+# BEP-1051: Migration and Compatibility
 
 ## Summary
 

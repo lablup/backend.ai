@@ -57,13 +57,13 @@ Additionally, Kata's integration with Confidential Containers (CoCo) and TEE har
 
 | Document | Description | Phase |
 |----------|-------------|-------|
-| [Configuration & Deployment](BEP-1049/configuration-deployment.md) | `[kata]` config section, hypervisor selection, host requirements | 1 |
-| [KataAgent Backend](BEP-1049/kata-agent-backend.md) | KataAgent, KataKernel, KataKernelCreationContext | 1 |
-| [Storage Compatibility](BEP-1049/storage-compatibility.md) | virtio-fs mount translation, lxcfs/socket exceptions, I/O analysis | 1 |
-| [Networking](BEP-1049/networking.md) | Calico CNI integration, inter-VM networking, network policy, hostname resolution | 1 |
-| [VFIO Accelerator Plugin](BEP-1049/vfio-accelerator-plugin.md) | CUDAVFIOPlugin, IOMMU group detection, device passthrough | 2 |
-| [Scheduler Integration](BEP-1049/scheduler-integration.md) | Agent backend tracking, scaling group policy, VM overhead | 3 |
-| [Migration & Compatibility](BEP-1049/migration-compatibility.md) | Additive rollout, backward compatibility, rollback plan | All |
+| [Configuration & Deployment](BEP-1051/configuration-deployment.md) | `[kata]` config section, hypervisor selection, host requirements | 1 |
+| [KataAgent Backend](BEP-1051/kata-agent-backend.md) | KataAgent, KataKernel, KataKernelCreationContext | 1 |
+| [Storage Compatibility](BEP-1051/storage-compatibility.md) | virtio-fs mount translation, lxcfs/socket exceptions, I/O analysis | 1 |
+| [Networking](BEP-1051/networking.md) | Calico CNI integration, inter-VM networking, network policy, hostname resolution | 1 |
+| [VFIO Accelerator Plugin](BEP-1051/vfio-accelerator-plugin.md) | CUDAVFIOPlugin, IOMMU group detection, device passthrough | 2 |
+| [Scheduler Integration](BEP-1051/scheduler-integration.md) | Agent backend tracking, scaling group policy, VM overhead | 3 |
+| [Migration & Compatibility](BEP-1051/migration-compatibility.md) | Additive rollout, backward compatibility, rollback plan | All |
 
 ## Design Overview
 
@@ -210,7 +210,7 @@ The `kernel_init_polling_timeout_sec` and `kernel_init_timeout_sec` configs must
 | 2026-03-25 | GPUDirect RDMA via Kata VRA: GPU + InfiniBand HCA co-passthrough with PCIe topology replication | Multi-node GPU workloads require GPUDirect RDMA (direct GPU↔NIC DMA without CPU). Kata VRA architecture supports this via: (1) `hotplug_vfio = "switch-port"` to replicate host PCIe switch topology inside the guest, (2) `clique-id` CDI annotations to group GPU and NIC for P2P, (3) ACS/ATS configuration for Direct Translated P2P. Guest image must include full NVIDIA + MLNX_OFED driver stack with `nvidia-peermem`. Architecturally feasible but not yet demonstrated end-to-end in Kata (upstream issue [#10796](https://github.com/kata-containers/kata-containers/issues/10796)). NVLink/NVSwitch for intra-node GPU-GPU P2P works via VFIO BAR mapping of NVLink registers. | No RDMA support (unacceptable for multi-node training); SR-IOV VF passthrough only (currently broken in Kata [#11910](https://github.com/kata-containers/kata-containers/issues/11910)); userspace RDMA without GPUDirect (CPU bottleneck) |
 | 2026-03-25 | CoCo by default for all Kata workloads | The host is always untrusted. All Kata VMs run with TEE protection (TDX/SEV-SNP). This collapses the original 4-phase plan — CoCo is the starting point. Eliminates conditional logic for CoCo vs non-CoCo modes and resolves several open questions (see below). | Non-CoCo Kata mode for initial development (defers trust model, but creates throwaway code); CoCo as opt-in (adds configuration complexity for a mode that should always be on) |
 | 2026-03-25 | Guest-side image pull via `image-rs` (no host-side pull) | Host is untrusted and must not see image contents. `image-rs` inside the TEE pulls encrypted images, decrypts with keys from KBS after remote attestation. Host-side containerd pull is not an option. Agent's role reduces to: pass image reference + attestation config to Kata shim, wait for kernel runner ZMQ connection. Registry credentials delivered via KBS (attestation-gated), not via host. | Host-side containerd pull (breaks CoCo trust model); credentials via IVSHMEM (less standard than KBS for CoCo) |
-| 2026-03-25 | CUDAVFIOPlugin implements current `generate_docker_args()` API with `_kata_vfio_devices` return | BEP-1016 is Draft with no implementation timeline. CoCo does not affect plugin interface — VFIO device assignment is a host-side operation regardless of guest encryption. The `_kata_vfio_devices` convention maps directly to future `WorkloadConfig` fields. Migrate to BEP-1016 `create_lifecycle_hook()` when available. | Wait for BEP-1016 (unknown delay); implement BEP-1016 as part of BEP-1049 (scope creep) |
+| 2026-03-25 | CUDAVFIOPlugin implements current `generate_docker_args()` API with `_kata_vfio_devices` return | BEP-1016 is Draft with no implementation timeline. CoCo does not affect plugin interface — VFIO device assignment is a host-side operation regardless of guest encryption. The `_kata_vfio_devices` convention maps directly to future `WorkloadConfig` fields. Migrate to BEP-1016 `create_lifecycle_hook()` when available. | Wait for BEP-1016 (unknown delay); implement BEP-1016 as part of BEP-1051 (scope creep) |
 | 2026-03-25 | No `backend` field on `ScalingGroupOpts`; homogeneous groups by convention | CoCo-by-default eliminates the kata/kata-confidential distinction. Only two backend types exist: Docker and Kata (always CoCo). `AgentRow.backend` column provides admin visibility. Homogeneous groups are even more sufficient with no CoCo/non-CoCo split. | `allowed_backends` field (unnecessary guard with simplified backend model); `attestation_policy` field (low-priority future option) |
 | 2026-03-25 | Exclude shared IOMMU groups with warning; `max_gpus_per_vm` safety limit; validate TEE constraints empirically | Target hardware is DGX/HGX with isolated IOMMU groups (one GPU per group). Shared groups are rare on server hardware — exclude with `log.warning()`. Multi-GPU from separate groups is supported. `max_gpus_per_vm` config (default 8) prevents extreme VM boot times from PCIe BAR mapping overhead. TDX Connect / SEV-SNP ASID interaction with multi-device VFIO requires empirical validation on target hardware — not a design blocker. | Atomic device bundles for shared groups (complex scheduler change for rare case); no GPU limit (risks 30+ minute boot) |
 | 2026-03-25 | Monolithic attested guest rootfs; all drivers baked in from day one | CoCo trust model requires the guest rootfs to be part of the attestation chain — its measurement (hash) is verified during remote attestation before secrets (KBS keys, storage credentials) are released. Runtime module loading from host is eliminated (untrusted source). krunner binaries, NVIDIA drivers, MLNX_OFED, storage clients, DCGM/Node Exporter, and storage mount boot script are all baked into a single versioned image (`kata-rootfs-{version}.qcow2`). Attestation measurement in KBS must be updated on every image rebuild. | Layered with attested chain (incremental updates but more complex attestation); runtime module loading (eliminated — host is untrusted) |
@@ -289,11 +289,11 @@ See Decision Log (2026-03-25) for the `containerd exec` policy finding.
 
 ### Future: MNNVL Support (Separate BEP Required)
 
-Rack-scale NVLink systems (GB200 NVL72, Vera Rubin NVL72) use **Multi-Node NVLink (MNNVL)** — a fundamentally different interconnect architecture from InfiniBand-based GPU servers. This requires a separate BEP, not an extension of BEP-1049.
+Rack-scale NVLink systems (GB200 NVL72, Vera Rubin NVL72) use **Multi-Node NVLink (MNNVL)** — a fundamentally different interconnect architecture from InfiniBand-based GPU servers. This requires a separate BEP, not an extension of BEP-1051.
 
 **Why a separate BEP:**
 
-| Aspect | BEP-1049 (InfiniBand) | MNNVL (future BEP) |
+| Aspect | BEP-1051 (InfiniBand) | MNNVL (future BEP) |
 |---|---|---|
 | GPU interconnect | InfiniBand (400 Gbps) | NVLink fabric (1.8 TB/s per GPU — 36x IB) |
 | Isolation model | Kata VM + VFIO passthrough | IMEX domains (per-workload NVLink partition) — may not need VMs |

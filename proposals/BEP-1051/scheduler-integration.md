@@ -1,6 +1,6 @@
 <!-- context-for-ai
 type: detail-doc
-parent: BEP-1049 (Kata Containers Agent Backend)
+parent: BEP-1051 (Kata Containers Agent Backend)
 scope: Manager and scheduler changes for Kata backend selection and resource accounting
 depends-on: [kata-agent-backend.md, vfio-accelerator-plugin.md]
 key-decisions:
@@ -9,7 +9,7 @@ key-decisions:
   - backend column added to AgentRow (default "docker")
 -->
 
-# BEP-1049: Scheduler Integration
+# BEP-1051: Scheduler Integration
 
 ## Summary
 

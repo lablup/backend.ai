@@ -1,6 +1,6 @@
 <!-- context-for-ai
 type: detail-doc
-parent: BEP-1049 (Kata Containers Agent Backend)
+parent: BEP-1051 (Kata Containers Agent Backend)
 scope: Multi-container networking for Kata VMs — Calico CNI integration, inter-VM communication, network policy, service port exposure
 depends-on: [kata-agent-backend.md, configuration-deployment.md]
 key-decisions:
@@ -12,7 +12,7 @@ key-decisions:
   - Calico standalone mode with etcd datastore for non-Kubernetes deployments
 -->
 
-# BEP-1049: Multi-Container Networking
+# BEP-1051: Multi-Container Networking
 
 ## Summary
 

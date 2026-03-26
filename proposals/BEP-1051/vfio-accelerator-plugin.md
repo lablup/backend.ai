@@ -1,6 +1,6 @@
 <!-- context-for-ai
 type: detail-doc
-parent: BEP-1049 (Kata Containers Agent Backend)
+parent: BEP-1051 (Kata Containers Agent Backend)
 scope: VFIO-based GPU passthrough compute plugin for Kata backend
 depends-on: [kata-agent-backend.md]
 key-decisions:
@@ -12,7 +12,7 @@ key-decisions:
   - InfiniBand HCA passthrough alongside GPU requires BAR sizing fix (Kata 3.8+) and RDMA device plugin
 -->
 
-# BEP-1049: VFIO Accelerator Plugin
+# BEP-1051: VFIO Accelerator Plugin
 
 ## Summary
 

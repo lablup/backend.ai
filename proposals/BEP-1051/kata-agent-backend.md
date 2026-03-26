@@ -1,6 +1,6 @@
 <!-- context-for-ai
 type: detail-doc
-parent: BEP-1049 (Kata Containers Agent Backend)
+parent: BEP-1051 (Kata Containers Agent Backend)
 scope: KataAgent, KataKernel, KataKernelCreationContext implementation; kernel runner boot sequence in guest VM
 depends-on: [configuration-deployment.md, storage-compatibility.md]
 key-decisions:
@@ -12,7 +12,7 @@ key-decisions:
   - entrypoint.sh requires Kata-specific variant (skip LD_PRELOAD/libbaihook, skip jail references)
 -->
 
-# BEP-1049: KataAgent Backend
+# BEP-1051: KataAgent Backend
 
 ## Summary
 

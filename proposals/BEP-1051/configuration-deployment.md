@@ -1,6 +1,6 @@
 <!-- context-for-ai
 type: detail-doc
-parent: BEP-1049 (Kata Containers Agent Backend)
+parent: BEP-1051 (Kata Containers Agent Backend)
 scope: Agent configuration schema for Kata backend and host deployment requirements
 depends-on: []
 key-decisions:
@@ -9,7 +9,7 @@ key-decisions:
   - Config validated at agent startup with fail-fast on missing paths
 -->
 
-# BEP-1049: Configuration and Deployment
+# BEP-1051: Configuration and Deployment
 
 ## Summary
 
