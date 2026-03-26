@@ -536,6 +536,7 @@ class VFolderService:
         scope = ProjectVFolderSearchScope(project_id=action.project_id)
         result = await self._vfolder_repository.search_in_project(action.querier, scope)
         return SearchVFoldersInProjectActionResult(
+            project_id=action.project_id,
             data=result.items,
             total_count=result.total_count,
             has_next_page=result.has_next_page,
