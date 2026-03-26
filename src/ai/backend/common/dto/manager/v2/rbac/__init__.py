@@ -113,6 +113,8 @@ __all__ = (
     "UpdateRoleInput",
     # Node and Payload models (response)
     "AssociationScopesEntitiesNode",
+    "EntityOperationCombinationInfo",
+    "OperationInfo",
     "BulkAssignRoleFailureInfo",
     "BulkAssignRoleResultPayload",
     "BulkRevokeRoleFailureInfo",
