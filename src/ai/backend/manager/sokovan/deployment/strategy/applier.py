@@ -90,6 +90,7 @@ class StrategyResultApplier:
         swapped = await self._deployment_repo.apply_strategy_mutations(
             rollout=rollout,
             drain=drain,
+            promote=None,
             completed_ids=completed_ids,
         )
 
