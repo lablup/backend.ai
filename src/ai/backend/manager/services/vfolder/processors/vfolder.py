@@ -1,10 +1,11 @@
-from typing import override
+from typing import cast, override
 
 from ai.backend.manager.actions.monitors.monitor import ActionMonitor
 from ai.backend.manager.actions.processor import ActionProcessor
 from ai.backend.manager.actions.processor.scope import ScopeActionProcessor
 from ai.backend.manager.actions.processor.single_entity import SingleEntityActionProcessor
 from ai.backend.manager.actions.types import AbstractProcessorPackage, ActionSpec
+from ai.backend.manager.actions.validator.base import ActionValidator
 from ai.backend.manager.actions.validators import ActionValidators
 from ai.backend.manager.services.vfolder.actions.base import (
     CloneVFolderAction,
@@ -31,6 +32,10 @@ from ai.backend.manager.services.vfolder.actions.base import (
     RestoreVFolderFromTrashActionResult,
     UpdateVFolderAttributeAction,
     UpdateVFolderAttributeActionResult,
+)
+from ai.backend.manager.services.vfolder.actions.search_in_project import (
+    SearchVFoldersInProjectAction,
+    SearchVFoldersInProjectActionResult,
 )
 from ai.backend.manager.services.vfolder.actions.storage_ops import (
     ChangeVFolderOwnershipAction,
@@ -67,6 +72,9 @@ class VFolderProcessors(AbstractProcessorPackage):
     create_vfolder: ScopeActionProcessor[CreateVFolderAction, CreateVFolderActionResult]
     get_vfolder: SingleEntityActionProcessor[GetVFolderAction, GetVFolderActionResult]
     list_vfolder: ScopeActionProcessor[ListVFolderAction, ListVFolderActionResult]
+    search_vfolders_in_project: ActionProcessor[
+        SearchVFoldersInProjectAction, SearchVFoldersInProjectActionResult
+    ]
     update_vfolder_attribute: SingleEntityActionProcessor[
         UpdateVFolderAttributeAction, UpdateVFolderAttributeActionResult
     ]
@@ -121,6 +129,11 @@ class VFolderProcessors(AbstractProcessorPackage):
         )
         self.list_vfolder = ScopeActionProcessor(
             service.list, action_monitors, validators=scope_rbac_validators
+        )
+        self.search_vfolders_in_project = ActionProcessor(
+            service.search_in_project,
+            action_monitors,
+            validators=[cast(ActionValidator, validators.rbac.scope)],
         )
 
         # Single entity actions with RBAC validation
@@ -178,6 +191,7 @@ class VFolderProcessors(AbstractProcessorPackage):
             CreateVFolderAction.spec(),
             GetVFolderAction.spec(),
             ListVFolderAction.spec(),
+            SearchVFoldersInProjectAction.spec(),
             UpdateVFolderAttributeAction.spec(),
             MoveToTrashVFolderAction.spec(),
             RestoreVFolderFromTrashAction.spec(),
