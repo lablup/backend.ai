@@ -11,9 +11,11 @@ from ai.backend.manager.data.auth.login_session_types import LoginHistoryData, L
 from ai.backend.manager.data.auth.types import GroupMembershipData, UserData
 from ai.backend.manager.data.common.types import SearchResult
 from ai.backend.manager.models.hasher.types import PasswordInfo
+from ai.backend.manager.models.login_session.enums import LoginAttemptResult
 from ai.backend.manager.models.user import UserRole, UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.auth.db_source.db_source import (
+    ActiveSessionInfo,
     AuthDBSource,
     CredentialVerificationResult,
     LoginSessionCreationResult,
@@ -89,21 +91,20 @@ class AuthRepository:
         return await self._db_source.fetch_user_info_by_email(email)
 
     @auth_repository_resilience.apply()
-    async def check_credential_with_migration(
+    async def get_user_uuid_by_email(self, email: str, domain_name: str) -> UUID | None:
+        return await self._db_source.fetch_user_uuid_by_email(email, domain_name)
+
+    @auth_repository_resilience.apply()
+    async def verify_credential(
         self,
         domain_name: str,
         email: str,
         target_password_info: PasswordInfo,
-        *,
-        force: bool = False,
-        max_session_age: int = 604800,
     ) -> CredentialVerificationResult:
-        return await self._db_source.verify_credential_with_migration(
+        return await self._db_source.verify_credential(
             domain_name,
             email,
             target_password_info,
-            force=force,
-            max_session_age=max_session_age,
         )
 
     @auth_repository_resilience.apply()
@@ -111,9 +112,18 @@ class AuthRepository:
         self,
         user_id: UUID,
         access_key: str,
-        max_session_age: int = 604800,
+        domain_name: str,
+        *,
+        max_concurrent_sessions: int = 1,
+        tokens_to_invalidate: list[str] | None = None,
     ) -> LoginSessionCreationResult:
-        return await self._db_source.create_login_session(user_id, access_key, max_session_age)
+        return await self._db_source.create_login_session(
+            user_id,
+            access_key,
+            domain_name,
+            max_concurrent_sessions=max_concurrent_sessions,
+            tokens_to_invalidate=tokens_to_invalidate,
+        )
 
     @auth_repository_resilience.apply()
     async def check_credential_without_migration(
@@ -138,6 +148,10 @@ class AuthRepository:
     # --- Login Session ---
 
     @auth_repository_resilience.apply()
+    async def get_active_session_tokens(self, user_id: UUID) -> list[ActiveSessionInfo]:
+        return await self._db_source.fetch_active_session_tokens(user_id)
+
+    @auth_repository_resilience.apply()
     async def invalidate_login_session_by_token(self, session_token: str) -> None:
         await self._db_source.invalidate_session_by_token(session_token)
 
@@ -152,6 +166,16 @@ class AuthRepository:
         querier: BatchQuerier,
     ) -> SearchResult[LoginSessionData]:
         return await self._db_source.search_login_sessions(scope, querier)
+
+    @auth_repository_resilience.apply()
+    async def record_login_history(
+        self,
+        user_id: UUID,
+        domain_name: str,
+        result: LoginAttemptResult,
+        fail_reason: str | None = None,
+    ) -> None:
+        await self._db_source.record_login_history(user_id, domain_name, result, fail_reason)
 
     # --- Login History ---
 

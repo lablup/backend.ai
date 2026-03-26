@@ -1,6 +1,6 @@
-import json
 import logging
 import time
+import uuid
 from collections import ChainMap
 from collections.abc import Mapping
 from datetime import datetime
@@ -10,6 +10,11 @@ from aiohttp import web
 from sqlalchemy import RowMapping
 
 from ai.backend.common.clients.valkey_client.valkey_session.client import ValkeySessionClient
+from ai.backend.common.clients.valkey_client.valkey_session.types import (
+    LoginSessionData,
+    LoginSessionInner,
+    LoginSessionTokenData,
+)
 from ai.backend.common.dto.manager.auth.types import AuthTokenType
 from ai.backend.common.exception import InvalidAPIParameters
 from ai.backend.common.plugin.hook import ALL_COMPLETED, FIRST_COMPLETED, PASSED, HookPluginContext
@@ -19,6 +24,7 @@ from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.config.unified import AuthConfig
 from ai.backend.manager.data.auth.types import AuthorizationResult, SSHKeypair
 from ai.backend.manager.errors.auth import (
+    ActiveLoginSessionExistsError,
     AuthorizationFailed,
     EmailAlreadyExistsError,
     GroupMembershipNotFoundError,
@@ -38,12 +44,14 @@ from ai.backend.manager.models.keypair import (
     generate_ssh_keypair,
     validate_ssh_keypair,
 )
+from ai.backend.manager.models.login_session.enums import LoginAttemptResult
 from ai.backend.manager.models.user import (
     INACTIVE_USER_STATUSES,
     UserRole,
     UserStatus,
     compare_to_hashed_password,
 )
+from ai.backend.manager.repositories.auth.db_source.db_source import ActiveSessionInfo
 from ai.backend.manager.repositories.auth.repository import AuthRepository
 from ai.backend.manager.services.auth.actions.authorize import (
     AuthorizeAction,
@@ -97,6 +105,17 @@ from ai.backend.manager.utils import check_if_requester_is_eligible_to_act_as_ta
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
+_FAILURE_MAP: dict[type[Exception], LoginAttemptResult] = {
+    AuthorizationFailed: LoginAttemptResult.FAILED_INVALID_CREDENTIALS,
+    PasswordExpired: LoginAttemptResult.FAILED_PASSWORD_EXPIRED,
+    RejectedByHook: LoginAttemptResult.FAILED_REJECTED_BY_HOOK,
+    ActiveLoginSessionExistsError: LoginAttemptResult.FAILED_SESSION_ALREADY_EXISTS,
+}
+
+
+def _classify_failure(exc: Exception) -> LoginAttemptResult:
+    return _FAILURE_MAP.get(type(exc), LoginAttemptResult.FAILED_INVALID_CREDENTIALS)
+
 
 class AuthService:
     _hook_plugin_ctx: HookPluginContext
@@ -143,57 +162,86 @@ class AuthService:
 
     async def authorize(self, action: AuthorizeAction) -> AuthorizeActionResult:
         if action.type != AuthTokenType.KEYPAIR:
-            # other types are not implemented yet.
             raise InvalidAPIParameters("Unsupported authorization type")
+        auth_config = self._config_provider.config.auth
+        user, active_sessions = await self._verify_user(action, auth_config)
 
+        try:
+            post_result = await self._post_check(action, user, active_sessions, auth_config)
+            if isinstance(post_result, AuthorizeActionResult):
+                return post_result
+            keypair_row, live_sessions = post_result
+
+            return await self._create_login_session(
+                action, user, keypair_row, live_sessions, auth_config
+            )
+        except (
+            AuthorizationFailed,
+            PasswordExpired,
+            RejectedByHook,
+            ActiveLoginSessionExistsError,
+        ) as e:
+            await self._record_login_failure(
+                user.uuid,
+                action.domain_name,
+                _classify_failure(e),
+            )
+            raise
+
+    async def _verify_user(
+        self,
+        action: AuthorizeAction,
+        auth_config: AuthConfig,
+    ) -> tuple[RowMapping, list[ActiveSessionInfo]]:
+        """Step 1: Verify user identity via hook or password."""
         params = action.hook_params
         hook_result = await self._hook_plugin_ctx.dispatch(
             "AUTHORIZE",
             (action.request, params),
             return_when=FIRST_COMPLETED,
         )
-        auth_config = self._config_provider.config.auth
         if hook_result.status != PASSED:
             raise RejectedByHook.from_hook_result(hook_result)
-        expires_at: datetime | None = None
-        session_token = ""
         if hook_result.result:
-            # Passed one of AUTHORIZED hook
             user = hook_result.result
-        else:
-            # No AUTHORIZE hook is defined (proceed with normal login)
-            # Credential check + login history recording happen atomically
-            # inside the repository layer.
-            target_password_info = PasswordInfo(
-                password=action.password,
-                algorithm=auth_config.password_hash_algorithm,
-                rounds=auth_config.password_hash_rounds,
-                salt_size=auth_config.password_hash_salt_size,
-            )
-            cred_result = await self._auth_repository.check_credential_with_migration(
-                action.domain_name,
-                action.email,
-                target_password_info=target_password_info,
-                force=action.force,
-                max_session_age=auth_config.login_session_max_age,
-            )
-            user = cred_result.user
-            session_token = cred_result.session_token
-            expires_at = cred_result.expires_at
+            active_sessions = await self._auth_repository.get_active_session_tokens(user.uuid)
+            return user, active_sessions
+
+        target_password_info = PasswordInfo(
+            password=action.password,
+            algorithm=auth_config.password_hash_algorithm,
+            rounds=auth_config.password_hash_rounds,
+            salt_size=auth_config.password_hash_salt_size,
+        )
+        cred_result = await self._auth_repository.verify_credential(
+            action.domain_name,
+            action.email,
+            target_password_info=target_password_info,
+        )
+        return cred_result.user, cred_result.active_sessions
+
+    async def _post_check(
+        self,
+        action: AuthorizeAction,
+        user: RowMapping,
+        active_sessions: list[ActiveSessionInfo],
+        auth_config: AuthConfig,
+    ) -> tuple[Any, list[ActiveSessionInfo]] | AuthorizeActionResult:
+        """Step 2: User status checks, keypair lookup, POST_AUTHORIZE hook, Valkey cross-check."""
         if user.status == UserStatus.BEFORE_VERIFICATION:
             raise AuthorizationFailed("This account needs email verification.")
         if user.status in INACTIVE_USER_STATUSES:
             raise AuthorizationFailed("User credential mismatch.")
         await self._check_password_age(user, auth_config)
+
         user_row = await self._auth_repository.get_user_row_by_uuid(user.uuid)
         main_keypair_row = user_row.get_main_keypair_row()
         if main_keypair_row is None:
             raise AuthorizationFailed("No API keypairs found.")
-        # [Hooking point for POST_AUTHORIZE]
-        # The hook handlers should accept a tuple of the request, user, and keypair objects.
+
         hook_result = await self._hook_plugin_ctx.dispatch(
             "POST_AUTHORIZE",
-            (action.request, params, user, main_keypair_row.mapping),
+            (action.request, action.hook_params, user, main_keypair_row.mapping),
             return_when=FIRST_COMPLETED,
         )
         if hook_result.status != PASSED:
@@ -204,49 +252,87 @@ class AuthService:
                 authorization_result=None,
             )
 
-        # Create login session for hook-based auth (normal path already creates in repository)
-        if not session_token:
-            session_result = await self._auth_repository.create_login_session(
-                user_id=user.uuid,
-                access_key=main_keypair_row.access_key,
-                max_session_age=auth_config.login_session_max_age,
-            )
-            session_token = session_result.session_token
-            expires_at = session_result.expires_at
+        # Cross-check active sessions with Valkey
+        live_sessions: list[ActiveSessionInfo] = []
+        for session_info in active_sessions:
+            if await self._valkey_session_client.get_login_session(session_info.session_token):
+                live_sessions.append(session_info)
+            else:
+                await self._auth_repository.invalidate_login_session_by_token(
+                    session_info.session_token
+                )
 
-        # Store session data in Valkey (same format as Webserver's RedisStorage)
-        if session_token and expires_at:
-            valkey_session_data = json.dumps({
-                "created": int(time.time()),
-                "expiration_dt": int(expires_at.timestamp()),
-                "session": {
-                    "authenticated": True,
-                    "token": {
-                        "type": "keypair",
-                        "access_key": main_keypair_row.access_key,
-                        "secret_key": main_keypair_row.secret_key or "",
-                        "role": user.role,
-                        "status": user.status,
-                    },
-                },
-            })
-            await self._valkey_session_client.set_session_data(
-                f"AIOHTTP_SESSION_{session_token}",
-                valkey_session_data,
-                auth_config.login_session_max_age,
-            )
+        return main_keypair_row, live_sessions
+
+    async def _create_login_session(
+        self,
+        action: AuthorizeAction,
+        user: RowMapping,
+        keypair_row: Any,
+        live_sessions: list[ActiveSessionInfo],
+        auth_config: AuthConfig,
+    ) -> AuthorizeActionResult:
+        """Step 3: Create login session (DB + Valkey), force-invalidate old sessions if needed."""
+        max_concurrent_sessions = 1
+        tokens_to_invalidate: list[str] | None = None
+        if action.force and len(live_sessions) >= max_concurrent_sessions:
+            sessions_to_remove = len(live_sessions) - max_concurrent_sessions + 1
+            tokens_to_invalidate = [s.session_token for s in live_sessions[:sessions_to_remove]]
+
+        session_result = await self._auth_repository.create_login_session(
+            user_id=user.uuid,
+            access_key=keypair_row.access_key,
+            domain_name=action.domain_name,
+            max_concurrent_sessions=max_concurrent_sessions,
+            tokens_to_invalidate=tokens_to_invalidate,
+        )
+
+        if tokens_to_invalidate:
+            for token in tokens_to_invalidate:
+                await self._valkey_session_client.delete_login_session(token)
+
+        session_data = LoginSessionData(
+            created=int(time.time()),
+            expiration_dt=int(time.time()) + auth_config.login_session_max_age,
+            session=LoginSessionInner(
+                authenticated=True,
+                token=LoginSessionTokenData(
+                    type="keypair",
+                    access_key=keypair_row.access_key,
+                    secret_key=keypair_row.secret_key or "",
+                    role=user.role,
+                    status=user.status,
+                ),
+            ),
+        )
+        await self._valkey_session_client.set_login_session(
+            session_result.session_token,
+            session_data.model_dump_json(),
+            auth_config.login_session_max_age,
+        )
 
         return AuthorizeActionResult(
             stream_response=None,
             authorization_result=AuthorizationResult(
-                access_key=main_keypair_row.access_key,
-                secret_key=main_keypair_row.secret_key or "",
+                access_key=keypair_row.access_key,
+                secret_key=keypair_row.secret_key or "",
                 user_id=user.uuid,
                 role=user.role,
                 status=user.status,
-                session_token=session_token,
+                session_token=session_result.session_token,
             ),
         )
+
+    async def _record_login_failure(
+        self,
+        user_uuid: uuid.UUID,
+        domain_name: str,
+        result: LoginAttemptResult,
+    ) -> None:
+        try:
+            await self._auth_repository.record_login_history(user_uuid, domain_name, result)
+        except Exception:
+            log.warning("Failed to record login history: {} for user {}", result, user_uuid)
 
     async def signup(self, action: SignupAction) -> SignupActionResult:
         params = action.hook_params
@@ -359,6 +445,7 @@ class AuthService:
 
     async def logout(self, action: LogoutAction) -> LogoutActionResult:
         await self._auth_repository.invalidate_login_session_by_token(action.session_token)
+        await self._valkey_session_client.delete_login_session(action.session_token)
         return LogoutActionResult(success=True)
 
     async def signout(self, action: SignoutAction) -> SignoutActionResult:
@@ -370,7 +457,11 @@ class AuthService:
             email,
             action.password,
         )
+        # Get active session tokens before invalidating, for Valkey cleanup
+        active_sessions = await self._auth_repository.get_active_session_tokens(action.user_id)
         await self._auth_repository.invalidate_user_login_sessions(action.user_id)
+        for session_info in active_sessions:
+            await self._valkey_session_client.delete_login_session(session_info.session_token)
         await self._auth_repository.deactivate_user_and_keypairs(email)
 
         return SignoutActionResult(success=True)
