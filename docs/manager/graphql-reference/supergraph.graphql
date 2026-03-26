@@ -2720,6 +2720,26 @@ input CreatePermissionInput
   operation: OperationType!
 }
 
+"""Added in UNRELEASED. Input for creating a new project."""
+input CreateProjectInputGQL
+  @join__type(graph: STRAWBERRY)
+{
+  """Project name. Must be unique within the domain."""
+  name: String!
+
+  """Name of the domain this project belongs to."""
+  domainName: String!
+
+  """Optional description."""
+  description: String = null
+
+  """External integration identifier."""
+  integrationId: String = null
+
+  """Name of the resource policy to apply."""
+  resourcePolicy: String = null
+}
+
 type CreateProjectResourcePolicy
   @join__type(graph: GRAPHENE)
 {
@@ -3343,6 +3363,14 @@ type DeletePermissionPayload
 {
   """ID of the deleted permission"""
   id: UUID!
+}
+
+"""Added in UNRELEASED. Payload for project deletion mutation."""
+type DeleteProjectPayloadGQL
+  @join__type(graph: STRAWBERRY)
+{
+  """Whether the deletion was successful."""
+  deleted: Boolean!
 }
 
 type DeleteProjectResourcePolicy
@@ -7989,6 +8017,26 @@ type Mutation
   adminPurgeDomainV2(domainName: String!): PurgeDomainPayloadGQL! @join__field(graph: STRAWBERRY)
 
   """
+  Added in UNRELEASED. Create a new project (admin only). Requires superadmin privileges.
+  """
+  adminCreateProjectV2(input: CreateProjectInputGQL!): ProjectPayloadGQL! @join__field(graph: STRAWBERRY)
+
+  """
+  Added in UNRELEASED. Update a project (admin only). Requires superadmin privileges. Only provided fields will be updated.
+  """
+  adminUpdateProjectV2(projectId: UUID!, input: UpdateProjectInputGQL!): ProjectPayloadGQL! @join__field(graph: STRAWBERRY)
+
+  """
+  Added in UNRELEASED. Soft-delete a project (admin only). Requires superadmin privileges.
+  """
+  adminDeleteProjectV2(projectId: UUID!): DeleteProjectPayloadGQL! @join__field(graph: STRAWBERRY)
+
+  """
+  Added in UNRELEASED. Permanently purge a project and all associated data (admin only). Requires superadmin privileges.
+  """
+  adminPurgeProjectV2(projectId: UUID!): PurgeProjectPayloadGQL! @join__field(graph: STRAWBERRY)
+
+  """
   Added in 26.2.0. Create a new user (admin only). Requires superadmin privileges. Automatically creates a default keypair for the user
   """
   adminCreateUserV2(input: CreateUserV2Input!): CreateUserV2Payload! @join__field(graph: STRAWBERRY)
@@ -8493,6 +8541,7 @@ type Permission implements Node
   scopeId: String!
   entityType: RBACElementType!
   operation: OperationType!
+  createdAt: DateTime!
 
   """The role this permission belongs to."""
   role: Role
@@ -8531,6 +8580,7 @@ input PermissionFilter
   roleId: UUID = null
   scopeType: RBACElementType = null
   entityType: RBACElementType = null
+  createdAt: DateTimeFilter = null
   AND: [PermissionFilter!] = null
   OR: [PermissionFilter!] = null
   NOT: [PermissionFilter!] = null
@@ -8565,6 +8615,7 @@ enum PermissionOrderField
 {
   ID @join__enumValue(graph: STRAWBERRY)
   ENTITY_TYPE @join__enumValue(graph: STRAWBERRY)
+  CREATED_AT @join__enumValue(graph: STRAWBERRY)
 }
 
 type PredefinedAtomicPermission
@@ -8900,6 +8951,14 @@ type ProjectOrganizationInfo
 
   """Name of the project resource policy applied to this project."""
   resourcePolicy: String!
+}
+
+"""Added in UNRELEASED. Payload for project mutation responses."""
+type ProjectPayloadGQL
+  @join__type(graph: STRAWBERRY)
+{
+  """The project entity."""
+  project: ProjectV2!
 }
 
 type ProjectResourcePolicy
@@ -9343,6 +9402,14 @@ type PurgeImagesPayload
   @join__type(graph: GRAPHENE)
 {
   task_id: String
+}
+
+"""Added in UNRELEASED. Payload for project permanent deletion mutation."""
+type PurgeProjectPayloadGQL
+  @join__type(graph: STRAWBERRY)
+{
+  """Whether the purge was successful."""
+  purged: Boolean!
 }
 
 """Added in 26.3.0. Input for purging a role"""
@@ -13157,6 +13224,28 @@ input UpdatePermissionInput
   scopeId: String = null
   entityType: RBACElementType = null
   operation: OperationType = null
+}
+
+"""
+Added in UNRELEASED. Input for updating project information. All fields optional.
+"""
+input UpdateProjectInputGQL
+  @join__type(graph: STRAWBERRY)
+{
+  """New project name."""
+  name: String = null
+
+  """New description."""
+  description: String = null
+
+  """Updated active status."""
+  isActive: Boolean = null
+
+  """New external integration identifier."""
+  integrationId: String = null
+
+  """New resource policy name."""
+  resourcePolicy: String = null
 }
 
 """Added in 25.14.0. """
