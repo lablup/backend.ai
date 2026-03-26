@@ -3,6 +3,7 @@
 import uuid
 
 import pytest
+from pydantic import ValidationError
 
 from ai.backend.common.dto.manager.field import VFolderPermissionField
 from ai.backend.common.dto.manager.vfolder.request import (
@@ -234,8 +235,8 @@ class TestCreateArchiveDownloadSessionReq:
         req = CreateArchiveDownloadSessionReq(files=["a.txt"], filename="archive.zip")
         assert req.filename == "archive.zip"
 
-    def test_empty_files_raises(self) -> None:
-        with pytest.raises(Exception):
+    def test_empty_files_raises_validation_error(self) -> None:
+        with pytest.raises(ValidationError, match="files"):
             CreateArchiveDownloadSessionReq(files=[])
 
 
