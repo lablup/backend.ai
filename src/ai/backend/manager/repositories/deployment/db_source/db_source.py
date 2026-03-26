@@ -278,6 +278,9 @@ class DeploymentDBSource:
                 .options(
                     selectinload(EndpointRow.image_row),
                     selectinload(EndpointRow.deployment_policy),
+                    selectinload(EndpointRow.revisions).selectinload(
+                        DeploymentRevisionRow.image_row
+                    ),
                 )
             )
             result = await db_sess.execute(stmt)
@@ -330,6 +333,9 @@ class DeploymentDBSource:
                 .options(
                     selectinload(EndpointRow.image_row),
                     selectinload(EndpointRow.deployment_policy),
+                    selectinload(EndpointRow.revisions).selectinload(
+                        DeploymentRevisionRow.image_row
+                    ),
                 )
             )
             result = await db_sess.execute(stmt)
