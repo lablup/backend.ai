@@ -45,6 +45,10 @@ from ai.backend.manager.services.session.actions.download_files import (
     DownloadFilesAction,
     DownloadFilesActionResult,
 )
+from ai.backend.manager.services.session.actions.enqueue_session import (
+    EnqueueSessionAction,
+    EnqueueSessionActionResult,
+)
 from ai.backend.manager.services.session.actions.execute_session import (
     ExecuteSessionAction,
     ExecuteSessionActionResult,
@@ -139,6 +143,7 @@ class SessionProcessors(AbstractProcessorPackage):
         CreateFromTemplateAction,
         CreateFromTemplateActionResult,
     ]
+    enqueue_session: ActionProcessor[EnqueueSessionAction, EnqueueSessionActionResult]
     destroy_session: ActionProcessor[DestroySessionAction, DestroySessionActionResult]
     download_file: ActionProcessor[DownloadFileAction, DownloadFileActionResult]
     download_files: ActionProcessor[DownloadFilesAction, DownloadFilesActionResult]
@@ -209,6 +214,11 @@ class SessionProcessors(AbstractProcessorPackage):
             action_monitors,
             validators=[cast(ActionValidator, scope_validator)],
         )
+        self.enqueue_session = ActionProcessor(
+            service.enqueue_session,
+            action_monitors,
+            validators=[cast(ActionValidator, scope_validator)],
+        )
         self.create_from_params = ActionProcessor(
             service.create_from_params,
             action_monitors,
@@ -262,6 +272,7 @@ class SessionProcessors(AbstractProcessorPackage):
             CompleteAction.spec(),
             ConvertSessionToImageAction.spec(),
             CreateClusterAction.spec(),
+            EnqueueSessionAction.spec(),
             CreateFromParamsAction.spec(),
             CreateFromTemplateAction.spec(),
             DestroySessionAction.spec(),

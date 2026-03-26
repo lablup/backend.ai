@@ -14,9 +14,10 @@ from ai.backend.common.docker import ImageRef
 from ai.backend.common.types import AccessKey, ImageAlias, SessionId
 from ai.backend.manager.data.image.types import ImageIdentifier, ImageStatus
 from ai.backend.manager.data.kernel.types import KernelListResult
-from ai.backend.manager.data.session.types import SessionListResult
+from ai.backend.manager.data.session.types import SessionData, SessionListResult
 from ai.backend.manager.data.user.types import UserData
 from ai.backend.manager.errors.common import GenericBadRequest
+from ai.backend.manager.errors.image import ImageNotFound
 from ai.backend.manager.errors.kernel import SessionAlreadyExists, SessionNotFound
 from ai.backend.manager.models.container_registry import ContainerRegistryRow
 from ai.backend.manager.models.group import groups
@@ -554,6 +555,38 @@ class SessionDBSource:
                 has_next_page=result.has_next_page,
                 has_previous_page=result.has_previous_page,
             )
+
+    async def resolve_image_by_id(
+        self,
+        image_id: uuid.UUID,
+    ) -> ImageRow:
+        """Resolve an image by its UUID. Raises ImageNotFound if not found or not alive."""
+        async with self._db.begin_readonly_session_read_committed() as db_sess:
+            query = (
+                sa.select(ImageRow)
+                .where(ImageRow.id == image_id)
+                .where(ImageRow.status == ImageStatus.ALIVE)
+            )
+            row = await db_sess.scalar(query)
+            if row is None:
+                raise ImageNotFound(f"Image not found: {image_id}")
+            return row
+
+    async def get_session_data_by_id(
+        self,
+        session_id: SessionId,
+    ) -> SessionData:
+        """Get session data by session ID."""
+        async with self._db.begin_readonly_session() as db_sess:
+            query = (
+                sa.select(SessionRow)
+                .options(selectinload(SessionRow.kernels))
+                .where(SessionRow.id == session_id)
+            )
+            row = await db_sess.scalar(query)
+            if row is None:
+                raise SessionNotFound(f"Session not found: {session_id}")
+            return row.to_dataclass()
 
     async def update_image_last_used_at(
         self,
