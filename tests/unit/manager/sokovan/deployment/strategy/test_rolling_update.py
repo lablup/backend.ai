@@ -694,18 +694,6 @@ class TestEdgeCases:
         with pytest.raises(InvalidEndpointState):
             RollingUpdateStrategy().evaluate_cycle(deployment, routes, spec)
 
-    def test_route_without_revision_classified_as_old(self) -> None:
-        """Routes with revision_id=None are classified as old."""
-        deployment = make_deployment(desired=1)
-        spec = RollingUpdateSpec(
-            max_surge=make_int_or_percent(1), max_unavailable=make_int_or_percent(0)
-        )
-        routes = [make_route(revision_id=None, status=RouteStatus.HEALTHY)]  # type: ignore[arg-type]
-
-        result = RollingUpdateStrategy().evaluate_cycle(deployment, routes, spec)
-
-        assert len(result.route_changes.rollout_specs) == 1
-
     def test_provisioning_prioritized_over_completion_check(self) -> None:
         """PROVISIONING check comes before completion check in FSM."""
         deployment = make_deployment(desired=1)

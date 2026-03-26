@@ -40,6 +40,7 @@ def sample_route_data() -> RouteData:
         status=RouteStatus.PROVISIONING,
         traffic_ratio=1.0,
         created_at=datetime.now(tzutc()),
+        revision_id=uuid4(),
     )
 
 
@@ -327,6 +328,7 @@ class TestProcessRouteLifecycle:
                     status=RouteStatus.HEALTHY,
                     traffic_ratio=1.0,
                     created_at=datetime.now(tzutc()),
+                    revision_id=uuid4(),
                 )
             ]
         )

@@ -254,6 +254,7 @@ def sample_route(sample_endpoint: EndpointRow) -> RoutingRow:
         session_owner=sample_endpoint.session_owner,
         domain=sample_endpoint.domain,
         project=sample_endpoint.project,
+        revision=uuid.uuid4(),
     )
 
 

@@ -157,6 +157,7 @@ def _create_route_data(
         status=status,
         traffic_ratio=1.0,
         created_at=datetime.now(tzutc()),
+        revision_id=uuid4(),
     )
 
 

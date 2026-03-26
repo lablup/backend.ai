@@ -104,15 +104,26 @@ def upgrade() -> None:
         """
     )
 
+    # Step 4: Delete orphan routes whose endpoint has no revision
+    # (i.e., endpoints with image IS NULL that could not get a revision row).
+    op.execute(
+        """
+        DELETE FROM routings
+        WHERE revision IS NULL
+        """
+    )
+
+    # Step 5: Make routings.revision NOT NULL now that all routes have a revision.
+    op.alter_column("routings", "revision", nullable=False)
+
     # Note: Endpoints with image IS NULL are left as-is.
     # They cannot have a revision row (deployment_revisions.image is NOT NULL),
     # so current_revision remains nullable.
 
 
 def downgrade() -> None:
-    # Data-only migration: downgrade is intentionally a no-op.
-    # The created revision rows and current_revision pointers are harmless
-    # to keep, and there is no reliable way to distinguish revisions created
-    # by this migration from those created by the original 25ac68cb28ba or
-    # by normal application usage.
-    pass
+    # Revert routings.revision back to nullable.
+    op.alter_column("routings", "revision", nullable=True)
+
+    # Note: deleted routes (Step 4) and created revision rows cannot be reliably
+    # restored, but making the column nullable again is sufficient for downgrade.

@@ -151,36 +151,6 @@ class TestProvisionRoutes:
             revision_id=explicit_revision_id,
         )
 
-    async def test_provision_route_falls_back_to_deploying_revision(
-        self,
-        route_executor: RouteExecutor,
-        mock_deployment_repo: AsyncMock,
-        mock_scheduling_controller: AsyncMock,
-        provisioning_route: RouteData,
-    ) -> None:
-        """RP-004b: When route has no revision_id, falls back to deploying_revision_id."""
-        # Arrange
-        fallback_revision_id = uuid4()
-        route = dataclasses.replace(provisioning_route, revision_id=None)
-        deployment = MagicMock()
-        deployment.id = route.endpoint_id
-        deployment.deploying_revision_id = fallback_revision_id
-        deployment.current_revision_id = None
-        mock_deployment_repo.get_endpoints_by_ids.return_value = [deployment]
-
-        entity_ids = [route.route_id]
-        with RouteRecorderContext.scope("test", entity_ids=entity_ids):
-            # Act
-            result = await route_executor.provision_routes([route])
-
-        # Assert
-        assert len(result.successes) == 1
-        assert len(result.errors) == 0
-        mock_deployment_repo.fetch_deployment_context.assert_awaited_once_with(
-            deployment,
-            revision_id=fallback_revision_id,
-        )
-
 
 # =============================================================================
 # TestCheckRouteHealth (RH-001 ~ RH-004)

@@ -445,7 +445,7 @@ class RouteInfo:
     status: RouteStatus
     traffic_ratio: float
     created_at: datetime
-    revision_id: UUID | None
+    revision_id: UUID
     traffic_status: RouteTrafficStatus
     error_data: dict[str, Any] = field(default_factory=dict)
 
