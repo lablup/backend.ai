@@ -1790,7 +1790,7 @@ class VfolderRepository:
                         entity_type=EntityType.VFOLDER,
                         entity_id=str(vfolder_id),
                     ),
-                    entity_scope_type=RBACElementType.VFOLDER,
+                    entity_scope_type=ScopeType.VFOLDER,
                     target_role_ids=[new_owner_role_id],
                     operations=None,
                 )
@@ -1809,7 +1809,7 @@ class VfolderRepository:
                             entity_type=EntityType.VFOLDER,
                             entity_id=str(vfolder_id),
                         ),
-                        entity_scope_type=RBACElementType.VFOLDER,
+                        entity_scope_type=ScopeType.VFOLDER,
                         target_role_ids=[user_role_id],
                         operations=None,
                     )
