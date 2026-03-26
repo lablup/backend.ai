@@ -1190,7 +1190,7 @@ def auth_processors(
     valkey_clients: ValkeyClients,
 ) -> AuthProcessors:
     """Real AuthProcessors wired with real AuthService and AuthRepository."""
-    repo = AuthRepository(database_engine)
+    repo = AuthRepository(database_engine, valkey_clients.session)
     service = AuthService(
         hook_plugin_ctx=hook_plugin_ctx,
         auth_repository=repo,

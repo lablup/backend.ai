@@ -189,6 +189,72 @@ class TestBaseGQLAdapterBuildPagination:
             )
         assert "Only one pagination mode allowed" in str(exc_info.value)
 
+    def test_build_pagination_mixed_modes_first_and_offset_error(
+        self, adapter: BaseGQLAdapter, pagination_spec: PaginationSpec
+    ) -> None:
+        """Test that first + offset raises InvalidGraphQLParameters."""
+        with pytest.raises(InvalidGraphQLParameters) as exc_info:
+            adapter.build_querier(
+                PaginationOptions(first=10, offset=0),
+                pagination_spec,
+            )
+        assert "Only one pagination mode allowed" in str(exc_info.value)
+
+    def test_build_pagination_mixed_modes_last_and_offset_error(
+        self, adapter: BaseGQLAdapter, pagination_spec: PaginationSpec
+    ) -> None:
+        """Test that last + offset raises InvalidGraphQLParameters."""
+        with pytest.raises(InvalidGraphQLParameters) as exc_info:
+            adapter.build_querier(
+                PaginationOptions(last=5, offset=0),
+                pagination_spec,
+            )
+        assert "Only one pagination mode allowed" in str(exc_info.value)
+
+    def test_build_pagination_mixed_modes_after_and_limit_error(
+        self, adapter: BaseGQLAdapter, pagination_spec: PaginationSpec
+    ) -> None:
+        """Test that after + limit raises InvalidGraphQLParameters."""
+        with pytest.raises(InvalidGraphQLParameters) as exc_info:
+            adapter.build_querier(
+                PaginationOptions(after="cursor", limit=10),
+                pagination_spec,
+            )
+        assert "Only one pagination mode allowed" in str(exc_info.value)
+
+    def test_build_pagination_mixed_modes_before_and_limit_error(
+        self, adapter: BaseGQLAdapter, pagination_spec: PaginationSpec
+    ) -> None:
+        """Test that before + limit raises InvalidGraphQLParameters."""
+        with pytest.raises(InvalidGraphQLParameters) as exc_info:
+            adapter.build_querier(
+                PaginationOptions(before="cursor", limit=10),
+                pagination_spec,
+            )
+        assert "Only one pagination mode allowed" in str(exc_info.value)
+
+    def test_build_pagination_mixed_modes_first_and_before_error(
+        self, adapter: BaseGQLAdapter, pagination_spec: PaginationSpec
+    ) -> None:
+        """Test that first + before raises InvalidGraphQLParameters (forward + backward)."""
+        with pytest.raises(InvalidGraphQLParameters) as exc_info:
+            adapter.build_querier(
+                PaginationOptions(first=10, before="cursor"),
+                pagination_spec,
+            )
+        assert "Only one pagination mode allowed" in str(exc_info.value)
+
+    def test_build_pagination_mixed_modes_after_and_last_error(
+        self, adapter: BaseGQLAdapter, pagination_spec: PaginationSpec
+    ) -> None:
+        """Test that after + last raises InvalidGraphQLParameters (forward + backward)."""
+        with pytest.raises(InvalidGraphQLParameters) as exc_info:
+            adapter.build_querier(
+                PaginationOptions(after="cursor", last=5),
+                pagination_spec,
+            )
+        assert "Only one pagination mode allowed" in str(exc_info.value)
+
     def test_build_pagination_first_without_after(
         self,
         adapter: BaseGQLAdapter,
