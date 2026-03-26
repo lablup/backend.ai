@@ -169,15 +169,20 @@ virtio-fs introduces FUSE overhead on the host side and — critically — break
 
 The correct architecture mirrors Docker: mount the **storage volume** directly inside the guest VM using the guest's own NFS/Lustre/WekaFS kernel client (preserving RDMA, 100% native throughput), then bind-mount the specific vfolder subdirectory into the container.
 
+```mermaid
+flowchart LR
+    subgraph Docker["Docker (current)"]
+        SC1["Storage cluster"] -->|"NFS/Lustre (RDMA)"| Host["/mnt/vfstore (host)"]
+        Host -->|bind-mount| DC["container:/home/work/data"]
+    end
 ```
-Docker (current):
-  Storage cluster ──(NFS/Lustre/RDMA)──→ Host: /mnt/vfstore
-    └── DockerAgent bind-mounts /mnt/vfstore/<vfid>/subpath → container:/home/work/data
 
-Kata (proposed):
-  Storage cluster ──(NFS/Lustre/RDMA)──→ Guest VM: /mnt/vfstore (direct mount)
-    └── Container bind-mounts /mnt/vfstore/<vfid>/subpath → /home/work/data
-  (Guest VM's own filesystem client mounts storage directly — RDMA preserved, 100% native)
+```mermaid
+flowchart LR
+    subgraph Kata["Kata (proposed)"]
+        SC2["Storage cluster"] -->|"NFS/Lustre (RDMA, direct)"| GuestVM["/mnt/vfstore (guest VM)"]
+        GuestVM -->|bind-mount| KC["container:/home/work/data"]
+    end
 ```
 
 **How mount specs and storage network config reach the guest:**

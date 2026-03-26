@@ -67,11 +67,15 @@ Additionally, Kata's integration with Confidential Containers (CoCo) and TEE har
 
 ## Design Overview
 
-```
-AbstractAgent[KernelObjectType, KernelCreationContextType]
-├── DockerAgent[DockerKernel, DockerKernelCreationContext]       ← existing
-├── KubernetesAgent[KubernetesKernel, KubernetesKernelCreationContext]  ← existing
-└── KataAgent[KataKernel, KataKernelCreationContext]             ← proposed
+```mermaid
+classDiagram
+    class AbstractAgent~KernelObjectType, KernelCreationContextType~
+    AbstractAgent <|-- DockerAgent : existing
+    AbstractAgent <|-- KubernetesAgent : existing
+    AbstractAgent <|-- KataAgent : proposed
+    class DockerAgent~DockerKernel, DockerKernelCreationContext~
+    class KubernetesAgent~KubernetesKernel, KubernetesKernelCreationContext~
+    class KataAgent~KataKernel, KataKernelCreationContext~
 ```
 
 KataAgent manages CoCo-enabled containers via containerd with the Kata shim (`io.containerd.kata.v2`). All Kata VMs run with TEE protection (TDX/SEV-SNP) by default — the host is always untrusted. Container lifecycle differs from Docker: VM boot with attestation → guest-side image pull via `image-rs` → container spawn inside guest. GPU devices are assigned via VFIO passthrough at VM creation time, binding PCI devices directly into the guest's address space through IOMMU. Co-located InfiniBand HCAs are auto-attached for GPUDirect RDMA.

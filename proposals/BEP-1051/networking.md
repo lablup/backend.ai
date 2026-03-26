@@ -30,25 +30,16 @@ Backend.AI has a network plugin system (`src/ai/backend/agent/plugin/network.py`
 
 Kata transparently bridges the host-side network namespace into the guest VM using TC (Traffic Control) filter redirection:
 
-```
-                   HOST SIDE                        │  GUEST VM SIDE
-                                                    │
-  CNI assigns IP to container namespace             │
-  ┌──────────┐                                      │
-  │  eth0    │  (veth pair, container namespace)     │
-  │  (veth)  │                                      │
-  └────┬─────┘                                      │
-       │  TC filter: eth0 ingress → tap0 egress     │
-       │  TC filter: tap0 ingress → eth0 egress     │
-  ┌────┴─────┐                                      │
-  │ tap0_kata│  (TAP device)                        │
-  └────┬─────┘                                      │
-───────┼────────────────────────────────────────────┼──── VM boundary (KVM)
-       │  virtio-net                                │
-  ┌────┴─────┐                                      │
-  │   eth0   │  (guest interface, same IP as host   │
-  │          │   veth — transparent to CNI)          │
-  └──────────┘                                      │
+```mermaid
+flowchart TB
+    subgraph HOST["Host Side"]
+        CNI["CNI assigns IP"] --> veth["eth0 (veth pair)"]
+        veth -->|"TC filter: ingress/egress"| tap["tap0_kata (TAP device)"]
+    end
+    subgraph VM["Guest VM (KVM boundary)"]
+        geth["eth0 (virtio-net, same IP as host veth)"]
+    end
+    tap -->|virtio-net| geth
 ```
 
 This TC filter mechanism is Kata's default and requires no additional configuration. The guest VM's `eth0` gets the same IP address that the CNI assigned to the host-side veth, making the VM transparent to the network infrastructure.
@@ -106,29 +97,19 @@ KataAgent requires Calico as the CNI networking layer for the following reasons:
 
 ### Calico Architecture with Kata
 
-```
-  Agent Host A                              Agent Host B
- ┌─────────────────────────────────┐      ┌─────────────────────────────────┐
- │  ┌──────────┐   ┌──────────┐   │      │  ┌──────────┐   ┌──────────┐   │
- │  │ Kata VM  │   │ Kata VM  │   │      │  │ Kata VM  │   │ Kata VM  │   │
- │  │ (sess-1) │   │ (sess-2) │   │      │  │ (sess-3) │   │ (sess-4) │   │
- │  └──┬───────┘   └──┬───────┘   │      │  └──┬───────┘   └──┬───────┘   │
- │     │ virtio-net    │           │      │     │              │           │
- │  ┌──┴───┐       ┌──┴───┐       │      │  ┌──┴───┐       ┌──┴───┐       │
- │  │ tap0 │       │ tap0 │       │      │  │ tap0 │       │ tap0 │       │
- │  └──┬───┘       └──┬───┘       │      │  └──┬───┘       └──┬───┘       │
- │     │ TC filter     │           │      │     │              │           │
- │  ┌──┴───┐       ┌──┴───┐       │      │  ┌──┴───┐       ┌──┴───┐       │
- │  │ veth │       │ veth │       │      │  │ veth │       │ veth │       │
- │  └──┬───┘       └──┬───┘       │      │  └──┬───┘       └──┬───┘       │
- │     └───────┬───────┘           │      │     └───────┬───────┘           │
- │         ┌───┴────┐              │      │         ┌───┴────┐              │
- │         │ Felix  │ (policy)     │      │         │ Felix  │ (policy)     │
- │         │ BIRD   │ (BGP)       │      │         │ BIRD   │ (BGP)       │
- │         └───┬────┘              │      │         └───┬────┘              │
- └─────────────┼───────────────────┘      └─────────────┼───────────────────┘
-               │         BGP peering / VXLAN            │
-               └────────────────────────────────────────┘
+```mermaid
+flowchart TB
+    subgraph HostA["Agent Host A"]
+        VM1["Kata VM (sess-1)"] -->|virtio-net| tap1[tap0] -->|TC filter| veth1[veth]
+        VM2["Kata VM (sess-2)"] -->|virtio-net| tap2[tap0] -->|TC filter| veth2[veth]
+        veth1 & veth2 --> FelixA["Felix (policy) + BIRD (BGP)"]
+    end
+    subgraph HostB["Agent Host B"]
+        VM3["Kata VM (sess-3)"] -->|virtio-net| tap3[tap0] -->|TC filter| veth3[veth]
+        VM4["Kata VM (sess-4)"] -->|virtio-net| tap4[tap0] -->|TC filter| veth4[veth]
+        veth3 & veth4 --> FelixB["Felix (policy) + BIRD (BGP)"]
+    end
+    FelixA <-->|"BGP peering / VXLAN"| FelixB
 ```
 
 **Felix** programs iptables rules on each host to enforce network policies between Kata VMs. **BIRD** exchanges routing information so that VMs on Host A can reach VMs on Host B via BGP or VXLAN encapsulation.

@@ -109,14 +109,14 @@ Kata Containers uses **two separate filesystem layers** that must not be confuse
 
 2. **Container image** (e.g., `cr.backend.ai/stable/python-tensorflow:2.15-py312-cuda12.3`): The user-selected OCI image that Backend.AI's image management system resolves. Under CoCo-by-default, images are pulled and decrypted **inside the guest** using `image-rs` — the host is untrusted and must not see image contents. Registry credentials are delivered via KBS (Key Broker Service) after remote attestation.
 
-```
-Guest VM boots from kata-containers.img (attested rootfs)
-  │
-  ├─ TEE attestation completes
-  ├─ image-rs pulls encrypted OCI image from registry
-  ├─ Decrypts image with keys from KBS (attestation-gated)
-  └─ kata-agent mounts container rootfs inside the guest
-       └─ Container process runs on the OCI image filesystem
+```mermaid
+flowchart TB
+    boot["Guest VM boots from kata-containers.img (attested rootfs)"]
+    boot --> attest["TEE attestation completes"]
+    attest --> pull["image-rs pulls encrypted OCI image from registry"]
+    pull --> decrypt["Decrypts image with keys from KBS (attestation-gated)"]
+    decrypt --> mount["kata-agent mounts container rootfs inside guest"]
+    mount --> run["Container process runs on OCI image filesystem"]
 ```
 
 **Image management changes for CoCo:** The image registry and image selection flow are unchanged (manager resolves image references identically). The pull mechanism differs — instead of host-side containerd pull, `image-rs` inside the guest TEE handles pull + integrity verification + decryption. The agent cannot verify image presence on the host; it passes the image reference to the Kata shim and waits for the kernel runner ZMQ connection.

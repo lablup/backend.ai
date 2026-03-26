@@ -137,8 +137,7 @@ The recommended approach: each scaling group contains agents of a single backend
 Scaling Groups:
 ├── default          → DockerAgent instances (general compute)
 ├── gpu-docker       → DockerAgent instances with GPUs (NVIDIA runtime)
-├── gpu-kata         → KataAgent instances with GPUs (VFIO passthrough)
-└── kata-confidential → KataAgent instances with CoCo enabled
+└── gpu-kata         → KataAgent instances with GPUs (VFIO + CoCo, always confidential)
 ```
 
 Users/projects are assigned to scaling groups as before; selecting `gpu-kata` routes the session to a Kata agent.

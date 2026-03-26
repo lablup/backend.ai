@@ -54,48 +54,33 @@ Backend.AI runs three software layers inside every container:
 
 **Boot sequence:**
 
-```
-Agent (host)                           Container (guest in Kata)
-─────────────────────────────────────────────────────────────────
-1. get_intrinsic_mounts() — build
-   initial mount list
-2. Resource allocation
-3. prepare_scratch() — create dirs
-4. Write environ.txt, resource.txt,
-   intrinsic-ports.json, SSH keys
-   to scratch_dir/config/
-5. apply_network(), prepare_ssh(),
-   mount_vfolders(), mount_krunner(),
-   process_mounts()
-6. Create container with mounts        ──→ Container starts
-                                            │
-                                        7. entrypoint.sh runs:
-                                           - Create user/group (LOCAL_USER_ID)
-                                           - Set up LD_PRELOAD (Docker only)
-                                           - Symlink scp, extract dotfiles
-                                           - Generate random password
-                                           - exec su-exec → bai-krunner
-                                            │
-                                        8. BaseRunner.__init__():
-                                           - Read /home/config/environ.txt
-                                             → populate child_env + os.environ
-                                            │
-                                        9. BaseRunner._init():
-                                           - Read /home/config/intrinsic-ports.json
-                                             → determine ZMQ socket ports
-                                           - Bind ZMQ PULL on tcp://*:{insock_port}
-                                           - Bind ZMQ PUSH on tcp://*:{outsock_port}
-                                           - Parse service definitions
-                                            │
-                                       10. main_loop():
-                                           - Start sshd (dropbear) + ttyd
-                                           - Run user bootstrap.sh if present
-                                           - Enter ZMQ command loop
-                                            │
-11. Connect ZMQ PUSH to                ←── Kernel runner ready
-    tcp://{guest_ip}:{repl_in_port}
-12. Connect ZMQ PULL to
-    tcp://{guest_ip}:{repl_out_port}
+```mermaid
+sequenceDiagram
+    participant A as Agent (host)
+    participant G as Container (guest in Kata)
+
+    Note over A: [1] get_intrinsic_mounts()
+    Note over A: [2] Resource allocation
+    Note over A: [3] prepare_scratch() - create dirs
+    Note over A: [4] Write environ.txt, resource.txt,<br/>intrinsic-ports.json, storage-mounts.json, SSH keys
+    Note over A: [5] apply_network(), prepare_ssh(),<br/>mount_vfolders(), process_mounts()
+    A->>G: [6] Create container with mounts
+
+    Note over G: [7] entrypoint.sh runs
+    Note over G: Create user/group, dotfiles, password
+    Note over G: exec su-exec -> bai-krunner
+
+    Note over G: [8] BaseRunner.__init__()
+    Note over G: Read /home/config/environ.txt
+
+    Note over G: [9] BaseRunner._init()
+    Note over G: Read intrinsic-ports.json
+    Note over G: Bind ZMQ PULL/PUSH sockets
+
+    Note over G: [10] main_loop()
+    Note over G: Start sshd + ttyd, enter ZMQ loop
+
+    G-->>A: [11-12] ZMQ TCP connect (kernel runner ready)
 ```
 
 ### Config Files in /home/config
@@ -208,11 +193,15 @@ async def __ainit__(self):
 
 **Container lifecycle** — The core difference from DockerAgent:
 
-```
-DockerAgent:  docker.containers.create() → docker.containers.start()
-KataAgent:    containerd.create_container() → containerd.create_task() → task.start()
-              ↓ (internally)
-              Kata shim boots VM → virtio-fs setup → kata-agent → container
+```mermaid
+flowchart LR
+    subgraph Docker["DockerAgent"]
+        d1["docker.containers.create()"] --> d2["docker.containers.start()"]
+    end
+    subgraph Kata["KataAgent"]
+        k1["containerd.create_container()"] --> k2["containerd.create_task()"] --> k3["task.start()"]
+        k3 -.->|internally| k4["Kata shim boots VM"] --> k5["virtio-fs setup"] --> k6["kata-agent"] --> k7["container"]
+    end
 ```
 
 **`destroy_kernel()`** — Stop and remove via containerd:

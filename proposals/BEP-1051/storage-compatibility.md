@@ -73,29 +73,19 @@ Total: **20-30+ mounts** per container (varies by accelerator and vfolder count)
 
 When a container is created via containerd with the Kata runtime class, the Kata shim **automatically** translates bind mount specifications into virtio-fs shares:
 
-```
-                         HOST SIDE                           │  GUEST VM SIDE
-                                                             │
-Host filesystem path                                         │
-  (/mnt/vfolders/project)                                    │
-         │                                                   │
-         ▼                                                   │
-  ┌──────────────┐                                           │
-  │  virtiofsd   │  (FUSE server, one per sandbox)           │
-  │  daemon      │                                           │
-  └──────┬───────┘                                           │
-         │  virtio-fs device                                 │
-─────────┼───────────────────────────────────────────────────┼──── VM boundary (KVM)
-         │                                                   │
-         ▼                                                   │
-  ┌──────────────┐                                           │
-  │  virtio-fs   │  (guest kernel FUSE client)               │
-  │  mount       │                                           │
-  └──────┬───────┘                                           │
-         │                                                   │
-         ▼                                                   │
-  Container mount namespace                                  │
-  (/home/work/project)                                       │
+```mermaid
+flowchart TB
+    subgraph HOST["Host Side"]
+        hostfs["Host filesystem path (/mnt/vfolders/project)"]
+        virtiofsd["virtiofsd daemon (FUSE server, 1 per sandbox)"]
+        hostfs --> virtiofsd
+    end
+    subgraph VM["Guest VM (KVM boundary)"]
+        vfsmount["virtio-fs mount (guest kernel FUSE client)"]
+        container["Container mount namespace (/home/work/project)"]
+        vfsmount --> container
+    end
+    virtiofsd -->|"virtio-fs device"| vfsmount
 ```
 
 The Kata shim handles this translation internally:
@@ -395,35 +385,39 @@ Conventional VM hypervisors (VMware, Proxmox, OpenStack) solve this differently:
 
 ### Two Models Compared
 
-**Model A: virtio-fs for everything** (current proposal)
+**Model A: virtio-fs for everything** (reference — NOT the adopted model for vfolders)
 
-```
-Host                                     Guest VM
-┌──────────────────────┐                ┌────────────────────────┐
-│  virtiofsd           │                │                          │
-│  (1 process per VM,  │──virtio-fs───→ │ /home/config, /home/work│
-│   serves all mounts  │                │ /etc/localtime          │
-│   via shared dir     │                │ /opt/kernel/*           │
-│   tree)              │                │ /opt/backend.ai/...     │
-│                      │                │ /home/work/data         │
-│                      │                │ /home/work/models       │
-└──────────────────────┘                └────────────────────────┘
+```mermaid
+flowchart LR
+    subgraph HOST["Host"]
+        virtiofsd["virtiofsd (1 per VM)"]
+    end
+    subgraph VM["Guest VM"]
+        config["/home/config"]
+        work["/home/work"]
+        kernel["/opt/kernel/*"]
+        data["/home/work/data"]
+    end
+    virtiofsd -->|virtio-fs| config & work & kernel & data
 ```
 
 **Model B: Per-VM cloned disk + selective virtio-fs** (hybrid)
 
-```
-Host                                     Guest VM
-┌──────────────────────┐                ┌────────────────────────┐
-│ base.qcow2 (template)│                │                          │
-│   └─ clone.qcow2     │──virtio-blk──→│ / (root, includes       │
-│      (CoW thin clone) │                │    krunner, pylibs,     │
-│                       │                │    timezone, etc.)       │
-│                       │                │                          │
-│ virtiofsd (scratch)  │──virtio-fs───→ │ /home/config, /home/work│
-│ virtiofsd (vfolder1) │──virtio-fs───→ │ /home/work/data         │
-│ virtiofsd (vfolder2) │──virtio-fs───→ │ /home/work/models       │
-└──────────────────────┘                └────────────────────────┘
+```mermaid
+flowchart LR
+    subgraph HOST["Host"]
+        qcow2["base.qcow2 → clone.qcow2 (CoW)"]
+        vfsd["virtiofsd (scratch only)"]
+    end
+    subgraph VM["Guest VM"]
+        root["/ (rootfs: krunner, pylibs, timezone)"]
+        scratch["/home/config"]
+        vf1["/home/work/data"]
+        vf2["/home/work/models"]
+    end
+    qcow2 -->|virtio-blk| root
+    vfsd -->|virtio-fs| scratch
+    NFS["Storage cluster"] -->|"NFS/Lustre (direct)"| vf1 & vf2
 ```
 
 ### Trade-off Analysis
