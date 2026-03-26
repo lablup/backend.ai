@@ -4,9 +4,15 @@ from __future__ import annotations
 
 import asyncio
 from datetime import datetime
+from typing import TYPE_CHECKING
 from uuid import UUID
 
 import click
+
+if TYPE_CHECKING:
+    from ai.backend.common.dto.manager.v2.prometheus_query_preset.request import (
+        MetricLabelEntry,
+    )
 
 from ai.backend.client.cli.v2.helpers import (
     create_v2_registry,
@@ -174,7 +180,7 @@ def update(preset_id: str, body: str) -> None:
     asyncio.run(_run())
 
 
-def _parse_label_filters(labels: tuple[str, ...]) -> list:
+def _parse_label_filters(labels: tuple[str, ...]) -> list[MetricLabelEntry]:
     """Parse ``--label key=value`` options into MetricLabelEntry list."""
     import sys
 
