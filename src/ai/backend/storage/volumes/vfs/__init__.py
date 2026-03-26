@@ -457,13 +457,11 @@ class BaseVolume(AbstractVolume):
 
         # create the target vfolder (auto-create quota scope if missing)
         src_vfpath = self.mangle_vfpath(src_vfid)
-        try:
-            await self.create_vfolder(dst_vfid)
-        except QuotaScopeNotFoundError:
+        if not self.quota_model.mangle_qspath(dst_vfid).exists():
             if dst_vfid.quota_scope_id is None:
-                raise
+                raise QuotaScopeNotFoundError
             await self.quota_model.create_quota_scope(dst_vfid.quota_scope_id)
-            await self.create_vfolder(dst_vfid)
+        await self.create_vfolder(dst_vfid)
         dst_vfpath = self.mangle_vfpath(dst_vfid)
 
         # perform the file-tree copy
