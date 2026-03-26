@@ -275,6 +275,9 @@ class DeploymentDBSource:
                 .options(
                     selectinload(EndpointRow.image_row),
                     selectinload(EndpointRow.deployment_policy),
+                    selectinload(EndpointRow.revisions).selectinload(
+                        DeploymentRevisionRow.image_row
+                    ),
                 )
             )
             result = await db_sess.execute(stmt)
@@ -323,6 +326,9 @@ class DeploymentDBSource:
                 .options(
                     selectinload(EndpointRow.image_row),
                     selectinload(EndpointRow.deployment_policy),
+                    selectinload(EndpointRow.revisions).selectinload(
+                        DeploymentRevisionRow.image_row
+                    ),
                 )
             )
             result = await db_sess.execute(stmt)
@@ -672,7 +678,20 @@ class DeploymentDBSource:
             result = await execute_updater(db_sess, updater)
             if result is None:
                 raise EndpointNotFound(f"Endpoint {updater.pk_value} not found")
-            return result.row.to_deployment_info()
+            stmt = (
+                sa.select(EndpointRow)
+                .where(EndpointRow.id == updater.pk_value)
+                .options(
+                    selectinload(EndpointRow.image_row),
+                    selectinload(EndpointRow.deployment_policy),
+                    selectinload(EndpointRow.revisions).selectinload(
+                        DeploymentRevisionRow.image_row
+                    ),
+                )
+            )
+            query_result = await db_sess.execute(stmt)
+            row: EndpointRow = query_result.scalar_one()
+            return row.to_deployment_info()
 
     async def update_endpoint_lifecycle_bulk(
         self,
