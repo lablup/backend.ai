@@ -77,6 +77,7 @@ from ai.backend.manager.repositories.deployment import DeploymentRepository
 from ai.backend.manager.repositories.model_serving import EndpointCreatorSpec
 from ai.backend.manager.repositories.model_serving.creators import EndpointTokenCreatorSpec
 from ai.backend.manager.repositories.model_serving.repository import ModelServingRepository
+from ai.backend.manager.repositories.model_serving.types import ProjectEndpointSearchScope
 from ai.backend.manager.repositories.model_serving.updaters import EndpointUpdaterSpec
 from ai.backend.manager.repositories.scheduler.types.session_creation import (
     SessionCreationSpec,
@@ -124,6 +125,10 @@ from ai.backend.manager.services.model_serving.actions.list_model_service import
 from ai.backend.manager.services.model_serving.actions.modify_endpoint import (
     ModifyEndpointAction,
     ModifyEndpointActionResult,
+)
+from ai.backend.manager.services.model_serving.actions.search_in_project import (
+    SearchServicesInProjectAction,
+    SearchServicesInProjectActionResult,
 )
 from ai.backend.manager.services.model_serving.actions.search_services import (
     SearchServicesAction,
@@ -434,6 +439,19 @@ class ModelServingService:
             total_count=result.total_count,
             offset=action.offset,
             limit=action.limit,
+        )
+
+    async def search_services_in_project(
+        self, action: SearchServicesInProjectAction
+    ) -> SearchServicesInProjectActionResult:
+        """Search model serving services scoped to a project."""
+        scope = ProjectEndpointSearchScope(project_id=action.project_id)
+        result = await self._repository.search_in_project(action.querier, scope)
+        return SearchServicesInProjectActionResult(
+            items=result.items,
+            total_count=result.total_count,
+            has_next_page=result.has_next_page,
+            has_previous_page=result.has_previous_page,
         )
 
     async def check_user_access(self) -> None:

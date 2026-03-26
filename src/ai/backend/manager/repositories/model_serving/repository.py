@@ -79,6 +79,7 @@ from ai.backend.manager.repositories.base.rbac.entity_creator import (
     execute_rbac_entity_creator,
 )
 from ai.backend.manager.repositories.deployment.creators import DeploymentPolicyCreatorSpec
+from ai.backend.manager.repositories.model_serving.types import ProjectEndpointSearchScope
 from ai.backend.manager.repositories.model_serving.updaters import EndpointUpdaterSpec
 from ai.backend.manager.services.model_serving.actions.modify_endpoint import ModifyEndpointAction
 from ai.backend.manager.services.model_serving.exceptions import (
@@ -987,6 +988,52 @@ class ModelServingRepository:
                         resource_slots=(
                             current_rev.resource_slots if current_rev else ResourceSlot({})
                         ),
+                        resource_group=ep.resource_group,
+                        routings=routings_data,
+                    )
+                )
+
+            return ServiceSearchResult(
+                items=items,
+                total_count=result.total_count,
+                has_next_page=result.has_next_page,
+                has_previous_page=result.has_previous_page,
+            )
+
+    @model_serving_repository_resilience.apply()
+    async def search_in_project(
+        self,
+        querier: BatchQuerier,
+        scope: ProjectEndpointSearchScope,
+    ) -> ServiceSearchResult:
+        """Search model serving services scoped to a project."""
+        async with self._db.begin_readonly_session() as session:
+            query = (
+                sa.select(EndpointRow)
+                .where(EndpointRow.lifecycle_stage == EndpointLifecycle.CREATED)
+                .options(selectinload(EndpointRow.routings))
+            )
+
+            result = await execute_batch_querier(session, query, querier, scope=scope)
+
+            items: list[ServiceSearchItem] = []
+            for row in result.rows:
+                ep = row.EndpointRow
+                routings_data = [r.to_data() for r in ep.routings] if ep.routings else None
+                active_route_count = (
+                    len([r for r in ep.routings if r.status == RouteStatus.HEALTHY])
+                    if ep.routings
+                    else 0
+                )
+                items.append(
+                    ServiceSearchItem(
+                        id=ep.id,
+                        name=ep.name,
+                        replicas=ep.replicas,
+                        active_route_count=active_route_count,
+                        service_endpoint=HttpUrl(ep.url) if ep.url else None,
+                        open_to_public=ep.open_to_public or False,
+                        resource_slots=ep.resource_slots,
                         resource_group=ep.resource_group,
                         routings=routings_data,
                     )
