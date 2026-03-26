@@ -178,6 +178,45 @@ class TestRollingUpdateConfigInput:
         with pytest.raises(ValidationError):
             RollingUpdateConfigInput(max_unavailable=-1)
 
+    def test_percentage_max_surge(self) -> None:
+        config = RollingUpdateConfigInput(max_surge="25%", max_unavailable=0)
+        assert config.max_surge == "25%"
+        assert config.max_unavailable == 0
+
+    def test_percentage_max_unavailable(self) -> None:
+        config = RollingUpdateConfigInput(max_surge=1, max_unavailable="50%")
+        assert config.max_unavailable == "50%"
+
+    def test_both_percentage(self) -> None:
+        config = RollingUpdateConfigInput(max_surge="30%", max_unavailable="20%")
+        assert config.max_surge == "30%"
+        assert config.max_unavailable == "20%"
+
+    def test_percentage_boundary_0_percent(self) -> None:
+        config = RollingUpdateConfigInput(max_surge="0%", max_unavailable=1)
+        assert config.max_surge == "0%"
+
+    def test_percentage_boundary_100_percent(self) -> None:
+        config = RollingUpdateConfigInput(max_surge="100%", max_unavailable=0)
+        assert config.max_surge == "100%"
+
+    def test_invalid_percentage_over_100_raises_error(self) -> None:
+        with pytest.raises(ValidationError):
+            RollingUpdateConfigInput(max_surge="101%")
+
+    def test_invalid_percentage_negative_raises_error(self) -> None:
+        with pytest.raises(ValidationError):
+            RollingUpdateConfigInput(max_surge="-1%")
+
+    def test_invalid_string_raises_error(self) -> None:
+        with pytest.raises(ValidationError):
+            RollingUpdateConfigInput(max_surge="abc")
+
+    def test_integer_string_normalized_to_int(self) -> None:
+        config = RollingUpdateConfigInput(max_surge="3")
+        assert config.max_surge == 3
+        assert isinstance(config.max_surge, int)
+
 
 class TestBlueGreenConfigInput:
     """Tests for BlueGreenConfigInput model."""

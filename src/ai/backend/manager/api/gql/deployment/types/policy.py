@@ -6,6 +6,7 @@ from datetime import datetime
 
 from strawberry import ID
 from strawberry.relay import NodeID
+from strawberry.scalars import JSON
 
 from ai.backend.common.data.model_deployment.types import DeploymentStrategy
 from ai.backend.common.dto.manager.v2.deployment.request import (
@@ -75,8 +76,8 @@ class DeploymentStrategySpecGQL:
 )
 class RollingUpdateStrategySpecGQL(DeploymentStrategySpecGQL):
     strategy: DeploymentStrategyTypeGQL
-    max_surge: int
-    max_unavailable: int
+    max_surge: JSON
+    max_unavailable: JSON
 
 
 @gql_pydantic_type(
@@ -114,8 +115,8 @@ class DeploymentPolicyGQL(PydanticNodeMixin[DeploymentPolicyNodeDTO]):
     name="RollingUpdateConfigInput",
 )
 class RollingUpdateConfigInputGQL(PydanticInputMixin[RollingUpdateConfigInputDTO]):
-    max_surge: int = 1
-    max_unavailable: int = 0
+    max_surge: JSON = 1
+    max_unavailable: JSON = 0
 
 
 @gql_pydantic_input(

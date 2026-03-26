@@ -170,8 +170,8 @@ class RollingUpdateStrategy(AbstractDeploymentStrategy):
             )
             return StrategyCycleResult(sub_step=DeploymentLifecycleSubStep.DEPLOYING_PROVISIONING)
 
-        max_surge = spec.max_surge  # extra routes allowed above desired
-        max_unavailable = spec.max_unavailable  # routes allowed to be down
+        max_surge = spec.resolve_max_surge(desired)  # extra routes allowed above desired
+        max_unavailable = spec.resolve_max_unavailable(desired)  # routes allowed to be down
 
         max_total = desired + max_surge  # upper bound on simultaneous routes
         current_total = (

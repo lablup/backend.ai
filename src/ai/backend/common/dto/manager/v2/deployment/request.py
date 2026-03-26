@@ -7,10 +7,10 @@ from __future__ import annotations
 from collections.abc import Mapping
 from datetime import datetime
 from decimal import Decimal
-from typing import Any
+from typing import Annotated, Any
 from uuid import UUID
 
-from pydantic import Field, field_validator
+from pydantic import BeforeValidator, Field, field_validator
 
 from ai.backend.common.api_handlers import SENTINEL, BaseRequestModel, Sentinel
 from ai.backend.common.config import ModelDefinition
@@ -31,7 +31,12 @@ from ai.backend.common.dto.manager.v2.deployment.types import (
     RouteOrderField,
 )
 from ai.backend.common.dto.manager.v2.resource_slot.types import ResourceOptsDTOInput
-from ai.backend.common.types import AutoScalingMetricSource, ClusterMode, RuntimeVariant
+from ai.backend.common.types import (
+    AutoScalingMetricSource,
+    ClusterMode,
+    RuntimeVariant,
+    validate_int_or_percent,
+)
 
 __all__ = (
     "AccessTokenFilter",
@@ -242,14 +247,23 @@ class ModelDeploymentNetworkAccessInput(BaseRequestModel):
     open_to_public: bool = Field(default=False, description="Whether the deployment is public")
 
 
-class RollingUpdateConfigInput(BaseRequestModel):
-    """Input for rolling update configuration."""
+IntOrPercent = Annotated[int | str, BeforeValidator(validate_int_or_percent)]
 
-    max_surge: int = Field(
-        default=1, ge=0, description="Maximum number of extra replicas during update"
+
+class RollingUpdateConfigInput(BaseRequestModel):
+    """Input for rolling update configuration.
+
+    ``max_surge`` and ``max_unavailable`` accept either an absolute non-negative
+    integer (e.g. ``1``) or a percentage string between 0% and 100% (e.g. ``"25%"``).
+    """
+
+    max_surge: IntOrPercent = Field(
+        default=1,
+        description="Maximum number of extra replicas during update (integer or percentage string)",
     )
-    max_unavailable: int = Field(
-        default=0, ge=0, description="Maximum number of unavailable replicas during update"
+    max_unavailable: IntOrPercent = Field(
+        default=0,
+        description="Maximum number of unavailable replicas during update (integer or percentage string)",
     )
 
 

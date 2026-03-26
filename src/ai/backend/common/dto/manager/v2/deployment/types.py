@@ -129,8 +129,8 @@ class ReplicaStateInfo(BaseResponseModel):
 class RollingUpdateConfigInfo(BaseResponseModel):
     """Rolling update policy configuration."""
 
-    max_surge: int
-    max_unavailable: int
+    max_surge: int | str
+    max_unavailable: int | str
 
 
 class BlueGreenConfigInfo(BaseResponseModel):
@@ -162,8 +162,8 @@ class DeploymentStrategySpecInfo(BaseResponseModel):
 class RollingUpdateStrategySpecInfo(DeploymentStrategySpecInfo):
     """Rolling update strategy spec — matches RollingUpdateStrategySpecGQL structure."""
 
-    max_surge: int
-    max_unavailable: int
+    max_surge: int | str
+    max_unavailable: int | str
 
 
 class BlueGreenStrategySpecInfo(DeploymentStrategySpecInfo):

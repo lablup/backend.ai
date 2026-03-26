@@ -3,14 +3,15 @@ from __future__ import annotations
 import logging
 import uuid
 from datetime import datetime
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Annotated
 
 import sqlalchemy as sa
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, BeforeValidator, Field, model_validator
 from sqlalchemy.dialects import postgresql as pgsql
 from sqlalchemy.orm import Mapped, foreign, mapped_column, relationship
 
 from ai.backend.common.data.model_deployment.types import DeploymentStrategy
+from ai.backend.common.types import resolve_int_or_percent, validate_int_or_percent
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.deployment.types import DeploymentPolicyData
 from ai.backend.manager.errors.deployment import InvalidDeploymentStrategy
@@ -33,26 +34,48 @@ __all__ = (
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
-class RollingUpdateSpec(BaseModel):
-    """Specification for rolling update deployment strategy."""
+IntOrPercent = Annotated[int | str, BeforeValidator(validate_int_or_percent)]
 
-    max_surge: int = Field(default=1, ge=0)
-    max_unavailable: int = Field(default=0, ge=0)
+
+class RollingUpdateSpec(BaseModel):
+    """Specification for rolling update deployment strategy.
+
+    ``max_surge`` and ``max_unavailable`` accept either an absolute integer
+    (e.g. ``1``) or a percentage string (e.g. ``"25%"``).  Percentage values
+    are resolved to absolute counts at execution time via
+    :meth:`resolve_max_surge` / :meth:`resolve_max_unavailable`.
+    """
+
+    max_surge: IntOrPercent = Field(default=1)
+    max_unavailable: IntOrPercent = Field(default=0)
 
     @model_validator(mode="after")
     def _validate_progress_is_possible(self) -> RollingUpdateSpec:
         """Ensure at least one of max_surge or max_unavailable is positive.
 
-        If both are zero, the rolling update FSM cannot make progress:
-        it cannot create new routes (would exceed max_total) nor terminate
-        old routes (would fall below min_available), causing a deadlock.
+        If both are zero (or "0%"), the rolling update FSM cannot make
+        progress: it cannot create new routes (would exceed max_total)
+        nor terminate old routes (would fall below min_available), causing
+        a deadlock.
+
+        When either value is a percentage string we cannot fully validate
+        at definition time (the resolved count depends on the replica count
+        at execution time), so we only reject the obvious ``0 + 0`` case.
         """
-        if self.max_surge == 0 and self.max_unavailable == 0:
+        if self.max_surge in (0, "0%") and self.max_unavailable in (0, "0%"):
             raise ValueError(
                 "At least one of max_surge or max_unavailable must be positive; "
                 "otherwise the rolling update cannot make progress."
             )
         return self
+
+    def resolve_max_surge(self, desired_replicas: int) -> int:
+        """Resolve max_surge to an absolute count (rounds up for percentages)."""
+        return resolve_int_or_percent(self.max_surge, desired_replicas, round_up=True)
+
+    def resolve_max_unavailable(self, desired_replicas: int) -> int:
+        """Resolve max_unavailable to an absolute count (rounds down for percentages)."""
+        return resolve_int_or_percent(self.max_unavailable, desired_replicas, round_up=False)
 
 
 class BlueGreenSpec(BaseModel):

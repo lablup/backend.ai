@@ -343,6 +343,16 @@ class TestSurgeAndUnavailabilityBudget:
         with pytest.raises(ValueError, match="max_surge or max_unavailable must be positive"):
             RollingUpdateSpec(max_surge=0, max_unavailable=0)
 
+    def test_surge_and_unavailable_both_zero_percent_rejected(self) -> None:
+        """surge='0%', unavailable='0%': rejected by Pydantic validation."""
+        with pytest.raises(ValueError, match="max_surge or max_unavailable must be positive"):
+            RollingUpdateSpec(max_surge="0%", max_unavailable="0%")
+
+    def test_surge_and_unavailable_mixed_zero_rejected(self) -> None:
+        """surge=0, unavailable='0%': rejected by Pydantic validation."""
+        with pytest.raises(ValueError, match="max_surge or max_unavailable must be positive"):
+            RollingUpdateSpec(max_surge=0, max_unavailable="0%")
+
 
 # ===========================================================================
 # 3. Multi-cycle progression
@@ -815,3 +825,108 @@ class TestScaleChangeDuringRollingUpdate:
         result = RollingUpdateStrategy().evaluate_cycle(deployment, routes, spec)
 
         assert len(result.route_changes.rollout_specs) == 5
+
+
+# ===========================================================================
+# 12. Percentage-based max_surge / max_unavailable
+# ===========================================================================
+
+
+class TestPercentageSpec:
+    """Test RollingUpdateSpec with percentage values."""
+
+    def test_percentage_max_surge_accepted(self) -> None:
+        spec = RollingUpdateSpec(max_surge="25%", max_unavailable=0)
+        assert spec.max_surge == "25%"
+
+    def test_percentage_max_unavailable_accepted(self) -> None:
+        spec = RollingUpdateSpec(max_surge=1, max_unavailable="50%")
+        assert spec.max_unavailable == "50%"
+
+    def test_resolve_max_surge_rounds_up(self) -> None:
+        """25% of 10 = 2.5 → rounds up to 3."""
+        spec = RollingUpdateSpec(max_surge="25%", max_unavailable=1)
+        assert spec.resolve_max_surge(10) == 3
+
+    def test_resolve_max_unavailable_rounds_down(self) -> None:
+        """25% of 10 = 2.5 → rounds down to 2."""
+        spec = RollingUpdateSpec(max_surge=1, max_unavailable="25%")
+        assert spec.resolve_max_unavailable(10) == 2
+
+    def test_resolve_exact_percentage(self) -> None:
+        """50% of 4 = 2.0 → exactly 2 for both."""
+        spec = RollingUpdateSpec(max_surge="50%", max_unavailable="50%")
+        assert spec.resolve_max_surge(4) == 2
+        assert spec.resolve_max_unavailable(4) == 2
+
+    def test_resolve_100_percent(self) -> None:
+        """100% of 5 = 5."""
+        spec = RollingUpdateSpec(max_surge="100%", max_unavailable="100%")
+        assert spec.resolve_max_surge(5) == 5
+        assert spec.resolve_max_unavailable(5) == 5
+
+    def test_resolve_0_percent(self) -> None:
+        """0% of anything = 0."""
+        spec = RollingUpdateSpec(max_surge="0%", max_unavailable=1)
+        assert spec.resolve_max_surge(10) == 0
+
+    def test_resolve_integer_passthrough(self) -> None:
+        """Integer values pass through unchanged regardless of desired."""
+        spec = RollingUpdateSpec(max_surge=3, max_unavailable=2)
+        assert spec.resolve_max_surge(100) == 3
+        assert spec.resolve_max_unavailable(100) == 2
+
+    def test_invalid_percentage_over_100_rejected(self) -> None:
+        with pytest.raises(ValueError, match="Percentage must be between 0 and 100"):
+            RollingUpdateSpec(max_surge="101%", max_unavailable=0)
+
+    def test_invalid_string_rejected(self) -> None:
+        with pytest.raises(ValueError, match="Expected integer or percentage string"):
+            RollingUpdateSpec(max_surge="abc", max_unavailable=0)
+
+
+class TestPercentageStrategy:
+    """Test rolling update strategy evaluation with percentage specs."""
+
+    def test_percentage_surge_creates_correct_routes(self) -> None:
+        """25% surge with 4 desired → max_surge=1 (ceil(1.0))."""
+        deployment = make_deployment(desired=4)
+        spec = RollingUpdateSpec(max_surge="25%", max_unavailable="25%")
+        routes = [make_route(revision_id=OLD_REV, status=RouteStatus.HEALTHY) for _ in range(4)]
+
+        result = RollingUpdateStrategy().evaluate_cycle(deployment, routes, spec)
+
+        assert result.sub_step == DeploymentLifecycleSubStep.DEPLOYING_PROVISIONING
+        assert len(result.route_changes.rollout_specs) == 1
+
+    def test_percentage_unavailable_terminates_correct_routes(self) -> None:
+        """50% unavailable with 4 desired → max_unavailable=2.
+
+        4 old + 2 new healthy = 6 available, min_available = 4-2 = 2
+        can_terminate = 6-2 = 4, but old=4 so terminate up to 4.
+        However, surge budget limits creation to max_total-current_total.
+        """
+        deployment = make_deployment(desired=4)
+        spec = RollingUpdateSpec(max_surge="50%", max_unavailable="50%")
+        routes = [
+            make_route(revision_id=OLD_REV, status=RouteStatus.HEALTHY),
+            make_route(revision_id=OLD_REV, status=RouteStatus.HEALTHY),
+            make_route(revision_id=OLD_REV, status=RouteStatus.HEALTHY),
+            make_route(revision_id=OLD_REV, status=RouteStatus.HEALTHY),
+            make_route(revision_id=NEW_REV, status=RouteStatus.HEALTHY),
+            make_route(revision_id=NEW_REV, status=RouteStatus.HEALTHY),
+        ]
+
+        result = RollingUpdateStrategy().evaluate_cycle(deployment, routes, spec)
+
+        assert len(result.route_changes.drain_route_ids) == 4
+
+    def test_small_percentage_with_few_replicas(self) -> None:
+        """10% surge with 3 desired → ceil(0.3) = 1."""
+        deployment = make_deployment(desired=3)
+        spec = RollingUpdateSpec(max_surge="10%", max_unavailable=0)
+        routes = [make_route(revision_id=OLD_REV, status=RouteStatus.HEALTHY) for _ in range(3)]
+
+        result = RollingUpdateStrategy().evaluate_cycle(deployment, routes, spec)
+
+        assert len(result.route_changes.rollout_specs) == 1
