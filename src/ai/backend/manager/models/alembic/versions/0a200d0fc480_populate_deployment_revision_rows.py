@@ -57,6 +57,7 @@ def upgrade() -> None:
         FROM endpoints e
         WHERE e.current_revision IS NULL
           AND e.image IS NOT NULL
+          AND e.lifecycle_stage != 'destroyed'
         """
     )
 
@@ -73,6 +74,7 @@ def upgrade() -> None:
         )
         WHERE e.current_revision IS NULL
           AND e.image IS NOT NULL
+          AND e.lifecycle_stage != 'destroyed'
         """
     )
 
