@@ -80,3 +80,110 @@ def project_search(project_id: str, limit: int, offset: int) -> None:
             await registry.close()
 
     asyncio.run(_run())
+
+
+@session.command()
+@click.argument("session_ids", nargs=-1, required=True)
+@click.option("--forced", is_flag=True, default=False, help="Force-terminate without cleanup.")
+def terminate(session_ids: tuple[str, ...], forced: bool) -> None:
+    """Terminate one or more sessions by ID."""
+
+    from ai.backend.common.dto.manager.v2.session.request import TerminateSessionsInput
+
+    body = TerminateSessionsInput(
+        session_ids=[UUID(sid) for sid in session_ids],
+        forced=forced,
+    )
+
+    async def _run() -> None:
+        registry = await create_v2_registry(load_v2_config())
+        try:
+            result = await registry.session.terminate(body)
+            print_result(result)
+        finally:
+            await registry.close()
+
+    asyncio.run(_run())
+
+
+@session.command(name="start-service")
+@click.argument("session_id", type=str)
+@click.argument("service", type=str)
+@click.option("--port", type=int, default=None, help="Specific container port.")
+def start_service(session_id: str, service: str, port: int | None) -> None:
+    """Start a service (e.g., jupyter, vscode) in a session."""
+
+    from ai.backend.common.dto.manager.v2.session.request import StartSessionServiceInput
+
+    body = StartSessionServiceInput(service=service, port=port)
+
+    async def _run() -> None:
+        registry = await create_v2_registry(load_v2_config())
+        try:
+            result = await registry.session.start_service(UUID(session_id), body)
+            print_result(result)
+        finally:
+            await registry.close()
+
+    asyncio.run(_run())
+
+
+@session.command(name="shutdown-service")
+@click.argument("session_id", type=str)
+@click.argument("service", type=str)
+def shutdown_service(session_id: str, service: str) -> None:
+    """Shut down a service in a session."""
+
+    from ai.backend.common.dto.manager.v2.session.request import ShutdownSessionServiceInput
+
+    body = ShutdownSessionServiceInput(service=service)
+
+    async def _run() -> None:
+        registry = await create_v2_registry(load_v2_config())
+        try:
+            await registry.session.shutdown_service(UUID(session_id), body)
+            click.echo("Service shut down successfully.")
+        finally:
+            await registry.close()
+
+    asyncio.run(_run())
+
+
+@session.command()
+@click.argument("session_id", type=str)
+@click.option("--kernel-id", type=str, default=None, help="Specific kernel UUID.")
+def logs(session_id: str, kernel_id: str | None) -> None:
+    """Get container logs for a session."""
+
+    async def _run() -> None:
+        registry = await create_v2_registry(load_v2_config())
+        try:
+            kid = UUID(kernel_id) if kernel_id else None
+            result = await registry.session.get_logs(UUID(session_id), kid)
+            click.echo(result.logs)
+        finally:
+            await registry.close()
+
+    asyncio.run(_run())
+
+
+@session.command()
+@click.argument("session_id", type=str)
+@click.option("--name", type=str, default=None, help="New session name.")
+@click.option("--tag", type=str, default=None, help="Updated tag.")
+def update(session_id: str, name: str | None, tag: str | None) -> None:
+    """Update a session."""
+
+    from ai.backend.common.dto.manager.v2.session.request import UpdateSessionInput
+
+    body = UpdateSessionInput(name=name, tag=tag)
+
+    async def _run() -> None:
+        registry = await create_v2_registry(load_v2_config())
+        try:
+            result = await registry.session.update(UUID(session_id), body)
+            print_result(result)
+        finally:
+            await registry.close()
+
+    asyncio.run(_run())

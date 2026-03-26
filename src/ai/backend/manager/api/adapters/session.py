@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from collections.abc import Sequence
 from datetime import datetime, timedelta
 from decimal import Decimal
@@ -44,16 +45,24 @@ from ai.backend.common.dto.manager.v2.session.request import (
     EnqueueSessionInput,
     SessionFilter,
     SessionOrder,
+    ShutdownSessionServiceInput,
+    StartSessionServiceInput,
+    TerminateSessionsInput,
+    UpdateSessionInput,
 )
 from ai.backend.common.dto.manager.v2.session.response import (
     AdminSearchSessionsPayload,
     EnqueueSessionPayload,
     SessionLifecycleInfoGQLDTO,
+    SessionLogsPayload,
     SessionMetadataInfoGQLDTO,
     SessionNetworkInfo,
     SessionNode,
     SessionResourceInfoGQLDTO,
     SessionRuntimeInfoGQLDTO,
+    StartSessionServicePayload,
+    TerminateSessionsPayload,
+    UpdateSessionPayload,
 )
 from ai.backend.common.dto.manager.v2.session.types import ClusterModeEnum
 from ai.backend.common.types import (
@@ -114,8 +123,17 @@ from ai.backend.manager.services.session.actions.enqueue_session import (
     SessionSchedulingSpec,
     VFolderMountItem,
 )
+from ai.backend.manager.services.session.actions.get_container_logs import (
+    GetContainerLogsAction,
+)
+from ai.backend.manager.services.session.actions.rename_session import RenameSessionAction
 from ai.backend.manager.services.session.actions.search import SearchSessionsAction
 from ai.backend.manager.services.session.actions.search_kernel import SearchKernelsAction
+from ai.backend.manager.services.session.actions.shutdown_service import ShutdownServiceAction
+from ai.backend.manager.services.session.actions.start_service import StartServiceAction
+from ai.backend.manager.services.session.actions.terminate_sessions import (
+    TerminateSessionsAction,
+)
 
 from .base import BaseAdapter
 
@@ -698,6 +716,104 @@ class SessionAdapter(BaseAdapter):
     @staticmethod
     def _convert_kernel_orders(orders: list[KernelOrder]) -> list[QueryOrder]:
         return [resolve_kernel_order(o.field, o.direction) for o in orders]
+
+    # -------------------------------------------------------------------------
+    # Terminate
+    # -------------------------------------------------------------------------
+
+    async def terminate(self, input: TerminateSessionsInput) -> TerminateSessionsPayload:
+        """Terminate one or more sessions."""
+        action = TerminateSessionsAction(
+            session_ids=[SessionId(sid) for sid in input.session_ids],
+            forced=input.forced,
+        )
+        result = await self._processors.session.terminate_sessions.wait_for_complete(action)
+        return TerminateSessionsPayload(
+            cancelled=result.cancelled,
+            terminating=result.terminating,
+            force_terminated=result.force_terminated,
+            skipped=result.skipped,
+        )
+
+    # -------------------------------------------------------------------------
+    # Service management
+    # -------------------------------------------------------------------------
+
+    async def start_service(
+        self,
+        session_id: UUID,
+        input: StartSessionServiceInput,
+        access_key: str,
+    ) -> StartSessionServicePayload:
+        """Start an app service in a session."""
+        action = StartServiceAction(
+            session_name=str(session_id),
+            access_key=AccessKey(access_key),
+            service=input.service,
+            login_session_token=input.login_session_token,
+            port=input.port,
+            arguments=json.dumps(input.arguments) if input.arguments else None,
+            envs=json.dumps(input.envs) if input.envs else None,
+        )
+        result = await self._processors.session.start_service.wait_for_complete(action)
+        return StartSessionServicePayload(token=result.token, wsproxy_addr=result.wsproxy_addr)
+
+    async def shutdown_service(
+        self,
+        session_id: UUID,
+        input: ShutdownSessionServiceInput,
+        access_key: str,
+    ) -> None:
+        """Shut down a service in a session."""
+        action = ShutdownServiceAction(
+            session_name=str(session_id),
+            owner_access_key=AccessKey(access_key),
+            service_name=input.service,
+        )
+        await self._processors.session.shutdown_service.wait_for_complete(action)
+
+    # -------------------------------------------------------------------------
+    # Logs
+    # -------------------------------------------------------------------------
+
+    async def get_logs(
+        self,
+        session_id: UUID,
+        access_key: str,
+        kernel_id: UUID | None = None,
+    ) -> SessionLogsPayload:
+        """Get container logs for a session."""
+        action = GetContainerLogsAction(
+            session_name=str(session_id),
+            owner_access_key=AccessKey(access_key),
+            kernel_id=KernelId(kernel_id) if kernel_id else None,
+        )
+        result = await self._processors.session.get_container_logs.wait_for_complete(action)
+        logs_text = result.result.get("result", {}).get("logs", "")
+        return SessionLogsPayload(logs=logs_text)
+
+    # -------------------------------------------------------------------------
+    # Update
+    # -------------------------------------------------------------------------
+
+    async def update(
+        self,
+        session_id: UUID,
+        input: UpdateSessionInput,
+        access_key: str,
+    ) -> UpdateSessionPayload:
+        """Update session fields (currently supports rename only)."""
+        if input.name is not None:
+            action = RenameSessionAction(
+                session_name=str(session_id),
+                new_name=input.name,
+                owner_access_key=AccessKey(access_key),
+            )
+            result = await self._processors.session.rename_session.wait_for_complete(action)
+            return UpdateSessionPayload(session=self._session_data_to_node(result.session_data))
+        # If no fields to update, just return the current session
+        session_node = await self.get(session_id)
+        return UpdateSessionPayload(session=session_node)
 
     # -------------------------------------------------------------------------
     # Data → DTO conversion

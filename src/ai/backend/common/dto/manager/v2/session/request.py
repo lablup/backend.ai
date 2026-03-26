@@ -32,6 +32,7 @@ __all__ = (
     "DownloadFilesInput",
     "ExecuteInput",
     "GetContainerLogsInput",
+    "GetSessionLogsQuery",
     "ListFilesInput",
     "MountItemInput",
     "RenameSessionInput",
@@ -44,7 +45,11 @@ __all__ = (
     "SessionOrder",
     "SessionPathParam",
     "ShutdownServiceInput",
+    "ShutdownSessionServiceInput",
     "StartServiceInput",
+    "StartSessionServiceInput",
+    "TerminateSessionsInput",
+    "UpdateSessionInput",
     "UploadFilesInput",
 )
 
@@ -345,3 +350,71 @@ class EnqueueSessionInput(BaseRequestModel):
     project_id: UUID | None = Field(
         default=None, description="Project (group) UUID. Uses default project if omitted."
     )
+
+
+# ---------------------------------------------------------------------------
+# Terminate (batch)
+# ---------------------------------------------------------------------------
+
+
+class TerminateSessionsInput(BaseRequestModel):
+    """Input for terminating one or more sessions."""
+
+    session_ids: list[UUID] = Field(description="Session UUIDs to terminate.")
+    forced: bool = Field(default=False, description="Force-terminate without waiting for cleanup.")
+
+
+# ---------------------------------------------------------------------------
+# Service management (v2 typed)
+# ---------------------------------------------------------------------------
+
+
+class StartSessionServiceInput(BaseRequestModel):
+    """Input for starting an app service within a session."""
+
+    service: str = Field(description="Service name (e.g., 'jupyter', 'vscode', 'tensorboard').")
+    port: int | None = Field(
+        default=None, ge=1024, le=65535, description="Specific container port."
+    )
+    envs: dict[str, str] | None = Field(
+        default=None, description="Environment variables for the service."
+    )
+    arguments: dict[str, str] | None = Field(
+        default=None, description="Arguments passed to the service."
+    )
+    login_session_token: str | None = Field(
+        default=None, description="Login session token for proxy auth."
+    )
+
+
+class ShutdownSessionServiceInput(BaseRequestModel):
+    """Input for shutting down a service in a session."""
+
+    service: str = Field(description="Service name to shut down.")
+
+
+# ---------------------------------------------------------------------------
+# Logs query
+# ---------------------------------------------------------------------------
+
+
+class GetSessionLogsQuery(BaseRequestModel):
+    """Query parameters for getting session logs."""
+
+    kernel_id: UUID | None = Field(
+        default=None, description="Specific kernel UUID. Main kernel if omitted."
+    )
+
+
+# ---------------------------------------------------------------------------
+# Update session
+# ---------------------------------------------------------------------------
+
+
+class UpdateSessionInput(BaseRequestModel):
+    """Input for updating a session."""
+
+    name: str | None = Field(
+        default=None, min_length=1, max_length=64, description="New session name."
+    )
+    tag: str | None = Field(default=None, max_length=64, description="Updated tag.")

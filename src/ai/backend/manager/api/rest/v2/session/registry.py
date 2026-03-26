@@ -74,5 +74,35 @@ def register_v2_session_routes(
         handler.project_search,
         middlewares=[auth_required],
     )
+    registry.add(
+        "POST",
+        "/terminate",
+        handler.terminate,
+        middlewares=[auth_required],
+    )
+    registry.add(
+        "POST",
+        "/{session_id}/services/start",
+        handler.start_service,
+        middlewares=[auth_required],
+    )
+    registry.add(
+        "POST",
+        "/{session_id}/services/shutdown",
+        handler.shutdown_service,
+        middlewares=[auth_required],
+    )
+    registry.add(
+        "GET",
+        "/{session_id}/logs",
+        handler.get_logs,
+        middlewares=[auth_required],
+    )
+    registry.add(
+        "PATCH",
+        "/{session_id}",
+        handler.update,
+        middlewares=[auth_required],
+    )
 
     return registry

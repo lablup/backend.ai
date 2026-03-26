@@ -10,11 +10,19 @@ from ai.backend.common.dto.manager.v2.kernel.response import AdminSearchKernelsP
 from ai.backend.common.dto.manager.v2.session.request import (
     AdminSearchSessionsInput,
     EnqueueSessionInput,
+    ShutdownSessionServiceInput,
+    StartSessionServiceInput,
+    TerminateSessionsInput,
+    UpdateSessionInput,
 )
 from ai.backend.common.dto.manager.v2.session.response import (
     AdminSearchSessionsPayload,
     EnqueueSessionPayload,
+    SessionLogsPayload,
     SessionNode,
+    StartSessionServicePayload,
+    TerminateSessionsPayload,
+    UpdateSessionPayload,
 )
 
 _PATH = "/v2/sessions"
@@ -124,4 +132,70 @@ class V2SessionClient(BaseDomainClient):
             f"{_PATH}/projects/{project_id}/search",
             request=request,
             response_model=AdminSearchSessionsPayload,
+        )
+
+    async def terminate(
+        self,
+        request: TerminateSessionsInput,
+    ) -> TerminateSessionsPayload:
+        """Terminate one or more sessions."""
+        return await self._client.typed_request(
+            "POST",
+            f"{_PATH}/terminate",
+            request=request,
+            response_model=TerminateSessionsPayload,
+        )
+
+    async def start_service(
+        self,
+        session_id: UUID,
+        request: StartSessionServiceInput,
+    ) -> StartSessionServicePayload:
+        """Start a service in a session."""
+        return await self._client.typed_request(
+            "POST",
+            f"{_PATH}/{session_id}/services/start",
+            request=request,
+            response_model=StartSessionServicePayload,
+        )
+
+    async def shutdown_service(
+        self,
+        session_id: UUID,
+        request: ShutdownSessionServiceInput,
+    ) -> None:
+        """Shut down a service in a session."""
+        await self._client.typed_request_no_content(
+            "POST",
+            f"{_PATH}/{session_id}/services/shutdown",
+            request=request,
+        )
+
+    async def get_logs(
+        self,
+        session_id: UUID,
+        kernel_id: UUID | None = None,
+    ) -> SessionLogsPayload:
+        """Get container logs for a session."""
+        params: dict[str, str] = {}
+        if kernel_id is not None:
+            params["kernel_id"] = str(kernel_id)
+        return await self._client.typed_request(
+            "GET",
+            f"{_PATH}/{session_id}/logs",
+            params=params if params else None,
+            response_model=SessionLogsPayload,
+        )
+
+    async def update(
+        self,
+        session_id: UUID,
+        request: UpdateSessionInput,
+    ) -> UpdateSessionPayload:
+        """Update a session."""
+        return await self._client.typed_request(
+            "PATCH",
+            f"{_PATH}/{session_id}",
+            request=request,
+            response_model=UpdateSessionPayload,
         )

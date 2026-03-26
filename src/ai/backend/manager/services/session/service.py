@@ -193,6 +193,10 @@ from ai.backend.manager.services.session.actions.start_service import (
     StartServiceAction,
     StartServiceActionResult,
 )
+from ai.backend.manager.services.session.actions.terminate_sessions import (
+    TerminateSessionsAction,
+    TerminateSessionsActionResult,
+)
 from ai.backend.manager.services.session.actions.upload_files import (
     UploadFilesAction,
     UploadFilesActionResult,
@@ -781,6 +785,25 @@ class SessionService:
         # Return response - same format for both recursive and non-recursive
         resp = {"stats": last_stat}
         return DestroySessionActionResult(result=resp)
+
+    async def terminate_sessions(
+        self, action: TerminateSessionsAction
+    ) -> TerminateSessionsActionResult:
+        """Terminate multiple sessions by their IDs."""
+        reason = (
+            KernelLifecycleEventReason.FORCE_TERMINATED
+            if action.forced
+            else KernelLifecycleEventReason.USER_REQUESTED
+        )
+        mark_result = await self._scheduling_controller.mark_sessions_for_termination(
+            action.session_ids, reason=reason.value, forced=action.forced
+        )
+        return TerminateSessionsActionResult(
+            cancelled=[uuid.UUID(str(s)) for s in mark_result.cancelled_sessions],
+            terminating=[uuid.UUID(str(s)) for s in mark_result.terminating_sessions],
+            force_terminated=[uuid.UUID(str(s)) for s in mark_result.force_terminated_sessions],
+            skipped=[uuid.UUID(str(s)) for s in mark_result.skipped_sessions],
+        )
 
     async def download_file(self, action: DownloadFileAction) -> DownloadFileActionResult:
         session_name = action.session_name

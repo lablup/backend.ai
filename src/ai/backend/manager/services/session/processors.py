@@ -121,6 +121,10 @@ from ai.backend.manager.services.session.actions.start_service import (
     StartServiceAction,
     StartServiceActionResult,
 )
+from ai.backend.manager.services.session.actions.terminate_sessions import (
+    TerminateSessionsAction,
+    TerminateSessionsActionResult,
+)
 from ai.backend.manager.services.session.actions.upload_files import (
     UploadFilesAction,
     UploadFilesActionResult,
@@ -166,6 +170,7 @@ class SessionProcessors(AbstractProcessorPackage):
     search_sessions: ActionProcessor[SearchSessionsAction, SearchSessionsActionResult]
     shutdown_service: ActionProcessor[ShutdownServiceAction, ShutdownServiceActionResult]
     start_service: ActionProcessor[StartServiceAction, StartServiceActionResult]
+    terminate_sessions: ActionProcessor[TerminateSessionsAction, TerminateSessionsActionResult]
     upload_files: ActionProcessor[UploadFilesAction, UploadFilesActionResult]
     modify_session: ActionProcessor[ModifySessionAction, ModifySessionActionResult]
     check_and_transit_status: ActionProcessor[
@@ -203,6 +208,7 @@ class SessionProcessors(AbstractProcessorPackage):
         self.restart_session = ActionProcessor(service.restart_session, action_monitors)
         self.shutdown_service = ActionProcessor(service.shutdown_service, action_monitors)
         self.start_service = ActionProcessor(service.start_service, action_monitors)
+        self.terminate_sessions = ActionProcessor(service.terminate_sessions, action_monitors)
         self.upload_files = ActionProcessor(service.upload_files, action_monitors)
         self.check_and_transit_status = ActionProcessor(
             service.check_and_transit_status, action_monitors
@@ -295,6 +301,7 @@ class SessionProcessors(AbstractProcessorPackage):
             SearchSessionsAction.spec(),
             ShutdownServiceAction.spec(),
             StartServiceAction.spec(),
+            TerminateSessionsAction.spec(),
             UploadFilesAction.spec(),
             ModifySessionAction.spec(),
             CheckAndTransitStatusAction.spec(),
