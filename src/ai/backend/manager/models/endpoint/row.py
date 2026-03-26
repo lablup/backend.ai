@@ -67,14 +67,9 @@ from ai.backend.manager.data.deployment.types import (
     DeploymentMetadata,
     DeploymentNetworkSpec,
     DeploymentState,
-    ExecutionSpec,
     ModelDeploymentAutoScalingRuleData,
-    ModelRevisionSpec,
-    MountMetadata,
     ReplicaSpec,
-    ResourceSpec,
 )
-from ai.backend.manager.data.image.types import ImageIdentifier
 from ai.backend.manager.data.model_serving.types import (
     EndpointAutoScalingRuleData,
     EndpointData,
@@ -105,7 +100,6 @@ from ai.backend.manager.types import MountOptionModel, UserScope
 
 if TYPE_CHECKING:
     from ai.backend.manager.data.deployment.creator import DeploymentCreator
-    from ai.backend.manager.models.deployment_revision import DeploymentRevisionRow
 
 __all__ = (
     "EndpointAutoScalingRuleRow",
@@ -770,11 +764,7 @@ class EndpointRow(Base):  # type: ignore[misc]
 
     def to_deployment_info(self) -> DeploymentInfo:
         """Convert EndpointRow to DeploymentInfo dataclass using revision data."""
-        model_revisions: list[ModelRevisionSpec] = []
-        for rev_row in self.revisions:
-            if rev_row.image_row is None:
-                continue
-            model_revisions.append(self._build_revision_spec(rev_row))
+        model_revisions = [rev_row.to_model_revision_spec() for rev_row in self.revisions]
 
         return DeploymentInfo(
             id=self.id,
@@ -806,39 +796,6 @@ class EndpointRow(Base):  # type: ignore[misc]
             deploying_revision_id=self.deploying_revision,
             sub_step=self.sub_step,
             policy=self.deployment_policy.to_data() if self.deployment_policy is not None else None,
-        )
-
-    def _build_revision_spec(
-        self,
-        revision: DeploymentRevisionRow,
-    ) -> ModelRevisionSpec:
-        """Build a ModelRevisionSpec from a revision row."""
-        image_identifier = ImageIdentifier(
-            canonical=revision.image_row.name,
-            architecture=revision.image_row.architecture,
-        )
-        return ModelRevisionSpec(
-            revision_id=revision.id,
-            image_identifier=image_identifier,
-            resource_spec=ResourceSpec(
-                cluster_mode=ClusterMode(revision.cluster_mode),
-                cluster_size=revision.cluster_size,
-                resource_slots=revision.resource_slots,
-                resource_opts=revision.resource_opts,
-            ),
-            mounts=MountMetadata(
-                model_vfolder_id=revision.model or uuid.UUID(int=0),
-                model_definition_path=revision.model_definition_path,
-                model_mount_destination=revision.model_mount_destination,
-                extra_mounts=revision.extra_mounts or [],
-            ),
-            execution=ExecutionSpec(
-                startup_command=revision.startup_command,
-                bootstrap_script=revision.bootstrap_script,
-                environ=revision.environ,
-                runtime_variant=revision.runtime_variant,
-                callback_url=yarl.URL(revision.callback_url) if revision.callback_url else None,
-            ),
         )
 
 

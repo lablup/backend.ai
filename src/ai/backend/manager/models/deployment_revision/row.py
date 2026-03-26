@@ -6,6 +6,7 @@ from datetime import datetime
 from typing import TYPE_CHECKING, Any
 
 import sqlalchemy as sa
+import yarl
 from sqlalchemy.dialects import postgresql as pgsql
 from sqlalchemy.orm import Mapped, foreign, mapped_column, relationship
 
@@ -18,12 +19,17 @@ from ai.backend.common.types import (
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.deployment.types import (
     ClusterConfigData,
+    ExecutionSpec,
     ExtraVFolderMountData,
     ModelMountConfigData,
     ModelRevisionData,
+    ModelRevisionSpec,
     ModelRuntimeConfigData,
+    MountMetadata,
     ResourceConfigData,
+    ResourceSpec,
 )
+from ai.backend.manager.data.image.types import ImageIdentifier
 from ai.backend.manager.models.base import (
     GUID,
     Base,
@@ -179,6 +185,39 @@ class DeploymentRevisionRow(Base):  # type: ignore[misc]
         primaryjoin=_get_routings_join_condition,
         viewonly=True,
     )
+
+    def to_model_revision_spec(self) -> ModelRevisionSpec:
+        """Convert to ModelRevisionSpec for deployment lifecycle operations.
+
+        Requires image_row to be eagerly loaded via selectinload.
+        """
+        image_identifier = ImageIdentifier(
+            canonical=self.image_row.name,
+            architecture=self.image_row.architecture,
+        )
+        return ModelRevisionSpec(
+            revision_id=self.id,
+            image_identifier=image_identifier,
+            resource_spec=ResourceSpec(
+                cluster_mode=ClusterMode(self.cluster_mode),
+                cluster_size=self.cluster_size,
+                resource_slots=self.resource_slots,
+                resource_opts=self.resource_opts,
+            ),
+            mounts=MountMetadata(
+                model_vfolder_id=self.model or uuid.UUID(int=0),
+                model_definition_path=self.model_definition_path,
+                model_mount_destination=self.model_mount_destination,
+                extra_mounts=self.extra_mounts or [],
+            ),
+            execution=ExecutionSpec(
+                startup_command=self.startup_command,
+                bootstrap_script=self.bootstrap_script,
+                environ=self.environ,
+                runtime_variant=self.runtime_variant,
+                callback_url=yarl.URL(self.callback_url) if self.callback_url else None,
+            ),
+        )
 
     def to_data(self) -> ModelRevisionData:
         """Convert to ModelRevisionData dataclass."""
