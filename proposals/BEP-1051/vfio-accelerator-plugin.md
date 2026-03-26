@@ -293,7 +293,7 @@ async def restore_from_container(self, container, alloc_map):
 | `create_alloc_map()` | `DiscretePropertyAllocMap` with `cuda.device` slots |
 | `generate_docker_args()` | Returns `_kata_vfio_devices` list for Kata shim |
 | `gather_node_measures()` | Limited sysfs metrics (no NVML on host) |
-| `gather_container_measures()` | Guest-side NVML via containerd exec |
+| `gather_container_measures()` | Returns empty — CoCo policy blocks exec; metrics via Prometheus scraping DCGM Exporter |
 | `restore_from_container()` | Reconstruct allocations from container labels |
 
 ## Multi-Node GPU Interconnect: GPUDirect RDMA

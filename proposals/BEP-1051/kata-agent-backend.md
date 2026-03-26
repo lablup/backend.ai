@@ -95,7 +95,7 @@ The agent writes several files to `scratch_dir/config/` before container creatio
 | `ssh/id_cluster` | Agent | **Kernel runner** (`intrinsic.py:89-130`) | Private key for inter-container SSH in multi-node sessions |
 | `ssh/id_cluster.pub` | Agent | **Kernel runner** (`intrinsic.py:130-140`) | Public key appended to `~/.ssh/authorized_keys` |
 | `ssh/port-mapping.json` | Agent | **Kernel runner** (`intrinsic.py:100-112`) | Cluster node SSH port mapping → written to `~/.ssh/config` |
-| `docker-creds.json` | Agent | Container bootstrap | Docker registry credentials for image pull inside container |
+| `docker-creds.json` | Agent | Container bootstrap | Docker-specific; **NOT used for Kata** — images pulled guest-side via `image-rs` with KBS-delivered credentials |
 | `environ_base.txt` | Agent (backup copy) | Agent (recovery) | Baseline copy of environ.txt for hot-update diffing |
 | `resource_base.txt` | Agent (backup copy) | Agent (recovery) | Baseline copy of resource.txt for hot-update diffing |
 
