@@ -29,6 +29,7 @@ __all__ = (
     "ListSharedVFoldersQuery",
     "ListVFoldersQuery",
     # File Operations
+    "CreateArchiveDownloadSessionReq",
     "CreateDownloadSessionReq",
     "CreateUploadSessionReq",
     "DeleteFilesAsyncBodyParam",
@@ -199,6 +200,16 @@ class MkdirReq(BaseRequestModel):
     path: str | list[str] = Field(description="Directory path(s) to create")
     parents: bool = Field(default=True, description="Create parent directories if needed")
     exist_ok: bool = Field(default=False, description="Do not raise error if directory exists")
+
+
+class CreateArchiveDownloadSessionReq(BaseRequestModel):
+    """Request to create an archive download session for multiple files."""
+
+    files: list[str] = Field(
+        min_length=1,
+        description="List of file paths to include in the archive",
+    )
+    filename: str | None = Field(default=None, description="Output archive filename")
 
 
 class CreateDownloadSessionReq(BaseRequestModel):
