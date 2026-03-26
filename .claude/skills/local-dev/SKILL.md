@@ -46,6 +46,15 @@ If DTO changes affect GQL schema, also restart webserver:
 sleep 5
 ```
 
+If GQL schema changes affect the federated supergraph (new types, fields, modules),
+regenerate and restart the Hive Gateway — see `/halfstack` skill for details:
+
+```bash
+./scripts/generate-graphql-schema.sh
+cp docs/manager/graphql-reference/supergraph.graphql ./supergraph.graphql
+docker compose -f docker-compose.halfstack.current.yml restart backendai-half-apollo-router
+```
+
 ## ./bai — V2 CLI
 
 Shortcut for `./backend.ai v2`. Calls `/v2/` REST API endpoints.
