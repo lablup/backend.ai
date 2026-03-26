@@ -78,7 +78,7 @@ def gql(
     async def _run() -> None:
         registry = await create_v2_registry(load_v2_config())
         try:
-            result = await registry.gql.query(query, variables=vars_dict, v2=use_v2)  # type: ignore[arg-type]
+            result = await registry.gql.query(query, variables=vars_dict, v2=use_v2)
             print_result(result)
         finally:
             await registry.close()
