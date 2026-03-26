@@ -26,6 +26,10 @@ from .export import (
     StreamingExportQuery,
     execute_streaming_export,
 )
+from .integrity import (
+    match_integrity_error,
+    parse_integrity_error,
+)
 from .pagination import (
     CursorBackwardPagination,
     CursorForwardPagination,
@@ -38,9 +42,12 @@ from .purger import (
     BatchPurger,
     BatchPurgerResult,
     BatchPurgerSpec,
+    BulkPurgerError,
+    BulkPurgerResultWithFailures,
     Purger,
     PurgerResult,
     execute_batch_purger,
+    execute_bulk_purger_partial,
     execute_purger,
 )
 from .querier import (
@@ -54,6 +61,7 @@ from .querier import (
 from .types import (
     CursorConditionFactory,
     ExistenceCheck,
+    IntegrityErrorCheck,
     QueryCondition,
     QueryOrder,
     SearchScope,
@@ -62,6 +70,7 @@ from .updater import (
     BatchUpdater,
     BatchUpdaterResult,
     BatchUpdaterSpec,
+    BulkUpdaterError,
     Updater,
     UpdaterResult,
     UpdaterSpec,
@@ -88,7 +97,11 @@ __all__ = [
     "QueryOrder",
     "CursorConditionFactory",
     "ExistenceCheck",
+    "IntegrityErrorCheck",
     "SearchScope",
+    # Integrity
+    "parse_integrity_error",
+    "match_integrity_error",
     # Export
     "ExportDataStream",
     "ExportFieldDef",
@@ -136,6 +149,8 @@ __all__ = [
     "BatchUpdater",
     "BatchUpdaterResult",
     "execute_batch_updater",
+    # BulkUpdater
+    "BulkUpdaterError",
     # Upserter
     "UpserterSpec",
     "Upserter",
@@ -149,6 +164,10 @@ __all__ = [
     "Purger",
     "PurgerResult",
     "execute_purger",
+    # BulkPurger
+    "BulkPurgerError",
+    "BulkPurgerResultWithFailures",
+    "execute_bulk_purger_partial",
     # BatchPurger
     "BatchPurgerSpec",
     "BatchPurger",

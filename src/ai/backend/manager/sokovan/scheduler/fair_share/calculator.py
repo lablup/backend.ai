@@ -23,7 +23,7 @@ from decimal import Decimal
 from typing import TYPE_CHECKING, TypedDict
 from uuid import UUID
 
-from ai.backend.common.types import ResourceSlot
+from ai.backend.common.types import ResourceSlot, SlotQuantity
 
 if TYPE_CHECKING:
     from ai.backend.manager.data.fair_share.types import (
@@ -383,7 +383,7 @@ class FairShareFactorCalculator:
         usage: ResourceSlot,
         weight: Decimal,
         resource_weights: ResourceSlot,
-        cluster_capacity: ResourceSlot,
+        cluster_capacity: list[SlotQuantity],
         lookback_days: int,
     ) -> tuple[Decimal, Decimal]:
         """Calculate normalized_usage and fair_share_factor.
@@ -419,7 +419,7 @@ class FairShareFactorCalculator:
     def _calculate_normalized_usage(
         self,
         usage: ResourceSlot,
-        cluster_capacity: ResourceSlot,
+        cluster_capacity: list[SlotQuantity],
         lookback_days: int,
         resource_weights: ResourceSlot,
     ) -> Decimal:
@@ -442,8 +442,10 @@ class FairShareFactorCalculator:
         total_weighted_ratio = Decimal("0")
         total_weight = Decimal("0")
 
+        capacity_map = {sq.slot_name: sq.quantity for sq in cluster_capacity}
+
         for resource_key, usage_value in usage.items():
-            capacity_value = cluster_capacity.get(resource_key, Decimal("0"))
+            capacity_value = capacity_map.get(resource_key, Decimal("0"))
             res_weight = resource_weights.get(resource_key, Decimal("1.0"))
 
             if capacity_value > 0:

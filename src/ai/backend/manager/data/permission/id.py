@@ -1,7 +1,11 @@
 from dataclasses import dataclass
 from typing import Self
 
-from ai.backend.common.data.permission.types import EntityType, FieldType, ScopeType
+from ai.backend.common.data.permission.types import (
+    EntityType,
+    FieldType,
+    ScopeType,
+)
 
 __all__ = [
     "EntityType",

@@ -10,6 +10,7 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 import sqlalchemy as sa
 
+from ai.backend.common.data.permission.types import EntityType, ScopeType
 from ai.backend.common.exception import InvalidAPIParameters
 from ai.backend.common.types import (
     QuotaScopeID,
@@ -46,7 +47,10 @@ from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.image import ImageRow
 from ai.backend.manager.models.kernel import KernelRow
 from ai.backend.manager.models.keypair import KeyPairRow
-from ai.backend.manager.models.rbac_models import UserRoleRow
+from ai.backend.manager.models.rbac_models import RoleRow, UserRoleRow
+from ai.backend.manager.models.rbac_models.association_scopes_entities import (
+    AssociationScopesEntitiesRow,
+)
 from ai.backend.manager.models.resource_policy import (
     KeyPairResourcePolicyRow,
     ProjectResourcePolicyRow,
@@ -85,6 +89,7 @@ class TestGroupRepositoryCreateResourcePolicyValidation:
                 DomainRow,
                 ProjectResourcePolicyRow,
                 GroupRow,
+                AssociationScopesEntitiesRow,  # RBAC scopes-entities association
             ],
         ):
             yield database_connection
@@ -161,7 +166,6 @@ class TestGroupRepositoryCreateResourcePolicyValidation:
         repo._db_source = group_db_source_with_mock_role_manager
         return repo
 
-    @pytest.mark.asyncio
     async def test_create_succeeds_with_existing_project_resource_policy(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
@@ -188,7 +192,6 @@ class TestGroupRepositoryCreateResourcePolicyValidation:
         assert result.name == spec.name
         assert result.resource_policy == project_resource_policy
 
-    @pytest.mark.asyncio
     async def test_create_fails_with_nonexistent_project_resource_policy(
         self,
         group_repository_with_mock_role_manager: GroupRepository,
@@ -244,11 +247,13 @@ class TestGroupRepository:
                 UserResourcePolicyRow,
                 ProjectResourcePolicyRow,
                 KeyPairResourcePolicyRow,
+                RoleRow,
                 UserRoleRow,
                 UserRow,
                 KeyPairRow,
                 GroupRow,
                 AssocGroupUserRow,  # User-Group association table
+                AssociationScopesEntitiesRow,  # RBAC scopes-entities association
                 ImageRow,
                 VFolderRow,
                 EndpointRow,
@@ -815,6 +820,42 @@ class TestGroupRepository:
         # Second creation with same name should fail
         with pytest.raises(InvalidAPIParameters):
             await group_repository_with_mock_role_manager.create(Creator(spec=creator_spec))
+
+    async def test_create_creates_domain_scope_association(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        group_repository_with_mock_role_manager: GroupRepository,
+        test_domain: str,
+        default_project_resource_policy: str,
+    ) -> None:
+        """Test that creating a project creates AssociationScopesEntitiesRow for domain scope."""
+        creator_spec = GroupCreatorSpec(
+            name="test-rbac-group",
+            domain_name=test_domain,
+            description="Test group for RBAC",
+            resource_policy=default_project_resource_policy,
+        )
+        creator = Creator(spec=creator_spec)
+
+        result = await group_repository_with_mock_role_manager.create(creator)
+
+        # Verify AssociationScopesEntitiesRow was created
+        async with db_with_cleanup.begin_readonly_session() as session:
+            scope_assoc = await session.scalar(
+                sa.select(AssociationScopesEntitiesRow).where(
+                    sa.and_(
+                        AssociationScopesEntitiesRow.entity_type == EntityType.PROJECT,
+                        AssociationScopesEntitiesRow.entity_id == str(result.id),
+                        AssociationScopesEntitiesRow.scope_type == ScopeType.DOMAIN,
+                        AssociationScopesEntitiesRow.scope_id == test_domain,
+                    )
+                )
+            )
+            assert scope_assoc is not None
+            assert scope_assoc.entity_type == EntityType.PROJECT
+            assert scope_assoc.scope_type == ScopeType.DOMAIN
+            assert scope_assoc.scope_id == test_domain
+            assert scope_assoc.entity_id == str(result.id)
 
     # ===========================================
     # Tests for modify_validated method

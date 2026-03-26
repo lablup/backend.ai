@@ -62,7 +62,6 @@ class TestVolumeState:
             options=default_options,
         )
 
-    @pytest.mark.asyncio
     async def test_cache_hit_returns_cached_data(
         self,
         state_with_cache_hit: VolumeState,
@@ -75,7 +74,6 @@ class TestVolumeState:
         assert result.iops_read == sample_cached_data.iops_read
         mock_valkey_client.get_volume_stats.assert_called_once_with("test-volume")
 
-    @pytest.mark.asyncio
     async def test_cache_miss_calls_api_and_stores(
         self,
         state_with_cache_miss: VolumeState,
@@ -87,7 +85,6 @@ class TestVolumeState:
         assert result.iops_read == 1000  # From sample_metric in fixture
         mock_valkey_client.set_volume_stats.assert_called_once()
 
-    @pytest.mark.asyncio
     async def test_cache_error_falls_back_to_api(
         self,
         state_with_cache_error: VolumeState,
@@ -99,7 +96,6 @@ class TestVolumeState:
         assert result.iops_read == 1000  # From sample_metric in fixture
         mock_valkey_client.set_volume_stats.assert_called_once()
 
-    @pytest.mark.asyncio
     async def test_store_cache_failure_is_suppressed(
         self,
         mock_volume_pool_with_single_volume: MagicMock,

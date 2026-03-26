@@ -79,4 +79,5 @@ class AssociationScopesEntitiesRow(Base):  # type: ignore[misc]
             ),
             object_id=self.object_id(),
             relation_type=self.relation_type,
+            registered_at=self.registered_at,
         )

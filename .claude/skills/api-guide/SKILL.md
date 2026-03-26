@@ -72,41 +72,67 @@ query adminDomain(id: ID)
 query adminSearchDomains(filter: ...)
 ```
 
-## REST API Patterns
+## REST v1 API Patterns (Legacy)
+
+> **New endpoints MUST use REST v2 patterns below.**
+> REST v1 is for existing legacy handlers only — do not add new handlers here.
 
 ### Architecture
 
 ```
-REST Handler → Processor → Service → Repository
+REST v1 Handler → Processor → Service → Repository
 ```
 
 **Key Files:**
-- `src/ai/backend/manager/api/{domain}/handler.py` - Handlers
-- `src/ai/backend/manager/api/{domain}/adapter.py` - Filters
-- `src/ai/backend/manager/api/adapter.py` - Base adapter
-
-### Processor-Based Service Invocation
-
-**Core principle:**
-- REST/GraphQL handlers MUST call service methods through Processors
-- Never call service methods directly from handlers
-- Processors wrap service methods as Actions and provide cross-cutting concerns (hooks, metrics, monitoring)
-
-**Pattern:**
-1. Handler creates Action with operation parameters
-2. Handler calls processor's `wait_for_complete()` with Action
-3. Processor invokes corresponding service method and returns ActionResult
-
-**ActionProcessor responsibilities:**
-- Action-based service method invocation
-- Hook execution (pre/post operation)
-- Metrics collection and monitoring
-- Error handling and logging
+- `src/ai/backend/manager/api/rest/{domain}/handler.py` - Handlers
+- `src/ai/backend/manager/api/rest/{domain}/adapter.py` - Filters (per-domain)
+- `src/ai/backend/manager/api/rest/adapter.py` - Base adapter
 
 **See complete examples:**
-- `api/fair_share/handler.py:144` - Handler calling processor
-- `services/storage_namespace/processors.py:29-56` - Processor implementation
+- `api/rest/fair_share/handler.py` - Handler calling processor
 - `services/processors.py` - ActionProcessor base class
+
+## REST v2 API Patterns
+
+> REST v2 uses the same DTOs as GraphQL (`common/dto/manager/v2/`), providing a
+> unified schema across both API surfaces.
+
+### Architecture
+
+```
+REST v2 Handler → Adapter (api/adapters/) → Processor → Service → Repository
+```
+
+**Key difference from v1:** v2 handlers call shared Adapters instead of Processors directly.
+Adapters are shared with the GQL layer.
+
+**Key Files:**
+- `src/ai/backend/manager/api/rest/v2/{domain}/handler.py` - Handlers
+- `src/ai/backend/manager/api/rest/v2/{domain}/registry.py` - Route registration
+- `src/ai/backend/manager/api/adapters/{domain}.py` - Shared adapters (same as GQL)
+- `src/ai/backend/common/dto/manager/v2/{domain}/` - Shared DTOs
+
+### Handler Pattern
+
+```python
+from ai.backend.common.api_handlers import APIResponse, BodyParam
+from ai.backend.common.dto.manager.v2.domain.request import AdminSearchDomainsInput
+from ai.backend.manager.api.adapters.registry import Adapters
+
+
+class DomainV2Handler:
+    def __init__(self, *, adapters: Adapters) -> None:
+        self._adapters = adapters
+
+    async def admin_search(
+        self,
+        body: BodyParam[AdminSearchDomainsInput],
+    ) -> APIResponse:
+        payload = await self._adapters.domain.admin_search(body.parsed)
+        return APIResponse.build(
+            status_code=HTTPStatus.OK, response_model=payload,
+        )
+```
 
 ### Scope Pattern
 
@@ -211,13 +237,26 @@ class SearchResult(BaseModel):
 ### Architecture
 
 ```
-GraphQL Resolver → check_admin_only (if admin) → Processor → Service → Repository
+GraphQL Resolver → check_admin_only (if admin) → Adapter (info.context.adapters.*) → Processor → Service → Repository
 ```
 
 **Key Files:**
 - `src/ai/backend/manager/api/gql/{domain}/resolver/` - Resolvers
-- `src/ai/backend/manager/api/gql/types.py` - Input types
+- `src/ai/backend/manager/api/gql/decorators.py` - Custom decorators (required)
+- `src/ai/backend/manager/api/gql/pydantic_compat.py` - PydanticNodeMixin, PydanticInputMixin
 - `src/ai/backend/manager/api/gql/utils.py` - Utilities
+
+### Decorator Rules
+
+All GQL types MUST use custom decorators from `decorators.py` — NEVER use `@strawberry.type`, `@strawberry.input`, or `@strawberry.experimental.pydantic.*` directly:
+
+- `@gql_node_type(meta)` — Relay Node types (inherit `PydanticNodeMixin[DTO]`)
+- `@gql_pydantic_type(meta, model=DTO)` — output types and payloads backed by a v2 Pydantic DTO
+- `@gql_pydantic_input(meta)` — input types (inherit `PydanticInputMixin[DTO]`)
+- `@gql_pydantic_interface(meta, model=DTO)` — interface types
+- `@gql_connection_type(meta)` — Connection[T] / Edge[T] subclasses
+
+`@strawberry.enum`, `@strawberry.field`, `@strawberry.mutation`, `@strawberry.subscription` may be used directly.
 
 ### Type System Rules
 
@@ -231,7 +270,6 @@ GraphQL Resolver → check_admin_only (if admin) → Processor → Service → R
 **Naming Convention:**
 - All GraphQL types MUST have `GQL` suffix (DomainGQL, DomainScopeGQL, DomainFilterGQL)
 - Distinguishes GraphQL types from data layer types
-- Applies to: @strawberry.type, @strawberry.input, @strawberry.enum classes
 
 **Scope vs Filter:**
 - Scope: Required context parameters (resource_group, domain_name, project_id)
@@ -318,15 +356,13 @@ class UserConnection:
 
 **See:** `api/gql/` for cursor pagination examples
 
-## REST vs GraphQL
+## REST v1 vs REST v2 vs GraphQL
 
-| Aspect | REST | GraphQL |
-|--------|------|---------|
-| **Scope** | PathParam/QueryParam | Strawberry input |
-| **Admin Check** | `_check_superadmin(request)` | `check_admin_only(info)` |
-| **Naming** | `domain_create_user` | `domainCreateUser` |
-| **Pagination** | Offset | Offset or Cursor |
-| **Response** | Pydantic | Strawberry type |
+- **REST v1 (legacy)**: Handler → Processor. DTOs from `common/dto/manager/`. Per-domain adapters in `api/rest/{domain}/adapter.py`.
+- **REST v2**: Handler → Adapter. DTOs from `common/dto/manager/v2/`. Shared adapters in `api/adapters/{domain}.py`.
+- **GraphQL**: Resolver → Adapter (same adapters as REST v2). DTOs from `common/dto/manager/v2/`. Strawberry types wrap DTOs via custom decorators.
+- Admin check: REST uses `superadmin_required` middleware, GQL uses `check_admin_only(info)`.
+- Naming: REST uses `domain_create_user`, GQL uses `domainCreateUser`.
 
 ## Client SDK + CLI Integration
 
@@ -374,14 +410,14 @@ CLI Tests → Mock HTTP
    - Implement service methods
    - Create processors
 
-3. ✅ **REST API**
-   - Handler with scope prefix
-   - Admin check if needed
-   - Filter adapter
+3. ✅ **REST API v2** (all new endpoints)
+   - Handler calls Adapter, uses `common/dto/manager/v2/` DTOs
+   - `BodyParam[DTO]` input, `APIResponse.build(response_model=payload)` output
+   - Admin check and scope prefix
 
 4. ✅ **GraphQL** (optional)
-   - Input types
-   - Resolver with scope prefix
+   - `@gql_pydantic_type` / `@gql_pydantic_input` with DTO — no `@strawberry.type` directly
+   - Resolver calls Adapter (`info.context.adapters.*`)
    - Admin check if needed
 
 5. ✅ **Client SDK**

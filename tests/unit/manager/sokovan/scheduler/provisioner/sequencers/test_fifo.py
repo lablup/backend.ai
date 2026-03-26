@@ -3,7 +3,7 @@ from decimal import Decimal
 
 import pytest
 
-from ai.backend.common.types import AccessKey, ResourceSlot, SessionId
+from ai.backend.common.types import AccessKey, ResourceSlot, SessionId, SlotQuantity
 from ai.backend.manager.sokovan.data import (
     ConcurrencySnapshot,
     KeypairOccupancy,
@@ -56,18 +56,15 @@ class TestFIFOSequencer:
             known_slot_types={},
         )
 
-    @pytest.mark.asyncio
     async def test_name(self, sequencer: FIFOSequencer) -> None:
         assert sequencer.name == "FIFOSequencer"
 
-    @pytest.mark.asyncio
     async def test_empty_workload(
         self, scaling_group: str, sequencer: FIFOSequencer, system_snapshot: SystemSnapshot
     ) -> None:
         result = await sequencer.sequence(scaling_group, system_snapshot, [])
         assert result == []
 
-    @pytest.mark.asyncio
     async def test_preserves_order(
         self, scaling_group: str, sequencer: FIFOSequencer, system_snapshot: SystemSnapshot
     ) -> None:
@@ -112,7 +109,6 @@ class TestFIFOSequencer:
         assert result[1] == workloads[1]
         assert result[2] == workloads[2]
 
-    @pytest.mark.asyncio
     async def test_ignores_system_snapshot(
         self, scaling_group: str, sequencer: FIFOSequencer
     ) -> None:
@@ -122,12 +118,18 @@ class TestFIFOSequencer:
             resource_occupancy=ResourceOccupancySnapshot(
                 by_keypair={
                     AccessKey("user1"): KeypairOccupancy(
-                        occupied_slots=ResourceSlot(cpu=Decimal("50"), mem=Decimal("50")),
+                        occupied_slots=[
+                            SlotQuantity("cpu", Decimal("50")),
+                            SlotQuantity("mem", Decimal("50")),
+                        ],
                         session_count=1,
                         sftp_session_count=0,
                     ),
                     AccessKey("user2"): KeypairOccupancy(
-                        occupied_slots=ResourceSlot(cpu=Decimal("30"), mem=Decimal("30")),
+                        occupied_slots=[
+                            SlotQuantity("cpu", Decimal("30")),
+                            SlotQuantity("mem", Decimal("30")),
+                        ],
                         session_count=1,
                         sftp_session_count=0,
                     ),

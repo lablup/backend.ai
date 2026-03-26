@@ -16,7 +16,7 @@ from ai.backend.manager.models.group import GroupRow, ProjectType
 from ai.backend.manager.models.image import ImageRow
 from ai.backend.manager.models.kernel import KernelRow
 from ai.backend.manager.models.keypair import KeyPairRow
-from ai.backend.manager.models.rbac_models import UserRoleRow
+from ai.backend.manager.models.rbac_models import RoleRow, UserRoleRow
 from ai.backend.manager.models.resource_policy import (
     KeyPairResourcePolicyRow,
     ProjectResourcePolicyRow,
@@ -56,6 +56,7 @@ class TestEnsureQuotaScopeAccessibleByUser:
                 UserResourcePolicyRow,
                 ProjectResourcePolicyRow,
                 KeyPairResourcePolicyRow,
+                RoleRow,
                 UserRoleRow,
                 UserRow,
                 KeyPairRow,
@@ -302,7 +303,6 @@ class TestEnsureQuotaScopeAccessibleByUser:
 
         yield group_uuid
 
-    @pytest.mark.asyncio
     async def test_ensure_quota_scope_accessible_by_domain_admin_with_user_dict(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
@@ -320,7 +320,6 @@ class TestEnsureQuotaScopeAccessibleByUser:
                 domain_user_data_dict,
             )
 
-    @pytest.mark.asyncio
     async def test_ensure_quota_scope_not_accessible_by_admin_from_other_domain(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
@@ -338,7 +337,6 @@ class TestEnsureQuotaScopeAccessibleByUser:
                     domain_user_data_dict,
                 )
 
-    @pytest.mark.asyncio
     async def test_ensure_group_quota_scope_accessible_by_admin(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,

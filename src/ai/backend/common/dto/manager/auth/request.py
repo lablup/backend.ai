@@ -16,6 +16,7 @@ from .types import AuthTokenType
 __all__ = (
     "AuthorizeRequest",
     "GetRoleRequest",
+    "LogoutRequest",
     "SignupRequest",
     "SignoutRequest",
     "UpdateFullNameRequest",
@@ -45,6 +46,14 @@ class AuthorizeRequest(BaseRequestModel):
         default=None,
         description="Secondary token forwarded to auth hook plugins (e.g., for 2FA)",
         validation_alias=AliasChoices("stoken", "sToken"),
+    )
+    otp: str | None = Field(
+        default=None,
+        description="One-time password for TOTP-based two-factor authentication",
+    )
+    force: bool = Field(
+        default=False,
+        description="If true, invalidate existing active sessions and proceed with login",
     )
 
 
@@ -78,6 +87,14 @@ class SignupRequest(BaseRequestModel):
     description: str | None = Field(
         default=None,
         description="Free-text account description; defaults to empty string",
+    )
+
+
+class LogoutRequest(BaseRequestModel):
+    """Request to invalidate a login session."""
+
+    session_token: str = Field(
+        description="The session token to invalidate",
     )
 
 

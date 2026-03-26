@@ -4,7 +4,7 @@ import logging
 import secrets
 import uuid
 from http import HTTPStatus
-from typing import cast
+from typing import Any, cast
 
 import aiohttp
 from pydantic import HttpUrl
@@ -14,6 +14,7 @@ from ai.backend.common.bgtask.bgtask import BackgroundTaskManager
 from ai.backend.common.bgtask.reporter import ProgressReporter
 from ai.backend.common.clients.valkey_client.valkey_live.client import ValkeyLiveClient
 from ai.backend.common.contexts.user import current_user
+from ai.backend.common.data.permission.types import RBACElementType
 from ai.backend.common.defs.session import SESSION_PRIORITY_DEFAULT
 from ai.backend.common.events.dispatcher import (
     EventDispatcher,
@@ -32,6 +33,7 @@ from ai.backend.common.types import (
     AccessKey,
     ImageAlias,
     KernelEnqueueingConfig,
+    RuntimeVariant,
     SessionTypes,
     VFolderID,
 )
@@ -55,6 +57,7 @@ from ai.backend.manager.data.model_serving.types import (
 from ai.backend.manager.data.model_serving.types import (
     EndpointTokenData as ServiceEndpointTokenData,
 )
+from ai.backend.manager.data.permission.types import RBACElementRef
 from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.data.vfolder.types import VFolderOwnershipType
 from ai.backend.manager.errors.service import (
@@ -63,11 +66,12 @@ from ai.backend.manager.errors.service import (
     ModelServiceNotFound,
     RouteNotFound,
 )
-from ai.backend.manager.models.endpoint import EndpointLifecycle
+from ai.backend.manager.models.endpoint import EndpointLifecycle, EndpointRow, ModelServiceHelper
 from ai.backend.manager.models.routing import RouteStatus
 from ai.backend.manager.models.storage import StorageSessionManager
 from ai.backend.manager.registry import AgentRegistry
-from ai.backend.manager.repositories.base import Creator
+from ai.backend.manager.repositories.base import BatchQuerier, Creator, OffsetPagination
+from ai.backend.manager.repositories.base.rbac.entity_creator import RBACEntityCreator
 from ai.backend.manager.repositories.deployment import DeploymentRepository
 from ai.backend.manager.repositories.model_serving import EndpointCreatorSpec
 from ai.backend.manager.repositories.model_serving.creators import EndpointTokenCreatorSpec
@@ -120,9 +124,17 @@ from ai.backend.manager.services.model_serving.actions.modify_endpoint import (
     ModifyEndpointAction,
     ModifyEndpointActionResult,
 )
+from ai.backend.manager.services.model_serving.actions.search_services import (
+    SearchServicesAction,
+    SearchServicesActionResult,
+)
 from ai.backend.manager.services.model_serving.actions.update_route import (
     UpdateRouteAction,
     UpdateRouteActionResult,
+)
+from ai.backend.manager.services.model_serving.actions.validate_model_service import (
+    ValidateModelServiceAction,
+    ValidateModelServiceActionResult,
 )
 from ai.backend.manager.services.model_serving.exceptions import (
     GenericForbidden,
@@ -135,7 +147,7 @@ from ai.backend.manager.sokovan.deployment.revision_generator.registry import (
 )
 from ai.backend.manager.sokovan.deployment.types import DeploymentLifecycleType
 from ai.backend.manager.sokovan.scheduling_controller import SchedulingController
-from ai.backend.manager.types import UserScope
+from ai.backend.manager.types import MountOptionModel, UserScope
 
 log = BraceStyleAdapter(logging.getLogger(__name__))
 
@@ -350,7 +362,14 @@ class ModelServingService:
             open_to_public=action.creator.open_to_public,
             runtime_variant=action.creator.runtime_variant,
         )
-        endpoint_creator = Creator(spec=endpoint_spec)
+        endpoint_creator: RBACEntityCreator[EndpointRow] = RBACEntityCreator(
+            spec=endpoint_spec,
+            element_type=RBACElementType.MODEL_DEPLOYMENT,
+            scope_ref=RBACElementRef(
+                element_type=RBACElementType.USER,
+                element_id=str(action.request_user_id),
+            ),
+        )
 
         endpoint_data = await self._repository.create_endpoint_validated(
             endpoint_creator, self._agent_registry
@@ -358,7 +377,7 @@ class ModelServingService:
         endpoint_id = endpoint_data.id
 
         return CreateModelServiceActionResult(
-            ServiceInfo(
+            data=ServiceInfo(
                 endpoint_id=endpoint_id,
                 model_id=endpoint_spec.model,
                 extra_mounts=[m.vfid.folder_id for m in endpoint_spec.extra_mounts],
@@ -370,7 +389,8 @@ class ModelServingService:
                 service_endpoint=None,
                 is_public=action.creator.open_to_public,
                 runtime_variant=action.creator.runtime_variant,
-            )
+            ),
+            _project_id=action._project_id,
         )
 
     async def list_serve(self, action: ListModelServiceAction) -> ListModelServiceActionResult:
@@ -394,7 +414,20 @@ class ModelServingService:
                     is_public=endpoint.open_to_public,
                 )
                 for endpoint in endpoints
-            ]
+            ],
+        )
+
+    async def search_services(self, action: SearchServicesAction) -> SearchServicesActionResult:
+        querier = BatchQuerier(
+            pagination=OffsetPagination(offset=action.offset, limit=action.limit),
+            conditions=action.conditions,
+        )
+        result = await self._repository.search_services_paginated(action.session_owner_id, querier)
+        return SearchServicesActionResult(
+            items=result.items,
+            total_count=result.total_count,
+            offset=action.offset,
+            limit=action.limit,
         )
 
     async def check_user_access(self) -> None:
@@ -430,7 +463,7 @@ class ModelServingService:
         # Update endpoint lifecycle
         await self._repository.update_endpoint_lifecycle(service_id, lifecycle_stage, replicas)
 
-        return DeleteModelServiceActionResult(success=True)
+        return DeleteModelServiceActionResult(service_id=service_id)
 
     async def dry_run(self, action: DryRunModelServiceAction) -> DryRunModelServiceActionResult:
         # TODO: Seperate background task definition and trigger into different layer
@@ -487,17 +520,17 @@ class ModelServingService:
         session_name = f"model-eval-{session_creation_id}"
 
         # Prepare mounts and environ
-        mounts = [
+        mounts: list[uuid.UUID] = [
             model_vfolder_id,
-            *[m.vfid for m in service_prepare_ctx.extra_mounts],
+            *[m.vfid.folder_id for m in service_prepare_ctx.extra_mounts],
         ]
-        mount_map: dict[uuid.UUID | VFolderID, str] = {
+        mount_map: dict[uuid.UUID, str] = {
             model_vfolder_id: action.config.model_mount_destination,
         }
         for m in service_prepare_ctx.extra_mounts:
-            mount_map[m.vfid] = str(m.kernel_path)
-        mount_options = {
-            m.vfid: {"permission": m.mount_perm} for m in service_prepare_ctx.extra_mounts
+            mount_map[m.vfid.folder_id] = str(m.kernel_path)
+        mount_options: dict[uuid.UUID, dict[str, Any]] = {
+            m.vfid.folder_id: {"permission": m.mount_perm} for m in service_prepare_ctx.extra_mounts
         }
         environ = creation_config.get("environ", {})
 
@@ -714,7 +747,7 @@ class ModelServingService:
             updated_endpoint_data.id
         )
 
-        return UpdateRouteActionResult(success=True)
+        return UpdateRouteActionResult(route_id=action.route_id)
 
     async def delete_route(self, action: DeleteRouteAction) -> DeleteRouteActionResult:
         # Validate access
@@ -751,7 +784,7 @@ class ModelServingService:
         # Decrease endpoint replicas
         await self._repository.decrease_endpoint_replicas(action.service_id)
 
-        return DeleteRouteActionResult(success=True)
+        return DeleteRouteActionResult(route_id=action.route_id)
 
     async def generate_token(self, action: GenerateTokenAction) -> GenerateTokenActionResult:
         # Validate access
@@ -854,4 +887,84 @@ class ModelServingService:
             await self._deployment_controller.mark_lifecycle_needed(
                 DeploymentLifecycleType.CHECK_REPLICA,
             )
-        return ModifyEndpointActionResult(success=result.success, data=result.data)
+        return ModifyEndpointActionResult(
+            endpoint_id=action.endpoint_id, success=result.success, data=result.data
+        )
+
+    async def validate_model_service(
+        self, action: ValidateModelServiceAction
+    ) -> ValidateModelServiceActionResult:
+        if action.replicas > action.max_session_count_per_model_session:
+            raise InvalidAPIParameters(
+                f"Cannot spawn more than {action.max_session_count_per_model_session}"
+                " sessions for a single service"
+            )
+
+        owner_access_key = action.owner_access_key
+        if action.owner_access_key_override is not None:
+            owner_access_key = action.owner_access_key_override
+
+        extra_mounts_typed: dict[uuid.UUID, MountOptionModel] = {
+            k: MountOptionModel(
+                mount_destination=v.mount_destination,
+                type=v.type,
+                permission=v.permission,
+            )
+            for k, v in action.config.extra_mounts.items()
+        }
+
+        # Delegate all DB-dependent resolution to the repository.
+        ctx = await self._repository.resolve_model_service_validation_context(
+            scaling_group=action.config.scaling_group,
+            owner_access_key=owner_access_key,
+            domain_name=action.domain_name,
+            group_name=action.group_name,
+            requester_uuid=action.requester_uuid,
+            requester_access_key=action.requester_access_key,
+            requester_role=action.requester_role,
+            requester_domain=action.requester_domain,
+            keypair_resource_policy=action.keypair_resource_policy,
+            owner_access_key_override=action.owner_access_key_override,
+            model=action.config.model,
+            model_mount_destination=action.config.model_mount_destination,
+            extra_mounts=extra_mounts_typed,
+            legacy_etcd_loader=self._config_provider.legacy_etcd_config_loader,
+            storage_manager=self._storage_manager,
+        )
+
+        if action.runtime_variant == RuntimeVariant.CUSTOM:
+            vfid = VFolderID(ctx.model_folder_quota_scope_id, ctx.model_id)
+            yaml_path = await ModelServiceHelper.validate_model_definition_file_exists(
+                self._storage_manager,
+                ctx.model_folder_host,
+                vfid,
+                action.config.model_definition_path,
+            )
+            await ModelServiceHelper.validate_model_definition(
+                self._storage_manager,
+                ctx.model_folder_host,
+                vfid,
+                yaml_path,
+            )
+        else:
+            if (
+                action.runtime_variant != RuntimeVariant.CMD
+                and action.config.model_mount_destination != "/models"
+            ):
+                raise InvalidAPIParameters(
+                    "Model mount destination must be /models for non-custom runtimes"
+                )
+            yaml_path = "model-definition.yaml"
+
+        return ValidateModelServiceActionResult(
+            model_id=ctx.model_id,
+            model_definition_path=yaml_path,
+            requester_access_key=ctx.requester_access_key,
+            owner_access_key=ctx.owner_access_key,
+            owner_uuid=ctx.owner_uuid,
+            owner_role=ctx.owner_role,
+            group_id=ctx.group_id,
+            resource_policy=ctx.resource_policy,
+            scaling_group=ctx.scaling_group,
+            extra_mounts=ctx.extra_mounts,
+        )

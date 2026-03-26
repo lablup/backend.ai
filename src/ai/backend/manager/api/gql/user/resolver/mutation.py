@@ -2,17 +2,30 @@
 
 from __future__ import annotations
 
-from typing import cast
+import ipaddress
 from uuid import UUID
 
-import strawberry
 from strawberry import Info
 
+from ai.backend.common.api_handlers import Sentinel
+from ai.backend.common.contexts.client_ip import current_client_ip
+from ai.backend.common.contexts.user import current_user
+from ai.backend.common.dto.manager.v2.user.request import DeleteUserInput, PurgeUserInput
+from ai.backend.common.exception import InvalidIpAddressValue, UnreachableError
+from ai.backend.common.types import ReadableCIDR
+from ai.backend.manager.api.gql.decorators import (
+    BackendAIGQLMeta,
+    gql_mutation,
+)
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.api.gql.user.types import (
-    BulkCreateUserErrorGQL,
-    BulkCreateUserInputGQL,
-    BulkCreateUsersPayloadGQL,
+    BulkCreateUsersV2PayloadGQL,
+    BulkCreateUserV2InputGQL,
+    BulkPurgeUsersV2InputGQL,
+    BulkPurgeUsersV2PayloadGQL,
+    BulkPurgeUserV2ErrorGQL,
+    BulkUpdateUsersV2PayloadGQL,
+    BulkUpdateUserV2InputGQL,
     CreateUserInputGQL,
     CreateUserPayloadGQL,
     DeleteUserPayloadGQL,
@@ -20,32 +33,42 @@ from ai.backend.manager.api.gql.user.types import (
     DeleteUsersPayloadGQL,
     PurgeUserInputGQL,
     PurgeUserPayloadGQL,
-    PurgeUsersInputGQL,
-    PurgeUsersPayloadGQL,
-    UpdateUserInputGQL,
+    UpdateMyAllowedClientIPInputGQL,
+    UpdateMyAllowedClientIPPayloadGQL,
     UpdateUserPayloadGQL,
-    UserV2GQL,
+    UpdateUserV2InputGQL,
 )
+from ai.backend.manager.api.gql.utils import check_admin_only
 from ai.backend.manager.data.user.types import UserStatus
+from ai.backend.manager.errors.api import InvalidAPIParameters
 from ai.backend.manager.models.hasher.types import PasswordInfo
+from ai.backend.manager.models.user import UserRole
 from ai.backend.manager.repositories.base.creator import Creator
+from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.repositories.user.creators import UserCreatorSpec
+from ai.backend.manager.repositories.user.updaters import UserUpdaterSpec
 from ai.backend.manager.services.user.actions.create_user import (
     BulkCreateUserAction,
     UserCreateSpec,
 )
+from ai.backend.manager.services.user.actions.modify_user import (
+    BulkModifyUserAction,
+    ModifyUserAction,
+    UserUpdateSpec,
+)
+from ai.backend.manager.services.user.actions.purge_user import BulkPurgeUserAction
+from ai.backend.manager.types import OptionalState, TriState
 
 # Create Mutations
 
 
-@strawberry.mutation(
-    description=(
-        "Added in 26.2.0. Create a new user (admin only). "
-        "Requires superadmin privileges. "
-        "Automatically creates a default keypair for the user."
+@gql_mutation(
+    BackendAIGQLMeta(
+        added_version="26.2.0",
+        description="Create a new user (admin only). Requires superadmin privileges. Automatically creates a default keypair for the user",
     )
 )  # type: ignore[misc]
-async def admin_create_user(
+async def admin_create_user_v2(
     info: Info[StrawberryGQLContext],
     input: CreateUserInputGQL,
 ) -> CreateUserPayloadGQL:
@@ -61,20 +84,22 @@ async def admin_create_user(
     Raises:
         NotImplementedError: This mutation is not yet implemented.
     """
-    raise NotImplementedError("admin_create_user is not yet implemented")
+    check_admin_only()
+    ctx = info.context
+    payload = await ctx.adapters.user.create_user(input.to_pydantic())
+    return CreateUserPayloadGQL.from_pydantic(payload)
 
 
-@strawberry.mutation(
-    description=(
-        "Added in 26.2.0. Create multiple users in bulk (admin only). "
-        "Requires superadmin privileges. "
-        "Each user has individual specifications."
+@gql_mutation(
+    BackendAIGQLMeta(
+        added_version="26.2.0",
+        description="Create multiple users in bulk (admin only). Requires superadmin privileges. Each user has individual specifications",
     )
 )  # type: ignore[misc]
-async def admin_bulk_create_users(
+async def admin_bulk_create_users_v2(
     info: Info[StrawberryGQLContext],
-    input: BulkCreateUserInputGQL,
-) -> BulkCreateUsersPayloadGQL:
+    input: BulkCreateUserV2InputGQL,
+) -> BulkCreateUsersV2PayloadGQL:
     """Create multiple users in bulk with individual specifications.
 
     Args:
@@ -82,77 +107,64 @@ async def admin_bulk_create_users(
         input: Bulk user creation input with individual specs.
 
     Returns:
-        BulkCreateUsersPayloadGQL with created users.
+        BulkCreateUsersV2PayloadGQL with created users.
     """
+    check_admin_only()
     ctx = info.context
     auth_config = ctx.config_provider.config.auth
 
     # Build list of UserCreateSpec from input
     items: list[UserCreateSpec] = []
     for user_input in input.users:
+        dto = user_input.to_pydantic()
         password_info = PasswordInfo(
-            password=user_input.password,
+            password=dto.password,
             algorithm=auth_config.password_hash_algorithm,
             rounds=auth_config.password_hash_rounds,
             salt_size=auth_config.password_hash_salt_size,
         )
 
         spec = UserCreatorSpec(
-            email=user_input.email,
-            username=user_input.username,
+            email=dto.email,
+            username=dto.username,
             password=password_info,
-            need_password_change=user_input.need_password_change,
-            domain_name=user_input.domain_name,
-            full_name=user_input.full_name,
-            description=user_input.description,
-            status=UserStatus(user_input.status.value),
-            role=user_input.role.value,
-            allowed_client_ip=user_input.allowed_client_ip,
-            totp_activated=user_input.totp_activated,
-            resource_policy=user_input.resource_policy,
-            sudo_session_enabled=user_input.sudo_session_enabled,
-            container_uid=user_input.container_uid,
-            container_main_gid=user_input.container_main_gid,
-            container_gids=user_input.container_gids,
+            need_password_change=dto.need_password_change,
+            domain_name=dto.domain_name,
+            full_name=dto.full_name,
+            description=dto.description,
+            status=UserStatus(dto.status),
+            role=str(dto.role),
+            allowed_client_ip=dto.allowed_client_ip,
+            totp_activated=dto.totp_activated,
+            resource_policy=dto.resource_policy,
+            sudo_session_enabled=dto.sudo_session_enabled,
+            container_uid=dto.container_uid,
+            container_main_gid=dto.container_main_gid,
+            container_gids=dto.container_gids,
         )
 
-        group_ids = [str(gid) for gid in user_input.group_ids] if user_input.group_ids else None
+        group_ids = [str(gid) for gid in dto.group_ids] if dto.group_ids else None
         items.append(UserCreateSpec(creator=Creator(spec=spec), group_ids=group_ids))
 
     action = BulkCreateUserAction(items=items)
-    result = await ctx.processors.user.bulk_create_users.wait_for_complete(action)
+    payload = await ctx.adapters.user.bulk_create_users(action)
 
-    created_users = [UserV2GQL.from_data(user_data) for user_data in result.data.successes]
-    failed = [
-        BulkCreateUserErrorGQL(
-            index=error.index,
-            username=cast(UserCreatorSpec, error.spec).username,
-            email=cast(UserCreatorSpec, error.spec).email,
-            message=str(error.exception),
-        )
-        for error in result.data.failures
-    ]
-
-    return BulkCreateUsersPayloadGQL(
-        created_users=created_users,
-        failed=failed,
-    )
+    return BulkCreateUsersV2PayloadGQL.from_pydantic(payload)
 
 
 # Update Mutations
 
 
-@strawberry.mutation(
-    description=(
-        "Added in 26.2.0. Update a user's information (admin only). "
-        "Requires superadmin privileges. "
-        "Only provided fields will be updated."
+@gql_mutation(
+    BackendAIGQLMeta(
+        added_version="26.3.0",
+        description="Update a user's information (admin only). Requires superadmin privileges. Only provided fields will be updated",
     )
 )  # type: ignore[misc]
-async def admin_update_user(
+async def admin_update_user_v2(
     info: Info[StrawberryGQLContext],
     user_id: UUID,
-    input: UpdateUserInputGQL,
+    input: UpdateUserV2InputGQL,
 ) -> UpdateUserPayloadGQL:
     """Update a user's information.
 
@@ -167,19 +179,150 @@ async def admin_update_user(
     Raises:
         NotImplementedError: This mutation is not yet implemented.
     """
-    raise NotImplementedError("admin_update_user is not yet implemented")
+    check_admin_only()
+    ctx = info.context
+    payload = await ctx.adapters.user.modify_user_by_id(user_id, input.to_pydantic())
+    return UpdateUserPayloadGQL.from_pydantic(payload)
 
 
-@strawberry.mutation(
-    description=(
-        "Added in 26.2.0. Update the current user's information. "
-        "Users can only update their own profile. "
-        "Some fields may be restricted based on user role."
+@gql_mutation(
+    BackendAIGQLMeta(
+        added_version="26.3.0",
+        description="Update multiple users in bulk (admin only). Requires superadmin privileges. Each user has individual update specifications",
     )
 )  # type: ignore[misc]
-async def update_user(
+async def admin_bulk_update_users_v2(
     info: Info[StrawberryGQLContext],
-    input: UpdateUserInputGQL,
+    input: BulkUpdateUserV2InputGQL,
+) -> BulkUpdateUsersV2PayloadGQL:
+    """Update multiple users in bulk with individual specifications.
+
+    Args:
+        info: Strawberry GraphQL context.
+        input: Bulk user update input with individual specs.
+
+    Returns:
+        BulkUpdateUsersPayloadGQL with updated users and failures.
+    """
+    check_admin_only()
+    ctx = info.context
+    auth_config = ctx.config_provider.config.auth
+
+    items: list[UserUpdateSpec] = []
+    for user_item in input.users:
+        dto = user_item.input.to_pydantic()
+
+        updater_spec = UserUpdaterSpec(
+            username=(
+                OptionalState.update(dto.username)
+                if dto.username is not None
+                else OptionalState.nop()
+            ),
+            password=(
+                OptionalState.update(
+                    PasswordInfo(
+                        password=dto.password,
+                        algorithm=auth_config.password_hash_algorithm,
+                        rounds=auth_config.password_hash_rounds,
+                        salt_size=auth_config.password_hash_salt_size,
+                    )
+                )
+                if dto.password is not None
+                else OptionalState.nop()
+            ),
+            need_password_change=(
+                OptionalState.update(dto.need_password_change)
+                if dto.need_password_change is not None
+                else OptionalState.nop()
+            ),
+            full_name=(
+                TriState.nop()
+                if isinstance(dto.full_name, Sentinel)
+                else TriState.nullify()
+                if dto.full_name is None
+                else TriState.update(dto.full_name)
+            ),
+            description=(
+                TriState.nop()
+                if isinstance(dto.description, Sentinel)
+                else TriState.nullify()
+                if dto.description is None
+                else TriState.update(dto.description)
+            ),
+            status=(
+                OptionalState.update(UserStatus(dto.status))
+                if dto.status is not None
+                else OptionalState.nop()
+            ),
+            domain_name=(
+                OptionalState.update(dto.domain_name)
+                if dto.domain_name is not None
+                else OptionalState.nop()
+            ),
+            role=(
+                OptionalState.update(UserRole(dto.role))
+                if dto.role is not None
+                else OptionalState.nop()
+            ),
+            allowed_client_ip=(
+                TriState.nop()
+                if isinstance(dto.allowed_client_ip, Sentinel)
+                else TriState.from_graphql(dto.allowed_client_ip)
+            ),
+            resource_policy=(
+                OptionalState.update(dto.resource_policy)
+                if dto.resource_policy is not None
+                else OptionalState.nop()
+            ),
+            sudo_session_enabled=(
+                OptionalState.update(dto.sudo_session_enabled)
+                if dto.sudo_session_enabled is not None
+                else OptionalState.nop()
+            ),
+            main_access_key=(
+                TriState.nop()
+                if isinstance(dto.main_access_key, Sentinel)
+                else TriState.from_graphql(dto.main_access_key)
+            ),
+            container_uid=(
+                TriState.nop()
+                if isinstance(dto.container_uid, Sentinel)
+                else TriState.from_graphql(dto.container_uid)
+            ),
+            container_main_gid=(
+                TriState.nop()
+                if isinstance(dto.container_main_gid, Sentinel)
+                else TriState.from_graphql(dto.container_main_gid)
+            ),
+            container_gids=(
+                TriState.nop()
+                if isinstance(dto.container_gids, Sentinel)
+                else TriState.from_graphql(dto.container_gids)
+            ),
+            group_ids=(
+                OptionalState.nop()
+                if isinstance(dto.group_ids, Sentinel) or dto.group_ids is None
+                else OptionalState.update([str(gid) for gid in dto.group_ids])
+            ),
+        )
+
+        items.append(UserUpdateSpec(user_id=user_item.user_id, updater_spec=updater_spec))
+
+    action = BulkModifyUserAction(items=items)
+    payload = await ctx.adapters.user.bulk_modify_users(action)
+
+    return BulkUpdateUsersV2PayloadGQL.from_pydantic(payload)
+
+
+@gql_mutation(
+    BackendAIGQLMeta(
+        added_version="26.2.0",
+        description="Update the current user's information. Users can only update their own profile. Some fields may be restricted based on user role",
+    )
+)  # type: ignore[misc]
+async def update_user_v2(
+    info: Info[StrawberryGQLContext],
+    input: UpdateUserV2InputGQL,
 ) -> UpdateUserPayloadGQL:
     """Update the current user's own information.
 
@@ -193,20 +336,24 @@ async def update_user(
     Raises:
         NotImplementedError: This mutation is not yet implemented.
     """
-    raise NotImplementedError("update_user is not yet implemented")
+    ctx = info.context
+    me = current_user()
+    if me is None:
+        raise UnreachableError("User context is not available")
+    payload = await ctx.adapters.user.modify_user_by_id(me.user_id, input.to_pydantic())
+    return UpdateUserPayloadGQL.from_pydantic(payload)
 
 
-# Delete Mutations (Soft Delete)
+# Delete UpdateUserV2InputGQLlete)
 
 
-@strawberry.mutation(
-    description=(
-        "Added in 26.2.0. Soft-delete a user (admin only). "
-        "Requires superadmin privileges. "
-        "Sets the user status to DELETED but preserves data."
+@gql_mutation(
+    BackendAIGQLMeta(
+        added_version="26.2.0",
+        description="Soft-delete a user (admin only). Requires superadmin privileges. Sets the user status to DELETED but preserves data",
     )
 )  # type: ignore[misc]
-async def admin_delete_user(
+async def admin_delete_user_v2(
     info: Info[StrawberryGQLContext],
     user_id: UUID,
 ) -> DeleteUserPayloadGQL:
@@ -222,17 +369,19 @@ async def admin_delete_user(
     Raises:
         NotImplementedError: This mutation is not yet implemented.
     """
-    raise NotImplementedError("admin_delete_user is not yet implemented")
+    check_admin_only()
+    ctx = info.context
+    await ctx.adapters.user.delete_user_by_id(DeleteUserInput(user_id=user_id))
+    return DeleteUserPayloadGQL(success=True)
 
 
-@strawberry.mutation(
-    description=(
-        "Added in 26.2.0. Soft-delete multiple users (admin only). "
-        "Requires superadmin privileges. "
-        "Sets user status to DELETED but preserves data."
+@gql_mutation(
+    BackendAIGQLMeta(
+        added_version="26.2.0",
+        description="Soft-delete multiple users (admin only). Requires superadmin privileges. Sets user status to DELETED but preserves data",
     )
 )  # type: ignore[misc]
-async def admin_delete_users(
+async def admin_delete_users_v2(
     info: Info[StrawberryGQLContext],
     input: DeleteUsersInputGQL,
 ) -> DeleteUsersPayloadGQL:
@@ -248,20 +397,24 @@ async def admin_delete_users(
     Raises:
         NotImplementedError: This mutation is not yet implemented.
     """
-    raise NotImplementedError("admin_delete_users is not yet implemented")
+    check_admin_only()
+    ctx = info.context
+    dto = input.to_pydantic()
+    for user_id in dto.user_ids:
+        await ctx.adapters.user.delete_user_by_id(DeleteUserInput(user_id=user_id))
+    return DeleteUsersPayloadGQL(deleted_count=len(dto.user_ids))
 
 
 # Purge Mutations (Hard Delete)
 
 
-@strawberry.mutation(
-    description=(
-        "Added in 26.2.0. Permanently delete a user and all associated data (admin only). "
-        "Requires superadmin privileges. "
-        "This action is IRREVERSIBLE. All user data, sessions, and resources will be deleted."
+@gql_mutation(
+    BackendAIGQLMeta(
+        added_version="26.2.0",
+        description="Permanently delete a user and all associated data (admin only). Requires superadmin privileges. This action is IRREVERSIBLE. All user data, sessions, and resources will be deleted",
     )
 )  # type: ignore[misc]
-async def admin_purge_user(
+async def admin_purge_user_v2(
     info: Info[StrawberryGQLContext],
     input: PurgeUserInputGQL,
 ) -> PurgeUserPayloadGQL:
@@ -277,30 +430,156 @@ async def admin_purge_user(
     Raises:
         NotImplementedError: This mutation is not yet implemented.
     """
-    raise NotImplementedError("admin_purge_user is not yet implemented")
+    check_admin_only()
+    ctx = info.context
+    me = current_user()
+    if me is None:
+        raise UnreachableError("User context is not available after check_admin_only()")
+    dto = input.to_pydantic()
+    options = dto.options
+    await ctx.adapters.user.purge_user_by_id(
+        PurgeUserInput(
+            user_id=dto.user_id,
+            purge_shared_vfolders=options.purge_shared_vfolders if options else False,
+            delegate_endpoint_ownership=options.delegate_endpoint_ownership if options else False,
+        ),
+        me.user_id,
+    )
+    return PurgeUserPayloadGQL(success=True)
 
 
-@strawberry.mutation(
-    description=(
-        "Added in 26.2.0. Permanently delete multiple users (admin only). "
-        "Requires superadmin privileges. "
-        "This action is IRREVERSIBLE. All user data will be deleted."
+@gql_mutation(
+    BackendAIGQLMeta(
+        added_version="26.3.0",
+        description="Permanently delete multiple users in bulk (admin only). Requires superadmin privileges. This action is IRREVERSIBLE. All user data will be deleted",
     )
 )  # type: ignore[misc]
-async def admin_purge_users(
+async def admin_bulk_purge_users_v2(
     info: Info[StrawberryGQLContext],
-    input: PurgeUsersInputGQL,
-) -> PurgeUsersPayloadGQL:
-    """Permanently delete multiple users.
+    input: BulkPurgeUsersV2InputGQL,
+) -> BulkPurgeUsersV2PayloadGQL:
+    """Permanently delete multiple users in bulk.
 
     Args:
         info: Strawberry GraphQL context.
-        input: Purge input with emails and options.
+        input: Bulk purge input with user IDs and options.
 
     Returns:
-        PurgeUsersPayloadGQL with count of purged users.
-
-    Raises:
-        NotImplementedError: This mutation is not yet implemented.
+        BulkPurgeUsersV2PayloadGQL with purged count and failures.
     """
-    raise NotImplementedError("admin_purge_users is not yet implemented")
+    check_admin_only()
+    ctx = info.context
+
+    me = current_user()
+    if me is None:
+        raise UnreachableError("User context is not available after check_admin_only()")
+
+    options = input.options
+    action = BulkPurgeUserAction(
+        user_ids=input.user_ids,
+        admin_user_id=me.user_id,
+        purge_shared_vfolders=(
+            OptionalState.update(options.purge_shared_vfolders)
+            if options and options.purge_shared_vfolders
+            else OptionalState.nop()
+        ),
+        delegate_endpoint_ownership=(
+            OptionalState.update(options.delegate_endpoint_ownership)
+            if options and options.delegate_endpoint_ownership
+            else OptionalState.nop()
+        ),
+    )
+    payload = await ctx.adapters.user.bulk_purge_users(action)
+
+    failed = [
+        BulkPurgeUserV2ErrorGQL(
+            user_id=error.user_id,
+            message=error.message,
+        )
+        for error in payload.failed
+    ]
+
+    return BulkPurgeUsersV2PayloadGQL(
+        purged_count=payload.purged_count,
+        failed=failed,
+    )
+
+
+# IP Allowlist Mutations
+
+
+@gql_mutation(
+    BackendAIGQLMeta(
+        added_version="26.4.0",
+        description="Update the current user's allowed client IP list. Set allowed_client_ip to null to remove all IP restrictions. When force is false, the operation fails if the current request IP would be excluded by the new allowlist (lockout prevention)",
+    )
+)  # type: ignore[misc]
+async def update_my_allowed_client_ip(
+    info: Info[StrawberryGQLContext],
+    input: UpdateMyAllowedClientIPInputGQL,
+) -> UpdateMyAllowedClientIPPayloadGQL:
+    """Update the current user's allowed client IP addresses."""
+    me = current_user()
+    if me is None:
+        raise UnreachableError("User context is not available")
+    ctx = info.context
+
+    # Get user email (needed for ModifyUserAction)
+    user_payload = await ctx.adapters.user.get(me.user_id)
+    email = user_payload.user.basic_info.email
+
+    new_allowlist = input.allowed_client_ip
+
+    if new_allowlist is not None:
+        # Validate CIDR format for each entry
+        for ip_str in new_allowlist:
+            try:
+                ReadableCIDR(ip_str)
+            except (InvalidIpAddressValue, ValueError) as e:
+                raise InvalidAPIParameters(f"Invalid IP address or CIDR: {ip_str}") from e
+
+        # Lockout prevention when force=False
+        if not input.force:
+            if len(new_allowlist) == 0:
+                raise InvalidAPIParameters(
+                    "Empty allowlist would block all access. "
+                    "Use force=true to override this safety check."
+                )
+
+            client_ip = current_client_ip()
+            if client_ip is not None:
+                try:
+                    client_addr: ReadableCIDR[ipaddress.IPv4Network | ipaddress.IPv6Network] = (
+                        ReadableCIDR(client_ip, is_network=False)
+                    )
+                except (InvalidIpAddressValue, ValueError) as e:
+                    raise InvalidAPIParameters(
+                        "Cannot verify current client IP for lockout prevention. "
+                        "Use force=true to override this safety check."
+                    ) from e
+                allowed_networks: list[
+                    ReadableCIDR[ipaddress.IPv4Network | ipaddress.IPv6Network]
+                ] = [ReadableCIDR(ip_str) for ip_str in new_allowlist]
+                if not any(
+                    client_addr.address in network.address
+                    for network in allowed_networks
+                    if network.address is not None
+                ):
+                    raise InvalidAPIParameters(
+                        f"Current IP ({client_ip}) is not in the new allowlist. "
+                        "Use force=true to override this safety check."
+                    )
+
+        allowed_client_ip = TriState.update(new_allowlist)
+    else:
+        allowed_client_ip = TriState.nullify()
+
+    updater_spec = UserUpdaterSpec(allowed_client_ip=allowed_client_ip)
+    action = ModifyUserAction(
+        email=email,
+        updater=Updater(spec=updater_spec, pk_value=email),
+        user_uuid=me.user_id,
+    )
+    await ctx.adapters.user.modify_user(action)
+
+    return UpdateMyAllowedClientIPPayloadGQL(success=True)

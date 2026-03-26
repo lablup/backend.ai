@@ -5,8 +5,19 @@ Federated Image (ImageNode) type with full field definitions for Strawberry Grap
 import strawberry
 from strawberry.scalars import ID
 
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
+from ai.backend.manager.api.gql.decorators import BackendAIGQLMeta, gql_federation_type
 
-@strawberry.federation.type(keys=["id"], name="ImageNode", extend=True)
+
+@gql_federation_type(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Federation stub for legacy ImageNode.",
+    ),
+    name="ImageNode",
+    keys=["id"],
+    extend=True,
+)
 class Image:
     """
     Federated type (ImageNode) with external reference for Strawberry GraphQL.

@@ -454,9 +454,13 @@ class KernelRow(Base):  # type: ignore[misc]
     container_id: Mapped[str | None] = mapped_column(
         "container_id", sa.String(length=64), nullable=True
     )
+    # DEPRECATED (Phase 3, BA-4308): No longer the source of truth.
+    # Kernel resource allocations are now tracked by the normalized
+    # resource_allocations table.  Retained for historical audit.
     occupied_slots: Mapped[ResourceSlot] = mapped_column(
         "occupied_slots", ResourceSlotColumn(), nullable=False
     )
+    # DEPRECATED (Phase 3, BA-4308): See resource_allocations table.
     requested_slots: Mapped[ResourceSlot] = mapped_column(
         "requested_slots", ResourceSlotColumn(), nullable=False
     )

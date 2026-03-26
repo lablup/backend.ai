@@ -5,7 +5,7 @@ from typing import Any, override
 
 from ai.backend.common.types import (
     AccessKey,
-    ResourceSlot,
+    SlotQuantity,
 )
 from ai.backend.common.types import (
     LegacyResourceSlotState as ResourceSlotState,
@@ -37,14 +37,14 @@ class CheckResourcePresetsAction(ResourcePresetAction):
 @dataclass
 class CheckResourcePresetsActionResult(BaseActionResult):
     presets: list[Mapping[str, Any]]
-    keypair_limits: ResourceSlot
-    keypair_using: ResourceSlot
-    keypair_remaining: ResourceSlot
-    group_limits: ResourceSlot
-    group_using: ResourceSlot
-    group_remaining: ResourceSlot
-    scaling_group_remaining: ResourceSlot
-    scaling_groups: Mapping[str, Mapping[ResourceSlotState, ResourceSlot]]
+    keypair_limits: list[SlotQuantity]
+    keypair_using: list[SlotQuantity]
+    keypair_remaining: list[SlotQuantity]
+    group_limits: list[SlotQuantity]
+    group_using: list[SlotQuantity]
+    group_remaining: list[SlotQuantity]
+    scaling_group_remaining: list[SlotQuantity]
+    scaling_groups: Mapping[str, Mapping[ResourceSlotState, list[SlotQuantity]]]
 
     # TODO: Should return preset row ids after changing to batching.
     @override

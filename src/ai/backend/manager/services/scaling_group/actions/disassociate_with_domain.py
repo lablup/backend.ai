@@ -6,16 +6,18 @@ from typing import override
 from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.models.scaling_group import ScalingGroupForDomainRow
-from ai.backend.manager.repositories.base.purger import BatchPurger
+from ai.backend.manager.repositories.base.rbac.scope_unbinder import (
+    RBACScopeEntityUnbinder,
+)
 
 from .domain_base import ScalingGroupDomainAction
 
 
 @dataclass
 class DisassociateScalingGroupWithDomainsAction(ScalingGroupDomainAction):
-    """Action to disassociate a scaling group from multiple domains."""
+    """Action to disassociate scaling groups from a domain."""
 
-    purger: BatchPurger[ScalingGroupForDomainRow]
+    unbinder: RBACScopeEntityUnbinder[ScalingGroupForDomainRow]
 
     @override
     @classmethod

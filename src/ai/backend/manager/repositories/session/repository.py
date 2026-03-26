@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import uuid
 from collections.abc import Sequence
+from datetime import datetime
 from typing import Any
 
 from sqlalchemy.orm.strategy_options import _AbstractLoad
@@ -284,3 +285,11 @@ class SessionRepository:
             KernelListResult with items, total count, and pagination info
         """
         return await self._db_source.search_kernels(querier)
+
+    @session_repository_resilience.apply()
+    async def update_image_last_used_at(
+        self,
+        image_id: uuid.UUID,
+        timestamp: datetime,
+    ) -> None:
+        await self._db_source.update_image_last_used_at(image_id, timestamp)

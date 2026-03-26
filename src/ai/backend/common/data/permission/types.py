@@ -89,6 +89,9 @@ class EntityType(enum.StrEnum):
     # === Standalone entity types ===
     AGENT = "agent"
     AUTH = "auth"
+    PROJECT_ADMIN_PAGE = "project_admin_page"
+    DOMAIN_ADMIN_PAGE = "domain_admin_page"
+    SERVICE_CATALOG = "service_catalog"
     AUDIT_LOG = "audit_log"
     CONTAINER_METRIC = "container_metric"
     CONTAINER_METRIC_METADATA = "container_metric_metadata"
@@ -97,14 +100,28 @@ class EntityType(enum.StrEnum):
     ERROR_LOG = "error_log"
     EXPORT = "export"
     GROUP = "group"
+    KERNEL = "kernel"
+    KEYPAIR = "keypair"
+    LOGIN_SESSION = "login_session"
     MODEL_SERVICE = "model_service"
+    NETWORK = "network"
     NOTIFICATION = "notification"
     OBJECT_PERMISSION = "object_permission"
     OBJECT_STORAGE = "object_storage"
     PERMISSION = "permission"
+    AGENT_RESOURCE = "agent_resource"
+    RESOURCE_ALLOCATION = "resource_allocation"
+    RESOURCE_SLOT_TYPE = "resource_slot_type"
+    RESOURCE_OVERVIEW = "resource_overview"
     RESOURCE_GROUP = "resource_group"
+    PROMETHEUS_QUERY_PRESET = "prometheus_query_preset"
     RESOURCE_PRESET = "resource_preset"
     ROLE = "role"
+    ROUTING = "routing"
+    DOTFILE = "dotfile"
+    ETCD_CONFIG = "etcd_config"
+    MANAGER_ADMIN = "manager_admin"
+    SESSION_TEMPLATE = "session_template"
     STORAGE_NAMESPACE = "storage_namespace"
     VFS_STORAGE = "vfs_storage"
 
@@ -155,14 +172,14 @@ class EntityType(enum.StrEnum):
     IMAGE_AGENT = "image:agent"
     IMAGE_RESOURCE_LIMIT = "image:resource_limit"
     # Artifact sub
-    ARTIFACT_REVISION = "artifact:revision"
+    ARTIFACT_REVISION = "artifact_revision"
     ARTIFACT_SCAN = "artifact:scan"
     ARTIFACT_MODEL = "artifact:model"
     ARTIFACT_IMPORT = "artifact:import"
     ARTIFACT_DOWNLOAD = "artifact:download"
     ARTIFACT_README = "artifact:readme"
     ARTIFACT_VERIFICATION = "artifact:verification"
-    ARTIFACT_REVISION_STORAGE_LINK = "artifact:revision:storage_link"
+    ARTIFACT_REVISION_STORAGE_LINK = "artifact_revision:storage_link"
     # VFolder sub
     VFOLDER_FILE = "vfolder:file"
     VFOLDER_DIRECTORY = "vfolder:directory"
@@ -270,13 +287,21 @@ class EntityType(enum.StrEnum):
         """
         return {*cls._resource_types(), cls.USER}
 
+    def to_element(self) -> RBACElementType:
+        from ai.backend.common.exception import RBACTypeConversionError
+
+        try:
+            return RBACElementType(self.value)
+        except ValueError as e:
+            raise RBACTypeConversionError(f"{self!r} has no corresponding RBACElementType") from e
+
 
 class FieldType(enum.StrEnum):
     """Field types for RBAC field-scoped entities.
 
-    Fields are sub-resources that belong to a parent entity.
-    Unlike EntityType which represents scope-scoped entities,
-    FieldType represents entity-scoped sub-entities.
+    Deprecated: No longer actively used. The field-scoped entity concept
+    (RBACFieldCreator/RBACFieldPurger) was removed by BEP-1048.
+    Kept only for the existing entity_fields table schema compatibility.
     """
 
     KERNEL = "kernel"
@@ -298,14 +323,110 @@ class ScopeType(enum.StrEnum):
     # === Entity-level scopes ===
     SESSION = "session"
     DEPLOYMENT = "deployment"
+    MODEL_DEPLOYMENT = "model_deployment"
     VFOLDER = "vfolder"
     IMAGE = "image"
     ARTIFACT = "artifact"
     ARTIFACT_REVISION = "artifact_revision"
+    AGENT = "agent"
     ROLE = "role"
+    NOTIFICATION_CHANNEL = "notification_channel"
+
+    def to_element(self) -> RBACElementType:
+        from ai.backend.common.exception import RBACTypeConversionError
+
+        try:
+            return RBACElementType(self.value)
+        except ValueError as e:
+            raise RBACTypeConversionError(f"{self!r} has no corresponding RBACElementType") from e
 
 
 GLOBAL_SCOPE_ID = "global"
+
+
+class RBACElementType(enum.StrEnum):
+    """Unified element type for the RBAC scope-entity relationship model.
+
+    Each value identifies an element in the RBAC permission hierarchy
+    that can act as a scope (parent) or an entity (child) depending on
+    the relationship direction.
+
+    This enum replaces the separate ``ScopeType`` and RBAC-subset of
+    ``EntityType`` with a single unified type.
+    """
+
+    # === Scope hierarchy ===
+    DOMAIN = "domain"
+    PROJECT = "project"
+    USER = "user"
+
+    # === Root-query-enabled entities (scoped) ===
+    SESSION = "session"
+    VFOLDER = "vfolder"
+    MODEL_DEPLOYMENT = "model_deployment"
+    KEYPAIR = "keypair"
+    NOTIFICATION_CHANNEL = "notification_channel"
+    NETWORK = "network"
+    RESOURCE_GROUP = "resource_group"
+    CONTAINER_REGISTRY = "container_registry"
+    STORAGE_HOST = "storage_host"
+    AGENT = "agent"
+    KERNEL = "kernel"
+    ROUTING = "routing"
+    IMAGE = "image"
+    ARTIFACT = "artifact"
+    ARTIFACT_REGISTRY = "artifact_registry"
+    SESSION_TEMPLATE = "session_template"
+    APP_CONFIG = "app_config"
+
+    # === Root-query-enabled entities (superadmin-only) ===
+    RESOURCE_PRESET = "resource_preset"
+    USER_RESOURCE_POLICY = "user_resource_policy"
+    KEYPAIR_RESOURCE_POLICY = "keypair_resource_policy"
+    PROJECT_RESOURCE_POLICY = "project_resource_policy"
+    ROLE = "role"
+    AUDIT_LOG = "audit_log"
+    EVENT_LOG = "event_log"
+
+    # === Admin page access control ===
+    PROJECT_ADMIN_PAGE = "project_admin_page"
+    DOMAIN_ADMIN_PAGE = "domain_admin_page"
+
+    # === Auto-only entities used in permissions ===
+    NOTIFICATION_RULE = "notification_rule"
+
+    # === Auto sub-entities with direct GET APIs ===
+    DEPLOYMENT_TOKEN = "deployment:token"
+    DEPLOYMENT_POLICY = "deployment:policy"
+    DEPLOYMENT_REVISION = "deployment:revision"
+    IMAGE_ALIAS = "image:alias"
+
+    # === Entity-level scopes (for entity-scope permissions) ===
+    ARTIFACT_REVISION = "artifact_revision"
+
+    def to_scope_type(self) -> ScopeType:
+        """Temporary bridge for DB/ORM layers that still use ScopeType.
+
+        TODO: Remove after the RBAC ORM migration and ScopeType removal are complete.
+        """
+        from ai.backend.common.exception import RBACTypeConversionError
+
+        try:
+            return ScopeType(self.value)
+        except ValueError as e:
+            raise RBACTypeConversionError(f"{self!r} has no corresponding ScopeType") from e
+
+    def to_entity_type(self) -> EntityType:
+        """Temporary bridge for DB/ORM layers that still use EntityType.
+
+        TODO: Remove after the RBAC ORM migration and EntityType RBAC usage removal are complete.
+        """
+        from ai.backend.common.exception import RBACTypeConversionError
+
+        try:
+            return EntityType(self.value)
+        except ValueError as e:
+            raise RBACTypeConversionError(f"{self!r} has no corresponding EntityType") from e
 
 
 class RelationType(enum.StrEnum):

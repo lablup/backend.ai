@@ -1,6 +1,8 @@
 """Deployment repository for managing model service deployments."""
 
-from .options import DeploymentConditions, RouteConditions
+from ai.backend.manager.models.endpoint.conditions import DeploymentConditions
+from ai.backend.manager.models.routing.conditions import RouteConditions
+
 from .repository import DeploymentRepository
 
 __all__ = [

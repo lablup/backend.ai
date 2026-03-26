@@ -14,7 +14,7 @@ from dateutil.tz import tzutc
 
 from ai.backend.common.data.endpoint.types import EndpointLifecycle
 from ai.backend.common.data.model_deployment.types import DeploymentStrategy
-from ai.backend.common.data.permission.types import EntityType, ScopeType
+from ai.backend.common.data.permission.types import RBACElementType
 from ai.backend.common.exception import DeploymentNameAlreadyExists
 from ai.backend.common.types import (
     AccessKey,
@@ -31,12 +31,13 @@ from ai.backend.common.types import (
 )
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.deployment.types import (
+    DeploymentPolicyData,
     ModelRevisionData,
     RouteStatus,
     RouteTrafficStatus,
 )
 from ai.backend.manager.data.image.types import ImageType
-from ai.backend.manager.data.permission.id import ScopeId
+from ai.backend.manager.data.permission.types import RBACElementRef
 from ai.backend.manager.errors.deployment import DeploymentRevisionNotFound
 from ai.backend.manager.errors.service import AutoScalingPolicyNotFound, DeploymentPolicyNotFound
 from ai.backend.manager.models.agent import AgentRow, AgentStatus
@@ -46,7 +47,6 @@ from ai.backend.manager.models.deployment_auto_scaling_policy import (
 )
 from ai.backend.manager.models.deployment_policy import (
     BlueGreenSpec,
-    DeploymentPolicyData,
     DeploymentPolicyRow,
     RollingUpdateSpec,
 )
@@ -58,7 +58,7 @@ from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.image import ImageRow
 from ai.backend.manager.models.kernel import KernelRow, KernelStatus
 from ai.backend.manager.models.keypair import KeyPairRow
-from ai.backend.manager.models.rbac_models import UserRoleRow
+from ai.backend.manager.models.rbac_models import RoleRow, UserRoleRow
 from ai.backend.manager.models.rbac_models.association_scopes_entities import (
     AssociationScopesEntitiesRow,
 )
@@ -86,10 +86,10 @@ from ai.backend.manager.repositories.base.purger import Purger
 from ai.backend.manager.repositories.base.querier import BatchQuerier
 from ai.backend.manager.repositories.base.rbac.entity_creator import RBACEntityCreator
 from ai.backend.manager.repositories.base.updater import Updater
+from ai.backend.manager.repositories.base.upserter import Upserter
 from ai.backend.manager.repositories.deployment import DeploymentRepository
 from ai.backend.manager.repositories.deployment.creators import (
     DeploymentAutoScalingPolicyCreatorSpec,
-    DeploymentPolicyCreatorSpec,
     DeploymentRevisionCreatorSpec,
     RouteCreatorSpec,
 )
@@ -99,13 +99,13 @@ from ai.backend.manager.repositories.deployment.creators.endpoint import (
 from ai.backend.manager.repositories.deployment.updaters import (
     DeploymentAutoScalingPolicyUpdaterSpec,
     DeploymentMetadataUpdaterSpec,
-    DeploymentPolicyUpdaterSpec,
     DeploymentUpdaterSpec,
     ReplicaSpecUpdaterSpec,
     RevisionStateUpdaterSpec,
     RouteStatusUpdaterSpec,
     RouteUpdaterSpec,
 )
+from ai.backend.manager.repositories.deployment.upserters import DeploymentPolicyUpserterSpec
 from ai.backend.manager.types import OptionalState, TriState
 from ai.backend.testutils.db import with_tables
 
@@ -139,6 +139,7 @@ class TestDeploymentRepositoryFetchRouteServiceDiscoveryInfo:
                 UserResourcePolicyRow,
                 ProjectResourcePolicyRow,
                 KeyPairResourcePolicyRow,
+                RoleRow,
                 UserRoleRow,  # UserRow relationship dependency
                 UserRow,
                 KeyPairRow,
@@ -622,13 +623,14 @@ class TestDeploymentRepositoryFetchRouteServiceDiscoveryInfo:
             valkey_schedule=valkey_schedule,
         )
 
-    @pytest.mark.asyncio
     async def test_fetch_single_route_with_inference_port(
         self,
         deployment_repository: DeploymentRepository,
         test_route_id: uuid.UUID,
         test_endpoint_id: uuid.UUID,
         test_kernel_with_inference_port: tuple[uuid.UUID, str, int],
+        test_user_uuid: uuid.UUID,
+        test_group_id: uuid.UUID,
     ) -> None:
         """Test fetching service discovery info for a single route with inference port."""
         kernel_id, kernel_host, inference_port = test_kernel_with_inference_port
@@ -643,8 +645,9 @@ class TestDeploymentRepositoryFetchRouteServiceDiscoveryInfo:
         assert info.kernel_port == inference_port
         assert info.runtime_variant == "vllm"
         assert "test-endpoint" in info.endpoint_name
+        assert info.session_owner == test_user_uuid
+        assert info.project == test_group_id
 
-    @pytest.mark.asyncio
     async def test_fetch_route_without_inference_port(
         self,
         deployment_repository: DeploymentRepository,
@@ -677,7 +680,6 @@ class TestDeploymentRepositoryFetchRouteServiceDiscoveryInfo:
         # Should return empty list because kernel has no inference port
         assert len(result) == 0
 
-    @pytest.mark.asyncio
     async def test_fetch_empty_route_ids(
         self,
         deployment_repository: DeploymentRepository,
@@ -687,7 +689,6 @@ class TestDeploymentRepositoryFetchRouteServiceDiscoveryInfo:
 
         assert len(result) == 0
 
-    @pytest.mark.asyncio
     async def test_fetch_nonexistent_route_ids(
         self,
         deployment_repository: DeploymentRepository,
@@ -699,7 +700,6 @@ class TestDeploymentRepositoryFetchRouteServiceDiscoveryInfo:
 
         assert len(result) == 0
 
-    @pytest.mark.asyncio
     async def test_fetch_multiple_routes(
         self,
         deployment_repository: DeploymentRepository,
@@ -1082,7 +1082,6 @@ class TestGetDefaultArchitectureFromScalingGroup:
 
         return agent_ids
 
-    @pytest.mark.asyncio
     async def test_returns_most_common_architecture(
         self,
         deployment_repository: DeploymentRepository,
@@ -1097,7 +1096,6 @@ class TestGetDefaultArchitectureFromScalingGroup:
         # x86_64 is most common (3 vs 2)
         assert result == "x86_64"
 
-    @pytest.mark.asyncio
     async def test_returns_none_when_no_agents(
         self,
         deployment_repository: DeploymentRepository,
@@ -1110,7 +1108,6 @@ class TestGetDefaultArchitectureFromScalingGroup:
 
         assert result is None
 
-    @pytest.mark.asyncio
     async def test_returns_single_architecture(
         self,
         deployment_repository: DeploymentRepository,
@@ -1124,7 +1121,6 @@ class TestGetDefaultArchitectureFromScalingGroup:
 
         assert result == "aarch64"
 
-    @pytest.mark.asyncio
     async def test_excludes_non_alive_agents(
         self,
         deployment_repository: DeploymentRepository,
@@ -1139,7 +1135,6 @@ class TestGetDefaultArchitectureFromScalingGroup:
         # Only ALIVE agent's architecture should be considered
         assert result == "x86_64"
 
-    @pytest.mark.asyncio
     async def test_excludes_non_schedulable_agents(
         self,
         deployment_repository: DeploymentRepository,
@@ -1154,7 +1149,6 @@ class TestGetDefaultArchitectureFromScalingGroup:
         # Only schedulable agent's architecture should be considered
         assert result == "x86_64"
 
-    @pytest.mark.asyncio
     async def test_excludes_agents_from_other_scaling_groups(
         self,
         deployment_repository: DeploymentRepository,
@@ -1169,7 +1163,6 @@ class TestGetDefaultArchitectureFromScalingGroup:
         # Only target scaling group's agent architecture should be considered
         assert result == "x86_64"
 
-    @pytest.mark.asyncio
     async def test_returns_none_for_nonexistent_scaling_group(
         self,
         deployment_repository: DeploymentRepository,
@@ -1199,6 +1192,7 @@ class TestDeploymentRevisionOperations:
                 ResourcePresetRow,  # ScalingGroupRow relationship dependency
                 UserResourcePolicyRow,
                 ProjectResourcePolicyRow,
+                RoleRow,
                 UserRoleRow,  # UserRow relationship dependency
                 UserRow,
                 GroupRow,
@@ -1206,7 +1200,9 @@ class TestDeploymentRevisionOperations:
                 ImageRow,
                 EndpointRow,
                 EntityFieldRow,  # DeploymentRevisionRow relationship dependency
+                AssociationScopesEntitiesRow,  # RBACEntityCreator dependency
                 DeploymentRevisionRow,
+                DeploymentPolicyRow,
             ],
         ):
             yield database_connection
@@ -1462,7 +1458,16 @@ class TestDeploymentRevisionOperations:
             runtime_variant=RuntimeVariant.CUSTOM,
             extra_mounts=[],
         )
-        return await deployment_repository.create_revision(Creator(spec=spec))
+        return await deployment_repository.create_revision(
+            RBACEntityCreator(
+                spec=spec,
+                element_type=RBACElementType.DEPLOYMENT_REVISION,
+                scope_ref=RBACElementRef(
+                    element_type=RBACElementType.MODEL_DEPLOYMENT,
+                    element_id=str(test_endpoint_id),
+                ),
+            )
+        )
 
     @pytest.fixture
     async def test_multiple_revisions(
@@ -1495,7 +1500,16 @@ class TestDeploymentRevisionOperations:
                 runtime_variant=RuntimeVariant.CUSTOM,
                 extra_mounts=[],
             )
-            revision = await deployment_repository.create_revision(Creator(spec=spec))
+            revision = await deployment_repository.create_revision(
+                RBACEntityCreator(
+                    spec=spec,
+                    element_type=RBACElementType.DEPLOYMENT_REVISION,
+                    scope_ref=RBACElementRef(
+                        element_type=RBACElementType.MODEL_DEPLOYMENT,
+                        element_id=str(test_endpoint_id),
+                    ),
+                )
+            )
             revisions.append(revision)
         return revisions
 
@@ -1530,11 +1544,19 @@ class TestDeploymentRevisionOperations:
                 runtime_variant=RuntimeVariant.CUSTOM,
                 extra_mounts=[],
             )
-            revision = await deployment_repository.create_revision(Creator(spec=spec))
+            revision = await deployment_repository.create_revision(
+                RBACEntityCreator(
+                    spec=spec,
+                    element_type=RBACElementType.DEPLOYMENT_REVISION,
+                    scope_ref=RBACElementRef(
+                        element_type=RBACElementType.MODEL_DEPLOYMENT,
+                        element_id=str(test_endpoint_id),
+                    ),
+                )
+            )
             revisions.append(revision)
         return revisions
 
-    @pytest.mark.asyncio
     async def test_create_revision(
         self,
         deployment_repository: DeploymentRepository,
@@ -1542,7 +1564,7 @@ class TestDeploymentRevisionOperations:
         test_image_id: uuid.UUID,
         test_scaling_group_name: str,
     ) -> None:
-        """Test creating a deployment revision using Creator."""
+        """Test creating a deployment revision using RBACEntityCreator."""
         spec = DeploymentRevisionCreatorSpec(
             endpoint_id=test_endpoint_id,
             revision_number=1,
@@ -1563,7 +1585,14 @@ class TestDeploymentRevisionOperations:
             runtime_variant=RuntimeVariant.CUSTOM,
             extra_mounts=[],
         )
-        creator = Creator(spec=spec)
+        creator = RBACEntityCreator(
+            spec=spec,
+            element_type=RBACElementType.DEPLOYMENT_REVISION,
+            scope_ref=RBACElementRef(
+                element_type=RBACElementType.MODEL_DEPLOYMENT,
+                element_id=str(test_endpoint_id),
+            ),
+        )
 
         result = await deployment_repository.create_revision(creator)
 
@@ -1574,7 +1603,6 @@ class TestDeploymentRevisionOperations:
         assert result.model_runtime_config.runtime_variant == RuntimeVariant.CUSTOM
         assert result.name == "revision-1"
 
-    @pytest.mark.asyncio
     async def test_get_revision(
         self,
         deployment_repository: DeploymentRepository,
@@ -1587,7 +1615,6 @@ class TestDeploymentRevisionOperations:
         assert result.name == "revision-1"
         assert result.cluster_config.mode == ClusterMode.SINGLE_NODE
 
-    @pytest.mark.asyncio
     async def test_get_revision_not_found(
         self,
         deployment_repository: DeploymentRepository,
@@ -1598,7 +1625,6 @@ class TestDeploymentRevisionOperations:
         with pytest.raises(DeploymentRevisionNotFound):
             await deployment_repository.get_revision(nonexistent_id)
 
-    @pytest.mark.asyncio
     async def test_get_latest_revision_number_no_revisions(
         self,
         deployment_repository: DeploymentRepository,
@@ -1609,7 +1635,6 @@ class TestDeploymentRevisionOperations:
 
         assert result is None
 
-    @pytest.mark.asyncio
     async def test_get_latest_revision_number_with_revisions(
         self,
         deployment_repository: DeploymentRepository,
@@ -1621,7 +1646,6 @@ class TestDeploymentRevisionOperations:
 
         assert result == 3
 
-    @pytest.mark.asyncio
     async def test_search_revisions_empty(
         self,
         deployment_repository: DeploymentRepository,
@@ -1640,7 +1664,6 @@ class TestDeploymentRevisionOperations:
         assert result.has_next_page is False
         assert result.has_previous_page is False
 
-    @pytest.mark.asyncio
     async def test_search_revisions_with_results(
         self,
         deployment_repository: DeploymentRepository,
@@ -1660,7 +1683,6 @@ class TestDeploymentRevisionOperations:
         assert result.has_next_page is False
         assert result.has_previous_page is False
 
-    @pytest.mark.asyncio
     async def test_search_revisions_with_pagination(
         self,
         deployment_repository: DeploymentRepository,
@@ -1692,7 +1714,6 @@ class TestDeploymentRevisionOperations:
         assert result.has_next_page is True
         assert result.has_previous_page is True
 
-    @pytest.mark.asyncio
     async def test_update_endpoint_deploying_revision(
         self,
         deployment_repository: DeploymentRepository,
@@ -1719,7 +1740,6 @@ class TestDeploymentRevisionOperations:
             endpoint = result.scalar_one()
             assert endpoint.deploying_revision == test_revision_data.id
 
-    @pytest.mark.asyncio
     async def test_update_endpoint_current_revision(
         self,
         deployment_repository: DeploymentRepository,
@@ -1747,7 +1767,6 @@ class TestDeploymentRevisionOperations:
             endpoint = result.scalar_one()
             assert endpoint.current_revision == test_revision_data.id
 
-    @pytest.mark.asyncio
     async def test_update_endpoint_nullify_deploying_revision(
         self,
         deployment_repository: DeploymentRepository,
@@ -1783,7 +1802,6 @@ class TestDeploymentRevisionOperations:
             endpoint = result.scalar_one()
             assert endpoint.deploying_revision is None
 
-    @pytest.mark.asyncio
     async def test_update_endpoint_returns_updated_deployment_info(
         self,
         deployment_repository: DeploymentRepository,
@@ -1844,6 +1862,7 @@ class TestDeploymentAutoScalingPolicyOperations:
                 ResourcePresetRow,  # ScalingGroupRow relationship dependency
                 UserResourcePolicyRow,
                 ProjectResourcePolicyRow,
+                RoleRow,
                 UserRoleRow,  # UserRow relationship dependency
                 UserRow,
                 GroupRow,
@@ -2066,7 +2085,6 @@ class TestDeploymentAutoScalingPolicyOperations:
         )
         return await deployment_repository.create_auto_scaling_policy(Creator(spec=spec))
 
-    @pytest.mark.asyncio
     async def test_create_auto_scaling_policy(
         self,
         deployment_repository: DeploymentRepository,
@@ -2103,7 +2121,6 @@ class TestDeploymentAutoScalingPolicyOperations:
         assert result.scale_down_step_size == 2
         assert result.cooldown_seconds == 600
 
-    @pytest.mark.asyncio
     async def test_get_auto_scaling_policy(
         self,
         deployment_repository: DeploymentRepository,
@@ -2120,7 +2137,6 @@ class TestDeploymentAutoScalingPolicyOperations:
         assert result.metric_source == AutoScalingMetricSource.KERNEL
         assert result.metric_name == "cpu_utilization"
 
-    @pytest.mark.asyncio
     async def test_get_auto_scaling_policy_not_found(
         self,
         deployment_repository: DeploymentRepository,
@@ -2130,7 +2146,6 @@ class TestDeploymentAutoScalingPolicyOperations:
         with pytest.raises(AutoScalingPolicyNotFound):
             await deployment_repository.get_auto_scaling_policy(test_endpoint_id)
 
-    @pytest.mark.asyncio
     async def test_update_auto_scaling_policy(
         self,
         deployment_repository: DeploymentRepository,
@@ -2156,7 +2171,6 @@ class TestDeploymentAutoScalingPolicyOperations:
         assert result.scale_down_threshold == Decimal("20")
         assert result.cooldown_seconds == 300
 
-    @pytest.mark.asyncio
     async def test_update_auto_scaling_policy_not_found(
         self,
         deployment_repository: DeploymentRepository,
@@ -2173,7 +2187,6 @@ class TestDeploymentAutoScalingPolicyOperations:
         with pytest.raises(AutoScalingPolicyNotFound):
             await deployment_repository.update_auto_scaling_policy(updater)
 
-    @pytest.mark.asyncio
     async def test_delete_auto_scaling_policy(
         self,
         deployment_repository: DeploymentRepository,
@@ -2195,7 +2208,6 @@ class TestDeploymentAutoScalingPolicyOperations:
         with pytest.raises(AutoScalingPolicyNotFound):
             await deployment_repository.get_auto_scaling_policy(test_endpoint_id)
 
-    @pytest.mark.asyncio
     async def test_delete_auto_scaling_policy_not_found(
         self,
         deployment_repository: DeploymentRepository,
@@ -2229,6 +2241,7 @@ class TestDeploymentPolicyOperations:
                 ResourcePresetRow,  # ScalingGroupRow relationship dependency
                 UserResourcePolicyRow,
                 ProjectResourcePolicyRow,
+                RoleRow,
                 UserRoleRow,  # UserRow relationship dependency
                 UserRow,
                 GroupRow,
@@ -2435,39 +2448,56 @@ class TestDeploymentPolicyOperations:
         deployment_repository: DeploymentRepository,
         test_endpoint_id: uuid.UUID,
     ) -> DeploymentPolicyData:
-        """Create a single test deployment policy."""
-        spec = DeploymentPolicyCreatorSpec(
+        """Create a single test deployment policy via upsert."""
+        spec = DeploymentPolicyUpserterSpec(
             endpoint_id=test_endpoint_id,
             strategy=DeploymentStrategy.ROLLING,
             strategy_spec=RollingUpdateSpec(max_surge=1, max_unavailable=0),
-            rollback_on_failure=False,
         )
-        return await deployment_repository.create_deployment_policy(Creator(spec=spec))
+        result = await deployment_repository.upsert_deployment_policy(Upserter(spec=spec))
+        return result.data
 
-    @pytest.mark.asyncio
-    async def test_create_deployment_policy(
+    async def test_upsert_deployment_policy_insert(
         self,
         deployment_repository: DeploymentRepository,
         test_endpoint_id: uuid.UUID,
     ) -> None:
-        """Test creating a deployment policy using Creator."""
-        spec = DeploymentPolicyCreatorSpec(
+        """Test upserting a deployment policy (insert path)."""
+        spec = DeploymentPolicyUpserterSpec(
             endpoint_id=test_endpoint_id,
             strategy=DeploymentStrategy.BLUE_GREEN,
             strategy_spec=BlueGreenSpec(auto_promote=True, promote_delay_seconds=60),
-            rollback_on_failure=False,
         )
-        creator = Creator(spec=spec)
 
-        result = await deployment_repository.create_deployment_policy(creator)
+        result = await deployment_repository.upsert_deployment_policy(Upserter(spec=spec))
 
-        assert result.id is not None
-        assert result.endpoint == test_endpoint_id
-        assert result.strategy == DeploymentStrategy.BLUE_GREEN
-        assert result.strategy_spec == BlueGreenSpec(auto_promote=True, promote_delay_seconds=60)
-        assert result.rollback_on_failure is False
+        assert result.data.id is not None
+        assert result.data.endpoint == test_endpoint_id
+        assert result.data.strategy == DeploymentStrategy.BLUE_GREEN
+        assert result.data.strategy_spec == BlueGreenSpec(
+            auto_promote=True, promote_delay_seconds=60
+        )
+        assert result.created is True
 
-    @pytest.mark.asyncio
+    async def test_upsert_deployment_policy_update(
+        self,
+        deployment_repository: DeploymentRepository,
+        test_endpoint_id: uuid.UUID,
+        test_deployment_policy_data: DeploymentPolicyData,
+    ) -> None:
+        """Test upserting a deployment policy (update path)."""
+        spec = DeploymentPolicyUpserterSpec(
+            endpoint_id=test_endpoint_id,
+            strategy=DeploymentStrategy.BLUE_GREEN,
+            strategy_spec=BlueGreenSpec(auto_promote=True, promote_delay_seconds=30),
+        )
+
+        result = await deployment_repository.upsert_deployment_policy(Upserter(spec=spec))
+
+        assert result.data.endpoint == test_endpoint_id
+        assert result.data.strategy == DeploymentStrategy.BLUE_GREEN
+        assert result.created is False
+
     async def test_get_deployment_policy(
         self,
         deployment_repository: DeploymentRepository,
@@ -2482,7 +2512,6 @@ class TestDeploymentPolicyOperations:
         assert result.strategy == DeploymentStrategy.ROLLING
         assert result.strategy_spec == RollingUpdateSpec(max_surge=1, max_unavailable=0)
 
-    @pytest.mark.asyncio
     async def test_get_deployment_policy_not_found(
         self,
         deployment_repository: DeploymentRepository,
@@ -2492,48 +2521,6 @@ class TestDeploymentPolicyOperations:
         with pytest.raises(DeploymentPolicyNotFound):
             await deployment_repository.get_deployment_policy(test_endpoint_id)
 
-    @pytest.mark.asyncio
-    async def test_update_deployment_policy(
-        self,
-        deployment_repository: DeploymentRepository,
-        test_deployment_policy_data: DeploymentPolicyData,
-    ) -> None:
-        """Test updating a deployment policy using Updater."""
-        new_strategy_spec = BlueGreenSpec(auto_promote=True, promote_delay_seconds=30)
-        updater = Updater(
-            spec=DeploymentPolicyUpdaterSpec(
-                strategy=OptionalState.update(DeploymentStrategy.BLUE_GREEN),
-                strategy_spec=OptionalState.update(new_strategy_spec),
-                rollback_on_failure=OptionalState.update(True),
-            ),
-            pk_value=test_deployment_policy_data.id,
-        )
-
-        result = await deployment_repository.update_deployment_policy(updater)
-
-        assert result.id == test_deployment_policy_data.id
-        assert result.strategy == DeploymentStrategy.BLUE_GREEN
-        assert result.strategy_spec == new_strategy_spec
-        assert result.rollback_on_failure is True
-
-    @pytest.mark.asyncio
-    async def test_update_deployment_policy_not_found(
-        self,
-        deployment_repository: DeploymentRepository,
-    ) -> None:
-        """Test that update_deployment_policy raises DeploymentPolicyNotFound."""
-        nonexistent_id = uuid.uuid4()
-        updater = Updater(
-            spec=DeploymentPolicyUpdaterSpec(
-                strategy=OptionalState.update(DeploymentStrategy.BLUE_GREEN),
-            ),
-            pk_value=nonexistent_id,
-        )
-
-        with pytest.raises(DeploymentPolicyNotFound):
-            await deployment_repository.update_deployment_policy(updater)
-
-    @pytest.mark.asyncio
     async def test_delete_deployment_policy(
         self,
         deployment_repository: DeploymentRepository,
@@ -2555,7 +2542,6 @@ class TestDeploymentPolicyOperations:
         with pytest.raises(DeploymentPolicyNotFound):
             await deployment_repository.get_deployment_policy(test_endpoint_id)
 
-    @pytest.mark.asyncio
     async def test_delete_deployment_policy_not_found(
         self,
         deployment_repository: DeploymentRepository,
@@ -2570,6 +2556,374 @@ class TestDeploymentPolicyOperations:
         result = await deployment_repository.delete_deployment_policy(purger)
 
         assert result is None
+
+
+class TestSearchDeploymentPolicies:
+    """Test cases for search_deployment_policies repository method."""
+
+    @pytest.fixture
+    async def db_with_cleanup(
+        self,
+        database_connection: ExtendedAsyncSAEngine,
+    ) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
+        """Database connection with tables created."""
+        async with with_tables(
+            database_connection,
+            [
+                DomainRow,
+                ScalingGroupRow,
+                ResourcePresetRow,
+                UserResourcePolicyRow,
+                ProjectResourcePolicyRow,
+                RoleRow,
+                UserRoleRow,
+                UserRow,
+                GroupRow,
+                VFolderRow,
+                EndpointRow,
+                DeploymentPolicyRow,
+            ],
+        ):
+            yield database_connection
+
+    @pytest.fixture
+    async def test_domain_name(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+    ) -> str:
+        domain_name = f"test-domain-{uuid.uuid4().hex[:8]}"
+        async with db_with_cleanup.begin_session() as db_sess:
+            domain = DomainRow(
+                name=domain_name,
+                description="Test domain",
+                is_active=True,
+                total_resource_slots=ResourceSlot(),
+                allowed_vfolder_hosts={},
+                allowed_docker_registries=[],
+            )
+            db_sess.add(domain)
+            await db_sess.commit()
+        return domain_name
+
+    @pytest.fixture
+    async def test_scaling_group_name(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+    ) -> str:
+        sgroup_name = f"test-sgroup-{uuid.uuid4().hex[:8]}"
+        async with db_with_cleanup.begin_session() as db_sess:
+            sgroup = ScalingGroupRow(
+                name=sgroup_name,
+                description="Test scaling group",
+                is_active=True,
+                driver="static",
+                driver_opts={},
+                scheduler="fifo",
+                scheduler_opts=ScalingGroupOpts(),
+            )
+            db_sess.add(sgroup)
+            await db_sess.commit()
+        return sgroup_name
+
+    @pytest.fixture
+    async def test_resource_policy_name(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+    ) -> str:
+        policy_name = f"test-policy-{uuid.uuid4().hex[:8]}"
+        async with db_with_cleanup.begin_session() as db_sess:
+            policy = UserResourcePolicyRow(
+                name=policy_name,
+                max_vfolder_count=10,
+                max_quota_scope_size=BinarySize.finite_from_str("10GiB"),
+                max_session_count_per_model_session=5,
+                max_customized_image_count=3,
+            )
+            db_sess.add(policy)
+            await db_sess.commit()
+        return policy_name
+
+    @pytest.fixture
+    async def test_project_resource_policy_name(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+    ) -> str:
+        policy_name = f"test-proj-policy-{uuid.uuid4().hex[:8]}"
+        async with db_with_cleanup.begin_session() as db_sess:
+            policy = ProjectResourcePolicyRow(
+                name=policy_name,
+                max_vfolder_count=10,
+                max_quota_scope_size=int(BinarySize.from_str("100GiB")),
+                max_network_count=5,
+            )
+            db_sess.add(policy)
+            await db_sess.commit()
+        return policy_name
+
+    @pytest.fixture
+    async def test_user_uuid(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        test_domain_name: str,
+        test_resource_policy_name: str,
+    ) -> uuid.UUID:
+        user_uuid = uuid.uuid4()
+        async with db_with_cleanup.begin_session() as db_sess:
+            user = UserRow(
+                uuid=user_uuid,
+                username=f"testuser-{user_uuid.hex[:8]}",
+                email=f"test-{user_uuid.hex[:8]}@example.com",
+                password=create_test_password_info("test_password"),
+                need_password_change=False,
+                status=UserStatus.ACTIVE,
+                status_info="active",
+                domain_name=test_domain_name,
+                role=UserRole.USER,
+                resource_policy=test_resource_policy_name,
+            )
+            db_sess.add(user)
+            await db_sess.commit()
+        return user_uuid
+
+    @pytest.fixture
+    async def test_group_id(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        test_domain_name: str,
+        test_project_resource_policy_name: str,
+    ) -> uuid.UUID:
+        group_id = uuid.uuid4()
+        async with db_with_cleanup.begin_session() as db_sess:
+            group = GroupRow(
+                id=group_id,
+                name=f"test-group-{uuid.uuid4().hex[:8]}",
+                domain_name=test_domain_name,
+                resource_policy=test_project_resource_policy_name,
+            )
+            db_sess.add(group)
+            await db_sess.commit()
+        return group_id
+
+    @pytest.fixture
+    async def sample_endpoint_ids(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        test_domain_name: str,
+        test_scaling_group_name: str,
+        test_user_uuid: uuid.UUID,
+        test_group_id: uuid.UUID,
+    ) -> list[uuid.UUID]:
+        """Create 4 endpoints and return their IDs."""
+        endpoint_ids: list[uuid.UUID] = []
+        async with db_with_cleanup.begin_session() as db_sess:
+            for i in range(4):
+                eid = uuid.uuid4()
+                endpoint = EndpointRow(
+                    id=eid,
+                    name=f"test-endpoint-{i}-{uuid.uuid4().hex[:8]}",
+                    created_user=test_user_uuid,
+                    session_owner=test_user_uuid,
+                    domain=test_domain_name,
+                    project=test_group_id,
+                    resource_group=test_scaling_group_name,
+                    model=None,
+                    desired_replicas=1,
+                    image=None,
+                    runtime_variant=RuntimeVariant.CUSTOM,
+                    url=f"http://test-{eid.hex[:8]}.example.com",
+                    open_to_public=False,
+                    lifecycle_stage=EndpointLifecycle.DESTROYED,
+                    resource_slots=ResourceSlot({"cpu": Decimal("4"), "mem": Decimal("8192")}),
+                )
+                db_sess.add(endpoint)
+                endpoint_ids.append(eid)
+            await db_sess.commit()
+        return endpoint_ids
+
+    @pytest.fixture
+    async def sample_policies(
+        self,
+        deployment_repository: DeploymentRepository,
+        sample_endpoint_ids: list[uuid.UUID],
+    ) -> list[DeploymentPolicyData]:
+        """Create deployment policies for all sample endpoints."""
+        policies: list[DeploymentPolicyData] = []
+        strategies: list[tuple[DeploymentStrategy, RollingUpdateSpec | BlueGreenSpec]] = [
+            (DeploymentStrategy.ROLLING, RollingUpdateSpec(max_surge=1, max_unavailable=0)),
+            (DeploymentStrategy.ROLLING, RollingUpdateSpec(max_surge=2, max_unavailable=1)),
+            (DeploymentStrategy.BLUE_GREEN, BlueGreenSpec(auto_promote=True)),
+            (DeploymentStrategy.ROLLING, RollingUpdateSpec(max_surge=0, max_unavailable=1)),
+        ]
+        for eid, (strategy, spec) in zip(sample_endpoint_ids, strategies, strict=False):
+            result = await deployment_repository.upsert_deployment_policy(
+                Upserter(
+                    spec=DeploymentPolicyUpserterSpec(
+                        endpoint_id=eid,
+                        strategy=strategy,
+                        strategy_spec=spec,
+                    )
+                )
+            )
+            policies.append(result.data)
+        return policies
+
+    @pytest.fixture
+    def deployment_repository(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+    ) -> DeploymentRepository:
+        storage_manager = MagicMock()
+        valkey_stat = MagicMock()
+        valkey_live = MagicMock()
+        valkey_schedule = MagicMock()
+        return DeploymentRepository(
+            db=db_with_cleanup,
+            storage_manager=storage_manager,
+            valkey_stat=valkey_stat,
+            valkey_live=valkey_live,
+            valkey_schedule=valkey_schedule,
+        )
+
+    # =========================================================================
+    # Tests - Search with pagination
+    # =========================================================================
+
+    async def test_search_first_page(
+        self,
+        deployment_repository: DeploymentRepository,
+        sample_policies: list[DeploymentPolicyData],
+    ) -> None:
+        """Test first page of search results."""
+        querier = BatchQuerier(
+            pagination=OffsetPagination(limit=2, offset=0),
+            conditions=[],
+            orders=[],
+        )
+        result = await deployment_repository.search_deployment_policies(querier)
+
+        assert len(result.items) == 2
+        assert result.total_count == 4
+        assert result.has_next_page is True
+        assert result.has_previous_page is False
+
+    async def test_search_second_page(
+        self,
+        deployment_repository: DeploymentRepository,
+        sample_policies: list[DeploymentPolicyData],
+    ) -> None:
+        """Test second page of search results."""
+        querier = BatchQuerier(
+            pagination=OffsetPagination(limit=2, offset=2),
+            conditions=[],
+            orders=[],
+        )
+        result = await deployment_repository.search_deployment_policies(querier)
+
+        assert len(result.items) == 2
+        assert result.total_count == 4
+        assert result.has_next_page is False
+        assert result.has_previous_page is True
+
+    # =========================================================================
+    # Tests - Search with filtering
+    # =========================================================================
+
+    async def test_search_filter_by_strategy(
+        self,
+        deployment_repository: DeploymentRepository,
+        sample_policies: list[DeploymentPolicyData],
+    ) -> None:
+        """Test filtering deployment policies by strategy."""
+        querier = BatchQuerier(
+            pagination=OffsetPagination(limit=10, offset=0),
+            conditions=[
+                lambda: DeploymentPolicyRow.strategy == DeploymentStrategy.BLUE_GREEN,
+            ],
+            orders=[],
+        )
+        result = await deployment_repository.search_deployment_policies(querier)
+
+        assert len(result.items) == 1
+        assert result.items[0].strategy == DeploymentStrategy.BLUE_GREEN
+
+    async def test_search_filter_by_endpoint(
+        self,
+        deployment_repository: DeploymentRepository,
+        sample_policies: list[DeploymentPolicyData],
+        sample_endpoint_ids: list[uuid.UUID],
+    ) -> None:
+        """Test filtering deployment policies by endpoint ID."""
+        target_endpoint_id = sample_endpoint_ids[0]
+        querier = BatchQuerier(
+            pagination=OffsetPagination(limit=10, offset=0),
+            conditions=[
+                lambda: DeploymentPolicyRow.endpoint == target_endpoint_id,
+            ],
+            orders=[],
+        )
+        result = await deployment_repository.search_deployment_policies(querier)
+
+        assert len(result.items) == 1
+        assert result.items[0].endpoint == target_endpoint_id
+
+    # =========================================================================
+    # Tests - Search with ordering
+    # =========================================================================
+
+    async def test_search_order_by_created_at_ascending(
+        self,
+        deployment_repository: DeploymentRepository,
+        sample_policies: list[DeploymentPolicyData],
+    ) -> None:
+        """Test ordering deployment policies by created_at ascending."""
+        querier = BatchQuerier(
+            pagination=OffsetPagination(limit=10, offset=0),
+            conditions=[],
+            orders=[DeploymentPolicyRow.created_at.asc()],
+        )
+        result = await deployment_repository.search_deployment_policies(querier)
+
+        created_ats = [item.created_at for item in result.items]
+        assert created_ats == sorted(created_ats)
+
+    async def test_search_order_by_created_at_descending(
+        self,
+        deployment_repository: DeploymentRepository,
+        sample_policies: list[DeploymentPolicyData],
+    ) -> None:
+        """Test ordering deployment policies by created_at descending."""
+        querier = BatchQuerier(
+            pagination=OffsetPagination(limit=10, offset=0),
+            conditions=[],
+            orders=[DeploymentPolicyRow.created_at.desc()],
+        )
+        result = await deployment_repository.search_deployment_policies(querier)
+
+        created_ats = [item.created_at for item in result.items]
+        assert created_ats == sorted(created_ats, reverse=True)
+
+    # =========================================================================
+    # Tests - Empty results
+    # =========================================================================
+
+    async def test_search_no_results(
+        self,
+        deployment_repository: DeploymentRepository,
+        sample_policies: list[DeploymentPolicyData],
+    ) -> None:
+        """Test search with no matching results."""
+        nonexistent_id = uuid.uuid4()
+        querier = BatchQuerier(
+            pagination=OffsetPagination(limit=10, offset=0),
+            conditions=[
+                lambda: DeploymentPolicyRow.endpoint == nonexistent_id,
+            ],
+            orders=[],
+        )
+        result = await deployment_repository.search_deployment_policies(querier)
+
+        assert len(result.items) == 0
+        assert result.total_count == 0
 
 
 class TestRouteOperations:
@@ -2589,12 +2943,14 @@ class TestRouteOperations:
                 ResourcePresetRow,  # ScalingGroupRow relationship dependency
                 UserResourcePolicyRow,
                 ProjectResourcePolicyRow,
+                RoleRow,
                 UserRoleRow,  # UserRow relationship dependency
                 UserRow,
                 GroupRow,
                 VFolderRow,
                 EndpointRow,
                 RoutingRow,
+                AssociationScopesEntitiesRow,
             ],
         ):
             yield database_connection
@@ -2789,7 +3145,6 @@ class TestRouteOperations:
             valkey_schedule=valkey_schedule,
         )
 
-    @pytest.mark.asyncio
     async def test_create_route(
         self,
         deployment_repository: DeploymentRepository,
@@ -2808,14 +3163,20 @@ class TestRouteOperations:
             revision_id=None,
             traffic_status=RouteTrafficStatus.ACTIVE,
         )
-        creator = Creator(spec=spec)
+        creator = RBACEntityCreator(
+            spec=spec,
+            element_type=RBACElementType.ROUTING,
+            scope_ref=RBACElementRef(
+                element_type=RBACElementType.MODEL_DEPLOYMENT,
+                element_id=str(test_endpoint_id),
+            ),
+        )
 
         route_id = await deployment_repository.create_route(creator)
 
         assert route_id is not None
         assert isinstance(route_id, uuid.UUID)
 
-    @pytest.mark.asyncio
     async def test_update_route_status(
         self,
         deployment_repository: DeploymentRepository,
@@ -2833,7 +3194,15 @@ class TestRouteOperations:
             domain=test_domain_name,
             project_id=test_group_id,
         )
-        route_id = await deployment_repository.create_route(Creator(spec=spec))
+        creator = RBACEntityCreator(
+            spec=spec,
+            element_type=RBACElementType.ROUTING,
+            scope_ref=RBACElementRef(
+                element_type=RBACElementType.MODEL_DEPLOYMENT,
+                element_id=str(test_endpoint_id),
+            ),
+        )
+        route_id = await deployment_repository.create_route(creator)
 
         # Update the route status
         updater = Updater(
@@ -2855,7 +3224,6 @@ class TestRouteOperations:
             assert route.status == RouteStatus.HEALTHY
             assert route.traffic_status == RouteTrafficStatus.INACTIVE
 
-    @pytest.mark.asyncio
     async def test_update_route_with_unified_spec(
         self,
         deployment_repository: DeploymentRepository,
@@ -2873,7 +3241,15 @@ class TestRouteOperations:
             domain=test_domain_name,
             project_id=test_group_id,
         )
-        route_id = await deployment_repository.create_route(Creator(spec=spec))
+        creator = RBACEntityCreator(
+            spec=spec,
+            element_type=RBACElementType.ROUTING,
+            scope_ref=RBACElementRef(
+                element_type=RBACElementType.MODEL_DEPLOYMENT,
+                element_id=str(test_endpoint_id),
+            ),
+        )
+        route_id = await deployment_repository.create_route(creator)
 
         # Update the route using unified spec (excluding session to avoid FK constraint)
         updater = Updater(
@@ -2897,7 +3273,6 @@ class TestRouteOperations:
             assert route.traffic_status == RouteTrafficStatus.ACTIVE
             assert route.traffic_ratio == 0.5
 
-    @pytest.mark.asyncio
     async def test_update_route_not_found(
         self,
         deployment_repository: DeploymentRepository,
@@ -2935,6 +3310,7 @@ class TestDeploymentRepositoryDuplicateName:
                 UserResourcePolicyRow,
                 ProjectResourcePolicyRow,
                 KeyPairResourcePolicyRow,
+                RoleRow,
                 UserRoleRow,
                 UserRow,
                 KeyPairRow,
@@ -2943,6 +3319,7 @@ class TestDeploymentRepositoryDuplicateName:
                 ImageRow,
                 EndpointRow,
                 AssociationScopesEntitiesRow,
+                DeploymentPolicyRow,
             ],
         ):
             yield database_connection
@@ -3130,11 +3507,12 @@ class TestDeploymentRepositoryDuplicateName:
         )
         return RBACEntityCreator(
             spec=spec,
-            entity_type=EntityType.MODEL_DEPLOYMENT,
-            scope_ref=ScopeId(scope_type=ScopeType.PROJECT, scope_id=str(group.id)),
+            element_type=RBACElementType.MODEL_DEPLOYMENT,
+            scope_ref=RBACElementRef(
+                element_type=RBACElementType.PROJECT, element_id=str(group.id)
+            ),
         )
 
-    @pytest.mark.asyncio
     async def test_create_endpoint_raises_when_duplicate_name(
         self,
         deployment_repository: DeploymentRepository,
@@ -3166,7 +3544,6 @@ class TestDeploymentRepositoryDuplicateName:
         with pytest.raises(DeploymentNameAlreadyExists):
             await deployment_repository.create_endpoint_legacy(second_creator)
 
-    @pytest.mark.asyncio
     async def test_create_endpoint_succeeds_with_different_name(
         self,
         deployment_repository: DeploymentRepository,
@@ -3200,7 +3577,6 @@ class TestDeploymentRepositoryDuplicateName:
         assert result.metadata.name == "different-endpoint-name"
         assert result.metadata.project == test_group.id
 
-    @pytest.mark.asyncio
     async def test_create_endpoint_succeeds_with_same_name_in_different_project(
         self,
         deployment_repository: DeploymentRepository,
@@ -3234,3 +3610,45 @@ class TestDeploymentRepositoryDuplicateName:
 
         assert result.metadata.name == "same-name-endpoint"
         assert result.metadata.project == different_group.id
+
+    async def test_create_endpoint_succeeds_with_same_name_when_existing_is_destroyed(
+        self,
+        deployment_repository: DeploymentRepository,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        test_domain: DomainRow,
+        test_group: GroupRow,
+        test_scaling_group: ScalingGroupRow,
+        test_image_id: uuid.UUID,
+    ) -> None:
+        """Test that create_endpoint_legacy allows same name when existing endpoint is destroyed."""
+        # Create first endpoint
+        first_creator = self._create_endpoint_creator(
+            name="reusable-endpoint",
+            domain=test_domain,
+            group=test_group,
+            scaling_group=test_scaling_group,
+            image_id=test_image_id,
+        )
+        first_result = await deployment_repository.create_endpoint_legacy(first_creator)
+
+        # Mark the first endpoint as destroyed
+        async with db_with_cleanup.begin_session() as db_sess:
+            await db_sess.execute(
+                sa.update(EndpointRow)
+                .where(EndpointRow.id == first_result.id)
+                .values(lifecycle_stage=EndpointLifecycle.DESTROYED)
+            )
+
+        # Create second endpoint with same name should succeed
+        second_creator = self._create_endpoint_creator(
+            name="reusable-endpoint",
+            domain=test_domain,
+            group=test_group,
+            scaling_group=test_scaling_group,
+            image_id=test_image_id,
+        )
+
+        result = await deployment_repository.create_endpoint_legacy(second_creator)
+
+        assert result.metadata.name == "reusable-endpoint"
+        assert result.metadata.project == test_group.id

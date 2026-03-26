@@ -10,6 +10,10 @@ from __future__ import annotations
 from datetime import date
 from decimal import Decimal
 
+from ai.backend.common.dto.manager.v2.fair_share.types import (
+    ResourceSlotEntryInfo,
+    ResourceSlotInfo,
+)
 from ai.backend.common.types import ResourceSlot
 from ai.backend.manager.api.gql.fair_share.types import ResourceSlotGQL
 
@@ -44,7 +48,7 @@ def calculate_average_daily_usage(
     bucket_duration_days = Decimal((period_end - period_start).days + 1)
 
     if bucket_duration_days == 0:
-        return ResourceSlotGQL(entries=[])
+        return ResourceSlotGQL.from_pydantic(ResourceSlotInfo(entries=[]))
 
     # Convert ResourceSlotGQL to ResourceSlot for calculation
     usage_slot = ResourceSlot({
@@ -55,7 +59,13 @@ def calculate_average_daily_usage(
     for resource_type, quantity in usage_slot.items():
         avg_daily[resource_type] = quantity / (bucket_duration_days * SECONDS_PER_DAY)
 
-    return ResourceSlotGQL.from_resource_slot(avg_daily)
+    return ResourceSlotGQL.from_pydantic(
+        ResourceSlotInfo(
+            entries=[
+                ResourceSlotEntryInfo(resource_type=k, quantity=v) for k, v in avg_daily.items()
+            ]
+        )
+    )
 
 
 def calculate_usage_capacity_ratio(
@@ -96,4 +106,10 @@ def calculate_usage_capacity_ratio(
 
         ratio_slot[resource_type] = usage_quantity / capacity_quantity
 
-    return ResourceSlotGQL.from_resource_slot(ratio_slot)
+    return ResourceSlotGQL.from_pydantic(
+        ResourceSlotInfo(
+            entries=[
+                ResourceSlotEntryInfo(resource_type=k, quantity=v) for k, v in ratio_slot.items()
+            ]
+        )
+    )

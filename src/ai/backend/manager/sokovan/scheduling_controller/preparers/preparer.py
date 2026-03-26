@@ -134,6 +134,7 @@ class SessionPreparer:
             cluster_mode=spec.cluster_mode,
             cluster_size=spec.cluster_size,
             priority=spec.priority,
+            is_preemptible=spec.is_preemptible,
             status=SessionStatus.PENDING.name,
             status_history={
                 SessionStatus.PENDING.name: enqueue_time.isoformat(),

@@ -113,7 +113,6 @@ class TestAgentConfigReading:
         ],
         ids=["invalid_keys", "empty", "only_gid", "both_valid"],
     )
-    @pytest.mark.asyncio
     async def test_read_agent_config_container(
         self,
         agent_rpc_server: AgentRPCServer,
@@ -154,7 +153,6 @@ class TestScalingGroupUpdates:
 
         assert mock_agent.local_config.agent.scaling_group == "gpu"
 
-    @pytest.mark.asyncio
     async def test_update_scaling_group_persists_single_agent(
         self, tmp_path: Path, mock_agent_factory: Callable[[str, str], Mock]
     ) -> None:
@@ -203,7 +201,6 @@ addr = { host = "127.0.0.1", port = 2379 }
         assert updated_config["agent"]["scaling-group"] == "gpu"  # type: ignore[index]
         assert mock_agent.local_config.agent.scaling_group == "gpu"
 
-    @pytest.mark.asyncio
     async def test_update_scaling_group_persists_multi_agent(
         self, tmp_path: Path, mock_agent_factory: Callable[[str, str], Mock]
     ) -> None:

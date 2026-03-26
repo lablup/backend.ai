@@ -33,6 +33,7 @@ def mock_config_provider() -> MagicMock:
         password_hash_algorithm=PasswordHashAlgorithm.PBKDF2_SHA256,
         password_hash_rounds=100_000,
         password_hash_salt_size=32,
+        login_session_max_age=604800,
     )
     return mock_provider
 
@@ -47,10 +48,10 @@ def auth_service(
         hook_plugin_ctx=mock_hook_plugin_ctx,
         auth_repository=mock_auth_repository,
         config_provider=mock_config_provider,
+        valkey_session_client=AsyncMock(),
     )
 
 
-@pytest.mark.asyncio
 async def test_update_password_no_auth_successful(
     auth_service: AuthService,
     mock_auth_repository: AsyncMock,
@@ -94,7 +95,6 @@ async def test_update_password_no_auth_successful(
     assert result.password_changed_at == datetime(2024, 1, 1, 12, 0, 0, tzinfo=UTC)
 
 
-@pytest.mark.asyncio
 async def test_update_password_no_auth_fails_when_max_password_age_is_none(
     mock_hook_plugin_ctx: AsyncMock,
     mock_config_provider: MagicMock,
@@ -123,7 +123,6 @@ async def test_update_password_no_auth_fails_when_max_password_age_is_none(
         await auth_service.update_password_no_auth(action)
 
 
-@pytest.mark.asyncio
 async def test_update_password_no_auth_fails_with_incorrect_current_password(
     mock_hook_plugin_ctx: AsyncMock,
     mock_auth_repository: AsyncMock,
@@ -154,7 +153,6 @@ async def test_update_password_no_auth_fails_with_incorrect_current_password(
         await auth_service.update_password_no_auth(action)
 
 
-@pytest.mark.asyncio
 async def test_update_password_no_auth_fails_when_new_password_same_as_current(
     mock_hook_plugin_ctx: AsyncMock,
     mock_auth_repository: AsyncMock,
@@ -193,7 +191,6 @@ async def test_update_password_no_auth_fails_when_new_password_same_as_current(
         await auth_service.update_password_no_auth(action)
 
 
-@pytest.mark.asyncio
 async def test_update_password_no_auth_with_retry(
     mock_hook_plugin_ctx: AsyncMock,
     mock_auth_repository: AsyncMock,
@@ -236,7 +233,6 @@ async def test_update_password_no_auth_with_retry(
     assert result.password_changed_at == changed_at
 
 
-@pytest.mark.asyncio
 async def test_update_password_no_auth_hook_rejection(
     mock_hook_plugin_ctx: AsyncMock,
     mock_auth_repository: AsyncMock,

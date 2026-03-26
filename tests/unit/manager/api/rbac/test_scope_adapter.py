@@ -16,7 +16,7 @@ from ai.backend.common.dto.manager.rbac.request import (
 )
 from ai.backend.common.dto.manager.rbac.response import ScopeDTO
 from ai.backend.common.dto.manager.rbac.types import OrderDirection, ScopeOrderField
-from ai.backend.manager.api.rbac.scope_adapter import ScopeAdapter
+from ai.backend.manager.api.rest.rbac.scope_adapter import ScopeAdapter
 from ai.backend.manager.data.permission.id import ScopeId
 from ai.backend.manager.data.permission.types import ScopeData
 from ai.backend.manager.repositories.base import OffsetPagination
@@ -216,31 +216,17 @@ class TestScopeAdapterBuildQuerier:
 
         assert len(querier.conditions) == 1
 
-    def test_build_querier_global_scope(self, adapter: ScopeAdapter) -> None:
-        """Test building querier for global scope returns empty querier."""
-        limit = 10
-        offset = 0
+    def test_build_querier_global_scope_raises(self, adapter: ScopeAdapter) -> None:
+        """Test building querier for global scope raises NotImplementedError."""
         request = SearchScopesRequest(
-            filter=ScopeFilter(
-                name=StringFilter(
-                    i_contains="anything",
-                )
-            ),
-            order=[
-                ScopeOrder(
-                    field=ScopeOrderField.NAME,
-                    direction=OrderDirection.ASC,
-                )
-            ],
-            limit=limit,
-            offset=offset,
+            filter=None,
+            order=[],
+            limit=10,
+            offset=0,
         )
 
-        querier = adapter.build_querier(ScopeType.GLOBAL, request)
-
-        # Global scope ignores filters and orders
-        assert querier.conditions == []
-        assert querier.orders == []
+        with pytest.raises(NotImplementedError):
+            adapter.build_querier(ScopeType.GLOBAL, request)
 
 
 class TestScopeAdapterConvertToDTO:

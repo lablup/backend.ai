@@ -106,7 +106,7 @@ BEP numbers start from 1000.
 | [1033](BEP-1033-sokovan-handler-test-scenarios.md) | Sokovan Handler Test Scenarios | HyeokJin Kim | Draft |
 | [1034](BEP-1034-kernel-v2-gql-implementation.md) | KernelV2 GQL Implementation | Gyubong Lee | Draft |
 | [1035](BEP-1035-request-id-tracing.md) | Distributed Request ID Propagation | Gyubong Lee | Draft |
-| [1036](BEP-1036-artifact-storage-quota.md) | Artifact Storage Usage Tracking and Quota Enforcement | Gyubong Lee | Rejected |
+| [1036](BEP-1036-artifact-storage-quota.md) | Artifact Storage Usage Tracking and Quota Enforcement | Gyubong Lee | Draft |
 | [1037](BEP-1037-storage-proxy-health-monitoring.md) | Volume Host Availability Check | Gyubong Lee | Draft |
 | [1038](BEP-1038-image-v2-gql-implementation.md) | ImageV2 GQL Implementation | Gyubong Lee | Draft |
 | [1039](BEP-1039-image-id-based-service-logic-migration.md) | Image ID Based Service Logic Migration | Gyubong Lee | Draft |
@@ -119,6 +119,8 @@ BEP numbers start from 1000.
 | [1046](BEP-1046-unified-service-discovery.md) | Unified Service Discovery with DB-backed Service Catalog | HyeokJin Kim | Draft |
 | [1047](BEP-1047-resource-slot-db-normalization.md) | Resource Slot DB Normalization | HyeokJin Kim | Draft |
 | [1048](BEP-1048-RBAC-entity-relationship-model.md) | RBAC Entity Relationship Model | Sanghun Lee | Draft |
+| [1049](BEP-1049-zero-downtime-deployment.md) | Model Service Zero-downtime deployment architecture | Gyubong Lee | Draft |
+| [1050](BEP-1050-prometheus-query-preset-system.md) | Prometheus Query Preset System | BoKeum Kim | Draft |
 | [1051](BEP-1051-kata-containers-agent.md) | Kata Containers Agent Backend | Kyujin Cho | Draft |
 | _next_ | _(reserve your number here)_ | | |
 

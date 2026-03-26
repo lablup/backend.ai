@@ -30,7 +30,7 @@ from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.image import ImageRow
 from ai.backend.manager.models.kernel import KernelRow
 from ai.backend.manager.models.keypair import KeyPairRow
-from ai.backend.manager.models.rbac_models import UserRoleRow
+from ai.backend.manager.models.rbac_models import RoleRow, UserRoleRow
 from ai.backend.manager.models.resource_policy import (
     KeyPairResourcePolicyRow,
     ProjectResourcePolicyRow,
@@ -86,6 +86,7 @@ class TestAuthRepository:
                 UserResourcePolicyRow,
                 ProjectResourcePolicyRow,
                 KeyPairResourcePolicyRow,
+                RoleRow,
                 UserRoleRow,
                 UserRow,
                 KeyPairRow,
@@ -316,7 +317,6 @@ class TestAuthRepository:
             )
         yield group_data
 
-    @pytest.mark.asyncio
     async def test_get_group_membership_success(
         self,
         auth_repository: AuthRepository,
@@ -332,7 +332,6 @@ class TestAuthRepository:
         assert result.group_id == sample_group_data.id
         assert result.user_id == sample_user_data.uuid
 
-    @pytest.mark.asyncio
     async def test_get_group_membership_not_found(
         self, auth_repository: AuthRepository, sample_user_data: UserTestData
     ) -> None:
@@ -342,7 +341,6 @@ class TestAuthRepository:
         with pytest.raises(GroupMembershipNotFoundError):
             await auth_repository.get_group_membership(non_existent_group_id, sample_user_data.uuid)
 
-    @pytest.mark.asyncio
     async def test_check_email_exists(
         self, auth_repository: AuthRepository, sample_user_data: UserTestData
     ) -> None:
@@ -351,14 +349,12 @@ class TestAuthRepository:
 
         assert result is True
 
-    @pytest.mark.asyncio
     async def test_check_email_not_exists(self, auth_repository: AuthRepository) -> None:
         """Test email existence check when email doesn't exist"""
         result = await auth_repository.check_email_exists("nonexistent@example.com")
 
         assert result is False
 
-    @pytest.mark.asyncio
     async def test_update_user_full_name(
         self,
         auth_repository: AuthRepository,
@@ -379,7 +375,6 @@ class TestAuthRepository:
             assert user is not None
             assert user.full_name == update_name
 
-    @pytest.mark.asyncio
     async def test_update_user_full_name_not_found(
         self, auth_repository: AuthRepository, default_domain: DomainTestData
     ) -> None:
@@ -389,7 +384,6 @@ class TestAuthRepository:
                 "nonexistent@example.com", default_domain.name, "Some Name"
             )
 
-    @pytest.mark.asyncio
     async def test_update_user_password(
         self,
         auth_repository: AuthRepository,
@@ -414,7 +408,6 @@ class TestAuthRepository:
             assert user is not None
             assert user.password != sample_user_data.password  # Password should have changed
 
-    @pytest.mark.asyncio
     async def test_update_user_password_by_uuid(
         self,
         auth_repository: AuthRepository,
@@ -439,7 +432,6 @@ class TestAuthRepository:
             assert user is not None
             assert user.password != sample_user_data.password
 
-    @pytest.mark.asyncio
     async def test_deactivate_user_and_keypairs(
         self,
         auth_repository: AuthRepository,
@@ -464,7 +456,6 @@ class TestAuthRepository:
             assert keypair is not None
             assert keypair.is_active is False
 
-    @pytest.mark.asyncio
     async def test_get_ssh_public_key(
         self,
         auth_repository: AuthRepository,
@@ -475,7 +466,6 @@ class TestAuthRepository:
 
         assert result == sample_user_data.ssh_public_key
 
-    @pytest.mark.asyncio
     async def test_update_ssh_keypair(
         self,
         auth_repository: AuthRepository,
@@ -503,7 +493,6 @@ class TestAuthRepository:
             assert keypair.ssh_public_key == update_public_key
             assert keypair.ssh_private_key == update_private_key
 
-    @pytest.mark.asyncio
     async def test_get_user_row_by_uuid(
         self, auth_repository: AuthRepository, sample_user_data: UserTestData
     ) -> None:
@@ -515,7 +504,6 @@ class TestAuthRepository:
         assert result.uuid == sample_user_data.uuid
         assert result.email == sample_user_data.email
 
-    @pytest.mark.asyncio
     async def test_get_user_row_by_uuid_not_found(self, auth_repository: AuthRepository) -> None:
         """Test getting user row by UUID when user doesn't exist"""
         non_existent_uuid = UUID("99999999-9999-9999-9999-999999999999")
@@ -523,7 +511,6 @@ class TestAuthRepository:
         with pytest.raises(UserNotFound):
             await auth_repository.get_user_row_by_uuid(non_existent_uuid)
 
-    @pytest.mark.asyncio
     async def test_get_current_time(self, auth_repository: AuthRepository) -> None:
         """Test getting current time from database"""
         result = await auth_repository.get_current_time()

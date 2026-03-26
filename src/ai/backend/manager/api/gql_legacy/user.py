@@ -977,10 +977,10 @@ class ModifyUserInput(graphene.InputObjectType):  # type: ignore[misc]
             need_password_change=OptionalState[bool].from_graphql(
                 self.need_password_change,
             ),
-            full_name=OptionalState[str].from_graphql(
+            full_name=TriState[str].from_graphql(
                 self.full_name,
             ),
-            description=OptionalState[str].from_graphql(
+            description=TriState[str].from_graphql(
                 self.description,
             ),
             is_active=OptionalState[bool].from_graphql(
@@ -1120,6 +1120,8 @@ class ModifyUser(graphene.Mutation):  # type: ignore[misc]
         validate_user_mutation_props(props)
 
         action: ModifyUserAction = props.to_action(email, graph_ctx)
+        user_data = await graph_ctx.user_repository.get_by_email_validated(email)
+        action.user_uuid = user_data.id
         res: ModifyUserActionResult = await graph_ctx.processors.user.modify_user.wait_for_complete(
             action
         )

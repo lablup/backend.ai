@@ -29,10 +29,10 @@ def auth_service(
         hook_plugin_ctx=mock_hook_plugin_ctx,
         auth_repository=mock_auth_repository,
         config_provider=mock_config_provider,
+        valkey_session_client=AsyncMock(),
     )
 
 
-@pytest.mark.asyncio
 async def test_update_password_successful(
     auth_service: AuthService,
     mock_auth_repository: AsyncMock,
@@ -75,7 +75,6 @@ async def test_update_password_successful(
     mock_auth_repository.update_user_password.assert_called_once()
 
 
-@pytest.mark.asyncio
 async def test_update_password_fails_when_new_passwords_dont_match(
     mock_hook_plugin_ctx: AsyncMock,
     mock_auth_repository: AsyncMock,
@@ -117,7 +116,6 @@ async def test_update_password_fails_when_new_passwords_dont_match(
     mock_auth_repository.update_user_password.assert_not_called()
 
 
-@pytest.mark.asyncio
 async def test_update_password_fails_with_incorrect_old_password(
     mock_hook_plugin_ctx: AsyncMock,
     mock_auth_repository: AsyncMock,
@@ -154,7 +152,6 @@ async def test_update_password_fails_with_incorrect_old_password(
     mock_auth_repository.update_user_password.assert_not_called()
 
 
-@pytest.mark.asyncio
 async def test_update_password_with_hook_rejection(
     mock_hook_plugin_ctx: AsyncMock,
     mock_auth_repository: AsyncMock,
@@ -192,7 +189,6 @@ async def test_update_password_with_hook_rejection(
     assert "Password is too weak" in str(exc_info.value)
 
 
-@pytest.mark.asyncio
 async def test_update_password_repository_call(
     mock_hook_plugin_ctx: AsyncMock,
     mock_auth_repository: AsyncMock,

@@ -3,6 +3,7 @@ from __future__ import annotations
 import logging
 import uuid
 from collections.abc import Mapping, Sequence
+from decimal import Decimal
 from typing import (
     TYPE_CHECKING,
     Any,
@@ -106,10 +107,18 @@ _queryorder_colmap: Mapping[str, OrderSpecItem] = {
 }
 
 
+def _strip_gpu_prefix(alloc_map: dict[str, Decimal]) -> dict[str, Decimal]:
+    return {k.removeprefix("GPU-"): v for k, v in alloc_map.items()}
+
+
+def _decimal_to_float(alloc_map: dict[str, Decimal]) -> dict[str, float]:
+    return {k: float(v) for k, v in alloc_map.items()}
+
+
 async def _resolve_gpu_alloc_map(ctx: GraphQueryContext, agent_id: AgentId) -> dict[str, float]:
     raw_alloc_map = await ctx.valkey_stat.get_gpu_allocation_map(str(agent_id))
     if raw_alloc_map:
-        return UUIDFloatMap.parse_value({k: float(v) for k, v in raw_alloc_map.items()})
+        return UUIDFloatMap.parse_value(_decimal_to_float(_strip_gpu_prefix(raw_alloc_map)))
     return {}
 
 
@@ -550,7 +559,7 @@ class Agent(graphene.ObjectType):  # type: ignore[misc]
     ) -> Sequence[Agent]:
         conditions = []
         if scaling_group is not None:
-            conditions.append(QueryConditions.by_scaling_group(scaling_group))
+            conditions.append(QueryConditions.by_resource_group(scaling_group))
         if raw_status is not None:
             conditions.append(QueryConditions.by_statuses([AgentStatus[raw_status]]))
 

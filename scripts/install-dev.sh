@@ -1144,7 +1144,7 @@ configure_backendai() {
   # install and configure webui
   if [ $EDITABLE_WEBUI -eq 1 ]; then
     install_editable_webui
-    sed_inplace "s@\(#\)\{0,1\}static_path = .*@static_path = "'"src/ai/backend/webui/build/rollup"'"@" ./webserver.conf
+    sed_inplace "s@\(#\)\{0,1\}static_path = .*@static_path = "'"src/ai/backend/webui/build/web"'"@" ./webserver.conf
   else
     webui_version=$(jq -r '.package + " (built at " + .buildDate + ", rev " + .revision + ")"' src/ai/backend/web/static/version.json)
     show_note "The currently embedded webui version: $webui_version"
@@ -1162,11 +1162,14 @@ configure_backendai() {
   show_info "Setting up databases... (core)"
   echo "(postgres container: ${POSTGRES_CONTAINER_ID})"
   ./backend.ai mgr schema oneshot
+  # Apply any pending migrations for existing databases
+  ./py -m alembic upgrade head
 
   ./backend.ai mgr fixture populate fixtures/manager/example-container-registries-harbor.json
   ./backend.ai mgr fixture populate fixtures/manager/example-users.json
   ./backend.ai mgr fixture populate fixtures/manager/example-keypairs.json
   ./backend.ai mgr fixture populate fixtures/manager/example-set-user-main-access-keys.json
+  ./backend.ai mgr fixture populate fixtures/manager/example-resource-slot-types.json
   ./backend.ai mgr fixture populate fixtures/manager/example-resource-presets.json
   ./backend.ai mgr fixture populate fixtures/manager/example-roles.json
 

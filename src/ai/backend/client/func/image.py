@@ -20,6 +20,7 @@ _default_list_fields_admin = (
     image_fields["digest"],
     image_fields["size_bytes"],
     image_fields["aliases"],
+    image_fields["last_used_at"],
 )
 
 

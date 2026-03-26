@@ -37,7 +37,7 @@ from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.image import ImageRow
 from ai.backend.manager.models.kernel import KernelRow, KernelStatus
 from ai.backend.manager.models.keypair import KeyPairRow
-from ai.backend.manager.models.rbac_models import UserRoleRow
+from ai.backend.manager.models.rbac_models import RoleRow, UserRoleRow
 from ai.backend.manager.models.resource_policy import (
     KeyPairResourcePolicyRow,
     ProjectResourcePolicyRow,
@@ -75,6 +75,7 @@ class TestDomainRepository:
                 UserResourcePolicyRow,
                 ProjectResourcePolicyRow,
                 KeyPairResourcePolicyRow,
+                RoleRow,
                 UserRoleRow,
                 UserRow,
                 KeyPairRow,
@@ -407,7 +408,6 @@ class TestDomainRepository:
             await session.commit()
         return domain_name
 
-    @pytest.mark.asyncio
     async def test_create_domain_success(
         self,
         db_with_default_resource_policies: ExtendedAsyncSAEngine,
@@ -448,7 +448,6 @@ class TestDomainRepository:
             assert group_row is not None
             assert group_row.name == "model-store"
 
-    @pytest.mark.asyncio
     async def test_create_domain_duplicate_name(
         self,
         domain_repository: DomainRepository,
@@ -470,7 +469,6 @@ class TestDomainRepository:
         with pytest.raises(InvalidAPIParameters):
             await domain_repository.create_domain(duplicate_creator)
 
-    @pytest.mark.asyncio
     async def test_modify_domain_success(
         self,
         db_with_default_resource_policies: ExtendedAsyncSAEngine,
@@ -519,7 +517,6 @@ class TestDomainRepository:
             assert domain_row is not None
             assert domain_row.description == "Updated description"
 
-    @pytest.mark.asyncio
     async def test_modify_domain_not_found(
         self,
         domain_repository: DomainRepository,
@@ -533,7 +530,6 @@ class TestDomainRepository:
         with pytest.raises(DomainNotFound):
             await domain_repository.modify_domain(updater)
 
-    @pytest.mark.asyncio
     async def test_soft_delete_domain_success(
         self,
         db_with_default_resource_policies: ExtendedAsyncSAEngine,
@@ -569,7 +565,6 @@ class TestDomainRepository:
             assert domain_row is not None
             assert domain_row.is_active is False
 
-    @pytest.mark.asyncio
     async def test_soft_delete_domain_not_found(
         self,
         domain_repository: DomainRepository,
@@ -578,7 +573,6 @@ class TestDomainRepository:
         with pytest.raises(DomainNotFound):
             await domain_repository.soft_delete_domain("nonexistent-domain")
 
-    @pytest.mark.asyncio
     async def test_purge_domain_success(
         self,
         db_with_default_resource_policies: ExtendedAsyncSAEngine,
@@ -595,7 +589,6 @@ class TestDomainRepository:
             domain_row = result.first()
             assert domain_row is None
 
-    @pytest.mark.asyncio
     async def test_purge_domain_with_users(
         self,
         domain_repository: DomainRepository,
@@ -606,7 +599,6 @@ class TestDomainRepository:
         with pytest.raises(DomainHasUsers):
             await domain_repository.purge_domain(domain_with_user)
 
-    @pytest.mark.asyncio
     async def test_purge_domain_not_found(
         self,
         domain_repository: DomainRepository,
@@ -615,7 +607,6 @@ class TestDomainRepository:
         with pytest.raises(DomainDeletionFailed):
             await domain_repository.purge_domain("nonexistent-domain")
 
-    @pytest.mark.asyncio
     async def test_create_domain_with_all_fields(
         self,
         db_with_default_resource_policies: ExtendedAsyncSAEngine,
@@ -667,7 +658,6 @@ class TestDomainRepository:
             assert domain_row.name == "comprehensive-domain"
             assert domain_row.is_active is True
 
-    @pytest.mark.asyncio
     async def test_purge_domain_with_groups(
         self,
         domain_repository: DomainRepository,
@@ -678,7 +668,6 @@ class TestDomainRepository:
         with pytest.raises(DomainHasGroups):
             await domain_repository.purge_domain(domain_with_group)
 
-    @pytest.mark.asyncio
     async def test_purge_domain_with_active_kernels(
         self,
         domain_repository: DomainRepository,

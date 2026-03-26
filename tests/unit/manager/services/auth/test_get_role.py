@@ -25,6 +25,7 @@ def auth_service(
         hook_plugin_ctx=mock_hook_plugin_ctx,
         auth_repository=mock_auth_repository,
         config_provider=mock_config_provider,
+        valkey_session_client=AsyncMock(),
     )
 
 
@@ -36,7 +37,6 @@ def auth_service(
         ("domain admin", False, True, "user", "admin"),
     ],
 )
-@pytest.mark.asyncio
 async def test_get_role_simple_cases(
     auth_service: AuthService,
     description: str,
@@ -60,7 +60,6 @@ async def test_get_role_simple_cases(
     assert result.group_role is None
 
 
-@pytest.mark.asyncio
 async def test_get_role_with_valid_group_membership(
     auth_service: AuthService,
     mock_auth_repository: AsyncMock,
@@ -89,7 +88,6 @@ async def test_get_role_with_valid_group_membership(
     assert result.group_role == "user"  # TODO: per-group role is not yet implemented
 
 
-@pytest.mark.asyncio
 async def test_get_role_without_group_membership_raises_error(
     auth_service: AuthService,
     mock_auth_repository: AsyncMock,
@@ -114,7 +112,6 @@ async def test_get_role_without_group_membership_raises_error(
         await auth_service.get_role(action)
 
 
-@pytest.mark.asyncio
 async def test_get_role_verifies_correct_parameters(
     auth_service: AuthService,
     mock_auth_repository: AsyncMock,

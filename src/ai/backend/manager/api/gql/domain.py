@@ -1,8 +1,19 @@
 import strawberry
 from strawberry import ID, Info
 
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
+from ai.backend.manager.api.gql.decorators import BackendAIGQLMeta, gql_federation_type
 
-@strawberry.federation.type(keys=["id"], name="DomainNode", extend=True)
+
+@gql_federation_type(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Federation stub for legacy DomainNode.",
+    ),
+    name="DomainNode",
+    keys=["id"],
+    extend=True,
+)
 class Domain:
     id: ID = strawberry.federation.field(external=True)
 

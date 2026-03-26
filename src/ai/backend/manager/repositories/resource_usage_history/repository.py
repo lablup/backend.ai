@@ -5,6 +5,7 @@ from __future__ import annotations
 import uuid
 from collections.abc import Mapping
 from datetime import date, datetime
+from decimal import Decimal
 from typing import TYPE_CHECKING
 
 from ai.backend.common.metrics.metric import DomainType, LayerType
@@ -315,3 +316,15 @@ class ResourceUsageHistoryRepository:
             decay_unit_days: Decay unit days for new buckets (default: 1)
         """
         return await self._db_source.increment_usage_buckets(aggregation_result, decay_unit_days)
+
+    @resource_usage_history_repository_resilience.apply()
+    async def update_bucket_entry_capacities(
+        self,
+        scaling_group: str,
+        capacity_by_slot: Mapping[str, Decimal],
+    ) -> None:
+        """Update capacity on usage_bucket_entries for a scaling group.
+
+        Called after cluster capacity is fetched during fair share calculation.
+        """
+        await self._db_source.update_bucket_entry_capacities(scaling_group, capacity_by_slot)

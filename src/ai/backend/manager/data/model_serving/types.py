@@ -18,6 +18,7 @@ from ai.backend.common.types import (
     ClusterMode,
     MountPermission,
     MountTypes,
+    QuotaScopeID,
     ResourceSlot,
     RuntimeVariant,
     VFolderMount,
@@ -35,6 +36,8 @@ __all__ = [
     "EndpointLifecycle",
     "EndpointTokenData",
     "RoutingData",
+    "ServiceSearchItem",
+    "ServiceSearchResult",
 ]
 
 
@@ -90,7 +93,7 @@ class RoutingData:
     session: uuid.UUID | None
     status: RouteStatus
     traffic_ratio: float
-    created_at: datetime | None
+    created_at: datetime
     error_data: dict[str, Any]
 
 
@@ -141,6 +144,24 @@ class UserData:
 class ScalingGroupData:
     wsproxy_addr: str
     wsproxy_api_token: str
+
+
+@dataclass(frozen=True)
+class ModelServiceValidationContext:
+    """Data resolved from DB during model service validation."""
+
+    model_id: uuid.UUID
+    model_folder_host: str
+    model_folder_quota_scope_id: QuotaScopeID | None
+    model_folder_usage_mode: str
+    requester_access_key: AccessKey
+    owner_access_key: AccessKey
+    owner_uuid: uuid.UUID
+    owner_role: UserRole
+    group_id: uuid.UUID
+    resource_policy: dict[str, Any]
+    scaling_group: str
+    extra_mounts: Sequence[VFolderMount]
 
 
 @dataclass
@@ -234,6 +255,27 @@ class CompactServiceInfo:
     active_route_count: int
     service_endpoint: HttpUrl | None
     is_public: bool
+
+
+@dataclass
+class ServiceSearchItem:
+    id: uuid.UUID
+    name: str
+    replicas: int
+    active_route_count: int
+    service_endpoint: HttpUrl | None
+    open_to_public: bool
+    resource_slots: ResourceSlot
+    resource_group: str
+    routings: Sequence[RoutingData] | None
+
+
+@dataclass
+class ServiceSearchResult:
+    items: list[ServiceSearchItem]
+    total_count: int
+    has_next_page: bool
+    has_previous_page: bool
 
 
 @dataclass

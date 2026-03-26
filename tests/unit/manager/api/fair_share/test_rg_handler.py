@@ -14,7 +14,7 @@ from uuid import UUID
 
 import pytest
 
-from ai.backend.common.types import ResourceSlot
+from ai.backend.common.types import ResourceSlot, SlotQuantity
 from ai.backend.manager.data.fair_share import (
     DomainFairShareData,
     FairShareCalculationSnapshot,
@@ -48,7 +48,7 @@ def create_domain_fair_share_data() -> DomainFairShareData:
             ),
             calculation_snapshot=FairShareCalculationSnapshot(
                 fair_share_factor=Decimal("0.5"),
-                total_decayed_usage=ResourceSlot({"cpu": Decimal("50.0")}),
+                total_decayed_usage=[SlotQuantity("cpu", Decimal("50.0"))],
                 normalized_usage=Decimal("100.0"),
                 lookback_start=date(2024, 1, 1),
                 lookback_end=date(2024, 1, 31),
@@ -79,7 +79,7 @@ def create_project_fair_share_data() -> ProjectFairShareData:
             ),
             calculation_snapshot=FairShareCalculationSnapshot(
                 fair_share_factor=Decimal("0.5"),
-                total_decayed_usage=ResourceSlot({"cpu": Decimal("50.0")}),
+                total_decayed_usage=[SlotQuantity("cpu", Decimal("50.0"))],
                 normalized_usage=Decimal("100.0"),
                 lookback_start=date(2024, 1, 1),
                 lookback_end=date(2024, 1, 31),
@@ -111,7 +111,7 @@ def create_user_fair_share_data() -> UserFairShareData:
             ),
             calculation_snapshot=FairShareCalculationSnapshot(
                 fair_share_factor=Decimal("0.5"),
-                total_decayed_usage=ResourceSlot({"cpu": Decimal("50.0")}),
+                total_decayed_usage=[SlotQuantity("cpu", Decimal("50.0"))],
                 normalized_usage=Decimal("100.0"),
                 lookback_start=date(2024, 1, 1),
                 lookback_end=date(2024, 1, 31),
@@ -141,7 +141,6 @@ class TestRGGetDomainFairShare:
         )
         return processors
 
-    @pytest.mark.asyncio
     async def test_calls_action_with_correct_params(
         self,
         mock_processors_with_domain_exists: MagicMock,
@@ -164,7 +163,6 @@ class TestRGGetDomainFairShare:
         assert action.resource_group == "default"
         assert action.domain_name == "test-domain"
 
-    @pytest.mark.asyncio
     async def test_returns_data_when_found(
         self,
         mock_processors_with_domain_exists: MagicMock,
@@ -191,7 +189,6 @@ class TestRGGetDomainFairShare:
         )
         return processors
 
-    @pytest.mark.asyncio
     async def test_raises_domain_not_found_when_domain_does_not_exist(
         self,
         mock_processors_with_domain_not_found: MagicMock,
@@ -222,7 +219,6 @@ class TestRGGetProjectFairShare:
         )
         return processors
 
-    @pytest.mark.asyncio
     async def test_calls_action_with_correct_params(
         self,
         mock_processors_with_project_exists: MagicMock,
@@ -244,7 +240,6 @@ class TestRGGetProjectFairShare:
         assert action.resource_group == "default"
         assert action.project_id == project_id
 
-    @pytest.mark.asyncio
     async def test_returns_data_when_found(
         self,
         mock_processors_with_project_exists: MagicMock,
@@ -270,7 +265,6 @@ class TestRGGetProjectFairShare:
         )
         return processors
 
-    @pytest.mark.asyncio
     async def test_raises_project_not_found_when_project_does_not_exist(
         self,
         mock_processors_with_project_not_found: MagicMock,
@@ -301,7 +295,6 @@ class TestRGGetUserFairShare:
         )
         return processors
 
-    @pytest.mark.asyncio
     async def test_calls_action_with_correct_params(
         self,
         mock_processors_with_user_exists: MagicMock,
@@ -326,7 +319,6 @@ class TestRGGetUserFairShare:
         assert action.project_id == project_id
         assert action.user_uuid == user_uuid
 
-    @pytest.mark.asyncio
     async def test_returns_data_when_found(
         self,
         mock_processors_with_user_exists: MagicMock,
@@ -353,7 +345,6 @@ class TestRGGetUserFairShare:
         )
         return processors
 
-    @pytest.mark.asyncio
     async def test_raises_user_not_found_when_user_does_not_exist(
         self,
         mock_processors_with_user_not_found: MagicMock,

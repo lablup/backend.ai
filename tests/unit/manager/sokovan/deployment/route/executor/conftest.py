@@ -110,7 +110,6 @@ def _create_deployment_info(
 ) -> DeploymentInfo:
     """Create DeploymentInfo for tests."""
     dep_id = deployment_id or uuid4()
-    revision = MagicMock()
 
     return DeploymentInfo(
         id=dep_id,
@@ -136,7 +135,7 @@ def _create_deployment_info(
             open_to_public=False,
             url="http://test.endpoint",
         ),
-        model_revisions=[revision],
+        model_revisions=[],
         current_revision_id=uuid4(),
     )
 
@@ -151,6 +150,7 @@ def _create_route_data(
     endpoint_id: UUID | None = None,
     session_id: SessionId | None = None,
     status: RouteStatus = RouteStatus.PROVISIONING,
+    revision_id: UUID | None = None,
 ) -> RouteData:
     """Create RouteData for tests."""
     return RouteData(
@@ -160,6 +160,7 @@ def _create_route_data(
         status=status,
         traffic_ratio=1.0,
         created_at=datetime.now(tzutc()),
+        revision_id=revision_id,
     )
 
 

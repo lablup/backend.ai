@@ -78,46 +78,6 @@ Auto edges represent composition relationships with **permission delegation** vi
 - No separate RBAC check is needed for B.
 - B appears as a GQL sub-field of A.
 
-```
-Session ━━auto━━► Kernel
-Session ━━auto━━► Routing
-Session ━━auto━━► SessionDependency
-Session ━━auto━━► SessionSchedulingHistory
-ResourceGroup ━━auto━━► Agent ━━auto━━► Kernel
-ContainerRegistry ━━auto━━► Image ━━auto━━► ImageAlias
-VFolder ━━auto━━► VFolderInvitation
-Endpoint ━━auto━━► EndpointToken
-Endpoint ━━auto━━► EndpointAutoScalingRule
-Endpoint ━━auto━━► DeploymentRevision
-Endpoint ━━auto━━► DeploymentPolicy
-Endpoint ━━auto━━► DeploymentAutoScalingPolicy
-Endpoint ━━auto━━► DeploymentHistory
-Endpoint ━━auto━━► Routing
-Artifact ━━auto━━► ArtifactRevision
-NotificationChannel ━━auto━━► NotificationRule
-Kernel ━━auto━━► KernelSchedulingHistory
-Routing ━━auto━━► RouteHistory
-ResourceGroup ━━auto━━► DomainFairShare
-ResourceGroup ━━auto━━► ProjectFairShare
-ResourceGroup ━━auto━━► UserFairShare
-Domain ━━auto━━► User
-Domain ━━auto━━► Project
-Domain ━━auto━━► Network
-Domain ━━auto━━► DomainFairShare
-Project ━━auto━━► Session
-Project ━━auto━━► VFolder
-Project ━━auto━━► Endpoint
-Project ━━auto━━► Network
-Project ━━auto━━► ProjectFairShare
-User ━━auto━━► Session
-User ━━auto━━► VFolder
-User ━━auto━━► Endpoint
-User ━━auto━━► KeyPair
-User ━━auto━━► UserFairShare
-Role ━━auto━━► Permission
-Role ━━auto━━► UserRole
-```
-
 ### Ref Edges
 
 Ref edges represent read-only references stored per-instance in `association_scopes_entities` with `relation_type=ref`, but with **no permission delegation**. If A ──ref──► B:
@@ -152,21 +112,9 @@ Permission check is two-layer:
 
 This ensures that B's existing User-scope permissions (e.g., `vfolder:delete` at `scope=User:B`) do not flow through to VFolder X, while explicitly granted entity-scope permissions (read/write) work as intended.
 
-```
-Session ──ref──► Agent, ResourceGroup, KeyPair
-Kernel ──ref──► Image, Agent
-Routing ──ref──► Endpoint (from Session), Session (from Endpoint)
-VFolderInvitation ──ref──► User (invitee, inviter)
-Endpoint ──ref──► Image, User (created_user, session_owner)
-User ──ref──► UserResourcePolicy, KeyPair (main_access_key)
-KeyPair ──ref──► KeyPairResourcePolicy, User
-Project ──ref──► ProjectResourcePolicy
-Network ──ref──► Domain, Project
-UserRole ──ref──► User
-Artifact ──ref──► ArtifactRegistry (HuggingFaceRegistry, ReservoirRegistry)
-NotificationChannel ──ref──► User (created_by)
-NotificationRule ──ref──► User (created_by)
-```
+### Edge Catalog
+
+For the complete list of all auto, ref, and guarded edges, see [Entity Edge Catalog](BEP-1048/entity-edge-catalog.md).
 
 ### Key Principles
 
@@ -264,16 +212,18 @@ StorageHost is a planned entity that does not yet exist as a DB table:
 
 ### Association Table Replacement
 
-Existing junction tables will be replaced by `association_scopes_entities`:
+Existing junction tables will be replaced by `association_scopes_entities`.
+These are N:N scope-accessibility mappings — entity visibility propagates to child scopes via CTE scope chain traversal (see [Entity Edge Catalog](BEP-1048/entity-edge-catalog.md) for details).
 
-| Current Table | Replacement | `relation_type` |
-|--------------|-------------|-----------------|
-| `AssociationContainerRegistriesGroupsRow` | `association_scopes_entities` (ContainerRegistry, Project scope) | `auto` |
-| `ScalingGroupForDomainRow` | `association_scopes_entities` (ResourceGroup, Domain scope) | `auto` |
-| `ScalingGroupForProjectRow` | `association_scopes_entities` (ResourceGroup, Project scope) | `auto` |
-| `ScalingGroupForKeypairsRow` | `association_scopes_entities` (ResourceGroup, User scope) | `auto` |
-| `AssocGroupUserRow` | `association_scopes_entities` (User, Project scope) | `ref` |
-| `VFolderPermissionRow` | `association_scopes_entities` (VFolder, User scope) + entity-scope permissions | `ref` |
+| Current Table | Edge | `relation_type` |
+|---|---|---|
+| `ScalingGroupForDomainRow` | Domain ━━auto━━► ResourceGroup | `auto` |
+| `ScalingGroupForProjectRow` | Project ━━auto━━► ResourceGroup | `auto` |
+| `ScalingGroupForKeypairsRow` | User ━━auto━━► ResourceGroup | `auto` |
+| (new) | Domain ━━auto━━► ContainerRegistry | `auto` |
+| `AssociationContainerRegistriesGroupsRow` | Project ━━auto━━► ContainerRegistry | `auto` |
+| `AssocGroupUserRow` | Project ━━ref━━► User | `ref` |
+| `VFolderPermissionRow` | User ━━ref━━► VFolder (+ entity-scope permissions) | `ref` |
 
 ### Final RBAC Tables
 

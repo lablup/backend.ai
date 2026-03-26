@@ -110,7 +110,6 @@ async def virtual_user_db(postgres_container: Any) -> AsyncGenerator[tuple[Any, 
     engine.dispose()
 
 
-@pytest.mark.asyncio
 async def test_select_queries(virtual_user_db: tuple[Any, Any]) -> None:
     conn, users = virtual_user_db
     parser = QueryFilterParser()
@@ -270,7 +269,6 @@ async def test_select_queries(virtual_user_db: tuple[Any, Any]) -> None:
         )
 
 
-@pytest.mark.asyncio
 async def test_modification_queries(virtual_user_db: tuple[Any, Any]) -> None:
     conn, users = virtual_user_db
     parser = QueryFilterParser()
@@ -290,7 +288,6 @@ async def test_modification_queries(virtual_user_db: tuple[Any, Any]) -> None:
     assert result.rowcount == 4
 
 
-@pytest.mark.asyncio
 async def test_fieldspec(virtual_user_db: tuple[Any, Any]) -> None:
     conn, users = virtual_user_db
     parser = QueryFilterParser({

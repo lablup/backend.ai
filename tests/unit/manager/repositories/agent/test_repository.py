@@ -49,7 +49,7 @@ from ai.backend.manager.models.group import GroupRow
 from ai.backend.manager.models.image import ImageRow
 from ai.backend.manager.models.kernel import KernelRow
 from ai.backend.manager.models.keypair import KeyPairRow
-from ai.backend.manager.models.rbac_models import UserRoleRow
+from ai.backend.manager.models.rbac_models import RoleRow, UserRoleRow
 from ai.backend.manager.models.resource_policy import (
     KeyPairResourcePolicyRow,
     ProjectResourcePolicyRow,
@@ -103,6 +103,7 @@ class TestAgentRepositoryDB:
                 UserResourcePolicyRow,
                 ProjectResourcePolicyRow,
                 KeyPairResourcePolicyRow,
+                RoleRow,
                 UserRoleRow,
                 UserRow,
                 KeyPairRow,
@@ -567,14 +568,18 @@ class TestAgentRepositoryCache:
         """Test GPU allocation map update is stored in cache"""
         agent_id = AgentId("agent-001")
         alloc_map: Mapping[str, Any] = {
-            "cuda:0": {"session_id": "sess-001"},
-            "cuda:1": {"session_id": "sess-002"},
+            "GPU-aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee": "0.50",
+            "GPU-11111111-2222-3333-4444-555555555555": "1.00",
         }
 
         await agent_repository.update_gpu_alloc_map(agent_id, alloc_map)
 
         stored_map = await valkey_stat_client.get_gpu_allocation_map(str(agent_id))
-        assert stored_map == alloc_map
+        assert stored_map is not None
+        assert stored_map == {
+            "GPU-aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee": Decimal("0.50"),
+            "GPU-11111111-2222-3333-4444-555555555555": Decimal("1.00"),
+        }
 
 
 @dataclass
@@ -606,6 +611,7 @@ class TestAgentDBSourceKernelFiltering:
                 UserResourcePolicyRow,
                 ProjectResourcePolicyRow,
                 KeyPairResourcePolicyRow,
+                RoleRow,
                 UserRoleRow,
                 UserRow,
                 KeyPairRow,

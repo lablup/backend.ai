@@ -10,6 +10,7 @@ import pytest
 from dateutil.tz import tzutc
 
 from ai.backend.common.data.endpoint.types import EndpointLifecycle
+from ai.backend.common.types import RuntimeVariant
 from ai.backend.manager.data.deployment.types import (
     DeploymentInfo,
     DeploymentMetadata,
@@ -21,6 +22,7 @@ from ai.backend.manager.data.deployment.types import (
 from ai.backend.manager.data.resource.types import ScalingGroupProxyTarget
 from ai.backend.manager.repositories.deployment.types import RouteData
 from ai.backend.manager.sokovan.deployment.executor import DeploymentExecutor
+from ai.backend.manager.sokovan.deployment.types import DeploymentWithHistory
 
 # =============================================================================
 # Mock Dependencies
@@ -40,6 +42,9 @@ def mock_deployment_repo() -> AsyncMock:
     repo.fetch_auto_scaling_rules_by_endpoint_ids = AsyncMock(return_value={})
     repo.fetch_metrics_for_autoscaling = AsyncMock(return_value=MagicMock())
     repo.calculate_desired_replicas_for_deployment = AsyncMock(return_value=None)
+    mock_revision_spec = MagicMock()
+    mock_revision_spec.execution.runtime_variant = RuntimeVariant.CUSTOM
+    repo.get_revision_spec_from_endpoint = AsyncMock(return_value=mock_revision_spec)
     return repo
 
 
@@ -105,7 +110,10 @@ def _create_deployment_info(
 ) -> DeploymentInfo:
     """Create DeploymentInfo for tests."""
     dep_id = deployment_id or uuid4()
+    rev_id = uuid4()
     revision = MagicMock() if has_revision else None
+    if revision is not None:
+        revision.revision_id = rev_id
 
     return DeploymentInfo(
         id=dep_id,
@@ -132,7 +140,7 @@ def _create_deployment_info(
             url=None,
         ),
         model_revisions=[revision] if has_revision else [],  # type: ignore[list-item]
-        current_revision_id=uuid4() if has_revision else None,
+        current_revision_id=rev_id if has_revision else None,
     )
 
 
@@ -153,68 +161,98 @@ def _create_route_data(
 
 
 @pytest.fixture
-def pending_deployment() -> DeploymentInfo:
+def pending_deployment() -> DeploymentWithHistory:
     """Single PENDING deployment for check_pending tests."""
-    return _create_deployment_info(lifecycle=EndpointLifecycle.PENDING)
+    return DeploymentWithHistory(
+        deployment_info=_create_deployment_info(lifecycle=EndpointLifecycle.PENDING),
+    )
 
 
 @pytest.fixture
-def pending_deployments_multiple() -> list[DeploymentInfo]:
+def pending_deployments_multiple() -> list[DeploymentWithHistory]:
     """Multiple PENDING deployments."""
     return [
-        _create_deployment_info(lifecycle=EndpointLifecycle.PENDING, resource_group="sg-1"),
-        _create_deployment_info(lifecycle=EndpointLifecycle.PENDING, resource_group="sg-2"),
+        DeploymentWithHistory(
+            deployment_info=_create_deployment_info(
+                lifecycle=EndpointLifecycle.PENDING, resource_group="sg-1"
+            ),
+        ),
+        DeploymentWithHistory(
+            deployment_info=_create_deployment_info(
+                lifecycle=EndpointLifecycle.PENDING, resource_group="sg-2"
+            ),
+        ),
     ]
 
 
 @pytest.fixture
-def pending_deployment_no_revision() -> DeploymentInfo:
+def pending_deployment_no_revision() -> DeploymentWithHistory:
     """PENDING deployment without target revision."""
-    return _create_deployment_info(lifecycle=EndpointLifecycle.PENDING, has_revision=False)
+    return DeploymentWithHistory(
+        deployment_info=_create_deployment_info(
+            lifecycle=EndpointLifecycle.PENDING, has_revision=False
+        ),
+    )
 
 
 @pytest.fixture
-def ready_deployment() -> DeploymentInfo:
+def ready_deployment() -> DeploymentWithHistory:
     """READY deployment for scaling tests."""
-    return _create_deployment_info(
-        lifecycle=EndpointLifecycle.READY,
-        desired_replica_count=2,
-        replica_count=2,
+    return DeploymentWithHistory(
+        deployment_info=_create_deployment_info(
+            lifecycle=EndpointLifecycle.READY,
+            desired_replica_count=2,
+            replica_count=2,
+        ),
     )
 
 
 @pytest.fixture
-def ready_deployment_needs_scale_up() -> DeploymentInfo:
+def ready_deployment_needs_scale_up() -> DeploymentWithHistory:
     """READY deployment that needs scale up."""
-    return _create_deployment_info(
-        lifecycle=EndpointLifecycle.READY,
-        desired_replica_count=3,
-        replica_count=2,
+    return DeploymentWithHistory(
+        deployment_info=_create_deployment_info(
+            lifecycle=EndpointLifecycle.READY,
+            desired_replica_count=3,
+            replica_count=2,
+        ),
     )
 
 
 @pytest.fixture
-def ready_deployment_needs_scale_down() -> DeploymentInfo:
+def ready_deployment_needs_scale_down() -> DeploymentWithHistory:
     """READY deployment that needs scale down."""
-    return _create_deployment_info(
-        lifecycle=EndpointLifecycle.READY,
-        desired_replica_count=1,
-        replica_count=2,
+    return DeploymentWithHistory(
+        deployment_info=_create_deployment_info(
+            lifecycle=EndpointLifecycle.READY,
+            desired_replica_count=1,
+            replica_count=2,
+        ),
     )
 
 
 @pytest.fixture
-def destroying_deployment() -> DeploymentInfo:
+def destroying_deployment() -> DeploymentWithHistory:
     """DESTROYING deployment for termination tests."""
-    return _create_deployment_info(lifecycle=EndpointLifecycle.DESTROYING)
+    return DeploymentWithHistory(
+        deployment_info=_create_deployment_info(lifecycle=EndpointLifecycle.DESTROYING),
+    )
 
 
 @pytest.fixture
-def destroying_deployments_multiple() -> list[DeploymentInfo]:
+def destroying_deployments_multiple() -> list[DeploymentWithHistory]:
     """Multiple DESTROYING deployments."""
     return [
-        _create_deployment_info(lifecycle=EndpointLifecycle.DESTROYING, resource_group="sg-1"),
-        _create_deployment_info(lifecycle=EndpointLifecycle.DESTROYING, resource_group="sg-2"),
+        DeploymentWithHistory(
+            deployment_info=_create_deployment_info(
+                lifecycle=EndpointLifecycle.DESTROYING, resource_group="sg-1"
+            ),
+        ),
+        DeploymentWithHistory(
+            deployment_info=_create_deployment_info(
+                lifecycle=EndpointLifecycle.DESTROYING, resource_group="sg-2"
+            ),
+        ),
     ]
 
 

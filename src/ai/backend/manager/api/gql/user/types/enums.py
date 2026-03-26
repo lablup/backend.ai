@@ -4,18 +4,21 @@ from __future__ import annotations
 
 from enum import StrEnum
 
-import strawberry
+from ai.backend.manager.api.gql.decorators import BackendAIGQLMeta, gql_enum
 
 
-@strawberry.enum(
-    name="UserStatusV2",
-    description=(
-        "Added in 26.2.0. User account status. "
-        "ACTIVE: User can log in and use the system. "
-        "INACTIVE: User account is disabled but preserved. "
-        "DELETED: User has been soft-deleted. "
-        "BEFORE_VERIFICATION: User account is pending email verification."
+@gql_enum(
+    BackendAIGQLMeta(
+        added_version="26.2.0",
+        description=(
+            "User account status. "
+            "ACTIVE: User can log in and use the system. "
+            "INACTIVE: User account is disabled but preserved. "
+            "DELETED: User has been soft-deleted. "
+            "BEFORE_VERIFICATION: User account is pending email verification."
+        ),
     ),
+    name="UserStatusV2",
 )
 class UserStatusEnumGQL(StrEnum):
     ACTIVE = "active"
@@ -24,15 +27,18 @@ class UserStatusEnumGQL(StrEnum):
     BEFORE_VERIFICATION = "before-verification"
 
 
-@strawberry.enum(
-    name="UserRoleV2",
-    description=(
-        "Added in 26.2.0. User role determining access permissions. "
-        "USER: Standard user with basic permissions. "
-        "ADMIN: Domain administrator with elevated permissions. "
-        "SUPERADMIN: System-wide administrator with full access. "
-        "MONITOR: Read-only access for monitoring purposes."
+@gql_enum(
+    BackendAIGQLMeta(
+        added_version="26.2.0",
+        description=(
+            "User role determining access permissions. "
+            "USER: Standard user with basic permissions. "
+            "ADMIN: Domain administrator with elevated permissions. "
+            "SUPERADMIN: System-wide administrator with full access. "
+            "MONITOR: Read-only access for monitoring purposes."
+        ),
     ),
+    name="UserRoleV2",
 )
 class UserRoleEnumGQL(StrEnum):
     USER = "user"

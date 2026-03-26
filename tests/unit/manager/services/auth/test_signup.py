@@ -37,10 +37,10 @@ def auth_service(
         hook_plugin_ctx=mock_hook_plugin_ctx,
         auth_repository=mock_auth_repository,
         config_provider=mock_config_provider,
+        valkey_session_client=AsyncMock(),
     )
 
 
-@pytest.mark.asyncio
 async def test_signup_successful_with_minimal_data(
     auth_service: AuthService,
     mock_auth_repository: AsyncMock,
@@ -86,7 +86,6 @@ async def test_signup_successful_with_minimal_data(
     assert result.secret_key == sk
 
 
-@pytest.mark.asyncio
 async def test_signup_successful_with_full_data(
     mock_hook_plugin_ctx: AsyncMock,
     mock_auth_repository: AsyncMock,
@@ -132,7 +131,6 @@ async def test_signup_successful_with_full_data(
     assert result.secret_key == sk
 
 
-@pytest.mark.asyncio
 async def test_signup_fails_when_email_already_exists(
     mock_hook_plugin_ctx: AsyncMock,
     mock_auth_repository: AsyncMock,
@@ -165,7 +163,6 @@ async def test_signup_fails_when_email_already_exists(
     mock_auth_repository.check_email_exists.assert_called_once()
 
 
-@pytest.mark.asyncio
 async def test_signup_with_hook_override(
     mock_hook_plugin_ctx: AsyncMock,
     mock_auth_repository: AsyncMock,
@@ -229,7 +226,6 @@ async def test_signup_with_hook_override(
     assert result.access_key == ak
 
 
-@pytest.mark.asyncio
 async def test_signup_creation_error(
     mock_hook_plugin_ctx: AsyncMock,
     mock_auth_repository: AsyncMock,
@@ -262,7 +258,6 @@ async def test_signup_creation_error(
     assert "Error creating user account" in str(exc_info.value)
 
 
-@pytest.mark.asyncio
 async def test_signup_post_hook_notification(
     mock_hook_plugin_ctx: AsyncMock,
     mock_auth_repository: AsyncMock,

@@ -24,7 +24,7 @@ from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.image import ImageRow
 from ai.backend.manager.models.kernel import KernelRow, kernels
 from ai.backend.manager.models.keypair import KeyPairRow
-from ai.backend.manager.models.rbac_models import UserRoleRow
+from ai.backend.manager.models.rbac_models import RoleRow, UserRoleRow
 from ai.backend.manager.models.resource_policy import (
     KeyPairResourcePolicyRow,
     ProjectResourcePolicyRow,
@@ -69,6 +69,7 @@ async def db_with_cleanup(
             UserResourcePolicyRow,
             ProjectResourcePolicyRow,
             KeyPairResourcePolicyRow,
+            RoleRow,
             UserRoleRow,
             UserRow,
             KeyPairRow,
@@ -195,7 +196,6 @@ async def _select_kernel_row(
     return result.first()  # type: ignore[no-any-return]
 
 
-@pytest.mark.asyncio
 async def test_sql_json_merge__default(session_info: tuple[str, Any]) -> None:
     session_id, conn = session_info
     expected: dict[str, Any] | None = None
@@ -204,7 +204,6 @@ async def test_sql_json_merge__default(session_info: tuple[str, Any]) -> None:
     assert kernel.status_history == expected
 
 
-@pytest.mark.asyncio
 async def test_sql_json_merge__deeper_object(session_info: tuple[str, Any]) -> None:
     session_id, conn = session_info
     timestamp = datetime.now(tzutc()).isoformat()
@@ -236,7 +235,6 @@ async def test_sql_json_merge__deeper_object(session_info: tuple[str, Any]) -> N
     assert kernel.status_history == expected
 
 
-@pytest.mark.asyncio
 async def test_sql_json_merge__append_values(session_info: tuple[str, Any]) -> None:
     session_id, conn = session_info
     timestamp = datetime.now(tzutc()).isoformat()
@@ -285,7 +283,6 @@ async def test_sql_json_merge__append_values(session_info: tuple[str, Any]) -> N
     assert kernel.status_history == expected
 
 
-@pytest.mark.asyncio
 async def test_sql_json_merge__kernel_status_history(session_info: tuple[str, Any]) -> None:
     session_id, conn = session_info
     timestamp = datetime.now(tzutc()).isoformat()
@@ -330,7 +327,6 @@ async def test_sql_json_merge__kernel_status_history(session_info: tuple[str, An
     assert kernel.status_history == expected
 
 
-@pytest.mark.asyncio
 async def test_sql_json_merge__mixed_formats(session_info: tuple[str, Any]) -> None:
     session_id, conn = session_info
     timestamp = datetime.now(tzutc()).isoformat()
@@ -374,7 +370,6 @@ async def test_sql_json_merge__mixed_formats(session_info: tuple[str, Any]) -> N
     assert kernel.status_history == expected
 
 
-@pytest.mark.asyncio
 async def test_sql_json_merge__json_serializable_types(session_info: tuple[str, Any]) -> None:
     session_id, conn = session_info
     expected = {
@@ -407,7 +402,6 @@ async def test_sql_json_merge__json_serializable_types(session_info: tuple[str, 
     assert kernel.status_history == expected
 
 
-@pytest.mark.asyncio
 async def test_agg_to_str(session_info: tuple[str, Any]) -> None:
     session_id, conn = session_info
     test_data1, test_data2 = "hello", "world"
@@ -470,7 +464,6 @@ async def test_agg_to_str(session_info: tuple[str, Any]) -> None:
     )
 
 
-@pytest.mark.asyncio
 async def test_agg_to_array(session_info: tuple[str, Any]) -> None:
     session_id, conn = session_info
     test_data1, test_data2 = "a", "b"

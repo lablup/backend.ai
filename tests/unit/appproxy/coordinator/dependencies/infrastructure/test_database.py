@@ -43,7 +43,6 @@ class TestDatabaseProvider:
         config.db = db_config
         return config
 
-    @pytest.mark.asyncio
     async def test_provide_database_engine(
         self,
         coordinator_db_config: ServerConfig,
@@ -58,7 +57,6 @@ class TestDatabaseProvider:
                 result = await conn.scalar(sa.text("SELECT 1"))
                 assert result == 1
 
-    @pytest.mark.asyncio
     async def test_cleanup_on_exception(
         self,
         coordinator_db_config: ServerConfig,

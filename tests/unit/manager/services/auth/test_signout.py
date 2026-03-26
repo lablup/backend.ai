@@ -26,10 +26,10 @@ def auth_service(
         hook_plugin_ctx=mock_hook_plugin_ctx,
         auth_repository=mock_auth_repository,
         config_provider=mock_config_provider,
+        valkey_session_client=AsyncMock(),
     )
 
 
-@pytest.mark.asyncio
 async def test_signout_successful_with_valid_credentials(
     auth_service: AuthService,
     mock_auth_repository: AsyncMock,
@@ -59,7 +59,6 @@ async def test_signout_successful_with_valid_credentials(
     mock_auth_repository.deactivate_user_and_keypairs.assert_called_once()
 
 
-@pytest.mark.asyncio
 async def test_signout_fails_when_not_account_owner(
     auth_service: AuthService,
 ) -> None:
@@ -76,7 +75,6 @@ async def test_signout_fails_when_not_account_owner(
         await auth_service.signout(action)
 
 
-@pytest.mark.asyncio
 async def test_signout_fails_with_invalid_credentials(
     auth_service: AuthService,
     mock_auth_repository: AsyncMock,

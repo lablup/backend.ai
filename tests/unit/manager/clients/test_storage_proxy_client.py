@@ -53,7 +53,6 @@ def storage_proxy_client_factory(
 
 
 class TestStorageProxyClient:
-    @pytest.mark.asyncio
     async def test_client_gracefully_handle_non_json_response(
         self, storage_proxy_client_factory: StorageProxyClientFactory
     ) -> None:
@@ -85,7 +84,6 @@ class TestStorageProxyClient:
         assert error_code.operation == ErrorOperation.REQUEST
         assert error_code.error_detail == ErrorDetail.CONTENT_TYPE_MISMATCH
 
-    @pytest.mark.asyncio
     async def test_request_timeout_expiration(
         self, storage_proxy_client_factory: StorageProxyClientFactory
     ) -> None:
@@ -112,7 +110,6 @@ class TestStorageProxyClient:
 
         assert "Request to storage proxy timed out" in str(exc_info.value)
 
-    @pytest.mark.asyncio
     async def test_configured_client_timeout_causes_timeout_error(
         self, storage_proxy_client_factory: StorageProxyClientFactory
     ) -> None:
@@ -140,7 +137,6 @@ class TestStorageProxyClient:
         with pytest.raises(StorageProxyTimeoutError):
             await manager_client.get_volumes()
 
-    @pytest.mark.asyncio
     async def test_configured_client_timeout_succeeds(
         self, storage_proxy_client_factory: StorageProxyClientFactory
     ) -> None:

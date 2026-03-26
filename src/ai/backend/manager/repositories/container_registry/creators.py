@@ -3,12 +3,19 @@
 from __future__ import annotations
 
 import uuid
+from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import Any, override
 
 from ai.backend.common.container_registry import AllowedGroupsModel, ContainerRegistryType
+from ai.backend.common.exception import ContainerRegistryGroupsAlreadyAssociated
+from ai.backend.manager.errors.repository import UniqueConstraintViolationError
+from ai.backend.manager.models.association_container_registries_groups import (
+    AssociationContainerRegistriesGroupsRow,
+)
 from ai.backend.manager.models.container_registry import ContainerRegistryRow
 from ai.backend.manager.repositories.base.creator import CreatorSpec
+from ai.backend.manager.repositories.base.types import IntegrityErrorCheck
 
 
 @dataclass
@@ -44,4 +51,34 @@ class ContainerRegistryCreatorSpec(CreatorSpec[ContainerRegistryRow]):
             password=self.password,
             ssl_verify=self.ssl_verify,
             extra=self.extra,
+        )
+
+
+@dataclass
+class ContainerRegistryGroupCreatorSpec(
+    CreatorSpec[AssociationContainerRegistriesGroupsRow],
+):
+    """CreatorSpec for container registry group association."""
+
+    registry_id: uuid.UUID
+    group_id: uuid.UUID
+
+    @property
+    @override
+    def integrity_error_checks(self) -> Sequence[IntegrityErrorCheck]:
+        return (
+            IntegrityErrorCheck(
+                violation_type=UniqueConstraintViolationError,
+                constraint_name="uq_registry_id_group_id",
+                error=ContainerRegistryGroupsAlreadyAssociated(
+                    f"Already associated groups for registry_id: {self.registry_id}, group_id: {self.group_id}"
+                ),
+            ),
+        )
+
+    @override
+    def build_row(self) -> AssociationContainerRegistriesGroupsRow:
+        return AssociationContainerRegistriesGroupsRow(
+            registry_id=self.registry_id,
+            group_id=self.group_id,
         )

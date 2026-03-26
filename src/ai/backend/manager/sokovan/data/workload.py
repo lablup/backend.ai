@@ -99,6 +99,8 @@ class SessionWorkload:
     starts_at: datetime | None = None
     # Whether this is a private session (SFTP)
     is_private: bool = False
+    # Whether this session can be preempted
+    is_preemptible: bool = True
     # Kernels to be scheduled for this session
     kernels: list[KernelWorkload] = field(default_factory=list)
     # Manually designated agent (for superadmin)
@@ -106,3 +108,5 @@ class SessionWorkload:
     # Kernel counts at endpoint for each agent (for inference session spreading)
     # Only populated for inference sessions with enforce_spreading_endpoint_replica
     kernel_counts_at_endpoint: dict[AgentId, int] | None = None
+    # Agents that previously failed for this session (populated from Valkey during scheduling)
+    failed_agent_ids: frozenset[AgentId] = frozenset()

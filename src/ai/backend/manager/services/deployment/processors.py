@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING, override
 from ai.backend.manager.actions.monitors.monitor import ActionMonitor
 from ai.backend.manager.actions.processor import ActionProcessor
 from ai.backend.manager.actions.types import AbstractProcessorPackage, ActionSpec
+from ai.backend.manager.actions.validators import ActionValidators
 from ai.backend.manager.services.deployment.actions.access_token.create_access_token import (
     CreateAccessTokenAction,
     CreateAccessTokenActionResult,
@@ -22,6 +23,10 @@ from ai.backend.manager.services.deployment.actions.auto_scaling_rule.create_aut
 from ai.backend.manager.services.deployment.actions.auto_scaling_rule.delete_auto_scaling_rule import (
     DeleteAutoScalingRuleAction,
     DeleteAutoScalingRuleActionResult,
+)
+from ai.backend.manager.services.deployment.actions.auto_scaling_rule.get_auto_scaling_rule import (
+    GetAutoScalingRuleAction,
+    GetAutoScalingRuleActionResult,
 )
 from ai.backend.manager.services.deployment.actions.auto_scaling_rule.search_auto_scaling_rules import (
     SearchAutoScalingRulesAction,
@@ -42,6 +47,10 @@ from ai.backend.manager.services.deployment.actions.create_legacy_deployment imp
 from ai.backend.manager.services.deployment.actions.deployment_policy import (
     GetDeploymentPolicyAction,
     GetDeploymentPolicyActionResult,
+    SearchDeploymentPoliciesAction,
+    SearchDeploymentPoliciesActionResult,
+    UpsertDeploymentPolicyAction,
+    UpsertDeploymentPolicyActionResult,
 )
 from ai.backend.manager.services.deployment.actions.destroy_deployment import (
     DestroyDeploymentAction,
@@ -58,10 +67,6 @@ from ai.backend.manager.services.deployment.actions.get_replica_by_id import (
 from ai.backend.manager.services.deployment.actions.model_revision.add_model_revision import (
     AddModelRevisionAction,
     AddModelRevisionActionResult,
-)
-from ai.backend.manager.services.deployment.actions.model_revision.create_model_revision import (
-    CreateModelRevisionAction,
-    CreateModelRevisionActionResult,
 )
 from ai.backend.manager.services.deployment.actions.model_revision.get_revision_by_id import (
     GetRevisionByIdAction,
@@ -117,11 +122,14 @@ class DeploymentProcessors(AbstractProcessorPackage):
     get_deployment_policy: ActionProcessor[
         GetDeploymentPolicyAction, GetDeploymentPolicyActionResult
     ]
+    search_deployment_policies: ActionProcessor[
+        SearchDeploymentPoliciesAction, SearchDeploymentPoliciesActionResult
+    ]
+    upsert_deployment_policy: ActionProcessor[
+        UpsertDeploymentPolicyAction, UpsertDeploymentPolicyActionResult
+    ]
 
     # Revision operations
-    create_model_revision: ActionProcessor[
-        CreateModelRevisionAction, CreateModelRevisionActionResult
-    ]
     add_model_revision: ActionProcessor[AddModelRevisionAction, AddModelRevisionActionResult]
     get_revision_by_id: ActionProcessor[GetRevisionByIdAction, GetRevisionByIdActionResult]
     search_revisions: ActionProcessor[SearchRevisionsAction, SearchRevisionsActionResult]
@@ -142,6 +150,7 @@ class DeploymentProcessors(AbstractProcessorPackage):
     create_auto_scaling_rule: ActionProcessor[
         CreateAutoScalingRuleAction, CreateAutoScalingRuleActionResult
     ]
+    get_auto_scaling_rule: ActionProcessor[GetAutoScalingRuleAction, GetAutoScalingRuleActionResult]
     update_auto_scaling_rule: ActionProcessor[
         UpdateAutoScalingRuleAction, UpdateAutoScalingRuleActionResult
     ]
@@ -156,7 +165,12 @@ class DeploymentProcessors(AbstractProcessorPackage):
     create_access_token: ActionProcessor[CreateAccessTokenAction, CreateAccessTokenActionResult]
     search_access_tokens: ActionProcessor[SearchAccessTokensAction, SearchAccessTokensActionResult]
 
-    def __init__(self, service: DeploymentService, action_monitors: list[ActionMonitor]) -> None:
+    def __init__(
+        self,
+        service: DeploymentService,
+        action_monitors: list[ActionMonitor],
+        validators: ActionValidators,
+    ) -> None:
         # Deployment CRUD
         self.create_deployment = ActionProcessor(service.create_deployment, action_monitors)
         self.create_legacy_deployment = ActionProcessor(
@@ -167,9 +181,14 @@ class DeploymentProcessors(AbstractProcessorPackage):
         self.search_deployments = ActionProcessor(service.search_deployments, action_monitors)
         self.get_deployment_by_id = ActionProcessor(service.get_deployment_by_id, action_monitors)
         self.get_deployment_policy = ActionProcessor(service.get_deployment_policy, action_monitors)
+        self.search_deployment_policies = ActionProcessor(
+            service.search_deployment_policies, action_monitors
+        )
+        self.upsert_deployment_policy = ActionProcessor(
+            service.upsert_deployment_policy, action_monitors
+        )
 
         # Revision operations
-        self.create_model_revision = ActionProcessor(service.create_model_revision, action_monitors)
         self.add_model_revision = ActionProcessor(service.add_model_revision, action_monitors)
         self.get_revision_by_id = ActionProcessor(service.get_revision_by_id, action_monitors)
         self.search_revisions = ActionProcessor(service.search_revisions, action_monitors)
@@ -190,6 +209,7 @@ class DeploymentProcessors(AbstractProcessorPackage):
         self.create_auto_scaling_rule = ActionProcessor(
             service.create_auto_scaling_rule, action_monitors
         )
+        self.get_auto_scaling_rule = ActionProcessor(service.get_auto_scaling_rule, action_monitors)
         self.update_auto_scaling_rule = ActionProcessor(
             service.update_auto_scaling_rule, action_monitors
         )
@@ -215,8 +235,9 @@ class DeploymentProcessors(AbstractProcessorPackage):
             SearchDeploymentsAction.spec(),
             GetDeploymentByIdAction.spec(),
             GetDeploymentPolicyAction.spec(),
+            SearchDeploymentPoliciesAction.spec(),
+            UpsertDeploymentPolicyAction.spec(),
             # Revision operations
-            CreateModelRevisionAction.spec(),
             AddModelRevisionAction.spec(),
             GetRevisionByIdAction.spec(),
             SearchRevisionsAction.spec(),
@@ -230,6 +251,7 @@ class DeploymentProcessors(AbstractProcessorPackage):
             SearchReplicasAction.spec(),
             # Auto-scaling rules
             CreateAutoScalingRuleAction.spec(),
+            GetAutoScalingRuleAction.spec(),
             UpdateAutoScalingRuleAction.spec(),
             DeleteAutoScalingRuleAction.spec(),
             SearchAutoScalingRulesAction.spec(),

@@ -1,6 +1,15 @@
 import strawberry
+from graphql.pyutils.undefined import Undefined as GraphQLUndefined
 from strawberry.federation import Schema
 from strawberry.schema.config import StrawberryConfig
+
+from ai.backend.common.api_handlers import Sentinel as BackendSentinel
+from ai.backend.manager.api.gql.extensions import (
+    GQLExceptionHandlerExtension,
+    GQLLoggingExtension,
+    GQLMetricExtension,
+    GQLValidationExtension,
+)
 
 from .agent import (
     agent_stats,
@@ -39,6 +48,7 @@ from .artifact import (
     update_artifact,
 )
 from .artifact_registry import default_artifact_registry
+from .audit_log import admin_audit_logs_v2
 from .background_task import background_task_events
 from .deployment import (
     # Revision
@@ -50,7 +60,6 @@ from .deployment import (
     create_auto_scaling_rule,
     # Deployment
     create_model_deployment,
-    create_model_revision,
     delete_auto_scaling_rule,
     delete_model_deployment,
     deployment,
@@ -69,6 +78,7 @@ from .deployment import (
     routes,
     sync_replicas,
     update_auto_scaling_rule,
+    update_deployment_policy,
     update_model_deployment,
     update_route_traffic_status,
 )
@@ -125,6 +135,13 @@ from .image import (
     image_v2,
 )
 from .kernel.resolver import admin_kernels_v2, kernel_v2, session_kernels_v2
+from .keypair import (
+    issue_my_keypair,
+    my_keypairs,
+    revoke_my_keypair,
+    switch_my_main_access_key,
+    update_my_keypair,
+)
 from .notification import (
     admin_create_notification_channel,
     admin_create_notification_rule,
@@ -167,6 +184,34 @@ from .project_v2 import (
     project_domain_v2,
     project_v2,
 )
+from .prometheus_query_preset import (
+    admin_create_prometheus_query_preset,
+    admin_delete_prometheus_query_preset,
+    admin_modify_prometheus_query_preset,
+    admin_prometheus_query_preset,
+    admin_prometheus_query_preset_result,
+    admin_prometheus_query_presets,
+)
+from .rbac import (
+    admin_assign_role,
+    admin_bulk_assign_role,
+    admin_bulk_revoke_role,
+    admin_create_permission,
+    admin_create_role,
+    admin_delete_permission,
+    admin_delete_role,
+    admin_entities,
+    admin_permissions,
+    admin_purge_role,
+    admin_revoke_role,
+    admin_role,
+    admin_role_assignments,
+    admin_roles,
+    admin_update_permission,
+    admin_update_role,
+    my_roles,
+    rbac_scope_entity_combinations,
+)
 from .reservoir_registry import (
     create_reservoir_registry,
     delete_reservoir_registry,
@@ -181,6 +226,7 @@ from .resource_group import (
     resource_groups,
     update_resource_group_fair_share_spec,
 )
+from .resource_slot.resolver import resource_slot_type, resource_slot_types
 from .resource_usage import (
     admin_domain_usage_buckets,
     admin_project_usage_buckets,
@@ -206,26 +252,31 @@ from .scheduling_history import (
     session_scheduling_histories,
     session_scoped_scheduling_histories,
 )
+from .service_catalog import admin_service_catalogs
+from .session.resolver import admin_sessions_v2
 from .storage_namespace import (
     register_storage_namespace,
     unregister_storage_namespace,
 )
 from .user import (
     # Mutations
-    admin_bulk_create_users,
-    admin_create_user,
-    admin_delete_user,
-    admin_delete_users,
-    admin_purge_user,
-    admin_purge_users,
-    admin_update_user,
+    admin_bulk_create_users_v2,
+    admin_bulk_purge_users_v2,
+    admin_bulk_update_users_v2,
+    admin_create_user_v2,
+    admin_delete_user_v2,
+    admin_delete_users_v2,
+    admin_purge_user_v2,
+    admin_update_user_v2,
     # Queries
     admin_user_v2,
     admin_users_v2,
     domain_users_v2,
+    my_client_ip,
     my_user_v2,
     project_users_v2,
-    update_user,
+    update_my_allowed_client_ip,
+    update_user_v2,
 )
 from .vfs_storage import (
     create_vfs_storage,
@@ -266,6 +317,7 @@ class Query:
     image_alias = image_alias
     # Admin APIs
     admin_resource_groups = admin_resource_groups
+    admin_service_catalogs = admin_service_catalogs
     admin_session_scheduling_histories = admin_session_scheduling_histories
     admin_deployment_histories = admin_deployment_histories
     admin_route_histories = admin_route_histories
@@ -285,7 +337,26 @@ class Query:
     admin_user_usage_buckets = admin_user_usage_buckets
     admin_images_v2 = admin_images_v2
     admin_kernels_v2 = admin_kernels_v2
+    admin_audit_logs_v2 = admin_audit_logs_v2
+    admin_sessions_v2 = admin_sessions_v2
+    resource_slot_type = resource_slot_type
+    resource_slot_types = resource_slot_types
     admin_image_aliases = admin_image_aliases
+    # Prometheus Query Preset Admin APIs
+    admin_prometheus_query_preset = admin_prometheus_query_preset
+    admin_prometheus_query_presets = admin_prometheus_query_presets
+    admin_prometheus_query_preset_result = admin_prometheus_query_preset_result
+    # RBAC Admin APIs
+    admin_role = admin_role
+    admin_roles = admin_roles
+    admin_permissions = admin_permissions
+    admin_role_assignments = admin_role_assignments
+    admin_entities = admin_entities
+    # Keypair self-service queries
+    my_keypairs = my_keypairs
+    # RBAC User APIs
+    my_roles = my_roles
+    rbac_scope_entity_combinations = rbac_scope_entity_combinations
     # Session Scoped APIs
     session_kernels_v2 = session_kernels_v2
     # Resource Group Scoped APIs
@@ -334,6 +405,7 @@ class Query:
     admin_user_v2 = admin_user_v2
     admin_users_v2 = admin_users_v2
     domain_users_v2 = domain_users_v2
+    my_client_ip = my_client_ip
     my_user_v2 = my_user_v2
     project_users_v2 = project_users_v2
     # Domain V2 APIs
@@ -366,7 +438,7 @@ class Mutation:
     delete_model_deployment = delete_model_deployment
     sync_replicas = sync_replicas
     add_model_revision = add_model_revision
-    create_model_revision = create_model_revision
+    update_deployment_policy = update_deployment_policy
     # Notification - Admin APIs
     admin_create_notification_channel = admin_create_notification_channel
     admin_update_notification_channel = admin_update_notification_channel
@@ -435,14 +507,38 @@ class Mutation:
     # Resource Group - Legacy (deprecated)
     update_resource_group_fair_share_spec = update_resource_group_fair_share_spec
     # User V2 APIs
-    admin_create_user = admin_create_user
-    admin_bulk_create_users = admin_bulk_create_users
-    admin_update_user = admin_update_user
-    update_user = update_user
-    admin_delete_user = admin_delete_user
-    admin_delete_users = admin_delete_users
-    admin_purge_user = admin_purge_user
-    admin_purge_users = admin_purge_users
+    admin_create_user_v2 = admin_create_user_v2
+    admin_bulk_create_users_v2 = admin_bulk_create_users_v2
+    admin_bulk_update_users_v2 = admin_bulk_update_users_v2
+    admin_update_user_v2 = admin_update_user_v2
+    update_user_v2 = update_user_v2
+    admin_delete_user_v2 = admin_delete_user_v2
+    admin_delete_users_v2 = admin_delete_users_v2
+    admin_purge_user_v2 = admin_purge_user_v2
+    admin_bulk_purge_users_v2 = admin_bulk_purge_users_v2
+    # Keypair self-service mutations
+    issue_my_keypair = issue_my_keypair
+    revoke_my_keypair = revoke_my_keypair
+    switch_my_main_access_key = switch_my_main_access_key
+    update_my_keypair = update_my_keypair
+    # IP allowlist self-service mutation
+    update_my_allowed_client_ip = update_my_allowed_client_ip
+    # Prometheus Query Preset - Admin APIs
+    admin_create_prometheus_query_preset = admin_create_prometheus_query_preset
+    admin_modify_prometheus_query_preset = admin_modify_prometheus_query_preset
+    admin_delete_prometheus_query_preset = admin_delete_prometheus_query_preset
+    # RBAC Admin APIs
+    admin_create_role = admin_create_role
+    admin_update_role = admin_update_role
+    admin_delete_role = admin_delete_role
+    admin_purge_role = admin_purge_role
+    admin_create_permission = admin_create_permission
+    admin_update_permission = admin_update_permission
+    admin_delete_permission = admin_delete_permission
+    admin_assign_role = admin_assign_role
+    admin_revoke_role = admin_revoke_role
+    admin_bulk_assign_role = admin_bulk_assign_role
+    admin_bulk_revoke_role = admin_bulk_revoke_role
 
 
 @strawberry.type
@@ -457,6 +553,15 @@ class Subscription:
 
 class CustomizedSchema(Schema):
     def as_str(self) -> str:
+        # Strawberry picks up pydantic field defaults (including SENTINEL) as GraphQL
+        # schema field default_values.  SENTINEL is not a valid GraphQL scalar value, so
+        # replace any SENTINEL default with Undefined (= "no default" in the schema SDL).
+        for type_def in self._schema.type_map.values():
+            if not hasattr(type_def, "fields"):
+                continue
+            for field in type_def.fields.values():
+                if isinstance(getattr(field, "default_value", None), BackendSentinel):
+                    field.default_value = GraphQLUndefined
         sdl = super().as_str()
         sdl = sdl.replace("type PageInfo", "type PageInfo @shareable").replace(
             'import: ["@external", "@key"]', 'import: ["@external", "@key", "@shareable"]'
@@ -471,4 +576,10 @@ schema = CustomizedSchema(
     subscription=Subscription,
     config=StrawberryConfig(auto_camel_case=True),
     enable_federation_2=True,
+    extensions=[
+        GQLLoggingExtension,
+        GQLMetricExtension,
+        GQLValidationExtension,
+        GQLExceptionHandlerExtension,
+    ],
 )

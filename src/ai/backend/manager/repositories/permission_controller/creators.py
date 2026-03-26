@@ -3,17 +3,19 @@
 from __future__ import annotations
 
 import uuid
+from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import override
 
+from ai.backend.common.data.permission.types import RBACElementType
 from ai.backend.manager.data.permission.id import ObjectId, ScopeId
 from ai.backend.manager.data.permission.status import PermissionStatus, RoleStatus
 from ai.backend.manager.data.permission.types import (
-    EntityType,
     OperationType,
     RoleSource,
-    ScopeType,
 )
+from ai.backend.manager.errors.permission import RoleAlreadyAssigned
+from ai.backend.manager.errors.repository import UniqueConstraintViolationError
 from ai.backend.manager.models.rbac_models.association_scopes_entities import (
     AssociationScopesEntitiesRow,
 )
@@ -22,6 +24,7 @@ from ai.backend.manager.models.rbac_models.permission.permission import Permissi
 from ai.backend.manager.models.rbac_models.role import RoleRow
 from ai.backend.manager.models.rbac_models.user_role import UserRoleRow
 from ai.backend.manager.repositories.base.creator import CreatorSpec
+from ai.backend.manager.repositories.base.types import IntegrityErrorCheck
 
 
 @dataclass
@@ -52,18 +55,18 @@ class PermissionCreatorSpec(CreatorSpec[PermissionRow]):
     """CreatorSpec for permissions."""
 
     role_id: uuid.UUID
-    scope_type: ScopeType
+    scope_type: RBACElementType
     scope_id: str
-    entity_type: EntityType
+    entity_type: RBACElementType
     operation: OperationType
 
     @override
     def build_row(self) -> PermissionRow:
         return PermissionRow(
             role_id=self.role_id,
-            scope_type=self.scope_type,
+            scope_type=self.scope_type.to_scope_type(),
             scope_id=self.scope_id,
-            entity_type=self.entity_type,
+            entity_type=self.entity_type.to_entity_type(),
             operation=self.operation,
         )
 
@@ -73,7 +76,7 @@ class ObjectPermissionCreatorSpec(CreatorSpec[ObjectPermissionRow]):
     """CreatorSpec for object permissions."""
 
     role_id: uuid.UUID
-    entity_type: EntityType
+    entity_type: RBACElementType
     entity_id: str
     operation: OperationType
     status: PermissionStatus = PermissionStatus.ACTIVE
@@ -82,7 +85,7 @@ class ObjectPermissionCreatorSpec(CreatorSpec[ObjectPermissionRow]):
     def build_row(self) -> ObjectPermissionRow:
         return ObjectPermissionRow(
             role_id=self.role_id,
-            entity_type=self.entity_type,
+            entity_type=self.entity_type.to_entity_type(),
             entity_id=self.entity_id,
             operation=self.operation,
         )
@@ -95,6 +98,18 @@ class UserRoleCreatorSpec(CreatorSpec[UserRoleRow]):
     user_id: uuid.UUID
     role_id: uuid.UUID
     granted_by: uuid.UUID | None = None
+
+    @property
+    @override
+    def integrity_error_checks(self) -> Sequence[IntegrityErrorCheck]:
+        return (
+            IntegrityErrorCheck(
+                violation_type=UniqueConstraintViolationError,
+                error=RoleAlreadyAssigned(
+                    f"Role {self.role_id} is already assigned to user {self.user_id}."
+                ),
+            ),
+        )
 
     @override
     def build_row(self) -> UserRoleRow:

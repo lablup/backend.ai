@@ -120,6 +120,19 @@ TBaseModel = TypeVar("TBaseModel", bound=BaseModel)
 
 class EnumType[T_Enum: enum.Enum](TypeDecorator[T_Enum], SchemaType):
     """
+    .. deprecated::
+        Use :class:`StrEnumType` instead.
+
+        ``EnumType`` maps a Python enum to a **PostgreSQL native ENUM** column (stored by enum name).
+        Native ENUM types are difficult to alter (adding values requires DDL) and offer no
+        portability advantage over VARCHAR.
+
+        Migration guide:
+          - Replace ``EnumType(MyEnum)`` with ``StrEnumType(MyEnum, use_name=True)``
+          - The stored values remain identical (enum member names), but the column type changes
+            from native ENUM to VARCHAR(64) which is easier to evolve.
+          - A schema migration (alembic) is required to change the column type.
+
     A stripped-down version of Spoqa's sqlalchemy-enum34.
     It also handles postgres-specific enum type creation.
 
@@ -161,6 +174,19 @@ class EnumType[T_Enum: enum.Enum](TypeDecorator[T_Enum], SchemaType):
 
 class EnumValueType[T_Enum: enum.Enum](TypeDecorator[T_Enum], SchemaType):
     """
+    .. deprecated::
+        Use :class:`StrEnumType` instead.
+
+        ``EnumValueType`` maps a Python enum to a **PostgreSQL native ENUM** column (stored by
+        enum value).  Native ENUM types are difficult to alter (adding values requires DDL) and
+        offer no portability advantage over VARCHAR.
+
+        Migration guide:
+          - Replace ``EnumValueType(MyEnum)`` with ``StrEnumType(MyEnum)`` (default ``use_name=False``)
+          - The stored values remain identical (enum member values), but the column type changes
+            from native ENUM to VARCHAR(64) which is easier to evolve.
+          - A schema migration (alembic) is required to change the column type.
+
     A stripped-down version of Spoqa's sqlalchemy-enum34.
     It also handles postgres-specific enum type creation.
 
@@ -799,6 +825,10 @@ async def populate_fixture(
                         if col.name in row:
                             if row[col.name] is not None:
                                 row[col.name] = isoparse(row[col.name])
+                            elif not col.nullable and col.server_default is not None:
+                                # Remove the key so PostgreSQL applies the server default
+                                # instead of explicitly inserting NULL into a NOT NULL column.
+                                del row[col.name]
                             else:
                                 row[col.name] = None
                 if isinstance(col.type, EnumType):
@@ -847,6 +877,11 @@ async def populate_fixture(
                         if col.name in row and row[col.name] is not None:
                             if not isinstance(row[col.name], VFolderHostPermissionMap):
                                 row[col.name] = VFolderHostPermissionMap(row[col.name])
+                elif isinstance(col.type, PydanticColumn):
+                    for row in rows:
+                        if col.name in row and row[col.name] is not None:
+                            if not isinstance(row[col.name], col.type._schema):
+                                row[col.name] = col.type._schema.model_validate(row[col.name])
 
             match op_mode:
                 case FixtureOpModes.INSERT:

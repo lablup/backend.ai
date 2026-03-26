@@ -2,6 +2,7 @@ from .row import (
     DomainUsageBucketRow,
     KernelUsageRecordRow,
     ProjectUsageBucketRow,
+    UsageBucketEntryRow,
     UserUsageBucketRow,
 )
 
@@ -10,4 +11,5 @@ __all__ = (
     "DomainUsageBucketRow",
     "ProjectUsageBucketRow",
     "UserUsageBucketRow",
+    "UsageBucketEntryRow",
 )

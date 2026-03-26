@@ -131,7 +131,7 @@ def create(
     name: str,
     host: str,
     group: str | None,
-    _host_path: bool,
+    host_path: bool,
     unmanaged_path: str | None,
     usage_mode: str,
     permission: str,
@@ -143,6 +143,7 @@ def create(
     NAME: Name of a virtual folder.
     HOST: Name of a virtual folder host in which the virtual folder will be created.
     """
+    _ = host_path
     with Session() as session:
         try:
             result = session.VFolder.create(

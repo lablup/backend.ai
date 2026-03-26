@@ -15,38 +15,28 @@ from graphql_relay.utils import base64, unbase64
 from strawberry.relay import Edge, Node
 from strawberry.types import get_object_definition, has_object_definition
 
-from ai.backend.manager.data.common.types import IntFilterData, SearchResult, StringFilterData
+from ai.backend.common.data.filter_specs import StringMatchSpec, UUIDEqualMatchSpec, UUIDInMatchSpec
+from ai.backend.common.dto.manager.query import DateFilter as DateFilterDTO
+from ai.backend.common.dto.manager.query import DateTimeFilter as DateTimeFilterDTO
+from ai.backend.common.dto.manager.query import IntFilter as IntFilterDTO
+from ai.backend.common.dto.manager.query import StringFilter as StringFilterDTO
+from ai.backend.common.dto.manager.query import UUIDFilter as UUIDFilterDTO
+from ai.backend.manager.api.adapters.cursor import decode_cursor as decode_cursor
+from ai.backend.manager.api.adapters.cursor import encode_cursor as encode_cursor
+from ai.backend.manager.api.gql.decorators import (
+    BackendAIGQLMeta,
+    PydanticInputMixin,
+    gql_enum,
+    gql_field,
+    gql_pydantic_input,
+)
+from ai.backend.manager.data.common.types import SearchResult
 
 if TYPE_CHECKING:
     from ai.backend.manager.repositories.base import QueryCondition
     from ai.backend.manager.types import (
         PaginationOptions,
     )
-
-
-@dataclass(frozen=True)
-class StringMatchSpec:
-    """Specification for string matching operations in query conditions."""
-
-    value: str
-    case_insensitive: bool
-    negated: bool
-
-
-@dataclass(frozen=True)
-class UUIDEqualMatchSpec:
-    """Specification for UUID equality operations (=, !=)."""
-
-    value: uuid.UUID
-    negated: bool
-
-
-@dataclass(frozen=True)
-class UUIDInMatchSpec:
-    """Specification for UUID IN operations (IN, NOT IN)."""
-
-    values: list[uuid.UUID]
-    negated: bool
 
 
 @strawberry.scalar
@@ -66,8 +56,14 @@ class ByteSize(str):
         return ast.value
 
 
-@strawberry.input
-class StringFilter:
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description="Filter for string fields supporting equality, containment, prefix/suffix, and case-insensitive variants.",
+        added_version="24.09.0",
+    ),
+    name="StringFilter",
+)
+class StringFilter(PydanticInputMixin[StringFilterDTO]):
     # Basic operations
     contains: str | None = None
     starts_with: str | None = None
@@ -81,30 +77,32 @@ class StringFilter:
     not_equals: str | None = None
 
     # Case-insensitive operations
-    i_contains: str | None = strawberry.field(name="iContains", default=None)
-    i_starts_with: str | None = strawberry.field(name="iStartsWith", default=None)
-    i_ends_with: str | None = strawberry.field(name="iEndsWith", default=None)
-    i_equals: str | None = strawberry.field(name="iEquals", default=None)
+    i_contains: str | None = gql_field(
+        description="The i contains field.", name="iContains", default=None
+    )
+    i_starts_with: str | None = gql_field(
+        description="The i starts with field.", name="iStartsWith", default=None
+    )
+    i_ends_with: str | None = gql_field(
+        description="The i ends with field.", name="iEndsWith", default=None
+    )
+    i_equals: str | None = gql_field(
+        description="The i equals field.", name="iEquals", default=None
+    )
 
     # Case-insensitive NOT operations
-    i_not_contains: str | None = strawberry.field(name="iNotContains", default=None)
-    i_not_starts_with: str | None = strawberry.field(name="iNotStartsWith", default=None)
-    i_not_ends_with: str | None = strawberry.field(name="iNotEndsWith", default=None)
-    i_not_equals: str | None = strawberry.field(name="iNotEquals", default=None)
-
-    def to_dataclass(self) -> StringFilterData:
-        return StringFilterData(
-            contains=self.contains,
-            starts_with=self.starts_with,
-            ends_with=self.ends_with,
-            equals=self.equals,
-            not_equals=self.not_equals,
-            i_contains=self.i_contains,
-            i_starts_with=self.i_starts_with,
-            i_ends_with=self.i_ends_with,
-            i_equals=self.i_equals,
-            i_not_equals=self.i_not_equals,
-        )
+    i_not_contains: str | None = gql_field(
+        description="The i not contains field.", name="iNotContains", default=None
+    )
+    i_not_starts_with: str | None = gql_field(
+        description="The i not starts with field.", name="iNotStartsWith", default=None
+    )
+    i_not_ends_with: str | None = gql_field(
+        description="The i not ends with field.", name="iNotEndsWith", default=None
+    )
+    i_not_equals: str | None = gql_field(
+        description="The i not equals field.", name="iNotEquals", default=None
+    )
 
     def build_query_condition(
         self,
@@ -199,8 +197,14 @@ class StringFilter:
         return None
 
 
-@strawberry.input
-class IntFilter:
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description="Filter for integer fields supporting equality and comparison operations.",
+        added_version="24.09.0",
+    ),
+    name="IntFilter",
+)
+class IntFilter(PydanticInputMixin[IntFilterDTO]):
     equals: int | None = None
     not_equals: int | None = None
     greater_than: int | None = None
@@ -208,22 +212,15 @@ class IntFilter:
     less_than: int | None = None
     less_than_or_equal: int | None = None
 
-    def to_dataclass(self) -> IntFilterData:
-        return IntFilterData(
-            equals=self.equals,
-            not_equals=self.not_equals,
-            greater_than=self.greater_than,
-            greater_than_or_equal=self.greater_than_or_equal,
-            less_than=self.less_than,
-            less_than_or_equal=self.less_than_or_equal,
-        )
 
-
-@strawberry.input(description="Added in 26.1.0. Filter for UUID fields.")
-class UUIDFilter:
+@gql_pydantic_input(
+    BackendAIGQLMeta(description="Filter for UUID fields.", added_version="26.1.0"),
+    name="UUIDFilter",
+)
+class UUIDFilter(PydanticInputMixin[UUIDFilterDTO]):
     # Basic operations
     equals: uuid.UUID | None = None
-    in_: list[uuid.UUID] | None = strawberry.field(name="in", default=None)
+    in_: list[uuid.UUID] | None = gql_field(description="The in  field.", name="in", default=None)
 
     # NOT operations
     not_equals: uuid.UUID | None = None
@@ -278,10 +275,14 @@ class UUIDFilter:
         return None
 
 
-@strawberry.input
-class DateTimeFilter:
-    """Filter for datetime fields."""
-
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description="Filter for datetime fields supporting range and equality operations.",
+        added_version="24.09.0",
+    ),
+    name="DateTimeFilter",
+)
+class DateTimeFilter(PydanticInputMixin[DateTimeFilterDTO]):
     before: datetime | None = None
     after: datetime | None = None
     equals: datetime | None = None
@@ -312,10 +313,14 @@ class DateTimeFilter:
         return None
 
 
-@strawberry.input
-class DateFilter:
-    """Filter for date fields (not datetime)."""
-
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description="Filter for date fields (not datetime) supporting range and equality operations.",
+        added_version="24.09.0",
+    ),
+    name="DateFilter",
+)
+class DateFilter(PydanticInputMixin[DateFilterDTO]):
     before: date | None = None
     after: date | None = None
     equals: date | None = None
@@ -350,13 +355,18 @@ class DateFilter:
         return None
 
 
-@strawberry.enum
+@gql_enum(BackendAIGQLMeta(added_version="24.09.0", description="Sort direction for ordering"))
 class OrderDirection(StrEnum):
     ASC = "ASC"
     DESC = "DESC"
 
 
-@strawberry.enum
+@gql_enum(
+    BackendAIGQLMeta(
+        added_version="24.09.0",
+        description="Sort direction for ordering with null placement control",
+    )
+)
 class Ordering(StrEnum):
     ASC = "ASC"
     ASC_NULLS_FIRST = "ASC_NULLS_FIRST"
@@ -387,30 +397,6 @@ def resolve_global_id(global_id: str) -> tuple[str, str]:
     unbased_global_id = unbase64(global_id)
     type_, _, id_ = unbased_global_id.partition(":")
     return type_, id_
-
-
-CURSOR_VERSION = "v1"
-
-
-def encode_cursor(row_id: str | uuid.UUID) -> str:
-    """Encode row ID to cursor format: base64(cursor:v1:{row_id})"""
-    raw = f"cursor:{CURSOR_VERSION}:{row_id}"
-    return base64(raw)
-
-
-def decode_cursor(cursor: str) -> str:
-    """Decode cursor and return row_id. Raises InvalidCursor on failure."""
-    from ai.backend.manager.errors.api import InvalidCursor
-
-    try:
-        raw = unbase64(cursor)
-    except Exception as e:
-        raise InvalidCursor(f"Invalid cursor encoding: {cursor}") from e
-
-    parts = raw.split(":", 2)
-    if len(parts) != 3 or parts[0] != "cursor" or parts[1] != CURSOR_VERSION:
-        raise InvalidCursor(f"Invalid cursor format: {cursor}")
-    return parts[2]  # row_id
 
 
 def build_pagination_options(

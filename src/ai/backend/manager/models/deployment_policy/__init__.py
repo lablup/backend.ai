@@ -1,13 +1,13 @@
 from .row import (
     BlueGreenSpec,
-    DeploymentPolicyData,
     DeploymentPolicyRow,
+    DeploymentStrategySpec,
     RollingUpdateSpec,
 )
 
 __all__ = (
     "BlueGreenSpec",
-    "DeploymentPolicyData",
     "DeploymentPolicyRow",
+    "DeploymentStrategySpec",
     "RollingUpdateSpec",
 )

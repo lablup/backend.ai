@@ -1109,6 +1109,7 @@ class ArchiveDownloadHandler:
             volume=body.parsed.volume,
             virtual_folder_id=body.parsed.virtual_folder_id,
             files=body.parsed.files,
+            filename=body.parsed.filename,
             exp=datetime.now(UTC) + ctx.root_ctx.local_config.storage_proxy.session_expire,
         )
         payload = token_payload.model_dump(mode="json")
@@ -1333,7 +1334,7 @@ async def init_manager_app(ctx: RootContext) -> web.Application:
     app.router.add_route("POST", "/folder/file/fetch", fetch_file)
     app.router.add_route("POST", "/folder/file/download", create_download_session)
     app.router.add_route(
-        "POST", "/folder/file/download-archive", archive_download_handler.create_session
+        "POST", "/folder/file/archive-download-token", archive_download_handler.create_session
     )
     app.router.add_route("POST", "/folder/file/upload", create_upload_session)
     app.router.add_route("POST", "/folder/file/delete", delete_files)

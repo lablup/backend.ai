@@ -9,6 +9,7 @@ from uuid import UUID
 
 from sqlalchemy.engine import Row
 
+from ai.backend.common.data.permission.types import RBACElementType
 from ai.backend.common.data.user.types import UserRole
 from ai.backend.common.types import AccessKey
 from ai.backend.manager.data.keypair.types import KeyPairData
@@ -23,6 +24,7 @@ from ai.backend.manager.errors.resource import DataTransformationFailed
 if TYPE_CHECKING:
     from ai.backend.manager.models.user import UserRow
     from ai.backend.manager.repositories.base.creator import BulkCreatorError
+    from ai.backend.manager.repositories.base.updater import BulkUpdaterError
 
 
 class UserStatus(enum.StrEnum):
@@ -96,13 +98,13 @@ class UserData:
     def role_name(self) -> str:
         return f"user-{str(self.id)[:8]}"
 
-    def entity_operations(self) -> Mapping[EntityType, Iterable[OperationType]]:
+    def entity_operations(self) -> Mapping[RBACElementType, Iterable[OperationType]]:
         resource_entity_permissions = {
-            entity: OperationType.owner_operations()
+            entity.to_element(): OperationType.owner_operations()
             for entity in EntityType.owner_accessible_entity_types_in_user()
         }
         user_permissions = OperationType.owner_operations() - {OperationType.CREATE}
-        return {EntityType.USER: user_permissions, **resource_entity_permissions}
+        return {RBACElementType.USER: user_permissions, **resource_entity_permissions}
 
     @classmethod
     def from_row(cls, row: Row[Any]) -> Self:
@@ -125,7 +127,9 @@ class UserData:
             domain_name=row.domain_name,
             role=row.role,
             resource_policy=row.resource_policy,
-            allowed_client_ip=row.allowed_client_ip,
+            allowed_client_ip=[str(ip) for ip in row.allowed_client_ip]
+            if row.allowed_client_ip
+            else None,
             totp_activated=row.totp_activated,
             totp_activated_at=row.totp_activated_at,
             sudo_session_enabled=row.sudo_session_enabled,
@@ -177,4 +181,59 @@ class BulkUserCreateResultData:
 
     def failure_count(self) -> int:
         """Get count of failed user creations."""
+        return len(self.failures)
+
+
+@dataclass
+class BulkUserUpdateResultData:
+    """Result of bulk user update operation.
+
+    Attributes:
+        successes: Successfully updated users
+        failures: Failed user update attempts with error info
+    """
+
+    successes: list[UserData] = field(default_factory=list)
+    failures: list[BulkUpdaterError[UserRow]] = field(default_factory=list)
+
+    def success_count(self) -> int:
+        """Get count of successfully updated users."""
+        return len(self.successes)
+
+    def failure_count(self) -> int:
+        """Get count of failed user updates."""
+        return len(self.failures)
+
+
+@dataclass
+class BulkPurgeError:
+    """Error information for a failed bulk purge operation.
+
+    Attributes:
+        user_id: UUID of the user that failed to purge
+        exception: The exception that occurred
+    """
+
+    user_id: UUID
+    exception: Exception
+
+
+@dataclass
+class BulkUserPurgeResultData:
+    """Result of bulk user purge operation.
+
+    Attributes:
+        purged_user_ids: UUIDs of successfully purged users
+        failures: Failed user purge attempts with error info
+    """
+
+    purged_user_ids: list[UUID] = field(default_factory=list)
+    failures: list[BulkPurgeError] = field(default_factory=list)
+
+    def purged_count(self) -> int:
+        """Get count of successfully purged users."""
+        return len(self.purged_user_ids)
+
+    def failure_count(self) -> int:
+        """Get count of failed user purges."""
         return len(self.failures)

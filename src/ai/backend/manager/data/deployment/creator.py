@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from uuid import UUID
 
+from ai.backend.common.config import ModelDefinition
 from ai.backend.common.data.model_deployment.types import DeploymentStrategy
 from ai.backend.manager.data.deployment.types import (
     DeploymentMetadata,
@@ -39,6 +40,7 @@ class ModelRevisionCreator:
     resource_spec: ResourceSpec
     mounts: VFolderMountsCreator
     execution: ExecutionSpec
+    model_definition: ModelDefinition
 
 
 @dataclass
@@ -113,14 +115,19 @@ class DeploymentCreationDraft:
 
 @dataclass
 class DeploymentPolicyConfig:
-    """Configuration for deployment policy.
-
-    Passed from GQL layer to service layer for policy creation/update.
-    """
+    """Policy configuration without a target deployment."""
 
     strategy: DeploymentStrategy
     strategy_spec: RollingUpdateSpec | BlueGreenSpec
-    rollback_on_failure: bool = False
+
+
+@dataclass
+class DeploymentPolicyCreator:
+    """Creator for deployment policy bound to an existing deployment."""
+
+    deployment_id: UUID
+    strategy: DeploymentStrategy
+    strategy_spec: RollingUpdateSpec | BlueGreenSpec
 
 
 @dataclass

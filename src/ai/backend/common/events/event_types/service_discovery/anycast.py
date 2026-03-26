@@ -10,6 +10,7 @@ from ai.backend.common.events.user_event.user_event import UserEvent
 from ai.backend.common.json import dump_json_str, load_json
 
 __all__ = (
+    "DoSweepStaleServicesEvent",
     "ServiceEndpointInfo",
     "ServiceRegisteredEvent",
     "ServiceDeregisteredEvent",
@@ -109,6 +110,24 @@ class ServiceRegisteredEvent(BaseServiceDiscoveryEvent, BaseModel):
             startup_time=datetime.fromisoformat(value[1].decode()),
             config_hash=data.get("config_hash", ""),
         )
+
+
+class DoSweepStaleServicesEvent(BaseServiceDiscoveryEvent):
+    """Event to trigger sweeping stale services in the catalog."""
+
+    @classmethod
+    @override
+    def event_name(cls) -> str:
+        return "do_sweep_stale_services"
+
+    @override
+    def serialize(self) -> tuple[bytes, ...]:
+        return (b"",)
+
+    @classmethod
+    @override
+    def deserialize(cls, value: tuple[bytes, ...]) -> DoSweepStaleServicesEvent:
+        return cls()
 
 
 class ServiceDeregisteredEvent(BaseServiceDiscoveryEvent, BaseModel):

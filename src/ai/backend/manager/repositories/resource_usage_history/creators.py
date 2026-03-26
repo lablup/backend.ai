@@ -33,6 +33,9 @@ class KernelUsageRecordCreatorSpec(CreatorSpec[KernelUsageRecordRow]):
     period_start: datetime
     period_end: datetime
     resource_usage: ResourceSlot
+    # Raw occupied_slots (not pre-multiplied) used by bucket entry normalization.
+    # Not persisted to the kernel_usage_records table.
+    occupied_slots: ResourceSlot | None = None
 
     @override
     def build_row(self) -> KernelUsageRecordRow:

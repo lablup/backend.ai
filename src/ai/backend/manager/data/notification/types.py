@@ -11,7 +11,7 @@ from ai.backend.common.data.notification import (
     NotificationRuleType,
     WebhookSpec,
 )
-from ai.backend.manager.types import OptionalState, PartialModifier
+from ai.backend.manager.types import OptionalState, PartialModifier, TriState
 
 
 @dataclass
@@ -50,7 +50,7 @@ class NotificationChannelModifier(PartialModifier):
     """Modifier for notification channel."""
 
     name: OptionalState[str] = field(default_factory=OptionalState[str].nop)
-    description: OptionalState[str | None] = field(default_factory=OptionalState[str | None].nop)
+    description: TriState[str] = field(default_factory=TriState[str].nop)
     spec: OptionalState[WebhookSpec | EmailSpec] = field(
         default_factory=OptionalState[WebhookSpec | EmailSpec].nop
     )
@@ -73,7 +73,7 @@ class NotificationRuleModifier(PartialModifier):
     """Modifier for notification rule."""
 
     name: OptionalState[str] = field(default_factory=OptionalState[str].nop)
-    description: OptionalState[str | None] = field(default_factory=OptionalState[str | None].nop)
+    description: TriState[str] = field(default_factory=TriState[str].nop)
     message_template: OptionalState[str] = field(default_factory=OptionalState[str].nop)
     enabled: OptionalState[bool] = field(default_factory=OptionalState[bool].nop)
 

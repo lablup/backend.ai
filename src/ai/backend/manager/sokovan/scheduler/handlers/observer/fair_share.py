@@ -17,8 +17,8 @@ from typing import TYPE_CHECKING, override
 
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.data.kernel.types import KernelInfo
+from ai.backend.manager.models.kernel.conditions import KernelConditions
 from ai.backend.manager.repositories.base import BulkCreator, QueryCondition
-from ai.backend.manager.repositories.scheduler.options import KernelConditions
 from ai.backend.manager.sokovan.scheduler.fair_share import (
     FairShareAggregator,
     FairShareFactorCalculator,
@@ -215,6 +215,14 @@ class FairShareObserver(KernelObserver):
                 context.lookback_days,
                 context.raw_usage_buckets.is_empty(),
             )
+
+            # Update capacity on normalized bucket entries
+            if context.cluster_capacity:
+                capacity_by_slot = {sq.slot_name: sq.quantity for sq in context.cluster_capacity}
+                await self._resource_usage_repository.update_bucket_entry_capacities(
+                    scaling_group,
+                    capacity_by_slot,
+                )
 
             # Skip if no usage data
             if context.raw_usage_buckets.is_empty():

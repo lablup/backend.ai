@@ -2,17 +2,17 @@ from __future__ import annotations
 
 import logging
 import uuid
-from dataclasses import dataclass
 from datetime import datetime
 from typing import TYPE_CHECKING
 
 import sqlalchemy as sa
-from pydantic import BaseModel
+from pydantic import BaseModel, Field, model_validator
 from sqlalchemy.dialects import postgresql as pgsql
 from sqlalchemy.orm import Mapped, foreign, mapped_column, relationship
 
 from ai.backend.common.data.model_deployment.types import DeploymentStrategy
 from ai.backend.logging import BraceStyleAdapter
+from ai.backend.manager.data.deployment.types import DeploymentPolicyData
 from ai.backend.manager.errors.deployment import InvalidDeploymentStrategy
 from ai.backend.manager.models.base import (
     GUID,
@@ -25,8 +25,8 @@ if TYPE_CHECKING:
 
 __all__ = (
     "BlueGreenSpec",
-    "DeploymentPolicyData",
     "DeploymentPolicyRow",
+    "DeploymentStrategySpec",
     "RollingUpdateSpec",
 )
 
@@ -36,8 +36,23 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 class RollingUpdateSpec(BaseModel):
     """Specification for rolling update deployment strategy."""
 
-    max_surge: int = 1
-    max_unavailable: int = 0
+    max_surge: int = Field(default=1, ge=0)
+    max_unavailable: int = Field(default=0, ge=0)
+
+    @model_validator(mode="after")
+    def _validate_progress_is_possible(self) -> RollingUpdateSpec:
+        """Ensure at least one of max_surge or max_unavailable is positive.
+
+        If both are zero, the rolling update FSM cannot make progress:
+        it cannot create new routes (would exceed max_total) nor terminate
+        old routes (would fall below min_available), causing a deadlock.
+        """
+        if self.max_surge == 0 and self.max_unavailable == 0:
+            raise ValueError(
+                "At least one of max_surge or max_unavailable must be positive; "
+                "otherwise the rolling update cannot make progress."
+            )
+        return self
 
 
 class BlueGreenSpec(BaseModel):
@@ -45,6 +60,9 @@ class BlueGreenSpec(BaseModel):
 
     auto_promote: bool = False
     promote_delay_seconds: int = 0
+
+
+DeploymentStrategySpec = RollingUpdateSpec | BlueGreenSpec
 
 
 def _get_endpoint_join_condition() -> sa.ColumnElement[bool]:
@@ -89,14 +107,6 @@ class DeploymentPolicyRow(Base):  # type: ignore[misc]
         server_default="{}",
     )
 
-    # Whether to rollback on deployment failure
-    rollback_on_failure: Mapped[bool] = mapped_column(
-        "rollback_on_failure",
-        sa.Boolean,
-        nullable=False,
-        server_default="false",
-    )
-
     # Timestamps
     created_at: Mapped[datetime] = mapped_column(
         "created_at",
@@ -127,7 +137,6 @@ class DeploymentPolicyRow(Base):  # type: ignore[misc]
             endpoint=self.endpoint,
             strategy=self.strategy,
             strategy_spec=self.get_strategy_spec(),
-            rollback_on_failure=self.rollback_on_failure,
             created_at=self.created_at,
             updated_at=self.updated_at,
         )
@@ -141,16 +150,3 @@ class DeploymentPolicyRow(Base):  # type: ignore[misc]
                 return BlueGreenSpec.model_validate(self.strategy_spec or {})
             case _:
                 raise InvalidDeploymentStrategy(f"Unknown deployment strategy: {self.strategy}")
-
-
-@dataclass
-class DeploymentPolicyData:
-    """Data class for DeploymentPolicyRow."""
-
-    id: uuid.UUID
-    endpoint: uuid.UUID
-    strategy: DeploymentStrategy
-    strategy_spec: RollingUpdateSpec | BlueGreenSpec
-    rollback_on_failure: bool
-    created_at: datetime
-    updated_at: datetime

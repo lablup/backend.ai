@@ -21,7 +21,17 @@ from ai.backend.manager.models.base import (
 
 class PermissionRow(Base):  # type: ignore[misc]
     __tablename__ = "permissions"
-    __table_args__ = (sa.Index("ix_permissions_role_scope", "role_id", "scope_type", "scope_id"),)
+    __table_args__ = (
+        sa.Index("ix_permissions_role_scope", "role_id", "scope_type", "scope_id"),
+        sa.UniqueConstraint(
+            "role_id",
+            "scope_type",
+            "scope_id",
+            "entity_type",
+            "operation",
+            name="uq_permissions_role_scope_entity_op",
+        ),
+    )
 
     id: Mapped[uuid.UUID] = mapped_column(
         "id", GUID, primary_key=True, server_default=sa.text("uuid_generate_v4()")
@@ -29,6 +39,7 @@ class PermissionRow(Base):  # type: ignore[misc]
     role_id: Mapped[uuid.UUID] = mapped_column(
         "role_id",
         GUID,
+        sa.ForeignKey("roles.id", ondelete="CASCADE"),
         nullable=False,
     )
     scope_type: Mapped[ScopeType] = mapped_column(

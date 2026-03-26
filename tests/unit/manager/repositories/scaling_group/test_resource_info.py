@@ -9,7 +9,7 @@ from decimal import Decimal
 
 import pytest
 
-from ai.backend.common.types import ResourceSlot
+from ai.backend.common.types import ResourceSlot, SlotQuantity
 from ai.backend.manager.data.agent.types import AgentStatus
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.kernel.types import KernelStatus
@@ -21,7 +21,7 @@ from ai.backend.manager.models.group import GroupRow
 from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.kernel import KernelRow
 from ai.backend.manager.models.keypair import KeyPairRow
-from ai.backend.manager.models.rbac_models import UserRoleRow
+from ai.backend.manager.models.rbac_models import RoleRow, UserRoleRow
 from ai.backend.manager.models.resource_policy import (
     KeyPairResourcePolicyRow,
     ProjectResourcePolicyRow,
@@ -37,6 +37,11 @@ from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.scaling_group.db_source import ScalingGroupDBSource
 from ai.backend.testutils.db import with_tables
+
+
+def _quantities_to_resource_slot(quantities: list[SlotQuantity]) -> ResourceSlot:
+    """Convert list[SlotQuantity] to ResourceSlot for comparison."""
+    return ResourceSlot({sq.slot_name: sq.quantity for sq in quantities})
 
 
 def _create_kernel(
@@ -113,6 +118,7 @@ class TestResourceInfo:
                 UserResourcePolicyRow,
                 ProjectResourcePolicyRow,
                 KeyPairResourcePolicyRow,
+                RoleRow,
                 UserRoleRow,
                 UserRow,
                 KeyPairRow,
@@ -689,7 +695,7 @@ class TestResourceInfo:
         result = await db_source.get_resource_info(scaling_group)
 
         expected_capacity = agent_slots[0] + agent_slots[1]
-        assert result.capacity == expected_capacity
+        assert _quantities_to_resource_slot(result.capacity) == expected_capacity
 
     async def test_excludes_not_alive_agents(
         self,
@@ -701,7 +707,7 @@ class TestResourceInfo:
 
         result = await db_source.get_resource_info(scaling_group)
 
-        assert result.capacity == expected_capacity
+        assert _quantities_to_resource_slot(result.capacity) == expected_capacity
 
     async def test_excludes_non_schedulable_agents(
         self,
@@ -713,7 +719,7 @@ class TestResourceInfo:
 
         result = await db_source.get_resource_info(scaling_group)
 
-        assert result.capacity == expected_capacity
+        assert _quantities_to_resource_slot(result.capacity) == expected_capacity
 
     async def test_used_sums_from_agent_resources(
         self,
@@ -726,7 +732,7 @@ class TestResourceInfo:
         result = await db_source.get_resource_info(scaling_group)
 
         expected_used = kernel_slots[0] + kernel_slots[1]
-        assert result.used == expected_used
+        assert _quantities_to_resource_slot(result.used) == expected_used
 
     async def test_used_reflects_agent_resources(
         self,
@@ -738,7 +744,7 @@ class TestResourceInfo:
 
         result = await db_source.get_resource_info(scaling_group)
 
-        assert result.used == expected_used
+        assert _quantities_to_resource_slot(result.used) == expected_used
 
     async def test_free_equals_capacity_minus_used(
         self,
@@ -752,7 +758,7 @@ class TestResourceInfo:
 
         expected_used = kernel_slots[0] + kernel_slots[1]
         expected_free = agent_capacity - expected_used
-        assert result.free == expected_free
+        assert _quantities_to_resource_slot(result.free) == expected_free
 
     async def test_returns_empty_slots_when_no_agents(
         self,
@@ -762,9 +768,9 @@ class TestResourceInfo:
         """Should return empty ResourceSlots when no agents exist."""
         result = await db_source.get_resource_info(base_scaling_group)
 
-        assert result.capacity == ResourceSlot()
-        assert result.used == ResourceSlot()
-        assert result.free == ResourceSlot()
+        assert _quantities_to_resource_slot(result.capacity) == ResourceSlot()
+        assert _quantities_to_resource_slot(result.used) == ResourceSlot()
+        assert _quantities_to_resource_slot(result.free) == ResourceSlot()
 
     async def test_raises_error_for_nonexistent_scaling_group(
         self,

@@ -1,7 +1,13 @@
 import logging
+from collections.abc import Sequence
 
-from ai.backend.common.data.permission.types import EntityType, ScopeType
+from ai.backend.common.data.permission.types import RBACElementType
 from ai.backend.logging.utils import BraceStyleAdapter
+from ai.backend.manager.actions.action.rbac import (
+    BaseRBACAction,
+    RBACActionName,
+    RBACRequiredPermission,
+)
 from ai.backend.manager.repositories.permission_controller.db_source.db_source import (
     CreateRoleInput,
 )
@@ -11,6 +17,14 @@ from ai.backend.manager.repositories.permission_controller.repository import (
 from ai.backend.manager.services.permission_contoller.actions.assign_role import (
     AssignRoleAction,
     AssignRoleActionResult,
+)
+from ai.backend.manager.services.permission_contoller.actions.bulk_assign_role import (
+    BulkAssignRoleAction,
+    BulkAssignRoleActionResult,
+)
+from ai.backend.manager.services.permission_contoller.actions.bulk_revoke_role import (
+    BulkRevokeRoleAction,
+    BulkRevokeRoleActionResult,
 )
 from ai.backend.manager.services.permission_contoller.actions.create_role import (
     CreateRoleAction,
@@ -32,12 +46,6 @@ from ai.backend.manager.services.permission_contoller.actions.get_scope_types im
     GetScopeTypesAction,
     GetScopeTypesActionResult,
 )
-from ai.backend.manager.services.permission_contoller.actions.object_permission import (
-    CreateObjectPermissionAction,
-    CreateObjectPermissionActionResult,
-    DeleteObjectPermissionAction,
-    DeleteObjectPermissionActionResult,
-)
 from ai.backend.manager.services.permission_contoller.actions.permission import (
     CreatePermissionAction,
     CreatePermissionActionResult,
@@ -52,13 +60,13 @@ from ai.backend.manager.services.permission_contoller.actions.revoke_role import
     RevokeRoleAction,
     RevokeRoleActionResult,
 )
+from ai.backend.manager.services.permission_contoller.actions.search_element_associations import (
+    SearchElementAssociationsAction,
+    SearchElementAssociationsActionResult,
+)
 from ai.backend.manager.services.permission_contoller.actions.search_entities import (
     SearchEntitiesAction,
     SearchEntitiesActionResult,
-)
-from ai.backend.manager.services.permission_contoller.actions.search_object_permissions import (
-    SearchObjectPermissionsAction,
-    SearchObjectPermissionsActionResult,
 )
 from ai.backend.manager.services.permission_contoller.actions.search_permissions import (
     SearchPermissionsAction,
@@ -76,6 +84,10 @@ from ai.backend.manager.services.permission_contoller.actions.search_users_assig
     SearchUsersAssignedToRoleAction,
     SearchUsersAssignedToRoleActionResult,
 )
+from ai.backend.manager.services.permission_contoller.actions.update_permission import (
+    UpdatePermissionAction,
+    UpdatePermissionActionResult,
+)
 from ai.backend.manager.services.permission_contoller.actions.update_role import (
     UpdateRoleAction,
     UpdateRoleActionResult,
@@ -90,9 +102,15 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 class PermissionControllerService:
     _repository: PermissionControllerRepository
+    _rbac_action_registry: Sequence[type[BaseRBACAction]]
 
-    def __init__(self, repository: PermissionControllerRepository) -> None:
+    def __init__(
+        self,
+        repository: PermissionControllerRepository,
+        rbac_action_registry: Sequence[type[BaseRBACAction]],
+    ) -> None:
         self._repository = repository
+        self._rbac_action_registry = rbac_action_registry
 
     async def create_role(self, action: CreateRoleAction) -> CreateRoleActionResult:
         """
@@ -125,23 +143,14 @@ class PermissionControllerService:
         result = await self._repository.delete_permission(action.purger)
         return DeletePermissionActionResult(data=result)
 
-    async def create_object_permission(
-        self, action: CreateObjectPermissionAction
-    ) -> CreateObjectPermissionActionResult:
+    async def update_permission(
+        self, action: UpdatePermissionAction
+    ) -> UpdatePermissionActionResult:
         """
-        Creates a new object permission in the repository.
+        Updates an existing permission in the repository.
         """
-        result = await self._repository.create_object_permission(action.creator)
-        return CreateObjectPermissionActionResult(data=result)
-
-    async def delete_object_permission(
-        self, action: DeleteObjectPermissionAction
-    ) -> DeleteObjectPermissionActionResult:
-        """
-        Deletes an object permission from the repository.
-        """
-        result = await self._repository.delete_object_permission(action.purger)
-        return DeleteObjectPermissionActionResult(data=result)
+        result = await self._repository.update_permission(action.updater)
+        return UpdatePermissionActionResult(data=result)
 
     async def update_role(self, action: UpdateRoleAction) -> UpdateRoleActionResult:
         """
@@ -182,6 +191,16 @@ class PermissionControllerService:
 
         return RevokeRoleActionResult(data=data)
 
+    async def bulk_assign_role(self, action: BulkAssignRoleAction) -> BulkAssignRoleActionResult:
+        """Assigns a role to multiple users with partial failure support."""
+        data = await self._repository.bulk_assign_role(action.bulk_creator)
+        return BulkAssignRoleActionResult(data=data)
+
+    async def bulk_revoke_role(self, action: BulkRevokeRoleAction) -> BulkRevokeRoleActionResult:
+        """Revokes a role from multiple users with partial failure support."""
+        data = await self._repository.bulk_revoke_role(action.input)
+        return BulkRevokeRoleActionResult(data=data)
+
     async def get_role_detail(self, action: GetRoleDetailAction) -> GetRoleDetailActionResult:
         """Get role with all permission details and assigned users."""
         role_data = await self._repository.get_role_with_permissions(action.role_id)
@@ -198,13 +217,6 @@ class PermissionControllerService:
         """Search scoped permissions with pagination and filtering."""
         result = await self._repository.search_permissions(action.querier)
         return SearchPermissionsActionResult(result=result)
-
-    async def search_object_permissions(
-        self, action: SearchObjectPermissionsAction
-    ) -> SearchObjectPermissionsActionResult:
-        """Search object permissions with pagination and filtering."""
-        result = await self._repository.search_object_permissions(action.querier)
-        return SearchObjectPermissionsActionResult(result=result)
 
     async def search_users_assigned_to_role(
         self, action: SearchUsersAssignedToRoleAction
@@ -225,19 +237,43 @@ class PermissionControllerService:
         return UpdateRolePermissionsActionResult(role=result)
 
     async def search_scopes(self, action: SearchScopesAction) -> SearchScopesActionResult:
-        """Search scopes based on scope type."""
-        result = await self._repository.search_scopes(action.scope_type, action.querier)
+        """Search scopes based on element type."""
+        result = await self._repository.search_scopes(action.element_type, action.querier)
         return SearchScopesActionResult(result=result)
 
     async def get_scope_types(self, _action: GetScopeTypesAction) -> GetScopeTypesActionResult:
         """Get all available scope types."""
-        return GetScopeTypesActionResult(scope_types=list(ScopeType))
+        return GetScopeTypesActionResult(element_types=list(RBACElementType))
 
     async def get_entity_types(self, _action: GetEntityTypesAction) -> GetEntityTypesActionResult:
         """Get all available entity types."""
-        return GetEntityTypesActionResult(entity_types=list(EntityType))
+        return GetEntityTypesActionResult(element_types=list(RBACElementType))
 
     async def search_entities(self, action: SearchEntitiesAction) -> SearchEntitiesActionResult:
         """Search entities within a scope."""
         result = await self._repository.search_entities(action.querier)
         return SearchEntitiesActionResult(result=result)
+
+    async def search_element_associations(
+        self, action: SearchElementAssociationsAction
+    ) -> SearchElementAssociationsActionResult:
+        """Search element associations (full association rows) within a scope."""
+        result = await self._repository.search_element_associations(action.querier)
+        return SearchElementAssociationsActionResult(result=result)
+
+    def get_entity_valid_operations(
+        self,
+    ) -> dict[RBACElementType, dict[RBACActionName, RBACRequiredPermission]]:
+        """
+        Get valid operations for all registered RBAC element types.
+
+        Aggregates required permissions from all registered action classes,
+        grouping them by element type. Each entry maps action name to its
+        required permission.
+        """
+        result: dict[RBACElementType, dict[RBACActionName, RBACRequiredPermission]] = {}
+        for action_cls in self._rbac_action_registry:
+            perm = action_cls.required_permission()
+            actions = result.setdefault(perm.element_type, {})
+            actions[action_cls.action_name()] = perm
+        return result

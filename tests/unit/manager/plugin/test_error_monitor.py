@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import uuid
 from typing import TYPE_CHECKING, Any
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock
 
 import pytest
 
@@ -28,10 +28,8 @@ class TestErrorMonitor:
 
     @pytest.fixture
     def mock_root_context(self, mock_error_log_repository: AsyncMock) -> dict[str, Any]:
-        """Create a mock root context with repositories."""
-        root_ctx = MagicMock()
-        root_ctx.repositories.error_log.repository = mock_error_log_repository
-        return {"_root.context": root_ctx}
+        """Create a mock init context with error_log_repository."""
+        return {"error_log_repository": mock_error_log_repository}
 
     @pytest.fixture
     async def error_monitor(self, mock_root_context: dict[str, Any]) -> ErrorMonitor:

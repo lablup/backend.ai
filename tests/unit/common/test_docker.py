@@ -19,7 +19,6 @@ from ai.backend.common.docker import (
 )
 
 
-@pytest.mark.asyncio
 async def test_get_docker_connector(monkeypatch: pytest.MonkeyPatch) -> None:
     get_docker_context_host.cache_clear()
     _search_docker_socket_files_impl.cache_clear()

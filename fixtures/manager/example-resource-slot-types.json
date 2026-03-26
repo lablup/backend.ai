@@ -1,0 +1,144 @@
+{
+  "resource_slot_types": [
+    {
+      "slot_name": "cpu",
+      "slot_type": "count",
+      "display_name": "CPU",
+      "description": "CPU",
+      "display_unit": "Core",
+      "display_icon": "cpu",
+      "number_format": {"binary": false, "round_length": 0},
+      "rank": 100
+    },
+    {
+      "slot_name": "mem",
+      "slot_type": "bytes",
+      "display_name": "RAM",
+      "description": "Memory",
+      "display_unit": "GiB",
+      "display_icon": "ram",
+      "number_format": {"binary": true, "round_length": 0},
+      "rank": 200
+    },
+    {
+      "slot_name": "cuda.device",
+      "slot_type": "count",
+      "display_name": "GPU",
+      "description": "CUDA-capable GPU",
+      "display_unit": "GPU",
+      "display_icon": "nvidia",
+      "number_format": {"binary": false, "round_length": 0},
+      "rank": 300
+    },
+    {
+      "slot_name": "cuda.shares",
+      "slot_type": "count",
+      "display_name": "fGPU",
+      "description": "CUDA-capable GPU (fractional)",
+      "display_unit": "fGPU",
+      "display_icon": "nvidia",
+      "number_format": {"binary": false, "round_length": 2},
+      "rank": 400
+    },
+    {
+      "slot_name": "rocm.device",
+      "slot_type": "count",
+      "display_name": "GPU",
+      "description": "ROCm-capable GPU",
+      "display_unit": "GPU",
+      "display_icon": "rocm",
+      "number_format": {"binary": false, "round_length": 0},
+      "rank": 500
+    },
+    {
+      "slot_name": "tpu.device",
+      "slot_type": "count",
+      "display_name": "TPU",
+      "description": "TPU device",
+      "display_unit": "GPU",
+      "display_icon": "tpu",
+      "number_format": {"binary": false, "round_length": 0},
+      "rank": 600
+    },
+    {
+      "slot_name": "ipu.device",
+      "slot_type": "count",
+      "display_name": "IPU",
+      "description": "IPU device",
+      "display_unit": "IPU",
+      "display_icon": "ipu",
+      "number_format": {"binary": false, "round_length": 0},
+      "rank": 700
+    },
+    {
+      "slot_name": "atom.device",
+      "slot_type": "count",
+      "display_name": "ATOM Device",
+      "description": "ATOM",
+      "display_unit": "ATOM",
+      "display_icon": "rebel",
+      "number_format": {"binary": false, "round_length": 0},
+      "rank": 800
+    },
+    {
+      "slot_name": "atom-plus.device",
+      "slot_type": "count",
+      "display_name": "ATOM+ Device",
+      "description": "ATOM+",
+      "display_unit": "ATOM+",
+      "display_icon": "rebel",
+      "number_format": {"binary": false, "round_length": 0},
+      "rank": 900
+    },
+    {
+      "slot_name": "atom-max.device",
+      "slot_type": "count",
+      "display_name": "ATOM Max Device",
+      "description": "ATOM Max",
+      "display_unit": "ATOM Max",
+      "display_icon": "rebel",
+      "number_format": {"binary": false, "round_length": 0},
+      "rank": 1000
+    },
+    {
+      "slot_name": "gaudi2.device",
+      "slot_type": "count",
+      "display_name": "Gaudi 2 Device",
+      "description": "Gaudi 2",
+      "display_unit": "Gaudi 2",
+      "display_icon": "gaudi",
+      "number_format": {"binary": false, "round_length": 0},
+      "rank": 1100
+    },
+    {
+      "slot_name": "warboy.device",
+      "slot_type": "count",
+      "display_name": "Warboy Device",
+      "description": "Furiosa Warboy",
+      "display_unit": "Warboy",
+      "display_icon": "furiosa",
+      "number_format": {"binary": false, "round_length": 0},
+      "rank": 1200
+    },
+    {
+      "slot_name": "rngd.device",
+      "slot_type": "count",
+      "display_name": "RNGD Device",
+      "description": "Furiosa RNGD",
+      "display_unit": "RNGD",
+      "display_icon": "furiosa",
+      "number_format": {"binary": false, "round_length": 0},
+      "rank": 1300
+    },
+    {
+      "slot_name": "hyperaccel-lpu.device",
+      "slot_type": "count",
+      "display_name": "Hyperaccel LPU Device",
+      "description": "Hyperaccel LPU",
+      "display_unit": "LPU",
+      "display_icon": "lpu",
+      "number_format": {"binary": false, "round_length": 0},
+      "rank": 1400
+    }
+  ]
+}

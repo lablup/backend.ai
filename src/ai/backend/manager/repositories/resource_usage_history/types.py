@@ -216,8 +216,8 @@ class DomainUsageBucketSearchScope(SearchScope):
 
         def inner() -> sa.sql.expression.ColumnElement[bool]:
             return sa.and_(
-                DomainUsageBucketRow.resource_group == resource_group,
                 DomainUsageBucketRow.domain_name == domain_name,
+                DomainUsageBucketRow.resource_group == resource_group,
             )
 
         return inner
@@ -253,9 +253,9 @@ class ProjectUsageBucketSearchScope(SearchScope):
 
         def inner() -> sa.sql.expression.ColumnElement[bool]:
             return sa.and_(
-                ProjectUsageBucketRow.resource_group == resource_group,
                 ProjectUsageBucketRow.domain_name == domain_name,
                 ProjectUsageBucketRow.project_id == project_id,
+                ProjectUsageBucketRow.resource_group == resource_group,
             )
 
         return inner
@@ -298,10 +298,10 @@ class UserUsageBucketSearchScope(SearchScope):
 
         def inner() -> sa.sql.expression.ColumnElement[bool]:
             return sa.and_(
-                UserUsageBucketRow.resource_group == resource_group,
                 UserUsageBucketRow.domain_name == domain_name,
                 UserUsageBucketRow.project_id == project_id,
                 UserUsageBucketRow.user_uuid == user_uuid,
+                UserUsageBucketRow.resource_group == resource_group,
             )
 
         return inner

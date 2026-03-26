@@ -15,7 +15,7 @@ from uuid import uuid4
 
 import pytest
 
-from ai.backend.common.types import ResourceSlot
+from ai.backend.common.types import ResourceSlot, SlotQuantity
 from ai.backend.manager.data.fair_share import (
     DomainFairShareData,
     FairShareCalculationContext,
@@ -54,7 +54,7 @@ def make_calculation_snapshot() -> FairShareCalculationSnapshot:
     """Create a dummy calculation snapshot for testing."""
     return FairShareCalculationSnapshot(
         fair_share_factor=Decimal("1.0"),
-        total_decayed_usage=ResourceSlot(),
+        total_decayed_usage=[],
         normalized_usage=Decimal("0"),
         lookback_start=date(2024, 1, 1),
         lookback_end=date(2024, 1, 15),
@@ -83,15 +83,15 @@ def today() -> date:
 
 
 @pytest.fixture
-def cluster_capacity() -> ResourceSlot:
+def cluster_capacity() -> list[SlotQuantity]:
     """Default cluster capacity for testing.
 
     Large enough to produce normalized_usage values in 0~1 range.
     """
-    return ResourceSlot({
-        "cpu": Decimal("100"),  # 100 CPUs
-        "mem": Decimal("1000000000000"),  # 1TB memory
-    })
+    return [
+        SlotQuantity("cpu", Decimal("100")),  # 100 CPUs
+        SlotQuantity("mem", Decimal("1000000000000")),  # 1TB memory
+    ]
 
 
 class TestApplyTimeDecay:
@@ -117,7 +117,10 @@ class TestApplyTimeDecay:
             lookback_days=30,
             default_weight=Decimal("1.0"),
             resource_weights=ResourceSlot({"cpu": Decimal("1.0"), "mem": Decimal("1.0")}),
-            cluster_capacity=ResourceSlot({"cpu": Decimal("100"), "mem": Decimal("1000000000000")}),
+            cluster_capacity=[
+                SlotQuantity("cpu", Decimal("100")),
+                SlotQuantity("mem", Decimal("1000000000000")),
+            ],
             today=today,
         )
 
@@ -146,7 +149,10 @@ class TestApplyTimeDecay:
             lookback_days=30,
             default_weight=Decimal("1.0"),
             resource_weights=ResourceSlot({"cpu": Decimal("1.0")}),
-            cluster_capacity=ResourceSlot({"cpu": Decimal("100"), "mem": Decimal("1000000000000")}),
+            cluster_capacity=[
+                SlotQuantity("cpu", Decimal("100")),
+                SlotQuantity("mem", Decimal("1000000000000")),
+            ],
             today=today,
         )
 
@@ -174,7 +180,10 @@ class TestApplyTimeDecay:
             lookback_days=30,
             default_weight=Decimal("1.0"),
             resource_weights=ResourceSlot({"cpu": Decimal("1.0")}),
-            cluster_capacity=ResourceSlot({"cpu": Decimal("100"), "mem": Decimal("1000000000000")}),
+            cluster_capacity=[
+                SlotQuantity("cpu", Decimal("100")),
+                SlotQuantity("mem", Decimal("1000000000000")),
+            ],
             today=today,
         )
 
@@ -206,7 +215,10 @@ class TestApplyTimeDecay:
             lookback_days=30,
             default_weight=Decimal("1.0"),
             resource_weights=ResourceSlot({"cpu": Decimal("1.0")}),
-            cluster_capacity=ResourceSlot({"cpu": Decimal("100"), "mem": Decimal("1000000000000")}),
+            cluster_capacity=[
+                SlotQuantity("cpu", Decimal("100")),
+                SlotQuantity("mem", Decimal("1000000000000")),
+            ],
             today=today,
         )
 
@@ -235,7 +247,10 @@ class TestApplyTimeDecay:
             lookback_days=30,
             default_weight=Decimal("1.0"),
             resource_weights=ResourceSlot({"cpu": Decimal("1.0")}),
-            cluster_capacity=ResourceSlot({"cpu": Decimal("100"), "mem": Decimal("1000000000000")}),
+            cluster_capacity=[
+                SlotQuantity("cpu", Decimal("100")),
+                SlotQuantity("mem", Decimal("1000000000000")),
+            ],
             today=today,
         )
 
@@ -251,7 +266,10 @@ class TestApplyTimeDecay:
             lookback_days=30,
             default_weight=Decimal("1.0"),
             resource_weights=ResourceSlot({"cpu": Decimal("1.0")}),
-            cluster_capacity=ResourceSlot({"cpu": Decimal("100"), "mem": Decimal("1000000000000")}),
+            cluster_capacity=[
+                SlotQuantity("cpu", Decimal("100")),
+                SlotQuantity("mem", Decimal("1000000000000")),
+            ],
             today=today,
         )
 
@@ -281,7 +299,7 @@ class TestCalculateNormalizedUsage:
         # capacity_seconds = 100 * 30 * 86400 = 259,200,000
         # ratio = 8,640,000 / 259,200,000 = 0.0333...
         usage = ResourceSlot({"cpu": Decimal("8640000")})
-        cluster_capacity = ResourceSlot({"cpu": Decimal("100")})
+        cluster_capacity = [SlotQuantity("cpu", Decimal("100"))]
         lookback_days = 30
         weights = ResourceSlot({"cpu": Decimal("1.0")})
 
@@ -303,10 +321,10 @@ class TestCalculateNormalizedUsage:
             "cpu": Decimal("8640000"),
             "mem": Decimal("259200000000"),
         })
-        cluster_capacity = ResourceSlot({
-            "cpu": Decimal("100"),
-            "mem": Decimal("1000000000"),  # 1GB
-        })
+        cluster_capacity = [
+            SlotQuantity("cpu", Decimal("100")),
+            SlotQuantity("mem", Decimal("1000000000")),  # 1GB
+        ]
         lookback_days = 30
         weights = ResourceSlot({"cpu": Decimal("1.0"), "mem": Decimal("1.0")})
 
@@ -330,10 +348,10 @@ class TestCalculateNormalizedUsage:
             "cpu": Decimal("8640000"),
             "mem": Decimal("259200000000"),
         })
-        cluster_capacity = ResourceSlot({
-            "cpu": Decimal("100"),
-            "mem": Decimal("1000000000"),
-        })
+        cluster_capacity = [
+            SlotQuantity("cpu", Decimal("100")),
+            SlotQuantity("mem", Decimal("1000000000")),
+        ]
         lookback_days = 30
 
         # Equal weights
@@ -355,7 +373,7 @@ class TestCalculateNormalizedUsage:
     def test_empty_usage_returns_zero(self, calculator: FairShareFactorCalculator) -> None:
         """Empty usage should return zero normalized value."""
         usage = ResourceSlot()
-        cluster_capacity = ResourceSlot({"cpu": Decimal("100")})
+        cluster_capacity = [SlotQuantity("cpu", Decimal("100"))]
         lookback_days = 30
         weights = ResourceSlot({"cpu": Decimal("1.0")})
 
@@ -368,7 +386,7 @@ class TestCalculateNormalizedUsage:
     def test_zero_capacity_resource_ignored(self, calculator: FairShareFactorCalculator) -> None:
         """Resources with zero capacity are skipped."""
         usage = ResourceSlot({"cpu": Decimal("1000"), "gpu": Decimal("500")})
-        cluster_capacity = ResourceSlot({"cpu": Decimal("100"), "gpu": Decimal("0")})
+        cluster_capacity = [SlotQuantity("cpu", Decimal("100")), SlotQuantity("gpu", Decimal("0"))]
         lookback_days = 30
         weights = ResourceSlot({"cpu": Decimal("1.0"), "gpu": Decimal("1.0")})
 
@@ -393,7 +411,7 @@ class TestCalculateFactor:
         usage = ResourceSlot()
         weight = Decimal("1.0")
         resource_weights = ResourceSlot({"cpu": Decimal("1.0")})
-        cluster_capacity = ResourceSlot({"cpu": Decimal("100")})
+        cluster_capacity = [SlotQuantity("cpu", Decimal("100"))]
         lookback_days = 30
 
         normalized, factor = calculator._calculate_factor(
@@ -411,7 +429,7 @@ class TestCalculateFactor:
         # capacity_seconds = 100 * 30 * 86400 = 259,200,000
         # usage should equal capacity_seconds for 100% utilization
         weight = Decimal("1.0")
-        cluster_capacity = ResourceSlot({"cpu": Decimal("100")})
+        cluster_capacity = [SlotQuantity("cpu", Decimal("100"))]
         lookback_days = 30
         capacity_seconds = Decimal("100") * 30 * 86400  # 259,200,000
 
@@ -430,7 +448,7 @@ class TestCalculateFactor:
     def test_higher_weight_gives_higher_factor(self, calculator: FairShareFactorCalculator) -> None:
         """Higher weight should result in higher factor for same usage."""
         # 50% utilization
-        cluster_capacity = ResourceSlot({"cpu": Decimal("100")})
+        cluster_capacity = [SlotQuantity("cpu", Decimal("100"))]
         lookback_days = 30
         capacity_seconds = Decimal("100") * 30 * 86400
         usage = ResourceSlot({"cpu": capacity_seconds / 2})  # 50% utilization
@@ -449,7 +467,7 @@ class TestCalculateFactor:
     def test_factor_clamped_to_valid_range(self, calculator: FairShareFactorCalculator) -> None:
         """Factor should be clamped to [0, 1] range."""
         resource_weights = ResourceSlot({"cpu": Decimal("1.0")})
-        cluster_capacity = ResourceSlot({"cpu": Decimal("100")})
+        cluster_capacity = [SlotQuantity("cpu", Decimal("100"))]
         lookback_days = 30
         weight = Decimal("1.0")
 
@@ -484,7 +502,10 @@ class TestCalculateFactors:
             lookback_days=30,
             default_weight=Decimal("1.0"),
             resource_weights=ResourceSlot({"cpu": Decimal("1.0")}),
-            cluster_capacity=ResourceSlot({"cpu": Decimal("100"), "mem": Decimal("1000000000000")}),
+            cluster_capacity=[
+                SlotQuantity("cpu", Decimal("100")),
+                SlotQuantity("mem", Decimal("1000000000000")),
+            ],
             today=today,
         )
 
@@ -556,7 +577,10 @@ class TestCalculateFactors:
             lookback_days=30,
             default_weight=Decimal("1.0"),
             resource_weights=ResourceSlot({"cpu": Decimal("1.0")}),
-            cluster_capacity=ResourceSlot({"cpu": Decimal("100"), "mem": Decimal("1000000000000")}),
+            cluster_capacity=[
+                SlotQuantity("cpu", Decimal("100")),
+                SlotQuantity("mem", Decimal("1000000000000")),
+            ],
             today=today,
         )
 
@@ -595,7 +619,10 @@ class TestCalculateFactors:
             lookback_days=30,
             default_weight=Decimal("1.0"),
             resource_weights=ResourceSlot({"cpu": Decimal("1.0")}),
-            cluster_capacity=ResourceSlot({"cpu": Decimal("100"), "mem": Decimal("1000000000000")}),
+            cluster_capacity=[
+                SlotQuantity("cpu", Decimal("100")),
+                SlotQuantity("mem", Decimal("1000000000000")),
+            ],
             today=today,
         )
 
@@ -607,7 +634,10 @@ class TestCalculateFactors:
             lookback_days=30,
             default_weight=Decimal("1.0"),
             resource_weights=ResourceSlot({"cpu": Decimal("1.0")}),
-            cluster_capacity=ResourceSlot({"cpu": Decimal("100"), "mem": Decimal("1000000000000")}),
+            cluster_capacity=[
+                SlotQuantity("cpu", Decimal("100")),
+                SlotQuantity("mem", Decimal("1000000000000")),
+            ],
             today=today,
         )
 
@@ -654,7 +684,10 @@ class TestCalculateFactors:
             lookback_days=30,
             default_weight=Decimal("1.0"),
             resource_weights=ResourceSlot({"cpu": Decimal("1.0")}),
-            cluster_capacity=ResourceSlot({"cpu": Decimal("100"), "mem": Decimal("1000000000000")}),
+            cluster_capacity=[
+                SlotQuantity("cpu", Decimal("100")),
+                SlotQuantity("mem", Decimal("1000000000000")),
+            ],
             today=today,
         )
 
@@ -681,7 +714,10 @@ class TestCalculateFactors:
             lookback_days=30,
             default_weight=Decimal("1.0"),
             resource_weights=ResourceSlot({"cpu": Decimal("1.0")}),
-            cluster_capacity=ResourceSlot({"cpu": Decimal("100"), "mem": Decimal("1000000000000")}),
+            cluster_capacity=[
+                SlotQuantity("cpu", Decimal("100")),
+                SlotQuantity("mem", Decimal("1000000000000")),
+            ],
             today=today,
         )
 
@@ -722,7 +758,10 @@ class TestCalculateSchedulingRanks:
             lookback_days=30,
             default_weight=Decimal("1.0"),
             resource_weights=ResourceSlot({"cpu": Decimal("1.0")}),
-            cluster_capacity=ResourceSlot({"cpu": Decimal("100"), "mem": Decimal("1000000000000")}),
+            cluster_capacity=[
+                SlotQuantity("cpu", Decimal("100")),
+                SlotQuantity("mem", Decimal("1000000000000")),
+            ],
             today=today,
         )
 
@@ -756,7 +795,10 @@ class TestCalculateSchedulingRanks:
             lookback_days=30,
             default_weight=Decimal("1.0"),
             resource_weights=ResourceSlot({"cpu": Decimal("1.0")}),
-            cluster_capacity=ResourceSlot({"cpu": Decimal("100"), "mem": Decimal("1000000000000")}),
+            cluster_capacity=[
+                SlotQuantity("cpu", Decimal("100")),
+                SlotQuantity("mem", Decimal("1000000000000")),
+            ],
             today=today,
         )
 
@@ -791,7 +833,10 @@ class TestCalculateSchedulingRanks:
             lookback_days=30,
             default_weight=Decimal("1.0"),
             resource_weights=ResourceSlot({"cpu": Decimal("1.0")}),
-            cluster_capacity=ResourceSlot({"cpu": Decimal("100"), "mem": Decimal("1000000000000")}),
+            cluster_capacity=[
+                SlotQuantity("cpu", Decimal("100")),
+                SlotQuantity("mem", Decimal("1000000000000")),
+            ],
             today=today,
         )
 
@@ -846,7 +891,10 @@ class TestIntegrationScenarios:
             lookback_days=30,
             default_weight=Decimal("1.0"),
             resource_weights=ResourceSlot({"cpu": Decimal("1.0")}),
-            cluster_capacity=ResourceSlot({"cpu": Decimal("100"), "mem": Decimal("1000000000000")}),
+            cluster_capacity=[
+                SlotQuantity("cpu", Decimal("100")),
+                SlotQuantity("mem", Decimal("1000000000000")),
+            ],
             today=today,
         )
 
@@ -976,7 +1024,10 @@ class TestIntegrationScenarios:
             lookback_days=30,
             default_weight=Decimal("1.0"),
             resource_weights=ResourceSlot({"cpu": Decimal("1.0")}),
-            cluster_capacity=ResourceSlot({"cpu": Decimal("100"), "mem": Decimal("1000000000000")}),
+            cluster_capacity=[
+                SlotQuantity("cpu", Decimal("100")),
+                SlotQuantity("mem", Decimal("1000000000000")),
+            ],
             today=today,
         )
 
@@ -1034,7 +1085,7 @@ class TestDomainNameResolution:
             lookback_days=30,
             default_weight=Decimal("1.0"),
             resource_weights=ResourceSlot({"cpu": Decimal("1.0")}),
-            cluster_capacity=ResourceSlot({"cpu": Decimal("100")}),
+            cluster_capacity=[SlotQuantity("cpu", Decimal("100"))],
             today=today,
             project_domain_names={project_id: "fallback-domain"},
         )
@@ -1061,7 +1112,7 @@ class TestDomainNameResolution:
             lookback_days=30,
             default_weight=Decimal("1.0"),
             resource_weights=ResourceSlot({"cpu": Decimal("1.0")}),
-            cluster_capacity=ResourceSlot({"cpu": Decimal("100")}),
+            cluster_capacity=[SlotQuantity("cpu", Decimal("100"))],
             today=today,
             project_domain_names={project_id: fallback_domain},
         )
@@ -1090,7 +1141,7 @@ class TestDomainNameResolution:
             lookback_days=30,
             default_weight=Decimal("1.0"),
             resource_weights=ResourceSlot({"cpu": Decimal("1.0")}),
-            cluster_capacity=ResourceSlot({"cpu": Decimal("100")}),
+            cluster_capacity=[SlotQuantity("cpu", Decimal("100"))],
             today=today,
             project_domain_names={project_id: fallback_domain},
         )
@@ -1116,7 +1167,7 @@ class TestDomainNameResolution:
             lookback_days=30,
             default_weight=Decimal("1.0"),
             resource_weights=ResourceSlot({"cpu": Decimal("1.0")}),
-            cluster_capacity=ResourceSlot({"cpu": Decimal("100")}),
+            cluster_capacity=[SlotQuantity("cpu", Decimal("100"))],
             today=today,
             project_domain_names={},
         )
@@ -1159,7 +1210,7 @@ class TestDomainNameResolution:
             lookback_days=30,
             default_weight=Decimal("1.0"),
             resource_weights=ResourceSlot({"cpu": Decimal("1.0")}),
-            cluster_capacity=ResourceSlot({"cpu": Decimal("100")}),
+            cluster_capacity=[SlotQuantity("cpu", Decimal("100"))],
             today=today,
             project_domain_names={project_id: fallback_domain},
         )

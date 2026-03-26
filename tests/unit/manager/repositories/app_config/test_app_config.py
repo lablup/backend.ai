@@ -9,8 +9,10 @@ from collections.abc import AsyncGenerator
 import pytest
 
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
+from ai.backend.common.data.permission.types import RBACElementType
 from ai.backend.common.types import BinarySize, ResourceSlot, ValkeyTarget
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
+from ai.backend.manager.data.permission.types import RBACElementRef
 from ai.backend.manager.models.agent import AgentRow
 from ai.backend.manager.models.app_config import AppConfigRow, AppConfigScopeType
 from ai.backend.manager.models.deployment_auto_scaling_policy import DeploymentAutoScalingPolicyRow
@@ -23,7 +25,10 @@ from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.image import ImageRow
 from ai.backend.manager.models.kernel import KernelRow
 from ai.backend.manager.models.keypair import KeyPairRow
-from ai.backend.manager.models.rbac_models import UserRoleRow
+from ai.backend.manager.models.rbac_models import RoleRow, UserRoleRow
+from ai.backend.manager.models.rbac_models.association_scopes_entities import (
+    AssociationScopesEntitiesRow,
+)
 from ai.backend.manager.models.resource_policy import (
     KeyPairResourcePolicyRow,
     ProjectResourcePolicyRow,
@@ -39,7 +44,7 @@ from ai.backend.manager.models.vfolder import VFolderRow
 from ai.backend.manager.repositories.app_config import AppConfigRepository
 from ai.backend.manager.repositories.app_config.creators import AppConfigCreatorSpec
 from ai.backend.manager.repositories.app_config.updaters import AppConfigUpdaterSpec
-from ai.backend.manager.repositories.base.creator import Creator
+from ai.backend.manager.repositories.base.rbac.entity_creator import RBACEntityCreator
 from ai.backend.manager.types import OptionalState
 from ai.backend.testutils.db import with_tables
 
@@ -72,6 +77,7 @@ class TestAppConfigRepository:
                 UserResourcePolicyRow,
                 ProjectResourcePolicyRow,
                 KeyPairResourcePolicyRow,
+                RoleRow,
                 UserRoleRow,
                 UserRow,
                 KeyPairRow,
@@ -88,6 +94,7 @@ class TestAppConfigRepository:
                 RoutingRow,
                 ResourcePresetRow,
                 AppConfigRow,
+                AssociationScopesEntitiesRow,
             ],
         ):
             yield database_connection
@@ -197,19 +204,20 @@ class TestAppConfigRepository:
         repo = AppConfigRepository(db=db_with_cleanup, valkey_stat=valkey_stat_client)
         yield repo
 
-    @pytest.mark.asyncio
     async def test_create_domain_config(
         self,
         app_config_repository: AppConfigRepository,
         test_domain_name: str,
     ) -> None:
         """Test creating domain-level configuration"""
-        creator = Creator(
+        creator = RBACEntityCreator(
             spec=AppConfigCreatorSpec(
                 scope_type=AppConfigScopeType.DOMAIN,
                 scope_id=test_domain_name,
                 extra_config={"theme": "dark", "language": "en"},
-            )
+            ),
+            element_type=RBACElementType.APP_CONFIG,
+            scope_ref=RBACElementRef(RBACElementType.DOMAIN, test_domain_name),
         )
 
         config = await app_config_repository.create_config(creator)
@@ -218,19 +226,20 @@ class TestAppConfigRepository:
         assert config.scope_id == test_domain_name
         assert config.extra_config == {"theme": "dark", "language": "en"}
 
-    @pytest.mark.asyncio
     async def test_create_user_config(
         self,
         app_config_repository: AppConfigRepository,
         test_user_id: str,
     ) -> None:
         """Test creating user-level configuration"""
-        creator = Creator(
+        creator = RBACEntityCreator(
             spec=AppConfigCreatorSpec(
                 scope_type=AppConfigScopeType.USER,
                 scope_id=test_user_id,
                 extra_config={"theme": "light", "notifications": True},
-            )
+            ),
+            element_type=RBACElementType.APP_CONFIG,
+            scope_ref=RBACElementRef(RBACElementType.USER, test_user_id),
         )
 
         config = await app_config_repository.create_config(creator)
@@ -239,7 +248,6 @@ class TestAppConfigRepository:
         assert config.scope_id == test_user_id
         assert config.extra_config == {"theme": "light", "notifications": True}
 
-    @pytest.mark.asyncio
     async def test_get_merged_config_domain_only(
         self,
         app_config_repository: AppConfigRepository,
@@ -248,12 +256,14 @@ class TestAppConfigRepository:
     ) -> None:
         """Test getting merged config with only domain-level config"""
         # Create domain config
-        domain_creator = Creator(
+        domain_creator = RBACEntityCreator(
             spec=AppConfigCreatorSpec(
                 scope_type=AppConfigScopeType.DOMAIN,
                 scope_id=test_domain_name,
                 extra_config={"theme": "dark", "language": "en"},
-            )
+            ),
+            element_type=RBACElementType.APP_CONFIG,
+            scope_ref=RBACElementRef(RBACElementType.DOMAIN, test_domain_name),
         )
         await app_config_repository.create_config(domain_creator)
 
@@ -262,7 +272,6 @@ class TestAppConfigRepository:
 
         assert merged_config == {"theme": "dark", "language": "en"}
 
-    @pytest.mark.asyncio
     async def test_get_merged_config_with_user_override(
         self,
         app_config_repository: AppConfigRepository,
@@ -271,22 +280,26 @@ class TestAppConfigRepository:
     ) -> None:
         """Test getting merged config with user config overriding domain config"""
         # Create domain config
-        domain_creator = Creator(
+        domain_creator = RBACEntityCreator(
             spec=AppConfigCreatorSpec(
                 scope_type=AppConfigScopeType.DOMAIN,
                 scope_id=test_domain_name,
                 extra_config={"theme": "dark", "language": "en", "sidebar": "expanded"},
-            )
+            ),
+            element_type=RBACElementType.APP_CONFIG,
+            scope_ref=RBACElementRef(RBACElementType.DOMAIN, test_domain_name),
         )
         await app_config_repository.create_config(domain_creator)
 
         # Create user config that overrides theme
-        user_creator = Creator(
+        user_creator = RBACEntityCreator(
             spec=AppConfigCreatorSpec(
                 scope_type=AppConfigScopeType.USER,
                 scope_id=test_user_id,
                 extra_config={"theme": "light", "notifications": True},
-            )
+            ),
+            element_type=RBACElementType.APP_CONFIG,
+            scope_ref=RBACElementRef(RBACElementType.USER, test_user_id),
         )
         await app_config_repository.create_config(user_creator)
 
@@ -299,7 +312,6 @@ class TestAppConfigRepository:
         assert merged_config["sidebar"] == "expanded"  # From domain
         assert merged_config["notifications"] is True  # From user only
 
-    @pytest.mark.asyncio
     async def test_upsert_config_create(
         self,
         app_config_repository: AppConfigRepository,
@@ -318,7 +330,6 @@ class TestAppConfigRepository:
         assert config.scope_id == test_domain_name
         assert config.extra_config == {"theme": "dark", "language": "en"}
 
-    @pytest.mark.asyncio
     async def test_upsert_config_update(
         self,
         app_config_repository: AppConfigRepository,
@@ -326,12 +337,14 @@ class TestAppConfigRepository:
     ) -> None:
         """Test upserting config when it exists (update)"""
         # Create initial config
-        creator = Creator(
+        creator = RBACEntityCreator(
             spec=AppConfigCreatorSpec(
                 scope_type=AppConfigScopeType.DOMAIN,
                 scope_id=test_domain_name,
                 extra_config={"theme": "dark", "language": "en"},
-            )
+            ),
+            element_type=RBACElementType.APP_CONFIG,
+            scope_ref=RBACElementRef(RBACElementType.DOMAIN, test_domain_name),
         )
         initial_config = await app_config_repository.create_config(creator)
 
@@ -346,7 +359,6 @@ class TestAppConfigRepository:
         assert updated_config.id == initial_config.id
         assert updated_config.extra_config == {"theme": "light", "language": "ko"}
 
-    @pytest.mark.asyncio
     async def test_delete_config(
         self,
         app_config_repository: AppConfigRepository,
@@ -354,12 +366,14 @@ class TestAppConfigRepository:
     ) -> None:
         """Test deleting configuration"""
         # Create config
-        creator = Creator(
+        creator = RBACEntityCreator(
             spec=AppConfigCreatorSpec(
                 scope_type=AppConfigScopeType.DOMAIN,
                 scope_id=test_domain_name,
                 extra_config={"theme": "dark"},
-            )
+            ),
+            element_type=RBACElementType.APP_CONFIG,
+            scope_ref=RBACElementRef(RBACElementType.DOMAIN, test_domain_name),
         )
         await app_config_repository.create_config(creator)
 
@@ -374,7 +388,6 @@ class TestAppConfigRepository:
         config = await app_config_repository.get_config(AppConfigScopeType.DOMAIN, test_domain_name)
         assert config is None
 
-    @pytest.mark.asyncio
     async def test_delete_nonexistent_config(
         self,
         app_config_repository: AppConfigRepository,
@@ -387,7 +400,6 @@ class TestAppConfigRepository:
 
         assert deleted is False
 
-    @pytest.mark.asyncio
     async def test_get_merged_config_empty(
         self,
         app_config_repository: AppConfigRepository,
@@ -398,7 +410,6 @@ class TestAppConfigRepository:
 
         assert merged_config == {}
 
-    @pytest.mark.asyncio
     async def test_cache_invalidation_domain_config(
         self,
         app_config_repository: AppConfigRepository,
@@ -407,12 +418,14 @@ class TestAppConfigRepository:
     ) -> None:
         """Test cache invalidation when domain config is updated"""
         # Create domain config
-        domain_creator = Creator(
+        domain_creator = RBACEntityCreator(
             spec=AppConfigCreatorSpec(
                 scope_type=AppConfigScopeType.DOMAIN,
                 scope_id=test_domain_name,
                 extra_config={"theme": "dark"},
-            )
+            ),
+            element_type=RBACElementType.APP_CONFIG,
+            scope_ref=RBACElementRef(RBACElementType.DOMAIN, test_domain_name),
         )
         await app_config_repository.create_config(domain_creator)
 

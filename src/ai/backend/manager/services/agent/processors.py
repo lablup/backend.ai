@@ -3,6 +3,7 @@ from typing import override
 from ai.backend.manager.actions.monitors.monitor import ActionMonitor
 from ai.backend.manager.actions.processor import ActionProcessor
 from ai.backend.manager.actions.types import AbstractProcessorPackage, ActionSpec
+from ai.backend.manager.actions.validators import ActionValidators
 from ai.backend.manager.services.agent.actions.get_total_resources import (
     GetTotalResourcesAction,
     GetTotalResourcesActionResult,
@@ -86,7 +87,12 @@ class AgentProcessors(AbstractProcessorPackage):
         LoadContainerCountsAction, LoadContainerCountsActionResult
     ]
 
-    def __init__(self, service: AgentService, action_monitors: list[ActionMonitor]) -> None:
+    def __init__(
+        self,
+        service: AgentService,
+        action_monitors: list[ActionMonitor],
+        validators: ActionValidators,
+    ) -> None:
         self.sync_agent_registry = ActionProcessor(service.sync_agent_registry, action_monitors)
         self.get_watcher_status = ActionProcessor(service.get_watcher_status, action_monitors)
         self.watcher_agent_start = ActionProcessor(service.watcher_agent_start, action_monitors)

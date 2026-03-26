@@ -35,7 +35,7 @@ from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.image import ImageRow
 from ai.backend.manager.models.kernel import KernelRow
 from ai.backend.manager.models.keypair import KeyPairRow
-from ai.backend.manager.models.rbac_models import UserRoleRow
+from ai.backend.manager.models.rbac_models import RoleRow, UserRoleRow
 from ai.backend.manager.models.resource_policy import (
     KeyPairResourcePolicyRow,
     ProjectResourcePolicyRow,
@@ -84,6 +84,7 @@ class TestDeploymentAutoScalingPolicyRow:
                 UserResourcePolicyRow,
                 ProjectResourcePolicyRow,
                 KeyPairResourcePolicyRow,
+                RoleRow,
                 UserRoleRow,
                 UserRow,
                 KeyPairRow,
@@ -300,7 +301,6 @@ class TestDeploymentAutoScalingPolicyRow:
 
         yield endpoint
 
-    @pytest.mark.asyncio
     async def test_create_auto_scaling_policy(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
@@ -332,7 +332,6 @@ class TestDeploymentAutoScalingPolicyRow:
             assert policy.scale_up_threshold == Decimal("80")
             assert policy.scale_down_threshold == Decimal("30")
 
-    @pytest.mark.asyncio
     async def test_create_policy_with_defaults(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
@@ -357,7 +356,6 @@ class TestDeploymentAutoScalingPolicyRow:
             assert policy.scale_up_threshold is None
             assert policy.scale_down_threshold is None
 
-    @pytest.mark.asyncio
     async def test_to_data(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
@@ -399,7 +397,6 @@ class TestDeploymentAutoScalingPolicyRow:
             assert data.cooldown_seconds == 600
             assert data.created_at is not None
 
-    @pytest.mark.asyncio
     async def test_unique_constraint_endpoint(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
@@ -429,7 +426,6 @@ class TestDeploymentAutoScalingPolicyRow:
             # Rollback to clean up the session state after the expected error
             await db_sess.rollback()
 
-    @pytest.mark.asyncio
     async def test_nullable_thresholds(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,

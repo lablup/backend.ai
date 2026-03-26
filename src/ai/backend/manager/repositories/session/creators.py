@@ -35,8 +35,8 @@ class KernelRowCreatorSpec(CreatorSpec[KernelRow]):
     This spec is designed for retrofitting existing code that already builds
     KernelRow instances. It simply returns the provided row in build_row().
 
-    For field information needed by RBACFieldCreator, the kernel's session_id
-    identifies the parent entity (Session) with EntityType.SESSION.
+    Kernel is a sub-entity of Session. Use RBACElementType.SESSION as
+    the scope_ref element_type when creating the RBAC association.
     """
 
     row: KernelRow

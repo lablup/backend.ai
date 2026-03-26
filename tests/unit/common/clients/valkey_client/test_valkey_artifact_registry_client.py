@@ -90,7 +90,6 @@ class TestValkeyArtifactRegistryClient:
         )
         return sample_reservoir_registry_data
 
-    @pytest.mark.asyncio
     async def test_set_huggingface_registry(
         self,
         valkey_artifact_registry_client: ValkeyArtifactRegistryClient,
@@ -109,7 +108,6 @@ class TestValkeyArtifactRegistryClient:
         result = HuggingFaceRegistryStatefulData.from_dict(result_dict)
         assert result == sample_huggingface_registry_data
 
-    @pytest.mark.asyncio
     async def test_get_huggingface_registry(
         self,
         valkey_artifact_registry_client: ValkeyArtifactRegistryClient,
@@ -124,7 +122,6 @@ class TestValkeyArtifactRegistryClient:
         result = HuggingFaceRegistryStatefulData.from_dict(result_dict)
         assert result == stateful_huggingface_registry
 
-    @pytest.mark.asyncio
     async def test_get_nonexistent_huggingface_registry(
         self,
         valkey_artifact_registry_client: ValkeyArtifactRegistryClient,
@@ -136,7 +133,6 @@ class TestValkeyArtifactRegistryClient:
 
         assert result is None
 
-    @pytest.mark.asyncio
     async def test_delete_huggingface_registry(
         self,
         valkey_artifact_registry_client: ValkeyArtifactRegistryClient,
@@ -154,7 +150,6 @@ class TestValkeyArtifactRegistryClient:
         )
         assert result is None
 
-    @pytest.mark.asyncio
     async def test_delete_nonexistent_huggingface_registry(
         self,
         valkey_artifact_registry_client: ValkeyArtifactRegistryClient,
@@ -165,7 +160,6 @@ class TestValkeyArtifactRegistryClient:
         deleted = await valkey_artifact_registry_client.delete_registry(registry_id)
         assert deleted is False
 
-    @pytest.mark.asyncio
     async def test_set_reservoir_registry(
         self,
         valkey_artifact_registry_client: ValkeyArtifactRegistryClient,
@@ -184,7 +178,6 @@ class TestValkeyArtifactRegistryClient:
         result = ReservoirRegistryStatefulData.from_dict(result_dict)
         assert result == sample_reservoir_registry_data
 
-    @pytest.mark.asyncio
     async def test_get_reservoir_registry(
         self,
         valkey_artifact_registry_client: ValkeyArtifactRegistryClient,
@@ -199,7 +192,6 @@ class TestValkeyArtifactRegistryClient:
         result = ReservoirRegistryStatefulData.from_dict(result_dict)
         assert result == stateful_reservoir_registry
 
-    @pytest.mark.asyncio
     async def test_multiple_registries_isolation(
         self,
         valkey_artifact_registry_client: ValkeyArtifactRegistryClient,

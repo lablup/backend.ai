@@ -32,7 +32,6 @@ def api_version(request: pytest.FixtureRequest) -> Iterator[tuple[int, str]]:
         yield request.param
 
 
-@pytest.mark.asyncio
 async def test_create_kernel_url(mocker: MockerFixture) -> None:
     mock_req_obj = mock.Mock()
     mock_req_obj.fetch.return_value = AsyncContextMock(
@@ -53,7 +52,6 @@ async def test_create_kernel_url(mocker: MockerFixture) -> None:
         mock_req_obj.fetch.return_value.json.assert_awaited_once_with()
 
 
-@pytest.mark.asyncio
 async def test_destroy_kernel_url(mocker: MockerFixture) -> None:
     mock_req_obj = mock.Mock()
     mock_req_obj.fetch.return_value = AsyncContextMock(status=HTTPStatus.NO_CONTENT)
@@ -65,7 +63,6 @@ async def test_destroy_kernel_url(mocker: MockerFixture) -> None:
         mock_req_cls.assert_called_once_with("DELETE", f"/{prefix}/{session_name}", params={})
 
 
-@pytest.mark.asyncio
 async def test_restart_kernel_url(mocker: MockerFixture) -> None:
     mock_req_obj = mock.Mock()
     mock_req_obj.fetch.return_value = AsyncContextMock(status=HTTPStatus.NO_CONTENT)
@@ -77,7 +74,6 @@ async def test_restart_kernel_url(mocker: MockerFixture) -> None:
         mock_req_cls.assert_called_once_with("PATCH", f"/{prefix}/{session_name}", params={})
 
 
-@pytest.mark.asyncio
 async def test_get_kernel_info_url(mocker: MockerFixture) -> None:
     return_value: dict[str, str] = {}
     mock_json_coro = AsyncMock(return_value=return_value)
@@ -91,7 +87,6 @@ async def test_get_kernel_info_url(mocker: MockerFixture) -> None:
         mock_req_cls.assert_called_once_with("GET", f"/{prefix}/{session_name}", params={})
 
 
-@pytest.mark.asyncio
 async def test_execute_code_url(mocker: MockerFixture) -> None:
     return_value = {"result": "hi"}
     mock_json_coro = AsyncMock(return_value=return_value)

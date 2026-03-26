@@ -6,21 +6,20 @@ from dataclasses import dataclass
 from typing import Any
 from uuid import UUID
 
-from ai.backend.manager.api.gql.base import UUIDEqualMatchSpec
+from ai.backend.common.data.filter_specs import UUIDEqualMatchSpec
 from ai.backend.manager.errors.deployment import EndpointNotFound
 from ai.backend.manager.errors.kernel import SessionNotFound
 from ai.backend.manager.errors.service import RouteNotFound
 from ai.backend.manager.models.endpoint import EndpointRow
 from ai.backend.manager.models.routing import RoutingRow
-from ai.backend.manager.models.session import SessionRow
-from ai.backend.manager.repositories.base import QueryCondition, SearchScope
-from ai.backend.manager.repositories.base.types import ExistenceCheck
-
-from .options import (
+from ai.backend.manager.models.scheduling_history.conditions import (
     DeploymentHistoryConditions,
     RouteHistoryConditions,
     SessionSchedulingHistoryConditions,
 )
+from ai.backend.manager.models.session import SessionRow
+from ai.backend.manager.repositories.base import QueryCondition, SearchScope
+from ai.backend.manager.repositories.base.types import ExistenceCheck
 
 __all__ = (
     "SessionSchedulingHistorySearchScope",

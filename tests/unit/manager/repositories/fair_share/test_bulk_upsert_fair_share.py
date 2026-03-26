@@ -19,7 +19,7 @@ from ai.backend.manager.models.fair_share import (
 )
 from ai.backend.manager.models.group import GroupRow
 from ai.backend.manager.models.keypair import KeyPairRow
-from ai.backend.manager.models.rbac_models import UserRoleRow
+from ai.backend.manager.models.rbac_models import RoleRow, UserRoleRow
 from ai.backend.manager.models.resource_policy import (
     KeyPairResourcePolicyRow,
     ProjectResourcePolicyRow,
@@ -91,6 +91,7 @@ class TestBulkUpsertDomainFairShare:
                 UserResourcePolicyRow,
                 ProjectResourcePolicyRow,
                 KeyPairResourcePolicyRow,
+                RoleRow,
                 UserRoleRow,
                 UserRow,
                 KeyPairRow,
@@ -248,7 +249,6 @@ class TestBulkUpsertDomainFairShare:
             existing_weights=existing_weights,
         )
 
-    @pytest.mark.asyncio
     async def test_bulk_upsert_all_new(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
@@ -282,7 +282,6 @@ class TestBulkUpsertDomainFairShare:
         for i, domain in enumerate(ctx.domain_names):
             assert fair_shares[domain] == Decimal(f"{i + 1}.0")
 
-    @pytest.mark.asyncio
     async def test_bulk_upsert_all_existing(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
@@ -316,7 +315,6 @@ class TestBulkUpsertDomainFairShare:
         for i, domain in enumerate(ctx.domain_names):
             assert fair_shares[domain] == Decimal(f"{i + 10}.0")
 
-    @pytest.mark.asyncio
     async def test_bulk_upsert_mixed(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
@@ -351,7 +349,6 @@ class TestBulkUpsertDomainFairShare:
         for fs in fair_shares:
             assert fs.weight == Decimal("5.0")
 
-    @pytest.mark.asyncio
     async def test_bulk_upsert_empty_specs(
         self,
         fair_share_repository: FairShareRepository,
@@ -382,6 +379,7 @@ class TestBulkUpsertProjectFairShare:
                 UserResourcePolicyRow,
                 ProjectResourcePolicyRow,
                 KeyPairResourcePolicyRow,
+                RoleRow,
                 UserRoleRow,
                 UserRow,
                 KeyPairRow,
@@ -534,7 +532,6 @@ class TestBulkUpsertProjectFairShare:
             existing_weights=existing_weights,
         )
 
-    @pytest.mark.asyncio
     async def test_bulk_upsert_all_new(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
@@ -569,7 +566,6 @@ class TestBulkUpsertProjectFairShare:
         for i, pid in enumerate(ctx.project_ids):
             assert fair_shares[pid] == Decimal(f"{i + 1}.5")
 
-    @pytest.mark.asyncio
     async def test_bulk_upsert_all_existing(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
@@ -622,6 +618,7 @@ class TestBulkUpsertUserFairShare:
                 UserResourcePolicyRow,
                 ProjectResourcePolicyRow,
                 KeyPairResourcePolicyRow,
+                RoleRow,
                 UserRoleRow,
                 UserRow,
                 KeyPairRow,
@@ -932,7 +929,6 @@ class TestBulkUpsertUserFairShare:
             existing_weights={},
         )
 
-    @pytest.mark.asyncio
     async def test_bulk_upsert_all_new(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
@@ -968,7 +964,6 @@ class TestBulkUpsertUserFairShare:
         for i, uid in enumerate(ctx.user_uuids):
             assert fair_shares[uid] == Decimal(f"{i + 1}.25")
 
-    @pytest.mark.asyncio
     async def test_bulk_upsert_all_existing(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
@@ -1004,7 +999,6 @@ class TestBulkUpsertUserFairShare:
         for i, uid in enumerate(ctx.user_uuids):
             assert fair_shares[uid] == Decimal(f"{i + 30}.0")
 
-    @pytest.mark.asyncio
     async def test_bulk_upsert_with_null_weight(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,

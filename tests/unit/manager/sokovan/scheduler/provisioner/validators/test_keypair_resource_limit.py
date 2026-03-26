@@ -5,7 +5,7 @@ from decimal import Decimal
 
 import pytest
 
-from ai.backend.common.types import AccessKey, ResourceSlot, SessionId
+from ai.backend.common.types import AccessKey, ResourceSlot, SessionId, SlotQuantity
 from ai.backend.manager.sokovan.data import (
     ConcurrencySnapshot,
     KeypairOccupancy,
@@ -43,7 +43,10 @@ class TestKeypairResourceLimitValidator:
             resource_occupancy=ResourceOccupancySnapshot(
                 by_keypair={
                     AccessKey("user1"): KeypairOccupancy(
-                        occupied_slots=ResourceSlot(cpu=Decimal("3"), mem=Decimal("3")),
+                        occupied_slots=[
+                            SlotQuantity("cpu", Decimal("3")),
+                            SlotQuantity("mem", Decimal("3")),
+                        ],
                         session_count=1,
                         sftp_session_count=0,
                     )
@@ -92,7 +95,10 @@ class TestKeypairResourceLimitValidator:
             resource_occupancy=ResourceOccupancySnapshot(
                 by_keypair={
                     AccessKey("user1"): KeypairOccupancy(
-                        occupied_slots=ResourceSlot(cpu=Decimal("8"), mem=Decimal("8")),
+                        occupied_slots=[
+                            SlotQuantity("cpu", Decimal("8")),
+                            SlotQuantity("mem", Decimal("8")),
+                        ],
                         session_count=2,
                         sftp_session_count=0,
                     )
@@ -142,7 +148,10 @@ class TestKeypairResourceLimitValidator:
             resource_occupancy=ResourceOccupancySnapshot(
                 by_keypair={
                     AccessKey("user1"): KeypairOccupancy(
-                        occupied_slots=ResourceSlot(cpu=Decimal("50"), mem=Decimal("50")),
+                        occupied_slots=[
+                            SlotQuantity("cpu", Decimal("50")),
+                            SlotQuantity("mem", Decimal("50")),
+                        ],
                         session_count=5,
                         sftp_session_count=0,
                     )

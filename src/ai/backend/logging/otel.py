@@ -3,6 +3,7 @@ import uuid
 from collections.abc import Iterable
 from dataclasses import dataclass
 
+from opentelemetry import trace
 from opentelemetry.exporter.otlp.proto.grpc._log_exporter import OTLPLogExporter
 from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter
 from opentelemetry.instrumentation.aiohttp_client import AioHttpClientInstrumentor
@@ -24,6 +25,8 @@ class OpenTelemetrySpec:
     endpoint: str
     service_instance_id: uuid.UUID
     service_instance_name: str
+    max_queue_size: int
+    max_export_batch_size: int
 
     def to_resource(self) -> Resource:
         attributes = {
@@ -59,21 +62,23 @@ def apply_otel_loggers(loggers: Iterable[logging.Logger], spec: OpenTelemetrySpe
 
 
 def apply_otel_tracer(spec: OpenTelemetrySpec) -> None:
-    # TODO: Apply after the setup procedure is decoupled from aiohttp
     tracer_provider = TracerProvider(resource=spec.to_resource())
     span_exporter = OTLPSpanExporter(endpoint=spec.endpoint)
-    span_processor = BatchSpanProcessor(span_exporter)
+    span_processor = BatchSpanProcessor(
+        span_exporter,
+        max_queue_size=spec.max_queue_size,
+        max_export_batch_size=spec.max_export_batch_size,
+    )
     tracer_provider.add_span_processor(span_processor)
+    trace.set_tracer_provider(tracer_provider)
     logging.info("OpenTelemetry tracing initialized successfully.")
 
 
 def instrument_aiohttp_server() -> None:
-    # TODO: Apply after the setup procedure is decoupled from aiohttp
     AioHttpServerInstrumentor().instrument()
     logging.info("OpenTelemetry tracing for aiohttp server initialized successfully.")
 
 
 def instrument_aiohttp_client() -> None:
-    # TODO: Apply after the setup procedure is decoupled from aiohttp
     AioHttpClientInstrumentor().instrument()
     logging.info("OpenTelemetry tracing for aiohttp client initialized successfully.")

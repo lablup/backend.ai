@@ -14,6 +14,7 @@ from .types import AuthSuccessResponse
 __all__ = (
     "AuthorizeResponse",
     "GetRoleResponse",
+    "MyIpResponse",
     "SignupResponse",
     "SignoutResponse",
     "UpdateFullNameResponse",
@@ -21,6 +22,7 @@ __all__ = (
     "UpdatePasswordNoAuthResponse",
     "GetSSHKeypairResponse",
     "SSHKeypairResponse",
+    "VerifyAuthResponse",
 )
 
 
@@ -48,6 +50,12 @@ class SignupResponse(BaseResponseModel):
 
     access_key: str = Field(description="Auto-generated API access key")
     secret_key: str = Field(description="Auto-generated API secret key paired with access_key")
+
+
+class LogoutResponse(BaseResponseModel):
+    """Response for logout. Login session has been invalidated."""
+
+    pass
 
 
 class SignoutResponse(BaseResponseModel):
@@ -90,3 +98,16 @@ class SSHKeypairResponse(BaseResponseModel):
 
     ssh_public_key: str = Field(description="SSH public key in standard format")
     ssh_private_key: str = Field(description="SSH private key in PEM format")
+
+
+class VerifyAuthResponse(BaseResponseModel):
+    """Response for auth verification. Echoes back the input to confirm credentials are valid."""
+
+    authorized: str = Field(description="Authorization status string (always 'yes' when valid)")
+    echo: str = Field(description="Echoed input string confirming the auth round-trip succeeded")
+
+
+class MyIpResponse(BaseResponseModel):
+    """Response containing the client's IP address as seen by the server."""
+
+    client_ip: str = Field(description="The client's IP address as seen by the server")
