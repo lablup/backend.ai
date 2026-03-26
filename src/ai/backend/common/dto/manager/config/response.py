@@ -7,7 +7,7 @@ from __future__ import annotations
 
 from pydantic import BaseModel, Field
 
-from ai.backend.common.api_handlers import BaseResponseModel
+from ai.backend.common.api_handlers import BaseResponseModel, BaseRootResponseModel
 
 __all__ = (
     "DotfileItem",
@@ -57,10 +57,8 @@ class ListDotfilesResponse(BaseResponseModel):
     items: list[DotfileItem] = Field(description="List of dotfile entries")
 
 
-class GetBootstrapScriptResponse(BaseResponseModel):
-    """Response for retrieving the bootstrap script."""
-
-    script: str = Field(description="Bootstrap script content")
+class GetBootstrapScriptResponse(BaseRootResponseModel[str]):
+    """Response for retrieving the bootstrap script (plain string for backward compatibility)."""
 
 
 class UpdateBootstrapScriptResponse(BaseResponseModel):

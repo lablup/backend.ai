@@ -216,5 +216,5 @@ class UserConfigHandler:
         result = await self._dotfile.get_bootstrap.wait_for_complete(action)
         return APIResponse.build(
             HTTPStatus.OK,
-            GetBootstrapScriptResponse(script=result.script),
+            GetBootstrapScriptResponse(root=result.script),
         )
