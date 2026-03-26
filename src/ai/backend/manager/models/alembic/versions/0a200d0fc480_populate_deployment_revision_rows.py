@@ -1,16 +1,16 @@
-"""populate deployment revision rows and make routings.revision non-nullable
+"""populate deployment revision rows from endpoint data
 
-Revision ID: 0b8dc217003f
-Revises: f5338adb2de1
-Create Date: 2026-03-26
+Revision ID: 0a200d0fc480
+Revises: 3727dd0927cf
+Create Date: 2026-03-25
 
 """
 
 from alembic import op
 
 # revision identifiers, used by Alembic.
-revision = "0b8dc217003f"
-down_revision = "f5338adb2de1"
+revision = "0a200d0fc480"
+down_revision = "cff56a8381dd"
 branch_labels = None
 depends_on = None
 
@@ -91,26 +91,15 @@ def upgrade() -> None:
         """
     )
 
-    # Step 4: Delete orphan routes whose endpoint has no revision
-    # (i.e., endpoints with image IS NULL that could not get a revision row).
-    op.execute(
-        """
-        DELETE FROM routings
-        WHERE revision IS NULL
-        """
-    )
-
-    # Step 5: Make routings.revision NOT NULL now that all routes have a revision.
-    op.alter_column("routings", "revision", nullable=False)
-
     # Note: Endpoints with image IS NULL are left as-is.
     # They cannot have a revision row (deployment_revisions.image is NOT NULL),
     # so current_revision remains nullable.
 
 
 def downgrade() -> None:
-    # Revert routings.revision back to nullable.
-    op.alter_column("routings", "revision", nullable=True)
-
-    # Note: deleted routes (Step 4) and created revision rows cannot be reliably
-    # restored, but making the column nullable again is sufficient for downgrade.
+    # Data-only migration: downgrade is intentionally a no-op.
+    # The created revision rows and current_revision pointers are harmless
+    # to keep, and there is no reliable way to distinguish revisions created
+    # by this migration from those created by the original 25ac68cb28ba or
+    # by normal application usage.
+    pass
