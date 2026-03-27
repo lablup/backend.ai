@@ -74,13 +74,19 @@ class RollingUpdateSpec(BaseModel):
         return self._resolve(self.max_unavailable, desired_replicas, round_up=False)
 
     @staticmethod
-    def _resolve(surge: IntOrPercent, total: int, *, round_up: bool) -> int:
-        if surge.type == IntOrPercentType.COUNT:
-            # count is guaranteed non-None by IntOrPercent._validate_fields
-            return surge.count or 0
-        # percent is guaranteed non-None by IntOrPercent._validate_fields
-        result = total * (surge.percent or 0.0)
-        return math.ceil(result) if round_up else math.floor(result)
+    def _resolve(value: IntOrPercent, total: int, *, round_up: bool) -> int:
+        """Convert an IntOrPercent to an absolute replica count.
+
+        For COUNT type, returns the value as-is.
+        For PERCENT type, multiplies by total and rounds up (ceil) or down (floor)
+        following Kubernetes rolling-update semantics.
+        """
+        match value.type:
+            case IntOrPercentType.COUNT:
+                return value.count or 0
+            case IntOrPercentType.PERCENT:
+                result = total * (value.percent or 0.0)
+                return math.ceil(result) if round_up else math.floor(result)
 
 
 class BlueGreenSpec(BaseModel):

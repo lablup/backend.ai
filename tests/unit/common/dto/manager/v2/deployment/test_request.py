@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import uuid
+from dataclasses import dataclass
 from typing import Any
 
 import pytest
@@ -158,26 +159,54 @@ class TestExtraVFolderMountInput:
             ExtraVFolderMountInput.model_validate({})
 
 
+@dataclass(frozen=True)
+class RollingUpdateValidScenario:
+    """A valid RollingUpdateConfigInput test scenario."""
+
+    surge: IntOrPercent
+    unavailable: IntOrPercent
+    expected_surge_value: int | float
+    expected_unavailable_value: int | float
+
+
 class TestRollingUpdateConfigInput:
     """Tests for RollingUpdateConfigInput model."""
 
-    def test_count_surge(self) -> None:
+    @pytest.mark.parametrize(
+        "scenario",
+        [
+            pytest.param(
+                RollingUpdateValidScenario(
+                    surge=IntOrPercent(type=IntOrPercentType.COUNT, count=2),
+                    unavailable=IntOrPercent(type=IntOrPercentType.COUNT, count=1),
+                    expected_surge_value=2,
+                    expected_unavailable_value=1,
+                ),
+                id="count",
+            ),
+            pytest.param(
+                RollingUpdateValidScenario(
+                    surge=IntOrPercent(type=IntOrPercentType.PERCENT, percent=0.25),
+                    unavailable=IntOrPercent(type=IntOrPercentType.PERCENT, percent=0.5),
+                    expected_surge_value=0.25,
+                    expected_unavailable_value=0.5,
+                ),
+                id="percent",
+            ),
+        ],
+    )
+    def test_valid_surge_values(self, scenario: RollingUpdateValidScenario) -> None:
         config = RollingUpdateConfigInput(
-            max_surge=IntOrPercent(type=IntOrPercentType.COUNT, count=2),
-            max_unavailable=IntOrPercent(type=IntOrPercentType.COUNT, count=1),
+            max_surge=scenario.surge, max_unavailable=scenario.unavailable
         )
-        assert config.max_surge.type == IntOrPercentType.COUNT
-        assert config.max_surge.count == 2
-        assert config.max_unavailable.count == 1
-
-    def test_percent_surge(self) -> None:
-        config = RollingUpdateConfigInput(
-            max_surge=IntOrPercent(type=IntOrPercentType.PERCENT, percent=0.25),
-            max_unavailable=IntOrPercent(type=IntOrPercentType.PERCENT, percent=0.5),
-        )
-        assert config.max_surge.type == IntOrPercentType.PERCENT
-        assert config.max_surge.percent == 0.25
-        assert config.max_unavailable.percent == 0.5
+        assert config.max_surge.type == scenario.surge.type
+        assert config.max_unavailable.type == scenario.unavailable.type
+        if scenario.surge.type == IntOrPercentType.COUNT:
+            assert config.max_surge.count == scenario.expected_surge_value
+            assert config.max_unavailable.count == scenario.expected_unavailable_value
+        else:
+            assert config.max_surge.percent == scenario.expected_surge_value
+            assert config.max_unavailable.percent == scenario.expected_unavailable_value
 
     def test_defaults(self) -> None:
         config = RollingUpdateConfigInput()
@@ -186,31 +215,54 @@ class TestRollingUpdateConfigInput:
         assert config.max_unavailable.type == IntOrPercentType.PERCENT
         assert config.max_unavailable.percent == 0.0
 
-    def test_negative_count_raises_error(self) -> None:
+    @pytest.mark.parametrize(
+        "raw_input",
+        [
+            pytest.param(
+                {"max_surge": {"type": "count", "count": -1}},
+                id="surge_negative_count",
+            ),
+            pytest.param(
+                {"max_surge": {"type": "percent", "percent": 1.5}},
+                id="surge_percent_over_1",
+            ),
+            pytest.param(
+                {"max_surge": {"type": "percent", "percent": -0.1}},
+                id="surge_negative_percent",
+            ),
+            pytest.param(
+                {"max_surge": {"type": "count", "percent": 0.5}},
+                id="surge_count_type_with_percent_field",
+            ),
+            pytest.param(
+                {"max_surge": {"type": "percent", "count": 2}},
+                id="surge_percent_type_with_count_field",
+            ),
+            pytest.param(
+                {"max_unavailable": {"type": "count", "count": -1}},
+                id="unavailable_negative_count",
+            ),
+            pytest.param(
+                {"max_unavailable": {"type": "percent", "percent": 1.5}},
+                id="unavailable_percent_over_1",
+            ),
+            pytest.param(
+                {"max_unavailable": {"type": "percent", "percent": -0.1}},
+                id="unavailable_negative_percent",
+            ),
+            pytest.param(
+                {"max_unavailable": {"type": "count", "percent": 0.5}},
+                id="unavailable_count_type_with_percent_field",
+            ),
+            pytest.param(
+                {"max_unavailable": {"type": "percent", "count": 2}},
+                id="unavailable_percent_type_with_count_field",
+            ),
+        ],
+    )
+    def test_invalid_input_raises_error(self, raw_input: dict[str, object]) -> None:
         with pytest.raises(ValidationError):
-            RollingUpdateConfigInput.model_validate({"max_surge": {"type": "count", "count": -1}})
-
-    def test_percent_over_1_raises_error(self) -> None:
-        with pytest.raises(ValidationError):
-            RollingUpdateConfigInput.model_validate({
-                "max_surge": {"type": "percent", "percent": 1.5}
-            })
-
-    def test_negative_percent_raises_error(self) -> None:
-        with pytest.raises(ValidationError):
-            RollingUpdateConfigInput.model_validate({
-                "max_surge": {"type": "percent", "percent": -0.1}
-            })
-
-    def test_count_without_count_field_raises_error(self) -> None:
-        with pytest.raises(ValidationError):
-            RollingUpdateConfigInput.model_validate({
-                "max_surge": {"type": "count", "percent": 0.5}
-            })
-
-    def test_percent_without_percent_field_raises_error(self) -> None:
-        with pytest.raises(ValidationError):
-            RollingUpdateConfigInput.model_validate({"max_surge": {"type": "percent", "count": 2}})
+            RollingUpdateConfigInput.model_validate(raw_input)
 
 
 class TestBlueGreenConfigInput:
