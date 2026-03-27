@@ -1,3 +1,0 @@
-Generic single-database configuration.
-
-For the migration backport strategy, see `ALEMBIC.md` at the repository root.

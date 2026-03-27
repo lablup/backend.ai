@@ -1,9 +1,21 @@
-# Alembic Migration Backport Strategy
+# Alembic Migrations
 
-This document describes how to safely backport Alembic migrations to release branches
+Generic single-database configuration.
+
+## Migration Backport Strategy
+
+This section describes how to safely backport Alembic migrations to release branches
 while keeping the main branch consistent.
 
-## Principles
+The same strategy applies to all components:
+
+| Component | Alembic directory |
+|---|---|
+| Manager | `src/ai/backend/manager/models/alembic/` |
+| Account Manager | `src/ai/backend/account_manager/models/alembic/` |
+| App Proxy Coordinator | `src/ai/backend/appproxy/coordinator/models/alembic/` |
+
+### Principles
 
 1. **Fixes only** -- Backport migrations must contain schema fixes only (e.g., missing
    columns, incorrect types, enum coexistence issues). Feature-level schema changes are
@@ -15,15 +27,7 @@ while keeping the main branch consistent.
    allowed only when inserting a backport migration into the main branch chain before
    the change is merged (see Step 2 below).
 
-## Applicable Components
-
-| Component | Alembic directory |
-|---|---|
-| Manager | `src/ai/backend/manager/models/alembic/` |
-| Account Manager | `src/ai/backend/account_manager/models/alembic/` |
-| App Proxy Coordinator | `src/ai/backend/appproxy/coordinator/models/alembic/` |
-
-## Backport Procedure
+### Backport Procedure
 
 Given the following migration chain on **main**:
 
@@ -31,7 +35,7 @@ Given the following migration chain on **main**:
 a  -->  b  -->  c        (a = backport target head, c = main head)
 ```
 
-### Step 1: Create migration `d` on the release branch
+#### Step 1: Create migration `d` on the release branch
 
 On the release branch, create a new migration whose `down_revision` is `a` (the
 release branch head at the point you are targeting):
@@ -40,7 +44,7 @@ release branch head at the point you are targeting):
 a  -->  d                 (release branch result)
 ```
 
-### Step 2: Insert `d` into main and add duplicate `d'`
+#### Step 2: Insert `d` into main and add duplicate `d'`
 
 On **main**, the same migration `d` is inserted between `a` and `b`, and a duplicate
 `d'` is appended on top of the current main head `c`:
@@ -55,7 +59,7 @@ a  -->  d  -->  b  -->  c  -->  d'
   performs the **same schema change** as `d` but written idempotently so it is a no-op
   on databases that already applied `d`.
 
-### Step 3: Merge the head if necessary
+#### Step 3: Merge the head if necessary
 
 After inserting `d` into the chain, run `alembic heads` on main. If there are multiple
 heads, create a merge migration:
@@ -64,7 +68,7 @@ heads, create a merge migration:
 alembic merge heads -m "merge backport head"
 ```
 
-## Release Version Comment
+### Release Version Comment
 
 Every migration file must include a comment indicating which release version
 (including the minor version, e.g., `26.3.0`) it belongs to. Place the comment
@@ -85,15 +89,12 @@ For backport migrations, note both the target release branch and the main branch
 # Part of: 26.2.1 (backport), 26.3.0 (main)
 ```
 
-This makes it easy to trace which release introduced a given schema change and to
-identify backport migrations when reviewing the version history.
-
-## Idempotent Writing Rules
+### Idempotent Writing Rules
 
 Every backport migration (both `d` and `d'`) **must** be idempotent. Use the following
 patterns:
 
-### DDL guards
+#### DDL guards
 
 ```python
 # Creating a table
@@ -113,7 +114,7 @@ if "ix_my_table_col" not in indexes:
     op.create_index("ix_my_table_col", "my_table", ["col"])
 ```
 
-### Enum type guards
+#### Enum type guards
 
 ```python
 conn = op.get_bind()
@@ -126,7 +127,7 @@ if result.fetchone() is None:
     my_enum.create(conn)
 ```
 
-### Raw SQL guards
+#### Raw SQL guards
 
 ```sql
 -- Column
@@ -140,7 +141,7 @@ DROP INDEX IF EXISTS ix_my_table_col;
 ALTER TABLE my_table DROP COLUMN IF EXISTS old_col;
 ```
 
-### Downgrade
+#### Downgrade
 
 Downgrade functions follow the same idempotent rules. If the downgrade is handled by
 another migration in the chain, use `pass`:
@@ -150,7 +151,7 @@ def downgrade() -> None:
     pass
 ```
 
-## Real-World Example
+### Real-World Examples
 
 See the following migrations in the codebase for reference:
 
