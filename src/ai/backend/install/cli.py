@@ -251,7 +251,7 @@ class InstallReport(Static):
         - Username: `admin@lablup.com`
         - Password: `wJalrXUt`
 
-        To see this guide again, run './backendai-install-{self.os_info.platform} install --show-guide'.
+        To see this guide again, run '{sys.argv[0]} install --show-guide'.
         """
             )
         )
@@ -538,16 +538,16 @@ class InstallerApp(App):
             )
         self._args = args
 
-    async def show_guide(self):
+    async def show_guide(self) -> None:
         try:
             install_info = InstallInfo(**json.loads((Path.cwd() / "INSTALL-INFO").read_bytes()))
             os_info = await detect_os()
-            self.mount(InstallReport(install_info, os_info))
+            await self.mount(InstallReport(install_info, os_info))
         except IOError as e:
             log = SetupLog()
             log.write("Failed to read INSTALL-INFO!")
             log.write(e)
-            self.mount(log)
+            await self.mount(log)
 
     def compose(self) -> ComposeResult:
         yield Header(show_clock=True)
@@ -561,9 +561,7 @@ class InstallerApp(App):
         """
         )
         yield Static(logo_text, id="logo")
-        if self._args.show_guide:
-            asyncio.create_task(self.show_guide())
-        else:
+        if not self._args.show_guide:
             with ContentSwitcher(id="top", initial="mode-menu"):
                 yield ModeMenu(self._args, id="mode-menu")
                 yield DevSetup(id="dev-setup", non_interactive=self._args.non_interactive)
@@ -571,10 +569,12 @@ class InstallerApp(App):
                 yield Configure(id="configure")
         yield Footer()
 
-    def on_mount(self) -> None:
+    async def on_mount(self) -> None:
         header = self.query_one("Header", Header)
         header.tall = True
         self.title = "Backend.AI Installer"
+        if self._args.show_guide:
+            await self.show_guide()
 
     async def action_shutdown(self, message: str | None = None, exit_code: int = 0) -> None:
         had_cancelled_tasks = False
