@@ -16209,8 +16209,8 @@ Added in UNRELEASED. Access control information for a virtual folder. Includes t
 type VFolderAccessControlInfo
   @join__type(graph: STRAWBERRY)
 {
-  permission: VFolderPermissionField!
-  ownershipType: VFolderOwnershipTypeField!
+  permission: VFolderPermission!
+  ownershipType: VFolderOwnershipType!
   cloneable: Boolean!
 }
 
@@ -16268,7 +16268,7 @@ type VFolderMetadataInfo
 }
 
 """Added in UNRELEASED. Operation status of a virtual folder."""
-enum VFolderOperationStatusField
+enum VFolderOperationStatus
   @join__type(graph: STRAWBERRY)
 {
   READY @join__enumValue(graph: STRAWBERRY)
@@ -16285,7 +16285,7 @@ enum VFolderOperationStatusField
 """
 Added in UNRELEASED. Ownership type of a virtual folder (USER or GROUP).
 """
-enum VFolderOwnershipTypeField
+enum VFolderOwnershipType
   @join__type(graph: STRAWBERRY)
 {
   USER @join__enumValue(graph: STRAWBERRY)
@@ -16293,7 +16293,7 @@ enum VFolderOwnershipTypeField
 }
 
 """Added in UNRELEASED. Mount permission level for a virtual folder."""
-enum VFolderPermissionField
+enum VFolderPermission
   @join__type(graph: STRAWBERRY)
 {
   READ_ONLY @join__enumValue(graph: STRAWBERRY)
@@ -16342,7 +16342,7 @@ type VFolderV2 implements Node
   """
   Current operation status. READY, PERFORMING, CLONING, MOUNTED, ERROR, DELETE_PENDING, DELETE_ONGOING, DELETE_COMPLETE, or DELETE_ERROR.
   """
-  status: VFolderOperationStatusField!
+  status: VFolderOperationStatus!
 
   """Storage host where the virtual folder is physically located."""
   host: String!

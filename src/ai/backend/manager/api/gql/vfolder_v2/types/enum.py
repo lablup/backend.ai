@@ -26,7 +26,7 @@ class VFolderUsageModeGQL(StrEnum):
         added_version=NEXT_RELEASE_VERSION,
         description="Mount permission level for a virtual folder.",
     ),
-    name="VFolderPermissionField",
+    name="VFolderPermission",
 )
 class VFolderPermissionGQL(StrEnum):
     READ_ONLY = "ro"
@@ -39,7 +39,7 @@ class VFolderPermissionGQL(StrEnum):
         added_version=NEXT_RELEASE_VERSION,
         description="Ownership type of a virtual folder (USER or GROUP).",
     ),
-    name="VFolderOwnershipTypeField",
+    name="VFolderOwnershipType",
 )
 class VFolderOwnershipTypeGQL(StrEnum):
     USER = "user"
@@ -51,7 +51,7 @@ class VFolderOwnershipTypeGQL(StrEnum):
         added_version=NEXT_RELEASE_VERSION,
         description="Operation status of a virtual folder.",
     ),
-    name="VFolderOperationStatusField",
+    name="VFolderOperationStatus",
 )
 class VFolderOperationStatusGQL(StrEnum):
     READY = "ready"

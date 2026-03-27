@@ -10469,8 +10469,8 @@ type VFSStorageEdge {
 Added in UNRELEASED. Access control information for a virtual folder. Includes the mount permission level (read-only, read-write, read-write-delete), ownership type (user or project), and clone eligibility.
 """
 type VFolderAccessControlInfo {
-  permission: VFolderPermissionField!
-  ownershipType: VFolderOwnershipTypeField!
+  permission: VFolderPermission!
+  ownershipType: VFolderOwnershipType!
   cloneable: Boolean!
 }
 
@@ -10520,7 +10520,7 @@ type VFolderMetadataInfo {
 }
 
 """Added in UNRELEASED. Operation status of a virtual folder."""
-enum VFolderOperationStatusField {
+enum VFolderOperationStatus {
   READY
   PERFORMING
   CLONING
@@ -10535,13 +10535,13 @@ enum VFolderOperationStatusField {
 """
 Added in UNRELEASED. Ownership type of a virtual folder (USER or GROUP).
 """
-enum VFolderOwnershipTypeField {
+enum VFolderOwnershipType {
   USER
   GROUP
 }
 
 """Added in UNRELEASED. Mount permission level for a virtual folder."""
-enum VFolderPermissionField {
+enum VFolderPermission {
   READ_ONLY
   READ_WRITE
   RW_DELETE
@@ -10575,7 +10575,7 @@ type VFolderV2 implements Node {
   """
   Current operation status. READY, PERFORMING, CLONING, MOUNTED, ERROR, DELETE_PENDING, DELETE_ONGOING, DELETE_COMPLETE, or DELETE_ERROR.
   """
-  status: VFolderOperationStatusField!
+  status: VFolderOperationStatus!
 
   """Storage host where the virtual folder is physically located."""
   host: String!
