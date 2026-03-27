@@ -17,9 +17,10 @@ def _create_user_data(
 ) -> UserData:
     """Create a minimal UserData for testing adapter conversion."""
     now = datetime.now(tz=UTC)
+    effective_id = user_id or uuid4()
     return UserData(
-        id=user_id or uuid4(),
-        uuid=user_id or uuid4(),
+        id=effective_id,
+        uuid=effective_id,
         username="testuser",
         email="test@example.com",
         need_password_change=False,
@@ -68,9 +69,9 @@ class TestUserDataToNodeGroups:
         assert len(node.groups) == 2
         assert isinstance(node.groups[0], UserGroupMembershipDTO)
         assert isinstance(node.groups[1], UserGroupMembershipDTO)
-        assert node.groups[0].id == str(group_id_1)
+        assert node.groups[0].id == group_id_1
         assert node.groups[0].name == "researchers"
-        assert node.groups[1].id == str(group_id_2)
+        assert node.groups[1].id == group_id_2
         assert node.groups[1].name == "developers"
 
     def test_single_group_mapped_correctly(self) -> None:
@@ -81,5 +82,5 @@ class TestUserDataToNodeGroups:
         node = UserAdapter._user_data_to_node(data)
 
         assert len(node.groups) == 1
-        assert node.groups[0].id == str(group_id)
+        assert node.groups[0].id == group_id
         assert node.groups[0].name == "admins"

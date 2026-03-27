@@ -1131,5 +1131,5 @@ class UserAdapter(BaseAdapter):
                 created_at=data.created_at,
                 modified_at=data.modified_at,
             ),
-            groups=[UserGroupMembershipDTO(id=str(m.id), name=m.name) for m in data.groups],
+            groups=[UserGroupMembershipDTO(id=m.id, name=m.name) for m in data.groups],
         )

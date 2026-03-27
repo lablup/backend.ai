@@ -403,15 +403,17 @@ class TestUserGroupMembershipDTO:
     """Tests for UserGroupMembershipDTO sub-model."""
 
     def test_creation_with_required_fields(self) -> None:
-        membership = UserGroupMembershipDTO(id="some-uuid", name="my-group")
-        assert membership.id == "some-uuid"
+        gid = uuid.uuid4()
+        membership = UserGroupMembershipDTO(id=gid, name="my-group")
+        assert membership.id == gid
         assert membership.name == "my-group"
 
     def test_round_trip(self) -> None:
-        membership = UserGroupMembershipDTO(id="group-uuid-1", name="researchers")
+        gid = uuid.uuid4()
+        membership = UserGroupMembershipDTO(id=gid, name="researchers")
         json_data = membership.model_dump_json()
         restored = UserGroupMembershipDTO.model_validate_json(json_data)
-        assert restored.id == "group-uuid-1"
+        assert restored.id == gid
         assert restored.name == "researchers"
 
 
@@ -424,25 +426,27 @@ class TestUserNodeGroups:
 
     def test_groups_with_populated_list(self) -> None:
         node = make_user_node()
-        group1 = UserGroupMembershipDTO(id="g1", name="group-one")
-        group2 = UserGroupMembershipDTO(id="g2", name="group-two")
+        g1, g2 = uuid.uuid4(), uuid.uuid4()
+        group1 = UserGroupMembershipDTO(id=g1, name="group-one")
+        group2 = UserGroupMembershipDTO(id=g2, name="group-two")
         node_with_groups = node.model_copy(update={"groups": [group1, group2]})
         assert len(node_with_groups.groups) == 2
-        assert node_with_groups.groups[0].id == "g1"
+        assert node_with_groups.groups[0].id == g1
         assert node_with_groups.groups[0].name == "group-one"
-        assert node_with_groups.groups[1].id == "g2"
+        assert node_with_groups.groups[1].id == g2
         assert node_with_groups.groups[1].name == "group-two"
 
     def test_groups_round_trip_serialization(self) -> None:
         user_id = uuid.uuid4()
-        group = UserGroupMembershipDTO(id="grp-abc", name="test-group")
+        gid = uuid.uuid4()
+        group = UserGroupMembershipDTO(id=gid, name="test-group")
         node = make_user_node(user_id)
         node_with_groups = node.model_copy(update={"groups": [group]})
         json_str = node_with_groups.model_dump_json()
         restored = UserNode.model_validate_json(json_str)
         assert restored.id == user_id
         assert len(restored.groups) == 1
-        assert restored.groups[0].id == "grp-abc"
+        assert restored.groups[0].id == gid
         assert restored.groups[0].name == "test-group"
 
     def test_serialized_json_includes_groups_key(self) -> None:

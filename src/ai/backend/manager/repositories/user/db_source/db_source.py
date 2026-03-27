@@ -138,7 +138,9 @@ class UserDBSource:
                 sa.select(UserRow)
                 .where(UserRow.uuid == user_uuid)
                 .options(
-                    selectinload(UserRow.groups).joinedload(AssocGroupUserRow.group),
+                    selectinload(UserRow.groups)
+                    .joinedload(AssocGroupUserRow.group)
+                    .load_only(GroupRow.id, GroupRow.name),
                 )
             )
             user_row = await db_session.scalar(query)

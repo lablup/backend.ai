@@ -162,7 +162,7 @@ class EntityTimestamps(BaseModel):
 class UserGroupMembershipDTO(BaseResponseModel):
     """Group membership information for a user."""
 
-    id: str = Field(
+    id: UUID = Field(
         description="Unique identifier of the group.",
     )
     name: str = Field(
