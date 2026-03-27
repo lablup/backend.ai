@@ -5,7 +5,7 @@ from __future__ import annotations
 from enum import StrEnum
 from typing import Self
 
-from ai.backend.common.dto.manager.v2.vfolder.request import VFolderFilter, VFolderOrder
+from ai.backend.common.dto.manager.v2.vfolder.request import VFolderV2Filter, VFolderV2Order
 from ai.backend.common.dto.manager.v2.vfolder.types import (
     VFolderStatusFilter,
     VFolderUsageModeFilter,
@@ -116,7 +116,7 @@ class VFolderUsageModeEnumFilterGQL(PydanticInputMixin[VFolderUsageModeFilter]):
     ),
     name="VFolderV2Filter",
 )
-class VFolderV2FilterGQL(PydanticInputMixin[VFolderFilter]):
+class VFolderV2FilterGQL(PydanticInputMixin[VFolderV2Filter]):
     """Filter for vfolder queries."""
 
     name: StringFilter | None = None
@@ -158,7 +158,7 @@ class VFolderV2OrderFieldGQL(StrEnum):
     ),
     name="VFolderV2OrderBy",
 )
-class VFolderV2OrderByGQL(PydanticInputMixin[VFolderOrder]):
+class VFolderV2OrderByGQL(PydanticInputMixin[VFolderV2Order]):
     """OrderBy for vfolder queries."""
 
     field: VFolderV2OrderFieldGQL = VFolderV2OrderFieldGQL.CREATED_AT
