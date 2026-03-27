@@ -476,20 +476,16 @@ class TestModelDefinitionGeneratorRegistry:
 
     @pytest.fixture
     def vllm_user_override(self) -> ModelDefinition:
-        """User-provided override that only changes max-retries for VLLM variant."""
+        """User-provided override that changes start-command and port for VLLM variant.
+        health-check is absent so vfolder's health-check fields are fully preserved in the merge."""
         return ModelDefinition.model_validate({
             "models": [
                 {
                     "name": "vllm-model",
                     "model-path": "/models",
                     "service": {
-                        "start-command": "vfolder-command",
-                        "port": 8000,
-                        "health-check": {
-                            "path": "/health",
-                            "max-retries": 5,
-                            "initial-delay": 300.0,
-                        },
+                        "start-command": "user-override-command",
+                        "port": 9000,
                     },
                 }
             ]
@@ -516,11 +512,11 @@ class TestModelDefinitionGeneratorRegistry:
 
         model = result.models[0]
         assert model.service is not None
-        # from vfolder (overrode generator)
-        assert model.service.start_command == "vfolder-command"
+        # from user override (overrode vfolder and generator — vfolder had "vfolder-command")
+        assert model.service.start_command == "user-override-command"
+        assert model.service.port == 9000
         assert model.service.health_check is not None
-        # from vfolder (preserved through user override)
+        # from vfolder (preserved since user override has no health-check)
         assert model.service.health_check.initial_delay == 300.0
         assert model.service.health_check.path == "/health"
-        # from user override (overrode vfolder)
-        assert model.service.health_check.max_retries == 5
+        assert model.service.health_check.max_retries == 20

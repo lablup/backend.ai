@@ -102,6 +102,7 @@ class TestCheckPendingDeployments:
         # Assert - Deployment skipped due to missing revision
         assert len(result.successes) == 0
         assert len(result.failures) == 0
+        assert len(result.skipped) == 1
 
     async def test_no_proxy_target_deployment_skipped(
         self,
@@ -128,6 +129,7 @@ class TestCheckPendingDeployments:
         # Assert
         assert len(result.successes) == 0
         assert len(result.failures) == 0
+        assert len(result.skipped) == 1
 
     async def test_endpoint_registration_failure_captured(
         self,
@@ -236,7 +238,6 @@ class TestCheckReadyDeployments:
     async def test_empty_deployment_list(
         self,
         deployment_executor: DeploymentExecutor,
-        mock_deployment_repo: AsyncMock,
     ) -> None:
         """CR-003: Empty deployment list returns empty result.
 
@@ -394,6 +395,7 @@ class TestScaleDeployment:
             result = await deployment_executor.scale_deployment([ready_deployment_needs_scale_up])
 
         # Assert - KeyError since deployment.id not in empty dict
+        assert len(result.successes) == 0
         assert len(result.failures) == 1
 
 
