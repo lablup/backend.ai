@@ -308,10 +308,16 @@ class PreStartActionGQL(PydanticOutputMixin[PreStartActionInfoDTO]):
 class ModelHealthCheckGQL(PydanticOutputMixin[ModelHealthCheckInfoDTO]):
     interval: float = gql_field(description="Interval in seconds between health checks.")
     path: str = gql_field(description="Path to check for health status.")
-    max_retries: int = gql_field(description="Maximum number of retries for health checks.")
-    max_wait_time: float = gql_field(description="Maximum wait time for a health check.")
-    expected_status_code: int = gql_field(description="Expected HTTP status code.")
-    initial_delay: float = gql_field(description="Initial delay before health checks begin.")
+    max_retries: int = gql_field(description="Maximum number of retries for health check.")
+    max_wait_time: float = gql_field(
+        description="Maximum time in seconds to wait for a health check response."
+    )
+    expected_status_code: int = gql_field(
+        description="Expected HTTP status code for a healthy response."
+    )
+    initial_delay: float = gql_field(
+        description="Initial delay in seconds before the first health check."
+    )
 
 
 @gql_pydantic_type(
@@ -324,10 +330,10 @@ class ModelHealthCheckGQL(PydanticOutputMixin[ModelHealthCheckInfoDTO]):
 )
 class ModelServiceConfigGQL(PydanticOutputMixin[ModelServiceConfigInfoDTO]):
     pre_start_actions: list[PreStartActionGQL] = gql_field(
-        description="List of pre-start actions executed before service startup."
+        description="List of pre-start actions to execute before starting the model service."
     )
-    start_command: JSON = gql_field(description="Command used to start the model service.")
-    shell: str = gql_field(description="Shell used when start_command is a string.")
+    start_command: JSON = gql_field(description="Command to start the model service.")
+    shell: str = gql_field(description="Shell to use if start_command is a string.")
     port: int = gql_field(description="Port number for the model service.")
     health_check: ModelHealthCheckGQL | None = gql_field(
         description="Health check configuration for the model service.",
@@ -377,12 +383,12 @@ class ModelMetadataGQL(PydanticOutputMixin[ModelMetadataInfoDTO]):
 )
 class ModelConfigGQL(PydanticOutputMixin[ModelConfigInfoDTO]):
     name: str = gql_field(description="Name of the model.")
-    model_path: str = gql_field(description="Path to the model files.")
+    model_path: str = gql_field(description="Path to the model file.")
     service: ModelServiceConfigGQL | None = gql_field(
-        description="Service configuration for the model.", default=None
+        description="Configuration for the model service.", default=None
     )
     metadata: ModelMetadataGQL | None = gql_field(
-        description="Metadata associated with the model.", default=None
+        description="Metadata about the model.", default=None
     )
 
 
@@ -395,7 +401,7 @@ class ModelConfigGQL(PydanticOutputMixin[ModelConfigInfoDTO]):
     name="ModelDefinition",
 )
 class ModelDefinitionGQL(PydanticOutputMixin[ModelDefinitionInfoDTO]):
-    models: list[ModelConfigGQL] = gql_field(description="List of models in the definition.")
+    models: list[ModelConfigGQL] = gql_field(description="List of models in the model definition.")
 
 
 @gql_node_type(
