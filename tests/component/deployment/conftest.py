@@ -3,6 +3,7 @@ from __future__ import annotations
 import secrets
 import uuid
 from collections.abc import AsyncIterator, Callable, Coroutine
+from decimal import Decimal
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock
 
@@ -14,7 +15,8 @@ from ai.backend.common.config import ModelDefinition
 from ai.backend.common.container_registry import ContainerRegistryType
 from ai.backend.common.events.dispatcher import EventProducer
 from ai.backend.common.plugin.hook import HookPluginContext
-from ai.backend.common.types import QuotaScopeID, QuotaScopeType, VFolderUsageMode
+from ai.backend.common.resource.types import TotalResourceData
+from ai.backend.common.types import QuotaScopeID, QuotaScopeType, ResourceSlot, VFolderUsageMode
 from ai.backend.manager.actions.validators import ActionValidators
 from ai.backend.manager.api.rest.deployment.handler import DeploymentAPIHandler
 from ai.backend.manager.api.rest.deployment.registry import register_deployment_routes
@@ -95,6 +97,19 @@ def deployment_processors(
     )
     revision_generator_registry = RevisionGeneratorRegistry(
         RevisionGeneratorRegistryArgs(deployment_repository=repo)
+    )
+    # Mock resource availability so that rolling update surge validation
+    # passes in the test environment (no real agents are registered).
+    mock_available_slots = ResourceSlot({
+        "cpu": Decimal("1000"),
+        "mem": Decimal("1099511627776"),  # 1 TiB
+    })
+    scheduling_controller.get_available_resources_for_scaling_group = AsyncMock(
+        return_value=TotalResourceData(
+            total_used_slots=ResourceSlot({}),
+            total_free_slots=mock_available_slots,
+            total_capacity_slots=mock_available_slots,
+        )
     )
     deployment_controller = DeploymentController(
         DeploymentControllerArgs(

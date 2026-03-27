@@ -17,7 +17,7 @@ import pytest
 from ai.backend.common.data.endpoint.types import EndpointLifecycle
 from ai.backend.common.data.model_deployment.types import DeploymentStrategy
 from ai.backend.common.resource.types import TotalResourceData
-from ai.backend.common.types import ResourceSlot
+from ai.backend.common.types import ClusterMode, ResourceSlot
 from ai.backend.manager.data.deployment.types import (
     DeploymentInfo,
     DeploymentMetadata,
@@ -25,12 +25,12 @@ from ai.backend.manager.data.deployment.types import (
     DeploymentPolicyData,
     DeploymentState,
     ExecutionSpec,
-    ImageIdentifier,
     ModelRevisionSpec,
     MountMetadata,
     ReplicaSpec,
     ResourceSpec,
 )
+from ai.backend.manager.data.image.types import ImageIdentifier
 from ai.backend.manager.models.deployment_policy import (
     BlueGreenSpec,
     RollingUpdateSpec,
@@ -77,7 +77,7 @@ def _make_deployment_info(
                 revision_id=REVISION_ID,
                 image_identifier=ImageIdentifier(canonical="test:latest", architecture="x86_64"),
                 resource_spec=ResourceSpec(
-                    cluster_mode="SINGLE_NODE",
+                    cluster_mode=ClusterMode.SINGLE_NODE,
                     cluster_size=1,
                     resource_slots=slots,
                 ),
