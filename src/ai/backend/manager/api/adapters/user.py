@@ -497,9 +497,7 @@ class UserAdapter(BaseAdapter):
             integration_id=(
                 TriState.nop()
                 if isinstance(input.integration_id, Sentinel)
-                else TriState.nullify()
-                if input.integration_id is None
-                else TriState.update(input.integration_id)
+                else TriState.from_graphql(input.integration_id)
             ),
             group_ids=(
                 OptionalState.nop()
