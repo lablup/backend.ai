@@ -41,9 +41,9 @@ from ai.backend.manager.api.gql.pydantic_compat import PydanticInputMixin
             "DELETE_ERROR: An error occurred during deletion."
         ),
     ),
-    name="VFolderOperationStatusV2",
+    name="VFolderV2OperationStatus",
 )
-class VFolderOperationStatusEnumGQL(StrEnum):
+class VFolderV2OperationStatusEnumGQL(StrEnum):
     READY = "ready"
     PERFORMING = "performing"
     CLONING = "cloning"
@@ -65,9 +65,9 @@ class VFolderOperationStatusEnumGQL(StrEnum):
             "DATA: Virtual folder for shared data."
         ),
     ),
-    name="VFolderUsageModeV2",
+    name="VFolderV2UsageMode",
 )
-class VFolderUsageModeEnumGQL(StrEnum):
+class VFolderV2UsageModeEnumGQL(StrEnum):
     GENERAL = "general"
     MODEL = "model"
     DATA = "data"
@@ -78,15 +78,15 @@ class VFolderUsageModeEnumGQL(StrEnum):
         description="Filter for VFolder operation status enum fields. Supports in and not_in operations.",
         added_version=NEXT_RELEASE_VERSION,
     ),
-    name="VFolderOperationStatusV2EnumFilter",
+    name="VFolderV2OperationStatusEnumFilter",
 )
-class VFolderOperationStatusEnumFilterGQL(PydanticInputMixin[VFolderStatusFilter]):
+class VFolderV2OperationStatusEnumFilterGQL(PydanticInputMixin[VFolderStatusFilter]):
     """Filter for vfolder operation status enum fields."""
 
-    in_: list[VFolderOperationStatusEnumGQL] | None = gql_field(
+    in_: list[VFolderV2OperationStatusEnumGQL] | None = gql_field(
         description="The in field.", name="in", default=None
     )
-    not_in: list[VFolderOperationStatusEnumGQL] | None = gql_field(
+    not_in: list[VFolderV2OperationStatusEnumGQL] | None = gql_field(
         description="Exclude statuses not in this list.", default=None
     )
 
@@ -96,15 +96,15 @@ class VFolderOperationStatusEnumFilterGQL(PydanticInputMixin[VFolderStatusFilter
         description="Filter for VFolder usage mode enum fields. Supports in and not_in operations.",
         added_version=NEXT_RELEASE_VERSION,
     ),
-    name="VFolderUsageModeV2EnumFilter",
+    name="VFolderV2UsageModeEnumFilter",
 )
-class VFolderUsageModeEnumFilterGQL(PydanticInputMixin[VFolderUsageModeFilter]):
+class VFolderV2UsageModeEnumFilterGQL(PydanticInputMixin[VFolderUsageModeFilter]):
     """Filter for vfolder usage mode enum fields."""
 
-    in_: list[VFolderUsageModeEnumGQL] | None = gql_field(
+    in_: list[VFolderV2UsageModeEnumGQL] | None = gql_field(
         description="The in field.", name="in", default=None
     )
-    not_in: list[VFolderUsageModeEnumGQL] | None = gql_field(
+    not_in: list[VFolderV2UsageModeEnumGQL] | None = gql_field(
         description="Exclude usage modes not in this list.", default=None
     )
 
@@ -121,8 +121,8 @@ class VFolderV2FilterGQL(PydanticInputMixin[VFolderV2Filter]):
 
     name: StringFilter | None = None
     host: StringFilter | None = None
-    status: VFolderOperationStatusEnumFilterGQL | None = None
-    usage_mode: VFolderUsageModeEnumFilterGQL | None = None
+    status: VFolderV2OperationStatusEnumFilterGQL | None = None
+    usage_mode: VFolderV2UsageModeEnumFilterGQL | None = None
     created_at: DateTimeFilter | None = None
     AND: list[Self] | None = None
     OR: list[Self] | None = None
