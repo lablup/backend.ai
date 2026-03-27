@@ -63,7 +63,7 @@ def _make_permission_info() -> VFolderPermissionInfo:
 
 
 def _make_owner_info() -> VFolderOwnerInfo:
-    return VFolderOwnerInfo(user=uuid.uuid4(), group=None, creator="owner@example.com")
+    return VFolderOwnerInfo(user_id=uuid.uuid4(), group_id=None, creator="owner@example.com")
 
 
 def _make_usage_info() -> VFolderUsageInfo:

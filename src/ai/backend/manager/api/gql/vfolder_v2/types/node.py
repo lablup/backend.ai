@@ -1,0 +1,136 @@
+"""VFolderV2 GraphQL Node, Edge, and Connection types."""
+
+from __future__ import annotations
+
+from collections.abc import Iterable
+from typing import TYPE_CHECKING, Annotated, Any
+
+import strawberry
+from strawberry import Info
+from strawberry.relay import Connection, Edge, NodeID
+
+from ai.backend.common.dto.manager.v2.vfolder.response import VFolderNode
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
+from ai.backend.manager.api.gql.decorators import (
+    BackendAIGQLMeta,
+    gql_connection_type,
+    gql_field,
+    gql_node_type,
+)
+from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin
+
+if TYPE_CHECKING:
+    from ai.backend.manager.api.gql.project_v2.types.node import ProjectV2GQL
+    from ai.backend.manager.api.gql.types import StrawberryGQLContext
+    from ai.backend.manager.api.gql.user.types.node import UserV2GQL
+
+from .nested import (
+    VFolderBasicInfoGQL,
+    VFolderOwnerInfoGQL,
+    VFolderPermissionInfoGQL,
+    VFolderUsageInfoGQL,
+)
+
+
+@gql_node_type(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description=(
+            "Virtual folder entity with structured field groups. "
+            "Provides comprehensive vfolder information organized "
+            "into logical categories: basic (identity), permission (access control), "
+            "owner (ownership context), and usage (storage statistics)."
+        ),
+    ),
+    name="VFolderV2",
+)
+class VFolderV2GQL(PydanticNodeMixin[VFolderNode]):
+    """Virtual folder entity with structured field groups."""
+
+    id: NodeID[str] = gql_field(description="Unique identifier of the virtual folder.")
+    basic: VFolderBasicInfoGQL = gql_field(
+        description="Basic virtual folder information including name, host, and status."
+    )
+    permission: VFolderPermissionInfoGQL = gql_field(
+        description="Permission and ownership type information."
+    )
+    owner: VFolderOwnerInfoGQL = gql_field(
+        description="Owner context including user, group, and creator."
+    )
+    usage: VFolderUsageInfoGQL | None = gql_field(
+        description="Usage statistics; None when usage data is not loaded."
+    )
+    unmanaged_path: str | None = gql_field(description="Path for unmanaged virtual folders.")
+
+    @gql_field(description="The user who owns this virtual folder. Null for project-owned folders.")  # type: ignore[misc]
+    async def user(
+        self,
+        info: Info[StrawberryGQLContext],
+    ) -> (
+        Annotated[
+            UserV2GQL,
+            strawberry.lazy("ai.backend.manager.api.gql.user.types.node"),
+        ]
+        | None
+    ):
+        if self.owner is None or self.owner.user_id is None:
+            return None
+        # Defer to data loader when wired; stub returns None for now.
+        return None
+
+    @gql_field(
+        description="The project that owns this virtual folder. Null for user-owned folders."
+    )  # type: ignore[misc]
+    async def project(
+        self,
+        info: Info[StrawberryGQLContext],
+    ) -> (
+        Annotated[
+            ProjectV2GQL,
+            strawberry.lazy("ai.backend.manager.api.gql.project_v2.types.node"),
+        ]
+        | None
+    ):
+        if self.owner is None or self.owner.group_id is None:
+            return None
+        # Defer to data loader when wired; stub returns None for now.
+        return None
+
+    @classmethod
+    async def resolve_nodes(  # type: ignore[override]  # Strawberry Node uses AwaitableOrValue overloads incompatible with async def
+        cls,
+        *,
+        info: None = None,
+        node_ids: Iterable[str] | None = None,
+        required: bool = False,
+    ) -> Iterable[VFolderV2GQL | None]:
+        # Stub: returns None for each requested ID until a data loader is wired in.
+        if node_ids is None:
+            return []
+        return [None for _ in node_ids]
+
+
+VFolderV2Edge = Edge[VFolderV2GQL]
+
+
+@gql_connection_type(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description=(
+            "Paginated connection for virtual folder records. "
+            "Provides relay-style cursor-based pagination for efficient traversal of vfolder data. "
+            "Use 'edges' to access individual records with cursor information, "
+            "or 'nodes' for direct data access."
+        ),
+    )
+)
+class VFolderV2Connection(Connection[VFolderV2GQL]):
+    """Paginated connection for virtual folder records."""
+
+    count: int = gql_field(
+        description="Total number of virtual folder records matching the query criteria."
+    )
+
+    def __init__(self, *args: Any, count: int, **kwargs: Any) -> None:
+        super().__init__(*args, **kwargs)
+        self.count = count

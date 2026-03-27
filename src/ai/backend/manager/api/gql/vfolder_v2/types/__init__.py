@@ -9,6 +9,13 @@ from .filters import (
     VFolderV2UsageModeFilterGQL,
     VFolderV2UsageModeGQL,
 )
+from .nested import (
+    VFolderBasicInfoGQL,
+    VFolderOwnerInfoGQL,
+    VFolderPermissionInfoGQL,
+    VFolderUsageInfoGQL,
+)
+from .node import VFolderV2Connection, VFolderV2Edge, VFolderV2GQL
 
 __all__ = [
     # Enum types
@@ -21,4 +28,13 @@ __all__ = [
     "VFolderV2FilterGQL",
     "VFolderV2OrderByGQL",
     "VFolderV2OrderFieldGQL",
+    # Nested types
+    "VFolderBasicInfoGQL",
+    "VFolderPermissionInfoGQL",
+    "VFolderOwnerInfoGQL",
+    "VFolderUsageInfoGQL",
+    # Node types
+    "VFolderV2GQL",
+    "VFolderV2Edge",
+    "VFolderV2Connection",
 ]

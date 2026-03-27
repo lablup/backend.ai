@@ -92,8 +92,8 @@ class VFolderPermissionInfo(BaseResponseModel):
 class VFolderOwnerInfo(BaseResponseModel):
     """Owner context fields for a virtual folder."""
 
-    user: UUID | None
-    group: UUID | None
+    user_id: UUID | None
+    group_id: UUID | None
     creator: str | None
 
 
