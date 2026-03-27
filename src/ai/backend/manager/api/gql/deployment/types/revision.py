@@ -298,6 +298,13 @@ class ModelRevision(PydanticNodeMixin[RevisionNodeDTO]):
     model_mount_config: ModelMountConfig | None = gql_field(
         description="Model data mount configuration."
     )
+    model_definition: JSON | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="Resolved model definition stored for this revision.",
+        ),
+        default=None,
+    )
     extra_mounts: list[ExtraVFolderMountInfoGQL] = gql_field(
         description="Additional volume folder mounts."
     )

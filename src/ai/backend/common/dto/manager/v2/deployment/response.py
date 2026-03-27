@@ -91,6 +91,9 @@ class RevisionNode(BaseResponseModel):
     model_mount_config: ModelMountConfigInfoDTO | None = Field(
         default=None, description="Model mount configuration"
     )
+    model_definition: dict[str, Any] | None = Field(
+        default=None, description="Model definition configuration"
+    )
     created_at: datetime = Field(description="Creation timestamp")
     extra_mounts: list[ExtraVFolderMountGQLDTO] = Field(
         default_factory=list, description="Extra vfolder mounts"

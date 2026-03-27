@@ -13,6 +13,7 @@ from uuid import UUID
 import yarl
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
+from ai.backend.common.config import ModelDefinition
 from ai.backend.common.data.endpoint.types import EndpointLifecycle
 from ai.backend.common.data.model_deployment.types import (
     ActivenessStatus,
@@ -546,6 +547,7 @@ class ModelRevisionData:
     model_mount_config: ModelMountConfigData
     created_at: datetime
     image_id: UUID
+    model_definition: dict[str, Any] | None = None
     extra_vfolder_mounts: list[ExtraVFolderMountData] = field(default_factory=list)
 
 

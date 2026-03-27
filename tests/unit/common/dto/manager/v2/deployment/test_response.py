@@ -133,6 +133,7 @@ def _make_revision_node(**kwargs: object) -> RevisionNode:
         "resource_config": _make_resource_config(),
         "model_runtime_config": _make_model_runtime_config(),
         "model_mount_config": None,
+        "model_definition": None,
         "created_at": datetime.now(tz=UTC),
         "extra_mounts": [],
     }
@@ -231,13 +232,38 @@ class TestRevisionNode:
         assert len(node.extra_mounts) == 1
         assert node.extra_mounts[0].mount_destination == "/data"
 
+    def test_with_model_definition(self) -> None:
+        model_definition = {
+            "models": [
+                {
+                    "name": "sample-model",
+                    "model_path": "/models/sample",
+                    "service": {
+                        "start_command": "python serve.py",
+                        "port": 8000,
+                    },
+                }
+            ]
+        }
+        node = _make_revision_node(model_definition=model_definition)
+
+        assert node.model_definition is not None
+        assert node.model_definition["models"][0]["name"] == "sample-model"
+        assert node.model_definition["models"][0]["service"]["port"] == 8000
+
     def test_round_trip(self) -> None:
         revision_id = uuid.uuid4()
-        node = _make_revision_node(id=revision_id, name="v2")
+        node = _make_revision_node(
+            id=revision_id,
+            name="v2",
+            model_definition={"models": [{"name": "v2-model", "model_path": "/models/v2"}]},
+        )
         json_str = node.model_dump_json()
         restored = RevisionNode.model_validate_json(json_str)
         assert restored.id == revision_id
         assert restored.name == "v2"
+        assert restored.model_definition is not None
+        assert restored.model_definition["models"][0]["name"] == "v2-model"
 
 
 class TestDeploymentNode:

@@ -1479,6 +1479,9 @@ class DeploymentAdapter(BaseAdapter):
                 environ=environ_dto,
             ),
             model_mount_config=model_mount_config_dto,
+            model_definition=dict(data.model_definition)
+            if data.model_definition is not None
+            else None,
             created_at=data.created_at,
             extra_mounts=[
                 ExtraVFolderMountGQLDTO(

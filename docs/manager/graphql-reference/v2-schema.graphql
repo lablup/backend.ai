@@ -4636,6 +4636,11 @@ type ModelRevision implements Node {
   """Model data mount configuration."""
   modelMountConfig: ModelMountConfig
 
+  """
+  Added in UNRELEASED. Resolved model definition stored for this revision.
+  """
+  modelDefinition: JSON
+
   """Additional volume folder mounts."""
   extraMounts: [ExtraVFolderMountInfoGQL!]!
 
