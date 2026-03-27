@@ -264,6 +264,7 @@ class AsyncEtcd(AbstractKVStore):
         credentials: dict[str, str] | None = None,
         encoding: str = "utf-8",
         watch_reconnect_intvl: float = 0.5,
+        watch_reconnect_max_intvl: float = 30.0,
     ) -> None:
         self.scope_prefix_map = t.Dict({
             t.Key(ConfigScopes.GLOBAL): t.String(allow_blank=True),
@@ -289,10 +290,23 @@ class AsyncEtcd(AbstractKVStore):
         )
         self.encoding = encoding
         self.watch_reconnect_intvl = watch_reconnect_intvl
+        self.watch_reconnect_max_intvl = watch_reconnect_max_intvl
         self.etcd = EtcdClient(
             [f"http://{addr.host}:{addr.port}" for addr in addrs],
             connect_options=self._connect_options,
         )
+
+    def _calc_watch_reconnect_delay(self, attempt: int) -> float:
+        """Calculate exponential backoff delay for watch reconnection.
+
+        Args:
+            attempt: 1-indexed retry count.
+
+        Returns:
+            Delay in seconds, capped at ``watch_reconnect_max_intvl``.
+        """
+        delay = self.watch_reconnect_intvl * (2 ** (attempt - 1))
+        return cast(float, min(delay, self.watch_reconnect_max_intvl))
 
     @classmethod
     def create_from_config(cls, etcd_config: EtcdConfigData) -> Self:
