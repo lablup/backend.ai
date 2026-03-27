@@ -1,10 +1,11 @@
-from typing import override
+from typing import cast, override
 
 from ai.backend.manager.actions.monitors.monitor import ActionMonitor
 from ai.backend.manager.actions.processor import ActionProcessor
 from ai.backend.manager.actions.processor.scope import ScopeActionProcessor
 from ai.backend.manager.actions.processor.single_entity import SingleEntityActionProcessor
 from ai.backend.manager.actions.types import AbstractProcessorPackage, ActionSpec
+from ai.backend.manager.actions.validator.base import ActionValidator
 from ai.backend.manager.actions.validators import ActionValidators
 from ai.backend.manager.services.user.actions.admin_month_stats import (
     AdminMonthStatsAction,
@@ -125,7 +126,9 @@ class UserProcessors(AbstractProcessorPackage):
             user_service.search_users_by_domain, action_monitors
         )
         self.search_users_by_project = ActionProcessor(
-            user_service.search_users_by_project, action_monitors
+            user_service.search_users_by_project,
+            action_monitors,
+            validators=[cast(ActionValidator, validators.rbac.scope)],
         )
         self.search_users_by_role = ActionProcessor(
             user_service.search_users_by_role, action_monitors
