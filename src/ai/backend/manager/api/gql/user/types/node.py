@@ -13,8 +13,10 @@ from strawberry.relay import Connection, Edge, NodeID
 from ai.backend.common.dto.manager.v2.user.response import UserNode
 from ai.backend.common.dto.manager.v2.user.types import UserFairShareScope, UserUsageScope
 from ai.backend.common.exception import InvalidAPIParameters
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
+    gql_added_field,
     gql_connection_type,
     gql_federation_type,
     gql_field,
@@ -45,6 +47,7 @@ if TYPE_CHECKING:
         ProjectV2OrderBy,
     )
     from ai.backend.manager.api.gql.project_v2.types.node import ProjectV2Connection
+    from ai.backend.manager.api.gql.rbac.types.role import RoleAssignmentGQL
 
 
 @gql_pydantic_input(
@@ -210,6 +213,25 @@ class UserV2GQL(PydanticNodeMixin[UserNode]):
             self.organization.domain_name
         )
         return domain
+
+    @gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="RBAC roles assigned to this user.",
+        )
+    )  # type: ignore[misc]
+    async def role_assignments(
+        self,
+        info: Info[StrawberryGQLContext],
+    ) -> list[
+        Annotated[
+            RoleAssignmentGQL,
+            strawberry.lazy("ai.backend.manager.api.gql.rbac.types.role"),
+        ]
+    ]:
+        return await info.context.data_loaders.role_assignments_by_user_loader.load(
+            UUID(str(self.id))
+        )
 
     @gql_field(description="Projects this user is a member of.")  # type: ignore[misc]
     async def projects(
