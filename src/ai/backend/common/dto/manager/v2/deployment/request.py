@@ -255,11 +255,19 @@ class RollingUpdateConfigInput(BaseRequestModel):
 
     max_surge: IntOrPercent = Field(
         default_factory=lambda: IntOrPercent(type=IntOrPercentType.PERCENT, percent=0.5),
-        description='{"type": "count", "count": 2} or {"type": "percent", "percent": 0.25}',
+        description="Maximum number of extra replicas that can be created during a rolling update.",
+        examples=[
+            {"type": "count", "count": 2},
+            {"type": "percent", "percent": 0.25},
+        ],
     )
     max_unavailable: IntOrPercent = Field(
         default_factory=lambda: IntOrPercent(type=IntOrPercentType.PERCENT, percent=0.0),
-        description='{"type": "count", "count": 0} or {"type": "percent", "percent": 0.0}',
+        description="Maximum number of replicas that can be unavailable during a rolling update.",
+        examples=[
+            {"type": "count", "count": 0},
+            {"type": "percent", "percent": 0.0},
+        ],
     )
 
 

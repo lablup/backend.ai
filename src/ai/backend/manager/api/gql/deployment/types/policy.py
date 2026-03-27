@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import enum
 from datetime import datetime
 
 from strawberry import ID, UNSET
@@ -26,7 +27,6 @@ from ai.backend.common.dto.manager.v2.deployment.response import (
 from ai.backend.common.dto.manager.v2.deployment.types import (
     BlueGreenStrategySpecInfo,
     DeploymentStrategySpecInfo,
-    IntOrPercentType,
     RollingUpdateStrategySpecInfo,
 )
 from ai.backend.common.dto.manager.v2.deployment.types import (
@@ -54,14 +54,17 @@ DeploymentStrategyTypeGQL: type[DeploymentStrategy] = gql_enum(
     name="DeploymentStrategyType",
 )
 
-IntOrPercentTypeGQL: type[IntOrPercentType] = gql_enum(
+
+@gql_enum(
     BackendAIGQLMeta(
         added_version="26.4.0",
         description="Type of a surge value: 'count' for an absolute replica count, 'percent' for a fraction of desired replicas (0.0-1.0).",
     ),
-    IntOrPercentType,
     name="IntOrPercentType",
 )
+class IntOrPercentTypeGQL(enum.Enum):
+    COUNT = "count"
+    PERCENT = "percent"
 
 
 # ========== IntOrPercent types ==========
