@@ -11365,6 +11365,11 @@ type Query
   adminSessionsV2(filter: SessionV2Filter = null, orderBy: [SessionV2OrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): SessionV2Connection! @join__field(graph: STRAWBERRY)
 
   """
+  Added in UNRELEASED. List sessions within a specific project. Requires project membership or higher privileges.
+  """
+  projectSessionsV2(scope: ProjectSessionV2Scope!, filter: SessionV2Filter = null, orderBy: [SessionV2OrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): SessionV2Connection! @join__field(graph: STRAWBERRY)
+
+  """
   Added in 26.3.0. Returns a single resource slot type by slot_name, or null.
   """
   resourceSlotType(slotName: String!): ResourceSlotType @join__field(graph: STRAWBERRY)
