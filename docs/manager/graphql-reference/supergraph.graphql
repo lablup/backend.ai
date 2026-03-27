@@ -14593,6 +14593,9 @@ type UserV2 implements Node
   """The domain this user belongs to."""
   domain: DomainV2
 
+  """Added in UNRELEASED. RBAC roles assigned to this user."""
+  roleAssignments: [RoleAssignment!]!
+
   """Projects this user is a member of."""
   projects(filter: ProjectV2Filter = null, orderBy: [ProjectV2OrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ProjectV2Connection!
 }
