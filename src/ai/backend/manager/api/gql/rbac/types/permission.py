@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import uuid
 from collections.abc import Iterable
+from datetime import datetime
 from enum import StrEnum
 from typing import TYPE_CHECKING, Annotated, Any, Self, cast
 
@@ -34,17 +35,20 @@ from ai.backend.common.dto.manager.v2.rbac.response import (
     DeletePermissionPayload as DeletePermissionPayloadDTO,
 )
 from ai.backend.common.dto.manager.v2.rbac.response import (
-    PermissionNode as PermissionNodeDTO,
+    EntityOperationCombinationInfo,
+    OperationInfo,
+    ScopeEntityCombinationInfo,
 )
 from ai.backend.common.dto.manager.v2.rbac.response import (
-    ScopeEntityCombinationInfo,
+    PermissionNode as PermissionNodeDTO,
 )
 from ai.backend.common.dto.manager.v2.rbac.types import (
     OperationTypeDTO,
     RBACElementTypeDTO,
 )
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.common.types import SessionId
-from ai.backend.manager.api.gql.base import OrderDirection
+from ai.backend.manager.api.gql.base import DateTimeFilter, OrderDirection
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     PydanticInputMixin,
@@ -84,6 +88,7 @@ OperationTypeGQL: type[OperationTypeDTO] = gql_enum(
 class PermissionOrderField(StrEnum):
     ID = "id"
     ENTITY_TYPE = "entity_type"
+    CREATED_AT = "created_at"
 
 
 # ==================== Node Types ====================
@@ -100,6 +105,7 @@ class PermissionGQL(PydanticNodeMixin[PermissionNodeDTO]):
     scope_id: str
     entity_type: RBACElementTypeGQL
     operation: OperationTypeGQL
+    created_at: datetime
 
     @classmethod
     async def resolve_nodes(  # type: ignore[override]
@@ -222,6 +228,7 @@ class PermissionFilter(PydanticInputMixin[PermissionFilterDTO], GQLFilter):
     role_id: uuid.UUID | None = None
     scope_type: RBACElementTypeGQL | None = None
     entity_type: RBACElementTypeGQL | None = None
+    created_at: DateTimeFilter | None = None
     AND: list[Self] | None = None
     OR: list[Self] | None = None
     NOT: list[Self] | None = None
@@ -298,6 +305,33 @@ class DeletePermissionPayload(PydanticOutputMixin[DeletePermissionPayloadDTO]):
 class ScopeEntityCombinationGQL(PydanticOutputMixin[ScopeEntityCombinationInfo]):
     scope_type: RBACElementTypeGQL
     valid_entity_types: list[RBACElementTypeGQL]
+
+
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Information about a single RBAC operation.",
+    ),
+    model=OperationInfo,
+    name="OperationInfo",
+)
+class OperationInfoGQL(PydanticOutputMixin[OperationInfo]):
+    operation: str
+    description: str
+    required_permission: OperationTypeGQL
+
+
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Valid entity-operation combination for RBAC actions.",
+    ),
+    model=EntityOperationCombinationInfo,
+    name="EntityOperationCombination",
+)
+class EntityOperationCombinationGQL(PydanticOutputMixin[EntityOperationCombinationInfo]):
+    entity_type: RBACElementTypeGQL
+    operations: list[OperationInfoGQL]
 
 
 PermissionEdge = Edge[PermissionGQL]

@@ -15,6 +15,7 @@ from ai.backend.common.data.permission.types import (
     RBACElementType,
     RelationType,
 )
+from ai.backend.manager.data.permission.role import ScopeChainPermissionCheckInput
 from ai.backend.manager.data.permission.status import RoleStatus
 from ai.backend.manager.data.permission.types import (
     EntityType,
@@ -22,6 +23,9 @@ from ai.backend.manager.data.permission.types import (
     RBACElementRef,
     ScopeType,
 )
+from ai.backend.manager.data.user.types import UserStatus
+from ai.backend.manager.models.domain import DomainRow
+from ai.backend.manager.models.keypair import KeyPairRow
 from ai.backend.manager.models.rbac_models import UserRoleRow
 from ai.backend.manager.models.rbac_models.association_scopes_entities import (
     AssociationScopesEntitiesRow,
@@ -29,6 +33,11 @@ from ai.backend.manager.models.rbac_models.association_scopes_entities import (
 from ai.backend.manager.models.rbac_models.permission.object_permission import ObjectPermissionRow
 from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
 from ai.backend.manager.models.rbac_models.role import RoleRow
+from ai.backend.manager.models.resource_policy import (
+    KeyPairResourcePolicyRow,
+    UserResourcePolicyRow,
+)
+from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.permission_controller.db_source.db_source import (
     PermissionDBSource,
@@ -68,8 +77,13 @@ class TestCheckPermissionWithScopeChain:
         async with with_tables(
             database_connection,
             [
+                DomainRow,
+                UserResourcePolicyRow,
+                KeyPairResourcePolicyRow,
                 RoleRow,
                 UserRoleRow,
+                UserRow,
+                KeyPairRow,
                 PermissionRow,
                 ObjectPermissionRow,
                 AssociationScopesEntitiesRow,
@@ -99,6 +113,25 @@ class TestCheckPermissionWithScopeChain:
     ) -> ScopeChainFixture:
         """Create a user with an active role (no permissions yet)."""
         async with db_with_rbac_tables.begin_session() as db_sess:
+            policy = UserResourcePolicyRow(
+                name="test-rbac-policy",
+                max_vfolder_count=0,
+                max_quota_scope_size=-1,
+                max_session_count_per_model_session=0,
+                max_customized_image_count=0,
+            )
+            db_sess.add(policy)
+            user = UserRow(
+                uuid=fixture_ids.user_id,
+                email="testuser@test.com",
+                resource_policy="test-rbac-policy",
+                status=UserStatus.ACTIVE,
+                need_password_change=False,
+                sudo_session_enabled=False,
+            )
+            db_sess.add(user)
+            await db_sess.flush()
+
             role = RoleRow(
                 id=fixture_ids.role_id,
                 name="test-role",
@@ -223,12 +256,15 @@ class TestCheckPermissionWithScopeChain:
         """VFOLDER in PROJECT (auto): direct scope permission checks."""
         fixture = user_with_active_role
         result = await db_source.check_permission_with_scope_chain(
-            user_id=fixture.user_id,
-            target_element_ref=RBACElementRef(
-                element_type=RBACElementType.VFOLDER,
-                element_id=fixture.vfolder_id,
-            ),
-            operation=check_op,
+            ScopeChainPermissionCheckInput(
+                user_id=fixture.user_id,
+                target_element_ref=RBACElementRef(
+                    element_type=RBACElementType.VFOLDER,
+                    element_id=fixture.vfolder_id,
+                ),
+                operation=check_op,
+                permission_entity_type=None,
+            )
         )
         assert result is expected
 
@@ -257,12 +293,15 @@ class TestCheckPermissionWithScopeChain:
         """AUTO edge delegates all operations from parent scope."""
         fixture = user_with_active_role
         result = await db_source.check_permission_with_scope_chain(
-            user_id=fixture.user_id,
-            target_element_ref=RBACElementRef(
-                element_type=RBACElementType.VFOLDER,
-                element_id=fixture.vfolder_id,
-            ),
-            operation=check_op,
+            ScopeChainPermissionCheckInput(
+                user_id=fixture.user_id,
+                target_element_ref=RBACElementRef(
+                    element_type=RBACElementType.VFOLDER,
+                    element_id=fixture.vfolder_id,
+                ),
+                operation=check_op,
+                permission_entity_type=None,
+            )
         )
         assert result is expected
 
@@ -296,12 +335,15 @@ class TestCheckPermissionWithScopeChain:
         """REF edge is not traversed; no operation passes through."""
         fixture = user_with_active_role
         result = await db_source.check_permission_with_scope_chain(
-            user_id=fixture.user_id,
-            target_element_ref=RBACElementRef(
-                element_type=RBACElementType.VFOLDER,
-                element_id=fixture.vfolder_id,
-            ),
-            operation=check_op,
+            ScopeChainPermissionCheckInput(
+                user_id=fixture.user_id,
+                target_element_ref=RBACElementRef(
+                    element_type=RBACElementType.VFOLDER,
+                    element_id=fixture.vfolder_id,
+                ),
+                operation=check_op,
+                permission_entity_type=None,
+            )
         )
         assert result is expected
 
@@ -330,12 +372,15 @@ class TestCheckPermissionWithScopeChain:
         """REF edge terminates scope chain; scopes beyond REF are unreachable."""
         fixture = user_with_active_role
         result = await db_source.check_permission_with_scope_chain(
-            user_id=fixture.user_id,
-            target_element_ref=RBACElementRef(
-                element_type=RBACElementType.VFOLDER,
-                element_id=fixture.vfolder_id,
-            ),
-            operation=check_op,
+            ScopeChainPermissionCheckInput(
+                user_id=fixture.user_id,
+                target_element_ref=RBACElementRef(
+                    element_type=RBACElementType.VFOLDER,
+                    element_id=fixture.vfolder_id,
+                ),
+                operation=check_op,
+                permission_entity_type=None,
+            )
         )
         assert result is expected
 
@@ -347,6 +392,25 @@ class TestCheckPermissionWithScopeChain:
     ) -> ScopeChainFixture:
         """Create a user with an inactive role."""
         async with db_with_rbac_tables.begin_session() as db_sess:
+            policy = UserResourcePolicyRow(
+                name="test-rbac-policy",
+                max_vfolder_count=0,
+                max_quota_scope_size=-1,
+                max_session_count_per_model_session=0,
+                max_customized_image_count=0,
+            )
+            db_sess.add(policy)
+            user = UserRow(
+                uuid=fixture_ids.user_id,
+                email="testuser@test.com",
+                resource_policy="test-rbac-policy",
+                status=UserStatus.ACTIVE,
+                need_password_change=False,
+                sudo_session_enabled=False,
+            )
+            db_sess.add(user)
+            await db_sess.flush()
+
             role = RoleRow(
                 id=fixture_ids.role_id,
                 name="inactive-role",
@@ -381,12 +445,15 @@ class TestCheckPermissionWithScopeChain:
         """Inactive role does not grant any permission."""
         fixture = user_with_inactive_role
         result = await db_source.check_permission_with_scope_chain(
-            user_id=fixture.user_id,
-            target_element_ref=RBACElementRef(
-                element_type=RBACElementType.VFOLDER,
-                element_id=fixture.vfolder_id,
-            ),
-            operation=OperationType.READ,
+            ScopeChainPermissionCheckInput(
+                user_id=fixture.user_id,
+                target_element_ref=RBACElementRef(
+                    element_type=RBACElementType.VFOLDER,
+                    element_id=fixture.vfolder_id,
+                ),
+                operation=OperationType.READ,
+                permission_entity_type=None,
+            )
         )
         assert result is False
 
@@ -420,12 +487,15 @@ class TestCheckPermissionWithScopeChain:
         """Permission scoped directly to the target entity itself is honored."""
         fixture = user_with_active_role
         result = await db_source.check_permission_with_scope_chain(
-            user_id=fixture.user_id,
-            target_element_ref=RBACElementRef(
-                element_type=RBACElementType.VFOLDER,
-                element_id=fixture.vfolder_id,
-            ),
-            operation=check_op,
+            ScopeChainPermissionCheckInput(
+                user_id=fixture.user_id,
+                target_element_ref=RBACElementRef(
+                    element_type=RBACElementType.VFOLDER,
+                    element_id=fixture.vfolder_id,
+                ),
+                operation=check_op,
+                permission_entity_type=None,
+            )
         )
         assert result is expected
 
@@ -452,12 +522,15 @@ class TestCheckPermissionWithScopeChain:
         """Self-scope permission works even without any association edges."""
         fixture = user_with_active_role
         result = await db_source.check_permission_with_scope_chain(
-            user_id=fixture.user_id,
-            target_element_ref=RBACElementRef(
-                element_type=RBACElementType.VFOLDER,
-                element_id=fixture.vfolder_id,
-            ),
-            operation=check_op,
+            ScopeChainPermissionCheckInput(
+                user_id=fixture.user_id,
+                target_element_ref=RBACElementRef(
+                    element_type=RBACElementType.VFOLDER,
+                    element_id=fixture.vfolder_id,
+                ),
+                operation=check_op,
+                permission_entity_type=None,
+            )
         )
         assert result is expected
 
@@ -487,12 +560,15 @@ class TestCheckPermissionWithScopeChain:
         """Permission exists but for a different operation; check should fail."""
         fixture = user_with_active_role
         result = await db_source.check_permission_with_scope_chain(
-            user_id=fixture.user_id,
-            target_element_ref=RBACElementRef(
-                element_type=RBACElementType.VFOLDER,
-                element_id=fixture.vfolder_id,
-            ),
-            operation=check_op,
+            ScopeChainPermissionCheckInput(
+                user_id=fixture.user_id,
+                target_element_ref=RBACElementRef(
+                    element_type=RBACElementType.VFOLDER,
+                    element_id=fixture.vfolder_id,
+                ),
+                operation=check_op,
+                permission_entity_type=None,
+            )
         )
         assert result is expected
 
@@ -521,12 +597,15 @@ class TestCheckPermissionWithScopeChain:
         """Operation mismatch at chain-traversed scope still returns False."""
         fixture = user_with_active_role
         result = await db_source.check_permission_with_scope_chain(
-            user_id=fixture.user_id,
-            target_element_ref=RBACElementRef(
-                element_type=RBACElementType.VFOLDER,
-                element_id=fixture.vfolder_id,
-            ),
-            operation=check_op,
+            ScopeChainPermissionCheckInput(
+                user_id=fixture.user_id,
+                target_element_ref=RBACElementRef(
+                    element_type=RBACElementType.VFOLDER,
+                    element_id=fixture.vfolder_id,
+                ),
+                operation=check_op,
+                permission_entity_type=None,
+            )
         )
         assert result is expected
 
@@ -540,6 +619,25 @@ class TestCheckPermissionWithScopeChain:
     ) -> ScopeChainFixture:
         """Create a user with a deleted role."""
         async with db_with_rbac_tables.begin_session() as db_sess:
+            policy = UserResourcePolicyRow(
+                name="test-rbac-policy",
+                max_vfolder_count=0,
+                max_quota_scope_size=-1,
+                max_session_count_per_model_session=0,
+                max_customized_image_count=0,
+            )
+            db_sess.add(policy)
+            user = UserRow(
+                uuid=fixture_ids.user_id,
+                email="testuser@test.com",
+                resource_policy="test-rbac-policy",
+                status=UserStatus.ACTIVE,
+                need_password_change=False,
+                sudo_session_enabled=False,
+            )
+            db_sess.add(user)
+            await db_sess.flush()
+
             role = RoleRow(
                 id=fixture_ids.role_id,
                 name="deleted-role",
@@ -574,12 +672,15 @@ class TestCheckPermissionWithScopeChain:
         """Deleted role does not grant any permission."""
         fixture = user_with_deleted_role
         result = await db_source.check_permission_with_scope_chain(
-            user_id=fixture.user_id,
-            target_element_ref=RBACElementRef(
-                element_type=RBACElementType.VFOLDER,
-                element_id=fixture.vfolder_id,
-            ),
-            operation=OperationType.READ,
+            ScopeChainPermissionCheckInput(
+                user_id=fixture.user_id,
+                target_element_ref=RBACElementRef(
+                    element_type=RBACElementType.VFOLDER,
+                    element_id=fixture.vfolder_id,
+                ),
+                operation=OperationType.READ,
+                permission_entity_type=None,
+            )
         )
         assert result is False
 
@@ -621,12 +722,15 @@ class TestCheckPermissionWithScopeChain:
         """User with no role assignment gets no permission."""
         fixture = user_with_unassigned_role
         result = await db_source.check_permission_with_scope_chain(
-            user_id=fixture.user_id,
-            target_element_ref=RBACElementRef(
-                element_type=RBACElementType.VFOLDER,
-                element_id=fixture.vfolder_id,
-            ),
-            operation=OperationType.READ,
+            ScopeChainPermissionCheckInput(
+                user_id=fixture.user_id,
+                target_element_ref=RBACElementRef(
+                    element_type=RBACElementType.VFOLDER,
+                    element_id=fixture.vfolder_id,
+                ),
+                operation=OperationType.READ,
+                permission_entity_type=None,
+            )
         )
         assert result is False
 
@@ -641,6 +745,25 @@ class TestCheckPermissionWithScopeChain:
         """Create a user with two active roles. Returns (fixture, second_role_id)."""
         second_role_id = uuid.uuid4()
         async with db_with_rbac_tables.begin_session() as db_sess:
+            policy = UserResourcePolicyRow(
+                name="test-rbac-policy",
+                max_vfolder_count=0,
+                max_quota_scope_size=-1,
+                max_session_count_per_model_session=0,
+                max_customized_image_count=0,
+            )
+            db_sess.add(policy)
+            user = UserRow(
+                uuid=fixture_ids.user_id,
+                email="testuser@test.com",
+                resource_policy="test-rbac-policy",
+                status=UserStatus.ACTIVE,
+                need_password_change=False,
+                sudo_session_enabled=False,
+            )
+            db_sess.add(user)
+            await db_sess.flush()
+
             role1 = RoleRow(
                 id=fixture_ids.role_id,
                 name="role-1",
@@ -730,12 +853,15 @@ class TestCheckPermissionWithScopeChain:
         """Multiple roles: succeeds if any role matches, fails if none does."""
         fixture, _ = user_with_two_roles
         result = await db_source.check_permission_with_scope_chain(
-            user_id=fixture.user_id,
-            target_element_ref=RBACElementRef(
-                element_type=RBACElementType.VFOLDER,
-                element_id=fixture.vfolder_id,
-            ),
-            operation=check_op,
+            ScopeChainPermissionCheckInput(
+                user_id=fixture.user_id,
+                target_element_ref=RBACElementRef(
+                    element_type=RBACElementType.VFOLDER,
+                    element_id=fixture.vfolder_id,
+                ),
+                operation=check_op,
+                permission_entity_type=None,
+            )
         )
         assert result is expected
 
@@ -784,12 +910,15 @@ class TestCheckPermissionWithScopeChain:
         """VFOLDER→(AUTO)→PROJECT→(REF)→DOMAIN: REF in the middle blocks chain."""
         fixture = user_with_active_role
         result = await db_source.check_permission_with_scope_chain(
-            user_id=fixture.user_id,
-            target_element_ref=RBACElementRef(
-                element_type=RBACElementType.VFOLDER,
-                element_id=fixture.vfolder_id,
-            ),
-            operation=check_op,
+            ScopeChainPermissionCheckInput(
+                user_id=fixture.user_id,
+                target_element_ref=RBACElementRef(
+                    element_type=RBACElementType.VFOLDER,
+                    element_id=fixture.vfolder_id,
+                ),
+                operation=check_op,
+                permission_entity_type=None,
+            )
         )
         assert result is expected
 
@@ -818,12 +947,15 @@ class TestCheckPermissionWithScopeChain:
         """VFOLDER→(AUTO)→PROJECT→(REF)→DOMAIN: PROJECT scope is still reachable."""
         fixture = user_with_active_role
         result = await db_source.check_permission_with_scope_chain(
-            user_id=fixture.user_id,
-            target_element_ref=RBACElementRef(
-                element_type=RBACElementType.VFOLDER,
-                element_id=fixture.vfolder_id,
-            ),
-            operation=check_op,
+            ScopeChainPermissionCheckInput(
+                user_id=fixture.user_id,
+                target_element_ref=RBACElementRef(
+                    element_type=RBACElementType.VFOLDER,
+                    element_id=fixture.vfolder_id,
+                ),
+                operation=check_op,
+                permission_entity_type=None,
+            )
         )
         assert result is expected
 
@@ -873,12 +1005,15 @@ class TestCheckPermissionWithScopeChain:
         """VFOLDER→(AUTO)→PROJECT→(AUTO)→DOMAIN→(AUTO)→USER: 3-level chain traversal."""
         fixture = user_with_active_role
         result = await db_source.check_permission_with_scope_chain(
-            user_id=fixture.user_id,
-            target_element_ref=RBACElementRef(
-                element_type=RBACElementType.VFOLDER,
-                element_id=fixture.vfolder_id,
-            ),
-            operation=check_op,
+            ScopeChainPermissionCheckInput(
+                user_id=fixture.user_id,
+                target_element_ref=RBACElementRef(
+                    element_type=RBACElementType.VFOLDER,
+                    element_id=fixture.vfolder_id,
+                ),
+                operation=check_op,
+                permission_entity_type=None,
+            )
         )
         assert result is expected
 
@@ -908,12 +1043,15 @@ class TestCheckPermissionWithScopeChain:
         """Self-scope permission works regardless of AUTO edge presence."""
         fixture = user_with_active_role
         result = await db_source.check_permission_with_scope_chain(
-            user_id=fixture.user_id,
-            target_element_ref=RBACElementRef(
-                element_type=RBACElementType.VFOLDER,
-                element_id=fixture.vfolder_id,
-            ),
-            operation=check_op,
+            ScopeChainPermissionCheckInput(
+                user_id=fixture.user_id,
+                target_element_ref=RBACElementRef(
+                    element_type=RBACElementType.VFOLDER,
+                    element_id=fixture.vfolder_id,
+                ),
+                operation=check_op,
+                permission_entity_type=None,
+            )
         )
         assert result is expected
 
@@ -930,6 +1068,25 @@ class TestCheckPermissionWithScopeChain:
         other_role_id = uuid.uuid4()
 
         async with db_with_rbac_tables.begin_session() as db_sess:
+            policy = UserResourcePolicyRow(
+                name="test-rbac-policy",
+                max_vfolder_count=0,
+                max_quota_scope_size=-1,
+                max_session_count_per_model_session=0,
+                max_customized_image_count=0,
+            )
+            db_sess.add(policy)
+            other_user = UserRow(
+                uuid=other_user_id,
+                email="otheruser@test.com",
+                resource_policy="test-rbac-policy",
+                status=UserStatus.ACTIVE,
+                need_password_change=False,
+                sudo_session_enabled=False,
+            )
+            db_sess.add(other_user)
+            await db_sess.flush()
+
             role = RoleRow(
                 id=other_role_id,
                 name="other-user-role",
@@ -963,12 +1120,15 @@ class TestCheckPermissionWithScopeChain:
     ) -> None:
         """Permission granted to another user does not affect the target user."""
         result = await db_source.check_permission_with_scope_chain(
-            user_id=fixture_ids.user_id,
-            target_element_ref=RBACElementRef(
-                element_type=RBACElementType.VFOLDER,
-                element_id=fixture_ids.vfolder_id,
-            ),
-            operation=OperationType.READ,
+            ScopeChainPermissionCheckInput(
+                user_id=fixture_ids.user_id,
+                target_element_ref=RBACElementRef(
+                    element_type=RBACElementType.VFOLDER,
+                    element_id=fixture_ids.vfolder_id,
+                ),
+                operation=OperationType.READ,
+                permission_entity_type=None,
+            )
         )
         assert result is False
 
@@ -1010,16 +1170,130 @@ class TestCheckPermissionWithScopeChain:
         """Role with READ+UPDATE: READ matches, SOFT_DELETE does not."""
         fixture = user_with_active_role
         result = await db_source.check_permission_with_scope_chain(
-            user_id=fixture.user_id,
-            target_element_ref=RBACElementRef(
-                element_type=RBACElementType.VFOLDER,
-                element_id=fixture.vfolder_id,
-            ),
-            operation=check_op,
+            ScopeChainPermissionCheckInput(
+                user_id=fixture.user_id,
+                target_element_ref=RBACElementRef(
+                    element_type=RBACElementType.VFOLDER,
+                    element_id=fixture.vfolder_id,
+                ),
+                operation=check_op,
+                permission_entity_type=None,
+            )
         )
         assert result is expected
 
-    # ── J. Different entity_type permission ──
+    # ── J. Cross-scope entity type (permission_entity_type override) ──
+
+    @pytest.mark.parametrize(
+        ("permission_setup", "check_op", "expected"),
+        [
+            pytest.param(
+                [PermissionEntry("project", OperationType.READ, EntityType.MODEL_DEPLOYMENT)],
+                OperationType.READ,
+                True,
+                id="cross-scope-direct-match",
+            ),
+        ],
+        indirect=["permission_setup"],
+    )
+    async def test_cross_scope_entity_type_direct_match(
+        self,
+        db_source: PermissionDBSource,
+        user_with_active_role: ScopeChainFixture,
+        vfolder_in_project_auto: None,
+        permission_setup: None,
+        check_op: OperationType,
+        expected: bool,
+    ) -> None:
+        """MODEL_DEPLOYMENT:READ permission at PROJECT scope, checked from PROJECT via CTE Layer 1."""
+        fixture = user_with_active_role
+        result = await db_source.check_permission_with_scope_chain(
+            ScopeChainPermissionCheckInput(
+                user_id=fixture.user_id,
+                target_element_ref=RBACElementRef(
+                    element_type=RBACElementType.VFOLDER,
+                    element_id=fixture.vfolder_id,
+                ),
+                operation=check_op,
+                permission_entity_type=EntityType.MODEL_DEPLOYMENT,
+            )
+        )
+        assert result is expected
+
+    @pytest.mark.parametrize(
+        ("permission_setup", "check_op", "expected"),
+        [
+            pytest.param(
+                [PermissionEntry("domain", OperationType.READ, EntityType.MODEL_DEPLOYMENT)],
+                OperationType.READ,
+                True,
+                id="cross-scope-chain-to-domain",
+            ),
+        ],
+        indirect=["permission_setup"],
+    )
+    async def test_cross_scope_entity_type_chain_to_domain(
+        self,
+        db_source: PermissionDBSource,
+        user_with_active_role: ScopeChainFixture,
+        vfolder_in_project_auto: None,
+        project_in_domain_auto: None,
+        permission_setup: None,
+        check_op: OperationType,
+        expected: bool,
+    ) -> None:
+        """MODEL_DEPLOYMENT:READ at DOMAIN scope, checked from PROJECT via CTE Layer 2."""
+        fixture = user_with_active_role
+        result = await db_source.check_permission_with_scope_chain(
+            ScopeChainPermissionCheckInput(
+                user_id=fixture.user_id,
+                target_element_ref=RBACElementRef(
+                    element_type=RBACElementType.VFOLDER,
+                    element_id=fixture.vfolder_id,
+                ),
+                operation=check_op,
+                permission_entity_type=EntityType.MODEL_DEPLOYMENT,
+            )
+        )
+        assert result is expected
+
+    @pytest.mark.parametrize(
+        ("permission_setup", "check_op", "expected"),
+        [
+            pytest.param(
+                [PermissionEntry("project", OperationType.READ, EntityType.SESSION)],
+                OperationType.READ,
+                False,
+                id="cross-scope-mismatch-denied",
+            ),
+        ],
+        indirect=["permission_setup"],
+    )
+    async def test_cross_scope_entity_type_mismatch_denied(
+        self,
+        db_source: PermissionDBSource,
+        user_with_active_role: ScopeChainFixture,
+        vfolder_in_project_auto: None,
+        permission_setup: None,
+        check_op: OperationType,
+        expected: bool,
+    ) -> None:
+        """SESSION:READ permission exists, but MODEL_DEPLOYMENT:READ requested — denied."""
+        fixture = user_with_active_role
+        result = await db_source.check_permission_with_scope_chain(
+            ScopeChainPermissionCheckInput(
+                user_id=fixture.user_id,
+                target_element_ref=RBACElementRef(
+                    element_type=RBACElementType.VFOLDER,
+                    element_id=fixture.vfolder_id,
+                ),
+                operation=check_op,
+                permission_entity_type=EntityType.MODEL_DEPLOYMENT,
+            )
+        )
+        assert result is expected
+
+    # ── K. Different entity_type permission (legacy, no override) ──
 
     @pytest.mark.parametrize(
         ("permission_setup", "check_op", "expected"),
@@ -1045,11 +1319,14 @@ class TestCheckPermissionWithScopeChain:
         """SESSION entity permission does not match VFOLDER entity check."""
         fixture = user_with_active_role
         result = await db_source.check_permission_with_scope_chain(
-            user_id=fixture.user_id,
-            target_element_ref=RBACElementRef(
-                element_type=RBACElementType.VFOLDER,
-                element_id=fixture.vfolder_id,
-            ),
-            operation=check_op,
+            ScopeChainPermissionCheckInput(
+                user_id=fixture.user_id,
+                target_element_ref=RBACElementRef(
+                    element_type=RBACElementType.VFOLDER,
+                    element_id=fixture.vfolder_id,
+                ),
+                operation=check_op,
+                permission_entity_type=None,
+            )
         )
         assert result is expected

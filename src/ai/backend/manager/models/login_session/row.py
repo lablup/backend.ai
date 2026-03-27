@@ -51,12 +51,6 @@ class LoginSessionRow(Base):  # type: ignore[misc]
         server_default=sa.func.now(),
         nullable=False,
     )
-    expires_at: Mapped[datetime] = mapped_column(
-        "expires_at",
-        sa.DateTime(timezone=True),
-        nullable=False,
-        index=True,
-    )
     last_accessed_at: Mapped[datetime | None] = mapped_column(
         "last_accessed_at", sa.DateTime(timezone=True), nullable=True
     )
@@ -78,7 +72,6 @@ class LoginSessionRow(Base):  # type: ignore[misc]
             access_key=self.access_key,
             status=self.status,
             created_at=self.created_at,
-            expires_at=self.expires_at,
             last_accessed_at=self.last_accessed_at,
             invalidated_at=self.invalidated_at,
         )

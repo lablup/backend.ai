@@ -1289,7 +1289,7 @@ type ComputePluginEntry {
   pluginName: String!
 
   """
-  Plugin value string containing plugin-specific information. The content varies by plugin type and may include version or configuration details.
+  Plugin value as a JSON-encoded string containing plugin-specific information. The content varies by plugin type and may include version or configuration details.
   """
   value: String!
 }
@@ -1413,6 +1413,24 @@ type CreateDeploymentPayload {
   deployment: ModelDeployment!
 }
 
+"""Added in UNRELEASED. Input for creating a new domain."""
+input CreateDomainInputGQL {
+  """Domain name. Must be unique across the system."""
+  name: String!
+
+  """Optional description."""
+  description: String = null
+
+  """Whether the domain is active."""
+  isActive: Boolean! = true
+
+  """Allowed Docker registry URLs."""
+  allowedDockerRegistries: [String!] = null
+
+  """External integration identifier."""
+  integrationId: String = null
+}
+
 """Added in 25.14.0. """
 input CreateHuggingFaceRegistryInput {
   name: String!
@@ -1484,6 +1502,24 @@ input CreatePermissionInput {
   operation: OperationType!
 }
 
+"""Added in UNRELEASED. Input for creating a new project."""
+input CreateProjectInputGQL {
+  """Project name. Must be unique within the domain."""
+  name: String!
+
+  """Name of the domain this project belongs to."""
+  domainName: String!
+
+  """Optional description."""
+  description: String = null
+
+  """External integration identifier."""
+  integrationId: String = null
+
+  """Name of the resource policy to apply."""
+  resourcePolicy: String = null
+}
+
 """Added in 26.3.0. Input for creating a new query definition."""
 input CreateQueryDefinitionInput {
   """Human-readable identifier (must be unique)."""
@@ -1540,7 +1576,7 @@ input CreateRevisionInput {
 input CreateRoleInput {
   name: String!
   description: String = null
-  source: RoleSource = null
+  source: RoleSource! = CUSTOM
 }
 
 """
@@ -1771,6 +1807,12 @@ type DeleteDomainConfigPayload {
   deleted: Boolean!
 }
 
+"""Added in UNRELEASED. Payload for domain deletion mutation."""
+type DeleteDomainPayloadGQL {
+  """Whether the deletion was successful."""
+  deleted: Boolean!
+}
+
 """Added in 25.14.0. """
 input DeleteHuggingFaceRegistryInput {
   id: ID!
@@ -1824,6 +1866,12 @@ input DeletePermissionInput {
 type DeletePermissionPayload {
   """ID of the deleted permission"""
   id: UUID!
+}
+
+"""Added in UNRELEASED. Payload for project deletion mutation."""
+type DeleteProjectPayloadGQL {
+  """Whether the deletion was successful."""
+  deleted: Boolean!
 }
 
 """Added in 26.3.0. Payload returned after deleting a query definition."""
@@ -1924,7 +1972,7 @@ type DeploymentHistory implements Node {
   result: SchedulingResult!
   errorCode: String
   message: String
-  subSteps: [SubStepResult!]!
+  subSteps: [SubStepResultGQL!]!
   attempts: Int!
   createdAt: DateTime!
   updatedAt: DateTime!
@@ -2226,6 +2274,12 @@ type DomainLifecycleInfo {
 
 extend type DomainNode @key(fields: "id") {
   id: ID! @external
+}
+
+"""Added in UNRELEASED. Payload for domain mutation responses."""
+type DomainPayloadGQL {
+  """The domain entity."""
+  domain: DomainV2!
 }
 
 """
@@ -2542,6 +2596,17 @@ input EntityFilter {
 }
 
 union EntityNode = UserV2 | ProjectV2 | DomainV2 | VirtualFolderNode | ImageV2 | ComputeSessionNode | SessionV2 | Artifact | ArtifactRegistry | AppConfig | NotificationChannel | NotificationRule | ModelDeployment | ResourceGroup | ContainerRegistryV2 | ArtifactRevision | Role
+
+"""
+Added in UNRELEASED. Valid entity-operation combination for RBAC actions.
+"""
+type EntityOperationCombination {
+  """Entity element type"""
+  entityType: RBACElementType!
+
+  """Valid operations for this entity"""
+  operations: [OperationInfo!]!
+}
 
 """Added in 26.3.0. Order by specification for entity associations"""
 input EntityOrderBy {
@@ -3528,6 +3593,184 @@ enum LivenessStatus {
   DEGRADED
 }
 
+"""Added in UNRELEASED. Result of a login attempt."""
+enum LoginAttemptResult {
+  SUCCESS
+  FAILED_INVALID_CREDENTIALS
+  FAILED_USER_INACTIVE
+  FAILED_BLOCKED
+  FAILED_PASSWORD_EXPIRED
+  FAILED_REJECTED_BY_HOOK
+  FAILED_SESSION_ALREADY_EXISTS
+}
+
+"""Added in UNRELEASED. Filter criteria for querying login history."""
+input LoginHistoryFilter {
+  domainName: StringFilter = null
+  result: LoginHistoryResultFilter = null
+  createdAt: DateTimeFilter = null
+  AND: [LoginHistoryFilter!] = null
+  OR: [LoginHistoryFilter!] = null
+  NOT: [LoginHistoryFilter!] = null
+}
+
+"""Added in UNRELEASED. Ordering specification for login history."""
+input LoginHistoryOrderBy {
+  field: LoginHistoryOrderField!
+  direction: OrderDirection! = DESC
+}
+
+"""Added in UNRELEASED. Fields available for ordering login history."""
+enum LoginHistoryOrderField {
+  CREATED_AT
+  RESULT
+  DOMAIN_NAME
+}
+
+"""Added in UNRELEASED. Filter for login attempt result field."""
+input LoginHistoryResultFilter {
+  equals: LoginAttemptResult = null
+
+  """The in field."""
+  in: [LoginAttemptResult!] = null
+  notIn: [LoginAttemptResult!] = null
+}
+
+"""
+Added in UNRELEASED. Represents a login history entry tracking user authentication attempts.
+"""
+type LoginHistoryV2 implements Node {
+  """The Globally Unique ID of this object"""
+  id: ID!
+
+  """UUID of the user who attempted to log in."""
+  userId: UUID!
+
+  """Domain name of the user at the time of the attempt."""
+  domainName: String!
+
+  """Result of the login attempt."""
+  result: LoginAttemptResult!
+
+  """Detailed reason for the login failure."""
+  failReason: String
+
+  """Timestamp when the login attempt occurred."""
+  createdAt: DateTime!
+}
+
+"""
+Added in UNRELEASED. Connection type for paginated login history results.
+"""
+type LoginHistoryV2Connection {
+  """Pagination data for this connection"""
+  pageInfo: PageInfo!
+
+  """Contains the nodes in this connection"""
+  edges: [LoginHistoryV2Edge!]!
+
+  """Total number of login history entries matching the query."""
+  count: Int!
+}
+
+"""An edge in a connection."""
+type LoginHistoryV2Edge {
+  """A cursor for use in pagination"""
+  cursor: String!
+
+  """The item at the end of the edge"""
+  node: LoginHistoryV2!
+}
+
+"""Added in UNRELEASED. Filter criteria for querying login sessions."""
+input LoginSessionFilter {
+  status: LoginSessionStatusFilter = null
+  accessKey: StringFilter = null
+  createdAt: DateTimeFilter = null
+  lastAccessedAt: DateTimeFilter = null
+  AND: [LoginSessionFilter!] = null
+  OR: [LoginSessionFilter!] = null
+  NOT: [LoginSessionFilter!] = null
+}
+
+"""Added in UNRELEASED. Ordering specification for login sessions."""
+input LoginSessionOrderBy {
+  field: LoginSessionOrderField!
+  direction: OrderDirection! = DESC
+}
+
+"""Added in UNRELEASED. Fields available for ordering login sessions."""
+enum LoginSessionOrderField {
+  CREATED_AT
+  STATUS
+  LAST_ACCESSED_AT
+}
+
+"""Added in UNRELEASED. Status of a login session."""
+enum LoginSessionStatus {
+  ACTIVE
+  INVALIDATED
+  REVOKED
+}
+
+"""Added in UNRELEASED. Filter for login session status field."""
+input LoginSessionStatusFilter {
+  equals: LoginSessionStatus = null
+
+  """The in field."""
+  in: [LoginSessionStatus!] = null
+  notIn: [LoginSessionStatus!] = null
+}
+
+"""
+Added in UNRELEASED. Represents a login session entry tracking user authentication sessions.
+"""
+type LoginSessionV2 implements Node {
+  """The Globally Unique ID of this object"""
+  id: ID!
+
+  """UUID of the user who owns the session."""
+  userId: UUID!
+
+  """Access key associated with the session."""
+  accessKey: String!
+
+  """Current status of the login session."""
+  status: LoginSessionStatus!
+
+  """Timestamp when the session was created."""
+  createdAt: DateTime!
+
+  """Timestamp when the session was last accessed."""
+  lastAccessedAt: DateTime
+
+  """Timestamp when the session was invalidated."""
+  invalidatedAt: DateTime
+}
+
+"""
+Added in UNRELEASED. Connection type for paginated login session results.
+"""
+type LoginSessionV2Connection {
+  """Pagination data for this connection"""
+  pageInfo: PageInfo!
+
+  """Contains the nodes in this connection"""
+  edges: [LoginSessionV2Edge!]!
+
+  """Total number of login sessions matching the query."""
+  count: Int!
+}
+
+"""An edge in a connection."""
+type LoginSessionV2Edge {
+  """A cursor for use in pagination"""
+  cursor: String!
+
+  """The item at the end of the edge"""
+  node: LoginSessionV2!
+}
+
 """Added in 26.3.0. Key-value label entry from Prometheus result."""
 type MetricLabelEntry {
   """Label key"""
@@ -4262,6 +4505,46 @@ type Mutation {
   updateResourceGroupFairShareSpec(input: UpdateResourceGroupFairShareSpecInput!): UpdateResourceGroupFairShareSpecPayload! @deprecated(reason: "Use admin_update_resource_group_fair_share_spec instead. This API will be removed after v26.3.0. See BEP-1041 for migration guide.")
 
   """
+  Added in UNRELEASED. Create a new domain (admin only). Requires superadmin privileges.
+  """
+  adminCreateDomainV2(input: CreateDomainInputGQL!): DomainPayloadGQL!
+
+  """
+  Added in UNRELEASED. Update a domain (admin only). Requires superadmin privileges. Only provided fields will be updated.
+  """
+  adminUpdateDomainV2(domainName: String!, input: UpdateDomainInputGQL!): DomainPayloadGQL!
+
+  """
+  Added in UNRELEASED. Soft-delete a domain (admin only). Requires superadmin privileges.
+  """
+  adminDeleteDomainV2(domainName: String!): DeleteDomainPayloadGQL!
+
+  """
+  Added in UNRELEASED. Permanently purge a domain and all associated data (admin only). Requires superadmin privileges.
+  """
+  adminPurgeDomainV2(domainName: String!): PurgeDomainPayloadGQL!
+
+  """
+  Added in UNRELEASED. Create a new project (admin only). Requires superadmin privileges.
+  """
+  adminCreateProjectV2(input: CreateProjectInputGQL!): ProjectPayloadGQL!
+
+  """
+  Added in UNRELEASED. Update a project (admin only). Requires superadmin privileges. Only provided fields will be updated.
+  """
+  adminUpdateProjectV2(projectId: UUID!, input: UpdateProjectInputGQL!): ProjectPayloadGQL!
+
+  """
+  Added in UNRELEASED. Soft-delete a project (admin only). Requires superadmin privileges.
+  """
+  adminDeleteProjectV2(projectId: UUID!): DeleteProjectPayloadGQL!
+
+  """
+  Added in UNRELEASED. Permanently purge a project and all associated data (admin only). Requires superadmin privileges.
+  """
+  adminPurgeProjectV2(projectId: UUID!): PurgeProjectPayloadGQL!
+
+  """
   Added in 26.2.0. Create a new user (admin only). Requires superadmin privileges. Automatically creates a default keypair for the user
   """
   adminCreateUserV2(input: CreateUserV2Input!): CreateUserV2Payload!
@@ -4325,6 +4608,12 @@ type Mutation {
   Added in UNRELEASED. Update a keypair owned by the current user (e.g. toggle active state). The keypair must be owned by the current user.
   """
   updateMyKeypair(input: UpdateMyKeypairInput!): UpdateMyKeypairPayload!
+
+  """Added in UNRELEASED. Revoke a login session. (admin only)"""
+  adminRevokeLoginSession(sessionId: UUID!): RevokeLoginSessionPayload!
+
+  """Added in UNRELEASED. Revoke a login session owned by the current user."""
+  myRevokeLoginSession(sessionId: UUID!): RevokeLoginSessionPayload!
 
   """
   Added in 26.4.0. Update the current user's allowed client IP list. Set allowed_client_ip to null to remove all IP restrictions. When force is false, the operation fails if the current request IP would be excluded by the new allowlist (lockout prevention)
@@ -4605,6 +4894,18 @@ type ObjectStorageEdge {
   node: ObjectStorage!
 }
 
+"""Added in UNRELEASED. Information about a single RBAC operation."""
+type OperationInfo {
+  """Operation name"""
+  operation: String!
+
+  """Human-readable description"""
+  description: String!
+
+  """Required RBAC permission"""
+  requiredPermission: OperationType!
+}
+
 """Added in 26.3.0. RBAC operation type"""
 enum OperationType {
   CREATE
@@ -4649,6 +4950,7 @@ type Permission implements Node {
   scopeId: String!
   entityType: RBACElementType!
   operation: OperationType!
+  createdAt: DateTime!
 
   """The role this permission belongs to."""
   role: Role
@@ -4681,6 +4983,7 @@ input PermissionFilter {
   roleId: UUID = null
   scopeType: RBACElementType = null
   entityType: RBACElementType = null
+  createdAt: DateTimeFilter = null
   AND: [PermissionFilter!] = null
   OR: [PermissionFilter!] = null
   NOT: [PermissionFilter!] = null
@@ -4709,6 +5012,7 @@ input PermissionOrderBy {
 enum PermissionOrderField {
   ID
   ENTITY_TYPE
+  CREATED_AT
 }
 
 """
@@ -4991,6 +5295,12 @@ type ProjectOrganizationInfo {
 
   """Name of the project resource policy applied to this project."""
   resourcePolicy: String!
+}
+
+"""Added in UNRELEASED. Payload for project mutation responses."""
+type ProjectPayloadGQL {
+  """The project entity."""
+  project: ProjectV2!
 }
 
 """
@@ -5294,6 +5604,18 @@ input ProjectWeightInputItem {
   weight: Decimal = null
 }
 
+"""Added in UNRELEASED. Payload for domain permanent deletion mutation."""
+type PurgeDomainPayloadGQL {
+  """Whether the purge was successful."""
+  purged: Boolean!
+}
+
+"""Added in UNRELEASED. Payload for project permanent deletion mutation."""
+type PurgeProjectPayloadGQL {
+  """Whether the purge was successful."""
+  purged: Boolean!
+}
+
 """Added in 26.3.0. Input for purging a role"""
 input PurgeRoleInput {
   id: UUID!
@@ -5512,6 +5834,16 @@ type Query {
   adminAuditLogsV2(filter: AuditLogFilter = null, orderBy: [AuditLogOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): AuditLogV2Connection!
 
   """
+  Added in UNRELEASED. Query login sessions with pagination and filtering. (admin only)
+  """
+  adminLoginSessionsV2(filter: LoginSessionFilter = null, orderBy: [LoginSessionOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): LoginSessionV2Connection!
+
+  """
+  Added in UNRELEASED. Query login history with pagination and filtering. (admin only)
+  """
+  adminLoginHistoryV2(filter: LoginHistoryFilter = null, orderBy: [LoginHistoryOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): LoginHistoryV2Connection!
+
+  """
   Added in 26.3.0. Query sessions with pagination and filtering. (admin only)
   """
   adminSessionsV2(filter: SessionV2Filter = null, orderBy: [SessionV2OrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): SessionV2Connection!
@@ -5573,12 +5905,25 @@ type Query {
   myKeypairs(filter: KeypairFilter = null, orderBy: [KeypairOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): KeyPairConnection!
 
   """
+  Added in UNRELEASED. Query login sessions of the current user with pagination and filtering.
+  """
+  myLoginSessionsV2(filter: LoginSessionFilter = null, orderBy: [LoginSessionOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): LoginSessionV2Connection!
+
+  """
+  Added in UNRELEASED. Query login history of the current user with pagination and filtering.
+  """
+  myLoginHistoryV2(filter: LoginHistoryFilter = null, orderBy: [LoginHistoryOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): LoginHistoryV2Connection!
+
+  """
   Added in 26.3.0. List roles assigned to the current authenticated user.
   """
   myRoles(filter: RoleAssignmentFilter = null, orderBy: [RoleAssignmentOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): RoleAssignmentConnection!
 
   """Added in 26.3.0. List valid RBAC scope-entity type combinations."""
   rbacScopeEntityCombinations: [ScopeEntityCombination!]!
+
+  """Added in UNRELEASED. List valid RBAC entity-operation combinations."""
+  rbacEntityOperationCombinations: [EntityOperationCombination!]!
 
   """Added in 26.2.0. Query kernels within a specific session."""
   sessionKernelsV2(scope: SessionScope!, filter: KernelV2Filter = null, orderBy: [KernelV2OrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): KernelV2Connection
@@ -6583,6 +6928,12 @@ type RestoreArtifactsPayload {
   artifacts: [Artifact!]!
 }
 
+"""Added in UNRELEASED. Payload returned after revoking a login session."""
+type RevokeLoginSessionPayload {
+  """Whether the revocation was successful"""
+  success: Boolean!
+}
+
 """
 Added in 24.09.0. Input for revoking a keypair owned by the current user.
 """
@@ -6874,7 +7225,7 @@ type RouteHistory implements Node {
   result: SchedulingResult!
   errorCode: String
   message: String
-  subSteps: [SubStepResult!]!
+  subSteps: [SubStepResultGQL!]!
   attempts: Int!
   createdAt: DateTime!
   updatedAt: DateTime!
@@ -7260,7 +7611,7 @@ type SessionSchedulingHistory implements Node {
   result: SchedulingResult!
   errorCode: String
   message: String
-  subSteps: [SubStepResult!]!
+  subSteps: [SubStepResultGQL!]!
   attempts: Int!
   createdAt: DateTime!
   updatedAt: DateTime!
@@ -7649,7 +8000,7 @@ input StringFilter {
 }
 
 """Added in 26.3.0. Sub-step result in scheduling history."""
-type SubStepResult {
+type SubStepResultGQL {
   step: String!
   result: SchedulingResult!
   errorCode: String
@@ -7833,6 +8184,26 @@ type UpdateDeploymentPolicyPayload {
   deploymentPolicy: DeploymentPolicy!
 }
 
+"""
+Added in UNRELEASED. Input for updating domain information. All fields optional.
+"""
+input UpdateDomainInputGQL {
+  """New domain name."""
+  name: String = null
+
+  """New description."""
+  description: String = null
+
+  """Updated active status."""
+  isActive: Boolean = null
+
+  """New allowed Docker registry URLs."""
+  allowedDockerRegistries: [String!] = null
+
+  """New external integration identifier."""
+  integrationId: String = null
+}
+
 """Added in 25.14.0. """
 input UpdateHuggingFaceRegistryInput {
   id: ID!
@@ -7943,6 +8314,26 @@ input UpdatePermissionInput {
   scopeId: String = null
   entityType: RBACElementType = null
   operation: OperationType = null
+}
+
+"""
+Added in UNRELEASED. Input for updating project information. All fields optional.
+"""
+input UpdateProjectInputGQL {
+  """New project name."""
+  name: String = null
+
+  """New description."""
+  description: String = null
+
+  """Updated active status."""
+  isActive: Boolean = null
+
+  """New external integration identifier."""
+  integrationId: String = null
+
+  """New resource policy name."""
+  resourcePolicy: String = null
 }
 
 """Added in 25.14.0. """

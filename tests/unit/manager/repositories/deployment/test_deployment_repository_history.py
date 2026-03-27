@@ -26,7 +26,7 @@ from ai.backend.manager.models.group import GroupRow
 from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.image import ImageRow
 from ai.backend.manager.models.keypair import KeyPairRow
-from ai.backend.manager.models.rbac_models import UserRoleRow
+from ai.backend.manager.models.rbac_models import RoleRow, UserRoleRow
 from ai.backend.manager.models.resource_policy import (
     KeyPairResourcePolicyRow,
     ProjectResourcePolicyRow,
@@ -87,6 +87,7 @@ class TestUpdateEndpointLifecycleBulkWithHistory:
                 UserResourcePolicyRow,
                 ProjectResourcePolicyRow,
                 KeyPairResourcePolicyRow,
+                RoleRow,
                 UserRoleRow,  # UserRow relationship dependency
                 UserRow,
                 KeyPairRow,
@@ -392,6 +393,7 @@ class TestUpdateEndpointLifecycleBulkWithHistory:
                 url="http://test.example.com",
                 open_to_public=False,
                 lifecycle_stage=EndpointLifecycle.PENDING,
+                current_revision=uuid.uuid4(),
                 resource_slots=ResourceSlot({"cpu": Decimal("4"), "mem": Decimal("8192")}),
             )
             db_sess.add(endpoint)
@@ -501,6 +503,7 @@ class TestUpdateRouteStatusBulkWithHistory:
                 UserResourcePolicyRow,
                 ProjectResourcePolicyRow,
                 KeyPairResourcePolicyRow,
+                RoleRow,
                 UserRoleRow,  # UserRow relationship dependency
                 UserRow,
                 KeyPairRow,
@@ -806,6 +809,7 @@ class TestUpdateRouteStatusBulkWithHistory:
                 url="http://test.example.com",
                 open_to_public=False,
                 lifecycle_stage=EndpointLifecycle.READY,
+                current_revision=uuid.uuid4(),
                 resource_slots=ResourceSlot({"cpu": Decimal("4"), "mem": Decimal("8192")}),
             )
             db_sess.add(endpoint)
@@ -943,6 +947,7 @@ class TestDeploymentHistoryMergeLogic:
                 UserResourcePolicyRow,
                 ProjectResourcePolicyRow,
                 KeyPairResourcePolicyRow,
+                RoleRow,
                 UserRoleRow,
                 UserRow,
                 KeyPairRow,
@@ -1113,6 +1118,7 @@ class TestDeploymentHistoryMergeLogic:
                     url="http://test.example.com",
                     open_to_public=False,
                     lifecycle_stage=EndpointLifecycle.PENDING,
+                    current_revision=uuid.uuid4(),
                     resource_slots=ResourceSlot({"cpu": Decimal("4"), "mem": Decimal("8192")}),
                 )
             )
@@ -1269,6 +1275,7 @@ class TestRouteHistoryMergeLogic:
                 UserResourcePolicyRow,
                 ProjectResourcePolicyRow,
                 KeyPairResourcePolicyRow,
+                RoleRow,
                 UserRoleRow,
                 UserRow,
                 KeyPairRow,
@@ -1440,6 +1447,7 @@ class TestRouteHistoryMergeLogic:
                     url="http://test.example.com",
                     open_to_public=False,
                     lifecycle_stage=EndpointLifecycle.READY,
+                    current_revision=uuid.uuid4(),
                     resource_slots=ResourceSlot({"cpu": Decimal("4"), "mem": Decimal("8192")}),
                 )
             )

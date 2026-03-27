@@ -15,6 +15,8 @@ from ai.backend.manager.api.adapters.domain import DomainAdapter
 from ai.backend.manager.api.adapters.fair_share import FairShareAdapter
 from ai.backend.manager.api.adapters.huggingface_registry import HuggingFaceRegistryAdapter
 from ai.backend.manager.api.adapters.image import ImageAdapter
+from ai.backend.manager.api.adapters.login_history import LoginHistoryAdapter
+from ai.backend.manager.api.adapters.login_session import LoginSessionAdapter
 from ai.backend.manager.api.adapters.notification import NotificationAdapter
 from ai.backend.manager.api.adapters.object_storage import ObjectStorageAdapter
 from ai.backend.manager.api.adapters.project import ProjectAdapter
@@ -57,6 +59,8 @@ class Adapters:
         fair_share: FairShareAdapter,
         huggingface_registry: HuggingFaceRegistryAdapter,
         image: ImageAdapter,
+        login_history: LoginHistoryAdapter,
+        login_session: LoginSessionAdapter,
         notification: NotificationAdapter,
         object_storage: ObjectStorageAdapter,
         project: ProjectAdapter,
@@ -84,6 +88,8 @@ class Adapters:
         self.fair_share = fair_share
         self.huggingface_registry = huggingface_registry
         self.image = image
+        self.login_history = login_history
+        self.login_session = login_session
         self.notification = notification
         self.object_storage = object_storage
         self.project = project
@@ -115,6 +121,8 @@ class Adapters:
             fair_share=FairShareAdapter(processors),
             huggingface_registry=HuggingFaceRegistryAdapter(processors),
             image=ImageAdapter(processors),
+            login_history=LoginHistoryAdapter(processors),
+            login_session=LoginSessionAdapter(processors),
             notification=NotificationAdapter(processors),
             object_storage=ObjectStorageAdapter(processors),
             project=ProjectAdapter(processors),

@@ -2,7 +2,8 @@
 
 from __future__ import annotations
 
-from collections.abc import Sequence
+import json
+from collections.abc import Mapping, Sequence
 
 from ai.backend.common.dto.manager.query import StringFilter
 from ai.backend.common.dto.manager.v2.agent.request import (
@@ -231,7 +232,10 @@ class AgentAdapter(BaseAdapter):
                 compute_plugins=(
                     ComputePluginsGQLDTO(
                         entries=[
-                            ComputePluginEntryDTO(plugin_name=k, value=v)
+                            ComputePluginEntryDTO(
+                                plugin_name=k,
+                                value=json.dumps(v) if isinstance(v, Mapping) else str(v),
+                            )
                             for k, v in data.compute_plugins.items()
                         ]
                     )

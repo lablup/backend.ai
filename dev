@@ -1,0 +1,215 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+TMUX_SESSION="backend-ai-session"
+
+_service_cmd() {
+  case $1 in
+    mgr)              echo "./backend.ai mgr start-server --debug" ;;
+    agent)            echo "./backend.ai ag start-server --debug" ;;
+    storage)          echo "./backend.ai storage start-server --debug" ;;
+    web)              echo "./backend.ai web start-server --debug" ;;
+    proxy-coordinator) echo "./backend.ai app-proxy-coordinator start-server --debug" ;;
+    proxy-worker)     echo "./backend.ai app-proxy-worker start-server --debug" ;;
+    *) return 1 ;;
+  esac
+}
+
+_service_process() {
+  case $1 in
+    mgr)              echo "backend.ai: manager" ;;
+    agent)            echo "backend.ai: agent" ;;
+    storage)          echo "backend.ai: storage-proxy" ;;
+    web)              echo "backend.ai: webserver" ;;
+    proxy-coordinator) echo "backend.ai: proxy-coordinator" ;;
+    proxy-worker)     echo "backend.ai: proxy-worker" ;;
+    *) return 1 ;;
+  esac
+}
+
+_tmux_window_name() {
+  case $1 in
+    proxy-coordinator) echo "app-proxy-coordinator" ;;
+    proxy-worker)     echo "app-proxy-worker" ;;
+    *)                echo "$1" ;;
+  esac
+}
+
+ALL_SERVICES="mgr agent storage web proxy-coordinator proxy-worker"
+
+_color() {
+  local color=$1; shift
+  case $color in
+    green)  printf "\033[32m%s\033[0m" "$*" ;;
+    red)    printf "\033[31m%s\033[0m" "$*" ;;
+    yellow) printf "\033[33m%s\033[0m" "$*" ;;
+    bold)   printf "\033[1m%s\033[0m" "$*" ;;
+    *)      printf "%s" "$*" ;;
+  esac
+}
+
+_is_running() {
+  pgrep -f "$(_service_process "$1")" > /dev/null 2>&1
+}
+
+_stop_service() {
+  local svc=$1
+  if _is_running "$svc"; then
+    echo "  Stopping $svc..."
+    pkill -f "$(_service_process "$svc")" 2>/dev/null || true
+    for _ in $(seq 1 10); do
+      _is_running "$svc" || break
+      sleep 0.5
+    done
+    if _is_running "$svc"; then
+      pkill -9 -f "$(_service_process "$svc")" 2>/dev/null || true
+      sleep 1
+    fi
+  fi
+}
+
+_start_service() {
+  local svc=$1
+  if _is_running "$svc"; then
+    echo "  $(_color yellow "$svc is already running")"
+    return
+  fi
+  local cmd
+  cmd=$(_service_cmd "$svc")
+  if ! tmux has-session -t "$TMUX_SESSION" 2>/dev/null; then
+    local winname
+    winname=$(_tmux_window_name "$svc")
+    tmux new-session -d -s "$TMUX_SESSION" -n "$winname" "$cmd"
+  else
+    local winname
+  winname=$(_tmux_window_name "$svc")
+  tmux new-window -t "$TMUX_SESSION" -n "$winname" "$cmd"
+  fi
+  echo "  Started $svc"
+}
+
+cmd_status() {
+  echo ""
+  printf "  %-20s %s\n" "SERVICE" "STATUS"
+  printf "  %-20s %s\n" "-------" "------"
+  for svc in $ALL_SERVICES; do
+    if _is_running "$svc"; then
+      local pid
+      pid=$(pgrep -f "$(_service_process "$svc")" | head -1)
+      printf "  %-20s %s (pid: %s)\n" "$svc" "$(_color green running)" "$pid"
+    else
+      printf "  %-20s %s\n" "$svc" "$(_color red stopped)"
+    fi
+  done
+  echo ""
+}
+
+cmd_stop() {
+  local svc=$1
+  if [ "$svc" = "all" ]; then
+    echo "$(_color bold "Stopping all services...")"
+    for s in $ALL_SERVICES; do _stop_service "$s"; done
+    echo "$(_color green "All services stopped.")"
+  else
+    echo "$(_color bold "Stopping $svc...")"
+    _stop_service "$svc"
+    echo "$(_color green "$svc stopped.")"
+  fi
+}
+
+cmd_start() {
+  local svc=$1
+  if [ "$svc" = "all" ]; then
+    echo "$(_color bold "Starting all services...")"
+    for s in $ALL_SERVICES; do _start_service "$s"; done
+    echo "$(_color green "All services started.")"
+  else
+    echo "$(_color bold "Starting $svc...")"
+    _start_service "$svc"
+    echo "$(_color green "$svc started.")"
+  fi
+}
+
+cmd_restart() {
+  local svc=$1
+  if [ "$svc" = "all" ]; then
+    echo "$(_color bold "Restarting all services...")"
+    for s in $ALL_SERVICES; do _stop_service "$s"; done
+    sleep 1
+    for s in $ALL_SERVICES; do _start_service "$s"; done
+    echo "$(_color green "All services restarted.")"
+  else
+    echo "$(_color bold "Restarting $svc...")"
+    _stop_service "$svc"
+    sleep 1
+    _start_service "$svc"
+    echo "$(_color green "$svc restarted.")"
+  fi
+}
+
+cmd_log() {
+  local svc=$1
+  local winname
+  winname=$(_tmux_window_name "$svc")
+  local win
+  win=$(tmux list-windows -t "$TMUX_SESSION" -F "#{window_name}" 2>/dev/null | grep "^${winname}$" | head -1) || true
+  if [ -n "$win" ]; then
+    tmux capture-pane -t "$TMUX_SESSION:$win" -p -S -50
+  else
+    echo "$(_color red "No tmux window found for $svc")"
+  fi
+}
+
+usage() {
+  cat <<EOF
+
+Usage: ./dev <command> [service]
+
+Commands:
+  status                    Show status of all services
+  start   <service|all>     Start a service
+  stop    <service|all>     Stop a service
+  restart <service|all>     Restart a service
+  log     <service>         Show recent log output
+
+Services:
+  mgr, agent, storage, web, proxy-coordinator, proxy-worker, all
+
+Examples:
+  ./dev status
+  ./dev restart mgr
+  ./dev restart all
+  ./dev log mgr
+
+EOF
+}
+
+_validate_service() {
+  local svc=$1
+  [ "$svc" = "all" ] && return 0
+  _service_cmd "$svc" > /dev/null 2>&1 || {
+    echo "$(_color red "Unknown service: $svc")"
+    echo "Valid services: $ALL_SERVICES all"
+    exit 1
+  }
+}
+
+if [ $# -lt 1 ]; then
+  usage
+  exit 0
+fi
+
+case "$1" in
+  status) cmd_status ;;
+  start|stop|restart)
+    [ $# -lt 2 ] && { echo "$(_color red "Usage: ./dev $1 <service|all>")"; exit 1; }
+    _validate_service "$2"
+    "cmd_$1" "$2"
+    ;;
+  log)
+    [ $# -lt 2 ] && { echo "$(_color red "Usage: ./dev log <service>")"; exit 1; }
+    _validate_service "$2"
+    cmd_log "$2"
+    ;;
+  *) echo "$(_color red "Unknown command: $1")"; usage; exit 1 ;;
+esac

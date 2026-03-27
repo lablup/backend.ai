@@ -13,7 +13,7 @@ from .object_permission import (
 )
 from .permission import ScopedPermissionCreateInput
 from .status import RoleStatus
-from .types import EntityType, OperationType, RoleSource
+from .types import EntityType, OperationType, RBACElementRef, RoleSource
 
 
 @dataclass(frozen=True)
@@ -84,6 +84,14 @@ class BatchEntityPermissionCheckInput:
     user_id: uuid.UUID
     target_object_ids: list[ObjectId]
     operation: OperationType
+
+
+@dataclass(frozen=True)
+class ScopeChainPermissionCheckInput:
+    user_id: uuid.UUID
+    target_element_ref: RBACElementRef
+    operation: OperationType
+    permission_entity_type: EntityType | None
 
 
 @dataclass(frozen=True)

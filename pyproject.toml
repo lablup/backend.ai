@@ -309,6 +309,10 @@ split-on-trailing-comma = true
 "src/ai/backend/manager/api/rest/v2/tree.py" = ["PLC0415"]
 "src/ai/backend/manager/api/rest/v2/*/registry.py" = ["PLC0415"]
 "src/ai/backend/manager/api/rest/v2/*/__init__.py" = ["PLC0415"]
+# - Client v2 SDK domain clients and CLI commands use lazy imports
+"src/ai/backend/client/v2/v2_registry.py" = ["PLC0415"]
+"src/ai/backend/client/v2/domains_v2/*.py" = ["PLC0415"]
+"src/ai/backend/client/cli/v2/*.py" = ["PLC0415"]
 
 [tool.ruff.format]
 preview = true  # enable the black's preview style

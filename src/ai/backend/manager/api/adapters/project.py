@@ -5,20 +5,28 @@ from __future__ import annotations
 from collections.abc import Sequence
 from uuid import UUID
 
+from ai.backend.common.api_handlers import Sentinel
 from ai.backend.common.data.filter_specs import UUIDInMatchSpec
 from ai.backend.common.dto.manager.query import DateTimeFilter, StringFilter, UUIDFilter
 from ai.backend.common.dto.manager.v2.group.request import (
     AdminSearchGroupsInput,
+    CreateGroupInput,
+    DeleteGroupInput,
     GroupFilter,
     GroupOrder,
+    PurgeGroupInput,
+    UpdateGroupInput,
 )
 from ai.backend.common.dto.manager.v2.group.response import (
     AdminSearchGroupsPayload,
+    DeleteProjectPayload,
     ProjectBasicInfo,
     ProjectLifecycleInfo,
     ProjectNode,
     ProjectOrganizationInfo,
+    ProjectPayload,
     ProjectStorageInfo,
+    PurgeProjectPayload,
     VFolderHostPermissionEntry,
 )
 from ai.backend.common.dto.manager.v2.group.types import (
@@ -28,6 +36,7 @@ from ai.backend.common.dto.manager.v2.group.types import (
     ProjectType,
     ProjectTypeFilter,
 )
+from ai.backend.common.exception import UnreachableError
 from ai.backend.manager.api.adapters.pagination import PaginationSpec
 from ai.backend.manager.data.group.types import GroupData
 from ai.backend.manager.data.group.types import ProjectType as DataProjectType
@@ -43,16 +52,25 @@ from ai.backend.manager.repositories.base import (
     combine_conditions_or,
     negate_conditions,
 )
+from ai.backend.manager.repositories.base.creator import Creator
+from ai.backend.manager.repositories.base.updater import Updater
+from ai.backend.manager.repositories.group.creators import GroupCreatorSpec
 from ai.backend.manager.repositories.group.types import (
     DomainProjectSearchScope,
     UserProjectSearchScope,
 )
+from ai.backend.manager.repositories.group.updaters import GroupUpdaterSpec
+from ai.backend.manager.services.group.actions.create_group import CreateGroupAction
+from ai.backend.manager.services.group.actions.delete_group import DeleteGroupAction
+from ai.backend.manager.services.group.actions.modify_group import ModifyGroupAction
+from ai.backend.manager.services.group.actions.purge_group import PurgeGroupAction
 from ai.backend.manager.services.group.actions.search_projects import (
     GetProjectAction,
     SearchProjectsAction,
     SearchProjectsByDomainAction,
     SearchProjectsByUserAction,
 )
+from ai.backend.manager.types import OptionalState, TriState
 
 from .base import BaseAdapter
 
@@ -129,6 +147,75 @@ class ProjectAdapter(BaseAdapter):
             has_next_page=action_result.has_next_page,
             has_previous_page=action_result.has_previous_page,
         )
+
+    async def admin_create(self, input: CreateGroupInput) -> ProjectPayload:
+        """Create a new project (superadmin only)."""
+        spec = GroupCreatorSpec(
+            name=input.name,
+            domain_name=input.domain_name,
+            description=input.description,
+            integration_id=input.integration_id,
+            resource_policy=input.resource_policy,
+        )
+        result = await self._processors.group.create_group.wait_for_complete(
+            CreateGroupAction(creator=Creator(spec=spec), _domain_name=input.domain_name)
+        )
+        if result.data is None:
+            raise UnreachableError("create_group must return data")
+        return ProjectPayload(project=self._group_data_to_node(result.data))
+
+    async def admin_update(self, project_id: UUID, input: UpdateGroupInput) -> ProjectPayload:
+        """Update an existing project (superadmin only)."""
+        spec = GroupUpdaterSpec(
+            name=(
+                OptionalState.update(input.name) if input.name is not None else OptionalState.nop()
+            ),
+            description=(
+                TriState.nop()
+                if isinstance(input.description, Sentinel)
+                else TriState.nullify()
+                if input.description is None
+                else TriState.update(input.description)
+            ),
+            is_active=(
+                OptionalState.update(input.is_active)
+                if input.is_active is not None
+                else OptionalState.nop()
+            ),
+            integration_id=(
+                OptionalState.nop()
+                if isinstance(input.integration_id, Sentinel)
+                else OptionalState.nop()
+                if input.integration_id is None
+                else OptionalState.update(input.integration_id)
+            ),
+            resource_policy=(
+                OptionalState.update(input.resource_policy)
+                if input.resource_policy is not None
+                else OptionalState.nop()
+            ),
+        )
+        updater: Updater[GroupRow] = Updater(spec=spec, pk_value=project_id)
+        result = await self._processors.group.modify_group.wait_for_complete(
+            ModifyGroupAction(updater=updater)
+        )
+        if result.data is None:
+            raise UnreachableError("modify_group must return data")
+        return ProjectPayload(project=self._group_data_to_node(result.data))
+
+    async def admin_delete(self, input: DeleteGroupInput) -> DeleteProjectPayload:
+        """Soft-delete a project (superadmin only)."""
+        await self._processors.group.delete_group.wait_for_complete(
+            DeleteGroupAction(group_id=input.group_id)
+        )
+        return DeleteProjectPayload(deleted=True)
+
+    async def admin_purge(self, input: PurgeGroupInput) -> PurgeProjectPayload:
+        """Permanently purge a project (superadmin only)."""
+        await self._processors.group.purge_group.wait_for_complete(
+            PurgeGroupAction(group_id=input.group_id)
+        )
+        return PurgeProjectPayload(purged=True)
 
     async def search_by_domain(
         self,
@@ -315,6 +402,7 @@ class ProjectAdapter(BaseAdapter):
         return dt_filter.build_query_condition(
             before_factory=GroupConditions.by_created_at_before,
             after_factory=GroupConditions.by_created_at_after,
+            equals_factory=GroupConditions.by_created_at_equals,
         )
 
     @staticmethod
@@ -322,6 +410,7 @@ class ProjectAdapter(BaseAdapter):
         return dt_filter.build_query_condition(
             before_factory=GroupConditions.by_modified_at_before,
             after_factory=GroupConditions.by_modified_at_after,
+            equals_factory=GroupConditions.by_modified_at_equals,
         )
 
     @staticmethod

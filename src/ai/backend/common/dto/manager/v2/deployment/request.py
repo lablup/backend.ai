@@ -20,6 +20,7 @@ from ai.backend.common.data.model_deployment.types import (
     RouteTrafficStatus,
 )
 from ai.backend.common.dto.manager.query import DateTimeFilter, StringFilter
+from ai.backend.common.dto.manager.v2.common import ResourceSlotEntryInput
 from ai.backend.common.dto.manager.v2.deployment.types import (
     AccessTokenOrderField,
     AutoScalingRuleOrderField,
@@ -105,13 +106,6 @@ class ResourceGroupInput(BaseRequestModel):
     """Resource group input for a revision."""
 
     name: str = Field(description="Resource group name")
-
-
-class ResourceSlotEntryInput(BaseRequestModel):
-    """Single resource slot entry with resource type and quantity."""
-
-    resource_type: str = Field(description="Resource type identifier (e.g., 'cpu', 'mem')")
-    quantity: str = Field(description="Quantity of the resource as a decimal string")
 
 
 class ResourceSlotInput(BaseRequestModel):

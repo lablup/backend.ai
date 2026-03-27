@@ -7,7 +7,13 @@ from http import HTTPStatus
 from typing import TYPE_CHECKING, Final
 
 from ai.backend.common.api_handlers import APIResponse, BodyParam, PathParam
-from ai.backend.common.dto.manager.v2.group.request import AdminSearchGroupsInput
+from ai.backend.common.dto.manager.v2.group.request import (
+    AdminSearchGroupsInput,
+    CreateGroupInput,
+    DeleteGroupInput,
+    PurgeGroupInput,
+    UpdateGroupInput,
+)
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.api.rest.v2.path_params import ProjectIdPathParam
 
@@ -37,4 +43,37 @@ class V2ProjectHandler:
     ) -> APIResponse:
         """Search projects with filters, orders, and pagination (superadmin only)."""
         result = await self._adapter.admin_search(body.parsed)
+        return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
+
+    async def admin_create(
+        self,
+        body: BodyParam[CreateGroupInput],
+    ) -> APIResponse:
+        """Create a new project (superadmin only)."""
+        result = await self._adapter.admin_create(body.parsed)
+        return APIResponse.build(status_code=HTTPStatus.CREATED, response_model=result)
+
+    async def admin_update(
+        self,
+        path: PathParam[ProjectIdPathParam],
+        body: BodyParam[UpdateGroupInput],
+    ) -> APIResponse:
+        """Update a project (superadmin only)."""
+        result = await self._adapter.admin_update(path.parsed.project_id, body.parsed)
+        return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
+
+    async def admin_delete(
+        self,
+        body: BodyParam[DeleteGroupInput],
+    ) -> APIResponse:
+        """Soft-delete a project (superadmin only)."""
+        result = await self._adapter.admin_delete(body.parsed)
+        return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
+
+    async def admin_purge(
+        self,
+        body: BodyParam[PurgeGroupInput],
+    ) -> APIResponse:
+        """Permanently purge a project (superadmin only)."""
+        result = await self._adapter.admin_purge(body.parsed)
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)

@@ -58,7 +58,7 @@ from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.image import ImageRow
 from ai.backend.manager.models.kernel import KernelRow, KernelStatus
 from ai.backend.manager.models.keypair import KeyPairRow
-from ai.backend.manager.models.rbac_models import UserRoleRow
+from ai.backend.manager.models.rbac_models import RoleRow, UserRoleRow
 from ai.backend.manager.models.rbac_models.association_scopes_entities import (
     AssociationScopesEntitiesRow,
 )
@@ -139,6 +139,7 @@ class TestDeploymentRepositoryFetchRouteServiceDiscoveryInfo:
                 UserResourcePolicyRow,
                 ProjectResourcePolicyRow,
                 KeyPairResourcePolicyRow,
+                RoleRow,
                 UserRoleRow,  # UserRow relationship dependency
                 UserRow,
                 KeyPairRow,
@@ -567,6 +568,7 @@ class TestDeploymentRepositoryFetchRouteServiceDiscoveryInfo:
                 url="http://test.example.com",
                 open_to_public=False,
                 lifecycle_stage=EndpointLifecycle.DESTROYED,  # DESTROYED allows null image
+                current_revision=uuid.uuid4(),
                 resource_slots=ResourceSlot({"cpu": Decimal("4"), "mem": Decimal("8192")}),
             )
             db_sess.add(endpoint)
@@ -734,6 +736,7 @@ class TestDeploymentRepositoryFetchRouteServiceDiscoveryInfo:
                     url=f"http://test{i}.example.com",
                     open_to_public=False,
                     lifecycle_stage=EndpointLifecycle.DESTROYED,  # DESTROYED allows null image
+                    current_revision=uuid.uuid4(),
                     resource_slots=ResourceSlot({"cpu": Decimal("4"), "mem": Decimal("8192")}),
                 )
                 db_sess.add(endpoint)
@@ -1191,6 +1194,7 @@ class TestDeploymentRevisionOperations:
                 ResourcePresetRow,  # ScalingGroupRow relationship dependency
                 UserResourcePolicyRow,
                 ProjectResourcePolicyRow,
+                RoleRow,
                 UserRoleRow,  # UserRow relationship dependency
                 UserRow,
                 GroupRow,
@@ -1394,6 +1398,7 @@ class TestDeploymentRevisionOperations:
                 url=f"http://test-{uuid.uuid4().hex[:8]}.example.com",
                 open_to_public=False,
                 lifecycle_stage=EndpointLifecycle.CREATED,
+                current_revision=uuid.uuid4(),
                 resource_slots=ResourceSlot({"cpu": Decimal("4"), "mem": Decimal("8192")}),
                 model_mount_destination="/models",
                 cluster_mode=ClusterMode.SINGLE_NODE.name,
@@ -1860,6 +1865,7 @@ class TestDeploymentAutoScalingPolicyOperations:
                 ResourcePresetRow,  # ScalingGroupRow relationship dependency
                 UserResourcePolicyRow,
                 ProjectResourcePolicyRow,
+                RoleRow,
                 UserRoleRow,  # UserRow relationship dependency
                 UserRow,
                 GroupRow,
@@ -2034,6 +2040,7 @@ class TestDeploymentAutoScalingPolicyOperations:
                 url=f"http://test-{uuid.uuid4().hex[:8]}.example.com",
                 open_to_public=False,
                 lifecycle_stage=EndpointLifecycle.DESTROYED,
+                current_revision=uuid.uuid4(),
                 resource_slots=ResourceSlot({"cpu": Decimal("4"), "mem": Decimal("8192")}),
             )
             db_sess.add(endpoint)
@@ -2238,6 +2245,7 @@ class TestDeploymentPolicyOperations:
                 ResourcePresetRow,  # ScalingGroupRow relationship dependency
                 UserResourcePolicyRow,
                 ProjectResourcePolicyRow,
+                RoleRow,
                 UserRoleRow,  # UserRow relationship dependency
                 UserRow,
                 GroupRow,
@@ -2412,6 +2420,7 @@ class TestDeploymentPolicyOperations:
                 url=f"http://test-{uuid.uuid4().hex[:8]}.example.com",
                 open_to_public=False,
                 lifecycle_stage=EndpointLifecycle.DESTROYED,
+                current_revision=uuid.uuid4(),
                 resource_slots=ResourceSlot({"cpu": Decimal("4"), "mem": Decimal("8192")}),
             )
             db_sess.add(endpoint)
@@ -2571,6 +2580,7 @@ class TestSearchDeploymentPolicies:
                 ResourcePresetRow,
                 UserResourcePolicyRow,
                 ProjectResourcePolicyRow,
+                RoleRow,
                 UserRoleRow,
                 UserRow,
                 GroupRow,
@@ -2728,6 +2738,7 @@ class TestSearchDeploymentPolicies:
                     url=f"http://test-{eid.hex[:8]}.example.com",
                     open_to_public=False,
                     lifecycle_stage=EndpointLifecycle.DESTROYED,
+                    current_revision=uuid.uuid4(),
                     resource_slots=ResourceSlot({"cpu": Decimal("4"), "mem": Decimal("8192")}),
                 )
                 db_sess.add(endpoint)
@@ -2938,6 +2949,7 @@ class TestRouteOperations:
                 ResourcePresetRow,  # ScalingGroupRow relationship dependency
                 UserResourcePolicyRow,
                 ProjectResourcePolicyRow,
+                RoleRow,
                 UserRoleRow,  # UserRow relationship dependency
                 UserRow,
                 GroupRow,
@@ -3113,6 +3125,7 @@ class TestRouteOperations:
                 url=f"http://test-{uuid.uuid4().hex[:8]}.example.com",
                 open_to_public=False,
                 lifecycle_stage=EndpointLifecycle.DESTROYED,  # DESTROYED allows null image
+                current_revision=uuid.uuid4(),
                 resource_slots=ResourceSlot({"cpu": Decimal("4"), "mem": Decimal("8192")}),
             )
             db_sess.add(endpoint)
@@ -3304,6 +3317,7 @@ class TestDeploymentRepositoryDuplicateName:
                 UserResourcePolicyRow,
                 ProjectResourcePolicyRow,
                 KeyPairResourcePolicyRow,
+                RoleRow,
                 UserRoleRow,
                 UserRow,
                 KeyPairRow,
@@ -3311,6 +3325,7 @@ class TestDeploymentRepositoryDuplicateName:
                 VFolderRow,
                 ImageRow,
                 EndpointRow,
+                DeploymentRevisionRow,
                 AssociationScopesEntitiesRow,
                 DeploymentPolicyRow,
             ],

@@ -179,6 +179,7 @@ class VFolderFileService:
             volume=volume_name,
             virtual_folder_id=str(info.vfolder_id),
             files=action.files,
+            filename=action.filename,
         )
         client_api_url = self._storage_manager.get_client_api_url(proxy_name)
         return CreateArchiveDownloadSessionActionResult(

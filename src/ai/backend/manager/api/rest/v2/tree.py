@@ -13,6 +13,7 @@ from ai.backend.manager.api.rest.routing import RouteRegistry
 
 if TYPE_CHECKING:
     from ai.backend.manager.api.adapters.registry import Adapters
+    from ai.backend.manager.api.rest.export.handler import ExportHandler
     from ai.backend.manager.api.rest.types import RouteDeps
 
 
@@ -20,6 +21,7 @@ def build_v2_routes(
     *,
     adapters: Adapters,
     route_deps: RouteDeps,
+    export_handler: ExportHandler | None = None,
 ) -> RouteRegistry:
     """Build the v2 parent registry with all domain sub-registries."""
 
@@ -46,6 +48,12 @@ def build_v2_routes(
     from .huggingface_registry.registry import register_v2_huggingface_registry_routes
     from .image.handler import V2ImageHandler
     from .image.registry import register_v2_image_routes
+    from .keypair.handler import V2KeypairHandler
+    from .keypair.registry import register_v2_keypair_routes
+    from .login_history.handler import V2LoginHistoryHandler
+    from .login_history.registry import register_v2_login_history_routes
+    from .login_session.handler import V2LoginSessionHandler
+    from .login_session.registry import register_v2_login_session_routes
     from .notification.handler import V2NotificationHandler
     from .notification.registry import register_v2_notification_routes
     from .object_storage.handler import V2ObjectStorageHandler
@@ -91,6 +99,9 @@ def build_v2_routes(
         adapter=adapters.huggingface_registry
     )
     image_handler = V2ImageHandler(adapter=adapters.image)
+    keypair_handler = V2KeypairHandler(adapter=adapters.user)
+    login_history_handler = V2LoginHistoryHandler(adapter=adapters.login_history)
+    login_session_handler = V2LoginSessionHandler(adapter=adapters.login_session)
     notification_handler = V2NotificationHandler(adapter=adapters.notification)
     object_storage_handler = V2ObjectStorageHandler(adapter=adapters.object_storage)
     project_handler = V2ProjectHandler(adapter=adapters.project)
@@ -130,6 +141,9 @@ def build_v2_routes(
         register_v2_huggingface_registry_routes(huggingface_registry_handler, route_deps)
     )
     v2_reg.add_subregistry(register_v2_image_routes(image_handler, route_deps))
+    v2_reg.add_subregistry(register_v2_keypair_routes(keypair_handler, route_deps))
+    v2_reg.add_subregistry(register_v2_login_history_routes(login_history_handler, route_deps))
+    v2_reg.add_subregistry(register_v2_login_session_routes(login_session_handler, route_deps))
     v2_reg.add_subregistry(register_v2_notification_routes(notification_handler, route_deps))
     v2_reg.add_subregistry(register_v2_object_storage_routes(object_storage_handler, route_deps))
     v2_reg.add_subregistry(register_v2_project_routes(project_handler, route_deps))
@@ -153,5 +167,11 @@ def build_v2_routes(
     )
     v2_reg.add_subregistry(register_v2_user_routes(user_handler, route_deps))
     v2_reg.add_subregistry(register_v2_vfs_storage_routes(vfs_storage_handler, route_deps))
+
+    # Export (reuses v1 handler directly, no adapter)
+    if export_handler is not None:
+        from .export.registry import register_v2_export_routes
+
+        v2_reg.add_subregistry(register_v2_export_routes(export_handler, route_deps))
 
     return v2_reg

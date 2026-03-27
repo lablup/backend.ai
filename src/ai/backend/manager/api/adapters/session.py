@@ -2,9 +2,13 @@
 
 from __future__ import annotations
 
+import json
 from collections.abc import Sequence
+from datetime import datetime, timedelta
 from decimal import Decimal
 from uuid import UUID
+
+import sqlalchemy as sa
 
 from ai.backend.common.contexts.user import current_user
 from ai.backend.common.dto.manager.v2.deployment.types import (
@@ -38,22 +42,42 @@ from ai.backend.common.dto.manager.v2.resource_slot.types import (
 )
 from ai.backend.common.dto.manager.v2.session.request import (
     AdminSearchSessionsInput,
+    EnqueueSessionInput,
     SessionFilter,
     SessionOrder,
+    ShutdownSessionServiceInput,
+    StartSessionServiceInput,
+    TerminateSessionsInput,
+    UpdateSessionInput,
 )
 from ai.backend.common.dto.manager.v2.session.response import (
     AdminSearchSessionsPayload,
+    EnqueueSessionPayload,
     SessionLifecycleInfoGQLDTO,
+    SessionLogsPayload,
     SessionMetadataInfoGQLDTO,
     SessionNetworkInfo,
     SessionNode,
     SessionResourceInfoGQLDTO,
     SessionRuntimeInfoGQLDTO,
+    StartSessionServicePayload,
+    TerminateSessionsPayload,
+    UpdateSessionPayload,
 )
-from ai.backend.common.types import AgentId, KernelId, SessionId
+from ai.backend.common.dto.manager.v2.session.types import ClusterModeEnum
+from ai.backend.common.types import (
+    AccessKey,
+    AgentId,
+    ClusterMode,
+    KernelId,
+    MountPermission,
+    SessionId,
+    SessionTypes,
+)
 from ai.backend.manager.api.adapters.pagination import PaginationSpec
 from ai.backend.manager.data.kernel.types import KernelInfo, KernelStatus, KernelStatusInMatchSpec
 from ai.backend.manager.data.session.types import SessionData, SessionStatus
+from ai.backend.manager.errors.kernel import SessionNotFound
 from ai.backend.manager.models.kernel.conditions import KernelConditions
 from ai.backend.manager.models.kernel.orders import (
     DEFAULT_BACKWARD_ORDER as KERNEL_DEFAULT_BACKWARD_ORDER,
@@ -80,6 +104,8 @@ from ai.backend.manager.models.session.orders import (
 from ai.backend.manager.models.session.orders import (
     resolve_order as resolve_session_order,
 )
+from ai.backend.manager.models.session.row import SessionRow
+from ai.backend.manager.models.user import UserRole
 from ai.backend.manager.repositories.base import (
     BatchQuerier,
     NoPagination,
@@ -88,8 +114,26 @@ from ai.backend.manager.repositories.base import (
     combine_conditions_or,
     negate_conditions,
 )
+from ai.backend.manager.services.session.actions.enqueue_session import (
+    EnqueueSessionAction,
+    ResourceSlotEntry,
+    SessionBatchSpec,
+    SessionExecutionSpec,
+    SessionResourceSpec,
+    SessionSchedulingSpec,
+    VFolderMountItem,
+)
+from ai.backend.manager.services.session.actions.get_container_logs import (
+    GetContainerLogsAction,
+)
+from ai.backend.manager.services.session.actions.rename_session import RenameSessionAction
 from ai.backend.manager.services.session.actions.search import SearchSessionsAction
 from ai.backend.manager.services.session.actions.search_kernel import SearchKernelsAction
+from ai.backend.manager.services.session.actions.shutdown_service import ShutdownServiceAction
+from ai.backend.manager.services.session.actions.start_service import StartServiceAction
+from ai.backend.manager.services.session.actions.terminate_sessions import (
+    TerminateSessionsAction,
+)
 
 from .base import BaseAdapter
 
@@ -153,6 +197,120 @@ class SessionAdapter(BaseAdapter):
         if user is None:
             raise RuntimeError("SessionAdapter requires an authenticated user in context")
         return user.user_id
+
+    # -------------------------------------------------------------------------
+    # Create
+    # -------------------------------------------------------------------------
+
+    async def enqueue(
+        self,
+        input: EnqueueSessionInput,
+        user_id: UUID,
+        user_role: str,
+        access_key: str,
+        domain_name: str,
+        group_id: UUID,
+    ) -> EnqueueSessionPayload:
+        """Enqueue a new session for scheduling."""
+        batch_spec: SessionBatchSpec | None = None
+        if input.batch is not None:
+            starts_at = None
+            if input.batch.starts_at is not None:
+                starts_at = datetime.fromisoformat(input.batch.starts_at)
+
+            batch_timeout = (
+                timedelta(seconds=input.batch.batch_timeout)
+                if input.batch.batch_timeout is not None
+                else None
+            )
+
+            batch_spec = SessionBatchSpec(
+                startup_command=input.batch.startup_command,
+                starts_at=starts_at,
+                batch_timeout=batch_timeout,
+            )
+
+        mounts: list[VFolderMountItem] | None = None
+        if input.mounts is not None:
+            mounts = [
+                VFolderMountItem(
+                    vfolder_id=m.vfolder_id,
+                    mount_path=m.mount_path,
+                    permission=(MountPermission(m.permission) if m.permission else None),
+                )
+                for m in input.mounts
+            ]
+
+        execution_spec: SessionExecutionSpec | None = None
+        if input.environ or input.preopen_ports or input.bootstrap_script:
+            execution_spec = SessionExecutionSpec(
+                environ=input.environ,
+                preopen_ports=input.preopen_ports,
+                bootstrap_script=input.bootstrap_script,
+            )
+
+        action = EnqueueSessionAction(
+            session_name=input.session_name,
+            session_type=SessionTypes(input.session_type.value),
+            image_id=input.image_id,
+            resource=SessionResourceSpec(
+                entries=[
+                    ResourceSlotEntry(
+                        resource_type=e.resource_type,
+                        quantity=e.quantity,
+                    )
+                    for e in input.resource_entries
+                ],
+                resource_group=input.resource_group,
+                shmem=input.resource_opts.shmem if input.resource_opts else None,
+                cluster_mode=(
+                    ClusterMode.MULTI_NODE
+                    if input.cluster_mode == ClusterModeEnum.MULTI_NODE
+                    else ClusterMode.SINGLE_NODE
+                ),
+                cluster_size=input.cluster_size,
+            ),
+            mounts=mounts,
+            execution=execution_spec,
+            scheduling=SessionSchedulingSpec(
+                priority=input.priority,
+                is_preemptible=input.is_preemptible,
+                dependencies=input.dependencies,
+                agent_list=input.agent_list,
+                attach_network=input.attach_network,
+            ),
+            batch=batch_spec,
+            tag=input.tag,
+            callback_url=input.callback_url,
+            user_id=user_id,
+            user_role=UserRole(user_role),
+            access_key=AccessKey(access_key),
+            domain_name=domain_name,
+            group_id=group_id,
+        )
+
+        result = await self._processors.session.enqueue_session.wait_for_complete(action)
+        return EnqueueSessionPayload(
+            session=self._session_data_to_node(result.session_data),
+        )
+
+    # -------------------------------------------------------------------------
+    # Get single session
+    # -------------------------------------------------------------------------
+
+    async def get(self, session_id: UUID) -> SessionNode:
+        """Get a single session by ID."""
+        conditions = [SessionConditions.by_ids([SessionId(session_id)])]
+        querier = BatchQuerier(
+            pagination=NoPagination(),
+            conditions=conditions,
+        )
+        action_result = await self._processors.session.search_sessions.wait_for_complete(
+            SearchSessionsAction(querier=querier, user_id=self._require_user_id())
+        )
+        if not action_result.data:
+            raise SessionNotFound(f"Session not found: {session_id}")
+        return self._session_data_to_node(action_result.data[0])
 
     # -------------------------------------------------------------------------
     # Batch load (DataLoader)
@@ -258,6 +416,72 @@ class SessionAdapter(BaseAdapter):
             SearchSessionsAction(querier=querier, user_id=self._require_user_id())
         )
 
+        return AdminSearchSessionsPayload(
+            items=[self._session_data_to_node(item) for item in action_result.data],
+            total_count=action_result.total_count,
+            has_next_page=action_result.has_next_page,
+            has_previous_page=action_result.has_previous_page,
+        )
+
+    async def my_search(self, input: AdminSearchSessionsInput) -> AdminSearchSessionsPayload:
+        """Search sessions owned by the current user."""
+        user = current_user()
+        if user is None:
+            raise RuntimeError("No authenticated user in context")
+
+        conditions = self._convert_session_filter(input.filter) if input.filter else []
+        orders = self._convert_session_orders(input.order) if input.order else []
+
+        def _by_user_uuid() -> sa.sql.expression.ColumnElement[bool]:
+            return SessionRow.user_uuid == user.user_id
+
+        querier = self._build_querier(
+            conditions=conditions,
+            orders=orders,
+            pagination_spec=_SESSION_PAGINATION_SPEC,
+            first=input.first,
+            after=input.after,
+            last=input.last,
+            before=input.before,
+            limit=input.limit,
+            offset=input.offset,
+            base_conditions=[_by_user_uuid],
+        )
+        action_result = await self._processors.session.search_sessions.wait_for_complete(
+            SearchSessionsAction(querier=querier, user_id=user.user_id)
+        )
+        return AdminSearchSessionsPayload(
+            items=[self._session_data_to_node(item) for item in action_result.data],
+            total_count=action_result.total_count,
+            has_next_page=action_result.has_next_page,
+            has_previous_page=action_result.has_previous_page,
+        )
+
+    async def project_search(
+        self, project_id: UUID, input: AdminSearchSessionsInput
+    ) -> AdminSearchSessionsPayload:
+        """Search sessions within a specific project."""
+        conditions = self._convert_session_filter(input.filter) if input.filter else []
+        orders = self._convert_session_orders(input.order) if input.order else []
+
+        def _by_project_id() -> sa.sql.expression.ColumnElement[bool]:
+            return SessionRow.group_id == project_id
+
+        querier = self._build_querier(
+            conditions=conditions,
+            orders=orders,
+            pagination_spec=_SESSION_PAGINATION_SPEC,
+            first=input.first,
+            after=input.after,
+            last=input.last,
+            before=input.before,
+            limit=input.limit,
+            offset=input.offset,
+            base_conditions=[_by_project_id],
+        )
+        action_result = await self._processors.session.search_sessions.wait_for_complete(
+            SearchSessionsAction(querier=querier, user_id=self._require_user_id())
+        )
         return AdminSearchSessionsPayload(
             items=[self._session_data_to_node(item) for item in action_result.data],
             total_count=action_result.total_count,
@@ -492,6 +716,104 @@ class SessionAdapter(BaseAdapter):
     @staticmethod
     def _convert_kernel_orders(orders: list[KernelOrder]) -> list[QueryOrder]:
         return [resolve_kernel_order(o.field, o.direction) for o in orders]
+
+    # -------------------------------------------------------------------------
+    # Terminate
+    # -------------------------------------------------------------------------
+
+    async def terminate(self, input: TerminateSessionsInput) -> TerminateSessionsPayload:
+        """Terminate one or more sessions."""
+        action = TerminateSessionsAction(
+            session_ids=[SessionId(sid) for sid in input.session_ids],
+            forced=input.forced,
+        )
+        result = await self._processors.session.terminate_sessions.wait_for_complete(action)
+        return TerminateSessionsPayload(
+            cancelled=result.cancelled,
+            terminating=result.terminating,
+            force_terminated=result.force_terminated,
+            skipped=result.skipped,
+        )
+
+    # -------------------------------------------------------------------------
+    # Service management
+    # -------------------------------------------------------------------------
+
+    async def start_service(
+        self,
+        session_id: UUID,
+        input: StartSessionServiceInput,
+        access_key: str,
+    ) -> StartSessionServicePayload:
+        """Start an app service in a session."""
+        action = StartServiceAction(
+            session_name=str(session_id),
+            access_key=AccessKey(access_key),
+            service=input.service,
+            login_session_token=input.login_session_token,
+            port=input.port,
+            arguments=json.dumps(input.arguments) if input.arguments else None,
+            envs=json.dumps(input.envs) if input.envs else None,
+        )
+        result = await self._processors.session.start_service.wait_for_complete(action)
+        return StartSessionServicePayload(token=result.token, wsproxy_addr=result.wsproxy_addr)
+
+    async def shutdown_service(
+        self,
+        session_id: UUID,
+        input: ShutdownSessionServiceInput,
+        access_key: str,
+    ) -> None:
+        """Shut down a service in a session."""
+        action = ShutdownServiceAction(
+            session_name=str(session_id),
+            owner_access_key=AccessKey(access_key),
+            service_name=input.service,
+        )
+        await self._processors.session.shutdown_service.wait_for_complete(action)
+
+    # -------------------------------------------------------------------------
+    # Logs
+    # -------------------------------------------------------------------------
+
+    async def get_logs(
+        self,
+        session_id: UUID,
+        access_key: str,
+        kernel_id: UUID | None = None,
+    ) -> SessionLogsPayload:
+        """Get container logs for a session."""
+        action = GetContainerLogsAction(
+            session_name=str(session_id),
+            owner_access_key=AccessKey(access_key),
+            kernel_id=KernelId(kernel_id) if kernel_id else None,
+        )
+        result = await self._processors.session.get_container_logs.wait_for_complete(action)
+        logs_text = result.result.get("result", {}).get("logs", "")
+        return SessionLogsPayload(logs=logs_text)
+
+    # -------------------------------------------------------------------------
+    # Update
+    # -------------------------------------------------------------------------
+
+    async def update(
+        self,
+        session_id: UUID,
+        input: UpdateSessionInput,
+        access_key: str,
+    ) -> UpdateSessionPayload:
+        """Update session fields (currently supports rename only)."""
+        if input.name is not None:
+            action = RenameSessionAction(
+                session_name=str(session_id),
+                new_name=input.name,
+                owner_access_key=AccessKey(access_key),
+            )
+            result = await self._processors.session.rename_session.wait_for_complete(action)
+            return UpdateSessionPayload(session=self._session_data_to_node(result.session_data))
+        # If no fields to update, just return the current session
+        session_node = await self.get(session_id)
+        return UpdateSessionPayload(session=session_node)
 
     # -------------------------------------------------------------------------
     # Data → DTO conversion

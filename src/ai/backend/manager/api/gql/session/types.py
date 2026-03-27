@@ -13,8 +13,29 @@ from strawberry import ID, Info
 from strawberry.relay import Connection, Edge, NodeID
 
 from ai.backend.common.contexts.user import current_user
+from ai.backend.common.dto.manager.v2.common import (
+    ResourceSlotEntryInput as ResourceSlotEntryInputDTO,
+)
 from ai.backend.common.dto.manager.v2.kernel.request import AdminSearchKernelsInput
-from ai.backend.common.dto.manager.v2.session.request import SessionFilter, SessionOrder
+from ai.backend.common.dto.manager.v2.session.request import (
+    BatchConfigInput as BatchConfigInputDTO,
+)
+from ai.backend.common.dto.manager.v2.session.request import (
+    EnqueueSessionInput as EnqueueSessionInputDTO,
+)
+from ai.backend.common.dto.manager.v2.session.request import (
+    MountItemInput as MountItemInputDTO,
+)
+from ai.backend.common.dto.manager.v2.session.request import (
+    ResourceOptsInput as ResourceOptsInputDTO,
+)
+from ai.backend.common.dto.manager.v2.session.request import (
+    SessionFilter,
+    SessionOrder,
+)
+from ai.backend.common.dto.manager.v2.session.response import (
+    EnqueueSessionPayload as EnqueueSessionPayloadDTO,
+)
 from ai.backend.common.dto.manager.v2.session.response import (
     SessionLifecycleInfoGQLDTO,
     SessionMetadataInfoGQLDTO,
@@ -26,6 +47,7 @@ from ai.backend.common.dto.manager.v2.session.response import (
 from ai.backend.common.dto.manager.v2.session.types import (
     SessionStatusFilter,
 )
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.common.types import SessionId
 from ai.backend.manager.api.gql.base import OrderDirection, StringFilter, UUIDFilter, encode_cursor
 from ai.backend.manager.api.gql.common.types import (
@@ -420,3 +442,143 @@ class SessionV2ConnectionGQL(Connection[SessionV2GQL]):
     def __init__(self, *args: Any, count: int, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
         self.count = count
+
+
+# ========== Create Session Input Types ==========
+
+
+@gql_enum(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Session types allowed for user-initiated creation.",
+    ),
+    name="CreateSessionType",
+)
+class CreateSessionTypeGQL(StrEnum):
+    INTERACTIVE = "interactive"
+    BATCH = "batch"
+
+
+@gql_enum(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Cluster networking modes for session creation.",
+    ),
+    name="SessionClusterMode",
+)
+class SessionClusterModeGQL(StrEnum):
+    SINGLE_NODE = "single-node"
+    MULTI_NODE = "multi-node"
+
+
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description="A single resource slot allocation entry.",
+        added_version=NEXT_RELEASE_VERSION,
+    ),
+    name="SessionResourceSlotEntryInput",
+)
+class SessionResourceSlotEntryInputGQL(PydanticInputMixin[ResourceSlotEntryInputDTO]):
+    resource_type: str = gql_field(description="Resource type identifier.")
+    quantity: str = gql_field(description="Quantity as a decimal string.")
+
+
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description="Additional resource options for session creation.",
+        added_version=NEXT_RELEASE_VERSION,
+    ),
+    name="SessionResourceOptsInput",
+)
+class SessionResourceOptsInputGQL(PydanticInputMixin[ResourceOptsInputDTO]):
+    shmem: str | None = gql_field(default=None, description="Shared memory size (e.g., '1g').")
+
+
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description="A virtual folder mount specification.",
+        added_version=NEXT_RELEASE_VERSION,
+    ),
+    name="SessionMountItemInput",
+)
+class SessionMountItemInputGQL(PydanticInputMixin[MountItemInputDTO]):
+    vfolder_id: ID = gql_field(description="Virtual folder UUID.")
+    mount_path: str | None = gql_field(default=None, description="Custom mount path.")
+    permission: str | None = gql_field(default=None, description="Mount permission ('rw' or 'ro').")
+
+
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description="Batch session specific configuration.",
+        added_version=NEXT_RELEASE_VERSION,
+    ),
+    name="SessionBatchConfigInput",
+)
+class SessionBatchConfigInputGQL(PydanticInputMixin[BatchConfigInputDTO]):
+    startup_command: str = gql_field(description="Shell command to execute.")
+    starts_at: str | None = gql_field(default=None, description="Scheduled start time (ISO 8601).")
+    batch_timeout: int | None = gql_field(default=None, description="Execution timeout in seconds.")
+
+
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description="Input for creating a new compute session.",
+        added_version=NEXT_RELEASE_VERSION,
+    ),
+    name="EnqueueSessionInput",
+)
+class EnqueueSessionInputGQL(PydanticInputMixin[EnqueueSessionInputDTO]):
+    session_name: str = gql_field(description="Session name.")
+    session_type: CreateSessionTypeGQL = gql_field(description="Session type.")
+    image_id: ID = gql_field(description="Image UUID.")
+
+    resource_entries: list[SessionResourceSlotEntryInputGQL] = gql_field(
+        description="Resource slot allocations."
+    )
+    resource_group: str | None = gql_field(default=None, description="Scaling group name.")
+    resource_opts: SessionResourceOptsInputGQL | None = gql_field(
+        default=None, description="Additional resource options."
+    )
+    cluster_mode: SessionClusterModeGQL = gql_field(
+        default=SessionClusterModeGQL.SINGLE_NODE, description="Cluster mode."
+    )
+    cluster_size: int = gql_field(default=1, description="Number of containers.")
+
+    mounts: list[SessionMountItemInputGQL] | None = gql_field(
+        default=None, description="Virtual folder mounts."
+    )
+
+    environ: strawberry.scalars.JSON | None = gql_field(
+        default=None, description="Environment variables."
+    )
+    preopen_ports: list[int] | None = gql_field(default=None, description="Ports to pre-open.")
+    bootstrap_script: str | None = gql_field(default=None, description="Bootstrap script.")
+
+    priority: int = gql_field(default=10, description="Scheduling priority (0-100).")
+    is_preemptible: bool = gql_field(default=True, description="Whether preemptible.")
+    dependencies: list[ID] | None = gql_field(default=None, description="Dependent session IDs.")
+    agent_list: list[str] | None = gql_field(default=None, description="Designated agent IDs.")
+    attach_network: ID | None = gql_field(default=None, description="Network UUID to attach.")
+
+    tag: str | None = gql_field(default=None, description="User-defined tag.")
+    callback_url: str | None = gql_field(default=None, description="Webhook URL.")
+
+    batch: SessionBatchConfigInputGQL | None = gql_field(
+        default=None, description="Batch configuration."
+    )
+    project_id: ID | None = gql_field(default=None, description="Project UUID.")
+
+
+# ========== Create Session Payload ==========
+
+
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Payload returned after creating a session.",
+    ),
+    model=EnqueueSessionPayloadDTO,
+    name="EnqueueSessionPayload",
+)
+class EnqueueSessionPayloadGQL:
+    session: SessionV2GQL = gql_field(description="Created session details.")

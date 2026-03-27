@@ -13,12 +13,19 @@ from datetime import UTC, datetime, timedelta
 import pytest
 
 from ai.backend.common.data.filter_specs import StringMatchSpec
+from ai.backend.manager.models.domain import DomainRow
+from ai.backend.manager.models.keypair import KeyPairRow
 from ai.backend.manager.models.rbac_models import UserRoleRow
 from ai.backend.manager.models.rbac_models.conditions import RoleConditions
 from ai.backend.manager.models.rbac_models.orders import RoleOrders
 from ai.backend.manager.models.rbac_models.permission.object_permission import ObjectPermissionRow
 from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
 from ai.backend.manager.models.rbac_models.role import RoleRow
+from ai.backend.manager.models.resource_policy import (
+    KeyPairResourcePolicyRow,
+    UserResourcePolicyRow,
+)
+from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.base import BatchQuerier, OffsetPagination
 from ai.backend.manager.repositories.permission_controller.repository import (
@@ -45,8 +52,13 @@ class TestSearchRoles:
         async with with_tables(
             database_connection,
             [
+                DomainRow,
+                UserResourcePolicyRow,
+                KeyPairResourcePolicyRow,
                 RoleRow,
                 UserRoleRow,
+                UserRow,
+                KeyPairRow,
                 PermissionRow,
                 ObjectPermissionRow,
             ],

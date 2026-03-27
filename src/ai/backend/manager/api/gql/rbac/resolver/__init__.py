@@ -6,6 +6,7 @@ from .permission import (
     admin_delete_permission,
     admin_permissions,
     admin_update_permission,
+    rbac_entity_operation_combinations,
     rbac_scope_entity_combinations,
 )
 from .role import (
@@ -26,6 +27,7 @@ from .role import (
 __all__ = [
     # Permission queries
     "admin_permissions",
+    "rbac_entity_operation_combinations",
     "rbac_scope_entity_combinations",
     # Entity queries
     "admin_entities",

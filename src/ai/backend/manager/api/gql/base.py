@@ -288,30 +288,6 @@ class DateTimeFilter(PydanticInputMixin[DateTimeFilterDTO]):
     equals: datetime | None = None
     not_equals: datetime | None = None
 
-    def build_query_condition(
-        self,
-        before_factory: Callable[[datetime], QueryCondition],
-        after_factory: Callable[[datetime], QueryCondition],
-        equals_factory: Callable[[datetime], QueryCondition] | None = None,
-    ) -> QueryCondition | None:
-        """Build a query condition from this filter using the provided factory callables.
-
-        Args:
-            before_factory: Factory function that takes datetime and returns QueryCondition for < comparison
-            after_factory: Factory function that takes datetime and returns QueryCondition for > comparison
-            equals_factory: Optional factory function for = comparison
-
-        Returns:
-            QueryCondition if any filter field is set, None otherwise
-        """
-        if self.equals and equals_factory:
-            return equals_factory(self.equals)
-        if self.before:
-            return before_factory(self.before)
-        if self.after:
-            return after_factory(self.after)
-        return None
-
 
 @gql_pydantic_input(
     BackendAIGQLMeta(

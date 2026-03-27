@@ -83,7 +83,11 @@ from .deployment import (
     update_route_traffic_status,
 )
 from .domain_v2 import (
+    admin_create_domain_v2,
+    admin_delete_domain_v2,
     admin_domains_v2,
+    admin_purge_domain_v2,
+    admin_update_domain_v2,
     domain_v2,
     rg_domains_v2,
 )
@@ -142,6 +146,13 @@ from .keypair import (
     switch_my_main_access_key,
     update_my_keypair,
 )
+from .login_history import admin_login_history_v2, my_login_history_v2
+from .login_session import (
+    admin_login_sessions_v2,
+    admin_revoke_login_session,
+    my_login_sessions_v2,
+    my_revoke_login_session,
+)
 from .notification import (
     admin_create_notification_channel,
     admin_create_notification_rule,
@@ -179,7 +190,11 @@ from .object_storage import (
     update_object_storage,
 )
 from .project_v2 import (
+    admin_create_project_v2,
+    admin_delete_project_v2,
     admin_projects_v2,
+    admin_purge_project_v2,
+    admin_update_project_v2,
     domain_projects_v2,
     project_domain_v2,
     project_v2,
@@ -210,6 +225,7 @@ from .rbac import (
     admin_update_permission,
     admin_update_role,
     my_roles,
+    rbac_entity_operation_combinations,
     rbac_scope_entity_combinations,
 )
 from .reservoir_registry import (
@@ -338,6 +354,8 @@ class Query:
     admin_images_v2 = admin_images_v2
     admin_kernels_v2 = admin_kernels_v2
     admin_audit_logs_v2 = admin_audit_logs_v2
+    admin_login_sessions_v2 = admin_login_sessions_v2
+    admin_login_history_v2 = admin_login_history_v2
     admin_sessions_v2 = admin_sessions_v2
     resource_slot_type = resource_slot_type
     resource_slot_types = resource_slot_types
@@ -354,9 +372,13 @@ class Query:
     admin_entities = admin_entities
     # Keypair self-service queries
     my_keypairs = my_keypairs
+    # Login session/history self-service queries
+    my_login_sessions_v2 = my_login_sessions_v2
+    my_login_history_v2 = my_login_history_v2
     # RBAC User APIs
     my_roles = my_roles
     rbac_scope_entity_combinations = rbac_scope_entity_combinations
+    rbac_entity_operation_combinations = rbac_entity_operation_combinations
     # Session Scoped APIs
     session_kernels_v2 = session_kernels_v2
     # Resource Group Scoped APIs
@@ -506,6 +528,16 @@ class Mutation:
     admin_update_resource_group = admin_update_resource_group
     # Resource Group - Legacy (deprecated)
     update_resource_group_fair_share_spec = update_resource_group_fair_share_spec
+    # Domain V2 APIs
+    admin_create_domain_v2 = admin_create_domain_v2
+    admin_update_domain_v2 = admin_update_domain_v2
+    admin_delete_domain_v2 = admin_delete_domain_v2
+    admin_purge_domain_v2 = admin_purge_domain_v2
+    # Project V2 APIs
+    admin_create_project_v2 = admin_create_project_v2
+    admin_update_project_v2 = admin_update_project_v2
+    admin_delete_project_v2 = admin_delete_project_v2
+    admin_purge_project_v2 = admin_purge_project_v2
     # User V2 APIs
     admin_create_user_v2 = admin_create_user_v2
     admin_bulk_create_users_v2 = admin_bulk_create_users_v2
@@ -521,6 +553,9 @@ class Mutation:
     revoke_my_keypair = revoke_my_keypair
     switch_my_main_access_key = switch_my_main_access_key
     update_my_keypair = update_my_keypair
+    # Login session mutations
+    admin_revoke_login_session = admin_revoke_login_session
+    my_revoke_login_session = my_revoke_login_session
     # IP allowlist self-service mutation
     update_my_allowed_client_ip = update_my_allowed_client_ip
     # Prometheus Query Preset - Admin APIs

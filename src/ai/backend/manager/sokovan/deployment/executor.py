@@ -126,6 +126,7 @@ class DeploymentExecutor:
         # Collect registration tasks
         registration_tasks: list[Coroutine[Any, Any, str]] = []
         valid_deployments: list[DeploymentWithHistory] = []
+        skipped_deployments: list[DeploymentWithHistory] = []
         for deployment in deployments:
             info = deployment.deployment_info
             targets = scaling_group_targets[info.metadata.resource_group]
@@ -135,8 +136,14 @@ class DeploymentExecutor:
                     info.metadata.resource_group,
                     info.id,
                 )
+                skipped_deployments.append(deployment)
                 continue
-            registration_tasks.append(self._register_endpoint(info, targets))
+            if info.current_revision_id is None:
+                skipped_deployments.append(deployment)
+                continue
+            registration_tasks.append(
+                self._register_endpoint(info, targets, info.current_revision_id)
+            )
             valid_deployments.append(deployment)
 
         # Wait for all tasks to complete
@@ -185,6 +192,7 @@ class DeploymentExecutor:
         return DeploymentExecutionResult(
             successes=successful_deployments,
             failures=errors,
+            skipped=skipped_deployments,
         )
 
     async def check_ready_deployments_that_need_scaling(
@@ -431,20 +439,18 @@ class DeploymentExecutor:
         self,
         deployment: DeploymentInfo,
         scaling_group_target: ScalingGroupProxyTarget,
+        revision_id: UUID,
     ) -> str:
+        """Resolve the target revision's model definition and register the endpoint to the app proxy.
+
+        Returns the registered endpoint URL.
+        """
         pool = DeploymentRecorderContext.current_pool()
         recorder = pool.recorder(deployment.id)
 
         with recorder.phase("register_endpoint"):
             with recorder.step("check_target_revision"):
-                if deployment.current_revision_id is not None:
-                    target_revision = deployment.resolve_revision_spec(
-                        deployment.current_revision_id
-                    )
-                else:
-                    target_revision = await self._deployment_repo.get_revision_spec_from_endpoint(
-                        deployment.id
-                    )
+                target_revision = deployment.resolve_revision_spec(revision_id)
 
             with recorder.step("generate_model_definition"):
                 model_definition = (

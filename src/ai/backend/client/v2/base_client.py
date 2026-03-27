@@ -30,6 +30,15 @@ def _create_aiohttp_session(config: ClientConfig) -> aiohttp.ClientSession:
         sock_connect=config.connection_timeout or None,
         sock_read=config.read_timeout or None,
     )
+    cookie_jar = config.cookie_jar
+    if cookie_jar is None and config.endpoint_type == "session":
+        cookie_jar = aiohttp.CookieJar(unsafe=True)
+    if cookie_jar is not None:
+        return aiohttp.ClientSession(
+            connector=connector,
+            timeout=timeout,
+            cookie_jar=cookie_jar,
+        )
     return aiohttp.ClientSession(
         connector=connector,
         timeout=timeout,
@@ -69,13 +78,28 @@ class BackendAIAuthClient:
         session = _create_aiohttp_session(config)
         return cls(config, auth, session)
 
+    @property
+    def session(self) -> aiohttp.ClientSession:
+        return self._session
+
+    @property
+    def config(self) -> ClientConfig:
+        return self._config
+
     async def close(self) -> None:
         await self._session.close()
 
     def _build_url(self, path: str) -> str:
         base = str(self._config.endpoint).rstrip("/")
         path = path.lstrip("/")
+        if self._config.endpoint_type == "session":
+            return f"{base}/func/{path}"
         return f"{base}/{path}"
+
+    def build_url_raw(self, path: str) -> str:
+        """Build URL without /func/ prefix (for webserver-native endpoints like /server/login)."""
+        base = str(self._config.endpoint).rstrip("/")
+        return f"{base}/{path.lstrip('/')}"
 
     def _sign(self, method: str, rel_url: str, content_type: str) -> Mapping[str, str]:
         now = datetime.now(UTC)
@@ -102,7 +126,7 @@ class BackendAIAuthClient:
         json: Any | None = None,
         params: dict[str, str] | None = None,
         extra_headers: Mapping[str, str] | None = None,
-    ) -> dict[str, Any] | list[Any] | None:
+    ) -> dict[str, Any] | list[Any] | str | None:
         session = self._session
         content_type = "application/json"
         rel_url = "/" + path.lstrip("/")
@@ -128,7 +152,7 @@ class BackendAIAuthClient:
                 raise map_status_to_exception(resp.status, resp.reason or "", data)
             if resp.status == 204:
                 return None
-            result: dict[str, Any] | list[Any] = await resp.json()
+            result: dict[str, Any] | list[Any] | str = await resp.json()
             return result
 
     async def typed_request(
@@ -353,6 +377,8 @@ class BackendAIAnonymousClient:
     def _build_url(self, path: str) -> str:
         base = str(self._config.endpoint).rstrip("/")
         path = path.lstrip("/")
+        if self._config.endpoint_type == "session":
+            return f"{base}/func/{path}"
         return f"{base}/{path}"
 
     def _build_headers(self, method: str, rel_url: str, content_type: str) -> CIMultiDict[str]:
@@ -370,7 +396,7 @@ class BackendAIAnonymousClient:
         json: Any | None = None,
         params: dict[str, str] | None = None,
         extra_headers: Mapping[str, str] | None = None,
-    ) -> dict[str, Any] | list[Any] | None:
+    ) -> dict[str, Any] | list[Any] | str | None:
         content_type = "application/json"
         rel_url = "/" + path.lstrip("/")
         headers = self._build_headers(method, rel_url, content_type)
@@ -392,7 +418,7 @@ class BackendAIAnonymousClient:
                 raise map_status_to_exception(resp.status, resp.reason or "", data)
             if resp.status == 204:
                 return None
-            result: dict[str, Any] | list[Any] = await resp.json()
+            result: dict[str, Any] | list[Any] | str = await resp.json()
             return result
 
     async def typed_request(

@@ -80,13 +80,11 @@ def build_pagination(
         InvalidGraphQLParameters: If multiple pagination modes are requested
             or if first/last values are not positive.
     """
-    pagination_modes = sum([
-        options.first is not None,
-        options.last is not None,
-        options.limit is not None,
-    ])
+    has_forward_cursor = options.first is not None or options.after is not None
+    has_backward_cursor = options.last is not None or options.before is not None
+    has_offset = options.limit is not None or options.offset is not None
 
-    if pagination_modes > 1:
+    if sum([has_forward_cursor, has_backward_cursor, has_offset]) > 1:
         raise InvalidGraphQLParameters(
             "Only one pagination mode allowed: (first/after) OR (last/before) OR (limit/offset)"
         )
@@ -123,5 +121,10 @@ def build_pagination(
         if options.offset is not None and options.offset < 0:
             raise InvalidGraphQLParameters(f"offset must be non-negative, got {options.offset}")
         return OffsetPagination(limit=options.limit, offset=options.offset or 0)
+
+    if options.offset is not None:
+        if options.offset < 0:
+            raise InvalidGraphQLParameters(f"offset must be non-negative, got {options.offset}")
+        return OffsetPagination(limit=DEFAULT_PAGINATION_LIMIT, offset=options.offset)
 
     return OffsetPagination(limit=DEFAULT_PAGINATION_LIMIT, offset=0)

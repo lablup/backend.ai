@@ -32,5 +32,35 @@ def register_v2_image_routes(
         handler.admin_search_image_aliases,
         middlewares=[superadmin_required],
     )
+    registry.add(
+        "POST",
+        "/forget",
+        handler.admin_forget,
+        middlewares=[superadmin_required],
+    )
+    registry.add(
+        "POST",
+        "/purge",
+        handler.admin_purge,
+        middlewares=[superadmin_required],
+    )
+    registry.add(
+        "POST",
+        "/alias",
+        handler.admin_alias,
+        middlewares=[superadmin_required],
+    )
+    registry.add(
+        "POST",
+        "/dealias",
+        handler.admin_dealias,
+        middlewares=[superadmin_required],
+    )
+    registry.add(
+        "PATCH",
+        "",
+        handler.admin_update,
+        middlewares=[superadmin_required],
+    )
 
     return registry

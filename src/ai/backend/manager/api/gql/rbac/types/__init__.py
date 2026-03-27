@@ -13,6 +13,8 @@ from .permission import (
     CreatePermissionInput,
     DeletePermissionInput,
     DeletePermissionPayload,
+    EntityOperationCombinationGQL,
+    OperationInfoGQL,
     OperationTypeGQL,
     PermissionConnection,
     PermissionEdge,
@@ -124,4 +126,7 @@ __all__ = [
     "EntityConnection",
     # Scope-entity combination
     "ScopeEntityCombinationGQL",
+    # Entity-operation combination
+    "EntityOperationCombinationGQL",
+    "OperationInfoGQL",
 ]

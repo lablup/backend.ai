@@ -24,6 +24,7 @@ __all__ = (
     "SearchSessionsPayload",
     "SessionLifecycleInfo",
     "SessionLifecycleInfoGQLDTO",
+    "SessionLogsPayload",
     "SessionMetadataInfo",
     "SessionMetadataInfoGQLDTO",
     "SessionNetworkInfo",
@@ -33,6 +34,9 @@ __all__ = (
     "SessionRuntimeInfo",
     "SessionRuntimeInfoGQLDTO",
     "StartServicePayload",
+    "StartSessionServicePayload",
+    "TerminateSessionsPayload",
+    "UpdateSessionPayload",
 )
 
 
@@ -171,6 +175,12 @@ class SessionNode(BaseResponseModel):
 # ---------------------------------------------------------------------------
 
 
+class EnqueueSessionPayload(BaseResponseModel):
+    """Payload for session enqueue. Returns the full session node."""
+
+    session: SessionNode = Field(description="Created session details.")
+
+
 class RestartSessionPayload(BaseResponseModel):
     """Payload for session restart action (204 No Content in practice)."""
 
@@ -219,6 +229,42 @@ class AdminSearchSessionsPayload(BaseResponseModel):
     total_count: int = Field(description="Total number of records matching the filter.")
     has_next_page: bool = Field(description="Whether there is a next page.")
     has_previous_page: bool = Field(description="Whether there is a previous page.")
+
+
+class TerminateSessionsPayload(BaseResponseModel):
+    """Payload for session termination with per-session outcome."""
+
+    cancelled: list[UUID] = Field(
+        default_factory=list, description="Sessions cancelled from PENDING."
+    )
+    terminating: list[UUID] = Field(
+        default_factory=list, description="Sessions marked TERMINATING."
+    )
+    force_terminated: list[UUID] = Field(
+        default_factory=list, description="Sessions force-terminated."
+    )
+    skipped: list[UUID] = Field(
+        default_factory=list, description="Sessions already terminated or not found."
+    )
+
+
+class StartSessionServicePayload(BaseResponseModel):
+    """Payload for starting a service in a session."""
+
+    token: str = Field(description="WSProxy authentication token.")
+    wsproxy_addr: str = Field(description="WebSocket proxy address for service access.")
+
+
+class SessionLogsPayload(BaseResponseModel):
+    """Payload containing container logs."""
+
+    logs: str = Field(description="Container stdout/stderr log output.")
+
+
+class UpdateSessionPayload(BaseResponseModel):
+    """Payload for session update."""
+
+    session: SessionNode = Field(description="Updated session details.")
 
 
 # ---------------------------------------------------------------------------

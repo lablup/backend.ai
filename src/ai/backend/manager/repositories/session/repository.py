@@ -16,7 +16,7 @@ from ai.backend.common.resilience.resilience import Resilience
 from ai.backend.common.types import AccessKey, ImageAlias, SessionId
 from ai.backend.manager.data.image.types import ImageIdentifier
 from ai.backend.manager.data.kernel.types import KernelListResult
-from ai.backend.manager.data.session.types import SessionListResult
+from ai.backend.manager.data.session.types import SessionData, SessionListResult
 from ai.backend.manager.data.user.types import UserData
 from ai.backend.manager.models.container_registry import ContainerRegistryRow
 from ai.backend.manager.models.image import ImageRow
@@ -285,6 +285,22 @@ class SessionRepository:
             KernelListResult with items, total count, and pagination info
         """
         return await self._db_source.search_kernels(querier)
+
+    @session_repository_resilience.apply()
+    async def resolve_image_by_id(
+        self,
+        image_id: uuid.UUID,
+    ) -> ImageRow:
+        """Resolve an image by its UUID."""
+        return await self._db_source.resolve_image_by_id(image_id)
+
+    @session_repository_resilience.apply()
+    async def get_session_data_by_id(
+        self,
+        session_id: SessionId,
+    ) -> SessionData:
+        """Get session data by session ID for response construction."""
+        return await self._db_source.get_session_data_by_id(session_id)
 
     @session_repository_resilience.apply()
     async def update_image_last_used_at(

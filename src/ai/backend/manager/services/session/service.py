@@ -14,6 +14,7 @@ import aiohttp
 import aiotools
 import multidict
 import trafaret as t
+import yarl
 from aiohttp.multipart import BodyPartReader
 from dateutil.tz import tzutc
 
@@ -32,6 +33,7 @@ from ai.backend.common.plugin.monitor import ErrorPluginContext
 from ai.backend.common.types import (
     ContainerId,
     ImageAlias,
+    KernelEnqueueingConfig,
     SessionId,
     SessionTypes,
 )
@@ -70,6 +72,7 @@ from ai.backend.manager.models.session import (
 )
 from ai.backend.manager.models.user import UserRole
 from ai.backend.manager.registry import AgentRegistry
+from ai.backend.manager.repositories.scheduler.types.session_creation import SessionCreationSpec
 from ai.backend.manager.repositories.session.repository import SessionRepository
 from ai.backend.manager.repositories.session.updaters import SessionUpdaterSpec
 from ai.backend.manager.services.session.actions.check_and_transit_status import (
@@ -113,6 +116,10 @@ from ai.backend.manager.services.session.actions.download_file import (
 from ai.backend.manager.services.session.actions.download_files import (
     DownloadFilesAction,
     DownloadFilesActionResult,
+)
+from ai.backend.manager.services.session.actions.enqueue_session import (
+    EnqueueSessionAction,
+    EnqueueSessionActionResult,
 )
 from ai.backend.manager.services.session.actions.execute_session import (
     ExecuteSessionAction,
@@ -185,6 +192,10 @@ from ai.backend.manager.services.session.actions.shutdown_service import (
 from ai.backend.manager.services.session.actions.start_service import (
     StartServiceAction,
     StartServiceActionResult,
+)
+from ai.backend.manager.services.session.actions.terminate_sessions import (
+    TerminateSessionsAction,
+    TerminateSessionsActionResult,
 )
 from ai.backend.manager.services.session.actions.upload_files import (
     UploadFilesAction,
@@ -774,6 +785,25 @@ class SessionService:
         # Return response - same format for both recursive and non-recursive
         resp = {"stats": last_stat}
         return DestroySessionActionResult(result=resp)
+
+    async def terminate_sessions(
+        self, action: TerminateSessionsAction
+    ) -> TerminateSessionsActionResult:
+        """Terminate multiple sessions by their IDs."""
+        reason = (
+            KernelLifecycleEventReason.FORCE_TERMINATED
+            if action.forced
+            else KernelLifecycleEventReason.USER_REQUESTED
+        )
+        mark_result = await self._scheduling_controller.mark_sessions_for_termination(
+            action.session_ids, reason=reason.value, forced=action.forced
+        )
+        return TerminateSessionsActionResult(
+            cancelled=[uuid.UUID(str(s)) for s in mark_result.cancelled_sessions],
+            terminating=[uuid.UUID(str(s)) for s in mark_result.terminating_sessions],
+            force_terminated=[uuid.UUID(str(s)) for s in mark_result.force_terminated_sessions],
+            skipped=[uuid.UUID(str(s)) for s in mark_result.skipped_sessions],
+        )
 
     async def download_file(self, action: DownloadFileAction) -> DownloadFileActionResult:
         session_name = action.session_name
@@ -1508,3 +1538,112 @@ class SessionService:
             has_next_page=result.has_next_page,
             has_previous_page=result.has_previous_page,
         )
+
+    async def enqueue_session(self, action: EnqueueSessionAction) -> EnqueueSessionActionResult:
+        """Enqueue a new compute session for scheduling.
+
+        Resolves the image, builds a SessionCreationSpec, and delegates
+        to the scheduling controller. Returns immediately with PENDING status.
+        """
+        image_row = await self._session_repository.resolve_image_by_id(action.image_id)
+
+        user_scope = UserScope(
+            domain_name=action.domain_name,
+            group_id=action.group_id,
+            user_uuid=action.user_id,
+            user_role=action.user_role,
+        )
+
+        # Build creation_spec dict from typed action fields
+        resource_entries = {
+            entry.resource_type: entry.quantity for entry in action.resource.entries
+        }
+        resource_opts: dict[str, Any] = {}
+        if action.resource.shmem is not None:
+            resource_opts["shmem"] = action.resource.shmem
+
+        mount_ids: list[uuid.UUID] = []
+        mount_id_map: dict[uuid.UUID, str] = {}
+        mount_options: dict[str, dict[str, str]] = {}
+        if action.mounts:
+            for item in action.mounts:
+                mount_ids.append(item.vfolder_id)
+                if item.mount_path is not None:
+                    mount_id_map[item.vfolder_id] = item.mount_path
+                if item.permission is not None:
+                    mount_options[str(item.vfolder_id)] = {
+                        "permission": item.permission.value,
+                    }
+
+        creation_spec: dict[str, Any] = {
+            "resources": resource_entries,
+            "resource_opts": resource_opts or None,
+            "scaling_group": action.resource.resource_group,
+            "mount_ids": mount_ids or None,
+            "mount_id_map": mount_id_map or None,
+            "mount_options": mount_options or None,
+            "environ": action.execution.environ if action.execution else None,
+            "preopen_ports": action.execution.preopen_ports if action.execution else None,
+            "agent_list": action.scheduling.agent_list,
+            "attach_network": action.scheduling.attach_network,
+        }
+
+        bootstrap_script = action.execution.bootstrap_script if action.execution else None
+        startup_command = action.batch.startup_command if action.batch else None
+
+        # Build kernel specs (one per cluster member)
+        kernel_specs: list[KernelEnqueueingConfig] = []
+        for i in range(action.resource.cluster_size):
+            is_main = i == 0
+            role = "main" if is_main else "worker"
+            kernel_specs.append(
+                KernelEnqueueingConfig(
+                    image_ref=image_row.image_ref,
+                    cluster_role=role,
+                    cluster_idx=i + 1,
+                    local_rank=i,
+                    cluster_hostname=f"{role}{i + 1}",
+                    creation_config=creation_spec,
+                    bootstrap_script=bootstrap_script or "",
+                    startup_command=startup_command,
+                    uid=None,
+                    main_gid=None,
+                    supplementary_gids=[],
+                ),
+            )
+
+        session_creation_id = secrets.token_urlsafe(16)
+
+        spec = SessionCreationSpec(
+            session_creation_id=session_creation_id,
+            session_name=action.session_name,
+            access_key=action.access_key,
+            user_scope=user_scope,
+            session_type=action.session_type,
+            cluster_mode=action.resource.cluster_mode,
+            cluster_size=action.resource.cluster_size,
+            priority=action.scheduling.priority,
+            resource_policy={},
+            kernel_specs=kernel_specs,
+            creation_spec=creation_spec,
+            is_preemptible=action.scheduling.is_preemptible,
+            scaling_group=action.resource.resource_group,
+            session_tag=action.tag,
+            starts_at=action.batch.starts_at if action.batch else None,
+            batch_timeout=action.batch.batch_timeout if action.batch else None,
+            dependency_sessions=(
+                [SessionId(d) for d in action.scheduling.dependencies]
+                if action.scheduling.dependencies
+                else None
+            ),
+            callback_url=(yarl.URL(action.callback_url) if action.callback_url else None),
+            startup_command=startup_command,
+            designated_agent_list=action.scheduling.agent_list,
+            public_sgroup_only=action.session_type not in PRIVATE_SESSION_TYPES,
+        )
+
+        session_id = await self._scheduling_controller.enqueue_session(spec)
+
+        session_data = await self._session_repository.get_session_data_by_id(session_id)
+
+        return EnqueueSessionActionResult(session_data=session_data)

@@ -13,6 +13,8 @@ from datetime import UTC, datetime, timedelta
 import pytest
 
 from ai.backend.manager.data.permission.types import EntityType, RBACElementType, ScopeType
+from ai.backend.manager.models.domain import DomainRow
+from ai.backend.manager.models.keypair import KeyPairRow
 from ai.backend.manager.models.rbac_models import UserRoleRow
 from ai.backend.manager.models.rbac_models.association_scopes_entities import (
     AssociationScopesEntitiesRow,
@@ -21,6 +23,11 @@ from ai.backend.manager.models.rbac_models.conditions import EntityScopeConditio
 from ai.backend.manager.models.rbac_models.permission.object_permission import ObjectPermissionRow
 from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
 from ai.backend.manager.models.rbac_models.role import RoleRow
+from ai.backend.manager.models.resource_policy import (
+    KeyPairResourcePolicyRow,
+    UserResourcePolicyRow,
+)
+from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.base import BatchQuerier, OffsetPagination
 from ai.backend.manager.repositories.permission_controller.repository import (
@@ -50,8 +57,13 @@ class TestSearchElementAssociations:
         async with with_tables(
             database_connection,
             [
+                DomainRow,
+                UserResourcePolicyRow,
+                KeyPairResourcePolicyRow,
                 RoleRow,
                 UserRoleRow,
+                UserRow,
+                KeyPairRow,
                 PermissionRow,
                 ObjectPermissionRow,
                 AssociationScopesEntitiesRow,

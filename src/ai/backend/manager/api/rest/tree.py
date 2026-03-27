@@ -287,7 +287,11 @@ def build_api_routes(
     prometheus_query_preset_handler = PrometheusQueryPresetHandler(processor=prometheus_processor)
 
     # v2 REST API routes
-    v2_registry = build_v2_routes(adapters=adapters, route_deps=route_deps)
+    v2_registry = build_v2_routes(
+        adapters=adapters,
+        route_deps=route_deps,
+        export_handler=export_handler,
+    )
 
     # 3. Build all registries
     return [

@@ -15,7 +15,6 @@ class LoginSessionData:
     access_key: str
     status: LoginSessionStatus
     created_at: datetime
-    expires_at: datetime
     last_accessed_at: datetime | None
     invalidated_at: datetime | None
 

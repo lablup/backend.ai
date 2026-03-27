@@ -1,14 +1,14 @@
 from __future__ import annotations
 
 from ai.backend.client.v2.base_domain import BaseDomainClient
-from ai.backend.common.dto.manager.export import (
-    AuditLogExportCSVRequest,
-    GetExportReportResponse,
-    KeypairExportCSVRequest,
-    ListExportReportsResponse,
-    ProjectExportCSVRequest,
-    SessionExportCSVRequest,
-    UserExportCSVRequest,
+from ai.backend.common.dto.manager.v2.export import (
+    AuditLogExportCSVInput,
+    GetExportReportPayload,
+    KeypairExportCSVInput,
+    ListExportReportsPayload,
+    ProjectExportCSVInput,
+    SessionExportCSVInput,
+    UserExportCSVInput,
 )
 
 
@@ -19,18 +19,18 @@ class ExportClient(BaseDomainClient):
     # Report endpoints
     # ---------------------------------------------------------------------------
 
-    async def list_reports(self) -> ListExportReportsResponse:
+    async def list_reports(self) -> ListExportReportsPayload:
         return await self._client.typed_request(
             "GET",
             f"{self.API_PREFIX}/reports",
-            response_model=ListExportReportsResponse,
+            response_model=ListExportReportsPayload,
         )
 
-    async def get_report(self, report_key: str) -> GetExportReportResponse:
+    async def get_report(self, report_key: str) -> GetExportReportPayload:
         return await self._client.typed_request(
             "GET",
             f"{self.API_PREFIX}/reports/{report_key}",
-            response_model=GetExportReportResponse,
+            response_model=GetExportReportPayload,
         )
 
     # ---------------------------------------------------------------------------
@@ -39,7 +39,7 @@ class ExportClient(BaseDomainClient):
 
     async def download_users_csv(
         self,
-        request: UserExportCSVRequest | None = None,
+        request: UserExportCSVInput | None = None,
     ) -> bytes:
         json_body = request.model_dump(mode="json", exclude_none=True) if request else None
         return await self._client.download(
@@ -49,7 +49,7 @@ class ExportClient(BaseDomainClient):
 
     async def download_sessions_csv(
         self,
-        request: SessionExportCSVRequest | None = None,
+        request: SessionExportCSVInput | None = None,
     ) -> bytes:
         json_body = request.model_dump(mode="json", exclude_none=True) if request else None
         return await self._client.download(
@@ -59,7 +59,7 @@ class ExportClient(BaseDomainClient):
 
     async def download_projects_csv(
         self,
-        request: ProjectExportCSVRequest | None = None,
+        request: ProjectExportCSVInput | None = None,
     ) -> bytes:
         json_body = request.model_dump(mode="json", exclude_none=True) if request else None
         return await self._client.download(
@@ -69,7 +69,7 @@ class ExportClient(BaseDomainClient):
 
     async def download_keypairs_csv(
         self,
-        request: KeypairExportCSVRequest | None = None,
+        request: KeypairExportCSVInput | None = None,
     ) -> bytes:
         json_body = request.model_dump(mode="json", exclude_none=True) if request else None
         return await self._client.download(
@@ -79,7 +79,7 @@ class ExportClient(BaseDomainClient):
 
     async def download_audit_logs_csv(
         self,
-        request: AuditLogExportCSVRequest | None = None,
+        request: AuditLogExportCSVInput | None = None,
     ) -> bytes:
         json_body = request.model_dump(mode="json", exclude_none=True) if request else None
         return await self._client.download(

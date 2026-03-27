@@ -38,6 +38,7 @@ from ai.backend.manager.models.keypair import KeyPairRow
 from ai.backend.manager.models.rbac_models import (
     AssociationScopesEntitiesRow,
     EntityFieldRow,
+    RoleRow,
     UserRoleRow,
 )
 from ai.backend.manager.models.resource_policy import (
@@ -78,6 +79,7 @@ class TestEnqueueSessionSchedulingHistory:
                 UserResourcePolicyRow,
                 ProjectResourcePolicyRow,
                 KeyPairResourcePolicyRow,
+                RoleRow,
                 UserRoleRow,
                 UserRow,
                 KeyPairRow,
@@ -417,6 +419,7 @@ class TestMarkTerminatingSchedulingHistory:
                 UserResourcePolicyRow,
                 ProjectResourcePolicyRow,
                 KeyPairResourcePolicyRow,
+                RoleRow,
                 UserRoleRow,
                 UserRow,
                 KeyPairRow,

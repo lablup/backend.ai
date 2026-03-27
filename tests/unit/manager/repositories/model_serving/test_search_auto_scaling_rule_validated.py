@@ -39,7 +39,7 @@ from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.image import ImageRow
 from ai.backend.manager.models.kernel import KernelRow
 from ai.backend.manager.models.keypair import KeyPairRow
-from ai.backend.manager.models.rbac_models import UserRoleRow
+from ai.backend.manager.models.rbac_models import RoleRow, UserRoleRow
 from ai.backend.manager.models.resource_policy import (
     KeyPairResourcePolicyRow,
     ProjectResourcePolicyRow,
@@ -79,6 +79,7 @@ class TestSearchAutoScalingRulesValidated:
                 UserResourcePolicyRow,
                 ProjectResourcePolicyRow,
                 KeyPairResourcePolicyRow,
+                RoleRow,
                 UserRoleRow,
                 UserRow,
                 KeyPairRow,
@@ -307,6 +308,7 @@ class TestSearchAutoScalingRulesValidated:
                 model_mount_destination="/models",
                 runtime_variant=RuntimeVariant.CUSTOM,
                 lifecycle_stage=EndpointLifecycle.CREATED,
+                current_revision=uuid.uuid4(),
                 replicas=1,
                 resource_slots=ResourceSlot({"cpu": "1", "mem": "1g"}),
                 cluster_mode=ClusterMode.SINGLE_NODE,
