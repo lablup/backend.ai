@@ -81,10 +81,6 @@ class SessionResourceInfo(BaseResponseModel):
         default=None,
         description="The resource group (scaling group) this session is assigned to.",
     )
-    target_sgroup_names: list[str] | None = Field(
-        default=None,
-        description="Candidate resource group names considered during scheduling.",
-    )
     agent_ids: list[str] | None = Field(
         default=None, description="IDs of agents running this session's kernels."
     )
@@ -315,10 +311,6 @@ class SessionResourceInfoGQLDTO(BaseResponseModel):
     resource_group_name: str | None = Field(
         default=None,
         description="The resource group (scaling group) this session is assigned to.",
-    )
-    target_resource_group_names: list[str] | None = Field(
-        default=None,
-        description="Candidate resource group names considered during scheduling.",
     )
 
 

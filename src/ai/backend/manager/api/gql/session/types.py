@@ -77,10 +77,6 @@ from ai.backend.manager.api.gql.kernel.types import (
 )
 from ai.backend.manager.api.gql.project_v2.types.node import ProjectV2GQL
 from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin
-from ai.backend.manager.api.gql.resource_group.resolver import (
-    ResourceGroupConnection,
-    ResourceGroupEdge,
-)
 from ai.backend.manager.api.gql.resource_group.types import ResourceGroupGQL
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.api.gql.user.types.node import UserV2GQL
@@ -206,9 +202,6 @@ class SessionV2ResourceInfoGQL:
     )
     resource_group_name: str | None = gql_field(
         description="The resource group (scaling group) this session is assigned to."
-    )
-    target_resource_group_names: list[str] | None = gql_field(
-        description="Candidate resource group names considered during scheduling."
     )
 
 
@@ -344,32 +337,6 @@ class SessionV2GQL(PydanticNodeMixin[SessionNode]):
         if resource_group_data is None:
             return None
         return resource_group_data
-
-    @gql_added_field(
-        BackendAIGQLMeta(
-            added_version="26.3.0",
-            description="The candidate resource groups considered during scheduling.",
-        )
-    )  # type: ignore[misc]
-    async def target_resource_groups(
-        self, info: Info[StrawberryGQLContext]
-    ) -> ResourceGroupConnection | None:
-        names = self.resource.target_resource_group_names
-        if not names:
-            return None
-        results = await info.context.data_loaders.resource_group_loader.load_many(names)
-        nodes = [data for data in results if data is not None]
-        edges = [ResourceGroupEdge(node=node, cursor=encode_cursor(node.id)) for node in nodes]
-        return ResourceGroupConnection(
-            edges=edges,
-            page_info=strawberry.relay.PageInfo(
-                has_next_page=False,
-                has_previous_page=False,
-                start_cursor=edges[0].cursor if edges else None,
-                end_cursor=edges[-1].cursor if edges else None,
-            ),
-            count=len(nodes),
-        )
 
     @gql_added_field(
         BackendAIGQLMeta(

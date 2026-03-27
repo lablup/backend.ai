@@ -862,7 +862,6 @@ class SessionAdapter(BaseAdapter):
             resource=SessionResourceInfoGQLDTO(
                 allocation=ResourceAllocationGQLDTO(requested=requested, used=occupied),
                 resource_group_name=data.scaling_group_name,
-                target_resource_group_names=data.target_sgroup_names,
             ),
             lifecycle=SessionLifecycleInfoGQLDTO(
                 status=_fold_session_status(data.status),
