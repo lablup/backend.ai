@@ -1,7 +1,7 @@
 """assign default rolling deployment policy and add FK to endpoints
 
 Revision ID: 930e9f2dd502
-Revises: 3727dd0927cf
+Revises: 17b679c98b50, 6f8a4c0d2e3g, 7h4m7ygnaao1
 Create Date: 2026-03-25
 
 """
@@ -10,7 +10,7 @@ from alembic import op
 
 # revision identifiers, used by Alembic.
 revision = "930e9f2dd502"
-down_revision = "3727dd0927cf"
+down_revision = ("17b679c98b50", "6f8a4c0d2e3g", "7h4m7ygnaao1")
 branch_labels = None
 depends_on = None
 
