@@ -8,10 +8,10 @@ from ai.backend.client.v2.exceptions import (
     PermissionDeniedError,
 )
 from ai.backend.client.v2.registry import BackendAIClientRegistry
-from ai.backend.common.dto.manager.export import (
-    GetExportReportResponse,
-    ListExportReportsResponse,
-    UserExportCSVRequest,
+from ai.backend.common.dto.manager.v2.export import (
+    GetExportReportPayload,
+    ListExportReportsPayload,
+    UserExportCSVInput,
 )
 
 
@@ -21,7 +21,7 @@ class TestListReports:
         admin_registry: BackendAIClientRegistry,
     ) -> None:
         result = await admin_registry.export.list_reports()
-        assert isinstance(result, ListExportReportsResponse)
+        assert isinstance(result, ListExportReportsPayload)
         assert isinstance(result.reports, list)
         assert len(result.reports) > 0
         report_keys = [r.report_key for r in result.reports]
@@ -41,7 +41,7 @@ class TestGetReport:
         admin_registry: BackendAIClientRegistry,
     ) -> None:
         result = await admin_registry.export.get_report("users")
-        assert isinstance(result, GetExportReportResponse)
+        assert isinstance(result, GetExportReportPayload)
         assert result.report.report_key == "users"
         assert len(result.report.fields) > 0
 
@@ -50,7 +50,7 @@ class TestGetReport:
         admin_registry: BackendAIClientRegistry,
     ) -> None:
         result = await admin_registry.export.get_report("sessions")
-        assert isinstance(result, GetExportReportResponse)
+        assert isinstance(result, GetExportReportPayload)
         assert result.report.report_key == "sessions"
         assert len(result.report.fields) > 0
 
@@ -59,7 +59,7 @@ class TestGetReport:
         admin_registry: BackendAIClientRegistry,
     ) -> None:
         result = await admin_registry.export.get_report("projects")
-        assert isinstance(result, GetExportReportResponse)
+        assert isinstance(result, GetExportReportPayload)
         assert result.report.report_key == "projects"
         assert len(result.report.fields) > 0
 
@@ -99,7 +99,7 @@ class TestDownloadUsersCSV:
         self,
         admin_registry: BackendAIClientRegistry,
     ) -> None:
-        request = UserExportCSVRequest(fields=["uuid", "email"])
+        request = UserExportCSVInput(fields=["uuid", "email"])
         result = await admin_registry.export.download_users_csv(request)
         assert isinstance(result, bytes)
         assert len(result) > 0

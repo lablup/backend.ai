@@ -14,7 +14,7 @@ from ai.backend.common.dto.manager.v2.export import (
 )
 
 
-class ExportClient(BaseDomainClient):
+class V2ExportClient(BaseDomainClient):
     API_PREFIX = "/v2/export"
 
     # ---------------------------------------------------------------------------

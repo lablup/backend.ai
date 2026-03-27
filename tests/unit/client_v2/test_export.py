@@ -10,10 +10,10 @@ from yarl import URL
 from ai.backend.client.v2.base_client import BackendAIAuthClient
 from ai.backend.client.v2.config import ClientConfig
 from ai.backend.client.v2.domains.export import ExportClient
-from ai.backend.common.dto.manager.export import (
-    GetExportReportResponse,
-    ListExportReportsResponse,
-    UserExportCSVRequest,
+from ai.backend.common.dto.manager.v2.export import (
+    GetExportReportPayload,
+    ListExportReportsPayload,
+    UserExportCSVInput,
 )
 
 from .conftest import MockAuth
@@ -82,7 +82,7 @@ class TestReportEndpoints:
 
         result = await ec.list_reports()
 
-        assert isinstance(result, ListExportReportsResponse)
+        assert isinstance(result, ListExportReportsPayload)
         assert len(result.reports) == 1
         assert result.reports[0].report_key == "users"
         method, url, body = _last_request_call(mock_session)
@@ -97,7 +97,7 @@ class TestReportEndpoints:
 
         result = await ec.get_report("users")
 
-        assert isinstance(result, GetExportReportResponse)
+        assert isinstance(result, GetExportReportPayload)
         assert result.report.report_key == "users"
         method, url, body = _last_request_call(mock_session)
         assert method == "GET"
@@ -193,7 +193,7 @@ class TestRequestBodyHandling:
         ec = ExportClient(mock_client)
         mock_download = AsyncMock(return_value=b"csv-data")
 
-        request = UserExportCSVRequest(
+        request = UserExportCSVInput(
             fields=["username", "email"],
             encoding="utf-8",
         )

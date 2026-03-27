@@ -5,20 +5,20 @@ from __future__ import annotations
 from collections.abc import AsyncIterator
 
 from ai.backend.client.request import Request
-from ai.backend.common.dto.manager.export import (
-    AuditLogExportCSVRequest,
+from ai.backend.common.dto.manager.v2.export import (
+    AuditLogExportCSVInput,
     AuditLogExportFilter,
     AuditLogExportOrder,
-    GetExportReportResponse,
-    KeypairExportCSVRequest,
-    ListExportReportsResponse,
-    ProjectExportCSVRequest,
+    GetExportReportPayload,
+    KeypairExportCSVInput,
+    ListExportReportsPayload,
+    ProjectExportCSVInput,
     ProjectExportFilter,
     ProjectExportOrder,
-    SessionExportCSVRequest,
+    SessionExportCSVInput,
     SessionExportFilter,
     SessionExportOrder,
-    UserExportCSVRequest,
+    UserExportCSVInput,
     UserExportFilter,
     UserExportOrder,
 )
@@ -36,7 +36,7 @@ class Export(BaseFunction):
 
     @api_function
     @classmethod
-    async def list_reports(cls) -> ListExportReportsResponse:
+    async def list_reports(cls) -> ListExportReportsPayload:
         """
         List all available export reports.
 
@@ -45,11 +45,11 @@ class Export(BaseFunction):
         rqst = Request("GET", "/export/reports")
         async with rqst.fetch() as resp:
             data = await resp.json()
-            return ListExportReportsResponse.model_validate(data)
+            return ListExportReportsPayload.model_validate(data)
 
     @api_function
     @classmethod
-    async def get_report(cls, report_key: str) -> GetExportReportResponse:
+    async def get_report(cls, report_key: str) -> GetExportReportPayload:
         """
         Get a specific export report by key.
 
@@ -59,7 +59,7 @@ class Export(BaseFunction):
         rqst = Request("GET", f"/export/reports/{report_key}")
         async with rqst.fetch() as resp:
             data = await resp.json()
-            return GetExportReportResponse.model_validate(data)
+            return GetExportReportPayload.model_validate(data)
 
     # =========================================================================
     # User Export
@@ -88,7 +88,7 @@ class Export(BaseFunction):
         :param chunk_size: Size of chunks to yield (default: 8192 bytes)
         :yields: Chunks of CSV data as bytes
         """
-        request = UserExportCSVRequest(
+        request = UserExportCSVInput(
             fields=fields,
             filter=filter,
             order=order,
@@ -131,7 +131,7 @@ class Export(BaseFunction):
         :param chunk_size: Size of chunks to yield (default: 8192 bytes)
         :yields: Chunks of CSV data as bytes
         """
-        request = SessionExportCSVRequest(
+        request = SessionExportCSVInput(
             fields=fields,
             filter=filter,
             order=order,
@@ -174,7 +174,7 @@ class Export(BaseFunction):
         :param chunk_size: Size of chunks to yield (default: 8192 bytes)
         :yields: Chunks of CSV data as bytes
         """
-        request = ProjectExportCSVRequest(
+        request = ProjectExportCSVInput(
             fields=fields,
             filter=filter,
             order=order,
@@ -215,7 +215,7 @@ class Export(BaseFunction):
         :param chunk_size: Size of chunks to yield (default: 8192 bytes)
         :yields: Chunks of CSV data as bytes
         """
-        request = KeypairExportCSVRequest(
+        request = KeypairExportCSVInput(
             fields=fields,
             encoding=encoding,
         )
@@ -256,7 +256,7 @@ class Export(BaseFunction):
         :param chunk_size: Size of chunks to yield (default: 8192 bytes)
         :yields: Chunks of CSV data as bytes
         """
-        request = AuditLogExportCSVRequest(
+        request = AuditLogExportCSVInput(
             fields=fields,
             filter=filter,
             order=order,

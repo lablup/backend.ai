@@ -13,6 +13,7 @@ from ai.backend.manager.api.rest.routing import RouteRegistry
 
 if TYPE_CHECKING:
     from ai.backend.manager.api.adapters.registry import Adapters
+    from ai.backend.manager.api.rest.export.handler import ExportHandler
     from ai.backend.manager.api.rest.types import RouteDeps
 
 
@@ -20,6 +21,7 @@ def build_v2_routes(
     *,
     adapters: Adapters,
     route_deps: RouteDeps,
+    export_handler: ExportHandler | None = None,
 ) -> RouteRegistry:
     """Build the v2 parent registry with all domain sub-registries."""
 
@@ -165,5 +167,11 @@ def build_v2_routes(
     )
     v2_reg.add_subregistry(register_v2_user_routes(user_handler, route_deps))
     v2_reg.add_subregistry(register_v2_vfs_storage_routes(vfs_storage_handler, route_deps))
+
+    # Export (reuses v1 handler directly, no adapter)
+    if export_handler is not None:
+        from .export.registry import register_v2_export_routes
+
+        v2_reg.add_subregistry(register_v2_export_routes(export_handler, route_deps))
 
     return v2_reg

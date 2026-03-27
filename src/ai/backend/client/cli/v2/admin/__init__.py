@@ -80,6 +80,11 @@ def login_session() -> None:
     """Admin login session commands."""
 
 
+@admin.group(cls=LazyGroup, import_name="ai.backend.client.cli.v2.admin.export:export")
+def export() -> None:
+    """Admin CSV export commands."""
+
+
 @admin.group(
     cls=LazyGroup,
     import_name="ai.backend.client.cli.v2.admin.service_catalog:service_catalog",

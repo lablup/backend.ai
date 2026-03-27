@@ -11,11 +11,11 @@ from typing import TYPE_CHECKING, Any
 import sqlalchemy as sa
 
 from ai.backend.common.data.filter_specs import StringMatchSpec
-from ai.backend.common.dto.manager.export import (
+from ai.backend.common.dto.manager.query import DateTimeRangeFilter, StringFilter
+from ai.backend.common.dto.manager.v2.export import (
     AuditLogExportFilter,
     AuditLogExportOrder,
     BooleanFilter,
-    DateTimeRangeFilter,
     OrderDirection,
     ProjectExportFilter,
     ProjectExportOrder,
@@ -24,7 +24,6 @@ from ai.backend.common.dto.manager.export import (
     UserExportFilter,
     UserExportOrder,
 )
-from ai.backend.common.dto.manager.query import StringFilter
 from ai.backend.manager.api.rest.adapter import BaseFilterAdapter
 from ai.backend.manager.errors.export import InvalidExportFieldKeys
 from ai.backend.manager.repositories.base import QueryCondition, QueryOrder

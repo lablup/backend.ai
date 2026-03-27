@@ -21,29 +21,38 @@ from ai.backend.common.api_handlers import (
     HeaderParam,
     PathParam,
 )
-from ai.backend.common.dto.manager.export import (
-    AuditLogExportCSVRequest,
-    ExportFieldInfo,
-    ExportReportInfo,
-    GetExportReportResponse,
-    KeypairExportCSVRequest,
-    ListExportReportsResponse,
-    ProjectExportCSVRequest,
-    SessionExportCSVRequest,
-    UserExportCSVRequest,
+from ai.backend.common.dto.manager.v2.export import (
+    AuditLogExportCSVInput,
+    ExportFieldInfoNode,
+    ExportReportInfoNode,
+    GetExportReportPayload,
+    KeypairExportCSVInput,
+    ListExportReportsPayload,
+    ProjectExportCSVInput,
+    SessionExportCSVInput,
+    UserExportCSVInput,
 )
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.config.unified import ExportConfig
-from ai.backend.manager.dto.context import RequestCtx
-from ai.backend.manager.dto.export import ExportFilenameHeader, ExportPathParam
+from ai.backend.manager.dto.context import RequestCtx, UserContext
+from ai.backend.manager.dto.export import (
+    ExportDomainPathParam,
+    ExportFilenameHeader,
+    ExportPathParam,
+    ExportProjectPathParam,
+)
 from ai.backend.manager.exporter.csv import CSVExporter
 from ai.backend.manager.exporter.stream import CSVExportStreamReader
 from ai.backend.manager.repositories.base.export import ExportDataStream
 from ai.backend.manager.services.export.actions import (
     ExportAuditLogsCSVAction,
     ExportKeypairsCSVAction,
+    ExportMyKeypairsCSVAction,
+    ExportMySessionsCSVAction,
     ExportProjectsCSVAction,
+    ExportSessionsByProjectCSVAction,
     ExportSessionsCSVAction,
+    ExportUsersByDomainCSVAction,
     ExportUsersCSVAction,
     GetReportAction,
     ListReportsAction,
@@ -88,12 +97,12 @@ class ExportHandler:
         action_result = await self._export.list_reports.wait_for_complete(ListReportsAction())
 
         reports = [
-            ExportReportInfo(
+            ExportReportInfoNode(
                 report_key=r.report_key,
                 name=r.name,
                 description=r.description,
                 fields=[
-                    ExportFieldInfo(
+                    ExportFieldInfoNode(
                         key=f.key,
                         name=f.name,
                         description=f.description,
@@ -105,7 +114,7 @@ class ExportHandler:
             for r in action_result.reports
         ]
 
-        resp = ListExportReportsResponse(reports=reports)
+        resp = ListExportReportsPayload(reports=reports)
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=resp)
 
     # ------------------------------------------------------------------
@@ -122,13 +131,13 @@ class ExportHandler:
         )
 
         report = action_result.report
-        resp = GetExportReportResponse(
-            report=ExportReportInfo(
+        resp = GetExportReportPayload(
+            report=ExportReportInfoNode(
                 report_key=report.report_key,
                 name=report.name,
                 description=report.description,
                 fields=[
-                    ExportFieldInfo(
+                    ExportFieldInfoNode(
                         key=f.key,
                         name=f.name,
                         description=f.description,
@@ -146,7 +155,7 @@ class ExportHandler:
 
     async def export_users_csv(
         self,
-        body: BodyParam[UserExportCSVRequest],
+        body: BodyParam[UserExportCSVInput],
         header: HeaderParam[ExportFilenameHeader],
         request_ctx: RequestCtx,
     ) -> web.StreamResponse:
@@ -176,7 +185,7 @@ class ExportHandler:
 
     async def export_sessions_csv(
         self,
-        body: BodyParam[SessionExportCSVRequest],
+        body: BodyParam[SessionExportCSVInput],
         header: HeaderParam[ExportFilenameHeader],
         request_ctx: RequestCtx,
     ) -> web.StreamResponse:
@@ -206,7 +215,7 @@ class ExportHandler:
 
     async def export_projects_csv(
         self,
-        body: BodyParam[ProjectExportCSVRequest],
+        body: BodyParam[ProjectExportCSVInput],
         header: HeaderParam[ExportFilenameHeader],
         request_ctx: RequestCtx,
     ) -> web.StreamResponse:
@@ -236,7 +245,7 @@ class ExportHandler:
 
     async def export_keypairs_csv(
         self,
-        body: BodyParam[KeypairExportCSVRequest],
+        body: BodyParam[KeypairExportCSVInput],
         header: HeaderParam[ExportFilenameHeader],
         request_ctx: RequestCtx,
     ) -> web.StreamResponse:
@@ -266,7 +275,7 @@ class ExportHandler:
 
     async def export_audit_logs_csv(
         self,
-        body: BodyParam[AuditLogExportCSVRequest],
+        body: BodyParam[AuditLogExportCSVInput],
         header: HeaderParam[ExportFilenameHeader],
         request_ctx: RequestCtx,
     ) -> web.StreamResponse:
@@ -288,6 +297,136 @@ class ExportHandler:
             filename=header.parsed.filename,
         )
         action_result = await self._export.export_audit_logs_csv.wait_for_complete(action)
+        return await self._build_csv_stream_response(request_ctx.request, action_result)
+
+    # ------------------------------------------------------------------
+    # export_sessions_by_project_csv
+    # (POST /export/sessions/projects/{project_id}/csv)
+    # ------------------------------------------------------------------
+
+    async def export_sessions_by_project_csv(
+        self,
+        body: BodyParam[SessionExportCSVInput],
+        header: HeaderParam[ExportFilenameHeader],
+        path: PathParam[ExportProjectPathParam],
+        request_ctx: RequestCtx,
+    ) -> web.StreamResponse:
+        """Export session data as CSV scoped to a project."""
+        report_result = await self._export.get_report.wait_for_complete(
+            GetReportAction(report_key=SESSIONS_REPORT_KEY)
+        )
+        query = self._adapter.build_session_query(
+            report=report_result.report,
+            fields=body.parsed.fields,
+            filter=body.parsed.filter,
+            order=body.parsed.order,
+            max_rows=self._export_config.max_rows,
+            statement_timeout_sec=self._export_config.statement_timeout_sec,
+        )
+        action = ExportSessionsByProjectCSVAction(
+            project_id=path.parsed.project_id,
+            query=query,
+            encoding=body.parsed.encoding,
+            filename=header.parsed.filename,
+        )
+        action_result = await self._export.export_sessions_by_project_csv.wait_for_complete(action)
+        return await self._build_csv_stream_response(request_ctx.request, action_result)
+
+    # ------------------------------------------------------------------
+    # export_users_by_domain_csv
+    # (POST /export/users/domains/{domain_name}/csv)
+    # ------------------------------------------------------------------
+
+    async def export_users_by_domain_csv(
+        self,
+        body: BodyParam[UserExportCSVInput],
+        header: HeaderParam[ExportFilenameHeader],
+        path: PathParam[ExportDomainPathParam],
+        request_ctx: RequestCtx,
+    ) -> web.StreamResponse:
+        """Export user data as CSV scoped to a domain."""
+        report_result = await self._export.get_report.wait_for_complete(
+            GetReportAction(report_key=USERS_REPORT_KEY)
+        )
+        query = self._adapter.build_user_query(
+            report=report_result.report,
+            fields=body.parsed.fields,
+            filter=body.parsed.filter,
+            order=body.parsed.order,
+            max_rows=self._export_config.max_rows,
+            statement_timeout_sec=self._export_config.statement_timeout_sec,
+        )
+        action = ExportUsersByDomainCSVAction(
+            domain_name=path.parsed.domain_name,
+            query=query,
+            encoding=body.parsed.encoding,
+            filename=header.parsed.filename,
+        )
+        action_result = await self._export.export_users_by_domain_csv.wait_for_complete(action)
+        return await self._build_csv_stream_response(request_ctx.request, action_result)
+
+    # ------------------------------------------------------------------
+    # export_my_sessions_csv (POST /export/sessions/my/csv)
+    # ------------------------------------------------------------------
+
+    async def export_my_sessions_csv(
+        self,
+        body: BodyParam[SessionExportCSVInput],
+        header: HeaderParam[ExportFilenameHeader],
+        user_ctx: UserContext,
+        request_ctx: RequestCtx,
+    ) -> web.StreamResponse:
+        """Export session data as CSV scoped to the current user."""
+        report_result = await self._export.get_report.wait_for_complete(
+            GetReportAction(report_key=SESSIONS_REPORT_KEY)
+        )
+        query = self._adapter.build_session_query(
+            report=report_result.report,
+            fields=body.parsed.fields,
+            filter=body.parsed.filter,
+            order=body.parsed.order,
+            max_rows=self._export_config.max_rows,
+            statement_timeout_sec=self._export_config.statement_timeout_sec,
+        )
+        action = ExportMySessionsCSVAction(
+            user_uuid=user_ctx.user_uuid,
+            query=query,
+            encoding=body.parsed.encoding,
+            filename=header.parsed.filename,
+        )
+        action_result = await self._export.export_my_sessions_csv.wait_for_complete(action)
+        return await self._build_csv_stream_response(request_ctx.request, action_result)
+
+    # ------------------------------------------------------------------
+    # export_my_keypairs_csv (POST /export/keypairs/my/csv)
+    # ------------------------------------------------------------------
+
+    async def export_my_keypairs_csv(
+        self,
+        body: BodyParam[KeypairExportCSVInput],
+        header: HeaderParam[ExportFilenameHeader],
+        user_ctx: UserContext,
+        request_ctx: RequestCtx,
+    ) -> web.StreamResponse:
+        """Export keypair data as CSV scoped to the current user."""
+        report_result = await self._export.get_report.wait_for_complete(
+            GetReportAction(report_key=KEYPAIRS_REPORT_KEY)
+        )
+        query = self._adapter.build_keypair_query(
+            report=report_result.report,
+            fields=body.parsed.fields,
+            filter=None,
+            order=None,
+            max_rows=self._export_config.max_rows,
+            statement_timeout_sec=self._export_config.statement_timeout_sec,
+        )
+        action = ExportMyKeypairsCSVAction(
+            user_uuid=user_ctx.user_uuid,
+            query=query,
+            encoding=body.parsed.encoding,
+            filename=header.parsed.filename,
+        )
+        action_result = await self._export.export_my_keypairs_csv.wait_for_complete(action)
         return await self._build_csv_stream_response(request_ctx.request, action_result)
 
     # ------------------------------------------------------------------
