@@ -11,7 +11,9 @@ while keeping the main branch consistent.
 2. **Idempotent** -- Both the backport migration and its duplicate on main must be
    idempotent so they are safe to re-apply on databases that may already have the change.
 3. **No manual revision editing** -- Never modify the `revision` or `down_revision` of
-   an existing migration. Always create new migration files.
+   an existing migration that has already been released. Editing `down_revision` is
+   allowed only when inserting a backport migration into the main branch chain before
+   the change is merged (see Step 2 below).
 
 ## Applicable Components
 
@@ -128,7 +130,7 @@ def downgrade() -> None:
 
 See the following migrations in the codebase for reference:
 
-- `manager/models/alembic/versions/1cc9b47e0a8e_fix_sessionresult_enum_type_coexistence_backport.py`
+- `src/ai/backend/manager/models/alembic/versions/1cc9b47e0a8e_fix_sessionresult_enum_type_coexistence_backport.py`
   -- Checks multiple possible enum states and fixes whichever scenario it finds.
-- `manager/models/alembic/versions/c4ea15b77136_ensure_auditlogs_table_exist.py`
+- `src/ai/backend/manager/models/alembic/versions/c4ea15b77136_ensure_auditlogs_table_exist.py`
   -- Uses `inspector.get_table_names()` to skip table creation when it already exists.
