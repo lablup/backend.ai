@@ -77,7 +77,6 @@ from ai.backend.manager.repositories.deployment import DeploymentRepository
 from ai.backend.manager.repositories.model_serving import EndpointCreatorSpec
 from ai.backend.manager.repositories.model_serving.creators import EndpointTokenCreatorSpec
 from ai.backend.manager.repositories.model_serving.repository import ModelServingRepository
-from ai.backend.manager.repositories.model_serving.types import ProjectEndpointSearchScope
 from ai.backend.manager.repositories.model_serving.updaters import EndpointUpdaterSpec
 from ai.backend.manager.repositories.scheduler.types.session_creation import (
     SessionCreationSpec,
@@ -445,8 +444,7 @@ class ModelServingService:
         self, action: SearchServicesInProjectAction
     ) -> SearchServicesInProjectActionResult:
         """Search model serving services scoped to a project."""
-        scope = ProjectEndpointSearchScope(project_id=action.project_id)
-        result = await self._repository.search_in_project(action.querier, scope)
+        result = await self._repository.search_in_project(action.querier, action.scope)
         return SearchServicesInProjectActionResult(
             items=result.items,
             total_count=result.total_count,

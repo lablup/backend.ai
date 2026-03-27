@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import uuid
 from dataclasses import dataclass
 from typing import override
 
@@ -10,6 +9,7 @@ from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.model_serving.types import ServiceSearchItem
 from ai.backend.manager.data.permission.types import RBACElementRef
 from ai.backend.manager.repositories.base import BatchQuerier
+from ai.backend.manager.repositories.model_serving.types import ProjectEndpointSearchScope
 from ai.backend.manager.services.model_serving.actions.base import ModelServiceScopeAction
 
 
@@ -21,8 +21,8 @@ class SearchServicesInProjectAction(ModelServiceScopeAction):
     Used for project admin page.
     """
 
+    scope: ProjectEndpointSearchScope
     querier: BatchQuerier
-    project_id: uuid.UUID
 
     @override
     @classmethod
@@ -35,11 +35,11 @@ class SearchServicesInProjectAction(ModelServiceScopeAction):
 
     @override
     def scope_id(self) -> str:
-        return str(self.project_id)
+        return str(self.scope.project_id)
 
     @override
     def target_element(self) -> RBACElementRef:
-        return RBACElementRef(RBACElementType.PROJECT, str(self.project_id))
+        return RBACElementRef(RBACElementType.PROJECT, str(self.scope.project_id))
 
 
 @dataclass
