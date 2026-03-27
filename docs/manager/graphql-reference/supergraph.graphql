@@ -4580,6 +4580,19 @@ union EntityNode
   @join__unionMember(graph: STRAWBERRY, member: "Role")
  = UserV2 | ProjectV2 | DomainV2 | VirtualFolderNode | ImageV2 | ComputeSessionNode | SessionV2 | Artifact | ArtifactRegistry | AppConfig | NotificationChannel | NotificationRule | ModelDeployment | ResourceGroup | ContainerRegistryV2 | ArtifactRevision | Role
 
+"""
+Added in UNRELEASED. Valid entity-operation combination for RBAC actions.
+"""
+type EntityOperationCombination
+  @join__type(graph: STRAWBERRY)
+{
+  """Entity element type"""
+  entityType: RBACElementType!
+
+  """Valid operations for this entity"""
+  operations: [OperationInfo!]!
+}
+
 """Added in 26.3.0. Order by specification for entity associations"""
 input EntityOrderBy
   @join__type(graph: STRAWBERRY)
@@ -8696,6 +8709,20 @@ type ObjectStorageEdge
   node: ObjectStorage!
 }
 
+"""Added in UNRELEASED. Information about a single RBAC operation."""
+type OperationInfo
+  @join__type(graph: STRAWBERRY)
+{
+  """Operation name"""
+  operation: String!
+
+  """Human-readable description"""
+  description: String!
+
+  """Required RBAC permission"""
+  requiredPermission: OperationType!
+}
+
 """Added in 26.3.0. RBAC operation type"""
 enum OperationType
   @join__type(graph: STRAWBERRY)
@@ -10347,6 +10374,9 @@ type Query
 
   """Added in 26.3.0. List valid RBAC scope-entity type combinations."""
   rbacScopeEntityCombinations: [ScopeEntityCombination!]! @join__field(graph: STRAWBERRY)
+
+  """Added in UNRELEASED. List valid RBAC entity-operation combinations."""
+  rbacEntityOperationCombinations: [EntityOperationCombination!]! @join__field(graph: STRAWBERRY)
 
   """Added in 26.2.0. Query kernels within a specific session."""
   sessionKernelsV2(scope: SessionScope!, filter: KernelV2Filter = null, orderBy: [KernelV2OrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): KernelV2Connection @join__field(graph: STRAWBERRY)
