@@ -12,7 +12,7 @@ from sqlalchemy.dialects import postgresql as pgsql
 from sqlalchemy.orm import Mapped, foreign, mapped_column, relationship
 
 from ai.backend.common.data.model_deployment.types import DeploymentStrategy
-from ai.backend.common.dto.manager.v2.deployment.types import IntOrPercent, IntOrPercentType
+from ai.backend.common.dto.manager.v2.deployment.types import IntOrPercent
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.deployment.types import DeploymentPolicyData
 from ai.backend.manager.errors.deployment import InvalidDeploymentStrategy
@@ -43,12 +43,8 @@ class RollingUpdateSpec(BaseModel):
     :meth:`resolve_max_surge` / :meth:`resolve_max_unavailable`.
     """
 
-    max_surge: IntOrPercent = Field(
-        default_factory=lambda: IntOrPercent(type=IntOrPercentType.PERCENT, percent=0.5)
-    )
-    max_unavailable: IntOrPercent = Field(
-        default_factory=lambda: IntOrPercent(type=IntOrPercentType.PERCENT, percent=0.0)
-    )
+    max_surge: IntOrPercent = Field(default_factory=lambda: IntOrPercent(percent=0.5))
+    max_unavailable: IntOrPercent = Field(default_factory=lambda: IntOrPercent(percent=0.0))
 
     @model_validator(mode="after")
     def _validate_progress_is_possible(self) -> RollingUpdateSpec:
@@ -77,16 +73,14 @@ class RollingUpdateSpec(BaseModel):
     def _resolve(value: IntOrPercent, total: int, *, round_up: bool) -> int:
         """Convert an IntOrPercent to an absolute replica count.
 
-        For COUNT type, returns the value as-is.
-        For PERCENT type, multiplies by total and rounds up (ceil) or down (floor)
+        For count, returns the value as-is.
+        For percent, multiplies by total and rounds up (ceil) or down (floor)
         following Kubernetes rolling-update semantics.
         """
-        match value.type:
-            case IntOrPercentType.COUNT:
-                return value.count or 0
-            case IntOrPercentType.PERCENT:
-                result = total * (value.percent or 0.0)
-                return math.ceil(result) if round_up else math.floor(result)
+        if value.count is not None:
+            return value.count
+        result = total * (value.percent or 0.0)
+        return math.ceil(result) if round_up else math.floor(result)
 
 
 class BlueGreenSpec(BaseModel):

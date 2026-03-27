@@ -36,7 +36,7 @@ from ai.backend.common.dto.manager.v2.deployment.request import (
     ScaleDeploymentInput,
     UpdateDeploymentInput,
 )
-from ai.backend.common.dto.manager.v2.deployment.types import IntOrPercent, IntOrPercentType
+from ai.backend.common.dto.manager.v2.deployment.types import IntOrPercent
 from ai.backend.common.types import ClusterMode, RuntimeVariant
 
 
@@ -177,8 +177,8 @@ class TestRollingUpdateConfigInput:
         [
             pytest.param(
                 RollingUpdateValidScenario(
-                    surge=IntOrPercent(type=IntOrPercentType.COUNT, count=2),
-                    unavailable=IntOrPercent(type=IntOrPercentType.COUNT, count=1),
+                    surge=IntOrPercent(count=2),
+                    unavailable=IntOrPercent(count=1),
                     expected_surge_value=2,
                     expected_unavailable_value=1,
                 ),
@@ -186,8 +186,8 @@ class TestRollingUpdateConfigInput:
             ),
             pytest.param(
                 RollingUpdateValidScenario(
-                    surge=IntOrPercent(type=IntOrPercentType.PERCENT, percent=0.25),
-                    unavailable=IntOrPercent(type=IntOrPercentType.PERCENT, percent=0.5),
+                    surge=IntOrPercent(percent=0.25),
+                    unavailable=IntOrPercent(percent=0.5),
                     expected_surge_value=0.25,
                     expected_unavailable_value=0.5,
                 ),
@@ -199,9 +199,7 @@ class TestRollingUpdateConfigInput:
         config = RollingUpdateConfigInput(
             max_surge=scenario.surge, max_unavailable=scenario.unavailable
         )
-        assert config.max_surge.type == scenario.surge.type
-        assert config.max_unavailable.type == scenario.unavailable.type
-        if scenario.surge.type == IntOrPercentType.COUNT:
+        if scenario.surge.is_count:
             assert config.max_surge.count == scenario.expected_surge_value
             assert config.max_unavailable.count == scenario.expected_unavailable_value
         else:
@@ -210,53 +208,53 @@ class TestRollingUpdateConfigInput:
 
     def test_defaults(self) -> None:
         config = RollingUpdateConfigInput()
-        assert config.max_surge.type == IntOrPercentType.PERCENT
+        assert config.max_surge.is_percent
         assert config.max_surge.percent == 0.5
-        assert config.max_unavailable.type == IntOrPercentType.PERCENT
+        assert config.max_unavailable.is_percent
         assert config.max_unavailable.percent == 0.0
 
     @pytest.mark.parametrize(
         "raw_input",
         [
             pytest.param(
-                {"max_surge": {"type": "count", "count": -1}},
+                {"max_surge": {"count": -1}},
                 id="surge_negative_count",
             ),
             pytest.param(
-                {"max_surge": {"type": "percent", "percent": 1.5}},
+                {"max_surge": {"percent": 1.5}},
                 id="surge_percent_over_1",
             ),
             pytest.param(
-                {"max_surge": {"type": "percent", "percent": -0.1}},
+                {"max_surge": {"percent": -0.1}},
                 id="surge_negative_percent",
             ),
             pytest.param(
-                {"max_surge": {"type": "count", "percent": 0.5}},
-                id="surge_count_type_with_percent_field",
+                {"max_surge": {"count": 2, "percent": 0.5}},
+                id="surge_both_fields_set",
             ),
             pytest.param(
-                {"max_surge": {"type": "percent", "count": 2}},
-                id="surge_percent_type_with_count_field",
+                {"max_surge": {}},
+                id="surge_neither_field_set",
             ),
             pytest.param(
-                {"max_unavailable": {"type": "count", "count": -1}},
+                {"max_unavailable": {"count": -1}},
                 id="unavailable_negative_count",
             ),
             pytest.param(
-                {"max_unavailable": {"type": "percent", "percent": 1.5}},
+                {"max_unavailable": {"percent": 1.5}},
                 id="unavailable_percent_over_1",
             ),
             pytest.param(
-                {"max_unavailable": {"type": "percent", "percent": -0.1}},
+                {"max_unavailable": {"percent": -0.1}},
                 id="unavailable_negative_percent",
             ),
             pytest.param(
-                {"max_unavailable": {"type": "count", "percent": 0.5}},
-                id="unavailable_count_type_with_percent_field",
+                {"max_unavailable": {"count": 0, "percent": 0.0}},
+                id="unavailable_both_fields_set",
             ),
             pytest.param(
-                {"max_unavailable": {"type": "percent", "count": 2}},
-                id="unavailable_percent_type_with_count_field",
+                {"max_unavailable": {}},
+                id="unavailable_neither_field_set",
             ),
         ],
     )
@@ -365,8 +363,8 @@ class TestCreateDeploymentInput:
 
     def test_with_rolling_update_config(self) -> None:
         rolling = RollingUpdateConfigInput(
-            max_surge=IntOrPercent(type=IntOrPercentType.COUNT, count=2),
-            max_unavailable=IntOrPercent(type=IntOrPercentType.COUNT, count=1),
+            max_surge=IntOrPercent(count=2),
+            max_unavailable=IntOrPercent(count=1),
         )
         inp = self._make_input(
             default_deployment_strategy=DeploymentStrategyInput(

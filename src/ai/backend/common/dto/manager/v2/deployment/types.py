@@ -60,7 +60,6 @@ __all__ = (
     "RouteTrafficStatus",
     "RuntimeVariant",
     "IntOrPercent",
-    "IntOrPercentType",
 )
 
 
@@ -87,43 +86,37 @@ class RouteOrderField(StrEnum):
     TRAFFIC_RATIO = "traffic_ratio"
 
 
-class IntOrPercentType(StrEnum):
-    """Discriminator for :class:`IntOrPercent`."""
-
-    COUNT = "count"
-    PERCENT = "percent"
-
-
 class IntOrPercent(BaseModel):
     """A rolling-update budget value: either an absolute count or a percentage.
 
-    - ``{"type": "count", "count": 2}``      — absolute replica count
-    - ``{"type": "percent", "percent": 0.5}`` — fraction of desired replicas (0.0-1.0)
+    Exactly one of ``count`` or ``percent`` must be provided (oneOf semantics).
 
-    Exactly one of ``count`` or ``percent`` must be provided, matching ``type``.
+    - ``{"count": 2}``        — absolute replica count
+    - ``{"percent": 0.25}``   — fraction of desired replicas (0.0-1.0)
     """
 
-    type: IntOrPercentType
     count: int | None = Field(default=None, ge=0)
     percent: float | None = Field(default=None, ge=0.0, le=1.0)
 
     @model_validator(mode="after")
-    def _validate_fields(self) -> IntOrPercent:
-        if self.type == IntOrPercentType.COUNT:
-            if self.count is None:
-                raise ValueError("'count' is required when type is 'count'")
-            if self.percent is not None:
-                raise ValueError("'percent' must not be set when type is 'count'")
-        else:
-            if self.percent is None:
-                raise ValueError("'percent' is required when type is 'percent'")
-            if self.count is not None:
-                raise ValueError("'count' must not be set when type is 'percent'")
+    def _validate_one_of(self) -> IntOrPercent:
+        has_count = self.count is not None
+        has_percent = self.percent is not None
+        if has_count == has_percent:
+            raise ValueError("Exactly one of 'count' or 'percent' must be provided.")
         return self
 
     @property
+    def is_count(self) -> bool:
+        return self.count is not None
+
+    @property
+    def is_percent(self) -> bool:
+        return self.percent is not None
+
+    @property
     def is_zero(self) -> bool:
-        if self.type == IntOrPercentType.COUNT:
+        if self.count is not None:
             return self.count == 0
         return self.percent == 0.0
 

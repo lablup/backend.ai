@@ -26,7 +26,6 @@ from ai.backend.common.dto.manager.v2.deployment.types import (
     AutoScalingRuleOrderField,
     DeploymentOrderField,
     IntOrPercent,
-    IntOrPercentType,
     OrderDirection,
     ReplicaOrderField,
     RevisionOrderField,
@@ -247,26 +246,26 @@ class ModelDeploymentNetworkAccessInput(BaseRequestModel):
 class RollingUpdateConfigInput(BaseRequestModel):
     """Input for rolling update configuration.
 
-    ``max_surge`` and ``max_unavailable`` are :class:`IntOrPercent` objects:
+    ``max_surge`` and ``max_unavailable`` are :class:`IntOrPercent` objects (oneOf):
 
-    - ``{"type": "count", "count": 2}``      — absolute replica count
-    - ``{"type": "percent", "percent": 0.25}`` — fraction of desired replicas (0.0-1.0)
+    - ``{"count": 2}``        — absolute replica count
+    - ``{"percent": 0.25}``   — fraction of desired replicas (0.0-1.0)
     """
 
     max_surge: IntOrPercent = Field(
-        default_factory=lambda: IntOrPercent(type=IntOrPercentType.PERCENT, percent=0.5),
+        default_factory=lambda: IntOrPercent(percent=0.5),
         description="Maximum number of extra replicas that can be created during a rolling update.",
         examples=[
-            {"type": "count", "count": 2},
-            {"type": "percent", "percent": 0.25},
+            {"count": 2},
+            {"percent": 0.25},
         ],
     )
     max_unavailable: IntOrPercent = Field(
-        default_factory=lambda: IntOrPercent(type=IntOrPercentType.PERCENT, percent=0.0),
+        default_factory=lambda: IntOrPercent(percent=0.0),
         description="Maximum number of replicas that can be unavailable during a rolling update.",
         examples=[
-            {"type": "count", "count": 0},
-            {"type": "percent", "percent": 0.0},
+            {"count": 0},
+            {"percent": 0.0},
         ],
     )
 

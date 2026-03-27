@@ -18,7 +18,6 @@ from ai.backend.common.dto.manager.v2.deployment.types import (
     DeploymentPolicyInfo,
     DeploymentRevisionInfo,
     IntOrPercent,
-    IntOrPercentType,
     NetworkConfigInfo,
     OrderDirection,
     ReplicaStateInfo,
@@ -364,16 +363,16 @@ class TestRollingUpdateConfigInfo:
 
     def test_creation(self) -> None:
         info = RollingUpdateConfigInfo(
-            max_surge=IntOrPercent(type=IntOrPercentType.COUNT, count=2),
-            max_unavailable=IntOrPercent(type=IntOrPercentType.COUNT, count=1),
+            max_surge=IntOrPercent(count=2),
+            max_unavailable=IntOrPercent(count=1),
         )
         assert info.max_surge.count == 2
         assert info.max_unavailable.count == 1
 
     def test_serialization_round_trip(self) -> None:
         info = RollingUpdateConfigInfo(
-            max_surge=IntOrPercent(type=IntOrPercentType.COUNT, count=1),
-            max_unavailable=IntOrPercent(type=IntOrPercentType.COUNT, count=0),
+            max_surge=IntOrPercent(count=1),
+            max_unavailable=IntOrPercent(count=0),
         )
         json_str = info.model_dump_json()
         restored = RollingUpdateConfigInfo.model_validate_json(json_str)
@@ -402,8 +401,8 @@ class TestDeploymentPolicyInfo:
 
     def test_creation_with_rolling_strategy(self) -> None:
         rolling = RollingUpdateConfigInfo(
-            max_surge=IntOrPercent(type=IntOrPercentType.COUNT, count=1),
-            max_unavailable=IntOrPercent(type=IntOrPercentType.COUNT, count=0),
+            max_surge=IntOrPercent(count=1),
+            max_unavailable=IntOrPercent(count=0),
         )
         info = DeploymentPolicyInfo(
             strategy=DeploymentStrategy.ROLLING,
@@ -428,8 +427,8 @@ class TestDeploymentPolicyInfo:
 
     def test_serialization_round_trip(self) -> None:
         rolling = RollingUpdateConfigInfo(
-            max_surge=IntOrPercent(type=IntOrPercentType.COUNT, count=2),
-            max_unavailable=IntOrPercent(type=IntOrPercentType.COUNT, count=1),
+            max_surge=IntOrPercent(count=2),
+            max_unavailable=IntOrPercent(count=1),
         )
         info = DeploymentPolicyInfo(
             strategy=DeploymentStrategy.ROLLING,

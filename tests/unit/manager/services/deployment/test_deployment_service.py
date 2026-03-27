@@ -16,7 +16,7 @@ import pytest
 from ai.backend.common.config import ModelDefinition
 from ai.backend.common.data.endpoint.types import EndpointLifecycle
 from ai.backend.common.data.model_deployment.types import DeploymentStrategy
-from ai.backend.common.dto.manager.v2.deployment.types import IntOrPercent, IntOrPercentType
+from ai.backend.common.dto.manager.v2.deployment.types import IntOrPercent
 from ai.backend.common.types import ClusterMode, ResourceSlot, RuntimeVariant
 from ai.backend.manager.actions.validators import ActionValidators
 from ai.backend.manager.data.deployment.creator import (
@@ -117,8 +117,8 @@ class DeploymentServiceBaseFixtures:
             endpoint=uuid.uuid4(),
             strategy=DeploymentStrategy.ROLLING,
             strategy_spec=RollingUpdateSpec(
-                max_surge=IntOrPercent(type=IntOrPercentType.COUNT, count=1),
-                max_unavailable=IntOrPercent(type=IntOrPercentType.COUNT, count=0),
+                max_surge=IntOrPercent(count=1),
+                max_unavailable=IntOrPercent(count=0),
             ),
             created_at=datetime(2024, 1, 1, 0, 0, 0, tzinfo=UTC),
             updated_at=datetime(2024, 1, 1, 0, 0, 0, tzinfo=UTC),
@@ -142,8 +142,8 @@ class TestUpsertDeploymentPolicy(DeploymentServiceBaseFixtures):
             deployment_id=endpoint_id,
             strategy=DeploymentStrategy.ROLLING,
             strategy_spec=RollingUpdateSpec(
-                max_surge=IntOrPercent(type=IntOrPercentType.COUNT, count=2),
-                max_unavailable=IntOrPercent(type=IntOrPercentType.COUNT, count=1),
+                max_surge=IntOrPercent(count=2),
+                max_unavailable=IntOrPercent(count=1),
             ),
         )
 

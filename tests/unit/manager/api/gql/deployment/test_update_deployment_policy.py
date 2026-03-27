@@ -27,7 +27,6 @@ from ai.backend.common.dto.manager.v2.deployment.types import (
     BlueGreenConfigInfo,
     BlueGreenStrategySpecInfo,
     IntOrPercent,
-    IntOrPercentType,
     RollingUpdateConfigInfo,
     RollingUpdateStrategySpecInfo,
 )
@@ -36,7 +35,6 @@ from ai.backend.manager.api.gql.deployment.resolver import policy as policy_reso
 from ai.backend.manager.api.gql.deployment.types.policy import (
     BlueGreenConfigInputGQL,
     IntOrPercentInputGQL,
-    IntOrPercentTypeGQL,
     RollingUpdateConfigInputGQL,
     UpdateDeploymentPolicyInputGQL,
     UpdateDeploymentPolicyPayloadGQL,
@@ -48,8 +46,8 @@ SAMPLE_DEPLOYMENT_ID = "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"
 def _int_or_percent(value: int | float) -> IntOrPercent:
     """Build an IntOrPercent from a plain int or float for test brevity."""
     if isinstance(value, float):
-        return IntOrPercent(type=IntOrPercentType.PERCENT, percent=value)
-    return IntOrPercent(type=IntOrPercentType.COUNT, count=value)
+        return IntOrPercent(percent=value)
+    return IntOrPercent(count=value)
 
 
 # --- Test scenarios ---
@@ -104,8 +102,8 @@ def rolling_update_input() -> UpdateDeploymentPolicyInputGQL:
         deployment_id=ID(SAMPLE_DEPLOYMENT_ID),
         strategy=DeploymentStrategy.ROLLING,
         rolling_update=RollingUpdateConfigInputGQL(
-            max_surge=IntOrPercentInputGQL(type=IntOrPercentTypeGQL.COUNT, count=2),
-            max_unavailable=IntOrPercentInputGQL(type=IntOrPercentTypeGQL.COUNT, count=1),
+            max_surge=IntOrPercentInputGQL(count=2),
+            max_unavailable=IntOrPercentInputGQL(count=1),
         ),
     )
 
@@ -161,10 +159,8 @@ class TestToPydanticConversion:
                         deployment_id=ID(SAMPLE_DEPLOYMENT_ID),
                         strategy=DeploymentStrategy.ROLLING,
                         rolling_update=RollingUpdateConfigInputGQL(
-                            max_surge=IntOrPercentInputGQL(type=IntOrPercentTypeGQL.COUNT, count=2),
-                            max_unavailable=IntOrPercentInputGQL(
-                                type=IntOrPercentTypeGQL.COUNT, count=1
-                            ),
+                            max_surge=IntOrPercentInputGQL(count=2),
+                            max_unavailable=IntOrPercentInputGQL(count=1),
                         ),
                     ),
                     expected_rolling_update=RollingUpdateConfigInput(

@@ -15,7 +15,7 @@ from dateutil.tz import tzutc
 from ai.backend.common.data.endpoint.types import EndpointLifecycle
 from ai.backend.common.data.model_deployment.types import DeploymentStrategy
 from ai.backend.common.data.permission.types import RBACElementType
-from ai.backend.common.dto.manager.v2.deployment.types import IntOrPercent, IntOrPercentType
+from ai.backend.common.dto.manager.v2.deployment.types import IntOrPercent
 from ai.backend.common.exception import DeploymentNameAlreadyExists
 from ai.backend.common.types import (
     AccessKey,
@@ -2459,8 +2459,8 @@ class TestDeploymentPolicyOperations:
             endpoint_id=test_endpoint_id,
             strategy=DeploymentStrategy.ROLLING,
             strategy_spec=RollingUpdateSpec(
-                max_surge=IntOrPercent(type=IntOrPercentType.COUNT, count=1),
-                max_unavailable=IntOrPercent(type=IntOrPercentType.COUNT, count=0),
+                max_surge=IntOrPercent(count=1),
+                max_unavailable=IntOrPercent(count=0),
             ),
         )
         result = await deployment_repository.upsert_deployment_policy(Upserter(spec=spec))
@@ -2520,8 +2520,8 @@ class TestDeploymentPolicyOperations:
         assert result.endpoint == test_endpoint_id
         assert result.strategy == DeploymentStrategy.ROLLING
         assert result.strategy_spec == RollingUpdateSpec(
-            max_surge=IntOrPercent(type=IntOrPercentType.COUNT, count=1),
-            max_unavailable=IntOrPercent(type=IntOrPercentType.COUNT, count=0),
+            max_surge=IntOrPercent(count=1),
+            max_unavailable=IntOrPercent(count=0),
         )
 
     async def test_get_deployment_policy_not_found(
@@ -2765,23 +2765,23 @@ class TestSearchDeploymentPolicies:
             (
                 DeploymentStrategy.ROLLING,
                 RollingUpdateSpec(
-                    max_surge=IntOrPercent(type=IntOrPercentType.COUNT, count=1),
-                    max_unavailable=IntOrPercent(type=IntOrPercentType.COUNT, count=0),
+                    max_surge=IntOrPercent(count=1),
+                    max_unavailable=IntOrPercent(count=0),
                 ),
             ),
             (
                 DeploymentStrategy.ROLLING,
                 RollingUpdateSpec(
-                    max_surge=IntOrPercent(type=IntOrPercentType.COUNT, count=2),
-                    max_unavailable=IntOrPercent(type=IntOrPercentType.COUNT, count=1),
+                    max_surge=IntOrPercent(count=2),
+                    max_unavailable=IntOrPercent(count=1),
                 ),
             ),
             (DeploymentStrategy.BLUE_GREEN, BlueGreenSpec(auto_promote=True)),
             (
                 DeploymentStrategy.ROLLING,
                 RollingUpdateSpec(
-                    max_surge=IntOrPercent(type=IntOrPercentType.COUNT, count=0),
-                    max_unavailable=IntOrPercent(type=IntOrPercentType.COUNT, count=1),
+                    max_surge=IntOrPercent(count=0),
+                    max_unavailable=IntOrPercent(count=1),
                 ),
             ),
         ]

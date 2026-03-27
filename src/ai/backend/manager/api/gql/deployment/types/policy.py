@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import enum
 from datetime import datetime
 
 from strawberry import ID, UNSET
@@ -56,18 +55,6 @@ DeploymentStrategyTypeGQL: type[DeploymentStrategy] = gql_enum(
 )
 
 
-@gql_enum(
-    BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
-        description="Type of a surge value: 'count' for an absolute replica count, 'percent' for a fraction of desired replicas (0.0-1.0).",
-    ),
-    name="IntOrPercentType",
-)
-class IntOrPercentTypeGQL(enum.Enum):
-    COUNT = "count"
-    PERCENT = "percent"
-
-
 # ========== IntOrPercent types ==========
 
 
@@ -76,15 +63,13 @@ class IntOrPercentTypeGQL(enum.Enum):
         added_version=NEXT_RELEASE_VERSION,
         description=dedent_strip("""
             A rolling-update budget value: either an absolute count or a percentage.
-            When type is COUNT, 'count' holds the value.
-            When type is PERCENT, 'percent' holds the value (0.0-1.0).
+            Exactly one of 'count' or 'percent' is non-null.
         """),
     ),
     model=IntOrPercentDTO,
     name="IntOrPercent",
 )
 class IntOrPercentGQL:
-    type: IntOrPercentTypeGQL
     count: int | None
     percent: float | None
 
@@ -93,14 +78,14 @@ class IntOrPercentGQL:
     BackendAIGQLMeta(
         added_version=NEXT_RELEASE_VERSION,
         description=dedent_strip("""
-            Input for a rolling-update budget value.
-            Set type to COUNT and provide 'count', or set type to PERCENT and provide 'percent' (0.0-1.0).
+            Input for a rolling-update budget value (oneOf).
+            Provide exactly one of 'count' (absolute replica count) or 'percent' (0.0-1.0 fraction).
         """),
     ),
     name="IntOrPercentInput",
+    one_of=True,
 )
 class IntOrPercentInputGQL(PydanticInputMixin[IntOrPercentDTO]):
-    type: IntOrPercentTypeGQL
     count: int | None = UNSET
     percent: float | None = UNSET
 

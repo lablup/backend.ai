@@ -21,7 +21,7 @@ import pytest
 from pydantic import ValidationError
 
 from ai.backend.common.data.endpoint.types import EndpointLifecycle
-from ai.backend.common.dto.manager.v2.deployment.types import IntOrPercent, IntOrPercentType
+from ai.backend.common.dto.manager.v2.deployment.types import IntOrPercent
 from ai.backend.common.types import SessionId
 from ai.backend.manager.data.deployment.types import (
     DeploymentInfo,
@@ -47,8 +47,8 @@ ENDPOINT_ID = UUID("aaaaaaaa-0000-0000-0000-aaaaaaaaaaaa")
 def make_int_or_percent(value: int | float) -> IntOrPercent:
     """Shorthand to build a IntOrPercent from a plain int or float."""
     if isinstance(value, float):
-        return IntOrPercent(type=IntOrPercentType.PERCENT, percent=value)
-    return IntOrPercent(type=IntOrPercentType.COUNT, count=value)
+        return IntOrPercent(percent=value)
+    return IntOrPercent(count=value)
 
 
 OLD_REV = UUID("11111111-1111-1111-1111-111111111111")
@@ -959,14 +959,14 @@ class TestFractionSpec:
         spec = RollingUpdateSpec(
             max_surge=make_int_or_percent(0.25), max_unavailable=make_int_or_percent(0)
         )
-        assert spec.max_surge.type == IntOrPercentType.PERCENT
+        assert spec.max_surge.is_percent
         assert spec.max_surge.percent == 0.25
 
     def test_fraction_max_unavailable_accepted(self) -> None:
         spec = RollingUpdateSpec(
             max_surge=make_int_or_percent(1), max_unavailable=make_int_or_percent(0.5)
         )
-        assert spec.max_unavailable.type == IntOrPercentType.PERCENT
+        assert spec.max_unavailable.is_percent
         assert spec.max_unavailable.percent == 0.5
 
     def test_resolve_max_surge_rounds_up(self) -> None:
