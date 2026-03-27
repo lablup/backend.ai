@@ -785,6 +785,7 @@ class AsyncEtcd(AbstractKVStore):
         scope_prefix = self._merge_scope_prefix_map(scope_prefix_map)[scope]
         scope_prefix_len = len(self._mangle_key(f"{_slash(scope_prefix)}"))
         mangled_key_prefix = self._mangle_key(f"{_slash(scope_prefix)}{key_prefix}")
+        retry_count: int = 0
         ended_without_error = False
 
         while not ended_without_error:
@@ -799,16 +800,32 @@ class AsyncEtcd(AbstractKVStore):
                     cleanup_event=cleanup_event,
                     wait_timeout=wait_timeout,
                 ):
+                    if retry_count > 0:
+                        log.info(
+                            "watch_prefix(): successfully reconnected to Etcd server after %d retries",
+                            retry_count,
+                        )
+                        retry_count = 0
                     yield ev
                 ended_without_error = True
             except GRPCStatusError as e:
                 err_detail = e.args[0]
 
                 if err_detail["code"] == GRPCStatusCode.Unavailable:
-                    log.warning(
-                        "watch_prefix(): error while connecting to Etcd server, retrying..."
-                    )
-                    await asyncio.sleep(self.watch_reconnect_intvl)
+                    retry_count += 1
+                    delay = self._calc_watch_reconnect_delay(retry_count)
+                    if retry_count == 1:
+                        log.warning(
+                            "watch_prefix(): error while connecting to Etcd server, retrying..."
+                        )
+                    else:
+                        log.debug(
+                            "watch_prefix(): still unable to connect to Etcd server (attempt %d),"
+                            " next retry in %.1fs",
+                            retry_count,
+                            delay,
+                        )
+                    await asyncio.sleep(delay)
                     ended_without_error = False
                 else:
-                    raise e
+                    raise
