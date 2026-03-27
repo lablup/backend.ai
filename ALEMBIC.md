@@ -64,6 +64,30 @@ heads, create a merge migration:
 alembic merge heads -m "merge backport head"
 ```
 
+## Release Version Comment
+
+Every migration file must include a comment indicating which release version
+(including the minor version, e.g., `26.3.0`) it belongs to. Place the comment
+next to the revision identifiers:
+
+```python
+# revision identifiers, used by Alembic.
+revision = "1cc9b47e0a8e"
+down_revision = "ffcf0ed13a26"
+# Part of: 26.3.0
+branch_labels = None
+depends_on = None
+```
+
+For backport migrations, note both the target release branch and the main branch:
+
+```python
+# Part of: 26.2.1 (backport), 26.3.0 (main)
+```
+
+This makes it easy to trace which release introduced a given schema change and to
+identify backport migrations when reviewing the version history.
+
 ## Idempotent Writing Rules
 
 Every backport migration (both `d` and `d'`) **must** be idempotent. Use the following
