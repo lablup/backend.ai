@@ -7,6 +7,7 @@ This file contains core rules for AI coding agents. For detailed patterns and wo
 **Core Documents (Read directly):**
 - `tests/CLAUDE.md` - Testing guidelines and strategies
 - `BUILDING.md` - Build system, quality enforcement, BUILD policies
+- `ALEMBIC.md` - Alembic migration backport strategy
 - `README.md` - Project overview and architecture
 - `proposals/README.md` - BEP (Backend.AI Enhancement Proposals)
 
@@ -48,6 +49,11 @@ pants test --changed-since=HEAD~1
 ```
 
 **Fix all lint, type, and test errors — never suppress or skip.**
+
+## Alembic Migration Backport
+
+When backporting migrations to release branches, both the backport and main branch
+migrations must be idempotent. See `ALEMBIC.md` for the full strategy and examples.
 
 ## Layer Architecture
 
