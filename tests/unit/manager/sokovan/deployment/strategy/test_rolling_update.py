@@ -36,6 +36,7 @@ from ai.backend.manager.data.deployment.types import (
 )
 from ai.backend.manager.models.deployment_policy import RollingUpdateSpec
 from ai.backend.manager.repositories.deployment.creators import RouteCreatorSpec
+from ai.backend.manager.sokovan.deployment.exceptions import InvalidEndpointState
 from ai.backend.manager.sokovan.deployment.strategy.rolling_update import (
     RollingUpdateStrategy,
 )
@@ -690,7 +691,7 @@ class TestEdgeCases:
         )
         routes = [make_route(revision_id=OLD_REV, status=RouteStatus.HEALTHY)]
 
-        with pytest.raises(Exception):  # InvalidEndpointState
+        with pytest.raises(InvalidEndpointState):
             RollingUpdateStrategy().evaluate_cycle(deployment, routes, spec)
 
     def test_route_without_revision_classified_as_old(self) -> None:

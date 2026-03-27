@@ -3581,7 +3581,7 @@ input IntFilter {
 }
 
 """
-Added in 26.4.0. Input for a rolling-update budget value.
+Added in UNRELEASED. Input for a rolling-update budget value.
 Set type to COUNT and provide 'count', or set type to PERCENT and provide 'percent' (0.0-1.0).
 """
 input IntOrPercentInput {
@@ -3591,7 +3591,7 @@ input IntOrPercentInput {
 }
 
 """
-Added in 26.4.0. Type of a surge value: 'count' for an absolute replica count, 'percent' for a fraction of desired replicas (0.0-1.0).
+Added in UNRELEASED. Type of a surge value: 'count' for an absolute replica count, 'percent' for a fraction of desired replicas (0.0-1.0).
 """
 enum IntOrPercentType {
   COUNT
@@ -4805,7 +4805,7 @@ type Mutation {
   addModelRevision(input: AddRevisionInput!): AddRevisionPayload!
 
   """
-  Added in 26.4.0. Create or update the deployment policy for a given deployment (upsert semantics). If the deployment already has a policy, it is replaced entirely with the new configuration
+  Added in UNRELEASED. Create or update the deployment policy for a given deployment (upsert semantics). If the deployment already has a policy, it is replaced entirely with the new configuration
   """
   updateDeploymentPolicy(input: UpdateDeploymentPolicyInput!): UpdateDeploymentPolicyPayload!
 
@@ -9187,7 +9187,7 @@ type UpdateDeploymentPayload {
 }
 
 """
-Added in 26.4.0. Input for creating or updating a deployment policy (upsert semantics).
+Added in UNRELEASED. Input for creating or updating a deployment policy (upsert semantics).
 Specify the target deployment_id and the desired strategy type.
 Exactly one of rolling_update or blue_green must be provided,
 matching the chosen strategy type.
@@ -9201,7 +9201,7 @@ input UpdateDeploymentPolicyInput {
 }
 
 """
-Added in 26.4.0. Result payload returned after creating or updating a deployment policy. Contains the full deployment_policy object reflecting the applied configuration.
+Added in UNRELEASED. Result payload returned after creating or updating a deployment policy. Contains the full deployment_policy object reflecting the applied configuration.
 """
 type UpdateDeploymentPolicyPayload {
   """The updated deployment policy"""

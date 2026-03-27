@@ -32,6 +32,7 @@ from ai.backend.common.dto.manager.v2.deployment.types import (
 from ai.backend.common.dto.manager.v2.deployment.types import (
     IntOrPercent as IntOrPercentDTO,
 )
+from ai.backend.common.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     PydanticInputMixin,
@@ -57,7 +58,7 @@ DeploymentStrategyTypeGQL: type[DeploymentStrategy] = gql_enum(
 
 @gql_enum(
     BackendAIGQLMeta(
-        added_version="26.4.0",
+        added_version=NEXT_RELEASE_VERSION,
         description="Type of a surge value: 'count' for an absolute replica count, 'percent' for a fraction of desired replicas (0.0-1.0).",
     ),
     name="IntOrPercentType",
@@ -72,7 +73,7 @@ class IntOrPercentTypeGQL(enum.Enum):
 
 @gql_pydantic_type(
     BackendAIGQLMeta(
-        added_version="26.4.0",
+        added_version=NEXT_RELEASE_VERSION,
         description=dedent_strip("""
             A rolling-update budget value: either an absolute count or a percentage.
             When type is COUNT, 'count' holds the value.
@@ -90,7 +91,7 @@ class IntOrPercentGQL:
 
 @gql_pydantic_input(
     BackendAIGQLMeta(
-        added_version="26.4.0",
+        added_version=NEXT_RELEASE_VERSION,
         description=dedent_strip("""
             Input for a rolling-update budget value.
             Set type to COUNT and provide 'count', or set type to PERCENT and provide 'percent' (0.0-1.0).
@@ -196,7 +197,7 @@ class BlueGreenConfigInputGQL(PydanticInputMixin[BlueGreenConfigInputDTO]):
             matching the chosen strategy type.
             If a policy already exists for the deployment, it is replaced entirely.
         """),
-        added_version="26.4.0",
+        added_version=NEXT_RELEASE_VERSION,
     ),
     name="UpdateDeploymentPolicyInput",
 )
@@ -209,7 +210,7 @@ class UpdateDeploymentPolicyInputGQL(PydanticInputMixin[UpsertDeploymentPolicyIn
 
 @gql_pydantic_type(
     BackendAIGQLMeta(
-        added_version="26.4.0",
+        added_version=NEXT_RELEASE_VERSION,
         description="Result payload returned after creating or updating a deployment policy. Contains the full deployment_policy object reflecting the applied configuration.",
     ),
     model=UpdateDeploymentPolicyPayloadDTO,
