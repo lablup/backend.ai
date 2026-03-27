@@ -35,7 +35,6 @@ from sqlalchemy.orm import (
     relationship,
     selectinload,
 )
-from sqlalchemy.orm.attributes import instance_state
 
 from ai.backend.common.config import ModelDefinition, model_definition_iv
 from ai.backend.common.types import (
@@ -770,30 +769,19 @@ class EndpointRow(Base):  # type: ignore[misc]
         )
 
     def to_deployment_info(self) -> DeploymentInfo:
-        """Convert EndpointRow to DeploymentInfo dataclass using revision data.
-
-        If current_revision is set and revisions are loaded, uses revision data.
-        Otherwise, falls back to endpoint-level fields for legacy compatibility.
-        """
+        """Convert EndpointRow to DeploymentInfo dataclass using revision data."""
         policy_data = None
         if self.deployment_policy is not None:
             policy_data = self.deployment_policy.to_data()
 
-        # Build model_revisions list from loaded revision rows
-        if "revisions" in instance_state(self).dict and self.revisions:
-            model_revisions: list[ModelRevisionSpec] = []
-            for rev_row in self.revisions:
-                if rev_row.image_row is None:
-                    continue
-                if rev_row.id == self.current_revision or rev_row.id == self.deploying_revision:
-                    model_revisions.append(self._build_revision_spec(rev_row))
-            if model_revisions:
-                info = self._to_deployment_info_with_revisions(model_revisions)
-                info.policy = policy_data
-                return info
+        model_revisions: list[ModelRevisionSpec] = []
+        for rev_row in self.revisions:
+            if rev_row.image_row is None:
+                continue
+            if rev_row.id == self.current_revision or rev_row.id == self.deploying_revision:
+                model_revisions.append(self._build_revision_spec(rev_row))
 
-        # Fallback: no revisions available
-        info = self._to_deployment_info_with_revisions([])
+        info = self._to_deployment_info_with_revisions(model_revisions)
         info.policy = policy_data
         return info
 
