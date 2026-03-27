@@ -57,6 +57,12 @@ class UserStatus(enum.StrEnum):
 
 
 @dataclass
+class UserGroupMembership:
+    id: UUID
+    name: str
+
+
+@dataclass
 class UserInfoContext:
     uuid: UUID
     email: str

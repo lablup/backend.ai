@@ -12,7 +12,7 @@ from dateutil.tz import tzutc
 from sqlalchemy import Row
 from sqlalchemy.ext.asyncio import AsyncConnection
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
-from sqlalchemy.orm import joinedload, load_only, noload
+from sqlalchemy.orm import joinedload, load_only, noload, selectinload
 from sqlalchemy.sql.expression import bindparam
 
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
@@ -134,7 +134,16 @@ class UserDBSource:
         Admin-only operation.
         """
         async with self._db.begin_readonly_session_read_committed() as db_session:
-            user_row = await self._get_user_by_uuid(db_session, user_uuid)
+            query = (
+                sa.select(UserRow)
+                .where(UserRow.uuid == user_uuid)
+                .options(
+                    selectinload(UserRow.groups).joinedload(AssocGroupUserRow.group),
+                )
+            )
+            user_row = await db_session.scalar(query)
+            if user_row is None:
+                raise UserNotFound(f"User with UUID {user_uuid} not found.")
             return user_row.to_data()
 
     async def get_by_email_validated(

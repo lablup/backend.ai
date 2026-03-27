@@ -33,6 +33,7 @@ __all__ = (
     "UpdateUserPayload",
     "UserBasicInfo",
     "UserContainerSettings",
+    "UserGroupMembershipDTO",
     "UserNode",
     "UserOrganizationInfo",
     "UserPayload",
@@ -158,6 +159,17 @@ class EntityTimestamps(BaseModel):
     )
 
 
+class UserGroupMembershipDTO(BaseResponseModel):
+    """Group membership information for a user."""
+
+    id: str = Field(
+        description="Unique identifier of the group.",
+    )
+    name: str = Field(
+        description="Name of the group.",
+    )
+
+
 class UserNode(BaseResponseModel):
     """User entity with structured field groups."""
 
@@ -181,6 +193,10 @@ class UserNode(BaseResponseModel):
     )
     timestamps: EntityTimestamps = Field(
         description="Creation and modification timestamps.",
+    )
+    groups: list[UserGroupMembershipDTO] = Field(
+        default_factory=list,
+        description="List of groups the user belongs to.",
     )
 
 

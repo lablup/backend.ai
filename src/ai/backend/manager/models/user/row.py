@@ -22,7 +22,7 @@ from ai.backend.common.types import ReadableCIDR
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.model_serving.types import UserData as ModelServingUserData
-from ai.backend.manager.data.user.types import UserData, UserStatus
+from ai.backend.manager.data.user.types import UserData, UserGroupMembership, UserStatus
 from ai.backend.manager.errors.auth import AuthorizationFailed
 from ai.backend.manager.errors.common import ObjectNotFound
 from ai.backend.manager.models.base import (
@@ -405,6 +405,14 @@ class UserRow(Base):  # type: ignore[misc]
         )
 
     def to_data(self) -> UserData:
+        groups: list[UserGroupMembership] = []
+        if "groups" in self.__dict__:
+            groups = [
+                UserGroupMembership(id=assoc.group.id, name=assoc.group.name)
+                for assoc in self.groups
+                if assoc.group is not None
+            ]
+
         return UserData(
             id=self.uuid,
             uuid=self.uuid,
