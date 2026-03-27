@@ -252,62 +252,87 @@ class EnvironmentVariablesInfoDTO(BaseResponseModel):
 class PreStartActionInfoDTO(BaseResponseModel):
     """Output DTO for a pre-start action in model definition."""
 
-    action: str
-    args: dict[str, Any] = Field(default_factory=dict)
+    action: str = Field(description="The name of the pre-start action to execute.")
+    args: dict[str, Any] = Field(
+        default_factory=dict, description="Arguments for the pre-start action."
+    )
 
 
 class ModelHealthCheckInfoDTO(BaseResponseModel):
     """Output DTO for model health check configuration."""
 
-    interval: float
-    path: str
-    max_retries: int
-    max_wait_time: float
-    expected_status_code: int
-    initial_delay: float
+    interval: float = Field(description="Interval in seconds between health checks.")
+    path: str = Field(description="Path to check for health status.")
+    max_retries: int = Field(description="Maximum number of retries for health check.")
+    max_wait_time: float = Field(
+        description="Maximum time in seconds to wait for a health check response."
+    )
+    expected_status_code: int = Field(
+        description="Expected HTTP status code for a healthy response."
+    )
+    initial_delay: float = Field(
+        description="Initial delay in seconds before the first health check."
+    )
 
 
 class ModelServiceConfigInfoDTO(BaseResponseModel):
     """Output DTO for model service configuration."""
 
-    pre_start_actions: list[PreStartActionInfoDTO] = Field(default_factory=list)
-    start_command: str | list[str]
-    shell: str = "/bin/bash"
-    port: int
-    health_check: ModelHealthCheckInfoDTO | None = None
+    pre_start_actions: list[PreStartActionInfoDTO] = Field(
+        default_factory=list,
+        description="List of pre-start actions to execute before starting the model service.",
+    )
+    start_command: str | list[str] = Field(description="Command to start the model service.")
+    shell: str = Field(
+        default="/bin/bash", description="Shell to use if start_command is a string."
+    )
+    port: int = Field(description="Port number for the model service.")
+    health_check: ModelHealthCheckInfoDTO | None = Field(
+        default=None, description="Health check configuration for the model service."
+    )
 
 
 class ModelMetadataInfoDTO(BaseResponseModel):
     """Output DTO for model metadata."""
 
-    author: str | None = None
-    title: str | None = None
-    version: int | str | None = None
-    created: str | None = None
-    last_modified: str | None = None
-    description: str | None = None
-    task: str | None = None
-    category: str | None = None
-    architecture: str | None = None
-    framework: list[str] | None = None
-    label: list[str] | None = None
-    license: str | None = None
-    min_resource: dict[str, Any] | None = None
+    author: str | None = Field(default=None, description="Author of the model.")
+    title: str | None = Field(default=None, description="Title of the model.")
+    version: int | str | None = Field(default=None, description="Version identifier of the model.")
+    created: str | None = Field(default=None, description="Creation date of the model.")
+    last_modified: str | None = Field(
+        default=None, description="Last modification date of the model."
+    )
+    description: str | None = Field(default=None, description="Description of the model.")
+    task: str | None = Field(default=None, description="Task type of the model.")
+    category: str | None = Field(default=None, description="Category of the model.")
+    architecture: str | None = Field(
+        default=None, description="Architecture metadata for the model."
+    )
+    framework: list[str] | None = Field(default=None, description="Frameworks used by the model.")
+    label: list[str] | None = Field(default=None, description="Labels attached to the model.")
+    license: str | None = Field(default=None, description="License of the model.")
+    min_resource: dict[str, Any] | None = Field(
+        default=None, description="Minimum resource requirements for the model."
+    )
 
 
 class ModelConfigInfoDTO(BaseResponseModel):
     """Output DTO for a single model entry in model definition."""
 
-    name: str
-    model_path: str
-    service: ModelServiceConfigInfoDTO | None = None
-    metadata: ModelMetadataInfoDTO | None = None
+    name: str = Field(description="Name of the model.")
+    model_path: str = Field(description="Path to the model file.")
+    service: ModelServiceConfigInfoDTO | None = Field(
+        default=None, description="Configuration for the model service."
+    )
+    metadata: ModelMetadataInfoDTO | None = Field(
+        default=None, description="Metadata about the model."
+    )
 
 
 class ModelDefinitionInfoDTO(BaseResponseModel):
     """Output DTO for model definition."""
 
-    models: list[ModelConfigInfoDTO]
+    models: list[ModelConfigInfoDTO] = Field(description="List of models in the model definition.")
 
 
 class ClusterConfigInfoDTO(BaseResponseModel):

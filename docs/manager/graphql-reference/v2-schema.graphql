@@ -4363,9 +4363,16 @@ input MetricLabelEntryInput {
 Added in UNRELEASED. Configuration for a single model in the model definition.
 """
 type ModelConfig {
+  """Name of the model."""
   name: String!
+
+  """Path to the model file."""
   modelPath: String!
+
+  """Configuration for the model service."""
   service: ModelServiceConfig
+
+  """Metadata about the model."""
   metadata: ModelMetadata
 }
 
@@ -4390,6 +4397,7 @@ input ModelConfigInput {
 Added in UNRELEASED. Model definition containing one or more model entries.
 """
 type ModelDefinition {
+  """List of models in the model definition."""
   models: [ModelConfig!]!
 }
 
@@ -4495,11 +4503,22 @@ input ModelDeploymentNetworkAccessInput {
 
 """Added in UNRELEASED. Health check configuration for a model service."""
 type ModelHealthCheck {
+  """Interval in seconds between health checks."""
   interval: Float!
+
+  """Path to check for health status."""
   path: String!
+
+  """Maximum number of retries for health check."""
   maxRetries: Int!
+
+  """Maximum time in seconds to wait for a health check response."""
   maxWaitTime: Float!
+
+  """Expected HTTP status code for a healthy response."""
   expectedStatusCode: Int!
+
+  """Initial delay in seconds before the first health check."""
   initialDelay: Float!
 }
 
@@ -4526,18 +4545,43 @@ input ModelHealthCheckInput {
 
 """Added in UNRELEASED. Metadata describing a model entry."""
 type ModelMetadata {
+  """Author of the model."""
   author: String
+
+  """Title of the model."""
   title: String
+
+  """Version identifier of the model."""
   version: JSON
+
+  """Creation date of the model."""
   created: String
+
+  """Last modification date of the model."""
   lastModified: String
+
+  """Description of the model."""
   description: String
+
+  """Task type of the model."""
   task: String
+
+  """Category of the model."""
   category: String
+
+  """Architecture metadata for the model."""
   architecture: String
+
+  """Frameworks used by the model."""
   framework: [String!]
+
+  """Labels attached to the model."""
   label: [String!]
+
+  """License of the model."""
   license: String
+
+  """Minimum resource requirements for the model."""
   minResource: JSON
 }
 
@@ -4755,10 +4799,21 @@ input ModelRuntimeConfigInput {
 
 """Added in UNRELEASED. Service configuration for a model entry."""
 type ModelServiceConfig {
+  """
+  List of pre-start actions to execute before starting the model service.
+  """
   preStartActions: [PreStartAction!]!
+
+  """Command to start the model service."""
   startCommand: JSON!
+
+  """Shell to use if start_command is a string."""
   shell: String!
+
+  """Port number for the model service."""
   port: Int!
+
+  """Health check configuration for the model service."""
   healthCheck: ModelHealthCheck
 }
 
@@ -5746,7 +5801,10 @@ enum PermissionOrderField {
 Added in UNRELEASED. A pre-start action to execute before starting the model service.
 """
 type PreStartAction {
+  """The name of the pre-start action to execute."""
   action: String!
+
+  """Arguments for the pre-start action."""
   args: JSON!
 }
 
