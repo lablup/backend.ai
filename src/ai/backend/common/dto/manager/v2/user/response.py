@@ -33,7 +33,7 @@ __all__ = (
     "UpdateUserPayload",
     "UserBasicInfo",
     "UserContainerSettings",
-    "UserGroupMembershipDTO",
+    "UserGroupMembershipInfo",
     "UserNode",
     "UserOrganizationInfo",
     "UserPayload",
@@ -159,7 +159,7 @@ class EntityTimestamps(BaseModel):
     )
 
 
-class UserGroupMembershipDTO(BaseResponseModel):
+class UserGroupMembershipInfo(BaseResponseModel):
     """Group membership information for a user."""
 
     id: UUID = Field(
@@ -194,7 +194,7 @@ class UserNode(BaseResponseModel):
     timestamps: EntityTimestamps = Field(
         description="Creation and modification timestamps.",
     )
-    groups: list[UserGroupMembershipDTO] = Field(
+    groups: list[UserGroupMembershipInfo] = Field(
         default_factory=list,
         description="List of groups the user belongs to.",
     )

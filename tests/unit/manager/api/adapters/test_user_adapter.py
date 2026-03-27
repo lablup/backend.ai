@@ -6,7 +6,7 @@ from datetime import UTC, datetime
 from uuid import UUID, uuid4
 
 from ai.backend.common.data.user.types import UserRole as DataUserRole
-from ai.backend.common.dto.manager.v2.user.response import UserGroupMembershipDTO
+from ai.backend.common.dto.manager.v2.user.response import UserGroupMembershipInfo
 from ai.backend.manager.api.adapters.user import UserAdapter
 from ai.backend.manager.data.user.types import UserData, UserGroupMembership
 
@@ -67,8 +67,8 @@ class TestUserDataToNodeGroups:
         node = UserAdapter._user_data_to_node(data)
 
         assert len(node.groups) == 2
-        assert isinstance(node.groups[0], UserGroupMembershipDTO)
-        assert isinstance(node.groups[1], UserGroupMembershipDTO)
+        assert isinstance(node.groups[0], UserGroupMembershipInfo)
+        assert isinstance(node.groups[1], UserGroupMembershipInfo)
         assert node.groups[0].id == group_id_1
         assert node.groups[0].name == "researchers"
         assert node.groups[1].id == group_id_2

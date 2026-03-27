@@ -406,7 +406,7 @@ class UserRow(Base):  # type: ignore[misc]
 
     def to_data(self) -> UserData:
         groups: list[UserGroupMembership] = []
-        if "groups" in self.__dict__:
+        if "groups" not in sa.inspect(self).unloaded:
             groups = [
                 UserGroupMembership(id=assoc.group.id, name=assoc.group.name)
                 for assoc in self.groups

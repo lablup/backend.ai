@@ -53,7 +53,7 @@ from ai.backend.common.dto.manager.v2.user.response import (
     UpdateUserPayload,
     UserBasicInfo,
     UserContainerSettings,
-    UserGroupMembershipDTO,
+    UserGroupMembershipInfo,
     UserNode,
     UserOrganizationInfo,
     UserPayload,
@@ -1131,5 +1131,5 @@ class UserAdapter(BaseAdapter):
                 created_at=data.created_at,
                 modified_at=data.modified_at,
             ),
-            groups=[UserGroupMembershipDTO(id=m.id, name=m.name) for m in data.groups],
+            groups=[UserGroupMembershipInfo(id=m.id, name=m.name) for m in data.groups],
         )

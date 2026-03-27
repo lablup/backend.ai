@@ -134,18 +134,15 @@ class UserDBSource:
         Admin-only operation.
         """
         async with self._db.begin_readonly_session_read_committed() as db_session:
-            query = (
-                sa.select(UserRow)
-                .where(UserRow.uuid == user_uuid)
-                .options(
+            user_row = await self._get_user_by_uuid(
+                db_session,
+                user_uuid,
+                options=[
                     selectinload(UserRow.groups)
                     .joinedload(AssocGroupUserRow.group)
                     .load_only(GroupRow.id, GroupRow.name),
-                )
+                ],
             )
-            user_row = await db_session.scalar(query)
-            if user_row is None:
-                raise UserNotFound(f"User with UUID {user_uuid} not found.")
             return user_row.to_data()
 
     async def get_by_email_validated(
@@ -828,9 +825,17 @@ class UserDBSource:
             raise UserNotFound(f"User with email {email} not found.")
         return res
 
-    async def _get_user_by_uuid(self, session: SASession, user_uuid: UUID) -> UserRow:
+    async def _get_user_by_uuid(
+        self,
+        session: SASession,
+        user_uuid: UUID,
+        options: Sequence[sa.orm.strategy_options._AbstractLoad] | None = None,
+    ) -> UserRow:
         """Private method to get user by UUID."""
-        res = await session.scalar(sa.select(UserRow).where(UserRow.uuid == user_uuid))
+        query = sa.select(UserRow).where(UserRow.uuid == user_uuid)
+        if options:
+            query = query.options(*options)
+        res = await session.scalar(query)
         if res is None:
             raise UserNotFound(f"User with UUID {user_uuid} not found.")
         return res

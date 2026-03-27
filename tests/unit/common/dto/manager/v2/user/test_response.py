@@ -14,7 +14,7 @@ from ai.backend.common.dto.manager.v2.user.response import (
     SearchUsersPayload,
     UserBasicInfo,
     UserContainerSettings,
-    UserGroupMembershipDTO,
+    UserGroupMembershipInfo,
     UserNode,
     UserOrganizationInfo,
     UserPayload,
@@ -399,20 +399,20 @@ class TestPurgeUserPayload:
         assert restored.success is False
 
 
-class TestUserGroupMembershipDTO:
-    """Tests for UserGroupMembershipDTO sub-model."""
+class TestUserGroupMembershipInfo:
+    """Tests for UserGroupMembershipInfo sub-model."""
 
     def test_creation_with_required_fields(self) -> None:
         gid = uuid.uuid4()
-        membership = UserGroupMembershipDTO(id=gid, name="my-group")
+        membership = UserGroupMembershipInfo(id=gid, name="my-group")
         assert membership.id == gid
         assert membership.name == "my-group"
 
     def test_round_trip(self) -> None:
         gid = uuid.uuid4()
-        membership = UserGroupMembershipDTO(id=gid, name="researchers")
+        membership = UserGroupMembershipInfo(id=gid, name="researchers")
         json_data = membership.model_dump_json()
-        restored = UserGroupMembershipDTO.model_validate_json(json_data)
+        restored = UserGroupMembershipInfo.model_validate_json(json_data)
         assert restored.id == gid
         assert restored.name == "researchers"
 
@@ -427,8 +427,8 @@ class TestUserNodeGroups:
     def test_groups_with_populated_list(self) -> None:
         node = make_user_node()
         g1, g2 = uuid.uuid4(), uuid.uuid4()
-        group1 = UserGroupMembershipDTO(id=g1, name="group-one")
-        group2 = UserGroupMembershipDTO(id=g2, name="group-two")
+        group1 = UserGroupMembershipInfo(id=g1, name="group-one")
+        group2 = UserGroupMembershipInfo(id=g2, name="group-two")
         node_with_groups = node.model_copy(update={"groups": [group1, group2]})
         assert len(node_with_groups.groups) == 2
         assert node_with_groups.groups[0].id == g1
@@ -439,7 +439,7 @@ class TestUserNodeGroups:
     def test_groups_round_trip_serialization(self) -> None:
         user_id = uuid.uuid4()
         gid = uuid.uuid4()
-        group = UserGroupMembershipDTO(id=gid, name="test-group")
+        group = UserGroupMembershipInfo(id=gid, name="test-group")
         node = make_user_node(user_id)
         node_with_groups = node.model_copy(update={"groups": [group]})
         json_str = node_with_groups.model_dump_json()
