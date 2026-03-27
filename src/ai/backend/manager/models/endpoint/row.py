@@ -423,7 +423,7 @@ class EndpointRow(Base):  # type: ignore[misc]
         return row
 
     @classmethod
-    async def list(
+    async def list_endpoint(
         cls,
         session: AsyncSession,
         domain: str | None = None,
@@ -594,7 +594,7 @@ class EndpointRow(Base):  # type: ignore[misc]
         from ai.backend.manager.models.routing import RoutingRow
         from ai.backend.manager.models.session import KernelLoadingStrategy, SessionRow
 
-        endpoint_rows = await EndpointRow.list(
+        endpoint_rows = await EndpointRow.list_endpoint(
             db_session,
             user_uuid=owner_user_uuid,
             load_session_owner=True,

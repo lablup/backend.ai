@@ -839,7 +839,7 @@ class Endpoint(graphene.ObjectType):  # type: ignore[misc]
         project: UUID | None = None,
     ) -> Sequence[Self]:
         async with ctx.db.begin_readonly_session() as session:
-            rows = await EndpointRow.list(
+            rows = await EndpointRow.list_endpoint(
                 session,
                 project=project,
                 domain=domain_name,
