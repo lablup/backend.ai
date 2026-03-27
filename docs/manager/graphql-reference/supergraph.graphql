@@ -14654,6 +14654,7 @@ input UserV2Filter
   email: StringFilter = null
   status: UserStatusV2EnumFilter = null
   domainName: StringFilter = null
+  integrationId: StringFilter = null
   role: UserRoleV2EnumFilter = null
   createdAt: DateTimeFilter = null
   domain: UserDomainNestedFilter = null
