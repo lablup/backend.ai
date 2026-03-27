@@ -7,7 +7,7 @@ from datetime import datetime
 from typing import TYPE_CHECKING
 
 import sqlalchemy as sa
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 from sqlalchemy.dialects import postgresql as pgsql
 from sqlalchemy.orm import Mapped, foreign, mapped_column, relationship
 
@@ -49,6 +49,14 @@ class RollingUpdateSpec(BaseModel):
     max_unavailable: IntOrPercent = Field(
         default_factory=lambda: IntOrPercent(type=IntOrPercentType.PERCENT, percent=0.0)
     )
+
+    @field_validator("max_surge", "max_unavailable", mode="before")
+    @classmethod
+    def _coerce_legacy_int(cls, v: object) -> object:
+        """Accept plain int from legacy DB rows (pre-IntOrPercent schema)."""
+        if isinstance(v, int):
+            return IntOrPercent(type=IntOrPercentType.COUNT, count=v)
+        return v
 
     @model_validator(mode="after")
     def _validate_progress_is_possible(self) -> RollingUpdateSpec:

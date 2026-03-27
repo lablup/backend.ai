@@ -51,14 +51,14 @@ def upgrade() -> None:
 
     class SessionRow(Base):  # type: ignore[valid-type, misc]
         __tablename__ = "sessions"
-        id: sa.Column[UUID] = sa.Column(
+        id = sa.Column(
             "id",
             GUID(),
             server_default=sa.text("uuid_generate_v4()"),
             nullable=False,
             primary_key=True,
         )
-        images: sa.Column[list[str] | None] = sa.Column(
+        images = sa.Column(
             "images", sa.ARRAY(sa.String), nullable=True
         )
 
