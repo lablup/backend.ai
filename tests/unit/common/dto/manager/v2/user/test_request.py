@@ -8,6 +8,7 @@ import pytest
 from pydantic import ValidationError
 
 from ai.backend.common.api_handlers import SENTINEL, Sentinel
+from ai.backend.common.dto.manager.query import StringFilter
 from ai.backend.common.dto.manager.v2.user.request import (
     CreateUserInput,
     DeleteUserInput,
@@ -441,8 +442,20 @@ class TestUserFilter:
         assert f.email is None
         assert f.username is None
         assert f.domain_name is None
+        assert f.integration_id is None
         assert f.status is None
         assert f.role is None
+
+    def test_integration_id_filter(self) -> None:
+        f = UserFilter(
+            integration_id=StringFilter(equals="k8s-user"),
+        )
+        assert f.integration_id is not None
+        assert f.integration_id.equals == "k8s-user"
+
+    def test_integration_id_filter_defaults_to_none(self) -> None:
+        f = UserFilter(email=StringFilter(contains="test"))
+        assert f.integration_id is None
 
     def test_status_filter(self) -> None:
         f = UserFilter(status=UserStatusFilter(in_=[UserStatus.ACTIVE, UserStatus.INACTIVE]))

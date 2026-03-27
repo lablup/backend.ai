@@ -825,6 +825,17 @@ class UserAdapter(BaseAdapter):
             if condition is not None:
                 conditions.append(condition)
 
+        if filter_req.integration_id is not None:
+            condition = self.convert_string_filter(
+                filter_req.integration_id,
+                contains_factory=UserConditions.by_integration_id_contains,
+                equals_factory=UserConditions.by_integration_id_equals,
+                starts_with_factory=UserConditions.by_integration_id_starts_with,
+                ends_with_factory=UserConditions.by_integration_id_ends_with,
+            )
+            if condition is not None:
+                conditions.append(condition)
+
         if filter_req.role is not None:
             conditions.extend(self._convert_role_filter(filter_req.role))
 
@@ -997,6 +1008,17 @@ class UserAdapter(BaseAdapter):
                 equals_factory=UserConditions.by_domain_name_equals,
                 starts_with_factory=UserConditions.by_domain_name_starts_with,
                 ends_with_factory=UserConditions.by_domain_name_ends_with,
+            )
+            if condition is not None:
+                conditions.append(condition)
+
+        if filter_req.integration_id is not None:
+            condition = self.convert_string_filter(
+                filter_req.integration_id,
+                contains_factory=UserConditions.by_integration_id_contains,
+                equals_factory=UserConditions.by_integration_id_equals,
+                starts_with_factory=UserConditions.by_integration_id_starts_with,
+                ends_with_factory=UserConditions.by_integration_id_ends_with,
             )
             if condition is not None:
                 conditions.append(condition)

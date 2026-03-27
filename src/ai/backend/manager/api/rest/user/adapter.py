@@ -203,6 +203,17 @@ class UserAdapter(BaseFilterAdapter):
             if condition is not None:
                 conditions.append(condition)
 
+        if filter_req.integration_id is not None:
+            condition = self.convert_string_filter(
+                filter_req.integration_id,
+                contains_factory=UserConditions.by_integration_id_contains,
+                equals_factory=UserConditions.by_integration_id_equals,
+                starts_with_factory=UserConditions.by_integration_id_starts_with,
+                ends_with_factory=UserConditions.by_integration_id_ends_with,
+            )
+            if condition is not None:
+                conditions.append(condition)
+
         if filter_req.status is not None and len(filter_req.status) > 0:
             conditions.append(
                 UserConditions.by_status_in([UserStatus(s.value) for s in filter_req.status])

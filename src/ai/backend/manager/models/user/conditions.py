@@ -129,6 +129,60 @@ class UserConditions:
 
         return inner
 
+    # ==================== Integration ID Filters ====================
+
+    @staticmethod
+    def by_integration_id_contains(spec: StringMatchSpec) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            if spec.case_insensitive:
+                condition = UserRow.integration_id.ilike(f"%{spec.value}%")
+            else:
+                condition = UserRow.integration_id.like(f"%{spec.value}%")
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
+
+        return inner
+
+    @staticmethod
+    def by_integration_id_equals(spec: StringMatchSpec) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            if spec.case_insensitive:
+                condition = sa.func.lower(UserRow.integration_id) == spec.value.lower()
+            else:
+                condition = UserRow.integration_id == spec.value
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
+
+        return inner
+
+    @staticmethod
+    def by_integration_id_starts_with(spec: StringMatchSpec) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            if spec.case_insensitive:
+                condition = UserRow.integration_id.ilike(f"{spec.value}%")
+            else:
+                condition = UserRow.integration_id.like(f"{spec.value}%")
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
+
+        return inner
+
+    @staticmethod
+    def by_integration_id_ends_with(spec: StringMatchSpec) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            if spec.case_insensitive:
+                condition = UserRow.integration_id.ilike(f"%{spec.value}")
+            else:
+                condition = UserRow.integration_id.like(f"%{spec.value}")
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
+
+        return inner
+
     # ==================== Domain Name Filters ====================
 
     @staticmethod

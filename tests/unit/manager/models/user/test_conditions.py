@@ -72,6 +72,74 @@ _WITH_TABLES = [
 ]
 
 
+class TestUserConditionsIntegrationIdFilters:
+    """Tests for integration_id filter conditions in UserConditions."""
+
+    def test_by_integration_id_contains(self) -> None:
+        spec = StringMatchSpec(value="ext-abc", case_insensitive=False, negated=False)
+        condition = UserConditions.by_integration_id_contains(spec)
+        sql = str(condition().compile(compile_kwargs={"literal_binds": True}))
+        assert "integration_id" in sql
+        assert "LIKE" in sql.upper()
+        assert "%ext-abc%" in sql
+
+    def test_by_integration_id_contains_case_insensitive(self) -> None:
+        spec = StringMatchSpec(value="ext-abc", case_insensitive=True, negated=False)
+        condition = UserConditions.by_integration_id_contains(spec)
+        sql = str(condition().compile(compile_kwargs={"literal_binds": True}))
+        assert "lower" in sql
+
+    def test_by_integration_id_contains_negated(self) -> None:
+        spec = StringMatchSpec(value="ext-abc", case_insensitive=False, negated=True)
+        condition = UserConditions.by_integration_id_contains(spec)
+        sql = str(condition().compile(compile_kwargs={"literal_binds": True}))
+        assert "NOT LIKE" in sql.upper()
+
+    def test_by_integration_id_equals(self) -> None:
+        spec = StringMatchSpec(value="ext-abc", case_insensitive=False, negated=False)
+        condition = UserConditions.by_integration_id_equals(spec)
+        sql = str(condition().compile(compile_kwargs={"literal_binds": True}))
+        assert "integration_id" in sql
+        assert "ext-abc" in sql
+
+    def test_by_integration_id_equals_case_insensitive(self) -> None:
+        spec = StringMatchSpec(value="Ext-ABC", case_insensitive=True, negated=False)
+        condition = UserConditions.by_integration_id_equals(spec)
+        sql = str(condition().compile(compile_kwargs={"literal_binds": True}))
+        assert "lower" in sql
+
+    def test_by_integration_id_equals_negated(self) -> None:
+        spec = StringMatchSpec(value="ext-abc", case_insensitive=False, negated=True)
+        condition = UserConditions.by_integration_id_equals(spec)
+        sql = str(condition().compile(compile_kwargs={"literal_binds": True}))
+        assert "!=" in sql or "NOT" in sql.upper()
+
+    def test_by_integration_id_starts_with(self) -> None:
+        spec = StringMatchSpec(value="ext-", case_insensitive=False, negated=False)
+        condition = UserConditions.by_integration_id_starts_with(spec)
+        sql = str(condition().compile(compile_kwargs={"literal_binds": True}))
+        assert "integration_id" in sql
+        assert "LIKE" in sql.upper()
+
+    def test_by_integration_id_ends_with(self) -> None:
+        spec = StringMatchSpec(value="-abc", case_insensitive=False, negated=False)
+        condition = UserConditions.by_integration_id_ends_with(spec)
+        sql = str(condition().compile(compile_kwargs={"literal_binds": True}))
+        assert "integration_id" in sql
+        assert "LIKE" in sql.upper()
+
+    def test_closure_independence(self) -> None:
+        spec_a = StringMatchSpec(value="alpha", case_insensitive=False, negated=False)
+        spec_b = StringMatchSpec(value="beta", case_insensitive=False, negated=False)
+        cond_a = UserConditions.by_integration_id_contains(spec_a)
+        cond_b = UserConditions.by_integration_id_contains(spec_b)
+        sql_a = str(cond_a().compile(compile_kwargs={"literal_binds": True}))
+        sql_b = str(cond_b().compile(compile_kwargs={"literal_binds": True}))
+        assert sql_a != sql_b
+        assert "alpha" in sql_a
+        assert "beta" in sql_b
+
+
 class TestUserConditionsDomainNestedFilters:
     """Tests for Domain nested filter conditions in UserConditions."""
 

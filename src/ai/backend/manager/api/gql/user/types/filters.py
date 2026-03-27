@@ -108,6 +108,7 @@ class UserFilterGQL(PydanticInputMixin[UserFilter]):
     email: StringFilter | None = None
     status: UserStatusEnumFilterGQL | None = None
     domain_name: StringFilter | None = None
+    integration_id: StringFilter | None = None
     role: UserRoleEnumFilterGQL | None = None
     created_at: DateTimeFilter | None = None
     domain: UserDomainNestedFilterGQL | None = None
