@@ -1,5 +1,11 @@
 """VFolderV2 GraphQL types package."""
 
+from .enum import (
+    VFolderOperationStatusGQL,
+    VFolderOwnershipTypeGQL,
+    VFolderPermissionGQL,
+    VFolderUsageModeGQL,
+)
 from .filters import (
     VFolderV2FilterGQL,
     VFolderV2OperationStatusFilterGQL,
@@ -18,6 +24,10 @@ from .node import VFolderV2Connection, VFolderV2Edge, VFolderV2GQL
 
 __all__ = [
     # Enum types
+    "VFolderUsageModeGQL",
+    "VFolderPermissionGQL",
+    "VFolderOwnershipTypeGQL",
+    "VFolderOperationStatusGQL",
     "VFolderV2OperationStatusGQL",
     "VFolderV2UsageModeGQL",
     # Enum filters

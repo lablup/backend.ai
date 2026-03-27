@@ -10519,6 +10519,7 @@ type VFolderMetadataInfo {
   lastUsed: DateTime
 }
 
+"""Added in UNRELEASED. Operation status of a virtual folder."""
 enum VFolderOperationStatusField {
   READY
   PERFORMING
@@ -10531,11 +10532,15 @@ enum VFolderOperationStatusField {
   DELETE_ERROR
 }
 
+"""
+Added in UNRELEASED. Ownership type of a virtual folder (USER or GROUP).
+"""
 enum VFolderOwnershipTypeField {
   USER
   GROUP
 }
 
+"""Added in UNRELEASED. Mount permission level for a virtual folder."""
 enum VFolderPermissionField {
   READ_ONLY
   READ_WRITE
@@ -10551,6 +10556,9 @@ type VFolderUsageInfo {
   maxFiles: Int!
 }
 
+"""
+Added in UNRELEASED. Usage mode of a virtual folder (GENERAL, MODEL, DATA).
+"""
 enum VFolderUsageMode {
   GENERAL
   MODEL

@@ -4,8 +4,6 @@ from __future__ import annotations
 
 from datetime import datetime
 
-import strawberry
-
 from ai.backend.common.dto.manager.v2.vfolder.types import (
     VFolderAccessControlInfo as VFolderAccessControlInfoDTO,
 )
@@ -20,6 +18,11 @@ from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     gql_field,
     gql_pydantic_type,
+)
+from ai.backend.manager.api.gql.vfolder_v2.types.enum import (
+    VFolderOwnershipTypeGQL,
+    VFolderPermissionGQL,
+    VFolderUsageModeGQL,
 )
 
 
@@ -39,7 +42,7 @@ class VFolderMetadataInfoGQL:
     """Descriptive metadata fields for a virtual folder."""
 
     name: str = gql_field(description="Display name of the virtual folder.")
-    usage_mode: strawberry.auto = gql_field(
+    usage_mode: VFolderUsageModeGQL = gql_field(
         description="Usage mode: GENERAL (normal), MODEL (shared models), or DATA (shared datasets)."
     )
     quota_scope_id: str | None = gql_field(
@@ -66,10 +69,10 @@ class VFolderMetadataInfoGQL:
 class VFolderAccessControlInfoGQL:
     """Access control and ownership type information."""
 
-    permission: strawberry.auto = gql_field(
+    permission: VFolderPermissionGQL = gql_field(
         description="Mount permission level: READ_ONLY (ro), READ_WRITE (rw), or RW_DELETE (wd)."
     )
-    ownership_type: strawberry.auto = gql_field(
+    ownership_type: VFolderOwnershipTypeGQL = gql_field(
         description="Ownership type: USER (personal folder) or GROUP (project-shared folder)."
     )
     cloneable: bool = gql_field(
