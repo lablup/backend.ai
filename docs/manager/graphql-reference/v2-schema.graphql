@@ -3572,21 +3572,12 @@ input IntFilter {
 }
 
 """
-Added in UNRELEASED. Input for a rolling-update budget value.
-Set type to COUNT and provide 'count', or set type to PERCENT and provide 'percent' (0.0-1.0).
+Added in UNRELEASED. Input for a rolling-update budget value (oneOf).
+Provide exactly one of 'count' (absolute replica count) or 'percent' (0.0-1.0 fraction).
 """
-input IntOrPercentInput {
-  type: IntOrPercentType!
+input IntOrPercentInput @oneOf {
   count: Int
   percent: Float
-}
-
-"""
-Added in UNRELEASED. Type of a surge value: 'count' for an absolute replica count, 'percent' for a fraction of desired replicas (0.0-1.0).
-"""
-enum IntOrPercentType {
-  COUNT
-  PERCENT
 }
 
 """
