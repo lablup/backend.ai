@@ -82,6 +82,7 @@ class TestRbacEntityOperationCombinationsResolver:
             for op in combo.operations:
                 assert hasattr(op, "operation")
                 assert hasattr(op, "description")
+                assert hasattr(op, "required_permission")
 
     async def test_operations_are_sorted(self) -> None:
         info = MagicMock()

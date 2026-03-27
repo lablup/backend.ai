@@ -318,6 +318,7 @@ class ScopeEntityCombinationGQL(PydanticOutputMixin[ScopeEntityCombinationInfo])
 class OperationInfoGQL(PydanticOutputMixin[OperationInfo]):
     operation: str
     description: str
+    required_permission: OperationTypeGQL
 
 
 @gql_pydantic_type(

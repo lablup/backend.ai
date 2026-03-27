@@ -24,6 +24,7 @@ from ai.backend.manager.api.gql.rbac.types import (
     DeletePermissionPayload,
     EntityOperationCombinationGQL,
     OperationInfoGQL,
+    OperationTypeGQL,
     PermissionConnection,
     PermissionFilter,
     PermissionGQL,
@@ -123,7 +124,11 @@ async def rbac_entity_operation_combinations(
         name = action_cls.action_name()
         desc = build_operation_description(name, perm.element_type)
         entity_ops.setdefault(perm.element_type, []).append(
-            OperationInfoGQL(operation=name.value, description=desc)
+            OperationInfoGQL(
+                operation=name.value,
+                description=desc,
+                required_permission=OperationTypeGQL(perm.operation.value),
+            )
         )
     return [
         EntityOperationCombinationGQL(
