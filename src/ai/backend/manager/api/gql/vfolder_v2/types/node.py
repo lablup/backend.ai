@@ -10,6 +10,7 @@ from strawberry import Info
 from strawberry.relay import Connection, Edge, NodeID
 
 from ai.backend.common.dto.manager.v2.vfolder.response import VFolderNode
+from ai.backend.common.dto.manager.v2.vfolder.types import VFolderOperationStatusField
 from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
@@ -47,7 +48,7 @@ class VFolderV2GQL(PydanticNodeMixin[VFolderNode]):
     """Virtual folder entity with structured field groups."""
 
     id: NodeID[str] = gql_field(description="Unique identifier of the virtual folder.")
-    status: strawberry.auto = gql_field(
+    status: VFolderOperationStatusField = gql_field(
         description=(
             "Current operation status. "
             "READY, PERFORMING, CLONING, MOUNTED, ERROR, "

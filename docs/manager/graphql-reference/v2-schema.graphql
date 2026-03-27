@@ -6904,6 +6904,9 @@ type Query {
   Added in UNRELEASED. Check which resource presets are available for session creation.
   """
   checkPresetAvailabilityV2(input: CheckPresetAvailabilityV2Input!): CheckPresetAvailabilityPayloadV2!
+
+  """Added in UNRELEASED. List virtual folders within a specific project."""
+  projectVfoldersV2(projectId: UUID!, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): VFolderV2Connection!
 }
 
 """
@@ -10463,6 +10466,15 @@ type VFSStorageEdge {
 }
 
 """
+Added in UNRELEASED. Access control information for a virtual folder. Includes the mount permission level (read-only, read-write, read-write-delete), ownership type (user or project), and clone eligibility.
+"""
+type VFolderAccessControlInfo {
+  permission: VFolderPermissionField!
+  ownershipType: VFolderOwnershipTypeField!
+  cloneable: Boolean!
+}
+
+"""
 Added in 26.2.0. Storage host permission configuration. Defines what operations are allowed for a specific storage host.
 """
 type VFolderHostPermissionEntry {
@@ -10494,6 +10506,121 @@ enum VFolderHostPermissionV2 {
   DOWNLOAD_FILE
   INVITE_OTHERS
   SET_USER_PERM
+}
+
+"""
+Added in UNRELEASED. Descriptive metadata for a virtual folder. Includes the folder name, usage mode, quota scope, and timestamps.
+"""
+type VFolderMetadataInfo {
+  name: String!
+  usageMode: VFolderUsageMode!
+  quotaScopeId: String
+  createdAt: DateTime!
+  lastUsed: DateTime
+}
+
+enum VFolderOperationStatusField {
+  READY
+  PERFORMING
+  CLONING
+  MOUNTED
+  ERROR
+  DELETE_PENDING
+  DELETE_ONGOING
+  DELETE_COMPLETE
+  DELETE_ERROR
+}
+
+enum VFolderOwnershipTypeField {
+  USER
+  GROUP
+}
+
+enum VFolderPermissionField {
+  READ_ONLY
+  READ_WRITE
+  RW_DELETE
+}
+
+"""
+Added in UNRELEASED. Storage usage statistics for a virtual folder. Reports current file count and byte usage, along with configured quota limits. May be null in list responses where usage data is not loaded for performance reasons.
+"""
+type VFolderUsageInfo {
+  usedBytes: Int!
+  maxSize: Int
+  maxFiles: Int!
+}
+
+enum VFolderUsageMode {
+  GENERAL
+  MODEL
+  DATA
+}
+
+"""
+Added in UNRELEASED. Virtual folder entity with structured field groups. Provides comprehensive vfolder information organized into logical categories: metadata (descriptive), permission (access control), and usage (storage statistics). Owner and creator are resolved as Node references.
+"""
+type VFolderV2 implements Node {
+  """The Globally Unique ID of this object"""
+  id: ID!
+
+  """
+  Current operation status. READY, PERFORMING, CLONING, MOUNTED, ERROR, DELETE_PENDING, DELETE_ONGOING, DELETE_COMPLETE, or DELETE_ERROR.
+  """
+  status: VFolderOperationStatusField!
+
+  """Storage host where the virtual folder is physically located."""
+  host: String!
+
+  """
+  Descriptive metadata including name, usage mode, quota scope, and timestamps.
+  """
+  metadata: VFolderMetadataInfo!
+
+  """
+  Access control including permission level, ownership type, and clone eligibility.
+  """
+  accessControl: VFolderAccessControlInfo!
+
+  """Usage statistics; None when usage data is not loaded."""
+  usage: VFolderUsageInfo
+
+  """Path for unmanaged virtual folders."""
+  unmanagedPath: String
+
+  """The user who owns this virtual folder. Null for project-owned folders."""
+  ownerUser: UserV2
+
+  """
+  The project that owns this virtual folder. Null for user-owned folders.
+  """
+  ownerProject: ProjectV2
+
+  """The user who originally created this virtual folder."""
+  creator: UserV2
+}
+
+"""
+Added in UNRELEASED. Paginated connection for virtual folder records. Provides relay-style cursor-based pagination for efficient traversal of vfolder data. Use 'edges' to access individual records with cursor information, or 'nodes' for direct data access.
+"""
+type VFolderV2Connection {
+  """Pagination data for this connection"""
+  pageInfo: PageInfo!
+
+  """Contains the nodes in this connection"""
+  edges: [VFolderV2Edge!]!
+
+  """Total number of virtual folder records matching the query criteria."""
+  count: Int!
+}
+
+"""An edge in a connection."""
+type VFolderV2Edge {
+  """A cursor for use in pagination"""
+  cursor: String!
+
+  """The item at the end of the edge"""
+  node: VFolderV2!
 }
 
 """Added in 24.09.0. Input for validate notification channel mutation"""
