@@ -284,11 +284,16 @@ def _create_promotion_specs() -> Mapping[ScheduleType, PromotionSpec]:
     - ALL: All kernels must be in these statuses (used for completion checks)
     """
     return {
-        # Promote to PREPARED when no kernel is in pre-prepared states
-        # (handles terminal statuses gracefully)
+        # Promote to PREPARED when no kernel is in pre-prepared states.
+        # Includes SCHEDULED to handle cases where kernels advance to PREPARED
+        # while the session status update to PREPARING hasn't happened yet.
         ScheduleType.CHECK_PULLING_PROGRESS: PromotionSpec(
             name="promote-to-prepared",
-            target_statuses=[SessionStatus.PREPARING, SessionStatus.PULLING],
+            target_statuses=[
+                SessionStatus.SCHEDULED,
+                SessionStatus.PREPARING,
+                SessionStatus.PULLING,
+            ],
             target_kernel_statuses=list(KernelStatus.pre_prepared_statuses()),
             kernel_match_type=KernelMatchType.NOT_ANY,
             success_status=SessionStatus.PREPARED,
