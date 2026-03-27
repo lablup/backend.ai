@@ -25,9 +25,8 @@ if TYPE_CHECKING:
     from ai.backend.manager.api.gql.user.types.node import UserV2GQL
 
 from .nested import (
-    VFolderBasicInfoGQL,
-    VFolderOwnerInfoGQL,
-    VFolderPermissionInfoGQL,
+    VFolderAccessControlInfoGQL,
+    VFolderMetadataInfoGQL,
     VFolderUsageInfoGQL,
 )
 
@@ -38,8 +37,8 @@ from .nested import (
         description=(
             "Virtual folder entity with structured field groups. "
             "Provides comprehensive vfolder information organized "
-            "into logical categories: basic (identity), permission (access control), "
-            "owner (ownership context), and usage (storage statistics)."
+            "into logical categories: metadata (descriptive), permission (access control), "
+            "and usage (storage statistics). Owner and creator are resolved as Node references."
         ),
     ),
     name="VFolderV2",
@@ -48,14 +47,21 @@ class VFolderV2GQL(PydanticNodeMixin[VFolderNode]):
     """Virtual folder entity with structured field groups."""
 
     id: NodeID[str] = gql_field(description="Unique identifier of the virtual folder.")
-    basic: VFolderBasicInfoGQL = gql_field(
-        description="Basic virtual folder information including name, host, and status."
+    status: strawberry.auto = gql_field(
+        description=(
+            "Current operation status. "
+            "READY, PERFORMING, CLONING, MOUNTED, ERROR, "
+            "DELETE_PENDING, DELETE_ONGOING, DELETE_COMPLETE, or DELETE_ERROR."
+        )
     )
-    permission: VFolderPermissionInfoGQL = gql_field(
-        description="Permission and ownership type information."
+    host: str = gql_field(
+        description="Storage host where the virtual folder is physically located."
     )
-    owner: VFolderOwnerInfoGQL = gql_field(
-        description="Owner context including user, group, and creator."
+    metadata: VFolderMetadataInfoGQL = gql_field(
+        description="Descriptive metadata including name, usage mode, quota scope, and timestamps."
+    )
+    access_control: VFolderAccessControlInfoGQL = gql_field(
+        description="Access control including permission level, ownership type, and clone eligibility."
     )
     usage: VFolderUsageInfoGQL | None = gql_field(
         description="Usage statistics; None when usage data is not loaded."
@@ -63,7 +69,7 @@ class VFolderV2GQL(PydanticNodeMixin[VFolderNode]):
     unmanaged_path: str | None = gql_field(description="Path for unmanaged virtual folders.")
 
     @gql_field(description="The user who owns this virtual folder. Null for project-owned folders.")  # type: ignore[misc]
-    async def user(
+    async def owner_user(
         self,
         info: Info[StrawberryGQLContext],
     ) -> (
@@ -73,15 +79,13 @@ class VFolderV2GQL(PydanticNodeMixin[VFolderNode]):
         ]
         | None
     ):
-        if self.owner is None or self.owner.user_id is None:
-            return None
         # Defer to data loader when wired; stub returns None for now.
         return None
 
     @gql_field(
         description="The project that owns this virtual folder. Null for user-owned folders."
     )  # type: ignore[misc]
-    async def project(
+    async def owner_project(
         self,
         info: Info[StrawberryGQLContext],
     ) -> (
@@ -91,8 +95,20 @@ class VFolderV2GQL(PydanticNodeMixin[VFolderNode]):
         ]
         | None
     ):
-        if self.owner is None or self.owner.group_id is None:
-            return None
+        # Defer to data loader when wired; stub returns None for now.
+        return None
+
+    @gql_field(description="The user who originally created this virtual folder.")  # type: ignore[misc]
+    async def creator(
+        self,
+        info: Info[StrawberryGQLContext],
+    ) -> (
+        Annotated[
+            UserV2GQL,
+            strawberry.lazy("ai.backend.manager.api.gql.user.types.node"),
+        ]
+        | None
+    ):
         # Defer to data loader when wired; stub returns None for now.
         return None
 

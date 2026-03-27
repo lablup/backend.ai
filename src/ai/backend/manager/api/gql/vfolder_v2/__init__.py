@@ -5,9 +5,8 @@ replacing JSON scalars and organized into logical field groups.
 """
 
 from .types import (
-    VFolderBasicInfoGQL,
-    VFolderOwnerInfoGQL,
-    VFolderPermissionInfoGQL,
+    VFolderAccessControlInfoGQL,
+    VFolderMetadataInfoGQL,
     VFolderUsageInfoGQL,
     VFolderV2Connection,
     VFolderV2Edge,
@@ -33,9 +32,8 @@ __all__ = [
     "VFolderV2OrderByGQL",
     "VFolderV2OrderFieldGQL",
     # Nested types
-    "VFolderBasicInfoGQL",
-    "VFolderPermissionInfoGQL",
-    "VFolderOwnerInfoGQL",
+    "VFolderMetadataInfoGQL",
+    "VFolderAccessControlInfoGQL",
     "VFolderUsageInfoGQL",
     # Node types
     "VFolderV2GQL",

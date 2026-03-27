@@ -3,18 +3,14 @@
 from __future__ import annotations
 
 from datetime import datetime
-from uuid import UUID
 
 import strawberry
 
 from ai.backend.common.dto.manager.v2.vfolder.types import (
-    VFolderBasicInfo as VFolderBasicInfoDTO,
+    VFolderAccessControlInfo as VFolderAccessControlInfoDTO,
 )
 from ai.backend.common.dto.manager.v2.vfolder.types import (
-    VFolderOwnerInfo as VFolderOwnerInfoDTO,
-)
-from ai.backend.common.dto.manager.v2.vfolder.types import (
-    VFolderPermissionInfo as VFolderPermissionInfoDTO,
+    VFolderMetadataInfo as VFolderMetadataInfoDTO,
 )
 from ai.backend.common.dto.manager.v2.vfolder.types import (
     VFolderUsageInfo as VFolderUsageInfoDTO,
@@ -31,35 +27,23 @@ from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta(
         added_version=NEXT_RELEASE_VERSION,
         description=(
-            "Core identity and status fields for a virtual folder. "
-            "Includes the folder name, storage host location, quota scope, "
-            "usage mode (general/model/data), current operation status, "
+            "Descriptive metadata for a virtual folder. "
+            "Includes the folder name, usage mode, quota scope, "
             "and timestamps."
         ),
     ),
-    model=VFolderBasicInfoDTO,
-    name="VFolderBasicInfo",
+    model=VFolderMetadataInfoDTO,
+    name="VFolderMetadataInfo",
 )
-class VFolderBasicInfoGQL:
-    """Core identity and status fields for a virtual folder."""
+class VFolderMetadataInfoGQL:
+    """Descriptive metadata fields for a virtual folder."""
 
-    id: UUID = gql_field(description="Unique identifier of the virtual folder (UUID).")
     name: str = gql_field(description="Display name of the virtual folder.")
-    host: str = gql_field(
-        description="Storage host where the virtual folder is physically located."
-    )
-    quota_scope_id: str | None = gql_field(
-        description="Quota scope identifier that governs storage limits for this folder."
-    )
     usage_mode: strawberry.auto = gql_field(
         description="Usage mode: GENERAL (normal), MODEL (shared models), or DATA (shared datasets)."
     )
-    status: strawberry.auto = gql_field(
-        description=(
-            "Current operation status. "
-            "READY, PERFORMING, CLONING, MOUNTED, ERROR, "
-            "DELETE_PENDING, DELETE_ONGOING, DELETE_COMPLETE, or DELETE_ERROR."
-        )
+    quota_scope_id: str | None = gql_field(
+        description="Quota scope identifier that governs storage limits for this folder."
     )
     created_at: datetime = gql_field(description="Timestamp when the virtual folder was created.")
     last_used: datetime | None = gql_field(
@@ -73,14 +57,13 @@ class VFolderBasicInfoGQL:
         description=(
             "Access control information for a virtual folder. "
             "Includes the mount permission level (read-only, read-write, read-write-delete), "
-            "ownership type (user or project), whether the querying user is the owner, "
-            "and clone eligibility."
+            "ownership type (user or project), and clone eligibility."
         ),
     ),
-    model=VFolderPermissionInfoDTO,
-    name="VFolderPermissionInfo",
+    model=VFolderAccessControlInfoDTO,
+    name="VFolderAccessControlInfo",
 )
-class VFolderPermissionInfoGQL:
+class VFolderAccessControlInfoGQL:
     """Access control and ownership type information."""
 
     permission: strawberry.auto = gql_field(
@@ -89,37 +72,8 @@ class VFolderPermissionInfoGQL:
     ownership_type: strawberry.auto = gql_field(
         description="Ownership type: USER (personal folder) or GROUP (project-shared folder)."
     )
-    is_owner: bool = gql_field(
-        description="Whether the current querying user is the owner of this virtual folder."
-    )
     cloneable: bool = gql_field(
         description="Whether this virtual folder can be cloned by other users."
-    )
-
-
-@gql_pydantic_type(
-    BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
-        description=(
-            "Owner context for a virtual folder. "
-            "Identifies the user or project that owns this virtual folder "
-            "and the account that originally created it."
-        ),
-    ),
-    model=VFolderOwnerInfoDTO,
-    name="VFolderOwnerInfo",
-)
-class VFolderOwnerInfoGQL:
-    """Owner context identifying who owns and created this virtual folder."""
-
-    user_id: UUID | None = gql_field(
-        description="UUID of the owning user. Set when ownership_type is USER, null otherwise."
-    )
-    group_id: UUID | None = gql_field(
-        description="UUID of the owning project/group. Set when ownership_type is GROUP, null otherwise."
-    )
-    creator: str | None = gql_field(
-        description="Email address of the user who originally created this virtual folder."
     )
 
 
@@ -139,7 +93,6 @@ class VFolderOwnerInfoGQL:
 class VFolderUsageInfoGQL:
     """Storage usage statistics and quota limits."""
 
-    num_files: int = gql_field(description="Current number of files stored in the virtual folder.")
     used_bytes: int = gql_field(
         description="Total storage space used by the virtual folder, in bytes."
     )

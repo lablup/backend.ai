@@ -12,11 +12,12 @@ from pydantic import Field
 from ai.backend.common.api_handlers import BaseResponseModel
 
 from .types import (
-    VFolderBasicInfo,
+    VFolderAccessControlInfo,
     VFolderInvitationState,
+    VFolderMetadataInfo,
+    VFolderOperationStatusField,
     VFolderOwnerInfo,
     VFolderPermissionField,
-    VFolderPermissionInfo,
     VFolderUsageInfo,
 )
 
@@ -50,8 +51,11 @@ __all__ = (
 class VFolderNode(BaseResponseModel):
     """Node model representing a virtual folder entity with nested sub-models."""
 
-    basic: VFolderBasicInfo = Field(description="Core identity fields")
-    permission: VFolderPermissionInfo = Field(description="Permission and ownership fields")
+    id: UUID = Field(description="Unique identifier of the virtual folder")
+    status: VFolderOperationStatusField = Field(description="Current operation status")
+    host: str = Field(description="Storage host where the virtual folder is located")
+    metadata: VFolderMetadataInfo = Field(description="Descriptive metadata fields")
+    access_control: VFolderAccessControlInfo = Field(description="Access control fields")
     owner: VFolderOwnerInfo = Field(description="Owner context fields")
     usage: VFolderUsageInfo | None = Field(
         default=None,

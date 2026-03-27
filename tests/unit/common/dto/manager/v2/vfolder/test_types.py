@@ -8,14 +8,14 @@ from uuid import uuid4
 from ai.backend.common.dto.manager.v2.common import BinarySizeInfo
 from ai.backend.common.dto.manager.v2.vfolder.types import (
     OrderDirection,
-    VFolderBasicInfo,
+    VFolderAccessControlInfo,
     VFolderInvitationState,
+    VFolderMetadataInfo,
     VFolderOperationStatusField,
     VFolderOrderField,
     VFolderOwnerInfo,
     VFolderOwnershipTypeField,
     VFolderPermissionField,
-    VFolderPermissionInfo,
     VFolderUsageInfo,
     VFolderUsageMode,
 )
@@ -109,18 +109,15 @@ class TestReExportedEnums:
         assert VFolderUsageMode.DATA.value == "data"
 
 
-class TestVFolderBasicInfo:
-    """Tests for VFolderBasicInfo sub-model."""
+class TestVFolderMetadataInfo:
+    """Tests for VFolderMetadataInfo sub-model."""
 
     def test_creation(self) -> None:
         now = datetime.now(tz=UTC)
-        info = VFolderBasicInfo(
-            id=uuid4(),
+        info = VFolderMetadataInfo(
             name="my-folder",
-            host="nfs01",
-            quota_scope_id="user:abc",
             usage_mode=VFolderUsageMode.GENERAL,
-            status=VFolderOperationStatusField.READY,
+            quota_scope_id="user:abc",
             created_at=now,
             last_used=None,
         )
@@ -129,42 +126,36 @@ class TestVFolderBasicInfo:
 
     def test_round_trip(self) -> None:
         now = datetime.now(tz=UTC)
-        info = VFolderBasicInfo(
-            id=uuid4(),
+        info = VFolderMetadataInfo(
             name="test",
-            host="nfs01",
-            quota_scope_id=None,
             usage_mode=VFolderUsageMode.MODEL,
-            status=VFolderOperationStatusField.READY,
+            quota_scope_id=None,
             created_at=now,
             last_used=now,
         )
-        restored = VFolderBasicInfo.model_validate_json(info.model_dump_json())
+        restored = VFolderMetadataInfo.model_validate_json(info.model_dump_json())
         assert restored.name == info.name
         assert restored.usage_mode == VFolderUsageMode.MODEL
 
 
-class TestVFolderPermissionInfo:
-    """Tests for VFolderPermissionInfo sub-model."""
+class TestVFolderAccessControlInfo:
+    """Tests for VFolderAccessControlInfo sub-model."""
 
     def test_creation(self) -> None:
-        info = VFolderPermissionInfo(
+        info = VFolderAccessControlInfo(
             permission=VFolderPermissionField.READ_WRITE,
             ownership_type=VFolderOwnershipTypeField.USER,
-            is_owner=True,
             cloneable=False,
         )
-        assert info.is_owner is True
         assert info.cloneable is False
 
     def test_round_trip(self) -> None:
-        info = VFolderPermissionInfo(
+        info = VFolderAccessControlInfo(
             permission=VFolderPermissionField.READ_ONLY,
             ownership_type=VFolderOwnershipTypeField.GROUP,
-            is_owner=False,
             cloneable=True,
         )
-        restored = VFolderPermissionInfo.model_validate_json(info.model_dump_json())
+        restored = VFolderAccessControlInfo.model_validate_json(info.model_dump_json())
         assert restored.permission == VFolderPermissionField.READ_ONLY
         assert restored.ownership_type == VFolderOwnershipTypeField.GROUP
 
@@ -173,15 +164,15 @@ class TestVFolderOwnerInfo:
     """Tests for VFolderOwnerInfo sub-model."""
 
     def test_creation_with_all_none(self) -> None:
-        info = VFolderOwnerInfo(user_id=None, group_id=None, creator=None)
-        assert info.user_id is None
-        assert info.group_id is None
+        info = VFolderOwnerInfo(user=None, group=None, creator=None)
+        assert info.user is None
+        assert info.group is None
         assert info.creator is None
 
     def test_creation_with_values(self) -> None:
         uid = uuid4()
-        info = VFolderOwnerInfo(user_id=uid, group_id=None, creator="user@example.com")
-        assert info.user_id == uid
+        info = VFolderOwnerInfo(user=uid, group=None, creator="user@example.com")
+        assert info.user == uid
         assert info.creator == "user@example.com"
 
 

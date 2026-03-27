@@ -19,14 +19,14 @@ from ai.backend.common.types import VFolderUsageMode
 
 __all__ = (
     "OrderDirection",
-    "VFolderBasicInfo",
     "VFolderInvitationState",
+    "VFolderMetadataInfo",
     "VFolderOperationStatusField",
     "VFolderOrderField",
     "VFolderOwnerInfo",
     "VFolderOwnershipTypeField",
     "VFolderPermissionField",
-    "VFolderPermissionInfo",
+    "VFolderAccessControlInfo",
     "VFolderStatusFilter",
     "VFolderUsageInfo",
     "VFolderUsageMode",
@@ -67,33 +67,29 @@ class VFolderUsageModeFilter(BaseRequestModel):
     not_in: list[VFolderUsageMode] | None = None
 
 
-class VFolderBasicInfo(BaseResponseModel):
-    """Core identity fields for a virtual folder."""
+class VFolderMetadataInfo(BaseResponseModel):
+    """Descriptive metadata fields for a virtual folder."""
 
-    id: UUID
     name: str
-    host: str
-    quota_scope_id: str | None
     usage_mode: VFolderUsageMode
-    status: VFolderOperationStatusField
+    quota_scope_id: str | None
     created_at: datetime
     last_used: datetime | None
 
 
-class VFolderPermissionInfo(BaseResponseModel):
-    """Permission and ownership fields for a virtual folder."""
+class VFolderAccessControlInfo(BaseResponseModel):
+    """Access control fields for a virtual folder."""
 
     permission: VFolderPermissionField
     ownership_type: VFolderOwnershipTypeField
-    is_owner: bool
     cloneable: bool
 
 
 class VFolderOwnerInfo(BaseResponseModel):
     """Owner context fields for a virtual folder."""
 
-    user_id: UUID | None
-    group_id: UUID | None
+    user: UUID | None
+    group: UUID | None
     creator: str | None
 
 

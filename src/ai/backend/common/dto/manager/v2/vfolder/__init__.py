@@ -46,14 +46,14 @@ from ai.backend.common.dto.manager.v2.vfolder.response import (
 )
 from ai.backend.common.dto.manager.v2.vfolder.types import (
     OrderDirection,
-    VFolderBasicInfo,
+    VFolderAccessControlInfo,
     VFolderInvitationState,
+    VFolderMetadataInfo,
     VFolderOperationStatusField,
     VFolderOrderField,
     VFolderOwnerInfo,
     VFolderOwnershipTypeField,
     VFolderPermissionField,
-    VFolderPermissionInfo,
     VFolderStatusFilter,
     VFolderUsageInfo,
     VFolderUsageMode,
@@ -63,14 +63,14 @@ from ai.backend.common.dto.manager.v2.vfolder.types import (
 __all__ = (
     # Types
     "OrderDirection",
-    "VFolderBasicInfo",
+    "VFolderMetadataInfo",
     "VFolderInvitationState",
     "VFolderOperationStatusField",
     "VFolderOrderField",
     "VFolderOwnerInfo",
     "VFolderOwnershipTypeField",
     "VFolderPermissionField",
-    "VFolderPermissionInfo",
+    "VFolderAccessControlInfo",
     "VFolderStatusFilter",
     "VFolderUsageInfo",
     "VFolderUsageMode",
