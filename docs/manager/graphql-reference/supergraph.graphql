@@ -12716,11 +12716,6 @@ type SessionV2 implements Node
   resourceGroup: ResourceGroup
 
   """
-  Added in 26.3.0. The candidate resource groups considered during scheduling.
-  """
-  targetResourceGroups: ResourceGroupConnection
-
-  """
   Added in 26.3.0. The images used by this session. Multiple images are possible in multi-kernel (cluster) sessions.
   """
   images: ImageV2Connection!
@@ -12868,9 +12863,6 @@ type SessionV2ResourceInfo
 
   """The resource group (scaling group) this session is assigned to."""
   resourceGroupName: String
-
-  """Candidate resource group names considered during scheduling."""
-  targetResourceGroupNames: [String!]
 }
 
 """
