@@ -66,7 +66,6 @@ from ai.backend.manager.models.vfolder import (
 )
 from ai.backend.manager.repositories.user.repository import UserRepository
 from ai.backend.manager.repositories.vfolder.repository import VfolderRepository
-from ai.backend.manager.repositories.vfolder.types import ProjectVFolderSearchScope
 from ai.backend.manager.repositories.vfolder.updaters import VFolderAttributeUpdaterSpec
 from ai.backend.manager.services.vfolder.actions.base import (
     CloneVFolderAction,
@@ -533,10 +532,9 @@ class VFolderService:
         self, action: SearchVFoldersInProjectAction
     ) -> SearchVFoldersInProjectActionResult:
         """Search vfolders scoped to a project."""
-        scope = ProjectVFolderSearchScope(project_id=action.project_id)
-        result = await self._vfolder_repository.search_in_project(action.querier, scope)
+        result = await self._vfolder_repository.search_in_project(action.querier, action.scope)
         return SearchVFoldersInProjectActionResult(
-            project_id=action.project_id,
+            project_id=action.scope.project_id,
             data=result.items,
             total_count=result.total_count,
             has_next_page=result.has_next_page,
