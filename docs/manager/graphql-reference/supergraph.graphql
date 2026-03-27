@@ -3540,7 +3540,7 @@ type DeploymentHistory implements Node
   result: SchedulingResult!
   errorCode: String
   message: String
-  subSteps: [SubStepResult!]!
+  subSteps: [SubStepResultGQL!]!
   attempts: Int!
   createdAt: DateTime!
   updatedAt: DateTime!
@@ -11916,7 +11916,7 @@ type RouteHistory implements Node
   result: SchedulingResult!
   errorCode: String
   message: String
-  subSteps: [SubStepResult!]!
+  subSteps: [SubStepResultGQL!]!
   attempts: Int!
   createdAt: DateTime!
   updatedAt: DateTime!
@@ -12562,7 +12562,7 @@ type SessionSchedulingHistory implements Node
   result: SchedulingResult!
   errorCode: String
   message: String
-  subSteps: [SubStepResult!]!
+  subSteps: [SubStepResultGQL!]!
   attempts: Int!
   createdAt: DateTime!
   updatedAt: DateTime!
@@ -13089,7 +13089,7 @@ type Subscription
 }
 
 """Added in 26.3.0. Sub-step result in scheduling history."""
-type SubStepResult
+type SubStepResultGQL
   @join__type(graph: STRAWBERRY)
 {
   step: String!
