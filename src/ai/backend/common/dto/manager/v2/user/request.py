@@ -173,7 +173,6 @@ class UpdateUserInput(BaseRequestModel):
     )
     integration_id: str | Sentinel | None = Field(
         default=SENTINEL,
-        max_length=512,
         description="New external integration identifier. Set to null to clear.",
     )
 
